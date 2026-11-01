@@ -25,6 +25,117 @@ import path from 'node:path';
 import { Name } from '../shared/product-name.mjs';
 import { codexPosture } from '../shared/codex-modes.mjs';
 
+export interface McpServerEntry {
+  enabled?: boolean;
+  command?: string;
+  env?: Record<string, string | undefined>;
+  args?: string[];
+}
+
+export interface StoreServer {
+  name?: string;
+  command?: string;
+  env?: Record<string, string | undefined>;
+  args?: string[];
+}
+
+export interface WorkerThreadOptions {
+  cwd?: string;
+  model?: string | null;
+  instructions?: string | null;
+  mcpServers?: unknown[];
+  storeServer?: StoreServer | null;
+  mode?: string | null;
+  reviewer?: string | null;
+}
+
+export type WorkerThreadParams = {
+  cwd?: string;
+  ephemeral: boolean;
+  approvalPolicy: string;
+  sandbox: string;
+  approvalsReviewer: string;
+  config: {
+    mcp_servers: Record<string, McpServerEntry>;
+    projects: Record<string, { trust_level: string }>;
+    features: { apps: boolean; plugins: boolean; remote_plugin: boolean };
+  };
+  model?: string;
+  developerInstructions?: string;
+};
+
+export interface CodexTurn {
+  id?: unknown;
+  status?: unknown;
+  error?: { message?: unknown; additionalDetails?: unknown; codexErrorInfo?: unknown };
+}
+
+export interface CodexParams {
+  turn?: CodexTurn;
+  turnId?: unknown;
+  name?: unknown;
+  status?: unknown;
+  error?: unknown;
+}
+
+export interface McpStoreStatus {
+  name?: string;
+  runtimeStatus?: string | null;
+  tools?: Record<string, unknown> | null;
+}
+
+export interface CodexReply {
+  data?: McpStoreStatus[];
+  nextCursor?: string | null;
+  turn?: { id?: unknown };
+  turnId?: unknown;
+  threadId?: string | null;
+}
+
+export interface CodexTurnParams {
+  reviewTarget?: unknown;
+  [key: string]: unknown;
+}
+
+export interface CodexExitHow {
+  transportFault: boolean;
+}
+
+export interface CodexHandlers {
+  onNotification: (method: string, params: CodexParams) => void;
+  onClosed: (gone: { why?: unknown; stderr?: unknown } | null | undefined) => void;
+  onApproval?: (method: string, params: CodexParams) => unknown;
+}
+
+export interface CodexServerClient {
+  steerTurn(threadId: string, expectedTurnId: string, text: string, pictures: unknown[]): Promise<CodexReply | null | undefined>;
+  request(method: string, params: object): Promise<CodexReply | null | undefined>;
+  unwatch(threadId: string): unknown;
+  resumeThread(params: object, handlers: CodexHandlers): Promise<unknown>;
+  startThread(params: object, handlers: CodexHandlers): Promise<CodexReply | null | undefined>;
+  startTurn(threadId: string, params: object): Promise<CodexReply | null | undefined>;
+  interruptTurn(threadId: string, turnId: string): Promise<unknown> | undefined;
+}
+
+export interface CodexWorkerOptions {
+  server?: CodexServerClient;
+  ready?: Promise<unknown>;
+  threadParams?: Record<string, unknown> | ((settled: unknown) => Record<string, unknown>);
+  turnParams?: CodexTurnParams;
+  resumeThreadId?: string | null;
+  onApproval?: ((method: string, params: CodexParams) => unknown) | null;
+  requireMcpServer?: string | null;
+  mcpReadyMs?: number;
+}
+
+export interface CodexWorker extends EventEmitter {
+  stderr: EventEmitter;
+  threadId: string | null;
+  turnId: string | null;
+  steer(text: string, pictures?: unknown[]): Promise<unknown>;
+  kill(): boolean;
+}
+
 /**
  * What a worker thread may do. The sandbox is the wall; the approval policy
  * only decides who gets interrupted.
@@ -65,16 +176,16 @@ export const MCP_READY_MS = 30_000;
  * The store server is written last, so it wins over a server of the user's
  * with the same name.
  */
-export function mcpIsolation(names = [], storeServer = null) {
+export function mcpIsolation(names: unknown[] = [], storeServer: StoreServer | null = null) {
   // Null prototype, because a server may be named `__proto__`. On a plain
   // object that key hits the prototype setter, is never serialised, and the
   // server would stay on.
-  const mcp_servers = Object.create(null);
+  const mcp_servers: Record<string, McpServerEntry> = Object.create(null);
   for (const name of names) {
     if (typeof name === 'string' && name) mcp_servers[name] = { enabled: false };
   }
   if (storeServer?.name && storeServer.command) {
-    const entry = { command: storeServer.command, env: storeServer.env ?? {} };
+    const entry: McpServerEntry = { command: storeServer.command, env: storeServer.env ?? {} };
     // Agentbox's own launcher has no args, but a server whose args are dropped
     // starts and never completes its handshake, so pass them when given.
     if (Array.isArray(storeServer.args) && storeServer.args.length) entry.args = [...storeServer.args];
@@ -99,9 +210,9 @@ export function mcpIsolation(names = [], storeServer = null) {
  * A cwd that is not a non-empty string gives `{}`, because Codex refuses a
  * table with an empty key.
  */
-export function projectIsolation(cwd) {
+export function projectIsolation(cwd: unknown) {
   // Null prototype for the reason `mcpIsolation` gives: a path can be `__proto__`.
-  const projects = Object.create(null);
+  const projects: Record<string, { trust_level: string }> = Object.create(null);
   if (typeof cwd === 'string' && cwd) projects[cwd] = { trust_level: 'untrusted' };
   return projects;
 }
@@ -115,8 +226,8 @@ export function projectIsolation(cwd) {
  * every server the user has. `createCodexWorker` catches the throw and ends the
  * worker with the message on stderr.
  */
-export function mcpServerNames(configRead) {
-  const cannot = () => {
+export function mcpServerNames(configRead: unknown) {
+  const cannot: () => never = () => {
     throw new Error('could not read which MCP servers to switch off for this worker, so it is not starting rather than running every server the founder has');
   };
   if (!plainObject(configRead) || !plainObject(configRead.config)) cannot();
@@ -126,7 +237,7 @@ export function mcpServerNames(configRead) {
   return Object.keys(servers);
 }
 
-const plainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+const plainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /**
  * The `thread/start` params for one worker.
@@ -143,9 +254,9 @@ const plainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
  * while signed out, so `createCodexWorker` also reports any server that starts
  * unasked (`sayUnasked`).
  */
-export function workerThreadParams({ cwd, model = null, instructions = null, mcpServers = [], storeServer = null, mode = null, reviewer = null } = {}) {
+export function workerThreadParams({ cwd, model = null, instructions = null, mcpServers = [], storeServer = null, mode = null, reviewer = null }: WorkerThreadOptions = {}) {
   const posture = codexPosture(mode, { reviewer });
-  const params = {
+  const params: WorkerThreadParams = {
     cwd,
     ephemeral: false,
     approvalPolicy: posture.approvalPolicy,
@@ -173,7 +284,7 @@ export function workerThreadParams({ cwd, model = null, instructions = null, mcp
  * `{threadId}`, the user's servers start and the store server is missing.
  * `ephemeral` is dropped because ThreadResumeParams does not take it.
  */
-export function resumeThreadParams(threadId, params = {}) {
+export function resumeThreadParams(threadId: string, params: Record<string, unknown> | null = {}) {
   const { ephemeral, ...rest } = params ?? {};
   return { threadId, ...rest };
 }
@@ -187,7 +298,7 @@ export function resumeThreadParams(threadId, params = {}) {
  * that a session still exists before resuming it. The whole filename must
  * match, because a substring match could resume the wrong conversation.
  */
-export function codexTranscriptFile(sessionId, { home = path.join(os.homedir(), '.codex'), days = 60 } = {}) {
+export function codexTranscriptFile(sessionId: unknown, { home = path.join(os.homedir(), '.codex'), days = 60 }: { home?: string; days?: number } = {}) {
   if (!sessionId || typeof sessionId !== 'string') return null;
   const wanted = new RegExp(`^rollout-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-${escapeForRegExp(sessionId)}\\.jsonl$`);
   const root = path.join(home, 'sessions');
@@ -198,7 +309,7 @@ export function codexTranscriptFile(sessionId, { home = path.join(os.homedir(), 
         if (looked >= days) return null;
         looked += 1;
         const dir = path.join(root, year, month, day);
-        let names = [];
+        let names: string[] = [];
         try { names = fs.readdirSync(dir); } catch { names = []; }
         const hit = names.find((name) => wanted.test(name));
         if (hit) return path.join(dir, hit);
@@ -208,14 +319,14 @@ export function codexTranscriptFile(sessionId, { home = path.join(os.homedir(), 
   return null;
 }
 
-function escapeForRegExp(text) {
+function escapeForRegExp(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // Newest first, numeric names only, so a stray entry cannot stop or reorder
 // the walk.
-function numericDesc(dir) {
-  let names = [];
+function numericDesc(dir: string) {
+  let names: string[] = [];
   try { names = fs.readdirSync(dir); } catch { return []; }
   return names.filter((n) => /^\d+$/.test(n)).sort((a, b) => Number(b) - Number(a));
 }
@@ -245,17 +356,17 @@ export function createCodexWorker({
   onApproval = null,
   requireMcpServer = null,
   mcpReadyMs = MCP_READY_MS,
-} = {}) {
+}: CodexWorkerOptions = {}): CodexWorker {
   if (!server) throw new Error('createCodexWorker needs a codex app-server client');
 
-  const worker = new EventEmitter();
+  const worker = new EventEmitter() as CodexWorker;
   const stderr = new EventEmitter();
   worker.stderr = stderr;
   worker.threadId = resumeThreadId ?? null;
   worker.turnId = null;
 
   let ended = false;
-  worker.steer = async (text, pictures = []) => {
+  worker.steer = async (text: string, pictures: unknown[] = []) => {
     if (ended || !worker.threadId || !worker.turnId) throw Error('The turn is not running. Send again when the conversation is ready.');
     const expected=worker.turnId;
     const result=await server.steerTurn(worker.threadId,expected,text,pictures);
@@ -263,7 +374,7 @@ export function createCodexWorker({
     return result;
   };
 
-  const say = (text) => {
+  const say = (text: unknown) => {
     const line = String(text ?? '').trim();
     if (line) stderr.emit('data', line);
   };
@@ -276,7 +387,7 @@ export function createCodexWorker({
   // status.
   let storeIsUp = !requireMcpServer;
   let storeTrouble = '';
-  const waiting = [];
+  const waiting: ((up: boolean) => void)[] = [];
 
   /**
    * Says on stderr, once per server, when a server starts on this thread that
@@ -288,8 +399,8 @@ export function createCodexWorker({
    * contain neither. Pinned by
    * tests/a-codex-worker-does-not-reach-her-connected-apps.test.mjs.
    */
-  const spoken = new Set();
-  const sayUnasked = (params) => {
+  const spoken = new Set<string>();
+  const sayUnasked = (params: CodexParams) => {
     const name = typeof params?.name === 'string' ? params.name : '';
     if (!name || name === requireMcpServer) return;
     if (params.status !== 'starting' && params.status !== 'ready') return;
@@ -298,7 +409,7 @@ export function createCodexWorker({
     say(`${Name} did not put the MCP server "${name}" on this run and it started anyway; whatever it offers is outside the command sandbox and outside the approval path.`);
   };
 
-  const readStoreStatus = (params) => {
+  const readStoreStatus = (params: CodexParams) => {
     sayUnasked(params);
     if (!requireMcpServer || params?.name !== requireMcpServer) return;
     if (params.status === 'ready') {
@@ -312,19 +423,19 @@ export function createCodexWorker({
 
   const storeReady = () => {
     if (storeIsUp) return Promise.resolve(true);
-    return new Promise((resolve) => {
+    return new Promise<boolean>((resolve) => {
       let settled = false;
-      const done = (up) => { if (settled) return; settled = true; clearTimeout(timer); resolve(up); };
+      const done = (up: boolean) => { if (settled) return; settled = true; clearTimeout(timer); resolve(up); };
       const timer = setTimeout(() => done(false), mcpReadyMs);
       timer?.unref?.();
       waiting.push(done);
       if (resumeThreadId) {
         const checkExistingStore = async () => {
-          let cursor;
-          const seen = new Set();
+          let cursor: string | null | undefined;
+          const seen = new Set<string>();
           do {
             if (ended || settled || storeIsUp) return;
-            const inventory = await server.request('mcpServerStatus/list', {
+            const inventory: CodexReply | null | undefined = await server.request('mcpServerStatus/list', {
               threadId: worker.threadId,
               serverName: requireMcpServer,
               detail: 'toolsAndAuthOnly',
@@ -358,7 +469,7 @@ export function createCodexWorker({
    * The only ending this worker has. It releases the thread's watch, so later
    * lines for that id do not reach a dead session or keep the client alive.
    */
-  const end = (code, signal = null, how = null) => {
+  const end = (code: number, signal: string | null = null, how: CodexExitHow | null = null) => {
     if (ended) return;
     ended = true;
     for (const wake of waiting.splice(0)) wake(false);
@@ -366,7 +477,7 @@ export function createCodexWorker({
     worker.emit('exit', code, signal, how);
   };
 
-  const handlers = {
+  const handlers: CodexHandlers = {
     onNotification: (method, params) => {
       // `turn/started` can arrive before the `turn/start` response resolves,
       // and `turn/interrupt` needs the turn id, so take it from the earlier one.
@@ -443,7 +554,7 @@ export function createCodexWorker({
       worker.emit('spawn');
       return turnParams.reviewTarget
         ? server.request('review/start', { threadId: worker.threadId, target: turnParams.reviewTarget, delivery: 'inline' })
-        : server.startTurn(worker.threadId, turnParams);
+        : server.startTurn(worker.threadId!, turnParams);
     })
     .then((accepted) => {
       const id = accepted?.turn?.id;
@@ -488,8 +599,8 @@ export function createCodexWorker({
  * speaking early). No 'spawn' is emitted, so no delivery mark is written and
  * no one-off permission mode is spent.
  */
-export function refusedCodexWorker(sentence) {
-  const worker = new EventEmitter();
+export function refusedCodexWorker(sentence: unknown): CodexWorker {
+  const worker = new EventEmitter() as CodexWorker;
   worker.stderr = new EventEmitter();
   worker.threadId = null;
   worker.turnId = null;
@@ -515,7 +626,7 @@ export function refusedCodexWorker(sentence) {
  * first because `noteExitForBackoff` cuts the last stderr line to 300
  * characters. Object variants and `other` are left out.
  */
-function troubleText(turn) {
+function troubleText(turn: CodexTurn | undefined) {
   const why = String(turn?.error?.message ?? '').trim();
   const more = String(turn?.error?.additionalDetails ?? '').trim();
   const info = turn?.error?.codexErrorInfo;

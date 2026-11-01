@@ -6,8 +6,23 @@
 import { Session } from 'node:inspector';
 import { parentPort, workerData } from 'node:worker_threads';
 import { freezeFrom, writeFreeze } from './freeze-recorder.mts';
+import type { CpuProfile, FreezeLine } from './freeze-recorder.mts';
 
-const { beat, dir, appDir, thresholdMs, rotateMs, intervalUs } = workerData;
+interface FreezeWorkerData {
+  beat: SharedArrayBuffer;
+  dir: string;
+  appDir: string[];
+  thresholdMs: number;
+  rotateMs: number;
+  intervalUs: number;
+}
+
+interface StoppedProfile {
+  profile: CpuProfile;
+  offsetUs: number;
+}
+
+const { beat, dir, appDir, thresholdMs, rotateMs, intervalUs }: FreezeWorkerData = workerData;
 const stamp = new BigInt64Array(beat);
 const nowUs = () => Number(process.hrtime.bigint() / 1000n);
 // The main thread asleep rather than stuck (App Nap timers, say) has an idle
@@ -15,14 +30,14 @@ const nowUs = () => Number(process.hrtime.bigint() / 1000n);
 const BUSY_ENOUGH = 0.5;
 
 const session = new Session();
-const post = (method, params = {}) => new Promise((resolve, reject) => {
-  session.post(method, params, (err, out) => (err ? reject(err) : resolve(out)));
+const post = <T extends object = object>(method: string, params: object = {}) => new Promise<T>((resolve, reject) => {
+  session.post(method, params, (err, out) => (err ? reject(err) : resolve(out as T)));
 });
 
-let running = null;  // { anchorUs } of the profile being taken
-let previous = null; // { profile, offsetUs } of the last one stopped
-let frozeAt = null;  // the last stamp before the freeze in progress, in µs
-const seen = [];     // freezes ended and not yet cut out of a profile
+let running: { anchorUs: number } | null = null;  // { anchorUs } of the profile being taken
+let previous: StoppedProfile | null = null; // { profile, offsetUs } of the last one stopped
+let frozeAt: number | null = null;  // the last stamp before the freeze in progress, in µs
+const seen: { fromUs: number; toUs: number }[] = [];     // freezes ended and not yet cut out of a profile
 let busy = false;
 
 async function start() {
@@ -32,17 +47,17 @@ async function start() {
 }
 
 async function rotate() {
-  const { profile } = await post('Profiler.stop');
-  const stopped = { profile, offsetUs: profile.startTime - running.anchorUs };
+  const { profile } = await post<{ profile: CpuProfile }>('Profiler.stop');
+  const stopped: StoppedProfile = { profile, offsetUs: profile.startTime - running!.anchorUs };
   await start();
-  const profiles = [previous, stopped].filter(Boolean);
+  const profiles = [previous, stopped].filter(Boolean) as StoppedProfile[];
   previous = stopped;
   for (const f of seen.splice(0)) {
     const read = freezeFrom(profiles, { fromUs: f.fromUs, toUs: f.toUs, appDir });
     if (read.busy < BUSY_ENOUGH) continue;
-    const line = { at: new Date(Date.now() - (nowUs() - f.fromUs) / 1000).toISOString(), ms: Math.round((f.toUs - f.fromUs) / 1000), ...read };
+    const line: FreezeLine = { at: new Date(Date.now() - (nowUs() - f.fromUs) / 1000).toISOString(), ms: Math.round((f.toUs - f.fromUs) / 1000), ...read };
     writeFreeze(dir, line);
-    parentPort.postMessage({ freeze: { at: line.at, ms: line.ms, where: line.where } });
+    parentPort!.postMessage({ freeze: { at: line.at, ms: line.ms, where: line.where } });
   }
 }
 
@@ -64,13 +79,13 @@ function watch() {
   void turn();
 }
 
-let watching = null;
-let rotating = null;
-function quit(err) {
-  clearInterval(watching);
-  clearInterval(rotating);
+let watching: NodeJS.Timeout | null = null;
+let rotating: NodeJS.Timeout | null = null;
+function quit(err: unknown) {
+  clearInterval(watching!);
+  clearInterval(rotating!);
   try { session.disconnect(); } catch { /* already gone */ }
-  parentPort.postMessage({ gaveUp: String(err?.message ?? err) });
+  parentPort!.postMessage({ gaveUp: String((err as Error | null)?.message ?? err) });
 }
 
 // The timers go first: an inspector reply does not keep this thread alive.

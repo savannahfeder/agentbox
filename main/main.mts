@@ -1,6 +1,7 @@
 // The app: the agent inbox. Electron shell around a keyboard-first renderer, a
 // file-derived store, and a supervisor of headless sessions.
 
+import type { ContextMenuParams, MenuItemConstructorOptions, WebContents } from 'electron';
 import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, net, powerMonitor, protocol, screen as electronScreen, shell, session, safeStorage, systemPreferences } from 'electron';
 import './no-default-menu.mts';
 import * as workItemsDisk from './store/work-items.mjs';
@@ -30,7 +31,9 @@ import { registerIpc } from './ipc.mts';
 import { stallWatch } from './stall-watch.mts';
 import { startFreezeRecorder } from './freeze-recorder.mts';
 import { applyThrough, phoneDevice } from './phone-inbox.mts';
+import type { PhoneChannel } from './phone-inbox.mts';
 import { answerWhatOnlyTheWindowAnswered } from './serve.mts';
+import type { CollectingIpcMain, IpcHandler } from './serve.mts';
 import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mts';
 import * as approvals from './approvals.mjs';
 import { recoveryToast } from '../shared/recovery.mjs';
@@ -62,6 +65,11 @@ import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterI
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
 import { JOIN_SCHEME, ourLink, tokenFromLink } from '../shared/room-links.mjs';
 import { getMic } from './mic.mts';
+import type { IpcConfig } from './ipc.mts';
+import type { CornerTagConfig } from './corner-tag.mts';
+import type { AnalyticsConfig } from './analytics.mts';
+
+type AppConfig = IpcConfig & CornerTagConfig & AnalyticsConfig;
 
 // HOW LONG TO WAIT AFTER THE LID OPENS, and the wait is for the network rather
 // than for the wake. `powerMonitor`'s resume event fires while wifi is still
@@ -104,7 +112,7 @@ protocol.registerSchemesAsPrivileged([...DOC_SCHEMES.map((scheme) => ({
 
 // A local file answered so the window asks again next time instead of reusing
 // what it drew before. Why, measured, is at the page scheme's handler below.
-function noStore(res) {
+function noStore(res: Response) {
   const headers = new Headers(res.headers);
   headers.set('cache-control', 'no-store');
   return new Response(res.body, { status: res.status, headers });
@@ -118,7 +126,7 @@ const docGrants = new DocGrants();
 // The picture scheme's roots, as a function so it reads the live store. Nothing
 // is servable until the window has been built, which is the same shape as the
 // grants above: an empty list is a closed door, never an open one.
-let imageRoots = () => [];
+let imageRoots: () => string[] = () => [];
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.join(__dirname, '..');
@@ -200,7 +208,7 @@ if (!PROFILE) try {
 // because a throwaway home moves that folder and does not move the checkout.
 // `configDir` in main/config.mjs is the whole rule and says what she saw when
 // it was missing.
-const dataDir = configDir({ appDir, userData: app.getPath('userData'), packaged: app.isPackaged });
+const dataDir: string = configDir({ appDir, userData: app.getPath('userData'), packaged: app.isPackaged } as Parameters<typeof configDir>[0]);
 
 // AND WHERE WHAT SHE TYPES LIVES, WHICH IS NEVER THE CHECKOUT (w-3dc46f3a67,
 // 2026-09-21). Her standing instructions and her writing rules used to be
@@ -233,7 +241,7 @@ try {
   // appended; the app's message defaults continue to come from the bundle.
   if (unifyAgentInstructions(appDir, userDir)) console.log('zero: combined the general and writing instructions');
 } catch (err) {
-  console.warn(`zero: could not carry her instructions into ${userDir}: ${err.message}`);
+  console.warn(`zero: could not carry her instructions into ${userDir}: ${(err as Error).message}`);
 }
 
 // Before anything else can throw. A crash during boot is the one a stranger
@@ -250,7 +258,7 @@ installCrashReports({
   dir: crashDir,
 });
 
-let window = null;
+let window: BrowserWindow | null = null;
 // A ROOM INVITE LINK THAT OPENED THE APP (Rooms, alpha): agentbox://join/<token>.
 // Held until the window takes it ('zero:take-join'); a window that is up is
 // told to come and take it, and one still starting takes it as it mounts.
@@ -260,7 +268,7 @@ function showWindow() {
   if (window.isMinimized()) window.restore();
   window.focus();
 }
-function openJoinLink(url) {
+function openJoinLink(url: string) {
   const token = tokenFromLink(url);
   if (!token) return;
   pendingJoin = token;
@@ -286,10 +294,10 @@ function builtAt() {
 
 let lastReloadAt = 0;
 // The wake sweep's one line, and whether there is a page to say it to yet.
-let pendingRecovery = null;
+let pendingRecovery: string | null = null;
 let pageReady = false;
 // The line the page shows after this process reloaded it from a crash or a freeze.
-let pendingRevived = null;
+let pendingRevived: string | null = null;
 
 function reloadRenderer() {
   // The chord can now arrive twice, from the menu accelerator and from
@@ -312,7 +320,7 @@ function reloadRenderer() {
     ipcMain,
     reload: () => {
       reloadRequested = true;
-      window.webContents.reloadIgnoringCache();
+      window!.webContents.reloadIgnoringCache();
     },
   });
 }
@@ -326,7 +334,7 @@ async function createWindow() {
   const [shellPath] = await Promise.all([recoverShellPath(), learnShellDataDirs()]);
   process.env.PATH = shellPath.path;
   if (shellPath.error) console.warn('agentbox: could not load your shell PATH; using the inherited PATH:', shellPath.error);
-  const config = loadConfig(dataDir);
+  const config = loadConfig(dataDir) as unknown as AppConfig;
   // The store modules read the app's own home variable at call time; setting it
   // here points auth session files, sync, and every store path at its root.
   // Written under every name this app has had, because a store server or a
@@ -363,7 +371,7 @@ async function createWindow() {
   // The variable is filled in the moment `registerIpc` returns, a few hundred
   // lines down. Until then there is nothing to answer with and nothing that
   // could have been pressed, and the stub says so rather than pretending.
-  let answerApproval = (id, allow) => {
+  let answerApproval: (id: string, allow: boolean, note?: string) => boolean = (id, allow) => {
     console.warn(`zero: an approval (${id}) was answered ${allow ? 'yes' : 'no'} before the app had finished starting; nothing was decided`);
     return false;
   };
@@ -371,7 +379,7 @@ async function createWindow() {
   // (shared/which-card-is-in-front.mjs). Late-bound beside the door above,
   // because only the IPC surface knows which thread is on screen, and before it
   // exists the spool's own order is the whole of what is known.
-  let cardInFront = () => approvals.listPending(config.storeRoot)[0] ?? null;
+  let cardInFront: () => { id: string } | null = () => approvals.listPending(config.storeRoot)[0] ?? null;
   installMenu({
     onApproval: (allow) => {
       const front = cardInFront();
@@ -416,14 +424,14 @@ async function createWindow() {
   // leaving a dead button (renderer/src/compose-says.ts noProjectYet).
   try {
     ensurePersonalProject(config.accountRoot);
-  } catch (err) { console.warn(`zero: could not make My Workspace: ${err.message}`); }
+  } catch (err) { console.warn(`zero: could not make My Workspace: ${(err as Error).message}`); }
   const store = await new Store(config).init();
   // Where the window's own pictures may come from (main/img-scheme.mts). The
   // account root holds every product's docs, attachments, designs and the
   // `.staging` folder a pasted screenshot lands in; a product's repo is where a
   // worker writes `shots/…` and then names it on a card. Read fresh on every
   // request so a project made after launch is not a folder of broken images.
-  imageRoots = () => [config.accountRoot, ...store.listProducts().map((p) => p.repoPath).filter(Boolean)];
+  imageRoots = () => [config.accountRoot, ...store.listProducts().map((p) => p.repoPath).filter(Boolean) as string[]];
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   // THAT agents start and stop work (main/analytics.mts checks the switch).
   supervisor.count = (name, props) => analytics.track(name, props);
@@ -449,8 +457,8 @@ async function createWindow() {
   // single-person app, which has no sign-in to keep
   // (tests/the-installed-app-is-the-single-person-app.test.mjs).
   const cloudConfig = loadCloudConfig(appDir, { packaged: app.isPackaged });
-  let phoneApply = null;
-  let phoneSettings = null;
+  let phoneApply: ReturnType<typeof applyThrough> | null = null;
+  let phoneSettings: (() => unknown) | null = null;
   // Every installed build has a cloud now, so the keychain is asked only once
   // a sign-in is read or kept, not at launch.
   const team = cloudConfig ? createTeamService({
@@ -549,7 +557,7 @@ async function createWindow() {
   // actually under the cursor. MUST register before the window exists:
   // web-contents-created only fires for contents created after it (the first
   // fix missed the main window for exactly that reason, 2026-08-04).
-  const openLink = (url) => {
+  const openLink = (url: string) => {
     if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
     else shell.openExternal(url);
   };
@@ -575,7 +583,7 @@ async function createWindow() {
   // flavour and leaves every app one unambiguous thing to paste. Reading the
   // file also skips `copyImageAt`'s round trip to the renderer, so there is no
   // window in which the clipboard holds half an answer.
-  const copyPicture = (contents, params) => {
+  const copyPicture = (contents: WebContents, params: ContextMenuParams) => {
     // The same two rules the scheme itself enforces (main/img-scheme.mts): it is
     // a picture, and it is inside a root the app owns. A context menu is not a
     // reason to widen them.
@@ -607,7 +615,7 @@ async function createWindow() {
   // that is wanted: the same rule the picture follows, one unambiguous thing
   // to paste, because one copy leaving two answers is the whole of the bug on
   // this row.
-  const copyFile = (file) => {
+  const copyFile = (file: string | null) => {
     // The same rule the picture and the two schemes enforce: inside a root the
     // app owns. A right click is not a reason to widen it.
     if (!file || !servable(file, imageRoots())) return false;
@@ -621,7 +629,7 @@ async function createWindow() {
   // The path under her pointer, when what is under it is a chip rather than a
   // link. `params` carries an href and an image src and nothing else, so the
   // window is asked. Tiny, guarded, and answered before the menu is drawn.
-  const fileUnderPointer = async (contents, params) => {
+  const fileUnderPointer = async (contents: WebContents, params: ContextMenuParams) => {
     if (params.linkURL.startsWith('file://')) {
       try { return fileURLToPath(params.linkURL.split('#')[0]); } catch { return null; }
     }
@@ -635,7 +643,7 @@ async function createWindow() {
   };
   app.on('web-contents-created', (_event, contents) => {
     contents.on('context-menu', async (_e, params) => {
-      const items = [];
+      const items: MenuItemConstructorOptions[] = [];
       const file = await fileUnderPointer(contents, params);
       // WHAT SHE SELECTED COMES FIRST, ABOVE ANYTHING ABOUT A LINK.
       //
@@ -726,7 +734,7 @@ async function createWindow() {
       }
       while (items.length && items[items.length - 1].type === 'separator') items.pop();
       if (!items.length) return;
-      Menu.buildFromTemplate(items).popup({ window: BrowserWindow.fromWebContents(contents) ?? window });
+      Menu.buildFromTemplate(items).popup({ window: BrowserWindow.fromWebContents(contents) ?? window! });
     });
   });
 
@@ -783,7 +791,7 @@ async function createWindow() {
   // unless the answer actually flips, so dragging a window around does not
   // spray IPC at the page.
   const currentScreenDetail = () => {
-    try { return screenDetailFor(electronScreen.getDisplayMatching(window.getBounds())); }
+    try { return screenDetailFor(electronScreen.getDisplayMatching(window!.getBounds())); }
     catch { return 'sharp'; }
   };
   let lastScreenDetail = currentScreenDetail();
@@ -844,9 +852,9 @@ async function createWindow() {
   // Node stand-ins for these three; everything else about the call is the same.
   // What the phone leaves in the cloud is done through these same handlers
   // (main/phone-inbox.mts), so each one is filed in a Map as Electron gets it.
-  const phoneChannels = new Map();
+  const phoneChannels = new Map<string, PhoneChannel>();
   const filingIpcMain = {
-    handle(channel, fn) { ipcMain.handle(channel, stalls.time(channel, fn)); phoneChannels.set(channel, fn); },
+    handle(channel: string, fn: IpcHandler) { ipcMain.handle(channel, stalls.time(channel, fn)); phoneChannels.set(channel, fn); },
   };
   // `readClipboardText` is read only by the cloud setup, and only for a
   // Claude sign-in code (main/ipc.mts `zero:cloud-clipboard-code`).
@@ -870,7 +878,7 @@ async function createWindow() {
   cardInFront = () => ipc.pendingApprovals()[0] ?? null;
   // What the window answers itself (badge, boot info) gets the plain stand-ins
   // a browser tab gets.
-  answerWhatOnlyTheWindowAnswered({ handle: (channel, fn) => { if (!phoneChannels.has(channel)) phoneChannels.set(channel, fn); } });
+  answerWhatOnlyTheWindowAnswered({ handle: (channel, fn) => { if (!phoneChannels.has(channel)) phoneChannels.set(channel, fn); } } as CollectingIpcMain);
   phoneApply = applyThrough(phoneChannels);
   // Every minute, so no engine search: that is a login shell on this thread.
   phoneSettings = () => phoneChannels.get('zero:settings-read')?.({ sender: null }, { search: false }) ?? null;
@@ -929,10 +937,10 @@ async function createWindow() {
     if (theAppKeepsThisInput(input) || aLetterFromAPage) {
       let theFrame = null;
       try {
-        const frame = window.webContents.focusedFrame;
-        if (frame && frame !== window.webContents.mainFrame) theFrame = frame;
+        const frame = window!.webContents.focusedFrame;
+        if (frame && frame !== window!.webContents.mainFrame) theFrame = frame;
       } catch { theFrame = null; /* an older Electron cannot say; leave it alone */ }
-      const sendItUp = () => window.webContents.send('zero:key-in-the-file', {
+      const sendItUp = () => window!.webContents.send('zero:key-in-the-file', {
         key: input.key, meta: !!input.meta, ctrl: !!input.control, alt: !!input.alt, shift: !!input.shift,
       });
       // Never preventDefault: the page under it may want the key too, and the
@@ -960,7 +968,7 @@ async function createWindow() {
     // no way back.
     const zoomDelta = zoomDeltaFor(input);
     if (zoomDelta !== null) {
-      applyZoom(zoomDelta, window.webContents);
+      applyZoom(zoomDelta, window!.webContents);
       event.preventDefault();
       return;
     }
@@ -1040,7 +1048,7 @@ async function createWindow() {
     powerMonitor.on('resume', () => {
       supervisor.noteWake();
       setTimeout(() => {
-        try { supervisor.recoverInterrupted('wake'); } catch (e) { console.warn('zero: wake recovery:', e.message); }
+        try { supervisor.recoverInterrupted('wake'); } catch (e) { console.warn('zero: wake recovery:', (e as Error).message); }
       }, WAKE_SETTLE_MS);
     });
   }
@@ -1048,7 +1056,7 @@ async function createWindow() {
   // Unread badge + notification on new inbox arrivals are driven by the
   // renderer (it owns the definition of "inbox"), through the badge API.
   ipcMain.handle('zero:badge', (_e, count) => {
-    if (process.platform === 'darwin') app.dock.setBadge(count > 0 ? String(count) : '');
+    if (process.platform === 'darwin') app.dock!.setBadge(count > 0 ? String(count) : '');
   });
   // WHETHER to speak, and what to say, is not the renderer's call: only this
   // process can see whether the window has focus, and a page cannot be trusted
@@ -1058,7 +1066,7 @@ async function createWindow() {
   // while I am in Agentbox.
   // A banner and the tray never disagree: whatever a banner told you about
   // while you were away is in the tray until you are back (w-93b3a1a796).
-  let cornerTag = null;
+  let cornerTag: ReturnType<typeof createCornerTag> | null = null;
   const notifier = installNotifier({
     app, window, Notification, powerMonitor, ipcMain, nativeImage,
     onArrivals: (list, needsYou) => team?.phoneArrivals(list, needsYou),
@@ -1229,17 +1237,17 @@ async function createWindow() {
     setTimeout(async () => {
       try {
         if (process.env.ZERO_DEBUG_CONSOLE) {
-          const dom = await window.webContents.executeJavaScript(
+          const dom = await window!.webContents.executeJavaScript(
             'JSON.stringify({ text: document.body.innerText.slice(0, 240), classes: [...document.querySelectorAll("[class]")].slice(0, 12).map(e => e.className) })',
           );
           console.log(`dom: ${dom}`);
         }
-        const image = await window.webContents.capturePage();
+        const image = await window!.webContents.capturePage();
         const fs = await import('node:fs');
         fs.writeFileSync(shotPath, image.toPNG());
         console.log(`screenshot: ${shotPath}`);
       } catch (err) {
-        console.error('screenshot failed:', err.message);
+        console.error('screenshot failed:', (err as Error).message);
       }
       // The picture is taken, so the run is over whether the quit works or
       // not. On Linux it did not, and the shell's `timeout` ended these runs.

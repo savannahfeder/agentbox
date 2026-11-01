@@ -154,6 +154,6 @@ describe('the buttons', () => {
     expect(ipc).toMatch(/const TEAMMATE_OPS = new Set\(\[[^\]]*'stop'/);
     expect(ipc).toMatch(/op === 'remove'\) value = mates\.remove\(a\.id, \{ kill \}\)/);
     expect(ipc).toMatch(/op === 'stop'\) value = mates\.stop\(a\.id, \{ kill \}\)/);
-    expect(ipc).toMatch(/const kill = \(id\) => supervisor\.stopSession\(id\)/);
+    expect(ipc).toMatch(/const kill = \(id(?:: string)?\) => supervisor\.stopSession\(id\)/);
   });
 });

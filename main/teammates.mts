@@ -56,9 +56,9 @@ export interface Teammate {
 
 export type TeammatePatch = Partial<Teammate> & { remember?: Memory; forget?: string };
 
-export interface ThreadRef { product: string; id: string; title?: string }
+export interface ThreadRef { product?: string; id: string; title?: string }
 
-export interface ItemRef { id: string; product: string; title?: string }
+export interface ItemRef { id: string; product?: string; title?: string }
 
 export interface Turn { source?: string; field?: string; text?: string }
 
@@ -66,7 +66,7 @@ interface Written { source?: string; ts?: number }
 
 export interface TeamItem {
   id: string;
-  product: string;
+  product?: string;
   status?: string;
   labels?: string[];
   title?: string;
@@ -165,11 +165,11 @@ export type WakeAction =
   | (ActionBase & { type: 'hops'; msg: string; from: string });
 
 export interface TeammateStore {
-  config: { storeRoot: string; accountId: string };
+  config: { storeRoot?: string; accountId?: string };
   listProducts(): { slug: string; name?: string; dir?: string | null; repoPath?: string | null; practice?: boolean | null; personal?: boolean | null }[];
   listItems(now?: number): TeamItem[];
   productDir(slug: string | null | undefined): string;
-  readHistory?(slug: string, id: string, opts?: { max?: number }): unknown[];
+  readHistory?(slug: string | undefined, id: string, opts?: { max?: number }): unknown[];
   modules: {
     workItemsDisk: {
       updateWorkItem(dir: string, id: string, patch: Record<string, unknown>, opts: { source: string; now: number }): unknown;
@@ -228,7 +228,7 @@ export interface OfferInput { items?: TeamItem[]; chat?: Chat; now?: number }
 
 interface SourceFile { file: string; title?: string; chars: number }
 
-type TurnsOf = (product: string, id: string) => Turn[];
+type TurnsOf = (product: string | undefined, id: string) => Turn[];
 
 interface Opening { body: string; yours: boolean }
 
@@ -242,7 +242,7 @@ function shippedByProduct(items?: TeamItem[] | null) {
   for (const i of items ?? []) {
     if (!isShippedNote(i.note)) continue;
     const at = i.wrote?.note?.ts ?? i.updatedAt ?? 0;
-    if (at > (out[i.product] ?? 0)) out[i.product] = at;
+    if (at > (out[i.product!] ?? 0)) out[i.product!] = at;
   }
   return out;
 }
@@ -788,7 +788,7 @@ export class Teammates {
     const cut = (text: string, n: number) => (text.length > n ? `${text.slice(0, n - 1)}…` : text);
     // From the history kept per ledger change, not readThread: that reads the
     // whole ledger once per thread, many times in one brief.
-    const said = (product: string, thread: string) => this.store.modules.workItemsCore.threadOf(this.store.readHistory?.(product, thread, { max: 2000 }) ?? [], thread);
+    const said = (product: string | undefined, thread: string) => this.store.modules.workItemsCore.threadOf(this.store.readHistory?.(product, thread, { max: 2000 }) ?? [], thread);
     const earlier = items.filter((i) => teammateIdOf(i) === id && i.id !== item.id);
     const origin = chat.messages.find((m) => m.kind === 'msg' && m.setup && (m.to ?? []).includes(id) && m.threads?.length)?.threads ?? [];
     const method = readMethod(this.dir(), id);
@@ -936,7 +936,7 @@ export class Teammates {
   _writeSources(t: Teammate, origin: ThreadRef[], earlier: TeamItem[], said: TurnsOf, everything: TeamItem[] = []): SourceFile[] {
     const dir = sourcesDir(this.dir(), t.id);
     const read = new Map<string, Turn[]>();
-    const turnsOf = (product: string, id: string): Turn[] => {
+    const turnsOf = (product: string | undefined, id: string): Turn[] => {
       if (!read.has(id)) {
         try { read.set(id, said(product, id) ?? []); } catch { read.set(id, []); }
       }

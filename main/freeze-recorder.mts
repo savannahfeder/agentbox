@@ -22,12 +22,71 @@ const IDLE = new Set(['(idle)', '(program)']);
 const GC = '(garbage collector)';
 const FRAMES_KEPT = 12;
 
-export const dayOf = (ms) => {
+export interface ProfileNode {
+  id: number;
+  children?: number[];
+  callFrame?: { functionName?: string; url?: string; lineNumber: number };
+}
+
+export interface CpuProfile {
+  nodes?: ProfileNode[];
+  samples?: number[];
+  timeDeltas?: number[];
+  startTime: number;
+}
+
+export interface ProfileSlice {
+  profile?: CpuProfile;
+  offsetUs?: number;
+}
+
+export interface FreezeStackFrame {
+  fn: string;
+  file: string;
+  line: number;
+}
+
+interface FreezeStack {
+  kind: string;
+  frames: FreezeStackFrame[];
+  where: string;
+  key: string;
+}
+
+export interface FreezeRead {
+  samples: number;
+  busy: number;
+  gc: number;
+  where: string | null;
+  stacks: { share: number; frames: string[] }[];
+}
+
+export interface FreezeLine extends FreezeRead {
+  at: string;
+  ms: number;
+}
+
+export interface FreezeSummary {
+  at: string;
+  ms: number;
+  where: string | null;
+}
+
+export interface FreezeRecorderOptions {
+  dir?: string;
+  appDir?: string;
+  thresholdMs?: number;
+  rotateMs?: number;
+  intervalUs?: number;
+  onFreeze?: (freeze: FreezeSummary) => void;
+}
+
+export const dayOf = (ms: number) => {
   const d = new Date(ms);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-function fileOf(url, appDirs) {
+function fileOf(url: string | undefined, appDirs: string[]) {
   if (!url) return '';
   let file = url;
   if (url.startsWith('file://')) { try { file = fileURLToPath(url); } catch { /* keep the url */ } }
@@ -39,32 +98,32 @@ function fileOf(url, appDirs) {
 }
 
 // The profile names a file by its real path, which on macOS is /private/var for /var.
-const realPath = (dir) => { try { return dir ? fs.realpathSync(dir) : ''; } catch { return ''; } };
+const realPath = (dir: string) => { try { return dir ? fs.realpathSync(dir) : ''; } catch { return ''; } };
 
-const ours = (frame) => /\.(m?js|cjs|ts)$/.test(frame.file) && !/^(node:|…\/)/.test(frame.file) && !frame.file.includes('node_modules');
-const named = (f) => (f.file ? `${f.fn} ${f.file}:${f.line}` : f.fn);
+const ours = (frame: FreezeStackFrame) => /\.(m?js|cjs|ts)$/.test(frame.file) && !/^(node:|…\/)/.test(frame.file) && !frame.file.includes('node_modules');
+const named = (f: FreezeStackFrame) => (f.file ? `${f.fn} ${f.file}:${f.line}` : f.fn);
 
 /**
  * What held the thread between `fromUs` and `toUs`, read off one or more CPU
  * profiles. Times are on the watcher's clock; `offsetUs` is each profile's
  * clock minus that one. `appDir` is one path or several. Pure.
  */
-export function freezeFrom(profiles, { fromUs, toUs, appDir = '' }) {
+export function freezeFrom(profiles: ProfileSlice[], { fromUs, toUs, appDir = '' }: { fromUs: number; toUs: number; appDir?: string | string[] }): FreezeRead {
   const appDirs = [appDir].flat().filter(Boolean);
-  const groups = new Map();
+  const groups = new Map<string, { samples: number; s: FreezeStack }>();
   let total = 0;
   let idle = 0;
   let gc = 0;
   for (const { profile, offsetUs = 0 } of profiles) {
     if (!profile?.nodes?.length || !profile.samples?.length) continue;
-    const byId = new Map(profile.nodes.map((n) => [n.id, n]));
-    const parent = new Map();
+    const byId = new Map(profile.nodes.map((n): [number, ProfileNode] => [n.id, n]));
+    const parent = new Map<number, number>();
     for (const n of profile.nodes) for (const c of n.children ?? []) parent.set(c, n.id);
-    const stacks = new Map();
-    const stackOf = (id) => {
-      if (stacks.has(id)) return stacks.get(id);
-      const frames = [];
-      for (let at = id; at != null; at = parent.get(at)) {
+    const stacks = new Map<number, FreezeStack>();
+    const stackOf = (id: number): FreezeStack => {
+      if (stacks.has(id)) return stacks.get(id)!;
+      const frames: FreezeStackFrame[] = [];
+      for (let at: number | undefined = id; at != null; at = parent.get(at)) {
         const cf = byId.get(at)?.callFrame;
         if (!cf || cf.functionName === '(root)') continue;
         frames.push({ fn: cf.functionName || '(anonymous)', file: fileOf(cf.url, appDirs), line: cf.url ? cf.lineNumber + 1 : 0 });
@@ -73,7 +132,7 @@ export function freezeFrom(profiles, { fromUs, toUs, appDir = '' }) {
       const kind = frames.length <= 1 && IDLE.has(leaf) ? 'idle' : leaf === GC ? 'gc' : 'busy';
       const first = frames.findIndex(ours);
       const mine = first < 0 ? [] : frames.slice(first);
-      const s = { kind, frames, where: mine[0] ? named(mine[0]) : leaf, key: `${leaf}|${mine.slice(0, 10).map(named).join('<')}` };
+      const s: FreezeStack = { kind, frames, where: mine[0] ? named(mine[0]) : leaf, key: `${leaf}|${mine.slice(0, 10).map(named).join('<')}` };
       stacks.set(id, s);
       return s;
     };
@@ -102,7 +161,7 @@ export function freezeFrom(profiles, { fromUs, toUs, appDir = '' }) {
 }
 
 /** One freeze's line, appended to today's file; older files than a week go. */
-export function writeFreeze(dir, line, { keepDays = KEEP_DAYS } = {}) {
+export function writeFreeze(dir: string, line: FreezeLine, { keepDays = KEEP_DAYS }: { keepDays?: number } = {}) {
   fs.mkdirSync(dir, { recursive: true });
   const at = Date.parse(line.at) || Date.now();
   fs.appendFileSync(path.join(dir, `freeze-${dayOf(at)}.jsonl`), `${JSON.stringify(line)}\n`);
@@ -117,25 +176,25 @@ export function writeFreeze(dir, line, { keepDays = KEEP_DAYS } = {}) {
  * Starts the watcher for this thread. `onFreeze` hears each line as it is
  * written. Never throws: a recorder that breaks the app is worse than a gap.
  */
-export function startFreezeRecorder({ dir, appDir = '', thresholdMs = THRESHOLD_MS, rotateMs = 60_000, intervalUs = 10_000, onFreeze = () => {} } = {}) {
+export function startFreezeRecorder({ dir, appDir = '', thresholdMs = THRESHOLD_MS, rotateMs = 60_000, intervalUs = 10_000, onFreeze = () => {} }: FreezeRecorderOptions = {}) {
   const beat = new SharedArrayBuffer(8);
   const stamp = new BigInt64Array(beat);
   const tick = () => Atomics.store(stamp, 0, process.hrtime.bigint());
   tick();
   const timer = setInterval(tick, BEAT_MS);
   timer.unref?.();
-  let worker = null;
+  let worker: Worker | null = null;
   try {
     worker = new Worker(new URL('./freeze-recorder-thread.mts', import.meta.url), {
       workerData: { beat, dir, appDir: [appDir, realPath(appDir)], thresholdMs, rotateMs, intervalUs },
     });
   } catch (err) {
     clearInterval(timer);
-    console.warn(`zero: freezes will not be recorded: ${err.message}`);
+    console.warn(`zero: freezes will not be recorded: ${(err as Error).message}`);
     return { stop() {} };
   }
   worker.unref();
-  worker.on('message', (m) => {
+  worker.on('message', (m: { freeze?: FreezeSummary; gaveUp?: string } | null) => {
     if (m?.freeze) { try { onFreeze(m.freeze); } catch { /* the line is already on disk */ } }
     if (m?.gaveUp) console.warn(`zero: freezes will not be recorded: ${m.gaveUp}`);
   });

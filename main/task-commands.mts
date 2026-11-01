@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { providerCommand, providerCommands, reviewTarget } from '../shared/provider-commands.mjs';
 import { harnessFor } from './harnesses.mts';
+import type { HarnessSupervisor } from './harnesses/common.mts';
 import { NAME } from '../shared/product-name.mjs';
 const exec = promisify(execFile);
 
@@ -47,9 +48,8 @@ export interface CodexUsageReport {
 }
 
 /** The part of the supervisor that slash commands read and call. */
-export interface TaskCommandSupervisor {
+export interface TaskCommandSupervisor extends HarnessSupervisor {
   onChange?: () => void;
-  config: unknown;
   sessions: Map<string, CommandSession>;
   _compactions?: Record<string, CommandResult>;
   _compactionJobs?: Map<string, CompactionJob>;
@@ -174,15 +174,15 @@ export async function taskCommand(sup: TaskCommandSupervisor, productSlug: strin
   if(op.name==='model') {
    // Both halves read off this Mac, so /model lists what its CLIs can actually
    // be asked for today rather than what was true when Agentbox was built.
-   const models=harness.models({home,bin:harness.binary(sup.config)});
+   const models=harness.models({home,bin:harness.binary(sup.config)}) as { id: string; label: string }[];
    if(!op.args)result=`Task model: ${model||'provider default'}\n${models.map((m: { id: string; label: string })=>`/model ${m.id} · ${m.label}`).join('\n')}`;
    else {if(!models.some((m: { id: string })=>m.id===op.args))throw new Error('Choose one of the models listed by /model. Your draft has been kept.');
     // Model changes cannot carry an incompatible effort into the next run.
-    const levels=harness.effortLevels(op.args,{home});
+    const levels=harness.effortLevels(op.args,{home}) as string[] | null;
     write({model:op.args,...(item.effort&&levels&&!levels.includes(item.effort)?{effort:null}:{})});
     result=`This task will use ${op.args} on its next response.`;}
   } else if(op.name==='effort') {
-   const levels=harness.effortLevels(model,{home});
+   const levels=harness.effortLevels(model,{home}) as string[] | null;
    if(!op.args)result=`Task effort: ${item.effort||'provider default'}\n${levels?.map((l: string)=>`/effort ${l}`).join('\n')||'The provider has not reported available levels.'}`;
    else {if(!levels?.includes(op.args))throw new Error('Choose one of the levels listed by /effort. Your draft has been kept.');write({effort:op.args});result=`This task will use ${op.args} effort on its next response.`;}
   } else if(op.name==='rename') {
@@ -213,7 +213,7 @@ export async function taskCommand(sup: TaskCommandSupervisor, productSlug: strin
   } else {
    if(op.name==='goal' && op.args && !['pause','clear'].includes(op.args)) throw new Error(`Setting or resuming a Codex goal is not connected to ${NAME}’s worker lifecycle yet. Your draft has been kept.`);
    if(!rec?.sessionId&&op.name!=='skills')throw new Error('This task has no saved conversation yet. Send a message first.');
-   result=await harness.runCommand(sup,{home,threadId:rec?.sessionId,cwd,...op});
+   result=await harness.runCommand(sup,{home,threadId:rec?.sessionId,cwd,...op}) as string;
    if(op.name==='status')result=`Task model: ${model||'provider default'}\nTask effort: ${item.effort||'provider default'}\n${result}`;
   }
   if(op.name==='copy')return {state:'copy',text:result,at:Date.now()};

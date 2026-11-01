@@ -74,13 +74,14 @@ import { handedOnByReply } from '../shared/team-rules.mjs';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mjs';
 import { saveAttachments } from './save-attachments.mts';
 import { stageAttachment } from './stage-attachment.mts';
-import type { BrowserWindow } from 'electron';
 import type { AnswerInput, ComposeInput, Store, StoreConfig } from './store.mts';
 import type { Supervisor, SupervisorConfig } from './supervisor.mts';
 import type { SettingsConfig } from './settings.mts';
 import type { createTeamService } from './team/index.mts';
 import type { UpdateTerminals } from './agent-updates.mts';
 import type { AttachmentFile } from './save-attachments.mts';
+import type { PostInput } from './teammates.mts';
+import type { ConversationInput } from './agents.mts';
 
 export interface IpcEvent { sender?: unknown; senderFrame?: { parent?: unknown } | null }
 export type IpcListener = { bivarianceHack(event: IpcEvent, payload?: unknown): unknown }['bivarianceHack'];
@@ -104,7 +105,10 @@ export interface IpcOpenDialog {
 }
 
 export interface IpcHost {
-  ipcMain: { handle(channel: string, listener: IpcListener): unknown };
+  ipcMain: {
+    handle(channel: 'zero:settings-set-workspace', listener: (event: IpcEvent, payload: { key: string; value?: unknown }) => unknown): unknown;
+    handle(channel: string, listener: IpcListener): unknown;
+  };
   app: {
     isPackaged: boolean;
     getVersion(): string;
@@ -123,7 +127,7 @@ export interface IpcAnalytics {
   enabled: boolean;
   installId?: unknown;
   track(name: string, props?: Record<string, unknown>): unknown;
-  flush?(): unknown;
+  flush(): unknown;
   onboardingArm?(): string;
 }
 
@@ -135,7 +139,7 @@ export interface IpcUpdater {
 }
 
 export type IpcTeam = ReturnType<typeof createTeamService>;
-export type IpcConfig = StoreConfig & SupervisorConfig & SettingsConfig & { accountRoot: string; storeRoot: string };
+export type IpcConfig = StoreConfig & SupervisorConfig & SettingsConfig & { accountRoot: string; storeRoot: string; feedbackUrl?: unknown };
 
 export interface IpcDeps {
   store: Store;
@@ -151,19 +155,21 @@ export interface IpcDeps {
 }
 
 export interface TeammateArgs {
-  id?: string;
+  id: string;
   engine?: unknown;
   start?: boolean;
-  patch?: { engine?: unknown; [field: string]: unknown };
-  text?: string;
-  to?: unknown;
+  patch?: Record<string, unknown>;
+  text: string;
+  to?: PostInput['to'];
   fresh?: boolean;
   answers?: unknown;
-  ref?: unknown;
-  memory?: unknown;
-  [field: string]: unknown;
+  ref: string;
+  memory: string;
 }
 
+type TerminalPayload = { product: unknown; id: unknown; action?: string; data?: string; cols: number; rows: number; offset: number; wait: number };
+type LookedAgain = Awaited<ReturnType<typeof lookAgainFor>>;
+type ElectronWindow = import('electron').BaseWindow;
 type RoomCalls = Record<string, (...args: unknown[]) => unknown>;
 type ImportableThreads = Awaited<ReturnType<typeof readImportableThreads>>;
 type SetProjectPayload = { product?: string; key: string; value?: unknown };
@@ -183,7 +189,7 @@ const CARD_CHANGED = 'The approval request changed between being drawn and being
 // WHAT COUNTS AS SENT WHEN NOTHING IS. Analytics is optional here on purpose:
 // every test and every copy without a key gets an object that answers no to
 // everything, so no call site has to ask whether it exists.
-const NO_ANALYTICS: IpcAnalytics = { enabled: false, track: () => false };
+const NO_ANALYTICS = { enabled: false, track: () => false } as unknown as IpcAnalytics;
 
 // A copy with no updater wired in: the tests, and any host that constructs the
 // IPC surface by hand. It reports the state a build from source really is in
@@ -205,8 +211,8 @@ const NO_UPDATER: IpcUpdater = {
   move: () => ({ moved: false, error: null }),
 };
 
-const TEAMMATE_OPS: ReadonlySet<unknown> = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget', 'method']);
-const ROOM_OPS: ReadonlySet<unknown> = new Set(['refresh', 'send', 'markRead', 'markUnread', 'react', 'edit', 'deleteMessage', 'putFile', 'file', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute']);
+const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget', 'method']);
+const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markUnread', 'react', 'edit', 'deleteMessage', 'putFile', 'file', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute']);
 
 export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, onCount = () => {} }: IpcDeps) {
   // The three Electron things, or a plain Node stand-in for them. There is no
@@ -324,10 +330,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // Agentbox that text is task titles. A NUMBER MAY RIDE WITH THE NAME, and only
   // a number (2026-10-06): which setup step was reached.
   ipcMain.handle('zero:onboarding-arm', () => analytics.onboardingArm?.() ?? 'tour');
-  ipcMain.handle('zero:track', (_e, { name, count }: { name?: string; count?: unknown } = {}) => {
-    if (!EVENT_NAMES.includes(name as string)) return false;
+  ipcMain.handle('zero:track', (_e, { name, count }: { name: string; count?: unknown } = {} as { name: string; count?: unknown }) => {
+    if (!EVENT_NAMES.includes(name)) return false;
     onCount();
-    return analytics.track(name as string, Number.isFinite(count) ? { count } : undefined);
+    return analytics.track(name, Number.isFinite(count) ? { count } : undefined);
   });
 
   // WHETHER A COUNT CAME FROM SETUP'S PRACTICE PROJECT, read off the project's
@@ -400,7 +406,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // Asked each time rather than captured, because Claude Code can be installed
     // while the app is running and the settings screen already promises that
     // works without a restart.
-    bin: () => config.claudeBin,
+    bin: () => config.claudeBin ?? null,
     // The account marked In use, asked each time so a switch is read at once.
     account: () => supervisor.usageAccount(),
     onChange: () => {
@@ -424,10 +430,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // Every Claude login's own reading, asked for only by the Settings page.
   const accountUsage = new AccountUsage({
-    bin: () => config.claudeBin,
+    bin: () => config.claudeBin ?? null,
     env: () => supervisor._workerEnv(DEFAULT_ENGINE),
-    onReading: (profile: string, reading: unknown) => supervisor.noteUsageReading(profile, reading),
-    identity: (profile: string) => accountIdentity(profile === 'default' ? null : profile, { home: config.home }),
+    onReading: (profile, reading) => supervisor.noteUsageReading(profile, reading),
+    identity: (profile) => accountIdentity(profile === 'default' ? null : profile, { home: config.home }),
   });
   ipcMain.handle('zero:account-usage', async (event, { refresh = false, engine = DEFAULT_ENGINE }: { refresh?: boolean; engine?: string } = {}) => {
     if (event.senderFrame?.parent || (event.sender && event.sender !== window.webContents)) throw Error('Usage is only available in the main app window.');
@@ -490,7 +496,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
      closed in the same breath. */
   let pendingLogin: string | null=null;
 
-  const terminals=new TaskTerminals({resolve:(key: string)=>{
+  const terminals=new TaskTerminals({resolve:key=>{
     const {product,id}=JSON.parse(key);
     /*
      * THE SETTINGS TERMINAL, which belongs to no task. There is exactly one of
@@ -510,17 +516,17 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
    * A TASK'S TERMINAL LIVES AS LONG AS THE TASK IS OPEN, in a process that
      outlives the app (main/terminal-host.mts). The sign-in terminal on
      Settings belongs to no task and stays in the app. */
-  const taskTerminals=new TerminalHosts({local:terminals,logFile:path.join(supervisor.userDir,'terminal-host.log'),log:(line: string)=>console.warn(`zero: ${line}`)});
+  const taskTerminals=new TerminalHosts({local:terminals,logFile:path.join(supervisor.userDir,'terminal-host.log'),log:line=>console.warn(`zero: ${line}`)});
   // A task's folder is not deleted while its terminal is open (supervisor.mts, `_folderInUse`).
-  supervisor.terminalOpen=(itemId: string)=>taskTerminals.hasTerminal(itemId);
-  const lookAtTerminals=()=>taskTerminals.endClosed(taskClosed(store)).catch((e: unknown)=>console.warn('zero: terminals:',(e as Error).message));
+  supervisor.terminalOpen=itemId=>taskTerminals.hasTerminal(itemId);
+  const lookAtTerminals=()=>taskTerminals.endClosed(taskClosed(store)).catch(e=>console.warn('zero: terminals:',e.message));
   void taskTerminals.ready().then(lookAtTerminals);
   setInterval(lookAtTerminals,60_000).unref?.();
   const agentUpdates=new AgentUpdates({
-    installation:async (engine: string)=>{await lookAgainFor(engine,config);return installedAgent(engine,config);},
-    refresh:async (engine: string)=>{await lookAgainFor(engine,config);await refreshAgentModels(engine,config,supervisor._codexOfferHomes());if(engine==='codex')for(const profile of supervisor._codexProfiles())supervisor._releaseIdleCodex(profile);},
+    installation:async engine=>{await lookAgainFor(engine,config);return installedAgent(engine,config as unknown as Parameters<typeof installedAgent>[1]);},
+    refresh:async engine=>{await lookAgainFor(engine,config);await refreshAgentModels(engine,config,supervisor._codexOfferHomes());if(engine==='codex')for(const profile of supervisor._codexProfiles())supervisor._releaseIdleCodex(profile);},
   });
-  ipcMain.handle('zero:agent-update',async(event,{engine,action}: {engine?: string; action?: string}={})=>{
+  ipcMain.handle('zero:agent-update',async(event,{engine,action}: {engine: string; action?: string}={} as {engine: string; action?: string})=>{
     if(event.senderFrame?.parent||(event.sender&&event.sender!==window.webContents))throw Error('Updates are only available in the main app window.');
     if(!['claude','codex'].includes(engine))throw Error('Unknown agent.');
     if(action==='check')return agentUpdates.check(engine);
@@ -536,7 +542,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     event.preventDefault();
     if(!terminalQuitPending){terminalQuitPending=true;void Promise.all([terminals.shutdown(),agentUpdates.shutdown()]).finally(()=>{terminalQuitReady=true;app.quit();});}
   });
-  ipcMain.handle('zero:terminal',async(_event,payload: {product?: unknown; id?: unknown; action?: string; data?: string; cols?: number; rows?: number; offset?: number; wait?: number}={})=>{
+  ipcMain.handle('zero:terminal',async(_event,payload: TerminalPayload={} as TerminalPayload)=>{
     if(_event.senderFrame?.parent || (_event.sender && _event.sender!==window.webContents)) throw Error('Terminal is only available in the main app window.');
     const {product,id,action,data,cols,rows,offset,wait}=payload;
     if(typeof product!=='string'||typeof id!=='string'||!id||id.length>300)throw Error('Invalid task.');
@@ -755,14 +761,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // already has, only when she presses it. No model, nothing sent, nothing
   // written. It is streamed inside the reader because the biggest transcript on
   // this machine is 160MB.
-  ipcMain.handle('zero:agent-conversation', async (_e, payload?: { sessionId?: string; pid?: unknown; startedAt?: number; [field: string]: unknown }) => {
+  ipcMain.handle('zero:agent-conversation', async (_e, payload?: ConversationInput & { startedAt?: number }) => {
     try {
       // Her replies from Agentbox ride in beside the transcript for the same
       // reason the card needs them: they are not IN the transcript as hers.
       // The key is DERIVED here rather than sent, because what identifies an
       // agent is a rule with one copy of it (shared/agents.mjs) and the
       // renderer already hands over both halves it needs.
-      const key = agentKey({ sessionId: payload?.sessionId, pid: Number(payload?.pid), startedAt: payload?.startedAt });
+      const key = agentKey({ sessionId: payload?.sessionId as string | undefined, pid: Number(payload?.pid), startedAt: payload?.startedAt });
       return await agents.conversation({ ...(payload ?? {}), spoke: agentSchedule.spoke(key) });
     } catch {
       return { ok: false, reason: 'That conversation could not be read.' };
@@ -952,7 +958,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // when it lands rather than leaving the person to find it.
   ipcMain.handle('zero:team-sign-in', teamCall(async () => {
     await team!.signIn();
-    try { if (window?.isMinimized?.()) window.restore(); window?.show?.(); app?.focus?.({ steal: true }); } catch { /* no window to raise */ }
+    try { if (window?.isMinimized?.()) window.restore?.(); window?.show?.(); app?.focus?.({ steal: true }); } catch { /* no window to raise */ }
   }));
   ipcMain.handle('zero:team-sign-in-cancel', teamCall(() => team!.cancelSignIn()));
   ipcMain.handle('zero:team-sign-in-reopen', teamCall(() => team!.reopenSignIn()));
@@ -960,7 +966,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:team-sign-in-email', teamCall(({ email, password }: { email: string; password: string }) => team!.signInWithEmail(email, password)));
   // Its own door, because it has one more thing to say: whether the account
   // waits on the link in its confirmation email.
-  ipcMain.handle('zero:team-sign-up', async (_e, { email, password, name }: { email?: string; password?: string; name?: string } = {}) => {
+  ipcMain.handle('zero:team-sign-up', async (_e, { email, password, name }: { email: string; password: string; name: string } = {} as { email: string; password: string; name: string }) => {
     if (!team) return { ok: false, error: 'This build has no team cloud set up.' };
     try {
       const out = await team.signUp(email, password, name);
@@ -985,15 +991,15 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:team-sync', teamCall(() => team!.syncNow()));
   // A MESSAGE TO A PERSON (approved 2026-10-01: people get messages, never
   // tasks). main/team/index.mts keeps it between the two of them.
-  ipcMain.handle('zero:team-message', teamCall(({ to, body, priority, files }: { to: string; body: string; priority?: number; files?: unknown[] }) => team!.message(to, body, priority, files)));
+  ipcMain.handle('zero:team-message', teamCall(({ to, body, priority, files }: { to: string; body: string; priority?: number; files?: AttachmentFile[] }) => team!.message(to, body, priority, files)));
   // ROOMS (alpha): one door, and only these calls through it (main/team/rooms.mts).
-  ipcMain.handle('zero:teammates', async (_e, { op, args = {} }: { op?: string; args?: TeammateArgs } = {}) => {
+  ipcMain.handle('zero:teammates', async (_e, { op, args = {} }: { op?: string; args?: unknown } = {}) => {
     const mates = store.teammates;
     if (!mates) return { ok: false, error: 'Teammates need a store.' };
-    if (!TEAMMATE_OPS.has(op)) return { ok: false, error: `no teammates call named ${op}` };
+    if (!TEAMMATE_OPS.has(op as string)) return { ok: false, error: `no teammates call named ${op}` };
     if (!alphaFeatures(config).teammates) return { ok: false, error: 'Teammates are an alpha feature. Turn them on in Settings, Alpha features.' };
     try {
-      const a: TeammateArgs = args && typeof args === 'object' ? args : {};
+      const a = (args && typeof args === 'object' ? args : {}) as TeammateArgs;
       const kill = (id: string) => supervisor.stopSession(id);
       let value: unknown;
       if (op === 'create') {
@@ -1019,7 +1025,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:rooms', async (_e, { op, args = [] }: { op?: string; args?: unknown } = {}) => {
     const rooms = team?.rooms;
     if (!rooms) return { ok: false, error: 'This build has no team cloud set up.' };
-    if (!ROOM_OPS.has(op)) return { ok: false, error: `no room call named ${op}` };
+    if (!ROOM_OPS.has(op as string)) return { ok: false, error: `no room call named ${op}` };
     try {
       const value = await (rooms as unknown as RoomCalls)[op as string](...(Array.isArray(args) ? args : [args]));
       push();
@@ -1075,7 +1081,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     if (route === 'agent') store.teamPatch(product, id, { assignee: 'agent', runner: me });
     else if (route === 'me') store.teamPatch(product, id, { assignee: me });
     else if (route === 'back') {
-      const to = (row.people ?? []).find((p) => p !== me) || row.createdBy;
+      const to = ((row.people ?? []) as string[]).find((p) => p !== me) || row.createdBy as string;
       if (!to || to === me) throw new Error('there is nobody to hand it back to');
       store.teamPatch(product, id, { assignee: to });
     } else throw new Error(`unknown route ${route}`);
@@ -1189,7 +1195,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // in: main/store.mts and main/supervisor.mts both say what that means.
   ipcMain.handle('zero:first-run-practice', () => {
     const made = store.createPractice();
-    let rows = { ids: [] };
+    let rows: { ids: string[] } = { ids: [] };
     // A store that will not take the three rows is not a reason to strand
     // somebody mid-walk. They land in an empty practice inbox and the beat that
     // clears them is skipped, exactly as beat thirteen already behaves.
@@ -1197,7 +1203,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // AND THE REST OF THE PRACTICE TEAM'S WORK, so the tour and the board have
     // something in every column (w-58c8f466e7). Its own try: a store that will
     // not take these still leaves the walk its four rows.
-    let backdrop = { ids: [] };
+    let backdrop: { ids: string[] } = { ids: [] };
     try { backdrop = store.stagePracticeBackdrop(made.slug); } catch { backdrop = { ids: [] }; }
     return { ...made, examples: rows.ids, backdrop: backdrop.ids };
   });
@@ -1507,7 +1513,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     lastThreads = threads;
     // Each one already in the inbox says so, and the card leaves it out
     // (w-db6f5e331e). The walk's folder suggestions still read all of them.
-    let items = [];
+    let items: ReturnType<Store['listItems']> = [];
     try { items = store.listItems(); } catch { items = []; }
     return { threads: markImported(threads, items) };
   });
@@ -1543,7 +1549,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const byId = new Map(lastThreads.map((t) => [String(t?.id ?? ''), t]));
     for (const t of searchable.threads) if (!byId.has(String(t?.id ?? ''))) byId.set(String(t?.id ?? ''), t);
     lastThreads = [...byId.values()];
-    let items = [];
+    let items: ReturnType<Store['listItems']> = [];
     try { items = store.listItems(); } catch { items = []; }
     return { threads: markImported(lastThreads, items), reached: searchable.reached };
   });
@@ -1798,7 +1804,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
         return { ok: true, ...readSettings({ config, supervisor, store }) };
       }
       const { dialog } = await import('electron');
-      const r = await dialog.showOpenDialog(window as unknown as BrowserWindow, {
+      const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, {
         title: engine === 'codex' ? 'Where is Codex?' : 'Where is Claude Code?',
         buttonLabel: 'Use this one',
         properties: ['openFile', 'showHiddenFiles', 'treatPackageAsDirectory'],
@@ -1820,17 +1826,17 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // rest of the app runs on it without a restart.
   const engineSetup = createEngineSetup({
     find: (engine: string) => {
-      const finders = {
+      const finders: Record<string, (() => Promise<{ found: boolean | undefined; path: string | null | undefined; certain: boolean | undefined }>) | undefined> = {
         // `certain` travels with the answer, so a search that established
         // nothing does not read as a computer with nothing on it.
-        claude: async () => { const s = await lookAgainFor('claude', config); return { found: s.claudeFound, path: s.claudeBin, certain: s.claudeCertain }; },
-        codex: async () => { const s = await lookAgainFor('codex', config); return { found: s.found, path: s.bin, certain: s.certain }; },
+        claude: async () => { const s = await lookAgainFor('claude', config) as Extract<LookedAgain, { claudeFound: unknown }>; return { found: s.claudeFound, path: s.claudeBin, certain: s.claudeCertain }; },
+        codex: async () => { const s = await lookAgainFor('codex', config) as Extract<LookedAgain, { found: unknown }>; return { found: s.found, path: s.bin, certain: s.certain }; },
       };
       return finders[engine]?.() ?? { found: false, path: null };
     },
     // WHICH ONE IS SIGNED IN, kept on the config for the run that reads it
     // (`Supervisor#_enginesFound`) and never saved: it changes outside the app.
-    onSignIn: (engine: string, signedIn: boolean) => {
+    onSignIn: (engine, signedIn) => {
       config[`${engine}SignedIn`] = signedIn;
     },
   });
@@ -1844,7 +1850,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   }
   // A sign-in left waiting on the browser is not left running after the app.
   app.on('will-quit', () => { engineSetup.cancel('claude'); engineSetup.cancel('codex'); });
-  ipcMain.handle('zero:engine-setup', async (_e, { action, engine }: { action?: string; engine?: string } = {}) => {
+  ipcMain.handle('zero:engine-setup', async (_e, { action, engine }: { action?: string; engine: string } = {} as { action?: string; engine: string }) => {
     if (!isEngine(engine)) return { ok: false, error: 'Unknown coding agent.' };
     try {
       if (action === 'ready') return { ok: true, ...(await engineSetup.readiness(engine)) };
@@ -1925,17 +1931,17 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     confirming = waitForEmailConfirmation({ config: acct.value, session: acct.session, home: supervisor.config.home || os.homedir() })
       .then((out) => {
         if (!out.ok) { console.log(`cloud account: the confirmation link did not finish: ${out.error}`); return; }
-        try { if (window?.isMinimized?.()) window.restore(); window?.show?.(); } catch { /* no window to raise */ }
+        try { if (window?.isMinimized?.()) window.restore?.(); window?.show?.(); } catch { /* no window to raise */ }
         push();
       })
       .finally(() => { confirming = null; });
   };
-  ipcMain.handle('zero:cloud-account-sign-in', async (_e, { method, email, password, name, acceptTerms }: { method?: string; email?: string; password?: string; name?: string; acceptTerms?: unknown } = {}) => {
+  ipcMain.handle('zero:cloud-account-sign-in', async (_e, { method, email, password, name, acceptTerms }: { method: string; email: string; password: string; name: string; acceptTerms?: unknown } = {} as { method: string; email: string; password: string; name: string; acceptTerms?: unknown }) => {
     const acct = await cloudAccountSessionNow();
     if (!acct) return { ok: false, error: 'This copy of the app has no cloud to sign in to.' };
     const { cloudSignIn } = await import('./cloud/account.mts');
     const out = await cloudSignIn({ config: acct.value, session: acct.session, method, email, password, name, acceptTerms: acceptTerms === true, home: supervisor.config.home || os.homedir() });
-    if (method === 'google') { try { if (window?.isMinimized?.()) window.restore(); window?.show?.(); } catch { /* no window to raise */ } }
+    if (method === 'google') { try { if (window?.isMinimized?.()) window.restore?.(); window?.show?.(); } catch { /* no window to raise */ } }
     if (out.ok && out.confirm) void waitForTheLink(acct);
     push();
     return out;
@@ -1954,14 +1960,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     try {
       const account = await import('./cloud/account.mts');
       const shell = await shellNow();
-      return await account[name]({ ...args, openExternal: (u: string) => shell.openExternal(u), home: supervisor.config.home || os.homedir() });
+      return await (account[name] as unknown as (options: Record<string, unknown>) => Promise<unknown>)({ ...args, openExternal: (u: string) => shell.openExternal(u), home: supervisor.config.home || os.homedir() });
     } catch (err) {
       return { ok: false, error: 'unreachable', message: `The cloud did not answer: ${(err as Error)?.message || err}` };
     }
   };
   ipcMain.handle('zero:cloud-account-plan', async () => {
     const plan = await cloudCall('cloudPlan');
-    supervisor.cloudPlanSeen?.(plan);
+    supervisor.cloudPlanSeen?.(plan as Parameters<Supervisor['cloudPlanSeen']>[0]);
     return plan;
   });
   ipcMain.handle('zero:cloud-account-pay', (_e, { plan }: { plan?: string } = {}) => cloudCall('payForCloud', { plan }));
@@ -1969,7 +1975,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // THE CLOUD SETUP'S SIGN-IN for one account, made in the cloud
   // (main/cloud/logins.mts). The Mac relays the link and the code only.
-  ipcMain.handle('zero:cloud-signin', async (_e, { action, engine, key, code }: { action?: string; engine?: string; key?: string | null; code?: string } = {}) => {
+  ipcMain.handle('zero:cloud-signin', async (_e, { action, engine, key, code }: { action: string; engine: string; key?: string | null; code?: string } = {} as { action: string; engine: string; key?: string | null; code?: string }) => {
     try {
       const out = await supervisor.cloudSignIn(action, engine, key ?? null, code);
       push();
@@ -1993,11 +1999,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       return { code: null };
     }
   });
-  ipcMain.handle('zero:settings-set-workspace', (_e, payload?: { key?: string; value?: unknown }) => {
+  ipcMain.handle('zero:settings-set-workspace', (_e, payload) => {
     try {
       // Before the save: once the switch is off, nothing leaves, not even this.
       if (countsTurnedOff(payload)) { analytics.track('counts_turned_off'); analytics.flush(); }
-      setWorkspaceSetting({ config, supervisor, store }, (payload ?? {}) as { key: string; value?: unknown });
+      setWorkspaceSetting({ config, supervisor, store }, payload ?? {});
       if (payload?.key === 'alphaRooms') team?.rooms?.tick().catch(() => {});
       if (cornerTagTurnedOff(payload)) analytics.track('tag_turned_off');
       push();
@@ -2038,7 +2044,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // ARCHIVE A PROJECT, OR BRING ONE BACK (main/store.mts setProductArchived).
   // Its files stay on disk; it leaves every list the app draws. Pushed for the
   // same reason a rename is: the rail, the inbox and the picker all list it.
-  ipcMain.handle('zero:project-archive', (_e, { product, archived }: { product?: string; archived?: boolean } = {}) => {
+  ipcMain.handle('zero:project-archive', (_e, { product, archived }: { product: string; archived?: boolean } = {} as { product: string; archived?: boolean }) => {
     try {
       store.setProductArchived(product, archived === true);
       push();
@@ -2051,7 +2057,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // WHO SEES A PROJECT'S THREADS (main/store.mts setProductSeenBy,
   // w-b989839656). Pushed, because the inbox's locks and the New thread
   // card's starting chip both read it off the snapshot's projects.
-  ipcMain.handle('zero:project-seen-by', (_e, { product, who, people }: { product?: string; who?: string; people?: string[] } = {}) => {
+  ipcMain.handle('zero:project-seen-by', (_e, { product, who, people }: { product: string; who?: string; people?: string[] } = {} as { product: string; who?: string; people?: string[] }) => {
     try {
       store.setProductSeenBy(product, { who, people });
       push();
@@ -2070,7 +2076,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       const dir = productDirOf(product);
       if (!dir) return { ok: false, error: 'That project could not be found.' };
       const { dialog } = await import('electron');
-      const r = await dialog.showOpenDialog(window as unknown as BrowserWindow, {
+      const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, {
         title: 'Pick a picture for this project',
         buttonLabel: 'Use this picture',
         properties: ['openFile'],

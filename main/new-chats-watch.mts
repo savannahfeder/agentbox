@@ -12,7 +12,9 @@ import { productsForThread } from '../shared/codex-import.mjs';
 import type { CodexThreadLike } from '../shared/codex-import.mjs';
 import { isShared } from '../shared/team-rules.mjs';
 import { appSessionFolders } from './agent-homes.mts';
+import type { HomesSupervisor } from './agent-homes.mts';
 import { outsideAgentsMode } from './settings.mts';
+import type { SettingsConfig } from './settings.mts';
 import { claudeSessionOpen } from './claude-session-open.mts';
 import { readCodexThreadsOffThread } from './codex-threads.mts';
 import { readRecentThreads } from './importable-threads.mts';
@@ -30,7 +32,7 @@ export interface NewChatProduct {
   team?: { projectId?: string; sharedBy?: string | null } | null;
 }
 
-export interface NewChatsConfig { importNew?: unknown; importNewSince?: unknown }
+export type NewChatsConfig = SettingsConfig;
 
 export interface NewChatsStore {
   listProducts(): NewChatProduct[];
@@ -144,7 +146,7 @@ export function startNewChatsWatch({
 }
 
 /** The watch as the app runs it, on the desktop (main/main.mts) and in the browser copy (bin/agentbox.mjs). */
-export function watchNewChatsFor({ store, config, supervisor, ...timing }: { store: NewChatsStore; config: NewChatsConfig | null | undefined; supervisor: unknown } & NewChatsTiming) {
+export function watchNewChatsFor({ store, config, supervisor, ...timing }: { store: NewChatsStore; config: NewChatsConfig | null | undefined; supervisor: HomesSupervisor | null | undefined } & NewChatsTiming) {
   return startNewChatsWatch({
     store,
     config,

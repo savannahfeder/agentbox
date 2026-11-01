@@ -176,6 +176,7 @@ import type { ActiveTool } from './agent-activity.mts';
 import type { ShipItem, ShipProduct } from './ship-queue.mts';
 import type { CloudKit } from './cloud/kit.mts';
 import type { CatchUpCard } from './catch-up.mts';
+import type { QueuedLine } from './live-replies.mts';
 import type { Kit } from '../shared/cloud-kit.mjs';
 
 export type WorkItemStatus = 'open' | 'claimed' | 'done' | 'blocked';
@@ -246,7 +247,7 @@ export interface SupervisorConfig {
   home?: string;
   storeRoot: string;
   accountRoot?: string;
-  accountId?: string | null;
+  accountId?: string;
   activeAccount?: Record<string, string | null | undefined> | null;
   sessionArgs?: string[] | null;
   projectSessionArgs?: Record<string, string[] | null | undefined> | null;
@@ -269,7 +270,7 @@ export interface SupervisorConfig {
   codexModel?: string | null;
   codexMode?: string | null;
   codexSignedIn?: boolean | null;
-  codexStoreReadyMs?: number | null;
+  codexStoreReadyMs?: number;
   claudeFound?: boolean | null;
   claudeSignedIn?: boolean | null;
   cloudRuns?: string | boolean | null;
@@ -278,7 +279,7 @@ export interface SupervisorConfig {
   cloudCodexMode?: string | null;
   memoryGate?: boolean | null;
   memoryGateSocket?: string | null;
-  memoryGateLockPort?: number | null;
+  memoryGateLockPort?: number;
   memoryGateSlots?: number | null;
   cleanupLeftovers?: boolean | null;
   cleanupLeftoversSince?: number | null;
@@ -338,7 +339,7 @@ export interface WhyLocal {
  * WHAT A RUN IS, AS EVERY READER OF ONE SEES IT: a live session, a cloud run
  * joined after a restart, or the record either leaves behind.
  */
-export interface RunState {
+export type RunState = {
   itemId?: string;
   product?: string;
   startedAt?: number;
@@ -384,10 +385,10 @@ export interface RunState {
   helperIds?: Set<string>;
   claimCalls?: Set<string | undefined>;
   activeTools?: Map<string, ActiveTool>;
-}
+};
 
 /** One run this Mac started and is watching (`Supervisor#sessions`). */
-export interface WorkerSession extends RunState {
+export type WorkerSession = RunState & {
   child: WorkerChild;
   itemId: string;
   product: string;
@@ -399,10 +400,10 @@ export interface WorkerSession extends RunState {
   cwd: string;
   spawnFiles: string[];
   cloud: boolean;
-}
+};
 
 /** A cloud run picked back up after a restart, followed in `_comingHome`. */
-export interface JoinedRun extends RunState {
+export type JoinedRun = RunState & {
   itemId: string;
   product: string;
   startedAt: number;
@@ -412,7 +413,7 @@ export interface JoinedRun extends RunState {
   saying: string;
   sayingAt: number;
   stop: () => void;
-}
+};
 
 /** A session remembered for a restart, the moment its id arrives (`_liveSessions`). */
 export interface LiveSessionRecord {
@@ -583,10 +584,10 @@ export interface SupervisorStore {
   listItems(now?: number): WorkItem[];
   readItem(slug: string, id: string, now?: number): WorkItem | null;
   readThread?(slug: string, id: string): ThreadTurn[];
-  readHistory?(slug: string, id: string, opts?: { max?: number; before?: number }): unknown[];
+  readHistory?(slug: string, id: string, opts?: { max?: number; before?: number }): QueuedLine[];
   isDue(item: WorkItem, now?: number): boolean;
   answerItem(slug: string, id: string, patch: { answer?: string; status?: WorkItemStatus | null; [field: string]: unknown }): WorkItem | null | undefined;
-  tellItem(slug: string, id: string, opts: { text: string; from?: string; hold?: boolean; hop?: unknown }): unknown;
+  tellItem(slug: string, id: string, opts: { text: string; from?: unknown; hold?: boolean; hop?: unknown }): unknown;
   recordSessionResult(slug: string, id: string, opts: { result: string; status?: WorkItemStatus | null }): WorkItem | null | undefined;
   releaseRunClaim(slug: string, id: string, run: unknown): unknown;
   nameItem(slug: string, id: string, label: string): unknown;
@@ -744,7 +745,7 @@ export interface StrayFolder {
 
 /** One cloud sign-in being walked through (`cloudSignIn`). */
 export interface CloudSignInFlow {
-  status(): { state: string; [fact: string]: unknown };
+  status(): { state: string; url?: string | null; code?: string | null; message?: string | null; attempt?: string };
   code(code?: string): Promise<unknown>;
   cancel(): Promise<unknown>;
 }
@@ -755,7 +756,24 @@ export interface KitWriter {
   again: { item: WorkItem; session: RunState } | null;
 }
 
-export type KitCopy = CloudKit & Partial<Pick<Kit, 'project' | 'engine' | 'newThread'>>;
+export type CodexTurn = {
+  input?: ({ type: string; text: string } | { type: string; path: string })[];
+  effort?: string;
+  reviewTarget?: unknown;
+};
+
+export interface ProcExit { code?: number | null; signal?: string | null }
+
+export interface ForkSource {
+  sessionId: string;
+  profile?: string | null;
+  sourceId?: string;
+  imported?: boolean;
+  folder?: string;
+  open?: boolean;
+}
+
+export type KitCopy = Kit & CloudKit;
 
 export type CodexClient = ReturnType<typeof createCodexAppServer>;
 
@@ -765,7 +783,7 @@ export interface CodexServerEntry {
   handshake: Promise<unknown>;
   home: string;
   loaded?: Set<string>;
-  procExit?: Promise<unknown>;
+  procExit?: Promise<ProcExit>;
 }
 
 const POLL_MS = 15_000;
@@ -1203,19 +1221,19 @@ export class Supervisor {
   declare _cloudMonth: { at: number; month: ReturnType<typeof summarizeCloudUsage> } | undefined;
   declare _cloudNoRoom: { error: string; message: string | null; until: number } | null | undefined;
   declare _cloudOrgBusy: boolean | undefined;
-  declare _cloudOrgTried: Map<string, number> | undefined;
+  declare _cloudOrgTried: Map<string, number>;
   declare _cloudRenewAt: number | undefined;
-  declare _cloudRenewing: Set<string> | undefined;
+  declare _cloudRenewing: Set<string>;
   declare _cloudSetUpAt: number | undefined;
   declare _cloudSetUpWas: boolean | undefined;
-  declare _cloudSignIns: Map<string, CloudSignInFlow> | undefined;
+  declare _cloudSignIns: Map<string, CloudSignInFlow>;
   declare _cloudStartFails: Map<string, number> | undefined;
   declare _cloudCodexClients: Set<CodexClient> | undefined;
   declare _forgotOldCloudTokens: boolean | undefined;
   declare _perlRunsTheShim: boolean | undefined;
   declare _plainCaps: boolean | undefined;
   declare _plainCapsAt: number | undefined;
-  declare _macVersions: Record<string, string | null> | undefined;
+  declare _macVersions: Record<string, string | null | undefined> | undefined;
   declare _macVersionsAt: number | undefined;
   declare _macVersionsReading: Promise<void> | null | undefined;
   declare _comingHome: Map<string, JoinedRun>;
@@ -4138,7 +4156,7 @@ export class Supervisor {
       const engine = engineOf(this._engineFor(item));
       if (engine !== 'claude' && engine !== 'codex') continue;
       if (continuation) {
-        const kit: KitCopy | null = readKitCopy(kitCopyPath(this.userDir, item.product, item.id));
+        const kit = readKitCopy(kitCopyPath(this.userDir, item.product, item.id)) as KitCopy | null;
         if (!kit || kit.item !== item.id || kit.project !== item.product) continue;
         // A kit is left only after a run that finished, so a folder whose last
         // cloud run never came home has one from before that run: starting
@@ -5831,8 +5849,8 @@ export class Supervisor {
     return {
       setUp, offered, managed: typeof config?.gateway === 'string', mode, running: this._cloudLoad(), month: this._cloudMonth.month,
       ...this._cloudHealthNow(now),
-      noRoom: (({ error, message } = {}) => (error ? { error, message } : null))(this._cloudNoRoomNow(now) ?? {}),
-      versionGap: setUp ? this._cloudVersionGaps(now).sort((a, b) => b.blocks - a.blocks)[0] ?? null : null,
+      noRoom: (({ error, message }: { error?: string; message?: string | null } = {}) => (error ? { error, message } : null))(this._cloudNoRoomNow(now) ?? {}),
+      versionGap: setUp ? this._cloudVersionGaps(now).sort((a, b) => Number(b.blocks) - Number(a.blocks))[0] ?? null : null,
       // What C turns the cloud back on to (main/settings.mts cloudWhenOn).
       whenOn: this.config.cloudWhenOn === 'all' ? 'all' : 'full',
       accounts: setUp ? this._cloudAccounts() : [],
@@ -5940,7 +5958,7 @@ export class Supervisor {
     if (engine !== 'codex' && engine !== 'claude') throw new Error('not an engine the cloud runs');
     const which = engineOf(engine);
     this._cloudSignIns ??= new Map();
-    const known = (k: unknown) => typeof k === 'string' && /^acct-[a-z0-9-]{4,40}$/.test(k);
+    const known = (k: unknown): k is string => typeof k === 'string' && /^acct-[a-z0-9-]{4,40}$/.test(k);
     if (action === 'remove') {
       if (!known(key)) throw new Error('not one of the cloud accounts');
       const { storage } = await this._cloudClients().catch(() => ({ storage: null }));
@@ -5951,7 +5969,7 @@ export class Supervisor {
     }
     if (action !== 'start' && !known(key)) throw new Error('not one of the cloud accounts');
     if (action === 'start' && key != null && !listCloudLogins(which, { home: this.config.home }).some((r) => r.key === key)) throw new Error('not one of the cloud accounts');
-    const account = action === 'start' && key == null ? newCloudAccountKey() : key;
+    const account = action === 'start' && key == null ? newCloudAccountKey() : key!;
     const flowKey = `${which}|${account}`;
     const live = this._cloudSignIns.get(flowKey);
     const going = live && !['saved', 'failed'].includes(live.status().state);
@@ -6243,7 +6261,7 @@ export class Supervisor {
     if (this._macVersionsReading) return this._macVersionsReading;
     this._macVersionsAt = Date.now();
     this._macVersionsReading = (async () => {
-      const found: Record<string, string | null> = {};
+      const found: Record<string, string | null | undefined> = {};
       for (const engine of ['claude', 'codex']) {
         try { found[engine] = await this._readMacAgentVersion(engine); } catch { /* not installed here */ }
       }
@@ -6443,7 +6461,7 @@ export class Supervisor {
   }
 
   // A throw still ends the pass, as it always has; it is counted first.
-  _startFromTheQueue(item: WorkItem, opts: SpawnOptions) {
+  _startFromTheQueue(item: WorkItem, opts?: SpawnOptions) {
     try { return this.spawnWorker(item, opts); }
     catch (error) { this._noteNotStarting(item, 'error', this._engineFor(item)); throw error; }
   }
@@ -8535,7 +8553,7 @@ export class Supervisor {
       const sent = submitReply(this, { product, id, answer }, () => this.store.answerItem(product, id, { answer }));
       const out = await Promise.race([sent, late]).finally(() => clearTimeout(timer));
       if (out === 'late') {
-        sent.catch((err) => teammates.noteTrouble(`A message to a running teammate did not land: ${err.message}`));
+        sent.catch((err: Error) => teammates.noteTrouble(`A message to a running teammate did not land: ${err.message}`));
         teammates.noteTrouble('A message to a running teammate is taking a while to land.', now);
       }
       this.wake?.();
@@ -8551,7 +8569,7 @@ export class Supervisor {
       const sent = submitReply(this, { product, id, answer: text, from: from.name }, commit);
       const out = await Promise.race([sent, late]).finally(() => clearTimeout(timer));
       if (out === 'late') {
-        sent.catch((err) => teammates.noteTrouble(`A hand-off to a running teammate did not land: ${err.message}`));
+        sent.catch((err: Error) => teammates.noteTrouble(`A hand-off to a running teammate did not land: ${err.message}`));
         teammates.noteTrouble('A hand-off to a running teammate is taking a while to land.', now);
       }
       this.wake?.();
@@ -8616,7 +8634,7 @@ export class Supervisor {
     const mine = items.filter((i) => i.product === slug);
     const isDigest = (i: WorkItem) => (i.labels ?? []).includes('digest');
     const digests = mine.filter(isDigest);
-    let newest: WorkItem | null = null;
+    let newest = null as WorkItem | null;
     for (const d of digests) if (!newest || (d.createdAt ?? 0) > (newest.createdAt ?? 0)) newest = d;
     // The floor on frequency. Bi-daily read as "no more often than every twelve
     // hours" rather than "at 6 and 18", which is precisely what makes an
@@ -8742,7 +8760,7 @@ export class Supervisor {
     // A RUN ITS ACCOUNT STOPPED PARTWAY goes back to its own session when it
     // is started again (`_noteStoppedByAccount`).
     const stopped = !rowChat && !resumeSessionId ? this._sessionStoppedByAccount(item, engine, product) : null;
-    const forkFrom = !rowChat && !resumeSessionId && !stopped
+    const forkFrom: ForkSource | null = !rowChat && !resumeSessionId && !stopped
       ? (this.forkSourceFor(item, product) ?? this.importedThreadFor(item, product))
       : null;
     const resumeIdOnDisk = resumeSessionId ?? rowChat?.sessionId ?? forkFrom?.sessionId ?? stopped?.sessionId ?? null;
@@ -8791,7 +8809,7 @@ export class Supervisor {
     // stands on words no agent read (w-5f577f2cae).
     if (continuation && item.answer && this.store?.readHistory) {
       const conversation = forkFrom ? null : resumeId;
-      const answer = queuedReplyText(item, this.store.readHistory(item.product, item.id), (row) => this._heardIn(row, conversation));
+      const answer = queuedReplyText(item, this.store.readHistory(item.product, item.id), (row) => this._heardIn(row as WorkItem, conversation)) as string | undefined;
       if (answer !== item.answer) item = { ...item, answer };
     } else if (continuation && toldBy(item)) {
       item = { ...item, answer: framedTeammate(toldBy(item).name, item.answer) };
@@ -8847,7 +8865,7 @@ export class Supervisor {
     // list survives, because buildSessionArgs carries the model, the tools and
     // everything else through untouched. A value that is not one of Claude
     // Code's six is ignored rather than passed to the CLI.
-    const oneOff = CLAUDE_MODES.includes(item.answerMode) ? item.answerMode : null;
+    const oneOff = (CLAUDE_MODES as readonly unknown[]).includes(item.answerMode) ? item.answerMode : null;
     // THE USER'S CONFIG GOES TO THE CLI AS WRITTEN, and only a one-off rewrites
     // it. This was briefly the other way round, running every spawn through
     // buildSessionArgs so that exactly one permission flag always reached the
@@ -8898,7 +8916,7 @@ export class Supervisor {
      * trace this app already
      * keeps puts it in the thread with nothing new written to show it. */
     const review = continuation && harnessFor(engine).capabilities.nativeReview && providerCommand(item.answer, engine)?.name === 'review' ? providerCommand(item.answer, engine) : null;
-    const command = continuation && harnessFor(engine).capabilities.nativeCommands ? commandPrompt(item.answer, this._nativeCommands?.[item.id]) : review ? item.answer.trim() : null;
+    const command = continuation && harnessFor(engine).capabilities.nativeCommands ? commandPrompt(item.answer, this._nativeCommands?.[item.id]) : review ? item.answer!.trim() : null;
     if (command) prompt = command;
     else prompt = withWorkerGitBrief(prompt, product.repoPath);
     if (!command && resumeId) {
@@ -9091,8 +9109,8 @@ export class Supervisor {
     };
     const item = this.store.readItem(productSlug, id);
     const engine = item ? this._engineFor(item) : null;
-    if (!item || !supportsHarnessOperation(engine, 'compact')) return publish('unavailable');
-    const harness = harnessFor(engine);
+    if (!item || !supportsHarnessOperation(engine!, 'compact')) return publish('unavailable');
+    const harness = harnessFor(engine!);
     if (this.sessions.has(id)) return publish('busy');
     const product = this.store.listProducts().find(p => p.slug === productSlug);
     if (!product) return publish('missing');
@@ -9106,7 +9124,7 @@ export class Supervisor {
       const cwd = product.repoPath && fs.existsSync(product.repoPath) ? product.repoPath : product.dir;
       // Same isolated configuration as a worker, with no store tool needed:
       // compaction summarizes the existing thread and never starts an agent turn.
-      return harness.compact(this, rec, cwd);
+      return harness.compact(this, rec, cwd) as Promise<string>;
     }).then(publish, () => publish('failed')).finally(() => {
       this._compactionJobs.delete(key);
       harness.release(this, rec.profile ?? 'default');
@@ -9838,7 +9856,7 @@ export class Supervisor {
       // thread already running cannot un-launch them. Read fresh for THIS start
       // rather than once per app-server, and never caught: see `_codexIsolation`.
       ready: this._codexIsolation(client, handshake),
-      threadParams: (mcpServers: unknown) => this.codexThreadParamsFor(plan, cwd, mcpServers, storeServer, home, { cloud }),
+      threadParams: (mcpServers: unknown) => this.codexThreadParamsFor(plan, cwd, mcpServers as unknown[], storeServer, home, { cloud }),
       turnParams: this.codexTurnParamsFor(plan),
       resumeThreadId: plan.resumeId,
       // The card, which is the other half of what a worker needs to be able to
@@ -9870,13 +9888,13 @@ export class Supervisor {
     // takes it away any more (w-4b00022acb), so this hook is the whole of how a
     // dead run's card leaves.
     worker.once('exit', () => {
-      try { cards.close('the run that asked this has stopped'); } catch (e) { console.warn('zero: could not close a codex worker cards:', e?.message ?? e); }
+      try { cards.close('the run that asked this has stopped'); } catch (e) { console.warn('zero: could not close a codex worker cards:', (e as Error)?.message ?? e); }
     });
     // A CLOUD WORKER ENDS WHEN ITS WORK IS HOME, not when its turn ends
     // (main/cloud/codex-cloud.mts); its cards close at the turn's end.
     if (cloud) {
       holdUntilHome({
-        worker, client, procExit,
+        worker, client, procExit: procExit!,
         onTurnEnd: () => { try { cards.close('the run that asked this has stopped'); } catch { /* already closed */ } },
       });
     }
@@ -9988,7 +10006,7 @@ export class Supervisor {
    */
   // `home` is the login this thread runs on. Its own list is the one checked:
   // reading the main login's let a free-plan login be handed gpt-6.1-sol.
-  codexThreadParamsFor(plan: SpawnPlan, cwd: string, mcpServers: unknown, storeServer: ToolServer | null, home: string = this._codexHome(), { cloud = false }: { cloud?: boolean } = {}) {
+  codexThreadParamsFor(plan: SpawnPlan, cwd: string, mcpServers: unknown[], storeServer: ToolServer | null, home: string = this._codexHome(), { cloud = false }: { cloud?: boolean } = {}) {
     // ASKED HERE RATHER THAN CARRIED ON THE PLAN. A precomputed field would be
     // a second copy of this decision that a caller can forget to set, and the
     // way it fails is a word Codex cannot read reaching `thread/start` -- which
@@ -10034,7 +10052,7 @@ export class Supervisor {
      shapes it. Nothing on the row sends nothing, and then the * `model_reasoning_effort`
      line in her own config.toml decides, exactly as * her terminal does.
   */
-  codexTurnParamsFor(plan: SpawnPlan) {
+  codexTurnParamsFor(plan: SpawnPlan): CodexTurn {
     if (plan?.reviewTarget) return { reviewTarget: plan.reviewTarget };
     const effort = typeof plan?.effort === 'string' && isEffortWord(plan.effort) ? plan.effort : null;
     // AND THE PICTURES SHE ATTACHED, AS PICTURES (MP-09). `UserInput` is an
@@ -10247,8 +10265,8 @@ export class Supervisor {
   // (after the work is home) is what `holdUntilHome` waits for. Kept apart from
   // the shared servers, and closed with them when the app quits.
   _cloudCodexServer({ cwd, item, home }: { cwd: string; item: WorkItem; home: string }): CodexServerEntry {
-    let resolveExit!: (value: unknown) => void;
-    const procExit = new Promise((resolve) => { resolveExit = resolve; });
+    let resolveExit!: (value: ProcExit) => void;
+    const procExit = new Promise<ProcExit>((resolve) => { resolveExit = resolve; });
     const client = createCodexAppServer({
       spawn: () => {
         const proc = this._spawnCloudRelay(['--agentbox-codex', 'app-server'], {
@@ -10434,7 +10452,7 @@ export class Supervisor {
    * and asking with the cwd would only start producing names that kill the run.
    * The measurements are in that file.
    */
-  _codexIsolation(client, handshake) {
+  _codexIsolation(client: CodexClient, handshake: Promise<unknown>) {
     return handshake
       .then(() => client.request('config/read', {}))
       .then((read) => mcpServerNames(read));
@@ -10469,7 +10487,7 @@ export class Supervisor {
    * for itself worth nothing (main/codex-approvals.mjs). False for a Claude
    * Code worker's card, which this spool has never heard of.
    */
-  settleCodexApproval(id, allow, note) {
+  settleCodexApproval(id: string, allow: boolean, note?: string) {
     return this._codexCards?.settle(id, allow, note) ?? false;
   }
 
@@ -10483,20 +10501,20 @@ export class Supervisor {
    * this may never invent a refusal: that engine's own check happens where its
    * request actually lives (main/approval-prompt-server.mts).
    */
-  codexCardChanged(id, shown) {
+  codexCardChanged(id: string, shown: unknown) {
     return this._codexCards?.changed(id, shown) ?? false;
   }
 
   // A loaded app-server thread holds Codex's writer lock even after its turn
   // finishes. Closing an idle account returns its sessions to the native CLI.
-  _releaseIdleCodex(profile = 'default') {
+  _releaseIdleCodex(profile: string = 'default') {
     // A cloud Codex run is not on this login's shared server.
     if ([...this.sessions.values()].some(s => s.engine === 'codex' && !s.cloud && (s.profile ?? 'default') === profile)) return;
     if ([...(this._compactionJobs?.values() ?? [])].some(j => (j.profile ?? 'default') === profile)) return;
     const home = this._codexProfileHome(profile);
     const entry = this._codexServers?.get(home);
     if (!entry) return;
-    this._codexServers.delete(home);
+    this._codexServers!.delete(home);
     entry.client.close('Account idle; release native session ownership');
   }
 
@@ -10815,7 +10833,7 @@ export class Supervisor {
     // A CLOUD RUN IS THE SAME HARNESS, A DIFFERENT PROGRAM: Claude Code's runs
     // main/cloud/run-cli.mts with the same arguments (main/harnesses/claude.mts),
     // Codex's talks to an app-server in the sandbox (`_spawnCodexWorker`).
-    const child: WorkerChild = harness.spawn(this, plan, { cwd, item, profile, env, cloud: where === 'cloud' });
+    const child: WorkerChild = harness.spawn(this, plan, { cwd, item, profile, env, cloud: where === 'cloud' }) as WorkerChild;
 
     // `command` RIDES ON THE SESSION so the cap can leave it out (`_load`).
     // The exit handler already needed the same fact from `plan`; this is that
@@ -10857,7 +10875,7 @@ export class Supervisor {
     this.count?.('run_started', { engine });
     this._notStarting?.delete(item.id);
     // Its worker, so a run left "running" by a crash can later be told ended.
-    if (Number.isInteger(child?.pid)) this._leftoverCleaner?.worker(item.id, child.pid);
+    if (Number.isInteger(child?.pid)) this._leftoverCleaner?.worker(item.id, child.pid!);
     if (harness.capabilities.remoteControl) {
       harness.attachInput(child);
       if (remoteOnly) { child.holdInput!(true); session.remoteIdle = true; session.remoteHeld = true; }
@@ -11960,7 +11978,7 @@ export class Supervisor {
   // resume with the params this computer would give it and the turn's own
   // settings; the relay rewrites them for the cloud (main/cloud/run.mts
   // `codexKitOpen`). A thread with no conversation yet, or a review, has none.
-  _codexKitLaunch(item: WorkItem, plan: SpawnPlan, { cwd, profile }: { cwd: string; profile: string | null | undefined }) {
+  _codexKitLaunch(item: WorkItem, plan: SpawnPlan, { cwd, profile }: { cwd: string; profile: string | null | undefined }): { args: string[]; env: NodeJS.ProcessEnv } | null {
     if (!plan.resumeId || plan.reviewTarget) return null;
     const home = this._codexProfileHome(profile);
     const params = this.codexThreadParamsFor(plan, cwd, [], this._codexStoreServer(item), home, { cloud: true });
@@ -12101,8 +12119,8 @@ export class Supervisor {
   // The copy of the new-thread kit the server would have taken: the coding
   // agent she chose, or the one the project gives a new thread (cloud/gateway/phone.mjs).
   _newThreadCopyFor(slug: string, chosen: unknown) {
-    const read = (engine: string): KitCopy | null => {
-      const k: KitCopy | null = readKitCopy(kitCopyPath(this.userDir, slug, engine === 'codex' ? NEW_THREAD_CODEX : NEW_THREAD));
+    const read = (engine: string) => {
+      const k = readKitCopy(kitCopyPath(this.userDir, slug, engine === 'codex' ? NEW_THREAD_CODEX : NEW_THREAD)) as KitCopy | null;
       return k?.project === slug && k.engine === engine ? k : null;
     };
     if (chosen === 'codex') return read('codex');
@@ -12166,7 +12184,7 @@ export class Supervisor {
       // Its branch at the main the kit saw, so the folder made next is on it.
       if (!kit.plain) {
         try { await gitAsync(root, ['rev-parse', '--verify', '-q', `refs/heads/${kit.branch}`]); } catch {
-          await gitAsync(root, ['branch', kit.branch, filled.mainSha]);
+          await gitAsync(root, ['branch', kit.branch!, filled.mainSha!]);
         }
       }
       const folder = kit.plain ? base : await this._makeTaskFolder(base, itemId);
@@ -12176,7 +12194,7 @@ export class Supervisor {
       }
       fs.mkdirSync(path.dirname(kitCopyPath(this.userDir, slug, itemId)), { recursive: true });
       fs.writeFileSync(kitCopyPath(this.userDir, slug, itemId), JSON.stringify(kit), { mode: 0o600 });
-      writeMarker(place, markerForCloudRun(kit, runId));
+      writeMarker(place, markerForCloudRun(kit as KitCopy, runId));
       await makeRow();
       const carrying = this._answerHeard(slug, itemId, replies);
       const codex = kit.engine === 'codex';
@@ -12211,7 +12229,7 @@ export class Supervisor {
   // `carried`: the run is of a reply this computer handed over while asleep,
   // which is on the row already and is what the run carries.
   async adoptCloudRun({ product: slug, itemId, runId, replies = [], carried = false }: { product: string; itemId: string; runId: string; replies?: string[]; carried?: boolean }) {
-    const kit: KitCopy | null = readKitCopy(kitCopyPath(this.userDir, slug, itemId));
+    const kit = readKitCopy(kitCopyPath(this.userDir, slug, itemId)) as KitCopy | null;
     if (!kit || kit.item !== itemId || kit.project !== slug) {
       for (const reply of replies) this.store.answerItem(slug, itemId, { answer: reply, status: 'open' });
       if (carried) this.takenBack({ item: itemId });

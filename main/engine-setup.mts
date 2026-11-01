@@ -23,18 +23,59 @@ import { harnessFor } from './harnesses.mts';
 // terminal already uses.
 
 import { spawn as nodeSpawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { terminalEnv } from './task-terminals.mts';
 import { codexLaunchEnv } from './codex-launch-env.mts';
 
-export function installCommand(engine) { return harnessFor(engine).install(); }
+export interface SetupSpawnOptions { env?: NodeJS.ProcessEnv; onData?: (data: unknown) => void; keepStdin?: boolean }
+
+/** A running command: its exit code settles `exit`. */
+export interface SetupProcess { exit: Promise<number>; kill(): void }
+
+/** What the finder answers for a tool. */
+export interface EngineFound { found?: boolean; path?: string | null; certain?: boolean }
+
+export interface EngineSetupOptions {
+  find: (engine: string) => EngineFound | Promise<EngineFound>;
+  spawn?: (file: string, args: string[], options?: SetupSpawnOptions) => SetupProcess;
+  wait?: (ms: number) => Promise<unknown>;
+  env?: NodeJS.ProcessEnv;
+  poll?: number;
+  onSignIn?: (engine: string, signedIn: boolean) => void;
+}
+
+interface SetupJob {
+  engine: string;
+  phase: string;
+  error: string | null;
+  log: string;
+  running: SetupProcess | null;
+  login: SetupProcess | null;
+  run: number;
+  already?: boolean;
+  bin?: string | null;
+}
+
+export interface EngineSetupStatus {
+  engine: string;
+  phase: string;
+  error: string | null;
+  log: string;
+  bin: string | null;
+  already: boolean;
+}
+
+export interface EngineReadiness { engine: string; found: boolean; signedIn: boolean; certain: boolean; error?: string }
+
+export function installCommand(engine: string) { return harnessFor(engine).install(); }
 
 /** The plan, never the API console: `--claudeai` is Claude Code's own name for it. */
-export function signInCommand(engine, bin) {
+export function signInCommand(engine: string, bin: string) {
   return harnessFor(engine).signIn(bin);
 }
 
 /** Exit 0 is signed in and 1 is not, for both (measured 2026-10-05). */
-export function statusCommand(engine, bin) {
+export function statusCommand(engine: string, bin: string) {
   return harnessFor(engine).signInStatus(bin);
 }
 
@@ -43,25 +84,25 @@ const STATUS_TIMEOUT = 15_000;
 const POLL = 2_000;
 const ANSI = /\x1b\[[0-9;?]*[A-Za-z]/g;
 
-function realSpawn(file, args, { env, onData, keepStdin = false } = {}) {
-  let child;
+function realSpawn(file: string, args: string[], { env, onData, keepStdin = false }: SetupSpawnOptions = {}): SetupProcess {
+  let child: ChildProcess;
   try {
     child = nodeSpawn(file, args, { env, stdio: [keepStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] });
   } catch (error) {
-    onData?.(`${error.message}\n`);
+    onData?.(`${(error as Error).message}\n`);
     return { exit: Promise.resolve(127), kill() {} };
   }
-  const feed = (d) => onData?.(String(d));
+  const feed = (d: unknown) => onData?.(String(d));
   child.stdout?.on('data', feed);
   child.stderr?.on('data', feed);
-  const exit = new Promise((resolve) => {
+  const exit = new Promise<number>((resolve) => {
     child.on('exit', (code) => resolve(code ?? 1));
     child.on('error', (error) => { onData?.(`${error.message}\n`); resolve(127); });
   });
   return { exit, kill: () => { try { child.kill('SIGTERM'); } catch { /* already gone */ } } };
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * One setup per tool, held for the life of the app.
@@ -71,22 +112,22 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * config so the rest of the app runs on what was just installed). `spawn` and
  * `wait` are seams for the tests; nothing in the app passes them.
  */
-export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env = process.env, poll = POLL, onSignIn = () => {} } = {}) {
+export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env = process.env, poll = POLL, onSignIn = () => {} }: EngineSetupOptions = {} as EngineSetupOptions) {
   const runEnv = terminalEnv(env);
-  const toolEnv = (engine, bin) => engine === 'codex' ? codexLaunchEnv(bin, runEnv) : runEnv;
-  const jobs = new Map();
+  const toolEnv = (engine: string, bin: string | null | undefined) => engine === 'codex' ? codexLaunchEnv(bin, runEnv) : runEnv;
+  const jobs = new Map<string, SetupJob>();
 
-  const fresh = (engine) => ({ engine, phase: 'idle', error: null, log: '', running: null, login: null, run: 0 });
-  const job = (engine) => { if (!jobs.has(engine)) jobs.set(engine, fresh(engine)); return jobs.get(engine); };
-  const say = (j, text) => { j.log = (j.log + String(text).replace(ANSI, '')).slice(-LOG_LIMIT); };
-  const lastLine = (text) => text.split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? '';
+  const fresh = (engine: string): SetupJob => ({ engine, phase: 'idle', error: null, log: '', running: null, login: null, run: 0 });
+  const job = (engine: string) => { if (!jobs.has(engine)) jobs.set(engine, fresh(engine)); return jobs.get(engine)!; };
+  const say = (j: Pick<SetupJob, 'log'>, text: unknown) => { j.log = (j.log + String(text).replace(ANSI, '')).slice(-LOG_LIMIT); };
+  const lastLine = (text: string) => text.split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? '';
 
-  async function signedIn(j, bin) {
-    const { file, args } = statusCommand(j.engine, bin);
+  async function signedIn(j: Pick<SetupJob, 'engine' | 'log'>, bin: string | null | undefined) {
+    const { file, args } = statusCommand(j.engine, bin!);
     let output = '';
     const p = spawn(file, args, { env: toolEnv(j.engine, bin), onData: (d) => { output = (output + String(d).replace(ANSI, '')).slice(-LOG_LIMIT); } });
     const TIMED_OUT = Symbol('no answer');
-    const code = await Promise.race([p.exit, wait(STATUS_TIMEOUT).then(() => { p.kill(); return TIMED_OUT; })]);
+    const code = await Promise.race([p.exit, wait(STATUS_TIMEOUT).then((): typeof TIMED_OUT => { p.kill(); return TIMED_OUT; })]);
     // TOLD TO THE APP, which routes on it (w-d5d632e503): a Claude Code that
     // is signed out beside a Codex that is signed in is a Mac that runs on
     // Codex. Only a real yes or no; a check that never answered says nothing.
@@ -99,15 +140,15 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
       : `${name} could not check sign-in: ${lastLine(output) || `exit ${code}`}`);
   }
 
-  function startLogin(j, bin) {
+  function startLogin(j: SetupJob, bin: string | null | undefined) {
     j.login?.kill();
-    const { file, args } = signInCommand(j.engine, bin);
+    const { file, args } = signInCommand(j.engine, bin!);
     const login = spawn(file, args, { env: toolEnv(j.engine, bin), keepStdin: true, onData: (d) => say(j, d) });
     j.login = login;
     return login;
   }
 
-  async function go(j, run) {
+  async function go(j: SetupJob, run: number) {
     const live = () => j.run === run;
     let hit = await find(j.engine);
     if (!live()) return;
@@ -133,14 +174,14 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
     j.phase = 'signing-in';
     let login = startLogin(j, hit.path);
     let ended = false;
-    const watchLogin = (loginProcess) => loginProcess.exit.then(() => { if (loginProcess === j.login) ended = true; });
+    const watchLogin = (loginProcess: SetupProcess) => loginProcess.exit.then(() => { if (loginProcess === j.login) ended = true; });
     watchLogin(login);
     for (;;) {
       await wait(poll);
       if (!live()) return;
       if (await signedIn(j, hit.path)) { if (live()) ready(j); return; }
       if (j.login !== login) {
-        login = j.login;
+        login = j.login!;
         ended = false;
         watchLogin(login);
       }
@@ -156,11 +197,11 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
     }
   }
 
-  function ready(j) { j.login?.kill(); j.login = null; j.phase = 'ready'; j.error = null; }
-  function fail(j, error) { j.login?.kill(); j.login = null; j.phase = 'failed'; j.error = error; }
+  function ready(j: SetupJob) { j.login?.kill(); j.login = null; j.phase = 'ready'; j.error = null; }
+  function fail(j: SetupJob, error: string) { j.login?.kill(); j.login = null; j.phase = 'failed'; j.error = error; }
 
   return {
-    start(engine) {
+    start(engine: string): EngineSetupStatus {
       const j = job(engine);
       if (['installing', 'checking', 'signing-in'].includes(j.phase)) return this.status(engine);
       j.run += 1; j.phase = 'checking'; j.error = null; j.log = '';
@@ -169,12 +210,12 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
       return this.status(engine);
     },
     /** Kill the sign-in that is waiting and start a new one, which opens the page again. */
-    signInAgain(engine) {
+    signInAgain(engine: string): EngineSetupStatus {
       const j = job(engine);
       if (j.phase === 'signing-in' && j.bin) startLogin(j, j.bin);
       return this.status(engine);
     },
-    cancel(engine) {
+    cancel(engine: string): EngineSetupStatus {
       const j = job(engine);
       j.run += 1;
       j.running?.kill(); j.login?.kill();
@@ -182,7 +223,7 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
       if (j.phase !== 'ready') j.phase = 'idle';
       return this.status(engine);
     },
-    status(engine) {
+    status(engine: string): EngineSetupStatus {
       const j = job(engine);
       return { engine, phase: j.phase, error: j.error, log: j.log, bin: j.bin ?? null, already: !!j.already };
     },
@@ -194,15 +235,15 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
      *  `certain` is whether anything was established at all, the same rule
      *  `signedIn` above keeps for the app's routing: a check that never
      *  answered says nothing, rather than no. */
-    async readiness(engine) {
+    async readiness(engine: string): Promise<EngineReadiness> {
       const hit = await find(engine);
       if (!hit?.found) return { engine, found: false, signedIn: false, certain: hit?.certain !== false };
       try { return { engine, found: true, signedIn: await signedIn({ engine, log: '' }, hit.path), certain: true }; }
-      catch (error) { return { engine, found: true, signedIn: false, certain: false, error: error.message }; }
+      catch (error) { return { engine, found: true, signedIn: false, certain: false, error: (error as Error).message }; }
     },
     /** The same question against a path already found, so asking it at
      *  launch does not search the Mac again. */
-    signedInNow(engine, bin) {
+    signedInNow(engine: string, bin: string | null | undefined) {
       return signedIn({ engine, log: '' }, bin).catch(() => false);
     },
   };

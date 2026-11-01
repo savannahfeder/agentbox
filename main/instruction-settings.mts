@@ -16,19 +16,19 @@ import {nameSlug} from '../shared/product-name.mjs';
 // it is off. Kept in its own file so edits to it never mix with the user's own
 // rules, and survive while the mode is off. Whether it is on lives in the
 // config (`adhdMode`).
-const files = {rules:'founder.md',messages:'message-rules.md',adhd:'adhd-mode.md',system:'worker.md'};
+const files: Record<string, string> = {rules:'founder.md',messages:'message-rules.md',adhd:'adhd-mode.md',system:'worker.md'};
 // The two names the joined document replaced, read only by the migration.
 const WAS_MESSAGES = ['writing-rules.md','finishing.md'];
 const UNIFIED = '.unified-agent-instructions';
-export function agentInstructionsUnified(appDir) {
+export function agentInstructionsUnified(appDir: string): boolean {
  return fs.existsSync(path.join(appDir,'briefs',UNIFIED));
 }
-function sectionFor(appDir,id) {
+function sectionFor(appDir: string,id: string): string {
  fileFor(id);
  return id==='messages' && agentInstructionsUnified(appDir) ? 'rules' : id;
 }
-const defaults = JSON.parse(fs.readFileSync(fileURLToPath(new URL('../shared/instruction-defaults.json',import.meta.url)),'utf8'));
-function fileFor(id) {
+const defaults = JSON.parse(fs.readFileSync(fileURLToPath(new URL('../shared/instruction-defaults.json',import.meta.url)),'utf8')) as Record<string, string>;
+function fileFor(id: string): string {
  if (!Object.hasOwn(files,id)) throw new Error('Unknown instruction section');
  return files[id];
 }
@@ -36,13 +36,13 @@ function fileFor(id) {
 // box starts empty like the general one (w-3ec9f07978): the app's own message
 // rules are not the user's to edit, because the inbox reads every message by
 // them, so they ride on every run from the checkout and never sit in the box.
-const boxDefault=(id)=>(id==='rules'||id==='messages') ? '' : defaults[id];
-export function readInstruction(appDir,id,shippedDir=appDir) {
+const boxDefault=(id: string): string=>(id==='rules'||id==='messages') ? '' : defaults[id];
+export function readInstruction(appDir: string,id: string,shippedDir: string=appDir): { text: string; defaultText: string } {
  id=sectionFor(appDir,id);
  const file=fileFor(id);
  const defaultText=boxDefault(id);
  let text=defaultText;
- try {text=fs.readFileSync(path.join(appDir,'briefs',file),'utf8');} catch(e) {if(e.code!=='ENOENT') throw e; if(id==='system') text=readSystemTemplate(shippedDir,appDir);}
+ try {text=fs.readFileSync(path.join(appDir,'briefs',file),'utf8');} catch(e) {if((e as NodeJS.ErrnoException).code!=='ENOENT') throw e; if(id==='system') text=readSystemTemplate(shippedDir,appDir);}
  return {text,defaultText};
 }
 /**
@@ -69,30 +69,31 @@ export function readInstruction(appDir,id,shippedDir=appDir) {
 const HISTORY='instruction-history';
 const KEEP=20;
 const QUIET_MS=10*60*1000;
-function historyDir(appDir,id) {return path.join(appDir,HISTORY,id);}
-export function listVersions(appDir,id) {
+function historyDir(appDir: string,id: string) {return path.join(appDir,HISTORY,id);}
+export interface InstructionVersion { ts: number; chars: number }
+export function listVersions(appDir: string,id: string): InstructionVersion[] {
  id=sectionFor(appDir,id);
  const dir=historyDir(appDir,id);
- let names;
- try {names=fs.readdirSync(dir);} catch(e) {if(e.code!=='ENOENT') throw e; return [];}
- return names.filter(n=>n.endsWith('.md')).map(n=>{
+ let names: string[];
+ try {names=fs.readdirSync(dir);} catch(e) {if((e as NodeJS.ErrnoException).code!=='ENOENT') throw e; return [];}
+ return (names.filter(n=>n.endsWith('.md')).map(n=>{
   const ts=Number(n.slice(0,-3));
   if(!Number.isFinite(ts)) return null;
   try {return {ts,chars:fs.readFileSync(path.join(dir,n),'utf8').length};} catch {return null;}
- }).filter(Boolean).sort((a,b)=>b.ts-a.ts);
+ }).filter(Boolean) as InstructionVersion[]).sort((a,b)=>b.ts-a.ts);
 }
-export function readVersion(appDir,id,ts) {
+export function readVersion(appDir: string,id: string,ts: unknown): { text: string } {
  id=sectionFor(appDir,id);
  const at=Number(ts);
  if(!Number.isFinite(at)) throw new Error('Unknown version');
  return {text:fs.readFileSync(path.join(historyDir(appDir,id),`${at}.md`),'utf8')};
 }
-function keepVersion(appDir,id,now=Date.now(),always=false) {
+function keepVersion(appDir: string,id: string,now: number=Date.now(),always: boolean=false) {
  try {
   const live=path.join(appDir,'briefs',fileFor(id));
-  let stat,text;
+  let stat: fs.Stats,text: string;
   try {stat=fs.statSync(live); text=fs.readFileSync(live,'utf8');}
-  catch(e) {if(e.code!=='ENOENT') throw e; return;}
+  catch(e) {if((e as NodeJS.ErrnoException).code!=='ENOENT') throw e; return;}
   if(!always&&now-stat.mtimeMs<QUIET_MS) return;
   const ts=Math.floor(stat.mtimeMs);
   const have=listVersions(appDir,id);
@@ -102,9 +103,9 @@ function keepVersion(appDir,id,now=Date.now(),always=false) {
   fs.mkdirSync(dir,{recursive:true});
   fs.writeFileSync(path.join(dir,`${ts}.md`),text,'utf8');
   for(const old of [{ts},...have].sort((a,b)=>b.ts-a.ts).slice(KEEP)) fs.rmSync(path.join(dir,`${old.ts}.md`),{force:true});
- } catch(e) {console.warn(`${nameSlug}: could not keep a restore point for ${id}: ${e.message}`);}
+ } catch(e) {console.warn(`${nameSlug}: could not keep a restore point for ${id}: ${(e as Error).message}`);}
 }
-export function writeInstruction(appDir,id,text,now=Date.now()) {
+export function writeInstruction(appDir: string,id: string,text: unknown,now: number=Date.now()): { ok: true } {
  id=sectionFor(appDir,id);
  const file=fileFor(id);
  if(typeof text!=='string') throw new Error('Instructions must be text');
@@ -118,10 +119,10 @@ export function writeInstruction(appDir,id,text,now=Date.now()) {
 }
 
 // Installed bundles are read-only. User templates shadow the shipped brief.
-export function readSystemTemplate(appDir,dataDir=appDir) {
+export function readSystemTemplate(appDir: string,dataDir: string=appDir): string {
  for(const root of new Set([dataDir,appDir])) {
   try {return fs.readFileSync(path.join(root,'briefs','worker.md'),'utf8');}
-  catch(e) {if(e.code!=='ENOENT') throw e;}
+  catch(e) {if((e as NodeJS.ErrnoException).code!=='ENOENT') throw e;}
  }
  return defaults.system;
 }
@@ -149,21 +150,21 @@ export function readSystemTemplate(appDir,dataDir=appDir) {
  *
  * Returns the ids it carried, so a caller can say what really happened.
  */
-export function carryHerBriefsAcross(fromDir,toDir) {
- const carried=[];
+export function carryHerBriefsAcross(fromDir: string | null | undefined,toDir: string | null | undefined): string[] {
+ const carried: string[]=[];
  if(!fromDir||!toDir||path.resolve(fromDir)===path.resolve(toDir)) return carried;
  for(const [id,file] of Object.entries(files)) {
   try {
    if(id==='messages' && agentInstructionsUnified(toDir)) continue;
    const target=path.join(toDir,'briefs',file);
    if(fs.existsSync(target)) continue;
-   let text;
+   let text: string;
    try {text=fs.readFileSync(path.join(fromDir,'briefs',file),'utf8');}
-   catch(e) {if(e.code!=='ENOENT') console.warn(`${nameSlug}: could not read ${file}: ${e.message}`); continue;}
+   catch(e) {if((e as NodeJS.ErrnoException).code!=='ENOENT') console.warn(`${nameSlug}: could not read ${file}: ${(e as Error).message}`); continue;}
    if(text===(id==='rules' ? '' : defaults[id])) continue;
    writeInstruction(toDir,id,text);
    carried.push(id);
-  } catch(e) {console.warn(`${nameSlug}: could not carry ${file} into the data folder: ${e.message}`);}
+  } catch(e) {console.warn(`${nameSlug}: could not carry ${file} into the data folder: ${(e as Error).message}`);}
  }
  return carried;
 }
@@ -199,19 +200,19 @@ export function carryHerBriefsAcross(fromDir,toDir) {
  *
  * Never throws, never overwrites. Returns what it joined, or null.
  */
-export function joinMessageRules(shippedDir,toDir) {
+export function joinMessageRules(shippedDir: string,toDir: string): { writing: number; ending: number; total: number } | null {
  try {
   if(agentInstructionsUnified(toDir)) return null;
   const target=path.join(toDir,'briefs',files.messages);
   if(fs.existsSync(target)) return null;
-  const read=(name)=>{try {return fs.readFileSync(path.join(toDir,'briefs',name),'utf8');} catch {return null;}};
+  const read=(name: string)=>{try {return fs.readFileSync(path.join(toDir,'briefs',name),'utf8');} catch {return null;}};
   const [writing,finishing]=WAS_MESSAGES.map((name)=>(read(name) ?? '').trim());
   if(!writing && !finishing) return null;
   const joined=[writing,finishing].filter(Boolean).join('\n\n');
   writeInstruction(toDir,'messages',`${joined}\n`);
   return {writing:writing.length,ending:finishing.length,total:joined.length+1};
  } catch(e) {
-  console.warn(`${nameSlug}: could not join the message rules: ${e.message}`);
+  console.warn(`${nameSlug}: could not join the message rules: ${(e as Error).message}`);
   return null;
  }
 }
@@ -229,12 +230,12 @@ export function joinMessageRules(shippedDir,toDir) {
  * Exact only. One line of the user's own makes the whole file theirs, and
  * nothing here tries to cut it apart. Never throws. Returns whether it acted.
  */
-export function setAsideShippedMessageRules(shippedDir,toDir) {
+export function setAsideShippedMessageRules(shippedDir: string,toDir: string): boolean {
  try {
   if(agentInstructionsUnified(toDir)) return false;
   const target=path.join(toDir,'briefs',files.messages);
   if(path.resolve(shippedDir)===path.resolve(toDir)||!fs.existsSync(target)) return false;
-  const read=(name)=>{try {return fs.readFileSync(path.join(shippedDir,'briefs',name),'utf8').trim();} catch {return '';}};
+  const read=(name: string)=>{try {return fs.readFileSync(path.join(shippedDir,'briefs',name),'utf8').trim();} catch {return '';}};
   const writing=read(WAS_MESSAGES[0]);
   const endings=[...new Set([read(files.messages),defaults.messages.trim()])].filter(Boolean);
   const ours=new Set([...endings,...endings.map((e)=>[writing,e].filter(Boolean).join('\n\n'))]);
@@ -244,7 +245,7 @@ export function setAsideShippedMessageRules(shippedDir,toDir) {
   fs.rmSync(target,{force:true});
   return true;
  } catch(e) {
-  console.warn(`${nameSlug}: could not set aside the shipped message rules: ${e.message}`);
+  console.warn(`${nameSlug}: could not set aside the shipped message rules: ${(e as Error).message}`);
   return false;
  }
 }
@@ -253,7 +254,7 @@ export function setAsideShippedMessageRules(shippedDir,toDir) {
 // Original message files and their histories remain on disk for recovery.
 // The completion marker prevents later boots reimporting them after an edit
 // or an intentional empty save. A failed save leaves both originals active.
-export function unifyAgentInstructions(shippedDir,toDir) {
+export function unifyAgentInstructions(shippedDir: string,toDir: string): { general: number; writing: number } | null {
  try {
   if(path.resolve(shippedDir)===path.resolve(toDir)||agentInstructionsUnified(toDir)) return null;
   const general=readInstruction(toDir,'rules').text;
@@ -273,7 +274,7 @@ export function unifyAgentInstructions(shippedDir,toDir) {
   fs.renameSync(temporary,marker);
   return {general:general.length,writing:writing.length};
  } catch(e) {
-  console.warn(`${nameSlug}: could not combine the agent instructions: ${e.message}`);
+  console.warn(`${nameSlug}: could not combine the agent instructions: ${(e as Error).message}`);
   return null;
  }
 }

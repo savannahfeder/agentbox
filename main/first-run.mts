@@ -26,8 +26,16 @@ const README = ['README.md', 'README', 'README.txt', 'README.markdown', 'readme.
  *  sometimes a book, and the whole of one has no business in memory here. */
 const READ_BYTES = 64 * 1024;
 
-function readHead(file) {
-  let fd = null;
+export interface FolderCount {
+  files: number;
+  dirs: number;
+  ext: Record<string, number>;
+  newest: number;
+  capped: boolean;
+}
+
+function readHead(file: string) {
+  let fd: number | null = null;
   try {
     fd = fs.openSync(file, 'r');
     const buf = Buffer.alloc(READ_BYTES);
@@ -44,14 +52,14 @@ function readHead(file) {
  * The readme at the top of a folder, whatever it is called. Only the top
  *  level, which is the bound she took as recommended on round four: "Read the
  *  readme and the top level of this folder, and nothing deeper than that." */
-export function readReadme(folder) {
+export function readReadme(folder: string | null | undefined) {
   if (!folder) return null;
   for (const name of README) {
     const file = path.join(folder, name);
     if (fs.existsSync(file)) return readHead(file);
   }
   // A folder whose readme is spelled some other way. One listing, top level.
-  let entries = [];
+  let entries: string[] = [];
   try { entries = fs.readdirSync(folder); } catch { return null; }
   const hit = entries.find((e) => /^readme(\.|$)/i.test(e));
   return hit ? readHead(path.join(folder, hit)) : null;
@@ -60,7 +68,7 @@ export function readReadme(folder) {
 /**
  * The one field in a manifest that says what a thing is. package.json is the
  *  common case by a distance; the other two cost two lines each. */
-export function readDescription(folder) {
+export function readDescription(folder: string | null | undefined) {
   if (!folder) return null;
   const pkg = path.join(folder, 'package.json');
   if (fs.existsSync(pkg)) {
@@ -87,7 +95,7 @@ export function readDescription(folder) {
  * project folders in ~/Desktop/dev on 2026-08-21, only 16 of them have a line
  * anywhere that says what the project is. It is what goes UNDER THE PROJECT'S
  * NAME IN THE SIDEBAR, which is the job it was wanted for. */
-export function describeFor({ folder, name, shortFolder }) {
+export function describeFor({ folder, name, shortFolder }: { folder: string | null | undefined; name?: string; shortFolder?: string | null }) {
   try {
     return firstRunAnswer({
       readme: readReadme(folder),
@@ -117,7 +125,7 @@ export function describeFor({ folder, name, shortFolder }) {
  *  project called `Documents` inside somebody's code folder is their project;
  *  `~/Documents` is not. A project INSIDE a guarded folder still counts
  *  normally, because the walk starts below the guard. */
-function guardedPaths(home) {
+function guardedPaths(home: unknown): Set<string> {
   const h = String(home ?? '').replace(/\/+$/, '');
   if (!h) return new Set();
   return new Set(
@@ -131,12 +139,12 @@ function guardedPaths(home) {
  *  is not the person's own work, never entering a folder macOS guards, and
  *  stopping at a hard cap so a folder with a million files in it cannot turn a
  *  two second promise into a long one. */
-export function countFolder(folder, { cap = 20_000, home = os.homedir() } = {}) {
-  const out = { files: 0, dirs: 0, ext: Object.create(null), newest: 0, capped: false };
+export function countFolder(folder: string, { cap = 20_000, home = os.homedir() }: { cap?: number; home?: string } = {}) {
+  const out: FolderCount = { files: 0, dirs: 0, ext: Object.create(null), newest: 0, capped: false };
   const guarded = guardedPaths(home);
-  const walk = (dir, depth) => {
+  const walk = (dir: string, depth: number) => {
     if (out.files >= cap) { out.capped = true; return; }
-    let entries = [];
+    let entries: fs.Dirent[] = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const e of entries) {
       if (out.files >= cap) { out.capped = true; return; }
@@ -160,7 +168,7 @@ export function countFolder(folder, { cap = 20_000, home = os.homedir() } = {}) 
  * Git's own words for when the folder last changed, or null when it is not a
  *  repo. Its answer is better than a file's timestamp, which a checkout or a
  *  build can move without anybody having written anything. */
-export function lastCommit(folder) {
+export function lastCommit(folder: string) {
   try {
     // GIT_DIR beats `-C`, so a shell that exported one (a git hook does, and so
     // does anything launched from inside one) would have every folder answer
@@ -180,11 +188,11 @@ export function lastCommit(folder) {
  * THE FIRST TASK'S ANSWER.The sentence is ours and every number in it is read
  * off the folder chosen two screens earlier, so it is true about any project
  * and cannot be a guess about what that project is. Never throws. */
-export function answerFor({ folder, name }) {
+export function answerFor({ folder, name }: { folder: string; name?: string }) {
   try {
     const count = countFolder(folder);
     return projectSentence({ ...count, name, lastCommit: lastCommit(folder) });
   } catch {
-    return projectSentence({ name, files: 0, dirs: 0, ext: {} });
+    return projectSentence({ name, files: 0, dirs: 0, ext: {} } as Parameters<typeof projectSentence>[0]);
   }
 }

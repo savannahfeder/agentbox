@@ -12,15 +12,24 @@ import { Worker } from 'node:worker_threads';
 import * as git from './git-change.mjs';
 import { saveRunChange } from './run-change.mts';
 
-const change = { ...git, saveRunChange };
+type Job = (...args: unknown[]) => unknown;
+
+interface GitJobRequest {
+  name: string;
+  args: unknown[];
+  resolve: (value: unknown) => void;
+  reject: (reason: unknown) => void;
+}
+
+const change = { ...git, saveRunChange } as unknown as Record<string, Job>;
 const JOBS = new Set(['snapshotRepo', 'saveRunChange']);
 
-let worker = null;
+let worker: Worker | null = null;
 let broken = false;
 let seq = 0;
-const waiting = new Map();
+const waiting = new Map<number, GitJobRequest>();
 
-function runHere({ name, args, resolve, reject }) {
+function runHere({ name, args, resolve, reject }: GitJobRequest) {
   try { resolve(change[name](...args)); } catch (error) { reject(error); }
 }
 
@@ -32,23 +41,23 @@ function giveUp() {
   for (const job of left) runHere(job);
 }
 
-function thread() {
+function thread(): Worker | null {
   if (worker || broken) return worker;
   try {
     worker = new Worker(new URL('./git-change-thread.mts', import.meta.url));
   } catch (error) {
-    console.warn('zero: the checkout will be read on the main thread:', error.message);
+    console.warn('zero: the checkout will be read on the main thread:', (error as Error).message);
     broken = true;
     return null;
   }
-  worker.on('message', ({ id, ok, value, error }) => {
+  worker.on('message', ({ id, ok, value, error }: { id: number; ok: boolean; value: unknown; error: string }) => {
     const job = waiting.get(id);
     if (!job) return;
     waiting.delete(id);
     if (!waiting.size) worker?.unref();
     if (ok) job.resolve(value); else job.reject(new Error(error));
   });
-  worker.on('error', (error) => {
+  worker.on('error', (error: Error) => {
     console.warn('zero: the checkout thread failed:', error.message);
     giveUp();
   });
@@ -63,10 +72,10 @@ export async function __gitJobsIdle() {
 }
 
 /** Run one of git-change.mjs's exports without blocking this thread. */
-export function gitJob(name, ...args) {
+export function gitJob(name: string, ...args: unknown[]): Promise<unknown> {
   if (!JOBS.has(name)) return Promise.reject(new Error(`not a git job: ${name}`));
   return new Promise((resolve, reject) => {
-    const job = { name, args, resolve, reject };
+    const job: GitJobRequest = { name, args, resolve, reject };
     const w = thread();
     if (!w) { runHere(job); return; }
     const id = ++seq;

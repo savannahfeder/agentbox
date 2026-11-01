@@ -18,6 +18,77 @@ import path from 'node:path';
 import { claudeDataDirs } from './agent-homes.mts';
 import { howTheChatEnded } from '../shared/agent-import.mjs';
 
+export interface ImportThread {
+  id: string;
+  source: 'terminal' | 'editor' | 'desktop' | 'codex';
+  folder: string;
+  folderName: string;
+  short: string;
+  title: string;
+  when: number;
+  path: string;
+  firstSaid?: string;
+  startedAt: number;
+  waiting?: boolean;
+  ask?: string;
+  lastSaid?: string;
+  endUnknown?: boolean;
+}
+
+export interface TranscriptHead { cwd: string | null; entrypoint: string | null; said: string[]; firstAt: number }
+
+export interface TranscriptTail { aiTitle: string; customTitle: string; lastSaid: string }
+
+export interface FolderGroup { folder: string; name: string; short: string; threads: ImportThread[] }
+
+export interface SessionThreadOptions {
+  home?: string;
+  dirs?: string[];
+  days?: number;
+  now?: number;
+  max?: number;
+  budgetMs?: number;
+  ends?: boolean;
+}
+
+export interface ProjectChatOptions { home?: string; dirs?: string[]; folders?: string[]; since?: number }
+
+interface TranscriptRow {
+  type?: string;
+  timestamp?: string;
+  cwd?: unknown;
+  entrypoint?: unknown;
+  toolUseResult?: unknown;
+  isMeta?: boolean;
+  isCompactSummary?: boolean;
+  isApiErrorMessage?: boolean;
+  aiTitle?: unknown;
+  customTitle?: unknown;
+  message?: { content?: unknown };
+}
+
+interface TerminalReadOptions {
+  home: string;
+  dirs: string[];
+  cutoff: number;
+  max: number;
+  budgetMs?: number;
+  skipIds?: Set<string>;
+}
+
+interface DesktopRecord {
+  cliSessionId?: string;
+  sessionId?: string;
+  lastActivityAt?: number;
+  createdAt?: number;
+  isArchived?: boolean;
+  originCwd?: string;
+  cwd?: string;
+  title?: string;
+}
+
+interface End { name: string; lastSaid: string; waiting: boolean; ask: string }
+
 /** How many days back counts as recent. Codex reads the same number
  *  (main/codex-threads.mts), so the two halves of the card agree. */
 export const RECENT_DAYS = 10;
@@ -49,7 +120,7 @@ const READ_BUDGET_MS = 3000;
 
 /** A temp folder, where nobody works. Agentbox's own scripts and workers run
  *  Claude Code sessions there, so a thread from one is not the person's. */
-export function isScratchFolder(folder, home = os.homedir()) {
+export function isScratchFolder(folder: unknown, home = os.homedir()) {
   const p = String(folder ?? '');
   if (!p) return true;
   // A folder inside the home folder is the person's, whatever the path. This
@@ -68,7 +139,7 @@ export function isScratchFolder(folder, home = os.homedir()) {
  *  Claude Code's desktop app makes worktrees in the same place, named
  *  `upbeat-matsumoto-588a8d`, so the `w-<hex>` id is what tells them apart. */
 const TASK_FOLDER = /\/\.claude\/worktrees\/w-[0-9a-f]{6,}(\/|$)/i;
-export function isTaskFolder(folder) {
+export function isTaskFolder(folder: unknown) {
   return TASK_FOLDER.test(String(folder ?? ''));
 }
 // The same rule on the name Claude Code files a transcript under, where `/.`
@@ -79,7 +150,7 @@ const TASK_PROJECT_DIR = /--claude-worktrees-w-[0-9a-f]{6,}(-|$)/i;
  *  a temp-folder transcript is refused without being opened. Claude Code names
  *  that folder after the working folder with every character that is not a
  *  letter or digit turned into `-`, so `/private/tmp/w-1` is `-private-tmp-w-1`. */
-export function isScratchProjectDir(name, home = os.homedir()) {
+export function isScratchProjectDir(name: unknown, home = os.homedir()) {
   const n = String(name ?? '');
   const here = path.resolve(String(home ?? '')).replace(/[^a-zA-Z0-9]/g, '-');
   if (here.length > 1 && (n === here || n.startsWith(`${here}-`))) return false;
@@ -92,20 +163,20 @@ export function isScratchProjectDir(name, home = os.homedir()) {
  *  software, usually Agentbox's own workers and chats. An unknown entrypoint
  *  counts as not the person's: a missing row costs less than hundreds of
  *  wrong ones. `remote*` sessions run in the cloud, not on this disk. */
-const BY_HAND = new Set(['cli', 'claude-desktop', 'claude-vscode']);
-export function startedByHand(entrypoint) {
+const BY_HAND = new Set<string | null | undefined>(['cli', 'claude-desktop', 'claude-vscode']);
+export function startedByHand(entrypoint: string | null | undefined) {
   return BY_HAND.has(entrypoint);
 }
 
 /** Which of the three places a person starts Claude Code a session came from. */
-export function sourceOf(entrypoint) {
+export function sourceOf(entrypoint: string | null | undefined) {
   if (entrypoint === 'claude-desktop') return 'desktop';
   return entrypoint === 'claude-vscode' ? 'editor' : 'terminal';
 }
 
 /** Claude Code files subagent transcripts under `<session>/subagents/`. The
  *  parent session already stands for that work. */
-export function isSubagentPath(file) {
+export function isSubagentPath(file: unknown) {
   return /(^|\/)subagents\//.test(String(file ?? ''));
 }
 
@@ -122,7 +193,7 @@ const NOT_TYPED = [
  *  because a session that opens with a slash command has the wrapper first and
  *  the person's words second. Returns '' when nobody typed anything, and the
  *  caller drops that thread. */
-export function threadTitle(texts, max = 72) {
+export function threadTitle(texts: unknown, max = 72) {
   for (const text of Array.isArray(texts) ? texts : [texts]) {
     const got = titleFromOne(text, max);
     if (got) return got;
@@ -130,7 +201,7 @@ export function threadTitle(texts, max = 72) {
   return '';
 }
 
-function titleFromOne(text, max) {
+function titleFromOne(text: unknown, max: number) {
   const raw = String(text ?? '').replace(/\r/g, '');
   for (const line of raw.split('\n')) {
     // `[Image #1]` and `[Pasted text #1 +40 lines]` are Claude Code's stand-ins
@@ -153,7 +224,7 @@ function titleFromOne(text, max) {
 }
 
 /** Writes a folder under home as `~/...`. */
-export function shortFolder(folder, home = os.homedir()) {
+export function shortFolder(folder: unknown, home = os.homedir()) {
   const here = path.resolve(home);
   const full = path.resolve(String(folder ?? '') || here);
   return full === here || full.startsWith(`${here}/`) ? `~${full.slice(here.length)}` : full;
@@ -163,8 +234,8 @@ export function shortFolder(folder, home = os.homedir()) {
  *  in and the first messages the person typed. `entrypoint` and `cwd` are on
  *  every message row and the first human turn comes first, so a fixed head is
  *  enough. */
-export function readTranscriptHead(file, bytes = HEAD_BYTES, most = FIRST_TURN_BYTES) {
-  let fd = null;
+export function readTranscriptHead(file: string, bytes = HEAD_BYTES, most = FIRST_TURN_BYTES): TranscriptHead {
+  let fd: number | null = null;
   try {
     fd = fs.openSync(file, 'r');
     const buf = Buffer.alloc(bytes);
@@ -174,12 +245,12 @@ export function readTranscriptHead(file, bytes = HEAD_BYTES, most = FIRST_TURN_B
     // aside. When the whole file fit, the last line is complete and is kept.
     const lines = text.split('\n');
     const cut = n < bytes ? null : lines.pop();
-    let cwd = null;
-    let entrypoint = null;
+    let cwd: string | null = null;
+    let entrypoint: string | null = null;
     let firstAt = 0;
-    const said = [];
-    const take = (line) => {
-      let row;
+    const said: string[] = [];
+    const take = (line: string) => {
+      let row: TranscriptRow;
       try { row = JSON.parse(line); } catch { return; }
       if (!firstAt && row.timestamp) firstAt = Date.parse(row.timestamp) || 0;
       if (!cwd && typeof row.cwd === 'string' && row.cwd) cwd = row.cwd;
@@ -213,7 +284,7 @@ export function readTranscriptHead(file, bytes = HEAD_BYTES, most = FIRST_TURN_B
 
 /** A `user` line a person typed, as opposed to a tool result, a reminder or a
  *  command's wrapper. Only these end the agent's reply. */
-function typedTurn(row) {
+function typedTurn(row: TranscriptRow | null | undefined) {
   if (row?.type !== 'user' || row.toolUseResult || row.isMeta || row.isCompactSummary) return false;
   return threadTitle(messageText(row)) !== '';
 }
@@ -222,8 +293,8 @@ function typedTurn(row) {
  *  (`custom-title`) and the one Claude Code made up (`ai-title`), the last of
  *  each winning, and the agent's last reply, every text block of it since the
  *  last thing a person typed. */
-export function readTranscriptTail(file, bytes = TAIL_BYTES) {
-  let fd = null;
+export function readTranscriptTail(file: string, bytes = TAIL_BYTES): TranscriptTail {
+  let fd: number | null = null;
   try {
     fd = fs.openSync(file, 'r');
     const size = fs.fstatSync(fd).size;
@@ -240,7 +311,7 @@ export function readTranscriptTail(file, bytes = TAIL_BYTES) {
     let refused = false;
     for (const line of lines) {
       if (!line.trim()) continue;
-      let row;
+      let row: TranscriptRow;
       try { row = JSON.parse(line); } catch { continue; }
       if (row.type === 'ai-title' && row.aiTitle) aiTitle = String(row.aiTitle);
       // An empty one is a rename cleared.
@@ -263,7 +334,7 @@ export function readTranscriptTail(file, bytes = TAIL_BYTES) {
 
 /** What a finished read knows about how a chat ended, for its row and the
  *  setup card. */
-function endOf(file) {
+function endOf(file: string | null): End {
   const { aiTitle, customTitle, lastSaid } = file ? readTranscriptTail(file) : { aiTitle: '', customTitle: '', lastSaid: '' };
   // The name a person gave beats the one Claude Code made up, as in its own
   // resume list.
@@ -272,7 +343,7 @@ function endOf(file) {
 }
 
 /** The first message a person typed, whole, for an imported row's opening. */
-function firstTyped(said) {
+function firstTyped(said: string[]) {
   for (const text of said) {
     if (threadTitle(text)) return String(text).trim().slice(0, FIRST_CHARS);
   }
@@ -281,8 +352,8 @@ function firstTyped(said) {
 
 /** The bytes from `from` up to the next newline or the end of the file, or
  *  null if neither comes within `budget` bytes. */
-function restOfLine(fd, from, budget) {
-  const parts = [];
+function restOfLine(fd: number, from: number, budget: number) {
+  const parts: Buffer[] = [];
   let at = from;
   const chunk = Buffer.alloc(256 * 1024);
   while (at - from < budget) {
@@ -297,7 +368,7 @@ function restOfLine(fd, from, budget) {
 }
 
 /** A row's content is either a string or a list of blocks. */
-function messageText(row) {
+function messageText(row: TranscriptRow | null | undefined) {
   const c = row?.message?.content;
   if (typeof c === 'string') return c;
   if (Array.isArray(c)) {
@@ -311,15 +382,15 @@ function messageText(row) {
 
 /** `skipped` counts why each transcript was left out, so a change to a filter
  *  can be measured. */
-function readTerminalThreads({ home, dirs, cutoff, max, budgetMs = READ_BUDGET_MS, skipIds = new Set() }) {
+function readTerminalThreads({ home, dirs, cutoff, max, budgetMs = READ_BUDGET_MS, skipIds = new Set() }: TerminalReadOptions) {
   const skipped = { old: 0, scratch: 0, ours: 0, started: 0, subagent: 0, empty: 0, unread: 0, desktopDupe: 0, copy: 0 };
-  const out = [];
+  const out: ImportThread[] = [];
   // Every data folder is pooled and sorted newest first before any file is
   // opened, so `max` and the time budget only ever cut off older sessions.
-  const recent = [];
+  const recent: { file: string; when: number }[] = [];
   for (const dir of dirs) {
     const root = path.join(dir, 'projects');
-    const all = [];
+    const all: string[] = [];
     walkTranscripts(root, all);
     for (const file of all) {
       let when = 0;
@@ -337,7 +408,7 @@ function readTerminalThreads({ home, dirs, cutoff, max, budgetMs = READ_BUDGET_M
   recent.sort((a, b) => b.when - a.when);
   // One session is one row even when two data folders hold a copy. Newest
   // first, so the copy kept is the one still being written to.
-  const seenIds = new Set();
+  const seenIds = new Set<string>();
   // The cap counts threads kept, not files opened: on a machine running many
   // workers, the newest thousand transcripts can all be Agentbox's own.
   const started = Date.now();
@@ -349,7 +420,7 @@ function readTerminalThreads({ home, dirs, cutoff, max, budgetMs = READ_BUDGET_M
   let lastOpened = 0;
   // The desktop app's own record wins over its transcript, but how the chat
   // ended is only in the transcript.
-  const desktopFiles = new Map();
+  const desktopFiles = new Map<string, string>();
   for (const { file, when } of recent) {
     if (out.length >= max || Date.now() - started > budgetMs) {
       skipped.unread = recent.length - opened;
@@ -380,8 +451,8 @@ function readTerminalThreads({ home, dirs, cutoff, max, budgetMs = READ_BUDGET_M
     out.push({
       id,
       source: sourceOf(entrypoint),
-      folder: cwd,
-      folderName: path.basename(cwd),
+      folder: cwd!,
+      folderName: path.basename(cwd!),
       short: shortFolder(cwd, home),
       title,
       when,
@@ -399,7 +470,7 @@ function readTerminalThreads({ home, dirs, cutoff, max, budgetMs = READ_BUDGET_M
 const ENDS_MOST = 120;
 const ENDS_BUDGET_MS = 2000;
 
-function withEnds(threads, desktopFiles) {
+function withEnds(threads: ImportThread[], desktopFiles: Map<string, string>): ImportThread[] {
   const started = Date.now();
   return threads.map((t, i) => {
     const file = t.source === 'desktop' ? desktopFiles.get(t.id) ?? null : t.path;
@@ -422,7 +493,7 @@ function withEnds(threads, desktopFiles) {
 
 /** The chats somebody picked, with the end read for any the list left unread
  *  (past its cap, or found by name). Codex and desktop chats come read. */
-export function readChatEnds(threads) {
+export function readChatEnds(threads: ImportThread[]) {
   return threads.map((t) => {
     if (t.source === 'codex' || t.source === 'desktop' || !t.path) return t;
     if (t.lastSaid !== undefined && !t.endUnknown) return t;
@@ -433,9 +504,9 @@ export function readChatEnds(threads) {
 
 /** Lists every transcript, subagents included so the caller can count them.
  *  Not capped: listing names is cheap, and the cap is on opening. */
-function walkTranscripts(dir, into, depth = 4) {
+function walkTranscripts(dir: string, into: string[], depth = 4) {
   if (depth < 0) return;
-  let entries = [];
+  let entries: fs.Dirent[] = [];
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
   for (const e of entries) {
     const full = path.join(dir, e.name);
@@ -450,16 +521,16 @@ export function desktopSessionsDir(home = os.homedir()) {
 
 /** The desktop app's record carries a real `title`, the folder and the time of
  *  the last turn, so no transcript is read. Archived sessions are left out. */
-function readDesktopThreads({ home, cutoff, max }) {
+function readDesktopThreads({ home, cutoff, max }: { home: string; cutoff: number; max: number }) {
   const root = desktopSessionsDir(home);
   const skipped = { old: 0, scratch: 0, ours: 0, archived: 0, empty: 0 };
-  const out = [];
+  const out: ImportThread[] = [];
   // Every id this side owns, recent or not, so the transcript walk skips them.
-  const owned = new Set();
-  const files = [];
+  const owned = new Set<string>();
+  const files: string[] = [];
   walkDesktop(root, files, max);
   for (const file of files) {
-    let rec = null;
+    let rec: DesktopRecord | null = null;
     try { rec = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { continue; }
     if (typeof rec?.cliSessionId === 'string' && rec.cliSessionId) owned.add(rec.cliSessionId);
     const when = Number(rec?.lastActivityAt || rec?.createdAt || 0);
@@ -485,9 +556,9 @@ function readDesktopThreads({ home, cutoff, max }) {
   return { threads: out, skipped, owned };
 }
 
-function walkDesktop(dir, into, max, depth = 3) {
+function walkDesktop(dir: string, into: string[], max: number, depth = 3) {
   if (into.length >= max || depth < 0) return;
-  let entries = [];
+  let entries: fs.Dirent[] = [];
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
   for (const e of entries) {
     if (into.length >= max) return;
@@ -514,7 +585,7 @@ export function readSessionThreads({
   // Whether to read each listed chat's end too: its own title, its last reply
   // and whether it is waiting on you. The year-long search does not need it.
   ends = true,
-} = {}) {
+}: SessionThreadOptions = {}) {
   const cutoff = now - Math.max(0, Number(days) || 0) * 86400 * 1000;
   // The desktop side goes first so its ids are known before the transcripts
   // are walked, which stops one thread appearing twice.
@@ -537,37 +608,37 @@ export function readSessionThreads({
 // switch went on, and each file once until it changes.
 
 const PROJECT_CHATS_KEPT = 2000;
-const projectChats = new Map();
-const slugOf = (folder) => String(folder ?? '').replace(/[^a-zA-Z0-9]/g, '-');
-const sameFolder = (a, b) => String(a ?? '').replace(/\/+$/, '') === String(b ?? '').replace(/\/+$/, '');
+const projectChats = new Map<string, { size: number; mtimeMs: number; thread: ImportThread | null }>();
+const slugOf = (folder: unknown) => String(folder ?? '').replace(/[^a-zA-Z0-9]/g, '-');
+const sameFolder = (a: unknown, b: unknown) => String(a ?? '').replace(/\/+$/, '') === String(b ?? '').replace(/\/+$/, '');
 
-function readOneChat(file, { id, folder, home, when }) {
+function readOneChat(file: string, { id, folder, home, when }: { id: string; folder: string; home: string; when: number }): ImportThread | null {
   const { cwd, entrypoint, said, firstAt } = readTranscriptHead(file);
   if (!startedByHand(entrypoint) || !sameFolder(cwd, folder)) return null;
   const title = threadTitle(said);
   if (!title) return null;
   const end = endOf(file);
   return {
-    id, source: sourceOf(entrypoint), folder: cwd, folderName: path.basename(cwd), short: shortFolder(cwd, home),
+    id, source: sourceOf(entrypoint), folder: cwd!, folderName: path.basename(cwd!), short: shortFolder(cwd, home),
     title: end.name || title, when, path: file,
     waiting: end.waiting, ask: end.ask, lastSaid: end.lastSaid, firstSaid: firstTyped(said), startedAt: firstAt || when,
   };
 }
 
-export function readProjectChats({ home = os.homedir(), dirs = claudeDataDirs({ home }), folders = [], since = 0 } = {}) {
-  const out = [];
-  const seen = new Set();
+export function readProjectChats({ home = os.homedir(), dirs = claudeDataDirs({ home }), folders = [], since = 0 }: ProjectChatOptions = {}) {
+  const out: ImportThread[] = [];
+  const seen = new Set<string>();
   for (const dir of dirs) {
     for (const folder of folders) {
       const at = path.join(dir, 'projects', slugOf(folder));
-      let names = [];
+      let names: string[] = [];
       try { names = fs.readdirSync(at); } catch { continue; }
       for (const name of names) {
         if (!name.endsWith('.jsonl')) continue;
         const id = name.slice(0, -'.jsonl'.length);
         if (seen.has(id)) continue;
         const file = path.join(at, name);
-        let st;
+        let st: fs.Stats;
         try { st = fs.statSync(file); } catch { continue; }
         if (st.mtimeMs < since) continue;
         const kept = projectChats.get(file);
@@ -576,7 +647,7 @@ export function readProjectChats({ home = os.homedir(), dirs = claudeDataDirs({ 
           thread = readOneChat(file, { id, folder, home, when: st.mtimeMs });
           projectChats.delete(file);
           projectChats.set(file, { size: st.size, mtimeMs: st.mtimeMs, thread });
-          if (projectChats.size > PROJECT_CHATS_KEPT) projectChats.delete(projectChats.keys().next().value);
+          if (projectChats.size > PROJECT_CHATS_KEPT) projectChats.delete(projectChats.keys().next().value!);
         }
         if (thread) { seen.add(id); out.push(thread); }
       }
@@ -587,14 +658,14 @@ export function readProjectChats({ home = os.homedir(), dirs = claudeDataDirs({ 
 
 /** Groups threads by folder, each folder sorted by its newest thread. Expects
  *  the threads newest first, as readSessionThreads returns them. */
-export function threadsByFolder(threads = []) {
-  const byFolder = new Map();
+export function threadsByFolder(threads: ImportThread[] = []) {
+  const byFolder = new Map<string, FolderGroup>();
   for (const t of threads) {
     const key = t.folder || '';
     if (!byFolder.has(key)) {
       byFolder.set(key, { folder: key, name: t.folderName, short: t.short, threads: [] });
     }
-    byFolder.get(key).threads.push(t);
+    byFolder.get(key)!.threads.push(t);
   }
   return [...byFolder.values()].sort((a, b) => (b.threads[0]?.when ?? 0) - (a.threads[0]?.when ?? 0));
 }

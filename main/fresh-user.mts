@@ -38,7 +38,7 @@ import { NAME } from '../shared/product-name.mjs';
  *  half exists so the row can be driven in a test and in a dev window rather
  *  than only in a build, which is the difference between a feature that is
  *  checked and one that is hoped for. */
-export function relaunchCommand({ execPath = process.execPath, argv = process.argv, packaged = true } = {}) {
+export function relaunchCommand({ execPath = process.execPath, argv = process.argv, packaged = true }: { execPath?: string; argv?: string[]; packaged?: boolean } = {}): { bin: string; args: string[] } {
   if (packaged) return { bin: execPath, args: [] };
   const appPath = argv[1];
   return { bin: execPath, args: appPath ? [appPath] : [] };
@@ -52,13 +52,17 @@ export function relaunchCommand({ execPath = process.execPath, argv = process.ar
  *  Pure, and reads nothing, because what it says about a missing Claude Code
  *  otherwise depends on whether the computer running the test has one.
  */
-export function freshUserNotes({ claudeBin, keychain, agents } = {}, { withTools = true, withAgents = true } = {}) {
-  const notes = [];
+export function freshUserNotes({ claudeBin, keychain, agents }: { claudeBin?: unknown; keychain?: unknown; agents?: unknown } = {}, { withTools = true, withAgents = true }: { withTools?: boolean; withAgents?: boolean } = {}): string[] {
+  const notes: string[] = [];
   if (withTools && !claudeBin) notes.push('That copy has no Claude Code of its own, so its setup offers to set one up or to use ChatGPT.');
   if (!keychain) notes.push('There is no ~/Library/Keychains here, so Claude Code will say it is not logged in.');
   if (withAgents && !agents) notes.push('There is no ~/.claude on this computer, so it will have no agents to offer.');
   return notes;
 }
+
+export type FreshUserOpened =
+  | { ok: false; error: string; home?: string }
+  | { ok: true; home: string; agents: unknown; pid: number | null; notes: string[] };
 
 /**
  * Open one. Returns what happened, in the words the app will show her: this
@@ -81,12 +85,20 @@ export function openFreshUser({
   packaged = true,
   spawnFn = spawn,
   now,
-} = {}) {
-  let prepared;
+}: {
+  withAgents?: boolean;
+  withTools?: boolean;
+  execPath?: string;
+  argv?: string[];
+  packaged?: boolean;
+  spawnFn?: typeof spawn;
+  now?: Date;
+} = {}): FreshUserOpened {
+  let prepared: ReturnType<typeof prepareHome>;
   try {
     prepared = prepareHome(makeHome(now), { withAgents: withTools && withAgents, withTools });
   } catch (err) {
-    return { ok: false, error: `Could not make a throwaway home under ${HOMES}: ${err?.message ?? err}` };
+    return { ok: false, error: `Could not make a throwaway home under ${HOMES}: ${(err as Error)?.message ?? err}` };
   }
 
   const { bin, args } = relaunchCommand({ execPath, argv, packaged });
@@ -94,7 +106,7 @@ export function openFreshUser({
     return { ok: false, error: `Cannot find this app's own program at ${bin}.`, home: prepared.home };
   }
 
-  let child;
+  let child: ReturnType<typeof spawn> | undefined;
   try {
     child = spawnFn(bin, args, {
       detached: true,
@@ -103,7 +115,7 @@ export function openFreshUser({
     });
     child.unref?.();
   } catch (err) {
-    return { ok: false, error: `Could not start a second ${NAME}: ${err?.message ?? err}`, home: prepared.home };
+    return { ok: false, error: `Could not start a second ${NAME}: ${(err as Error)?.message ?? err}`, home: prepared.home };
   }
 
   return {
@@ -127,7 +139,7 @@ export function clearFreshUserHomes() {
     fs.rmSync(HOMES, { recursive: true, force: true });
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err?.message ?? String(err) };
+    return { ok: false, error: (err as Error)?.message ?? String(err) };
   }
 }
 

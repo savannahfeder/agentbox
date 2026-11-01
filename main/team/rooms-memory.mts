@@ -3,6 +3,8 @@
 // be tested with several people and no network. tests/rooms-backends-agree
 // runs one scenario against this and against a real database.
 import crypto from 'node:crypto';
+import type { MemoryCloud } from './memory-cloud.mts';
+import type { RoomEvent, RoomMessage, RoomPresenceRow, RoomProfile, RoomReaction } from './rooms.mts';
 import { PROFILE_FIELDS, PRESENCE_FIELDS, pick, roomOut, messageOut, reactionOut, ROOM_FILE_NAME, ROOM_FILE_MAX_DATA, ROOM_FILE_MAX_BYTES, fileExists } from './rooms-shape.mjs';
 
 export const GENERAL_ROOM = '9e9e9e9e-0000-4000-8000-000000000001';
@@ -12,12 +14,50 @@ const DAY = 24 * HOUR;
 const ATTACHMENT = /\]\(attachments\/([A-Za-z0-9][A-Za-z0-9_.-]{0,159})\)/g;
 // 1 to 4000 characters once trimmed, counted as Postgres's char_length counts:
 // an emoji is one character, not the two halves JavaScript's length sees.
-const fitsAMessage = (text) => { const n = [...String(text).trim()].length; return n >= 1 && n <= 4000; };
+const fitsAMessage = (text: unknown) => { const n = [...String(text).trim()].length; return n >= 1 && n <= 4000; };
 
 const PROFILE_DEFAULTS = { display_name: '', avatar_url: null, headline: null, bio: null, show_working: 'team', show_agents: true, show_level: true, show_status: true, show_activity: true, invisible_until: null, status_text: null, status_until: null };
 const PRESENCE_DEFAULTS = { gone: false, agents_running: 0, working_on: null, working_private: false, working_at: null, hours_total: 0, hours_week: 0, week_start: null, hours_today: 0, day: null, streak_days: 0, active_days: [], hours_by_month: [], activity: [] };
 
-function state(cloud) {
+export interface MemoryRoom {
+  id: string;
+  name: string;
+  kind: string;
+  teamId: string | null;
+  listed: boolean;
+  inviteOnly?: boolean;
+  createdBy: string | null;
+  createdAt: number;
+}
+export interface MemoryRoomMember { roomId: string; personId: string; role: string; joinedAt: number }
+export interface MemoryRoomLink { token: string; roomId: string; createdBy: string; createdAt: number; revokedAt: number | null }
+export interface MemoryRoomInvite { roomId: string; email: string; invitedBy: string; createdAt: number; acceptedAt: number | null }
+export interface MemoryRoomFile { roomId: string; name: string; byPerson: string; data: string; createdAt: number }
+
+/** What rooms add to the cloud; each is made the first time rooms look. */
+export interface MemoryRoomsFields {
+  rooms?: Map<string, MemoryRoom>;
+  roomMembers?: MemoryRoomMember[];
+  roomLinks?: MemoryRoomLink[];
+  roomInvites?: MemoryRoomInvite[];
+  roomProfiles?: Map<string, RoomProfile>;
+  roomPresence?: Map<string, RoomPresenceRow>;
+  roomMessages?: RoomMessage[];
+  roomReads?: Map<string, number>;
+  roomReactions?: Map<string, RoomReaction>;
+  roomFiles?: Map<string, MemoryRoomFile>;
+  roomActs?: { personId: string; kind: string; at: number }[];
+}
+
+type RoomsCloud = MemoryCloud & Required<MemoryRoomsFields>;
+
+type MemoryRoomEvent =
+  | { kind: 'message'; message: RoomMessage; roomId: string }
+  | { kind: 'reaction'; reaction: RoomReaction }
+  | { kind: 'membership'; roomId: string }
+  | { kind: 'profile' | 'presence' };
+
+function state(cloud: MemoryCloud): RoomsCloud {
   cloud.rooms ??= new Map();
   cloud.roomMembers ??= [];
   cloud.roomLinks ??= [];
@@ -33,58 +73,60 @@ function state(cloud) {
   // Every team has its room, named after it (the team_room_kept trigger).
   for (const t of cloud.teams.values()) {
     const room = [...cloud.rooms.values()].find((r) => r.teamId === t.id);
-    if (!room) cloud.rooms.set(crypto.randomUUID(), { id: null, name: String(t.name).slice(0, 40), kind: 'room', teamId: t.id, listed: false, createdBy: t.createdBy ?? null, createdAt: cloud.now() });
+    if (!room) cloud.rooms.set(crypto.randomUUID(), { id: null!, name: String(t.name).slice(0, 40), kind: 'room', teamId: t.id, listed: false, createdBy: t.createdBy ?? null, createdAt: cloud.now() });
     else room.name = String(t.name).slice(0, 40);
   }
   for (const [id, r] of cloud.rooms) r.id ??= id;
-  return cloud;
+  return cloud as RoomsCloud;
 }
 
-export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
+export function roomsMemory(cloud: MemoryCloud, personId: string, helpers: { confirmedEmail: () => string | null; refuse: (what: string) => never }) {
+  const { confirmedEmail } = helpers;
+  const refuse: (what: string) => never = helpers.refuse;
   const now = () => cloud.now();
-  const iso = (ms) => new Date(ms).toISOString();
-  const emit = (e) => cloud.events.emit('rooms', e);
+  const iso = (ms: number) => new Date(ms).toISOString();
+  const emit = (e: MemoryRoomEvent) => cloud.events.emit('rooms', e);
 
-  const roomsOf = (p) => {
+  const roomsOf = (p: string) => {
     const s = state(cloud);
     const teams = new Set(s.members.filter((m) => m.personId === p).map((m) => m.teamId));
     const out = new Set(s.roomMembers.filter((m) => m.personId === p).map((m) => m.roomId));
     for (const r of s.rooms.values()) if (r.teamId && teams.has(r.teamId)) out.add(r.id);
     return out;
   };
-  const inRoom = (r) => roomsOf(personId).has(r);
-  const sharesRoom = (p) => { const mine = roomsOf(personId); return [...roomsOf(p)].some((r) => mine.has(r)); };
-  const peopleOf = (r) => {
+  const inRoom = (r: string) => roomsOf(personId).has(r);
+  const sharesRoom = (p: string) => { const mine = roomsOf(personId); return [...roomsOf(p)].some((r) => mine.has(r)); };
+  const peopleOf = (r: string) => {
     const s = state(cloud);
     const room = s.rooms.get(r);
     const out = new Set(s.roomMembers.filter((m) => m.roomId === r).map((m) => m.personId));
     if (room?.teamId) for (const m of s.members) if (m.teamId === room.teamId) out.add(m.personId);
     return out;
   };
-  const ownsRoom = (r) => {
+  const ownsRoom = (r: string) => {
     const s = state(cloud);
     if (s.roomMembers.some((m) => m.roomId === r && m.personId === personId && m.role === 'owner')) return true;
     const room = s.rooms.get(r);
     return !!room?.teamId && s.members.some((m) => m.teamId === room.teamId && m.personId === personId && m.role === 'owner');
   };
-  const visible = (p) => { const until = Date.parse(state(cloud).roomProfiles.get(p)?.invisible_until ?? ''); return !(until > now()); };
-  const limit = (what, used, n) => { if (used >= n) refuse(`too many ${what} for now`); };
-  const act = (what, n, per) => {
+  const visible = (p: string) => { const until = Date.parse(state(cloud).roomProfiles.get(p)?.invisible_until ?? ''); return !(until > now()); };
+  const limit = (what: string, used: number, n: number) => { if (used >= n) refuse(`too many ${what} for now`); };
+  const act = (what: string, n: number, per: number) => {
     const s = state(cloud);
     limit(what, s.roomActs.filter((a) => a.personId === personId && a.kind === what && a.at > now() - per).length, n);
     s.roomActs = s.roomActs.filter((a) => !(a.personId === personId && a.at < now() - HOUR));
     s.roomActs.push({ personId, kind: what, at: now() });
   };
-  const copy = (m) => ({ ...m, mentions: [...m.mentions] });
+  const copy = (m: RoomMessage) => ({ ...m, mentions: [...m.mentions] });
   // A message I may change: in a room I am in, and mine.
-  const myMessage = (id, what) => {
+  const myMessage = (id: string, what: string) => {
     const m = state(cloud).roomMessages.find((x) => x.id === id);
     if (!m || !inRoom(m.roomId)) refuse(`${what} a message in a room you are not in`);
     if (m.by !== personId) refuse(`${what} somebody else's message`);
     return m;
   };
 
-  const join = (r) => {
+  const join = (r: string) => {
     const s = state(cloud);
     if (inRoom(r)) return r;
     limit('joins', s.roomMembers.filter((m) => m.personId === personId && m.joinedAt > now() - HOUR).length, 30);
@@ -94,7 +136,7 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
     return r;
   };
 
-  const dropMember = (r, p) => {
+  const dropMember = (r: string, p: string) => {
     const s = state(cloud);
     const row = s.roomMembers.find((m) => m.roomId === r && m.personId === p);
     if (!row) return;
@@ -110,7 +152,7 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
     emit({ kind: 'membership', roomId: r });
   };
 
-  const deleteRoom = (r) => {
+  const deleteRoom = (r: string) => {
     const s = state(cloud);
     s.rooms.delete(r);
     s.roomMembers = s.roomMembers.filter((m) => m.roomId !== r);
@@ -121,28 +163,28 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
     for (const [k, f] of s.roomFiles) if (f.roomId === r) s.roomFiles.delete(k);
   };
 
-  const room = (r) => state(cloud).rooms.get(r);
-  const liveLink = (r) => state(cloud).roomLinks.find((l) => l.roomId === r && l.createdBy === personId && !l.revokedAt);
-  const newLink = (r) => { const l = { token: crypto.randomUUID().replaceAll('-', ''), roomId: r, createdBy: personId, createdAt: now(), revokedAt: null }; state(cloud).roomLinks.push(l); return l.token; };
-  const faces = (ids, n) => ids.map((p) => state(cloud).roomProfiles.get(p)).filter(Boolean)
+  const room = (r: string) => state(cloud).rooms.get(r);
+  const liveLink = (r: string) => state(cloud).roomLinks.find((l) => l.roomId === r && l.createdBy === personId && !l.revokedAt);
+  const newLink = (r: string) => { const l = { token: crypto.randomUUID().replaceAll('-', ''), roomId: r, createdBy: personId, createdAt: now(), revokedAt: null }; state(cloud).roomLinks.push(l); return l.token; };
+  const faces = (ids: string[], n: number) => ids.map((p) => state(cloud).roomProfiles.get(p) as RoomProfile).filter(Boolean)
     .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)).slice(0, n)
     .map((p) => ({ name: p.display_name, avatar: p.avatar_url }));
-  const freshAgents = (ids) => [...state(cloud).roomPresence.values()]
+  const freshAgents = (ids: string[]) => [...state(cloud).roomPresence.values()]
     .filter((p) => ids.includes(p.person_id) && !p.gone && Date.parse(p.updated_at) > now() - 15 * MIN);
 
   return {
     async myRooms() {
       const s = state(cloud);
-      return [...roomsOf(personId)].map((id) => s.rooms.get(id)).filter(Boolean)
+      return [...roomsOf(personId)].map((id) => s.rooms.get(id) as MemoryRoom).filter(Boolean)
         .sort((a, b) => (a.teamId ? 0 : 1) - (b.teamId ? 0 : 1) || a.createdAt - b.createdAt)
         .map((r) => roomOut({ id: r.id, name: r.name, kind: r.kind, team_id: r.teamId, listed: r.listed, invite_only: !!r.inviteOnly, role: ownsRoom(r.id) ? 'owner' : 'member', members: peopleOf(r.id).size, created_at: iso(r.createdAt) }));
     },
 
-    async roomPeople(r) {
+    async roomPeople(r: string) {
       return inRoom(r) ? [...peopleOf(r)] : [];
     },
 
-    async roomNames(r) {
+    async roomNames(r: string) {
       if (!inRoom(r)) return [];
       const s = state(cloud);
       return [...peopleOf(r)].map((p) => {
@@ -152,14 +194,14 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       });
     },
 
-    async roomProfiles(ids) {
+    async roomProfiles(ids: string[] | null | undefined) {
       const s = state(cloud);
-      return (ids ?? []).map((p) => s.roomProfiles.get(p))
+      return (ids ?? []).map((p) => s.roomProfiles.get(p) as RoomProfile)
         .filter((row) => row && (row.person_id === personId || (sharesRoom(row.person_id) && visible(row.person_id))))
         .map((row) => structuredClone(row));
     },
 
-    async roomPresence(ids) {
+    async roomPresence(ids: string[] | null | undefined) {
       const want = new Set(ids ?? []);
       return [...state(cloud).roomPresence.values()]
         .filter((row) => want.has(row.person_id))
@@ -172,7 +214,7 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       return row ? structuredClone(row) : null;
     },
 
-    async saveRoomProfile(fields) {
+    async saveRoomProfile(fields: Record<string, unknown>) {
       const s = state(cloud);
       const row = { ...PROFILE_DEFAULTS, ...(s.roomProfiles.get(personId) ?? {}), ...pick(fields, PROFILE_FIELDS), person_id: personId, updated_at: iso(now()) };
       if (String(row.display_name).length > 40) refuse('a name that long');
@@ -182,7 +224,7 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       return structuredClone(row);
     },
 
-    async putPresence(device, fields) {
+    async putPresence(device: string, fields: Record<string, unknown>) {
       if (!/^[0-9a-f]{12}$/.test(String(device))) refuse('presence for no computer');
       const s = state(cloud);
       const key = `${personId}:${device}`;
@@ -194,19 +236,19 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       emit({ kind: 'presence' });
     },
 
-    async roomMessages(r, { before = null, limit: n = 200 } = {}) {
+    async roomMessages(r: string, { before = null, limit: n = 200 }: { before?: number | null; limit?: number } = {}) {
       if (!inRoom(r)) return [];
       return state(cloud).roomMessages
         .filter((m) => m.roomId === r && (before == null || m.at < before))
         .slice(-n).map(copy);
     },
 
-    async roomMentions({ limit: n = 50 } = {}) {
+    async roomMentions({ limit: n = 50 }: { limit?: number } = {}) {
       return state(cloud).roomMessages.filter((m) => !m.deleted && m.mentions.includes(personId) && inRoom(m.roomId))
         .slice(-n).reverse().map(copy);
     },
 
-    async sendRoomMessage(r, { body, inReplyTo = null, mentions = [] }) {
+    async sendRoomMessage(r: string, { body, inReplyTo = null, mentions = [] }: { body?: unknown; inReplyTo?: string | null; mentions?: string[] }) {
       const s = state(cloud);
       if (!inRoom(r)) refuse('write in a room you are not in');
       const text = String(body ?? '');
@@ -220,7 +262,7 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       return { ...msg, mentions: [...msg.mentions] };
     },
 
-    async editRoomMessage(id, { body, mentions = [] } = {}) {
+    async editRoomMessage(id: string, { body, mentions = [] }: { body?: unknown; mentions?: string[] | null } = {}) {
       const m = myMessage(id, 'edit');
       if (m.deleted) refuse('edit a deleted message');
       const text = String(body ?? '');
@@ -232,7 +274,7 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       return copy(m);
     },
 
-    async deleteRoomMessage(id) {
+    async deleteRoomMessage(id: string) {
       const s = state(cloud);
       const m = myMessage(id, 'delete');
       if (m.deleted) return;
@@ -243,13 +285,13 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       emit({ kind: 'message', message: copy(m), roomId: m.roomId });
     },
 
-    async roomReactions(r) {
+    async roomReactions(r: string) {
       if (!inRoom(r)) return [];
       return [...state(cloud).roomReactions.values()].filter((x) => x.roomId === r)
         .sort((a, b) => a.at - b.at).slice(-1000).map((x) => ({ ...x }));
     },
 
-    async reactRoomMessage(id, emoji, on = true) {
+    async reactRoomMessage(id: string, emoji: unknown, on = true) {
       const s = state(cloud);
       const m = s.roomMessages.find((x) => x.id === id);
       if (!m || !inRoom(m.roomId)) refuse('react in a room you are not in');
@@ -265,7 +307,7 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       emit({ kind: 'reaction', reaction: { ...row } });
     },
 
-    async putRoomFile(r, name, data) {
+    async putRoomFile(r: string, name: unknown, data: unknown) {
       const s = state(cloud);
       const n = String(name ?? '');
       const d = String(data ?? '');
@@ -278,7 +320,7 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       return n;
     },
 
-    async roomFile(r, name) {
+    async roomFile(r: string, name: string) {
       if (!inRoom(r)) return null;
       return state(cloud).roomFiles.get(`${r}:${name}`)?.data ?? null;
     },
@@ -287,7 +329,7 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       return [...state(cloud).roomReads].filter(([k]) => k.endsWith(`:${personId}`)).map(([k, readAt]) => ({ roomId: k.split(':')[0], readAt }));
     },
 
-    async markRoomRead(r, at) {
+    async markRoomRead(r: string, at: number) {
       if (!inRoom(r)) refuse('read a room you are not in');
       const key = `${r}:${personId}`;
       const s = state(cloud);
@@ -295,26 +337,26 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
     },
 
     // Unlike markRoomRead, this may move the read point back.
-    async markRoomUnread(r, at) {
+    async markRoomUnread(r: string, at: unknown) {
       if (!inRoom(r)) refuse('mark unread a room you are not in');
       if (at == null || !Number.isFinite(Number(at))) refuse('mark a room unread from no message');
       state(cloud).roomReads.set(`${r}:${personId}`, Math.min(Number(at), now()));
     },
 
-    async roomLink(r) {
+    async roomLink(r: string) {
       if (!inRoom(r)) refuse('make a link to a room you are not in');
       if (room(r)?.kind === 'group') refuse('a link to a group');
       if (room(r)?.inviteOnly) refuse('a link to a room that takes only people its members invite');
       return liveLink(r)?.token ?? newLink(r);
     },
 
-    async revokeRoomLink(r) {
+    async revokeRoomLink(r: string) {
       if (!inRoom(r)) refuse('turn off a link to a room you are not in');
       for (const l of state(cloud).roomLinks) if (l.roomId === r && !l.revokedAt && (l.createdBy === personId || ownsRoom(r))) l.revokedAt = now();
       return newLink(r);
     },
 
-    async joinRoomByLink(token) {
+    async joinRoomByLink(token: string) {
       const l = state(cloud).roomLinks.find((x) => x.token === token && !x.revokedAt);
       if (!l) refuse('an invite link that does not work any more');
       if (room(l.roomId)?.kind === 'group') refuse('join a group by link');
@@ -322,7 +364,7 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       return join(l.roomId);
     },
 
-    async joinListedRoom(r) {
+    async joinListedRoom(r: string) {
       if (!room(r)?.listed) refuse('join a room not open to everyone');
       return join(r);
     },
@@ -339,7 +381,7 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       }).sort((a, b) => b.members - a.members || a.createdAt - b.createdAt);
     },
 
-    async roomPreview(token) {
+    async roomPreview(token: string) {
       const l = state(cloud).roomLinks.find((x) => x.token === token && !x.revokedAt);
       const r = l && room(l.roomId);
       if (!r || r.inviteOnly) return null;
@@ -352,7 +394,7 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       };
     },
 
-    async createRoom({ name, kind = 'room', listed = false, people = [], inviteOnly = false }) {
+    async createRoom({ name, kind = 'room', listed = false, people = [], inviteOnly = false }: { name?: unknown; kind?: string; listed?: boolean; people?: string[] | null; inviteOnly?: boolean }) {
       const s = state(cloud);
       const clean = String(name ?? '').trim();
       if (clean.length < 1 || clean.length > 40) refuse('a room name that empty or that long');
@@ -371,24 +413,24 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       return id;
     },
 
-    async renameRoom(r, name) {
+    async renameRoom(r: string, name: unknown) {
       if (!ownsRoom(r) || room(r)?.teamId) refuse('rename a room you do not own');
       const clean = String(name ?? '').trim();
       if (clean.length < 1 || clean.length > 40) refuse('a room name that empty or that long');
-      room(r).name = clean;
+      room(r)!.name = clean;
       emit({ kind: 'membership', roomId: r });
     },
 
-    async leaveRoom(r) {
+    async leaveRoom(r: string) {
       dropMember(r, personId);
     },
 
-    async removeRoomMember(r, p) {
+    async removeRoomMember(r: string, p: string) {
       if (!ownsRoom(r)) refuse('remove somebody from a room you do not own');
       dropMember(r, p);
     },
 
-    async inviteToRoom(r, email) {
+    async inviteToRoom(r: string, email: unknown) {
       if (!inRoom(r)) refuse('invite to a room you are not in');
       if (room(r)?.kind === 'group') refuse('invite to a group by email');
       const clean = String(email).trim().toLowerCase();
@@ -399,7 +441,7 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       s.roomInvites.push({ roomId: r, email: clean, invitedBy: personId, createdAt: now(), acceptedAt: null });
     },
 
-    async roomInvitesSent(r) {
+    async roomInvitesSent(r: string) {
       if (!inRoom(r)) return [];
       return state(cloud).roomInvites.filter((i) => i.roomId === r && i.invitedBy === personId)
         .sort((a, b) => b.createdAt - a.createdAt).slice(0, 50)
@@ -415,7 +457,7 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
         .map((i) => ({ roomId: i.roomId, roomName: room(i.roomId)?.name ?? '', invitedBy: i.invitedBy, invitedByName: s.roomProfiles.get(i.invitedBy)?.display_name || null }));
     },
 
-    async acceptRoomInvite(r) {
+    async acceptRoomInvite(r: string) {
       const email = confirmedEmail();
       if (!email) refuse('join a room without a confirmed email');
       const s = state(cloud);
@@ -425,13 +467,13 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       return join(r);
     },
 
-    async agentboxRanks(ids) {
+    async agentboxRanks(ids: string[] | null | undefined) {
       const totals = new Map();
       for (const p of state(cloud).roomPresence.values()) {
         if (p.gone || !visible(p.person_id)) continue;
         totals.set(p.person_id, (totals.get(p.person_id) ?? 0) + Number(p.hours_total));
       }
-      const out = {};
+      const out: Record<string, number> = {};
       for (const p of ids ?? []) {
         if (p !== personId && !(sharesRoom(p) && visible(p))) continue;
         const h = totals.get(p) ?? 0;
@@ -440,8 +482,8 @@ export function roomsMemory(cloud, personId, { confirmedEmail, refuse }) {
       return out;
     },
 
-    subscribeRooms(onEvent) {
-      const hear = (e) => {
+    subscribeRooms(onEvent: (event: RoomEvent) => void) {
+      const hear = (e: MemoryRoomEvent) => {
         if (e.kind === 'message') { if (inRoom(e.message.roomId)) onEvent({ kind: 'message', message: copy(e.message) }); return; }
         if (e.kind === 'reaction') { if (inRoom(e.reaction.roomId)) onEvent({ kind: 'reaction', reaction: { ...e.reaction } }); return; }
         onEvent({ kind: e.kind });

@@ -60,7 +60,7 @@ const PICTURES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.b
 const MEDIA = new Set(['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.mp4', '.mov', '.m4v', '.webm']);
 
 /** The url the renderer draws, for a picture already resolved on disk. */
-export function imgUrl(file) {
+export function imgUrl(file: unknown) {
   if (typeof file !== 'string' || !path.isAbsolute(file)) return null;
   // Segment by segment: encodeURIComponent would eat the separators, and
   // encodeURI would leave '#' and '?' in a filename to be read as url syntax.
@@ -69,7 +69,7 @@ export function imgUrl(file) {
 }
 
 /** The file a request under this scheme is asking for, or null if it is not one. */
-export function imgPath(url) {
+export function imgPath(url: unknown) {
   let parsed;
   try { parsed = new URL(String(url)); } catch { return null; }
   if (!isScheme(IMG_SCHEMES, parsed.protocol)) return null;
@@ -83,20 +83,20 @@ export function imgPath(url) {
 }
 
 /** Is `file` inside `dir`, without /a/bc counting as inside /a/b. */
-function inside(dir, file) {
+function inside(dir: string | null | undefined, file: string | null | undefined) {
   if (!dir || !file) return false;
   const d = path.resolve(dir);
   const f = path.resolve(file);
   return f === d || f.startsWith(d + path.sep);
 }
 
-const MEDIA_TYPES = {
+const MEDIA_TYPES: Record<string, string> = {
   '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.ogg': 'audio/ogg',
   '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.m4v': 'video/mp4', '.webm': 'video/webm',
 };
 
 /** The content type of a sound or a film, or null when `file` is neither. */
-export function mediaType(file) {
+export function mediaType(file: unknown) {
   return MEDIA_TYPES[path.extname(String(file ?? '')).toLowerCase()] ?? null;
 }
 
@@ -112,7 +112,7 @@ export function mediaType(file) {
  * The bytes a Range header asks for, as { start, end } inclusive, or null for
  * the whole file, or false when the range cannot be served. Only one range.
  */
-export function byteRange(header, size) {
+export function byteRange(header: unknown, size: number) {
   if (!header) return null;
   const m = /^bytes=(\d*)-(\d*)$/.exec(String(header).trim());
   if (!m || (m[1] === '' && m[2] === '')) return null;
@@ -134,7 +134,7 @@ export function byteRange(header, size) {
  * A sound or a film off disk, answered in the range the player asked for.
  * The caller has already decided the file may be served (`servable`).
  */
-export async function mediaResponse(file, rangeHeader) {
+export async function mediaResponse(file: string, rangeHeader: unknown) {
   const { size } = await fs.promises.stat(file);
   const range = byteRange(rangeHeader, size);
   const headers = new Headers({ 'content-type': mediaType(file) ?? 'application/octet-stream', 'accept-ranges': 'bytes' });
@@ -151,7 +151,7 @@ export async function mediaResponse(file, rangeHeader) {
 }
 
 /** Is this a picture the window is allowed to draw? Pure, so it is testable. */
-export function servable(file, roots) {
+export function servable(file: unknown, roots: (string | null | undefined)[] | null | undefined) {
   if (typeof file !== 'string' || !path.isAbsolute(file)) return false;
   const ext = path.extname(file).toLowerCase();
   if (!PICTURES.has(ext) && !MEDIA.has(ext)) return false;

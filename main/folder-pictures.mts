@@ -14,33 +14,46 @@ import fsDefault from 'node:fs';
 import path from 'node:path';
 import { resolveArtifact } from './artifact-path.mts';
 import { servable } from './img-scheme.mts';
+import type { ArtifactFs, ArtifactProduct } from './artifact-path.mts';
+
+export type FolderFs = ArtifactFs & Pick<typeof fsDefault, 'statSync' | 'readdirSync'>;
+
+export interface FolderPicturesRequest {
+  src: unknown;
+  product?: string | null;
+  products?: ArtifactProduct[];
+  accountRoot?: string | null;
+  storeRoot?: string | null;
+  limit?: number;
+  fs?: FolderFs;
+}
 
 const PICTURE = /\.(png|jpe?g|gif|webp|avif)$/i;
 
-export async function folderPictures({ src, product, products = [], accountRoot, storeRoot, limit = 60, fs = fsDefault }) {
+export async function folderPictures({ src, product, products = [], accountRoot, storeRoot, limit = 60, fs = fsDefault }: FolderPicturesRequest) {
   if (typeof src !== 'string' || !src.trim()) return { ok: false, error: 'No folder was named.' };
   const named = src.replace(/\/+$/, '');
   const found = await resolveArtifact({ src: named, product, products, accountRoot, storeRoot, fs });
   if (!found.ok) return { ok: false, error: found.error };
   const own = products.find((p) => p.slug === product) ?? null;
-  const roots = [accountRoot, own?.dir, own?.repoPath].filter(Boolean);
+  const roots = [accountRoot, own?.dir, own?.repoPath].filter(Boolean) as string[];
   let entries;
   try {
-    if (!fs.statSync(found.path).isDirectory()) return { ok: false, error: `${src} is not a folder.` };
-    entries = fs.readdirSync(found.path, { withFileTypes: true });
+    if (!fs.statSync(found.path!).isDirectory()) return { ok: false, error: `${src} is not a folder.` };
+    entries = fs.readdirSync(found.path!, { withFileTypes: true });
   } catch (e) {
-    return { ok: false, error: `${src} could not be read (${e.message}).` };
+    return { ok: false, error: `${src} could not be read (${(e as Error).message}).` };
   }
-  const pictures = [];
+  const pictures: { file: string; mtime: number }[] = [];
   for (const entry of entries) {
     if (!entry.isFile() || !PICTURE.test(entry.name)) continue;
-    const file = path.join(found.path, entry.name);
+    const file = path.join(found.path!, entry.name);
     if (!servable(file, roots)) continue;
     let mtime = 0;
     try { mtime = fs.statSync(file).mtimeMs; } catch { continue; }
     pictures.push({ file, mtime });
   }
-  if (!pictures.length && !roots.some((r) => found.path === r || found.path.startsWith(r + path.sep))) {
+  if (!pictures.length && !roots.some((r) => found.path === r || found.path!.startsWith(r + path.sep))) {
     return { ok: false, error: `${src} is not in this project.` };
   }
   pictures.sort((a, b) => b.mtime - a.mtime || a.file.localeCompare(b.file));

@@ -425,7 +425,7 @@ describe('a codex card rewritten in the shared spool', () => {
 
 describe('the one door every answer goes through', () => {
   const door = fs.readFileSync(path.join(here, '..', 'main', 'ipc.mts'), 'utf8')
-    .match(/const answerApproval = \(id, allow, note\) => \{[\s\S]*?\n {2}\};/)[0];
+    .match(/const answerApproval = \(id\b[^)]*\) => \{[\s\S]*?\n {2}\};/)[0];
 
   it('binds her press to the card that was drawn before it records anything', () => {
     expect(door).toMatch(/approvals\.cardShown\(config\.storeRoot, id\)/);

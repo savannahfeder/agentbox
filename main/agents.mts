@@ -19,6 +19,134 @@ import {
 
 const run = promisify(execFile);
 
+export interface SessionRecord {
+  pid?: number;
+  ppid?: number;
+  sessionId?: string;
+  name?: string;
+  cwd?: string;
+  startedAt?: number;
+  status?: string;
+  statusUpdatedAt?: number | string;
+  waitingFor?: string;
+  messagingSocketPath?: string;
+  procStart?: string;
+}
+
+interface ProcessRow { ppid: number; started: string; command: string }
+
+type Measured = SessionRecord & { ppid: number; sources: string[] };
+
+export interface AskedTurn { at: number; text: string }
+
+export interface Facts {
+  lastActiveAt: number;
+  lastSaid: string;
+  saidAt: number;
+  saidOpen: boolean;
+  about: string;
+  lastAsked: string;
+  touched: string[];
+  asked: AskedTurn[];
+}
+
+type HistoryEntry = Facts & { file: string; size: number; mtimeMs: number; offset: number };
+
+export interface Agent {
+  pid: number;
+  ppid: number;
+  sessionId: string | null;
+  name: string;
+  cwd: string;
+  startedAt: number;
+  status: string | null;
+  statusAt: number;
+  waitingFor: string | null;
+  socket: string;
+  lastActiveAt: number;
+  lastSaid: string;
+  saidAt: number;
+  about: string;
+  lastAsked: string;
+  touched: string[];
+  asked: AskedTurn[];
+  transcript: string | null;
+  product: string | null;
+  productName: string | null;
+  startedByZero: boolean;
+}
+
+export interface RefreshOptions {
+  zeroPid?: number;
+  sessionIds?: (string | null | undefined)[];
+  products?: { slug?: string | null; name?: string | null; repoPath?: string | null }[];
+  claudeBin?: string | null;
+}
+
+type ProductLike = NonNullable<RefreshOptions['products']>[number];
+
+interface ContentBlock {
+  type?: string;
+  text?: string;
+  id?: string;
+  name?: string;
+  input?: { file_path?: string; notebook_path?: string; command?: string } & Record<string, unknown>;
+  tool_use_id?: string;
+  content?: string | ContentBlock[];
+  is_error?: boolean;
+}
+
+interface TranscriptLine {
+  type?: string;
+  isMeta?: boolean;
+  isCompactSummary?: boolean;
+  toolUseResult?: unknown;
+  timestamp?: string;
+  aiTitle?: string;
+  lastPrompt?: string;
+  message?: { content?: string | ContentBlock[] };
+  content?: unknown;
+}
+
+export interface Turn {
+  who: 'you' | 'it';
+  at: number;
+  text: string;
+  same?: boolean;
+  sealed?: boolean;
+  kind?: undefined;
+}
+
+export interface WorkEvent {
+  kind: 'work';
+  at: number;
+  verb: string;
+  subject: string;
+  file?: string;
+  full: string;
+  output: string;
+  lines: number;
+  failed: boolean;
+  sealed?: boolean;
+  who?: undefined;
+}
+
+export type ThreadEvent = Turn | WorkEvent;
+
+export interface Watermark { size: number; mtimeMs: number; status: string | null; cpu: number | null }
+
+export interface ConversationInput {
+  pid?: number | string;
+  sessionId?: unknown;
+  cwd?: string | null;
+  spoke?: { at?: unknown; text?: unknown }[];
+  whole?: boolean;
+}
+
+interface ErrnoLike { code?: string; message?: string }
+
+type RevealResult = { ok: false; reason: string } | { ok: true; name: string };
+
 // Resolved on every call rather than at import, so a test can point the
 // transcript reader at a temporary home.
 const SESSIONS_DIR = () => path.join(os.homedir(), '.claude', 'sessions');
@@ -28,7 +156,7 @@ const PROJECTS_DIR = () => path.join(os.homedir(), '.claude', 'projects');
 // (the dedupe key for the app's own workers), and when each one started (the
 // guard against pid reuse).
 async function processTable() {
-  const table = new Map();
+  const table = new Map<number, ProcessRow>();
   let out = '';
   try {
     ({ stdout: out } = await run('/bin/ps', ['-Ao', 'pid=,ppid=,lstart=,command='], {
@@ -46,7 +174,7 @@ async function processTable() {
 
 // Is the process at that pid still the session the record describes? The rule,
 // and the timezone trap behind it, are in `sameInstant` in shared/agents.mjs.
-function stillTheSame(rec, proc) {
+function stillTheSame(rec: SessionRecord, proc: ProcessRow | undefined): proc is ProcessRow {
   if (!proc) return false;
   if (!/claude/i.test(proc.command)) return false;
   if (!rec.procStart) return true;
@@ -57,20 +185,20 @@ function stillTheSame(rec, proc) {
 // each list sessions the other misses, and both describe a session in the same
 // shape.
 function fromStateFiles() {
-  const found = [];
-  let names = [];
+  const found: SessionRecord[] = [];
+  let names: string[] = [];
   try { names = fs.readdirSync(SESSIONS_DIR()); } catch { return found; }
   for (const name of names) {
     if (!name.endsWith('.json')) continue;
     try {
-      const rec = JSON.parse(fs.readFileSync(path.join(SESSIONS_DIR(), name), 'utf8'));
+      const rec: SessionRecord | null = JSON.parse(fs.readFileSync(path.join(SESSIONS_DIR(), name), 'utf8'));
       if (rec && rec.pid) found.push(rec);
     } catch { /* a half-written state file is not a reason to show her nothing */ }
   }
   return found;
 }
 
-async function fromCli(claudeBin) {
+async function fromCli(claudeBin: string | null | undefined): Promise<SessionRecord[]> {
   if (!claudeBin) return [];
   try {
     const { stdout } = await run(claudeBin, ['agents', '--json'], {
@@ -86,7 +214,7 @@ async function fromCli(claudeBin) {
 
 // The same scrub the supervisor does before every spawn. `claude agents --json`
 // does not call the API, but no claude invocation gets an inherited key.
-function scrubbed(env) {
+function scrubbed(env: NodeJS.ProcessEnv) {
   const out = { ...env };
   for (const key of Object.keys(out)) {
     if (/^(ANTHROPIC_|CLAUDE_CODE_|CLAUDECODE$|CLAUDE_PID$|CLAUDE_EFFORT$)/.test(key)) delete out[key];
@@ -101,15 +229,15 @@ function scrubbed(env) {
 // the whole file is read once and after that only the bytes appended since.
 // No model sees any of it.
 const CHUNK_BYTES = 4 << 20;
-const historyCache = new Map(); // sessionId -> { file, size, mtimeMs, offset, ...facts }
+const historyCache = new Map<string, HistoryEntry>(); // sessionId -> { file, size, mtimeMs, offset, ...facts }
 
 // Tools whose file paths count as touched. The card prints at most six, and
 // that cap is applied where they are shown, not here.
-const TOUCH_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'Read', 'MultiEdit']);
+const TOUCH_TOOLS = new Set<string | undefined>(['Edit', 'Write', 'NotebookEdit', 'Read', 'MultiEdit']);
 
-const transcriptPath = (sessionId, cwd) => findTranscript(PROJECTS_DIR(), sessionId, cwd);
+const transcriptPath = (sessionId: string, cwd: string | undefined) => findTranscript(PROJECTS_DIR(), sessionId, cwd);
 
-const NOTHING = { lastActiveAt: 0, lastSaid: '', saidAt: 0, saidOpen: false, about: '', lastAsked: '', touched: [], asked: [] };
+const NOTHING: Facts = { lastActiveAt: 0, lastSaid: '', saidAt: 0, saidOpen: false, about: '', lastAsked: '', touched: [], asked: [] };
 
 // The card quotes the end of the last reply, so this bounds the accumulator,
 // not what the user reads.
@@ -125,10 +253,10 @@ const RELAY_MARK = `Relayed from ${NAME},`;
 // The marker is recognised under every name this app has had, in any letter
 // case, because a transcript outlives a rename.
 const RELAY_MARKERS = [RELAY_MARK, ...WAS.map((was) => `Relayed from ${was},`)].map((m) => m.toLowerCase());
-const wasRelayed = (line) => RELAY_MARKERS.some((m) => line.toLowerCase().startsWith(m));
+const wasRelayed = (line: string) => RELAY_MARKERS.some((m) => line.toLowerCase().startsWith(m));
 export { wasRelayed as __wasRelayed };
 
-function herTurnRaw(obj) {
+function herTurnRaw(obj: TranscriptLine) {
   if (obj.type !== 'user' || obj.isMeta || obj.isCompactSummary || obj.toolUseResult) return '';
   const content = obj.message?.content;
   const text = typeof content === 'string'
@@ -145,7 +273,7 @@ function herTurnRaw(obj) {
   return clean;
 }
 
-function herTurn(obj) {
+function herTurn(obj: TranscriptLine) {
   return herTurnRaw(obj).replace(/\s+/g, ' ').trim();
 }
 
@@ -153,7 +281,7 @@ function herTurn(obj) {
 // `herTurnRaw` drops on purpose: messages Agentbox delivered, peer messages and
 // delivery notices. A tool result is the exception, because it is part of the
 // reply that is still going.
-function arrived(obj) {
+function arrived(obj: TranscriptLine | null | undefined) {
   return obj?.type === 'user' && !obj.toolUseResult;
 }
 
@@ -161,8 +289,8 @@ function arrived(obj) {
 // ask; after it, only the most recent.
 const KEEP_TURNS = 24;
 
-function remember(acc, line) {
-  let obj;
+function remember(acc: Facts, line: string) {
+  let obj: TranscriptLine;
   try { obj = JSON.parse(line); } catch { return; }
   if (obj.timestamp) {
     const ts = Date.parse(obj.timestamp);
@@ -173,7 +301,7 @@ function remember(acc, line) {
   if (obj.type === 'last-prompt' && obj.lastPrompt) acc.lastAsked = String(obj.lastPrompt);
   const mine = herTurn(obj);
   if (mine) {
-    acc.asked.push({ at: Date.parse(obj.timestamp ?? 0) || 0, text: mine });
+    acc.asked.push({ at: Date.parse((obj.timestamp ?? 0) as string) || 0, text: mine });
     // The first turn never leaves; the rest is a window on the end.
     if (acc.asked.length > KEEP_TURNS) acc.asked.splice(1, 1);
   }
@@ -192,7 +320,7 @@ function remember(acc, line) {
       // Stamped when the reply began, not when it ended. A reply that started
       // before the user's message is not an answer to it, even if it finished
       // after.
-      const at = Date.parse(obj.timestamp ?? 0) || 0;
+      const at = Date.parse((obj.timestamp ?? 0) as string) || 0;
       if (at && !open) acc.saidAt = at;
     }
     for (const c of obj.message.content) {
@@ -211,10 +339,10 @@ function remember(acc, line) {
 // Folds every whole line in [from, size) into the accumulator and returns the
 // offset the next read starts at. The transcript is appended to while this
 // runs, so a trailing half line is left for the next pass.
-function fold(file, acc, from, size) {
+function fold(file: string, acc: Facts, from: number, size: number) {
   let at = from;
   let rest = '';
-  let fd;
+  let fd: number;
   try { fd = fs.openSync(file, 'r'); } catch { return from; }
   try {
     while (at < size) {
@@ -236,10 +364,10 @@ function fold(file, acc, from, size) {
   return at - Buffer.byteLength(rest);
 }
 
-function readHistory(sessionId, cwd) {
+function readHistory(sessionId: string, cwd: string | undefined) {
   const file = transcriptPath(sessionId, cwd);
   if (!file) return { ...NOTHING, transcript: null };
-  let stat;
+  let stat: fs.Stats;
   try { stat = fs.statSync(file); } catch { return { ...NOTHING, transcript: null }; }
   const hit = historyCache.get(sessionId);
   if (hit && hit.file === file && hit.size === stat.size && hit.mtimeMs === stat.mtimeMs) {
@@ -280,32 +408,32 @@ export const __transcriptSearch = transcriptSearch;
 // `claude agents --json` take a quarter of a second. So `listAgents` returns the
 // last reading and starts a fresh one in the background when it is stale. The
 // first call after boot returns nothing.
-let cache = { at: 0, agents: [] };
-let inFlight = null;
+let cache: { at: number; agents: Agent[] } = { at: 0, agents: [] };
+let inFlight: Promise<Agent[]> | null = null;
 // Remembered so a later `refresh()` with no options measures the same way.
 // Without the binary path it skips `claude agents --json`, and a session only
 // that source sees could not be replied to.
-let lastOpts = {};
+let lastOpts: RefreshOptions = {};
 const TTL_MS = 4000;
 
 // Called only when the list changes, so a ticking `lastActiveAt` does not
 // re-render the window.
-export let onChange = null;
-export function setOnChange(fn) { onChange = fn; }
+export let onChange: (() => void) | null = null;
+export function setOnChange(fn: (() => void) | null) { onChange = fn; }
 
-function fingerprint(agents) {
+function fingerprint(agents: Agent[]) {
   // `lastActiveAt` is left out because it ticks. `statusAt` and `saidAt` are in,
   // because a session can go busy and back to idle, or answer, between two
   // readings that both see it idle, and the row still has to move.
   return agents.map((a) => `${a.pid}:${a.status ?? ''}:${a.statusAt ?? 0}:${a.waitingFor ?? ''}:${a.saidAt ?? 0}`).sort().join('|');
 }
 
-export function listAgents(opts = {}) {
+export function listAgents(opts: RefreshOptions = {}) {
   if (Date.now() - cache.at >= TTL_MS) refresh(opts).catch(() => {});
   return cache.agents;
 }
 
-export async function refresh(opts) {
+export async function refresh(opts?: RefreshOptions): Promise<Agent[]> {
   if (opts) lastOpts = opts;
   const { zeroPid = process.pid, sessionIds = [], products = [], claudeBin = null } = opts ?? lastOpts;
   // One measurement at a time, so a burst of pushes does not queue a
@@ -328,22 +456,22 @@ export async function refresh(opts) {
   return inFlight;
 }
 
-async function measure({ zeroPid, sessionIds, products, claudeBin }) {
+async function measure({ zeroPid, sessionIds, products, claudeBin }: Required<RefreshOptions>): Promise<Agent[]> {
   const [table, cliRecords] = await Promise.all([processTable(), fromCli(claudeBin)]);
   const zeroSessionIds = new Set(sessionIds.filter(Boolean));
 
   // A product owns an agent when the agent is working in that product's repo.
-  const owners = new Map();
+  const owners = new Map<string, ProductLike>();
   for (const p of products) {
     if (p?.repoPath) owners.set(path.resolve(p.repoPath), p);
   }
 
-  const byPid = new Map();
-  const add = (rec, source) => {
+  const byPid = new Map<number, Measured>();
+  const add = (rec: SessionRecord, source: string) => {
     if (!rec?.pid) return;
     const proc = table.get(rec.pid);
     if (!stillTheSame(rec, proc)) return;
-    const prev = byPid.get(rec.pid) ?? {};
+    const prev: Partial<Measured> = byPid.get(rec.pid) ?? {};
     byPid.set(rec.pid, {
       ...prev,
       ...rec,
@@ -354,14 +482,14 @@ async function measure({ zeroPid, sessionIds, products, claudeBin }) {
   for (const rec of fromStateFiles()) add(rec, 'state-file');
   for (const rec of cliRecords) add(rec, 'cli');
 
-  const agents = [];
+  const agents: Agent[] = [];
   for (const rec of byPid.values()) {
     const { lastActiveAt, lastSaid, saidAt, about, lastAsked, touched, asked, transcript } = rec.sessionId
       ? readHistory(rec.sessionId, rec.cwd)
       : { ...NOTHING, transcript: null };
     const owner = owners.get(path.resolve(rec.cwd ?? '/')) ?? null;
     agents.push({
-      pid: rec.pid,
+      pid: rec.pid!,
       ppid: rec.ppid,
       sessionId: rec.sessionId ?? null,
       name: rec.name ?? `session ${rec.pid}`,
@@ -373,7 +501,7 @@ async function measure({ zeroPid, sessionIds, products, claudeBin }) {
       // idle for a moment before it picks the message up.
       statusAt: Number(rec.statusUpdatedAt) || 0,
       waitingFor: rec.waitingFor ?? null,
-      socket: rec.messagingSocketPath ?? defaultSocket(rec.pid),
+      socket: rec.messagingSocketPath ?? defaultSocket(rec.pid!),
       lastActiveAt: lastActiveAt || rec.startedAt || 0,
       lastSaid,
       // Tells an answer to the newest message from an older one.
@@ -393,7 +521,7 @@ async function measure({ zeroPid, sessionIds, products, claudeBin }) {
   return agents;
 }
 
-function defaultSocket(pid) {
+function defaultSocket(pid: number) {
   const base = process.env.XDG_RUNTIME_DIR || os.tmpdir();
   return path.join(base, 'cc-socks', `${pid}.sock`);
 }
@@ -401,7 +529,7 @@ function defaultSocket(pid) {
 // Tells the session where the message came from and what it is about, which it
 // has no other way to know; a session given the bare message did not answer.
 // `spoke` records only what the user typed, so the card never quotes this.
-export function fromTheApp(message) {
+export function fromTheApp(message: string) {
   return [
     `${RELAY_MARK} the inbox your user reads. A person typed this, not an agent,`,
     "and they are asking about THIS session's own work. \"this\", \"it\" and \"the project\"",
@@ -422,7 +550,7 @@ export function fromTheApp(message) {
 // The socket does not acknowledge, so a result of ok means the message was
 // handed to a live, listening process, and `working` says the session was then
 // seen going to work. The movement check is best effort and never a gate.
-export async function reply(pid, text, { timeoutMs = 3000 } = {}) {
+export async function reply(pid: number, text: unknown, { timeoutMs = 3000 }: { timeoutMs?: number } = {}) {
   const message = String(text ?? '').trim();
   if (!message) return { ok: false, reason: 'There was nothing to send.' };
 
@@ -439,7 +567,7 @@ export async function reply(pid, text, { timeoutMs = 3000 } = {}) {
     // preamble.
     await writeToSocket(agent.socket, fromTheApp(message), tokenFor(pid));
   } catch (err) {
-    return { ok: false, reason: reasonFor(err) };
+    return { ok: false, reason: reasonFor(err as ErrnoLike) };
   }
 
   const moved = await waitForMovement(agent, before, timeoutMs);
@@ -451,7 +579,7 @@ export async function reply(pid, text, { timeoutMs = 3000 } = {}) {
   // is found outranks everything above; one that is not found proves nothing.
   // Looked for a few times, because `waitForMovement` returns at the first CPU
   // and the hold line may not be on disk yet.
-  let held = null;
+  let held: string | null = null;
   for (let i = 0; i < 6 && !held; i += 1) {
     held = heldNotice(agent, before.size, message);
     if (!held) await new Promise((r) => setTimeout(r, 250));
@@ -466,8 +594,8 @@ export async function reply(pid, text, { timeoutMs = 3000 } = {}) {
   return { ok: true, delivered: true, working: moved, name: agent.name, key: agentKey(agent), at: Date.now() };
 }
 
-function tokenFor(pid) {
-  let names = [];
+function tokenFor(pid: number) {
+  let names: string[] = [];
   try { names = fs.readdirSync(SESSIONS_DIR()); } catch { return null; }
   const key = names.find((n) => n.startsWith(`${pid}.`) && n.endsWith('.key'));
   if (!key) return null;
@@ -476,10 +604,10 @@ function tokenFor(pid) {
   } catch { return null; }
 }
 
-function writeToSocket(socketPath, message, token) {
-  return new Promise((resolve, reject) => {
+function writeToSocket(socketPath: string, message: string, token: string | null) {
+  return new Promise<void>((resolve, reject) => {
     const sock = net.createConnection({ path: socketPath });
-    const fail = (err) => { sock.destroy(); reject(err); };
+    const fail = (err: Error) => { sock.destroy(); reject(err); };
     sock.setTimeout(4000, () => fail(new Error('ETIMEDOUT')));
     sock.on('error', fail);
     sock.on('connect', () => {
@@ -495,7 +623,7 @@ function writeToSocket(socketPath, message, token) {
   });
 }
 
-function reasonFor(err) {
+function reasonFor(err: ErrnoLike | undefined) {
   const code = err?.code ?? err?.message ?? '';
   if (String(code).includes('ENOENT')) return 'That agent is not listening any more.';
   if (String(code).includes('ECONNREFUSED')) return 'That agent stopped listening.';
@@ -508,7 +636,7 @@ function reasonFor(err) {
 // session drifts about 0.02 s in three, so this is well clear of idle.
 const CPU_MOVED = 0.15;
 
-async function cpuSeconds(pid) {
+async function cpuSeconds(pid: number): Promise<number | null> {
   try {
     const { stdout } = await run('/bin/ps', ['-o', 'time=', '-p', String(pid)], { encoding: 'utf8', timeout: 3000 });
     const m = stdout.trim().match(/(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+(?:\.\d+)?)/);
@@ -518,7 +646,7 @@ async function cpuSeconds(pid) {
   } catch { return null; }
 }
 
-async function watermark(agent) {
+async function watermark(agent: Agent): Promise<Watermark> {
   let size = 0;
   let mtimeMs = 0;
   try {
@@ -527,7 +655,7 @@ async function watermark(agent) {
   return { size, mtimeMs, status: agent.status, cpu: await cpuSeconds(agent.pid) };
 }
 
-async function waitForMovement(agent, before, timeoutMs) {
+async function waitForMovement(agent: Agent, before: Watermark, timeoutMs: number) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 250));
@@ -552,7 +680,7 @@ async function waitForMovement(agent, before, timeoutMs) {
 // because a transcript can be over 100 MB and this runs on a click.
 const HOLD_LINE = /Held peer message/;
 
-function heldNotice(agent, sinceSize, message) {
+function heldNotice(agent: Agent, sinceSize: number, message: string) {
   // Resolved again, because a session may have written its first transcript
   // since it was last measured.
   const file = agent.transcript
@@ -573,7 +701,7 @@ function heldNotice(agent, sinceSize, message) {
   const opening = message.slice(0, 60);
   for (const line of tail.split('\n')) {
     if (!HOLD_LINE.test(line)) continue;
-    let obj;
+    let obj: TranscriptLine | null;
     try { obj = JSON.parse(line); } catch { continue; }
     const content = String(obj?.content ?? '');
     if (!HOLD_LINE.test(content)) continue;
@@ -586,7 +714,7 @@ function heldNotice(agent, sinceSize, message) {
 // Exported for tests/a-held-message-is-not-delivered.test.mjs.
 export const __heldNotice = heldNotice;
 
-function readState(pid) {
+function readState(pid: number) {
   try {
     return JSON.parse(fs.readFileSync(path.join(SESSIONS_DIR(), `${pid}.json`), 'utf8'));
   } catch { return null; }
@@ -595,7 +723,7 @@ function readState(pid) {
 // A reply cannot clear a permission box, so that agent needs the user at its
 // own window. Claude Code has no command to focus a session, so this walks the
 // parent chain to the first macOS .app and brings that to the front.
-export async function owningApp(pid) {
+export async function owningApp(pid: number) {
   const table = await processTable();
   let cur = table.get(pid);
   for (let hops = 0; cur && hops < 12; hops += 1) {
@@ -606,10 +734,10 @@ export async function owningApp(pid) {
   return null;
 }
 
-export async function reveal(pid) {
+export async function reveal(pid: number) {
   const app = await owningApp(pid);
   if (!app) return { ok: false, reason: `${Name} cannot tell which window it is running in.` };
-  return new Promise((resolve) => {
+  return new Promise<RevealResult>((resolve) => {
     execFile('/usr/bin/open', ['-a', app.path], (err) => {
       resolve(err ? { ok: false, reason: `${app.name} would not come to the front.` } : { ok: true, name: app.name });
     });
@@ -626,18 +754,18 @@ const TURN_CHARS = 4000;
 
 // A session id becomes a filename, so it is checked first: a slash in it would
 // read outside ~/.claude/projects.
-function safeSessionId(id) {
+function safeSessionId(id: unknown) {
   return /^[A-Za-z0-9._-]+$/.test(String(id ?? '')) ? String(id) : null;
 }
 
-function saidByIt(obj) {
+function saidByIt(obj: TranscriptLine) {
   if (obj.type !== 'assistant' || !Array.isArray(obj.message?.content)) return '';
   return obj.message.content.filter((c) => c.type === 'text').map((c) => c.text).join('\n').trim();
 }
 
 // Tool output keeps its head, unlike a turn, which keeps its tail: a command
 // puts what went wrong at the start.
-function cappedHead(text) {
+function cappedHead(text: unknown) {
   const s = String(text ?? '');
   return s.length > WORK_CHARS ? `${s.slice(0, WORK_CHARS - 1)}…` : s;
 }
@@ -645,9 +773,9 @@ function cappedHead(text) {
 // `dir` is the session's folder, used to shorten paths on screen. `full`
 // carries the whole string only when shortening changed it, so a shortened line
 // can always be recovered.
-function workedOn(obj, events, byId, dir = '') {
+function workedOn(obj: TranscriptLine, events: ThreadEvent[], byId: Map<string | undefined, WorkEvent>, dir = '') {
   if (obj.type !== 'assistant' || !Array.isArray(obj.message?.content)) return;
-  const at = Date.parse(obj.timestamp ?? 0) || 0;
+  const at = Date.parse((obj.timestamp ?? 0) as string) || 0;
   for (const c of obj.message.content) {
     if (c.type !== 'tool_use') continue;
     // Store tool calls are how a session talks to the app, not work it did.
@@ -659,11 +787,11 @@ function workedOn(obj, events, byId, dir = '') {
     const whole = fullSubject(c.input);
     // The file it changed, so the thread can offer a chip into the code. Empty
     // for calls that wrote no file.
-    const changed = changedFile(c.name, c.input);
-    const event = {
+    const changed = changedFile(c.name!, c.input);
+    const event: WorkEvent = {
       kind: 'work',
       at,
-      verb: plain ? plain.verb : workVerb(c.name),
+      verb: plain ? plain.verb : workVerb(c.name!),
       subject,
       ...(changed ? { file: changed } : {}),
       // A line put in words always carries the command, because the words
@@ -678,7 +806,7 @@ function workedOn(obj, events, byId, dir = '') {
   }
 }
 
-function cameBack(obj, byId) {
+function cameBack(obj: TranscriptLine | null | undefined, byId: Map<string | undefined, WorkEvent>) {
   if (!obj?.toolUseResult || !Array.isArray(obj.message?.content)) return;
   for (const b of obj.message.content) {
     if (b.type !== 'tool_result') continue;
@@ -700,20 +828,20 @@ function cameBack(obj, byId) {
 
 // The ellipsis is inside the cap, so the result is never longer than
 // TURN_CHARS.
-function capped(text) {
+function capped(text: string) {
   return text.length > TURN_CHARS ? `…${text.slice(-(TURN_CHARS - 1))}` : text;
 }
 
 // The last thing anybody said, skipping the work lines that sit between
 // messages in the thread.
-function lastSpoken(turns) {
+function lastSpoken(turns: ThreadEvent[]) {
   for (let i = turns.length - 1; i >= 0; i -= 1) {
-    if (turns[i].kind !== 'work') return turns[i];
+    if (turns[i].kind !== 'work') return turns[i] as Turn;
   }
   return null;
 }
 
-function seal(turns) {
+function seal(turns: ThreadEvent[]) {
   const last = turns[turns.length - 1];
   if (last) last.sealed = true;
   // Also seal the last spoken turn, which is not the last entry once work lines
@@ -726,8 +854,8 @@ function seal(turns) {
 // one answer into several lines when it stops for a tool. A sealed turn takes
 // nothing more, so separate answers never fold together. A turn keeps the time
 // it began, so its time and its first line come from the same moment.
-function addTurn(turns, who, text, at) {
-  const last = turns[turns.length - 1];
+function addTurn(turns: ThreadEvent[], who: 'you' | 'it', text: string, at: number) {
+  const last = turns[turns.length - 1] as Turn | undefined;
   if (last && !last.sealed && last.who === who) {
     // Overflow drops the oldest text, so a long answer keeps its conclusion.
     last.text = capped(`${last.text}\n\n${text}`);
@@ -744,10 +872,10 @@ function addTurn(turns, who, text, at) {
 // the whole machine and that is a visible delay on a click. The pid is walked
 // back to a live session only when there is no session id. `whole` asks for
 // every message, so `omitted` comes back zero; only the work stays capped.
-export async function conversation({ pid, sessionId, cwd, spoke = [], whole = false } = {}) {
+export async function conversation({ pid, sessionId, cwd, spoke = [], whole = false }: ConversationInput = {}) {
   let id = safeSessionId(sessionId);
   let dir = cwd ?? '';
-  let name = null;
+  let name: string | null = null;
   if (!id) {
     const live = (await refresh()).find((a) => a.pid === Number(pid));
     id = safeSessionId(live?.sessionId);
@@ -759,17 +887,17 @@ export async function conversation({ pid, sessionId, cwd, spoke = [], whole = fa
   const file = transcriptPath(id, dir);
   if (!file) return { ok: false, reason: 'This session has not written a transcript yet.' };
 
-  const turns = [];
+  const turns: ThreadEvent[] = [];
   // Tool calls by id. A call is in an assistant line and its output arrives
   // later in a user line, so the events are filled in behind.
-  const byId = new Map();
+  const byId = new Map<string | undefined, WorkEvent>();
   try {
     const lines = readline.createInterface({ input: fs.createReadStream(file), crlfDelay: Infinity });
     for await (const line of lines) {
       if (!line.trim()) continue;
-      let obj;
+      let obj: TranscriptLine;
       try { obj = JSON.parse(line); } catch { continue; }
-      const at = Date.parse(obj.timestamp ?? 0) || 0;
+      const at = Date.parse((obj.timestamp ?? 0) as string) || 0;
       // Anything inbound ends the answer above it, shown or not.
       if (arrived(obj)) seal(turns);
       cameBack(obj, byId);
@@ -794,7 +922,7 @@ export async function conversation({ pid, sessionId, cwd, spoke = [], whole = fa
 
   // Replies sent from Agentbox are not in the file as the user's. The caller
   // passes what Agentbox delivered, and each is slotted in by time.
-  const said = new Set(turns.filter((t) => t.who === 'you').map((t) => t.text.replace(/\s+/g, ' ').trim()));
+  const said = new Set(turns.filter((t): t is Turn => t.who === 'you').map((t) => t.text.replace(/\s+/g, ' ').trim()));
   for (const t of Array.isArray(spoke) ? spoke : []) {
     const text = String(t?.text ?? '').trim();
     const at = Number(t?.at) || 0;
