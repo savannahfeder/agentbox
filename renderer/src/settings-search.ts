@@ -85,7 +85,7 @@ const ENTRIES: Entry[] = [
   { page: 'running', label: 'Agents you started yourself', anchor: 'outside', words: 'terminal outside sessions inbox your own' },
   { page: 'running', label: 'Bring in new chats', anchor: 'outside', words: 'import chats conversations automatic' },
   { page: 'instructions', label: 'Instructions for every agent', words: 'rules prompt claude.md how agents write to you' },
-  { page: 'projects', label: 'Projects', words: 'order priority archive new project' },
+  { page: 'projects', label: 'Projects', words: 'order priority archive new project ship shipping deploy release merge approval approve review ask autonomous' },
   { page: 'team', label: 'Team', words: 'invite people members teammates' },
 ];
 

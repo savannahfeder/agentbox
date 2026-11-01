@@ -89,6 +89,40 @@ describe('the setting', () => {
   });
 });
 
+describe('the project page', async () => {
+  const { loadConfig } = await import('../main/config.mjs');
+  const { readSettings, setProjectSetting } = await import('../main/settings.mjs');
+  const { Supervisor } = await import('../main/supervisor.mjs');
+  const store = { listItems: () => [], listProducts: () => [{ slug: 'acme', name: 'Acme', dir: '/tmp/acme' }], isDue: () => true, readInstructions: () => '' };
+  const shown = (dir) => {
+    const config = loadConfig(dir);
+    return readSettings({ config, supervisor: new Supervisor(config, store, dir), store }).projects[0].shipMode;
+  };
+  const set = (dir, value) => {
+    const config = loadConfig(dir);
+    setProjectSetting({ config, supervisor: new Supervisor(config, store, dir) }, { product: 'acme', key: 'shipMode', value });
+  };
+
+  it('starts on asking first, and keeps what is chosen', () => {
+    expect(shown(tmp)).toBe('ask');
+    set(tmp, 'unseen');
+    expect(shown(tmp)).toBe('unseen');
+    expect(loadConfig(tmp).shipModes).toEqual({ acme: 'unseen' });
+  });
+
+  it('leaves nothing in the config once it is back on asking first', () => {
+    set(tmp, 'tested');
+    set(tmp, 'ask');
+    expect(shown(tmp)).toBe('ask');
+    expect(loadConfig(tmp).shipModes).toBeUndefined();
+  });
+
+  it('refuses an answer it does not know', () => {
+    expect(() => set(tmp, 'always')).toThrow(/not a ship mode/);
+    expect(shown(tmp)).toBe('ask');
+  });
+});
+
 describe('what the agent is told', () => {
   it('is nothing at all when the project asks first', () => {
     expect(shipModeBrief('ask')).toBe('');

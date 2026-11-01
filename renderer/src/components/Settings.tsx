@@ -56,6 +56,7 @@ import { chord, chords, sayKeys } from '../this-keyboard';
 import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mjs';
+import { SHIP_MODES, SHIP_MODE_SENTENCE, SHIP_MODE_WORDS, type ShipMode } from '../../../shared/ship-mode.mjs';
 import { TaskTerminal } from './TaskTerminal';
 import { ProjectsPage } from './ProjectsPage';
 import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId } from '../settings-search';
@@ -2525,6 +2526,15 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 desc="A task an agent writes on this project gets a session straight away. Without this it waits in your inbox for your yes. Questions and reviews always wait for you either way."
               >
                 <Switch label="Let agents start the tasks they file here" on={current.autonomous} onChange={(v) => setProject(current.slug, 'autonomous', v)} />
+              </Row>
+              <Row label="When a change is ready" desc={SHIP_MODE_SENTENCE[current.shipMode ?? 'ask']}>
+                <Picker
+                  bare
+                  label="When a change is ready"
+                  value={current.shipMode ?? 'ask'}
+                  options={SHIP_MODES.map((m) => ({ value: m, label: SHIP_MODE_WORDS[m] }))}
+                  onChange={(v: ShipMode) => setProject(current.slug, 'shipMode', v)}
+                />
               </Row>
               {/* ONE LOGIN, NO ROW. The choice is only a choice with a second
                   account signed in, and on the one-account Mac -- which is

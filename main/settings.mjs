@@ -36,6 +36,7 @@ import { isEngine } from '../shared/engines.mjs';
 import { codexAccount, codexFreePlan, codexLoginCommand, makeCodexHome } from './codex-account.mjs';
 import { codexDefaultModel, codexModelsAcross } from './codex-models.mjs';
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mjs';
+import { isShipMode, shipModeOf } from '../shared/ship-mode.mjs';
 import { CLOUD_SAME, CLOUD_CLAUDE_DEFAULT, CLOUD_CODEX_DEFAULT } from './cloud-permission.mjs';
 import { isPackagedElectron } from './team/session.mjs';
 import { claudeModels } from './claude-models.mjs';
@@ -615,6 +616,7 @@ export function readSettings({ config, supervisor, store }, { search = true } = 
       // workspace default and never a strip of Claude Code jargon on a page
       // she opens to change her rules.
       autonomous: (config.autonomousProducts ?? []).includes(product.slug),
+      shipMode: shipModeOf(config, product.slug),
       // ON HER PHONE WITH THE MAC SHUT (docs/cloud/PHONE-PLAN.md): its threads
       // go up to her own rows online on every sync (main/phone-inbox.mjs).
       onPhone: phoneSlugs.has(product.slug),
@@ -881,6 +883,14 @@ export function setProjectSetting({ config, supervisor, store }, { product, key,
     case 'autonomous':
       saveConfig(config, { autonomousProducts: withSlug(config.autonomousProducts, product, !!value) });
       break;
+    case 'shipMode': {
+      if (!isShipMode(value)) throw new Error(`not a ship mode: ${value}`);
+      const map = { ...(config.shipModes ?? {}) };
+      if (value === 'ask') delete map[product];
+      else map[product] = value;
+      saveConfig(config, { shipModes: Object.keys(map).length ? map : undefined });
+      break;
+    }
     case 'phone':
       saveConfig(config, { phoneProducts: withPhoneProject(config.phoneProducts, process.env.AGENTBOX_PERSON_ID, product, !!value, phoneEligible(store?.listProducts?.() ?? [])) });
       break;

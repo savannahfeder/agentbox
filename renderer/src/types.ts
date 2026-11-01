@@ -1087,6 +1087,8 @@ export interface ProjectSettings {
   /** Her mark for this project as a drawable url, or null for the burst. */
   logo: string | null;
   autonomous: boolean;
+  /** What may ship without asking her (shared/ship-mode.mjs). */
+  shipMode?: 'ask' | 'unseen' | 'tested';
   /** Its threads go to her account online for her phone with the Mac shut. */
   onPhone?: boolean;
   permission: PermissionMode | 'workspace';
