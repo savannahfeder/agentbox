@@ -590,7 +590,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // `ask.since` names the last answer the screen holds, and the threads that
   // did not change since are left out (shared/snapshot-delta.mjs).
   const snapshots = snapshotSender();
-  ipcMain.handle('zero:snapshot', (_e, ask) => {
+  ipcMain.handle('zero:snapshot', (_e, ask?: { since?: string; open?: { id?: string; product?: string } | null }) => {
     const now = Date.now();
     const items = store.listItems(now);
     const running = supervisor.status();
@@ -2378,7 +2378,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // `whole` is a thread's middle being asked for: every log, whole, once
   // (main/run-traces.mjs). Otherwise the newest, and `have` holds the stamps
   // of the logs the screen already has (shared/trace-delta.mjs).
-  ipcMain.handle('zero:session-trace', async (_e, { product, id, have, whole }: { product: string; id: string; have?: unknown; whole?: boolean } = {} as { product: string; id: string }) => {
+  ipcMain.handle('zero:session-trace', async (_e, { product, id, have, whole }: { product: string; id: string; have?: Record<string, string>; whole?: boolean } = {} as { product: string; id: string }) => {
     const fs = await import('node:fs');
     const path = await import('node:path');
     const dir = store.listProducts().find((p) => p.slug === product)?.dir;

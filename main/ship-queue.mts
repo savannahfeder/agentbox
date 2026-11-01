@@ -31,6 +31,7 @@ import { SHIP_FAILED } from '../shared/not-shipped.mts';
 import { conflictBrief, earlyConflictNote } from './ship-conflict-brief.mts';
 import type { ConflictThread } from './ship-conflict-brief.mts';
 import { redOnMain } from './main-went-red.mts';
+import type { GateAnswer, GateRequest, GateReply } from './memory-gate.mts';
 
 export const SHIP_LABEL = 'ship';
 const SHIP_MS = 20 * 60 * 1000;
@@ -58,8 +59,14 @@ export interface ShipRun { code: number; out: string }
 
 export interface ShipStore {
   readItem?(slug: string, id: string): ConflictThread | null | undefined;
+  noteItem?(slug: string, id: string, note: string): unknown;
   shipped(slug: string, id: string, result: { sha: string | null; labels: string[] }): unknown;
   shipFailed(slug: string, id: string, result: { note: string; labels: string[] }): unknown;
+}
+
+export interface ShipGate {
+  submit(req: GateRequest, reply: GateReply): unknown;
+  finish(id: unknown): unknown;
 }
 
 export interface ShipLog {
@@ -335,11 +342,11 @@ let shipTurns = 0;
  * last turn it goes anyway, because a ship left behind is a thread stuck in In
  * progress.
  */
-export async function shipSlot(gate, item, score = 0, { turns = 3, onWait = () => {} } = {}) {
+export async function shipSlot(gate: ShipGate | null | undefined, item: ShipItem, score = 0, { turns = 3, onWait = () => {} }: { turns?: number; onWait?: () => void } = {}): Promise<() => void> {
   if (!gate) return () => {};
   for (let turn = 1; ; turn += 1) {
     const id = `ship-${item.id}-${++shipTurns}`;
-    const answer = await new Promise((resolve) => {
+    const answer = await new Promise<GateAnswer>((resolve) => {
       gate.submit({ id, command: 'agentbox-ship', item: item.id, product: item.product, score }, resolve);
     });
     if (answer.allow || turn >= turns) return () => gate.finish(id);

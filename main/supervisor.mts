@@ -320,6 +320,9 @@ export interface WorkerChild {
   ranToTheEnd?(): boolean;
   waitingOn?(): unknown[];
   lastInterruptAt?: number;
+  runId?: string;
+  sockPath?: string;
+  keep?(): void;
 }
 
 /** The third argument only the Codex facade's exit sends. */
@@ -395,6 +398,10 @@ export type RunState = {
   helperIds?: Set<string>;
   claimCalls?: Set<string | undefined>;
   activeTools?: Map<string, ActiveTool>;
+  cutOffByQuit?: boolean;
+  hosted?: boolean;
+  adopted?: boolean;
+  letGo?: boolean;
 };
 
 /** One run this Mac started and is watching (`Supervisor#sessions`). */
@@ -437,6 +444,20 @@ export interface LiveSessionRecord {
   cloud?: boolean;
   reachedTheCloud?: boolean;
   carrying?: string | null;
+  hosted?: HostedRecord;
+  heard?: string | null;
+  carriesHandBack?: boolean;
+  resumed?: boolean;
+  spawnFiles?: string[];
+  repoHead?: { root: string; head: string | null; at: number } | null;
+}
+
+export interface HostedRecord {
+  runId?: string;
+  sock?: string;
+  pid: number | null;
+  out?: number | null;
+  err?: number | null;
 }
 
 /** A row's own chat, remembered after a clean finish too (`_rowSessions`). */
@@ -521,6 +542,21 @@ export interface SpawnOptions {
   remoteOnly?: boolean;
   shipFailure?: string | null;
   asked?: boolean;
+}
+
+export interface StartSessionOptions {
+  product: Product;
+  cwd: string;
+  profile: string;
+  engine: string;
+  plan: Pick<SpawnPlan, 'args' | 'command' | 'resumeId'>;
+  where: 'local' | 'cloud';
+  whyLocal?: WhyLocal | null;
+  remoteOnly?: boolean;
+  continuation?: boolean;
+  model?: string | null;
+  spawnFiles?: string[];
+  adopted?: { child: HostedRun; rec: LiveSessionRecord } | null;
 }
 
 /** A start waiting on its row's folder or picture (`_preparing`). */
@@ -1125,7 +1161,8 @@ export class Supervisor {
   // Set from outside by main/main.mts and its neighbours, and absent in tests.
   declare count: ((name: string, props?: Record<string, unknown>) => void) | undefined;
   declare idleMs: (() => number | null | undefined) | undefined;
-  declare stalls: { take(): Record<string, unknown> | undefined } | undefined;
+  declare stalls: { take(): Record<string, unknown> | undefined; longestNow?(): number } | undefined;
+  declare hostRuns: boolean | undefined;
   declare terminalOpen: ((id: string) => boolean) | undefined;
   declare runLedger: string | undefined;
   declare _remoteControls: Map<string, RemoteControlState> | undefined;
@@ -1135,6 +1172,10 @@ export class Supervisor {
   declare _madeFolders: Map<string, string>;
   declare _photos: Map<string, ReturnType<typeof snapshotRepo> | null> | undefined;
   declare _firstRunUntil: number;
+  declare _startBudget: StartBudget;
+  declare _runHostBroken: number | undefined;
+  declare _runHostSock: string | undefined;
+  declare _runHostProc: ChildProcess | undefined;
   declare _stateFile: string;
   declare _handledAnswers: Set<string>;
   declare _resumedWaits: Set<string>;
@@ -6758,7 +6799,7 @@ export class Supervisor {
       this._runHostProc = proc;
       return this._runHostSock;
     } catch (error) {
-      console.warn(`${nameSlug}: the run host could not start, so runs start directly:`, error.message);
+      console.warn(`${nameSlug}: the run host could not start, so runs start directly:`, (error as Error).message);
       return null;
     }
   }
@@ -6767,7 +6808,7 @@ export class Supervisor {
   // restart, and picked back up at the next start (`_adoptHostedRun`). One
   // whose session id has not arrived has nothing to be found again by, so it
   // is stopped and resumed as before.
-  _letGoOfHostedRun(s) {
+  _letGoOfHostedRun(s: WorkerSession) {
     if (!s?.hosted || !(s.child instanceof HostedRun)) return false;
     const rec = this._liveSessions?.[s.itemId];
     if (!rec || !s.sessionId || rec.sessionId !== s.sessionId) return false;
@@ -6791,7 +6832,7 @@ export class Supervisor {
   // the same session, its output read on from where the app stopped, its end
   // handled as any run's. False when there is nothing to attach to, and the
   // restart sweep resumes it from its transcript as before.
-  _adoptHostedRun(item, rec) {
+  _adoptHostedRun(item: WorkItem, rec: LiveSessionRecord) {
     const h = rec?.hosted;
     if (!this.hostRuns || !h?.runId || !h.sock || rec.cloud || this.sessions.has(item.id)) return false;
     const alive = Number.isInteger(h.pid) && pidAlive(h.pid);
@@ -6806,7 +6847,7 @@ export class Supervisor {
     // A reply written while the app was away was not heard by this run.
     const heard = !!rec.heard && !!item.answer && this._answerKey(item) === rec.heard;
     this._startSession(heard ? item : { ...item, answer: null }, {
-      product, cwd: rec.cwd, profile: rec.profile, engine: rec.engine ?? 'claude', where: 'local',
+      product, cwd: rec.cwd as string, profile: rec.profile as string, engine: rec.engine ?? 'claude', where: 'local',
       plan: { args: [], command: false, resumeId: rec.resumed ? rec.sessionId : null },
       continuation: !!rec.continuation, spawnFiles: rec.spawnFiles ?? [], adopted: { child, rec },
     });
@@ -10930,7 +10971,7 @@ export class Supervisor {
 
   // From the process on: the session, its readers and its exit. A run the app
   // reattached to after a restart comes in here with its process (`_adoptHostedRun`).
-  _startSession(item, { product, cwd, profile, engine, plan, where, whyLocal = null, remoteOnly = false, continuation = false, model = null, spawnFiles = [], adopted = null }) {
+  _startSession(item: WorkItem, { product, cwd, profile, engine, plan, where, whyLocal = null, remoteOnly = false, continuation = false, model = null, spawnFiles = [], adopted = null }: StartSessionOptions) {
     const { args } = plan;
     // A SECOND ACCOUNT ARRIVES EMPTY, AND THIS IS WHERE IT STOPS BEING EMPTY.
     // Our own Accounts page tells a person to log in with a brand new folder,
@@ -10960,7 +11001,7 @@ export class Supervisor {
     // A LOCAL RUN IS HELD BY THE RUN HOST, so a quit or a restart leaves it
     // and its helpers going (main/run-host.mjs).
     const hosted = !!this.hostRuns && where !== 'cloud' && !remoteOnly && !plan.command;
-    const child = adopted?.child ?? harness.spawn(this, plan, { cwd, item, profile, env, cloud: where === 'cloud', host: hosted ? this._runHost() : null });
+    const child: WorkerChild = adopted?.child ?? harness.spawn(this, plan, { cwd, item, profile, env, cloud: where === 'cloud', host: hosted ? this._runHost() : null }) as WorkerChild;
     if (child instanceof HostedRun && !adopted) child.once('exit', (code) => { if (code === HOST_LOST && !Number.isInteger(child.pid)) this._runHostBroken = Date.now(); });
 
     // `command` RIDES ON THE SESSION so the cap can leave it out (`_load`).
@@ -11238,7 +11279,7 @@ export class Supervisor {
         // reason. A resumed session announces the id it is resuming, so this
         // records the same id it already held and the thread keeps its name
         // across as many replies as she writes.
-        if (session.hosted) child.keep();
+        if (session.hosted) child.keep!();
         this.rememberRowSession(item, { sessionId: session.sessionId, cwd, profile, engine, startedAt: session.startedAt });
         this._stoppedSessionTakenUp(item, session);
         this._saveState();

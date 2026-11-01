@@ -20,14 +20,18 @@ export interface InputRun { print: string; input?: readonly string[] }
 
 export type ControlResult = Record<string, unknown>;
 
+export interface HostInputState { atResult?: boolean; waiting?: BackgroundTask[]; closed?: boolean }
+
 export interface ClaudeInput {
   waitingOn(): BackgroundTask[];
   ranToTheEnd(): boolean;
   holdInput(value: unknown): void;
+  inputState(): HostInputState;
   control(request: Record<string, unknown>, timeoutMs?: number): Promise<ControlResult>;
   interrupt(): Promise<{ interrupted: boolean }>;
   steer(text: string): Promise<{ accepted: boolean }>;
   lastInterruptAt?: number;
+  endedInHost?: boolean;
 }
 
 export type PipedChild = ChildProcess & { stdin: Writable; stdout: Readable };
@@ -205,7 +209,7 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
   });
   // A run the app reattached to (main/hosted-run.mjs): the host has been
   // reading the stream meanwhile, and knows where the turn stands.
-  child.on('input-state', (s) => {
+  child.on('input-state', (s: HostInputState | null | undefined) => {
     if (s?.closed) { closed = true; ended = true; return; }
     atResult = !!s?.atResult;
     if (Array.isArray(s?.waiting)) waiting = s.waiting;

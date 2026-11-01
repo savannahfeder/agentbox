@@ -116,6 +116,7 @@ export interface HarnessSpawnContext {
   profile: string;
   env: Env;
   cloud?: boolean;
+  host?: string | null;
 }
 
 export interface HarnessRecord {
@@ -139,6 +140,7 @@ export interface HarnessSupervisor {
   _cloudDocsEnv(item: HarnessItem): Env;
   _spawnCloudRelay(args: string[], options: { cwd: string; env: Env }): ChildProcess;
   memoryGateEnv(item: HarnessItem): Env;
+  _runSpool(): string;
   _codexWorkspaceModel(): string | null;
   _codexProfileHome(profile?: string | null): string;
   _codexProfiles(): string[];

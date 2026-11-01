@@ -305,7 +305,7 @@ export function createDailyCount(track: (name: string) => unknown) {
 
 // WHAT AN AGENT'S RUN REPORTS WHEN IT ENDS: how long, whether it failed, and
 // which engine. Nothing about the task it was on.
-export function runEndedProps(session: { startedAt?: number; exitFailed?: unknown; engine?: string }, now: number) {
+export function runEndedProps(session: { startedAt?: number; exitFailed?: unknown; cutOffByQuit?: boolean; engine?: string }, now: number) {
   return {
     seconds: Math.round((now - (session.startedAt ?? now)) / 1000),
     failed: !!session.exitFailed && !session.cutOffByQuit,
