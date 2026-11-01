@@ -620,9 +620,10 @@ runtime (`cloud/gateway/`). The Mac's two interfaces (transport and storage,
   kept in Secrets Manager. The role itself cannot read a sign-in or a run's
   files.
 - **Plans.** The ledger (`ledger/` in the same bucket, written with S3's
-  conditional writes, no database) holds each person's plan, their live
-  sessions, the seconds used per month, and one record per run (`ledger/runs/`,
-  how long and how it ended). A start is refused when there is no plan, the
+  conditional writes) holds each person's plan, their live sessions, the
+  seconds used per month, and one record per run (`ledger/runs/`, how long and
+  how it ended). The database carries a copy of the plan for people to read
+  (below); the ledger is what every start is weighed against. A start is refused when there is no plan, the
   plan's agents are all running, its hours are spent, or the cloud is paused. A live session
   takes only the same start again, never a run on a sign-in's session.
 - **Whatever stops being counted is stopped.** A run ends when its
@@ -639,11 +640,28 @@ runtime (`cloud/gateway/`). The Mac's two interfaces (transport and storage,
   `no-run` without asking AgentCore, which would make a machine for it. The
   Mac stops its session when a run fails or its work is home.
 - **The sweep**, every 5 minutes: ceilings, spent hours, a `done.json` whose
-  notice was missed, and stops to retry.
-- **The owner's hand** (`scripts/cloud-gateway-admin.mjs`, a direct call,
-  never the public address): set a plan, turn a person off (their runs stop,
-  every key of theirs is refused), pause or resume new runs. The budget the
-  spike made pauses new runs when the month's spend passes it.
+  notice was missed, stops to retry, plans asked for in the database, and any
+  plan the database has not taken.
+- **Who is subscribed, in the database** (`cloud_plans`, 2026-10-31). The
+  ledger above is what a run start reads, in the write that counts the runs
+  against the plan, so no run waits on the database. Beside it, every plan
+  change is copied into one row per account, which that person may read and
+  nobody may write, carrying the plan, who bills it and the ledger's own
+  revision of it; a write older than the row's revision changes nothing, so a
+  late one cannot put back a plan left behind. A write the database refuses is
+  offered again by every sweep until it lands, and said as behind after an
+  hour. Who pays is then one query beside the address:
+  `select p.email, c.plan, c.source from cloud_plans c join people p on p.id = c.person;`
+- **The owner's hand.** A plan is given in the database, which needs no AWS
+  sign-in: `insert into cloud_plans (person, give) select id, 'pro' from
+  people where email = '...' on conflict (person) do update set give = 'pro';`
+  The sweep takes it up within five minutes, writes the plan back and clears
+  `give`; a `give` that is no plan is said and cleared.
+  `scripts/cloud-gateway-admin.mjs` (a direct call, never the public address)
+  does the same by account id, and is still the only way to turn a person off
+  (their runs stop, every key of theirs is refused) or to pause and resume new
+  runs. The budget the spike made pauses new runs when the month's spend
+  passes it.
 - **Big calls.** Lambda takes and gives at most 6 MB; a call or an answer
   over 4 MB goes through the person's own `runs/calls/`. A refusal reaches
   the Mac as an answer, never a throw, so nothing retries it for ever; a
