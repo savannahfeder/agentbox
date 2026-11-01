@@ -83,7 +83,7 @@ export function readTeam(dir: string) {
 }
 
 // Every shared project on this Mac, as sync wants them.
-export function listSharedProjects(products: { team?: { projectId: string; direct?: boolean }; dir: string; name: string; slug: string }[]): SharedProjectRef[] {
+export function listSharedProjects(products: { team?: { projectId: string; direct?: boolean } | null; dir: string; name: string; slug: string }[]): SharedProjectRef[] {
   return products
     .filter((p) => p.team?.projectId)
     .map((p) => ({ projectId: p.team!.projectId, dir: p.dir, name: p.name, slug: p.slug, direct: p.team!.direct === true }));

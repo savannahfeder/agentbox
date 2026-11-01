@@ -285,7 +285,7 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
         // A line of your own comes back only in a conversation, and a line of a
         // teammate's keeps only what they may set here (shared/team-rules.mjs).
         .map((l) => (l.by === me ? whatYourOtherCopyMaySet(l, { direct }) : whatATeammateMaySet(l, { direct })))
-        .filter(Boolean);
+        .filter(Boolean) as LedgerLine[];
       // The pictures first, so no message lands without its own.
       if (direct) await takeFiles(project, bring.flatMap(filesNamedIn));
       pulled += disk.appendForeignLines(project.dir, bring);

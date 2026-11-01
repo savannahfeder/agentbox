@@ -33,7 +33,7 @@ export interface LedgerRun {
 export interface CloudUsageLine {
   at: string;
   wallSeconds?: unknown;
-  runId?: string | number;
+  runId?: string | number | null;
   item?: string | null;
   engine?: string | null;
   exitCode?: unknown;

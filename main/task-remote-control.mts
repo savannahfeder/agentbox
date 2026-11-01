@@ -44,7 +44,7 @@ export interface RemoteItem {
 /** The part of the supervisor that remote control reads and calls. */
 export interface RemoteSupervisor {
   _remoteControls?: Map<string, RemoteControlState>;
-  onChange?: () => void;
+  onChange?: (() => void) | null;
   sessions: Map<string, RemoteSession>;
   store: {
     readItem(product: string, id: string): RemoteItem | null | undefined;

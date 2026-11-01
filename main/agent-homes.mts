@@ -42,7 +42,7 @@ export interface DataDirOptions {
 
 export interface HomesSupervisor {
   _codexProfiles?: () => unknown;
-  _codexProfileHome: (profile: unknown) => unknown;
+  _codexProfileHome: (profile: string | null | undefined) => unknown;
 }
 
 const isDir = (p: string) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
@@ -140,7 +140,7 @@ export function codexHomesOf(supervisor: HomesSupervisor | null | undefined) {
  *  both lists inside one try, so any one of those left the import reading
  *  nothing beyond the defaults, and without the app's own CLAUDE_CONFIG_DIR or
  *  CODEX_HOME either. */
-export function appSessionFolders({ config = null, supervisor = null, env = process.env, shellEnv = shellDataDirsNow(), home = os.homedir() }: { config?: { authProfiles?: string[] | string } | null; supervisor?: HomesSupervisor | null; env?: Record<string, string | undefined>; shellEnv?: { CLAUDE_CONFIG_DIR?: string; CODEX_HOME?: string }; home?: string } = {}) {
+export function appSessionFolders({ config = null, supervisor = null, env = process.env, shellEnv = shellDataDirsNow(), home = os.homedir() }: { config?: { authProfiles?: string[] | string | null } | null; supervisor?: HomesSupervisor | null; env?: Record<string, string | undefined>; shellEnv?: { CLAUDE_CONFIG_DIR?: string; CODEX_HOME?: string }; home?: string } = {}) {
   let claudeProfiles: string[] | string = [];
   try { claudeProfiles = config?.authProfiles ?? []; } catch { claudeProfiles = []; }
   if (!Array.isArray(claudeProfiles)) claudeProfiles = [claudeProfiles];

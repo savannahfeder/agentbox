@@ -57,7 +57,7 @@ describe('the glyphs come from the table', () => {
 
   it('reads the keyboard once, and from the shared table', () => {
     const keyboard = fs.readFileSync(path.join(root, 'renderer/src/this-keyboard.ts'), 'utf8');
-    expect(keyboard).toContain("from '../../shared/key-caps.mjs'");
+    expect(keyboard).toContain("from '../../shared/key-caps.mts'");
     // Nobody else decides which keyboard this is. (`navigator.userAgent` is
     // still read elsewhere, for the phone, which is a different question.)
     const askers = files

@@ -105,7 +105,7 @@ export interface TeamProduct {
   name: string;
   dir: string;
   repoPath?: string | null;
-  team?: TeamRecord;
+  team?: TeamRecord | null;
 }
 
 /** A row of the store, as far as the team service reads it. */

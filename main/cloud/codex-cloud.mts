@@ -27,7 +27,7 @@ export const LOGIN_TROUBLE = 77;
 type ExitArgs = [code?: number | null, signal?: string | null, how?: Record<string, unknown>];
 
 export interface HomeWorker extends EventEmitter {
-  steer?: (...args: unknown[]) => Promise<unknown>;
+  steer?: (text: string, pictures?: unknown[]) => Promise<unknown>;
 }
 
 export interface HomeWait {

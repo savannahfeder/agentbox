@@ -107,7 +107,6 @@ export interface HarnessPlan {
   args: string[];
   answerMode?: string | null;
   resumeId?: string | null;
-  [key: string]: unknown;
 }
 
 export interface HarnessSpawnContext {
@@ -182,7 +181,7 @@ export interface Harness extends Omit<HarnessDefinition, 'instructions'> {
   profileEnv(env: Env, profile: string, sup?: HarnessSupervisor): Env;
   profiles(sup: HarnessSupervisor): string[];
   signedIn(sup: HarnessSupervisor, profile: string): boolean;
-  accountKey(profile: string): string;
+  accountKey(profile: string | null | undefined): string;
   models(options?: unknown): unknown;
   defaultModel(options?: unknown): unknown;
   workspaceModel(sup: HarnessSupervisor): string | null;
@@ -267,7 +266,7 @@ export function definitionMethods(definition: HarnessDefinition) {
     install: () => ({ file: definition.installer.shell, args: ['-c', `curl -fsSL ${definition.installer.url} | ${definition.installer.pipe}`] }),
     signIn: (bin: string): HarnessCommand => ({ file: bin, args: [...definition.loginArgs] }),
     signInStatus: (bin: string): HarnessCommand => ({ file: bin, args: [...definition.statusArgs] }),
-    accountKey: (profile: string) => `${definition.accountPrefix}${profile}`,
+    accountKey: (profile: string | null | undefined) => `${definition.accountPrefix}${profile}`,
     workerEnv(input: Env = process.env): Env {
       const env = { ...input };
       for (const key of Object.keys(env)) if (scrub.some(pattern => pattern.test(key))) delete env[key];

@@ -145,6 +145,6 @@ describe('a selection that covers no terminal cells is not a crash', () => {
     expect(pane).toMatch(/guardInvalidRange\(terminal\)/);
     // After open(), because the manager does not exist until then.
     expect(pane.indexOf('terminal.open(')).toBeLessThan(pane.indexOf('guardInvalidRange(terminal)'));
-    expect(pane).toMatch(/import\s*\{guardInvalidRange\}\s*from\s*'\.\.\/\.\.\/\.\.\/shared\/xterm-invalid-range\.mjs'/);
+    expect(pane).toMatch(/import\s*\{guardInvalidRange\}\s*from\s*'\.\.\/\.\.\/\.\.\/shared\/xterm-invalid-range\.mts'/);
   });
 });

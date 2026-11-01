@@ -53,6 +53,7 @@ import { CLOUD_SENT, readSent } from '../shared/cloud-start.mts';
 import { readCloudConfig, cloudAccountConfig, OLD_TOKEN_SERVICE, imageCapsToTry } from './cloud/config.mjs';
 import { cloudVersionGaps } from '../shared/cloud-versions.mts';
 import { cloudLoginState, mayRunOn, startCloudSignIn, renewCloudCodexLogin, sweepRetiredLogins, forgetOldCloudTokens, listCloudLogins, removeCloudLogin, newCloudAccountKey, lookAtCloudLogin, cloudLimits, markCloudLogin, cloudLoginInUse, cloudAccountsFrom, CLOUD_ACCOUNT_ENV } from './cloud/logins.mts';
+import type { CloudLimitReading } from './cloud/logins.mts';
 import { execFileSync } from 'node:child_process';
 import { holdUntilHome } from './cloud/codex-cloud.mts';
 import { hostSocketPath, perlRunsTheShim, HOST_ALREADY_THERE } from './cloud/host.mts';
@@ -588,7 +589,7 @@ export interface SupervisorStore {
   readHistory?(slug: string, id: string, opts?: { max?: number; before?: number }): QueuedLine[];
   isDue(item: WorkItem, now?: number): boolean;
   answerItem(slug: string, id: string, patch: { answer?: string; status?: WorkItemStatus | null; [field: string]: unknown }): WorkItem | null | undefined;
-  tellItem(slug: string, id: string, opts: { text: string; from?: unknown; hold?: boolean; hop?: unknown }): unknown;
+  tellItem(slug: string, id: string, opts: { text: string; from?: unknown; hold?: boolean; hop?: unknown }): WorkItem | null | undefined;
   recordSessionResult(slug: string, id: string, opts: { result: string; status?: WorkItemStatus | null }): WorkItem | null | undefined;
   releaseRunClaim(slug: string, id: string, run: unknown): unknown;
   nameItem(slug: string, id: string, label: string): unknown;
@@ -607,8 +608,8 @@ export interface SupervisorStore {
   fileMainFix(slug: string, fields: { title: string; body: string; problem?: string; kind?: string; priority?: number; labels?: string[] }): { id: string };
   repeats?: {
     list?(dir: string, now?: number): RepeatRule[] | null;
-    due(dir: string, now: number): { rule: RepeatRule; key: string }[];
-    serve(dir: string, ruleId: string, key: string, now?: number): Promise<{ alert?: string[] | null; misses?: number } | null | undefined>;
+    due(dir: string, now: number): { rule: RepeatRule; key: string | null }[];
+    serve(dir: string, ruleId: string, key: string | null, now?: number): Promise<{ alert?: string[] | null; misses?: number } | null | undefined>;
   } | null;
   teammates?: {
     briefFor(item: WorkItem): string | null;
@@ -1224,7 +1225,7 @@ export class Supervisor {
   declare _cloudOrgBusy: boolean | undefined;
   declare _cloudOrgTried: Map<string, number>;
   declare _cloudRenewAt: number | undefined;
-  declare _cloudRenewing: Set<string>;
+  declare _cloudRenewing: Set<string | undefined>;
   declare _cloudSetUpAt: number | undefined;
   declare _cloudSetUpWas: boolean | undefined;
   declare _cloudSignIns: Map<string, CloudSignInFlow>;
@@ -2843,7 +2844,7 @@ export class Supervisor {
     let folder = '';
     let file: string | null = null;
     try { file = this.transcriptFile({ sessionId, profile, engine: 'claude' }); } catch { file = null; }
-    try { folder = readTranscriptHead(file).cwd ?? ''; } catch { folder = ''; }
+    try { folder = readTranscriptHead(file!).cwd ?? ''; } catch { folder = ''; }
     // `<home>/projects/<folder>/<id>.jsonl`, so the login's home is three up.
     const home = file ? path.dirname(path.dirname(path.dirname(file))) : null;
     // Written to in the last two minutes counts as open too: a copy is the
@@ -3591,7 +3592,7 @@ export class Supervisor {
         'and start again only the ones that did not, rather than all of them.');
     }
     if (continuation && item?.answer && item.answer !== '(withdrawn)') {
-      parts.push('', toldBy(item) ? `${toldBy(item).name}, a teammate, has written since you stopped. The newest message is the` : 'The founder has answered since you stopped. Their newest message is the',
+      parts.push('', toldBy(item) ? `${toldBy(item)!.name}, a teammate, has written since you stopped. The newest message is the` : 'The founder has answered since you stopped. Their newest message is the',
         'last one below: do what it asks before you carry on with anything else.', '', String(item.answer));
       // A resumed session has everything it read still in it, EXCEPT anything
       // she attached to the reply that woke it. That is new, and it is the one
@@ -5890,7 +5891,7 @@ export class Supervisor {
         const failed = r.lookFailedAt && r.lookFailedAt > (r.readAt ?? 0);
         out.push({
           engine, key: r.key, name: name || null, plan: plans.size === 1 ? [...plans][0] : null, ready: mayRunOn(state), state, savedAt: r.savedAt ?? null,
-          limitedUntil: r.limitedUntil ?? null, limits: cloudLimits(r.limits), readAt: r.readAt ?? null, duplicateOf: r.duplicateOf ?? null,
+          limitedUntil: r.limitedUntil ?? null, limits: cloudLimits(r.limits as readonly CloudLimitReading[] | null | undefined), readAt: r.readAt ?? null, duplicateOf: r.duplicateOf ?? null,
           profile, readError: failed ? r.lookError || 'The cloud did not answer.' : null, inUse: r.key === inUse,
         });
       });
@@ -8589,7 +8590,7 @@ export class Supervisor {
     for (const product of this.store.listProducts()) {
       // The practice project is not a project anybody works in (`worksHere`).
       if (!this.worksHere(product)) continue;
-      let due: { rule: RepeatRule; key: string }[] = [];
+      let due: { rule: RepeatRule; key: string | null }[] = [];
       try {
         due = this.store.repeats.due(product.dir, now);
       } catch (err) {
@@ -8813,7 +8814,7 @@ export class Supervisor {
       const answer = queuedReplyText(item, this.store.readHistory(item.product, item.id), (row) => this._heardIn(row as WorkItem, conversation)) as string | undefined;
       if (answer !== item.answer) item = { ...item, answer };
     } else if (continuation && toldBy(item)) {
-      item = { ...item, answer: framedTeammate(toldBy(item).name, item.answer) };
+      item = { ...item, answer: framedTeammate(toldBy(item)!.name, item.answer) };
     }
     let prompt: string;
     // THE TWO KINDS OF RESUME SAY DIFFERENT THINGS, and handing a finished

@@ -107,7 +107,7 @@ describe('the reserved terminal key', () => {
   // item that has to exist; this one resolves to the folder main just made.
   it('is shared by both sides rather than spelled twice', () => {
     expect(read('main/ipc.mts')).toContain("import {SETTINGS_TERMINAL} from '../shared/settings-terminal.mts';");
-    expect(read('renderer/src/components/Settings.tsx')).toContain("import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mjs';");
+    expect(read('renderer/src/components/Settings.tsx')).toContain("import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mts';");
   });
 
   // A COLON, SO NO PROJECT CAN COLLIDE WITH IT. A product here is a slug taken

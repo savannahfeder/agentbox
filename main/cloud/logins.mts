@@ -205,7 +205,7 @@ export function cloudLoginFor(engine: string, dir: string | undefined, { home = 
 
 // A new sign-in becomes the account's current one. What it replaced is kept
 // on a list to delete once no run can still be about to fetch it.
-export function recordCloudLogin(engine: string, dir: string, { id, savedAt = Date.now(), expiresAt = null, email = null, org = null, limits = null }: RecordedLogin, { home = os.homedir(), now = Date.now() }: { home?: string; now?: number } = {}): CloudLoginRecord {
+export function recordCloudLogin(engine: string, dir: string | undefined, { id, savedAt = Date.now(), expiresAt = null, email = null, org = null, limits = null }: RecordedLogin, { home = os.homedir(), now = Date.now() }: { home?: string; now?: number } = {}): CloudLoginRecord {
   return withLock(home, () => {
   const all = readCloudLogins({ home });
   const key = accountOf(engine, dir);
@@ -222,7 +222,7 @@ export function recordCloudLogin(engine: string, dir: string, { id, savedAt = Da
 
 // A change to the account's note that applies only while `id` is still its
 // current login: an old run that reports trouble cannot undo a new sign-in.
-export function markCloudLogin(engine: string, dir: string, id: string | null | undefined, patch: Partial<CloudLoginRecord>, { home = os.homedir() }: { home?: string } = {}) {
+export function markCloudLogin(engine: string, dir: string | undefined, id: string | null | undefined, patch: Partial<CloudLoginRecord>, { home = os.homedir() }: { home?: string } = {}) {
   return withLock(home, () => {
     const all = readCloudLogins({ home });
     const key = accountOf(engine, dir);
@@ -354,7 +354,7 @@ export function noCloudAccountSentence(engine: string, inUse: CloudLoginRecord |
 
 // An account she took out of the cloud. Its object goes too, and every older
 // one it replaced (main/cloud/logins.mts keeps them only for runs under way).
-export async function removeCloudLogin(engine: string, key: string, { storage, home = os.homedir() }: { storage?: CloudStorage; home?: string } = {}) {
+export async function removeCloudLogin(engine: string, key: string, { storage, home = os.homedir() }: { storage?: CloudStorage | null; home?: string } = {}) {
   const rec = cloudLoginFor(engine, key, { home });
   if (!rec) return false;
   withLock(home, () => {
@@ -370,7 +370,7 @@ export async function removeCloudLogin(engine: string, key: string, { storage, h
 
 // Delete what newer sign-ins replaced, once their grace is over. Never the
 // current one.
-export async function sweepRetiredLogins(engine: string, dir: string, { storage, home = os.homedir(), now = Date.now() }: { storage?: CloudStorage; home?: string; now?: number } = {}) {
+export async function sweepRetiredLogins(engine: string, dir: string | undefined, { storage, home = os.homedir(), now = Date.now() }: { storage?: CloudStorage; home?: string; now?: number } = {}) {
   const rec = cloudLoginFor(engine, dir, { home });
   if (!rec?.retired?.length || !storage?.del) return;
   const keep: { id: string; at: number }[] = [];
@@ -573,7 +573,7 @@ export function startCloudSignIn({ transport, storage, engine, dir, home = os.ho
 // login and keeps the renewed one as a new object. Fenced by a `renewing`
 // mark, so an app restarted mid-renewal does not start a second one on the
 // same refresh token. Returns 'renewed', 'busy', 'signed-out' or 'failed'.
-export async function renewCloudCodexLogin({ transport, storage, dir, home = os.homedir(), now = Date.now(), pollWaitMs }: CloudSessionOptions & { storage: CloudStorage; dir: string; home?: string; now?: number }) {
+export async function renewCloudCodexLogin({ transport, storage, dir, home = os.homedir(), now = Date.now(), pollWaitMs }: CloudSessionOptions & { storage: CloudStorage; dir: string | undefined; home?: string; now?: number }) {
   const rec = cloudLoginFor('codex', dir, { home });
   if (!rec?.id || rec.broken) return 'failed';
   const was = typeof rec.renewing === 'number' ? { at: rec.renewing, id: null } : rec.renewing;
@@ -613,7 +613,7 @@ export async function renewCloudCodexLogin({ transport, storage, dir, home = os.
 
 /* ------------------------------- looking --------------------------------- */
 // A look's session and week, in the shape the usage meters draw. Null with none.
-export function cloudLimits(read: CloudLimitReading[] | null | undefined) {
+export function cloudLimits(read: readonly CloudLimitReading[] | null | undefined) {
   if (!Array.isArray(read) || !read.length) return null;
   return read.filter((l) => Number.isFinite(l?.percent)).map((l) => ({
     span: l.span === 'week' ? 'week' : 'session',
@@ -628,7 +628,7 @@ export function cloudLimits(read: CloudLimitReading[] | null | undefined) {
 // that makes one tiny reply on it and reads the reply's headers. Kept on the
 // login's note only while that login is still the current one. A failed look
 // keeps the last reading and notes why beside it. Returns 'read' or 'failed'.
-export async function lookAtCloudLogin({ transport, storage, key, home = os.homedir(), now = Date.now(), pollWaitMs }: CloudSessionOptions & { storage: CloudStorage; key: string; home?: string; now?: number }) {
+export async function lookAtCloudLogin({ transport, storage, key, home = os.homedir(), now = Date.now(), pollWaitMs }: CloudSessionOptions & { storage: CloudStorage; key: string | undefined; home?: string; now?: number }) {
   const rec = cloudLoginFor('claude', key, { home });
   if (!rec?.id || rec.broken) return 'failed';
   const end = await session({

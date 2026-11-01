@@ -43,7 +43,9 @@ import { NAME } from '../shared/product-name.mjs';
 //
 // It goes LAST, after her own folder, so nothing of hers is ever shadowed by
 // one of ours.
-export interface ArtifactProduct { slug?: string; name?: string; dir?: string; repoPath?: string }
+export interface ArtifactProduct { slug?: string; name?: string; dir?: string; repoPath?: string | null }
+
+export type ArtifactFound = { ok: true; path: string } | { ok: false; error: string };
 
 export type ArtifactFs = Pick<typeof fsDefault, 'existsSync'> & { promises: Pick<typeof fsDefault.promises, 'readdir' | 'stat'> };
 
@@ -146,7 +148,7 @@ export function notFoundMessage(raw: string, own: ArtifactProduct | null | undef
 //
 // `products` is the whole list only so the card's own product can be found in
 // it. Nothing in here reads another entry.
-export async function resolveArtifact({ src, product, products = [], accountRoot, storeRoot, fs = fsDefault, now = Date.now() }: ArtifactRequest) {
+export async function resolveArtifact({ src, product, products = [], accountRoot, storeRoot, fs = fsDefault, now = Date.now() }: ArtifactRequest): Promise<ArtifactFound> {
   if (typeof src !== 'string' || !src) return { ok: false, error: 'No file was named.' };
   const raw = decodeURIComponent(src.replace(/^file:\/\//, '')).replace(/^\.\//, '');
   const own = products.find((x) => x.slug === product) ?? null;

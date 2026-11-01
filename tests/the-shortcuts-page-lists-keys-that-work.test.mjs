@@ -373,7 +373,7 @@ describe('the page stays a page and not a wall', () => {
     for (const g of SHORTCUTS) {
       expect(Object.keys(g).sort()).toEqual(['keys', 'label']);
     }
-    expect(read('shared/shortcuts.d.mts')).not.toMatch(/^\s*note\?:/m);
+    expect(read('shared/shortcuts.mts')).not.toMatch(/^\s*note\?:/m);
     // Scoped to this pane's own markup: `.set-group-note` is a real class that
     // other panes in Settings still use, so a whole-file search proves nothing.
     const pane = settings.slice(

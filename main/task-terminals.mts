@@ -85,8 +85,8 @@ export interface TerminalListing {
 
 export interface TerminalPlaceArgs {
   store: {
-    listItems(): { id: string; product: string }[];
-    listProducts(): { slug: string; repoPath?: string; dir?: string }[];
+    listItems(): { id: string; product?: string }[];
+    listProducts(): { slug: string; repoPath?: string | null; dir?: string }[];
   };
   supervisor: {
     _liveSessions?: Record<string, { product?: string; cwd?: string | null } | undefined>;

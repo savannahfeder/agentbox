@@ -23,7 +23,7 @@ export interface MessageItem {
   priority?: number;
   wrote?: { answer?: Wrote; body?: Wrote; priority?: Wrote };
 }
-export interface MessageProduct { team?: { direct?: unknown } }
+export interface MessageProduct { team?: { direct?: unknown } | null }
 export interface LatestMessage { text: string; by: string | null; ts: number }
 
 const LIVE = new Set<string | undefined>(['open', 'claimed', 'blocked']);

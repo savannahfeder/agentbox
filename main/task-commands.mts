@@ -49,9 +49,9 @@ export interface CodexUsageReport {
 
 /** The part of the supervisor that slash commands read and call. */
 export interface TaskCommandSupervisor extends HarnessSupervisor {
-  onChange?: () => void;
+  onChange?: (() => void) | null;
   sessions: Map<string, CommandSession>;
-  _compactions?: Record<string, CommandResult>;
+  _compactions?: Record<string, { state: string; text?: string; name?: string; at?: number }>;
   _compactionJobs?: Map<string, CompactionJob>;
   _nativeCommands?: Record<string, string[] | undefined>;
   _saveState(): void;

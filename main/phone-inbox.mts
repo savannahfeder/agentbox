@@ -192,7 +192,7 @@ export interface PhoneInboxOptions {
   newThreadKits?: ((arg: { device: string; slugs: string[] }) => unknown) | null;
   adoptNew?: ((arg: AdoptNewArgs) => Promise<string>) | null;
   asleep?: () => boolean;
-  toCarry?: (() => Promise<(CarriedCommand & { replaces?: string })[]>) | null;
+  toCarry?: (() => Promise<(CarriedCommand & { replaces?: string | null })[]>) | null;
   handedOver?: (command: CarriedCommand & { command: string }) => unknown;
   takenBack?: (command: { project: string; item?: string | null; command: string }) => unknown;
   carriedFinished?: (commands: string[]) => unknown;
