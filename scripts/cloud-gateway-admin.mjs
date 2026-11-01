@@ -2,6 +2,9 @@
 // THE OWNER'S HAND ON THE CLOUD SERVER, through a direct call to the function
 // (never its public address). Needs an admin sign-in (`aws login`).
 //
+// A plan is easier given in the database, by address and with no AWS sign-in
+// (cloud/supabase/migrations/20261031000000_who_is_subscribed.sql).
+//
 //   node scripts/cloud-gateway-admin.mjs plan <person id> <free|pro|plus|max>
 //   node scripts/cloud-gateway-admin.mjs disable <person id>   # stops their runs, refuses their keys
 //   node scripts/cloud-gateway-admin.mjs enable <person id>
