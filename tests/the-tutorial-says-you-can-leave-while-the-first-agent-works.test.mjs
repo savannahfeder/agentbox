@@ -30,7 +30,7 @@ describe('the tip while the first agent works', () => {
   });
   it('after, says a notification will tell you', () => {
     expect(tour).toContain('You’ll get a notification when it’s done. Explore the app while you wait');
-    expect(tour).toContain("step === 'busy' && tried ? BUSY_TOLD : SAY[step].words");
+    expect(tour).toContain("step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : SAY[step].words");
   });
   it('never names a part of the app it has not shown', () => {
     expect(tour).not.toMatch(/Agent Tray/i);

@@ -54,7 +54,7 @@ describe('when the inbox knows a task is on its way', () => {
 
   it('draws it off that, the tutorial’s first task included', () => {
     const line = app.split('\n').find((l) => l.includes('<EmptyTab'));
-    expect(line).toMatch(/starting=\{justSent\}/);
+    expect(line).toMatch(/starting=\{!!landOn \|\| justSent\}/);
   });
 
   // And only on the tab that was waiting: a glance at Needs you in the middle

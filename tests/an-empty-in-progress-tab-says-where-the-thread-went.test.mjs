@@ -45,7 +45,7 @@ describe('the In progress tab with nothing in it', () => {
 describe('where the count comes from', () => {
   it('is the one the Needs you tab itself draws', () => {
     const app = read('renderer/src/App.tsx');
-    expect(app).toContain('<EmptyTab view={view} starting={justSent} waiting={needsYouCount.inbox} />');
+    expect(app).toContain('<EmptyTab view={view} starting={!!landOn || justSent} waiting={needsYouCount.inbox} />');
   });
 
   it('reaches the words through the component', () => {
