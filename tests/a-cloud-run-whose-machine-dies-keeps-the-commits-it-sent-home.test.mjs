@@ -150,7 +150,9 @@ describe('a cloud run whose machine dies', () => {
     const news = takeCloudNews(mac);
     expect(news).toHaveLength(1);
     expect(news[0]).toMatchObject({ item: 'w-1', product: 'p', lost: true });
-    expect(news[0].note).toMatch(/machine stopped before its run finished/);
+    // How long it had been going is part of the note (w-f37c87e2f1): a run
+    // cut short at thirteen minutes reads as a machine that keeps dying.
+    expect(news[0].note).toMatch(/machine stopped \d+ seconds? into its run, before it finished/);
     expect(news[0].note).toMatch(/in the task folder, the last one "From the cloud"/);
     expect(news[0].note).toMatch(/uncommitted files and its conversation since are lost/);
   });
