@@ -113,10 +113,12 @@ describe('the app lets go of a run and comes back to it', () => {
     expect(later.at(-1)?.type).toBe('bye');
   });
 
-  it('an app that dies without a word leaves the run going too', async () => {
+  it('an app that dies without a word leaves the run going too, once it could find it again', async () => {
     const sockPath = await aHost();
     const { child, runId } = start(sockPath);
     await until(() => child.pid);
+    child.keep();
+    await wait(50);
     child._sock.destroy();
     await wait(200);
     expect(alive(child.pid)).toBe(true);
@@ -124,6 +126,27 @@ describe('the app lets go of a run and comes back to it', () => {
     attachClaudeInput(back);
     back.stdin.end();
     expect(await new Promise((r) => back.once('exit', (code) => r(code)))).toBe(0);
+  });
+});
+
+describe('a run the app could not find again', () => {
+  // Its session id was never saved, so the next app would start the thread
+  // again beside it.
+  it('is stopped when the app vanishes', async () => {
+    const sockPath = await aHost();
+    const { child } = start(sockPath);
+    const pid = await until(() => child.pid);
+    child._sock.destroy();
+    expect(await until(() => !alive(pid))).toBe(true);
+  });
+
+  it('is stopped at once by a quit, without waiting on the socket', async () => {
+    const sockPath = await aHost();
+    const { child } = start(sockPath);
+    const pid = await until(() => child.pid);
+    child.kill('SIGTERM');
+    child._sock.destroy();
+    expect(await until(() => !alive(pid))).toBe(true);
   });
 });
 

@@ -218,10 +218,18 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
         if (msg.t === 'i' && typeof msg.d === 'string') { try { run.child.stdin.write(Buffer.from(msg.d, 'base64')); } catch { /* exit says why */ } }
         else if (msg.t === 'I') { run.inputClosed = true; try { run.child.stdin.end(); } catch { /* gone */ } }
         else if (msg.t === 'k' && /^SIG(TERM|INT|HUP|KILL)$/.test(msg.s)) { try { run.child.kill(msg.s); } catch { /* gone */ } }
-        else if (msg.t === 'bye') { detach(run, sock); sock.end(); }
+        else if (msg.t === 'keep') run.keep = true;
+        else if (msg.t === 'bye') { run.keep = true; detach(run, sock); sock.end(); }
       }
     });
-    sock.on('close', () => { clients -= 1; if (run) detach(run, sock); idle(); });
+    // An app gone before it could find this run again would leave it running
+    // unseen beside the run it starts next, so that run is stopped.
+    sock.on('close', () => {
+      clients -= 1;
+      if (run && run.clientSock === sock && !run.keep && !run.exit) { try { run.child?.kill('SIGTERM'); } catch { /* gone */ } }
+      if (run) detach(run, sock);
+      idle();
+    });
     sock.on('error', () => {});
   });
   server.on('error', (err) => log(`run host: ${err.message}`));

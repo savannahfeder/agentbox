@@ -115,10 +115,18 @@ export class HostedRun extends EventEmitter {
     setImmediate(() => { this.emit('exit', code, signal, how); this.emit('close', code, signal); });
   }
 
+  // Straight to the worker when its pid is known, so a quit that follows at
+  // once cannot outrun the message.
   kill(signal = 'SIGTERM') {
     if (this._over || this._detached) return false;
+    if (Number.isInteger(this.pid)) { try { process.kill(this.pid, signal); return true; } catch { /* the host's turn */ } }
     this._send({ t: 'k', s: signal });
     return true;
+  }
+
+  /** The app can find this run again: an app that vanishes leaves it going. */
+  keep() {
+    this._send({ t: 'keep' });
   }
 
   /** Let go and leave the run going. Returns how far its output was read. */

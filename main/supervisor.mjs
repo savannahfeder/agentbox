@@ -10430,6 +10430,7 @@ export class Supervisor {
         // reason. A resumed session announces the id it is resuming, so this
         // records the same id it already held and the thread keeps its name
         // across as many replies as she writes.
+        if (session.hosted) child.keep();
         this.rememberRowSession(item, { sessionId: session.sessionId, cwd, profile, engine, startedAt: session.startedAt });
         this._stoppedSessionTakenUp(item, session);
         this._saveState();
