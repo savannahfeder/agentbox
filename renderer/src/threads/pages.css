@@ -504,6 +504,8 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 /* Picked is a soft grey here, not an orange box: one small dot beside On is
    the menu's only orange (picked 2026-10-16 as calmer). */
 .th-cloud-pop .opts > button.picked, .th-cloud-pop .opts > button.picked:hover { border-color: var(--line-strong); background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); }
+/* A place this thread cannot go: dim and still, the note under it says why. */
+.th-cloud-pop .opts > button:disabled, .th-cloud-pop .opts > button:disabled:hover { opacity: .4; cursor: default; border-color: var(--line); color: var(--text-dim); }
 .th-cloud-pop .th-cloud-on-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-inline-end: 7px; vertical-align: 1px; }
 /* THE CLOUD ON: the cloud and its count orange, the box left plain. */
 .th-disp.th-cloud.lit svg, .th-disp.th-cloud.lit b { color: var(--accent); }
