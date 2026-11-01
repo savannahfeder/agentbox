@@ -548,6 +548,15 @@ function withTitleSaid(events: ThreadEvent[], title: string | null, label: strin
   return out;
 }
 
+// A run's notes, read once for as long as the window holds the same log
+// object: an open thread is drawn on every push, and its finished runs'
+// logs do not change (shared/trace-delta.mjs keeps their objects).
+const notesOfRun = new WeakMap<TraceSession, Notes | null>();
+function notesOf(session: TraceSession): Notes | null {
+  if (!notesOfRun.has(session)) notesOfRun.set(session, readNotes([session]));
+  return notesOfRun.get(session) ?? null;
+}
+
 /**
  * The runs, hung under the pickups that started them.
  *
@@ -597,7 +606,7 @@ export function withRuns(events: ThreadEvent[], sessions: TraceSession[]): Threa
     const its = mine.get(event);
     if (!its?.length) return event;
     const runs = its
-      .map((session) => readNotes([session]))
+      .map(notesOf)
       .filter((notes): notes is Notes => !!notes);
     return runs.length ? { ...event, runs } : event;
   });

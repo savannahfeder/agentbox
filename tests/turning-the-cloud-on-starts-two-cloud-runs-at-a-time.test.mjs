@@ -7,10 +7,11 @@
 // folder, up to 100 MB of documents and the transcript (the launch film's is
 // 278 MB) into memory before it sends them, on a Mac that is already full.
 //
-// Now at most two cloud runs are being packed and sent at once; the next one
+// Now at most two cloud runs are being packed and sent at first; the next one
 // starts when the cloud has taken one of them, or its agent is running
 // (tests/a-cloud-run-stops-holding-a-start-slot-once-it-is-sent). Runs already
-// going in the cloud do not count.
+// going in the cloud do not count. Starts that go well earn room for more
+// (tests/cloud-starts-speed-up-while-they-go-well-and-back-off-when-they-do-not).
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -88,6 +89,26 @@ describe('cloud runs starting', () => {
     // A row that cannot go to the cloud is not held.
     sup.threadOnMac['w-next'] = true;
     expect(sup._roomFor('claude', item)).toBe(true);
+  });
+
+  it('each start the cloud takes on a calm machine earns room for one more', () => {
+    const sup = make();
+    add(sup, 'w-1', {});
+    add(sup, 'w-2', {});
+    expect(sup._cloudSlotFor('claude')).toBe(false);
+    sup._noteCloudSent(sup.sessions.get('w-1'), 'agentbox cloud-sent: packed 5000 started 4000');
+    expect(sup._startBudget.now()).toBe(3);
+    add(sup, 'w-3', {});
+    add(sup, 'w-4', {});
+    expect(sup._cloudStarting()).toBe(3);
+    expect(sup._cloudSlotFor('claude')).toBe(false);
+  });
+
+  it('a cloud start that dies gives room back rather than taking more', () => {
+    const sup = make();
+    sup._startBudget.value = 8;
+    sup._noteCloudOutcome({ cloud: true, tail: [] }, 1);
+    expect(sup._startBudget.now()).toBe(4);
   });
 
   it('a start that never got going stops holding others back after ten minutes', () => {

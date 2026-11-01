@@ -54,6 +54,8 @@ export function stallWatch(
         }
       };
     },
+    /** The longest stall of the minute so far, leaving the minute running. */
+    longestNow: () => Math.round(loop.max / 1e6),
     /** The minute so far, and a fresh start. */
     take() {
       const out = {

@@ -1,9 +1,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import type { Readable } from 'node:stream';
+import { HostedRun } from '../hosted-run.mjs';
 import { harnessDefinition } from '../../shared/harness-definitions.mjs';
 import { EFFORT_LEVELS } from '../../shared/effort-levels.mts';
 import { storeRootEnv } from '../store/home.mjs';
@@ -55,7 +57,7 @@ export const claudeHarness = {
         CLAUDE_CONFIG_DIR: sup._claudeConfigDir(profile), ZERO_PRODUCT: item.product, ZERO_ITEM: item.id, ...sup._cloudDocsEnv(item) },
     };
   },
-  spawn(sup: HarnessSupervisor, plan: HarnessPlan, { cwd, item, profile, env, cloud = false }: HarnessSpawnContext): ChildProcess {
+  spawn(sup: HarnessSupervisor, plan: HarnessPlan, { cwd, item, profile, env, cloud = false, host = null }: HarnessSpawnContext & { host?: string | null }): ChildProcess | HostedRun {
     // A CLOUD RUN: THE SAME ARGUMENTS, A DIFFERENT PROGRAM (docs/cloud/PLAN.md).
     // main/cloud/run-cli.mts runs Claude Code in the sandbox with exactly these
     // arguments and is, to everything above, the worker: its stdout is the
@@ -69,13 +71,13 @@ export const claudeHarness = {
     }
     // The binary is the one this definition names, not a field spelled out
     // here: that is the last place an engine of this family needed code.
-    return spawn(sup.config[definition.binKey as BinKey]!, streamInputArgs(definition.run, plan.args), {
-      cwd,
-      env: { ...claudeLaunchEnv(sup.config[definition.binKey as BinKey], env), STORE_ACCOUNT_ID: sup.config.accountId, ...storeRootEnv(sup.config.storeRoot),
-        ...(profile !== 'default' ? { [definition.homeEnv]: profile } : {}),
-        ZERO_PRODUCT: item.product, ZERO_ITEM: item.id, ...sup.memoryGateEnv(item) },
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    const bin = sup.config[definition.binKey as BinKey];
+    const argv = streamInputArgs(definition.run, plan.args);
+    const runEnv = { ...claudeLaunchEnv(bin, env), STORE_ACCOUNT_ID: sup.config.accountId, ...storeRootEnv(sup.config.storeRoot),
+      ...(profile !== 'default' ? { [definition.homeEnv]: profile } : {}),
+      ZERO_PRODUCT: item.product, ZERO_ITEM: item.id, ...sup.memoryGateEnv(item) };
+    if (host) return new HostedRun({ sockPath: host, runId: crypto.randomUUID(), start: { bin, argv, env: runEnv, cwd, spool: sup._runSpool() } });
+    return spawn(bin!, argv, { cwd, env: runEnv, stdio: ['pipe', 'pipe', 'pipe'] });
   },
   readers: () => ({ capture: captureStream, stream: streamingText, summarize: summarizeStreamLine, trace: traceStreamLine, activity: claudeActivity }),
   subscribe(child: { stdout: Readable }, _session: unknown, absorb: (line: string) => void): void {
