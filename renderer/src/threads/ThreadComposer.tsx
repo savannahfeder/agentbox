@@ -30,6 +30,7 @@
 // closes the menu before it closes the card.
 
 import { PriorityIcon } from '../components/Priority';
+import { PhoneStatus } from '../components/PhoneStatus';
 import { SEND } from '../this-keyboard';
 import { Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { PRACTICE_TASK } from '../../../shared/first-run-practice.mjs';
@@ -1109,7 +1110,7 @@ export function ThreadComposer({
         )}
 
         {named.chips}
-        {statusLine && <div className="tc-note tc-connection-status" role="status">{statusLine}</div>}
+        <PhoneStatus message={statusLine} className="tc-note tc-connection-status" />
         <textarea
           ref={textRef}
           className={`tc-text ${named.over}`}

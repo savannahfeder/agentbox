@@ -121,13 +121,6 @@ cloud/cloud.public.json
 # makes it a decision rather than a side effect of a build.
 shared/*.local.json
 
-# The phone relay (relay/): what `npm run relay:build` makes, wrangler's own
-# working files, and the address `npm run relay:deploy` got, which this Mac
-# reads until a deployed address is committed in shared/relay-address.mjs.
-relay/dist/
-relay/.wrangler/
-relay/node_modules/
-relay/relay.local.json
 # The phone site as built (scripts/build-phone-site.mjs): it carries the team
 # cloud's address, which is never committed.
 phone-site/
