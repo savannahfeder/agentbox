@@ -4,7 +4,7 @@
 //
 // A local address is NOT a website here. A dev server is drawn in an ordinary
 // frame with a liveness check in front of it (renderer/src/local-preview.ts)
-// and its framing headers rewritten below the page (main/local-app-frames.mjs);
+// and its framing headers rewritten below the page (main/local-app-frames.mts);
 // none of that applies to a site on the web.
 
 /**

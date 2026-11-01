@@ -6,7 +6,8 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const files = ['mobile/src/ui/Markdown.tsx', 'mobile/src/ui/Attach.tsx'];
+// Markdown.tsx's folder pictures now crop from the top with expo-image and read no size.
+const files = ['mobile/src/ui/Attach.tsx'];
 
 describe('a picture on the phone app loads when the browser gives no size', () => {
   for (const file of files) {

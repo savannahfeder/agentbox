@@ -57,6 +57,6 @@ describe('the mac app does not crash on a leftover default menu', () => {
   it('still installs the real menu, once', () => {
     const calls = read('main', 'main.mjs').match(/^\s*installMenu\(\{/gm) ?? [];
     expect(calls).toHaveLength(1);
-    expect(read('main', 'menu.mjs')).toMatch(/Menu\.setApplicationMenu\(Menu\.buildFromTemplate/);
+    expect(read('main', 'menu.mts')).toMatch(/Menu\.setApplicationMenu\(Menu\.buildFromTemplate/);
   });
 });

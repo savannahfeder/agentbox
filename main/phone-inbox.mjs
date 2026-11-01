@@ -607,7 +607,9 @@ export function createPhoneInbox({
       if (replaces) {
         try {
           const claim = await backend.claimPhoneCommand(replaces, owner);
-          if (claim === 'cloud') continue;
+          // The cloud is running it: said again, so the hand-over is not
+          // offered afresh, and claimed again, at every wake from here on.
+          if (claim === 'cloud') { handedOver({ ...c, command: replaces }); continue; }
           // Already taken, maybe as a run the cloud did: let go rather than hand over twice.
           if (claim === 'gone') { takenBack({ ...c, command: replaces }); continue; }
           await backend.markPhoneCommand(replaces, 'done', owner);

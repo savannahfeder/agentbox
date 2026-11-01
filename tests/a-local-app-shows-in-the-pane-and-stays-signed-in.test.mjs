@@ -16,7 +16,7 @@
 // back on the next load.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { localAppHeaders, isLocalAddress } from '../main/local-app-frames.mjs';
+import { localAppHeaders, isLocalAddress } from '../main/local-app-frames.mts';
 
 const refusing = () => ({
   'X-Frame-Options': ['DENY'],

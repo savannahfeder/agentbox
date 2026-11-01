@@ -21,7 +21,7 @@ function files(dir) {
   return fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) => {
     const rel = path.join(dir, e.name);
     if (e.isDirectory()) return e.name === 'node_modules' ? [] : files(rel);
-    return /\.(mjs|cjs|js|ts|tsx)$/.test(e.name) ? [rel] : [];
+    return /\.(mjs|mts|cjs|js|ts|tsx)$/.test(e.name) ? [rel] : [];
   });
 }
 const code = (rel) => fs.readFileSync(path.join(root, rel), 'utf8').split('\n')

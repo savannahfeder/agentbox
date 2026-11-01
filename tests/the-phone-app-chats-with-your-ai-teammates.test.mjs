@@ -149,10 +149,9 @@ describe('a teammate\'s chat as the phone draws it', () => {
 });
 
 describe('Chats on the phone', () => {
-  it('is the fifth tab while teammates are on, holding your groups too', () => {
-    expect(bottomTabs(true, true).map((t) => t.label)).toEqual(['Needs you', 'In progress', 'Later', 'Done', 'Chats']);
-    expect(bottomTabs(false, true).at(-1).label).toBe('Chats');
-    expect(bottomTabs(true, false).at(-1).label).toBe('Groups');
+  it('is the last tab while a team is on, holding your groups too', () => {
+    expect(bottomTabs(true).map((t) => t.label)).toEqual(['Needs you', 'Everything else', 'Chats']);
+    expect(bottomTabs(false).map((t) => t.label)).not.toContain('Chats');
   });
   it('lists teammates, then your groups, and opens a teammate\'s chat', () => {
     const src = read('mobile/src/ui/Teammates.tsx');

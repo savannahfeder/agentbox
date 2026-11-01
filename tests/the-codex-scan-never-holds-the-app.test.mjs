@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readRollout, readCodexThreads, readCodexThreadsOffThread } from '../main/codex-threads.mjs';
-import { scanCodex, startCodexWatch } from '../main/codex-watch.mjs';
+import { scanCodex, startCodexWatch } from '../main/codex-watch.mts';
 
 let home; let codexDir;
 const day = new Date();

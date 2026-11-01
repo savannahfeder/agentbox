@@ -8,7 +8,8 @@ import {loadPty} from './pty.mjs';
 const LIMIT=262144;
 export function terminalEnv(source=process.env){
   const env={...source,TERM:'xterm-256color',COLORTERM:'truecolor'};
-  for(const key of Object.keys(env)) if(/^(ANTHROPIC_|OPENAI_API_KEY$|CLAUDE_CODE_|CLAUDECODE$|CLAUDE_PID$|CLAUDE_EFFORT$|ELECTRON_|NODE_OPTIONS$)/.test(key)) delete env[key];
+  // CLAUDE_SECURESTORAGE_CONFIG_DIR would save a sign-in typed here into another account's keychain slot.
+  for(const key of Object.keys(env)) if(/^(ANTHROPIC_|OPENAI_API_KEY$|CLAUDE_CODE_|CLAUDECODE$|CLAUDE_PID$|CLAUDE_EFFORT$|CLAUDE_SECURESTORAGE_CONFIG_DIR$|ELECTRON_|NODE_OPTIONS$)/.test(key)) delete env[key];
   // NPM'S STAND-IN EDITOR IS NOBODY'S CHOICE. `npm start` gives everything it
   // runs EDITOR=vi when neither EDITOR nor VISUAL is set, and zsh reads "vi"
   // there as a request for vi keys: Option+Left deleted and Option+Delete
