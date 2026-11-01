@@ -76,11 +76,8 @@ export function startHubClient(hub) {
     return true;
   });
   app.on('second-instance', () => { if (window) { if (window.isMinimized()) window.restore(); window.focus(); } });
-  app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-  app.on('activate', () => {
-    if (window) return;
-    ipcMain.removeHandler('zero:notify');
-    open();
-  });
+  // Quits like the whole app (main/main.mjs): with no window there is nothing to
+  // alert from, and a window opened twice would register its handlers twice.
+  app.on('window-all-closed', () => app.quit());
   app.whenReady().then(open);
 }
