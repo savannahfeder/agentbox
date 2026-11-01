@@ -35,7 +35,7 @@ const FAKE_STORE = here('./fixtures/cloud/fake-store-server.mjs');
 const STUB = here('../cloud/sandbox/mcp-stub.mjs');
 const LOGIN = { engine: 'claude', id: 'L1', key: 'logins/claude/L1.json' };
 
-let tmp; let sandbox; let sandboxUrl; let s3; let objects; let mac;
+let tmp; let sandbox; let sandboxUrl; let s3; let objects; let mac; let machineGone;
 const git = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim();
 
 describe('the note a cloud run is given', () => {
@@ -66,9 +66,11 @@ async function freshSandbox() {
 beforeEach(async () => {
   tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'cloudlimit-')));
   objects = new Map();
+  machineGone = false;
   s3 = http.createServer((req, res) => {
     const k = decodeURIComponent(req.url.slice(1).split('?')[0]);
     if (req.method === 'GET') { const b = objects.get(k); res.writeHead(b ? 200 : 404); return res.end(b); }
+    if (machineGone) return res.destroy();
     const chunks = []; req.on('data', (c) => chunks.push(c)); req.on('end', () => { objects.set(k, Buffer.concat(chunks)); res.writeHead(200); res.end(); });
   });
   await new Promise((r) => s3.listen(0, '127.0.0.1', r));
@@ -159,9 +161,15 @@ describe('a cloud run whose machine stopped', () => {
   it('says how long it had been going when it went', async () => {
     const run = launch({ message: 'STAY after committing', runLimitMs: 60_000 });
     await waitFor('the run to send its commits home as it works', () => [...objects.keys()].some((k) => k.endsWith('/checkpoint.bundle')));
+    // A machine that is gone uploads nothing more. Closing the sandbox SIGKILLs
+    // the agent and its exit path would collect for it; if that upload beat the
+    // Mac's next poll the run read as one that ended of signal 9, which is how
+    // main went red on GitHub while passing here.
+    machineGone = true;
     await sandbox.close();
     await freshSandbox();
     expect(await run.done, run.err()).toBe(IMPORT_FAILED);
+    expect([...objects.keys()].some((k) => k.endsWith('/done.json'))).toBe(false);
     const news = takeCloudNews(mac);
     expect(news[0].note).toMatch(/machine stopped \d+ seconds? into its run/);
   });
