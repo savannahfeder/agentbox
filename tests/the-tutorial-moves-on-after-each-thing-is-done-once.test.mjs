@@ -39,6 +39,15 @@ describe('after closing an imported chat, with the next one open', () => {
     expect(tourStep(closed, at({ thread: true, preparing: true }))).toBe('startHere');
     expect(tourStep(noteSent(closed), at({ thread: true, preparing: true }))).toBe('palette');
   });
+  it('sits where the close tip sat, clear of the undo notice in the header', () => {
+    const tour = read('renderer/src/components/Tour.tsx');
+    expect(tour).toContain("startHere: { words: <>Press <K k=\"N\" /> to give an agent a new task</>, side: 'below-right' },");
+    expect(tour).toContain("case 'startHere': return one(document.querySelector('.ts-done'));");
+    expect(tour).not.toContain("step === 'palette' || step === 'startHere'");
+  });
+  it('and the confetti waits for the real end, when N has been learned too', () => {
+    expect(read('renderer/src/components/Tour.tsx')).toContain("t.done.includes('close') && t.done.includes('palette') && (t.sent || t.done.includes('start'));");
+  });
   it('and pressing N learns it', () => {
     expect(keyLearns('startHere', { key: 'n' })).toBe(true);
     expect(lessonOf('startHere')).toBe('start');

@@ -349,7 +349,7 @@ describe('the end of the tutorial', () => {
   it('bursts the confetti once, when the close and the command bar are both learned', async () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
-    expect(tour).toContain("const ended = (t: TourState | null) => !!t && !t.skipped && t.done.includes('close') && t.done.includes('palette');");
+    expect(tour).toContain("const ended = (t: TourState | null) => !!t && !t.skipped && t.done.includes('close') && t.done.includes('palette') && (t.sent || t.done.includes('start'));");
     expect(tour).toContain('if (covered || hadEnded.current === ended(tour)) return;');
     expect(tour).toContain('{burst ? <ConfettiBurst key={burst} /> : null}');
   });
