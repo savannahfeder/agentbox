@@ -5,7 +5,7 @@
 // Measured on that Mac: at 20:54:10 the updater fast-forwarded the folder, its
 // package install ran scripts/link-own-bin.mjs, and at 20:54:11 that made
 // bin/agentbox.mjs executable. Git stored the file as 100644, so
-// `git status` read the flip as an edit, and main/source-updater.mjs never
+// `git status` read the flip as an edit, and main/source-updater.mts never
 // updates a folder with edits in it. Every update after that was refused.
 // The file is stored executable now, so the install finds nothing to change.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

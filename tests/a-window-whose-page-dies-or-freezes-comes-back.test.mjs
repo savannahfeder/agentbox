@@ -10,7 +10,7 @@
 // about 18 s in.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { keepThePageAlive, REVIVE_LOOP_MS, revivedLine } from '../main/when-the-page-stops.mjs';
+import { keepThePageAlive, REVIVE_LOOP_MS, revivedLine } from '../main/when-the-page-stops.mts';
 
 function fakeWindow() {
   const win = new EventEmitter();

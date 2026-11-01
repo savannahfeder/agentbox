@@ -4,8 +4,9 @@
 // open document is a webview with its own zoom.
 
 import { app, BrowserWindow, Menu, webContents } from 'electron';
-import { zoomTarget } from './zoom-keys.mjs';
-import { zoomPercentFor } from './zoom-readout.mjs';
+import type { BaseWindow, MenuItemConstructorOptions, WebContents } from 'electron';
+import { zoomTarget } from './zoom-keys.mts';
+import { zoomPercentFor } from './zoom-readout.mts';
 
 // Approval hotkeys live in the MENU, not the renderer: a child web contents
 // owns the keyboard whenever one is up, so a renderer listener never hears
@@ -26,7 +27,7 @@ import { zoomPercentFor } from './zoom-readout.mjs';
 // that an assumption rather than a load-bearing one, exactly like the reload
 // debounce in main.mjs.
 let lastZoomAt = 0;
-let lastZoomDelta = null;
+let lastZoomDelta: number | null = null;
 
 /**
  * Move the zoom one step. `target` is the web contents the caller named: the
@@ -35,7 +36,7 @@ let lastZoomDelta = null;
  * own window. That last fallback is the fix for her second report: focus can be
  * nowhere, and a target of null was a silent no-op.
  */
-export function applyZoom(delta, target = null) {
+export function applyZoom(delta: number, target: WebContents | null = null): void {
   const now = Date.now();
   if (delta === lastZoomDelta && now - lastZoomAt < 40) return;
   lastZoomAt = now;
@@ -57,7 +58,7 @@ export function applyZoom(delta, target = null) {
 // It always goes to the APP window, even when the level that moved belongs to
 // the junk browser's guest: the guest is a page inside her window, and a
 // browser puts its own readout in its own corner rather than in the page.
-function announceZoom(level) {
+function announceZoom(level: number): void {
   const percent = zoomPercentFor(level);
   if (percent === null) return;
   const target = appWindowContents();
@@ -72,9 +73,9 @@ function announceZoom(level) {
 // Two routes again, the menu and before-input-event in main.mjs, for the reason
 // zoom has two, and the same guard keeps one press from arriving twice.
 let lastFindAt = 0;
-let lastFindStep = null;
+let lastFindStep: number | null = null;
 
-export function requestFind(step) {
+export function requestFind(step: number): void {
   const now = Date.now();
   if (step === lastFindStep && now - lastFindAt < 40) return;
   lastFindAt = now;
@@ -84,23 +85,29 @@ export function requestFind(step) {
   target.send?.('zero:find', { step });
 }
 
-function appWindowContents() {
+function appWindowContents(): WebContents | null {
   const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
   return window && !window.isDestroyed() ? window.webContents : null;
 }
 
-export function installMenu({ onApproval, onReload, onZoom } = {}) {
+interface MenuHandlers {
+  onApproval?: (allow: boolean) => unknown;
+  onReload?: () => unknown;
+  onZoom?: (delta: number, target: WebContents | null) => unknown;
+}
+
+export function installMenu({ onApproval, onReload, onZoom }: MenuHandlers = {}): void {
   // A CLICK NAMES ITS WINDOW.after the chords were fixed. Electron hands a menu
   // click the window it was chosen from, so the click stops asking what is
   // focused, which is the question that was coming back null. main.mjs decides
   // the keystroke's target from where the event arrived: inside the junk
   // browser it is the guest, which carries its own zoom.
-  const zoom = (delta, window) => {
-    const target = window && !window.isDestroyed() ? (window.webContents ?? null) : null;
+  const zoom = (delta: number, window: BaseWindow | undefined) => {
+    const target = window && !window.isDestroyed() ? ((window as BrowserWindow).webContents ?? null) : null;
     return onZoom ? onZoom(delta, target) : applyZoom(delta, target);
   };
 
-  const template = [
+  const template: MenuItemConstructorOptions[] = [
     {
       label: app.name,
       submenu: [

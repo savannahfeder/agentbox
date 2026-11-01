@@ -5,7 +5,7 @@
 // On the desktop that is an Electron `<webview>`: a separate process on its
 // own session partition, and not a frame, so the X-Frame-Options and
 // frame-ancestors headers that come with anything carrying a sign-in do not
-// refuse it. What it may do is pinned below the tag by main/webview-guard.mjs.
+// refuse it. What it may do is pinned below the tag by main/webview-guard.mts.
 // In a browser tab there is no such tag, so it falls back to an opaque
 // iframe, which many sites will refuse; the way out to your own browser is
 // always in the bar above.

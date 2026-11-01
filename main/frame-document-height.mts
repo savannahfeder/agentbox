@@ -1,14 +1,26 @@
 import { DOC_SCHEMES, isScheme } from '../shared/schemes.mjs';
 
-export function wantsDocumentHeight(url) {
+export function wantsDocumentHeight(url: string): boolean {
   try {
     const parsed = new URL(url);
     return isScheme(DOC_SCHEMES, parsed.protocol) && parsed.searchParams.get('agentbox-height') === '1';
   } catch { return false; }
 }
 
+interface HeightElement {
+  scrollHeight: number;
+}
+
+interface HeightPage {
+  document: { documentElement: HeightElement; body: HeightElement | null };
+  innerHeight: number;
+  parent: { postMessage(message: { type: string; height: number }, targetOrigin: string): void };
+  ResizeObserver: new (callback: () => void) => { observe(target: HeightElement): void; disconnect(): void };
+  addEventListener(type: string, listener: () => void, options?: boolean | { once?: boolean }): void;
+}
+
 /** Runs in the document's own origin, without exposing the inbox to it. */
-export function reportDocumentHeight(page) {
+export function reportDocumentHeight(page: HeightPage): void {
   const doc = page.document;
   let previous = 0;
   let viewport = page.innerHeight;

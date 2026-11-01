@@ -59,6 +59,78 @@ export const REQUEST_TIMEOUT_MS = 2 * 60_000;
 // A line that never ends is not a message, it is a leak.
 export const MAX_FRAME_LENGTH = 16 * 1024 * 1024;
 
+type RpcId = string | number;
+
+export interface PermissionOption {
+  optionId?: string;
+  kind?: string;
+  name?: string;
+}
+
+export interface PermissionParams {
+  sessionId?: string;
+  options?: PermissionOption[];
+  [field: string]: unknown;
+}
+
+type OptionList = readonly (PermissionOption | null | undefined)[];
+type Chosen = string | null | undefined;
+
+interface RpcMessage {
+  id?: RpcId | null;
+  method?: string;
+  params?: unknown;
+  result?: unknown;
+  error?: { code?: number; message?: string };
+}
+
+interface AgentCapabilities {
+  promptCapabilities?: Record<string, unknown>;
+  [capability: string]: unknown;
+}
+
+interface Negotiated {
+  agentCapabilities?: AgentCapabilities;
+  authMethods?: unknown[];
+}
+
+interface AcpChild {
+  stdin: { write(line: string, callback?: (error?: Error | null) => void): unknown; end(): unknown };
+  stdout?: {
+    on(event: 'data', listener: (chunk: Buffer) => void): unknown;
+    on(event: 'end', listener: () => void): unknown;
+  } | null;
+  stderr?: { on(event: 'data', listener: (chunk: Buffer | string) => void): unknown } | null;
+  on?(event: 'error', listener: (error: Error) => void): unknown;
+  on?(event: 'exit', listener: (code: number | null) => void): unknown;
+  kill?(): unknown;
+}
+
+interface AcpClientOptions {
+  transport?: AcpChild | null;
+  spawn?: (() => AcpChild) | null;
+  clientInfo?: { name: string; version: string };
+  onNotification?: ((method: string, params: unknown) => void) | null;
+  onPermission?: ((request: PermissionParams & { requestId: RpcId }) => Chosen | PromiseLike<Chosen>) | null;
+  permissionTimeoutMs?: number;
+  requestTimeoutMs?: number;
+  maxFrameLength?: number;
+  stderrLimit?: number;
+}
+
+interface PendingRequest {
+  resolve: (result: unknown) => void;
+  reject: (error: Error) => void;
+  timer: NodeJS.Timeout;
+  method: string;
+}
+
+interface StandingPermission {
+  sessionId: string | null;
+  options: PermissionOption[];
+  timer: NodeJS.Timeout;
+}
+
 /**
  * THE OPTION THAT MEANS NO, out of the ones this agent actually offered.
  *
@@ -67,7 +139,7 @@ export const MAX_FRAME_LENGTH = 16 * 1024 * 1024;
  * a refusal forever is a different decision that nobody pressed. Null when the
  * agent offered no refusal at all, which is answered by cancelling the turn.
  */
-export function rejectionOption(options = []) {
+export function rejectionOption(options: OptionList = []) {
   for (const kind of REJECTIONS) {
     const found = options.find(option => option?.kind === kind);
     if (found?.optionId) return found.optionId;
@@ -76,7 +148,7 @@ export function rejectionOption(options = []) {
 }
 
 /** Whether an id the asker chose is one the agent really put on the table. */
-export function offeredOption(options = [], optionId) {
+export function offeredOption<Id extends Chosen>(options: OptionList = [], optionId: Id) {
   return options.some(option => option?.optionId === optionId) ? optionId : null;
 }
 
@@ -90,22 +162,23 @@ export function createAcpClient({
   requestTimeoutMs = REQUEST_TIMEOUT_MS,
   maxFrameLength = MAX_FRAME_LENGTH,
   stderrLimit = 64 * 1024,
-} = {}) {
-  const child = transport ?? spawn?.();
-  if (!child) throw Error('createAcpClient needs a transport or a spawn that makes one');
+}: AcpClientOptions = {}) {
+  const made = transport ?? spawn?.();
+  if (!made) throw Error('createAcpClient needs a transport or a spawn that makes one');
+  const child: AcpChild = made;
 
-  const pending = new Map();      // our request id -> { resolve, reject, timer, method }
-  const permissions = new Map();  // their request id -> { sessionId, options, answer }
+  const pending = new Map<RpcId, PendingRequest>();      // our request id -> { resolve, reject, timer, method }
+  const permissions = new Map<RpcId, StandingPermission>();  // their request id -> { sessionId, options, answer }
   const decoder = new StringDecoder('utf8');
   let nextId = 1;
   let buffer = '';
   let stderrText = '';
-  let gone = null;                // null while live; the reason once not
-  let negotiated = null;          // what initialize came back with
+  let gone: string | null = null;                // null while live; the reason once not
+  let negotiated: Negotiated | null = null;          // what initialize came back with
 
   /* ------------------------------- writing -------------------------------- */
 
-  function write(message) {
+  function write(message: RpcMessage & { jsonrpc: '2.0' }) {
     if (gone) return false;
     const line = `${JSON.stringify(message)}\n`;
     try {
@@ -114,16 +187,16 @@ export function createAcpClient({
       // never arrived cannot be told apart from an approval.
       child.stdin.write(line, error => { if (error) close(`Write failed: ${error.message}`); });
     } catch (error) {
-      close(`Write failed: ${error.message}`);
+      close(`Write failed: ${(error as Error).message}`);
       return false;
     }
     return true;
   }
 
-  function request(method, params) {
+  function request(method: string, params: unknown) {
     if (gone) return Promise.reject(Error(gone));
     const id = nextId++;
-    return new Promise((resolve, reject) => {
+    return new Promise<unknown>((resolve, reject) => {
       const timer = setTimeout(() => {
         pending.delete(id);
         reject(Error(`${method} did not answer within ${requestTimeoutMs}ms`));
@@ -138,7 +211,7 @@ export function createAcpClient({
     });
   }
 
-  const notify = (method, params) => write({ jsonrpc: '2.0', method, params });
+  const notify = (method: string, params: unknown) => write({ jsonrpc: '2.0', method, params });
 
   /* ------------------------------ permissions ------------------------------ */
 
@@ -151,7 +224,7 @@ export function createAcpClient({
    * answer from a card, a deadline and a cancellation racing each other still
    * only ever put one response on the wire.
    */
-  function settlePermission(id, optionId) {
+  function settlePermission(id: RpcId, optionId: Chosen) {
     const entry = permissions.get(id);
     if (!entry) return false;
     permissions.delete(id);
@@ -161,7 +234,7 @@ export function createAcpClient({
     return true;
   }
 
-  function askPermission(id, params) {
+  function askPermission(id: RpcId, params: PermissionParams | null | undefined) {
     const options = Array.isArray(params?.options) ? params.options : [];
     const deny = () => settlePermission(id, rejectionOption(options));
     const timer = setTimeout(deny, permissionTimeoutMs);
@@ -177,7 +250,7 @@ export function createAcpClient({
 
   /* ------------------------------- reading -------------------------------- */
 
-  function handle(message) {
+  function handle(message: RpcMessage) {
     if (message.id != null && (message.result !== undefined || message.error !== undefined)) {
       const waiting = pending.get(message.id);
       if (!waiting) return;                       // a response to something we gave up on
@@ -188,7 +261,7 @@ export function createAcpClient({
       return;
     }
     if (message.id != null && message.method) {
-      if (message.method === 'session/request_permission') return void askPermission(message.id, message.params);
+      if (message.method === 'session/request_permission') return void askPermission(message.id, message.params as PermissionParams | null | undefined);
       // Everything else is a capability we did not advertise. Say so.
       write({ jsonrpc: '2.0', id: message.id, error: { code: -32601, message: `${message.method} is not supported by this client` } });
       return;
@@ -196,7 +269,7 @@ export function createAcpClient({
     if (message.method) onNotification?.(message.method, message.params ?? {});
   }
 
-  function absorb(chunk) {
+  function absorb(chunk: Buffer) {
     if (gone) return;
     buffer += decoder.write(chunk);
     let index;
@@ -204,14 +277,14 @@ export function createAcpClient({
       const line = buffer.slice(0, index).trim();
       buffer = buffer.slice(index + 1);
       if (!line) continue;
-      let message = null;
+      let message: unknown = null;
       try { message = JSON.parse(line); } catch { continue; } // a line we cannot read is not a reason to die
-      if (message && typeof message === 'object') handle(message);
+      if (message && typeof message === 'object') handle(message as RpcMessage);
     }
     if (buffer.length > maxFrameLength) close(`A frame longer than ${maxFrameLength} bytes was too long to be a message`);
   }
 
-  function close(reason) {
+  function close(reason: string) {
     if (gone) return gone;
     gone = reason;
     // Every question still standing goes with the connection: an answer whose
@@ -219,7 +292,7 @@ export function createAcpClient({
     for (const id of [...permissions.keys()]) {
       const entry = permissions.get(id);
       permissions.delete(id);
-      clearTimeout(entry.timer);
+      clearTimeout(entry?.timer);
     }
     for (const [id, waiting] of [...pending]) {
       pending.delete(id);
@@ -247,7 +320,7 @@ export function createAcpClient({
         protocolVersion: ACP_PROTOCOL_VERSION,
         clientCapabilities: { fs: { ...CLIENT_CAPABILITIES.fs }, terminal: CLIENT_CAPABILITIES.terminal },
         clientInfo,
-      });
+      }) as Negotiated | null;
       return negotiated;
     },
     /**
@@ -255,7 +328,7 @@ export function createAcpClient({
      * not make a tool resumable: `loadSession` is optional in the protocol, so
      * a tool that cannot do it must be read as cannot rather than as untested.
      */
-    can(capability) {
+    can(capability: string) {
       const agent = negotiated?.agentCapabilities ?? {};
       if (capability === 'image' || capability === 'audio' || capability === 'embeddedContext') {
         return agent.promptCapabilities?.[capability] === true;
@@ -263,31 +336,31 @@ export function createAcpClient({
       return agent[capability] === true;
     },
     authMethods: () => negotiated?.authMethods ?? [],
-    authenticate: methodId => request('authenticate', { methodId }),
-    newSession: ({ cwd, mcpServers = [], additionalDirectories }) =>
+    authenticate: (methodId: string) => request('authenticate', { methodId }),
+    newSession: ({ cwd, mcpServers = [], additionalDirectories }: { cwd: string; mcpServers?: unknown[]; additionalDirectories?: string[] }) =>
       request('session/new', { cwd, mcpServers, ...(additionalDirectories ? { additionalDirectories } : {}) }),
-    loadSession({ sessionId, cwd, mcpServers = [] }) {
+    loadSession({ sessionId, cwd, mcpServers = [] }: { sessionId: string; cwd: string; mcpServers?: unknown[] }) {
       // Refused before anything reaches the wire, so a thread cannot be
       // silently restarted as an empty conversation on a tool that cannot
       // resume. The caller's job is then to say so on the row.
       if (!this.can('loadSession')) return Promise.reject(Error('This agent cannot resume a session, so there is no thread to load'));
       return request('session/load', { sessionId, cwd, mcpServers });
     },
-    prompt: ({ sessionId, text, blocks = null }) =>
+    prompt: ({ sessionId, text, blocks = null }: { sessionId: string; text?: string; blocks?: unknown[] | null }) =>
       request('session/prompt', { sessionId, prompt: blocks ?? [{ type: 'text', text }] }),
     /**
      * Stop the turn, and answer what it was parked on. The protocol says a
      * cancelled turn MUST be answered `cancelled`, and this is the only place
      * that is true of, so it happens here rather than at a call site.
      */
-    cancel(sessionId) {
+    cancel(sessionId?: string | null) {
       for (const [id, entry] of [...permissions]) {
         if (!sessionId || entry.sessionId === sessionId) settlePermission(id, null);
       }
       return notify('session/cancel', { sessionId });
     },
     /** An answer from a card. False when the question is no longer standing. */
-    answerPermission: (requestId, optionId) => settlePermission(requestId, optionId),
+    answerPermission: (requestId: RpcId, optionId: Chosen) => settlePermission(requestId, optionId),
     openPermissions: () => permissions.size,
     closed: () => gone,
     close,

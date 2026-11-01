@@ -12,19 +12,56 @@
 
 export const REVIVE_LOOP_MS = 60_000;
 
-export function revivedLine(reason) {
+export function revivedLine(reason: unknown) {
   if (reason === 'oom') return 'The screen ran out of memory and reloaded itself';
   if (reason === 'froze') return 'The screen froze and was reloaded';
   return 'The screen crashed and reloaded itself';
 }
 
-export function keepThePageAlive({ window, dialog, name, onRevived, report = () => {}, now = Date.now, log = console }) {
-  const contents = window.webContents;
-  let revivedAt = null;
-  let ending = false;
-  let asking = null;
+interface PageWindow {
+  webContents: {
+    on(event: 'render-process-gone', listener: (event: unknown, details?: { reason?: string }) => unknown): unknown;
+    reload(): void;
+    forcefullyCrashRenderer(): void;
+  };
+  on(event: 'unresponsive', listener: () => unknown): unknown;
+  on(event: 'responsive', listener: () => unknown): unknown;
+  isDestroyed(): boolean;
+}
 
-  const reload = (reason) => {
+interface PageDialog {
+  showMessageBox(window: PageWindow, options: {
+    type: string;
+    message: string;
+    detail: string;
+    buttons: string[];
+    defaultId: number;
+    cancelId: number;
+    signal?: AbortSignal;
+  }): Promise<{ response: number }>;
+}
+
+interface PageLog {
+  warn?: (message: string) => void;
+}
+
+export function keepThePageAlive(
+  { window, dialog, name, onRevived, report = () => {}, now = Date.now, log = console }: {
+    window: PageWindow;
+    dialog: PageDialog;
+    name: string;
+    onRevived: (line: string) => void;
+    report?: (kind: string, error: Error) => void;
+    now?: () => number;
+    log?: PageLog;
+  },
+) {
+  const contents = window.webContents;
+  let revivedAt: number | null = null;
+  let ending = false;
+  let asking: AbortController | null = null;
+
+  const reload = (reason: unknown) => {
     revivedAt = now();
     onRevived(revivedLine(reason));
     contents.reload();

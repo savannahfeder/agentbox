@@ -26,9 +26,16 @@ create table if not exists public.cloud_plans (
   give text,
   -- The ledger's count of plan changes. A write older than the row's own is
   -- refused, so one that arrives late cannot put back a plan left behind.
-  rev bigint not null default 0,
+  -- Before the server speaks the row is at -1, below its first write, so a
+  -- row made by asking for a plan is still filled in.
+  rev bigint not null default -1,
   at timestamptz not null default now()
 );
+
+-- A row this file made before that default was -1 is waiting for a write it
+-- would refuse: the plan beside it is the placeholder, never the server's.
+alter table public.cloud_plans alter column rev set default -1;
+update public.cloud_plans set rev = -1 where rev = 0;
 
 alter table public.cloud_plans enable row level security;
 -- A person reads their own plan and writes nothing: the server writes as the

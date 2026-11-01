@@ -21,7 +21,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const ALLOWED = {
   'main/engine-bin.mjs': [1, 'at launch, and when someone undoes a file they picked; every other look is in the background'],
-  'main/source-updater.mjs': [1, 'at launch'],
+  'main/source-updater.mts': [1, 'at launch'],
   'main/first-run.mjs': [1, 'once, during the walk'],
   'main/supervisor.mjs': [1, 'once per Mac, behind a flag file'],
   'main/start-hold.mjs': [1, 'sysctl once before a restart brings agents back, two second deadline'],
@@ -34,14 +34,14 @@ const ALLOWED = {
   'main/cloud/host.mjs': [1, 'runs in its own process, not the window\'s'],
   'scripts/brand-electron.mjs': [1, 'codesign, just before the app restarts itself from source'],
 };
-// Scripts the app's own process imports (main/main.mjs, main/source-updater.mjs).
+// Scripts the app's own process imports (main/main.mjs, main/source-updater.mts).
 const IMPORTED_SCRIPTS = ['scripts/brand-electron.mjs', 'scripts/linux-launcher.mjs'];
 
 function files(dir) {
   return fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) => {
     const rel = path.join(dir, e.name);
     if (e.isDirectory()) return e.name === 'node_modules' ? [] : files(rel);
-    return /\.(mjs|cjs|js)$/.test(e.name) ? [rel] : [];
+    return /\.(mjs|mts|cjs|js)$/.test(e.name) ? [rel] : [];
   });
 }
 const BLOCKING = /\b(execFileSync|spawnSync|execSync)\(/g;

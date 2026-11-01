@@ -9,12 +9,17 @@
 //
 // Pinned by tests/a-website-in-the-pane-cannot-reach-the-app.test.mjs.
 
+import type { WebPreferences } from 'electron';
+
 /**
  * Pin one attaching webview to the floor. `webPreferences` and `params` are
  * Electron's own objects from `will-attach-webview`, mutated in place, which
  * is how that event is answered.
  */
-export function hardenAttachedWebview(webPreferences, params) {
+export function hardenAttachedWebview(
+  webPreferences: (WebPreferences & { preloadURL?: string }) | undefined,
+  params: Record<string, string | boolean> | undefined,
+) {
   if (webPreferences) {
     // Nothing of ours reaches the page.
     delete webPreferences.preload;

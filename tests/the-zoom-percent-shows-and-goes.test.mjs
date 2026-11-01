@@ -11,11 +11,11 @@ import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { zoomPercentFor } from '../main/zoom-readout.mjs';
+import { zoomPercentFor } from '../main/zoom-readout.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (...p) => fs.readFileSync(path.join(here, '..', ...p), 'utf8');
-const menu = read('main', 'menu.mjs');
+const menu = read('main', 'menu.mts');
 const preload = read('preload.cjs');
 const app = read('renderer', 'src', 'App.tsx');
 const component = read('renderer', 'src', 'components', 'ZoomPercent.tsx');
@@ -70,7 +70,7 @@ describe('what the page is told', () => {
         getAllWindows: () => [{ isDestroyed: () => false, webContents: inbox }],
       },
     }));
-    return (await import('../main/menu.mjs')).applyZoom;
+    return (await import('../main/menu.mts')).applyZoom;
   };
 
   it('sends the percentage after every step, including back to 100', async () => {

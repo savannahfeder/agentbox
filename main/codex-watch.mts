@@ -19,6 +19,28 @@ import { readCodexThreads } from './codex-threads.mjs';
 
 export const CODEX_POLL_MS = 60_000;
 
+export interface CodexThread {
+  id?: unknown;
+  lastActive?: unknown;
+  live?: unknown;
+}
+
+type Count = (event: string, props: { engine: string }) => void;
+
+interface CodexStore {
+  refreshCodexMirrors(threads: CodexThread[], options: { now: number }): number;
+  refreshCodexAsks(threads: CodexThread[], options: { now: number }): number;
+}
+
+interface CodexRead {
+  threads?: CodexThread[];
+}
+
+type ReadThreads = (options: { now: number }) => CodexRead | null | undefined | PromiseLike<{ threads: CodexThread[] }>;
+
+const isPending = (value: unknown): value is PromiseLike<{ threads: CodexThread[] }> =>
+  typeof (value as { then?: unknown } | null | undefined)?.then === 'function';
+
 /**
  * HOW LONG AFTER ITS LAST WRITE A CODEX THREAD IS STILL AN AGENT THAT WAS SEEN.
  *
@@ -53,7 +75,10 @@ export const CODEX_SEEN_MS = 60 * 60_000;
  *  set: this reads the same conversations every minute, so without it one
  *  conversation would send an event a minute all day.
  */
-export function noticeCodexAgents(threads, { count = null, seen = null, now = Date.now() } = {}) {
+export function noticeCodexAgents(
+  threads: readonly CodexThread[] | null | undefined,
+  { count = null, seen = null, now = Date.now() }: { count?: Count | null; seen?: Set<unknown> | null; now?: number } = {},
+) {
   if (typeof count !== 'function') return 0;
   let sent = 0;
   for (const t of threads ?? []) {
@@ -75,28 +100,42 @@ export function noticeCodexAgents(threads, { count = null, seen = null, now = Da
 
 // Answers at once for a reader that answers at once, and as a promise for one
 // that reads off the main process (readCodexThreadsOffThread).
-export function scanCodex({ store, readThreads = readCodexThreads, now = Date.now(), count = null, seen = null } = {}) {
+interface ScanOptions {
+  store: CodexStore;
+  readThreads?: ReadThreads;
+  now?: number;
+  count?: Count | null;
+  seen?: Set<unknown> | null;
+}
+
+export function scanCodex({ store, readThreads = readCodexThreads, now = Date.now(), count = null, seen = null }: ScanOptions) {
   const none = { refreshed: 0, retold: 0, threads: 0 };
-  let read;
+  let read: ReturnType<ReadThreads>;
   try { read = readThreads({ now }); } catch { return none; }
-  if (typeof read?.then === 'function') return read.then(({ threads }) => applyCodexThreads(threads, { store, now, count, seen }), () => none);
+  if (isPending(read)) return read.then(({ threads }) => applyCodexThreads(threads, { store, now, count, seen }), () => none);
   return applyCodexThreads(read?.threads ?? [], { store, now, count, seen });
 }
 
-function applyCodexThreads(threads, { store, now, count, seen }) {
+function applyCodexThreads(
+  threads: CodexThread[],
+  { store, now, count, seen }: { store: CodexStore; now: number; count: Count | null; seen: Set<unknown> | null },
+) {
   noticeCodexAgents(threads, { count, seen, now });
   const refreshed = store.refreshCodexMirrors(threads, { now });
   const retold = store.refreshCodexAsks(threads, { now });
   return { refreshed, retold, threads: threads.length };
 }
 
-export function startCodexWatch({ store, readThreads = readCodexThreads, pollMs = CODEX_POLL_MS, firstDelayMs = 8_000, count = null } = {}) {
+export function startCodexWatch(
+  { store, readThreads = readCodexThreads, pollMs = CODEX_POLL_MS, firstDelayMs = 8_000, count = null }:
+    { store: CodexStore; readThreads?: ReadThreads; pollMs?: number; firstDelayMs?: number; count?: Count | null },
+) {
   // Conversations this run has already counted. In memory on purpose, exactly
   // as the Claude side's set is: a fresh launch seeing the same conversation
   // again is a fresh fact about the app being used.
   const seen = new Set();
   // One scan at a time: a read slower than the minute must not stack up.
-  let scanning = null;
+  let scanning: Promise<unknown> | null = null;
   const run = () => {
     if (scanning) return scanning;
     scanning = Promise.resolve().then(() => scanCodex({ store, readThreads, count, seen }))
