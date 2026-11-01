@@ -78,37 +78,64 @@ import { asksPermission, approvalsHandshakes } from './kit.mjs';
 import { snapshotSkills, filesInFolder } from './skills.mjs';
 import { createResourceRequests, resourceContextFor, accountFolderFor } from './resources.mjs';
 
+// HOW LONG A CLOUD RUN HAS. The sandbox stops the agent a quarter of an hour
+// before AgentCore ends the session at 8 hours, so its work can be saved
+// (cloud/sandbox/server.mjs DEFAULT_DEADLINE_MS). The relay sends it as the
+// deadline rather than leaving the image's copy as the only one, so the number
+// the agent is told is the number it is stopped at.
+export const RUN_LIMIT_MS = (8 * 60 - 15) * 60_000;
+
+/** `ms` as a person would say it: "7 hours 45 minutes", "1 hour", "45 seconds". */
+export function howLongWords(ms) {
+  if (ms < 60_000) { const s = Math.max(1, Math.round(ms / 1000)); return `${s} second${s === 1 ? '' : 's'}`; }
+  const mins = Math.round(ms / 60_000);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return [h ? `${h} hour${h === 1 ? '' : 's'}` : '', m ? `${m} minute${m === 1 ? '' : 's'}` : ''].filter(Boolean).join(' ');
+}
+
+// A run that cannot see its own ceiling plans past it: w-f37c87e2f1 gave two
+// subagents 45 minutes of work each and its machine was gone in 13.
+const howLongNote = (limitMs) => `This run is stopped ${howLongWords(limitMs)} after it starts, a quarter of an hour before the cloud session's own 8-hour limit, so that its work can be saved; the machine can also be reclaimed before that without warning. Size the work to finish inside that, and leave your answer before the limit rather than at it.`;
+const COMMIT_NOTE = 'Your commits on this task\'s branch are sent back to their computer every five minutes, and they are the only thing that outlives the machine: uncommitted files, commits on any other branch, and the conversation itself do not come back. So commit on this branch as you go rather than at the end, and when you hand work to a subagent, have it commit on this branch too.';
+
 // WHAT A CLOUD RUN IS TOLD ABOUT WHERE IT IS. Without it an agent there found
 // its film's files, ffmpeg and a key missing, and asked the person to move the
 // thread (2026-10-16). Kept true to cloud/sandbox/Dockerfile and ./docs.mjs.
-export const CLOUD_NOTE = [
-  '# You are running on a cloud machine, not on the person\'s own computer',
-  '',
-  'This turn runs in a Linux cloud sandbox (Debian, 2 cores, 8 GB) that is yours for this run and thrown away after it. It has: this task folder (its git branch and main, at the same path as on their computer); the project\'s documents folder at its usual path, but only its small files (up to 256 KB each), plus this thread\'s own designs folder (its newest files, up to 50 MB) and any file or folder the request names under the account\'s documents (up to 25 MB a file, 100 MB a folder); the store tools (look_at_page excepted); git, node, npm, python3 and pip, make, g++, curl, wget, unzip; and Playwright with Chromium already installed (`require(\'playwright\')` works from any folder).',
-  '',
-  'Install whatever else the work needs: you have sudo (`sudo apt-get update && sudo apt-get install -y <package>`, `pip install --user`, `npm install`). When you install a program the project will need again, add the same lines to `.agentbox/cloud-setup.sh` in the task folder and commit it: that script runs before every cloud run of this project, and its output from this run is in /tmp/agentbox-cloud-setup.log.',
-  '',
-  'It does not have: the project\'s other branches (only this task\'s branch and main came up); any other file from their computer (other threads\' design folders, large media, files under the home folder); files an earlier turn left outside git (node_modules, gitignored folders such as scripts/scratch, /tmp); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins). Run `npm ci --ignore-scripts` before anything that needs node_modules. Open files are capped at 1024 here (the cloud fixes that ceiling), so a test runner that watches the whole project (`vitest related`, `npm run test:changed`) fails with EMFILE: run the test files you changed and the ones that import them by name with `npx vitest run <files>`.',
-  '',
-  `Only this task's own branch comes back to their computer. A commit, merge or reset on main or any other branch stays in this sandbox and is thrown away with it, so a merge done here has not happened. When the request includes merging into main, or changing any branch but this task's, do the rest of the work and commit it on this branch, then end your turn with the one line \`${HAND_BACK} merging into main\` (as below): the app merges on their computer.`,
-  '',
-  `For a missing installed skill or task file, first use the store tool request_cloud_resource. Request a skill by name, or a file or folder by its path: relative to this task or the product's documents, or any path under the account's documents, other products' folders included, written out in full as the request writes it (\`~/...\` works). It returns a separate scratch path when delivery succeeds; read the skill's SKILL.md there with its references and scripts. A folder answers with its files, which you then ask for. For something the request does not name, if it cannot be delivered, finish independent work and explain exactly what is missing. Do not transfer the whole thread solely for a missing skill or file the request does not name. For a key, one of their apps, a private repository this machine cannot reach, or a file, folder or skill the request names that request_cloud_resource cannot deliver, stop at once. Do not work around it, do not write to the work item, do not give the person commands to run, and do not offer to move the thread: the app moves it. End your turn with one line and nothing else: ${HAND_BACK} followed by what was missing, in a few words they would use (your AWS sign-in, the iOS simulator), since the app shows those words to them. A person who asks to have this thread moved to their computer is answered with this line as well. That line replaces your usual final answer and its options. The app then runs the same request again on their computer, where all of it is. A program you can install is not a reason to stop. Otherwise work as usual, and never write that line.`,
-].join('\n');
+const HEADING = '# You are running on a cloud machine, not on the person\'s own computer';
+const HAND_BACK_NOTE = `For a missing installed skill or task file, first use the store tool request_cloud_resource. Request a skill by name, or a file or folder by its path: relative to this task or the product's documents, or any path under the account's documents, other products' folders included, written out in full as the request writes it (\`~/...\` works). It returns a separate scratch path when delivery succeeds; read the skill's SKILL.md there with its references and scripts. A folder answers with its files, which you then ask for. For something the request does not name, if it cannot be delivered, finish independent work and explain exactly what is missing. Do not transfer the whole thread solely for a missing skill or file the request does not name. For a key, one of their apps, a private repository this machine cannot reach, or a file, folder or skill the request names that request_cloud_resource cannot deliver, stop at once. Do not work around it, do not write to the work item, do not give the person commands to run, and do not offer to move the thread: the app moves it. End your turn with one line and nothing else: ${HAND_BACK} followed by what was missing, in a few words they would use (your AWS sign-in, the iOS simulator), since the app shows those words to them. A person who asks to have this thread moved to their computer is answered with this line as well. That line replaces your usual final answer and its options. The app then runs the same request again on their computer, where all of it is. A program you can install is not a reason to stop. Otherwise work as usual, and never write that line.`;
 
+/** The note a cloud run is given, for a project with a repository or without one. */
+export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS } = {}) {
+  if (plain) {
+    return [
+      HEADING,
+      'This turn runs in a Linux cloud sandbox (Debian, 2 cores, 8 GB) that is yours for this run and thrown away after it. It has: the project\'s documents folder, which is the folder you work in, at the same path as on their computer, but only its small files (up to 256 KB each), plus this thread\'s own designs folder (its newest files, up to 50 MB) and any file or folder the request names under the account\'s documents (up to 25 MB a file, 100 MB a folder); what you write there goes back to their computer as you work. There is no git repository here. It also has the store tools (look_at_page excepted); git, node, npm, python3 and pip, make, g++, curl, wget, unzip; and Playwright with Chromium already installed (`require(\'playwright\')` works from any folder).',
+      'Install whatever else the work needs: you have sudo (`sudo apt-get update && sudo apt-get install -y <package>`, `pip install --user`, `npm install`).',
+      'It does not have: any other file from their computer (documents over 256 KB, other threads\' design folders, large media, files under the home folder, /tmp from an earlier turn); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins).',
+      howLongNote(limitMs),
+      HAND_BACK_NOTE,
+    ].join('\n\n');
+  }
+  return [
+    HEADING,
+    'This turn runs in a Linux cloud sandbox (Debian, 2 cores, 8 GB) that is yours for this run and thrown away after it. It has: this task folder (its git branch and main, at the same path as on their computer); the project\'s documents folder at its usual path, but only its small files (up to 256 KB each), plus this thread\'s own designs folder (its newest files, up to 50 MB) and any file or folder the request names under the account\'s documents (up to 25 MB a file, 100 MB a folder); the store tools (look_at_page excepted); git, node, npm, python3 and pip, make, g++, curl, wget, unzip; and Playwright with Chromium already installed (`require(\'playwright\')` works from any folder).',
+    'Install whatever else the work needs: you have sudo (`sudo apt-get update && sudo apt-get install -y <package>`, `pip install --user`, `npm install`). When you install a program the project will need again, add the same lines to `.agentbox/cloud-setup.sh` in the task folder and commit it: that script runs before every cloud run of this project, and its output from this run is in /tmp/agentbox-cloud-setup.log.',
+    'It does not have: the project\'s other branches (only this task\'s branch and main came up); any other file from their computer (other threads\' design folders, large media, files under the home folder); files an earlier turn left outside git (node_modules, gitignored folders such as scripts/scratch, /tmp); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins). Run `npm ci --ignore-scripts` before anything that needs node_modules. Open files are capped at 1024 here (the cloud fixes that ceiling), so a test runner that watches the whole project (`vitest related`, `npm run test:changed`) fails with EMFILE: run the test files you changed and the ones that import them by name with `npx vitest run <files>`.',
+    `Only this task's own branch comes back to their computer. A commit, merge or reset on main or any other branch stays in this sandbox and is thrown away with it, so a merge done here has not happened. When the request includes merging into main, or changing any branch but this task's, do the rest of the work and commit it on this branch, then end your turn with the one line \`${HAND_BACK} merging into main\` (as below): the app merges on their computer.`,
+    `${howLongNote(limitMs)} ${COMMIT_NOTE}`,
+    HAND_BACK_NOTE,
+  ].join('\n\n');
+}
+
+export const CLOUD_NOTE = cloudNote();
 // The same, for a project with no repository, whose agent works in the
 // documents folder itself.
-const notes = CLOUD_NOTE.split('\n\n');
-export const PLAIN_CLOUD_NOTE = [
-  notes[0],
-  'This turn runs in a Linux cloud sandbox (Debian, 2 cores, 8 GB) that is yours for this run and thrown away after it. It has: the project\'s documents folder, which is the folder you work in, at the same path as on their computer, but only its small files (up to 256 KB each), plus this thread\'s own designs folder (its newest files, up to 50 MB) and any file or folder the request names under the account\'s documents (up to 25 MB a file, 100 MB a folder); what you write there goes back to their computer as you work. There is no git repository here. It also has the store tools (look_at_page excepted); git, node, npm, python3 and pip, make, g++, curl, wget, unzip; and Playwright with Chromium already installed (`require(\'playwright\')` works from any folder).',
-  'Install whatever else the work needs: you have sudo (`sudo apt-get update && sudo apt-get install -y <package>`, `pip install --user`, `npm install`).',
-  'It does not have: any other file from their computer (documents over 256 KB, other threads\' design folders, large media, files under the home folder, /tmp from an earlier turn); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins).',
-  notes[notes.length - 1],
-].join('\n\n');
+export const PLAIN_CLOUD_NOTE = cloudNote({ plain: true });
 
 // The app's own instructions with the cloud note after them.
-export function argvForTheCloud(argv, { plain = false } = {}) {
-  const note = plain ? PLAIN_CLOUD_NOTE : CLOUD_NOTE;
+export function argvForTheCloud(argv, { plain = false, limitMs = RUN_LIMIT_MS } = {}) {
+  const note = limitMs === RUN_LIMIT_MS ? (plain ? PLAIN_CLOUD_NOTE : CLOUD_NOTE) : cloudNote({ plain, limitMs });
   const i = argv.indexOf('--append-system-prompt');
   if (i < 0 || i + 1 >= argv.length) return [...argv, '--append-system-prompt', note];
   const out = [...argv];
@@ -178,6 +205,14 @@ const FOLDER_CAP = { files: 300, bytes: 100 * 1024 * 1024 };
 const RESULTS_WAIT_MS = 3 * 60_000;
 // How often a run's new documents are fetched while it works.
 const DOCS_EVERY_MS = 10_000;
+// How often a run's branch is sent home while it works, so a machine that dies
+// takes at most this much of it.
+const CHECKPOINT_EVERY_MS = 5 * 60_000;
+const NO_CHECKPOINT = 'the run saved no commits before its machine stopped';
+// How the sandbox says it stopped the agent at the deadline it was started
+// with (cloud/sandbox/server.mjs). Read off the stream rather than guessed
+// from the clock, which a slow start or a joined run would get wrong.
+const SAYS_THE_LIMIT = /stopped near the cloud session's .*limit/;
 // Four missed reads of the run's events: asleep, or off the network for good.
 const OFFLINE_AFTER_MS = 90_000;
 export const INPUT_CLOSED_IN_CLOUD = 'agentbox_input_closed_in_cloud';
@@ -592,6 +627,8 @@ export async function cloudRun({
   // spoken to over stdin/stdout by the supervisor's own Codex client.
   engine = 'claude',
   docsEveryMs = DOCS_EVERY_MS,
+  checkpointEveryMs = CHECKPOINT_EVERY_MS,
+  runLimitMs = RUN_LIMIT_MS,
   leaveFlushMs = LEAVE_FLUSH_MS,
   // How long the sandbox waits without word from this Mac before it counts
   // it asleep (cloud/sandbox/server.mjs "WHILE THE MAC IS AWAY").
@@ -957,7 +994,9 @@ export async function cloudRun({
   docs = docsDir ? { dir: docsDir, sentAt, sent: docsSent, laid: {}, ack: null } : null;
   // And what a process joining it after a restart needs to serve its tools:
   // the servers, and the worker's own variables they ran with.
-  marker = { runId, sessionId, branch, startSha, sent, configDir, engine, bringDirs, docs, mcp: mcpConfig.mcpServers, toolEnv: toolVariables(env), resourceContext: { engine, homeDir, configDir, codexHome }, ...(plain ? { plain: true } : {}) };
+  // `startedAt` outlives this process, so a run brought home by a later one
+  // can still say how long it had been going when its machine stopped.
+  marker = { runId, sessionId, branch, startSha, sent, configDir, engine, bringDirs, docs, startedAt: Date.now(), mcp: mcpConfig.mcpServers, toolEnv: toolVariables(env), resourceContext: { engine, homeDir, configDir, codexHome }, ...(plain ? { plain: true } : {}) };
   if (kit) {
     signals.off('SIGHUP', early);
     const { runId: _r, sessionId: _s, ...joins } = marker;
@@ -998,7 +1037,10 @@ export async function cloudRun({
     ...(env.AGENTBOX_PHONE_DEVICE ? { phone: { device: env.AGENTBOX_PHONE_DEVICE, project: env.ZERO_PRODUCT, item: env.ZERO_ITEM } } : {}),
     ...(plain ? { plain: true } : {}),
     ...(base ? { base, refs: pack.refs } : {}),
-    argv: [remoteCommand, ...(remoteCommand === 'claude' ? argvForTheCloud(argv, { plain }) : argv)], env: remoteEnv, files: withoutKeys(files),
+    argv: [remoteCommand, ...(remoteCommand === 'claude' ? argvForTheCloud(argv, { plain, limitMs: runLimitMs }) : argv)], env: remoteEnv, files: withoutKeys(files),
+    // The same number the agent was told in its note, rather than leaving the
+    // image's own copy of it as the only one.
+    deadlineMs: runLimitMs,
     changesRef: hasOutgoing ? outgoing : undefined,
     ...(remote ? { remote } : {}),
     ...(docsDir ? { docs: docsDir } : {}),
@@ -1056,6 +1098,10 @@ export async function cloudRun({
   let cancelled = false;
   let cancelledAt = 0;
   let finished = null; // 'collected' | 'collect-failed' | 'failed' | 'lost'
+  // The sandbox answered with no run at all: its machine is gone.
+  let machineGone = false;
+  // The sandbox stopped the agent at the deadline this run was started with.
+  let atTheLimit = false;
   let loginTrouble = null; // { state: 'missing'|'refused'|'expired', id }
   const servers = new Map(); // conn -> { proc, name, init, pending, swallow }
   let awayNoted = false;
@@ -1168,6 +1214,19 @@ export async function cloudRun({
       saveMarker();
     }
   })().catch((err) => say(`the run's documents stopped coming back early: ${err.message}`)) : null;
+
+  // THE BRANCH, WHILE IT WORKS, into one object the next send replaces. It is
+  // only read if the machine dies before the run's own results go up
+  // (`layCheckpoint`). A run with nothing new yet answers with a refusal,
+  // which is simply asked again next time.
+  const checkpointLoop = plain ? null : (async () => {
+    for (;;) {
+      const until = Date.now() + checkpointEveryMs;
+      while (Date.now() < until && !finished && !cancelled && !leaving) await sleep(Math.min(500, checkpointEveryMs));
+      if (finished || cancelled || leaving) return;
+      await retry(async () => transport.invoke(sessionId, { action: 'checkpoint', runId, bundleUrl: await storage.putUrl(keyOf(runId, 'checkpoint.bundle')) }), { what: 'save the run\'s commits', forever: false, stop: () => !!finished || cancelled || leaving });
+    }
+  })().catch((err) => say(`the run's commits stopped being saved as it works: ${err.message}`));
 
 
   // `init` is the handshake an earlier process had with this connection's
@@ -1293,7 +1352,7 @@ export async function cloudRun({
     // of the run it is.
     else if (e.kind === 'input-closed') { if (!joining) await write(stdout, Buffer.from(`${JSON.stringify({ type: 'system', subtype: INPUT_CLOSED_IN_CLOUD })}\n`)); }
     else if (e.kind === 'mcp-close') { const s = servers.get(e.conn); servers.delete(e.conn); if (s) { s.closed = true; s.proc.stdin.end(); setTimeout(() => s.proc.kill(), 2000); } }
-    else if (e.kind === 'error') say(e.message);
+    else if (e.kind === 'error') { if (SAYS_THE_LIMIT.test(e.message)) atTheLimit = true; say(e.message); }
     else if (e.kind === 'setup') noteSetup(e);
     else if (e.kind === 'login') loginTrouble = { state: e.state, id: e.id ?? login?.id ?? null };
     else if (e.kind === 'state' && ['collected', 'collect-failed', 'failed'].includes(e.state)) finished = e.state;
@@ -1387,7 +1446,7 @@ export async function cloudRun({
       // a Stop must end even when AWS cannot be reached.
       const page = await retry(() => transport.invoke(sessionId, { action: 'events', runId, since: cursor, waitMs: pollWaitMs }), { what: 'read the cloud run', forever: true, stop: () => overdue() || leaving });
       if (!page) continue;
-      if (!page.ok && page.error === 'no-run') { finished = 'lost'; break; }
+      if (!page.ok && page.error === 'no-run') { finished = 'lost'; machineGone = true; break; }
       // A call the sandbox may have given up on while this Mac was away is
       // made only once the sandbox says it has not: the agent was told it
       // did not reach the app (cloud/sandbox/server.mjs `mcp-claim`).
@@ -1413,6 +1472,7 @@ export async function cloudRun({
     finished = 'left';
     wake?.();
     await Promise.race([docsLoop, sleep(leaveFlushMs)]);
+    await Promise.race([checkpointLoop, sleep(leaveFlushMs)]);
     saveMarker({ pid: null });
     for (const sv of servers.values()) { sv.closed = true; sv.proc.stdin.end(); sv.proc.kill(); }
     return IMPORT_FAILED;
@@ -1426,6 +1486,7 @@ export async function cloudRun({
   wake?.();
   await sender;
   await docsLoop;
+  await checkpointLoop;
   await keptSettled(10_000);
   for (const s of servers.values()) { s.closed = true; s.proc.stdin.end(); s.proc.kill(); }
 
@@ -1439,17 +1500,25 @@ export async function cloudRun({
   // server counts a run until it is stopped (cloud/gateway/).
   const letGo = () => Promise.race([Promise.resolve(transport.stop?.(sessionId)).catch(() => {}), sleep(15_000)]);
   if (finished === 'failed') { clearMarker(here); await letGo(); return troubleWithLogin() ? LOGIN_TROUBLE : 1; }
-  const back = await bringHome({ ...marker }, { cursor, replay: (e) => absorb(e) });
+  const back = await bringHome({ ...marker }, { recovering: machineGone, cursor, replay: (e) => absorb(e) });
   if (back.ok) await letGo();
   if (!back.ok) {
-    say(`the cloud run's work could not be brought back (${back.why}); it is kept in the cloud for 7 days and will be tried again`);
+    const held = back.held || !!(await storage.get(keyOf(runId, 'done.json')).catch(() => null));
+    say(held
+      ? `the cloud run's work could not be brought back (${back.why}); it is kept in the cloud for 7 days and will be tried again`
+      : `the cloud run's work could not be brought back (${back.why}) and has not reached the cloud; its machine is asked again before the next run here`);
     writeMarker(here,{ ...marker, pid: null, state: back.state || 'import-failed', ...(back.laying ? { laying: back.laying } : {}) });
     // Its marker stays either way, so nothing ships the folder until its work
     // is home; a login that failed is still said, so no account here is
     // struck for it.
     return troubleWithLogin() ? LOGIN_TROUBLE : IMPORT_FAILED;
   }
+  if (atTheLimit) {
+    tellTheRow({ ...marker }, `This run was stopped at the cloud's time limit of ${howLongWords(runLimitMs)} so that its work could be saved. Its commits${plain ? ' and documents' : ' and files'} are home. The turn it was in did not finish, so a reply carries it on from here.`, { lost: true });
+  }
   if (troubleWithLogin()) return LOGIN_TROUBLE;
+  // The machine's fault, not the thread's: its turn is asked again.
+  if (back.lost) return IMPORT_FAILED;
   return exitCodeOf(back.record);
 
   /* --------------------------- bringing it home -------------------------- */
@@ -1482,11 +1551,7 @@ export async function cloudRun({
         // the results one last time; without them the run is gone for good.
         await transport.stop?.(rec.sessionId).catch(() => {});
         done = await storage.get(k('done.json'));
-        if (!done) {
-          clearMarker(here);
-          say('an earlier cloud run in this folder ended without its results; its work is lost');
-          return { ok: true, exitCode: null, lost: true };
-        }
+        if (!done) return layCheckpoint(rec);
       } else {
         if (st.state === 'preparing' || st.state === 'running') {
           await retry(() => transport.invoke(rec.sessionId, { action: 'signal', runId: rec.runId, signal: 'SIGTERM' }), { what: 'stop the earlier run', forever: false });
@@ -1508,14 +1573,18 @@ export async function cloudRun({
     }
     if (!done) return { ok: false, why: 'its results never arrived' };
     const record = JSON.parse(done.toString('utf8'));
-    // The heavy half, two runs at a time across every cloud run on this Mac,
-    // and through files rather than memory: twenty runs finishing together
-    // must not unpack twenty sets of bundles and transcripts at once.
+    return inSpool((spool) => layHome(rec, record, { recovering, replay, from, spool }));
+  }
+
+  // The heavy half, two runs at a time across every cloud run on this Mac,
+  // and through files rather than memory: twenty runs finishing together
+  // must not unpack twenty sets of bundles and transcripts at once.
+  async function inSpool(fn) {
     const release = await takeImportSlot();
     try {
       const spool = fs.mkdtempSync(path.join(os.tmpdir(), `${nameSlug}-cloud-home-`));
       try {
-        return await layHome(rec, record, { recovering, replay, from, spool });
+        return await fn(spool);
       } finally {
         try { fs.rmSync(spool, { recursive: true, force: true }); } catch { /* the tmp folder's own cleaning */ }
       }
@@ -1524,13 +1593,59 @@ export async function cloudRun({
     }
   }
 
+  // WHY THE RUN ENDED, SAID ON THE THREAD AND NOT ONLY IN THE LOG: a run the
+  // app asks again hands the next session its request afresh, with nothing
+  // about the try that was cut short (w-f37c87e2f1). `lost` is for a thread
+  // that carries on regardless; without it the row is held for them to come
+  // and look (main/supervisor.mjs `_sayCloudNews`).
+  function tellTheRow(rec, note, { lost = false } = {}) {
+    say(note);
+    addCloudNews(cwd, {
+      runId: rec.runId,
+      item: rec.toolEnv?.ZERO_ITEM || env.ZERO_ITEM || null,
+      product: rec.toolEnv?.ZERO_PRODUCT || env.ZERO_PRODUCT || null,
+      note, lost,
+    });
+  }
+
+  // A RUN WHOSE MACHINE DIED before its results went up. The commits it sent
+  // while it worked (`checkpointLoop`) are laid in as if it had ended there;
+  // its uncommitted files and conversation went with the machine. The row is
+  // told either way, or the next run starts as if nothing had happened.
+  async function layCheckpoint(rec) {
+    const stopped = rec.startedAt
+      ? `This thread's cloud machine stopped ${howLongWords(Date.now() - rec.startedAt)} into its run, before it finished, so the run never sent its work back.`
+      : 'This thread\'s cloud machine stopped before its run finished, so the run never sent its work back.';
+    const tell = (note) => tellTheRow(rec, note, { lost: true });
+    if (rec.plain) {
+      clearMarker(here);
+      say(`${stopped} The documents it wrote came back as it worked; its conversation since it started is lost.`);
+      return { ok: true, exitCode: null, lost: true };
+    }
+    let back = null;
+    try {
+      back = await inSpool((spool) => layHome(rec, { checkpoint: true, exitCode: null, commits: 1 }, { recovering: false, replay: null, from: 0, spool }));
+    } catch (err) {
+      if (err.message !== NO_CHECKPOINT) throw err;
+    }
+    if (!back) {
+      clearMarker(here);
+      tell(`${stopped} None of its work had been saved yet, so that run's commits, files and conversation are lost. The thread picks up from where it was before that run.`);
+      return { ok: true, exitCode: null, lost: true };
+    }
+    if (!back.ok) return { ...back, held: true };
+    const last = (await git(cwd, ['log', '-1', '--format=%s', back.parked || 'HEAD']).catch(() => '')).trim();
+    tell(`${stopped} The commits it saved on the way are ${back.parked ? `on the branch ${back.parked}` : 'in the task folder'}${last ? `, the last one "${last}"` : ''}. Anything after that, its uncommitted files and its conversation since are lost.`);
+    return { ...back, lost: true };
+  }
+
   async function layHome(rec, record, { recovering, replay, from, spool }) {
     const k = (name) => keyOf(rec.runId, name);
     // WHAT THE RUN USED, for setting the plan limits from real work
     // (main/cloud/usage.mjs). Recorded as soon as its results are here,
     // whatever laying them into the folder does next: the machine ran either
     // way. Once per run, however many times this is tried.
-    appendCloudUsage({ runId: rec.runId, item: env.ZERO_ITEM, engine: rec.engine || engine, exitCode: record.exitCode, usage: record.usage }, { home: homeDir });
+    if (!record.checkpoint) appendCloudUsage({ runId: rec.runId, item: env.ZERO_ITEM, engine: rec.engine || engine, exitCode: record.exitCode, usage: record.usage }, { home: homeDir });
 
     // Anything the stream never delivered (the session was gone before the
     // Mac could read it) is replayed from the copy in S3, and so is what the
@@ -1564,7 +1679,8 @@ export async function cloudRun({
       const specs = [];
       if (record.commits > 0) specs.push(`refs/heads/${rec.branch}:${keep}`);
       if (record.strayHead) specs.push(`refs/agentbox/head:${keep}-head`);
-      await fetchBundle('out.bundle', specs, 'the commits bundle is missing');
+      if (record.checkpoint) await fetchBundle('checkpoint.bundle', specs, NO_CHECKPOINT);
+      else await fetchBundle('out.bundle', specs, 'the commits bundle is missing');
     }
     if (record.uncommitted) await fetchBundle('changes.bundle', [`refs/agentbox/changes:${keepChanges}`], 'the uncommitted work is missing');
     // The conversation's folders, each one the run said it uploaded.

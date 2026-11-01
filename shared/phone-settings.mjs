@@ -59,6 +59,7 @@ const THREAD_ID = /^[\w-]{1,120}$/;
 export function checkSetting(p) {
   if (!p || typeof p !== 'object') return 'not a setting';
   if (p.scope === 'repeat') return checkRepeatChange(p);
+  if (p.scope === 'teammate') return checkTeammateAsk(p);
   const rules = p.scope === 'workspace' ? WORKSPACE : p.scope === 'project' ? PROJECT : p.scope === 'thread' ? THREAD : null;
   if (!rules || !Object.hasOwn(rules, p.key)) return 'not a setting your phone can change';
   if (p.scope !== 'workspace' && !(typeof p.product === 'string' && SLUG.test(p.product))) return 'that setting needs its project';
@@ -111,6 +112,36 @@ function repeatRoute(p) {
   }];
 }
 
+// WHAT THE PHONE MAY ASK OF YOUR AI TEAMMATES, handed to the window's own door
+// (main/ipc.mjs `zero:teammates`), which still refuses with teammates off. It
+// rides as a setting so the cloud's command table needs no new kind.
+const MATE_ID = /^t-[\w-]{1,60}$/;
+const words = (v, n) => typeof v === 'string' && v.trim().length > 0 && v.length <= n;
+const TEAMMATE_ASKS = {
+  // A message in your chat with one or more of them; `answers` picks among its questions' options.
+  post: (v) => words(v.text, 8000) && Array.isArray(v.to) && v.to.length >= 1 && v.to.length <= 10 && v.to.every((x) => MATE_ID.test(x))
+    && (v.fresh === undefined || typeof v.fresh === 'boolean')
+    && (v.answers === undefined || (!!v.answers && typeof v.answers === 'object' && !Array.isArray(v.answers)
+      && Object.entries(v.answers).length <= 20 && Object.entries(v.answers).every(([q, a]) => /^[\w-]{1,80}$/.test(q) && words(a, 2000)))),
+  // Someone new, from one of the starters or your own words, working in one of your projects.
+  describe: (v) => (words(v.text, 8000) || (typeof v.starter === 'string' && /^[a-z]{1,40}$/.test(v.starter)))
+    && typeof v.product === 'string' && SLUG.test(v.product),
+  // Your yes to work held after too many hand-offs.
+  goAhead: (v) => MATE_ID.test(v.id) && typeof v.ref === 'string' && /^[\w-]{1,80}$/.test(v.ref),
+};
+function checkTeammateAsk(p) {
+  if (!Object.hasOwn(TEAMMATE_ASKS, p.key)) return 'not something your phone can ask a teammate';
+  const v = p.value;
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return 'not a value that takes';
+  return TEAMMATE_ASKS[p.key](v) ? null : 'not a value that takes';
+}
+function teammateRoute(p) {
+  const v = p.value;
+  if (p.key === 'post') return ['zero:teammates', { op: 'post', args: { text: v.text, to: v.to, ...(v.fresh ? { fresh: true } : {}), ...(v.answers ? { answers: v.answers } : {}) } }];
+  if (p.key === 'describe') return ['zero:teammates', { op: 'describe', args: { ...(v.starter ? { starter: v.starter } : { text: v.text }), greeted: true, product: v.product } }];
+  return ['zero:teammates', { op: 'goAhead', args: { id: v.id, ref: v.ref } }];
+}
+
 function profileFor(model, engine, id) {
   if (id === null) return null;
   const list = engine === 'codex' ? model?.workspace?.codex?.accounts : model?.workspace?.accounts;
@@ -123,6 +154,7 @@ function profileFor(model, engine, id) {
 export function settingRoute(p, model) {
   if (p.scope === 'thread') return ['zero:set-thread-pins', { pins: { [p.item]: p.value === true ? true : null } }];
   if (p.scope === 'repeat') return repeatRoute(p);
+  if (p.scope === 'teammate') return teammateRoute(p);
   if (p.scope === 'project') {
     const value = p.key === 'account' && p.value !== 'any' ? profileFor(model, 'claude', p.value) : p.value;
     return ['zero:settings-set-project', { product: p.product, key: p.key, value }];

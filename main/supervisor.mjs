@@ -163,6 +163,7 @@ import { syncCodexMemoryGate } from './codex-memory-gate.mjs';
 import { autoAgents } from './machine.mjs';
 import { runEndedProps } from './analytics.mjs';
 import { appendRun, runLedgerPath } from './run-ledger.mjs';
+import { toolServerLaunch } from './tool-server-launch.mjs';
 
 const POLL_MS = 15_000;
 // The reasons a queued thread's line names (`status().cannotStart`).
@@ -6057,7 +6058,10 @@ export class Supervisor {
       const id = n.item || item?.id;
       if (!product || !id || !n.note) { console.warn(`zero: ${n.note || 'a cloud run was kept aside'} (${folder})`); continue; }
       try {
-        if (this.store.cloudWorkKeptAside) this.store.cloudWorkKeptAside(product, id, n.note);
+        // A run the app will ask again (a dead machine, the time limit): the
+        // row is told why and runs on, rather than waiting for them.
+        if (n.lost) this.store.noteItem?.(product, id, n.note);
+        else if (this.store.cloudWorkKeptAside) this.store.cloudWorkKeptAside(product, id, n.note);
         else this.store.noteItem?.(product, id, n.note);
       } catch (e) { console.warn('zero: could not say a cloud run was kept aside:', e.message); }
     }
@@ -9356,7 +9360,7 @@ export class Supervisor {
   _codexStoreServer(item) {
     const command = this.storeMcpCommand();
     if (!command) return null;
-    return {
+    return this._toolServer({
       name: STORE_SERVER,
       command,
       env: {
@@ -9366,7 +9370,7 @@ export class Supervisor {
         ZERO_PRODUCT: item.product,
         ZERO_ITEM: item.id,
       },
-    };
+    });
   }
 
   /**
@@ -11857,7 +11861,7 @@ export class Supervisor {
   }
 
   /** The servers themselves, apart from the file. */
-  mcpServers() {
+  mcpServers(platform = process.platform) {
     const storeCmd = this.storeMcpCommand();
     const servers = {
       // The approvals channel: gated actions pause here and ask the
@@ -11894,7 +11898,14 @@ export class Supervisor {
     }
     if (!Object.keys(servers).length) return null;
     if (!fs.existsSync(path.join(this.appDir, 'scripts', 'approval-server.sh')) && !storeCmd) return null;
+    for (const [name, server] of Object.entries(servers)) servers[name] = this._toolServer(server, platform);
     return servers;
+  }
+
+  /** One tool server's entry, started without a shell on Windows (main/tool-server-launch.mjs). */
+  _toolServer(server, platform = process.platform) {
+    const launch = toolServerLaunch(server.command, { appDir: this.appDir, platform, unpacked });
+    return { ...server, ...launch, env: { ...server.env, ...launch.env } };
   }
 }
 

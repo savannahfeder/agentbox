@@ -9,6 +9,10 @@ export const Back = ({ size = 16, tint = color.dim }: P) => (
   <Svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={tint} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><Path d="M10 3.5L5.5 8l4.5 4.5" /></Svg>
 );
 
+/** The chevron the page's arrows and folds wear (OneThingAtATime.tsx `chevron`). */
+export const Chevron = ({ up = false, size = 14, tint = color.dim }: P & { up?: boolean }) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d={up ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'} /></Svg>
+);
 export const Gear = ({ size = 17, tint = color.dim }: P) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
     <Circle cx={12} cy={12} r={3} />

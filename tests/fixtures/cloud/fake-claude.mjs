@@ -19,7 +19,8 @@
 // "LATE" makes it wait a moment after its handshake and before its tool call,
 // so a test can quit the app in between.
 // "AMEND" makes it amend the commit the branch started on instead of adding
-// one; "IDLE" makes it change nothing in the folder.
+// one; "IDLE" makes it change nothing in the folder. "STAY" makes it commit
+// and then keep working for ever, so a test can kill its machine.
 // "DOCS:<folder>" makes it read and write the project's documents folder:
 // it reports what it found there, draws a picture in its own designs folder
 // and waits a moment, then edits the notes just before its result.
@@ -107,6 +108,7 @@ async function turn(text) {
     execSync(text.includes('AMEND') ? 'git add cloud.txt && git commit -q --amend -m "Amended in the cloud"' : 'git add cloud.txt && git commit -q -m "From the cloud"');
     fs.writeFileSync('loose.txt', 'not committed\n');
   }
+  if (text.includes('STAY')) await new Promise(() => {});
   const docs = (text.match(/DOCS:(\S+)/) || [])[1];
   let found = null;
   if (docs) {
