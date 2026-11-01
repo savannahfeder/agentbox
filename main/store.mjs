@@ -434,10 +434,12 @@ export class Store {
   // app's own words, so both go in as 'system', as a note: the reply field is
   // hers. A failure reopens the row, and the queue hands the script's words
   // straight to the agent that wrote the change.
-  shipped(slug, id, { sha, labels }) {
+  // `close` is the project's own setting to ship without asking
+  // (shared/ship-mode.mjs): a thread it covered needs nothing more from her.
+  shipped(slug, id, { sha, labels, close = false }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
-    return workItemsDisk.updateWorkItem(dir, id, { labels, note: shippedNote(sha) }, { source: 'system' });
+    return workItemsDisk.updateWorkItem(dir, id, { labels, note: shippedNote(sha), ...(close ? { status: 'done' } : {}) }, { source: 'system' });
   }
 
   shipFailed(slug, id, { note, labels }) {
