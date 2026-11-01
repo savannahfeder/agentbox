@@ -5,8 +5,8 @@
 //
 //   main/main.mjs:1190  window-all-closed -> app.quit()
 //   main/main.mjs:761   before-quit -> phone.close()
-//   main/phone-link.mts:525  close() -> relay.stop()
-//   main/relay-client.mts:236  stop() -> onChange()
+//   main/phone-link.mjs:525  close() -> relay.stop()
+//   main/relay-client.mjs:236  stop() -> onChange()
 //   main/main.mjs:750   onChange -> window.isDestroyed()
 //   TypeError: Cannot read properties of null (reading 'isDestroyed')
 //
@@ -26,15 +26,14 @@
 // it. Exactly one install in the cohort relaunched, and it is the only one that
 // delivered the crash.
 //
-// So two things have to hold, and the second is the one that matters even when
-// some other step throws for some other reason: the phone's change handler must
-// survive a window that has gone, and NO quit step may be able to take down the
-// app before the counts are flushed.
+// The phone link and its relay have since left the app (2026-10-16, and the
+// relay's code 2026-11-01). What still has to hold, whatever step throws for
+// whatever reason: NO quit step may be able to take down the app before the
+// counts are flushed.
 
 import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
-import { createPhoneLink } from '../main/phone-link.mts';
 import { createAnalytics } from '../main/analytics.mjs';
 import { quitStep, flushBeforeQuit, FLUSH_DEADLINE_MS } from '../main/quit-sequence.mts';
 
@@ -49,27 +48,6 @@ function fakeApp() {
   };
   return app;
 }
-
-describe('the relay reports back on the way out', () => {
-  it('closing the phone link tells its onChange, so a dead window is reached', () => {
-    const onChange = vi.fn();
-    const link = createPhoneLink({
-      file: '/nowhere/phone-link.json',
-      channels: new Map(),
-      listeners: new Set(),
-      relayUrl: 'wss://relay.example/room',
-      onChange,
-      interfaces: () => ({}),
-      log: { warn() {} },
-      tailscale: null,
-    });
-    onChange.mockClear();
-    link.close();
-    // THE CASE THAT MUST NOT BE WISHED AWAY. If this ever stops being true the
-    // guard below is dead code, and someone will delete it.
-    expect(onChange).toHaveBeenCalled();
-  });
-});
 
 describe('a quit step cannot take the app down with it', () => {
   it('a step that throws does not stop the steps after it', () => {

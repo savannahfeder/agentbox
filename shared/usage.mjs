@@ -259,6 +259,64 @@ export function limitsStillRunning(limits, now = Date.now()) {
   return (limits ?? []).filter((l) => !Number.isFinite(l?.resetsAt) || l.resetsAt + JUST_RESET_MS > now);
 }
 
+/* ------------------- whether a reading can be believed -------------------- */
+// Claude Code says which folder it read and never which login it signed in
+// with, so a reading can carry another account's numbers under this one's
+// name (tests/two-accounts-that-report-the-same-usage-are-not-shown). These
+// two rules catch that from the numbers themselves.
+
+// One reset said two ways: Claude Code puts it a moment before the minute, the
+// cloud's header on it.
+const SAME_RESET_MS = 2 * 60_000;
+// Readings this close are of the same windows, unless one window has ended.
+// Further apart, Anthropic may have changed the limits in between.
+export const SAME_MOMENT_MS = 15 * 60_000;
+
+export const USAGE_SAME_AS_ANOTHER = 'Usage matched another account exactly, so it’s hidden. Refresh to check again.';
+
+const windowKey = (l) => `${l.span}:${l.span === 'week' && /^all/i.test(l.qualifier ?? 'all') ? 'all' : l.qualifier ?? ''}`;
+const resetOf = (l) => (Number.isFinite(l?.resetsAt) ? l.resetsAt : null);
+
+/**
+ * TWO READINGS WITH THE SAME NUMBERS: every window within a percent and
+ *  resetting at the same minute. Two subscriptions do not share a five hour
+ *  window and a week like that; one login read twice does. Two accounts nobody
+ *  has used (0% and no reset) are not counted, as that is what any new
+ *  account says.
+ */
+export function sameUsage(a, b) {
+  const x = new Map((a ?? []).filter((l) => Number.isFinite(l?.percent)).map((l) => [windowKey(l), l]));
+  const y = new Map((b ?? []).filter((l) => Number.isFinite(l?.percent)).map((l) => [windowKey(l), l]));
+  if (!x.size || x.size !== y.size) return false;
+  let spent = false;
+  for (const [key, l] of x) {
+    const m = y.get(key);
+    if (!m || Math.abs(l.percent - m.percent) > 1) return false;
+    const [p, q] = [resetOf(l), resetOf(m)];
+    if ((p === null) !== (q === null)) return false;
+    if (p !== null && Math.abs(p - q) > SAME_RESET_MS) return false;
+    if (p !== null && (l.percent > 0 || m.percent > 0)) spent = true;
+  }
+  return spent;
+}
+
+/**
+ * TWO READINGS OF ONE ACCOUNT THAT CANNOT BOTH BE TRUE: taken within
+ *  `SAME_MOMENT_MS`, with a window still running at the later one that the two
+ *  say resets at different times. Percentages are not compared, because a
+ *  changed limit moves them legitimately.
+ */
+export function readingsDisagree(a, b) {
+  if (!a?.limits || !b?.limits || !Number.isFinite(a.at) || !Number.isFinite(b.at)) return false;
+  if (Math.abs(a.at - b.at) > SAME_MOMENT_MS) return false;
+  const later = Math.max(a.at, b.at);
+  const main = (limits, key) => limits.find((l) => windowKey(l) === key);
+  return ['session:', 'week:all'].some((key) => {
+    const [p, q] = [resetOf(main(a.limits, key)), resetOf(main(b.limits, key))];
+    return p !== null && q !== null && p > later && q > later && Math.abs(p - q) > SAME_RESET_MS;
+  });
+}
+
 /**
  * A reset to the nearest minute. Claude Code gives one a moment before the
  * minute (11:59:59.6) and the cloud's header the minute itself, and both name

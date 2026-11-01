@@ -30,13 +30,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import type { AddressInfo } from 'node:net';
 import QRCode from 'qrcode';
 import webpush from 'web-push';
 import { phoneBanner, shouldSpeak } from '../shared/notify-rules.mjs';
 import { createHandler, sameKey } from './serve.mjs';
-import { createRelayClient } from './relay-client.mts';
-import type { RelayClient, RelayClientOptions } from './relay-client.mts';
 import { Name } from '../shared/product-name.mjs';
 
 export const PHONE_PORT = 41745;
@@ -63,7 +60,7 @@ const DEVICE_HEADER = 'x-agentbox-device';
 // is listed as last seen rather than connected.
 const QUIET_MS = 30_000;
 
-const newKey = (): string => crypto.randomBytes(24).toString('base64url');
+const newKey = () => crypto.randomBytes(24).toString('base64url');
 
 // THE SECURE ADDRESS. Over plain http a phone's browser says "Not Secure" in
 // the address bar (measured on an iPhone, 2026-10-09). Tailscale can put a real
@@ -75,36 +72,27 @@ export const SECURE_PORT = 8443;
 const TAILSCALE_BINS = ['/Applications/Tailscale.app/Contents/MacOS/tailscale', '/usr/local/bin/tailscale', '/opt/homebrew/bin/tailscale', '/usr/bin/tailscale'];
 
 /** The `tailscale` command, as three questions. Null when it is not installed. */
-export interface TailscaleCli {
-  name(): Promise<string | null>;
-  serve(port: number): Promise<string>;
-  unserve(): Promise<string>;
-}
-
-type Via = 'tailscale' | 'wifi' | 'anywhere';
-interface Route { via: Via; host: string; iface?: string }
-
-export function tailscaleCli(bins: string[] = TAILSCALE_BINS): TailscaleCli | null {
+export function tailscaleCli(bins = TAILSCALE_BINS) {
   const bin = bins.find((b) => { try { fs.accessSync(b, fs.constants.X_OK); return true; } catch { return false; } });
   if (!bin) return null;
-  const run = (args: string[]) => new Promise<string>((resolve, reject) => {
+  const run = (args) => new Promise((resolve, reject) => {
     execFile(bin, args, { timeout: 20_000 }, (err, stdout, stderr) => (err ? reject(new Error(String(stderr || err.message).trim())) : resolve(String(stdout))));
   });
   return {
     /** This computer's name in the tailnet, if it can have a certificate. */
     async name() {
-      const d = JSON.parse(await run(['status', '--json'])) as { Self?: { DNSName?: unknown }; CertDomains?: string[] };
+      const d = JSON.parse(await run(['status', '--json']));
       const host = String(d.Self?.DNSName ?? '').replace(/\.$/, '');
       return host && (d.CertDomains ?? []).includes(host) ? host : null;
     },
-    serve: (port: number) => run(['serve', '--bg', '--yes', `--https=${SECURE_PORT}`, `http://127.0.0.1:${port}`]),
+    serve: (port) => run(['serve', '--bg', '--yes', `--https=${SECURE_PORT}`, `http://127.0.0.1:${port}`]),
     unserve: () => run(['serve', `--https=${SECURE_PORT}`, 'off']),
   };
 }
 
 /** Wi-Fi and Tailscale addresses on this computer, in that order. */
-export function phoneAddresses(interfaces: ReturnType<typeof os.networkInterfaces> = os.networkInterfaces()): Route[] {
-  const out: Route[] = [];
+export function phoneAddresses(interfaces = os.networkInterfaces()) {
+  const out = [];
   for (const [name, list] of Object.entries(interfaces)) {
     for (const a of list ?? []) {
       if (a.family !== 'IPv4' || a.internal) continue;
@@ -117,7 +105,7 @@ export function phoneAddresses(interfaces: ReturnType<typeof os.networkInterface
     }
   }
   // en0 is the built-in Wi-Fi or Ethernet; prefer it over a VM bridge.
-  const rank = (a: Route): number => (a.via === 'wifi' ? (a.iface === 'en0' ? 0 : 1) : 2);
+  const rank = (a) => (a.via === 'wifi' ? (a.iface === 'en0' ? 0 : 1) : 2);
   return out.sort((a, b) => rank(a) - rank(b));
 }
 
@@ -127,7 +115,7 @@ export function phoneAddresses(interfaces: ReturnType<typeof os.networkInterface
  * public address: the key is the whole computer, and a Mac on a network that
  * hands it a public address must not answer the world with it.
  */
-export function fromThisNetwork(address: unknown): boolean {
+export function fromThisNetwork(address) {
   const a = String(address ?? '').replace(/^::ffff:/, '');
   if (a === '::1') return true;
   const m = a.match(/^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/);
@@ -137,7 +125,7 @@ export function fromThisNetwork(address: unknown): boolean {
 }
 
 /** "iPhone · Safari" from a user agent string. */
-export function deviceName(ua = ''): string {
+export function deviceName(ua = '') {
   const what = /iPhone/.test(ua) ? 'iPhone'
     : /iPad/.test(ua) ? 'iPad'
     : /Android/.test(ua) ? 'Android phone'
@@ -154,105 +142,35 @@ export function deviceName(ua = ''): string {
   return browser ? `${what} · ${browser}` : what;
 }
 
-type Handler = (...args: never[]) => unknown;
-
-interface PushSubscriptionLike { endpoint: string; keys: { p256dh: string; auth: string } }
-
-interface AlertEntry {
-  sub: PushSubscriptionLike;
-  name: string;
-  since: number;
-  lastSent?: number;
-  lastError?: string | null;
-  lastErrorAt?: number;
-}
-
-interface SavedState {
-  on: boolean;
-  key: string;
-  via: Via;
-  viaChosen: boolean;
-  vapid: { publicKey: string; privateKey: string } | null;
-  alerts: Record<string, AlertEntry>;
-}
-
-interface Device {
-  id: string;
-  name: string;
-  ip: string | null;
-  firstSeen: number;
-  lastSeen: number;
-  streams: Set<http.ServerResponse>;
-}
-
-interface Arrival { id?: string; kind?: string; title?: unknown; thread?: unknown }
-
-interface AlertsRequest {
-  action?: unknown;
-  subscription?: { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
-}
-
-interface PushPayload { title: string; body: string; open: string | null; count: number }
-
-interface PushFailure { statusCode?: number; code?: string; body?: unknown; message?: unknown }
-
-export interface PhoneLinkOptions {
-  file: string;
-  channels: Map<string, Handler>;
-  listeners: Set<Handler>;
-  dist?: string;
-  files?: unknown;
-  port?: number;
-  onChange?: () => void;
-  interfaces?: () => ReturnType<typeof os.networkInterfaces>;
-  log?: { warn?: (...args: unknown[]) => void; info?: (...args: unknown[]) => void };
-  tailscale?: TailscaleCli | null;
-  warm?: (url: string) => unknown;
-  send?: (sub: PushSubscriptionLike, body: string, opts: object) => Promise<unknown>;
-  atDesk?: () => boolean;
-  coalesceMs?: number;
-  relayUrl?: string;
-  createRelay?: (opts: RelayClientOptions) => RelayClient;
-}
-
-export function createPhoneLink({ file, channels, listeners, dist, files = null, port = PHONE_PORT, onChange = () => {}, interfaces = () => os.networkInterfaces(), log = console, tailscale = tailscaleCli(), warm = (url) => fetch(url, { signal: AbortSignal.timeout(10_000) }).catch(() => {}), send = (sub, body, opts) => webpush.sendNotification(sub, body, opts), atDesk = () => false, coalesceMs = COALESCE_MS, relayUrl = '', createRelay = (opts) => createRelayClient(opts) }: PhoneLinkOptions) {
-  let saved: SavedState = read(file);
+/**
+ * @param {{ file: string, channels: Map<string, Function>, listeners: Set<Function>,
+ *           dist?: string, port?: number, onChange?: () => void,
+ *           interfaces?: () => object, log?: { warn?: Function } }} options
+ */
+export function createPhoneLink({ file, channels, listeners, dist, files = null, port = PHONE_PORT, onChange = () => {}, interfaces = () => os.networkInterfaces(), log = console, tailscale = tailscaleCli(), warm = (url) => fetch(url, { signal: AbortSignal.timeout(10_000) }).catch(() => {}), send = (sub, body, opts) => webpush.sendNotification(sub, body, opts), atDesk = () => false, coalesceMs = COALESCE_MS }) {
+  let saved = read(file);
   // THE PORT IT IS ON, WHICH IS NOT ALWAYS THE PORT IT WAS ASKED FOR. `port` is
   // `PHONE_PORT` in the app, so a phone paired once comes back to the same
   // address; 0 asks for whatever is free, and then only the socket knows.
-  const livePort = (): number => (server?.address() as AddressInfo | null | undefined)?.port ?? port;
-  // ANYWHERE, THROUGH THE RELAY (main/relay-client.mts). With a relay to use it
-  // is where a person starts, because it needs nothing on the phone; a route
-  // someone picked stays picked. Before the relay every file said "wifi"
-  // whether or not anybody picked it, so only a pick marked as one counts.
-  const relay = relayUrl ? createRelay({ relayUrl, key: () => saved.key, port: () => livePort(), log, onChange: () => onChange() }) : null;
-  const via = () => {
-    const picked = saved.viaChosen || saved.via === 'tailscale' ? saved.via : null;
-    if (picked === 'anywhere' && !relay) return 'wifi';
-    return picked ?? (relay ? 'anywhere' : 'wifi');
-  };
-  function settleRelay() {
-    if (!relay) return;
-    if (saved.on && via() === 'anywhere') relay.start();
-    else relay.stop();
-  }
-  let server: http.Server | null = null;
-  let error: string | null = null;
+  const livePort = () => server?.address()?.port ?? port;
+  const via = () => saved.via;
+  let server = null;
+  let error = null;
   /** The https name `tailscale serve` is answering on, or why it is not. */
-  let secure: { host: string | null; error: string | null; busy: Promise<void> | null } = { host: null, error: null, busy: null };
+  let secure = { host: null, error: null, busy: null };
   /** id -> { id, name, ip, firstSeen, lastSeen, streams: Set<ServerResponse> } */
-  const devices = new Map<string, Device>();
+  const devices = new Map();
 
   const key = () => saved.key;
   // What the alerts know: the inbox count the desktop last drew, the arrivals
   // not yet told, and whether a burst has been told already (the desktop's
   // own rule, shared/notify-rules.mjs: once, then again only for a card).
   let count = 0;
-  const unseen = new Map<string, Arrival>();
-  let timer: ReturnType<typeof setTimeout> | null = null;
+  const unseen = new Map();
+  let timer = null;
   let spoke = false;
   let spokeAsk = false;
-  const inner = createHandler({ channels, token: key, listeners, dist, files: files as null });
+  const inner = createHandler({ channels, token: key, listeners, dist, files });
 
   function save() {
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -260,7 +178,7 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
     try { fs.chmodSync(file, 0o600); } catch { /* best effort */ }
   }
 
-  function seen(req: http.IncomingMessage, url: URL): Device | null {
+  function seen(req, url) {
     const id = String(req.headers[DEVICE_HEADER] || url.searchParams.get('device') || '').slice(0, 64);
     if (!id) return null;
     const now = Date.now();
@@ -279,9 +197,9 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
     return d;
   }
 
-  async function handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  async function handle(req, res) {
     if (!fromThisNetwork(req.socket?.remoteAddress)) { res.writeHead(403).end(); return; }
-    const url = new URL(req.url ?? '', 'http://phone');
+    const url = new URL(req.url, 'http://phone');
     const guarded = url.pathname === '/events' || url.pathname.startsWith('/api/') || url.pathname === '/manifest.webmanifest';
     const given = req.headers['x-agentbox-token'] || url.searchParams.get('token');
     const ok = sameKey(given, saved.key);
@@ -294,10 +212,7 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
       res.end(JSON.stringify({
         name: Name,
         short_name: Name,
-        // Saved through the relay, the icon opens with the key after the #, so
-        // a cold start (before the phone's worker is back) never hands the key
-        // to the relay in an address it could log.
-        start_url: req.headers['x-agentbox-relay'] ? `/#k=${encodeURIComponent(String(given))}` : `/?token=${encodeURIComponent(String(given))}`,
+        start_url: `/?token=${encodeURIComponent(given)}`,
         scope: '/',
         display: 'standalone',
         // The app's own warm dark. A cool grey here was what Safari painted
@@ -325,7 +240,7 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
     if (url.pathname === '/phone/alerts') {
       if (!ok || req.method !== 'POST') { res.writeHead(403).end(); return; }
       const d = seen(req, url);
-      let body: AlertsRequest = {};
+      let body = {};
       try { body = JSON.parse((await readJson(req)) || '{}'); } catch { res.writeHead(400).end(); return; }
       try {
         const answer = await alertsFor(d, body);
@@ -333,7 +248,7 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
         res.end(JSON.stringify(answer));
       } catch (err) {
         res.writeHead(400, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: String((err as Error).message ?? err) }));
+        res.end(JSON.stringify({ error: String(err.message ?? err) }));
       }
       return;
     }
@@ -366,15 +281,15 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
   // this computer only and no network the Mac joins can reach it in plain
   // http. Over Wi-Fi the phone is on the network, so it listens on every
   // address and `fromThisNetwork` turns away anyone who is not.
-  const wantedHost = () => (secureWanted() || via() === 'anywhere' ? '127.0.0.1' : '0.0.0.0');
-  let host: string | null = null;
+  const wantedHost = () => (secureWanted() ? '127.0.0.1' : '0.0.0.0');
+  let host = null;
 
   function start() {
     if (server) return;
     error = null;
     host = wantedHost();
     server = http.createServer(handle);
-    server.on('error', (err: NodeJS.ErrnoException) => {
+    server.on('error', (err) => {
       error = err.code === 'EADDRINUSE'
         ? `Port ${port} is taken by another program, so phones cannot reach this app.`
         : String(err.message ?? err);
@@ -396,7 +311,7 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
   // https port is touched, so anything else this computer serves is left alone.
   function secureWanted() { return saved.on && saved.via === 'tailscale'; }
   function settleSecure() {
-    const run: Promise<void> = (secure.busy ?? Promise.resolve()).then(async () => {
+    const run = (secure.busy ?? Promise.resolve()).then(async () => {
       if (secureWanted() && !secure.host) {
         if (!tailscale) { secure = { ...secure, error: 'Tailscale is not installed here, so there is no secure address.' }; return; }
         try {
@@ -408,11 +323,11 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
           // 40 seconds when measured. Make it now, not on the phone.
           warm(`https://${host}:${SECURE_PORT}/`);
         } catch (err) {
-          secure = { ...secure, host: null, error: `No secure address: ${(err as Error).message}` };
+          secure = { ...secure, host: null, error: `No secure address: ${err.message}` };
           log.warn?.('[phone-link]', secure.error);
         }
       } else if (!secureWanted() && secure.host) {
-        try { await tailscale?.unserve(); } catch (err) { log.warn?.('[phone-link] tailscale serve off:', (err as Error).message); }
+        try { await tailscale?.unserve(); } catch (err) { log.warn?.('[phone-link] tailscale serve off:', err.message); }
         secure = { ...secure, host: null, error: null };
       } else if (!secureWanted()) {
         secure = { ...secure, error: null };
@@ -448,7 +363,7 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
     return saved.vapid;
   }
 
-  async function alertsFor(d: Device | null, { action, subscription }: AlertsRequest = {}) {
+  async function alertsFor(d, { action, subscription } = {}) {
     if (!d) throw new Error('This phone did not say which phone it is.');
     if (action === 'key') return { publicKey: vapid().publicKey, on: !!saved.alerts[d.id] };
     if (action === 'state') return { on: !!saved.alerts[d.id] };
@@ -472,7 +387,7 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
   }
 
   /** One alert to one phone. A phone whose subscription is gone is forgotten. */
-  async function push(id: string, payload: PushPayload): Promise<boolean> {
+  async function push(id, payload) {
     const entry = saved.alerts[id];
     if (!entry) return false;
     try {
@@ -485,8 +400,7 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
       entry.lastSent = Date.now();
       entry.lastError = null;
       return true;
-    } catch (caught) {
-      const err = caught as PushFailure | null | undefined;
+    } catch (err) {
       if (err?.statusCode === 404 || err?.statusCode === 410) {
         delete saved.alerts[id];
         save();
@@ -519,12 +433,12 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
     spoke = true;
     if (items.some((i) => i.kind === 'approval')) spokeAsk = true;
     // A phone with the inbox open on its screen is looking already.
-    const away = Object.keys(saved.alerts).filter((id) => !((devices.get(id)?.streams.size ?? 0) > 0));
+    const away = Object.keys(saved.alerts).filter((id) => !(devices.get(id)?.streams.size > 0));
     await Promise.all(away.map((id) => push(id, { title: say.title, body: say.body, open: say.open, count })));
   }
 
   /** What the desktop's notifier was told arrived (main/notify.mjs). */
-  function arrivals(list: unknown) {
+  function arrivals(list) {
     if (!saved.on || !Object.keys(saved.alerts).length) return;
     if (!Array.isArray(list) || !list.length) return;
     if (atDesk()) return seenAll();
@@ -533,36 +447,26 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
     timer = setTimeout(() => { void speak(); }, coalesceMs);
   }
 
-  async function status({ via: asked }: { via?: Via } = {}) {
+  async function status({ via: asked } = {}) {
     const addrs = phoneAddresses(interfaces());
     const want = asked ?? via();
-    // THROUGH THE RELAY the code is its address with the key after the #,
-    // which a browser never sends: the relay sees a room, never the key.
-    const anywhere = want === 'anywhere' && relay;
-    const pick = anywhere ? { via: 'anywhere', host: new URL(relayUrl).host } : addrs.find((a) => a.via === want) ?? addrs[0] ?? null;
-    const safe = anywhere || (pick?.via === 'tailscale' && secure.host);
+    const pick = addrs.find((a) => a.via === want) ?? addrs[0] ?? null;
+    const safe = pick?.via === 'tailscale' && secure.host;
     const url = !pick ? null
-      : anywhere ? `${relayUrl.replace(/\/+$/, '')}/#k=${encodeURIComponent(saved.key)}`
       : safe ? `https://${secure.host}:${SECURE_PORT}/?token=${encodeURIComponent(saved.key)}`
       : `http://${pick.host}:${livePort()}/?token=${encodeURIComponent(saved.key)}`;
-    const relayState = anywhere ? relay.state() : null;
     const now = Date.now();
     return {
       on: !!saved.on,
       listening: !!server?.listening,
-      /** 127.0.0.1 over Tailscale and the relay, 0.0.0.0 over Wi-Fi. */
+      /** 127.0.0.1 over Tailscale, 0.0.0.0 over Wi-Fi. */
       host: server?.listening ? host : null,
-      error: error ?? (pick?.via === 'tailscale' ? secure.error : null) ?? relayState?.error ?? null,
+      error: error ?? (pick?.via === 'tailscale' ? secure.error : null),
       port: livePort(),
       secure: !!safe,
       settingUp: !!secure.busy,
-      /** Through the relay: whether this Mac is connected to it now. */
-      relay: relayState ? { connected: !!relayState.connected, host: pick!.host } : null,
       via: pick?.via ?? null,
-      routes: [
-        ...(relay ? [{ via: 'anywhere', host: new URL(relayUrl).host }] : []),
-        ...[...new Set(addrs.map((a) => a.via))].map((v) => ({ via: v, host: addrs.find((a) => a.via === v)!.host })),
-      ],
+      routes: [...new Set(addrs.map((a) => a.via))].map((v) => ({ via: v, host: addrs.find((a) => a.via === v).host })),
       url: saved.on ? url : null,
       qr: saved.on && url ? await QRCode.toString(url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }) : null,
       // The phones seen since the app started, and the phones with alerts on,
@@ -575,12 +479,12 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
   }
 
   /** The Settings page's one channel. */
-  async function act({ action, via, device }: { action?: unknown; via?: unknown; device?: unknown } = {}) {
-    if (action === 'on') { saved.on = true; save(); start(); await settleSecure(); settleRelay(); }
-    else if (action === 'off') { saved.on = false; save(); stop(); await settleSecure(); settleRelay(); }
-    else if (action === 'reset') { saved.key = newKey(); save(); dropEveryPhone(); relay?.restart(); }
-    else if (action === 'via' && (via === 'wifi' || via === 'tailscale' || (via === 'anywhere' && relay))) {
-      saved.via = via; saved.viaChosen = true; save(); await settleSecure(); settleRelay(); rebind();
+  async function act({ action, via, device } = {}) {
+    if (action === 'on') { saved.on = true; save(); start(); await settleSecure(); }
+    else if (action === 'off') { saved.on = false; save(); stop(); await settleSecure(); }
+    else if (action === 'reset') { saved.key = newKey(); save(); dropEveryPhone(); }
+    else if (action === 'via' && (via === 'wifi' || via === 'tailscale')) {
+      saved.via = via; save(); await settleSecure(); rebind();
     } else if (action === 'via') { /* a route this Mac does not have: nothing to change */ }
     else if (action === 'stop-alerts' && typeof device === 'string') { delete saved.alerts[device]; save(); }
     else if (action !== 'status') throw new Error(`Unknown phone action ${action}`);
@@ -588,51 +492,49 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
     return status();
   }
 
-  if (saved.on) { start(); void settleSecure(); settleRelay(); }
+  if (saved.on) { start(); void settleSecure(); }
   return {
     act, status, start, stop, handle, arrivals, seen: seenAll,
     /** The inbox count the desktop last drew, which each alert carries for the icon. */
-    count(n: number) { if (Number.isFinite(n)) count = Math.max(0, Math.floor(n)); },
+    count(n) { if (Number.isFinite(n)) count = Math.max(0, Math.floor(n)); },
     settled: () => secure.busy ?? Promise.resolve(),
     get key() { return saved.key; },
-    close() { if (timer) clearTimeout(timer); stop(); relay?.stop(); },
+    close() { if (timer) clearTimeout(timer); stop(); },
   };
 }
 
-function read(file: string): SavedState {
-  let saved: { on?: unknown; key?: unknown; via?: unknown; viaChosen?: unknown; vapid?: { publicKey?: unknown; privateKey?: unknown } | null; alerts?: unknown } = {};
+function read(file) {
+  let saved = {};
   try { saved = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* first run */ }
   if (typeof saved.key !== 'string' || saved.key.length < 24) saved.key = newKey();
   return {
     on: !!saved.on,
-    key: saved.key as string,
-    via: (['tailscale', 'wifi', 'anywhere'] as unknown[]).includes(saved.via) ? (saved.via as Via) : 'wifi',
-    // A route somebody picked, not one written down because it was the only one.
-    viaChosen: saved.viaChosen === true,
-    vapid: saved.vapid?.publicKey && saved.vapid?.privateKey ? (saved.vapid as SavedState['vapid']) : null,
+    key: saved.key,
+    via: saved.via === 'tailscale' ? 'tailscale' : 'wifi',
+    vapid: saved.vapid?.publicKey && saved.vapid?.privateKey ? saved.vapid : null,
     alerts: newestAlerts(saved.alerts),
   };
 }
 
 // ALERTS GO TO ONE PHONE, the one that turned them on last (2026-10-13).
-// Adding the app to the home screen again, over Wi-Fi, over Tailscale or
-// through the relay, makes a separate web app to iOS with its own id here, and
+// Adding the app to the home screen again, over Wi-Fi or over Tailscale,
+// makes a separate web app to iOS with its own id here, and
 // nothing a page can read says two of them are the same phone. One Mac held
 // three of them, so every alert arrived three times in three groups to clear.
 // The newest is the icon in use: an older one is told alerts are off and can
 // take them back with one tap.
-function newestAlerts(alerts: unknown): Record<string, AlertEntry> {
+function newestAlerts(alerts) {
   if (!alerts || typeof alerts !== 'object') return {};
-  const entries = Object.entries(alerts as Record<string, AlertEntry>).filter(([, a]) => a?.sub?.endpoint);
+  const entries = Object.entries(alerts).filter(([, a]) => a?.sub?.endpoint);
   if (entries.length <= 1) return Object.fromEntries(entries);
   const [id, a] = entries.reduce((best, e) => ((e[1].since ?? 0) > (best[1].since ?? 0) ? e : best));
   return { [id]: a };
 }
 
-function readJson(req: http.IncomingMessage): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
+function readJson(req) {
+  return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', (c: Buffer) => { body += c; if (body.length > 64 * 1024) reject(new Error('Body too large')); });
+    req.on('data', (c) => { body += c; if (body.length > 64 * 1024) reject(new Error('Body too large')); });
     req.on('end', () => resolve(body));
     req.on('error', reject);
   });

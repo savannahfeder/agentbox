@@ -62,7 +62,7 @@ with the Mac shut.
   browser-safe `foldWorkItems` rebuilds rows from them anywhere.
 - **The phone screen**: the app's own renderer with a phone layout
   (renderer/src/phone.css, browser-bridge.ts), served BY the Mac over Wi-Fi,
-  Tailscale or the Cloudflare relay (main/phone-link.mts, relay/). Dead when
+  Tailscale or the Cloudflare relay (main/phone-link.mjs, relay/). Dead when
   the Mac sleeps.
 - **Cloud runs** (docs/cloud/PLAN.md): every run is proxied by a process on the
   Mac, which also serves the agent's store tools and approvals.
@@ -220,8 +220,9 @@ starts with and however long; settings like `MAX_TOKENS=128000` stay; a new
 computer id keeps which rows the phone's new threads became; the migration
 has a version newer than every draft.
 
-(The relay was briefly deleted in this work and is back: it is deployed and in
-use, see "How a phone gets in".)
+(The relay was briefly deleted in this work and came back. After 2026-10-16
+nothing connected to it, and its code was deleted on 2026-11-01: "this is no
+longer used, should probably get rid of it".)
 
 Still to decide: the installed app has no team cloud at all
 (`loadCloudConfig` answers null when packaged), so until that changes only a

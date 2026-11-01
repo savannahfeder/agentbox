@@ -41,7 +41,7 @@ const KEEPALIVE_MAX = 16_000;
  *  not want it in a screenshot, and it would otherwise ride along into every
  *  link somebody copies out of here.
  */
-// THE PHONE DOOR IS THE OTHER CASE (main/phone-link.mts). Its address is not
+// THE PHONE DOOR IS THE OTHER CASE (main/phone-link.mjs). Its address is not
 // this computer's own, and there the key stays in the address bar on purpose:
 // a phone's home-screen icon is saved from that address, and on a phone the
 // icon gets storage of its own, so a key kept anywhere else is lost to it.
@@ -100,10 +100,7 @@ function showLockedOut() {
 
 function takeToken(): string | null {
   const url = new URL(location.href);
-  // THROUGH THE RELAY the key is after the # (relay/phone/), which a browser
-  // never sends, so the relay never sees it.
-  const fromHash = onPhoneDoor() ? /(?:^#|&)k=([A-Za-z0-9_-]{24,})/.exec(url.hash)?.[1] ?? null : null;
-  const fromUrl = url.searchParams.get('token') ?? fromHash;
+  const fromUrl = url.searchParams.get('token');
   if (fromUrl && onPhoneDoor()) {
     try { localStorage.setItem(TOKEN_KEY, fromUrl); } catch { /* private mode */ }
     return fromUrl;

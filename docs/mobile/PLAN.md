@@ -131,7 +131,7 @@ and the Edge Function, is still to build.
   where it came from. Two things write it:
   - the Mac, for its own threads, from the same arrivals that make a desktop
     banner today (`shared/notify-rules.mjs`, and the arrivals
-    main/phone-link.mts fed to web push);
+    main/phone-link.mjs fed to web push);
   - the database, when a line for a person is written: a Direct message, an
     @mention, a task given to them. These have to buzz with every Mac shut.
 - **One rule on the server decides what is sent**, for both: duplicates,
@@ -139,7 +139,7 @@ and the Edge Function, is still to build.
   they are at a computer. The desk rule stays: no buzz while they have used a
   Mac in the last five minutes (`shared/notify-rules.mjs`), read from an
   activity record each Mac renews and that expires on its own. Alerts close
-  together are folded into one, as main/phone-link.mts does.
+  together are folded into one, as main/phone-link.mjs does.
 - **History is never an alert.** Lines brought in from history get a fresh
   insert time, so their age cannot tell them apart; a line is marked as an
   import when it is written, and imports are never sent.

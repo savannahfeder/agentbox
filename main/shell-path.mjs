@@ -108,8 +108,8 @@ const DIRS = ['CLAUDE_CONFIG_DIR', 'CODEX_HOME'];
  *  has is left alone, and the proxies are one setting: if any proxy name is
  *  already set, none is added.
  */
-const PROXIES = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy', 'NO_PROXY', 'no_proxy'];
-const CERTIFICATES = ['NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'REQUESTS_CA_BUNDLE', 'CURL_CA_BUNDLE'];
+export const PROXIES = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy', 'NO_PROXY', 'no_proxy'];
+export const CERTIFICATES = ['NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'REQUESTS_CA_BUNDLE', 'CURL_CA_BUNDLE'];
 
 /**
  * THE LANGUAGE SETTING A DOCK LAUNCH DOES NOT HAVE (2026-10-15).
@@ -129,7 +129,7 @@ const CERTIFICATES = ['NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'R
  *  Mac only, en_US.UTF-8, which exists on every macOS and is what Terminal
  *  sets for most people. Linux sessions set their own.
  */
-const LOCALE = ['LANG', 'LC_ALL', 'LC_CTYPE'];
+export const LOCALE = ['LANG', 'LC_ALL', 'LC_CTYPE'];
 const MAC_LOCALE = 'en_US.UTF-8';
 
 const SETTINGS = [...DIRS, ...PROXIES, ...CERTIFICATES, ...LOCALE];

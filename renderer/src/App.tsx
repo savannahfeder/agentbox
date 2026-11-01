@@ -291,8 +291,8 @@ const liveAnswer = (i: WorkItem) => (i.answer && i.answer !== '(withdrawn)' ? i.
 // on every snapshot.
 const NO_ORDER: string[] = [];
 const NO_RUNNING: RunningSession[] = [];
-// How soon a first read that missed is asked again, as the relay's own
-// patience does for the page (relay/phone/tunnel.mjs GAP_MS).
+// How soon a first read that missed is asked again, rather than at the next
+// 30 s phone poll.
 const FIRST_READ_AGAIN_MS = 1_500;
 
 // THE SCREEN BEFORE THERE IS A SCREEN. The logo, its orange dot running round
@@ -2467,6 +2467,9 @@ export default function App() {
     searchReturn.current = null;
     if (back) { setView(back.view); setSelected(back.selected); }
   }, []);
+
+  // The sidebar's usage row opens the page its agent's limits and accounts are on.
+  const openAgentSettings = (engine: string) => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setSettingsPane(engine === 'codex' ? 'codex' : 'claude'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); };
 
   /*
    * WHAT THE WALK IS POINTING AT RIGHT NOW, worked out once and read in two
@@ -6457,6 +6460,8 @@ export default function App() {
           usage={snap.usage ?? null}
           now={now}
           sidebar
+          folded={sideFolded}
+          onOpen={openAgentSettings}
           engineWord={engineWordFor({
             engineChoice: (snap.engines?.choices?.length ?? 1) > 1,
             engine: snap.usage?.engine ?? null,

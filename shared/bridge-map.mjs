@@ -172,7 +172,7 @@ export const REQUEST_CHANNELS = {
   moveToCloud: 'zero:move-to-cloud',
   setProductHidden: 'zero:set-product-hidden',
   approve: 'zero:approve',
-  // The phone door's Settings page (main/phone-link.mts): its state, on, off,
+  // The phone door's Settings page (main/phone-link.mjs): its state, on, off,
   // a new key, and which address the QR code carries. The desktop window only.
   phoneLink: 'zero:phone-link',
 };

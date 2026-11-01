@@ -260,7 +260,7 @@ contextBridge.exposeInMainWorld('zero', {
   moveToCloud: (payload) => ipcRenderer.invoke('zero:move-to-cloud', payload),
   setProductHidden: (payload) => ipcRenderer.invoke('zero:set-product-hidden', payload),
   approve: (payload) => ipcRenderer.invoke('zero:approve', payload),
-  // The phone door (main/phone-link.mts): { action: 'status' | 'on' | 'off' | 'reset' | 'via', via }.
+  // The phone door (main/phone-link.mjs): { action: 'status' | 'on' | 'off' | 'reset' | 'via', via }.
   phoneLink: (payload) => ipcRenderer.invoke('zero:phone-link', payload),
   onPhoneChanged: (fn) => {
     const handler = () => fn();

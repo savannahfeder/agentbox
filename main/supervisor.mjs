@@ -254,7 +254,7 @@ const HUNG_QUIET_MS = 10 * 60_000;
 // A pass this late was not late, the Mac was asleep (forgiveSleep). Eight
 // missed passes: past any slow pass, well under the ten minutes above.
 const SLEPT_GAP_MS = 2 * 60_000;
-// Awake this long with no phone pass, a row handed to the cloud runs here (`_carriedHolds`).
+// Awake this long and not joined or taken back, a row handed to the cloud runs here (`_carriedHolds`).
 const PHONE_QUIET_MS = 10 * 60_000;
 // Two hangs on one row inside this window and the app stops restarting it and
 // tells her instead, so a row that hangs every time is not killed forever.
@@ -3335,6 +3335,9 @@ export class Supervisor {
     const out = [];
     for (const { item, continuation, notBefore = null, repeat = null } of wanted.values()) {
       if ((this._carried?.[item.id] && !stale(item.id)) || this.threadOnMac?.[item.id] || !this.leavesKitsFor(item.product)) continue;
+      // The queue only tests these on its way to a start, which asleep it never makes.
+      if (continuation && (answerSettled(item) || this._answerDelivered(item))) continue;
+      if (this._liveSessions?.[item.id]?.cloud) continue;
       const engine = engineOf(this._engineFor(item));
       if (engine !== 'claude' && engine !== 'codex') continue;
       if (continuation) {
@@ -6023,6 +6026,12 @@ export class Supervisor {
         // Finished only when its work is home: 75 is the app going again, or
         // results that did not come back, and a later homecoming tries again.
         const session = { ...view, startedAt: rec.startedAt, child: { ranToTheEnd: () => code === 0 } };
+        // Same as a run the app started: its reply was marked heard when it was
+        // joined, so it is released here or nothing would run it on this Mac.
+        if (this.runFinished(session) && this._noteCloudHandBack(item, session)) {
+          const fresh = this.store.readItem?.(rec.product, itemId);
+          if (fresh?.answer) this.redeliverAnswer({ ...fresh, product: rec.product }, fresh.answer);
+        }
         if (this.speaksForTheSession(session)) {
           try { this.store.recordSessionResult(rec.product, itemId, { result: session.result || '(the session ended with an empty reply)' }); } catch (e) { console.warn('zero: writing a joined run\'s answer failed:', e.message); }
         } else if (this.closingMessageIsTheAnswer(session)) {
@@ -6030,7 +6039,7 @@ export class Supervisor {
         }
         // The reply this conversation heard is answered; one typed while it
         // was away is left for the next run.
-        if (this.runFinished(session)) {
+        if (this.runFinished(session) && !session.handedBack) {
           try {
             const fresh = this.store.readItem?.(rec.product, itemId);
             if (fresh?.answer && this._heardIn(fresh, rec.sessionId)) {
@@ -7421,7 +7430,7 @@ export class Supervisor {
       // a special case.
       if (!this.store.isDue(item, now)) continue;
       // Handed to the cloud while asleep: the phone pass takes it back or joins its run.
-      if (this._carriedHolds(item.id, now)) {
+      if (this._carriedHolds(item, now)) {
         this._noteNotStarting(item, 'cloud-carried', this._engineFor(item));
         continue;
       }
@@ -11021,15 +11030,24 @@ export class Supervisor {
   }
 
   /**
-   * Whether a row handed to the cloud is still held from starting here. Only
-   * the phone pass takes one back, so with the Mac awake ten minutes and no
-   * pass in that time (signed out, the cloud unreachable) each is let go and
-   * runs here, said once in the log, rather than waiting for ever.
+   * Whether a row handed to the cloud is still held from starting here. A pass
+   * joins or takes back a hand-over within a minute or two of waking, so one
+   * still here after ten minutes awake never will be, even with passes coming:
+   * it runs here, said once in the log. A reply written since the hand-over is
+   * one the cloud never saw, so nothing holds it.
    */
-  _carriedHolds(id, now = Date.now()) {
-    if (!this._carried?.[id]) return false;
+  _carriedHolds(item, now = Date.now()) {
+    const id = item?.id;
+    const mark = this._carried?.[id];
+    if (!mark) return false;
+    if (this.asleep(now)) return true;
     const awakeSince = Math.max(this._wokeAt ?? 0, this._bootAt ?? 0);
-    if (this.asleep(now) || now - awakeSince < PHONE_QUIET_MS || now - (this._phoneSeenAt ?? 0) < PHONE_QUIET_MS) return true;
+    const newerReply = answerTs(item) > (mark.at ?? 0);
+    if (!newerReply) {
+      if (now - awakeSince < PHONE_QUIET_MS) return true;
+      const passesComing = now - (this._phoneSeenAt ?? 0) < PHONE_QUIET_MS;
+      if (passesComing && now - (mark.at ?? 0) < PHONE_QUIET_MS) return true;
+    }
     console.warn(`zero: ${id} was handed to the cloud and nothing has taken it back; it runs here`);
     delete this._carried[id];
     this._saveState();
