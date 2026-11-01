@@ -1,11 +1,9 @@
-// THE CORNER ANSWERS WHERE IT IS ASKED.
+// THE WINDOW CORNER ANSWERS WHERE IT IS ASKED.
 //
-// The last sentence is a decision about WHERE, and it is the one a later
-// session is most likely to undo by accident, because sending a control to
-// Settings is the obvious thing to do with a control that has more to say. It
-// used to do exactly that: `onOpen={ => setSettingsOpen(true)}`. A corner that
-// answers a question by opening a different screen has not answered the
-// question.
+// The bar in the window's corner opens its own panel rather than a different
+// screen. The sidebar's usage row is the exception, asked for on 2026-11-01:
+// hovering shows the panel and a press opens that agent's Settings page
+// (tests/the-usage-row-opens-its-agents-settings-page).
 //
 // None of this can be asserted by rendering, because the suite has no DOM for
 // the top bar. So it is asserted against the source, which is what the rest of
@@ -23,14 +21,14 @@ const pill = read('renderer/src/components/UsagePill.tsx');
 const css = read('renderer/src/styles.css');
 
 describe('the corner does not send her to Settings', () => {
-  // THE CALL SITE GREW ONE PROP ON 2026-09-05 and this assertion grew with it.
-  // What is asserted here is unchanged in kind: the props it is handed are the
-  // reading, the clock, and the agent's name, and there is no destination among
-  // them.
-  it('is handed the reading, the clock and the agent, and nothing else', () => {
+  it('is handed the reading, the clock and the agent', () => {
     expect(app).toContain('usage={snap.usage ?? null}');
     expect(app).toContain('engineWord={engineWordFor({');
-    expect(app).not.toMatch(/<UsagePill[^>]*onOpen/s);
+  });
+
+  // Only the sidebar row takes its press to a page; the corner keeps pinning.
+  it('goes to a page only from the sidebar', () => {
+    expect(pill).toContain('if (!sidebar || !onOpen || !usage) { setPinned(!pinned); return; }');
   });
 
   // THE EXACT SHAPE THAT WAS THERE, refused by name. A guard against the
@@ -73,7 +71,7 @@ describe('the corner is a bar and not a number', () => {
   it('opens on hover and on a press, and a press outlives the pointer', () => {
     expect(pill).toContain('onMouseEnter');
     expect(pill).toContain('onMouseLeave');
-    expect(pill).toContain('const open = pinned || hovering;');
+    expect(pill).toContain('const open = !folded && (pinned || hovering);');
   });
 
   // AND IT STILL SAYS EVERYTHING ALOUD. The bar has no words in it, so the

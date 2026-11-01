@@ -1,4 +1,5 @@
 import { previewFocus } from './preview-focus';
+import { PhoneStatus } from './components/PhoneStatus';
 import { cloudChord, cloudToggleNote, cloudToggleTarget, threadPlace } from './cloud-menu';
 import { usePhoneBack, onCloudPhone, onPhone } from './phone-screen';
 import { useLessonPlace } from './lesson-position';
@@ -290,8 +291,8 @@ const liveAnswer = (i: WorkItem) => (i.answer && i.answer !== '(withdrawn)' ? i.
 // on every snapshot.
 const NO_ORDER: string[] = [];
 const NO_RUNNING: RunningSession[] = [];
-// How soon a first read that missed is asked again, as the relay's own
-// patience does for the page (relay/phone/tunnel.mjs GAP_MS).
+// How soon a first read that missed is asked again, rather than at the next
+// 30 s phone poll.
 const FIRST_READ_AGAIN_MS = 1_500;
 
 // THE SCREEN BEFORE THERE IS A SCREEN. The logo, its orange dot running round
@@ -2466,6 +2467,9 @@ export default function App() {
     searchReturn.current = null;
     if (back) { setView(back.view); setSelected(back.selected); }
   }, []);
+
+  // The sidebar's usage row opens the page its agent's limits and accounts are on.
+  const openAgentSettings = (engine: string) => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setSettingsPane(engine === 'codex' ? 'codex' : 'claude'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); };
 
   /*
    * WHAT THE WALK IS POINTING AT RIGHT NOW, worked out once and read in two
@@ -6216,16 +6220,18 @@ export default function App() {
   const ruleOf = (item: WorkItem) => repeats.find((r) => r.product === item.product && r.id === ruleIdOf(item)) ?? null;
   const focusedRule = focused ? ruleOf(focused) : null;
 
-  const moveToCloud = async (ids: string[], product?: string) => {
+  const moveToCloud = async (ids: string[], product?: string, said = true) => {
     const moving = await api.moveToCloud(ids, product);
+    if (moving && !said) return;
     showToast(moving
       ? `Moving ${moving === 1 ? 'this thread' : `${moving} threads`} to the cloud. ${moving === 1 ? 'It keeps' : 'They keep'} working until the cloud has room.`
       : 'The cloud can’t take this thread right now');
   };
-  const placeThread = (item: WorkItem, keep: PlaceAct) => {
-    if (keep === 'move') { void moveToCloud([item.id], item.product); return; }
+  // `said` false for a pick in the thread's own Runs on panel, which shows it there.
+  const placeThread = (item: WorkItem, keep: PlaceAct, said = true) => {
+    if (keep === 'move') { void moveToCloud([item.id], item.product, said); return; }
     void api.setThreadOnMac({ [item.id]: keep ? true : null });
-    showToast(keep ? 'This thread now runs only on this Mac' : 'This thread can run on the cloud again');
+    if (said) showToast(keep ? 'This thread now runs only on this Mac' : 'This thread can run on the cloud again');
   };
   // The write the summary panel's Visible to menu makes.
   const seeThread = async (item: WorkItem, to: 'team' | 'private') => {
@@ -6454,6 +6460,8 @@ export default function App() {
           usage={snap.usage ?? null}
           now={now}
           sidebar
+          folded={sideFolded}
+          onOpen={openAgentSettings}
           engineWord={engineWordFor({
             engineChoice: (snap.engines?.choices?.length ?? 1) > 1,
             engine: snap.usage?.engine ?? null,
@@ -6892,11 +6900,11 @@ export default function App() {
                   onRunNow={() => runNow(focused)}
                   onPin={focused.agent ? undefined : (pin) => pinThread(focused.id, pin, true)}
                   place={focused.agent ? null : threadPlace(focused, snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null, snap.cloud ?? null)}
-                  onPlace={(keep) => placeThread(focused, keep)}
+                  onPlace={(keep) => placeThread(focused, keep, false)}
                   pageAsk={threadAsk?.key === keyOf(focused) ? threadAsk : null}
                   onAsked={() => setThreadAsk(null)}
                   onShown={setOpenShows}
-                  aboveDock={<>{snap.phoneStatus && <div className="phone-status" role="status">{snap.phoneStatus}</div>}{whereItWent}</>}
+                  aboveDock={<><PhoneStatus message={snap.phoneStatus} />{whereItWent}</>}
                   onReveal={() => revealAgent(focused)}
                   // Remind me later and stop this task are neither of the two
                   // ways a task ends, and the card beside the bar names exactly
@@ -6963,7 +6971,7 @@ export default function App() {
                 )}
                 {evTop}
                 {roomShown ? roomsUi.page : evSpace ? evSpace : <>
-                {snap.phoneStatus && <div className="phone-status" role="status">{snap.phoneStatus}</div>}
+                <PhoneStatus message={snap.phoneStatus} />
                 {snap.phoneConnect ? <ConnectComputer email={snap.phoneConnect.email} onSignOut={() => { void api.teamSignOut().then(() => refresh()); }} />
                 : clearMoves || (emptyView && !theirRows.length && !(view === 'inbox' && search === null && roomsUi.mentions.length)) ? (
                   // A FILTER IS READ FIRST, so it can never fall through to

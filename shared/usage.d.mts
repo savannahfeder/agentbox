@@ -53,6 +53,16 @@ export declare function limitsStillRunning(
   now?: number,
 ): UsageLimit[];
 
+export declare const SAME_MOMENT_MS: number;
+export declare const USAGE_SAME_AS_ANOTHER: string;
+/** Every window within a percent and resetting at the same minute, with something spent. */
+export declare function sameUsage(a: UsageLimit[] | null | undefined, b: UsageLimit[] | null | undefined): boolean;
+/** Two readings of one account, close in time, that disagree on when a running window resets. */
+export declare function readingsDisagree(
+  a: { at: number; limits: UsageLimit[] } | null | undefined,
+  b: { at: number; limits: UsageLimit[] } | null | undefined,
+): boolean;
+
 export declare function limitRows(
   limits: UsageLimit[] | null | undefined,
   now?: number,

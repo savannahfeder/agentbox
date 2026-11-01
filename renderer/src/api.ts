@@ -15,7 +15,7 @@ import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
 import { whileSystemWindowIsOpen } from './system-window';
-import { USAGE_UNREADABLE } from '../../shared/usage.mjs';
+import { USAGE_SAME_AS_ANOTHER, USAGE_UNREADABLE } from '../../shared/usage.mjs';
 import { accountSentence } from '../../shared/spawn-trouble.mjs';
 import { MOVE_SAY } from '../../shared/where-it-runs-from.mjs';
 import { cardsInFront } from '../../shared/which-card-is-in-front.mjs';
@@ -224,11 +224,16 @@ function fixtureAccountUsage(): AccountUsageReading[] {
   const [first, second] = fixtureSettingsState.workspace.accounts;
   const week = now + 6 * 86_400_000;
   // &usagefail: the first login's last refresh failed, so it keeps a reading two hours old.
-  const failed = params.has('usagefail') ? { at: now - 2 * 3_600_000, error: USAGE_UNREADABLE } : { at: now - 60_000 };
+  const failed = params.has('usagefail') ? { at: now - 2 * 3_600_000, error: USAGE_UNREADABLE }
+    // &usagereset: the first login was read 40 minutes ago and its session has reset since.
+    : params.has('usagereset') ? { at: now - 40 * 60_000 } : { at: now - 60_000 };
+  // &usagematched: both logins answered with one set of numbers, so main sent neither.
+  if (params.has('usagematched')) return [first, second].map((a) => ({ profile: a.profile, unconfirmed: true, error: USAGE_SAME_AS_ANOTHER }));
+  const session = params.has('usagereset') ? now - 10 * 60_000 : at(17, 9);
   // &fablefull: the first login has room in its session and week and none left on Fable.
   const firstLimits = params.has('fablefull')
-    ? [limit('session', 30, '5:09pm', at(17, 9)), limit('week', 60, '11:59am', week, 'all models'), limit('week', 100, '11:59am', week, 'Fable')]
-    : [limit('session', twoLogins ? 100 : 42, '5:09pm', at(17, 9)), limit('week', 15, '11:59am', week, 'all models'), limit('week', 24, '11:59am', week, 'Fable')];
+    ? [limit('session', 30, '5:09pm', session), limit('week', 60, '11:59am', week, 'all models'), limit('week', 100, '11:59am', week, 'Fable')]
+    : [limit('session', twoLogins ? 100 : 42, '5:09pm', session), limit('week', 15, '11:59am', week, 'all models'), limit('week', 24, '11:59am', week, 'Fable')];
   return [
     { profile: first.profile, ...failed, limits: firstLimits },
     { profile: second.profile, at: now - 60_000, limits: [limit('session', 5, '8pm', at(20)), limit('week', 9, '4pm', week, 'all models'), limit('week', 6, '4pm', week, 'Fable')] },
