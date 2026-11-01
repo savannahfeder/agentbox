@@ -6,6 +6,7 @@
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { envValue } from './engine-bin.mjs';
 
 // The shell a person actually has. `$SHELL` when that file exists, then zsh,
 // bash, and sh. A machine with no zsh used to spawn `/bin/zsh`: the terminal
@@ -17,6 +18,21 @@ export function loginShell(env = process.env, exists = fs.existsSync) {
     if (exists(candidate)) return candidate;
   }
   return preferred || '/bin/sh';
+}
+
+// Windows has no login shell and no -l: PowerShell reads -l as a command.
+// Only drive-rooted paths, so nothing resolves against the terminal's folder.
+export function terminalShell(env = process.env, exists = fs.existsSync, platform = process.platform) {
+  if (platform !== 'win32') return { file: loginShell(env, exists), args: ['-l'] };
+  const w = path.win32;
+  const rooted = (p) => (/^[A-Za-z]:[\\/]/.test(p ?? '') ? p : null);
+  const get = (name) => rooted(envValue(env, name, platform));
+  const root = get('SystemRoot') ?? 'C:\\Windows';
+  const found = [
+    ...String(envValue(env, 'PATH', platform) ?? '').split(';').map((d) => d.replace(/"/g, '')).filter(rooted).map((d) => w.join(d, 'pwsh.exe')),
+    w.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+  ].find((p) => exists(p));
+  return { file: found ?? get('ComSpec') ?? w.join(root, 'System32', 'cmd.exe'), args: [] };
 }
 
 const MARKER = '\0agentbox-path\0';
