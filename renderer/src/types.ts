@@ -800,6 +800,8 @@ export interface AgentTurn {
   refused?: string;
   // Or that Agentbox Cloud took it with the computer shut (shared/cloud-kit.mjs).
   cloud?: boolean;
+  // Or that it was taken and its thread's copy has not shown it yet (phone-rows.ts `copyShows`).
+  sent?: boolean;
   // THE ROW THE WORDS WERE SAID ON, when they came from somewhere other than here.
   //
   // The ask usually lives on the PARENT row, and the pane used to quote it in a
@@ -915,7 +917,7 @@ export interface Snapshot {
   items: WorkItem[];
   // ON THE PHONE WITH THE MAC SHUT ONLY (renderer/src/cloud-bridge.ts): her
   // replies from the phone her Mac has not taken yet, or turned down.
-  phoneWaiting?: { product: string; id: string; at: number; text: string; refused?: string; cloud?: true }[];
+  phoneWaiting?: { product: string; id: string; at: number; text: string; refused?: string; cloud?: true; sent?: true }[];
   // On the hosted phone: a line saying what it shows may be out of date (cloud-bridge.ts phoneStatusLine).
   phoneStatus?: string | null;
   // On the hosted phone, signed in to an account no computer has connected to yet (phone-rows.ts phoneConnectState).

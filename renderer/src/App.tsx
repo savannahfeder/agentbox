@@ -484,7 +484,7 @@ export default function App() {
       // a send still in this page's own queue is not drawn twice.
       const mine = new Set(here.map((s) => s.text.trim()));
       const away = (snap?.phoneWaiting ?? []).filter((w) => w.product === item.product && w.id === item.id && !mine.has(w.text.trim()));
-      return [...here, ...away.map((w) => ({ at: w.at, text: w.text, ...(w.refused ? { refused: w.refused } : {}), ...(w.cloud ? { cloud: true } : {}) }))];
+      return [...here, ...away.map((w) => ({ at: w.at, text: w.text, ...(w.refused ? { refused: w.refused } : {}), ...(w.cloud ? { cloud: true } : {}), ...(w.sent ? { sent: true } : {}) }))];
     },
     [sending, snap?.phoneWaiting],
   );

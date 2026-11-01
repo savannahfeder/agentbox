@@ -60,11 +60,13 @@ describe('what the inbox draws', () => {
     expect(made.id).toMatch(/^w-[0-9a-f]{10}$/);
   });
 
-  it('a reply waits, then goes once her Mac has taken it and sent the thread again', () => {
+  it('a reply waits, then goes once her Mac has taken it and sent the thread with it', () => {
     expect(phoneView(rows([cmd('c1', 'reply', { payload: { text: 'Yes, ship it.' } })]), NOW).waiting)
       .toEqual([{ product: A, id: 'w-1', at: NOW - 1000, text: 'Yes, ship it.' }]);
     const taken = rows([cmd('c1', 'reply', { payload: { text: 'x' }, taken_at: iso(NOW), outcome: 'done' })]);
-    expect(phoneView({ ...taken, threads: taken.threads.map((t) => ({ ...t, updated_at: iso(NOW + 1) })) }, NOW).waiting).toEqual([]);
+    const withIt = (t) => ({ ...t, snapshot: { ...t.snapshot, history: [...(t.snapshot.history ?? []), { id: 'w-1', ts: NOW - 1000, source: 'founder', patch: { answer: 'x' } }] } });
+    expect(phoneView({ ...taken, threads: taken.threads.map((t) => ({ ...t, updated_at: iso(NOW + 1) })) }, NOW).waiting.map((w) => w.text)).toEqual(['x']);
+    expect(phoneView({ ...taken, threads: taken.threads.map((t) => withIt({ ...t, updated_at: iso(NOW + 1) })) }, NOW).waiting).toEqual([]);
   });
 
   it('a reply still waiting is shown however old it is', () => {
