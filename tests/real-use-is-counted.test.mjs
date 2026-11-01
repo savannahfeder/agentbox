@@ -67,7 +67,7 @@ describe('an agent run', () => {
     // The exit handler's work is `settleExit` (a stop signal's death waits a
     // moment to be judged: tests/a-worker-stopped-with-the-app-is-not-a-failed-run).
     const exit = sup.indexOf('const settleExit = (code');
-    expect(sup.slice(exit, exit + 600)).toMatch(/this\.count\?\.\('run_finished', runEndedProps\(session, Date\.now\(\)\)\)/);
+    expect(sup.slice(exit, exit + 800)).toMatch(/this\.count\?\.\('run_finished', runEndedProps\(session, Date\.now\(\)\)\)/);
     expect(read('main/main.mts')).toMatch(/supervisor\.count = \(name, props\) => analytics\.track\(name, props\)/);
   });
 });

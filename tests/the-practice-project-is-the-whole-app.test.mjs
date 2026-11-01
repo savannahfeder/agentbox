@@ -276,14 +276,14 @@ describe('nothing ever runs in it', () => {
     // the interrupted-session recovery, a mid-flight reply, the digest and the
     // drive — funnels into it, so a fifth caller added tomorrow is refused
     // without anybody remembering to add a skip.
-    expect(src).toMatch(/worksHere\(product\) \{/);
+    expect(src).toMatch(/worksHere\(product(: [^)]*)?\) \{/);
     expect(src).toMatch(/const noWorkHere = new Set\(/);
     // And no copy of the rule left anywhere, spelled out by hand.
     expect(src).not.toMatch(/if \(product\.practice\) continue;/);
     // The refusal is inside spawnWorker and it is BEFORE the plan is built,
     // because a plan built for a practice project is already a working
     // directory pointed at a folder that does not exist.
-    const spawn = src.slice(src.indexOf('  spawnWorker(item, {'));
+    const spawn = src.slice(src.indexOf('  spawnWorker(item'));
     const refusal = spawn.indexOf('if (!this.worksHere(product))');
     expect(refusal).toBeGreaterThan(-1);
     expect(refusal).toBeLessThan(spawn.indexOf('const plan = this.spawnPlan('));

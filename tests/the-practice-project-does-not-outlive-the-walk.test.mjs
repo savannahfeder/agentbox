@@ -301,7 +301,7 @@ describe('D: an agent can never run in a practice project', () => {
     expect(supervisorSrc.match(/worksHere\(/g) ?? []).toHaveLength(7);
     // And the refusal is before the plan is built, because a plan for a practice
     // project already carries a working directory that is not a repository.
-    const spawn = supervisorSrc.slice(supervisorSrc.indexOf('  spawnWorker(item, {'));
+    const spawn = supervisorSrc.slice(supervisorSrc.indexOf('  spawnWorker(item'));
     expect(spawn.indexOf('if (!this.worksHere(product))'))
       .toBeLessThan(spawn.indexOf('const plan = this.spawnPlan('));
   });

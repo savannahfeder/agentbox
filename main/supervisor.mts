@@ -586,6 +586,8 @@ export interface SupervisorStore {
   listProducts(opts?: { includeArchived?: boolean }): Product[];
   listItems(now?: number): WorkItem[];
   readItem(slug: string, id: string, now?: number): WorkItem | null;
+  productDir(slug: string): string;
+  modules: { workItemsDisk: { updateWorkItem(dir: string, id: string, patch: Record<string, unknown>, options: { source: string }): unknown } };
   readThread?(slug: string, id: string): ThreadTurn[];
   readHistory?(slug: string, id: string, opts?: { max?: number; before?: number }): QueuedLine[];
   isDue(item: WorkItem, now?: number): boolean;

@@ -74,7 +74,7 @@ describe('every Claude Code the app starts for itself names its working director
     // boundary so a lost cwd cannot quietly make Claude start at disk root.
     // 2026-10-08: the binary is named by the definition now, not written here.
     const src = read('main/harnesses/claude.mts');
-    const at = src.indexOf('spawn(sup.config[definition.binKey]');
+    const at = src.indexOf('spawn(sup.config[definition.binKey');
     expect(at).toBeGreaterThan(-1);
     expect(src.slice(at, at + 200)).toMatch(/\bcwd\b/);
     expect(read('main/supervisor.mts')).toMatch(/harness\.spawn\(this, plan, \{ cwd,/);

@@ -13,7 +13,7 @@ import { codexActivity } from '../agent-activity.mts';
 import { runCodexCommand } from '../provider-commands.mts';
 import { definitionMethods, commonUpdatePlan } from './common.mts';
 import type { Env, HarnessRecord, HarnessPlan, HarnessSession, HarnessSpawnContext, HarnessSupervisor, UpdatePlanOptions } from './common.mts';
-const definition = harnessDefinition('codex');
+const definition = harnessDefinition('codex')!;
 
 export const codexHarness = {
   ...definitionMethods(definition),

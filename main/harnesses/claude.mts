@@ -19,7 +19,7 @@ import { captureStream, streamingText, summarizeStreamLine, traceStreamLine } fr
 import { definitionMethods, commonUpdatePlan } from './common.mts';
 import type { BinKey, Env, HarnessItem, HarnessPlan, HarnessRecord, HarnessSpawnContext, HarnessSupervisor, SignInFilesWhere, UpdatePlanOptions } from './common.mts';
 import { findTranscript } from '../transcript-search.mts';
-const definition = harnessDefinition('claude');
+const definition = harnessDefinition('claude')!;
 
 // THE SETTINGS LAYER THAT TAKES A METERED KEY BACK OFF A RUN. Claude Code reads
 // `env.ANTHROPIC_API_KEY` and `apiKeyHelper` out of a person's own and a

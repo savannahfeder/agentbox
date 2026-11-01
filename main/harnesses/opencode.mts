@@ -32,7 +32,7 @@ import {
 import { definitionMethods, commonUpdatePlan } from './common.mts';
 import type { BinKey, Env, HarnessConfig, HarnessPlan, HarnessSession, HarnessSpawnContext, HarnessSupervisor, SignInFilesWhere, UpdatePlanOptions } from './common.mts';
 
-const definition = harnessDefinition('opencode');
+const definition = harnessDefinition('opencode')!;
 
 /**
  * WHERE THIS WORKER'S PERMISSION POLICY LIVES ON DISK.
