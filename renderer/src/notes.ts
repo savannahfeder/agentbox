@@ -15,7 +15,7 @@
 // Nothing is summarised, inferred or smoothed. If the run said little, the
 // panel says little (the fix for that is briefs/worker.md, not this file).
 
-import { SERVER_BUSY } from '../../shared/spawn-trouble.mjs';
+import { SERVER_BUSY } from '../../shared/spawn-trouble.mts';
 
 export interface Step {
   // Wall-clock, as the trace recorded it: "5:16pm".

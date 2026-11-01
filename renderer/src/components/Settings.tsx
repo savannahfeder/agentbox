@@ -55,7 +55,7 @@ import { SHORTCUTS } from '../shortcuts';
 import { chord, chords, sayKeys } from '../this-keyboard';
 import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
-import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mjs';
+import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mts';
 import { TaskTerminal } from './TaskTerminal';
 import { ProjectsPage } from './ProjectsPage';
 import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId } from '../settings-search';
@@ -546,7 +546,7 @@ export function cloudRunsLine(mode: CloudStatus['mode'], inUse: string | null): 
 
 /*
  * THE SETTINGS SHELL, which is the app's own terminal opened against the one
-   reserved key that belongs to no task (shared/settings-terminal.mjs). It is
+   reserved key that belongs to no task (shared/settings-terminal.mts). It is
    `TaskTerminal` and not a second terminal: one xterm in this app, one set of
    keys, one scrollback rule.
 
@@ -1221,7 +1221,7 @@ function Connection({ copy, check, engine, found, certain, bin, chosen = false, 
   /**
    * WHY NOTHING RUNS ON IT DESPITE IT BEING HERE, or null. Main's sentence,
    *  never one derived here (main/settings.mts `engineTroubleFor`, off
-   *  shared/spawn-trouble.mjs). BEING FOUND IS NOT BEING USABLE: a subscription
+   *  shared/spawn-trouble.mts). BEING FOUND IS NOT BEING USABLE: a subscription
    *  that lapsed leaves the binary exactly where it was and stops every task on
    *  that engine. */
   trouble?: string | null;
@@ -1405,7 +1405,7 @@ function Updates({ state }: { state?: UpdateState | null }) {
     // THE COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS: the press moves the
     // app into Applications and macOS relaunches it, so nothing after a
     // success here is ever drawn. A refusal arrives in the state, through the
-    // snapshot, like every other failure (shared/where-it-runs-from.mjs).
+    // snapshot, like every other failure (shared/where-it-runs-from.mts).
     if (look.move) { void api.updateMove(); return; }
     setChecking(true);
     try {

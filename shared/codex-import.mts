@@ -21,12 +21,12 @@
 // it under "Not imported" with an Import key, and the ⌘K import card lists it
 // too.
 //
-// Pure on purpose, like shared/agent-import.mjs beside it: the words are tested
+// Pure on purpose, like shared/agent-import.mts beside it: the words are tested
 // rather than eyeballed, and main/store.mts does the writing.
 
 /** On the row while it is asking. */
 import { Name } from '../shared/product-name.mjs';
-import { CATCH_UP_LABEL } from './agent-import.mjs';
+import { CATCH_UP_LABEL } from './agent-import.mts';
 export const CODEX_IMPORT_LABEL = 'codex-import';
 /** On the row once it is hers to read. */
 export const CODEX_MIRROR_LABEL = 'codex';

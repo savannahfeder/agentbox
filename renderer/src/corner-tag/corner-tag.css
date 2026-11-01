@@ -16,7 +16,7 @@
    page by its edge instead: a hairline out and a bright line in.
 
    ONE NUMBER IS THE SIZE. --ct-s multiplies everything; the main process sets
-   it from the width of the screen the tag rests on (shared/corner-tag.mjs,
+   it from the width of the screen the tag rests on (shared/corner-tag.mts,
    tagScale), so the tray is bigger on a 32" than on a laptop.
 
    Approved over rounds of drawings in the product's designs folder
@@ -27,7 +27,7 @@
   /* The list's own scale. It follows the tag less than a third of the way,
      because a tag is glanced at from across a desk and a list is read: at the
      tag's full size on a 32" the rows came out bigger than anything else on
-     the screen. The page sets it (shared/corner-tag.mjs, cardScale). */
+     the screen. The page sets it (shared/corner-tag.mts, cardScale). */
   --ct-cs: 1.03;
   --ct-ink: #1d1d1f;
   --ct-dim: rgba(29, 29, 31, 0.74);
@@ -53,7 +53,7 @@
      not: "the bottom border isn't really visible and the bottom-left corner
      looks a little messed up". A border follows the corner radius exactly and
      lands on whole pixels, which is also why the heights are whole numbers
-     (shared/corner-tag.mjs). The bottom carries a shade more than the rest,
+     (shared/corner-tag.mts). The bottom carries a shade more than the rest,
      the way anything lit from above does.
 
      It is faint. Drawn dark enough to count the pixels it was "a bit too

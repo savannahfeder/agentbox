@@ -10,7 +10,7 @@
 import type { cloudClient } from './cloud-rest';
 import type { Room, RoomCard, RoomMention, RoomMessage, RoomProfile, RoomsState } from './types';
 import { computerOf, type SettingsRow } from './phone-settings-view';
-import { displayNameOf, wallCards as wallCardsJs } from '../../shared/room-cards.mjs';
+import { displayNameOf, wallCards as wallCardsJs } from '../../shared/room-cards.mts';
 import { Name } from '../../shared/product-name.mjs';
 
 const wallCards = wallCardsJs as unknown as (o: Record<string, unknown>) => RoomCard[];

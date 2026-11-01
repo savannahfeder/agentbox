@@ -225,7 +225,7 @@ let said = plan.say ?? 'the stub worker ran';
 //   [[stub:work-then-die]] run a tool, then die with no answer
 //
 // The words a limit is reported in are the CLI's own ("You've hit your session
-// limit · resets …"), which is what shared/spawn-trouble.mjs reads.
+// limit · resets …"), which is what shared/spawn-trouble.mts reads.
 const promptText = (() => {
   const c = firstUserLine?.message?.content;
   const fromStdin = typeof c === 'string' ? c : Array.isArray(c) ? c.map((b) => b?.text ?? '').join('\n') : '';

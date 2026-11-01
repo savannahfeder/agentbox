@@ -3,7 +3,7 @@
 // own card in renderer/src/onboarding.ts.
 
 import type { AgentFile } from './onboarding';
-import { titleFromFileName } from '../../shared/name-words.mjs';
+import { titleFromFileName } from '../../shared/name-words.mts';
 import { Name } from '../../shared/product-name.mjs';
 
 export interface Project { slug: string; name: string; repoPath: string | null }
@@ -257,7 +257,7 @@ export const SECTION = {
 /**
  * The toast after the press. New rows and rows that already existed are counted
  * apart, because `importAgentRows` files nothing for an agent that has a row
- * (`agentsNeedingRows`, shared/agent-import.mjs). `inboxes` and `made` cover a
+ * (`agentsNeedingRows`, shared/agent-import.mts). `inboxes` and `made` cover a
  * press that files into several projects and makes some of them. */
 export function importedLine(
   {

@@ -93,7 +93,7 @@
 // touching it, so the row names no sections at all.
 
 import { NAME } from './product-name.mjs';
-import { chordOf, everyChord } from './key-caps.mjs';
+import { chordOf, everyChord } from './key-caps.mts';
 
 /** @type {import('./shortcuts.d.mts').ShortcutGroup[]} */
 export const SHORTCUTS = [

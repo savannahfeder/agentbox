@@ -2,7 +2,7 @@
 // phone app (mobile/) alike: each door the screens press, the command it
 // leaves, and taking one back while her Mac has not claimed it.
 
-import { REQUEST_CHANNELS } from '../../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS } from '../../shared/bridge-map.mts';
 import { madeHere } from '../../shared/phone-snapshot.mjs';
 import {
   NOT_HERE, UNDONE, approvalCommand, commandFor, phoneSlug, phoneView, realItem, settingCommand, splitSlug, takeBack, type Aliases, type PhoneRows,

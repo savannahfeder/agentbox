@@ -13,7 +13,7 @@ import { folderTitle, mentionKind, mentionLabel, mentionName, type MentionKind }
 import { TaskTerminal } from './TaskTerminal';
 import { whereALinkGoes, type LinkClick } from '../link-click';
 import { watchCommandCatalog } from '../command-catalog';
-import { providerCommand } from '../../../shared/provider-commands.mjs';
+import { providerCommand } from '../../../shared/provider-commands.mts';
 // Focus mode: the whole interruption, rendered to be decidable in seconds.
 //
 // THE MESSAGE IS A CONVERSATION, ON EVERY ROW.An imported Claude Code session
@@ -51,9 +51,9 @@ import {
  * THE ROW'S TWO WORDS COME FROM `rowSays` NOW, not from six constants pulled
    apart here. One list, one row shape (w-23a7b3f568, 2026-08-27). */
 import { commandBeingWritten, enterWaitsForWords, holdingHint, rowKey, rowSays, slashRows, type SlashRow } from '../slash-menu';
-import { commandDraft } from '../../../shared/claude-commands.mjs';
+import { commandDraft } from '../../../shared/claude-commands.mts';
 import { CompactionResult, runCompaction, runCommand } from './CompactionResult';
-import { codexCommand, COMPACTION_COPY } from '../../../shared/codex-commands.mjs';
+import { codexCommand, COMPACTION_COPY } from '../../../shared/codex-commands.mts';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mjs';
 import { dayLabel, itemOptions, offerIsLive, optionsFrom, parseOptions, parseRepeat, repeatsLine, stripOptionsSection, type ParsedOption } from '../format';
 import { ruleIdOf } from '../../../shared/repeats.mjs';

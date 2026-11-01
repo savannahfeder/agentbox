@@ -37,7 +37,7 @@
 //   now carries a note pointing here. `esc` and a bare arrow are one key
 //   whatever their length, so only a real chord splits.
 
-import { capNameOf, capsOf } from '../../shared/key-caps.mjs';
+import { capNameOf, capsOf } from '../../shared/key-caps.mts';
 import { MAC } from './this-keyboard';
 
 /** One line of a plate: the caps to draw, and the fragment beside them. */
@@ -55,7 +55,7 @@ export interface HintLine {
  *  however many characters it is written with, which is what keeps `esc` from
  *  being drawn as three caps.
  *
- *  THE GLYPHS ARE THIS KEYBOARD'S (shared/key-caps.mjs): ⌘↵ on a Mac, Ctrl and
+ *  THE GLYPHS ARE THIS KEYBOARD'S (shared/key-caps.mts): ⌘↵ on a Mac, Ctrl and
  *  Enter where there is no Command key.
  */
 export function capsFor(key: string, mac: boolean = MAC): string[] {

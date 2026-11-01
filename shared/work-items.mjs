@@ -30,7 +30,7 @@
 // This is what lets the app write an answer while a worker still holds the
 // claim: the answer lands, the worker's own status keeps flowing under its
 // epoch, and neither erases the other. Same rule as beats in
-// shared/dashboard.mjs.
+// shared/dashboard.mts.
 
 import { resolveEdits } from './message-edits.mjs';
 
@@ -428,7 +428,7 @@ function coerceField(field, value) {
     // Claude Code for any name it does not know, so an unrecognised value is a
     // working session rather than a row that silently never runs. `effort` (HOW
     // HARD IT THINKS) is the same kind of word: the five the CLI takes live in
-    // shared/effort-levels.mjs, and the spawn gates on them, so a value this
+    // shared/effort-levels.mts, and the spawn gates on them, so a value this
     // module does not recognise is a run at Claude Code's own choice rather
     // than a row that never runs.
     case 'kind': case 'product': case 'parent': return str(value, MAX_SHORT);

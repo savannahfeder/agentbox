@@ -38,7 +38,7 @@
 // Claude Code commands at all. modes.ts says all of that at length. The menu
 // draws both lists; they are two different verbs and the menu labels them so.
 
-import { CLAUDE_COMMANDS, READ_FROM, READ_AT } from './claude-commands.generated.mjs';
+import { CLAUDE_COMMANDS, READ_FROM, READ_AT } from './claude-commands.generated.mts';
 
 export { CLAUDE_COMMANDS, READ_FROM, READ_AT };
 

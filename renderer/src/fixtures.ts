@@ -1056,9 +1056,9 @@ const OFF_THE_WORKSPACE: Record<'claude' | 'codex', Record<string, string>> = {
 // none: it is absent until a figure lands, and adding one would put a pill on
 // every picture ever taken of this app. The two shapes are genuinely different
 // and both are copied from the readers that produce them. Claude Code prints a
-// clock time in a named zone (shared/claude-usage.mjs); Codex prints no clock
+// clock time in a named zone (shared/claude-usage.mts); Codex prints no clock
 // time and names no zone, it hands over the instant, so every text field is
-// null (shared/codex-usage.mjs). The Codex percentages are the ones in that
+// null (shared/codex-usage.mts). The Codex percentages are the ones in that
 // file's own recorded capture.
 const CLAUDE_LIMITS: NonNullable<Snapshot['usage']>['limits'] = [
   {

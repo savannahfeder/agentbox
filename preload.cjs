@@ -41,7 +41,7 @@ contextBridge.exposeInMainWorld('zero', {
   agentUpdate: (payload) => ipcRenderer.invoke('zero:agent-update', payload),
   snapshot: () => ipcRenderer.invoke('zero:snapshot'),
   // Which thread is on screen, so the approval card in front is its own and
-  // ⌘Y answers the card being read (shared/which-card-is-in-front.mjs).
+  // ⌘Y answers the card being read (shared/which-card-is-in-front.mts).
   looking: (payload) => ipcRenderer.invoke('zero:looking', payload),
   refreshUsage: (p) => ipcRenderer.invoke('zero:refresh-usage', p),
   accountUsage: (payload) => ipcRenderer.invoke('zero:account-usage', payload),
@@ -349,7 +349,7 @@ contextBridge.exposeInMainWorld('zero', {
   //
   // It carried Escape alone until 2026-08-24, which is why ⌘K was dead inside
   // an open page and she reported it. It carries the press now and
-  // shared/artifact-keys.mjs decides what the app does with it.
+  // shared/artifact-keys.mts decides what the app does with it.
   onKeyInTheFile: (fn) => {
     const handler = (_e, payload) => fn(payload ?? {});
     ipcRenderer.on('zero:key-in-the-file', handler);

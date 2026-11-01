@@ -84,7 +84,7 @@ export function usageEngine({ workspace = DEFAULT_ENGINE, running = [] } = {}) {
 }
 
 /* --------------------- reading a clock in a named zone -------------------- */
-// The two primitives the zone-honesty of shared/claude-usage.mjs rests on, and
+// The two primitives the zone-honesty of shared/claude-usage.mts rests on, and
 // the one question this file asks about a day. They exist because
 // `new Date(y, m, d, h, min)` and `Date#getDate` are the PROCESS's zone and
 // nothing else, and every question about a reset is about hers.
@@ -245,7 +245,7 @@ const JUST_RESET_MS = 2 * 60_000;
  * THE WINDOWS A READING CAN STILL ANSWER FOR (w-7b7182ef61).
  *
  * A window whose reset has gone past is over, and the one running in its place
- * has never been read. shared/codex-usage.mjs already holds the rule for that:
+ * has never been read. shared/codex-usage.mts already holds the rule for that:
  * absence of data and a real zero are different facts and must never look the
  * same. So it is DROPPED rather than relabelled -- no wording makes a
  * percentage about a window nobody is in worth reading -- and the corner falls

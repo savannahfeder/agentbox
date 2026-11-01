@@ -32,7 +32,7 @@
 // was already right.
 
 import { unwrapWrappedProse, isWrappedProse } from './unwrap-lines';
-import { ALL_SCHEMES } from '../../shared/schemes.mjs';
+import { ALL_SCHEMES } from '../../shared/schemes.mts';
 
 // A LINK INTO THIS MAC, ON ANY SCHEME OF OURS. Read rather than typed, and it
 // carries every name this app has had, because a message she was sent months

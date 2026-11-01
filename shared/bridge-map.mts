@@ -16,7 +16,7 @@ export const REQUEST_CHANNELS = {
   agentUpdate: 'zero:agent-update',
   snapshot: 'zero:snapshot',
   // Which thread is on screen. The one thing that reads it is which approval
-  // card is in front (shared/which-card-is-in-front.mjs).
+  // card is in front (shared/which-card-is-in-front.mts).
   looking: 'zero:looking',
   refreshUsage: 'zero:refresh-usage',
   accountUsage: 'zero:account-usage',
@@ -68,7 +68,7 @@ export const REQUEST_CHANNELS = {
   teammates: 'zero:teammates',
   takeJoin: 'zero:take-join',
   threadEdit: 'zero:thread-edit',
-  // Move a thread to another project (shared/move-thread.mjs).
+  // Move a thread to another project (shared/move-thread.mts).
   moveItem: 'zero:move-item',
   repeats: 'zero:repeats',
   composeRepeat: 'zero:compose-repeat',

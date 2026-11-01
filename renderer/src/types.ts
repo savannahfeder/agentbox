@@ -251,7 +251,7 @@ export interface TeamState {
   rooms?: RoomsState | null;
 }
 
-/** One person's card on a room's wall (shared/room-cards.mjs wallCards). */
+/** One person's card on a room's wall (shared/room-cards.mts wallCards). */
 export interface RoomCard {
   id: string;
   me: boolean;
@@ -501,10 +501,10 @@ export interface DemoOpened {
 }
 
 /**
- * ONE LIMIT, AS WHICHEVER CODING AGENT REPORTED IT (shared/usage.mjs). Claude
+ * ONE LIMIT, AS WHICHEVER CODING AGENT REPORTED IT (shared/usage.mts). Claude
  *  Code reports three -- the session, the week, and the week for one model
- *  (shared/claude-usage.mjs). Codex reports up to two, a five hour window and a
- *  week, and either of them can be absent (shared/codex-usage.mjs). */
+ *  (shared/claude-usage.mts). Codex reports up to two, a five hour window and a
+ *  week, and either of them can be absent (shared/codex-usage.mts). */
 export interface UsageLimit {
   span: 'session' | 'week';
   /**
@@ -559,7 +559,7 @@ export interface CloudPlan {
 export interface Usage {
   /**
    * WHOSE SUBSCRIPTION THIS IS, resolved by main and never here
-   *  (`usageEngine`, shared/usage.mjs). The corner is about the agent most of
+   *  (`usageEngine`, shared/usage.mts). The corner is about the agent most of
    *  her live work is on, and the workspace's own when nothing is running: the
    *  byline's rule that what is running beats what would run, asked about the
    *  app instead of about a row. It is only ever DRAWN where this Mac has two
@@ -639,7 +639,7 @@ export interface SupervisorStatus {
     retryAt: number;
     // The same rows counted PER CAUSE, so a look above the list can say what
     // each failure is instead of only how many there are. Every string is
-    // written once, in shared/spawn-trouble.mjs; nothing here is worded in the
+    // written once, in shared/spawn-trouble.mts; nothing here is worded in the
     // renderer. `act` is null when there is honestly nothing to press, which is
     // true of a limit and of a dropped connection.
     count?: number;
@@ -664,7 +664,7 @@ export interface SupervisorStatus {
 // person in it: no login she can type will end it, and being told to type one
 // can cost an afternoon. 'subscription-ended' is refused in the same words as
 // 'org-blocked', and told apart by the login's own file (refineCause in
-// shared/spawn-trouble.mjs): its owner renews it, no admin is involved.
+// shared/spawn-trouble.mts): its owner renews it, no admin is involved.
 // 'model-not-on-plan' is a Codex login whose plan lacks the model the task asks
 // for; the fix is another model or another login, not this login.
 // 'level-not-offered' is a thinking level the task's model does not offer.
@@ -903,7 +903,7 @@ export interface UpdateState {
   behind?: number | null;
   installing?: boolean;
   // WHERE THIS COPY IS RUNNING FROM, when that is a place macOS will not let
-  // it update itself (shared/where-it-runs-from.mjs). `canMove` is the one
+  // it update itself (shared/where-it-runs-from.mts). `canMove` is the one
   // question the screens ask, `place` is which read-only place it is, and
   // `moveError` is why the last move did not work. All absent, and `canMove`
   // false, on every copy that can update itself, which is nearly all of them.
@@ -977,7 +977,7 @@ export interface Snapshot {
    *  Answered whole by `Supervisor#runsOnAccount`, for the reason `engines` is:
    *  which account the fleet spends is `_theOneAccount`'s rule, pinned to that
    *  file. Null, or absent on an older payload, on a Mac where nothing readable
-   *  is signed in, and then nothing is said. The words are shared/runs-on.mjs.
+   *  is signed in, and then nothing is said. The words are shared/runs-on.mts.
    *
    *  NO PLAN RIDES HERE. It did for a few hours, so the sidebar could print a
    *  tier; that row and the tier both came out the same day. What somebody pays
@@ -1424,7 +1424,7 @@ declare global {
       rooms?(p: { op: string; args?: unknown[] }): Promise<RoomsResult>;
       teammates?(p: { op: string; args?: unknown }): Promise<TeammatesResult>;
       threadEdit(p: { product: string; id: string; patch: ThreadEditPatch }): Promise<{ ok: boolean; error?: string }>;
-      /** Move a thread to another project (shared/move-thread.mjs). Answers
+      /** Move a thread to another project (shared/move-thread.mts). Answers
        *  with the row it became there, or with the reason in words. */
       moveItem(p: { product: string; id: string; to: string }): Promise<{ ok: boolean; error?: string; item?: WorkItem; from?: string; to?: string }>;
       schedule(p: { product: string; id: string; runAt: number }): Promise<WorkItem>;
@@ -1481,7 +1481,7 @@ declare global {
       onEscapeBrowser?(fn: () => void): () => void;
       /**
        * A key the app owns, pressed while the keyboard was inside an open
-       *  file. shared/artifact-keys.mjs says which keys those are. */
+       *  file. shared/artifact-keys.mts says which keys those are. */
       onKeyInTheFile?(fn: (k: { key: string; meta?: boolean; ctrl?: boolean; alt?: boolean; shift?: boolean }) => void): () => void;
       saveAttachments(p: { product: string; files: Array<{ name: string; dataBase64?: string; srcPath?: string }> }): Promise<Array<{ rel: string; name: string; image: boolean }>>;
       pathForFile(file: File): string | null;

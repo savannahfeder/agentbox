@@ -45,7 +45,7 @@ import { changeOwnsKey } from './code-keys';
 import { askStillStands, bringsBack, closesAgain, graceUndoneLine, nextUndo, shownAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO, UNDID_CLOSING } from './undo-window';
 import { answeredAlready, TOO_LATE_TO_WITHDRAW } from './withdraw-send';
 import { addUndoMark, UNDO_MARKS_EVENT, type UndidSpec } from './undo-marks';
-import { whatTheFileSentUp } from '../../shared/artifact-keys.mjs';
+import { whatTheFileSentUp } from '../../shared/artifact-keys.mts';
 import { ALIVE_EVERY_MS, markWindowAlive, type Place, placeIsSomewhere, readPlace, windowWasJustHere, writePlace, writeScroll } from './where-she-was';
 import { Rail } from './components/Rail';
 import { ThreadComposer, type ComposeStart } from './threads/ThreadComposer';
@@ -87,12 +87,12 @@ import { approvalAnswered, approvalReads } from './approval-card';
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
 import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
-import { filedByThePerson } from '../../shared/answers.mjs';
+import { filedByThePerson } from '../../shared/answers.mts';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { focusTheReplyBox } from './focus-at-end';
 import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
-import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mjs';
+import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
 import { DONE } from './done-word';
 import { modalAfterLeavingATask } from './modal-scope';
@@ -143,7 +143,7 @@ import { CloudSetup } from './components/CloudSetup';
 import { SETUP, newlyFailedSignIns } from './cloud-setup';
 import { AppMark } from './components/AppMark';
 import { planBar, type BarWords, type Plan } from './plan-setup';
-import { PRACTICE_REPLY, PRACTICE_ROWS, PRACTICE_SLUG } from '../../shared/first-run-practice.mjs';
+import { PRACTICE_REPLY, PRACTICE_ROWS, PRACTICE_SLUG } from '../../shared/first-run-practice.mts';
 import { ModeScreen, isModeVariant } from './components/ModeScreen';
 import { practiceRemembered, rememberProject, rememberedProject } from './compose-project';
 import { needsStaging, walkStageKey } from './walk-staging';
@@ -176,7 +176,7 @@ import { rankProducts } from './project-priority';
 import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT } from './threads-made';
 import { waitingCounts } from './threads-made';
 import { closeAsk, closeAskOwnsKey, KEEP_OPEN, unshippedAsk } from './close-asks-first';
-import { notShipped, shipItAsk } from '../../shared/not-shipped.mjs';
+import { notShipped, shipItAsk } from '../../shared/not-shipped.mts';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, chatProjects, chatTaskSharing, chatTranscript, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { ruleIdOf, ruleLabel, runToOpen } from '../../shared/repeats.mjs';
@@ -207,7 +207,7 @@ import { SentLine } from './components/SentLine';
 
 const FIRST_IDEAS = ideasFor();
 
-/** Which first run this install shows, half each (shared/onboarding-arm.mjs). */
+/** Which first run this install shows, half each (shared/onboarding-arm.mts). */
 type Arm = 'tour' | 'classic';
 const ARM_WAIT_MS = 3000;
 async function armNow(): Promise<Arm> {
@@ -3244,7 +3244,7 @@ export default function App() {
   }, []);
   // AND THE OPEN THREAD'S OWN CARD IS THE ONE IN FRONT. The order is decided in
   // the main process, because ⌘Y is answered there, ahead of this page; all
-  // this says is which thread is being read (shared/which-card-is-in-front.mjs).
+  // this says is which thread is being read (shared/which-card-is-in-front.mts).
   useEffect(() => {
     void api.lookingAt(focused ? { product: focused.product, id: focused.id } : null);
   }, [focused?.product, focused?.id]);
@@ -4102,7 +4102,7 @@ export default function App() {
     // is the one place the question can stand between a close and the tasks it
     // would skip. From the list it opens the thread, which is where they are.
     // And before that, a thread whose work never reached main
-    // (shared/not-shipped.mjs), whose last word may still say it ships.
+    // (shared/not-shipped.mts), whose last word may still say it ships.
     const unshipped = !unshippedOk && !!notShipped(item);
     if (unshipped || (!force && waitingFiled(item).length)) {
       if (focused?.id !== item.id || focused?.product !== item.product) { setFocused(item); markSeen(item); }
@@ -4851,7 +4851,7 @@ export default function App() {
     await refresh();
   }, [refresh, showToast]);
 
-  // MOVE A THREAD TO ANOTHER PROJECT (shared/move-thread.mjs). The move is one
+  // MOVE A THREAD TO ANOTHER PROJECT (shared/move-thread.mts). The move is one
   // write on each side, both in main, so there is one place that can refuse it
   // and one answer to show when it does.
   const moveToProject = useCallback(async (item: WorkItem, slug: string, name: string) => {
@@ -6550,7 +6550,7 @@ export default function App() {
         update={announcesUpdate(snap?.update, { walking, closed: '' }) ? { installing: !!snap?.update?.installing, version: snap?.update?.newVersion, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
         onUpdate={() => { void api.updateInstall(); }}
         /* AND THE COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS
-           (shared/where-it-runs-from.mjs): the same card, in the same place,
+           (shared/where-it-runs-from.mts): the same card, in the same place,
            offering the move. Null on every copy that can. */
         move={announcesMove(snap?.update, { walking, closed: '' }) ? { place: snap?.update?.place ?? null, error: snap?.update?.moveError ?? null } : null}
         onMove={() => { void api.updateMove(); }}
@@ -7582,7 +7582,7 @@ export default function App() {
             // WHEN IT CANNOT MOVE, THE WORD STILL FINDS SOMETHING THAT SAYS SO,
             // and the reason is the row's own hint rather than a sentence you
             // have to press for. Only a thread nothing has run on can go
-            // (shared/move-thread.mjs), and a "move" that matched nothing is
+            // (shared/move-thread.mts), and a "move" that matched nothing is
             // the complaint this answers. The press says it again because a
             // narrow window cuts the hint and not the toast.
             ...(moveRefusal

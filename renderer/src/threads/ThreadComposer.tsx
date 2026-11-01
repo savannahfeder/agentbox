@@ -33,7 +33,7 @@ import { PriorityIcon } from '../components/Priority';
 import { PhoneStatus } from '../components/PhoneStatus';
 import { SEND } from '../this-keyboard';
 import { Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
-import { PRACTICE_TASK } from '../../../shared/first-run-practice.mjs';
+import { PRACTICE_TASK } from '../../../shared/first-run-practice.mts';
 import type { Product, WorkItem } from '../types';
 import type { Engine } from '../../../shared/engines.mjs';
 import { ENGINES } from '../../../shared/engines.mjs';

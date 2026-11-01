@@ -45,7 +45,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   updateReady?: string | null;
   onInstallUpdate?: () => void;
   /** Whether this copy is somewhere it cannot update itself from, which is
-   *  what the move row answers (shared/where-it-runs-from.mjs). */
+   *  what the move row answers (shared/where-it-runs-from.mts). */
   moveToApplications?: boolean;
   onMoveToApplications?: () => void;
   /** Look for a new version now. Answers in a toast. */
@@ -213,7 +213,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     }] : []),
     // A copy run from the disk image, or from a copy macOS made, can never
     // update itself. This row is here as well as on the sidebar card because
-    // that card can be closed (shared/where-it-runs-from.mjs).
+    // that card can be closed (shared/where-it-runs-from.mts).
     ...(moveToApplications ? [{
       id: 'update-move',
       label: MOVE_SAY.button,

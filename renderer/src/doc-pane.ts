@@ -3,7 +3,7 @@
 // The look of the pane is settled and lives in styles.css and DocPane.tsx. This
 // file is the arithmetic and the naming, kept out of the component so it can be
 // tested without a window.
-import { isWebsiteAddress } from '../../shared/websites.mjs';
+import { isWebsiteAddress } from '../../shared/websites.mts';
 
 /**
  * The kinds of file the pane draws, and nothing else.
@@ -19,7 +19,7 @@ import { isWebsiteAddress } from '../../shared/websites.mjs';
  * https link in a thread used to leave the app for the browser; it now draws
  * in the pane where the file would have been, in a browser of its own
  * (WebsitePane.tsx), with one mark that hands it to the browser you use.
- * shared/websites.mjs decides which addresses those are, and a local app is
+ * shared/websites.mts decides which addresses those are, and a local app is
  * NOT one of them: it already has its own way through here.
  */
 export type DocKind = 'html' | 'markdown' | 'code' | 'image' | 'website';

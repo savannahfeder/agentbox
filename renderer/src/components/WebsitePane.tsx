@@ -10,7 +10,7 @@
 // iframe, which many sites will refuse; the way out to your own browser is
 // always in the bar above.
 import { useEffect, useRef } from 'react';
-import { WEBSITE_PARTITION } from '../../../shared/websites.mjs';
+import { WEBSITE_PARTITION } from '../../../shared/websites.mts';
 
 // `<webview>` is Electron's own element, so React has no type for it.
 declare module 'react' {

@@ -3,7 +3,7 @@
 // them, so the phone site (cloud-bridge.ts) and the phone app (mobile/) keep
 // one copy of every rule.
 
-import { REQUEST_CHANNELS } from '../../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS } from '../../shared/bridge-map.mts';
 import { madeHere, phoneChoices, WAIT_STATES } from '../../shared/phone-snapshot.mjs';
 import { runOfClaim } from '../../shared/cloud-kit.mjs';
 import { isCarried } from '../../shared/cloud-carry.mjs';

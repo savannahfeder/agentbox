@@ -48,7 +48,7 @@ export function closeAsk(waiting: number): CloseAsk | null {
   };
 }
 
-/** For a thread whose work never reached main (shared/not-shipped.mjs). */
+/** For a thread whose work never reached main (shared/not-shipped.mts). */
 export function unshippedAsk(): CloseAsk {
   return {
     ask: "This thread's work never reached main.",

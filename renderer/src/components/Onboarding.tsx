@@ -19,13 +19,13 @@ import {
 import { type AgentFolder, type Project, type SessionThread } from '../agent-import-card';
 import { ImportAgents } from './ImportAgents';
 import FolderPicker from './FolderPicker';
-import { PRACTICE_NAME, PRACTICE_ROWS, PRACTICE_TASK } from '../../../shared/first-run-practice.mjs';
+import { PRACTICE_NAME, PRACTICE_ROWS, PRACTICE_TASK } from '../../../shared/first-run-practice.mts';
 import { AppMark } from './AppMark';
 import { SidebarIcon } from './SidebarIcon';
 import { AskList, PlanQuestion, PlanSetupCard } from './PlanSetup';
 import { afterCheck, type EngineSetupState, type Plan } from '../plan-setup';
 import { NAME, Name } from '../../../shared/product-name.mjs';
-import { foundOnThisComputer, type RunsOn } from '../../../shared/runs-on.mjs';
+import { foundOnThisComputer, type RunsOn } from '../../../shared/runs-on.mts';
 import { chord, sayKeys } from '../this-keyboard';
 
 /** What the walk knows about each coding agent on this computer. */

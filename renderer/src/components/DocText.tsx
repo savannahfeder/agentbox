@@ -21,7 +21,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import { buildExtensions } from '../editor/extensions';
 import { mdToPmDoc, pmDocToMd } from '../editor/markdown';
 import { patchOriginal } from '../editor/patch-md';
-import { theAppKeepsThisKey } from '../../../shared/artifact-keys.mjs';
+import { theAppKeepsThisKey } from '../../../shared/artifact-keys.mts';
 import { api } from '../api';
 import { asksForANewTab } from '../link-click';
 

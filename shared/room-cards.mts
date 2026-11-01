@@ -4,7 +4,7 @@
 // 20261021000000_rooms.sql): `room_profiles` say what a person lets a card
 // show, `room_presence` is one row per Mac. docs/team/ROOMS-PLAN.md has the
 // rules; the test is tests/a-room-wall-shows-each-person-as-they-chose.
-import { levelFor, localDate, streakOf } from './agent-hours.mjs';
+import { levelFor, localDate, streakOf } from './agent-hours.mts';
 import { visibilityOf } from './thread-cards.mjs';
 
 export const PRESENCE_STALE_MS = 15 * 60_000;

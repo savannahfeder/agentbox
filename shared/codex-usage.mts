@@ -1,8 +1,8 @@
 // WHAT IS LEFT OF HER LIMIT, OUT OF `codex app-server`'S OWN RATE LIMITS.
 //
-// The pure half, and the mirror of shared/claude-usage.mjs: the payload in, the
+// The pure half, and the mirror of shared/claude-usage.mts: the payload in, the
 // limits out. Everything after that -- the countdown, the rows, the sentence --
-// is shared/usage.mjs, because a limit is a limit whichever agent reported it.
+// is shared/usage.mts, because a limit is a limit whichever agent reported it.
 // Asking for the payload is main/codex-usage.mts.
 //
 // NOTHING IS SPAWNED TO DRAW THIS AND NOTHING IS ASKED FOR IT, which is the
@@ -114,7 +114,7 @@ export function windowSpan(minutes) {
 }
 
 /**
- * EVERY WINDOW THE SNAPSHOT REALLY CARRIES, in the shape shared/usage.mjs draws.
+ * EVERY WINDOW THE SNAPSHOT REALLY CARRIES, in the shape shared/usage.mts draws.
  *
  * `qualifier` is null and stays null: it is Claude Code's own word for which
  * model a weekly line is about, and nothing in this payload is about a model.

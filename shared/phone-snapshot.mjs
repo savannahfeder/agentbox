@@ -96,7 +96,7 @@ export function hideSecrets(text, { home = null } = {}) {
   for (const re of SECRETS) out = out.replace(re, (m, bearer) => (typeof bearer === 'string' && /^(Bearer|Basic)/i.test(bearer) ? `${bearer}[hidden]` : '[hidden]'));
   out = hideNamed(out);
   out = hideKeyLike(out);
-  // Her home folder is ~ online, as it is in a crash report (shared/crash-scrub.mjs).
+  // Her home folder is ~ online, as it is in a crash report (shared/crash-scrub.mts).
   if (home && home.length > 1) out = out.split(home).join('~');
   return out;
 }

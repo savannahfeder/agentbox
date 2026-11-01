@@ -62,7 +62,7 @@
 // would be this app telling her to do the one thing it refuses to do.
 import { NAME, Name } from '../shared/product-name.mjs';
 import { harnessDefinition } from './harness-definitions.mjs';
-import { instantIn, resetDay, wallIn } from './usage.mjs';
+import { instantIn, resetDay, wallIn } from './usage.mts';
 
 // A CLAUDE CODE TOO OLD FOR THE LINE AGENTBOX STARTS IT WITH. Its argument
 // parser refuses the line before a single request, in one of two shapes,
@@ -829,7 +829,7 @@ function fixBeforeReplying({ cause, engineWord, resetsAt, model, planEnded }) {
 // Nothing restarts the thread until somebody replies or resumes it, so the
 // sentence asks for that and promises nothing of its own.
 // `account` is the login this run was spending, already in words
-// (shared/account-names.mjs). It is null on a Mac with one login, where naming
+// (shared/account-names.mts). It is null on a Mac with one login, where naming
 // it tells nobody anything, and then every sentence here is the one it has
 // always been. There is no `instead`: nothing takes the task to another login
 // (w-dac993a554), so a limit is named and waited out.

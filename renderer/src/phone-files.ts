@@ -6,7 +6,7 @@
 // the same files out under /f/<file key>/ (main/serve.mts), and this points
 // every such address the screen draws at it, in one place rather than in each
 // of the components that draw a picture, a page, a sound or a film.
-import { DOC_SCHEMES, IMG_SCHEMES } from '../../shared/schemes.mjs';
+import { DOC_SCHEMES, IMG_SCHEMES } from '../../shared/schemes.mts';
 
 const KINDS: [readonly string[], 'doc' | 'img'][] = [[DOC_SCHEMES, 'doc'], [IMG_SCHEMES, 'img']];
 

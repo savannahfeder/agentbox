@@ -28,10 +28,10 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { CHROME as BROWSER, guard, sweep } from './lib/chrome-guard.mjs';
 import { answerFor } from '../main/first-run.mts';
-import { EXAMPLES } from '../shared/first-run-examples.mjs';
+import { EXAMPLES } from '../shared/first-run-examples.mts';
 import {
   PRACTICE_ANSWER, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG, PRACTICE_TASK_TRACE,
-} from '../shared/first-run-practice.mjs';
+} from '../shared/first-run-practice.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'renderer', 'dist-fr');

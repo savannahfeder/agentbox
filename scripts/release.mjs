@@ -18,7 +18,7 @@
 // sentences macOS shows in ITS OWN permission panels. Without them the panel is
 // the system's bare wording with no reason on it, which is what a tester walked
 // into. They do NOT ask for anything by existing: macOS only shows a panel when
-// something really reads that folder, and shared/project-folder-check.mjs is
+// something really reads that folder, and shared/project-folder-check.mts is
 // what stops that happening by accident. What they change is that a panel which
 // does appear says who is asking and what for.
 //

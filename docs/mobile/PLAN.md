@@ -31,7 +31,7 @@ get an app approved.
 - **The renderer's language.** React and TypeScript. The app has its own
   dependencies, because Expo SDK 58 needs React 19.3 and the desktop is on
   React 18 (package.json). It imports only the shared modules that run without
-  Node: some import Node's own modules (`shared/install-id.mjs`).
+  Node: some import Node's own modules (`shared/install-id.mts`).
 - **iPhone and Android from one code base.**
 
 Not chosen:

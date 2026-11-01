@@ -1,5 +1,5 @@
 // A command is an operation, never prose asking a model to imitate a CLI.
-import { CLAUDE_COMMANDS, commandWords } from './claude-commands.mjs';
+import { CLAUDE_COMMANDS, commandWords } from './claude-commands.mts';
 import { harnessDefinition } from './harness-definitions.mjs';
 const command = (name, description, argumentHint = null, aliases = []) => ({ name, description, menuDescription: null, whole: true, argumentHint, aliases });
 export const CODEX_COMMANDS = [

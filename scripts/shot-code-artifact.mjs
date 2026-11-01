@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { foldWorkItems } from '../shared/work-items.mjs';
 import { resolveArtifact } from '../main/artifact-path.mts';
 import { readDoc } from '../main/doc-file.mts';
-import { referencedFiles } from '../shared/referenced-files.mjs';
+import { referencedFiles } from '../shared/referenced-files.mts';
 import { machineryPath } from '../main/store/home.mjs';
 import { guard, sweep } from './lib/chrome-guard.mjs';
 import { ACCOUNT_ROOT } from './lib/machine-paths.mjs';

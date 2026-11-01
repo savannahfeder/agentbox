@@ -52,7 +52,7 @@ import { denyOutput } from '../main/memory-gate-server.mts';
 import { codexLaunchEnv } from '../main/codex-launch-env.mts';
 import { resolveCodexBin } from '../main/codex-bin.mjs';
 import { loggedCodexLimits, forgetLoggedLimits } from '../main/codex-usage-file.mts';
-import { codexLimits, codexPlan } from '../shared/codex-usage.mjs';
+import { codexLimits, codexPlan } from '../shared/codex-usage.mts';
 
 const CODEX_HOME = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
 const bin = resolveCodexBin()?.path;

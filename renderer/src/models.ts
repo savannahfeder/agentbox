@@ -45,7 +45,7 @@ export interface ModelChoice {
   /**
    * A CODEX MODEL'S OWN REASONING LEVELS, read off this Mac beside its name
    *  (main/codex-models.mts). Absent on every Claude Code row, whose levels are
-   *  the CLI's five for any model (../../shared/effort-levels.mjs). */
+   *  the CLI's five for any model (../../shared/effort-levels.mts). */
   levels?: string[];
   defaultLevel?: string | null;
 }

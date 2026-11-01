@@ -8,7 +8,7 @@ import { LOCAL_APP_SANDBOX, previewShows, previewStatus, useLocalPreview } from 
 import { LocalPreviewStatus } from './LocalPreviewStatus';
 import { WebsitePane, type Browsing, type PageControl } from './WebsitePane';
 import { BrowserChrome, type WebChromeKind } from './BrowserChrome';
-import { addressYouTyped, canFrameAWebsite, isWebsiteAddress } from '../../../shared/websites.mjs';
+import { addressYouTyped, canFrameAWebsite, isWebsiteAddress } from '../../../shared/websites.mts';
 // THE DOCUMENT PANE. The right half of the window is the file itself.
 //
 // The look is settled and is not a question any more.

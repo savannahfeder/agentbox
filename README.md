@@ -286,10 +286,10 @@ it, whether an agent's run failed, whether it happened in setup's practice
 project, which coding agent ran it, Claude Code or Codex, and why an agent
 could not start yet, out of eighteen fixed words.
 No file contents, no prompts, no paths, no titles, nothing you typed.
-`shared/analytics-events.mjs` is the whole list, and anything a caller attaches
+`shared/analytics-events.mts` is the whole list, and anything a caller attaches
 beyond those eight is dropped rather than sent, so nobody can widen it by
 accident. Crash reports travel the same way and are scrubbed first
-(`shared/crash-scrub.mjs`).
+(`shared/crash-scrub.mts`).
 
 **The events can be turned off,** and either way is enough on its own:
 

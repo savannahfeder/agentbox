@@ -18,11 +18,11 @@
 // command is main/claude-usage.mts.
 //
 // THE WORDS THE PANEL PRINTS LEFT THIS FILE ON 2026-09-05, and they went to
-// shared/usage.mjs. What is Claude Code's is still here: this text format, the
+// shared/usage.mts. What is Claude Code's is still here: this text format, the
 // timezone stamp it prints, and the refusal to count down from a stamp computed
 // somewhere else. What belongs to a LIMIT, any limit, is next door.
 
-import { instantIn, localZone, resetDay, sessionLimit, toMinute, untilReset, wallIn } from './usage.mjs';
+import { instantIn, localZone, resetDay, sessionLimit, toMinute, untilReset, wallIn } from './usage.mts';
 
 /** One limit, as the CLI reported it. */
 // { span, qualifier, name, percent, resetsAt|null, resetsText, resetsOn, zone }
@@ -193,7 +193,7 @@ export function readUsageReport(value, now = Date.now()) {
 }
 
 // The words the text report used to carry, in this machine's zone, so the
-// panel keeps saying "Resets 6:19pm" and not a countdown (limitRows, shared/usage.mjs).
+// panel keeps saying "Resets 6:19pm" and not a countdown (limitRows, shared/usage.mts).
 function clockWords(at, now) {
   const d = new Date(toMinute(at));
   const h = d.getHours();

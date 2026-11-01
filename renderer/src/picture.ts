@@ -13,7 +13,7 @@
 // the app for it, on the app's own scheme, which works from either origin. The
 // scheme is READ rather than typed, out of the one module that names this app,
 // so a rename reaches the window and the main process in one move.
-import { IMG_SCHEME } from '../../shared/schemes.mjs';
+import { IMG_SCHEME } from '../../shared/schemes.mts';
 
 const SCHEME = `${IMG_SCHEME}://file`;
 

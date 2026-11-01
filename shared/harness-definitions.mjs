@@ -18,7 +18,7 @@ export const HARNESS_DEFINITIONS = freeze([
     // 2.1.71 (2026-03-06) is the first that takes `--permission-mode auto`,
     // which every worker is started with; 2.1.70 and older die in under a
     // second on it. Every other flag is older still (`--effort` arrived after
-    // 2.1.8, `--include-partial-messages` after 1.0.90). shared/spawn-trouble.mjs
+    // 2.1.8, `--include-partial-messages` after 1.0.90). shared/spawn-trouble.mts
     // names it when an older one refuses the line.
     minVersion: '2.1.71',
     // HOW A WORKER IS STARTED, AS DATA. This was six hardcoded flag names in

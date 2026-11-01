@@ -13,12 +13,12 @@ import { fixtureAgents, fixtureSnapshot, fixtureDashboards, fixtureRepeats, fixt
 import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine } from './fixtures';
 import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
-import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
+import { checkProjectFolder } from '../../shared/project-folder-check.mts';
 import { whileSystemWindowIsOpen } from './system-window';
-import { USAGE_SAME_AS_ANOTHER, USAGE_UNREADABLE } from '../../shared/usage.mjs';
-import { accountSentence } from '../../shared/spawn-trouble.mjs';
-import { MOVE_SAY } from '../../shared/where-it-runs-from.mjs';
-import { cardsInFront } from '../../shared/which-card-is-in-front.mjs';
+import { USAGE_SAME_AS_ANOTHER, USAGE_UNREADABLE } from '../../shared/usage.mts';
+import { accountSentence } from '../../shared/spawn-trouble.mts';
+import { MOVE_SAY } from '../../shared/where-it-runs-from.mts';
+import { cardsInFront } from '../../shared/which-card-is-in-front.mts';
 // THE SECOND FRONT DOOR, AND IT HAS TO BE BUILT BEFORE THE LINE BELOW RUNS.
 // `useFixtures` reads `window.zero` once, at module load, and on the desktop
 // preload.cjs has already put it there. In a browser tab nothing has, so this
@@ -315,7 +315,7 @@ export function updateShape(wanted: string): UpdateState {
     current: { phase: 'current' },
     error: { phase: 'error', error: 'Could not reach the internet.' },
     // A COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS
-    // (shared/where-it-runs-from.mjs). This is the state two real installs
+    // (shared/where-it-runs-from.mts). This is the state two real installs
     // were in for a week, and the only way to look at the card and the row
     // without a disk image and a packaged build.
     'disk-image': { phase: 'error', error: MOVE_SAY.cannotUpdateHere, canMove: true, place: 'disk-image' },
@@ -614,7 +614,7 @@ export const api = {
   },
 
   // MOVING THE APP INTO APPLICATIONS, for a copy that cannot update itself
-  // from where it is (shared/where-it-runs-from.mjs). A real move relaunches
+  // from where it is (shared/where-it-runs-from.mts). A real move relaunches
   // the app, so fixtures answer the only interesting half: `?update=move-failed`
   // is the refusal, which is the one state that has anything left to draw.
   async updateMove(): Promise<{ moved: boolean; error: string | null }> {
@@ -878,7 +878,7 @@ export const api = {
     if (useFixtures || !window.zero?.threadEdit) return { ok: true };
     try { return await window.zero.threadEdit({ product, id, patch }); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   },
-  // Move a thread to another project (shared/move-thread.mjs). Answers with
+  // Move a thread to another project (shared/move-thread.mts). Answers with
   // the row it became there, or with the reason in words: only a thread
   // nothing has ever run on can go, and main asks that again before it writes.
   async moveItem(product: string, id: string, to: string): Promise<{ ok: boolean; error?: string; item?: WorkItem; from?: string; to?: string }> {

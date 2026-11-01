@@ -59,7 +59,7 @@ export const PRACTICE_REFUSAL =
  * `scripted` IS THE ONE EXEMPTION AND IT IS NOT A LOOPHOLE. The first run's own
  * example task really is sent into the practice project, and it really is
  * answered a couple of seconds later — by the app itself, out of a pre-written
- * line (main/store.mts finishFirstRunTask, shared/first-run-practice.mjs), with
+ * line (main/store.mts finishFirstRunTask, shared/first-run-practice.mts), with
  * no session behind it. That task is the only one in the practice project with
  * something waiting to answer it, and the card can tell it apart with no
  * guessing: it is the one the walk typed in itself, so it is the one arriving

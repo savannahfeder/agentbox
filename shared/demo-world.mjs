@@ -21,7 +21,7 @@ import { envName, nameSlug } from './product-name.mjs';
 
 /**
  * The mark a demo copy carries, so it can tell what it is. Set in the child's
- *  environment by `main/demo.mts` and read by `shared/install-id.mjs`. */
+ *  environment by `main/demo.mts` and read by `shared/install-id.mts`. */
 export const DEMO_ENV = envName('DEMO');
 
 /**

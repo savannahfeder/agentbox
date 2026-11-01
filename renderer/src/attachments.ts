@@ -2,7 +2,7 @@
 // send, then persisted into the product's attachments/ dir and embedded in
 // the body as markdown (relative paths: workers read them through the MCP,
 // the message view renders them).
-import { turnedName } from '../../shared/picture-formats.mjs';
+import { turnedName } from '../../shared/picture-formats.mts';
 
 export interface PendingAttachment {
   name: string;

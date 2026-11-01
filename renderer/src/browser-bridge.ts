@@ -6,7 +6,7 @@
 // identical object out of ordinary http instead: every name calls the same
 // handler, through the server in main/serve.mts.
 //
-// It is built rather than written out. Both halves read shared/bridge-map.mjs,
+// It is built rather than written out. Both halves read shared/bridge-map.mts,
 // so a channel cannot be added to one door and forgotten on the other, and
 // nothing in api.ts had to change to gain a second transport: it asks whether
 // `window.zero` is there, and now it is either way.
@@ -16,7 +16,7 @@
 // finished before the first import of api.ts, which is why main.tsx calls it
 // on its very first line.
 
-import { REQUEST_CHANNELS, PUSH_CHANNELS, WRAPPED_ARGS, DESKTOP_ONLY } from '../../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS, PUSH_CHANNELS, WRAPPED_ARGS, DESKTOP_ONLY } from '../../shared/bridge-map.mts';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { setIconCount, startPhoneAlerts } from './phone-alerts';
 import { installPhoneFiles } from './phone-files';

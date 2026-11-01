@@ -4,7 +4,7 @@
 //
 // Two faults wore that one sentence. A parse bug had dropped the time beside
 // the number, so a control built to say two things was saying one (see
-// shared/claude-usage.mjs).
+// shared/claude-usage.mts).
 //
 // SIX SHAPES WERE DRAWN AT REAL SIZE for her to pick from
 // (designs//usage-options.html) and this is the one she picked:
@@ -29,7 +29,7 @@
 // about status lines.
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { headlineLimit, limitRows, limitsStillRunning, usageSentence } from '../../../shared/usage.mjs';
+import { headlineLimit, limitRows, limitsStillRunning, usageSentence } from '../../../shared/usage.mts';
 import { agoQuiet } from '../format';
 import type { Usage } from '../types';
 import { engineLabel } from '../../../shared/engines.mjs';

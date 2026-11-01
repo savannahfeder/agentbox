@@ -18,7 +18,7 @@
 // how the machinery keeps its place, not things that happened to her.
 
 import { readNotes, type Notes, type TraceSession } from './notes';
-import { commandPrompt } from '../../shared/claude-commands.mjs';
+import { commandPrompt } from '../../shared/claude-commands.mts';
 import { DEFAULT_ENGINE } from '../../shared/engines.mjs';
 import { instructionOf } from '../../shared/repeats.mjs';
 

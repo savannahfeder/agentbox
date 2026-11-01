@@ -27,7 +27,7 @@ function mtsUnder(dir) {
 }
 
 describe('the back end is TypeScript that runs as it is', () => {
-  const files = mtsUnder('main');
+  const files = [...mtsUnder('main'), ...mtsUnder('shared')];
 
   it('has migrated files to check', () => {
     expect(files.length).toBeGreaterThan(0);
