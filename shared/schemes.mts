@@ -16,18 +16,18 @@
 
 import { WAS, nameSlug } from './product-name.mjs';
 
-const under = (was) => was.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const under = (was: string): string => was.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 /** What a url built today is on. */
-export const DOC_SCHEME = `${nameSlug}-doc`;
-export const IMG_SCHEME = `${nameSlug}-img`;
+export const DOC_SCHEME: string = `${nameSlug}-doc`;
+export const IMG_SCHEME: string = `${nameSlug}-img`;
 
 /** Every spelling that must still resolve, current name first. */
-export const DOC_SCHEMES = Object.freeze([DOC_SCHEME, ...WAS.map((was) => `${under(was)}-doc`)]);
-export const IMG_SCHEMES = Object.freeze([IMG_SCHEME, ...WAS.map((was) => `${under(was)}-img`)]);
+export const DOC_SCHEMES: readonly string[] = Object.freeze([DOC_SCHEME, ...WAS.map((was) => `${under(was)}-doc`)]);
+export const IMG_SCHEMES: readonly string[] = Object.freeze([IMG_SCHEME, ...WAS.map((was) => `${under(was)}-img`)]);
 
 /** Both, for the one place that registers all of them at once. */
-export const ALL_SCHEMES = Object.freeze([...DOC_SCHEMES, ...IMG_SCHEMES]);
+export const ALL_SCHEMES: readonly string[] = Object.freeze([...DOC_SCHEMES, ...IMG_SCHEMES]);
 
 /** True when `protocol` (as `URL` gives it, with its colon) is one of them. */
-export const isScheme = (schemes, protocol) => schemes.some((s) => `${s}:` === protocol);
+export const isScheme = (schemes: readonly string[], protocol: string): boolean => schemes.some((s) => `${s}:` === protocol);

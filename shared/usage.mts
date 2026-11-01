@@ -31,6 +31,29 @@
 
 import { DEFAULT_ENGINE } from './engines.mjs';
 
+export interface UsageLimit {
+  span: 'session' | 'week';
+  qualifier: string | null;
+  /** What the panel calls it, in plain words, stamped on by whichever reader
+   *  produced it. See renderer/src/types.ts for why it is not derived here. */
+  name: string;
+  percent: number;
+  resetsText: string | null;
+  resetsOn: string | null;
+  resetsAt: number | null;
+  zone: string | null;
+}
+
+/** One live session as `Supervisor#status` reports it. Only the engine is read;
+ *  it is already one of exactly two words by the time it arrives. */
+export interface RunningSession {
+  engine?: string | null;
+}
+
+export interface WallTime {
+  year: number; month: number; day: number; hour: number; minute: number; second: number;
+}
+
 /* ------------------ WHICH CODING AGENT THE CORNER IS ABOUT ---------------- */
 
 // WHAT A USAGE CHECK THAT GOT NOTHING READABLE SAYS, for every reason we have
@@ -67,14 +90,17 @@ export const USAGE_UNREADABLE = "Claude Code didn't report usage for this accoun
  * second engine existed comes out as Claude Code. A session with no engine on it
  * at all is not counted here rather than counted as a third thing.
  */
-export function usageEngine({ workspace = DEFAULT_ENGINE, running = [] } = {}) {
-  const tally = new Map();
+export function usageEngine({ workspace = DEFAULT_ENGINE, running = [] }: {
+  workspace?: string;
+  running?: RunningSession[] | null;
+} = {}): string {
+  const tally = new Map<string, number>();
   for (const session of running ?? []) {
     const id = session?.engine;
     if (typeof id !== 'string' || !id) continue;
     tally.set(id, (tally.get(id) ?? 0) + 1);
   }
-  let best = null;
+  let best: string | null = null;
   let most = 0;
   let level = false;
   for (const [id, count] of tally) {
@@ -95,21 +121,21 @@ export function usageEngine({ workspace = DEFAULT_ENGINE, running = [] } = {}) {
 // machine that matters, hers. It is a fallback and never a first choice: when we
 // are told the zone we use the zone.
 
-export function localZone() {
+export function localZone(): string | null {
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch { return null; }
 }
 
-const WALL = {
+const WALL: Intl.DateTimeFormatOptions = {
   year: 'numeric', month: '2-digit', day: '2-digit',
   hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
 };
 
 /** What a clock in `zone` reads at instant `ms`, or null if it cannot be asked. */
-export function wallIn(ms, zone) {
+export function wallIn(ms: number, zone: string | null): WallTime | null {
   if (!zone) return null;
   try {
     const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, ...WALL }).formatToParts(new Date(ms));
-    const at = (type) => Number(parts.find((p) => p.type === type)?.value);
+    const at = (type: string) => Number(parts.find((p) => p.type === type)?.value);
     // `hour12: false` prints midnight as 24 in some engines and 0 in others.
     const read = {
       year: at('year'), month: at('month'), day: at('day'),
@@ -132,7 +158,9 @@ export function wallIn(ms, zone) {
  * what every other reader of a bare clock time does and is a whole hour better
  * than being in the wrong zone.
  */
-export function instantIn(year, monthIndex, day, hour, minute, zone) {
+export function instantIn(
+  year: number, monthIndex: number, day: number, hour: number, minute: number, zone: string | null,
+): number {
   const local = () => new Date(year, monthIndex, day, hour, minute, 0, 0).getTime();
   if (!zone) return local();
   const wanted = Date.UTC(year, monthIndex, day, hour, minute, 0);
@@ -157,7 +185,7 @@ export function instantIn(year, monthIndex, day, hour, minute, zone) {
  * the same instant is Sep 1 in Los Angeles and Sep 2 in Berlin, so the panel's
  * "Resets 4pm" became "Resets Sep 1 at 4pm" purely by moving desks.
  */
-function sameDay(a, b, zone) {
+function sameDay(a: number, b: number, zone: string | null): boolean {
   const x = wallIn(a, zone), y = wallIn(b, zone);
   if (x && y) return x.year === y.year && x.month === y.month && x.day === y.day;
   const p = new Date(a), q = new Date(b);
@@ -170,7 +198,7 @@ function sameDay(a, b, zone) {
  * The five hour limit, which is the one that stops her today. Claude Code
  *  prints it as "Current session"; Codex reports it as the `primary` window,
  *  measured at 300 minutes. Both readers mark it `span: 'session'`. */
-export function sessionLimit(limits) {
+export function sessionLimit(limits: UsageLimit[] | null | undefined): UsageLimit | null {
   return (limits ?? []).find((l) => l.span === 'session') ?? null;
 }
 
@@ -190,10 +218,10 @@ export function sessionLimit(limits) {
  * span it runs over. Null only when there is truly nothing, which stays the
  * honest empty corner it has always been.
  */
-export function headlineLimit(limits) {
+export function headlineLimit(limits: UsageLimit[] | null | undefined): UsageLimit | null {
   const session = sessionLimit(limits);
   if (session) return session;
-  let best = null;
+  let best: UsageLimit | null = null;
   for (const limit of limits ?? []) {
     if (!Number.isFinite(limit?.percent)) continue;
     if (!best || limit.percent > best.percent) best = limit;
@@ -205,7 +233,7 @@ export function headlineLimit(limits) {
  * HOW LONG UNTIL IT STARTS OVER, in her house style: whole minutes, then hours
  * and minutes, and never a seconds counter.
  */
-export function untilReset(ms) {
+export function untilReset(ms: number): string {
   const span = spanLeft(ms);
   return span === ANY_MOMENT ? span : `${span} left`;
 }
@@ -216,7 +244,7 @@ export function untilReset(ms) {
  * rounding; `untilReset` is this plus a suffix, so the two cannot drift into
  * disagreeing about what 90 minutes is. */
 export const ANY_MOMENT = 'any moment';
-export function spanLeft(ms) {
+export function spanLeft(ms: number): string {
   const minutes = Math.max(0, Math.floor(ms / 60_000));
   if (minutes < 1) return ANY_MOMENT;
   if (minutes < 60) return `${minutes}m`;
@@ -255,8 +283,8 @@ const JUST_RESET_MS = 2 * 60_000;
  * whenever Claude Code printed its stamp in a timezone we could not honestly
  * convert, and a limit we cannot time is not a limit we may call finished.
  */
-export function limitsStillRunning(limits, now = Date.now()) {
-  return (limits ?? []).filter((l) => !Number.isFinite(l?.resetsAt) || l.resetsAt + JUST_RESET_MS > now);
+export function limitsStillRunning(limits: UsageLimit[] | null | undefined, now = Date.now()): UsageLimit[] {
+  return (limits ?? []).filter((l) => !Number.isFinite(l?.resetsAt) || l.resetsAt! + JUST_RESET_MS > now);
 }
 
 /* ------------------- whether a reading can be believed -------------------- */
@@ -274,8 +302,8 @@ export const SAME_MOMENT_MS = 15 * 60_000;
 
 export const USAGE_SAME_AS_ANOTHER = 'Usage matched another account exactly, so it’s hidden. Refresh to check again.';
 
-const windowKey = (l) => `${l.span}:${l.span === 'week' && /^all/i.test(l.qualifier ?? 'all') ? 'all' : l.qualifier ?? ''}`;
-const resetOf = (l) => (Number.isFinite(l?.resetsAt) ? l.resetsAt : null);
+const windowKey = (l: UsageLimit) => `${l.span}:${l.span === 'week' && /^all/i.test(l.qualifier ?? 'all') ? 'all' : l.qualifier ?? ''}`;
+const resetOf = (l: UsageLimit | undefined): number | null => (Number.isFinite(l?.resetsAt) ? l!.resetsAt : null);
 
 /**
  * TWO READINGS WITH THE SAME NUMBERS: every window within a percent and
@@ -284,9 +312,9 @@ const resetOf = (l) => (Number.isFinite(l?.resetsAt) ? l.resetsAt : null);
  *  has used (0% and no reset) are not counted, as that is what any new
  *  account says.
  */
-export function sameUsage(a, b) {
-  const x = new Map((a ?? []).filter((l) => Number.isFinite(l?.percent)).map((l) => [windowKey(l), l]));
-  const y = new Map((b ?? []).filter((l) => Number.isFinite(l?.percent)).map((l) => [windowKey(l), l]));
+export function sameUsage(a: UsageLimit[] | null | undefined, b: UsageLimit[] | null | undefined): boolean {
+  const x = new Map((a ?? []).filter((l) => Number.isFinite(l?.percent)).map((l): [string, UsageLimit] => [windowKey(l), l]));
+  const y = new Map((b ?? []).filter((l) => Number.isFinite(l?.percent)).map((l): [string, UsageLimit] => [windowKey(l), l]));
   if (!x.size || x.size !== y.size) return false;
   let spent = false;
   for (const [key, l] of x) {
@@ -294,7 +322,7 @@ export function sameUsage(a, b) {
     if (!m || Math.abs(l.percent - m.percent) > 1) return false;
     const [p, q] = [resetOf(l), resetOf(m)];
     if ((p === null) !== (q === null)) return false;
-    if (p !== null && Math.abs(p - q) > SAME_RESET_MS) return false;
+    if (p !== null && Math.abs(p - q!) > SAME_RESET_MS) return false;
     if (p !== null && (l.percent > 0 || m.percent > 0)) spent = true;
   }
   return spent;
@@ -306,11 +334,14 @@ export function sameUsage(a, b) {
  *  say resets at different times. Percentages are not compared, because a
  *  changed limit moves them legitimately.
  */
-export function readingsDisagree(a, b) {
+export function readingsDisagree(
+  a: { at: number; limits: UsageLimit[] } | null | undefined,
+  b: { at: number; limits: UsageLimit[] } | null | undefined,
+): boolean {
   if (!a?.limits || !b?.limits || !Number.isFinite(a.at) || !Number.isFinite(b.at)) return false;
   if (Math.abs(a.at - b.at) > SAME_MOMENT_MS) return false;
   const later = Math.max(a.at, b.at);
-  const main = (limits, key) => limits.find((l) => windowKey(l) === key);
+  const main = (limits: UsageLimit[], key: string) => limits.find((l) => windowKey(l) === key);
   return ['session:', 'week:all'].some((key) => {
     const [p, q] = [resetOf(main(a.limits, key)), resetOf(main(b.limits, key))];
     return p !== null && q !== null && p > later && q > later && Math.abs(p - q) > SAME_RESET_MS;
@@ -322,14 +353,14 @@ export function readingsDisagree(a, b) {
  * minute (11:59:59.6) and the cloud's header the minute itself, and both name
  * the same reset.
  */
-export const toMinute = (at) => Math.round(at / 60_000) * 60_000;
+export const toMinute = (at: number): number => Math.round(at / 60_000) * 60_000;
 
 /**
  * THE DAY A RESET FALLS ON, in this machine's calendar: null today, "Thu" this
  * week, and "Tue Oct 27" six or more days out, where a weekday alone would
  * read as today.
  */
-export function resetDay(at, now = Date.now()) {
+export function resetDay(at: number, now = Date.now()): string | null {
   const d = new Date(toMinute(at));
   if (d.toDateString() === new Date(now).toDateString()) return null;
   const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
@@ -382,7 +413,10 @@ export function resetDay(at, now = Date.now()) {
  * with no zone on it at all falls back to the process's, which is what it always
  * was, and is every Codex reading.
  */
-export function limitRows(limits, now = Date.now()) {
+export function limitRows(
+  limits: UsageLimit[] | null | undefined,
+  now = Date.now(),
+): { key: string; name: string; used: number; when: string | null }[] {
   const here = localZone();
   return limitsStillRunning(limits, now).map((l) => ({
     // Stable across redraws, and it has to carry the qualifier: Claude Code's
@@ -394,7 +428,7 @@ export function limitRows(limits, now = Date.now()) {
   }));
 }
 
-function whenItStartsOver(l, now, here) {
+function whenItStartsOver(l: UsageLimit, now: number, here: string | null): string | null {
   if (l.resetsText) {
     if (l.resetsAt && sameDay(l.resetsAt, now, l.zone ?? here)) return `Resets ${l.resetsText}`;
     return l.resetsOn ? `Resets ${l.resetsOn} at ${l.resetsText}` : `Resets ${l.resetsText}`;
@@ -418,7 +452,11 @@ function whenItStartsOver(l, now, here) {
  * then this is byte for byte the sentence she has been reading since
  * 2026-09-01.
  */
-export function usageSentence(limits, now = Date.now(), engineWord = null) {
+export function usageSentence(
+  limits: UsageLimit[] | null | undefined,
+  now = Date.now(),
+  engineWord: string | null = null,
+): string | null {
   const live = limitsStillRunning(limits, now);
   if (!live.length) return null;
   const said = live.map((l) => {

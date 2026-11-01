@@ -76,9 +76,9 @@ import { instantIn, resetDay, wallIn } from './usage.mts';
 // so an unknown flag of theirs stays 'unknown'. Anchored to the start of a
 // line because that is where the CLI prints it, and an agent quoting the same
 // words from some other program's output is not this.
-const CLAUDE = harnessDefinition('claude');
+const CLAUDE = harnessDefinition('claude')!;
 const OUR_FLAGS = [
-  ...JSON.stringify(CLAUDE.run).match(/--[A-Za-z-]+/g),
+  ...JSON.stringify(CLAUDE.run).match(/--[A-Za-z-]+/g)!,
   '--allowedTools', '--disallowedTools', '--permission-mode', '--mcp-config', '--permission-prompt-tool', '--settings', '--model',
 ];
 const TOO_OLD = [
@@ -133,7 +133,7 @@ const LOGIN_BUSY = [/another claude code process is refreshing/i];
 // The server turning requests away for a moment, in Claude Code's words:
 // "Server is temporarily limiting requests (not your usage limit)". Before
 // AT_LIMIT, whose /usage limit/ would bench a plan that has room.
-export const SERVER_BUSY = [/not your usage limit/i, /temporarily limiting requests/i];
+export const SERVER_BUSY: RegExp[] = [/not your usage limit/i, /temporarily limiting requests/i];
 
 const AT_LIMIT = [
   /usage limit/i,
@@ -280,7 +280,7 @@ const OPEN_ELSEWHERE = [/already has an active writer/i];
 // WHICH OF THE THREE THINGS WENT WRONG, from whatever the tool printed.
 // 'unknown' is a first-class answer, not a failure: an honest generic sentence
 // beats a confident wrong one.
-export function troubleCause(raw) {
+export function troubleCause(raw: unknown): string {
   const text = String(raw ?? '');
   if (!text.trim()) return 'unknown';
   // The CLI's own argument check, before any account is asked anything.
@@ -320,7 +320,7 @@ export function troubleCause(raw) {
 // the second is what somebody who skipped setup meets: "Sign that account back
 // in" about an account they never had. `everSignedIn` is the caller's reading
 // of the login's own files; false only where that reading is proof.
-export function refineCause(cause, plan, { everSignedIn = true } = {}) {
+export function refineCause(cause: string, plan: { ended?: unknown } | null | undefined, { everSignedIn = true }: { everSignedIn?: boolean } = {}): string {
   if (cause === 'org-blocked' && plan?.ended) return 'subscription-ended';
   if (cause === 'signed-out' && !everSignedIn) return 'no-plan';
   return cause;
@@ -339,7 +339,7 @@ export function refineCause(cause, plan, { everSignedIn = true } = {}) {
 //
 // Both wordings are real: the CLI's own line is "resets 6pm" and the API's is
 // "Your weekly limit resets at 4pm", so the "at" is optional.
-function resetClock(raw) {
+function resetClock(raw: unknown): { h: number; min: number; offset: number | null } | null {
   const m = /resets\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*(?:\(\s*(?:UTC|GMT)\s*(?:([+-])(\d{1,2})(?::?(\d{2}))?)?\s*\))?/i
     .exec(String(raw ?? ''));
   if (!m) return null;
@@ -353,13 +353,13 @@ function resetClock(raw) {
 
 // The CLI's own wording for a clock time, so a converted hour reads exactly
 // the way a quoted one always has.
-function clockWords(h, min) {
+function clockWords(h: number, min: number): string {
   return `${h % 12 || 12}${min ? `:${String(min).padStart(2, '0')}` : ''}${h < 12 ? 'am' : 'pm'}`;
 }
 
 // "3:15pm" today, "Wed 2:30pm" this week, "Wed Oct 28 1:05pm" further out,
 // the same day words the account meters use.
-function momentWords(ms, from) {
+function momentWords(ms: number, from: number): string {
   const d = new Date(ms);
   const day = resetDay(ms, from);
   return `${day ? `${day} ` : ''}${clockWords(d.getHours(), d.getMinutes())}`;
@@ -374,7 +374,7 @@ function momentWords(ms, from) {
 // already local and is quoted as it stands. Null when there is no time to
 // quote, and then the sentence falls back to the wording that has always been
 // there.
-export function limitResetsAt(raw, from = Date.now()) {
+export function limitResetsAt(raw: unknown, from: number = Date.now()): string | null {
   const clock = resetClock(raw);
   if (!clock) {
     // A reset on another day ("resets Oct 22 at 4pm", Codex's "try again at
@@ -383,7 +383,7 @@ export function limitResetsAt(raw, from = Date.now()) {
     return moment == null ? null : momentWords(moment, from);
   }
   if (clock.offset == null) return clockWords(clock.h, clock.min);
-  const at = new Date(limitResetMoment(raw, from));
+  const at = new Date(limitResetMoment(raw, from)!);
   return clockWords(at.getHours(), at.getMinutes());
 }
 
@@ -394,7 +394,7 @@ const UTC_ZONE = /^(?:UTC|GMT)\s*(?:([+-])(\d{1,2})(?::?(\d{2}))?)?$/i;
 
 // "UTC", "GMT+2" or a place such as "America/Los_Angeles". A zone this
 // computer cannot name, or none, is its own clock.
-function zoneOf(word) {
+function zoneOf(word: string | undefined): { offset: number | null; name: string | null } {
   const utc = UTC_ZONE.exec(word ?? '');
   if (utc) return { offset: (utc[1] === '-' ? -1 : 1) * (Number(utc[2] ?? 0) * 60 + Number(utc[3] ?? 0)), name: null };
   return { offset: null, name: word && wallIn(Date.now(), word) ? word : null };
@@ -403,7 +403,7 @@ function zoneOf(word) {
 // The moment a dated Claude Code reset names, or null. The line has no year,
 // so it is the year in that zone at `from`, or the next one when that puts the
 // reset more than a day behind (December reading a January date).
-function claudeResetDay(raw, from) {
+function claudeResetDay(raw: unknown, from: number): number | null {
   const m = CLAUDE_DAY.exec(String(raw ?? ''));
   if (!m) return null;
   const month = MONTHS.indexOf(m[1].toLowerCase());
@@ -412,7 +412,7 @@ function claudeResetDay(raw, from) {
   const h = (Number(m[3]) % 12) + (m[5].toLowerCase() === 'pm' ? 12 : 0);
   const min = Number(m[4] ?? 0);
   const zone = zoneOf(m[6]);
-  const at = (year) => zone.offset != null
+  const at = (year: number): number => zone.offset != null
     ? Date.UTC(year, month, day, h, min) - zone.offset * 60_000
     : instantIn(year, month, day, h, min, zone.name);
   const year = zone.offset != null
@@ -427,7 +427,7 @@ function claudeResetDay(raw, from) {
 // because the app waited a fixed thirty minutes instead of reading this line).
 // The next local occurrence of that clock time at or after `from`; null when
 // the line names no hour.
-export function limitResetMoment(raw, from = Date.now()) {
+export function limitResetMoment(raw: unknown, from: number = Date.now()): number | null {
   // CODEX NAMES A DAY, NOT AN HOUR: "try again at Sep 28th, 2026 1:05 PM"
   // (codex-cli 0.153.4, 2026-09-24). A weekly limit read as "thirty minutes"
   // put the capped login back in the pool every half hour for days.
@@ -465,7 +465,7 @@ export function limitResetMoment(raw, from = Date.now()) {
 // Worth its own question because it is the one cause where trying again in
 // thirty minutes cannot possibly help, so the account leaves the rotation on
 // the first sighting rather than after three.
-export function needsHerHands(cause) {
+export function needsHerHands(cause: string | null | undefined): boolean {
   // Both of these are true until a PERSON acts, and neither of them is the
   // same person: one is her, in a terminal; one is an admin of a workspace she
   // may not run. What they share is the only thing this question asks — trying
@@ -486,7 +486,7 @@ const UPDATE = `run claude update in a terminal (${Name} needs version ${CLAUDE.
 // WHAT SHE READS WHEN NOT ONE AGENT CAN START ANYWHERE.
 // Not "an error occurred". The subject of the sentence is the thing she cares
 // about, which is her agents, and the reason follows it in plain words.
-export function troubleSentence(cause) {
+export function troubleSentence(cause: string): string {
   if (cause === 'signed-out') return 'No agents can start. Your Claude login has run out.';
   if (cause === 'no-plan') return 'No agents can start. No AI plan is set up on this computer.';
   if (cause === 'org-blocked') return 'No agents can start. Your organization has turned Claude Code off.';
@@ -502,7 +502,7 @@ export function troubleSentence(cause) {
 // THE SECOND LINE: what happens next, so the first line is never a dead end.
 // A sentence that only names a problem makes her go and find out whether she
 // is meant to do something; these say it.
-export function troubleRemedy(cause) {
+export function troubleRemedy(cause: string): string {
   // ). "Sign in to Claude again" is a thing to go and work out; /login is a
   // thing to type.
   if (cause === 'signed-out') return 'Open Claude in a terminal, type /login, and they pick straight back up.';
@@ -519,7 +519,7 @@ export function troubleRemedy(cause) {
 
 // THE SAME FACT ABOUT ONE ACCOUNT, on the Accounts page, where the reader is
 // already looking at a list of accounts and does not need the word again.
-export function accountSentence(cause, dir) {
+export function accountSentence(cause: string, dir?: string | null): string {
   // The folder comes in because the row that shows this sentence REPLACES the
   // folder line with it, so "with this folder set" pointed at something that
   // was no longer on the screen. With the path in the sentence the whole
@@ -578,7 +578,7 @@ export function accountSentence(cause, dir) {
 // subcommand, read off `codex --help` on this Mac 2026-09-05, for the same
 // reason /login is named next door: "sign in again" is a thing to go and work
 // out; a command is a thing to type.
-export function engineTroubleNote(cause, engineWord = 'Codex') {
+export function engineTroubleNote(cause: string, engineWord: string = 'Codex'): string {
   if (cause === 'signed-out') {
     return `${engineWord} is signed out, so nothing runs on it. Open a terminal, run codex login, and its tasks pick straight back up.`;
   }
@@ -613,7 +613,7 @@ export function engineTroubleNote(cause, engineWord = 'Codex') {
 // Under three hours the clause is noise, because everything in her inbox is
 // from today. Past that it carries the weight of the sentence: "since
 // yesterday" is the difference between a blip and a day lost.
-export function sinceWords(since, now = Date.now()) {
+export function sinceWords(since: number | null | undefined, now: number = Date.now()): string {
   if (!since || !Number.isFinite(since) || since > now) return '';
   if (now - since < 3 * 60 * 60_000) return '';
   const then = new Date(since);
@@ -634,7 +634,7 @@ export function sinceWords(since, now = Date.now()) {
 }
 
 // THE FACT, in her nouns: tasks, run, started. No engine, no account, no folder.
-export function strandedSentence({ count, since, now = Date.now() } = {}) {
+export function strandedSentence({ count, since, now = Date.now() }: { count?: number | null; since?: number | null; now?: number } = {}): string {
   const n = Math.max(0, Math.trunc(count ?? 0));
   return `${strandedTitle(n)}${sinceWords(since, now)}.`
     + ` Nothing has started on ${n !== 1 ? 'any of them' : 'it'}.`;
@@ -644,7 +644,7 @@ export function strandedSentence({ count, since, now = Date.now() } = {}) {
 // titled. Here rather than in the renderer so the row, the sentence above and
 // anything else that ever says this cannot drift into three ways of counting
 // the same tasks. One task has, eleven tasks have.
-export function strandedTitle(count) {
+export function strandedTitle(count: number): string {
   const n = Math.max(0, Math.trunc(count ?? 0));
   const many = n !== 1;
   return `${n} task${many ? 's' : ''} ${many ? 'have' : 'has'} not been able to run`;
@@ -657,7 +657,7 @@ export function strandedTitle(count) {
 // name, so it says that instead of naming the commonest one and leaving her to
 // find out it only mended half of them. Each row carries its own reason
 // (`deadRunSentence`), which is where that detail belongs and where it fits.
-export function strandedRemedy(causes = []) {
+export function strandedRemedy(causes: string[] = []): string {
   const distinct = [...new Set(causes)];
   if (distinct.length === 1) return troubleRemedy(distinct[0]);
   return 'They are not all stuck on the same thing. Each row says which.';
@@ -694,7 +694,7 @@ export function strandedRemedy(causes = []) {
 // FIRST SENTENCE UNDER 112 CHARACTERS, because that is where her inbox row
 // clips (SUMMARY_BUDGET in renderer/src/list-rules.ts) and this is the whole
 // point of the message. Longest of the five is 96 with "Claude Code" in front.
-const DEAD_RUN_OPENERS = {
+const DEAD_RUN_OPENERS: Record<string, string> = {
   workspace: "would not start in this project's folder, so nothing has been done here.",
   'signed-out': 'could not sign in, so nothing has been done on this task.',
   'org-blocked': 'is switched off for that account by its organization, so nothing has been done.',
@@ -724,7 +724,7 @@ const SET_UP_A_PLAN = 'at the top of your inbox';
 // not count the row among those nothing has started on. A cause missing here
 // can only stop a run before its first tool, so on a run that worked it is a
 // misreading and gets the plain line.
-const WORKED_OPENERS = {
+const WORKED_OPENERS: Record<string, string> = {
   'signed-out': 'was signed out partway through, so this task is not finished.',
   'org-blocked': 'was switched off for that account partway through, so this task is not finished.',
   'subscription-ended': "stopped partway through because that account's subscription ended.",
@@ -743,7 +743,7 @@ const WORKED_OPENERS = {
  * stops mid-thread has usually done plenty before it, so it says nothing about
  * what has or has not been done.
  */
-const RUN_STOPPED = {
+const RUN_STOPPED: Record<string, string> = {
   'signed-out': 'This run stopped because the account was signed out.',
   // Same refusal text for an admin's block and an ended subscription, and this
   // line has only the text, so it says what is true of both.
@@ -761,22 +761,22 @@ const RUN_STOPPED = {
   unknown: 'This run stopped before it finished.',
 };
 
-export function runStoppedLine(raw) {
+export function runStoppedLine(raw: string): string {
   return RUN_STOPPED[troubleCause(raw)] ?? RUN_STOPPED.unknown;
 }
 
 // A cause we cannot name still has a likeliest culprit, and it is the agent's
 // plan, not the app (2026-10-19). Engines with no plan to point at get none.
-const UNNAMED_CHECK = {
+const UNNAMED_CHECK: Record<string, string> = {
   Codex: 'Check that your ChatGPT plan is active at chatgpt.com, or run codex in a terminal to see what it says. ',
   'Claude Code': 'Check that your Claude plan is active at claude.ai, or run claude in a terminal to see what it says. ',
 };
 
 // Named on a limit, because with the cloud on "its usage limit" read as the
 // cloud's hours.
-const PLAN_WORD = { Codex: 'ChatGPT plan', 'Claude Code': 'Claude plan' };
+const PLAN_WORD: Record<string, string> = { Codex: 'ChatGPT plan', 'Claude Code': 'Claude plan' };
 
-function limitNext(engineWord, resetsAt) {
+function limitNext(engineWord: string, resetsAt: string | null | undefined): string {
   const plan = PLAN_WORD[engineWord];
   if (!plan) return resetsAt ? ` It starts again on its own at ${resetsAt}.` : ' It starts again on its own when the limit resets.';
   return resetsAt
@@ -784,13 +784,13 @@ function limitNext(engineWord, resetsAt) {
     : ` It starts again on its own when your ${plan}'s limit resets.`;
 }
 
-function dayWords(ms) {
+function dayWords(ms: number): string {
   return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 // What to do before replying to a thread the app has stopped trying on, in the
 // same words `deadRunSentence` uses for each cause. Null when the reply is all.
-function fixBeforeReplying({ cause, engineWord, resetsAt, model, planEnded }) {
+function fixBeforeReplying({ cause, engineWord, resetsAt, model, planEnded }: { cause: string; engineWord: string; resetsAt?: string | null; model?: string | null; planEnded?: number | null }): string | null {
   if (cause === 'signed-out') return 'Sign that account back in.';
   if (cause === 'no-plan') return `Set up a plan ${SET_UP_A_PLAN}.`;
   if (cause === 'org-blocked') return 'Only an admin of that Claude workspace can turn it back on.';
@@ -843,7 +843,21 @@ function fixBeforeReplying({ cause, engineWord, resetsAt, model, planEnded }) {
 //
 // `slept` is this computer having slept while the run was up. A run that named no
 // cause of its own was cut off by that, and says so.
-export function deadRunSentence({ engineWord = 'The agent', cause = 'unknown', runs = 1, resetsAt = null, worked: usedATool = false, partway = false, model = null, planEnded = null, gaveUp = false, account = null, retryAt = null, slept = false, now = Date.now() } = {}) {
+export function deadRunSentence({ engineWord = 'The agent', cause = 'unknown', runs = 1, resetsAt = null, worked: usedATool = false, partway = false, model = null, planEnded = null, gaveUp = false, account = null, retryAt = null, slept = false, now = Date.now() }: {
+  engineWord?: string;
+  cause?: string;
+  runs?: number;
+  resetsAt?: string | null;
+  worked?: boolean;
+  partway?: boolean;
+  model?: string | null;
+  planEnded?: number | null;
+  gaveUp?: boolean;
+  account?: string | null;
+  retryAt?: number | null;
+  slept?: boolean;
+  now?: number;
+} = {}): string {
   if (usedATool && !WORKED_OPENERS[cause]) cause = 'unknown';
   const asleep = slept && (cause === 'interrupted' || cause === 'unknown');
   if (asleep) cause = 'interrupted';
@@ -869,7 +883,7 @@ export function deadRunSentence({ engineWord = 'The agent', cause = 'unknown', r
     return `${opener}${again} ${fix ? `${fix} Then reply` : 'Reply'} here to start it again.`;
   }
 
-  const when = retryAt > now ? ` at ${momentWords(retryAt, now)}` : '';
+  const when = retryAt! > now ? ` at ${momentWords(retryAt!, now)}` : '';
   // THE TIME THE LIMIT PRINTED, when there is one. "when the limit resets"
   // leaves her with a question; "at 6pm" is an answer, and it is the CLI's own
   // word for it rather than anything we worked out.
@@ -913,7 +927,7 @@ export function deadRunSentence({ engineWord = 'The agent', cause = 'unknown', r
 // Whether `deadRunSentence` tells her the app runs the task again by itself.
 // The fresh-work pass keeps a row in the queue on exactly these, so a row is
 // never promised a retry and then read as an answer waiting on her.
-export function deadRunPromisesARetry({ cause = 'unknown', gaveUp = false } = {}) {
+export function deadRunPromisesARetry({ cause = 'unknown', gaveUp = false }: { cause?: string; gaveUp?: boolean } = {}): boolean {
   if (gaveUp) return false;
   return cause !== 'org-blocked' && cause !== 'level-not-offered' && cause !== 'model-not-on-plan';
 }
@@ -943,7 +957,7 @@ export function deadRunPromisesARetry({ cause = 'unknown', gaveUp = false } = {}
 //
 // FIRST SENTENCE UNDER 112 CHARACTERS, the same budget the openers keep, because
 // that is where her inbox row clips (SUMMARY_BUDGET, renderer/src/list-rules.ts).
-export function undeliveredAnswerSentence({ engineWord = 'The agent', attempts = 1 } = {}) {
+export function undeliveredAnswerSentence({ engineWord = 'The agent', attempts = 1 }: { engineWord?: string; attempts?: number | null } = {}): string {
   const n = Math.max(1, Math.trunc(attempts ?? 1));
   const runs = n === 1 ? 'once and finished' : `${n} times and each run finished`;
   return `${UNDELIVERED} ${engineWord} ran ${runs} without writing anything back on the row, so ${NAME} has stopped carrying it. Reply again and it goes to a fresh session.`;
@@ -955,9 +969,9 @@ const UNDELIVERED = 'Your reply did not reach this task.';
 // main/supervisor.mts). `tries` is how many times it has tried again on its
 // own since, and `next` when it tries again, null once it has stopped trying.
 const STOPPED_STARTING = `${Name} stopped starting this thread`;
-const clock = (t) => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(/\s/g, '');
+const clock = (t: number): string => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(/\s/g, '');
 
-export function stoppedStartingSentence({ starts = 6, minutes = 10, tries = 0, triedAt = null, said = null, next = null } = {}) {
+export function stoppedStartingSentence({ starts = 6, minutes = 10, tries = 0, triedAt = null, said = null, next = null }: { starts?: number; minutes?: number; tries?: number; triedAt?: number | null; said?: string | null; next?: number | null } = {}): string {
   const what = tries === 0
     ? `It was started ${starts} times in ${minutes} minutes, and each run ended before its agent began.`
     : tries === 1
@@ -973,11 +987,11 @@ export function stoppedStartingSentence({ starts = 6, minutes = 10, tries = 0, t
 // thread it stopped starting. On a thread carrying a reply, each is written
 // only once nothing will carry the reply on its own, so that thread waits on a
 // person (`gaveUpOnTheAnswer`, renderer/src/list-rules.ts).
-const DEAD_RUN_HALVES = {
+const DEAD_RUN_HALVES: Record<string, string[]> = {
   'at-limit': ['is at its usage limit', 'so nothing has been done on this task.'],
 };
 
-export function saysARunGotNowhere(text) {
+export function saysARunGotNowhere(text: string | null | undefined): boolean {
   const s = String(text ?? '');
   if (!s.trim()) return false;
   if (deadRunCause(s)) return true;
@@ -1004,7 +1018,7 @@ export function saysARunGotNowhere(text) {
 // alex@acme.com, so nothing has been done"), so that one is read back by its
 // two halves. Without this a row stopped counting as one nothing had run on
 // the moment it said which account was spent.
-export function deadRunCause(text) {
+export function deadRunCause(text: string | null | undefined): string | null {
   const s = String(text ?? '');
   if (!s.trim()) return null;
   for (const [cause, opener] of Object.entries(DEAD_RUN_OPENERS)) {
@@ -1033,7 +1047,7 @@ export function deadRunCause(text) {
 
 // THE SHORT NAME OF THE CAUSE, in her nouns. Never the engine's words. Used
 // where the shape has no room for a sentence, which is most of them.
-export function causeWord(cause) {
+export function causeWord(cause: string): string {
   if (cause === 'signed-out') return 'a signed-out login';
   if (cause === 'no-plan') return 'no plan to run on';
   if (cause === 'org-blocked') return 'an organization that blocks Claude Code';
@@ -1052,7 +1066,7 @@ export function causeWord(cause) {
 // WHAT IT IS, with the count in front of it, as one clause. The verb is chosen
 // per cause because "waiting" is true of a limit and false of a login that has
 // run out.
-export function causeWhat(cause, count) {
+export function causeWhat(cause: string, count: number | null | undefined): string {
   const n = Math.max(0, Math.trunc(count ?? 0));
   if (cause === 'signed-out') return `${n} stopped by a signed-out Claude login`;
   if (cause === 'no-plan') return `${n} waiting on a plan to run on`;
@@ -1071,7 +1085,7 @@ export function causeWhat(cause, count) {
 
 // WHAT HAPPENS NEXT, so no line on any of these looks is a dead end. The hour
 // comes from the limit line the CLI printed, never from our own clock.
-export function causeNext(cause, resetsAt = null) {
+export function causeNext(cause: string, resetsAt: string | null = null): string {
   if (cause === 'signed-out') return 'Type /login in a terminal and they pick straight up.';
   if (cause === 'no-plan') return `Set one up ${SET_UP_A_PLAN}.`;
   if (cause === 'org-blocked') return 'Ask an admin of that Claude workspace to turn Claude Code back on.';
@@ -1090,7 +1104,7 @@ export function causeNext(cause, resetsAt = null) {
 // THE ONE THING SHE COULD PRESS, or null when there is honestly nothing. Only
 // the causes a person can end are given a word; a limit is not one of them, and
 // putting a button on it would be the app pretending she has a move.
-export function causeAct(cause) {
+export function causeAct(cause: string): string | null {
   if (cause === 'signed-out') return 'Sign in';
   if (cause === 'workspace') return 'Trust the folder';
   return null;
@@ -1099,8 +1113,8 @@ export function causeAct(cause) {
 // THE PILE, GROUPED. Biggest first, and a cause she can end always outranks one
 // she cannot at the same count, because the list is read top down and the top
 // of it should be the part with a move in it.
-export function causeBreakdown(rows = [], resetsAt = null) {
-  const by = new Map();
+export function causeBreakdown(rows: readonly ({ cause?: string } | null | undefined)[] = [], resetsAt: string | null = null): { cause: string; count: number; what: string; next: string; act: string | null; hers: boolean }[] {
+  const by = new Map<string, number>();
   for (const r of rows) {
     const cause = r?.cause ?? 'unknown';
     by.set(cause, (by.get(cause) ?? 0) + 1);
@@ -1114,5 +1128,5 @@ export function causeBreakdown(rows = [], resetsAt = null) {
       act: causeAct(cause),
       hers: needsHerHands(cause) || cause === 'workspace' || cause === 'model-not-on-plan' || cause === 'level-not-offered' || cause === 'network' || cause === 'open-elsewhere',
     }))
-    .sort((a, b) => (b.hers - a.hers) || (b.count - a.count) || a.cause.localeCompare(b.cause));
+    .sort((a, b) => (Number(b.hers) - Number(a.hers)) || (b.count - a.count) || a.cause.localeCompare(b.cause));
 }

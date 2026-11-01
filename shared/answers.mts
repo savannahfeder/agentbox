@@ -58,14 +58,22 @@
 // in list-rules.ts and never reach this rule.
 const SPOKEN = ['result', 'title', 'body'];
 
-export function agentSpokeSince(item, since) {
+export interface AnsweredItem {
+  answer?: string;
+  answeredThrough?: number;
+  status?: string;
+  labels?: string[];
+  wrote?: Record<string, { ts?: number; source?: string; from?: string; teammate?: string | null } | undefined>;
+}
+
+export function agentSpokeSince(item: AnsweredItem | null | undefined, since: number): boolean {
   return SPOKEN.some((field) => {
     const w = item?.wrote?.[field];
     return !!w && w.source === 'agent' && (w.ts ?? 0) > since;
   });
 }
 
-export function answerSettled(item) {
+export function answerSettled(item: AnsweredItem | null | undefined): boolean {
   const answer = item?.answer;
   if (!answer || answer === '(withdrawn)') return false;
   const ts = item?.wrote?.answer?.ts ?? 0;
@@ -75,7 +83,7 @@ export function answerSettled(item) {
 
 // The moment of the answer a session was spawned to carry, which is what gets
 // written down when it finishes. The app for a row nobody has answered.
-export function answerTs(item) {
+export function answerTs(item: AnsweredItem | null | undefined): number {
   return item?.wrote?.answer?.ts ?? 0;
 }
 
@@ -86,7 +94,7 @@ export function answerTs(item) {
 // stopped run came straight back ten seconds later (2026-10-01).
 // tests/a-stopped-agent-stays-stopped-until-she-resumes-it.test.mjs
 // A teammate's reply after the stop is not her speaking, so it never lifts it.
-export function stoppedByHer(item) {
+export function stoppedByHer(item: AnsweredItem | null | undefined): boolean {
   const status = item?.wrote?.status;
   return item?.status === 'blocked' && status?.source === 'founder'
     && (answerTs(item) <= (status.ts ?? 0) || !!toldBy(item));
@@ -97,13 +105,13 @@ export function stoppedByHer(item) {
 // may not start its own work, so the queue refuses that tag. The lists read the
 // same rule, or they promise an agent is coming to a thread none will start. A
 // tag with no recorded author predates `wrote` and keeps counting.
-export function filedByThePerson(item) {
+export function filedByThePerson(item: AnsweredItem | null | undefined): boolean {
   return (item?.labels ?? []).includes('founder') && item?.wrote?.labels?.source !== 'agent';
 }
 
 // The teammate whose words are this row's newest reply, or null when the
 // newest reply is the person's own.
-export function toldBy(item) {
+export function toldBy(item: AnsweredItem | null | undefined): { name: string; teammate: string | null } | null {
   const a = item?.wrote?.answer;
   return a?.source === 'system' && a.from ? { name: a.from, teammate: a.teammate ?? null } : null;
 }
@@ -111,7 +119,7 @@ export function toldBy(item) {
 // HELD FOR HER YES: a teammate's words are on the row, and the app blocked it
 // after them so nothing runs on them until she replies. Her reply is newer
 // than the hold and releases it, as it releases her own stop.
-export function heldForHer(item) {
+export function heldForHer(item: AnsweredItem | null | undefined): boolean {
   const status = item?.wrote?.status;
   return item?.status === 'blocked' && status?.source === 'system' && !!toldBy(item)
     && answerTs(item) <= (status.ts ?? 0);

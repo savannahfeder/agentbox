@@ -30,29 +30,40 @@
 // above turns red on the bundle it reads, and this file goes.
 export const INVALID_RANGE = 'invalid range';
 
+type SelectionHandler = {
+  (this: unknown, ...args: unknown[]): unknown;
+  guardsInvalidRange?: true;
+};
+
+// The private parts of xterm's Terminal this file reaches into; none are typed.
+type XtermInternals = {
+  _core?: { _accessibilityManager?: { value?: { _handleSelectionChange?: SelectionHandler } } };
+  clearSelection(): void;
+};
+
 /**
  * Wrap the accessibility manager's selection handler on `terminal`, which must
  * already be open. Answers whether there was one to wrap: false when
  * screenReaderMode is off, which is every install not running a screen reader,
  * and false when it is already wrapped.
  */
-export function guardInvalidRange(terminal, { warn = console.warn } = {}) {
-  const manager = terminal?._core?._accessibilityManager?.value;
+export function guardInvalidRange(terminal: unknown, { warn = console.warn }: { warn?: (message: string) => void } = {}): boolean {
+  const manager = (terminal as XtermInternals | null | undefined)?._core?._accessibilityManager?.value;
   const handler = manager?._handleSelectionChange;
-  if (typeof handler !== 'function' || handler.guardsInvalidRange) return false;
-  const guarded = function (...args) {
+  if (typeof handler !== 'function' || (handler as SelectionHandler).guardsInvalidRange) return false;
+  const guarded: SelectionHandler = function (this: unknown, ...args: unknown[]) {
     try {
       return handler.apply(this, args);
     } catch (e) {
       // Message, not instanceof: an Error from another realm is still this bug.
-      if (e?.message !== INVALID_RANGE) throw e;
+      if ((e as { message?: unknown } | null | undefined)?.message !== INVALID_RANGE) throw e;
       warn(`xterm mapped the selection onto no cells and threw "${INVALID_RANGE}"; cleared the terminal's selection instead`);
       // It threw before mirroring the selection, so the terminal is still
       // holding the previous one. Nothing is selected; say that.
-      terminal.clearSelection();
+      (terminal as XtermInternals).clearSelection();
     }
   };
   guarded.guardsInvalidRange = true;
-  manager._handleSelectionChange = guarded;
+  manager!._handleSelectionChange = guarded;
   return true;
 }

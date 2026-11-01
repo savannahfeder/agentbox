@@ -29,6 +29,15 @@
 // is typing, and the app keeps its hands off it, which is the part that was
 // already right.
 
+export interface KeyPress {
+  key: string;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+}
+
+interface PaneInput { key?: string; meta?: boolean; control?: boolean; alt?: boolean }
+
 /**
  * Does this press belong to the app even though the keyboard is in the file?
  *
@@ -42,7 +51,7 @@
  * the caret was in the document, which is the only place ⌘S is ever pressed.
  * Letting the chord through is what makes that one work again as well.
  */
-export function theAppKeepsThisKey(e) {
+export function theAppKeepsThisKey(e: KeyPress | null | undefined): boolean {
   if (!e || typeof e.key !== 'string') return false;
   if (e.key === 'Escape') return true;
   return !!(e.metaKey || e.ctrlKey);
@@ -52,7 +61,7 @@ export function theAppKeepsThisKey(e) {
  * The same question asked from the main process, where a key arrives as an
  * Electron `input` rather than a DOM event. One rule, two vocabularies.
  */
-export function theAppKeepsThisInput(input) {
+export function theAppKeepsThisInput(input: PaneInput | null | undefined): boolean {
   if (!input || typeof input.key !== 'string') return false;
   return theAppKeepsThisKey({ key: input.key, metaKey: !!input.meta, ctrlKey: !!input.control, altKey: !!input.alt });
 }
@@ -69,7 +78,9 @@ export function theAppKeepsThisInput(input) {
  * every other chord: ⌘R, ⌘=, ⌘Y and the rest are answered in the main process
  * already, and the window must not answer them a second time.
  */
-export function whatTheFileSentUp(k) {
+export function whatTheFileSentUp(
+  k: { key?: string; meta?: boolean; ctrl?: boolean; alt?: boolean } | null | undefined,
+): 'close' | 'palette' | 'app' | null {
   if (!k || typeof k.key !== 'string') return null;
   if (k.key === 'Escape') return 'close';
   if ((k.meta || k.ctrl) && k.key.toLowerCase() === 'k') return 'palette';
@@ -108,7 +119,7 @@ export function whatTheFileSentUp(k) {
 //                               app only ever happens deliberately (App.tsx
 //                               says so where E used to approve and burned
 //                               her). A forwarded digit is not deliberate.
-export const HER_LETTERS_IN_A_PAGE = new Set(['e', 'j', 'k', 'r', 'c', 'n', 's', 'z', 'b', 'g', '/', '\\']);
+export const HER_LETTERS_IN_A_PAGE: Set<string> = new Set(['e', 'j', 'k', 'r', 'c', 'n', 's', 'z', 'b', 'g', '/', '\\']);
 
 /**
  * Is this one of her letters, arriving from inside a page where there is
@@ -117,7 +128,7 @@ export const HER_LETTERS_IN_A_PAGE = new Set(['e', 'j', 'k', 'r', 'c', 'n', 's',
  * Bare or shifted only. A chord is already answered by theAppKeepsThisInput
  * above, and Option-e is a letter on a Mac, so neither belongs here.
  */
-export function theAppKeepsThisLetterInAPage(input) {
+export function theAppKeepsThisLetterInAPage(input: PaneInput | null | undefined): boolean {
   if (!input || typeof input.key !== 'string') return false;
   if (input.meta || input.control || input.alt) return false;
   return HER_LETTERS_IN_A_PAGE.has(input.key.toLowerCase());
@@ -132,7 +143,7 @@ export function theAppKeepsThisLetterInAPage(input) {
  * — the same rule the app applies to its own fields, applied one document down.
  * Main asks the frame this, because only the frame can see its own focus.
  */
-export const IS_SHE_TYPING_IN_THE_PAGE = `(() => {
+export const IS_SHE_TYPING_IN_THE_PAGE: string = `(() => {
   const a = document.activeElement;
   if (!a) return false;
   const t = String(a.tagName || '').toUpperCase();

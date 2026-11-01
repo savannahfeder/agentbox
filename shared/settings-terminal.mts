@@ -11,4 +11,4 @@
 // so no project anybody creates can collide with this and be handed a shell
 // pointed somewhere else. Both sides import this rather than spelling it,
 // because the whole value of a reserved key is that there is one of it.
-export const SETTINGS_TERMINAL = { product: 'zero:settings', id: 'codex-login' };
+export const SETTINGS_TERMINAL: { product: string; id: string } = { product: 'zero:settings', id: 'codex-login' };

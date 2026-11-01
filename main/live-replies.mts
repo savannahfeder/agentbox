@@ -68,7 +68,7 @@ export interface ReplySupervisor {
 export interface ReplyPayload {
   product: string;
   id: string;
-  status?: string;
+  status?: string | null;
   permissionMode?: unknown;
   now?: boolean;
   from?: string | null;

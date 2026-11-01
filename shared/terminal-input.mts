@@ -8,7 +8,7 @@
 //
 // A write that fails (the shell exited) drops what was waiting behind it: those
 // keys were for a shell that is gone, and the failure is reported once.
-export function inputQueue(send, { chunk = 16384, onError } = {}) {
+export function inputQueue(send: (data: string) => Promise<unknown>, { chunk = 16384, onError }: { chunk?: number; onError?: (e: unknown) => void } = {}): { push(data: string): void } {
   let queued = '', sending = false;
   async function drain() {
     if (sending) return;

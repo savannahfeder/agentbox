@@ -4,11 +4,15 @@
 // all until w-e1a42f6b21.
 
 /**
- * @param {{ email?: string | null, engine?: string, index?: number, total?: number }} account
- *  `index` is its place among that engine's accounts, `total` how many there
- *  are: one account is not counted, because the number would mean nothing.
+ * `index` is its place among that engine's accounts, `total` how many there
+ * are: one account is not counted, because the number would mean nothing.
  */
-export function accountName({ email = null, engine = 'claude', index = 0, total = 1 } = {}) {
+export function accountName({ email = null, engine = 'claude', index = 0, total = 1 }: {
+  email?: string | null;
+  engine?: string;
+  index?: number;
+  total?: number;
+} = {}): string {
   if (email) return email;
   const word = engine === 'codex' ? 'Codex' : 'Claude';
   return `${word} account${total > 1 ? ` ${index + 1}` : ''}`;

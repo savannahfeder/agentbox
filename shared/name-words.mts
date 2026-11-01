@@ -16,14 +16,14 @@ export const SHOUTED = new Set([
 
 /** One word of a name: shouted if it is on the list, otherwise its first
  *  letter up and the rest exactly as written, so `BAR` and `iOS` survive. */
-export function nameWord(word) {
+export function nameWord(word: string): string {
   if (!word) return word;
   if (SHOUTED.has(word.toLowerCase())) return word.toUpperCase();
   return word.replace(/^\w/, (c) => c.toUpperCase());
 }
 
 /** A file or folder name as a name: `greet-js` reads "Greet JS". */
-export function titleFromFileName(name) {
+export function titleFromFileName(name: string | null | undefined): string {
   return String(name ?? '')
     .replace(/[-_.]+/g, ' ')
     .trim()

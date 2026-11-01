@@ -17,7 +17,7 @@
 
 // name -> the sentence the privacy page promises, word for word.
 import { Name } from '../shared/product-name.mjs';
-export const EVENTS = {
+export const EVENTS: Record<string, string> = {
   app_opened: `${Name} was opened`,
   first_run_finished: 'First run finished',
   repo_connected: 'A repo was connected',
@@ -52,14 +52,14 @@ export const EVENTS = {
   run_waiting: 'An agent could not start yet',
 };
 
-export const EVENT_NAMES = Object.keys(EVENTS);
+export const EVENT_NAMES: string[] = Object.keys(EVENTS);
 
 // THE ONLY PROPERTIES A CALLER MAY ATTACH, and every one of them is a number or
 // a boolean. A string is refused outright rather than scrubbed, because a
 // scrubbed string is a promise about a regular expression and this is a promise
 // about a type. The version pair is set by the sender itself (`main/analytics
 // .mjs`), never by a caller, which is why it is not in here.
-export const ALLOWED_PROPS = new Set([
+export const ALLOWED_PROPS: Set<string> = new Set([
   'seconds',        // how long something took, rounded
   'count',          // how many of a thing, never which ones
   'kind',           // -> KINDS below, an enum and nothing else
@@ -72,18 +72,18 @@ export const ALLOWED_PROPS = new Set([
 
 // `kind`, `engine` and `reason` are the properties that are not numbers, so each is a
 // closed list. A value outside it is dropped, not passed through.
-export const KINDS = new Set(['task', 'question', 'review', 'directive', 'agent', 'digest']);
-export const ENGINES = new Set(['claude', 'codex']);
-export const WAIT_REASONS = new Set([
+export const KINDS: Set<string> = new Set(['task', 'question', 'review', 'directive', 'agent', 'digest']);
+export const ENGINES: Set<string> = new Set(['claude', 'codex']);
+export const WAIT_REASONS: Set<string> = new Set([
   'setup', 'paused', 'asleep', 'stuck', 'brake', 'slot', 'login', 'engine', 'memory',
   'held', 'folder', 'slow-folder', 'model', 'cloud', 'practice', 'project', 'claim', 'error',
 ]);
 
 // Refuse an event nobody approved; drop a property nobody approved. Returns the
 // payload that may be sent, or null when the event itself is not one of hers.
-export function sanitize(name, props = {}) {
+export function sanitize(name: string, props: Record<string, unknown> | null = {}): Record<string, string | number | boolean> | null {
   if (!EVENT_NAMES.includes(name)) return null;
-  const out = {};
+  const out: Record<string, string | number | boolean> = {};
   for (const [key, value] of Object.entries(props ?? {})) {
     if (!ALLOWED_PROPS.has(key)) continue;
     if (key === 'kind') {

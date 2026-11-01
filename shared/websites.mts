@@ -17,7 +17,7 @@ export const WEBSITE_PARTITION = 'persist:websites';
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 
 /** Is this an ordinary page on the web, the kind the pane opens in a browser? */
-export function isWebsiteAddress(src) {
+export function isWebsiteAddress(src: string | undefined | null): boolean {
   if (typeof src !== 'string' || !src) return false;
   try {
     const url = new URL(src);
@@ -33,13 +33,13 @@ export function isWebsiteAddress(src) {
  * local app, with the scheme a browser would add, or null. Never a search,
  * which would send what you typed to somebody else.
  */
-export function addressYouTyped(typed) {
+export function addressYouTyped(typed: string | undefined | null): string | null {
   const text = typeof typed === 'string' ? typed.trim() : '';
   if (!text || /\s/.test(text)) return null;
   const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(text);
-  const bareHost = text.split(/[/?#]/)[0].replace(/:\d+$/, '').toLowerCase();
+  const bareHost = text.split(/[/?#]/)[0]!.replace(/:\d+$/, '').toLowerCase();
   const full = hasScheme ? text : `${LOOPBACK.has(bareHost) ? 'http' : 'https'}://${text}`;
-  let url;
+  let url: URL;
   try { url = new URL(full); } catch { return null; }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
   if (url.username || url.password) return null;
@@ -52,7 +52,7 @@ export function addressYouTyped(typed) {
  * window can: `<webview>` is Electron's, and nothing registers the tag in an
  * ordinary tab or on a phone. Asking the tag beats guessing which door this is.
  */
-export function canFrameAWebsite(doc) {
+export function canFrameAWebsite(doc: { createElement(tag: string): object } | null | undefined): boolean {
   try {
     return !!doc && 'partition' in doc.createElement('webview');
   } catch {

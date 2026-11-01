@@ -29,7 +29,7 @@ export const DEPTH = 3;
 /**
  * Never counted: none of it is the project, and node_modules alone would put
  *  the number in the tens of thousands and the read into seconds. */
-export const SKIP = new Set([
+export const SKIP = new Set<string>([
   'node_modules', '.git', 'dist', 'build', 'out', '.next', '.nuxt', 'target',
   'venv', '.venv', '__pycache__', '.cache', 'vendor', 'Pods', 'DerivedData',
 ]);
@@ -37,7 +37,7 @@ export const SKIP = new Set([
 /**
  * What a file extension is called out loud. A language nobody here names is
  *  simply not mentioned, rather than guessed at from the extension. */
-export const LANGUAGE = {
+export const LANGUAGE: Record<string, string> = {
   '.ts': 'TypeScript', '.tsx': 'TypeScript', '.js': 'JavaScript', '.mjs': 'JavaScript',
   '.cjs': 'JavaScript', '.jsx': 'JavaScript', '.py': 'Python', '.rs': 'Rust',
   '.go': 'Go', '.swift': 'Swift', '.rb': 'Ruby', '.java': 'Java', '.kt': 'Kotlin',
@@ -49,23 +49,23 @@ export const LANGUAGE = {
  * The language most of it is written in, or null when nothing here is code we
  *  can name. Never a guess: a folder of things this table has never heard of
  *  gets a sentence with no language in it rather than a wrong one. */
-export function mainLanguage(ext) {
-  let best = null;
+export function mainLanguage(ext: Record<string, number> | null | undefined): string | null {
+  let best: [string, number] | null = null;
   for (const [e, n] of Object.entries(ext ?? {})) {
     if (!LANGUAGE[e]) continue;
     if (!best || n > best[1]) best = [e, n];
   }
-  return best ? LANGUAGE[best[0]] : null;
+  return best ? LANGUAGE[best[0]]! : null;
 }
 
-function plural(n, one, many) {
+function plural(n: number, one: string, many: string): string {
   return `${n.toLocaleString('en-US')} ${n === 1 ? one : many}`;
 }
 
 /**
  * How long ago, in the words a person uses. Only reached when a folder is not
  *  a git repo, because a repo's own answer is better. */
-export function howLongAgo(ms, now = Date.now()) {
+export function howLongAgo(ms: number, now = Date.now()): string {
   const days = (now - ms) / 86_400_000;
   if (days < 1) return 'today';
   if (days < 2) return 'yesterday';
@@ -84,7 +84,17 @@ export function howLongAgo(ms, now = Date.now()) {
  *  ("2 minutes ago") when the folder is a repo, and `newest` is the newest file
  *  in it for when it is not. Nothing in here can be false about a project,
  *  which is the whole point of it. */
-export function projectSentence({ name, files, dirs, ext, lastCommit, newest }, now = Date.now()) {
+export function projectSentence(
+  { name, files, dirs, ext, lastCommit, newest }: {
+    name?: string | null;
+    files: number;
+    dirs?: number;
+    ext?: Record<string, number> | null;
+    lastCommit?: string | null;
+    newest?: number | null;
+  },
+  now = Date.now(),
+): string {
   const who = name || 'This project';
   if (!files) {
     return `${who} is an empty folder. Everything you put in it from here shows up in ${NAME}.`;

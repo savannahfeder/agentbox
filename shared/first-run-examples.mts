@@ -18,7 +18,9 @@
 // the renderer draws the walk off ../renderer/src/onboarding.ts, and the main
 // process writes the rows off here.
 
-export const EXAMPLES = [
+export type Example = { kind: string; title: string; result: string; agoMs: number };
+
+export const EXAMPLES: Example[] = [
   {
     kind: 'question',
     title: 'Example: which of these two dates should the offsite use?',
@@ -49,7 +51,7 @@ export const EXAMPLES = [
  *  This returns the two writes for one example, in order, with the timestamps
  *  already worked out. Pure, so the ordering is tested rather than hoped for:
  *  tests/the-walk-stages-three-examples.test.mjs. */
-export function stampsFor(example, now) {
+export function stampsFor(example: Pick<Example, 'agoMs'>, now: number): { hers: number; agent: number } {
   const at = now - example.agoMs;
   return {
     // the row exists and it is her ask, at the moment it landed.

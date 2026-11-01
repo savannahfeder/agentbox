@@ -4,7 +4,7 @@
 // shortcuts stand aside for a textarea. `startOpen` is a page that is only a
 // terminal, which always takes it.
 // Pinned by tests/coming-back-to-an-open-terminal-leaves-the-keyboard-alone.test.mjs.
-export function terminalKeys({ startOpen = false, wasOpen = false } = {}) {
+export function terminalKeys({ startOpen = false, wasOpen = false }: { startOpen?: boolean; wasOpen?: boolean } = {}): { takesKeys(revision?: number): boolean; hidden(): void } {
   let cameBack = wasOpen === true && !startOpen;
   return {
     takesKeys: (revision = 0) => !cameBack || revision > 0,

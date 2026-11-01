@@ -41,7 +41,7 @@ export interface NewChatsStore {
   importCodexThreads(slug: string, list: NewChatThread[], opts: { now: number; land: string }): { added: number };
 }
 
-export type ReadThreads = (opts: { days: number; since: number; folders: (string | null | undefined)[]; now: number }) => Promise<NewChatThread[]> | NewChatThread[];
+export type ReadThreads = (opts: { days: number; since: number; folders: string[]; now: number }) => Promise<NewChatThread[]> | NewChatThread[];
 
 function idsWithRows(items: { labels?: unknown[] }[] | null | undefined) {
   const ids = new Set<string>();
@@ -99,7 +99,7 @@ export async function scanNewChats({ store, config, readThreads, isOpen, now = D
   const days = Math.min(10, Math.max(1, Math.ceil((now - since) / 86400e3) + 1));
   // Never a project shared with a team: teammates would read chats nobody chose to share.
   const products = store.listProducts().filter((p) => !isShared(p));
-  const folders = products.map((p) => p.repoPath).filter(Boolean);
+  const folders = products.map((p) => p.repoPath).filter(Boolean) as string[];
   const threads = await readThreads({ days, since, folders, now });
   // An open session already has its own row when "Show while they run" is on.
   const openShownLive = outsideAgentsMode(config) !== 'off';

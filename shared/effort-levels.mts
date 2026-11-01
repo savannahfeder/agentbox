@@ -36,7 +36,14 @@
 // not know what that is per model, so it does not claim to. The strip draws no
 // lit button until she picks one.
 
-export const EFFORT_LEVELS = Object.freeze([
+export type EffortLevel = {
+  /** What the app sends Claude Code after `--effort`. */
+  id: string;
+  /** The word on the strip in the model drawer. */
+  label: string;
+};
+
+export const EFFORT_LEVELS: ReadonlyArray<EffortLevel> = Object.freeze<EffortLevel[]>([
   { id: 'low', label: 'Low' },
   { id: 'medium', label: 'Medium' },
   { id: 'high', label: 'High' },
@@ -47,7 +54,7 @@ export const EFFORT_LEVELS = Object.freeze([
 ]);
 
 /** Whether a word is one Claude Code will take after `--effort`. */
-export function isEffort(value) {
+export function isEffort(value: unknown): value is string {
   return typeof value === 'string' && EFFORT_LEVELS.some((e) => e.id === value);
 }
 
@@ -58,7 +65,7 @@ export function isEffort(value) {
  * spawn is the real gate for each engine: `isEffort` for Claude Code, the
  * model's own advertised levels for Codex (`Supervisor#codexEffortRefusal`).
  */
-export function isEffortWord(value) {
+export function isEffortWord(value: unknown): value is string {
   return typeof value === 'string' && /^[a-z][a-z0-9]{0,23}$/.test(value);
 }
 
@@ -68,7 +75,7 @@ export function isEffortWord(value) {
  * shown with its first letter up, so the app never invents a name for a level
  * it only learned about from the cache.
  */
-export function effortLabel(id) {
+export function effortLabel(id: unknown): string | null {
   const known = EFFORT_LEVELS.find((e) => e.id === id);
   if (known) return known.label;
   if (!isEffortWord(id)) return null;

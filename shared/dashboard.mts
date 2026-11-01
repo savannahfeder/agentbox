@@ -22,12 +22,85 @@
 // headline is "steps to launch", which counts down and is derived from the
 // path, rather than anything a founder can raise by interviewing forever.
 
+export type Stage = 'prelaunch' | 'launched';
+export type StepStatus = 'done' | 'here' | 'ahead';
+export type PathStep = { name: string; status: StepStatus; note: string };
+export type Metric = {
+  id: string;
+  label: string;
+  value: number | null;
+  of: number | null;
+  prefix: string;
+  unit: string;
+  absent: string | null;
+  fills: string;
+  series: number[] | null;
+  source: unknown;
+};
+export type MetricInput = {
+  id?: unknown;
+  label?: unknown;
+  value?: unknown;
+  of?: unknown;
+  prefix?: unknown;
+  unit?: unknown;
+  absent?: unknown;
+  fills?: unknown;
+  series?: unknown;
+  source?: unknown;
+};
+export type MetricShape = 'absent' | 'pips' | 'series' | 'flat';
+export type Pip = 'on' | 'now' | 'off';
+export type Callout = { body: string; foot: string };
+export type Analytics = { provider: string; projectId: string | null; host: string | null };
+export type LedgerField =
+  | 'founderName' | 'oneLiner' | 'stage' | 'path' | 'bottleneck' | 'nextMove'
+  | 'metrics' | 'keyMetricId' | 'analytics';
+export type LedgerSource = 'agent' | 'founder';
+export type LedgerEntry = { ts: number; source: LedgerSource; chatId: unknown; patch: Record<string, unknown> };
+export type Dashboard = {
+  stage: Stage;
+  founderName: string | null;
+  oneLiner: string | null;
+  path: PathStep[];
+  bottleneck: Callout | null;
+  nextMove: Callout | null;
+  metrics: Metric[];
+  keyMetricId: string | null;
+  analytics: Analytics | null;
+  authored: Partial<Record<string, LedgerSource>>;
+  now: number;
+};
+export type Glyph = 'wait' | 'run' | 'stop' | 'done';
+export type ChatStatus = {
+  askPending?: boolean;
+  askSince?: number | null;
+  working?: boolean;
+  workingSince?: number | null;
+  doneAt?: number | null;
+  readAt?: number | null;
+  cutAt?: number | null;
+};
+export type InFlightItem = {
+  key: string;
+  chatId?: string;
+  creationId?: string;
+  name: string;
+  glyph: Glyph;
+  state: string;
+  detail: string;
+  since: number | null;
+};
+
+type Loose = Record<string, unknown>;
+type Patch = Loose | string | number | boolean | null | undefined;
+
 /* ------------------------------- the stages ------------------------------ */
 // Two states of one page, never two products. Pre-launch adds the path and the
 // proportion pips; launched retires them and real metrics take over.). A
 // founder who flips their own stage early is not a failure mode worth
 // machinery.
-export const STAGES = ['prelaunch', 'launched'];
+export const STAGES: Stage[] = ['prelaunch', 'launched'];
 
 /* -------------------------------- the path ------------------------------- */
 // The default road to launch. Six steps, plain words, ending at the door: the
@@ -38,7 +111,7 @@ export const STAGES = ['prelaunch', 'launched'];
 //
 // Every step's `note` is a fact or a condition, never a target and never a
 // countdown: comparison is motivating, prescription is not.
-export const DEFAULT_PATH = [
+export const DEFAULT_PATH: PathStep[] = [
   { name: 'Describe it', status: 'here', note: '' },
   { name: 'Meet your customers', status: 'ahead', note: '' },
   { name: 'Talk to them', status: 'ahead', note: '' },
@@ -47,18 +120,18 @@ export const DEFAULT_PATH = [
   { name: "Show it to people you don't know", status: 'ahead', note: 'the whole point' },
 ];
 
-export const STEP_STATUSES = ['done', 'here', 'ahead'];
+export const STEP_STATUSES: StepStatus[] = ['done', 'here', 'ahead'];
 
 // The last step is the door: it renders as wanted rather than as locked (full
 // strength label, a lamp ring waiting). Position, not a flag on the data, so a
 // replaced path gets the same treatment for free.
-export function isDoor(path, index) {
+export function isDoor(path: unknown[] | null | undefined, index: number): boolean {
   return index === (path?.length ?? 0) - 1;
 }
 
 // How many steps remain, the pre-launch headline. Counts every step that is not
 // done, so standing still cannot improve it and finishing one always does.
-export function stepsToLaunch(path) {
+export function stepsToLaunch(path: PathStep[] | null | undefined): number {
   const steps = Array.isArray(path) ? path : [];
   return steps.filter((s) => s?.status !== 'done').length;
 }
@@ -76,9 +149,9 @@ export function stepsToLaunch(path) {
 // Absence of data and a real zero are DIFFERENT FACTS and must never look the
 // same. A page that draws "not measured" as a confident 0 is lying, and this
 // product's whole claim is that its numbers are not lying.
-export function makeMetric(input = {}) {
-  const value = Number.isFinite(input.value) ? input.value : null;
-  const of = Number.isFinite(input.of) ? input.of : null;
+export function makeMetric(input: MetricInput = {}): Metric {
+  const value = Number.isFinite(input.value) ? input.value as number : null;
+  const of = Number.isFinite(input.of) ? input.of as number : null;
   return {
     id: String(input.id ?? '').trim() || slug(input.label),
     label: String(input.label ?? '').trim(),
@@ -94,7 +167,7 @@ export function makeMetric(input = {}) {
     // yet") and the line that says what would fill it. Never a loading state.
     absent: value == null ? (String(input.absent ?? '').trim() || 'not measured') : null,
     fills: value == null ? String(input.fills ?? '').trim() : '',
-    series: Array.isArray(input.series) ? input.series.filter((n) => Number.isFinite(n)) : null,
+    series: Array.isArray(input.series) ? input.series.filter((n: unknown) => Number.isFinite(n)) : null,
     source: input.source ?? null,
   };
 }
@@ -102,7 +175,7 @@ export function makeMetric(input = {}) {
 // Which drawing a metric gets. A proportion is pips; anything else with history
 // is a sparkline; anything else is the dashed absent baseline. Pure, so the
 // component never decides this itself and the tests can pin it.
-export function metricShape(metric) {
+export function metricShape(metric: Pick<Metric, 'of' | 'value' | 'series'> | null | undefined): MetricShape {
   if (!metric) return 'absent';
   if (metric.of != null) return 'pips';
   if (metric.value == null) return 'absent';
@@ -116,7 +189,7 @@ export function metricShape(metric) {
 }
 
 // True when this metric is honestly measured. `0` is measured; null is not.
-export function isMeasured(metric) {
+export function isMeasured(metric: Pick<Metric, 'value'> | null | undefined): boolean {
   return !!metric && metric.value != null;
 }
 
@@ -136,31 +209,31 @@ export function isMeasured(metric) {
 // clobber each other the way two read-modify-writes of a single document would.
 // Folding is newest-wins per TOP-LEVEL field, so a chat that only knows the
 // next move never has to restate the one-liner to avoid erasing it.
-export const LEDGER_FIELDS = [
+export const LEDGER_FIELDS: LedgerField[] = [
   'founderName', 'oneLiner', 'stage', 'path', 'bottleneck', 'nextMove',
   'metrics', 'keyMetricId', 'analytics',
 ];
 
-export const LEDGER_SOURCES = ['agent', 'founder'];
+export const LEDGER_SOURCES: LedgerSource[] = ['agent', 'founder'];
 
 // THE FOUNDER'S WORD WINS.). Authority is per FIELD and only over fields the
 // founder actually touched, so pinning the headline metric never freezes the
 // agent out of updating the metric values themselves. A newer founder patch
 // always beats an older founder patch: changing your mind is allowed.
-export function foldLedger(lines, now = Date.now()) {
+export function foldLedger(lines: unknown, now = Date.now()): Dashboard {
   const picture = defaultDashboard(now);
-  const winner = new Map(); // field -> { ts, source }
+  const winner = new Map<string, { ts: number; source: LedgerSource }>(); // field -> { ts, source }
 
   for (const line of Array.isArray(lines) ? lines : []) {
     const entry = normalizeLine(line);
     if (!entry) continue; // a malformed line is skipped, never fatal
     for (const [field, value] of Object.entries(entry.patch)) {
-      if (!LEDGER_FIELDS.includes(field)) continue;
+      if (!LEDGER_FIELDS.includes(field as LedgerField)) continue;
       const held = winner.get(field);
       if (held && !beats(entry, held)) continue;
-      const clean = coerceField(field, value);
+      const clean = coerceField(field, value as Patch);
       if (clean === undefined) continue; // a field that failed validation keeps the older value
-      picture[field] = clean;
+      (picture as Record<string, unknown>)[field] = clean;
       winner.set(field, { ts: entry.ts, source: entry.source });
     }
   }
@@ -172,7 +245,7 @@ export function foldLedger(lines, now = Date.now()) {
 }
 
 // Does the incoming entry outrank the one already holding this field?
-function beats(incoming, held) {
+function beats(incoming: LedgerEntry, held: { ts: number; source: LedgerSource }): boolean {
   if (held.source === 'founder' && incoming.source !== 'founder') return false;
   if (incoming.source === 'founder' && held.source !== 'founder') return true;
   return incoming.ts >= held.ts;
@@ -180,25 +253,25 @@ function beats(incoming, held) {
 
 // One ledger line, defensively read. Anything unparseable returns null so a
 // corrupt ledger degrades to an older picture rather than a broken page.
-export function normalizeLine(line) {
-  let raw = line;
+export function normalizeLine(line: unknown): LedgerEntry | null {
+  let raw = line as string | Loose | null | undefined;
   if (typeof raw === 'string') {
     const text = raw.trim();
     if (!text) return null;
     try { raw = JSON.parse(text); } catch { return null; }
   }
   if (!raw || typeof raw !== 'object') return null;
-  const patch = raw.patch;
+  const patch = raw.patch as Loose | null | undefined;
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return null;
-  const ts = Number.isFinite(raw.ts) ? raw.ts : 0;
-  const source = LEDGER_SOURCES.includes(raw.source) ? raw.source : 'agent';
+  const ts = Number.isFinite(raw.ts) ? raw.ts as number : 0;
+  const source = LEDGER_SOURCES.includes(raw.source as LedgerSource) ? raw.source as LedgerSource : 'agent';
   return { ts, source, chatId: raw.chatId ?? null, patch };
 }
 
 // Per-field validation. Returning undefined means "this patch had nothing
 // usable for this field", and the previous value stands: a garbled write can
 // never blank a good picture.
-function coerceField(field, value) {
+function coerceField(field: string, value: Patch): unknown {
   switch (field) {
     case 'founderName':
       // What to call them, as THEY said it. Never derived from an email local
@@ -212,7 +285,7 @@ function coerceField(field, value) {
       return typeof value === 'string' && value.trim() ? clean(value) : undefined;
 
     case 'stage':
-      return STAGES.includes(value) ? value : undefined;
+      return STAGES.includes(value as Stage) ? value : undefined;
 
     case 'keyMetricId':
       return typeof value === 'string' && value.trim() ? value.trim() : undefined;
@@ -220,10 +293,10 @@ function coerceField(field, value) {
     case 'path': {
       if (!Array.isArray(value) || !value.length) return undefined;
       const steps = value
-        .filter((s) => s && typeof s === 'object' && String(s.name ?? '').trim())
-        .map((s) => ({
+        .filter((s: Loose | null) => s && typeof s === 'object' && String(s.name ?? '').trim())
+        .map((s: Loose): PathStep => ({
           name: clean(s.name),
-          status: STEP_STATUSES.includes(s.status) ? s.status : 'ahead',
+          status: STEP_STATUSES.includes(s.status as StepStatus) ? s.status as StepStatus : 'ahead',
           note: clean(s.note ?? ''),
         }));
       return steps.length ? steps : undefined;
@@ -241,8 +314,8 @@ function coerceField(field, value) {
     case 'metrics': {
       if (!Array.isArray(value)) return undefined;
       const metrics = value
-        .filter((m) => m && typeof m === 'object' && String(m.label ?? '').trim())
-        .map((m) => makeMetric({ ...m, label: clean(m.label), unit: clean(m.unit ?? ''), fills: clean(m.fills ?? ''), absent: clean(m.absent ?? '') }));
+        .filter((m: Loose | null) => m && typeof m === 'object' && String(m.label ?? '').trim())
+        .map((m: Loose) => makeMetric({ ...m, label: clean(m.label), unit: clean(m.unit ?? ''), fills: clean(m.fills ?? ''), absent: clean(m.absent ?? '') }));
       return metrics.length ? metrics : undefined;
     }
 
@@ -265,7 +338,7 @@ function coerceField(field, value) {
 
 // The picture before anyone has written anything: a brand new company on step
 // one.
-export function defaultDashboard(now = Date.now()) {
+export function defaultDashboard(now = Date.now()): Dashboard {
   return {
     stage: 'prelaunch',
     founderName: null,
@@ -290,7 +363,10 @@ export function defaultDashboard(now = Date.now()) {
 // no agent has written a single metric, because the page has to be honest and
 // useful on day one, and that number is derived from the path so it cannot be
 // gamed.
-export function metricRow(picture, { others = 3 } = {}) {
+export function metricRow(
+  picture: Partial<Pick<Dashboard, 'metrics' | 'stage' | 'path' | 'keyMetricId'>> | null | undefined,
+  { others = 3 }: { others?: number } = {},
+): { key: Metric | null; others: Metric[] } {
   // NO PICTURE IS NOT A COMPANY. Day one is `defaultDashboard`, which has the
   // six-step path and therefore a true headline; a null picture means the
   // ledger has not been read yet (on the web the brain is a sandbox that takes
@@ -320,7 +396,7 @@ export function metricRow(picture, { others = 3 } = {}) {
 
 // The derived pre-launch headline. Its unit line NAMES the remaining steps, so
 // the number is never a bare score: it says what it would take to move it.
-export function stepsToLaunchMetric(path) {
+export function stepsToLaunchMetric(path: PathStep[] | null | undefined): Metric {
   const steps = Array.isArray(path) ? path : [];
   const remaining = steps.filter((s) => s?.status !== 'done');
   const names = remaining.map((s) => lowerFirst(s.name));
@@ -340,7 +416,7 @@ export function stepsToLaunchMetric(path) {
 
 // The pips under a pre-launch figure: a proportion, not a series. The path's
 // own pips mark where you are with the lamp; a plain proportion has no "now".
-export function pipsFor(metric, path) {
+export function pipsFor(metric: Pick<Metric, 'id' | 'of' | 'value'> | null | undefined, path?: PathStep[] | null): Pip[] {
   if (metric?.id === 'steps-to-launch') {
     const steps = Array.isArray(path) ? path : [];
     return steps.map((s, i) => {
@@ -370,15 +446,23 @@ export function pipsFor(metric, path) {
 // on this page: the per-chat status ledger and the runtime map. The old home's
 // "in progress" lamp was not liveness at all and does not survive into this
 // grid.
-export const GLYPHS = ['wait', 'run', 'stop', 'done'];
+export const GLYPHS: Glyph[] = ['wait', 'run', 'stop', 'done'];
 
 // Order on screen: what needs you, then what is moving, then what stopped, then
 // what is ready. Never a drought counter, never a scolding; a stalled item says
 // when it stopped and nothing more.
-const GLYPH_RANK = { wait: 0, run: 1, stop: 2, done: 3 };
+const GLYPH_RANK: Record<Glyph, number> = { wait: 0, run: 1, stop: 2, done: 3 };
 
-export function deriveInFlight({ chats = [], chatStatus = {}, runtime = {}, creations = [] } = {}, now = Date.now()) {
-  const items = [];
+export function deriveInFlight(
+  { chats = [], chatStatus = {}, runtime = {}, creations = [] }: {
+    chats?: { id: string; title?: string }[];
+    chatStatus?: Record<string, ChatStatus | undefined> | null;
+    runtime?: Record<string, { status?: string; port?: number | string } | null> | null;
+    creations?: { id: string; title?: string }[];
+  } = {},
+  now = Date.now(),
+): InFlightItem[] {
+  const items: InFlightItem[] = [];
 
   for (const chat of chats) {
     const st = chatStatus?.[chat?.id];
@@ -395,7 +479,7 @@ export function deriveInFlight({ chats = [], chatStatus = {}, runtime = {}, crea
     }
   }
 
-  const titleOf = (id) => creations.find((c) => c?.id === id)?.title;
+  const titleOf = (id: string): string | undefined => creations.find((c) => c?.id === id)?.title;
   for (const [creationId, rt] of Object.entries(runtime ?? {})) {
     const name = titleOf(creationId);
     if (!name) continue; // a runtime whose creation is gone is not a thing to show
@@ -414,9 +498,9 @@ export function deriveInFlight({ chats = [], chatStatus = {}, runtime = {}, crea
 // Elapsed, for something happening right now. Minutes until an hour, then
 // hours: a working turn measured in seconds reads as a stopwatch, which invites
 // watching it rather than doing something else.
-export function elapsed(since, now = Date.now()) {
-  if (!Number.isFinite(since) || since <= 0) return '';
-  const mins = Math.floor((now - since) / 60_000);
+export function elapsed(since: number | null | undefined, now = Date.now()): string {
+  if (!Number.isFinite(since) || since! <= 0) return '';
+  const mins = Math.floor((now - since!) / 60_000);
   if (mins < 1) return 'just now';
   if (mins < 60) return `${mins} min`;
   const hours = Math.floor(mins / 60);
@@ -424,17 +508,17 @@ export function elapsed(since, now = Date.now()) {
 }
 
 // When something happened, in the same words the rest of the app uses.
-export function when(ts, now = Date.now()) {
-  if (!Number.isFinite(ts) || ts <= 0) return '';
-  const days = Math.floor((now - ts) / 86_400_000);
+export function when(ts: number | null | undefined, now = Date.now()): string {
+  if (!Number.isFinite(ts) || ts! <= 0) return '';
+  const days = Math.floor((now - ts!) / 86_400_000);
   if (days <= 0) return 'today';
   if (days === 1) return 'yesterday';
   if (days < 7) return `${days} days ago`;
-  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return new Date(ts!).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 // The date on the top bar, in the app's house form: "Mon · Jul 27".
-export function dateLine(now = Date.now()) {
+export function dateLine(now = Date.now()): string {
   const d = new Date(now);
   const day = d.toLocaleDateString('en-US', { weekday: 'short' });
   const rest = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -451,7 +535,7 @@ export function dateLine(now = Date.now()) {
 /* ------------------------------- the greeting ---------------------------- */
 // Time of day, for "Morning, the founder." Local to whoever is reading
 // it.
-export function greeting(now = Date.now()) {
+export function greeting(now = Date.now()): string {
   const hour = new Date(now).getHours();
   if (hour < 12) return 'Morning';
   if (hour < 18) return 'Afternoon';
@@ -462,20 +546,20 @@ export function greeting(now = Date.now()) {
 // House rule, enforced rather than remembered: no em or en dashes in anything a
 // founder reads. An agent writing the ledger is a model, and models reach for
 // them constantly, so the ledger cleans on the way in instead of hoping.
-export function clean(text) {
+export function clean(text: unknown): string {
   return String(text ?? '')
     .replace(/\s*[—–]\s*/g, ', ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-function slug(text) {
+function slug(text: unknown): string {
   return String(text ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'metric';
 }
 
-function lowerFirst(text) {
+function lowerFirst(text: unknown): string {
   const s = String(text ?? '').trim();
   if (!s) return s;
   // only lowercase a plain capitalized word, so a proper noun keeps its case
-  return /^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s;
+  return /^[A-Z][a-z]/.test(s) ? s[0]!.toLowerCase() + s.slice(1) : s;
 }

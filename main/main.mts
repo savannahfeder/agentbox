@@ -6,6 +6,7 @@ import './no-default-menu.mts';
 import type { ContextMenuParams, MenuItemConstructorOptions, WebContents } from 'electron';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mts';
+import type { TeamSession } from './team/index.mts';
 import { roomsSetup } from './team/room-setup.mts';
 import { loadCloudConfig, supabaseSession } from './team/session.mjs';
 // MY WORKSPACE IS NOT A TEAM FEATURE ANY MORE (w-f8d123be62), even though it
@@ -469,7 +470,7 @@ async function createWindow() {
       decrypt: (buf: Buffer) => (safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : buf.toString('utf8')),
       packaged: app.isPackaged,
       openExternal: (url: string) => shell.openExternal(url),
-    } as unknown as Parameters<typeof supabaseSession>[0]),
+    } as unknown as Parameters<typeof supabaseSession>[0]) as TeamSession,
     store,
     disk: workItemsDisk,
     accountRoot: config.accountRoot,

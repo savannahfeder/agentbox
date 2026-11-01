@@ -10,12 +10,12 @@
 // on the next tick, and a toast that lasts 2.5 seconds has no room for a
 // number that will be wrong before she has finished reading it.
 
-export function recoveryToast(r) {
+export function recoveryToast(r: { resumed?: unknown; waiting?: unknown } | null | undefined): string | null {
   if (!r) return null;
   const resumed = Number(r.resumed) || 0;
   const waiting = Number(r.waiting) || 0;
   if (!resumed && !waiting) return null;
-  const agents = (n) => (n === 1 ? '1 agent' : `${n} agents`);
+  const agents = (n: number): string => (n === 1 ? '1 agent' : `${n} agents`);
   if (!waiting) {
     return `${agents(resumed)} picked up where ${resumed === 1 ? 'it' : 'they'} left off`;
   }

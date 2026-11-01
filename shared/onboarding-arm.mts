@@ -9,10 +9,10 @@ import { readEnv } from './product-name.mjs';
 import { runningAsAFreshUser } from './fresh-user-home.mjs';
 import { runningAsADemo } from './demo-world.mjs';
 
-export const ARMS = ['tour', 'classic'];
+export const ARMS: string[] = ['tour', 'classic'];
 const FILE = 'onboarding-arm';
 
-export function readArm(dir) {
+export function readArm(dir: string | null | undefined): string | null {
   if (!dir) return null;
   try {
     const word = fs.readFileSync(path.join(dir, FILE), 'utf8').trim();
@@ -21,8 +21,8 @@ export function readArm(dir) {
 }
 
 /** The install's word, drawn and kept the first time it is asked for. */
-export function armFor(dir, { env = process.env, random = Math.random } = {}) {
-  const named = readEnv('ONBOARDING', env);
+export function armFor(dir: string, { env = process.env, random = Math.random }: { env?: NodeJS.ProcessEnv; random?: () => number } = {}): string {
+  const named = readEnv('ONBOARDING', env) as string;
   // A test window or a demo is not a new install: it shows the version asked for, or the new one, and keeps nothing.
   if (runningAsAFreshUser(env) || runningAsADemo(env)) return ARMS.includes(named) ? named : 'tour';
   const kept = readArm(dir);

@@ -19,30 +19,30 @@ const ADDRESS = /https?:\/\/[^\s"'<>`]+/g;
 // Punctuation that closes the sentence around an address, not the address.
 const TRAILING = /[.,;:!?)\]}'"]+$/;
 
+export type TerminalLink = { url: string; range: { start: { x: number; y: number }; end: { x: number; y: number } } };
+
 /**
- * @param {(y: number) => ({ text: string, wrapped: boolean } | undefined)} at
- * @param {number} row 0-based
- * @returns {{ url: string, range: { start: { x: number, y: number }, end: { x: number, y: number } } }[]}
+ * @param row 0-based
  */
-export function linksAtRow(at, row) {
+export function linksAtRow(at: (y: number) => { text: string; wrapped: boolean } | undefined, row: number): TerminalLink[] {
   if (!at(row)) return [];
   let top = row;
   while (top > 0 && at(top)?.wrapped && at(top - 1)) top -= 1;
-  const rows = [at(top).text];
-  for (let y = top + 1; at(y)?.wrapped; y += 1) rows.push(at(y).text);
+  const rows = [at(top)!.text];
+  for (let y = top + 1; at(y)?.wrapped; y += 1) rows.push(at(y)!.text);
 
   // Where each row starts in the joined string, to turn an index back into a
   // cell.
-  const starts = [];
+  const starts: number[] = [];
   let joined = '';
   for (const text of rows) { starts.push(joined.length); joined += text; }
-  const cell = (i) => {
+  const cell = (i: number) => {
     let r = starts.length - 1;
-    while (r > 0 && starts[r] > i) r -= 1;
-    return { x: i - starts[r] + 1, y: top + r + 1 };
+    while (r > 0 && starts[r]! > i) r -= 1;
+    return { x: i - starts[r]! + 1, y: top + r + 1 };
   };
 
-  const out = [];
+  const out: TerminalLink[] = [];
   for (const m of joined.matchAll(ADDRESS)) {
     const url = m[0].replace(TRAILING, '');
     if (!/^https?:\/\/./.test(url)) continue;

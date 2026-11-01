@@ -45,6 +45,7 @@ import { createAnalytics, createDailyCount } from './analytics.mts';
 import type { AnalyticsConfig } from './analytics.mts';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mts';
+import type { TeamSession } from './team/index.mts';
 import { ensurePersonalProject } from './team/projects.mts';
 import { loadCloudConfig, supabaseSession, headlessSessionFile } from './team/session.mjs';
 import { roomsSetup } from './team/room-setup.mts';
@@ -271,7 +272,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
       cloudConfig,
       sessionFile: headlessSessionFile({ userDir, storeRoot: config.storeRoot } as Parameters<typeof headlessSessionFile>[0]),
       openExternal: host.shell.openExternal,
-    }),
+    }) as TeamSession,
     store,
     disk: workItemsDisk,
     accountRoot: config.accountRoot,

@@ -18,14 +18,14 @@
  * What the practice project is called, on its own row in the rail and in the
  *  compose card. The slug is derived from it the same way any project's is. */
 import { NAME } from '../shared/product-name.mjs';
-export const PRACTICE_NAME = 'Practice';
-export const PRACTICE_SLUG = 'practice';
+export const PRACTICE_NAME: string = 'Practice';
+export const PRACTICE_SLUG: string = 'practice';
 
 /**
  * The mark in project.json. `listProducts` reads it out so the rest of the app
  *  can tell a practice project from a real one without matching on a name
  *  somebody could give a real project of their own. */
-export const PRACTICE_FLAG = 'practice';
+export const PRACTICE_FLAG: string = 'practice';
 
 /**
  * THE ONE TASK THEY SEND THEMSELVES. Written for them, because the beat is
@@ -73,7 +73,7 @@ export const PRACTICE_FLAG = 'practice';
 // already.", which is the walk talking to her, and it was then drawn in her
 // own thread as a message from "You". The band over the window already says
 // none of it is hers.
-export const PRACTICE_TASK = {
+export const PRACTICE_TASK: { title: string; body: string } = {
   title: 'Add a summary to the Practice meeting notes.',
   body: 'Keep it short: what we decided, and what is still open.',
 };
@@ -87,7 +87,7 @@ export const PRACTICE_TASK = {
  *
  * IT STILL TAKES TWO SECONDS AND IT IS STILL A REAL ROW WITH A REAL RESULT ON
  * THE REAL LEDGER.*/
-export const PRACTICE_ANSWER =
+export const PRACTICE_ANSWER: string =
   'Done, and it is five lines at the top of the notes: three decisions and two open questions. Say the word and I will make it shorter.';
 
 /**
@@ -100,9 +100,9 @@ export const PRACTICE_ANSWER =
  *  that or click the inbox have it auto-write something". It is in the reply
  *  box when her first thread comes back, so R or a click opens it ready to send,
  *  the same way the first thread's own words were ready in the card. */
-export const PRACTICE_REPLY = 'Make it shorter, please.';
+export const PRACTICE_REPLY: string = 'Make it shorter, please.';
 
-export const PRACTICE_REPLY_ANSWER =
+export const PRACTICE_REPLY_ANSWER: string =
   'Shorter now: three lines at the top of the notes, one for what was decided, one for what is open, and one for who owns each open question.';
 
 /**
@@ -130,7 +130,7 @@ export const PRACTICE_REPLY_ANSWER =
  *  SHORT ON PURPOSE. The panel is 322px wide with 12px of padding either side,
  *  so a line much past forty characters wraps, and a wrapped goal reads as a
  *  paragraph rather than a goal. */
-export const PRACTICE_NOTE = [
+export const PRACTICE_NOTE: string = [
   'Sessions are cookies, not tokens.',
   '',
   '15 new users this week. At 6.',
@@ -139,6 +139,26 @@ export const PRACTICE_NOTE = [
   '',
   'Next: talk to the five who churned.',
 ].join('\n');
+
+export type PracticeRow = {
+  kind: string;
+  title: string;
+  /** The sentence a person typed to start it. */
+  body: string;
+  /** The lines the run wrote while it worked, in the shape traceStreamLine
+   *  writes a real one: `[Tool] argument`, or a plain sentence when the agent
+   *  is talking. The store stamps the times. */
+  trace: string[];
+  result: string;
+  agoMs: number;
+  /** THE ONE THAT IS NOT FINISHED. An agent is stopped on it, waiting for an
+   *  answer, and beat thirteen is about the difference between this row and the
+   *  other two. Exactly one of the three carries it. */
+  waiting?: boolean;
+  /** THE ONE THAT IS NOT FOR TODAY. Real work, nobody's emergency, and the row
+   *  beat fourteen snoozes. Exactly one of the four carries it. */
+  later?: boolean;
+};
 
 /* * * THE FOUR WAITING ROWS, and processing them is the point of beats thirteen, * fourteen
  and fifteen. * * EACH ONE IS A WHOLE CONVERSATION NOW, NOT A TITLE AND A LINE.What she had
@@ -167,7 +187,7 @@ export const PRACTICE_NOTE = [
  exists to stop somebody * making, which is why they get beats of their own rather than a
  fourth press * of E.
 */
-export const PRACTICE_ROWS = [
+export const PRACTICE_ROWS: PracticeRow[] = [
   {
     kind: 'task',
     title: 'Drafted a reply to the venue.',
@@ -253,6 +273,19 @@ export const PRACTICE_ROWS = [
   },
 ];
 
+export type PracticeBackdropRow = {
+  state: 'needs' | 'working' | 'scheduled';
+  kind: string;
+  title: string;
+  body: string;
+  trace: string[];
+  /** Only on the `needs` rows: what the agent handed back. */
+  result?: string;
+  agoMs: number;
+  /** Only on the `scheduled` row: how long after staging it is set to run. */
+  inMs?: number;
+};
+
 /**
  * THE REST OF THE PRACTICE TEAM'S WORK, for the beats that show the whole of it.
  *
@@ -278,7 +311,7 @@ export const PRACTICE_ROWS = [
  *  rows into a Needs you the tour had just called empty. The same two pieces of
  *  work are still here in states that ask nothing of anybody, which keeps both
  *  rules: something in every column, and the inbox stays at zero. */
-export const PRACTICE_BACKDROP = [
+export const PRACTICE_BACKDROP: PracticeBackdropRow[] = [
   {
     state: 'working',
     kind: 'task',
@@ -344,7 +377,7 @@ export const PRACTICE_BACKDROP = [
  *  no thread at all. This is the run behind `PRACTICE_ANSWER`, in the same
  *  shape as the traces above, so the first task anybody opens in Agentbox shows
  *  them what a task holds. */
-export const PRACTICE_TASK_TRACE = [
+export const PRACTICE_TASK_TRACE: string[] = [
   '[Read] Meeting notes.docx',
   '[Grep] decided',
   'Three things were decided and two were left open, so the summary says which is which.',

@@ -48,7 +48,7 @@ export interface CodexAccount {
   accountId: string | null;
 }
 /** The login a running Codex reports for a home, as far as this file reads it. */
-interface LiveAccount { type?: string; planType?: string; email?: string }
+export interface LiveAccount { type?: string; planType?: string; email?: string }
 
 const liveAccounts = new Map<string, { fingerprint: string; account: LiveAccount | null | undefined }>();
 const authFingerprint = (text: string) => createHash('sha256').update(text).digest('hex');

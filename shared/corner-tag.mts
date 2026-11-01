@@ -28,15 +28,23 @@ export const MARGIN = 18;
  */
 export const EDGE_SLACK = 24;
 
+export type HideChoice = { key: '5m' | '30m' | 'today'; label: string };
+export type Grip = 'tl' | 'tr' | 'bl' | 'br';
+export type Rect = { x: number; y: number; width: number; height: number };
+export type Size = { width: number; height: number };
+export type Point = { x: number; y: number };
+export type ReadyLine = { id: string; title: string; says: string; since?: number; open?: string | null };
+export type Place = { corner: Grip; dx: number; dy: number };
+
 /** The ways to hide it. All of them come back; none of them is permanent. */
-export const HIDE_CHOICES = [
+export const HIDE_CHOICES: HideChoice[] = [
   { key: '5m', label: '5 min' },
   { key: '30m', label: '30 min' },
   { key: 'today', label: 'Today' },
 ];
 
 /** When a hide chosen at `now` runs out. 0 means "not hidden". */
-export function hiddenUntil(choice, now) {
+export function hiddenUntil(choice: unknown, now: number): number {
   if (choice === '5m') return now + 5 * 60_000;
   if (choice === '30m') return now + 30 * 60_000;
   if (choice === 'today') {
@@ -53,7 +61,7 @@ export function hiddenUntil(choice, now) {
  * (w-93b3a1a796), so working agents only appear in its list. "Waiting" won
  * over "ready" and "need you", and is what the tag says aloud.
  */
-export function tagSays({ ready = 0 } = {}) {
+export function tagSays({ ready = 0 }: { ready?: number } = {}): { kind: 'ready'; text: string; label: string } | null {
   if (ready > 0) return { kind: 'ready', text: String(ready), label: `${ready} waiting` };
   return null;
 }
@@ -64,13 +72,16 @@ export function tagSays({ ready = 0 } = {}) {
  * glass are placed in points: at 87% the glass stood out past the tag
  * (w-93b3a1a796). A zoom it cannot read counts as 100%.
  */
-export function inPoints({ width, height, glass, radius }, zoom) {
-  const z = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+export function inPoints(
+  { width, height, glass, radius }: { width: number; height: number; glass?: Rect; radius?: number },
+  zoom?: number,
+): { width: number; height: number; glass?: Rect; radius?: number } {
+  const z = Number.isFinite(zoom) && zoom! > 0 ? zoom! : 1;
   return {
     width: width * z,
     height: height * z,
     glass: glass && { x: glass.x * z, y: glass.y * z, width: glass.width * z, height: glass.height * z },
-    radius: Number.isFinite(radius) ? radius * z : radius,
+    radius: Number.isFinite(radius) ? radius! * z : radius,
   };
 }
 
@@ -80,14 +91,18 @@ export function inPoints({ width, height, glass, radius }, zoom) {
  * you were last at the app (`told`, { id, at }), dated from when it told you.
  * Before you have ever looked, everything counts.
  */
-export function newSince(ready, lookedAt, told = []) {
-  const toldAt = new Map();
-  for (const t of told ?? []) if (t?.id != null) toldAt.set(t.id, Number.isFinite(t.at) ? t.at : 0);
-  const out = [];
+export function newSince<T extends { id: string; since?: number }>(
+  ready: T[] | null | undefined,
+  lookedAt: number | null | undefined,
+  told: { id?: string | null; at?: number }[] | null = [],
+): T[] {
+  const toldAt = new Map<string, number>();
+  for (const t of told ?? []) if (t?.id != null) toldAt.set(t.id, Number.isFinite(t.at) ? t.at! : 0);
+  const out: T[] = [];
   for (const r of ready ?? []) {
     const own = Number.isFinite(r.since) ? r.since : null;
-    if (toldAt.has(r.id)) out.push(own != null && own >= toldAt.get(r.id) ? r : { ...r, since: toldAt.get(r.id) });
-    else if (!(lookedAt > 0) || (own != null && own > lookedAt)) out.push(r);
+    if (toldAt.has(r.id)) out.push(own != null && own >= toldAt.get(r.id)! ? r : { ...r, since: toldAt.get(r.id) });
+    else if (!(lookedAt! > 0) || (own != null && own > lookedAt!)) out.push(r);
   }
   return out;
 }
@@ -96,10 +111,10 @@ export function newSince(ready, lookedAt, told = []) {
  * What is left once you have crossed some off the tray (`dismissed`, id to
  * when). A thread stays off until it has something newer than that.
  */
-export function notDismissed(list, dismissed = {}) {
+export function notDismissed<T extends { id: string; since?: number }>(list: T[] | null | undefined, dismissed: Record<string, number> | null = {}): T[] {
   return (list ?? []).filter((r) => {
     const at = dismissed?.[r.id];
-    return !(Number.isFinite(at) && !(r.since > at));
+    return !(Number.isFinite(at) && !(r.since! > at!));
   });
 }
 
@@ -124,7 +139,7 @@ export function notDismissed(list, dismissed = {}) {
  * messed up (2026-10-13). Whole heights keep every edge on a real pixel.
  */
 export const TAG_BASE = 28;
-export const TAG_HEIGHTS = [
+export const TAG_HEIGHTS: { from: number; px: number }[] = [
   { from: 0, px: 31 },
   { from: 1900, px: 36 },
   { from: 2400, px: 42 },
@@ -132,15 +147,15 @@ export const TAG_HEIGHTS = [
 ];
 
 /** How tall the tag draws on a screen this many points wide, in whole pixels. */
-export function tagHeight(width) {
-  const w = Number.isFinite(width) ? width : 0;
-  let px = TAG_HEIGHTS[0].px;
+export function tagHeight(width: number | null | undefined): number {
+  const w = Number.isFinite(width) ? width! : 0;
+  let px = TAG_HEIGHTS[0]!.px;
   for (const step of TAG_HEIGHTS) if (w >= step.from) px = step.px;
   return px;
 }
 
 /** The one number the page multiplies everything by. */
-export function tagScale(width) {
+export function tagScale(width: number | null | undefined): number {
   return tagHeight(width) / TAG_BASE;
 }
 
@@ -159,28 +174,28 @@ export const TAG_ZOOM = { min: 0.75, max: 2, step: 0.1 };
 export const TAG_LIMITS = { min: 24, max: 80 };
 
 /** Her multiple, kept sane; nothing stored means the automatic size. */
-export function tagZoom(zoom) {
-  const z = Number.isFinite(zoom) ? zoom : 1;
+export function tagZoom(zoom: number | null | undefined): number {
+  const z = Number.isFinite(zoom) ? zoom! : 1;
   return clamp(Math.round(z * 100) / 100, TAG_ZOOM.min, TAG_ZOOM.max);
 }
 
 /** How tall the tag draws on this screen, with her multiple applied. */
-export function tagHeightOn(width, zoom) {
+export function tagHeightOn(width: number | null | undefined, zoom: number | null | undefined): number {
   return clamp(Math.round(tagHeight(width) * tagZoom(zoom)), TAG_LIMITS.min, TAG_LIMITS.max);
 }
 
 /** The scale the page is handed: the automatic size times her multiple. */
-export function tagScaleOn(width, zoom) {
+export function tagScaleOn(width: number | null | undefined, zoom: number | null | undefined): number {
   return tagHeightOn(width, zoom) / TAG_BASE;
 }
 
 /** One notch bigger or smaller, for the tag's own menu. */
-export function zoomStep(zoom, by) {
+export function zoomStep(zoom: number | null | undefined, by: number): number {
   return tagZoom(tagZoom(zoom) + by * TAG_ZOOM.step);
 }
 
 /** The four corners of a screen the tag can be placed in. */
-export const GRIPS = ['tl', 'tr', 'bl', 'br'];
+export const GRIPS = ['tl', 'tr', 'bl', 'br'] as const;
 
 /**
  * HOW MUCH OF THE TAG'S SIZE THE LIST TAKES (2026-10-13). The tag is a glance
@@ -190,8 +205,8 @@ export const GRIPS = ['tl', 'tr', 'bl', 'br'];
  * on the screen", so the list follows the tag less than a third of the way and
  * stops at a quarter bigger than the app's own text.
  */
-export function cardScale(scale) {
-  const s = Number.isFinite(scale) ? scale : 1;
+export function cardScale(scale: number | null | undefined): number {
+  const s = Number.isFinite(scale) ? scale! : 1;
   return clamp(Math.round((1 + (s - 1) * 0.3) * 1000) / 1000, 1, 1.25);
 }
 
@@ -223,14 +238,17 @@ export const LATTICE = { box: 10, dot: 2.7, gap: 0.95 };
  * old rule, and a point on her screen is 1.5 device pixels, which is why it
  * kept coming back.
  */
-export function latticeGrid(box, dpr = 1) {
-  const px = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
-  const want = (Number.isFinite(box) && box > 0 ? box : LATTICE.box) * px;
+export function latticeGrid(box: number | null | undefined, dpr: number | null | undefined = 1): {
+  dot: number; gap: number; pitch: number; side: number; size: number;
+  dots: { cx: number; cy: number }[];
+} {
+  const px = Number.isFinite(dpr) && dpr! > 0 ? dpr! : 1;
+  const want = (Number.isFinite(box) && box! > 0 ? box! : LATTICE.box) * px;
   // Both whole numbers either side of the film's dot and gap, and the pair
   // whose mark comes closest to the size asked for — a dot and a gap rounded
   // on their own can leave the mark a fifth too big, which shows.
   const ideal = { dot: (want * LATTICE.dot) / LATTICE.box, gap: (want * LATTICE.gap) / LATTICE.box };
-  const ways = [];
+  const ways: { dot: number; gap: number; side: number }[] = [];
   for (const dot of [Math.floor(ideal.dot), Math.ceil(ideal.dot)]) {
     for (const gap of [Math.floor(ideal.gap), Math.ceil(ideal.gap)]) {
       const d = Math.max(2, dot);
@@ -245,7 +263,7 @@ export function latticeGrid(box, dpr = 1) {
   const pick = (inBand.length ? inBand : ways)
     .sort((a, b) => Math.abs(a.side - want) - Math.abs(b.side - want)
       || Math.abs(a.dot / a.gap - LATTICE.dot / LATTICE.gap) - Math.abs(b.dot / b.gap - LATTICE.dot / LATTICE.gap));
-  const { dot, gap, side } = pick[0];
+  const { dot, gap, side } = pick[0]!;
   const pitch = dot + gap;
   const at = [0, 1, 2].map((i) => dot / 2 + i * pitch);
   return { dot, gap, pitch, side, size: side / px, dots: at.flatMap((cy) => at.map((cx) => ({ cx, cy }))) };
@@ -255,9 +273,9 @@ export function latticeGrid(box, dpr = 1) {
  * Newest first. Something with no moment it became ready (an agent stopped on
  * a yes, right now) sorts as now.
  */
-export function readyNow(ready, now) {
+export function readyNow<T extends { since?: number }>(ready: T[] | null | undefined, now: number): T[] {
   return [...(ready ?? [])]
-    .sort((a, b) => (Number.isFinite(b.since) ? b.since : now) - (Number.isFinite(a.since) ? a.since : now));
+    .sort((a, b) => (Number.isFinite(b.since) ? b.since! : now) - (Number.isFinite(a.since) ? a.since! : now));
 }
 
 /**
@@ -265,7 +283,7 @@ export function readyNow(ready, now) {
  * null without a reading. Near the middle it keeps the tone it had, so a
  * mid-grey page does not flip the ink every time the reading drifts.
  */
-export function toneFromLuma(luma, was = null) {
+export function toneFromLuma(luma: unknown, was: 'light' | 'dark' | null = null): 'light' | 'dark' | null {
   if (typeof luma !== 'number' || !(luma >= 0 && luma <= 1)) return null;
   if (was === 'light' && luma >= 0.4) return 'light';
   if (was === 'dark' && luma <= 0.6) return 'dark';
@@ -273,7 +291,13 @@ export function toneFromLuma(luma, was = null) {
 }
 
 /** Whether the tag is on screen right now; `ready` is how many are new. */
-export function tagShows({ on, hiddenUntil: until = 0, now, inApp, ready = 0 }) {
+export function tagShows({ on, hiddenUntil: until = 0, now, inApp, ready = 0 }: {
+  on?: boolean;
+  hiddenUntil?: number;
+  now: number;
+  inApp?: boolean;
+  ready?: number;
+}): boolean {
   if (on === false) return false;
   if (until > now) return false;
   // In the app itself the inbox already says all of this, bigger.
@@ -282,25 +306,28 @@ export function tagShows({ on, hiddenUntil: until = 0, now, inApp, ready = 0 }) 
 }
 
 /** How long something has waited, in units. */
-export function waitedFor(since, now) {
+export function waitedFor(since: number | null | undefined, now: number): string {
   if (!Number.isFinite(since)) return '';
-  const min = Math.floor((now - since) / 60_000);
+  const min = Math.floor((now - since!) / 60_000);
   if (min < 1) return 'now';
   if (min < 60) return `${min} min`;
   return `${Math.floor(min / 60)} h`;
 }
 
 /** The lines under the tag: the newest first, three at most. */
-export function cardLines(ready, now, max = 3) {
-  const sorted = readyNow(ready, now, Infinity);
+export function cardLines<T extends ReadyLine>(ready: T[], now: number, max = 3): {
+  lines: (T & { waited: string })[];
+  more: number;
+} {
+  const sorted = readyNow(ready, now);
   const lines = sorted.slice(0, max).map((r) => ({ ...r, waited: waitedFor(r.since, now) }));
   return { lines, more: Math.max(0, sorted.length - lines.length) };
 }
 
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
-function areaFor(point, areas) {
-  return areas.find((a) => point.x >= a.x && point.x < a.x + a.width && point.y >= a.y && point.y < a.y + a.height) ?? areas[0];
+function areaFor(point: Point, areas: Rect[]): Rect {
+  return areas.find((a) => point.x >= a.x && point.x < a.x + a.width && point.y >= a.y && point.y < a.y + a.height) ?? areas[0]!;
 }
 
 /**
@@ -308,20 +335,20 @@ function areaFor(point, areas) {
  * onto a screen if that screen is gone, or the bottom-right corner the first
  * time. `spot` is the tag's top-left, `areas` are the screens' work areas.
  */
-export function restingSpot(spot, size, areas) {
+export function restingSpot(spot: Point | null | undefined, size: Size, areas: Rect[]): Point {
   if (!spot) {
-    const a = areas[0];
+    const a = areas[0]!;
     return { x: a.x + a.width - MARGIN - size.width, y: a.y + a.height - MARGIN - size.height };
   }
-  const a = areaFor({ x: spot.x + size.width / 2, y: spot.y + size.height / 2 }, areas) ?? areas[0];
+  const a = areaFor({ x: spot.x + size.width / 2, y: spot.y + size.height / 2 }, areas) ?? areas[0]!;
   return {
     x: clamp(spot.x, a.x, a.x + a.width - size.width),
     y: clamp(spot.y, a.y, a.y + a.height - size.height),
   };
 }
 
-function inRightHalf(r, a) { return r.x + r.width / 2 > a.x + a.width / 2; }
-function inLowerHalf(r, a) { return r.y + r.height / 2 > a.y + a.height / 2; }
+function inRightHalf(r: Rect, a: Rect): boolean { return r.x + r.width / 2 > a.x + a.width / 2; }
+function inLowerHalf(r: Rect, a: Rect): boolean { return r.y + r.height / 2 > a.y + a.height / 2; }
 
 /**
  * The tag's new bounds when its words change length. The edge nearest its
@@ -335,7 +362,7 @@ function inLowerHalf(r, a) { return r.y + r.height / 2 > a.y + a.height / 2; }
  * coordinates underneath it and the tag "jumps around quite a bit". A corner
  * and a gap mean the same thing on any screen: bottom right, 18 points in.
  */
-export function cornerPlace(bounds, area) {
+export function cornerPlace(bounds: Rect, area: Rect): Place {
   const right = inRightHalf(bounds, area);
   const lower = inLowerHalf(bounds, area);
   return {
@@ -346,21 +373,21 @@ export function cornerPlace(bounds, area) {
 }
 
 /** That same place on this screen, wholly on it however small it is. */
-export function spotFor(place, size, area) {
+export function spotFor(place: { corner?: string; dx?: number; dy?: number } | null | undefined, size: Size, area: Rect): Point | null {
   if (!place?.corner) return null;
   const right = place.corner.endsWith('r');
   const lower = place.corner.startsWith('b');
   // A gap may be negative: that is the tag tucked past the edge, which she
   // asked for and which the resting rule now allows.
-  const dx = clamp(Number.isFinite(place.dx) ? place.dx : MARGIN, -EDGE_SLACK, Math.max(0, area.width - size.width));
-  const dy = clamp(Number.isFinite(place.dy) ? place.dy : MARGIN, -EDGE_SLACK, Math.max(0, area.height - size.height));
+  const dx = clamp(Number.isFinite(place.dx) ? place.dx! : MARGIN, -EDGE_SLACK, Math.max(0, area.width - size.width));
+  const dy = clamp(Number.isFinite(place.dy) ? place.dy! : MARGIN, -EDGE_SLACK, Math.max(0, area.height - size.height));
   return {
     x: right ? area.x + area.width - size.width - dx : area.x + dx,
     y: lower ? area.y + area.height - size.height - dy : area.y + dy,
   };
 }
 
-export function keepCorner(bounds, size, area) {
+export function keepCorner(bounds: Rect, size: Size, area: Rect): Rect {
   const x = inRightHalf(bounds, area) ? bounds.x + bounds.width - size.width : bounds.x;
   const y = inLowerHalf(bounds, area) ? bounds.y + bounds.height - size.height : bounds.y;
   return { x, y, width: size.width, height: size.height };
@@ -370,7 +397,7 @@ export function keepCorner(bounds, size, area) {
  * Where the list opens when you point at the tag: toward the middle of the
  * screen, so it never runs off an edge, lined up with the tag's outer edge.
  */
-export function cardPlacement(tag, card, area, gap = 8) {
+export function cardPlacement(tag: Rect, card: Size, area: Rect, gap = 8): { above: boolean; alignRight: boolean; card: Rect } {
   const alignRight = inRightHalf(tag, area);
   const x = clamp(alignRight ? tag.x + tag.width - card.width : tag.x, area.x, area.x + area.width - card.width);
   // Which side has the room. The list may never cover the tag: she adjusts the

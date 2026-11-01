@@ -5,7 +5,7 @@
 // test can draw either keyboard with no machine to run it on.
 
 /** The word for each Mac glyph on a keyboard that has none of them. */
-const PLAIN = {
+const PLAIN: Record<string, string> = {
   '⌘': 'Ctrl',
   '⌃': 'Ctrl',
   '⌥': 'Alt',
@@ -16,14 +16,14 @@ const PLAIN = {
 };
 
 /** The keys written as a word rather than a glyph on both keyboards. */
-const WORDS = ['esc', 'Ctrl', 'Alt', 'Shift', 'Enter', 'Tab', 'Backspace'];
+const WORDS: string[] = ['esc', 'Ctrl', 'Alt', 'Shift', 'Enter', 'Tab', 'Backspace'];
 
 /**
  * One cap per key. Anything that is one physical key stays whole however many
  *  characters it is written with, which keeps `esc` and `Ctrl+K` from being
  *  drawn letter by letter.
  */
-export function capsOf(key, mac = true) {
+export function capsOf(key: string, mac: boolean = true): string[] {
   if (!key) return [];
   for (const word of WORDS) if (key === word) return [key];
   // Something already written out for this keyboard, such as the Ctrl+K the
@@ -33,7 +33,7 @@ export function capsOf(key, mac = true) {
 }
 
 /** A whole chord as one label: `⌘↵` on a Mac, `Ctrl+Enter` where there is no ⌘. */
-export function chordOf(key, mac = true) {
+export function chordOf(key: string, mac: boolean = true): string {
   return capsOf(key, mac).join(mac ? '' : '+');
 }
 
@@ -42,7 +42,7 @@ export function chordOf(key, mac = true) {
  *  its own name. Only ⇥ on a Mac, which reads "⇥ Tab"; a keyboard whose cap is
  *  the word already would otherwise say "Tab Tab".
  */
-export function capNameOf(cap, mac = true) {
+export function capNameOf(cap: string, mac: boolean = true): string | null {
   if (!mac) return null;
   return cap === '⇥' ? 'Tab' : null;
 }
@@ -52,8 +52,8 @@ export function capNameOf(cap, mac = true) {
  *  The shortcuts page lists ⌘K and Ctrl+K together because a Mac answers both;
  *  on Linux they are one key, and drawn twice the page looks like it is guessing.
  */
-export function everyChord(keys, mac = true) {
-  const out = [];
+export function everyChord(keys: readonly string[], mac: boolean = true): string[] {
+  const out: string[] = [];
   for (const key of keys ?? []) {
     const chord = chordOf(key, mac);
     if (!out.includes(chord)) out.push(chord);
@@ -62,7 +62,7 @@ export function everyChord(keys, mac = true) {
 }
 
 /** The keys inside a sentence, in this keyboard's words. */
-export function sayTheKeys(text, mac = true) {
+export function sayTheKeys(text: string, mac: boolean = true): string {
   if (mac || !text) return text;
   return text.replace(/[⌘⌃⌥⇧][⌘⌃⌥⇧]*[^\s,.;:!?]?/gu, (chord) => chordOf(chord, false));
 }

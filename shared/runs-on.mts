@@ -36,7 +36,12 @@
 // than "checking…" or a dash.
 
 /** The word for the plan behind an engine. Null for an engine we cannot name. */
-export function runsOnName(engine) {
+export interface RunsOn {
+  /** 'claude' or 'codex', or null on a computer where nothing is signed in. */
+  engine?: string | null;
+}
+
+export function runsOnName(engine?: string | null): string | null {
   if (engine === 'claude') return 'Claude';
   if (engine === 'codex') return 'ChatGPT';
   return null;
@@ -51,7 +56,7 @@ export function runsOnName(engine) {
  *  It says computer rather than Mac: Agentbox runs on Linux too, and one
  *  sentence beats a branch, since "this computer" is true on a Mac as well.
  */
-export function foundOnThisComputer({ engine = null } = {}) {
+export function foundOnThisComputer({ engine = null }: RunsOn = {}): string | null {
   const name = runsOnName(engine);
   if (!name) return null;
   return `Your agents will run on the ${name} account already signed in on this computer.`;

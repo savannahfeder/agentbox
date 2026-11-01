@@ -23,6 +23,7 @@
 // somewhere else. What belongs to a LIMIT, any limit, is next door.
 
 import { instantIn, localZone, resetDay, sessionLimit, toMinute, untilReset, wallIn } from './usage.mts';
+import type { UsageLimit } from './usage.mts';
 
 /** One limit, as the CLI reported it. */
 // { span, qualifier, name, percent, resetsAt|null, resetsText, resetsOn, zone }
@@ -66,7 +67,7 @@ const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', '
  * moment AND the zone and then reading one of them off the machine cannot be
  * tested, and it rots the day it leaves the desk it was written on.
  */
-export function resetAt(text, now = Date.now(), zoneNow = localZone()) {
+export function resetAt(text: unknown, now = Date.now(), zoneNow: string | null = localZone()): number | null {
   const m = RESET.exec(String(text ?? '').trim());
   if (!m) return null;
   const [, mon, day, hour12, minute, half, zone] = m;
@@ -107,7 +108,7 @@ export function resetAt(text, now = Date.now(), zoneNow = localZone()) {
  *  would have had one branch for "session", one for "week" and no honest answer
  *  for anything else -- which is how "This week, Fable", a Claude model, could
  *  have appeared over a Codex reading. Each reader names its own limits. */
-function limitName(span, qualifier) {
+function limitName(span: string, qualifier: string | null | undefined) {
   if (span === 'session') return 'This session';
   const q = qualifier && qualifier.toLowerCase() !== 'all models' ? qualifier : null;
   return q ? `This week, ${q}` : 'This week';
@@ -120,14 +121,14 @@ function limitName(span, qualifier) {
  * page (requests, sessions, what is contributing to the limits) and this only
  * claims to understand the lines that say a percentage.
  */
-export function readUsage(text, now = Date.now(), zoneNow = localZone()) {
-  const out = [];
+export function readUsage(text: string | null | undefined, now = Date.now(), zoneNow: string | null = localZone()): UsageLimit[] {
+  const out: UsageLimit[] = [];
   for (const raw of String(text ?? '').split('\n')) {
     const m = LINE.exec(raw.trim());
     if (!m) continue;
     const [, span, qualifier, percent, resets] = m;
     const reset = RESET.exec(String(resets ?? '').trim());
-    const kind = span.toLowerCase();
+    const kind = span.toLowerCase() as UsageLimit['span'];
     const named = qualifier ? qualifier.trim() : null;
     out.push({
       // `session` is the five hour one he asked for. The week lines carry a
@@ -153,37 +154,54 @@ export function readUsage(text, now = Date.now(), zoneNow = localZone()) {
   return out;
 }
 
+interface RateWindow { utilization?: unknown; resets_at?: unknown; display_name?: unknown }
+type RateRow = RateWindow | null | undefined;
+interface ListedLimit { kind?: unknown; percent?: unknown; resets_at?: unknown }
+interface UsageReport {
+  rate_limits_available?: unknown;
+  rate_limits?: {
+    limits?: unknown;
+    five_hour?: RateRow;
+    seven_day?: RateRow;
+    seven_day_oauth_apps?: RateRow;
+    seven_day_opus?: RateRow;
+    seven_day_sonnet?: RateRow;
+    model_scoped?: unknown;
+  } | null;
+}
+
 /** Provider limits from Claude Code's get_usage response, without local activity estimates. */
-export function readUsageReport(value, now = Date.now()) {
-  let report = value;
-  if (typeof report === 'string') {
-    try { report = JSON.parse(report); } catch { return []; }
+export function readUsageReport(value: unknown, now = Date.now()): UsageLimit[] {
+  let parsed = value;
+  if (typeof parsed === 'string') {
+    try { parsed = JSON.parse(parsed); } catch { return []; }
   }
+  const report = parsed as UsageReport | null | undefined;
   if (report?.rate_limits_available !== true || !report.rate_limits) return [];
   const data = report.rate_limits;
   // `limits` is Anthropic's list of the limits that apply. When it is there,
   // a named field it leaves out is a limit that has gone, whatever number it
   // still holds (tests/a-limit-anthropic-no-longer-lists-is-not-drawn).
-  const listed = Array.isArray(data.limits) ? data.limits : null;
-  const fromList = (kind) => {
-    const row = listed.find((l) => l?.kind === kind);
+  const listed = Array.isArray(data.limits) ? data.limits as (ListedLimit | null)[] : null;
+  const fromList = (kind: string): RateWindow | null => {
+    const row = listed!.find((l) => l?.kind === kind);
     return row ? { utilization: row.percent, resets_at: row.resets_at } : null;
   };
-  const windows = [
+  const windows: [UsageLimit['span'], string | null, RateRow][] = [
     ['session', null, listed ? fromList('session') : data.five_hour],
     ['week', 'all models', listed ? fromList('weekly_all') : data.seven_day],
     ['week', 'OAuth apps', data.seven_day_oauth_apps],
     ['week', 'Opus', data.seven_day_opus],
     ['week', 'Sonnet', data.seven_day_sonnet],
-    ...(Array.isArray(data.model_scoped) ? data.model_scoped : [])
-      .filter(row => typeof row?.display_name === 'string' && row.display_name.trim())
-      .map(row => ['week', row.display_name, row]),
+    ...(Array.isArray(data.model_scoped) ? data.model_scoped as RateRow[] : [])
+      .filter((row): row is RateWindow & { display_name: string } => typeof row?.display_name === 'string' && !!row.display_name.trim())
+      .map((row): [UsageLimit['span'], string | null, RateRow] => ['week', row.display_name, row]),
   ];
-  return windows.flatMap(([span, qualifier, row]) => {
+  return windows.flatMap(([span, qualifier, row]): UsageLimit[] => {
     const percent = row?.utilization;
     // Over 100 is a limit past its allowance, which is full, not unreadable.
     if (typeof percent !== 'number' || !Number.isFinite(percent) || percent < 0) return [];
-    const at = typeof row.resets_at === 'string' ? Date.parse(row.resets_at) : NaN;
+    const at = typeof row?.resets_at === 'string' ? Date.parse(row.resets_at) : NaN;
     // Whole percents, as the text report printed them; only a full limit reads 100, only an unused one 0.
     const whole = percent === 0 || percent >= 100 ? Math.min(100, percent) : Math.min(99, Math.max(1, Math.round(percent)));
     const known = Number.isFinite(at);
@@ -194,7 +212,7 @@ export function readUsageReport(value, now = Date.now()) {
 
 // The words the text report used to carry, in this machine's zone, so the
 // panel keeps saying "Resets 6:19pm" and not a countdown (limitRows, shared/usage.mts).
-function clockWords(at, now) {
+function clockWords(at: number, now: number) {
   const d = new Date(toMinute(at));
   const h = d.getHours();
   const m = d.getMinutes();
@@ -209,7 +227,7 @@ function clockWords(at, now) {
  * Two parts, which is what he asked for: "Even a small pill with percent used
  * and time left would do it."
  */
-export function pillText(limits, now = Date.now()) {
+export function pillText(limits: UsageLimit[] | null | undefined, now = Date.now()): { used: string; when: string | null } | null {
   const session = sessionLimit(limits);
   if (!session) return null;
   const used = `${session.percent}%`;

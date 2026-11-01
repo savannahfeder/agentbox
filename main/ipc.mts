@@ -99,7 +99,7 @@ export interface IpcShell { openExternal(url: string): unknown; openPath?(path: 
 export interface IpcOpenDialog {
   title: string;
   buttonLabel: string;
-  properties: string[];
+  properties: NonNullable<import('electron').OpenDialogOptions['properties']>;
   defaultPath?: string;
   filters?: { name: string; extensions: string[] }[];
 }
@@ -114,7 +114,7 @@ export interface IpcHost {
     focus?(options?: { steal: boolean }): void;
     accessibilitySupportEnabled?: boolean;
   };
-  dialog: { showOpenDialog(window: IpcWindow, options: IpcOpenDialog): Promise<{ canceled: boolean; noDialog?: boolean; filePaths: string[] }> };
+  dialog: { showOpenDialog(window: ElectronWindow, options: IpcOpenDialog): Promise<{ canceled: boolean; noDialog?: boolean; filePaths: string[] }> };
   shell?: IpcShell;
   micAccess?(): unknown;
   readClipboardText?(): unknown;
@@ -144,7 +144,7 @@ export interface IpcDeps {
   config: IpcConfig;
   window: IpcWindow;
   analytics?: IpcAnalytics;
-  docGrants?: { grant(file: string, roots: unknown[]): unknown } | null;
+  docGrants?: { grant(file: string, roots: string[]): unknown } | null;
   updater?: IpcUpdater;
   host: IpcHost;
   team?: IpcTeam | null;
@@ -1375,7 +1375,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const connected = store.listProducts().map((p) => p.repoPath).filter(Boolean);
     const isDir = (p: string) => { try { return fsWatch.statSync(p).isDirectory(); } catch { return false; } };
     const openAt = chooserStartsIn(startIn, { known: connected, home: os.homedir() }).find(isDir) ?? null;
-    const r = await dialog.showOpenDialog(window, {
+    const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, {
       // The title is what the screen behind it asks. On Linux the chooser
       // draws one, and it was still asking "Where is its code?", the heading
       // that screen gave up in w-ec62ab6b38.

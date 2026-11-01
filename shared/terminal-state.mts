@@ -40,12 +40,12 @@ const SHELLS = /^(zsh|bash|sh|fish|ksh|dash|tcsh|csh|Shell)$/i;
 //
 // So the name is reduced to what it actually is before it is asked about: no
 // directory, no login dash.
-function shellName(raw) {
+function shellName(raw: unknown): string {
   const bare = String(raw).replace(/^-+/, '');
   return (bare.split('/').pop() || bare).replace(/^-+/, '');
 }
 
-export function commandRunning(processName, exited) {
+export function commandRunning(processName: string, exited: boolean): boolean {
   if (exited) return false;
   const name = String(processName || '').trim();
   // NOTHING IS NOT A COMMAND. The backend defaults this to 'Shell' and the
@@ -64,9 +64,9 @@ export function commandRunning(processName, exited) {
 // login` said "Login successful." (2026-10-05). Feed it every reading the
 // terminal polls; it calls `onFinish` once per command, and never for a shell
 // that has only ever sat at its prompt.
-export function whenACommandFinishes(onFinish) {
+export function whenACommandFinishes(onFinish: () => void): (processName: string, exited: boolean) => void {
   let running = false;
-  return (processName, exited) => {
+  return (processName: string, exited: boolean) => {
     const now = commandRunning(processName, exited);
     if (running && !now) onFinish();
     running = now;

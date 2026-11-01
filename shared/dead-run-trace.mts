@@ -44,7 +44,7 @@ const STOPPED = /^# exited \([^)]*\) \S+ · stopped on request$/m;
 // and neither does OpenCode's `[error]`.
 const TOOL_LINE = /^\d{2}:\d{2}:\d{2}\s{2}\[(?!error\])[^\]\s]+\]/m;
 
-export function tracesAToolCall(text) {
+export function tracesAToolCall(text: unknown): boolean {
   return TOOL_LINE.test(String(text ?? ''));
 }
 
@@ -62,8 +62,8 @@ export function tracesAToolCall(text) {
 // knew exactly. So a chunk runs from its `stderr:` line until the blank line
 // that ends it, and nothing of ours can be swept up on the way: the header and
 // the narration both end the chunk too.
-function stderrChunks(raw) {
-  const out = [];
+function stderrChunks(raw: string): string {
+  const out: string[] = [];
   let inside = false;
   for (const line of raw.split('\n')) {
     if (line.startsWith('stderr:')) {
@@ -98,7 +98,7 @@ function stderrChunks(raw) {
 // that must not be pattern-matched for words like "unauthorized".
 const ERROR_RESULT = /^\d{2}:\d{2}:\d{2}\s{2}== RESULT \([^)]*\bERROR\b[^)]*\) ==$/m;
 
-function errorResult(raw) {
+function errorResult(raw: string): string {
   const at = ERROR_RESULT.exec(raw);
   if (!at) return '';
   const after = raw.slice(at.index + at[0].length);
@@ -106,17 +106,24 @@ function errorResult(raw) {
   return (end === -1 ? after : after.slice(0, end)).trim();
 }
 
+export type DeadRunTrace = {
+  everRan: boolean;
+  worked: boolean;
+  exitCode: number | null;
+  stoppedOnRequest: boolean;
+  stderr: string;
+};
+
 /**
- * @param {string} text the whole trace file
- * @returns {{everRan: boolean, worked: boolean, exitCode: number|null, stoppedOnRequest: boolean, stderr: string}}
- *   `stderr` is what the tool said about itself, from either place it says it.
- *   `worked` means the agent called at least one tool before it ended.
- *   `everRan` false means the CLI never produced a first line: the process
- *   started and died before it was a session. `exitCode` null means the trace
- *   has no exit line at all, which is what a run killed with the app looks
- *   like, and is deliberately NOT read as a death.
+ * Takes the whole trace file.
+ * `stderr` is what the tool said about itself, from either place it says it.
+ * `worked` means the agent called at least one tool before it ended.
+ * `everRan` false means the CLI never produced a first line: the process
+ * started and died before it was a session. `exitCode` null means the trace
+ * has no exit line at all, which is what a run killed with the app looks
+ * like, and is deliberately NOT read as a death.
  */
-export function readDeadRunTrace(text) {
+export function readDeadRunTrace(text: unknown): DeadRunTrace {
   const raw = String(text ?? '');
   const exited = EXITED.exec(raw);
   return {
@@ -138,7 +145,7 @@ export function readDeadRunTrace(text) {
  * A clean exit means a worker ran and made its own choices about the row, and
  * the supervisor has no business speaking over it.
  */
-export function traceShowsASilentDeath(trace) {
+export function traceShowsASilentDeath(trace: Pick<DeadRunTrace, 'exitCode' | 'stoppedOnRequest' | 'everRan'> | null | undefined): boolean {
   if (!trace || trace.exitCode == null || trace.stoppedOnRequest) return false;
   return !trace.everRan || trace.exitCode !== 0;
 }

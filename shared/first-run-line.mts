@@ -29,7 +29,7 @@ const MIN_SENTENCE = 24;
 /**
  * A markdown badge line: `[![build](a)](b)`, shields, and nothing else on it.
  *  Readmes open with rows of these and none of them says what the thing is. */
-function isBadges(line) {
+function isBadges(line: string): boolean {
   const stripped = line.replace(/\[?!\[[^\]]*\]\([^)]*\)\]?\([^)]*\)?/g, '').trim();
   return stripped === '' && /!\[/.test(line);
 }
@@ -44,7 +44,7 @@ function isBadges(line) {
  *  "Built with: Next.js 16 | FastAPI | DeepAgents | ..." for a fourth. Every one
  *  of those is a true line out of a readme and none of them says what the thing
  *  IS, which is the question the task asks. */
-function isFurniture(line) {
+function isFurniture(line: string): boolean {
   if (!line) return true;
   if (line.startsWith('<!--') || line.startsWith('<')) return true; // html comment, or a centred div
   if (/^[-=*_]{3,}$/.test(line)) return true; // a rule
@@ -62,7 +62,7 @@ function isFurniture(line) {
 /**
  * Markdown out, words left. Links keep their text, emphasis and code lose
  *  their marks, and a trailing full stop is kept because it is a sentence. */
-export function plainText(line) {
+export function plainText(line: string): string {
   return line
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
@@ -77,7 +77,7 @@ export function plainText(line) {
  *  name, which she already typed on the screen before this one, so it is not
  *  the answer: what is wanted is the first line of prose under it. A readme
  *  with nothing but a heading in it returns null rather than the heading. */
-export function fromReadme(text) {
+export function fromReadme(text: unknown): string | null {
   if (!text) return null;
   let inFence = false;
   for (const raw of String(text).split(/\r?\n/)) {
@@ -97,7 +97,7 @@ export function fromReadme(text) {
 /**
  * package.json says what a thing is in one field, and people fill it in. Same
  *  for Cargo.toml and pyproject.toml, which is why the shape is shared. */
-export function fromDescription(value) {
+export function fromDescription(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const words = plainText(value);
   return words.split(' ').filter(Boolean).length >= 2 ? clip(words) : null;
@@ -112,7 +112,7 @@ export function fromDescription(value) {
  *  Only a first sentence long enough to say something counts. Under that, and
  *  when there is no sentence end at all, the cut is at a word with an ellipsis,
  *  because a line that stops mid-word reads as a bug rather than as a summary. */
-export function clip(text, max = MAX_LINE) {
+export function clip(text: string, max = MAX_LINE): string {
   const first = text.search(/[.!?](\s|$)/);
   if (first >= MIN_SENTENCE && first < max) return text.slice(0, first + 1);
   if (text.length <= max) return text;
@@ -130,7 +130,12 @@ export function clip(text, max = MAX_LINE) {
  *  readme and no description in it has nothing written down that says what it
  *  is, and saying so is better than guessing, because this same line goes in
  *  the sidebar and stays there. */
-export function firstRunAnswer({ readme, description, name, folder }) {
+export function firstRunAnswer({ readme, description, name, folder }: {
+  readme?: unknown;
+  description?: unknown;
+  name?: string | null;
+  folder?: string | null;
+}): { line: string; found: boolean } {
   const found = fromReadme(readme) ?? fromDescription(description);
   if (found) return { line: found, found: true };
   const where = folder ? ` in ${folder}` : '';

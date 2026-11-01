@@ -27,7 +27,7 @@ import path from 'node:path';
 import { FRESH_INSTALL_ID, runningAsAFreshUser } from './fresh-user-home.mjs';
 import { DEMO_INSTALL_ID, runningAsADemo } from './demo-world.mjs';
 
-export function readInstallId(dir, env = process.env) {
+export function readInstallId(dir: string | null | undefined, env: NodeJS.ProcessEnv = process.env): string | null {
   if (runningAsADemo(env)) return DEMO_INSTALL_ID;
   if (runningAsAFreshUser(env)) return FRESH_INSTALL_ID;
   if (!dir) return null;

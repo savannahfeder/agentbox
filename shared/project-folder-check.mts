@@ -27,17 +27,25 @@
 // Pure, so both sides of the bridge and the tests can use one copy: the
 // renderer checks as she picks, and main checks again before it writes.
 
+export interface FolderVerdict {
+  ok: boolean;
+  /** Why it was turned down. For tests and the log; never put on a screen. */
+  reason?: 'home' | 'guarded' | 'system' | 'volume';
+  /** The sentence to show as it stands, when `ok` is false. */
+  say?: string;
+}
+
 /**
  * The guarded folders, by their name directly under the home folder. The
  *  system asks about each of these separately, which is why the panels arrive
  *  as a run rather than as one. `Library` is the one that reads as "every app":
  *  it holds one directory per application under Application Support. */
-export const GUARDED = [
+export const GUARDED: string[] = [
   'Desktop', 'Documents', 'Downloads', 'Movies', 'Music', 'Pictures', 'Library', 'Public',
 ];
 
 /** Top-level directories that are the Mac and not anybody's work. */
-const SYSTEM = [
+const SYSTEM: string[] = [
   '/', '/Applications', '/Library', '/System', '/Users', '/Volumes',
   '/private', '/tmp', '/var', '/etc', '/usr', '/bin', '/sbin', '/opt', '/net', '/cores',
 ];
@@ -52,11 +60,11 @@ const SYSTEM = [
  *  bar is holding, so `~/.` reaches the check as a path that is not equal to
  *  the home folder, and the refusal below is a string comparison.
  */
-export function tidyFolder(p) {
+export function tidyFolder(p: string | null | undefined): string {
   const s = String(p ?? '').trim();
   if (!s) return '';
   const root = s.startsWith('~') ? '~' : s.startsWith('/') ? '/' : '';
-  const parts = [];
+  const parts: string[] = [];
   for (const part of s.slice(root.length).split('/')) {
     if (!part || part === '.') continue;
     // Above a root there is nothing to climb to, so the climb stops there.
@@ -68,7 +76,7 @@ export function tidyFolder(p) {
   return parts.join('/');
 }
 
-function underHome(p, home) {
+function underHome(p: string, home: string | null | undefined): string | null {
   const h = tidyFolder(home);
   if (!h) return null;
   if (p === h) return '';
@@ -84,7 +92,7 @@ function underHome(p, home) {
  *  pick instead. `reason` is for tests and for the note in the log; nothing
  *  puts it on a screen.
  */
-export function checkProjectFolder(folder, { home = '' } = {}) {
+export function checkProjectFolder(folder: string | null | undefined, { home = '' }: { home?: string } = {}): FolderVerdict {
   const p = tidyFolder(folder);
   if (!p) return { ok: true };
 
@@ -132,7 +140,7 @@ export function checkProjectFolder(folder, { home = '' } = {}) {
  *  to learn from. None of them is one of the guarded seven, so opening the
  *  window on one costs no permission panel.
  */
-const USUAL = ['dev', 'code', 'src', 'Projects', 'projects', 'Developer', 'repos', 'workspace'];
+const USUAL: string[] = ['dev', 'code', 'src', 'Projects', 'projects', 'Developer', 'repos', 'workspace'];
 
 /**
  * WHERE THE SYSTEM'S FOLDER WINDOW OPENS, in order, best first (F-148).
@@ -147,9 +155,9 @@ const USUAL = ['dev', 'code', 'src', 'Projects', 'projects', 'Developer', 'repos
  *  what gets offered, commonest first, because the folder beside the projects
  *  somebody already has is where the next one is.
  */
-export function chooserStartsIn(startIn, { known = [], home = '' } = {}) {
+export function chooserStartsIn(startIn: string | null | undefined, { known = [], home = '' }: { known?: readonly (string | null | undefined)[]; home?: string } = {}): string[] {
   const h = tidyFolder(home);
-  const counts = new Map();
+  const counts = new Map<string, number>();
   for (const f of known) {
     const p = tidyFolder(f);
     const cut = p.lastIndexOf('/');
@@ -189,8 +197,8 @@ export function chooserStartsIn(startIn, { known = [], home = '' } = {}) {
  *  guarded and costs no panel. It is a guess and the card says so by showing
  *  the whole path, which is the same thing it has always done.
  */
-export function proposeParent(existing = [], { home = '~' } = {}) {
-  const counts = new Map();
+export function proposeParent(existing: string[] = [], { home = '~' }: { home?: string } = {}): string {
+  const counts = new Map<string, number>();
   for (const f of existing) {
     const p = tidyFolder(f);
     if (!p) continue;
@@ -203,7 +211,7 @@ export function proposeParent(existing = [], { home = '~' } = {}) {
     if (!checkProjectFolder(parent, { home }).ok) continue;
     counts.set(parent, (counts.get(parent) ?? 0) + 1);
   }
-  let best = null;
+  let best: string | null = null;
   let bestN = 0;
   for (const [parent, n] of counts) {
     // Ties go to the shorter path, so a stable answer rather than whichever

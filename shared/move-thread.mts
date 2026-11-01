@@ -21,13 +21,22 @@
 // one is not drawn at all. The old row closes saying where its thread went, so
 // neither end of the move is a row that vanished.
 
+export interface MovableThread {
+  status?: string;
+  epoch?: number;
+  result?: string;
+  note?: string;
+  agent?: unknown;
+  [field: string]: unknown;
+}
+
 // Every word somebody might type into ⌘K reaching for this. "file" and
 // "project" are in here because that is what the tester typed first: "pro"
 // offered New project… and Projects… and nothing else.
-export const MOVE_KEYWORDS = 'move to project file refile wrong another switch put';
+export const MOVE_KEYWORDS: string = 'move to project file refile wrong another switch put';
 
 /** Nothing offers a move to the project the thread is already in. */
-export const SAME_PROJECT = 'That thread is already in that project.';
+export const SAME_PROJECT: string = 'That thread is already in that project.';
 
 /**
  * Why this thread cannot be moved, or null when it can.
@@ -40,13 +49,13 @@ export const SAME_PROJECT = 'That thread is already in that project.';
  * item can stand in for: a worker writes nothing until it has something to
  * say, so a row can be under way and still look untouched.
  */
-export function whyItCannotMove(item, { live = false } = {}) {
+export function whyItCannotMove(item: MovableThread | null | undefined, { live = false }: { live?: boolean } = {}): string | null {
   if (!item) return 'That thread is gone.';
   // An agent row stands for a session running outside Agentbox and belongs to
   // no project's ledger, so there is nothing here to move.
   if (item.agent) return 'An agent’s own session does not live in a project.';
   if (live) return 'An agent is working on this one. Stop it first.';
-  if (item.epoch > 0) return RAN_ALREADY;
+  if (item.epoch! > 0) return RAN_ALREADY;
   if (words(item.result) || words(item.note)) return RAN_ALREADY;
   if (item.status === 'done') return 'This thread is finished. Moving it would only move the record.';
   return null;
@@ -55,23 +64,23 @@ export function whyItCannotMove(item, { live = false } = {}) {
 // The one sentence for every shape of "an agent has already had this", because
 // they are one fact to the person reading it: the thread has a history here
 // now, and the history is what cannot follow it.
-export const RAN_ALREADY = 'Only a thread nothing has run on can move. This one has a history here.';
+export const RAN_ALREADY: string = 'Only a thread nothing has run on can move. This one has a history here.';
 
-export function canMove(item, opts) {
+export function canMove(item: MovableThread | null | undefined, opts?: { live?: boolean }): boolean {
   return whyItCannotMove(item, opts) === null;
 }
 
-const words = (text) => typeof text === 'string' && !!text.trim();
+const words = (text: unknown): boolean => typeof text === 'string' && !!text.trim();
 
 /** What the old row says in Closed, so neither end of a move is a row that
  *  vanished. `name` is the project it went to. */
-export function movedAway(name) {
+export function movedAway(name: string): string {
   return `Moved to ${name}.`;
 }
 
 /** What the new row's thread opens with, under the message itself. `name` is
  *  the project it came from. */
-export function movedHere(name) {
+export function movedHere(name: string): string {
   return `Moved here from ${name}.`;
 }
 
@@ -81,17 +90,17 @@ export function movedHere(name) {
 // the old project, which is exactly the life that does not follow it.
 //
 // `parent` rides across so a thread filed under another one stays under it.
-export const CARRIED = ['title', 'body', 'kind', 'priority', 'labels', 'parent', 'model', 'engine', 'effort', 'runAt', 'start', 'label', 'problem', 'visibility', 'visibleTo'];
+export const CARRIED: string[] = ['title', 'body', 'kind', 'priority', 'labels', 'parent', 'model', 'engine', 'effort', 'runAt', 'start', 'label', 'problem', 'visibility', 'visibleTo'];
 
 // THE THREE `composeItem` DOES NOT TAKE, which is why they are named here
 // rather than discovered by the store dropping them on the floor. They are
 // written as a second line on the new row: the name you gave it, the context
 // you wrote in the summary, and the thread it was filed under.
-export const CARRIED_AFTERWARDS = ['parent', 'label', 'problem'];
+export const CARRIED_AFTERWARDS: string[] = ['parent', 'label', 'problem'];
 
 /** The content of `item`, machinery left behind. */
-export function whatMoves(item) {
-  const out = {};
+export function whatMoves(item: MovableThread): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
   for (const field of CARRIED) {
     const value = item?.[field];
     if (value === undefined || value === null) continue;
@@ -102,9 +111,9 @@ export function whatMoves(item) {
 
 /** Split for the two writes the store makes: what `composeItem` takes, and
  *  what has to follow it. */
-export function splitForCompose(carried) {
-  const compose = {};
-  const after = {};
+export function splitForCompose(carried: Record<string, unknown>): { compose: Record<string, unknown>; after: Record<string, unknown> } {
+  const compose: Record<string, unknown> = {};
+  const after: Record<string, unknown> = {};
   for (const [field, value] of Object.entries(carried)) {
     (CARRIED_AFTERWARDS.includes(field) ? after : compose)[field] = value;
   }

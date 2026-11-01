@@ -79,19 +79,33 @@
 // numbers from the same service and neither is converted upstream, so both are
 // accepted right here rather than in two places that could drift apart.
 
-const plain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+import type { UsageLimit } from './usage.mts';
+
+type Rec = Record<string, unknown>;
+type WindowKey = 'primary' | 'secondary';
+export type WindowSpanKind = 'session' | 'week' | 'month' | 'window';
+export type CodexLimit = UsageLimit & { reached: boolean };
+export interface CodexPlan {
+  plan: string | null;
+  credits: boolean | null;
+  unlimitedCredits: boolean | null;
+  spendControlReached: boolean | null;
+  reached: WindowKey | null;
+}
+
+const plain = (v: unknown): v is Rec => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /**
  * The order the panel draws them in, and the fallback when nothing says how
  *  long a window is. */
-const WINDOWS = ['primary', 'secondary'];
+const WINDOWS = ['primary', 'secondary'] as const;
 
-const FALLBACK = { primary: ['session', 'This session'], secondary: ['week', 'This week'] };
+const FALLBACK: Record<WindowKey, [WindowSpanKind, string]> = { primary: ['session', 'This session'], secondary: ['week', 'This week'] };
 
 /** Either spelling of the same field, because two sources feed this. */
-const field = (window, camel, snake) => {
-  const value = window?.[camel] ?? window?.[snake];
-  return Number.isFinite(value) ? value : null;
+const field = (window: Rec, camel: string, snake: string): number | null => {
+  const value = window[camel] ?? window[snake];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 };
 
 /**
@@ -102,8 +116,8 @@ const field = (window, camel, snake) => {
  * rather than guessed at, because a limit drawn under the wrong span is worse
  * than one drawn under a plain one.
  */
-export function windowSpan(minutes) {
-  if (!Number.isFinite(minutes) || minutes <= 0) return null;
+export function windowSpan(minutes: number | null | undefined): [WindowSpanKind, string] | null {
+  if (typeof minutes !== 'number' || !Number.isFinite(minutes) || minutes <= 0) return null;
   if (minutes <= 60 * 12) return ['session', 'This session'];
   if (minutes >= 60 * 24 * 6 && minutes <= 60 * 24 * 8) return ['week', 'This week'];
   if (minutes >= 60 * 24 * 27 && minutes <= 60 * 24 * 32) return ['month', 'This month'];
@@ -123,11 +137,12 @@ export function windowSpan(minutes) {
  * itself, so the panel counts down to it rather than re-deriving a wall time we
  * were never given.
  */
-export function codexLimits(snapshot) {
-  const out = [];
+export function codexLimits(snapshot: unknown): CodexLimit[] {
+  const snap = snapshot as Rec | null | undefined;
+  const out: CodexLimit[] = [];
   const refused = reachedWindow(snapshot);
   for (const key of WINDOWS) {
-    const window = snapshot?.[key];
+    const window = snap?.[key];
     if (!plain(window)) continue;
     const percent = field(window, 'usedPercent', 'used_percent');
     if (percent === null) continue;
@@ -136,7 +151,7 @@ export function codexLimits(snapshot) {
     const resets = field(window, 'resetsAt', 'resets_at');
     const reached = refused === key;
     out.push({
-      span,
+      span: span as UsageLimit['span'],
       qualifier: null,
       name,
       percent: drawnPercent(percent),
@@ -164,9 +179,10 @@ export function codexLimits(snapshot) {
  * ignored rather than guessed at: marking a line we were not told about is how
  * a confident wrong number gets drawn.
  */
-function reachedWindow(snapshot) {
-  const named = snapshot?.rateLimitReachedType ?? snapshot?.rate_limit_reached_type;
-  return WINDOWS.includes(named) ? named : null;
+function reachedWindow(snapshot: unknown): WindowKey | null {
+  const snap = snapshot as Rec | null | undefined;
+  const named = snap?.rateLimitReachedType ?? snap?.rate_limit_reached_type;
+  return (WINDOWS as readonly unknown[]).includes(named) ? named as WindowKey : null;
 }
 
 /**
@@ -187,7 +203,7 @@ function reachedWindow(snapshot) {
  * The clamp stays exactly as it was: a provider that over- or under-reports
  * must not put an impossible number on her screen.
  */
-function drawnPercent(percent) {
+function drawnPercent(percent: number) {
   const inRange = Math.max(0, Math.min(100, percent));
   if (inRange >= 100) return 100;
   return Math.min(99, Math.round(inRange));
@@ -213,16 +229,17 @@ function drawnPercent(percent) {
  * percentages: a plan nobody has reported is not a plan of none, and a reading
  * that invents one is worse than a panel that stays quiet.
  */
-export function codexPlan(snapshot) {
-  const credits = plain(snapshot?.credits) ? snapshot.credits : null;
-  const bool = (value) => (typeof value === 'boolean' ? value : null);
+export function codexPlan(snapshot: unknown): CodexPlan {
+  const snap = snapshot as Rec | null | undefined;
+  const credits = plain(snap?.credits) ? snap.credits : null;
+  const bool = (value: unknown) => (typeof value === 'boolean' ? value : null);
   return {
-    plan: typeof snapshot?.planType === 'string' && snapshot.planType
-      ? snapshot.planType
-      : (typeof snapshot?.plan_type === 'string' && snapshot.plan_type ? snapshot.plan_type : null),
+    plan: typeof snap?.planType === 'string' && snap.planType
+      ? snap.planType
+      : (typeof snap?.plan_type === 'string' && snap.plan_type ? snap.plan_type : null),
     credits: credits ? (bool(credits.hasCredits) ?? bool(credits.has_credits)) : null,
     unlimitedCredits: credits ? bool(credits.unlimited) : null,
-    spendControlReached: bool(snapshot?.spendControlReached ?? snapshot?.spend_control_reached),
+    spendControlReached: bool(snap?.spendControlReached ?? snap?.spend_control_reached),
     reached: reachedWindow(snapshot),
   };
 }
@@ -265,8 +282,10 @@ export function codexPlan(snapshot) {
  */
 const CARRIED = ['planType', 'credits', 'spendControlReached', 'rateLimitReachedType'];
 
-export function mergeRateLimits(previous, update) {
-  const out = {};
+export function mergeRateLimits(previousSnapshot: unknown, updateSnapshot: unknown): Rec {
+  const previous = previousSnapshot as Rec | null | undefined;
+  const update = updateSnapshot as Rec | null | undefined;
+  const out: Rec = {};
   for (const key of WINDOWS) {
     if (plain(update?.[key])) out[key] = update[key];
     else if (plain(previous?.[key])) out[key] = previous[key];

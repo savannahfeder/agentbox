@@ -3,10 +3,10 @@
 // box is turned into a PNG or a JPEG as it comes in (main/stage-attachment.mts).
 // Both sides read this: the window to know a dropped file is worth staging,
 // the main process to turn it.
-const TURNED = [[/\.tiff?$/i, '.png'], [/\.hei[cf]$/i, '.jpg']];
+const TURNED: [RegExp, string][] = [[/\.tiff?$/i, '.png'], [/\.hei[cf]$/i, '.jpg']];
 
 /** The name the picture goes on under once turned, or null when it is not one of these. */
-export function turnedName(name) {
+export function turnedName(name: string | null | undefined): string | null {
   const s = String(name ?? '');
   const hit = TURNED.find(([re]) => re.test(s));
   return hit ? s.replace(/\.[^.]+$/, hit[1]) : null;

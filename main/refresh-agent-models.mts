@@ -5,6 +5,8 @@ import {forget,claudeModels} from './claude-models.mjs';
 import {terminalEnv} from './task-terminals.mts';
 import {codexLaunchEnv} from './codex-launch-env.mts';
 import {ensureCodexHome,rememberCodexAccount} from './codex-account.mts';
+import type {LiveAccount} from './codex-account.mts';
+import type {LiveModel} from './codex-models.mts';
 // `homes` is every Codex login to ask, one after another. A login that cannot
 // answer keeps its last list and does not cost the others theirs; only all of
 // them failing is an error.
@@ -32,9 +34,9 @@ async function refreshOne(client: ModelRefreshClient,home: string){
  const deadline=setTimeout(()=>client.close('Model refresh timed out'),15000);
  try{
   await client.initialize();
-  const {account}=await client.request('account/read',{refreshToken:true}) as {account?: unknown};
+  const {account}=await client.request('account/read',{refreshToken:true}) as {account?: LiveAccount};
   rememberCodexAccount(home,account);
-  let cursor: string | null | undefined=null;const models: unknown[]=[];const seen=new Set<string | null | undefined>();
+  let cursor: string | null | undefined=null;const models: LiveModel[]=[];const seen=new Set<string | null | undefined>();
   do{const r=await client.request('model/list',{limit:100,includeHidden:true,...(cursor?{cursor}:{})}) as ModelPage;
    if(!Array.isArray(r.data))throw Error('Model list could not be read.');models.push(...r.data);cursor=r.nextCursor;
    if(cursor&&seen.has(cursor))throw Error('Model list did not finish.');seen.add(cursor);

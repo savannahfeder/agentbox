@@ -19,19 +19,49 @@
  * The label every one of these rows carries, so a second walk through the
  *  first run can tell which agents already have a row and file nothing twice. */
 import { NAME } from '../shared/product-name.mjs';
+
+export interface ImportableAgent {
+  name?: string;
+  title?: string;
+  line?: string;
+  path?: string;
+  scope?: string;
+}
+
+export interface ImportableThread {
+  id?: string;
+  title?: string;
+  firstSaid?: string;
+  lastSaid?: string;
+}
+
+interface LabelledItem {
+  labels?: unknown[];
+  status?: string;
+}
+
+export interface ImportRow {
+  title: string;
+  body: string;
+  result?: string;
+  kind: 'question';
+  priority: number;
+  labels: string[];
+}
+
 export const IMPORT_LABEL = 'agent-import';
 
 /**
  * And the one that says WHICH agent, for the same reason. Names only, the way
  *  `projectAgents` stores them: the file is the author's and never moves, so a
  *  name that has gone stale costs nothing. */
-export const agentLabel = (name) => `agent:${String(name ?? '').trim()}`;
+export const agentLabel = (name: unknown): string => `agent:${String(name ?? '').trim()}`;
 
 /**
  * `/Users/x/.claude/agents/a.md` as `~/.claude/agents/a.md`. A path with a
  *  stranger's home folder in it is a path they read twice to find their own
  *  name in it. */
-export function shortenHome(p, home) {
+export function shortenHome(p: unknown, home: unknown): string {
   const full = String(p ?? '');
   const h = String(home ?? '').replace(/\/+$/, '');
   return h && full.startsWith(h + '/') ? `~${full.slice(h.length)}` : full;
@@ -50,7 +80,7 @@ export function shortenHome(p, home) {
  *  which of Claude Code's two scopes it is in, in the same two words the finish
  *  card uses.
  */
-export function agentImportRow(agent, { projectName = null, home = '' } = {}) {
+export function agentImportRow(agent: ImportableAgent | null | undefined, { projectName = null, home = '' }: { projectName?: string | null; home?: string } = {}): ImportRow {
   const title = String(agent?.title || agent?.name || '').trim();
   const name = String(agent?.name || '').trim();
   const line = String(agent?.line || '').trim();
@@ -89,14 +119,14 @@ export function agentImportRow(agent, { projectName = null, home = '' } = {}) {
  *  folder shadow a home folder agent of the same name, and the project's copy
  *  is the one that runs, so that is the one the row describes.
  */
-export function agentsNeedingRows(chosen, existingItems = []) {
-  const already = new Set();
+export function agentsNeedingRows<T extends ImportableAgent>(chosen: readonly T[] | null | undefined, existingItems: readonly (LabelledItem | null | undefined)[] = []): T[] {
+  const already = new Set<string>();
   for (const item of existingItems) {
     for (const label of item?.labels ?? []) {
       if (typeof label === 'string' && label.startsWith('agent:')) already.add(label.slice(6));
     }
   }
-  const byName = new Map();
+  const byName = new Map<string, T>();
   for (const a of chosen ?? []) {
     const name = String(a?.name ?? '').trim();
     if (!name || already.has(name)) continue;
@@ -123,12 +153,12 @@ export const THREAD_LABEL = 'thread-import';
 /** A thread just brought in, owed one run that writes it up the way every thread here reads. Taken off as that run starts. */
 export const CATCH_UP_LABEL = 'catch-up';
 export const CATCH_UP_TRIES = 3;
-export const catchUpDue = (item) => (item?.labels ?? []).includes(CATCH_UP_LABEL) && item?.status === 'open';
+export const catchUpDue = (item: LabelledItem | null | undefined): boolean => (item?.labels ?? []).includes(CATCH_UP_LABEL) && item?.status === 'open';
 
 /**
  * And the one that says WHICH thread. The id is Claude Code's own session id,
  *  which is stable across renames and is what the transcript is filed under. */
-export const threadLabel = (id) => `thread:${String(id ?? '').trim()}`;
+export const threadLabel = (id: unknown): string => `thread:${String(id ?? '').trim()}`;
 
 /**
  * WHETHER A CHAT ENDED WAITING ON YOU, read off the agent's last reply.
@@ -141,7 +171,7 @@ const SHORT_ASK = 40;
 const CHOICE = /^(\d+[.)]|[-*+]|[a-z][.)])\s+/i;
 const NOT_WAITING = Object.freeze({ waiting: false, ask: '' });
 
-function plainLine(line) {
+function plainLine(line: string) {
   return String(line)
     .replace(/^(>\s*)+/, '')
     .replace(/^#{1,6}\s+/, '')
@@ -153,12 +183,12 @@ function plainLine(line) {
     .trim();
 }
 
-function shortAsk(line) {
+function shortAsk(line: string) {
   if (line.length <= ASK_CHARS) return line;
   const sentences = line.split(/(?<=[.!?])\s+/);
-  let last = sentences.pop();
+  let last = sentences.pop()!;
   // "Shall I do that?" says nothing without the sentence it follows.
-  while (last.length < SHORT_ASK && sentences.length && sentences.at(-1).length + 1 + last.length <= ASK_CHARS) {
+  while (last.length < SHORT_ASK && sentences.length && sentences.at(-1)!.length + 1 + last.length <= ASK_CHARS) {
     last = `${sentences.pop()} ${last}`;
   }
   if (last.length <= ASK_CHARS) return last;
@@ -167,7 +197,7 @@ function shortAsk(line) {
   return `…${sp > 0 && sp < 40 ? tail.slice(sp + 1) : tail}`;
 }
 
-export function howTheChatEnded(said) {
+export function howTheChatEnded(said: unknown): { waiting: boolean; ask: string } {
   const lines = String(said ?? '').replace(/\r/g, '').split('\n').map((l) => l.trim()).filter(Boolean);
   let i = lines.length - 1;
   while (i >= 0 && CHOICE.test(lines[i])) i -= 1;
@@ -185,10 +215,10 @@ export function howTheChatEnded(said) {
  *  point at the wrong Monday, so those say the date. Anything the arithmetic
  *  cannot place, or anything far outside the window, says nothing rather than
  *  guessing. */
-export function whenWords(when, now = Date.now()) {
+export function whenWords(when: unknown, now = Date.now()): string {
   const then = new Date(Number(when) || 0);
   if (!Number.isFinite(then.getTime()) || !when) return '';
-  const midnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const midnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const days = Math.round((midnight(new Date(now)) - midnight(then)) / 86400000);
   if (days <= 0) return 'today';
   if (days === 1) return 'yesterday';
@@ -198,7 +228,7 @@ export function whenWords(when, now = Date.now()) {
 }
 
 /** Where she was when she started it, in the two places she named. */
-export function startedIn(source) {
+export function startedIn(source: string | null | undefined): string {
   if (source === 'codex') return 'in Codex';
   // VS Code, Cursor or Windsurf: the extension says which family, not which one.
   if (source === 'editor') return 'in your code editor';
@@ -210,7 +240,7 @@ export function startedIn(source) {
  *  it, your first message as the body and the agent's last reply as the
  *  result, so the thread opens on the question it ended with. The reply
  *  carries the conversation on (`Supervisor#importedThreadFor`). */
-export function threadImportRow(thread) {
+export function threadImportRow(thread: ImportableThread | null | undefined): ImportRow {
   const title = String(thread?.title || '').trim();
   return {
     title,
@@ -226,14 +256,14 @@ export function threadImportRow(thread) {
  * WHICH OF THE TICKED THREADS STILL NEED A ROW. The card opens on a Mac whose
  *  threads it has offered before, so pressing twice is ordinary and a second row
  *  for the same conversation is the one failure an inbox cannot absorb. */
-export function threadsNeedingRows(chosen, existingItems = []) {
-  const already = new Set();
+export function threadsNeedingRows<T extends ImportableThread>(chosen: readonly T[] | null | undefined, existingItems: readonly (LabelledItem | null | undefined)[] = []): T[] {
+  const already = new Set<string>();
   for (const item of existingItems) {
     for (const label of item?.labels ?? []) {
       if (typeof label === 'string' && label.startsWith('thread:')) already.add(label.slice(7));
     }
   }
-  const byId = new Map();
+  const byId = new Map<string, T>();
   for (const t of chosen ?? []) {
     const id = String(t?.id ?? '').trim();
     if (!id || already.has(id) || byId.has(id)) continue;
@@ -249,8 +279,8 @@ export function threadsNeedingRows(chosen, existingItems = []) {
  *  `thread:<id>`; a Codex one once any row carries `codex:<id>`, except the
  *  row that records a no, because the card is the way back to that one. Each
  *  thread comes back as it was, with `imported: true` on the ones that are in. */
-export function markImported(threads = [], items = []) {
-  const inbox = new Set();
+export function markImported<T extends { id?: unknown }>(threads: readonly T[] | null | undefined = [], items: readonly (LabelledItem | null | undefined)[] | null | undefined = []): (T | (T & { imported: true }))[] {
+  const inbox = new Set<string>();
   for (const item of items ?? []) {
     const labels = item?.labels ?? [];
     const declined = labels.includes('not-imported') && item?.status === 'done';
@@ -271,7 +301,7 @@ export function markImported(threads = [], items = []) {
  *  agent exists, not that it is the one meant to do the work. The whole of the
  *  fix is that the reply reaches the agent, so the instruction is explicit
  *  (`importedAgentBrief`) rather than inferred from a sentence on a card. */
-export function importedAgentName(item) {
+export function importedAgentName(item: LabelledItem | null | undefined): string | null {
   for (const label of item?.labels ?? []) {
     if (typeof label === 'string' && label.startsWith('agent:')) {
       const name = label.slice(6).trim();
@@ -291,7 +321,7 @@ export function importedAgentName(item) {
  *  session that quietly does the work itself would leave them believing their
  *  agent ran when it did not, which is the same empty promise this row exists
  *  to end. */
-export function importedAgentBrief(name) {
+export function importedAgentBrief(name: unknown): string {
   const n = String(name ?? '').trim();
   if (!n) return '';
   return [

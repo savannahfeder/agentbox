@@ -68,15 +68,15 @@ const IMAGE = /\.(png|jpe?g|gif|webp)$/i;
  * caller downstream keeps receiving relative paths and nothing else changes.
  * Leave it out and only relative paths count, which is what this did before.
  */
-export function referencedFiles(...texts) {
+export function referencedFiles(...texts: Array<string | null | undefined | { dir?: string | null }>): string[] {
   const last = texts[texts.length - 1];
-  const opts = last && typeof last === 'object' ? texts.pop() : null;
+  const opts = last && typeof last === 'object' ? texts.pop() as { dir?: string | null } : null;
   const dir = String(opts?.dir ?? '').replace(/\/+$/, '');
 
-  const found = [];
-  const seen = new Set();
+  const found: string[] = [];
+  const seen = new Set<string>();
 
-  const take = (raw) => {
+  const take = (raw: string | undefined): void => {
     if (!raw) return;
     let path = raw.replace(/^\.\//, '').trim();
     // Written out in full. It is one of ours only when it sits inside this
@@ -98,7 +98,7 @@ export function referencedFiles(...texts) {
     // links first, so a target that also matches the bare-path scan is recorded
     // once, in the order a reader meets it
     const source = String(text);
-    const hits = [];
+    const hits: { at: number; path: string }[] = [];
     for (const m of source.matchAll(LINK)) hits.push({ at: m.index ?? 0, path: m[1] });
     for (const m of source.matchAll(PATH)) hits.push({ at: m.index ?? 0, path: m[0] });
     if (dir) for (const m of source.matchAll(ABS_PATH)) hits.push({ at: m.index ?? 0, path: m[0] });
@@ -110,13 +110,13 @@ export function referencedFiles(...texts) {
 }
 
 /** What a chip says: the file's own name, with its folder as the quiet part. */
-export function fileLabel(path) {
+export function fileLabel(path: string): { name: string; where: string } {
   const parts = path.split('/');
   const name = parts.pop() ?? path;
   return { name, where: parts.join('/') };
 }
 
 /** Whether a referenced path is a picture, which is what a worker must OPEN. */
-export function isImagePath(path) {
+export function isImagePath(path: string | null | undefined): boolean {
   return IMAGE.test(String(path ?? ''));
 }

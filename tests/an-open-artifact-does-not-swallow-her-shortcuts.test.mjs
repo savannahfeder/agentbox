@@ -110,7 +110,7 @@ describe('the markdown editor', () => {
   });
 
   it('reads the one rule rather than writing its own', () => {
-    expect(docText).toContain("from '../../../shared/artifact-keys.mjs'");
+    expect(docText).toContain("from '../../../shared/artifact-keys.mts'");
   });
 
   it('hands the keyboard back on escape instead of eating it', () => {

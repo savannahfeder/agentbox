@@ -38,14 +38,28 @@
 // Claude Code commands at all. modes.ts says all of that at length. The menu
 // draws both lists; they are two different verbs and the menu labels them so.
 
-import { CLAUDE_COMMANDS, READ_FROM, READ_AT } from './claude-commands.generated.mts';
+import { CLAUDE_COMMANDS as GENERATED_COMMANDS, READ_FROM, READ_AT } from './claude-commands.generated.mts';
+
+export interface ClaudeCommand {
+  name: string;
+  description: string;
+  /** Claude Code's own shorter sentence, where they wrote one for a menu. */
+  menuDescription: string | null;
+  /** False when a getter composes the description at run time and we cut it at
+   *  the interpolation, so nothing may present it as a quotation. */
+  whole: boolean;
+  argumentHint: string | null;
+  aliases: string[];
+}
+
+const CLAUDE_COMMANDS: ClaudeCommand[] = GENERATED_COMMANDS;
 
 export { CLAUDE_COMMANDS, READ_FROM, READ_AT };
 
 /**
  * Every spelling that reaches a command: its own name and the aliases Claude
  *  Code registers for it. `/cost` and `/stats` are theirs, for `/usage`. */
-export function commandWords(cmd) {
+export function commandWords(cmd: Pick<ClaudeCommand, 'name'> & Partial<Pick<ClaudeCommand, 'aliases'>>): string[] {
   return [cmd.name, ...(cmd.aliases ?? [])];
 }
 
@@ -61,7 +75,7 @@ export function commandWords(cmd) {
  * stop matching the binary, which is the whole reason it is generated. So the
  * record stays faithful and the MENU does the spelling. A comma, because these
  * are all one short sentence with a pause in it. */
-export function commandHint(cmd) {
+export function commandHint(cmd: ClaudeCommand): string {
   return (cmd.menuDescription || cmd.description).replace(/\s*—\s*/g, ', ');
 }
 
@@ -72,7 +86,7 @@ export function commandHint(cmd) {
  *  modeMatches follows and for the same reason: a word appearing inside a
  *  longer word is a coincidence, and a menu that moves its cursor on a
  *  coincidence feels random. */
-export function commandMatches(query) {
+export function commandMatches(query: string | null | undefined): ClaudeCommand[] {
   if (query === null || query === undefined) return [];
   if (query === '') return [...CLAUDE_COMMANDS];
   const first = CLAUDE_COMMANDS.filter((c) => c.name.startsWith(query));
@@ -87,7 +101,7 @@ export function commandMatches(query) {
  *  one of the eight either takes an argument or is harmless with none, and a
  *  caret sitting after the space is what tells somebody there is more to type.
  *  It is never sent by the pick: she presses Send, the same as any message. */
-export function commandDraft(cmd) {
+export function commandDraft(cmd: Pick<ClaudeCommand, 'name'>): string {
   return `/${cmd.name} `;
 }
 
@@ -117,7 +131,7 @@ export function commandDraft(cmd) {
  *     CLI as `/usage`. An alias is a spelling for us; the CLI takes both, and
  *     sending its own word is one less thing to be wrong about.
  */
-export function commandPrompt(reply, nativeNames = []) {
+export function commandPrompt(reply: unknown, nativeNames: string[] = []): string | null {
   if (typeof reply !== 'string') return null;
   if (!reply.startsWith('/')) return null;
   const m = reply.match(/^\/([a-z][a-z0-9:_-]*)(?:(\s[\s\S]*))?$/i);

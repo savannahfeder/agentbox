@@ -6,12 +6,12 @@
 // says about why it failed (Supervisor#_noteCloudOutcome).
 export const CLOUD_SENT = 'agentbox cloud-sent:';
 
-export function sentLine({ packMs, startMs }) {
+export function sentLine({ packMs, startMs }: { packMs: number; startMs: number }): string {
   return `${CLOUD_SENT} packed ${Math.round(packMs)} started ${Math.round(startMs)}\n`;
 }
 
 /** `{ packMs, startMs }` from any text holding the line, else null. */
-export function readSent(text) {
+export function readSent(text: unknown): { packMs: number; startMs: number } | null {
   const m = new RegExp(`${CLOUD_SENT} packed (\\d+) started (\\d+)`).exec(String(text ?? ''));
   return m ? { packMs: Number(m[1]), startMs: Number(m[2]) } : null;
 }

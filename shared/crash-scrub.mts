@@ -42,7 +42,21 @@ const PATH_RE = /(?:file:\/\/)?(?:~|\/)[^\s'"`)\]},;]*/g;
 // handled" from "still raw" without re-parsing.
 const MARK = '<';
 
-function depthOf(rest) {
+export type ScrubContext = { home?: string | null; appDir?: string | null; username?: string | null };
+
+export type ScrubbedFrame = { fn: string | null; at: string; line: number | null; col: number | null };
+
+export type ScrubbedError = {
+  name: string;
+  code: string | null;
+  syscall: string | null;
+  message: string;
+  site: string | null;
+  frames: ScrubbedFrame[];
+  framesDropped: number;
+};
+
+function depthOf(rest: string): number {
   return rest.split('/').filter(Boolean).length;
 }
 
@@ -52,19 +66,19 @@ function depthOf(rest) {
 // aside before we go looking for the person: it carries no information about
 // them. EXPORTED because the check below and the tests both have to set the
 // same thing aside, and two definitions of "ours" is how they drift apart.
-export function withoutOurOwnPaths(text) {
+export function withoutOurOwnPaths(text: unknown): string {
   return String(text).replace(/app:[^\s'"`)\]},;]*/g, ' ');
 }
 
 // One path token in, one safe token out.
-export function scrubPath(raw, ctx = {}) {
+export function scrubPath(raw: string, ctx: ScrubContext = {}): string {
   const home = ctx.home ? path.resolve(ctx.home) : null;
   const appDir = ctx.appDir ? path.resolve(ctx.appDir) : null;
   let p = raw.startsWith('file://') ? raw.slice('file://'.length) : raw;
   // A trailing `:12:5` from a stack frame is line and column, not path.
   let tail = '';
   const lineCol = p.match(/(:\d+(?::\d+)?)$/);
-  if (lineCol) { tail = lineCol[1]; p = p.slice(0, -tail.length); }
+  if (lineCol) { tail = lineCol[1]!; p = p.slice(0, -tail.length); }
   if (home && (p === '~' || p.startsWith('~/'))) p = path.join(home, p.slice(1));
 
   // Inside the app bundle is OUR code, which is the one thing a crash report
@@ -83,21 +97,23 @@ export function scrubPath(raw, ctx = {}) {
 
 // Every string that leaves goes through this, including ones we believe are
 // safe. Belief is what the ENOENT measurement disproved.
-export function scrubText(text, ctx = {}) {
+export function scrubText(text: string, ctx?: ScrubContext): string;
+export function scrubText(text: unknown, ctx?: ScrubContext): unknown;
+export function scrubText(text: unknown, ctx: ScrubContext = {}): unknown {
   if (typeof text !== 'string' || !text) return text;
   // The trailing value goes FIRST, before the path pass: the shape the audit
   // found in our own throw sites is a RELATIVE path (`no such file: ${rel}`),
   // and the path pass would keep its first segment (`clients<abs+2>`) because a
   // relative path has no leading slash to match on.
-  let out = text.replace(/(: )([^\s:'"]{1,200})$/, (m, sep, token) => (token.includes(MARK) ? m : `${sep}<value>`));
-  out = out.replace(PATH_RE, (m) => scrubPath(m, ctx));
+  let out = text.replace(/(: )([^\s:'"]{1,200})$/, (m: string, sep: string, token: string) => (token.includes(MARK) ? m : `${sep}<value>`));
+  out = out.replace(PATH_RE, (m: string) => scrubPath(m, ctx));
   // A username reaches a message on its own too (`os.userInfo.username`),
   // with no path around it to catch it.
   const user = ctx.username || (ctx.home ? path.basename(ctx.home) : null);
   if (user && user.length > 2) out = out.split(user).join('<user>');
   // Quoted runs are where interpolated user strings hide when they are not
   // paths. Anything already redacted keeps its shape; the rest goes.
-  out = out.replace(/'([^']{1,400})'|"([^"]{1,400})"/g, (m, a, b) => {
+  out = out.replace(/'([^']{1,400})'|"([^"]{1,400})"/g, (m: string, a: string | undefined, b: string | undefined) => {
     const inner = a ?? b ?? '';
     return inner.includes(MARK) ? m : "'<str>'";
   });
@@ -108,14 +124,14 @@ const FRAME_RE = /^\s*at\s+(?:(.+?)\s+\()?([^()]+?)(?::(\d+):(\d+))?\)?\s*$/;
 
 // Rule 4. Frames inside the bundle are kept whole (function name included:
 // it is our identifier, not theirs); everything else is counted and dropped.
-export function scrubStack(stack, ctx = {}) {
-  const frames = [];
+export function scrubStack(stack: unknown, ctx: ScrubContext = {}): { frames: ScrubbedFrame[]; dropped: number } {
+  const frames: ScrubbedFrame[] = [];
   let dropped = 0;
   for (const line of String(stack || '').split('\n')) {
     const m = line.match(FRAME_RE);
     if (!m) continue;
     const [, fn, file, ln, col] = m;
-    const safe = scrubPath(file.trim(), ctx);
+    const safe = scrubPath(file!.trim(), ctx);
     if (safe.startsWith('app:')) {
       frames.push({ fn: fn ? fn.trim().slice(0, 80) : null, at: safe, line: ln ? Number(ln) : null, col: col ? Number(col) : null });
     } else {
@@ -129,8 +145,8 @@ export function scrubStack(stack, ctx = {}) {
 // `err.address`, `err.port`, `err.hostname`, `err.config`, `err.request` and
 // whatever the next library invents are absent because nothing copies them,
 // not because someone remembered them.
-export function scrubError(err, ctx = {}) {
-  const e = err && typeof err === 'object' ? err : { message: String(err) };
+export function scrubError(err: unknown, ctx: ScrubContext = {}): ScrubbedError {
+  const e: Record<string, unknown> = err && typeof err === 'object' ? err as Record<string, unknown> : { message: String(err) };
   const { frames, dropped } = scrubStack(e.stack, ctx);
   return {
     name: typeof e.name === 'string' ? e.name.slice(0, 60) : 'Error',
@@ -150,11 +166,11 @@ export function scrubError(err, ctx = {}) {
 // This walks the finished report and answers "is there anything private left in
 // here", and the writer refuses to keep a report that fails. Scrub before it
 // leaves means there is no second chance further down.
-export function findPrivate(value, ctx = {}) {
+export function findPrivate(value: unknown, ctx: ScrubContext = {}): string[] {
   const home = ctx.home ? path.resolve(ctx.home) : null;
   const user = ctx.username || (home ? path.basename(home) : null);
-  const hits = [];
-  const walk = (v, at) => {
+  const hits: string[] = [];
+  const walk = (v: unknown, at: string): void => {
     if (typeof v === 'string') {
       // A path inside our own bundle is ours and is the point of the report, so
       // it comes out of the string before ANY of the three scans rather than
@@ -174,7 +190,7 @@ export function findPrivate(value, ctx = {}) {
       for (const m of rest.match(PATH_RE) || []) {
         if (m.trim().split('/').filter(Boolean).length >= 2) hits.push(`${at}: path ${m.trim()}`);
       }
-    } else if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${at}[${i}]`));
+    } else if (Array.isArray(v)) v.forEach((x: unknown, i: number) => walk(x, `${at}[${i}]`));
     else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) walk(x, at ? `${at}.${k}` : k);
   };
   walk(value, '');

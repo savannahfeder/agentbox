@@ -4,31 +4,36 @@
 // without this the agent holds a name and nothing behind it.
 import { doneSteps, shownToPeople, visibilityOf } from './thread-cards.mjs';
 
+type Row = Parameters<typeof visibilityOf>[0];
+type Seen = Parameters<typeof visibilityOf>[1];
+type Reach = { rank: number; people: string[] };
+export interface FoundThread { item: Row; product?: (NonNullable<Seen> & { name?: string }) | null }
+
 const ID = /(?<![\w/.:@-])w-[a-f0-9]{10}(?![\w/-]|\.[a-z0-9])/gi;
 const MOST = 5;
 const ANSWER_CHARS = 1200;
 
 /** Every thread the texts name, once each and in order, never the row itself. */
-export function namedThreadIds(texts, self) {
+export function namedThreadIds(texts: unknown[], self?: string): string[] {
   const ids = texts.flatMap((t) => String(t ?? '').match(ID) ?? []).map((id) => id.toLowerCase());
   return [...new Set(ids)].filter((id) => id !== self);
 }
 
 // Who can read a thread: 0 only its owner, 1 chosen people, 2 the team.
-const reach = (item, product) => {
+const reach = (item: Row, product: Seen): Reach => {
   const v = visibilityOf(item, product);
   return v === 'private' ? { rank: 0, people: [] } : v === 'people' ? { rank: 1, people: shownToPeople(item, product) } : { rank: 2, people: [] };
 };
 // The agent's answer reaches everyone who reads the row, so a thread is
 // quoted into it only when all of them could open that thread already.
-const mayQuote = (named, row) => named.rank > row.rank
+const mayQuote = (named: Reach, row: Reach): boolean => named.rank > row.rank
   || (named.rank === row.rank && (named.rank !== 1 || row.people.every((p) => named.people.includes(p))));
 
-const STATE = { open: 'open', claimed: 'running', blocked: 'blocked', done: 'done' };
-const clip = (text, most) => (text.length > most ? `${text.slice(0, most).replace(/\s+\S*$/, '')}…` : text);
-const day = (ts) => (ts ? new Date(ts).toISOString().slice(0, 16).replace('T', ' ') : null);
+const STATE: Record<string, string> = { open: 'open', claimed: 'running', blocked: 'blocked', done: 'done' };
+const clip = (text: string, most: number): string => (text.length > most ? `${text.slice(0, most).replace(/\s+\S*$/, '')}…` : text);
+const day = (ts: number | undefined): string | null => (ts ? new Date(ts).toISOString().slice(0, 16).replace('T', ' ') : null);
 
-function summed(id, found, rowReach) {
+function summed(id: string, found: FoundThread | null | undefined, rowReach: Reach): string[] {
   if (!found?.item) return [`## ${id}`, '', 'Not on this computer, so there is nothing to read about it here.'];
   const { item, product } = found;
   if (!mayQuote(reach(item, product), rowReach)) {
@@ -49,7 +54,12 @@ function summed(id, found, rowReach) {
  * The brief's section on the threads a message names, or '' when it names
  * none. `find(id)` is the store's read of one thread, `{ item, product }`.
  */
-export function namedThreadsBlock({ texts, row, product, find }) {
+export function namedThreadsBlock({ texts, row, product, find }: {
+  texts: unknown[];
+  row: Row;
+  product: Seen;
+  find: (id: string) => FoundThread | null | undefined;
+}): string {
   const ids = namedThreadIds(texts, row?.id);
   if (!ids.length) return '';
   const rowReach = reach(row, product);
@@ -63,7 +73,7 @@ export function namedThreadsBlock({ texts, row, product, find }) {
     'below, so you need not go looking for them.',
   ];
   for (const id of shown) {
-    let found = null;
+    let found: FoundThread | null | undefined = null;
     try { found = find(id); } catch { found = null; }
     out.push('', ...summed(id, found, rowReach));
   }

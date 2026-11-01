@@ -27,33 +27,51 @@
 /** On the row while it is asking. */
 import { Name } from '../shared/product-name.mjs';
 import { CATCH_UP_LABEL } from './agent-import.mts';
+
+export interface CodexThreadLike {
+  id?: string;
+  title?: string;
+  folder?: string;
+  when?: number;
+  prompt?: string;
+  last?: string;
+  short?: string;
+  startedAt?: number;
+  lastActive?: number;
+  turns?: number;
+  images?: number;
+  live?: boolean;
+}
+
+interface LabelledItem { labels?: unknown[]; status?: string }
+interface ImportOptions { projectName?: string | null; now?: number }
 export const CODEX_IMPORT_LABEL = 'codex-import';
 /** On the row once it is hers to read. */
 export const CODEX_MIRROR_LABEL = 'codex';
 /** On a row the user said not now to. */
 export const NOT_IMPORTED_LABEL = 'not-imported';
 /** And which conversation, on all three. Codex's own thread id. */
-export const codexLabel = (id) => `codex:${String(id ?? '').trim()}`;
+export const codexLabel = (id: string | null | undefined): string => `codex:${String(id ?? '').trim()}`;
 
 /** The kind the asking row wears, so the list can draw it differently. */
 export const IMPORT_KIND = 'import';
 
-export function codexIdOf(item) {
+export function codexIdOf(item: LabelledItem | null | undefined): string | null {
   for (const label of item?.labels ?? []) {
     if (typeof label === 'string' && label.startsWith('codex:')) return label.slice(6);
   }
   return null;
 }
-export const isCodexImportRow = (item) => (item?.labels ?? []).includes(CODEX_IMPORT_LABEL) && item?.status !== 'done';
-export const isNotImportedRow = (item) => (item?.labels ?? []).includes(NOT_IMPORTED_LABEL) && item?.status === 'done';
-export const isCodexMirrorRow = (item) => (item?.labels ?? []).includes(CODEX_MIRROR_LABEL) && !!codexIdOf(item);
+export const isCodexImportRow = (item: LabelledItem | null | undefined): boolean => (item?.labels ?? []).includes(CODEX_IMPORT_LABEL) && item?.status !== 'done';
+export const isNotImportedRow = (item: LabelledItem | null | undefined): boolean => (item?.labels ?? []).includes(NOT_IMPORTED_LABEL) && item?.status === 'done';
+export const isCodexMirrorRow = (item: LabelledItem | null | undefined): boolean => (item?.labels ?? []).includes(CODEX_MIRROR_LABEL) && !!codexIdOf(item);
 
 /** "7:22 PM today", "yesterday at 7:22 PM", "Friday at 7:22 PM", else the date. */
-export function whenPhrase(when, now = Date.now()) {
+export function whenPhrase(when: number | null | undefined, now = Date.now()): string {
   const then = new Date(Number(when) || 0);
   if (!when || !Number.isFinite(then.getTime())) return '';
   const time = then.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  const midnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const midnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const days = Math.round((midnight(new Date(now)) - midnight(then)) / 86400000);
   if (days <= 0) return `${time} today`;
   if (days === 1) return `yesterday at ${time}`;
@@ -73,13 +91,13 @@ export function whenPhrase(when, now = Date.now()) {
  *  file path or a localhost address, keeps its words and loses its target, and
  *  a line that was nothing but such a link goes entirely, since "Open the
  *  interactive preview." with nothing to open is the confusing part. */
-const isWebLink = (target) => /^https?:\/\//i.test(target) && !/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])([:/]|$)/i.test(target);
-export function plainQuote(text) {
+const isWebLink = (target: string) => /^https?:\/\//i.test(target) && !/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])([:/]|$)/i.test(target);
+export function plainQuote(text: unknown): string {
   const lines = String(text ?? '').split('\n').map((raw) => {
     const line = raw.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
     const only = line.trim().match(/^\[([^\]]+)\]\(\s*([^)\s]+)[^)]*\)[.!]?$/);
     if (only && !isWebLink(only[2])) return null;
-    return line.replace(/\[([^\]]+)\]\(\s*([^)\s]+)[^)]*\)/g, (whole, words, target) => (isWebLink(target) ? whole : words));
+    return line.replace(/\[([^\]]+)\]\(\s*([^)\s]+)[^)]*\)/g, (whole: string, words: string, target: string) => (isWebLink(target) ? whole : words));
   });
   return lines.filter((l) => l !== null).join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
@@ -87,21 +105,21 @@ export function plainQuote(text) {
 /**
  * One paragraph of a longer text. Headings lose their hashes and become
  *  sentences, so "### 1. Folio" reads as "1. Folio." inside the line. */
-const clip = (text, max) => {
+const clip = (text: unknown, max: number) => {
   const t = plainQuote(text)
-    .replace(/^\s*#{1,6}\s*(.+?)\s*$/gm, (_m, h) => (/[.!?:]$/.test(h) ? h : `${h}.`))
+    .replace(/^\s*#{1,6}\s*(.+?)\s*$/gm, (_m: string, h: string) => (/[.!?:]$/.test(h) ? h : `${h}.`))
     .replace(/\s+/g, ' ')
     .trim();
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
 };
 
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
  * THE LINE THAT SAYS WHAT THE CONVERSATION IS, IN FACTS. Where it ran, how
  * long it has gone on, what she attached, and whether Codex is still in
  * it.*/
-export function threadFactsLine(thread, now = Date.now()) {
+export function threadFactsLine(thread: CodexThreadLike | null | undefined, now = Date.now()): string {
   const where = String(thread?.short || thread?.folder || '').trim();
   const startedAt = Number(thread?.startedAt) || 0;
   const when = Number(thread?.when) || 0;
@@ -130,7 +148,7 @@ export function threadFactsLine(thread, now = Date.now()) {
  * line stays inside the row's 112 character budget, so the quote is cut to
  * fit and the full prompt follows under it. */
 export const FIRST_LINE_BUDGET = 110;
-export function importFirstLine(thread, { projectName, now = Date.now() } = {}) {
+export function importFirstLine(thread: CodexThreadLike | null | undefined, { projectName, now = Date.now() }: ImportOptions = {}): string {
   const name = String(projectName || '').trim() || 'this project';
   // One line of plain words: a web link keeps its words here and loses its
   // address, because the inbox line draws text and not markdown.
@@ -149,7 +167,9 @@ export function importFirstLine(thread, { projectName, now = Date.now() } = {}) 
  * THE ASKING ROW'S WORDS. The first line carries the question and is what the
  *  inbox row prints; the facts line, her prompt and Codex's last message are the
  *  detail she approves from. */
-export function codexImportRow(thread, { projectName, now = Date.now() } = {}) {
+export function codexImportRow(thread: CodexThreadLike | null | undefined, { projectName, now = Date.now() }: ImportOptions = {}): {
+  title: string; body: string; kind: string; priority: number; labels: string[];
+} {
   const title = String(thread?.title || '').trim();
   const name = String(projectName || '').trim() || 'this project';
   const first = importFirstLine(thread, { projectName: name, now });
@@ -177,7 +197,7 @@ export function codexImportRow(thread, { projectName, now = Date.now() } = {}) {
  * THE ROW ONCE THE USER SAID YES. Their prompt is the body and Codex's last message
  *  is the result, so the thread reads You, then Codex, the way it did over
  *  there. A reply on it carries the work on here. */
-export function codexMirrorPatch(thread) {
+export function codexMirrorPatch(thread: CodexThreadLike | null | undefined): { body: string; result: string; kind: string; labels: string[]; engine: string } {
   const prompt = plainQuote(thread?.prompt);
   const last = plainQuote(thread?.last);
   return {
@@ -195,7 +215,7 @@ export function codexMirrorPatch(thread) {
  * WHAT HER ANSWER MEANS. A key on the row sends the word; the strip sends
  *  "Option 1: Import into X"; a typed reply can be either. Null is not an
  *  answer to this row and falls through to the ordinary reply path. */
-export function importChoice(answer) {
+export function importChoice(answer: string | null | undefined): 'yes' | 'no' | null {
   const a = String(answer ?? '').trim().toLowerCase();
   if (!a) return null;
   if (/^option\s*1\b/.test(a) || /^(y|yes|import)\b/.test(a)) return 'yes';
@@ -206,12 +226,12 @@ export function importChoice(answer) {
 /**
  * WHICH PROJECT A CONVERSATION BELONGS TO: the one whose folder it ran in,
  * the same rule every import follows. Null when nobody points at that folder. */
-export function productsForThread(thread, products = []) {
+export function productsForThread<P extends { repoPath?: string | null }>(thread: CodexThreadLike | null | undefined, products: P[] = []): P[] {
   const key = String(thread?.folder ?? '').replace(/\/+$/, '');
   if (!key) return [];
   return products.filter((p) => String(p?.repoPath ?? '').replace(/\/+$/, '') === key);
 }
-export function whereThreadLands(thread, products = []) {
+export function whereThreadLands<P extends { repoPath?: string | null }>(thread: CodexThreadLike | null | undefined, products: P[] = []): P | null {
   return productsForThread(thread, products)[0] ?? null;
 }
 
@@ -219,13 +239,13 @@ export function whereThreadLands(thread, products = []) {
  * WHICH CONVERSATIONS HAVE NO ROW YET, anywhere. A row asking, a row she
  *  imported and a row she declined all carry `codex:<id>`, and any of the
  *  three is a reason to file nothing. */
-export function threadsNeedingRows(threads, existingItems = []) {
-  const already = new Set();
+export function threadsNeedingRows<T extends CodexThreadLike>(threads: T[] | null | undefined, existingItems: (LabelledItem | null | undefined)[] = []): T[] {
+  const already = new Set<string>();
   for (const item of existingItems) {
     const id = codexIdOf(item);
     if (id) already.add(id);
   }
-  const byId = new Map();
+  const byId = new Map<string, T>();
   for (const t of threads ?? []) {
     const id = String(t?.id ?? '').trim();
     if (!id || already.has(id) || byId.has(id)) continue;

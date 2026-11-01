@@ -30,6 +30,21 @@
 
 import { Name } from './product-name.mjs';
 
+/** The place a copy of the app is in, as far as updating itself is concerned. */
+export type AppPlace =
+  | 'disk-image' | 'translocated' | 'applications' | 'elsewhere' | 'source' | 'not-mac';
+
+export interface PlaceState { place: AppPlace; canUpdate: boolean; offerMove: boolean }
+
+/** The parts of Electron's `app` this file reads. */
+export interface PlaceApp {
+  platform?: string;
+  isPackaged?: boolean;
+  getPath?(name: 'exe'): string;
+  isInApplicationsFolder?(): boolean;
+  moveToApplicationsFolder(): boolean;
+}
+
 // THE WORDS, IN ONE PLACE, and main and the renderer both read them from here.
 // `cannotUpdateHere` is the sentence `shortError` in main/updater.mts puts in
 // place of Squirrel's own paragraph, which is 240 characters with a URL in the
@@ -38,7 +53,15 @@ import { Name } from './product-name.mjs';
 // Every sentence says where the app is and what one press does about it, and
 // none of them says "read-only volume": that is the mechanism, and nobody
 // holding the Mac asked about the mechanism.
-export const MOVE_SAY = {
+export const MOVE_SAY: {
+  cannotUpdateHere: string;
+  button: string;
+  title: string;
+  where: Record<string, string>;
+  shortWhere: Record<string, string>;
+  fix: string;
+  retry: string;
+} = {
   cannotUpdateHere: `${Name} cannot update itself from where it is.`,
   button: 'Move to Applications',
   /** The sidebar card's heading. */
@@ -61,13 +84,20 @@ export const MOVE_SAY = {
 
 /** The sentence for a place, or null where there is nothing to say. `short` is
  *  the sidebar card's half of it: the button beside it already says the fix. */
-export function sayWhere(place, { short = false } = {}) {
+export function sayWhere(place: string | null | undefined, { short = false }: { short?: boolean } = {}): string | null {
   const words = short ? MOVE_SAY.shortWhere : MOVE_SAY.where;
-  return words[place] ?? null;
+  return place == null ? null : words[place] ?? null;
 }
 
 /** Where a copy of the app can be, as far as updating itself is concerned. */
-export const PLACE = {
+export const PLACE: {
+  diskImage: 'disk-image';
+  translocated: 'translocated';
+  applications: 'applications';
+  elsewhere: 'elsewhere';
+  source: 'source';
+  notMac: 'not-mac';
+} = {
   /** Run out of the mounted .dmg. Read-only; cannot update. */
   diskImage: 'disk-image',
   /** macOS is running a read-only copy of its own. Cannot update. */
@@ -101,8 +131,13 @@ const VOLUMES = '/Volumes/';
  * knows about `~/Applications` as well as `/Applications` and is therefore
  * never re-derived from the path here.
  */
-export function placeOfApp({ platform, packaged, exePath, inApplications } = {}) {
-  const no = (place) => ({ place, canUpdate: true, offerMove: false });
+export function placeOfApp({ platform, packaged, exePath, inApplications }: {
+  platform?: string;
+  packaged?: boolean;
+  exePath?: string | null;
+  inApplications?: boolean;
+} = {}): PlaceState {
+  const no = (place: AppPlace): PlaceState => ({ place, canUpdate: true, offerMove: false });
   if (platform !== 'darwin') return no(PLACE.notMac);
   if (!packaged) return no(PLACE.source);
   if (inApplications) return no(PLACE.applications);
@@ -123,7 +158,13 @@ export function placeOfApp({ platform, packaged, exePath, inApplications } = {})
  * cannot move under a running process except by the move below, which
  * relaunches.
  */
-export function createPlace({ app, log = console }) {
+export function createPlace({ app, log = console }: {
+  app: PlaceApp;
+  log?: { warn?: (...args: unknown[]) => void };
+}): {
+  state(): PlaceState;
+  move(): { moved: boolean; error: string | null };
+} {
   const where = placeOfApp({
     platform: app?.platform ?? process.platform,
     packaged: !!app?.isPackaged,
@@ -146,7 +187,7 @@ export function createPlace({ app, log = console }) {
         return { moved, error: null };
       } catch (e) {
         // One line, because Settings shows this string to a person.
-        const error = String(e?.message ?? e ?? 'The move did not work.').split('\n')[0].trim();
+        const error = String((e as { message?: unknown } | null | undefined)?.message ?? e ?? 'The move did not work.').split('\n')[0]!.trim();
         log.warn?.('[place] could not move the app into Applications:', error);
         return { moved: false, error };
       }

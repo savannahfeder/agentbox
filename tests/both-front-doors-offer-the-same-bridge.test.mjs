@@ -80,7 +80,7 @@ describe('renderer/src/browser-bridge.ts', () => {
   it('builds the bridge from the map rather than a list of its own', () => {
     // A hand-written second list is the thing this whole file exists to prevent,
     // so the browser door must not contain one.
-    expect(source).toContain("from '../../shared/bridge-map.mjs'");
+    expect(source).toContain("from '../../shared/bridge-map.mts'");
     expect(source.match(/'zero:[a-z-]+'/g) ?? []).toEqual([]);
   });
 
