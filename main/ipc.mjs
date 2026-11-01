@@ -72,6 +72,8 @@ import { EVENT_NAMES } from '../shared/analytics-events.mjs';
 import { Name } from '../shared/product-name.mjs';
 import { handedOnByReply } from '../shared/team-rules.mjs';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mjs';
+import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mjs';
+import { traceAnswer } from '../shared/trace-delta.mjs';
 import { saveAttachments } from './save-attachments.mjs';
 import { stageAttachment } from './stage-attachment.mjs';
 import { readRunTraces } from './run-traces.mjs';
@@ -486,7 +488,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     try { return !!host.app?.accessibilitySupportEnabled; } catch { return false; }
   });
 
-  ipcMain.handle('zero:snapshot', () => {
+  // `ask.since` names the last answer the screen holds, and the threads that
+  // did not change since are left out (shared/snapshot-delta.mjs).
+  const snapshots = snapshotSender();
+  ipcMain.handle('zero:snapshot', (_e, ask) => {
     const now = Date.now();
     const items = store.listItems(now);
     const running = supervisor.status();
@@ -504,7 +509,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // now. The Codex side never starts anything at all (main/codex-usage.mjs).
     const reading = usageFor === DEFAULT_ENGINE ? usage.read() : supervisor.codexUsage();
     const alpha = alphaFeatures(config);
-    return {
+    return snapshots.answer({
       products: store.listProducts(),
       // Each with the place she dragged it to, if she did (w-6e5b532a95).
       items: supervisor.withPlaces(items),
@@ -520,7 +525,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // The open thread's own card first, which is the order the chord and the
       // Agents menu answer in too (shared/which-card-is-in-front.mjs).
       approvals: pendingApprovals(),
-      supervisor: running,
+      // A screen that says which thread it has open is sent only that thread's
+      // live detail.
+      supervisor: ask && 'open' in ask ? { ...running, running: lightRunning(running.running, ask.open) } : running,
       // WHETHER THERE ARE TWO CODING AGENTS TO CHOOSE BETWEEN, AND WHICH ONE
       // EACH ROW RUNS ON. Answered whole by the supervisor, because the two
       // rules underneath it -- the capability gate and "an August choice is not
@@ -598,7 +605,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
           ...store.listProducts().map((p) => [p.slug, supervisor.effectivePermission(p.slug)]),
         ]),
       },
-    };
+    }, ask?.since);
   });
 
   // THE USER'S WORDS, INTO ONE OF THEIR LIVE AGENTS. The only thing in the app that writes
@@ -2269,11 +2276,25 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // The trace: what each session on this item actually did, from the logs the
   // supervisor persists under <product>/sessions/<item-id>/. Read-only.
-  ipcMain.handle('zero:session-trace', async (_e, { product, id, whole }) => {
+  // `whole` is a thread's middle being asked for: every log, whole, once
+  // (main/run-traces.mjs). Otherwise the newest, and `have` holds the stamps
+  // of the logs the screen already has (shared/trace-delta.mjs).
+  ipcMain.handle('zero:session-trace', async (_e, { product, id, have, whole } = {}) => {
+    const fs = await import('node:fs');
     const path = await import('node:path');
     const dir = store.listProducts().find((p) => p.slug === product)?.dir;
     if (!dir || !/^[\w-]+$/.test(String(id ?? ''))) return { ok: false, sessions: [] };
-    return { ok: true, sessions: readRunTraces(machineryPath(dir, path.join('sessions', id)), { whole: !!whole }) };
+    const traceDir = machineryPath(dir, path.join('sessions', id));
+    if (whole) return { ok: true, sessions: readRunTraces(traceDir, { whole: true }) };
+    let files = [];
+    try {
+      files = fs.readdirSync(traceDir).filter((f) => f.endsWith('.log')).sort();
+    } catch { return { ok: true, sessions: [] }; }
+    const sessions = files.slice(-20).map((f) => {
+      const startedAt = Number(f.replace('.log', '')) || 0;
+      return traceAnswer({ fs, file: path.join(traceDir, f), startedAt, had: have?.[startedAt] });
+    });
+    return { ok: true, sessions };
   });
 
   // The thread history behind the time under a task's title. Raw ledger lines,

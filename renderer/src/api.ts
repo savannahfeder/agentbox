@@ -19,6 +19,8 @@ import { USAGE_SAME_AS_ANOTHER, USAGE_UNREADABLE } from '../../shared/usage.mjs'
 import { accountSentence } from '../../shared/spawn-trouble.mjs';
 import { MOVE_SAY } from '../../shared/where-it-runs-from.mjs';
 import { cardsInFront } from '../../shared/which-card-is-in-front.mjs';
+import { snapshotReader } from '../../shared/snapshot-delta.mjs';
+import { traceReader } from '../../shared/trace-delta.mjs';
 // THE SECOND FRONT DOOR, AND IT HAS TO BE BUILT BEFORE THE LINE BELOW RUNS.
 // `useFixtures` reads `window.zero` once, at module load, and on the desktop
 // preload.cjs has already put it there. In a browser tab nothing has, so this
@@ -38,6 +40,13 @@ async function teamCall(fn: () => Promise<TeamCallResult>): Promise<TeamCallResu
   if (!window.zero?.teamSignIn) return { ok: false, error: 'This build has no team cloud set up.' };
   try { return await fn(); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
 }
+
+// The inbox and the open threads' agent logs as last answered, so each read
+// asks only for what changed since.
+const snapshots = snapshotReader();
+const traces = traceReader();
+// Which thread is on screen: only its agent's live detail is sent.
+let openThread: { product: string | null; id: string } | null = null;
 
 // READ SAFELY, BECAUSE THIS MODULE IS NOW REACHED FROM A COMPONENT THE TESTS
 // RENDER WITHOUT A WINDOW. The walk's last card is <ImportAgents> now, so
@@ -555,7 +564,10 @@ export const api = {
       }
       return fixtureSecondEngine(base, engineFixtures);
     }
-    return window.zero!.snapshot();
+    const got = snapshots.take(await window.zero!.snapshot({ ...snapshots.ask(), open: openThread }));
+    if (got) return got;
+    // Built on a list this window no longer holds: a whole one, which take() never refuses.
+    return snapshots.take(await window.zero!.snapshot({ open: openThread })) as Snapshot;
   },
 
   // WHERE YOU ARE, FOR THE ONE THING THAT DEPENDS ON IT: the approval card in
@@ -565,6 +577,7 @@ export const api = {
   async lookingAt(at: { product: string | null; id: string } | null): Promise<void> {
     // Fixtures have no main process to order the cards, and ?approvals is how
     // this card is reviewed, so the same shared rule is applied here.
+    openThread = at?.id ? { product: at.product, id: at.id } : null;
     if (useFixtures) { fixtureLooking = at; return; }
     try { await window.zero?.looking?.({ product: at?.product ?? null, id: at?.id ?? null }); } catch { /* the card simply stays where it was */ }
   },
@@ -657,7 +670,13 @@ export const api = {
   // from fixtures instead of only against a live fleet.
   async sessionTrace(p: { product: string; id: string; whole?: boolean }):Promise<{ sessions: Array<{ startedAt: number; text: string }> }> {
     if (useFixtures) return { sessions: (fixtureTraces as any)[p.id] ?? [] };
-    return (window.zero as any)?.sessionTrace?.(p) ?? { sessions: [] };
+    const zero = window.zero as any;
+    if (!zero?.sessionTrace) return { sessions: [] };
+    // Read once and kept by the thread page, so the newest logs' copy stays as it is.
+    if (p.whole) return (await zero.sessionTrace(p)) ?? { sessions: [] };
+    const key = `${p.product}/${p.id}`;
+    const got = traces.take(key, await zero.sessionTrace({ ...p, have: traces.have(key) }));
+    return got ?? traces.take(key, await zero.sessionTrace(p)) ?? { sessions: [] };
   },
 
   // THE DOCUMENT PANE'S THREE. All of them go through the app's own finder in

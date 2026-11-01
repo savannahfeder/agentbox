@@ -160,7 +160,8 @@ import { runsOn } from './runs-on.mjs';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mjs';
 import { startDecision, readMacPressureNow, SETTLE_MS } from './start-hold.mjs';
 import { MemoryLog } from './memory-log.mjs';
-import { autoSlots, DEFAULTS as MEMORY_GATE } from './memory-gate.mjs';
+import { StartBudget } from './cloud/start-budget.mjs';
+import { autoSlots, DEFAULTS as MEMORY_GATE, pressureFrom } from './memory-gate.mjs';
 import { LeftoverCleaner } from './leftovers.mjs';
 import { syncCodexMemoryGate } from './codex-memory-gate.mjs';
 import { autoAgents } from './machine.mjs';
@@ -280,9 +281,6 @@ const STORM_WINDOW_MS = 10 * 60_000;
 // the try before, in case what stopped it has gone away. Then it waits for a
 // person.
 const HELD_RETRY_MS = [30 * 60_000, 2 * 3_600_000, 8 * 3_600_000];
-// How many cloud runs may be packing and sending at once (`_cloudStarting`).
-// Turning the cloud on with Everything once started up to ten together.
-const CLOUD_STARTING_AT_ONCE = 2;
 // How long a cloud run may take to start before it stops holding others back.
 const CLOUD_START_PATIENCE_MS = 10 * 60_000;
 // A run paused to move to the cloud whose resume has not gone there by then
@@ -510,6 +508,8 @@ export class Supervisor {
         this.spawnWorker(fresh, { continuation: true, shipFailure: reply });
       },
       afterShip: (shipped) => { this.onShipped(); this.watchMainsTests(shipped); this.reclaimShippedFolder(shipped); },
+      memoryGate: () => this._memoryGate?.gate ?? null,
+      shipScore: (item) => this.memoryGateScore(item.product, item.id) ?? 0,
     });
     // AND THEN SOMEBODY WATCHES THE RUN THAT SHIP STARTED. The whole suite runs
     // on GitHub for every push and takes about five minutes, which is after the
@@ -527,6 +527,7 @@ export class Supervisor {
     // The first run's hold, in memory only and never persisted: firstRunWalking
     // below says why.
     this._firstRunUntil = 0;
+    this._startBudget = new StartBudget();
     this._stateFile = path.join(config.storeRoot, '.zero-supervisor.json');
     try {
       const state = JSON.parse(fs.readFileSync(this._stateFile, 'utf8'));
@@ -4184,7 +4185,7 @@ export class Supervisor {
     if (!this._cloudFirst() && !this._moveAsked?.size) return;
     if (!this._cloudUsable('claude')) return;
     const pausing = [...(this._toCloud?.keys() ?? [])].filter((id) => !this.sessions.has(id)).length;
-    let starts = CLOUD_STARTING_AT_ONCE - this._cloudStarting(now) - pausing;
+    let starts = this._startBudget.now() - this._cloudStarting(now) - pausing;
     let room = this._maxCloud() - this._cloudLoad() - pausing;
     if (starts <= 0 || room <= 0) return;
     const byId = new Map((items ?? []).map((i) => [i.id, i]));
@@ -5342,6 +5343,7 @@ export class Supervisor {
     if (!times) return;
     session.cloudSentAt = Date.now();
     session.cloudTimes = times;
+    this._startBudget.started(this._howTheMachineIs());
     this.wake?.();
   }
 
@@ -5436,7 +5438,13 @@ export class Supervisor {
     const set = this.config.maxCloudSessions;
     const n = Number(set);
     if (set !== null && set !== undefined && set !== '' && Number.isFinite(n) && n >= 0) return n;
-    return this._cloudHostAvailable() ? 50 : 20;
+    return this._cloudHostAvailable() ? 200 : 20;
+  }
+
+  // What a cloud start that just went out says about whether another may.
+  _howTheMachineIs() {
+    const reading = this._memReading;
+    return { pressure: reading ? pressureFrom(reading) : undefined, stallMs: this.stalls?.longestNow?.() ?? 0 };
   }
 
   _cloudHostAvailable() {
@@ -5456,7 +5464,7 @@ export class Supervisor {
   // the proxy's command; Codex as its own app-server in the sandbox
   // (main/cloud/codex-cloud.mjs).
   _cloudSlotFor(engine) {
-    return this._cloudUsable(engine) && this._cloudRoom(engine) && this._cloudStarting() < CLOUD_STARTING_AT_ONCE;
+    return this._cloudUsable(engine) && this._cloudRoom(engine) && this._cloudStarting() < this._startBudget.now();
   }
 
   // Not resting after failures of its own (`_noteCloudOutcome`), and not a
@@ -5532,6 +5540,7 @@ export class Supervisor {
     // down and the thread runs here (main/cloud/run.mjs `NO_PLAIN_HERE`).
     if (said && /earlier cloud run in this folder|cannot take a project with no repository/.test(said)) return;
     h.faults += 1;
+    this._startBudget.failed();
     h.lastError = said || `a cloud run ended (${signal || code}) before its agent started`;
     if (h.faults >= CLOUD_FAULTS_TO_REST) h.restUntil = Date.now() + CLOUD_REST_MS;
     this.onChange?.();
@@ -5858,7 +5867,7 @@ export class Supervisor {
 
   // Why a thread `_waitsForCloud` has no cloud slot yet, the way `_cloudSlotFor` asks.
   _whyWaitingForCloud(engine) {
-    if (this._cloudStarting() >= CLOUD_STARTING_AT_ONCE) return { why: 'two-at-a-time' };
+    if (this._cloudStarting() >= this._startBudget.now()) return { why: 'starting-in-turn' };
     if (this._cloudLoad() >= this._maxCloud()) return { why: 'cloud-full', detail: this._maxCloud() };
     if (!this._cloudReady(engine)) return { why: 'accounts-limited' };
     return { why: 'cloud-busy' };
