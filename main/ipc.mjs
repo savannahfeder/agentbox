@@ -74,6 +74,7 @@ import { handedOnByReply } from '../shared/team-rules.mjs';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mjs';
 import { saveAttachments } from './save-attachments.mjs';
 import { stageAttachment } from './stage-attachment.mjs';
+import { readRunTraces } from './run-traces.mjs';
 
 // WHAT A WORKER IS TOLD WHEN HER DECISION COULD NOT BE RECORDED.
 const SPOOL_REFUSED = `${Name} could not record the founder's decision, so nothing was allowed. Finish what your grants cover and file the rest as a review.`;
@@ -2267,23 +2268,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // The trace: what each session on this item actually did, from the logs the
   // supervisor persists under <product>/sessions/<item-id>/. Read-only.
-  ipcMain.handle('zero:session-trace', async (_e, { product, id }) => {
-    const fs = await import('node:fs');
+  ipcMain.handle('zero:session-trace', async (_e, { product, id, whole }) => {
     const path = await import('node:path');
     const dir = store.listProducts().find((p) => p.slug === product)?.dir;
     if (!dir || !/^[\w-]+$/.test(String(id ?? ''))) return { ok: false, sessions: [] };
-    const traceDir = machineryPath(dir, path.join('sessions', id));
-    let files = [];
-    try {
-      files = fs.readdirSync(traceDir).filter((f) => f.endsWith('.log')).sort();
-    } catch { return { ok: true, sessions: [] }; }
-    const sessions = files.slice(-20).map((f) => {
-      let text = '';
-      try { text = fs.readFileSync(path.join(traceDir, f), 'utf8'); } catch {}
-      if (text.length > 120_000) text = `… truncated (${text.length} bytes total)\n\n${text.slice(-120_000)}`;
-      return { startedAt: Number(f.replace('.log', '')) || 0, text };
-    });
-    return { ok: true, sessions };
+    return { ok: true, sessions: readRunTraces(machineryPath(dir, path.join('sessions', id)), { whole: !!whole }) };
   });
 
   // The thread history behind the time under a task's title. Raw ledger lines,

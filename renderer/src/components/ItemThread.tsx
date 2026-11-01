@@ -39,6 +39,7 @@ import { notShipped } from '../../../shared/not-shipped.mjs';
 import type { ModelChoice } from '../models';
 import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
+import { withEveryRun } from '../every-run';
 import type { AgentTurn, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
@@ -196,6 +197,17 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   // timer.
   const [whole, setWhole] = useState(false);
   useEffect(() => { setWhole(false); }, [item.product, item.id]);
+  // The regular read below has only the newest runs; the middle needs them all.
+  const [everyRun, setEveryRun] = useState<TraceSession[]>([]);
+  useEffect(() => {
+    setEveryRun([]);
+    if (!whole) return;
+    let live = true;
+    api.sessionTrace({ product: item.product, id: item.id, whole: true })
+      .then((r) => { if (live) setEveryRun(r?.sessions ?? []); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [item.product, item.id, whole]);
   const [earlierOpen, setEarlierOpen] = useState(false);
   useEffect(() => { setEarlierOpen(false); }, [item.product, item.id]);
 
@@ -288,7 +300,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   const saying = session?.saying && session.sayingAt
     ? { text: session.saying, at: session.sayingAt, run: session.startedAt }
     : null;
-  const built = itemThread(ledger.lines, sessions, saying, { whole, engine, pending: sending, chat, undone: marksFor(undoMarks, item.product, item.id) });
+  const built = itemThread(ledger.lines, withEveryRun(everyRun, sessions), saying, { whole, engine, pending: sending, chat, undone: marksFor(undoMarks, item.product, item.id) });
   const said = built.events.map((e) => (e.kind === 'work' ? e : { ...e, text: clean(e.text ?? '') }));
   /* * WHILE AN AGENT IS WORKING, THE LAST THING ON THE PAGE IS THE THINKING
      COMPONENT, AND THE COMMANDS UNDER IT ARE ITS OWN.

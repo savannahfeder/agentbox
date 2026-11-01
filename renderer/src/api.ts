@@ -655,7 +655,7 @@ export const api = {
   // The session traces behind the working notes. It comes through the seam
   // like everything else, so the notes can be built, reviewed and screenshotted
   // from fixtures instead of only against a live fleet.
-  async sessionTrace(p: { product: string; id: string }): Promise<{ sessions: Array<{ startedAt: number; text: string }> }> {
+  async sessionTrace(p: { product: string; id: string; whole?: boolean }):Promise<{ sessions: Array<{ startedAt: number; text: string }> }> {
     if (useFixtures) return { sessions: (fixtureTraces as any)[p.id] ?? [] };
     return (window.zero as any)?.sessionTrace?.(p) ?? { sessions: [] };
   },
