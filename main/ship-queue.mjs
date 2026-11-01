@@ -280,13 +280,34 @@ export async function runScript(script, cwd, { timeout = SHIP_MS, env = process.
   });
 }
 
+let shipTurns = 0;
+
+/**
+ * A ship's turn at the memory check (main/memory-gate.mjs), like any heavy
+ * command's, because its tests run from a git hook the check cannot see. Answers
+ * with what gives the slot back. Told no, it says so and asks again; after its
+ * last turn it goes anyway, because a ship left behind is a thread stuck in In
+ * progress.
+ */
+export async function shipSlot(gate, item, score = 0, { turns = 3, onWait = () => {} } = {}) {
+  if (!gate) return () => {};
+  for (let turn = 1; ; turn += 1) {
+    const id = `ship-${item.id}-${++shipTurns}`;
+    const answer = await new Promise((resolve) => {
+      gate.submit({ id, command: 'agentbox-ship', item: item.id, product: item.product, score }, resolve);
+    });
+    if (answer.allow || turn >= turns) return () => gate.finish(id);
+    onWait();
+  }
+}
+
 /**
  * One task at a time, for the whole Mac. `tick` is called from the
  * supervisor's own tick and returns at once; the run happens beside it.
  */
 export class ShipQueue {
-  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, log = console }) {
-    Object.assign(this, { store, userDir, folderFor, isLive, liveSince, handBack, run, afterShip, log });
+  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, memoryGate = () => null, shipScore = () => 0, log = console }) {
+    Object.assign(this, { store, userDir, folderFor, isLive, liveSince, handBack, run, afterShip, memoryGate, shipScore, log });
     this.busy = null;
     this.earlyConflicts = new Map();
   }
@@ -364,7 +385,17 @@ export class ShipQueue {
     this.log.info?.(`zero: shipping ${item.id} from ${cwd}`);
     // The push hook leaves tests already red on main out of its refusal.
     const red = redOnMain(this.userDir);
-    const { code, out } = await this.run(script, cwd, red.length ? { env: { ...process.env, AGENTBOX_RED_ON_MAIN: red.join('\n') } } : undefined);
+    const gate = this.memoryGate();
+    const giveBack = gate && await shipSlot(gate, item, this.shipScore(item), {
+      onWait: () => { try { this.store.noteItem?.(item.product, item.id, 'Waiting for memory on this computer before shipping.'); } catch { /* the ship still waits */ } },
+    });
+    let ran;
+    try {
+      ran = await this.run(script, cwd, red.length ? { env: { ...process.env, AGENTBOX_RED_ON_MAIN: red.join('\n') } } : undefined);
+    } finally {
+      giveBack?.();
+    }
+    const { code, out } = ran;
     try {
       // Already on main: there is nothing to fix, so nobody is woken.
       const already = /There is nothing to ship/.test(out);
