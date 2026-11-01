@@ -198,10 +198,13 @@ describe('end to end, with the stand-in worker', () => {
     booted.supervisor.start();
 
     const said = () => String(booted.store.readItem('sandbox', it.id)?.result ?? '');
-    const end = Date.now() + 15_000;
+    // LONGER THAN ONE SWEEP OF THE SUPERVISOR. The budget was 15 s, which is
+    // the poll interval itself, so a run its first tick missed was measured
+    // landing at 15.5 s and the file went red on macOS with nothing wrong.
+    const end = Date.now() + 50_000;
     while (!said() && Date.now() < end) await wait(50);
 
     expect(said()).toMatch(/partway through/);
     expect(said()).not.toMatch(UNSTARTED);
-  }, 20_000);
+  }, 60_000);
 });
