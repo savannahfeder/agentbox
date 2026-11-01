@@ -39,7 +39,7 @@ describe('the tip', () => {
   });
   it('is not a lesson of its own, so pressing nothing finishes nothing', () => {
     const tour = read('renderer/src/components/Tour.tsx');
-    expect(tour).toContain("step === 'busy' || step === 'palette' || step === 'gettingReady'");
+    expect(tour).toContain("step === 'busy' || step === 'palette' || step === 'gettingReady' || step === 'inPalette'");
     expect(lessonOf('gettingReady')).toBe('open');
   });
   it('offers something to do while waiting', () => {

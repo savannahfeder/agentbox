@@ -5,6 +5,7 @@
 // Everyone and project pickers over a board or a list. The rules they follow
 // are in ./page-rules.ts; the look is ./pages.css, ported from the drawings
 // she approved.
+import { laterTabShown } from '../later-tab';
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { LiveMark } from '../components/LiveMark';
 import { createPortal } from 'react-dom';
@@ -437,7 +438,7 @@ export type TeamTabs = { on: boolean; onNeeds: () => void; onEverything: () => v
 export const EVERYTHING_ELSE = 'Everything else';
 
 /** `needs` renames the first tab (Waiting, once a teammate is on the page). */
-export function StateTabs({ view, counts, onView, needs, onSearch, lit = false, after, dim = false, into = null, team = null }: {
+export function StateTabs({ view, counts, onView, needs, onSearch, lit = false, after, dim = false, into = null, team = null, keepLater = false }: {
   view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void; needs?: string;
   /** Draws Search at the row's right end (w-3c51d02de5). */
   onSearch?: () => void;
@@ -448,17 +449,20 @@ export function StateTabs({ view, counts, onView, needs, onSearch, lit = false, 
   /** Drawn here instead of in place: the top bar, where the page's title was. */
   into?: HTMLElement | null;
   team?: TeamTabs | null;
+  /** Later stays drawn while nothing is in it: the walk teaches it. */
+  keepLater?: boolean;
 }) {
-  const row = <StateTabsRow view={view} counts={counts} onView={onView} needs={needs} onSearch={onSearch} lit={lit} after={after} dim={dim} team={team} />;
+  const row = <StateTabsRow view={view} counts={counts} onView={onView} needs={needs} onSearch={onSearch} lit={lit} after={after} dim={dim} team={team} keepLater={keepLater} />;
   return into ? createPortal(row, into) : row;
 }
 
-function StateTabsRow({ view, counts, onView, needs, onSearch, lit = false, after, dim = false, team = null }: {
+function StateTabsRow({ view, counts, onView, needs, onSearch, lit = false, after, dim = false, team = null, keepLater = false }: {
   view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void; needs?: string;
-  onSearch?: () => void; lit?: boolean; after?: ReactNode; dim?: boolean; team?: TeamTabs | null;
+  onSearch?: () => void; lit?: boolean; after?: ReactNode; dim?: boolean; team?: TeamTabs | null; keepLater?: boolean;
 }) {
   // In progress, Later and Done are your own card's tabs on Everything else.
-  const tabs = team ? INBOX_TABS.filter((t) => t.view === 'inbox') : INBOX_TABS;
+  const tabs = team ? INBOX_TABS.filter((t) => t.view === 'inbox')
+    : INBOX_TABS.filter((t) => t.view !== 'snoozed' || laterTabShown({ count: counts.snoozed ?? 0, view, walking: keepLater }));
   const on = (t: TabView) => (team ? t === 'inbox' && !team.on : view === t && !dim);
   return <div className="th-bar"><div className="tm-tabs">
     {/* Every tab wears the Tab plate (hint-plate.ts, 'state-tab'). */}

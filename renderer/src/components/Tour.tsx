@@ -7,7 +7,7 @@ import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
 import { ConfettiBurst } from './ConfettiBurst';
-import { cursorOwed, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, tourLive, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { THREAD_CLOSED, cursorOwed, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, tourLive, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -39,8 +39,18 @@ const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
   close: { words: <>When it is finished, press <K k="E" /> to close it</>, side: 'below-right' },
   busy: { words: <>This agent is working. You can leave and come back when it’s done</>, side: 'below' },
   gettingReady: { words: <>Getting your chats ready. You can wait here or press <K k="N" /> to start something new</>, side: 'below' },
+  inPalette: { words: <></>, side: 'below' },
   palette: { words: <>Press <K k={CMD} /><K k="K" /> to find anything {Name} can do</>, side: 'below' },
 };
+
+/** Inside ⌘K: one thing worth trying on the thread it acts on, and the way out. */
+function InPalette() {
+  const urgent = [...document.querySelectorAll('.palette-label')].some((l) => /Priority: Urgent/.test(l.textContent ?? ''));
+  const here = document.querySelector('.focus-body') ? 'this thread' : 'the selected thread';
+  return urgent
+    ? <>Type <K k="urgent" /> and press <K k="↵" /> to make {here} urgent, or <K k="esc" /> to close</>
+    : <>Type what you want to do and press <K k="↵" />, or <K k="esc" /> to close</>;
+}
 
 /** A chat still being written up is not pointed at until it reads as a thread. */
 const ROWS = '.list-pane .row[data-item-id]:not([data-catching-up])';
@@ -72,6 +82,7 @@ function targetsOf(step: TourStep): HTMLElement[] {
     case 'reply': return one(document.querySelector('.dock-pill'));
     case 'close': return one(document.querySelector('.ts-done'));
     case 'busy': return one(document.querySelector('.live-activity .live-brief'));
+    case 'inPalette': return one(document.querySelector('.palette'));
     case 'gettingReady': return one([...document.querySelectorAll('.list-pane .row[data-catching-up]')].at(-1));
     // Nothing on screen opens the command bar, so the card sits alone under the tabs.
     case 'palette': return one(document.querySelector('.tm-tab')?.parentElement ?? document.querySelector('.thread-crumb-from')?.parentElement);
@@ -108,7 +119,7 @@ function boxOf(step: TourStep, els: HTMLElement[]): Box | null {
   return { x, y, w: Math.max(...rs.map((r) => r.right)) - x, h: Math.max(...rs.map((r) => r.bottom)) - y };
 }
 
-function readScreen(view: string, thread: boolean, covered: boolean): TourScreen {
+function readScreen(view: string, thread: boolean, covered: boolean, palette: boolean): TourScreen {
   const card = document.querySelector<HTMLElement>('.tc-card');
   return {
     composer: !card ? 'none' : card.classList.contains('tc-inline') ? 'inline' : 'card',
@@ -125,18 +136,21 @@ function readScreen(view: string, thread: boolean, covered: boolean): TourScreen
     busy: thread && !!document.querySelector('.live-word.is-shimmering'),
     menu: !!document.querySelector('.tc-menu'),
     options: !!document.querySelector('.opt-row'),
+    palette,
     covered,
   };
 }
 
 const same = (a: Box | null, b: Box | null) => (!a || !b ? a === b : a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
 
-export function Tour({ tour, view, thread, covered, onChange, onPoint }: {
+export function Tour({ tour, view, thread, covered, palette, onChange, onPoint }: {
   tour: TourState | null;
   view: string;
   thread: boolean;
   /** Settings, ⌘K or another card is over the window. */
   covered: boolean;
+  /** ⌘K is open, which the tutorial speaks over. */
+  palette: boolean;
   onChange: (t: TourState) => void;
   /** Puts the list's cursor on this thread. */
   onPoint: (id: string) => void;
@@ -190,7 +204,7 @@ export function Tour({ tour, view, thread, covered, onChange, onPoint }: {
   useEffect(() => {
     if (!live || !tour) { if (shown.current) { shown.current = null; setStep(null); } return undefined; }
     const read = () => {
-      const screen = readScreen(view, thread, covered);
+      const screen = readScreen(view, thread, covered, palette);
       if (screen.typing && !tour.done.includes('reply')) { onChange(finishLesson(tour, 'reply')); return; }
       const rawStep = tourStep(tour, screen);
       // Told to go and explore, nobody is then asked to come back and watch.
@@ -230,7 +244,7 @@ export function Tour({ tour, view, thread, covered, onChange, onPoint }: {
     read();
     const t = setInterval(read, 120);
     return () => clearInterval(t);
-  }, [live, tour, view, thread, covered, onChange, tried]);
+  }, [live, tour, view, thread, covered, palette, onChange, tried]);
 
   // THE CARD, beside the glow, kept inside the window.
   useEffect(() => {
@@ -268,7 +282,7 @@ export function Tour({ tour, view, thread, covered, onChange, onPoint }: {
     // Pressing the lit thing is doing what the tip asks; a click anywhere else leaves the tip up.
     const down = (e: PointerEvent) => {
       if (!onTarget(e.target)) return;
-      if (IN_THE_BOX.includes(step) || step === 'busy' || step === 'palette' || step === 'gettingReady') return;
+      if (IN_THE_BOX.includes(step) || step === 'busy' || step === 'palette' || step === 'gettingReady' || step === 'inPalette') return;
       setTimeout(() => onChange(finishLesson(tour, lessonOf(step))), 0);
     };
     const key = (e: KeyboardEvent) => {
@@ -276,28 +290,25 @@ export function Tour({ tour, view, thread, covered, onChange, onPoint }: {
       const later = (t: TourState) => setTimeout(() => onChange(t), 0);
       const typing = (e.target as Element | null)?.closest?.('input, textarea, [contenteditable="true"]');
       // The app holds the first E on a thread waiting on an answer, so it counts only once the thread has gone.
-      if (!typing && closesThread(e, thread)) {
-        const was = document.querySelector('.focus-body .one-title')?.textContent ?? null;
-        setTimeout(() => {
-          if ((document.querySelector('.focus-body .one-title')?.textContent ?? null) !== was) onChange(closeLessons(step).reduce(finishLesson, tour));
-        }, 900);
-        return;
-      }
+      // A close is counted when the app closes the thread (THREAD_CLOSED below); the first E on a waiting thread is held.
+      if (!typing && closesThread(e, thread)) return;
       if (!typing && keyLearns(step, e)) { later(finishLesson(tour, lessonOf(step))); return; }
     };
+    const closed = () => onChange(closeLessons(step).reduce(finishLesson, tour));
     window.addEventListener('pointerdown', down, true);
     window.addEventListener('keydown', key, true);
-    return () => { window.removeEventListener('pointerdown', down, true); window.removeEventListener('keydown', key, true); };
+    window.addEventListener(THREAD_CLOSED, closed);
+    return () => { window.removeEventListener('pointerdown', down, true); window.removeEventListener('keydown', key, true); window.removeEventListener(THREAD_CLOSED, closed); };
   }, [step, tour, thread, onChange]);
 
   if (!step || !box || !tour) return burst ? <ConfettiBurst key={burst} /> : null;
   return (
     <>
       {burst ? <ConfettiBurst key={burst} /> : null}
-      {step !== 'palette' && step !== 'busy' && step !== 'gettingReady' && <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
+      {step !== 'palette' && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
       <div key={`card-${step}`} ref={cardRef} className="tour-card" role="status"
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>
-        <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : SAY[step].words}</span>
+        <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : SAY[step].words}</span>
         {step === 'busy' && !tried && <button type="button" className="tour-act" onClick={tryNotifications}>Turn on notifications</button>}
       </div>
     </>

@@ -288,16 +288,16 @@ describe('the command bar', () => {
     // Someone who brought chats in and has not sent anything is then shown New thread.
     expect(tourStep(after('open', 'reply', 'close', 'palette'), at({ rows: 0 }))).toBe('start');
   });
-  it('counts as learned when the bar opens', async () => {
+  it('counts as learned when the bar closes, after its own tip has said what to do in it', async () => {
     const fs = await import('node:fs');
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-    expect(app).toContain("if (modal === 'palette' && tour && !tour.done.includes('palette')) setTour(finishLesson(tour, 'palette'));");
+    expect(app).toContain("if (paletteWasOpen.current && modal !== 'palette' && tour && !tour.done.includes('palette')) setTour(finishLesson(tour, 'palette'));");
   });
   it('has no glow, since nothing on screen opens it', async () => {
     // Drawn first on the page title: the glow hugged "Threads" and the card covered the tabs.
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
-    expect(tour).toContain("{step !== 'palette' && step !== 'busy' && step !== 'gettingReady' && <div key={`glow-${step}`}");
+    expect(tour).toContain("{step !== 'palette' && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && <div key={`glow-${step}`}");
   });
 });
 
@@ -554,7 +554,7 @@ describe('E on a thread that is waiting on you', () => {
   it('counts as the close only once the thread has really gone', async () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
-    expect(tour).toContain("const was = document.querySelector('.focus-body .one-title')?.textContent ?? null;");
-    expect(tour).toContain("if ((document.querySelector('.focus-body .one-title')?.textContent ?? null) !== was) onChange(closeLessons(step).reduce(finishLesson, tour));");
+    // The app says so as it closes the thread; a held E never reaches that line.
+    expect(tour).toContain("const closed = () => onChange(closeLessons(step).reduce(finishLesson, tour));");
   });
 });

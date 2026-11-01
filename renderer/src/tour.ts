@@ -3,7 +3,7 @@
 // tests/the-tutorial-walks-you-through-your-first-real-thread.test.mjs holds
 // what each rule is for.
 
-export type TourStep = 'start' | 'folder' | 'pick' | 'write' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'gettingReady';
+export type TourStep = 'start' | 'folder' | 'pick' | 'write' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'gettingReady' | 'inPalette';
 /** Each tip shows until it is done or put away, then never again. The New thread box's three steps are one. */
 export type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy';
 /** Every lesson there is; a tour with all of them done has nothing left to say. */
@@ -45,11 +45,15 @@ export interface TourScreen {
   typing?: boolean;
   /** The open thread offers options. */
   options: boolean;
-  /** Something else is over the window: settings, ⌘K, another card. */
+  /** ⌘K is open. */
+  palette?: boolean;
+  /** Something else is over the window: settings, another card. */
   covered: boolean;
 }
 
 export const TOUR_KEY = 'zero.tour';
+/** Sent by the app once a thread is really closed, which is the close lesson. */
+export const THREAD_CLOSED = 'agentbox:thread-closed';
 
 export const startTour = (): Tour => ({ sent: false, skipped: false, done: [] });
 export const skipTour = (t: Tour): Tour => ({ ...t, skipped: true });
@@ -57,7 +61,7 @@ export const tourLive = (t: Tour | null): boolean => !!t && !t.skipped && LESSON
 export const noteSent = (t: Tour): Tour => finishLesson({ ...t, sent: true }, 'compose');
 export const finishLesson = (t: Tour, l: Lesson): Tour => (t.done.includes(l) ? t : { ...t, done: [...t.done, l] });
 export const lessonOf = (s: TourStep): Lesson =>
-  s === 'folder' || s === 'pick' || s === 'write' || s === 'send' ? 'compose' : s === 'answered' || s === 'gettingReady' ? 'open' : s;
+  s === 'folder' || s === 'pick' || s === 'write' || s === 'send' ? 'compose' : s === 'answered' || s === 'gettingReady' ? 'open' : s === 'inPalette' ? 'palette' : s;
 
 const KEYS: Partial<Record<TourStep, RegExp>> = { start: /^n$/i, working: /^Enter$/, open: /^Enter$/, choose: /^[1-9]$/, reply: /^r$/i, close: /^e$/i };
 
@@ -107,6 +111,7 @@ export const cursorOwed = (step: TourStep | null, { writing, byHand }: { writing
 export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
   if (!t || t.skipped || s.covered) return null;
   const todo = (l: Lesson) => !t.done.includes(l);
+  if (s.palette) return todo('palette') ? 'inPalette' : null;
   // The command bar is the last tip, so it goes before the suggestions on the empty inbox.
   if (!todo('close') && todo('palette') && (t.sent || !todo('start')) && s.composer === 'inline' && !s.thread) return 'palette';
   if (s.composer !== 'none' && !t.sent && todo('compose')) {

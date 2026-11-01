@@ -149,7 +149,8 @@ import { comeBackTo, neverOffered, offerOnNewProject, rememberOffered } from './
 import { FirstRunFlow } from './components/FirstRun';
 import { ideasFor, runOfRule } from './first-run';
 import { Tour } from './components/Tour';
-import { finishLesson, firstTask, noteSent, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, type Tour as TourState } from './tour';
+import { laterTabShown } from './later-tab';
+import { THREAD_CLOSED, finishLesson, firstTask, noteSent, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   finishedCleared, firstRunNeeded, projectsOfTheirOwn, inboxCleared, laterCleared, laterId, laterIndex,
@@ -1031,8 +1032,10 @@ export default function App() {
   const tourRef = useRef(tour);
   tourRef.current = tour;
   // The tutorial's last tip is the command bar, learned the moment it opens.
+  const paletteWasOpen = useRef(false);
   useEffect(() => {
-    if (modal === 'palette' && tour && !tour.done.includes('palette')) setTour(finishLesson(tour, 'palette'));
+    if (paletteWasOpen.current && modal !== 'palette' && tour && !tour.done.includes('palette')) setTour(finishLesson(tour, 'palette'));
+    paletteWasOpen.current = modal === 'palette';
   }, [modal, tour, setTour]);
   const runRef = useRef<FirstRun | null>(null);
   runRef.current = run;
@@ -2672,7 +2675,7 @@ export default function App() {
     ? teammateRows(cards, { tab: view, picked, me: team?.me ?? null, display: DEFAULT_DISPLAY.inbox, products: snap?.products ?? [], now }).length : 0);
   // THE TABS A PRESS OF TAB MOVES ALONG: the list the bar is drawing, so there
   // is no second copy of the order to fall out of step with it.
-  const stateTabOrder = useMemo(() => INBOX_TABS.map((t) => t.view), []);
+  const stateTabOrder = useMemo(() => INBOX_TABS.map((t) => t.view).filter((v) => v !== 'snoozed' || laterTabShown({ count: snoozed.length, view, walking: !!run })), [snoozed.length, view, run]);
   // The inbox as she sees it, whichever tab is up: her filter AND her display
   // menu. Finishing a task from inside it advances through THIS, never the
   // whole inbox, or the next task opened can be one she has hidden
@@ -4074,6 +4077,7 @@ export default function App() {
       return;
     }
     if (closesAgain(pendingRef.current, item)) return;
+    if (!stay) window.dispatchEvent(new CustomEvent(THREAD_CLOSED));
     const undid = [{ product: item.product, id: item.id, words: UNDID_CLOSING }];
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, status: 'done', ...(unshippedOk ? { closeUnshipped: true } : {}) });
@@ -6959,6 +6963,7 @@ export default function App() {
                     lit={needsYouLit(inbox, needsLookedAt)}
                     onView={(next) => { roomsUi.leave(); setView(next as View); setSelected(0); setMultiSel(new Set()); }}
                     team={teamTabs}
+                    keepLater={!!run}
                   />
                 )}
                 {evTop}
@@ -7728,7 +7733,8 @@ export default function App() {
           surfaces at once would photograph the welcome screen. */}
       {fresh && !modeDraft && <FirstRunFlow snap={snap} home={home} onDone={finishFresh} />}
       {!fresh && <Tour tour={tour} view={view} thread={!!focused}
-        covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose')}
+        covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}
+        palette={modal === 'palette'}
         onChange={setTour}
         onPoint={(id) => { const at = list.findIndex((i) => i.id === id); if (at >= 0) setSelected(at); }} />}
       {run && !modeDraft && !walkWaitsForSignIn && (
