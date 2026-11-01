@@ -549,8 +549,8 @@ export interface StartSessionOptions {
   cwd: string;
   profile: string;
   engine: string;
-  plan: Pick<SpawnPlan, 'args' | 'command' | 'resumeId'>;
-  where: 'local' | 'cloud';
+  plan: Pick<SpawnPlan, 'args' | 'command'> & { resumeId?: string | null };
+  where: string;
   whyLocal?: WhyLocal | null;
   remoteOnly?: boolean;
   continuation?: boolean;
@@ -6835,7 +6835,7 @@ export class Supervisor {
   _adoptHostedRun(item: WorkItem, rec: LiveSessionRecord) {
     const h = rec?.hosted;
     if (!this.hostRuns || !h?.runId || !h.sock || rec.cloud || this.sessions.has(item.id)) return false;
-    const alive = Number.isInteger(h.pid) && pidAlive(h.pid);
+    const alive = Number.isInteger(h.pid) && pidAlive(h.pid!);
     if (!alive && !fs.existsSync(spoolFiles(this._runSpool(), h.runId).exit)) return false;
     if (!fs.existsSync(h.sock)) return false;
     const product = this.store.listProducts().find((p) => p.slug === item.product);
@@ -6846,7 +6846,7 @@ export class Supervisor {
     this._liveSessions[item.id] = kept;
     // A reply written while the app was away was not heard by this run.
     const heard = !!rec.heard && !!item.answer && this._answerKey(item) === rec.heard;
-    this._startSession(heard ? item : { ...item, answer: null }, {
+    this._startSession(heard ? item : { ...item, answer: null } as unknown as WorkItem, {
       product, cwd: rec.cwd as string, profile: rec.profile as string, engine: rec.engine ?? 'claude', where: 'local',
       plan: { args: [], command: false, resumeId: rec.resumed ? rec.sessionId : null },
       continuation: !!rec.continuation, spawnFiles: rec.spawnFiles ?? [], adopted: { child, rec },
@@ -11046,7 +11046,7 @@ export class Supervisor {
     if (!adopted) this.count?.('run_started', { engine });
     this._notStarting?.delete(item.id);
     // A hosted worker's pid arrives once the host has started it.
-    if (!Number.isInteger(child?.pid)) child.once?.('spawn', () => { if (Number.isInteger(child.pid)) this._leftoverCleaner?.worker(item.id, child.pid); });
+    if (!Number.isInteger(child?.pid)) child.once?.('spawn', () => { if (Number.isInteger(child.pid)) this._leftoverCleaner?.worker(item.id, child.pid!); });
     // Its worker, so a run left "running" by a crash can later be told ended.
     if (Number.isInteger(child?.pid)) this._leftoverCleaner?.worker(item.id, child.pid!);
     if (harness.capabilities.remoteControl) {

@@ -5,7 +5,7 @@ command -v zip >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get inst
 # Xvfb and Electron's libraries: a cloud run can then start the real app under
 # `xvfb-run` and watch it launch, screenshot itself and quit, which is how the
 # Linux quit was measured (tests/a-quit-held-for-the-last-counts-still-ends-the-app).
-command -v xvfb-run >/dev/null 2>&1 || {
+{ command -v xvfb-run && command -v xauth; } >/dev/null 2>&1 || {
   sudo apt-get update -qq
   sudo apt-get install -y -qq xvfb xauth libgtk-3-0 libnss3 libasound2
 }
