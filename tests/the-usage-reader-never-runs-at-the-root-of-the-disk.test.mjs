@@ -73,10 +73,11 @@ describe('every Claude Code the app starts for itself names its working director
     // 2026-10-07: spawning moved into the adapter. Pin both sides of the
     // boundary so a lost cwd cannot quietly make Claude start at disk root.
     // 2026-10-08: the binary is named by the definition now, not written here.
+    // 2026-11-01: a local worker can start through the run host too, and both ways name it.
     const src = read('main/harnesses/claude.mjs');
-    const at = src.indexOf('spawn(sup.config[definition.binKey]');
-    expect(at).toBeGreaterThan(-1);
-    expect(src.slice(at, at + 200)).toMatch(/\bcwd\b/);
+    expect(src).toContain('const bin = sup.config[definition.binKey];');
+    expect(src).toMatch(/return spawn\(bin, argv, \{ cwd,/);
+    expect(src).toMatch(/new HostedRun\(\{[^\n]*start: \{ bin, argv, env: runEnv, cwd,/);
     expect(read('main/supervisor.mjs')).toMatch(/harness\.spawn\(this, plan, \{ cwd,/);
   });
 });
