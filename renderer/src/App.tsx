@@ -1,7 +1,7 @@
 import { previewFocus } from './preview-focus';
 import { cloudChord, cloudToggleNote, cloudToggleTarget, threadPlace } from './cloud-menu';
 import { usePhoneBack, onCloudPhone, onPhone } from './phone-screen';
-import { lessonPosition } from './lesson-position';
+import { useLessonPlace } from './lesson-position';
 import { holdsReplies, writeHeldWhenHidden } from './phone-holds';
 import { pollEvery } from './phone-polls';
 import type {FocusControlStyle} from './focus-control';
@@ -119,6 +119,8 @@ import { RoomBoard } from './team/rooms/RoomBoard';
 import { directConversations } from './team/rooms/conversations';
 import { isPresenceCard, roomMateCards, roomMatesById } from './team/rooms/room-rules';
 import { MARK_UNREAD, SAY } from './team/chat-events';
+import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
+import { aBoxIsListening } from './dictation';
 import { MentionRows } from './team/rooms/MentionRows';
 import { AgentsLine, CornerFaces, MateThreads, PersonThreads, SpaceBar, TeamStrip, TeamThreads } from './team/everything/TeamStrip';
 import { buildMembers, hideMember, mateRunsOf, orderMembers, personCardsOf, readCardRows, readHidden, readOrder, splitHidden, teamRunsOf, unhideMember, writeCardRows, writeHidden, writeOrder, type CardRows, type Hidden, type Member } from './team/everything/members';
@@ -1988,7 +1990,7 @@ export default function App() {
   const fleet = useMemo((): Fleet => ({
     sessions: new Map(runningRows.map((r) => [r.itemId, r])),
     queued: queuedWithHeld(snap?.supervisor.queued, heldAnswer && pendingIds.has(heldAnswer) ? heldAnswer : null), remoteHeld: snap?.supervisor.remoteHeld, runNow: snap?.supervisor.runNow,
-    signInNeeded: snap?.supervisor.signInNeeded, atLimit: snap?.supervisor.atLimit,
+    signInNeeded: snap?.supervisor.signInNeeded, atLimit: snap?.supervisor.atLimit, cannotStart: snap?.supervisor.cannotStart,
     shipping: snap?.supervisor.shipping, stalled: snap?.supervisor.stalled,
     silent: snap?.supervisor.silent, paused: snap?.supervisor.paused,
     asking: [...askingIds],
@@ -2888,7 +2890,7 @@ export default function App() {
    */
   useEffect(() => {
     if (!fullScreenDoc || modal !== 'reply') return;
-    const foldBack = () => setModal(null);
+    const foldBack = () => { if (!aVoiceNoteIsRecording() && !aBoxIsListening()) setModal(null); };
     const awayInTheApp = (e: MouseEvent) => {
       const at = e.target as HTMLElement | null;
       if (at?.closest?.('.focus-dock')) return;
@@ -3252,6 +3254,7 @@ export default function App() {
     const away = (e: MouseEvent) => {
       const el = e.target as HTMLElement | null;
       if (el?.closest?.(SOMETHING_WITH_A_JOB)) return;
+      if (aVoiceNoteIsRecording() || aBoxIsListening()) return;
       setModal(null);
       (document.activeElement as HTMLElement | null)?.blur?.();
     };
@@ -3881,58 +3884,6 @@ export default function App() {
     joinWaiting.current = null;
     void roomsUi.join(token);
   }, [joinTick, roomsUi.live, snap, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // BEING A BRAND NEW USER, ON THE APP SHE DOWNLOADED.`walkAgain` above is the
-  // "at LEAST" half. This is the first half, and the difference between them
-  // is what each one forgets: that one forgets the walk was finished, this one
-  // has never been set up at all.
-  //
-  // IT OPENS A SECOND AGENTBOX AND DELETES NOTHING. Hers keeps running with
-  // every agent in it, because the single-instance lock is keyed on userData
-  // and the new copy has a throwaway one (main/fresh-user.mjs). The palette is
-  // closed first because the new window is what she should be looking at, and
-  // the toast is what tells her which window she just got, since the fresh one
-  // looks exactly like this one until it opens on the welcome screen.
-  //
-  // AND IT TAKES THE AGENTS AS AN ARGUMENT NOW.It passed `true` here, which
-  // links her ~/.claude into the throwaway home, so the fresh copy found the
-  // Claude Code sessions already running on this Mac and put them in its
-  // inbox. Measured that night with the app's own discovery, three of them. ⌘K
-  // has two rows for it now and this is told which test it is running.
-  const openAsNewUser = useCallback(async (withAgents: boolean, withTools = true) => {
-    setModal(null);
-    const out = await api.openFreshUser(withAgents, withTools);
-    if (!out.ok) { showToast(out.error ?? 'It could not be opened.'); return; }
-    // The notes are the honest half: no Claude Code, no keychain or no agent
-    // files means that copy is something to look at rather than something to
-    // use, and she should hear that instead of finding it out. On the blank
-    // run the missing agents are the POINT, so that one note is dropped: it is
-    // written for the other row and it would read as a fault here.
-    const notes = (out.notes ?? []).filter((n) => withAgents || !n.includes('.claude'));
-    const note = notes.length ? ` · ${notes[0]}` : '';
-    const what = !withTools
-      ? `Opening a new ${NAME} with no Claude Code or Codex, so setup asks which plan you pay for.`
-      : withAgents ? `Opening a new ${NAME} that can see your agents.` : `Opening a brand new ${NAME} with nothing of yours in it.`;
-    showToast(`${what} Yours keeps running.${note}`);
-  }, [showToast]);
-
-  // AN INBOX TO DEMO WITH, SO THE DEMO IS NOT HER OWN SCREEN.
-  //
-  // The same second Agentbox as `openAsNewUser` above, and the difference is what
-  // is in its store: three invented products and a day of invented work, seeded
-  // before it opens, so it lands on a full inbox rather than on the welcome
-  // screen (main/demo.mjs). Hers keeps running with every agent in it.
-  //
-  // THE TOAST SAYS WHICH WINDOW SHE JUST GOT, because the demo looks exactly
-  // like this one until it draws somebody else's products, and the moment to
-  // find out which window is which is not while a room is watching.
-  const openDemoInbox = useCallback(async () => {
-    setModal(null);
-    const out = await api.openDemo();
-    if (!out.ok) { showToast(out.error ?? 'It could not be opened.'); return; }
-    const note = out.notes?.length ? ` · ${out.notes[0]}` : '';
-    showToast(`Opening a demo inbox with ${out.rows ?? 0} rows in it. Yours keeps running.${note}`);
-  }, [showToast]);
 
   // She dragged the window onto the other screen, or unplugged one. The picture
   // does not change, only which copy of it is painted, so there is nothing to
@@ -6182,15 +6133,14 @@ export default function App() {
 
   // ↵ beside the row you are on, until a thread is opened, and never while a
   // card has the keyboard (`showsOpenLesson`).
-  const [lessonAt, setLessonAt] = useState<{ left: number; top: number } | null>(null);
-  useLayoutEffect(() => {
-    if (!showsOpenLesson({ lessons, focused: !!focused, fresh, view, modal })) { setLessonAt(null); return; }
+  const lessonAt = useLessonPlace(() => {
+    if (!showsOpenLesson({ lessons, focused: !!focused, fresh, view, modal })) return null;
     const title = document.querySelector('.list-pane .row.selected .th-cell-title') ?? document.querySelector('.list-pane .th-cell-title');
-    if (!title) { setLessonAt(null); return; }
+    if (!title) return null;
     const range = document.createRange();
     range.selectNodeContents(title);
     const r = range.getBoundingClientRect();
-    setLessonAt((previous) => lessonPosition(previous, { left: r.right + 20, top: r.top + r.height / 2 - 17 }));
+    return { left: r.right + 20, top: r.top + r.height / 2 - 17 };
   }, [lessons, focused, fresh, view, modal, list, selected]);
   useEffect(() => { if (focused) dropLesson('open'); }, [focused, dropLesson]);
 
@@ -6266,16 +6216,18 @@ export default function App() {
   const ruleOf = (item: WorkItem) => repeats.find((r) => r.product === item.product && r.id === ruleIdOf(item)) ?? null;
   const focusedRule = focused ? ruleOf(focused) : null;
 
-  const moveToCloud = async (ids: string[], product?: string) => {
+  const moveToCloud = async (ids: string[], product?: string, said = true) => {
     const moving = await api.moveToCloud(ids, product);
+    if (moving && !said) return;
     showToast(moving
       ? `Moving ${moving === 1 ? 'this thread' : `${moving} threads`} to the cloud. ${moving === 1 ? 'It keeps' : 'They keep'} working until the cloud has room.`
       : 'The cloud can’t take this thread right now');
   };
-  const placeThread = (item: WorkItem, keep: PlaceAct) => {
-    if (keep === 'move') { void moveToCloud([item.id], item.product); return; }
+  // `said` false for a pick in the thread's own Runs on panel, which shows it there.
+  const placeThread = (item: WorkItem, keep: PlaceAct, said = true) => {
+    if (keep === 'move') { void moveToCloud([item.id], item.product, said); return; }
     void api.setThreadOnMac({ [item.id]: keep ? true : null });
-    showToast(keep ? 'This thread now runs only on this Mac' : 'This thread can run on the cloud again');
+    if (said) showToast(keep ? 'This thread now runs only on this Mac' : 'This thread can run on the cloud again');
   };
   // The write the summary panel's Visible to menu makes.
   const seeThread = async (item: WorkItem, to: 'team' | 'private') => {
@@ -6375,7 +6327,10 @@ export default function App() {
   const showCard = (m: Member) => keepHidden(unhideMember(evHidden, m.key));
   const teamTabs = teamMode ? {
     on: evOn, onNeeds: goNeedsYou, onEverything: () => pickMember('me'),
-    corner: evOn ? null : <CornerFaces members={evSplit.shown} onPick={(key) => pickMember(key)} />,
+    // Not on a phone: there Needs you is just the inbox, and the team is
+    // under Everything else ("you shouldn't put teammates in the top bar",
+    // w-33511040d7).
+    corner: evOn || onPhone() ? null : <CornerFaces members={evSplit.shown} onPick={(key) => pickMember(key)} />,
   } : null;
   const dayStart = new Date(now).setHours(0, 0, 0, 0);
   const evItems = evMember?.kind === 'mate' ? (mateRunsOf(items, evMember.key.slice('mate:'.length), dayStart)) : [];
@@ -6457,7 +6412,11 @@ export default function App() {
     <CloudOfferContext.Provider value={cloudOfferNow ? { offer: cloudOfferNow, onGo: (go) => void onCloudGo(go) } : null}>
     <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${railOpen ? ' gt-rail-open' : ''}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}`}>
 
-      {signInGate && <SignInPage onSkip={onCloudPhone() ? undefined : skipSignIn} signedOut={signedOutHere} error={snap?.team?.error ?? null} waitingUrl={snap?.team?.signingIn?.url ?? null} />}
+      {/* At the end of <body>, so its drag rectangles are reported after the
+          top bar's and this layout's ::after strip. Inside the app, those put
+          the window drag back over "Skip for now" and its clicks moved the
+          window. The other two sign-in pages below go there for the same reason. */}
+      {signInGate && drawnIn(<SignInPage onSkip={onCloudPhone() ? undefined : skipSignIn} signedOut={signedOutHere} error={snap?.team?.error ?? null} waitingUrl={snap?.team?.signingIn?.url ?? null} />, document.body)}
       {/* Dark's corner marks, outside the card. Their own element, because
           `.workspace-layout::after` is the window's drag strip. */}
       <div className="panel-marks" aria-hidden="true" />
@@ -6634,8 +6593,9 @@ export default function App() {
               the right end on the Inbox, which is the one page of threads now
               (w-05ff3d1438). Display holds the view, the sort and the filters.
               Not over a teammate's card or the team's setup. Search is drawn
-              here only on the board; on the list it ends the tabs row
-              (w-3c51d02de5). */}
+              here, on a phone only (searchInTheList). It ended the tabs row
+              (w-3c51d02de5) until an iPhone clipped it out of sight there,
+              because that row scrolls sideways (w-33511040d7). */}
           {!focused && !settingsOpen && !teamShown && (teammatesShown && !evOn ? teammatesUi.right : roomShown && roomsUi.heading?.right !== undefined ? roomsUi.heading.right : (
             <HeaderActions
               page="inbox"
@@ -6646,7 +6606,7 @@ export default function App() {
               // reading her threads (w-5a08121f99: about forty projects).
               items={items}
               onCompose={() => setModal('compose')}
-              onSearch={!teamMode && inboxDisplay.view === 'board' ? searchInTheList : undefined}
+              onSearch={searchInTheList}
               shown={displayedBox.length + theirRows.length}
               total={(mineShown ? shownBox.length : 0) + theirRows.length}
               tab={view}
@@ -6934,7 +6894,7 @@ export default function App() {
                   onRunNow={() => runNow(focused)}
                   onPin={focused.agent ? undefined : (pin) => pinThread(focused.id, pin, true)}
                   place={focused.agent ? null : threadPlace(focused, snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null, snap.cloud ?? null)}
-                  onPlace={(keep) => placeThread(focused, keep)}
+                  onPlace={(keep) => placeThread(focused, keep, false)}
                   pageAsk={threadAsk?.key === keyOf(focused) ? threadAsk : null}
                   onAsked={() => setThreadAsk(null)}
                   onShown={setOpenShows}
@@ -7000,7 +6960,6 @@ export default function App() {
                     needs={team ? needsWord(picked, team.me) : undefined}
                     lit={needsYouLit(inbox, needsLookedAt)}
                     onView={(next) => { roomsUi.leave(); setView(next as View); setSelected(0); setMultiSel(new Set()); }}
-                    onSearch={searchInTheList}
                     team={teamTabs}
                   />
                 )}
@@ -7064,6 +7023,7 @@ export default function App() {
                   queued={snap.supervisor.queued}
                   signInNeeded={snap.supervisor.signInNeeded}
                   atLimit={snap.supervisor.atLimit}
+                  cannotStart={snap.supervisor.cannotStart}
                   shipping={snap.supervisor.shipping}
                   silent={snap.supervisor.silent}
                   paused={snap.supervisor.paused}
@@ -7313,8 +7273,6 @@ export default function App() {
         onFirstRun={walkAgain}
         onTutorial={() => startTutorial(comeBackTo(snap.products, productFilter, rememberedProject()))}
         onImportAgents={() => { setModal(null); setImportAgents(true); }}
-        onFreshUser={openAsNewUser}
-        onDemo={openDemoInbox}
         products={rankedProducts}
         supervisorPaused={snap.supervisor.paused}
         batch={multiSel.size > 0}
@@ -7939,10 +7897,10 @@ export default function App() {
           Signing in sets the cloud up, and the same open state then shows
           the setup's accounts. */}
       {phoneSignInOpen && snap?.team && !snap.team.signedIn && (
-        <SignInPage purpose="phone" waitingUrl={snap.team.signingIn?.url ?? null} onClose={() => setPhoneSignInOpen(false)} onSignedIn={() => setPhoneSignInOpen(false)} />
+        drawnIn(<SignInPage purpose="phone" waitingUrl={snap.team.signingIn?.url ?? null} onClose={() => setPhoneSignInOpen(false)} onSignedIn={() => setPhoneSignInOpen(false)} />, document.body)
       )}
       {cloudSetupOpen && !snap.cloud?.setUp && snap.cloud?.offered && (
-        <SignInPage purpose="cloud" onClose={() => setCloudSetupOpen(false)} onSignedIn={() => setCloudSetupOpen(true)} />
+        drawnIn(<SignInPage purpose="cloud" onClose={() => setCloudSetupOpen(false)} onSignedIn={() => setCloudSetupOpen(true)} />, document.body)
       )}
       {cloudSetupOpen && snap.cloud?.setUp && (
         <CloudSetup

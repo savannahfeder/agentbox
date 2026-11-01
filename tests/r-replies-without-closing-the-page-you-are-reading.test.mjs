@@ -89,7 +89,7 @@ describe('what must not change', () => {
   });
 
   it('clicking into a full screen page folds the box and keeps the page', () => {
-    expect(app).toContain('const foldBack = () => setModal(null);');
+    expect(app).toContain('const foldBack = () => { if (!aVoiceNoteIsRecording() && !aBoxIsListening()) setModal(null); };');
   });
 
   it('R on the list still opens the thread with its box', () => {

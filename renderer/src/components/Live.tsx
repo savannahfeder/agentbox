@@ -107,7 +107,7 @@ export function Live({ item, facts }: { item: WorkItem; facts: LiveFacts }) {
               {place.why && <span className="th-why-card" role="tooltip"><b>{place.why.head}</b><span>{place.why.body}</span></span>}</span>}
             <svg className="live-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="m4 2 4 4-4 4" /></svg>
           </button>
-        ) : <span className="live-word">{live.state === 'signin' || live.state === 'limit' ? live.line : word}</span>}
+        ) : <span className="live-word">{live.state === 'signin' || live.state === 'limit' || live.state === 'cannot' ? live.line : word}</span>}
         {!working && span && <span className="live-span">{span}</span>}
         <span className="live-announcement" role="status">{working ? word : live.line}</span>
       </div>

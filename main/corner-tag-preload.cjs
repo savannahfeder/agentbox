@@ -24,8 +24,7 @@ contextBridge.exposeInMainWorld('cornerTag', {
   zoom: () => webFrame.getZoomFactor(),
   ready: (part) => ipcRenderer.invoke('corner-tag:ready', { part }),
   // glass: where the glass itself sits inside that window, and how big it is.
-  // The tag's window is the glass plus a clear band, so the resize corners can
-  // hang over its edges; the list is lined up with the glass, never with the
+  // The tag's window is the glass plus a clear band; the list is lined up with the glass, never with the
   // window, which may be roomier than the page drew. radius: how round it is,
   // so the Mac's glass is drawn to the same shape.
   size: (part, width, height, glass, radius) => ipcRenderer.invoke('corner-tag:size', { part, width, height, glass, radius }),
@@ -37,10 +36,7 @@ contextBridge.exposeInMainWorld('cornerTag', {
   // The button went down on the tag, and came up (or was taken away). What
   // happens in between, a drag or nothing, the main process reads off the
   // real cursor.
-  // grip: the press landed on one of the tag's four resize corners, so what
-  // the cursor does next is a resize rather than a move, and corner says which
-  // one it has hold of.
-  press: (x, y, grip, corner) => ipcRenderer.invoke('corner-tag:press', { x, y, grip: !!grip, corner }),
+  press: (x, y) => ipcRenderer.invoke('corner-tag:press', { x, y }),
   release: (cancelled) => ipcRenderer.invoke('corner-tag:release', { cancelled: !!cancelled }),
   go: (id) => ipcRenderer.invoke('corner-tag:go', id),
   // The X on a line of the list: that thread off the tray, and only the tray.

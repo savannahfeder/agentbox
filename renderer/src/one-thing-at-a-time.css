@@ -36,6 +36,8 @@
 .one-app-note { margin: 14px 0 0; font-size: 13px; color: var(--text-faint); }
 
 .one-answer .one-q { margin: 0 0 8px; font-size: 17px; line-height: 1.45; font-weight: 600; color: var(--text); }
+.one-by { display: flex; align-items: center; gap: 9px; margin: 0 0 12px; font-size: 14px; color: var(--text-dim); }
+.one-by em { font: normal 400 10.5px/1 var(--mono); color: var(--text-faint); }
 
 /* A page or a note the answer names, read in place at the page's width. */
 .one-file { margin: 28px 0 0; border: 1px solid var(--line-strong); }

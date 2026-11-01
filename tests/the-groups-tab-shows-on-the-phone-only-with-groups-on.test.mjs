@@ -35,12 +35,13 @@ describe('whether Groups is on, by the computer’s settings', () => {
 });
 
 describe('the bottom bar', () => {
-  it('ends with Groups after Done when Groups is on', () => {
+  // 2026-10-31: the web app's team tabs, with your groups under Chats.
+  it('is Needs you, Everything else and Chats when Groups is on', () => {
     const tabs = bottomTabs(true);
-    expect(tabs.map((t) => t.label)).toEqual(['Needs you', 'In progress', 'Later', 'Done', 'Groups']);
-    expect(tabs.at(-1).id).toBe('groups');
+    expect(tabs.map((t) => t.label)).toEqual(['Needs you', 'Everything else', 'Chats']);
+    expect(tabs.at(-1).id).toBe('chats');
   });
-  it('has the four tabs and no Groups when it is off', () => {
+  it('has the four tabs and no Chats when it is off', () => {
     expect(bottomTabs(false).map((t) => t.label)).toEqual(['Needs you', 'In progress', 'Later', 'Done']);
   });
 });

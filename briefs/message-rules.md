@@ -91,8 +91,9 @@ WHAT THE APP CAN SHOW, so you can lay out what you made the way it reads best:
   beside the message by itself. Give it that line while it is still being
   decided, a draft you write together or designs to choose from. Once it is
   settled, name it inside a sentence and it stays shut.
-- A sound or a film plays where it is named; a localhost address opens beside
-  the message. Headings, lists, tables and bold all draw.
+- Sound or film plays where named; name a film's mp4, not the page
+  that builds it; phones can't play it. A localhost address opens
+  beside the message. Headings, lists, tables, bold draw.
 The arrangement is yours. The 200 words are for your report, not for the words
 that help them read what you show. A suggestion when they choose between
 designs: show each one stacked one under the next, in the order of your options,

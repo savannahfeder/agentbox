@@ -8,9 +8,11 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { docKind } from '../../../renderer/src/doc-pane';
 import { fileGlance, type Glance } from '../../../renderer/src/file-glance';
 import { folderTitle } from '../../../renderer/src/mentions';
-import { docOnPhone, folderPictures, openingOf, pageOnPhone, pictureLink, pictureShapeOf, sentEmbeds, threadFilePaths, typedWords } from '../lib/files';
+import { docOnPhone, folderPictures, linkToShare, openingOf, pageOnPhone, pictureLink, pictureShapeOf, sentEmbeds, threadFilePaths, typedWords } from '../lib/files';
 import { withDeadline } from '../lib/deadline';
 import { useCloud } from '../state/cloud';
+import { offerLink } from './LinkMenu';
+import { Skeleton } from './Skeleton';
 import { Markdown, type MessageFiles } from './Markdown';
 import { PageFrame } from './PageFrame';
 import { T } from './parts';
@@ -47,6 +49,10 @@ export function useMessageFiles(product: string, thread?: string): { dir: string
       const found = folderPictures(latest.current.places, product, src);
       const name = (id: string) => latest.current.items.find((i: { id: string; title?: string }) => i.id === id)?.title ?? null;
       return found && { title: folderTitle(src, { thread, name }), pictures: found.pictures, total: found.total };
+    },
+    hold: (src) => {
+      const { places, links, say } = latest.current;
+      offerLink(linkToShare(openingOf(places, links, product, src)), src.replace(/\/+$/, '').split('/').pop() || src, say);
     },
     open: (src, among) => {
       const { places, links, say } = latest.current;
@@ -89,14 +95,14 @@ export function ThreadFiles({ item, product }: { item: { id: string; result?: st
   if (!paths.length) return null;
   return (
     <View accessibilityLabel="Files" style={{ marginTop: 12, marginBottom: 20, gap: 10 }}>
-      {paths.map((path) => <FileTile key={path} product={product} path={path} open={() => files.open(path)} />)}
+      {paths.map((path) => <FileTile key={path} product={product} path={path} open={() => files.open(path)} hold={() => files.hold?.(path)} />)}
     </View>
   );
 }
 
 type Face = { glance: Glance; html?: string };
 
-function FileTile({ product, path, open }: { product: string; path: string; open: () => void }) {
+function FileTile({ product, path, open, hold }: { product: string; path: string; open: () => void; hold: () => void }) {
   const c = useCloud();
   const kind = docKind(path);
   // undefined until the first read answers; null for a file the phone cannot read.
@@ -127,9 +133,9 @@ function FileTile({ product, path, open }: { product: string; path: string; open
     </View>
   );
   return (
-    <Pressable onPress={face ? open : undefined} accessibilityRole="button" accessibilityLabel={`Open ${name}`}>
+    <Pressable onPress={face ? open : undefined} onLongPress={hold} accessibilityRole="button" accessibilityLabel={`Open ${name}`} accessibilityHint="Hold to open it in the browser or share it">
       <View style={{ height: 104, backgroundColor: face ? color.sunk : color.raised, overflow: 'hidden' }}>
-        {face?.html !== undefined ? <PageFrame html={face.html} desktop style={{ flex: 1 }} /> : face ? <MiniPage title={face.glance.title || name} blocks={face.glance.blocks} /> : null}
+        {face?.html !== undefined ? <PageFrame html={face.html} desktop style={{ flex: 1 }} /> : face ? <MiniPage title={face.glance.title || name} blocks={face.glance.blocks} /> : <Skeleton small />}
         <Ticks />
       </View>
       {foot}

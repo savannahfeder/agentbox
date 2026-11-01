@@ -46,6 +46,10 @@ export const EVENTS = {
   // Sent as the switch goes off and never again, so an install that opted out
   // is not read as one that stopped using the app.
   counts_turned_off: 'Counts were turned off',
+  // WHY A TASK HAS NOT STARTED (2026-10-29). 8 of 26 installs wrote a task and
+  // never started an agent, and nothing said which of a dozen checks held it
+  // (tests/a-start-that-is-turned-away-is-counted-and-said.test.mjs).
+  run_waiting: 'An agent could not start yet',
 };
 
 export const EVENT_NAMES = Object.keys(EVENTS);
@@ -63,12 +67,17 @@ export const ALLOWED_PROPS = new Set([
   'failed',         // whether an agent's run ended in failure
   'practice',       // whether it happened in setup's practice project
   'engine',         // -> ENGINES below, which coding agent ran
+  'reason',         // -> WAIT_REASONS below, why an agent could not start yet
 ]);
 
-// `kind` and `engine` are the properties that are not numbers, so each is a
+// `kind`, `engine` and `reason` are the properties that are not numbers, so each is a
 // closed list. A value outside it is dropped, not passed through.
 export const KINDS = new Set(['task', 'question', 'review', 'directive', 'agent', 'digest']);
 export const ENGINES = new Set(['claude', 'codex']);
+export const WAIT_REASONS = new Set([
+  'setup', 'paused', 'asleep', 'stuck', 'brake', 'slot', 'login', 'engine', 'memory',
+  'held', 'folder', 'slow-folder', 'model', 'cloud', 'practice', 'project', 'claim', 'error',
+]);
 
 // Refuse an event nobody approved; drop a property nobody approved. Returns the
 // payload that may be sent, or null when the event itself is not one of hers.
@@ -83,6 +92,10 @@ export function sanitize(name, props = {}) {
     }
     if (key === 'engine') {
       if (typeof value === 'string' && ENGINES.has(value)) out.engine = value;
+      continue;
+    }
+    if (key === 'reason') {
+      if (typeof value === 'string' && WAIT_REASONS.has(value)) out.reason = value;
       continue;
     }
     if (typeof value === 'number' && Number.isFinite(value)) out[key] = value;

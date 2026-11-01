@@ -121,6 +121,19 @@ select.tq-in { height: 32px; padding: 0 6px; }
 .tq-chip:disabled:hover { background: none; }
 .tq-chip.on { background: var(--wash-strong); border-color: var(--text-faint); }
 .tq-chip.dim { color: var(--text-faint); border-color: var(--line); }
+.tq-chip.on:disabled:hover { background: var(--wash-strong); }
+.tq-chip[aria-pressed="true"] { border-color: var(--text-dim); gap: 6px; padding-left: 9px; }
+.tq-chip.tq-own { color: var(--text-dim); border-style: dashed; }
+.tq-chip.tq-own:hover { color: var(--text); }
+.tq-own-field { flex: 1 1 280px; max-width: 520px; min-width: 0; outline: 0; cursor: text; }
+.tq-own-field:focus, .tq-own-field.on { border-color: var(--text-dim); }
+.tq-own-field::placeholder { color: var(--text-faint); }
+.tq-own-said { cursor: default; max-width: 100%; }
+.tq-answers { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.tq-answers .dock-send { margin-left: 0; }
+.tq-answers .dock-send:disabled { color: var(--text-faint); cursor: default; }
+.tq-answers .dock-send:disabled:hover { background: var(--wash); border-color: var(--line-strong); }
+.tq-answered { font-size: 13px; color: var(--text-faint); }
 .tq-where-chips { margin-top: 2px; }
 .tq-works { margin-top: 6px; font-size: 13px; }
 .tq-works.tq-link { display: block; color: var(--text-dim); font-size: 13px; }

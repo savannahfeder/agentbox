@@ -151,6 +151,7 @@ export function factsFor(fleet: Fleet, id: string): LiveFacts {
     runNow: fleet.runNow,
     signInNeeded: fleet.signInNeeded,
     atLimit: fleet.atLimit,
+    cannotStart: fleet.cannotStart,
     shipping: !!fleet.shipping?.includes(id),
     asking: !!fleet.asking?.includes(id),
     stalled: !!fleet.stalled?.includes(id),

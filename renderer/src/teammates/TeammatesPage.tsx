@@ -11,7 +11,7 @@ import { GREETING, MAX_HOPS, STARTERS, TEAMMATE_EFFORT, starterAsks, yesFirst } 
 import { ModelPicker } from '../components/Model';
 import type { ModelChoice } from '../models';
 import { rememberedProject } from '../compose-project';
-import { answerTo, chatEntries, chatWith, clockOf, dayOf, firstSentence, sentTab, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, type ChatEntry } from './chat-lines';
+import { answerOf, answersMessage, chatEntries, chatWith, clockOf, dayOf, firstSentence, sentTab, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, type ChatEntry } from './chat-lines';
 import { ChatsColumn } from './ChatsColumn';
 import { nowLine, TeammateMark } from './TeammatesRail';
 import { AskBeforeDeleting } from '../team/MessageMore';
@@ -107,6 +107,7 @@ export function TeammateMenu({ t, shown, onOpen, call, onDeleted }: { t: Teammat
     shown.kind === 'log' ? ['Hide its log', () => onOpen(t.id)] : ['Log', () => onOpen(`log:${t.id}`)],
     ...(shown.kind === 'chat' ? [[details ? 'Hide details' : 'Show details', () => setDetails(!details)] as [string, () => void]] : []),
     t.paused ? ['Resume', () => { void call('update', { id: t.id, patch: { paused: false } }); }] : ['Pause', () => { void call('update', { id: t.id, patch: { paused: true } }); }],
+    ...(!t.primary && t.status === 'active' ? [['Make primary', () => { void call('update', { id: t.id, patch: { primary: true } }); }] as [string, () => void]] : []),
     ['Delete', () => setAsking(true)],
   ];
   // The menu's call says only yes or no, and a refusal has to be read, so the
@@ -190,6 +191,26 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
   const scroller = useRef<HTMLDivElement>(null);
   const last = entries.at(-1)?.id;
   useEffect(() => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight; }, [last, t.id]);
+  // Its questions still waiting on you. With several, a tap picks an answer
+  // and one Send answers them all, since the first message you send wakes it.
+  const open = entries.filter((e): e is TeamChatLine => e.kind === 'msg' && e.from === t.id && !!(e as TeamChatLine).options?.length && !answerOf(view, e as TeamChatLine));
+  const [picks, setPicks] = useState<Record<string, Choice>>({});
+  const [sending, setSending] = useState(false);
+  useEffect(() => { setPicks({}); }, [t.id]);
+  const sendAnswers = async (chosen: Record<string, Choice>) => {
+    const m = answersMessage(open, Object.fromEntries(Object.entries(chosen).map(([q, p]) => [q, pickedText(p)])));
+    if (!m.text || sending) return;
+    setSending(true);
+    const ok = (await call('post', { text: m.text, to: [t.id], answers: m.answers })) !== false;
+    setSending(false);
+    if (ok) setPicks({});
+  };
+  const asking: Asking = {
+    picks, many: open.length > 1, sending, count: open.length, lastId: open.at(-1)?.id ?? null,
+    answered: open.filter((q) => pickedText(picks[q.id])).length,
+    onPick: (id, p) => setPicks((all) => ({ ...all, [id]: p })),
+    send: (chosen) => { void sendAnswers(chosen ?? picks); },
+  };
   let day = '';
   let prevFrom = '';
   let saved = false;
@@ -208,9 +229,15 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
       continue;
     }
     saved = false;
-    if (e.kind === 'msg') {
+    // Answers sent together are lit on their questions, so the message itself is one line.
+    const answers = e.kind === 'msg' && e.from === 'you' ? Object.keys((e as TeamChatLine).answers ?? {}).length : 0;
+    if (answers) {
+      rows.push(<div key={e.id} className="tq-act">{ICON.reply}<span><span className="v">You answered {answers === 1 ? 'its question' : `${answers} questions`}</span></span><em>{clockOf(e.ts)}</em></div>);
+      prevFrom = '';
+    } else if (e.kind === 'msg') {
       const lead = e.from !== prevFrom;
-      rows.push(<Message key={e.id} m={e} team={team} me={me} mePic={mePic} lead={lead} call={call} onOpenThread={onOpenThread} answered={answerTo(view, e)} />);
+      rows.push(<Message key={e.id} m={e} team={team} me={me} mePic={mePic} lead={lead} onOpenThread={onOpenThread} answered={answerOf(view, e)}
+        asking={open.some((q) => q.id === e.id) ? asking : null} />);
       prevFrom = e.from;
     } else if (e.kind === 'run' && e.verb === 'sent') {
       sent = [e as TeamRunLine];
@@ -286,7 +313,50 @@ function Saved({ onSee }: { onSee: () => void }) {
   return <div className="tq-act tq-saved">{ICON.check}<span><span className="v">Saved to its instructions</span> <Inline onClick={onSee}>See it</Inline></span></div>;
 }
 
-function Message({ m, team, me, mePic, lead, call, onOpenThread, answered }: { m: TeamChatLine; team: Teammate[]; me: string; mePic: string | null; lead: boolean; call: Call; onOpenThread: (product: string, id: string) => void; answered: string | null }) {
+/** An answer you are giving one question: a tapped answer, or your own words while their box is open. */
+type Choice = { chip: string | null; own: string | null };
+const pickedText = (p: Choice | undefined) => (p ? p.chip ?? p.own?.trim() ?? '' : '');
+type Asking = {
+  picks: Record<string, Choice>; many: boolean; sending: boolean; count: number; answered: number; lastId: string | null;
+  onPick: (id: string, p: Choice) => void;
+  send: (chosen?: Record<string, Choice>) => void;
+};
+
+// The answers under a question still waiting on you, and your own words as
+// one more. With one question a tap sends; with several it picks.
+function Answers({ q, options, asking }: { q: string; options: string[]; asking: Asking }) {
+  const p = asking.picks[q] ?? { chip: null, own: null };
+  const field = useRef<HTMLInputElement>(null);
+  const [focusOwn, setFocusOwn] = useState(false);
+  useEffect(() => { if (focusOwn) { field.current?.focus(); setFocusOwn(false); } }, [focusOwn]);
+  const tap = (o: string) => {
+    if (!asking.many) { asking.send({ [q]: { chip: o, own: null } }); return; }
+    asking.onPick(q, { chip: p.chip === o ? null : o, own: p.own?.trim() ? p.own : null });
+  };
+  const ownOn = p.chip === null && !!p.own?.trim();
+  const isLast = asking.lastId === q;
+  return <>
+    <div className="tq-chips">
+      {options.map((o) => <button key={o} type="button" className={`tq-chip${p.chip === o ? ' on' : ''}`} disabled={asking.sending}
+        aria-pressed={asking.many ? p.chip === o : undefined} onClick={() => tap(o)}>{p.chip === o && ICON.check}{o}</button>)}
+      {p.own === null
+        ? <button type="button" className="tq-chip tq-own" disabled={asking.sending} onClick={() => { asking.onPick(q, { chip: null, own: '' }); setFocusOwn(true); }}>Write your own</button>
+        : <input ref={field} className={`tq-chip tq-own-field${ownOn ? ' on' : ''}`} value={p.own} placeholder={asking.many ? 'Your answer' : 'Your answer, then ↵'} aria-label="Your own answer" disabled={asking.sending}
+          onChange={(e) => asking.onPick(q, { chip: null, own: e.target.value })}
+          onBlur={() => { if (!p.own?.trim()) asking.onPick(q, { chip: p.chip, own: null }); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); asking.onPick(q, { chip: null, own: null }); }
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing && p.own?.trim() && (!asking.many || asking.answered === asking.count)) { e.preventDefault(); asking.send(); }
+          }} />}
+    </div>
+    {asking.many && isLast && <div className="tq-answers">
+      <button type="button" className="dock-send" disabled={!asking.answered || asking.sending} onClick={() => asking.send()}>Send answers</button>
+      {asking.answered < asking.count && <span className="tq-answered">{asking.answered} of {asking.count} answered</span>}
+    </div>}
+  </>;
+}
+
+function Message({ m, team, me, mePic, lead, onOpenThread, answered, asking }: { m: TeamChatLine; team: Teammate[]; me: string; mePic: string | null; lead: boolean; onOpenThread: (product: string, id: string) => void; answered: { text: string; named: boolean } | null; asking: Asking | null }) {
   const t = team.find((x) => x.id === m.from) ?? null;
   const mine = m.from === 'you';
   const to = (Array.isArray(m.to) ? m.to : []).map((x) => nameOf(x, team));
@@ -299,10 +369,13 @@ function Message({ m, team, me, mePic, lead, call, onOpenThread, answered }: { m
       <em>{clockOf(m.ts)}</em>
     </div>}
     <div className="tx"><Folded long={longMessage(m.text ?? '')}><ReactMarkdown remarkPlugins={MD}>{m.text ?? ''}</ReactMarkdown></Folded>
-      {!mine && t && m.options?.length ? <div className="tq-chips">{m.options.filter((o) => answered === null || answered.trim() === o).map((o) => (
-        <button key={o} type="button" className={`tq-chip${answered === null ? '' : answered.trim() === o ? ' on' : ' dim'}`} disabled={answered !== null}
-          onClick={() => { void call('post', { text: o, to: [t.id] }); }}>{o}</button>
-      ))}</div> : null}
+      {!mine && t && m.options?.length ? (asking && !answered
+        ? <Answers q={m.id} options={m.options} asking={asking} />
+        : answered && (m.options.includes(answered.text.trim()) || answered.named) ? <div className="tq-chips">
+          {m.options.includes(answered.text.trim())
+            ? <button type="button" className="tq-chip on" disabled>{answered.text.trim()}</button>
+            : <span className="tq-chip on tq-own-said">{clipLine(answered.text, 120)}</span>}
+        </div> : null) : null}
     </div>
   </div>;
 }

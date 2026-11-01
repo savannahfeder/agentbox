@@ -10,7 +10,7 @@ import { REST_HEADING, URGENT_HEADING, clickIntent, rowKeys, rowSummary, rowTitl
 import { isUrgentRow } from '../interrupt';
 // THE SAME PREDICATE THE PANE USES, not a second copy of the rule. The row and
 // the pane disagreeing about one fact on one screen is what this import fixes.
-import { cameBackEmpty } from '../live-line';
+import { cameBackEmpty, cannotStartLine } from '../live-line';
 import { agentAtWork, engineWordFor } from '../byline';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mjs';
 import { isTroubleRow, TROUBLE_ID } from '../trouble-row';
@@ -102,7 +102,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, unread, running, engineChoice, engines, stalled, queued, signInNeeded, atLimit, shipping, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder, lead = null, stack }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, unread, running, engineChoice, engines, stalled, queued, signInNeeded, atLimit, cannotStart, shipping, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder, lead = null, stack }: {
   /** Your threads as one list in sections (../threads/stack-rules): each section's header, and which section a row is in. */
   stack?: { sections: StackSection[]; sectionOf: (item: WorkItem) => StackKey; onFold: (key: StackKey) => void };
   /** Rows drawn above the list's own, under its head: a mention in a room (team/rooms/MentionRows.tsx). */
@@ -142,6 +142,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
   signInNeeded?: Record<string, string>;
   /** `supervisor.atLimit`: rows held because every login of their tool is out of usage. */
   atLimit?: Record<string, { tool: string; until: number }>;
+  /** `supervisor.cannotStart`: queued rows the last pass could not start, and why. */
+  cannotStart?: Record<string, { why: string; tool: string }>;
   /** `supervisor.shipping`: rows the app's ship queue still owes a ship. */
   shipping?: string[];
   // A RUN ENDED ON THIS ROW AND WROTE NOTHING DOWN, keyed by id. The half of
@@ -752,6 +754,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                           ? <span className="time" title={`${atLimit[item.id].tool} is at its usage limit, so this starts on its own when it resets.`}>at its limit</span>
                         : shipping?.includes(item.id)
                           ? <span className="time" title="The app is shipping this. It comes back to you once it is live, or goes back to its agent if it fails.">shipping</span>
+                        : queued?.includes(item.id) && cannotStart?.[item.id] && cannotStartLine(cannotStart[item.id])
+                          ? <span className="time" title={cannotStartLine(cannotStart[item.id])!}>not started</span>
                         : queued?.includes(item.id)
                           ? <span className="time">queued</span>
                           : paused && tab === 'progress'

@@ -34,18 +34,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import os from 'node:os';
-import { threadSnapshot, threadsWorthCarrying, snapshotKey, checkCommand, madeHere, hideSecrets, bytesOf, phoneChoices, phoneApproval, phoneRepeatsOf, SNAPSHOT_LIMITS } from '../shared/phone-snapshot.mjs';
+import { threadSnapshot, threadsWorthCarrying, snapshotKey, checkCommand, madeHere, hideSecrets, bytesOf, phoneChoices, phoneApproval, phoneRepeatsOf, phoneTeammatesOf, SNAPSHOT_LIMITS, TEAMMATES_LIMITS } from '../shared/phone-snapshot.mjs';
 import { phoneSettingsOf, settingRoute } from '../shared/phone-settings.mjs';
 import { createPhoneUploads, UPLOAD_LIMITS } from './phone-uploads.mjs';
 import { createPhoneAlerts } from './phone-alerts.mjs';
 import { PHONE_FILES_MAX, phoneFilesIn, phoneFileSafeName, phoneAttachmentRel } from '../shared/phone-files.mjs';
 import { runOfClaim, cloudCard } from '../shared/cloud-kit.mjs';
 import { isCarried } from '../shared/cloud-carry.mjs';
+import { heldForUndo } from '../shared/phone-undo.mjs';
 
 // A file her phone sent with a reply or a new thread (shared/phone-files.mjs).
 export { phoneFilesIn };
 const HEARTBEAT_MS = 30_000;
 const SETTINGS_HEARTBEAT_MS = 5 * 60_000;
+// Under phone_settings' own check (20261023000000_phone_settings.sql), with room for the row's JSON to differ.
+const SETTINGS_MAX_BYTES = 190_000;
 class Refused extends Error {}
 
 // How long a thread started on the phone is remembered as the row it became:
@@ -84,6 +87,9 @@ export function createPhoneInbox({
   stateFile,
   home = os.homedir(),
   now = Date.now,
+  // How long a phone send her Undo can take back is left alone (shared/phone-undo.mjs).
+  // The app passes PHONE_UNDO_HOLD_MS; none takes each one on sight.
+  undoHoldMs = 0,
   log = () => {},
   // How a thread's copy is made; a test counts the calls.
   build = threadSnapshot,
@@ -100,6 +106,8 @@ export function createPhoneInbox({
   pinsOf = () => ({}),
   // () -> every project's repeating tasks (store.listRepeats); they ride with the settings.
   repeatsOf = null,
+  // () -> the teammates view (main/teammates.mjs `view`) while they are on, else null; it rides with the settings too.
+  teammatesOf = null,
   version = '',
   // This computer as her phone names it.
   name = os.hostname().replace(/\.local$/i, ''),
@@ -305,6 +313,14 @@ export function createPhoneInbox({
     if (repeatsOf) {
       try { carried = { ...carried, repeats: phoneRepeatsOf(repeatsOf(), projects().map((p) => p.slug), { home }) }; } catch (err) { troubled('read the repeating tasks for', err); }
     }
+    if (teammatesOf) {
+      try {
+        // Only the room the rest leaves under the cloud's 200KB check, so they can never cost the settings their copy.
+        const room = Math.min(TEAMMATES_LIMITS.bytes, SETTINGS_MAX_BYTES - bytesOf(carried));
+        const mates = room > 0 ? phoneTeammatesOf(teammatesOf(), { home, limits: { ...TEAMMATES_LIMITS, bytes: room } }) : null;
+        if (mates && bytesOf(mates) <= room) carried = { ...carried, teammates: mates };
+      } catch (err) { troubled('read the teammates for', err); }
+    }
     const key = JSON.stringify(carried);
     if (key === settings.key && now() - settings.sentAt < SETTINGS_HEARTBEAT_MS) return false;
     still();
@@ -411,6 +427,8 @@ export function createPhoneInbox({
       }
       // Her answer to a card the cloud put on the phone is the cloud server's to give (cloud/gateway/phone.mjs).
       if (cmd.kind === 'approve' && cloudCard(cmd.payload?.approval)) continue;
+      // Still inside the phone's Undo: claimed now, Undo could never win. The next pass takes it.
+      if (!state.done[cmd.id] && heldForUndo(cmd, now(), undoHoldMs)) continue;
       let outcome = state.done[cmd.id];
       if (!outcome) {
         // A reply to a thread started on the phone goes to the row it became.
@@ -523,7 +541,9 @@ export function createPhoneInbox({
           // Its files saved here where the cloud put them, so the row links them.
           let body = String(p.body ?? '');
           try { body = (await withPhoneFiles({ ...started, kind: 'new' })).payload.body ?? body; } catch (err) { if (err instanceof SignedOut) throw err; }
-          try { out = await adoptNew({ project, item, runId, title, body, command: started.id, replies, choices: phoneChoices('new', p) }); } catch (err) {
+          // An agent in the cloud already took it, so Auto has nobody left to pick.
+          const { labels: _auto, ...choices } = phoneChoices('new', p);
+          try { out = await adoptNew({ project, item, runId, title, body, command: started.id, replies, choices }); } catch (err) {
             out = 'failed';
             sayOnce(`adopt:${err?.message}`, `phone: could not take in the new thread the cloud started (${item}): ${err?.message ?? err}`);
           }
@@ -587,7 +607,9 @@ export function createPhoneInbox({
       if (replaces) {
         try {
           const claim = await backend.claimPhoneCommand(replaces, owner);
-          if (claim === 'cloud') continue;
+          // The cloud is running it: said again, so the hand-over is not
+          // offered afresh, and claimed again, at every wake from here on.
+          if (claim === 'cloud') { handedOver({ ...c, command: replaces }); continue; }
           // Already taken, maybe as a run the cloud did: let go rather than hand over twice.
           if (claim === 'gone') { takenBack({ ...c, command: replaces }); continue; }
           await backend.markPhoneCommand(replaces, 'done', owner);

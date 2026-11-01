@@ -21,6 +21,7 @@ import { saveAttachments, attachmentMarkdown } from '../save-attachments.mjs';
 import { hasLapsed, statusEnds } from '../../shared/team-status.mjs';
 import QRCode from 'qrcode';
 import { createPhoneInbox } from '../phone-inbox.mjs';
+import { PHONE_UNDO_HOLD_MS } from '../../shared/phone-undo.mjs';
 import { SNAPSHOT_LIMITS, phoneProjectsOf, phoneEligible } from '../../shared/phone-snapshot.mjs';
 import { createRooms } from './rooms.mjs';
 
@@ -206,6 +207,7 @@ export function createTeamService({
     inbox = createPhoneInbox({
       backend,
       owner,
+      undoHoldMs: PHONE_UNDO_HOLD_MS,
       alive: () => phoneInbox === inbox && backend === signedInAs && state.me?.id === owner,
       device: phone.device?.() ?? null,
       projects: () => {
@@ -221,6 +223,7 @@ export function createTeamService({
       readSettings: phone.readSettings ?? null,
       pinsOf: () => phone.pins?.() ?? {},
       repeatsOf: phone.repeats ?? null,
+      teammatesOf: phone.teammates ?? null,
       version: phone.version ?? '',
       idleMs: phone.idleMs ?? null,
       // The lid shut: projects whose threads carry on in the cloud, and runs it started (shared/cloud-kit.mjs).

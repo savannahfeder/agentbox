@@ -26,15 +26,15 @@ describe('the list and the board leave search to the sidebar', () => {
     expect(app).toMatch(/const searchInTheList = onPhone\(\) \? \(\) => setModal\('palette'\) : undefined;/);
   });
 
-  it('every tab row is handed only that', () => {
+  it('no tab row is handed a search of its own', () => {
     const tabs = elements('StateTabs');
     expect(tabs.length).toBeGreaterThanOrEqual(1);
-    for (const t of tabs) expect(t).toMatch(/onSearch=\{searchInTheList\}/);
+    for (const t of tabs) expect(t).not.toMatch(/onSearch=/);
   });
 
-  it('the board header is handed only that', () => {
+  it('the inbox header is handed only that', () => {
     const header = elements('HeaderActions').find((h) => h.includes('page="inbox"'));
-    expect(header).toMatch(/onSearch=\{!teamMode && inboxDisplay\.view === 'board' \? searchInTheList : undefined\}/);
+    expect(header).toMatch(/onSearch=\{searchInTheList\}/);
   });
 
   it('still opens the full search from ⌘K and the / key', () => {

@@ -5,6 +5,8 @@
 import type { AgentEvent, AgentTurn } from './types';
 import type { ItemOutcome } from './item-thread';
 import { optionsFrom } from './format';
+import { rowTitle } from './list-rules';
+import { teammateIdOf } from '../../shared/teammates.mjs';
 
 export interface Spot { pos: number; total: number; index: number }
 
@@ -69,9 +71,35 @@ export function standsAt(events: AgentEvent[], newest: { at: number } | null): n
   return answered ? events.findIndex((e) => said(e) && e.who !== 'you' && e.at === newest.at) : -1;
 }
 
+/**
+ * Where the page starts while an agent is working: at the answer your newest
+ * message or pick followed on from, or at the top when nothing came before it.
+ * The agent's sentences since are the steps you open it to watch, so none of
+ * them is lifted out as the answer.
+ */
+export function workingFrom(events: AgentEvent[]): number {
+  let yours = -1;
+  events.forEach((e, i) => { if (said(e) ? e.who === 'you' : e.yours) yours = i; });
+  for (let i = yours - 1; i >= 0; i--) {
+    const e = events[i];
+    if (said(e) && e.who !== 'you' && e.text?.trim()) return i;
+  }
+  return 0;
+}
+
 /** How many messages the fold holds above the one the page is drawn from. */
 export function earlierThan(events: AgentEvent[], from: number): number {
   return events.slice(0, from).filter(said).length;
+}
+
+/**
+ * The page's name. A teammate's row is named after its answer's first line,
+ * which would leave the page drawing that line twice or not at all under the
+ * Context, so its page is named after what woke it; the answer is signed instead.
+ */
+export function pageTitle(item: Parameters<typeof rowTitle>[0]): string {
+  const own = (item.title ?? '').trim();
+  return teammateIdOf(item) && own ? own : rowTitle(item);
 }
 
 /** An answer opening with a line that is bold and nothing else wears it as its headline. */

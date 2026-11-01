@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
   if (!to || !from || !key) return json({ ok: false, error: 'not configured' }, 503);
   if (Number(req.headers.get('content-length') ?? 0) > MAX_REQUEST) return json({ ok: false, error: 'too large' }, 413);
 
-  let body: { text?: unknown; files?: unknown; app?: { version?: unknown; os?: unknown } };
+  let body: { text?: unknown; files?: unknown; app?: { version?: unknown; os?: unknown; install?: unknown } };
   try {
     body = await req.json();
   } catch {
@@ -65,9 +65,12 @@ Deno.serve(async (req) => {
 
   const version = String(body.app?.version ?? '').slice(0, 40);
   const os = String(body.app?.os ?? '').slice(0, 80);
+  // The random install id (shared/install-id.mjs), cut to 8 characters: enough
+  // to tell whether two emails came from one install.
+  const install = String(body.app?.install ?? '').replace(/[^\w-]/g, '').slice(0, 64);
   const first = text.split('\n')[0].slice(0, 70);
   const subject = `Agentbox feedback: ${first || `${files.length} file${files.length === 1 ? '' : 's'}`}`;
-  const footer = `Agentbox ${version || 'unknown version'} · ${os || 'unknown OS'}`;
+  const footer = `Agentbox ${version || 'unknown version'} · ${os || 'unknown OS'}${install ? ` · install ${install.slice(0, 8)}` : ''}`;
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',

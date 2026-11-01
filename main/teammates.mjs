@@ -99,6 +99,7 @@ export class Teammates {
       limit: Number.isInteger(base.limit) ? base.limit : DEFAULT_LIMIT,
       status: base.status === 'draft' ? 'draft' : 'active',
       starter: starter?.starter ?? null,
+      ...(base.primary && !team.some((x) => x.primary) ? { primary: true } : {}),
       createdAt: now,
       paused: false,
     };
@@ -139,7 +140,7 @@ export class Teammates {
   update(id, patch = {}, now = Date.now()) {
     const t = this.get(id, now);
     if (!t) throw new Error('No such teammate.');
-    const allowed = ['name', 'role', 'job', 'goal', 'counted', 'asksFirst', 'works', 'product', 'engine', 'model', 'effort', 'limit', 'paused', 'letter', 'handoffsNeedYes'];
+    const allowed = ['name', 'role', 'job', 'goal', 'counted', 'asksFirst', 'works', 'product', 'engine', 'model', 'effort', 'limit', 'paused', 'letter', 'handoffsNeedYes', 'primary'];
     const clean = {};
     for (const k of allowed) if (k in patch) clean[k] = patch[k];
     if ('product' in clean) clean.product = this._product(clean.product);
@@ -148,6 +149,11 @@ export class Teammates {
       writeChat(this.dir(), { kind: 'act', from: id, verb: clean.paused ? 'paused' : 'resumed' }, now);
     }
     writeTeammate(this.dir(), id, clean, now);
+    // One primary at a time.
+    if (clean.primary === true && !t.primary) {
+      for (const other of this.list(now).filter((x) => x.id !== id && x.primary)) writeTeammate(this.dir(), other.id, { primary: false }, now);
+      writeChat(this.dir(), { kind: 'act', from: id, verb: 'primary', text: `${t.name} is your primary employee: it takes what Auto is not sure of, and checks in with you.` }, now);
+    }
     // Its open runs follow it from their next turn. A model is one engine's
     // name, so a move to another engine clears it.
     const effort = ('effort' in clean ? clean.effort : t.effort) || TEAMMATE_EFFORT;
@@ -227,13 +233,17 @@ export class Teammates {
 
   // Your words in the team chat. On a teammate's page they go to that
   // teammate; in the team chat to whoever they name with @.
-  post({ text, to = [], options, fresh = false } = {}, now = Date.now()) {
+  post({ text, to = [], options, fresh = false, answers } = {}, now = Date.now()) {
     const words = String(text ?? '').trim();
     if (!words) throw new Error('Nothing to send.');
     const team = this.list(now);
     const ids = new Set([...(Array.isArray(to) ? to : [to]).filter(Boolean), ...mentionsIn(words, team)]);
     const known = [...ids].filter((x) => team.some((t) => t.id === x));
-    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}) }, now);
+    // Which of its questions each answer is for, so the chat can show them one by one.
+    const said = answers && typeof answers === 'object' && !Array.isArray(answers)
+      ? Object.fromEntries(Object.entries(answers).filter(([, a]) => typeof a === 'string' && a.trim()).map(([q, a]) => [q, a.trim().slice(0, 2000)]))
+      : {};
+    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}), ...(Object.keys(said).length ? { answers: said } : {}) }, now);
   }
 
   // Your go-ahead for work held after too many hand-offs: the same work again,
@@ -581,7 +591,7 @@ export class Teammates {
     const yours = chat.messages.filter((m) => m.kind === 'msg' && m.from === YOU && now - m.ts < WEEK_MS).slice(-YOUR_CHAT_LINES)
       .map((m) => `- [${when(m.ts)}]${(m.to ?? []).length ? ` to ${m.to.map((x) => this.nameOf(x, team)).join(', ')}` : ''}: ${cut(String(m.text ?? '').replace(/\s+/g, ' ').trim(), 400)}`);
     const lastSeen = Math.max(0, ...earlier.map((i) => (i.wrote?.answer?.source === 'founder' ? i.wrote.answer.ts ?? 0 : 0)));
-    const untried = method && method.changedAt > lastSeen;
+    const untried = method && laterThan(method.changedAt, lastSeen);
     const toldLines = told.slice(-CHAT_TAIL).map((m) => {
       const when = new Date(m.ts).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
       return `- [${when}] ${this.nameOf(m.from, team)}: ${cut(String(m.text ?? '').trim(), 2000)}`;
@@ -619,12 +629,17 @@ export class Teammates {
       ...(record ? ['## Your recent work, from the record', 'Each of your recent runs, what the person said on it in their words, and the first line of what you answered. Read it before you start: it is how you know what was already tried, approved and turned down.', record, ''] : []),
       ...(t.duties?.length ? ['## What you do on your own', ...t.duties.map((d) => `- ${d.what} (${dutyWhen(d).toLowerCase()})${d.tell ? `. Bring the person in only when ${d.tell}` : ''}`), 'You also wake when someone writes to you or passes you work.', ''] : []),
       ...(!method && t.memory.length ? ['## What you know about the person (put these in your method)', ...t.memory.map((m) => `- ${m.text}`), ''] : []),
-      ...(method && t.memory.some((m) => m.at > method.changedAt) ? ['## Noted since your method last changed (put these in it)', ...t.memory.filter((m) => m.at > method.changedAt).map((m) => `- ${m.text}`), ''] : []),
+      ...(method && t.memory.some((m) => laterThan(m.at, method.changedAt)) ? ['## Noted since your method last changed (put these in it)', ...t.memory.filter((m) => laterThan(m.at, method.changedAt)).map((m) => `- ${m.text}`), ''] : []),
       ...(reads.length ? ['## Shared playbooks you read (lessons for every teammate doing this kind of work)', ...reads.flatMap((b) => [`### ${b.title}`, ...b.lessons.map((l) => `- ${cut(l.text, 300)}`)]), ''].slice(0, 60) : []),
       ...(notRead.length ? [`Playbooks on the team you do not read yet: ${notRead.map((b) => b.title).join(', ')}. Start reading one with team_playbook and its title, leaving out lesson, when its work is yours too.`, ''] : []),
       ...this._projectsFor(t),
+      ...(t.primary ? this._asPrimary(others, items, now) : []),
       '## The team',
-      ...(others.length ? others.map((o) => `- ${o.name}${o.role && o.role.toLowerCase() !== o.name.toLowerCase() ? `, ${o.role}` : ''}${o.paused ? ' (paused)' : ''}: ${o.job ? cut(o.job, 140) : 'no job yet'}`) : ['- You are the only teammate so far.']),
+      ...(others.length ? others.map((o) => {
+        const s = t.primary ? statusOf(o, items, now) : null;
+        const doing = s ? [s.now ? ` Now: ${s.now}.` : '', s.queued ? ` ${s.queued} queued.` : '', s.done.length ? ` Finished today: ${s.done.map((d) => d.title).join('; ')}.` : ''].join('') : '';
+        return `- ${o.name}${o.role && o.role.toLowerCase() !== o.name.toLowerCase() ? `, ${o.role}` : ''}${o.paused ? ' (paused)' : ''}: ${o.job ? cut(o.job, t.primary ? 240 : 140) : 'no job yet'}${doing}`;
+      }) : ['- You are the only teammate so far.']),
       '',
       ...(yours.length ? ['## What the person said in the team chat lately', ...yours, ''] : []),
       ...(toldLines.length ? ['## Teammates wrote to you in the chat since this thread last spoke', 'Read these into this turn. They woke nobody.', ...toldLines, ''] : []),
@@ -661,6 +676,25 @@ export class Teammates {
       `- When nothing needs them, post a one-line summary to the team chat, then close this run yourself: update_work_item with status done and labels ["founder", "${teammateLabel(t.id)}", "${HOP_LABEL_PREFIX}${hop}", "clean"] in one call. This run is your own work, not the person's ask, so closing it needs no quote from them. A duty that found nothing worth doing ends there.`,
       '- Never wait or poll for a teammate. Say what you are waiting for in the chat and finish. Hand work on with team_pass, not create_work_item.',
     ].filter((x) => x !== null).join('\n');
+  }
+
+  // What the primary is for, and what is waiting on the person across the team.
+  _asPrimary(others, items, now) {
+    const waiting = others.flatMap((o) => statusOf(o, items, now).waiting.map((w) => `- ${o.name}: "${w.title}" (${w.product}/${w.id})`));
+    return [
+      '## You are the primary employee',
+      "You are the person's main point of contact: the one teammate they talk to. Work reaches you three ways: they write to you, Auto gives you a thread it could not place (two teammates fit, or it spans several jobs), or it is your check-in.",
+      "- One teammate's job: hand it over with team_pass, with the person's words and what done looks like, and say in one line who has it. When this run started with the person's own words it starts at once; otherwise it waits for their yes. The result reaches their inbox from that teammate; do not relay it.",
+      '- Several jobs: split it, one owner for each piece and one team_pass each. Never two teammates on the same piece.',
+      "- Small, or nobody's job: do it yourself in this run.",
+      '- A kind of work that keeps coming and nobody owns: offer the person a new teammate for it, with options. On their yes, make it with team_hire (a name that says the role, and the job in plain words); it sets itself up by asking them.',
+      '- Your check-in: one message with what is waiting on the person, most urgent first, then what finished and what is stuck, each with its thread, in a few lines. When nothing needs them, post nothing and close this run quietly.',
+      "- Hand a teammate the outcome, not instructions for how to do its work: it works from its own method. Never do another teammate's job.",
+      '',
+      '## Waiting on the person, across the team',
+      ...(waiting.length ? waiting : ['- Nothing.']),
+      '',
+    ];
   }
 
   // A teammate with no method yet: the threads it learns from, written out
@@ -725,6 +759,12 @@ export class Teammates {
 }
 
 const YOUR_CHAT_LINES = 10;
+
+// The method's time is the file's and everything it is compared with is
+// Date.now(); Linux stamps a file up to 16ms behind, so the one written second
+// can read first. A second is past that and under any gap a person makes.
+const CLOCKS_APART_MS = 1_000;
+const laterThan = (a, b) => a > b + CLOCKS_APART_MS;
 
 const threadIdsIn = (text) => [...String(text ?? '').matchAll(/\bw-[0-9a-f]{10,12}\b/g)].map((m) => m[0]);
 

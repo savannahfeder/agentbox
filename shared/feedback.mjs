@@ -34,13 +34,14 @@ export function checkFeedback({ text = '', files = [] } = {}) {
 }
 
 // Exactly what travels: the words trimmed, each file as name, type and its
-// base64, and the app's version so a report can be matched to a release.
+// base64, the app's version so a report can be matched to a release, and the
+// random install id so reports from one install read as one sender.
 // Nothing else the card happened to hold rides along.
 export function feedbackPayload({ text = '', files = [], app = {} } = {}) {
   return {
     text: String(text ?? '').trim(),
     files: (files ?? []).map(({ name, type, data }) => ({ name: String(name ?? 'file'), type: String(type || 'application/octet-stream'), data: String(data ?? '') })),
-    app: { version: String(app.version ?? ''), os: String(app.os ?? '') },
+    app: { version: String(app.version ?? ''), os: String(app.os ?? ''), install: String(app.install ?? '').slice(0, 64) },
   };
 }
 
