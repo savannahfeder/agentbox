@@ -18,7 +18,7 @@ describe('a message naming a TypeScript back-end file', () => {
   });
 
   it('is not stretched to an ending that is not a source file', () => {
-    expect(sourceReference('notes.mtsx')).toBeNull();
+    expect(sourceReference('notes.mtx')).toBeNull();
     expect(sourceReference('notes.xts')).toBeNull();
   });
 
