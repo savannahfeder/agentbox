@@ -17,7 +17,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { deadRunSentence, deadRunPromisesARetry } from '../shared/spawn-trouble.mjs';
 
 const dirs = [];

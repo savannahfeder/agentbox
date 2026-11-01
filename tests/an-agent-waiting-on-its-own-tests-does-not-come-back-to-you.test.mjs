@@ -18,8 +18,8 @@
 
 import { it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { attachClaudeInput } from '../main/claude-input.mjs';
-import { claudeActivity, currentActivity } from '../main/agent-activity.mjs';
+import { attachClaudeInput } from '../main/claude-input.mts';
+import { claudeActivity, currentActivity } from '../main/agent-activity.mts';
 
 function fake() {
   const c = new EventEmitter();

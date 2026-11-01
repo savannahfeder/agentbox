@@ -17,7 +17,7 @@
 // fixture), and the cap takes a shell she has read before one she has not.
 
 import { describe, it, expect, vi } from 'vitest';
-import { TaskTerminals } from '../main/task-terminals.mjs';
+import { TaskTerminals } from '../main/task-terminals.mts';
 
 const MINUTE = 60000;
 

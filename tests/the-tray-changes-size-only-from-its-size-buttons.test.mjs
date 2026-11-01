@@ -11,7 +11,7 @@
 // alone, the page draws no corners to grab, and the Size steps still work.
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { createCornerTag } from '../main/corner-tag.mjs';
+import { createCornerTag } from '../main/corner-tag.mts';
 import { GRIPS, cardScale } from '../shared/corner-tag.mjs';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');

@@ -1,6 +1,6 @@
 // WHICH SET OF PICTURES A SCREEN GETS., 2026-08-22.
 //
-// Kept out of main.mjs and free of Electron, like zoom-keys.mts, so the rule can
+// Kept out of main.mts and free of Electron, like zoom-keys.mts, so the rule can
 // be tested against made-up displays instead of against whatever monitor the
 // machine running the tests happens to have.
 //

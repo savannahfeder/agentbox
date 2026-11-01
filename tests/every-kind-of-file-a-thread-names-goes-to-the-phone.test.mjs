@@ -17,7 +17,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createPhoneUploads, filesNamed, typeOf, hideCsvSecrets } from '../main/phone-uploads.mjs';
+import { createPhoneUploads, filesNamed, typeOf, hideCsvSecrets } from '../main/phone-uploads.mts';
 
 const T = Date.UTC(2026, 9, 19, 9, 0);
 let home; let docs;

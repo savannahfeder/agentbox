@@ -1,7 +1,7 @@
 // SHE WAITED ON THE ROW FOR A TABLE CODEX WAS NEVER GOING TO PRINT.
 //
 // THE MAIN PROCESS IS RIGHT AND THE RENDERER IS NOT, which is the whole of this
-// file. `main/supervisor.mjs` guards the eight commands on the engine in two
+// file. `main/supervisor.mts` guards the eight commands on the engine in two
 // places, in the same words both times:
 //
 // const command = continuation && engine === DEFAULT_ENGINE ?

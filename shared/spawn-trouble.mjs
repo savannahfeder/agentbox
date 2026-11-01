@@ -92,7 +92,7 @@ const ORG_BLOCKED = [
 ];
 
 // A CODEX SIGNED IN WITH AN API KEY. Our own line, said before the worker
-// starts (main/codex-account.mjs `codexKeyRefusal`), because Codex reads the
+// starts (main/codex-account.mts `codexKeyRefusal`), because Codex reads the
 // key out of auth.json past the worker scrub and bills every call to it.
 // Before SIGNED_OUT, whose /invalid api key/ is a different event.
 const API_KEY = [/signed in with an api key/i];
@@ -164,7 +164,7 @@ const AT_LIMIT = [
   // binary's own generator, run on this Mac -- defines TurnError as
   // `{ message, additionalDetails, codexErrorInfo }`, and CodexErrorInfo as an
   // enum including `usageLimitExceeded`. That is a name published by the vendor
-  // rather than prose that drifts, and main/codex-session.mjs was discarding it
+  // rather than prose that drifts, and main/codex-session.mts was discarding it
   // and leaving the classifier to read the sentence. It now puts the code in
   // front of the line, where the 300-character window `noteExitForBackoff`
   // takes cannot cut it off, and this is what reads it.
@@ -822,7 +822,7 @@ function fixBeforeReplying({ cause, engineWord, resetsAt, model, planEnded }) {
 // accounts any more, so a limit is named with the hour it resets and a model no
 // plan includes is answered with another model.
 //
-// `planEnded` is when the account's paid ChatGPT plan ended (main/codex-account.mjs
+// `planEnded` is when the account's paid ChatGPT plan ended (main/codex-account.mts
 // `codexPlanEnded`), which is why its list lacks `model`.
 //
 // `gaveUp` is the app having stopped carrying a reply (`settleDeliveryAndSay`).
@@ -839,7 +839,7 @@ function fixBeforeReplying({ cause, engineWord, resetsAt, model, planEnded }) {
 // partway words stopped this run before it began, and keeps its own opener.
 //
 // `retryAt` is when the rest ladder starts it again (`restingUntil` in
-// main/supervisor.mjs), named only on the causes that wait for nothing else.
+// main/supervisor.mts), named only on the causes that wait for nothing else.
 //
 // `slept` is this computer having slept while the run was up. A run that named no
 // cause of its own was cut off by that, and says so.
@@ -952,7 +952,7 @@ export function undeliveredAnswerSentence({ engineWord = 'The agent', attempts =
 const UNDELIVERED = 'Your reply did not reach this task.';
 
 // A THREAD THE APP STOPPED STARTING (`_noteHowTheRunStarted` in
-// main/supervisor.mjs). `tries` is how many times it has tried again on its
+// main/supervisor.mts). `tries` is how many times it has tried again on its
 // own since, and `next` when it tries again, null once it has stopped trying.
 const STOPPED_STARTING = `${Name} stopped starting this thread`;
 const clock = (t) => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(/\s/g, '');

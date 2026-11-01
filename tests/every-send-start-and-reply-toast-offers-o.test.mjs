@@ -28,7 +28,7 @@ import fs from 'node:fs';
 import { opensTheToast, toastOpens } from '../renderer/src/toast-parts';
 
 const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
 
 const goes = { product: 'agentbox', id: 'w-1' };
 

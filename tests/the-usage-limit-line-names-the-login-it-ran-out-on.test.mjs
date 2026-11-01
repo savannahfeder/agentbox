@@ -22,8 +22,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { accountName } from '../shared/account-names.mjs';
 import { deadRunCause, deadRunSentence } from '../shared/spawn-trouble.mjs';
-import { Store } from '../main/store.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Store } from '../main/store.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 describe('what one account is called', () => {
   it('is the email the vendor gave', () => {

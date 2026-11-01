@@ -765,7 +765,7 @@ function Finished({
   };
   // "Show me where it is" opens a file panel in the main process and applies
   // the choice there in the same call, so no path crosses the bridge
-  // (`zero:engine-bin` in main/ipc.mjs).
+  // (`zero:engine-bin` in main/ipc.mts).
   const [pointing, setPointing] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
   const point = async () => {
@@ -819,7 +819,7 @@ function Finished({
           <h1 className="fr-page">{card.head}</h1>
           <p className="fr-lede">{card.line}</p>
           {/* Check again drops the cached shell answer first and really
-              searches (`recheckClaude` in main/settings.mjs). */}
+              searches (`recheckClaude` in main/settings.mts). */}
           <AskList
             rows={gateRows(claude.url, { checking, pointing })}
             label={card.head}

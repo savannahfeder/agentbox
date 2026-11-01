@@ -18,7 +18,7 @@ export function previewRows(now = Date.now()): PhoneRows {
   });
   const planAsk = 'Plan the phone app. I want alerts that reach my lock screen and a way to reply without opening the Mac.';
   const planResult = 'The plan is ready and Codex has reviewed it.\n\nThe first version signs you in, shows your inbox and lets you reply. Alerts come next, then messages between people.\n\n![The inbox on the phone](designs/w-1a2b3c4d5e/inbox.png)\n\n**Getting it approved** is mostly about two things: deleting an account has to delete what you shared, and messages need a report button.\n\n## Options\n1. Start building the first version (recommended)\n2. Wait until the Apple account is checked';
-  // The files a Mac lists for a project, as main/phone-inbox.mjs sends them.
+  // The files a Mac lists for a project, as main/phone-inbox.mts sends them.
   const attached = PREVIEW_ATTACHED;
   const roundAsk = 'Draw three versions of the inbox for the phone.';
   const roundNote = "Three versions of the inbox are in the folder below. I'd go with the quiet one: it reads fastest at arm's length.\n\n~/docs/agentbox/designs/w-8b9c0d1e2f/\n\nWhat each one changes is in `designs/w-8b9c0d1e2f/inbox-versions.md`, and `designs/w-8b9c0d1e2f/compare.html` sets them side by side.\n\nThe walk-through is a short film: `designs/w-8b9c0d1e2f/walkthrough.mp4`\n\nThe full recording, `recordings/session.mov`, is too big for the phone.\n\n## Options\n1. Go with the quiet one (recommended)\n2. Try a fourth version";
@@ -54,7 +54,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(40), source: 'founder', patch: { body: 'Draw five sign-in screens on the real app.' } },
       ], {
         live: { since: at(12), at: at(0.5), where: 'cloud', doing: [{ label: 'Read the sign-in page', startedAt: at(9) }, { label: 'Wrote the five screens', startedAt: at(6) }, { label: 'Ran the screenshot script', startedAt: at(3) }, { label: 'Drawing the third screen', startedAt: at(1) }] },
-        // A permission it is waiting on, as main/phone-inbox.mjs sends one (shared/phone-snapshot.mjs `phoneApproval`).
+        // A permission it is waiting on, as main/phone-inbox.mts sends one (shared/phone-snapshot.mjs `phoneApproval`).
         approvals: [{ id: 'ap-preview-1', at: at(1), tool: 'Bash', input: { command: 'npx eas-cli init --non-interactive', description: 'Link this folder to the Expo project' }, card: 'cHJldmlldy1jYXJk' }],
       }),
       // Two threads the phone plan filed: one waiting on you, one finished.

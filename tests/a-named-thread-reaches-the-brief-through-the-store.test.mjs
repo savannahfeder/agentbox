@@ -6,8 +6,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { Store } from '../main/store.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { Store } from '../main/store.mts';
 
 let root;
 let store;

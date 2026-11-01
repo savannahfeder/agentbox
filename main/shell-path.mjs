@@ -191,7 +191,7 @@ export function launchAdditions({ network = {}, locale = {} } = {}, env = proces
  *
  *  AND THE NETWORK AND LANGUAGE SETTINGS ARE PUT INTO `into` (the app's own
  *  environment) here, because this is the one shell read that both the desktop
- *  (main/main.mjs) and the browser copy (bin/agentbox.mjs) wait for before the
+ *  (main/main.mts) and the browser copy (bin/agentbox.mjs) wait for before the
  *  first worker starts. */
 let shellDataEnv = {};
 export const shellDataDirsNow = () => shellDataEnv;

@@ -1,6 +1,6 @@
 // FEEDBACK FROM THE APP, FORWARDED BY EMAIL (w-1b574413db, 2026-10-04).
 //
-// The Feedback card posts here (main/feedback.mjs): what the person wrote,
+// The Feedback card posts here (main/feedback.mts): what the person wrote,
 // what they attached, and the app's version. This forwards it as one email
 // through Resend.
 //

@@ -233,7 +233,7 @@ function ensureAppUser(bucket, runtimeArn) {
     Statement: [
       { Effect: 'Allow', Action: ['bedrock-agentcore:InvokeAgentRuntime', 'bedrock-agentcore:StopRuntimeSession'], Resource: [runtimeArn, `${runtimeArn}/*`] },
       { Effect: 'Allow', Action: ['s3:GetObject', 's3:PutObject'], Resource: `arn:aws:s3:::${bucket}/runs/*` },
-      // Each account's cloud sign-in (main/cloud/logins.mjs). The app only
+      // Each account's cloud sign-in (main/cloud/logins.mts). The app only
       // presigns links to these for the sandbox, which carry the signer's
       // rights, and deletes the ones a newer sign-in replaced. No expiry rule
       // covers logins/.

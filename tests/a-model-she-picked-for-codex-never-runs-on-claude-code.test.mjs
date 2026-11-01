@@ -1,6 +1,6 @@
 // A MODEL SHE PICKED FOR CODEX NEVER RUNS ON CLAUDE CODE.
 //
-// THE MIRROR THAT WAS MISSING. `codexModelRefusal` (main/supervisor.mjs, and
+// THE MIRROR THAT WAS MISSING. `codexModelRefusal` (main/supervisor.mts, and
 // tests/a-model-she-picked-for-codex-is-honoured-or-the-run-says-why.test.mjs)
 // stops a CLAUDE alias reaching a CODEX run. Nothing stopped the other
 // direction, and the other direction is the one that happens by itself:
@@ -58,7 +58,7 @@
 // is the staleness-banner failure again (CLAUDE.md, 2026-08-12).
 //
 // AND HER REPLY IS NOT SWALLOWED BY THE REFUSAL. The queue writes the delivery
-// mark BEFORE it calls `spawnWorker` (main/supervisor.mjs, the fresh-work
+// mark BEFORE it calls `spawnWorker` (main/supervisor.mts, the fresh-work
 // pass), and that mark is persisted in the supervisor's state. A refusal that
 // left it standing would mean her words were recorded as delivered to a worker
 // that never existed, which is the exact failure CLAUDE.md is built around. So
@@ -86,7 +86,7 @@ vi.mock('../main/account-tooling.mjs', async (importActual) => {
   return { ...actual, linkAccountTooling: () => null };
 });
 
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { foldWorkItems } from '../shared/work-items.mjs';
 import { modelForEngine } from '../shared/engines.mjs';
 

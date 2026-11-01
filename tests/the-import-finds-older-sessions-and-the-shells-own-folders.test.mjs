@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readShellDataDirs } from '../main/shell-path.mjs';
-import { readImportableThreads } from '../main/importable-threads.mjs';
+import { readImportableThreads } from '../main/importable-threads.mts';
 import { markImported } from '../shared/agent-import.mjs';
 
 const NOW = Date.UTC(2026, 9, 11, 18, 0, 0);

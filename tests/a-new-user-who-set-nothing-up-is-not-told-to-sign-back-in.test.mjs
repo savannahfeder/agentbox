@@ -34,7 +34,7 @@ import {
 } from '../renderer/src/plan-setup.ts';
 import { PlanQuestion } from '../renderer/src/components/PlanSetup.tsx';
 import { deadRunCause, deadRunSentence, needsHerHands, refineCause, troubleCause } from '../shared/spawn-trouble.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 
 const r = (engine, found, signedIn) => ({ engine, found, signedIn });

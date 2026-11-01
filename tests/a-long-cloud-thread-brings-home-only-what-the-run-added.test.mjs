@@ -25,7 +25,7 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun, transcriptFolderName, layTails, CLOUD_NOTE } from '../main/cloud/run.mjs';
+import { cloudRun, transcriptFolderName, layTails, CLOUD_NOTE } from '../main/cloud/run.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');

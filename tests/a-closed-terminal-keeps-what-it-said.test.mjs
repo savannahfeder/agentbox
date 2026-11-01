@@ -6,14 +6,14 @@
 // read only "[The previous shell here was closed after ten minutes idle. This
 // is a new one.]" above a fresh prompt.
 //
-// Measured against main/task-terminals.mjs as it was: a deploy that finished
+// Measured against main/task-terminals.mts as it was: a deploy that finished
 // (or failed) at minute 0 left an idle shell, the sweep ended it at minute 10,
 // and the reopened terminal's whole screen was that one line, 70 characters,
 // with the deploy's output gone. Two fixes, both tested here: the wait is an
 // hour, and whatever the old shell last showed comes back above the new one.
 
 import { describe, it, expect, vi } from 'vitest';
-import { TaskTerminals } from '../main/task-terminals.mjs';
+import { TaskTerminals } from '../main/task-terminals.mts';
 
 const MINUTE = 60000;
 

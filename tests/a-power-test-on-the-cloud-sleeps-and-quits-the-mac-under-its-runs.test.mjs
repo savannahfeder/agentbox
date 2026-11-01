@@ -68,7 +68,7 @@ describe('the day a cloud power test lays out', () => {
   });
 
   it('measures "away" by the same 90 seconds the relay asks the cloud for', () => {
-    const run = fs.readFileSync(path.join(import.meta.dirname, '..', 'main', 'cloud', 'run.mjs'), 'utf8');
+    const run = fs.readFileSync(path.join(import.meta.dirname, '..', 'main', 'cloud', 'run.mts'), 'utf8');
     expect(Number(/const OFFLINE_AFTER_MS = ([\d_]+);/.exec(run)[1].replace(/_/g, ''))).toBe(CLOUD_AWAY_MS);
   });
 });
@@ -113,11 +113,11 @@ describe('the copy\'s processes when its threads run in the cloud', () => {
     { pid: 11, ppid: 10, rss: 5, command: `/usr/bin/perl /repo/scripts/cloud-shim.pl ${sock} -p --output-format stream-json --permission-prompt-tool mcp__zero-approvals__approval_prompt` },
     { pid: 12, ppid: 10, rss: 5, command: `/usr/bin/perl /repo/scripts/cloud-shim.pl ${sock} --agentbox-codex app-server` },
     { pid: 13, ppid: 10, rss: 70, command: '/home/u/.local/share/claude/versions/2.1.302 -p --output-format stream-json --permission-prompt-tool mcp__zero-approvals__approval_prompt' },
-    { pid: 14, ppid: 1, rss: 90, command: `/repo/node_modules/electron/dist/Electron /repo/main/cloud/host.mjs ${sock}` },
+    { pid: 14, ppid: 1, rss: 90, command: `/repo/node_modules/electron/dist/Electron /repo/main/cloud/host.mts ${sock}` },
     { pid: 15, ppid: 10, rss: 20, command: 'node /repo/mcp/server.mjs --store /tmp/i/store' },
     { pid: 20, ppid: 1, rss: 300, command: 'claude -p You are Maya --output-format stream-json' },
     { pid: 30, ppid: 1, rss: 400, command: '/opt/chrome --user-data-dir=/tmp/i/chrome-profile' },
-    { pid: 40, ppid: 1, rss: 280, command: `/Users/x/app/node_modules/electron/dist/Electron /Users/x/app/main/cloud/host.mjs ${hers}` },
+    { pid: 40, ppid: 1, rss: 280, command: `/Users/x/app/node_modules/electron/dist/Electron /Users/x/app/main/cloud/host.mts ${hers}` },
     { pid: 41, ppid: 1, rss: 5, command: `/usr/bin/perl /Users/x/app/scripts/cloud-shim.pl ${hers} -p --permission-prompt-tool mcp__zero-approvals__approval_prompt` },
   ];
 

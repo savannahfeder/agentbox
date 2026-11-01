@@ -25,12 +25,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import {
   recordCloudLogin, markCloudLogin, pickCloudLogin, cloudLoginInUse, cloudAccountFrom,
   noCloudAccountSentence, CLOUD_ACCOUNT_ENV,
-} from '../main/cloud/logins.mjs';
-import { loginForCloudRun } from '../main/cloud/run-cli.mjs';
+} from '../main/cloud/logins.mts';
+import { loginForCloudRun } from '../main/cloud/run-cli.mts';
 import { cloudAccountInUse, cloudFootLine } from '../renderer/src/cloud-menu';
 
 let home;

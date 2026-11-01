@@ -31,7 +31,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (...p) => fs.readFileSync(path.join(here, '..', ...p), 'utf8');
 const docText = read('renderer', 'src', 'components', 'DocText.tsx');
 const codeArtifact = read('renderer', 'src', 'components', 'CodeArtifact.tsx');
-const mainMjs = read('main', 'main.mjs');
+const mainMjs = read('main', 'main.mts');
 const app = read('renderer', 'src', 'App.tsx');
 
 describe('which keys are still the app\'s', () => {
@@ -85,7 +85,7 @@ describe('what a key sent up from inside a page means', () => {
   });
 
   it('answers nothing for the chords the main process handles itself', () => {
-    // ⌘R, ⌘=, ⌘0, ⌘Y and ⌘N are all answered in main/main.mjs. The window must
+    // ⌘R, ⌘=, ⌘0, ⌘Y and ⌘N are all answered in main/main.mts. The window must
     // not answer them a second time.
     for (const key of ['r', 'y', 'n', '=', '-', '0']) {
       expect(whatTheFileSentUp({ key, meta: true })).toBe(null);

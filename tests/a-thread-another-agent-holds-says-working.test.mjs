@@ -24,8 +24,8 @@ import { bylineFacts, stateLedParts } from '../renderer/src/byline.ts';
 import { Live } from '../renderer/src/components/Live.tsx';
 import { ThreadCells, LiveContext, CloudContext } from '../renderer/src/threads/Pages.tsx';
 import { FleetContext } from '../renderer/src/fleet.ts';
-import { Supervisor } from '../main/supervisor.mjs';
-import { Store } from '../main/store.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { Store } from '../main/store.mts';
 
 const NOW = Date.parse('2026-10-21T21:00:00Z');
 const MIN = 60_000;

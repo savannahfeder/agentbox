@@ -17,7 +17,7 @@
 // because its tool call returns at once while its process keeps running.
 
 import { describe, it, expect } from 'vitest';
-import { CommandHistory, commandSegments } from '../main/memory-gate-history.mjs';
+import { CommandHistory, commandSegments } from '../main/memory-gate-history.mts';
 
 const seen = (h, command, peakMb, times = 1, durationMs = 5_000) => {
   for (let i = 0; i < times; i++) h.record(command, { peakMb, durationMs });

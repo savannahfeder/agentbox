@@ -14,7 +14,7 @@
 //
 // A browser an agent may drive has to carry nothing. The app already ships one:
 // the pane on the `persist:junk` partition, a separate store with no logins in
-// it, described in main/main.mjs as a browser a human drives. That is the only
+// it, described in main/main.mts as a browser a human drives. That is the only
 // door this may come through, and it needs its own permission design first.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -52,7 +52,7 @@ describe('the browser an agent may reach', () => {
   it('is the pane the app ships, which carries no logins', () => {
     // If this line ever goes, the sentence above stops being true and the rule
     // in CLAUDE.md has nothing behind it.
-    expect(read('main/main.mjs')).toContain("session.fromPartition('persist:junk')");
+    expect(read('main/main.mts')).toContain("session.fromPartition('persist:junk')");
   });
 
   it('is written down where a session will read it before it builds one', () => {

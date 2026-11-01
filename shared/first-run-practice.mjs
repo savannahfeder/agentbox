@@ -80,7 +80,7 @@ export const PRACTICE_TASK = {
 
 /**
  * AND WHAT COMES BACK. The old walk read a readme out of the folder they chose
- *  (main/first-run.mjs) because the task ran against their own project. This
+ *  (main/first-run.mts) because the task ran against their own project. This
  *  one runs against a project that is not real, so the answer is written down
  *  here: it is a decision an agent made on its own and told them about, which
  *  is the shape the next beat teaches them to close.
@@ -123,7 +123,7 @@ export const PRACTICE_REPLY_ANSWER =
  *
  *  IT IS THE SAME TEXT IN BOTH PLACES. `createPractice` writes it to the
  *  project's `pinned.md`, which is the real file the sidebar reads
- *  (main/rail-note.mjs), and the third introduction slab draws it beside the
+ *  (main/rail-note.mts), and the third introduction slab draws it beside the
  *  words. A note the introduction promises and the practice project then does
  *  not have is the sort of quiet lie the walk has been caught in twice.
  *
@@ -147,7 +147,7 @@ export const PRACTICE_NOTE = [
  surface in the whole walk that shows what Agentbox * actually holds was blank. * * So every
  row carries three things: `body`, the sentence a person typed to * start it; `trace`, the
  lines the run wrote while it worked, in the exact * shape `traceStreamLine` in
- main/supervisor.mjs writes a real one; and * `result`, the finished word. The store writes
+ main/supervisor.mts writes a real one; and * `result`, the finished word. The store writes
  all three (`stagePracticeRows` * and the trace beside it), and the reading pane draws them
  with the same * components it draws a real run with. NOTHING IS MOCKED AND NO COMPONENT *
  KNOWS THESE ROWS EXIST. * * THE TRACE LINE FORMAT IS NOT DECORATION. `HH:MM:SS [Tool]

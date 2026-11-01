@@ -9,7 +9,7 @@
 // old app and is reused rather than rebuilt: hyphen-space becomes a bullet,
 // `##` a heading, `**` bold, `[ ]` a task, `->` an arrow. The note is markdown
 // on disk, in the product's own folder, so the note is a file an agent can be
-// pointed at rather than a blob in a settings store (main/rail-note.mjs).
+// pointed at rather than a blob in a settings store (main/rail-note.mts).
 //
 // WHAT IT DELIBERATELY DOES NOT HAVE, and each one is a design rule rather
 // than a corner cut: • No toolbar, no formatting buttons, no menu. The

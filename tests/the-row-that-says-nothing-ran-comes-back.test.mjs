@@ -25,7 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { deadRunSentence, deadRunCause } from '../shared/spawn-trouble.mjs';
 import { machineryPath } from '../main/store/home.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 
 const TWENTY_MINUTES = 20 * 60_000;

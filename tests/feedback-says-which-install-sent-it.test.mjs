@@ -33,7 +33,7 @@ describe('the payload carries the install id', () => {
 
 describe('the desktop app sends its own install id', () => {
   it('reads the same id the crash reports and counts use', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     const handler = ipc.slice(ipc.indexOf("'zero:send-feedback'"), ipc.indexOf("'zero:send-feedback'") + 400);
     expect(handler).toMatch(/install:\s*analytics\.installId/);
   });

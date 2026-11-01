@@ -6,7 +6,7 @@
 // reader had the opposite fault: a provider utilization above 100 was thrown
 // away, so a meter that was over its limit vanished instead of reading full.
 import { describe, expect, it } from 'vitest';
-import { cloudLimits } from '../main/cloud/logins.mjs';
+import { cloudLimits } from '../main/cloud/logins.mts';
 import { readUsageReport } from '../shared/claude-usage.mjs';
 
 const report = (session) => ({ rate_limits_available: true, rate_limits: { five_hour: { utilization: session, resets_at: null } } });

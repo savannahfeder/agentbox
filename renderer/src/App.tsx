@@ -708,7 +708,7 @@ export default function App() {
   // ADD PEOPLE on an open conversation: New thread, with everyone already in
   // that conversation in To. Nothing is written to the conversation on screen,
   // because adding somebody makes the group's conversation and leaves this one
-  // as it was; sending is what makes it (main/team/index.mjs directWith).
+  // as it was; sending is what makes it (main/team/index.mts directWith).
   const addPeopleToConversation = useCallback((who: { to: string; also: string[] }) => {
     setComposeInitial({ to: who.to, also: who.also });
     setModal('compose');
@@ -1114,7 +1114,7 @@ export default function App() {
 
   // WHAT CODEX CALLS ITS MODELS ON THIS MAC, and what its own config.toml
   // runs. Both stay empty on every Mac with one coding agent, because
-  // main/settings.mjs does not even open Codex's cache there, and the
+  // main/settings.mts does not even open Codex's cache there, and the
   // composer's model drawer then behaves exactly as it always has. Filled by
   // the settings read below, which is a trip this component was already
   // making.
@@ -1380,7 +1380,7 @@ export default function App() {
   //
   // AND IT IS ANSWERED IN THE PRACTICE PROJECT, which points at no folder at
   // all. The readme read above cannot run there and would have nothing honest
-  // to say if it did, so main/store.mjs writes the pre-written answer instead.
+  // to say if it did, so main/store.mts writes the pre-written answer instead.
   // Same row, same ledger, same two seconds.
   //
   // AND A REPLY IS ANSWERED THE SAME WAY (2026-10-06). `round` is how many
@@ -1909,7 +1909,7 @@ export default function App() {
   //
   // NONE IS THE DEFAULT NOW: a session started in a terminal is kept separate
   // from the inbox unless the setting says otherwise. The real default is
-  // decided once, in main/settings.mjs; this fallback only covers the moment
+  // decided once, in main/settings.mts; this fallback only covers the moment
   // before the first snapshot arrives, and it agrees with it so the inbox
   // cannot flash a row it is about to drop.
   const agentMode = snap?.config?.outsideAgents ?? 'off';
@@ -3016,7 +3016,7 @@ export default function App() {
   const [split, setSplit] = useState<number>(() => readSplit(window.localStorage));
   // The folders the open document's own product owns, so the breadcrumb reads
   // "astral › designs ›" and not the account plumbing above it. The same list
-  // main/artifact-path.mjs guesses against.
+  // main/artifact-path.mts guesses against.
   const docRoots = useMemo(() => {
     const prod = snap?.products.find((p) => p.slug === openDoc?.product) ?? null;
     if (!prod) return [];
@@ -3034,7 +3034,7 @@ export default function App() {
   // The key never reaches the window listener below from inside the pane: the
   // page there is its own document in its own origin, and a keydown does not
   // cross that line. Main hears it under the page and hands it here
-  // (before-input-event, main/main.mjs).
+  // (before-input-event, main/main.mts).
   //
   // ANSWERED ONCE, NEVER TWICE. Main forwards only from a frame, and this
   // refuses anything that arrives while the app's own page holds the keyboard,
@@ -3150,7 +3150,7 @@ export default function App() {
   // WHAT ARRIVED, not what to say about it. This page owns the definition of
   // "news" (it is the only place that knows what the inbox is), and it owns
   // nothing else about the banner: whether she is looking at the window is a
-  // fact only the main process can see, so main/notify.mjs decides whether to
+  // fact only the main process can see, so main/notify.mts decides whether to
   // speak, rolls a burst into one line, and takes it down when she comes back.
   //
   // A frozen worker travels the same road. An approval card is an agent
@@ -3167,7 +3167,7 @@ export default function App() {
 
     // THE CORNER TAG (w-dafae58a23) gets everything in Needs you with the
     // moment each started waiting, and how many are working; it shows only
-    // what started after you last left the app (main/corner-tag.mjs).
+    // what started after you last left the app (main/corner-tag.mts).
     const productName = (slug: string) => snap.products.find((p) => p.slug === slug)?.name ?? slug;
     window.zero?.cornerTag?.({
       ready: [
@@ -4349,7 +4349,7 @@ export default function App() {
     //
     // AFTER THE WINDOW IT REALLY IS UNREACHABLE, and no wording can soften
     // that: `steer` writes the message onto the session's stdin in the same tick
-    // (main/claude-input.mjs), where the CLI takes them at its next break.
+    // (main/claude-input.mts), where the CLI takes them at its next break.
     // What the promise waits on is the acknowledgement, not the handing over.
     // So the message says "press Z to undo" for exactly as long as that is
     // true and stops saying it the moment it stops being true.
@@ -4566,7 +4566,7 @@ export default function App() {
           // AND WHICH MODEL PICKS THE ROW UP. Absent unless she opened the
           // drawer; the store writes it onto the item BEFORE the answer, so the
           // run this reply starts reads the model she just chose rather than the
-          // one it was on (main/store.mjs, answerItem).
+          // one it was on (main/store.mts, answerItem).
           ...(pick ?? {}),
         });
       } catch (error) {
@@ -4816,7 +4816,7 @@ export default function App() {
   // withdraw. Holding the write for three seconds would have meant a task that
   // is in no view at all while she looks for it, and "did that actually send?"
   // is the one question this card must never make her ask. The withdraw stops
-  // the worker as well as closing the row: main/ipc.mjs kills the session on any
+  // the worker as well as closing the row: main/ipc.mts kills the session on any
   // archive, and her archive outranks whatever a straggler writes afterwards.
   const noteNewTask = useCallback((label: string, undoes: string, sent: ComposeDraft, withdraw: Undoable['run'], undid?: UndidSpec[]) => {
     pushUndo({
@@ -4835,7 +4835,7 @@ export default function App() {
   const retag = useCallback(async (targets: WorkItem[], value: number) => {
     if (!targets.length) return;
     const word = priorityLabelOf(priorityIdOf(value)).toLowerCase();
-    // A level picked clears a dragged place (main/ipc.mjs), so stop waiting for one.
+    // A level picked clears a dragged place (main/ipc.mts), so stop waiting for one.
     for (const i of targets) delete unsavedPlaces.current[i.id];
     await Promise.all(targets.map((i) => api.answer({ product: i.product, id: i.id, priority: value })));
     showToast(targets.length > 1 ? `${targets.length} set to ${word}` : `Priority: ${word}`);
@@ -5500,7 +5500,7 @@ export default function App() {
         return;
       }
       // cmd-Y / cmd-N (answer the oldest approval card) live in the MAIN
-      // process (before-input-event in main.mjs): menu accelerators and
+      // process (before-input-event in main.mts): menu accelerators and
       // renderer handlers both go quiet while an iframe holds focus, and these
       // two chords must outrank it (2026-08-06). cmd-1..4 USED
       // TO retag priority on whatever was selected. It is gone on her word,

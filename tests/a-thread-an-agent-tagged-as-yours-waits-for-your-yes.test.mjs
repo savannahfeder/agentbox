@@ -16,7 +16,7 @@
 import { describe, it, expect } from 'vitest';
 import { belongsInInbox, belongsInProgress, isProposal } from '../renderer/src/list-rules.ts';
 import { filedByThePerson } from '../shared/answers.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const NOW = Date.parse('2026-10-28T21:00:00Z');
 const at = NOW - 2 * 86_400_000;

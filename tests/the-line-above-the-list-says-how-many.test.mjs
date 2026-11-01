@@ -24,7 +24,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { sinceWords, strandedSentence, strandedRemedy, troubleRemedy } from '../shared/spawn-trouble.mjs';
 import { machineryPath } from '../main/store/home.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 import { setAppHome, clearAppHome } from './app-home.mjs';
 

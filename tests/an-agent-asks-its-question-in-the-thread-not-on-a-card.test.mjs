@@ -24,13 +24,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { answer, approvalPublicKey, listPending, spoolDir } from '../main/approvals.mjs';
-import { streamInputArgs } from '../main/claude-input.mjs';
+import { streamInputArgs } from '../main/claude-input.mts';
 import { harnessDefinition } from '../shared/harness-definitions.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const SERVER = path.join(here, '..', 'main', 'approval-prompt-server.mjs');
+const SERVER = path.join(here, '..', 'main', 'approval-prompt-server.mts');
 
 const launch = ({ mcp = '/tmp/mcp.json', rules = '/tmp/rules.json' } = {}) => {
   const plan = { args: ['-p', 'go'] };

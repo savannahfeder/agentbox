@@ -1,7 +1,7 @@
 // A THREAD WHOSE WORK NEVER REACHED MAIN, read off the app's own notes.
 //
-// The ship queue and the cloud run write these words (main/ship-queue.mjs
-// `failureNote`, main/cloud/run.mjs `park`), so the reader here cannot drift
+// The ship queue and the cloud run write these words (main/ship-queue.mts
+// `failureNote`, main/cloud/run.mts `park`), so the reader here cannot drift
 // from the writers. The agent's last message was written before either, and
 // usually says the work is shipping, so these notes are what has to be shown.
 

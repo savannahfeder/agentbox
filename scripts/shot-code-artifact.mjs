@@ -26,8 +26,8 @@ import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { foldWorkItems } from '../shared/work-items.mjs';
-import { resolveArtifact } from '../main/artifact-path.mjs';
-import { readDoc } from '../main/doc-file.mjs';
+import { resolveArtifact } from '../main/artifact-path.mts';
+import { readDoc } from '../main/doc-file.mts';
 import { referencedFiles } from '../shared/referenced-files.mjs';
 import { machineryPath } from '../main/store/home.mjs';
 import { guard, sweep } from './lib/chrome-guard.mjs';
@@ -72,7 +72,7 @@ const items = [...new Set([CODE_ITEM, MD_ITEM, HTML_ITEM])].map((id) => {
 
 // THE CHANGE, READ OFF DISK, AND IT IS A REAL FILE NOW. Round four had to
 // build this in the shot script because nothing wrote one. The supervisor now
-// writes it the moment a worker exits (main/supervisor.mjs), so this reads the
+// writes it the moment a worker exits (main/supervisor.mts), so this reads the
 // artifact the app itself produced for CODE_ITEM rather than making one up.
 const changeFile = machineryPath(dir, path.join('runs', CODE_ITEM, 'the-change-it-made.change'));
 if (!fs.existsSync(changeFile)) throw new Error(`${changeFile} does not exist: no run has saved a change for ${CODE_ITEM} yet`);

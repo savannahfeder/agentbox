@@ -10,7 +10,7 @@ import {
   clampSplit, splitFromPointer, readSplit, writeSplit,
   MIN_SPLIT, MAX_SPLIT, EVEN_SPLIT, OPENING_SPLIT, SPLIT_KEY,
 } from '../renderer/src/doc-pane.ts';
-import { canWrite, writeDoc, readDoc, isInside, MAX_DOC_BYTES } from '../main/doc-file.mjs';
+import { canWrite, writeDoc, readDoc, isInside, MAX_DOC_BYTES } from '../main/doc-file.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 describe('what the pane opens', () => {
@@ -34,7 +34,7 @@ describe('what the pane opens', () => {
   it('leaves everything else to the app that owns it', () => {
     // A pdf inside a sandboxed frame draws nothing at all in Chromium, and a
     // source file belongs in her editor.
-    for (const p of ['reports/audit.pdf', 'main/ipc.mjs', 'data.csv']) {
+    for (const p of ['reports/audit.pdf', 'main/ipc.mts', 'data.csv']) {
       expect(docKind(p), p).toBeNull();
       expect(opensInPane(p), p).toBe(false);
     }
@@ -235,7 +235,7 @@ describe('the pane and the app finder agree on where to look', () => {
     // THE SIXTH IS THE APP'S OWN HOME, where
     // `runs/<item>/the-change-it-made.change` now lives. It is last, so nothing
     // of hers is ever shadowed by one of ours.
-    const { artifactRoots } = await import('../main/artifact-path.mjs');
+    const { artifactRoots } = await import('../main/artifact-path.mts');
     const { machineryDir } = await import('../main/store/home.mjs');
     expect(artifactRoots(AGENTBOX)).toEqual([
       '/acct/agentbox',

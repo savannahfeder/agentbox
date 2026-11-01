@@ -326,7 +326,7 @@ describe('the three surfaces that offer it', () => {
   it('reaches main through the same bridge as the other two update doors', () => {
     expect(read('shared/bridge-map.mjs')).toContain("updateMove: 'zero:update-move'");
     expect(read('preload.cjs')).toContain("zero:update-move");
-    expect(read('main/ipc.mjs')).toContain("zero:update-move");
+    expect(read('main/ipc.mts')).toContain("zero:update-move");
   });
 
   // The screen imports this file's sentences (update-row, SidebarUpdate, api),

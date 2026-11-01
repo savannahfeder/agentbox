@@ -21,7 +21,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { recoveryToast } from '../shared/recovery.mjs';
 import { Name } from '../shared/product-name.mjs';
 

@@ -21,7 +21,7 @@
 //      it is drawn to a canvas and inlined as a data: uri, which every mail
 //      client on earth understands. This is why the picture scheme sends
 //      `access-control-allow-origin` and why <img> asks with `crossOrigin`
-//      (main/main.mjs): without both, the canvas throws SecurityError and there
+//      (main/main.mts): without both, the canvas throws SecurityError and there
 //      is nothing to inline.
 //   2. A PATH ON THIS MAC IS NOT A LINK ANYWHERE ELSE. A `file://` anchor is
 //      unwrapped to the words it was showing, so her email says

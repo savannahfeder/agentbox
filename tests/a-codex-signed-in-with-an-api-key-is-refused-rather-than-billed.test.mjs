@@ -20,8 +20,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { codexLoginMode, codexKeyRefusal } from '../main/codex-account.mjs';
-import { codexHarness } from '../main/harnesses/codex.mjs';
+import { codexLoginMode, codexKeyRefusal } from '../main/codex-account.mts';
+import { codexHarness } from '../main/harnesses/codex.mts';
 import { troubleCause, deadRunSentence, needsHerHands, engineTroubleNote } from '../shared/spawn-trouble.mjs';
 
 const homes = [];

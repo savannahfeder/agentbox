@@ -1,6 +1,6 @@
 // A CLOUD RUN THAT CANNOT BE LAID INTO ITS FOLDER NEVER BLOCKS ITS THREAD.
 //
-// What broke: main/cloud/run.mjs laid a run's commits in with
+// What broke: main/cloud/run.mts laid a run's commits in with
 // `merge --ff-only`, so an agent that amended or rebased a commit the branch
 // started on could never come home; an import cut off between its
 // `reset --hard` and its merge found the folder changed by its own hand and
@@ -28,9 +28,9 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun, IMPORT_FAILED } from '../main/cloud/run.mjs';
-import { readMarker, writeMarker, takeCloudNews, addCloudNews } from '../main/cloud/marker.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { cloudRun, IMPORT_FAILED } from '../main/cloud/run.mts';
+import { readMarker, writeMarker, takeCloudNews, addCloudNews } from '../main/cloud/marker.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');
@@ -266,7 +266,7 @@ describe('the supervisor', () => {
   });
 
   it('leaves the row waiting for her, with the note, and no longer marked to ship', async () => {
-    const { Store } = await import('../main/store.mjs');
+    const { Store } = await import('../main/store.mts');
     const root = path.join(tmp, 'store');
     fs.mkdirSync(path.join(root, 'team'), { recursive: true });
     fs.writeFileSync(path.join(root, 'team', 'project.json'), JSON.stringify({ schemaVersion: 1, id: 'team', name: 'Team', repoPath: mac }));

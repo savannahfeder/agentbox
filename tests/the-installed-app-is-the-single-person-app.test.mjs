@@ -9,7 +9,7 @@
 //      the team app. The founder's call: "users are no longer using the
 //      multiplayer version so this should never be visible."
 //   2. macOS asked for the login keychain password for "Agentbox Safe Storage".
-//      main.mjs called safeStorage.isEncryptionAvailable() at every launch, team
+//      main.mts called safeStorage.isEncryptionAvailable() at every launch, team
 //      or not, and on a Mac that touches the keychain. Only the team's saved
 //      sign-in uses it.
 //
@@ -72,10 +72,10 @@ describe('a checkout, run with npm run app', () => {
 });
 
 describe('the keychain', () => {
-  // Read off main.mjs because the call is Electron's and cannot run here: every
+  // Read off main.mts because the call is Electron's and cannot run here: every
   // use of safeStorage must sit inside the branch that has a team config.
   it('is only reached for when there is a team to keep a sign-in for', () => {
-    const main = fs.readFileSync(path.join(root, 'main', 'main.mjs'), 'utf8');
+    const main = fs.readFileSync(path.join(root, 'main', 'main.mts'), 'utf8');
     const uses = [...main.matchAll(/safeStorage\.\w+/g)].map((m) => m.index);
     expect(uses.length).toBeGreaterThan(0);
     const branch = main.indexOf('const team = cloudConfig ?');

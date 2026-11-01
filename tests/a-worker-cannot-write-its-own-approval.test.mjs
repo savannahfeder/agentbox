@@ -1,6 +1,6 @@
 // A WORKER CANNOT WRITE ITS OWN APPROVAL.
 //
-// main/approval-prompt-server.mjs:59 read `if (answer?.allow) return { behavior:
+// main/approval-prompt-server.mts:59 read `if (answer?.allow) return { behavior:
 // 'allow' }` off a file in a directory the adversary can write in. The spool is
 // `<storeRoot>/.approvals`, `writeWorkerSettings` puts the store root in
 // `additionalDirectories`, and `worker-permissions.json` allows Bash broadly --
@@ -70,7 +70,7 @@ import { answer, approvalPublicKey, answerIsHers, listPending, spoolDir } from '
 import { NAME } from '../shared/product-name.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const SERVER = path.join(here, '..', 'main', 'approval-prompt-server.mjs');
+const SERVER = path.join(here, '..', 'main', 'approval-prompt-server.mts');
 
 const roots = [];
 function spool() {

@@ -5128,7 +5128,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 }
 
 /* The gutter only bites under a 920 window: the nav is a fixed 236px and the
-   column 620, and the window goes down to 720 (main/main.mjs), where the pane
+   column 620, and the window goes down to 720 (main/main.mts), where the pane
    is 483 and the words would otherwise touch the nav. */
 .set-pane { flex: 1; min-width: 0; overflow-y: auto; background: var(--bg); position: relative; padding: 0 32px; }
 /* The screen is the ground here and nothing inside it paints a second one, or
@@ -6960,7 +6960,7 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
    `100vw - 260px`, so whatever it holds it always leaves at least 130px of
    clear strip on each side of it. This sits 16px in from the right edge and is
    one short word wide. The narrowest window the app will open is 980
-   (main/main.mjs), and 130 > 16 + a word at every width above that. NOT
+   (main/main.mts), and 130 > 16 + a word at every width above that. NOT
    DRAGGABLE, AND THAT WAS NEVER ENOUGH ON ITS OWN. `-webkit-app-region:
    no-drag` here does say "a press of this is a press", and in Electron it was
    overruled anyway: the band's own drag rectangle was reported to the window
@@ -7008,7 +7008,7 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
    ways, option 1 was chosen, and then it was reduced to the mark alone the same
    evening: a small icon with no esc text. AND THE WHOLE ROW SITS UNDER THE
    WINDOW BUTTONS, NOT BESIDE THEM. The reason is worth writing down. The window is `titleBarStyle: 'hiddenInset'`
-   (main/main.mjs), so the red, amber and green buttons own the very corner, and
+   (main/main.mts), so the red, amber and green buttons own the very corner, and
    `.fr-brand`'s 64px looks like it is there to clear them. It is not: at top 44
    this row is already well BELOW them, so there was never anything to the left
    of it to avoid, and the arrow inherited a gutter that had no reason behind

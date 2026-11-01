@@ -1,6 +1,6 @@
 // THE IN-MEMORY ROOMS AND THE REAL ONES KEEP THE SAME RULES (w-3d0fa23ffb, 2026-10-20).
 //
-// The rooms service is tested against main/team/rooms-memory.mjs, which is
+// The rooms service is tested against main/team/rooms-memory.mts, which is
 // only worth anything while it keeps the rules of
 // 20261021000000_rooms.sql. tests/rooms-cloud-shows-each-room-only-to-its-people
 // proves those rules in the database itself; this runs one scenario, through
@@ -13,9 +13,9 @@
 //     npx vitest run tests/rooms-backends-agree.test.mjs
 import { it, expect, describe, beforeAll, afterAll } from 'vitest';
 import crypto from 'node:crypto';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { supabaseBackend } from '../main/team/supabase-backend.mjs';
-import { GENERAL_ROOM } from '../main/team/rooms-memory.mjs';
+import { GENERAL_ROOM } from '../main/team/rooms-memory.mts';
 import { FILE_EXISTS } from '../main/team/rooms-shape.mjs';
 
 const NAMES = ['Maya', 'Theo', 'Jun', 'Ana'];

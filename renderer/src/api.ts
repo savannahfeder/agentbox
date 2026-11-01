@@ -267,7 +267,7 @@ function fixtureWrite(scope: 'project' | 'workspace', p: any): Settings {
     } else if (p.key === 'memoryGateSlots' && w.memoryGate) {
       w.memoryGate = { ...w.memoryGate, slots: p.value === null ? null : Math.max(1, Math.min(w.memoryGate.slotsMax, Number(p.value) || 1)) };
     } else if (p.key === 'activeAccount') {
-      // The account picked is the one marked chosen, as main/settings.mjs
+      // The account picked is the one marked chosen, as main/settings.mts
       // answers it, so the In use row can be seen in a preview.
       const list = p.value?.engine === 'codex' ? w.codex?.accounts ?? [] : w.accounts;
       for (const a of list) a.chosen = a.profile === p.value?.profile;
@@ -349,7 +349,7 @@ export const api = {
 
   // IS A SCREEN READER RUNNING. Asked by the terminal pane before it builds an
   // xterm, so the accessibility tree is built for the people it is for rather
-  // than for everybody (main/ipc.mjs 'zero:assistiveTech').
+  // than for everybody (main/ipc.mts 'zero:assistiveTech').
   //
   // Every failure is "no": fixtures, a preload from before this channel
   // existed, or a refused call. A terminal that cannot ask the question still
@@ -424,7 +424,7 @@ export const api = {
       // be looked at.
       if (params.has('stale')) {
         base.restartNeeded = {
-          files: ['main/supervisor.mjs', 'main/ipc.mjs', 'preload.cjs', 'shared/rank.mjs'],
+          files: ['main/supervisor.mts', 'main/ipc.mts', 'preload.cjs', 'shared/rank.mjs'],
           since: Date.now() - 2.9 * 24 * 3_600_000,
         };
       }
@@ -672,7 +672,7 @@ export const api = {
   // sentence rather than a blank page.
   // `url` comes back for an html page only: it is the astral-doc:// address
   // the pane points its frame at, so the page's own pictures load (main/
-  // doc-scheme.mjs). An older preload has no such field, and the pane says so
+  // doc-scheme.mts). An older preload has no such field, and the pane says so
   // rather than drawing a page with holes in it.
   async resolveDoc(p: { product: string; src: string }): Promise<{ ok: boolean; opened?: string; url?: string; error?: string }> {
     if (useFixtures && ['artifact-layout-sample.change', 'review-bundle.change'].includes(p.src)) return { ok: true, opened: p.src };
@@ -812,7 +812,7 @@ export const api = {
   // choice. `engine` is set by ⌘K (w-c9da359466) and by the reply box's menu,
   // which lists both agents' models (w-e1a42f6b21).
   // `now` cuts the running agent's current step so this message is answered at
-  // once instead of after it (main/claude-input.mjs `interrupt`).
+  // once instead of after it (main/claude-input.mts `interrupt`).
   // `inReplyTo` is the uid of the message a reply in a thread answers
   // (w-920461cbe6); main keeps it only in a conversation between people.
   async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean }): Promise<WorkItem | null> {
@@ -826,7 +826,7 @@ export const api = {
   },
 
   /* --------------------------------- feedback ------------------------------- */
-  // Answers { ok } or { ok: false, error } in words (main/feedback.mjs).
+  // Answers { ok } or { ok: false, error } in words (main/feedback.mts).
   async sendFeedback(p: { text: string; files: { name: string; type: string; size: number; data: string }[] }): Promise<{ ok: boolean; error?: string }> {
     if (useFixtures) return { ok: true };
     if (!window.zero?.sendFeedback) return { ok: false, error: `Restart ${Name} to send feedback.` };
@@ -860,11 +860,11 @@ export const api = {
   async teamEdit(p: { product: string; id: string; on: string; text?: string; gone?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamEdit(p)); },
   // A MESSAGE TO A PERSON (people get messages, never tasks), at the level the
   // sender picked. The level counts on the first message of a conversation and
-  // is ignored after, which is the main process's rule (main/team/index.mjs).
+  // is ignored after, which is the main process's rule (main/team/index.mts).
   // And the files the card carries, saved into the conversation once the main
   // process knows which one it is.
   async teamMessage(to: string | string[], body: string, priority?: number, files?: TeamMessageFile[]): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessage({ to, body, priority, files })); },
-  // Rooms (alpha): every call goes through one door (main/ipc.mjs ROOM_OPS).
+  // Rooms (alpha): every call goes through one door (main/ipc.mts ROOM_OPS).
   async teammates<T = unknown>(op: string, args: Record<string, unknown> = {}): Promise<TeammatesResult<T>> {
     if (!window.zero?.teammates) return { ok: false, error: 'Teammates are not available here.' };
     try { return (await window.zero.teammates({ op, args })) as TeammatesResult<T>; } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
@@ -1018,7 +1018,7 @@ export const api = {
 
   // BEING A BRAND NEW USER ON THE APP SHE DOWNLOADED.A second Agentbox opens in
   // a throwaway home beside hers; nothing of hers is deleted and her own
-  // window keeps running (main/fresh-user.mjs).
+  // window keeps running (main/fresh-user.mts).
   //
   // IT SAYS WHY IT COULD NOT RATHER THAN FALLING BACK QUIETLY. A missing
   // channel here means a main process older than this build, which is exactly
@@ -1501,7 +1501,7 @@ export const api = {
   },
 
   // `ofMany` says this one is part of a press that connects several folders and
-  // will count itself once (main/ipc.mjs); it changes nothing about the project.
+  // will count itself once (main/ipc.mts); it changes nothing about the project.
   async createProduct(p: { name: string; repoPath?: string | null; ofMany?: boolean }) {
     if (useFixtures) return null;
     return window.zero!.createProduct(p);
@@ -1700,7 +1700,7 @@ export const api = {
     return window.zero!.onChanged(fn);
   },
 
-  /** The phone door (main/phone-link.mjs). Null where there is none: the
+  /** The phone door (main/phone-link.mts). Null where there is none: the
    *  fixtures, and a browser tab, whose server has no such channel. */
   async phoneLink(p: { action: 'status' | 'on' | 'off' | 'reset' | 'via' | 'stop-alerts'; via?: PhoneRoute; device?: string }): Promise<PhoneLink | null> {
     if (useFixtures) return null;

@@ -19,7 +19,7 @@ import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const SUPERVISOR = fileURLToPath(new URL('../main/supervisor.mjs', import.meta.url));
+const SUPERVISOR = fileURLToPath(new URL('../main/supervisor.mts', import.meta.url));
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };

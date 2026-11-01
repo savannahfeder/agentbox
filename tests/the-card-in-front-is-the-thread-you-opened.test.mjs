@@ -75,8 +75,8 @@ describe('the approval card in front', () => {
 });
 
 describe('the screen, the chord and the Agents menu', () => {
-  const ipc = read('main', 'ipc.mjs');
-  const main = read('main', 'main.mjs');
+  const ipc = read('main', 'ipc.mts');
+  const main = read('main', 'main.mts');
 
   it('all read the one order, so ⌘Y answers the card being read', () => {
     // The snapshot the card is drawn from.

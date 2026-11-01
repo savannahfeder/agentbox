@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { Readable } from 'node:stream';
-import { createPhoneLink, fromThisNetwork } from '../main/phone-link.mjs';
+import { createPhoneLink, fromThisNetwork } from '../main/phone-link.mts';
 
 const open = [];
 afterEach(() => { while (open.length) open.pop().close(); });

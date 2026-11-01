@@ -6,8 +6,8 @@
 // about the person or the machine, so a second copy of this rule written
 // somewhere else is how it quietly becomes a fingerprint.
 //
-// Two callers, one file: `main/crash-report.mjs` (which needs it while the
-// process is dying) and `main/analytics.mjs`. Both read the same id, which is
+// Two callers, one file: `main/crash-report.mts` (which needs it while the
+// process is dying) and `main/analytics.mts`. Both read the same id, which is
 // what makes a crash and the counts around it one story.
 
 // ONE EXCEPTION, AND IT IS HER OWN TESTING. A copy launched into a throwaway

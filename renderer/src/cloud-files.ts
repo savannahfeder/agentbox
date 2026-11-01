@@ -1,7 +1,7 @@
 // PICTURES, FILMS, SOUNDS AND PAGES ON THE PHONE WITH THE MAC SHUT.
 //
 // Her Mac lists, in each thread's copy, the files the thread names and their
-// names in her private bucket (main/phone-uploads.mjs), keyed by where each is
+// names in her private bucket (main/phone-uploads.mts), keyed by where each is
 // on the Mac: relative to the project's documents folder, or `@repo/` and
 // relative to its code. The screens find a file the way they do on the Mac,
 // from a folder and a path, so each project here gets a stand-in folder of its
@@ -83,7 +83,7 @@ export function findFolder(place: Place, src: string): { folder: string; keys: s
 
 /**
  * What a path a message gives stands for, looked for where the Mac looks
- * (main/artifact-path.mjs resolveArtifact): in full, then under the project's
+ * (main/artifact-path.mts resolveArtifact): in full, then under the project's
  * folders, then by its name alone, the newest first.
  */
 export function findFile(places: Map<string, Place>, product: string, src: string): { key: string; entry: FileEntry; file: string; place: Place } | null {
@@ -124,7 +124,7 @@ export function pathOfUrl(url: string): { file: string; kind: 'doc' | 'img' } | 
 }
 
 // WHAT A PAGE DRAWS FROM BESIDE IT, the same reading as the Mac's
-// (main/phone-uploads.mjs partsOf), so each is pointed at its own link.
+// (main/phone-uploads.mts partsOf), so each is pointed at its own link.
 const REFS = /(\b(?:src|href|poster|data-src)\s*=\s*["'])([^"'#?]+)([^"']*["'])|(\bsrcset\s*=\s*["'])([^"']+)(["'])|(url\(\s*["']?)([^"')#?]+)([^"')]*["']?\s*\))/gi;
 const OUTSIDE = /^(?:[a-z][a-z0-9+.-]*:|\/\/|\/|#)/i;
 

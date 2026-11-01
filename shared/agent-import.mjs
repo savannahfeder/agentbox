@@ -11,8 +11,8 @@
 // only announced an agent would be the same empty promise in a louder place,
 // so the row asks for the agent's first job and the reply is what runs it.
 //
-// Pure on purpose: the files are read in main/agent-files.mjs and the rows are
-// written in main/store.mjs. Everything here is words, so the words are tested
+// Pure on purpose: the files are read in main/agent-files.mts and the rows are
+// written in main/store.mts. Everything here is words, so the words are tested
 // rather than eyeballed on a card nobody can screenshot twice.
 
 /**
@@ -181,7 +181,7 @@ export function howTheChatEnded(said) {
  * WHEN SHE HAD IT, in the words a person uses about this week.
  *
  *  Inside a week a day name is the plain word. The window is ten days
- *  (`RECENT_DAYS`, main/agent-sessions.mjs), and past a week a day name would
+ *  (`RECENT_DAYS`, main/agent-sessions.mts), and past a week a day name would
  *  point at the wrong Monday, so those say the date. Anything the arithmetic
  *  cannot place, or anything far outside the window, says nothing rather than
  *  guessing. */

@@ -549,7 +549,7 @@ export function projectsOfTheirOwn(products: Array<{ personal?: boolean }>): num
 // an agent made on its own — which is the shape the very next beat teaches
 // them to close.
 //
-// main/first-run.mjs and shared/first-run-shape.mjs are UNCHANGED and still
+// main/first-run.mts and shared/first-run-shape.mjs are UNCHANGED and still
 // read a folder: that path is what answers a task in a real project, and the
 // walk simply no longer sends one there.
 export const TASK_TITLE = PRACTICE_TASK.title;
@@ -570,7 +570,7 @@ export const SLOW_AFTER_MS = 15_000;
 //
 // So the row, the reading pane, the ledger and the result are all real, and the
 // answer is read out of the folder chosen two screens earlier: see
-// main/first-run.mjs. Nothing about it can queue, stall or need the network.
+// main/first-run.mts. Nothing about it can queue, stall or need the network.
 
 /**
  * The mark on the walk's own row. The supervisor never spawns fresh work on a
@@ -969,7 +969,7 @@ export const COPY = {
   // AND IT NO LONGER ASSUMES A CODE FOLDER (2026-10-01). An assistant has no
   // project folder and the screen had no way past it. `folderNone` is that way
   // past: the project is made with no folder, and its agents work in a folder
-  // the app keeps for it (`productFolder` in main/supervisor.mjs falls back to
+  // the app keeps for it (`productFolder` in main/supervisor.mts falls back to
   // the project's own directory in the store).
   folderHead: 'Pick a folder for your first project.',
   folderLede: 'Agents can read and change the files in it. Any folder of documents works.',
@@ -1230,7 +1230,7 @@ export const COPY = {
   // itself. What is new is that Agentbox knows they are there and remembers
   // which ones this project is for.
   //
-  // Every name on that list was read off her own Mac by main/agent-files.mjs
+  // Every name on that list was read off her own Mac by main/agent-files.mts
   // and nothing on the card said so, so the only honest reading of four
   // unfamiliar names on a setup screen is that they are samples. The line names
   // where they came from, and the folder each side was read out of is printed
@@ -3165,7 +3165,7 @@ export function forcedStep(param: string | null): Step | null {
 // ---------------------------------------------------------------------------
 // THE LAST SCREEN: THE USER'S CLAUDE CODE AGENTS.
 //
-// The files are read in the main process (main/agent-files.mjs); everything
+// The files are read in the main process (main/agent-files.mts); everything
 // here is the part with no window in it, so the screen's shape is tested
 // rather than eyeballed.
 //

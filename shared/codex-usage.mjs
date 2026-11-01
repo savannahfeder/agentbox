@@ -3,16 +3,16 @@
 // The pure half, and the mirror of shared/claude-usage.mjs: the payload in, the
 // limits out. Everything after that -- the countdown, the rows, the sentence --
 // is shared/usage.mjs, because a limit is a limit whichever agent reported it.
-// Asking for the payload is main/codex-usage.mjs.
+// Asking for the payload is main/codex-usage.mts.
 //
 // NOTHING IS SPAWNED TO DRAW THIS AND NOTHING IS ASKED FOR IT, which is the
 // whole reason this reader looks nothing like the other one. `claude -p /usage`
 // costs a child process and twenty-five seconds, which is what shaped every line
-// of main/claude-usage.mjs. Codex's figures ride the app-server the fleet is
+// of main/claude-usage.mts. Codex's figures ride the app-server the fleet is
 // ALREADY running and arrive unprompted as `account/rateLimits/updated` during a
 // turn. That push is the only source: the explicit read that once sat beside it
 // turned out to be a request to OpenAI's backend rather than a local lookup, and
-// main/codex-usage.mjs holds the measurement and the reason it is deliberately
+// main/codex-usage.mts holds the measurement and the reason it is deliberately
 // gone. So there is no 25-second cost here to design around, and there is no
 // reading at all until a turn reports one -- which is honest, and is better than
 // paying for a picture.
@@ -74,7 +74,7 @@
 //
 // TWO SPELLINGS REACH HERE, and both are real. The app-server's push is
 // camelCase (`usedPercent`, `windowDurationMins`, `resetsAt`); the session log on
-// disk, which main/codex-usage-file.mjs reads when no push has arrived, is
+// disk, which main/codex-usage-file.mts reads when no push has arrived, is
 // snake_case (`used_percent`, `window_minutes`, `resets_at`). They are the same
 // numbers from the same service and neither is converted upstream, so both are
 // accepted right here rather than in two places that could drift apart.
@@ -209,7 +209,7 @@ function drawnPercent(percent) {
  *   reached             which window the provider refused, for any surface
  *                       drawing the reading whole rather than line by line.
  *
- * NULLS RATHER THAN GUESSES, for the reason main/codex-usage.mjs gives about
+ * NULLS RATHER THAN GUESSES, for the reason main/codex-usage.mts gives about
  * percentages: a plan nobody has reported is not a plan of none, and a reading
  * that invents one is worse than a panel that stays quiet.
  */
@@ -241,7 +241,7 @@ export function codexPlan(snapshot) {
  *
  * AND FOLDING IS THE WHOLE OF IT, because the push is the whole of the input.
  * `previous` is null exactly once, on the first update ever seen: there is no
- * read response to start from, deliberately (main/codex-usage.mjs). The schema's
+ * read response to start from, deliberately (main/codex-usage.mts). The schema's
  * other instruction -- "or refetch that snapshot" -- is the branch this app does
  * not take, and the reason is written down there rather than repeated here.
  *

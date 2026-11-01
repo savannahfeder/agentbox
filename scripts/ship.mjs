@@ -35,11 +35,11 @@ import { deployAfterShip } from './lib/web-app-deploy.mjs';
 // package root, so a person or agent in a worktree ships that worktree as
 // before; Agentbox runs the copy in the app folder (which only ever
 // fast-forwards to the remote) against a task's folder, so a branch cannot
-// change the code that ships it (main/ship-queue.mjs).
+// change the code that ships it (main/ship-queue.mts).
 const root = (() => { try { return execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: process.cwd(), encoding: 'utf8' }).trim(); } catch { return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'); } })();
 const PUBLIC = 'origin';
 const ATTEMPTS = 3;
-// The ship queue stops a ship at 20 minutes (main/ship-queue.mjs); the web app's deploy ends before that.
+// The ship queue stops a ship at 20 minutes (main/ship-queue.mts); the web app's deploy ends before that.
 const began = Date.now();
 const SHIP_ENDS_BY = began + 18 * 60_000;
 

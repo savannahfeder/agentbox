@@ -1,6 +1,6 @@
 // THE TWO THINGS A CLOUD RUN NEEDS FROM AWS, AND NOTHING ELSE.
 //
-// main/cloud/run.mjs is written against two small interfaces so a test can
+// main/cloud/run.mts is written against two small interfaces so a test can
 // run it against the real sandbox server on this machine (see
 // tests/a-cloud-run-brings-the-agents-work-home.test.mjs). These are the real
 // ones: the AgentCore session (invoke, stop) and the S3 bucket (put, get, and

@@ -192,7 +192,7 @@ describe('one glass, whatever the Mac is set to', () => {
   });
 
   it('draws no outer shadow, because the window is exactly the tag', () => {
-    // main/corner-tag.mjs: padding the window for a drawn shadow let a real
+    // main/corner-tag.mts: padding the window for a drawn shadow let a real
     // first click fall through to the app beneath. So the glass is defined by
     // its edge, and every shadow in this page is an inset one.
     for (const line of css.split('\n')) {

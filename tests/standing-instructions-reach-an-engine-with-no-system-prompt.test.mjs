@@ -26,9 +26,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { instructionsTarget, writeInstructions, carriesInstructions, INSTRUCTIONS_BEGIN, INSTRUCTIONS_END } from '../main/harnesses/instructions-file.mjs';
+import { instructionsTarget, writeInstructions, carriesInstructions, INSTRUCTIONS_BEGIN, INSTRUCTIONS_END } from '../main/harnesses/instructions-file.mts';
 import { harnessDefinition } from '../shared/harness-definitions.mjs';
-import { harnessFor, createHarnessRegistry } from '../main/harnesses.mjs';
+import { harnessFor, createHarnessRegistry } from '../main/harnesses.mts';
 
 const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'instructions-'));
 const SYSTEM = 'Keep responses focused and brief.\n\nNo jargon unless I use it first.';

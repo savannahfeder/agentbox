@@ -21,7 +21,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 // A row an agent was on and released, which is how every practice row is
-// written (main/store.mjs stagePracticeBackdrop): claimed, released, no result.
+// written (main/store.mts stagePracticeBackdrop): claimed, released, no result.
 const ran = { id: 'w-bd1', status: 'open', createdAt: 1_000, wrote: { body: { ts: 1_000, source: 'founder' } }, runs: 1 };
 // The fleet, read and holding nothing, under the In progress column: the state
 // that produced the sentence.

@@ -39,7 +39,7 @@
 // ERR_UPDATER_ZIP_FILE_NOT_FOUND. `scripts/publish-download.mjs` is what puts
 // all three files on the release together.
 //
-// AND THE ONE THING THAT IS NOT TRUE ANY MORE. `main/analytics.mjs` opens by
+// AND THE ONE THING THAT IS NOT TRUE ANY MORE. `main/analytics.mts` opens by
 // calling itself the only place anything leaves this machine. Since this file
 // exists that is no longer so: an update check is a request to github.com. It
 // carries no identity, no key and no account, and it is not routed through
@@ -150,7 +150,7 @@ export function createUpdater({ app, log = console, onChanged = () => {}, autoUp
 }) {
   // READ ONCE, at construction (main/where-it-runs-from.mjs says why the
   // bundle cannot move under a running process). A build with no place passed
-  // in — the tests, and `main/serve.mjs` — simply never offers the move.
+  // in — the tests, and `main/serve.mts` — simply never offers the move.
   const where = place?.state?.() ?? { place: null, canUpdate: true, offerMove: false };
   let state: UpdaterState = {
     phase: 'idle',
@@ -251,7 +251,7 @@ export function createUpdater({ app, log = console, onChanged = () => {}, autoUp
       // `downloadUpdate` dispatches the `error` event and then RE-THROWS. The
       // await above resolves on the RESULT, not on the download, so a failed
       // download had nowhere to land but `unhandledRejection` — and
-      // `main/crash-report.mjs` files one of those as a crash.
+      // `main/crash-report.mts` files one of those as a crash.
       //
       // That is 7 of the 14 crash reports of launch week (PostHog, 2026-10-08)
       // and not one of them was a crash: five are Squirrel's read-only volume

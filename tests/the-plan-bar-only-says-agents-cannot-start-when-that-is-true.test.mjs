@@ -16,9 +16,9 @@
 //   turned that into `signedIn: false` -- a definite no built out of no
 //   answer. The same was true of a search that came back unsure. This file
 //   holds the rule the rest of the app already keeps: "Only a real yes or no;
-//   a check that never answered says nothing" (main/engine-setup.mjs), and
+//   a check that never answered says nothing" (main/engine-setup.mts), and
 //   "an unsure search never takes Claude Code away from anybody"
-//   (main/settings.mjs). So a reading now carries `certain`, and only a
+//   (main/settings.mts). So a reading now carries `certain`, and only a
 //   certain no raises the bar.
 //
 //   AND A RUNNING AGENT IS PROOF THE SENTENCE IS FALSE. Whatever any probe
@@ -36,7 +36,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { needsPlan, sureNoPlan } from '../renderer/src/plan-setup.ts';
-import { createEngineSetup } from '../main/engine-setup.mjs';
+import { createEngineSetup } from '../main/engine-setup.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -133,7 +133,7 @@ describe('what the inbox does with it', () => {
 
   // The search is the app's own, so what it is sure of has to survive the trip.
   it('carries what the search was sure of into the setup', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     expect(ipc).toMatch(/certain: s\.claudeCertain/);
     expect(ipc).toMatch(/certain: s\.certain/);
   });

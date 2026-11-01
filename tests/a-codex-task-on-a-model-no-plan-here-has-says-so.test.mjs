@@ -21,8 +21,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { codexPlanEnded } from '../main/codex-account.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { codexPlanEnded } from '../main/codex-account.mts';
 import { troubleCause, deadRunSentence, deadRunCause, runStoppedLine, causeBreakdown } from '../shared/spawn-trouble.mjs';
 
 // Copied off the run's trace log.

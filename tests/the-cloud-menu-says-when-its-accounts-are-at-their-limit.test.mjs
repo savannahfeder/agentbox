@@ -3,7 +3,7 @@
 // What happened (2026-10-16, 8:13pm): she wrote "our cloud must be broken
 // given only a few of my agents are running". Nothing was broken: both cloud
 // accounts had hit their session limit at 7:01pm and were benched until
-// 10:10pm (main/cloud/logins.mjs 'limited'), so every thread ran on the one
+// 10:10pm (main/cloud/logins.mts 'limited'), so every thread ran on the one
 // free login on this Mac, five at a time, and fourteen waited. The menu said
 // only "Nothing running in the cloud now".
 //
@@ -52,7 +52,7 @@ describe('the last line of the cloud menu', () => {
 
   it('is what the menu draws, and the app hands the screen each account\'s limit', () => {
     expect(fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8')).toMatch(/<span>\{cloudFootLine\(cloud\)\}<\/span>/);
-    expect(fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8')).toMatch(/limitedUntil: r\.limitedUntil \?\? null/);
-    expect(fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8')).toMatch(/inUse: r\.key === inUse/);
+    expect(fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8')).toMatch(/limitedUntil: r\.limitedUntil \?\? null/);
+    expect(fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8')).toMatch(/inUse: r\.key === inUse/);
   });
 });

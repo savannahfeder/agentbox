@@ -17,7 +17,7 @@
 // one way this feature can lose somebody's work.
 //
 // WHAT THE BACKEND GIVES US is node-pty's `pty.process`, the name of the
-// foreground process group's leader, read off the tty (main/task-terminals.mjs
+// foreground process group's leader, read off the tty (main/task-terminals.mts
 // line 50). At an idle prompt that is the shell itself, which macOS reports
 // with a leading dash for a login shell because the app spawns `$SHELL -l`.
 // While `npm test` runs it is `npm`, while `vim` is up it is `vim`.

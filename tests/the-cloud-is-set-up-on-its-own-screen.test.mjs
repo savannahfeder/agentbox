@@ -79,7 +79,7 @@ describe('Claude\'s code from the clipboard', () => {
   });
 
   it('is read only while a Claude sign-in is waiting for it', () => {
-    const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+    const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
     const handler = ipc.slice(ipc.indexOf("'zero:cloud-clipboard-code'"), ipc.indexOf("'zero:settings-set-workspace'"));
     expect(handler).toMatch(/s\.engine === 'claude' && s\.state === 'needs-code'/);
     expect(handler.indexOf('waiting')).toBeLessThan(handler.indexOf('readClipboardText'));

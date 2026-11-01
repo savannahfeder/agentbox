@@ -20,8 +20,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { listFolders, absolute } from '../main/folders.mjs';
-import { bootHeadless, createServer, newToken, nodeHost } from '../main/serve.mjs';
+import { listFolders, absolute } from '../main/folders.mts';
+import { bootHeadless, createServer, newToken, nodeHost } from '../main/serve.mts';
 import { checkProjectFolder } from '../shared/project-folder-check.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -150,7 +150,7 @@ describe('the folder channel, over http, with no Electron', () => {
   it('never serves the contents of a file', async () => {
     // This reads directory NAMES so somebody can point at one. Anything that
     // hands back what is inside a file is a different and much larger promise.
-    const source = fs.readFileSync(path.join(repoRoot, 'main', 'folders.mjs'), 'utf8');
+    const source = fs.readFileSync(path.join(repoRoot, 'main', 'folders.mts'), 'utf8');
     expect(source).not.toMatch(/readFileSync|createReadStream/);
   });
 });

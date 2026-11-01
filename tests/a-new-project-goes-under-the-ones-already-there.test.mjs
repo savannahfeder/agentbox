@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { rankProducts } from '../renderer/src/project-priority.ts';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 
 const day = (n) => Date.parse(`2026-10-${String(n).padStart(2, '0')}T00:00:00Z`);
 const p = (slug, createdAt) => ({ slug, name: slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()), createdAt });

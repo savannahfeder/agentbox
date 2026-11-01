@@ -18,8 +18,8 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { bootHeadless } from '../main/serve.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { bootHeadless } from '../main/serve.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { deadRunSentence, deadRunCause } from '../shared/spawn-trouble.mjs';
 import { readDeadRunTrace } from '../shared/dead-run-trace.mjs';
 import { Name } from '../shared/product-name.mjs';

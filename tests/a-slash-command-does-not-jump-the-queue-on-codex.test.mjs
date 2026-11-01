@@ -1,6 +1,6 @@
 // THE CAP IS SKIPPED FOR A COMMAND THAT WILL NEVER RUN AS A COMMAND.
 //
-// Two lines in main/supervisor.mjs ask whether her reply is one of Claude
+// Two lines in main/supervisor.mts ask whether her reply is one of Claude
 // Code's own eight commands, and until now only one of them asked which engine
 // the row runs on.
 //
@@ -39,7 +39,7 @@
 // else. The last block asserts the gate on an untouched supervisor.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { DEFAULT_ENGINE } from '../shared/engines.mjs';
 import { commandPrompt } from '../shared/claude-commands.mjs';
 

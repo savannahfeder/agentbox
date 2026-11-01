@@ -6,7 +6,7 @@
 // place that says so, because two files saying it is how one of them goes
 // quietly wrong.
 //
-// Why it matters, in main.mjs's own words at the single-instance lock: "Two
+// Why it matters, in main.mts's own words at the single-instance lock: "Two
 // instances mean two supervisors, and two supervisors spawn twin workers for
 // every answered item (observed 2026-08-04: nine items double-spawned one
 // second apart, four agents told the founder the same thing)." That lock lives

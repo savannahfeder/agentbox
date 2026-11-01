@@ -317,7 +317,7 @@ export function shown(file) {
  * READ_AT "2026-10-07" -> "2026-10-08". A line saying "the committed table is
  * behind" on every one of those builds would be a warning that is almost always
  * noise, and this app has already learnt once what that trains (the staleness
- * banner, main/staleness.mjs). So the new table is rendered with the OLD stamps
+ * banner, main/staleness.mts). So the new table is rendered with the OLD stamps
  * and compared byte for byte: equal means nothing but the clock moved.
  */
 export function onlyTheStampsMoved(had, table, render = moduleText) {

@@ -341,7 +341,7 @@ Rooms paragraph in this work.
 2. Agent hours: `runs.jsonl`, backfill, `shared/agent-hours.mjs`, level.
 3. Cloud migration and both backends (Supabase and the in-memory stand-in),
    RLS proven in PGlite.
-4. Room service in main (`main/team/rooms.mjs`): my rooms, members, cards,
+4. Room service in main (`main/team/rooms.mts`): my rooms, members, cards,
    messages, links, invites, publish my card, IPC, snapshot `rooms` field.
 5. Sidebar section, tabs, the wall, the chat panel (read and send), invite.
 6. Hover card, profile, ranks, Rooms settings, invisible.

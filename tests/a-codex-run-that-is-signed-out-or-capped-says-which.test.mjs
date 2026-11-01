@@ -73,7 +73,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { troubleCause } from '../shared/spawn-trouble.mjs';
 import { createCodexAppServer } from '../main/codex-app-server.mjs';
-import { createCodexWorker } from '../main/codex-session.mjs';
+import { createCodexWorker } from '../main/codex-session.mts';
 
 /* ===================== (1) the signed-out run, verbatim =================== */
 

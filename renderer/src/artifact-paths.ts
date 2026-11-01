@@ -16,7 +16,7 @@
 // roots or the main process.
 //
 // The extension list is narrower than the attachment row's on purpose. The row
-// is a manifest and may as well carry `supervisor.mjs`; a link is a promise
+// is a manifest and may as well carry `supervisor.mts`; a link is a promise
 // that clicking gets her somewhere, so it covers only what opens into something
 // she can read, hear or watch.
 //

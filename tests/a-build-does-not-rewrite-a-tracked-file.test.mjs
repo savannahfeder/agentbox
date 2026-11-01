@@ -23,7 +23,7 @@
 //
 // WHY NOT FILTER THE NAME EVERYWHERE instead: reviewed and rejected on
 // w-6bbb709b1f. A filename pattern cannot tell a regenerated timestamp from a
-// real change to the commands, aliases or model ids, and main/task-folders.mjs
+// real change to the commands, aliases or model ids, and main/task-folders.mts
 // runs against arbitrary product repositories where this app's naming
 // convention means nothing.
 //

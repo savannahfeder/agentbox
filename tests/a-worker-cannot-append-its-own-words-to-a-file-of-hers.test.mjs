@@ -2,7 +2,7 @@
 // (2026-09-04).
 //
 // Both engines end a decision the same way: `fs.appendFileSync(path.join(dir,
-// 'log.jsonl'), ...)` -- main/approval-prompt-server.mjs's `finish` for a
+// 'log.jsonl'), ...)` -- main/approval-prompt-server.mts's `finish` for a
 // Claude Code worker, main/codex-approvals.mjs's `finish` for a Codex one. The
 // name is FIXED, so unlike the answer file it needs no guessing at all, and the
 // bytes appended include the worker's own `command` string. Measured on this
@@ -138,7 +138,7 @@ describe('a Codex decision, with log.jsonl symlinked at a file of hers', () => {
 function decideOnce(root, allow) {
   const dir = spoolDir(root);
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [path.join(here, '..', 'main', 'approval-prompt-server.mjs')], {
+    const child = spawn(process.execPath, [path.join(here, '..', 'main', 'approval-prompt-server.mts')], {
       // The public key rides here exactly as `mcpServers` sends it: without one
       // the server refuses everything rather than believing a file it cannot
       // check (tests/a-worker-cannot-write-its-own-approval), and this test is

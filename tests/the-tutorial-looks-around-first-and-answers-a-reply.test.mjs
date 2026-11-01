@@ -33,7 +33,7 @@ import {
 } from '../renderer/src/onboarding.ts';
 import { PRACTICE_ANSWER, PRACTICE_REPLY, PRACTICE_REPLY_ANSWER, PRACTICE_SLUG } from '../shared/first-run-practice.mjs';
 import { answerSettled } from '../shared/answers.mjs';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');

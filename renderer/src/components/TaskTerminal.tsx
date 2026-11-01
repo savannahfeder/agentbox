@@ -141,7 +141,7 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
         await consume(initial);ready=true;resize();if(takeKeys)terminal.focus();
         // EACH READ WAITS IN MAIN for the shell's next output and comes back the
         // moment there is some, so an echo is on screen as soon as the shell
-        // prints it (main/task-terminals.mjs, `read`). A main that cannot wait
+        // prints it (main/task-terminals.mts, `read`). A main that cannot wait
         // answers without `live`, and the old 150ms poll carries on.
         const poll=async()=>{try{const state=await api.terminal({product,id,action:'read',offset,wait:1000});await consume(state);if(!cancelled)timer=setTimeout(poll,state.live?0:150);}catch(e){report(e);}};
         timer=setTimeout(poll,0);

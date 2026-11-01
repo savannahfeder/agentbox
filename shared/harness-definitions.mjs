@@ -22,7 +22,7 @@ export const HARNESS_DEFINITIONS = freeze([
     // names it when an older one refuses the line.
     minVersion: '2.1.71',
     // HOW A WORKER IS STARTED, AS DATA. This was six hardcoded flag names in
-    // main/supervisor.mjs, which made the cheapest possible new engine — one
+    // main/supervisor.mts, which made the cheapest possible new engine — one
     // that speaks this same stream-json and differs by a binary and the
     // `outputFormat` value, as Grok Build does in
     // github.com/savannahfeder/agentbox/issues/21 — a supervisor edit. A key
@@ -103,7 +103,7 @@ export const HARNESS_DEFINITIONS = freeze([
     // docs/harnesses.md: "A provider is not offered until that path works", and
     // "a new provider's networking or permission scope requires the
     // corresponding product policy review before admission." The transport is
-    // verified (see main/opencode-server.mjs for what was measured and how);
+    // verified (see main/opencode-server.mts for what was measured and how);
     // whether OpenCode appears in the picker is a product call, so this stays
     // false until somebody turns it on deliberately.
     admitted: false,

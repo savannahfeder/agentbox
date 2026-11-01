@@ -1,7 +1,7 @@
 // ADDING PEOPLE TO A CONVERSATION (2026-10-01).
 //
 // Messages already go to a group, and each exact group has one conversation
-// (main/team/index.mjs directWith). What was missing was the way in from a
+// (main/team/index.mts directWith). What was missing was the way in from a
 // conversation you already have open: the page named the people in it and
 // offered no way to start the one with one more person in it. So a quiet
 // "Add people" control sits beside the faces at the top of a conversation,

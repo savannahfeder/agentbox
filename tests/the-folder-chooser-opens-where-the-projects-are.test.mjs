@@ -69,7 +69,7 @@ describe('where the folder chooser opens', () => {
 });
 
 describe('the handler that opens the window', () => {
-  const ipc = fs.readFileSync(path.join(root, 'main', 'ipc.mjs'), 'utf8');
+  const ipc = fs.readFileSync(path.join(root, 'main', 'ipc.mts'), 'utf8');
   const handler = ipc.slice(ipc.indexOf("ipcMain.handle('zero:choose-folder'"), ipc.indexOf('zero:list-folders'));
 
   it('builds its list from the projects already connected', () => {

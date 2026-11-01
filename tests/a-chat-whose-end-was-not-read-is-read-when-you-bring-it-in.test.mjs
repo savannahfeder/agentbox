@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readSessionThreads, readChatEnds } from '../main/agent-sessions.mjs';
+import { readSessionThreads, readChatEnds } from '../main/agent-sessions.mts';
 import { pickupChats } from '../renderer/src/agent-import-card';
 
 let home;

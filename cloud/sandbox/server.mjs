@@ -121,7 +121,7 @@ export async function unpackFileArchive(file, destination) {
 // so a Mac knows rather than guesses whether its asks are honoured.
 const CAPS = ['offline', 'setup', 'kept', 'base', 'plain', 'hold', 'resources'];
 // A conversation sent home as only what the run added is listed in this file
-// (the same name in main/cloud/run.mjs).
+// (the same name in main/cloud/run.mts).
 const TAILS = '.agentbox-tails.json';
 // A PROJECT'S OWN SETUP: `.agentbox/cloud-setup.sh` in its task folder, run as
 // the agent before the agent, on every cloud run, so a project needing a
@@ -149,7 +149,7 @@ const WAKE_GRACE_MS = 2 * 60 * 1000;
 // How long a cancelled command gets before its group is killed outright.
 const KILL_GRACE_MS = 15_000;
 // AgentCore ends a session at 8 hours; stop the command a quarter hour before.
-// Exported so the relay can hold its own copy to this one (main/cloud/run.mjs
+// Exported so the relay can hold its own copy to this one (main/cloud/run.mts
 // RUN_LIMIT_MS), which is the number the agent is told at the start.
 export const DEFAULT_DEADLINE_MS = (8 * 60 - 15) * 60_000;
 
@@ -1923,7 +1923,7 @@ function mirror(from, to, skip) {
 
 // THE FOLDER AS IT GOES HOME WHEN IT HOLDS A FILE THE RUN WAS GIVEN AND ONLY
 // ADDED TO (a conversation): that file as what the run added, listed in TAILS
-// for the Mac to add to its own copy (main/cloud/run.mjs `layTails`). Null
+// for the Mac to add to its own copy (main/cloud/run.mts `layTails`). Null
 // when there is none; a file whose start the run changed goes whole.
 async function stageTails(r, dir, staging) {
   const tails = [];

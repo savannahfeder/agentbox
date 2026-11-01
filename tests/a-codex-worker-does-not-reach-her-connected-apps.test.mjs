@@ -47,7 +47,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { workerThreadParams, resumeThreadParams, createCodexWorker } from '../main/codex-session.mjs';
+import { workerThreadParams, resumeThreadParams, createCodexWorker } from '../main/codex-session.mts';
 import { troubleCause } from '../shared/spawn-trouble.mjs';
 import { NAME } from '../shared/product-name.mjs';
 

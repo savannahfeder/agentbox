@@ -17,7 +17,7 @@
 //   claude auth status --json / codex login status   exit 0 signed in, 1 not
 
 import { describe, it, expect } from 'vitest';
-import { createEngineSetup, installCommand, signInCommand, statusCommand } from '../main/engine-setup.mjs';
+import { createEngineSetup, installCommand, signInCommand, statusCommand } from '../main/engine-setup.mts';
 
 // A pretend machine. `found` is what the finder says, `signedIn` is what the
 // status command answers each time it is asked, and every spawn is recorded.

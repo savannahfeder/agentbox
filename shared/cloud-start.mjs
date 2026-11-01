@@ -1,5 +1,5 @@
 // THE LINE A CLOUD RUN PRINTS ONCE THE CLOUD HAS ACCEPTED ITS START
-// (main/cloud/run.mjs), with how long this Mac took to pack and send it and
+// (main/cloud/run.mts), with how long this Mac took to pack and send it and
 // the cloud took to take it. From then on the run holds nothing on this Mac,
 // so it stops counting against the starts allowed at once
 // (Supervisor#_cloudStarting). Not `agentbox cloud:`, which is what a run

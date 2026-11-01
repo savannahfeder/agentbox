@@ -132,7 +132,7 @@ describe('the reading main sends is still Claude Code\'s', () => {
   // exactly as it always did -- and a Codex-only workflow stops paying for a
   // reading nothing will draw.
   it('asks for the Claude reading only where the corner is about Claude Code', () => {
-    const ipc = readFileSync(join(root, 'main/ipc.mjs'), 'utf8');
+    const ipc = readFileSync(join(root, 'main/ipc.mts'), 'utf8');
     expect(ipc).toContain("usageFor === DEFAULT_ENGINE ? usage.read() : supervisor.codexUsage()");
   });
 });

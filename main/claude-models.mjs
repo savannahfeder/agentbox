@@ -19,7 +19,7 @@
 // known.
 //
 // SO IT IS READ AT THE MOMENT IT IS ASKED FOR, which is the stance
-// main/codex-models.mjs already takes beside this one for the same reason, and
+// main/codex-models.mts already takes beside this one for the same reason, and
 // hers is the same question both times. One `statSync` decides whether the
 // answer is still good; a `claude update` changes the binary's size and mtime,
 // so the next read is a fresh one and her picker says the new name with no
@@ -127,7 +127,7 @@ export const nameOf = (names, id) => names.find((n) => n.id === id)?.label;
 // that is per model, so it does not claim to." That was true and it is not any
 // more. Claude Code's catalog carries `default_effort` on each model, beside the
 // display name this file already reads, exactly as Codex's cache carries
-// `default_reasoning_level` (main/codex-models.mjs reads that one already).
+// `default_reasoning_level` (main/codex-models.mts reads that one already).
 //
 // AND IT REALLY IS PER MODEL, which is why a single typed word would have been
 // wrong. MEASURED out of 2.1.280 on 2026-09-22: Opus 5.5 medium, Opus 5 high,
@@ -190,7 +190,7 @@ export function rowsFrom({ aliases, names }) {
     const label = self?.label;
     if (!id || !label) continue;
     // `defaultLevel` travels beside the name rather than as a list of its own,
-    // the way main/codex-models.mjs carries its models' levels: it is per model,
+    // the way main/codex-models.mts carries its models' levels: it is per model,
     // so a table of its own could disagree with the row it belongs to.
     rows.push({ alias, id, label, defaultLevel: self.defaultLevel ?? null });
     // The entry immediately before this one inside its own family. The catalog
@@ -205,7 +205,7 @@ export function rowsFrom({ aliases, names }) {
 }
 
 /* --------------------------------- caching -------------------------------- */
-// KEYED ON THE BINARY ITSELF, NOT ON A CLOCK. main/codex-models.mjs refuses to
+// KEYED ON THE BINARY ITSELF, NOT ON A CLOCK. main/codex-models.mts refuses to
 // cache at all, and says why: caching a cheap read is how a screen ends up still
 // saying the old answer after the thing changed underneath it. Its read is one
 // 199 KB parse. This one is a walk through a 200 MB file, which is not cheap
@@ -237,7 +237,7 @@ function stampOf(binPath) {
  *
  * THE PATH IS HANDED IN, NEVER SEARCHED FOR HERE. `config.claudeBin` is already
  * resolved once at startup (main/config.mjs), and `findClaudeBin` falls back to
- * asking a login shell when the known folders miss. main/codex-models.mjs states
+ * asking a login shell when the known folders miss. main/codex-models.mts states
  * the rule this follows: a picker must never be the reason a shell is spawned
  * while she is typing.
  *

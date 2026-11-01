@@ -5,7 +5,7 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { codexHome, codexModels } from '../main/codex-models.mjs';
+import { codexHome, codexModels } from '../main/codex-models.mts';
 
 export function bestCodexModel({ home = codexHome(), read } = {}) {
   return codexModels(read ? { home, read } : { home })[0]?.id ?? null;

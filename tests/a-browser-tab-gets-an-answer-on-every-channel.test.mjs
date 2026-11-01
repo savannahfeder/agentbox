@@ -3,7 +3,7 @@
 // What broke: `npx agentbox-app` opened a tab that hammered the server with
 // about five thousand failing requests a second. Four channels in
 // shared/bridge-map.mjs (badge, bootInfo, notify, crash) were only ever
-// registered by main/main.mjs, inside the desktop window, so the browser server
+// registered by main/main.mts, inside the desktop window, so the browser server
 // answered each with 404. The screen turned the failed `badge` into an uncaught
 // error, reported it on `crash`, which also failed, which was reported on
 // `crash` again: 33,385 requests in six seconds, measured on 2026-10-07 by
@@ -20,7 +20,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { bootHeadless } from '../main/serve.mjs';
+import { bootHeadless } from '../main/serve.mts';
 import { REQUEST_CHANNELS } from '../shared/bridge-map.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -39,7 +39,7 @@ afterAll(() => {
   if (dir) fs.rmSync(dir, { recursive: true, force: true });
 });
 
-// Read the way main/serve.mjs reads it: nothing returned goes out as null.
+// Read the way main/serve.mts reads it: nothing returned goes out as null.
 const ask = async (channel, payload) => (await booted.channels.get(channel)({ sender: null }, payload)) ?? null;
 
 describe('a browser tab, asking for what the desktop window asks for', () => {

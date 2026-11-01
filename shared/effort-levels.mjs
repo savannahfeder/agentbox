@@ -24,7 +24,7 @@
 // (codex-cli 0.154.0), `gpt-6-astra` and `gpt-5.6-sol` take low, medium, high,
 // xhigh, max and ultra; `gpt-5.6-luna` stops at max; `gpt-5.5` stops at xhigh.
 // So a Codex model's levels are read off the Mac beside its name
-// (main/codex-models.mjs, `levels`) and the strip draws THOSE. What this file
+// (main/codex-models.mts, `levels`) and the strip draws THOSE. What this file
 // holds for Codex is only the shape of a word (`isEffortWord`) and the label
 // for one (`effortLabel`), so the two engines spell "xhigh" the same way on the
 // card.

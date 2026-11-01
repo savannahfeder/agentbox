@@ -14,7 +14,7 @@
 
 import { it, expect } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { attachClaudeInput } from '../main/claude-input.mjs';
+import { attachClaudeInput } from '../main/claude-input.mts';
 
 function fake() {
   const c = new EventEmitter();
@@ -89,7 +89,7 @@ it('says nothing into a session she is driving herself', () => {
 });
 
 // A cloud run's relay uploads any file outside the task folder that a line
-// on its input names (main/cloud/run.mjs `filesNamedIn`), and would send the
+// on its input names (main/cloud/run.mts `filesNamedIn`), and would send the
 // Mac's copy over the agent's own. So a job is named without its paths.
 it('names a job without the paths in it', () => {
   const c = fake();

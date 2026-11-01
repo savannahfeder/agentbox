@@ -2,7 +2,7 @@
 // its task resurrected one old unsupported-command error. Persist the latest
 // dispatch result so reopening cannot turn a successful send into a failure.
 import {it,expect,vi} from 'vitest';
-import {taskCommand} from '../main/task-commands.mjs';
+import {taskCommand} from '../main/task-commands.mts';
 function fixture(engine='claude') {
  return {store:{readItem:()=>({id:'one',product:'p'})},_engineFor:()=>engine,
  _nativeCommands:{one:['project-proof','code-review']},_compactions:{},

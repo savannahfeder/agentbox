@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { whyWords } from '../renderer/src/where-why.ts';
 import { threadPlace } from '../renderer/src/cloud-menu.ts';
 

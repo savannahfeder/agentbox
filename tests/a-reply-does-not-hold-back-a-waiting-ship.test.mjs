@@ -18,7 +18,7 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { SHIP_LABEL, nextToShip } from '../main/ship-queue.mjs';
+import { SHIP_LABEL, nextToShip } from '../main/ship-queue.mts';
 
 let tmp; let repo; let folders;
 beforeEach(() => {

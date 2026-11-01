@@ -32,7 +32,7 @@ import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { limitRows, limitsStillRunning, usageSentence } from '../shared/usage.mjs';
 import { UsagePill, agentsInUse } from '../renderer/src/components/UsagePill.tsx';
-import { CodexUsage } from '../main/codex-usage.mjs';
+import { CodexUsage } from '../main/codex-usage.mts';
 globalThis.React = React;
 
 const read = (p) => fs.readFileSync(new URL(p, import.meta.url), 'utf8');

@@ -176,7 +176,7 @@ describe('the sweep', () => {
   });
 
   it('nor in the error the store gives back', () => {
-    expect(visibleSnoozes('main/store.mjs')).toEqual([]);
+    expect(visibleSnoozes('main/store.mts')).toEqual([]);
   });
 
   it('would catch one if it came back', () => {

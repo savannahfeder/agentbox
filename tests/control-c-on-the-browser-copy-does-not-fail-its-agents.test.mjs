@@ -10,7 +10,7 @@
 //
 // Why. Control-C reaches the whole process group, so the worker died of the
 // signal itself. The desktop app stops its own workers before it quits
-// (main/main.mjs, `before-quit` -> `supervisor.killAll()`), which marks each
+// (main/main.mts, `before-quit` -> `supervisor.killAll()`), which marks each
 // one as stopped by us, so its death is never charged to the task. The browser
 // copy registered no such hook, so every worker it had looked like one that
 // failed on its own. Measured on the copy: the worker's log ended `exited (143)`
@@ -21,7 +21,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { bootHeadless } from '../main/serve.mjs';
+import { bootHeadless } from '../main/serve.mts';
 import { setAppHome } from './app-home.mjs';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');

@@ -30,7 +30,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   ensureTaskFolder, parkTaskFolder, restoreTaskFolder, taskFolderPath,
-} from '../main/task-folders.mjs';
+} from '../main/task-folders.mts';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 

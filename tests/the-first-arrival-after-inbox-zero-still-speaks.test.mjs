@@ -9,7 +9,7 @@
 // which is true on the app's genuine first snapshot AND true every time the
 // inbox is empty. Inbox zero is the state the whole product aims at, so the
 // arrival most worth a banner — the first one after she got clear — was the one
-// arrival the app threw away. Nothing in main/notify.mjs ever saw it, so no
+// arrival the app threw away. Nothing in main/notify.mts ever saw it, so no
 // rule about being away could have saved it.
 //
 // Measured 2026-10-07 while answering "do notifications work? I don't think

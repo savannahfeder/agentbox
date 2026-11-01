@@ -4,8 +4,8 @@
 // (w-1116fbb68a). Three counts were missing or misshapen, and each one bends a
 // number somebody reads as "did this install get going":
 //
-//   · `agent_seen` listed Claude Code PROCESSES and nothing else (main/ipc.mjs,
-//     liveAgents; main/agents.mjs has no Codex read in 0.1.11, 0.1.12 or main).
+//   · `agent_seen` listed Claude Code PROCESSES and nothing else (main/ipc.mts,
+//     liveAgents; main/agents.mts has no Codex read in 0.1.11, 0.1.12 or main).
 //     About a third of the people on this app are on Codex, so for them
 //     "an agent connected" was read off proxies: a run this app started, which
 //     only 0.1.12 sends at all, or a reply. A Codex thread has no process to
@@ -40,7 +40,7 @@ import { CODEX_SEEN_MS, scanCodex } from '../main/codex-watch.mts';
 import { ALLOWED_PROPS, EVENT_NAMES, sanitize } from '../shared/analytics-events.mjs';
 
 const read = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
-const ipc = () => read('main/ipc.mjs');
+const ipc = () => read('main/ipc.mts');
 
 const NOW = Date.parse('2026-10-08T14:00:00-07:00');
 
@@ -123,7 +123,7 @@ describe('a Codex conversation is an agent that was seen', () => {
     expect(read('main/codex-watch.mts')).toMatch(/const seen = new Set\(\)/);
     // The watch also takes a reader of every Codex folder since w-e46f2e9cea,
     // so the call spans lines; the counter is still the analytics switch.
-    expect(read('main/main.mjs')).toMatch(/startCodexWatch\(\{\s*store,\s*count: \(name, props\) => analytics\.track\(name, props\),/);
+    expect(read('main/main.mts')).toMatch(/startCodexWatch\(\{\s*store,\s*count: \(name, props\) => analytics\.track\(name, props\),/);
   });
 });
 

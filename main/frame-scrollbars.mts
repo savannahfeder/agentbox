@@ -7,7 +7,7 @@
 // light ones: a white track the full height of the pane with a grey thumb in
 // it. That was the report, with a screenshot, on 2026-10-05.
 //
-// THE FILE IS STILL SERVED EXACTLY AS IT WAS WRITTEN (doc-scheme.mjs). What is
+// THE FILE IS STILL SERVED EXACTLY AS IT WAS WRITTEN (doc-scheme.mts). What is
 // added here is the app's own chrome, from outside, once the page's document
 // exists: one adopted stylesheet that touches nothing but scrollbars, inside a
 // cascade layer so a page that styled its own scrollbars keeps them, and two

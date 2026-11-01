@@ -8,7 +8,7 @@
 //
 // ALL THREE LEVELS IT NAMES ARE CLAUDE CODE'S AND NONE OF THEM REACHES A CODEX
 // RUN. `codexThreadParamsFor` passes cwd, model, instructions and MCP servers,
-// and the posture is the pair of constants in main/codex-session.mjs:
+// and the posture is the pair of constants in main/codex-session.mts:
 // `WORKER_APPROVAL_POLICY = 'on-request'` and `WORKER_SANDBOX =
 // 'workspace-write'`. Neither is read off this screen, off a project, or off a
 // reply. `tests/the-slash-menu-offers-nothing-codex-cannot-run.test.mjs` proves
@@ -28,7 +28,7 @@
 // codex-cli 0.153.4: they ran unasked and they also FAILED, because under
 // `workspace-write` the sandbox refuses a write outside the workspace and has no
 // network. Not being asked and not being stopped are different things, and the
-// old note treated them as one. main/codex-session.mjs carries the numbers.
+// old note treated them as one. main/codex-session.mts carries the numbers.
 //
 // So the founder's own request -- that users switch modes on both engines the
 // way they naturally would -- is buildable after all, and is built: three
@@ -49,7 +49,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { WORKER_APPROVAL_POLICY, WORKER_SANDBOX } from '../main/codex-session.mjs';
+import { WORKER_APPROVAL_POLICY, WORKER_SANDBOX } from '../main/codex-session.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const settings = fs.readFileSync(path.join(root, 'renderer/src/components/Settings.tsx'), 'utf8');

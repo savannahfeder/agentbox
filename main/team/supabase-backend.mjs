@@ -1,4 +1,4 @@
-// THE SHARED CLOUD, ON SUPABASE. The same calls as memory-cloud.mjs, made
+// THE SHARED CLOUD, ON SUPABASE. The same calls as memory-cloud.mts, made
 // against the tables in cloud/supabase/migrations, through a supabase-js
 // client that is already signed in. Row level security on the server is what
 // actually keeps people apart; nothing here is trusted to.
@@ -86,7 +86,7 @@ export function supabaseBackend(client) {
     },
 
     // Every team you are on, oldest first. Which one this Mac is in is the
-    // Mac's own record (main/team/index.mjs), never this order alone.
+    // Mac's own record (main/team/index.mts), never this order alone.
     async myTeams() {
       const id = await myId();
       const members = must(await client.from('team_members').select('team_id').eq('person_id', id), 'reading your team');

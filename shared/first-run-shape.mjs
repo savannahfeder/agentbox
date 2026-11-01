@@ -17,7 +17,7 @@
 // description written down the sidebar simply has no line, which is what it
 // does today for every project.
 //
-// Pure on purpose: the reading of the disk is in main/first-run.mjs.
+// Pure on purpose: the reading of the disk is in main/first-run.mts.
 
 /**
  * How deep the count goes. Her bound from round four was the readme and the

@@ -27,7 +27,7 @@ import {
   deadRunSentence, deadRunCause, runStoppedLine, causeWord, causeWhat, causeNext, causeAct, causeBreakdown,
 } from '../shared/spawn-trouble.mjs';
 import { readPlan, slotsForPlans } from '../main/claude-plan.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const REFUSAL = 'Your organization has disabled Claude subscription access for Claude Code · Use an Anthropic API key instead, or ask your admin to enable access';
 

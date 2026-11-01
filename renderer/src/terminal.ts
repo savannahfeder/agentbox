@@ -31,7 +31,7 @@ export interface TraceLine {
 const STAMPED = /^(\d\d):(\d\d):(\d\d) {2}(.*)$/;
 const EXIT = /^# exited \((-?\d+)\)/;
 
-// The trace's clock is UTC and carries no date (supervisor.mjs stamps every
+// The trace's clock is UTC and carries no date (supervisor.mts stamps every
 // line with toISOString.slice(11, 19)), so a local 10pm can be written "05:00:12".
 // The session's own startedAt supplies the missing date; notes.ts owns that
 // arithmetic and this borrows it rather than keeping a second copy.

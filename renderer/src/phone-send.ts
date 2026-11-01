@@ -25,7 +25,7 @@ export function phoneSender({ client, rows, setRows, aliases, changed }: {
   // Threads whose reply was just taken back: the window's own undo goes on to
   // put the schedule back and send "(withdrawn)", none of which the Mac saw.
   const withdrawn = new Map<string, number>();
-  // A reply to a thread put off clears the schedule on her Mac (phone-inbox.mjs
+  // A reply to a thread put off clears the schedule on her Mac (phone-inbox.mts
   // ROUTES), so the window's clearing call right after it has nothing to do.
   const replied = new Map<string, number>();
   const scheduled = (p: any) => {
@@ -112,7 +112,7 @@ export function phoneSender({ client, rows, setRows, aliases, changed }: {
       if (p?.runAt === 0 && (replied.get(`${p.product}/${p.id}`) ?? 0) > Date.now() - 60_000) return { ok: true };
       return leave(REQUEST_CHANNELS.schedule, p);
     },
-    // Allow and Deny go to her Mac with the card they answer (phone-inbox.mjs).
+    // Allow and Deny go to her Mac with the card they answer (phone-inbox.mts).
     approve: async (p: { id: string; allow: boolean; note?: string }) => {
       const cmd = approvalCommand(phoneView(rows()).cards, p);
       if (!cmd) return { ok: false, error: 'This card is no longer waiting.' };

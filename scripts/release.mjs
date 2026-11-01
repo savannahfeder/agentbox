@@ -134,7 +134,7 @@ const identity = signingIdentity();
 // the repo stays clean and a copy run from source still has nowhere to send.
 //
 // THE VARIABLE IS NAMED FROM THE ONE PLACE THE APP IS NAMED, and it was not.
-// This read `ASTRAL_POSTHOG_KEY` by hand while main/analytics.mjs had moved to
+// This read `ASTRAL_POSTHOG_KEY` by hand while main/analytics.mts had moved to
 // `readEnv`, so the name you have to type to cut a release was two renames out
 // of date and matched nothing the app itself reads. `readEnv` answers to the
 // current name and to every older one, so an old note or an old shell profile
@@ -152,7 +152,7 @@ function posthogKey() {
 
 const analyticsKey = posthogKey();
 
-// WHERE THE FEEDBACK CARD SENDS (main/feedback.mjs), read the same two ways.
+// WHERE THE FEEDBACK CARD SENDS (main/feedback.mts), read the same two ways.
 // It is the address of the server function, not of anybody's inbox: who the
 // mail goes to is a secret on that function and never in a build.
 function feedbackAddress() {
@@ -269,7 +269,7 @@ if (!fs.existsSync(path.join(repo, 'build', 'icon.icns'))) {
 // package.json now carries a publish config so the APP can find its updates,
 // and that same config is what electron-builder would upload through.
 const args = ['--mac', '--publish', 'never'];
-// Baked into the packaged package.json, which main/analytics.mjs reads. Only
+// Baked into the packaged package.json, which main/analytics.mts reads. Only
 // the key travels; nothing else about this machine does.
 if (analyticsKey) {
   args.push(`-c.extraMetadata.bakedPosthogKey=${analyticsKey}`);
@@ -278,12 +278,12 @@ if (analyticsKey) {
   console.log('→ no analytics key, so this build will send nothing');
 }
 // Not a stop like the analytics key: a build without it sends to the address
-// that ships in the code (FEEDBACK_ADDRESS in main/feedback.mjs).
+// that ships in the code (FEEDBACK_ADDRESS in main/feedback.mts).
 if (feedbackUrl) {
   args.push(`-c.extraMetadata.bakedFeedbackUrl=${feedbackUrl}`);
   console.log('→ baking the feedback address into the build');
 } else {
-  console.log(`→ no feedback address (${envName('FEEDBACK_URL')} or "feedbackUrl" in zero.config.json), so the Feedback card sends to the one in main/feedback.mjs`);
+  console.log(`→ no feedback address (${envName('FEEDBACK_URL')} or "feedbackUrl" in zero.config.json), so the Feedback card sends to the one in main/feedback.mts`);
 }
 if (cloud) {
   for (const k of ['gateway', 'supabaseUrl', 'anonKey']) args.push(`-c.extraMetadata.bakedCloud.${k}=${cloud[k]}`);

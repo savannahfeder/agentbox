@@ -145,7 +145,7 @@ describe('the word the panel puts over the reading', () => {
 
 describe('the corner is handed the answer rather than working it out', () => {
   // The same reason the byline is: whether a choice is real needs the capability
-  // gate and the staleness rule, both pinned to main/supervisor.mjs. A corner
+  // gate and the staleness rule, both pinned to main/supervisor.mts. A corner
   // that derived its own answer could draw "Codex" over a Claude Code reading.
   it('reads the agent off the reading main sent, through the byline\'s own word', () => {
     const app = read('renderer/src/App.tsx');
@@ -165,7 +165,7 @@ describe('the corner is handed the answer rather than working it out', () => {
   // spellings of "which agent is this" is the defect the tester reported in the
   // first place.
   it('has exactly one function that answers which agent the corner is about', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     expect(ipc).toMatch(/usageEngine\(/);
     expect(read('shared/usage.mjs').match(/export function usageEngine/g)).toHaveLength(1);
   });

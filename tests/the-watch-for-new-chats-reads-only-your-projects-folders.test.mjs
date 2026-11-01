@@ -1,6 +1,6 @@
 // THE WATCH FOR NEW CHATS READS ONLY YOUR PROJECTS' FOLDERS.
 //
-// The watch that brings new chats in (main/new-chats-watch.mjs, w-62228098e6)
+// The watch that brings new chats in (main/new-chats-watch.mts, w-62228098e6)
 // first used the import card's reader, which walks every transcript Claude Code
 // has and opens the newest until a three second budget runs out. On a computer
 // that runs Agentbox, most of those are Agentbox's own runs, so every pass
@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readProjectChats } from '../main/agent-sessions.mjs';
+import { readProjectChats } from '../main/agent-sessions.mts';
 
 let home;
 let claudeDir;

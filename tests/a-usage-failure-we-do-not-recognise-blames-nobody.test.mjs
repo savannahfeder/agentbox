@@ -8,7 +8,7 @@
 // causes (an ended subscription, an admin's block) keep their own sentences.
 
 import { describe, it, expect } from 'vitest';
-import { ClaudeUsage } from '../main/claude-usage.mjs';
+import { ClaudeUsage } from '../main/claude-usage.mts';
 import { USAGE_UNREADABLE } from '../shared/usage.mjs';
 import { accountSentence } from '../shared/spawn-trouble.mjs';
 

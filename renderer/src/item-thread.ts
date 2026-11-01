@@ -41,7 +41,7 @@ import { liftReplies } from './team/chat-threads';
 import type { UndoMark } from './undo-marks';
 
 // `[Read] strategy/art-style.md` — how the supervisor writes a tool call into a
-// trace (`traceStreamLine`, main/supervisor.mjs). The name is the tool and the
+// trace (`traceStreamLine`, main/supervisor.mts). The name is the tool and the
 // rest is its key input, already flattened to one string on the way to disk.
 const TOOL = /^\[([^\]]+)\]\s*(.*)$/;
 
@@ -84,7 +84,7 @@ export interface ItemOutcome {
  * ONE MESSAGE OF HERS THAT IS ON ITS WAY AND NOT IN THE LEDGER YET.
  *
  * A reply typed while a worker is up does not go to the ledger first. It goes
- * to the running session, and `submitReply` (main/live-replies.mjs) writes the
+ * to the running session, and `submitReply` (main/live-replies.mts) writes the
  * row only once the provider has acknowledged it. Claude acknowledges by
  * replaying the message, which it does at its next break, and
  * `attachClaudeInput` lets that wait run to 120 seconds before it gives up. The

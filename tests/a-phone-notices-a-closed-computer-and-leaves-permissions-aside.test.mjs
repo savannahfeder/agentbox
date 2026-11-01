@@ -4,8 +4,8 @@ import { it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createPhoneInbox } from '../main/phone-inbox.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createPhoneInbox } from '../main/phone-inbox.mts';
 import { computerSays, phoneStatusLine } from '../renderer/src/phone-rows';
 const read = (p) => fs.readFileSync(new URL(p, import.meta.url), 'utf8');
 const now = 1_000_000;
@@ -19,7 +19,7 @@ it('expires online status after ninety seconds, including after a reload', () =>
   expect(phoneStatusLine({ error: 'offline', fetchedAt: now, macSeen: now }, now)).toContain("Can't reach");
 });
 it('renews presence well before the expiry', () => {
-  expect(read('../main/phone-inbox.mjs')).toMatch(/const HEARTBEAT_MS = 30_000;/);
+  expect(read('../main/phone-inbox.mts')).toMatch(/const HEARTBEAT_MS = 30_000;/);
 });
 it('renews a quiet project every thirty seconds without rewriting threads', async () => {
   let clock = now;

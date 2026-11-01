@@ -24,7 +24,7 @@
   ],
   "license": "GPL-3.0-or-later",
   "type": "module",
-  "main": "main/main.mjs",
+  "main": "main/main.mts",
   "bin": {
     "agentbox": "bin/agentbox.mjs"
   },

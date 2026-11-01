@@ -1,5 +1,5 @@
 /* THE PHONE LAYOUT. A phone reaches the inbox through the phone
-   door (main/phone-link.mjs) and draws the same screens in a quarter of the
+   door (main/phone-link.mts) and draws the same screens in a quarter of the
    width. The desktop window cannot get this narrow (its minimum is 720), so
    nothing here ever reaches it.
 

@@ -1,6 +1,6 @@
 // ROOMS ON A MAC FOLLOW THE CLOUD, AND ONLY WHILE SWITCHED ON (w-3d0fa23ffb, 2026-10-20).
 //
-// main/team/rooms.mjs keeps the rooms I am in, their walls and chat, and the
+// main/team/rooms.mts keeps the rooms I am in, their walls and chat, and the
 // presence row this Mac publishes. Rooms is an alpha feature: until it is
 // switched on, this Mac must publish nothing at all, and switching it off
 // must tell everyone this Mac has gone.
@@ -12,9 +12,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createRooms, roomPrefsFile } from '../main/team/rooms.mjs';
-import { GENERAL_ROOM } from '../main/team/rooms-memory.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
+import { GENERAL_ROOM } from '../main/team/rooms-memory.mts';
 
 const T0 = Date.parse('2026-10-22T15:00:00-07:00');
 const flush = async () => { for (let i = 0; i < 20; i += 1) await new Promise((r) => setImmediate(r)); };

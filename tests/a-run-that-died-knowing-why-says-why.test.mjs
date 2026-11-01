@@ -31,7 +31,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor, saidNothingSheCanUse } from '../main/supervisor.mjs';
+import { Supervisor, saidNothingSheCanUse } from '../main/supervisor.mts';
 import { troubleCause } from '../shared/spawn-trouble.mjs';
 import { Name } from '../shared/product-name.mjs';
 

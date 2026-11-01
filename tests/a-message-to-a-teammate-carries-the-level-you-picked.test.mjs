@@ -22,13 +22,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamService } from '../main/team/index.mjs';
+import { Store } from '../main/store.mts';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
 import { whatATeammateMaySet } from '../shared/team-rules.mjs';
 import { itemPriority, DEFAULT_PRIORITY } from '../shared/rank.mjs';
-import { LEVELS, wantsPriority } from '../main/message-priority.mjs';
+import { LEVELS, wantsPriority } from '../main/message-priority.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -143,7 +143,7 @@ describe('the Mac that receives one does not guess over the sender', () => {
   });
 
   // THE CASE THAT MUST STILL MATCH: nobody picked a level, so the model is
-  // still what sorts the message (main/message-priority.mjs).
+  // still what sorts the message (main/message-priority.mts).
   it('still sorts a message that arrived with no level at all', () => {
     expect(wantsPriority(message(0), product, 'p-me')).toBe(true);
   });

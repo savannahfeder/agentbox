@@ -304,7 +304,7 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
 
 // In progress promises that a worker is on this row or about to be, so it
 // never holds a row whose moment has not arrived. The supervisor's spawn
-// passes gate on the same thing (`isDue`, main/supervisor.mjs).
+// passes gate on the same thing (`isDue`, main/supervisor.mts).
 //
 // `deferredUntil` is the caller's dueAt: the ledger's runAt, maxed with the old
 // localStorage snooze the view still honours on read.
@@ -447,7 +447,7 @@ export function rowSummary(
 // The name on the row: the written label when there is one, otherwise the
 // title. `label` is its own field because the fold refuses a rewrite of the
 // title on a row the user wrote (shared/work-items.mjs). It is written once,
-// when the thread is made (main/row-label.mjs), because Claude Code names its
+// when the thread is made (main/row-label.mts), because Claude Code names its
 // terminal tab but never saves that name to a transcript.
 //
 // A title the user wrote after the label is a rename and wins, because the

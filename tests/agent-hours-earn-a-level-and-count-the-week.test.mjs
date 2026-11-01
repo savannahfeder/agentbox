@@ -3,7 +3,7 @@
 // Rooms shows a level from agent hours ("I find agent hours level
 // compelling"), ranks by this week's hours, a streak of days in a row, and a
 // chart of hours since you started. Nothing in the app kept a history of runs:
-// a run's length went to PostHog and was gone (main/analytics.mjs
+// a run's length went to PostHog and was gone (main/analytics.mts
 // runEndedProps), and the only durable trace of a run was its log file.
 //
 // These are the rules, measured with fixed clocks in the test time zone

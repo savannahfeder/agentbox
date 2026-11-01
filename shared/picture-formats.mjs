@@ -1,6 +1,6 @@
 // PICTURES THE WINDOW CANNOT DRAW, and what each is turned into so it can.
 // Chromium decodes no TIFF and no HEIC, so one pasted or dropped into a reply
-// box is turned into a PNG or a JPEG as it comes in (main/stage-attachment.mjs).
+// box is turned into a PNG or a JPEG as it comes in (main/stage-attachment.mts).
 // Both sides read this: the window to know a dropped file is worth staging,
 // the main process to turn it.
 const TURNED = [[/\.tiff?$/i, '.png'], [/\.hei[cf]$/i, '.jpg']];

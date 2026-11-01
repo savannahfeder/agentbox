@@ -15,7 +15,7 @@
 //
 // This file is the PURE half: the text in, the three limits out. It is pure so
 // the reading is pinned by tests rather than by a screenshot. Running the
-// command is main/claude-usage.mjs.
+// command is main/claude-usage.mts.
 //
 // THE WORDS THE PANEL PRINTS LEFT THIS FILE ON 2026-09-05, and they went to
 // shared/usage.mjs. What is Claude Code's is still here: this text format, the

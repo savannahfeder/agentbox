@@ -153,7 +153,7 @@ describe('the thread hands a web link to the pane', () => {
 
   it('still hands a pdf and a source file to the app that owns them', () => {
     expect(opensInPane('reports/audit.pdf')).toBe(false);
-    expect(opensInPane('main/ipc.mjs')).toBe(false);
+    expect(opensInPane('main/ipc.mts')).toBe(false);
   });
 });
 

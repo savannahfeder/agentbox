@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { __readTail } from '../main/agents.mjs';
+import { __readTail } from '../main/agents.mts';
 import { Name } from '../shared/product-name.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -55,7 +55,7 @@ describe('the tab is gone, not hidden', () => {
   });
 
   it('asks the setting how many of them the inbox takes', () => {
-    // The fallback matches the app's own default (main/settings.mjs) so the
+    // The fallback matches the app's own default (main/settings.mts) so the
     // inbox cannot flash a row it is about to drop.
     expect(app).toMatch(/const agentMode = snap\?\.config\?\.outsideAgents \?\? 'off';/);
     expect(app).toMatch(/reachesInbox\(r\.agent, now, agentMode\)/);
@@ -101,7 +101,7 @@ describe('the dock hides the reply box only where a message is swallowed', () =>
 // Claude Code writes three facts into the transcript that answer "what was this
 // task", and the shapes below are copied from a real transcript. Reading them
 // costs nothing extra: this is
-// the same 96KB tail main/agents.mjs already reads for `lastActiveAt`.
+// the same 96KB tail main/agents.mts already reads for `lastActiveAt`.
 //
 // The test drives the real reader through the real file layout, because the
 // half of this that can silently break is the SHAPE — a renamed field means a
@@ -162,7 +162,7 @@ describe('what a session says about itself, read off a real transcript', () => {
     const tail = await readTailOf(LINES);
     expect(tail.about).toBe(`${Name} product not displaying in Harbour`);
     expect(tail.lastAsked).toBe('sounds good. just make sure the login is remembered.');
-    expect(tail.touched).toEqual(['sync-service.mjs', 'store.mjs']);
+    expect(tail.touched).toEqual(['sync-service.mjs', 'store.mts']);
     expect(tail.lastSaid).toContain('The sync is running steadily');
     expect(tail.lastActiveAt).toBe(Date.parse('2026-08-12T17:03:00.000Z'));
   });
@@ -199,7 +199,7 @@ describe('what a session says about itself, read off a real transcript', () => {
       timestamp: '2026-08-12T17:04:00.000Z',
       message: { content: [{ type: 'tool_use', name: 'Edit', input: { file_path: '/x/sync-service.mjs' } }] },
     }];
-    expect((await readTailOf(again)).touched).toEqual(['store.mjs', 'sync-service.mjs']);
+    expect((await readTailOf(again)).touched).toEqual(['store.mts', 'sync-service.mjs']);
   });
 
   // A YOUNG SESSION'S FIRST LINE IS NOT HALF A LINE. The tail read skips its

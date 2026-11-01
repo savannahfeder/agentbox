@@ -3,7 +3,7 @@
 // Main was red on GitHub from 2026-10-09 to 2026-10-13 and nobody noticed. The
 // `tests` run takes about five minutes and finishes after the agent that
 // shipped has already ended, and `scripts/ship.mjs` only prints "check the
-// run", so the red cross had no reader at all. main/main-went-red.mjs watches
+// run", so the red cross had no reader at all. main/main-went-red.mts watches
 // the run for the commit the app just shipped and files ONE task when main
 // turns red.
 //
@@ -25,11 +25,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { CONTEXT_WORDS, summaryOf, wordsIn } from '../shared/thread-cards.mjs';
 import {
   GIVE_UP_MS, MainTests, failedTestsIn, machineOf, runFor, verdict,
-} from '../main/main-went-red.mjs';
+} from '../main/main-went-red.mts';
 
 let root; let userDir; let dir;
 beforeEach(async () => {
@@ -286,7 +286,7 @@ describe('and the runs it must stay quiet about', () => {
 // run it wants is the one for that sha and no other.
 describe('what starts it', () => {
   it('is a ship, carrying the commit, the task and the project', async () => {
-    const { ShipQueue } = await import('../main/ship-queue.mjs');
+    const { ShipQueue } = await import('../main/ship-queue.mts');
     const folders = path.join(root, 'folders');
     fs.mkdirSync(path.join(folders, 'w-a'), { recursive: true });
     fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
@@ -310,7 +310,7 @@ describe('what starts it', () => {
   });
 
   it('is wired to the supervisor, and a ship with no commit starts nothing', async () => {
-    const { Supervisor } = await import('../main/supervisor.mjs');
+    const { Supervisor } = await import('../main/supervisor.mts');
     const store = await storeFor();
     const config = { accountRoot: root, storeRoot: root, products: [], personalProducts: [], accountId: 'nobody', claudeBin: '/nonexistent' };
     const sup = new Supervisor(config, store, root, path.join(root, 'data'), userDir);

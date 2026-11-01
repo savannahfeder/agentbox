@@ -193,7 +193,7 @@ export function escapeClosesDoc(doc: { auto?: boolean } | null | undefined): boo
  * crosses a document boundary: the page in the frame is its own document, in
  * its own origin, so once her click lands inside it the app's own window
  * listener stops hearing the key entirely. Main forwards it instead
- * (before-input-event in main/main.mjs), and this decides what it means when it
+ * (before-input-event in main/main.mts), and this decides what it means when it
  * arrives.
  *
  * It is the FILE, always, including one the card opened by itself. The rule

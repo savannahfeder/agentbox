@@ -51,7 +51,7 @@ const ALLOWED = [
       + 'instead, by commandHint in shared/claude-commands.mjs.',
   },
   {
-    file: 'main/main.mjs',
+    file: 'main/main.mts',
     fragment: 'recovery',
     why: 'A console.log to the terminal. She never sees it.',
   },

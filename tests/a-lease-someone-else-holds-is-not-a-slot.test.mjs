@@ -31,7 +31,7 @@
 // burnt, and every other product's spawns are stalled behind the cooldown.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const ANSWERED = 1_786_822_582_584; // 2026-08-15 12:36:22.584, "merge it"
 const LEASE_UNTIL = 1_786_822_804_409; // 12:40:04.409, the dead session's lease

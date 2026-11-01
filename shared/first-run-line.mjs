@@ -15,7 +15,7 @@
 // project. It reads one that is already written down, and when nothing is
 // written down it says so.
 //
-// Pure on purpose: the reading of the disk is in main/first-run.mjs and the
+// Pure on purpose: the reading of the disk is in main/first-run.mts and the
 // judgement about what a line is worth is here, where a test can hold it.
 
 /** As long as a sentence in a list row can be before it is a paragraph. */

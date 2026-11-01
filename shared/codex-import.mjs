@@ -22,7 +22,7 @@
 // too.
 //
 // Pure on purpose, like shared/agent-import.mjs beside it: the words are tested
-// rather than eyeballed, and main/store.mjs does the writing.
+// rather than eyeballed, and main/store.mts does the writing.
 
 /** On the row while it is asking. */
 import { Name } from '../shared/product-name.mjs';
@@ -184,7 +184,7 @@ export function codexMirrorPatch(thread) {
     body: prompt || String(thread?.title ?? '').trim(),
     result: last || 'Codex has not answered yet.',
     kind: 'directive',
-    // Written up the way every thread reads once it lands (main/catch-up.mjs).
+    // Written up the way every thread reads once it lands (main/catch-up.mts).
     labels: [CODEX_MIRROR_LABEL, codexLabel(thread?.id), CATCH_UP_LABEL],
     // Carried on with the agent it was with, not the app's default.
     engine: 'codex',

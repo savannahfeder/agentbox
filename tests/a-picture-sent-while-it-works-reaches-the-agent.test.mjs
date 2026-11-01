@@ -19,10 +19,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
-import { Supervisor } from '../main/supervisor.mjs';
-import { submitReply, liveReplyBrief } from '../main/live-replies.mjs';
-import { filesNamedIn } from '../main/cloud/run.mjs';
-import { createCodexWorker } from '../main/codex-session.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { submitReply, liveReplyBrief } from '../main/live-replies.mts';
+import { filesNamedIn } from '../main/cloud/run.mts';
+import { createCodexWorker } from '../main/codex-session.mts';
 import { createCodexAppServer } from '../main/codex-app-server.mjs';
 
 const dirs = [];

@@ -33,7 +33,7 @@ import {
   deadRunSentence, deadRunCause, runStoppedLine, causeWord, causeWhat, causeNext, causeAct, causeBreakdown,
 } from '../shared/spawn-trouble.mjs';
 import { harnessDefinition } from '../shared/harness-definitions.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 
 // Byte for byte what each release printed on stderr, from the runs above.

@@ -1,6 +1,6 @@
 // THE IN-MEMORY CLOUD AND THE REAL ONE BEHAVE THE SAME.
 //
-// The sync engine and the app are tested against main/team/memory-cloud.mjs,
+// The sync engine and the app are tested against main/team/memory-cloud.mts,
 // because a test that needs the network is a test nobody runs. That is only
 // worth anything if the memory cloud keeps the real database's rules. So one
 // scenario (a team forms, a project is shared, lines go back and forth,
@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { supabaseBackend } from '../main/team/supabase-backend.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

@@ -93,7 +93,7 @@ export function rowKey(row: SlashRow): string {
  *
  * AND NO CODEX EQUIVALENT IS INVENTED FOR EITHER. A Codex worker runs on one
  * posture, `untrusted` + `workspace-write`, chosen by measurement and held
- * deliberately (main/codex-session.mjs); the other two approval policies were
+ * deliberately (main/codex-session.mts); the other two approval policies were
  * measured the same day and neither gates anything, so there is nothing on this
  * engine for six choices to choose between. Which of the six would stand for
  * which Codex setting is a judgement about what an agent may do on the user's

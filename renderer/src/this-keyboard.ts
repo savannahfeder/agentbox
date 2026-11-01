@@ -2,7 +2,7 @@
 // shared/key-caps.mjs; this is the one answer that file is handed.
 //
 // `navigator` rather than the bridge, because the same page is served to a
-// browser tab and to a phone (main/serve.mjs), where there is no preload.
+// browser tab and to a phone (main/serve.mts), where there is no preload.
 //
 // A Mac is the answer where there is no window at all, which is every test
 // here; one that wants the other keyboard passes `false` itself. The question

@@ -28,15 +28,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Store } from '../main/store.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Store } from '../main/store.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { PRACTICE_ROWS, PRACTICE_SLUG } from '../shared/first-run-practice.mjs';
 import { needsStaging, walkStageKey } from '../renderer/src/walk-staging.ts';
 import { practiceRemembered, rememberProject, rememberedProject, resolveProject } from '../renderer/src/compose-project.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = fs.readFileSync(path.join(root, 'renderer/src/App.tsx'), 'utf8');
-const supervisorSrc = fs.readFileSync(path.join(root, 'main/supervisor.mjs'), 'utf8');
+const supervisorSrc = fs.readFileSync(path.join(root, 'main/supervisor.mts'), 'utf8');
 
 async function freshStore() {
   const account = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-outlive-'));

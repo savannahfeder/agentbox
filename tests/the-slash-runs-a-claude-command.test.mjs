@@ -31,7 +31,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import {
   CLAUDE_COMMANDS, READ_FROM, commandDraft, commandHint, commandMatches,
   commandPrompt, commandWords,
@@ -282,7 +282,7 @@ describe('what actually reaches the CLI', () => {
   });
 
   it('only replaces the prompt when her own words caused the spawn', () => {
-    const sup = read('main/supervisor.mjs');
+    const sup = read('main/supervisor.mts');
     // `continuation` is the supervisor's own word for "the user wrote on this
     // row and no worker has answered yet". Without it, `item.answer` sits on the
     // row for good and an ordinary wake hours later would run /context instead
@@ -300,7 +300,7 @@ describe('what actually reaches the CLI', () => {
     // A command run answers in the thread and writes nothing on the row, which
     // is exactly what settleDelivery's ordinary test looks for. Left alone it
     // would redeliver to the retry cap.
-    const sup = read('main/supervisor.mjs');
+    const sup = read('main/supervisor.mts');
     // `carried` is the user's newest word the session really received: the one
     // it was spawned for, or a later one typed into it while it was running
     // (a-reply-typed-into-a-working-agent-comes-back-to-her).

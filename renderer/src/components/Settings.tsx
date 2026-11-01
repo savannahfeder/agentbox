@@ -632,7 +632,7 @@ export function agentCountOptions(w: {
  *
  * Every figure here is read, never worked out for display: the agents are the
  * sessions this app is running, and the rest comes from the memory check's own
- * coordinator (main/memory-gate-server.mjs) through `memoryReading`. ANYTHING IT
+ * coordinator (main/memory-gate-server.mts) through `memoryReading`. ANYTHING IT
  * DOES NOT KNOW IS LEFT OUT. A card whose whole job is to be the measured corner
  * of the screen cannot afford one invented number, so a kernel reading that did
  * not arrive takes its cell with it rather than showing a nought.
@@ -712,7 +712,7 @@ function PhoneFeedbackGroup({ onFeedback }: { onFeedback: () => void }) {
 // thing"): Every project, None, or a tick beside each project.
 type MacShut = {
   site: string | null; siteQr: string | null; all: boolean; projects: ProjectSettings[]; onChoose: (all: boolean, except: string[]) => void;
-  // Who this computer sends as, and whether its threads are reaching the web app (main/team/index.mjs phoneOnce).
+  // Who this computer sends as, and whether its threads are reaching the web app (main/team/index.mts phoneOnce).
   email?: string | null; sentAt?: number | null; error?: string | null;
 };
 function PhoneConnection({ macShut }: { macShut: MacShut }) {
@@ -1203,7 +1203,7 @@ function Connection({ copy, check, engine, found, certain, bin, chosen = false, 
   /**
    * WHICH AGENT THIS CARD IS ABOUT, and the only thing the window hands over
    *  when somebody points at the file themselves. The path comes back from the
-   *  panel main opened; it never goes the other way (main/ipc.mjs,
+   *  panel main opened; it never goes the other way (main/ipc.mts,
    *  `zero:engine-bin`). */
   engine: 'claude' | 'codex';
   /**
@@ -1220,7 +1220,7 @@ function Connection({ copy, check, engine, found, certain, bin, chosen = false, 
   account?: EngineAccount | null;
   /**
    * WHY NOTHING RUNS ON IT DESPITE IT BEING HERE, or null. Main's sentence,
-   *  never one derived here (main/settings.mjs `engineTroubleFor`, off
+   *  never one derived here (main/settings.mts `engineTroubleFor`, off
    *  shared/spawn-trouble.mjs). BEING FOUND IS NOT BEING USABLE: a subscription
    *  that lapsed leaves the binary exactly where it was and stops every task on
    *  that engine. */
@@ -1246,7 +1246,7 @@ function Connection({ copy, check, engine, found, certain, bin, chosen = false, 
       const r = await check();
       setAgain(!r.found);
       // The search has already updated the path the rest of the app spawns
-      // from (main/settings.mjs, recheckClaude and recheckCodex), so re-reading
+      // from (main/settings.mts, recheckClaude and recheckCodex), so re-reading
       // settings is what puts this row and every other row in step with it.
       await onChecked();
     } finally {
@@ -1435,7 +1435,7 @@ function Updates({ state }: { state?: UpdateState | null }) {
 // THE PICTURE BESIDE A PROJECT'S NAME, AND THE ONE CONTROL THAT CHANGES IT.
 //
 // Nothing is uploaded and nothing is hosted: the picture is copied into the
-// project's own folder and read from there. main/project-identity.mjs says why
+// project's own folder and read from there. main/project-identity.mts says why
 // it is copied rather than pointed at.
 //
 // THE MARK IS THE BUTTON. Clicking it opens the Mac's own picker. THE WAY BACK
@@ -2010,7 +2010,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 )}
                 {/* THE CLOUD'S OWN MODE: a cloud run works on a throwaway copy
                     with nobody there to approve anything, so by default it
-                    does not ask (main/cloud-permission.mjs). */}
+                    does not ask (main/cloud-permission.mts). */}
                 {cloudHere && (
                   <Row label="In the cloud" desc={w.cloudPermission && w.cloudPermission !== 'same' ? PERMISSION_SENTENCE[w.cloudPermission] : SAME_AS_HERE}>
                     <Picker
@@ -2318,7 +2318,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               )}
               {/* STOP WHAT FINISHED AGENTS LEAVE RUNNING (2026-10-05). A night
                   of agents left 7.7 GB running after every agent had finished
-                  and the Mac ran out of memory; main/leftovers.mjs has the
+                  and the Mac ran out of memory; main/leftovers.mts has the
                   numbers and the rules agreed with Codex. Its own switch,
                   because the memory switch only ever delays commands and this
                   one stops programs, and the person should agree to that by
@@ -2351,7 +2351,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                   outside the folder the app keeps its own in, about 740 MB, and
                   nothing in the app could list, show or sweep one: the same
                   invisibility that stranded 26 GB a fortnight earlier, in a new
-                  place. main/task-folders.mjs has the measurement and the rules.
+                  place. main/task-folders.mts has the measurement and the rules.
 
                   A SENTENCE AND NO CONTROL, and the row is absent whenever there
                   is nothing to say. A folder the app did not make is not the

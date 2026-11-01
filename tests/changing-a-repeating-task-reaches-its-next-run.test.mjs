@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Repeats } from '../main/repeats.mjs';
-import { loadStore } from '../main/store-modules.mjs';
+import { loadStore } from '../main/store-modules.mts';
 import { splitMessage, joinMessage } from '../renderer/src/message-split';
 import { NAME } from '../shared/product-name.mjs';
 

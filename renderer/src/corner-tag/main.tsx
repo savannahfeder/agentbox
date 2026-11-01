@@ -1,6 +1,6 @@
 // THE CORNER TAG'S PAGES (w-dafae58a23). One page, drawn twice: `?part=tag` is
 // the tag itself and `?part=card` is the list that opens beside it, each in its
-// own window (main/corner-tag.mjs), each window exactly the size of what it
+// own window (main/corner-tag.mts), each window exactly the size of what it
 // shows, drawing its own glass. shared/corner-tag.mjs owns the
 // words and the rules; this is the drawing and the pointer.
 //

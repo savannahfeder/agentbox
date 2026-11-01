@@ -11,7 +11,7 @@
 // you closed once and forgot existed), it is turned off only in Settings, and
 // it steps aside while you are in the app itself.
 //
-// main/corner-tag.mjs owns the window and renderer/src/corner-tag owns the
+// main/corner-tag.mts owns the window and renderer/src/corner-tag owns the
 // page; both decide through this file so the tests pin behaviour, not wiring.
 
 /** Space between the tag and the edge of the screen when it rests in a corner. */

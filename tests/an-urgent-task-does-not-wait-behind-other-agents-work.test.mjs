@@ -24,10 +24,10 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { MemoryGate } from '../main/memory-gate.mjs';
-import { MemoryGateServer } from '../main/memory-gate-server.mjs';
-import { CommandHistory } from '../main/memory-gate-history.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { MemoryGate } from '../main/memory-gate.mts';
+import { MemoryGateServer } from '../main/memory-gate-server.mts';
+import { CommandHistory } from '../main/memory-gate-history.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 const history = () => {
   const h = new CommandHistory();

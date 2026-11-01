@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { statusCell } from '../renderer/src/status-word';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { CLOSED_ANYWAY, shippedAs } from '../shared/not-shipped.mjs';
 
 const app = (ts) => ({ ts, source: 'system' });

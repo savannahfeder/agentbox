@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { alphaFeatures, setWorkspaceSetting } from '../main/settings.mjs';
+import { alphaFeatures, setWorkspaceSetting } from '../main/settings.mts';
 import { SETTINGS_PAGES, searchSettings } from '../renderer/src/settings-search.ts';
 import { REQUEST_CHANNELS, PUSH_CHANNELS, DESKTOP_ONLY } from '../shared/bridge-map.mjs';
 import { phoneSettingsOf } from '../shared/phone-settings.mjs';
@@ -45,7 +45,7 @@ describe('Neo is gone from the code', () => {
 
   it('the microphone helper voice notes use is still there', () => {
     expect(fs.existsSync(path.join(root, 'main/mic.mts'))).toBe(true);
-    expect(fs.readFileSync(path.join(root, 'main/main.mjs'), 'utf8')).toMatch(/import \{ getMic \} from '\.\/mic\.mts'/);
+    expect(fs.readFileSync(path.join(root, 'main/main.mts'), 'utf8')).toMatch(/import \{ getMic \} from '\.\/mic\.mts'/);
   });
 
   it('no bridge channel is about it', () => {

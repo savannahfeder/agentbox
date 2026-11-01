@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ARMS, armFor, readArm } from '../shared/onboarding-arm.mjs';
-import { createAnalytics } from '../main/analytics.mjs';
+import { createAnalytics } from '../main/analytics.mts';
 import { sanitize } from '../shared/analytics-events.mjs';
 
 const dir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'arm-'));

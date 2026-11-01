@@ -40,7 +40,7 @@ const ledger = [
 // The trace that worker left on disk, in the supervisor's real shape.
 //
 // ITS CLOCK IS UTC AND CARRIES NO DATE, because that is what the supervisor
-// writes (`new Date.toISOString.slice(11, 19)`, main/supervisor.mjs), and
+// writes (`new Date.toISOString.slice(11, 19)`, main/supervisor.mts), and
 // stamping it any other way is not a fixture of her store. This used to be
 // hand-typed local wall-clock, which put every line of the run a day into the
 // future once notes.ts rolled it forward past `startedAt` — invisible while

@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { banner, phoneBanner } from '../shared/notify-rules.mjs';
-import { createPhoneLink } from '../main/phone-link.mjs';
+import { createPhoneLink } from '../main/phone-link.mts';
 
 describe('what a phone alert says', () => {
   it('one finished thread: its name in bold, the sentence under it', () => {

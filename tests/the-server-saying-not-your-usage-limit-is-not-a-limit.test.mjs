@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { troubleCause, runStoppedLine } from '../shared/spawn-trouble.mjs';
-import { limitInResultLine } from '../main/cloud/run.mjs';
+import { limitInResultLine } from '../main/cloud/run.mts';
 import { humanFailure } from '../renderer/src/notes.ts';
 
 const SERVER_BUSY = 'Server is temporarily limiting requests (not your usage limit)';

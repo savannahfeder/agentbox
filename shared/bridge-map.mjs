@@ -8,7 +8,7 @@
 // preload.cjs and this file ever disagree.
 //
 // The keys are the screen's own vocabulary, the values are the channels
-// main/ipc.mjs registered. Nothing here decides anything; it is a phone book.
+// main/ipc.mts registered. Nothing here decides anything; it is a phone book.
 
 /** Asked, and the screen waits for the answer. */
 export const REQUEST_CHANNELS = {
@@ -117,18 +117,18 @@ export const REQUEST_CHANNELS = {
   codexRecheck: 'zero:codex-recheck',
   // Point at the coding agent yourself, or hand the choice back to the search.
   // The browser tab has no file panel, so main answers it ok-with-nothing-done
-  // there (main/serve.mjs stubs showOpenDialog) and the row stays honest.
+  // there (main/serve.mts stubs showOpenDialog) and the row stays honest.
   engineBin: 'zero:engine-bin',
   engineSetup: 'zero:engine-setup',
   codexAddAccount: 'zero:codex-add-account',
   claudeAddAccount: 'zero:claude-add-account',
   setProjectSetting: 'zero:settings-set-project',
   setWorkspaceSetting: 'zero:settings-set-workspace',
-  // The cloud setup's sign-in for one account, made in the cloud (main/cloud/logins.mjs).
+  // The cloud setup's sign-in for one account, made in the cloud (main/cloud/logins.mts).
   cloudSignIn: 'zero:cloud-signin',
   // Claude's sign-in code, read from the clipboard while one is waiting for it.
   cloudClipboardCode: 'zero:cloud-clipboard-code',
-  // Signing in to Agentbox Cloud itself, on the app's sign-in page (main/cloud/account.mjs).
+  // Signing in to Agentbox Cloud itself, on the app's sign-in page (main/cloud/account.mts).
   cloudAccountSignIn: 'zero:cloud-account-sign-in',
   cloudAccountCancel: 'zero:cloud-account-cancel',
   cloudAccountReopen: 'zero:cloud-account-reopen',
@@ -174,7 +174,7 @@ export const REQUEST_CHANNELS = {
   moveToCloud: 'zero:move-to-cloud',
   setProductHidden: 'zero:set-product-hidden',
   approve: 'zero:approve',
-  // The phone door's Settings page (main/phone-link.mjs): its state, on, off,
+  // The phone door's Settings page (main/phone-link.mts): its state, on, off,
   // a new key, and which address the QR code carries. The desktop window only.
   phoneLink: 'zero:phone-link',
 };

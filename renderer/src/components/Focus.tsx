@@ -198,7 +198,7 @@ function CodePre({ children }: { children?: ReactNode }) {
 // It opens the way the chip already does, which sends a png to Preview.
 //
 // AND WHEN EVERY ROOT MISSES, IT ASKS MAIN BEFORE IT GIVES UP (2026-10-04).
-// `find` is the same finder a click goes through (main/artifact-path.mjs),
+// `find` is the same finder a click goes through (main/artifact-path.mts),
 // which also hunts the project for the name. A picture a click could open and
 // the window drew as "missing image" was the screenshot on w-7fe215448b.
 export function ArtifactImg({ src, alt, roots, onOpen, find }: {
@@ -249,7 +249,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
   // A picture pasted straight into a message carries its own bytes, so there is
   // no file anywhere for a click to open and it stays a picture and nothing else.
   if (/^data:/.test(src)) return <img src={src} alt={alt ?? ''} className="inline-image" />;
-  // `data-copy-file` is what a right click reads (main/main.mjs), so the
+  // `data-copy-file` is what a right click reads (main/main.mts), so the
   // picture itself offers the file. The chips at the foot used to carry it too
   // and they are gone, so this is now the only one in the message: a right
   // click on the drawing is how she copies the file out.
@@ -302,7 +302,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
 // listening, so the player is the link: the name above it still opens the file
 // in the app that owns it, and the player tries every root the way a picture
 // does. The file comes on the app's own scheme, which serves sound and film
-// from the folders the app owns (main/img-scheme.mjs), because her window is
+// from the folders the app owns (main/img-scheme.mts), because her window is
 // served over http and may not load a file:// url.
 //
 // ITS NAME IS A MENTION LIKE ANY OTHER FILE'S (w-a3a7d1a1ec, 2026-10-12). The
@@ -634,7 +634,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // WHETHER THIS MAC OFFERS A CHOICE OF CODING AGENT, and which one this row
   // runs on. Both off the snapshot and both answered by main: the byline may
   // name an engine only where there is one to name, and the two rules that
-  // decide that are pinned to main/supervisor.mjs. False and absent on every
+  // decide that are pinned to main/supervisor.mts. False and absent on every
   // Mac until the gate is opened, and the line is then the one already chosen,
   // unchanged.
   engineChoice?: boolean;
@@ -833,7 +833,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // the conversation, folded to a rail when closed (w-a3482b8c2c).
   //
   // NOT ON A MESSAGE FROM A PERSON. A message between two people lives in a
-  // record of its own (main/team/projects.mjs makeDirect), is not work, and is
+  // record of its own (main/team/projects.mts makeDirect), is not work, and is
   // never carded for the team, so it has no state to report and nothing to
   // summarise. Not on the rows with no ledger behind them either: a running
   // agent's row, the trouble row and the update row have no fields to keep.
@@ -1183,7 +1183,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     };
 
     // Clicks resolve in the main process, across the roots a worker might have
-    // meant WITHIN THIS CARD'S OWN PRODUCT (main/artifact-path.mjs): a
+    // meant WITHIN THIS CARD'S OWN PRODUCT (main/artifact-path.mts): a
     // single-root file:// href opened nothing, silently, when the worker wrote
     // it against a different root, and reaching into other products opened the
     // wrong file, which is worse.
@@ -2079,7 +2079,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
 
             That is the whole reasoning and it is not only convention. Stopping
             is something she says TO the agent, and a reply already reaches a
-            running session mid-run (`session.child.steer`, main/live-replies.mjs),
+            running session mid-run (`session.child.steer`, main/live-replies.mts),
             so the box she says things in is where the verb belongs. What was
             here was a 290 point sentence on a bordered button, under a rule of
             the same weight as the rules between messages, in the one strip of
@@ -2815,7 +2815,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   //
   // AND NOTHING IS DRAWN IN ITS PLACE. A Codex worker runs one posture,
   // `untrusted` + `workspace-write`, and the other two approval policies were
-  // measured on 2026-09-04 and neither gates anything (main/codex-session.mjs).
+  // measured on 2026-09-04 and neither gates anything (main/codex-session.mts).
   // Which of the six would stand for which Codex setting is a judgement about
   // what an agent may do on her Mac, and it is hers to make with an approval
   // path built for it. Until then the honest control is no control.

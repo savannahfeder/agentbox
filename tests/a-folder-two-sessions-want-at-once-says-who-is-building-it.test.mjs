@@ -7,7 +7,7 @@
 //   Could not make a folder for w-same: Preparing worktree (checking out 'agentbox/w-same')
 //   fatal: '.../.claude/worktrees/.building-w-same' already exists
 //
-// rather than the refusal main/task-folders.mjs documents for exactly this case:
+// rather than the refusal main/task-folders.mts documents for exactly this case:
 // "building -- another live process is part way through making it".
 //
 // WHY THE DOCUMENTED PATH WAS UNREACHABLE. `clearUnfinished` produces `building`
@@ -38,7 +38,7 @@
 // a time never did. Git has a fifth wording, and on a slow enough loser the
 // winner has already FINISHED -- the folder is at its own path and nobody is
 // building anything, so "building" is the wrong word and asking again is the
-// right move. Both are in main/task-folders.mjs now, and the guard no longer
+// right move. Both are in main/task-folders.mts now, and the guard no longer
 // calls a branch checked out in somebody's finished work a race.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -47,7 +47,7 @@ import { execFileSync, fork } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   ensureTaskFolder, buildingFolderPath, taskFolderPath, somebodyIsBuilding, whoEndedUpInTheLock,
-} from '../main/task-folders.mjs';
+} from '../main/task-folders.mts';
 
 const git = (dir, ...args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
 
@@ -308,7 +308,7 @@ describe('six sessions wanting the same folder at once', () => {
   it('gives it to exactly one of them, and tells the rest who has it', async () => {
     const child = (id) => new Promise((resolve) => {
       const code = `
-        import { ensureTaskFolder } from ${JSON.stringify(path.resolve('main/task-folders.mjs'))};
+        import { ensureTaskFolder } from ${JSON.stringify(path.resolve('main/task-folders.mts'))};
         let out;
         try {
           const made = ensureTaskFolder(${JSON.stringify(dir)}, ${JSON.stringify(id)}, { dependencies: false });

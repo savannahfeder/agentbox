@@ -4,7 +4,7 @@
 // percentages separately from estimates based on local transcripts.
 import { expect, it } from 'vitest';
 import * as format from '../shared/claude-usage.mjs';
-import { ClaudeUsage } from '../main/claude-usage.mjs';
+import { ClaudeUsage } from '../main/claude-usage.mts';
 
 const reset = '2026-10-18T03:00:00Z';
 const report = (session = 8, week = 39) => ({

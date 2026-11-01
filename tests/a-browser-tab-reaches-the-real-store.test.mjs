@@ -20,7 +20,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { bootHeadless, createServer, newToken } from '../main/serve.mjs';
+import { bootHeadless, createServer, newToken } from '../main/serve.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(here, '..');

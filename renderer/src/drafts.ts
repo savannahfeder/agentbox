@@ -236,7 +236,7 @@ export function hasDraft(item: ItemRef, store?: DraftStore): boolean {
  * So the caller hands back the two things it took, separately: the words as
  * typed WITHOUT the markdown the send appended, and the staged attachments
  * themselves. The box then opens on what it looked like before Send. The
- * staged files are still on disk (main/ipc.mjs copies out of `.staging`, never
+ * staged files are still on disk (main/ipc.mts copies out of `.staging`, never
  * moves), so the thumbnails still draw.
  *
  * One consequence, stated rather than hidden: a withdrawn send leaves its copy

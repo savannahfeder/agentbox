@@ -21,7 +21,7 @@
 //               route a row wrong (answerSettled).
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { agentSpokeSince, answerSettled } from '../shared/answers.mjs';
 import { belongsInInbox, belongsInProgress } from '../renderer/src/list-rules';
 

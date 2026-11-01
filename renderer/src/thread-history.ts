@@ -100,7 +100,7 @@ export interface ThreadEvent {
   /**
    * WHAT THIS ANSWER RAN ON, folded off the ledger rather than recorded anew:
    * the row's agent and model are written BEFORE the reply that starts a run
-   * (main/store.mjs, `answerItem`), so what the row said at this point in the
+   * (main/store.mts, `answerItem`), so what the row said at this point in the
    * file is what the run that wrote this was spawned with. Absent where the
    * row named neither, because this line never guesses.
    *
@@ -377,7 +377,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     // Ranked, most newsworthy first. Her reply outranks anything an agent set
     // on the same line; an agent's finished word outranks its progress.
     // A TEAMMATE'S HAND-OFF, which the app wrote as a reply on this thread
-    // (main/store.mjs, `tellItem`). It is theirs, and never drawn as yours.
+    // (main/store.mts, `tellItem`). It is theirs, and never drawn as yours.
     const from = line.source === 'system' && has(patch, 'answer') ? (patch!.from as { name?: string } | undefined)?.name : undefined;
     if (from && words(patch.answer)) {
       events.push({ at, who: 'agent', said: `${from} handed this over`, words: words(patch.answer)!, message: true, field: 'answer', from });
@@ -471,7 +471,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
         if (mine) continue;
         // BLOCKED AFTER A SLASH COMMAND IS NOT A STOP AND IS NOT A QUESTION.
         // `blocked` is the one status that carries a finished answer back into
-        // her inbox (`recordSessionResult`, main/store.mjs), and the supervisor
+        // her inbox (`recordSessionResult`, main/store.mts), and the supervisor
         // now uses it for a command on every install.
         events.push({ at, who: 'agent', said: askedACommand ? 'It answered you' : 'It stopped and asked you' });
         askedACommand = false;

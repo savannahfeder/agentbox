@@ -6,7 +6,7 @@
 // settings, the two origins side by side: naturalWidth 788 from file://, 0 from
 // http://. Her Agentbox runs from the dev server, so every pasted thumbnail and
 // every screenshot a worker put in a message drew as a broken image for her,
-// while a packaged build drew them fine. See main/img-scheme.mjs for the whole
+// while a packaged build drew them fine. See main/img-scheme.mts for the whole
 // measurement and for what the app agrees to serve.
 //
 // So nothing in the window builds a file:// url for a picture any more. It asks

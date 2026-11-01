@@ -16,7 +16,7 @@ import { SUMMARY_NEEDS, summaryFits, summaryPlace } from '../renderer/src/room.t
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
 describe('the window can be half of a laptop screen', () => {
-  const floor = Number(read('main/main.mjs').match(/minWidth: (\d+)/)[1]);
+  const floor = Number(read('main/main.mts').match(/minWidth: (\d+)/)[1]);
   it('goes as narrow as half of a 1440-point screen', () => {
     expect(floor).toBeLessThanOrEqual(720);
   });

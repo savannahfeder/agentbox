@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { setWorkspaceSetting, alphaFeatures } from '../main/settings.mjs';
+import { setWorkspaceSetting, alphaFeatures } from '../main/settings.mts';
 import { SETTINGS_PAGES, searchSettings } from '../renderer/src/settings-search.ts';
 
 const read = (rel) => fs.readFileSync(path.join(import.meta.dirname, '..', rel), 'utf8');
@@ -40,10 +40,10 @@ describe('saving the switches', () => {
 
 describe('where the app reads them', () => {
   it('the snapshot carries the switches, so the renderer can gate Rooms', () => {
-    expect(read('main/ipc.mjs')).toMatch(/const alpha = alphaFeatures\(config\);[\s\S]{0,600}\n\s+alpha,\n/);
+    expect(read('main/ipc.mts')).toMatch(/const alpha = alphaFeatures\(config\);[\s\S]{0,600}\n\s+alpha,\n/);
   });
   it('Settings reads them back', () => {
-    expect(read('main/settings.mjs')).toMatch(/alpha:\s*alphaFeatures\(config\)/);
+    expect(read('main/settings.mts')).toMatch(/alpha:\s*alphaFeatures\(config\)/);
   });
 });
 

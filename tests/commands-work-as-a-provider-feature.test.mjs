@@ -3,7 +3,7 @@
 // imitation), including refusal without losing a draft or widening permissions.
 import { describe, it, expect, vi } from 'vitest';
 import { providerCommand, CODEX_COMMANDS } from '../shared/provider-commands.mjs';
-import { runCodexCommand } from '../main/provider-commands.mjs';
+import { runCodexCommand } from '../main/provider-commands.mts';
 import { commandPrompt } from '../shared/claude-commands.mjs';
 describe('provider command routing',()=>{
  it.each(['model','effort','status','usage','skills','mcp','goal','review','diff','rename','copy','help','compact'])('offers /%s for Codex',name=>expect(CODEX_COMMANDS.some(c=>c.name===name)).toBe(true));
@@ -24,8 +24,8 @@ describe('Codex operations',()=>{
 });
 
 import { nativeCommandNames, reviewTarget } from '../shared/provider-commands.mjs';
-import { taskCommand } from '../main/task-commands.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { taskCommand } from '../main/task-commands.mts';
+import { Supervisor } from '../main/supervisor.mts';
 describe('native discovery and arguments',()=>{
  it('discovers custom and bundled commands without admitting lifecycle/internal commands',()=>{
   const names=nativeCommandNames({type:'system',subtype:'init',slash_commands:['code-review','my-plugin:check','clear','__remote-workflow','code-review','/tmp/file']});
@@ -105,7 +105,7 @@ describe('commands during a response',()=>{
   expect(await runCodexCommand({server,threadId:'a',name:'copy'})).toBe('finished');
  });
 });
-import { compactCodexThread } from '../main/codex-compaction.mjs';
+import { compactCodexThread } from '../main/codex-compaction.mts';
 it('does not wake an active goal just to compact a dormant thread',async()=>{
  const server={request:vi.fn(async method=>method==='thread/goal/get'?{goal:{status:'active'}}:{thread:{turns:[],status:{type:'idle'}}}),resumeThread:vi.fn(),unwatch:vi.fn(),interruptTurn:vi.fn()};
  expect(await compactCodexThread({server,threadId:'a',timeoutMs:1})).toBe('busy');

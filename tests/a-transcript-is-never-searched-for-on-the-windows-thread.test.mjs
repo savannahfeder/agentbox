@@ -2,7 +2,7 @@
 //
 // What broke (2026-10-19): with the cloud on she still got the spinning wheel.
 // A ten-minute CPU profile of the running app had one 1,419 ms stretch with
-// no idle in it, all of it in `transcriptPath` (main/agents.mjs): a session
+// no idle in it, all of it in `transcriptPath` (main/agents.mts): a session
 // whose transcript was not where Claude Code's slug rule puts it was looked
 // for through every folder in ~/.claude/projects (10,429 of them), one
 // `existsSync` each. A cloud run's transcript is in the cloud, so every cloud
@@ -31,7 +31,7 @@ const line = JSON.stringify({ type: 'ai-title', aiTitle: 'Found where it was not
 describe('a session whose transcript is not where the slug rule puts it', () => {
   it('is not searched for on the thread that asked', async () => {
     const home = aHome();
-    const agents = await import('../main/agents.mjs');
+    const agents = await import('../main/agents.mts');
     const listed = vi.spyOn(fs, 'readdirSync');
     const checked = vi.spyOn(fs, 'existsSync');
     agents.__readHistory('s-elsewhere-1', '/somewhere/else');
@@ -45,7 +45,7 @@ describe('a session whose transcript is not where the slug rule puts it', () => 
   it('is found by a later call once the search has run', async () => {
     const home = aHome();
     fs.writeFileSync(path.join(projects(home), '-p37', 's-elsewhere-2.jsonl'), `${line}\n`);
-    const agents = await import('../main/agents.mjs');
+    const agents = await import('../main/agents.mts');
     expect(agents.__readHistory('s-elsewhere-2', '/somewhere/else').about).toBe('');
     await agents.__transcriptSearch();
     expect(agents.__readHistory('s-elsewhere-2', '/somewhere/else').about).toBe('Found where it was not expected');
@@ -53,7 +53,7 @@ describe('a session whose transcript is not where the slug rule puts it', () => 
 
   it('found nowhere, is not searched for again for ten minutes', async () => {
     const home = aHome();
-    const agents = await import('../main/agents.mjs');
+    const agents = await import('../main/agents.mts');
     const listed = vi.spyOn(fs.promises, 'readdir');
     agents.__readHistory('s-nowhere', '/somewhere/else');
     await agents.__transcriptSearch();
@@ -68,7 +68,7 @@ describe('a session whose transcript is not where the slug rule puts it', () => 
     const dir = path.join(projects(home), cwd.replace(/[^a-zA-Z0-9]/g, '-'));
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 's-direct.jsonl'), `${line}\n`);
-    const agents = await import('../main/agents.mjs');
+    const agents = await import('../main/agents.mts');
     expect(agents.__readHistory('s-direct', cwd).about).toBe('Found where it was not expected');
   });
 });

@@ -86,7 +86,7 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, fold
    * agent.
    *
    *  IT IS HANDED OVER, NEVER DERIVED. Which agent the corner is about needs the
-   *  capability gate and the staleness rule, both pinned to main/supervisor.mjs;
+   *  capability gate and the staleness rule, both pinned to main/supervisor.mts;
    *  a corner that worked it out here could name Codex over a Claude Code
    *  reading. App.tsx asks `engineWordFor`, which is the byline's one rule for
    *  this and returns null wherever there is only one agent to name -- so on

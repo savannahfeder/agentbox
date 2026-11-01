@@ -16,9 +16,9 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { recordCloudLogin, markCloudLogin, listCloudLogins, cloudLoginState, mayRunOn, pickCloudLogin } from '../main/cloud/logins.mjs';
-import { orgFromOutput } from '../main/cloud/org.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { recordCloudLogin, markCloudLogin, listCloudLogins, cloudLoginState, mayRunOn, pickCloudLogin } from '../main/cloud/logins.mts';
+import { orgFromOutput } from '../main/cloud/org.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { SETUP } from '../renderer/src/cloud-setup';
 import { countedAccounts } from '../renderer/src/cloud-menu';
 

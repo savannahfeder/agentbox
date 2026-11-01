@@ -7,7 +7,7 @@
 //   <repo>/.claude/worktrees/w-1b574413db/designs/w-1b574413db/a1-page-empty.png
 //
 // Every worker now runs in a checkout of its own under the repository's
-// `.claude/worktrees/<task id>` (main/task-folders.mjs), so a path it writes is
+// `.claude/worktrees/<task id>` (main/task-folders.mts), so a path it writes is
 // relative to THAT folder. The window never looked there, and main's own hunt
 // by name skips every folder whose name starts with a dot, `.claude` included,
 // so a click could not find it either.
@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pictureRoots } from '../renderer/src/message-folders.ts';
-import { resolveArtifact } from '../main/artifact-path.mjs';
+import { resolveArtifact } from '../main/artifact-path.mts';
 
 const DIR = '/Users/you/Zero/accounts/acct/agentbox-team';
 const REPO = '/Users/you/dev/agentbox';

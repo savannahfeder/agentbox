@@ -18,7 +18,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { cloudFootLine } from '../renderer/src/cloud-menu.ts';
 
 const dirs = [];

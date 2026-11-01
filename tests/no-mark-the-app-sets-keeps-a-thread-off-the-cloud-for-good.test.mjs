@@ -18,7 +18,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
 
 const HOUR = 60 * 60_000;
@@ -74,7 +74,7 @@ describe('every hand-back moves one request, however many came before', () => {
   });
 
   it('the run here says it goes back afterwards, never that it stays', () => {
-    const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     expect(src).not.toMatch(/handed this thread back twice/);
     expect(src).not.toMatch(/cloudHandBacks/);
   });

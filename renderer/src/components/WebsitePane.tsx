@@ -129,7 +129,7 @@ export function WebsitePane({ url, webview, ready = true, control, onNavigate, o
 
   // Opaque on purpose: `allow-same-origin` beside `allow-scripts` lets a page
   // escape its own sandbox, and on the phone door the app is served from this
-  // very origin (main/serve.mjs).
+  // very origin (main/serve.mts).
   return <iframe
     className="doc-view doc-website-view"
     style={{ opacity: ready ? 1 : 0 }}

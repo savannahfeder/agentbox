@@ -4,7 +4,7 @@
 // can be minutes into one command, and calling that a failure made her re-send
 // a message the agent then received twice (w-d92559b84f).
 import {it,expect,vi} from 'vitest';import {EventEmitter} from 'node:events';
-import {attachClaudeInput,streamInputArgs} from '../main/claude-input.mjs';
+import {attachClaudeInput,streamInputArgs} from '../main/claude-input.mts';
 import {harnessDefinition} from '../shared/harness-definitions.mjs';
 function fake(){const c=new EventEmitter();c.stdout=new EventEmitter();c.stdin={writable:true,write:()=>true,end:()=>{c.stdin.writable=false;},on:()=>{}};return c;}
 it('keeps grants and resumes while moving only the prompt to stdin',()=>{expect(streamInputArgs(harnessDefinition('claude').run,['-p','hello','--resume','session','--permission-mode','default'])).toEqual(['-p','--resume','session','--permission-mode','default','--input-format','stream-json','--replay-user-messages']);});

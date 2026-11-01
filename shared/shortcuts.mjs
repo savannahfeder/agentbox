@@ -10,7 +10,7 @@
 // even harder here is that a hint is read for a second and a reference page is
 // believed. So the list is a value, and
 // `tests/the-shortcuts-page-lists-keys-that-work.test.mjs` reads every entry
-// below against the branch in App.tsx (or main/main.mjs, or Compose.tsx) that
+// below against the branch in App.tsx (or main/main.mts, or Compose.tsx) that
 // actually runs it. A key added here without a handler fails the suite.
 //
 // WHY IT IS IN shared/ AND PLAIN ESM (w-7ec8553e23, 2026-10-04). It lived in
@@ -79,7 +79,7 @@
 //   key here that cannot be said without the word "permissions", and Settings
 //   already has a whole group explaining those.
 //
-//   ⌘R, ⌘=, ⌘- and ⌘0. The Mac's own chords, answered in main.mjs so they work
+//   ⌘R, ⌘=, ⌘- and ⌘0. The Mac's own chords, answered in main.mts so they work
 //   over the game. Nobody needs to be taught reload and zoom.
 //
 // EVERY SENTENCE IS PLAIN. A tester does not know what a modal, a pane, a
@@ -198,7 +198,7 @@ export const SHORTCUTS = [
     label: 'Anywhere in the app',
     keys: [
       // (meta||ctrl) && 'k' → the palette, above every other branch, and
-      // forwarded from inside an open file by main.mjs as well.
+      // forwarded from inside an open file by main.mts as well.
       { keys: ['⌘K', 'Ctrl+K'], join: 'or', what: `The command bar: everything ${NAME} can do, by name.` },
       // 'n' in both branches → setModal('compose').
       // "Threads", not tasks, since w-ec62ab6b38.
@@ -207,7 +207,7 @@ export const SHORTCUTS = [
       { keys: ['⌘C'], what: 'Turn the cloud on or off, when no text is selected.' },
       // '/' above the focused branch → openSearch
       { keys: ['/'], what: 'Search your threads.' },
-      // main/main.mjs before-input-event: ⌘Y / ⌘N answer the oldest approval.
+      // main/main.mts before-input-event: ⌘Y / ⌘N answer the oldest approval.
       // Its own card prints "⌘Y / ⌘N" beside Allow and Deny, so the words here
       // are the card's words. It lives under this heading rather than under an
       // open task because it is answered from anywhere at all.

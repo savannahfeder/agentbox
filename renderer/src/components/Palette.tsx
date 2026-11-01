@@ -135,7 +135,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: onOpenProjects,
     }] : []),
     // MY WORKSPACE SAYS WHAT IT IS (w-04e8d6d6e6). The app makes it at launch
-    // so that a thread always has somewhere to go (main/main.mjs), and a new
+    // so that a thread always has somewhere to go (main/main.mts), and a new
     // user meets it here as a project they never made, with nothing on the row
     // to say so. Its hint says what it is until it is ranked, after which
     // where it stands is the more useful thing to say.

@@ -90,7 +90,7 @@ not where you find out.
 
 A RED MAIN FIXES ITSELF (2026-10-29). When GitHub's whole-suite run on main
 goes red, the app files a thread that starts on its own, fixes the break or
-reverts the commit, and ships without review (`main/main-went-red.mjs`). After
+reverts the commit, and ships without review (`main/main-went-red.mts`). After
 two fixes that leave main red, the next one waits in Needs you. While main is
 red, a push is refused only for tests it turned red itself: the ones already
 red on main are left out (`AGENTBOX_RED_ON_MAIN` in the pre-push hook).

@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { importedLine } from '../renderer/src/agent-import-card';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 
 const read = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 
@@ -52,7 +52,7 @@ describe('the count of chats filed in Done', () => {
     const chat = (id, waiting) => ({ id, source: 'terminal', folder, title: id, firstSaid: id, lastSaid: waiting ? 'Ok?' : 'Done.', waiting });
     expect(store.importThreadRows(slug, [chat('a', true), chat('b', false)], { land: 'sorted' })).toMatchObject({ added: 2, done: 1 });
     expect(store.importCodexThreads(slug, [{ ...chat('c', false), source: 'codex', prompt: 'c', last: 'Done.' }], { land: 'sorted' })).toMatchObject({ added: 1, done: 1 });
-    expect(read('main/ipc.mjs')).toContain('done: claude.done + codex.done');
+    expect(read('main/ipc.mts')).toContain('done: claude.done + codex.done');
     expect(read('renderer/src/api.ts')).toContain('done: Number(r?.done ?? 0)');
     expect(read('renderer/src/components/ImportAgents.tsx')).toContain('done += r.done ?? 0;');
   });

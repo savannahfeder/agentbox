@@ -14,7 +14,7 @@ const card = fs.readFileSync(new URL('../renderer/src/components/Onboarding.tsx'
 const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
 // The names the card keeps are saved in main now, so the check that they are
 // still saved at all has to look where they are saved.
-const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
 
 describe('the walk ends by saying it is over', () => {
   it('has a step after the command bar, and it is still beat ten', () => {

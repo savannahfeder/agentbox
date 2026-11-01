@@ -39,7 +39,7 @@ export const REPO = path.resolve(here, '../../../..');
 export const ROOT = '/tmp/agentbox-verify';
 export const RUNS = path.join(ROOT, 'runs');
 const { FRESH_USER_ENV } = await import(path.join(REPO, 'shared', 'fresh-user-home.mjs'));
-const { listCloudLogins } = await import(path.join(REPO, 'main', 'cloud', 'logins.mjs'));
+const { listCloudLogins } = await import(path.join(REPO, 'main', 'cloud', 'logins.mts'));
 const { accountIdentity, nameForOrganization } = await import(path.join(REPO, 'main', 'account-tooling.mjs'));
 const KEY = crypto.createHash('sha1').update(REPO).digest('hex').slice(0, 8);
 /** One copy per checkout, or per name within it (`VERIFY_INSTANCE`), so a power test can run one copy per tester. */
@@ -113,7 +113,7 @@ export function cloudTmpFor(instance) {
 
 /**
  * The cloud accounts some emails name, as keys a copy's runs may use
- * (AGENTBOX_CLOUD_ACCOUNTS, main/cloud/logins.mjs pickCloudLogin). A Claude
+ * (AGENTBOX_CLOUD_ACCOUNTS, main/cloud/logins.mts pickCloudLogin). A Claude
  * login in the cloud carries its organization and not its email, so it is
  * named the way the cloud menu names it: by the one login here in it.
  */

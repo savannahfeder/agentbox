@@ -1,9 +1,9 @@
 // PICTURES AND DESIGN PAGES WERE BLANK ON A PHONE (2026-10-11). The desktop
 // draws them from two addresses only its own window can open (agentbox-img://
-// and agentbox-doc://, main/img-scheme.mjs and main/doc-scheme.mjs); a phone
+// and agentbox-doc://, main/img-scheme.mts and main/doc-scheme.mts); a phone
 // asked for them and got nothing, so every screenshot in a message and every
 // design page an agent made came up empty on a real iPhone ("images and
-// artefacts are missing"). Measured by reading main/serve.mjs: it answered
+// artefacts are missing"). Measured by reading main/serve.mts: it answered
 // /events, /api/* and the built screen, and nothing else.
 //
 // The phone's own server now answers /f/<file key>/<doc|img>/<path> under the
@@ -15,7 +15,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createServer, newToken, fileKey } from '../main/serve.mjs';
+import { createServer, newToken, fileKey } from '../main/serve.mts';
 import { phoneFileUrl } from '../renderer/src/phone-files';
 
 let server, base, token, root, outside, dist;

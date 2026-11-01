@@ -10,7 +10,7 @@
 //
 //   The hook payload is Claude Code's, field for field. `tool_name` is "Bash",
 //   the command is at `tool_input.command`, and the deny Codex reads is the same
-//   `hookSpecificOutput.permissionDecision` JSON main/memory-gate-server.mjs
+//   `hookSpecificOutput.permissionDecision` JSON main/memory-gate-server.mts
 //   already prints. So scripts/memory-gate-hook.sh is carried over UNCHANGED.
 //
 //   THE MATCHER IS "Bash" AND NOT "shell". A hook with matcher "shell" was
@@ -42,7 +42,7 @@ import {
   withoutOurHooks,
   ourTrustEdits,
   hookIsOurs,
-} from '../main/codex-memory-gate.mjs';
+} from '../main/codex-memory-gate.mts';
 
 const SCRIPT = '/Applications/Agentbox.app/Contents/scripts/memory-gate-hook.sh';
 

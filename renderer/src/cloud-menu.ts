@@ -14,7 +14,7 @@ export interface CloudMonth {
   costPerAgentHour: number | null;
 }
 
-// A sign-in going on in the cloud (main/cloud/logins.mjs). Claude: its page
+// A sign-in going on in the cloud (main/cloud/logins.mts). Claude: its page
 // opens, she copies the code it shows. Codex: OpenAI's page opens, she types
 // the code shown here, and it finishes by itself.
 export interface CloudSignIn {
@@ -150,7 +150,7 @@ export const countedAccounts = (accounts: CloudAccount[]) => accounts.filter((a)
 
 /**
  * THE ONE ACCOUNT THE CLOUD RUNS ON, as the app marks it. The rule is
- * `pickCloudLogin`'s (main/cloud/logins.mjs) and it starts from this Mac's own
+ * `pickCloudLogin`'s (main/cloud/logins.mts) and it starts from this Mac's own
  * account, which the screen's copy of the cloud accounts cannot see. One at
  * its usage limit is still the account, and the cloud waits for it.
  */

@@ -22,7 +22,7 @@ import { placeIsSomewhere, readPlace, writePlace } from '../renderer/src/where-s
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const app = fs.readFileSync(path.join(here, '..', 'renderer', 'src', 'App.tsx'), 'utf8');
-const mainProcess = fs.readFileSync(path.join(here, '..', 'main', 'main.mjs'), 'utf8');
+const mainProcess = fs.readFileSync(path.join(here, '..', 'main', 'main.mts'), 'utf8');
 
 const store = (seed) => {
   let held = seed ?? null;

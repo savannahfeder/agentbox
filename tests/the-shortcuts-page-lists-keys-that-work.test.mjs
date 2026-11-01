@@ -43,7 +43,7 @@ const focus = read('renderer/src/components/Focus.tsx');
 // The summary panel owns S in its own capture-phase listener (2026-10-01), so
 // that row's handler is here rather than in App.tsx.
 const summary = read('renderer/src/threads/Summary.tsx');
-const mainProc = read('main/main.mjs');
+const mainProc = read('main/main.mts');
 const css = read('renderer/src/styles.css');
 
 // The window key handler, cut into the three states it actually has. Every

@@ -18,8 +18,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { Supervisor } from '../main/supervisor.mjs';
-import { Store } from '../main/store.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { Store } from '../main/store.mts';
 
 let tmp; let store; let sup; let joined; let folder; let relays; let homeWas;
 

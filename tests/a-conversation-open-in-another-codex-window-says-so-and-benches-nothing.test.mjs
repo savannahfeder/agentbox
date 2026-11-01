@@ -16,8 +16,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { createCodexAppServer } from '../main/codex-app-server.mjs';
-import { createCodexWorker } from '../main/codex-session.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { createCodexWorker } from '../main/codex-session.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import {
   troubleCause, deadRunSentence, deadRunCause, runStoppedLine, needsHerHands, causeBreakdown,
 } from '../shared/spawn-trouble.mjs';

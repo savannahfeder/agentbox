@@ -1,4 +1,4 @@
-// The note the app writes on a row once its ship lands (main/store.mjs), and
+// The note the app writes on a row once its ship lands (main/store.mts), and
 // the one reader that has to know it is the app's and not an agent's
 // (renderer/src/format.ts, offerIsLive).
 export const shippedNote = (sha) => (sha ? `Shipped to main as ${sha}.` : 'Shipped to main.');

@@ -9,8 +9,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { appHome } from '../main/store/home.mjs';
-import { loadStore } from '../main/store-modules.mjs';
-import { Teammates } from '../main/teammates.mjs';
+import { loadStore } from '../main/store-modules.mts';
+import { Teammates } from '../main/teammates.mts';
 import { foldPlaybooks } from '../shared/teammates.mjs';
 
 describe('playbooks, folded', () => {
@@ -118,7 +118,7 @@ describe('a teammate keeping a lesson', () => {
 // points at the work instead of describing it again.
 describe('handing work on', () => {
   it('the brief says to point at threads, files and links rather than retell them', () => {
-    const src = fs.readFileSync(new URL('../main/teammates.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/teammates.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/point at the threads, files and links it needs rather than retelling them/);
   });
 });

@@ -14,7 +14,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readCodexThreads } from '../main/codex-threads.mjs';
+import { readCodexThreads } from '../main/codex-threads.mts';
 
 const NOW = Date.now();
 let home;
