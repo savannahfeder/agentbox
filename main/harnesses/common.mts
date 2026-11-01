@@ -3,6 +3,7 @@ import type { ChildProcess } from 'node:child_process';
 import { instructionsFor } from './instructions-file.mts';
 import type { InstructionsContext, InstructionsAnswer } from './instructions-file.mts';
 import type { OpenCodeProperties } from '../opencode.mts';
+import type { ToolingResult } from '../account-tooling.mjs';
 
 export type Env = NodeJS.ProcessEnv;
 
@@ -191,7 +192,7 @@ export interface Harness extends Omit<HarnessDefinition, 'instructions'> {
   readers(): HarnessReaders;
   subscribe(child: unknown, session: HarnessSession, absorb: (...args: never[]) => unknown): void;
   attachInput(child: unknown): unknown;
-  tooling(profile?: string): unknown;
+  tooling(profile?: string): ToolingResult | null;
   transcript(sup: HarnessSupervisor, rec: HarnessRecord | null | undefined): unknown;
   change(session: HarnessSession, options?: unknown): unknown;
   release(sup: HarnessSupervisor, profile?: string): unknown;

@@ -578,7 +578,7 @@ export function accountSentence(cause: string, dir?: string | null): string {
 // subcommand, read off `codex --help` on this Mac 2026-09-05, for the same
 // reason /login is named next door: "sign in again" is a thing to go and work
 // out; a command is a thing to type.
-export function engineTroubleNote(cause: string, engineWord: string = 'Codex'): string {
+export function engineTroubleNote(cause: string | null | undefined, engineWord: string = 'Codex'): string {
   if (cause === 'signed-out') {
     return `${engineWord} is signed out, so nothing runs on it. Open a terminal, run codex login, and its tasks pick straight back up.`;
   }

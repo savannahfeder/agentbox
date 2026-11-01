@@ -58,7 +58,7 @@ export interface CodexAppServer {
   resumeThread(params?: { threadId?: unknown; [key: string]: unknown }, handlers?: CodexThreadHandlers): Promise<unknown>;
   startTurn(threadId: string, params?: object): Promise<unknown>;
   interruptTurn(threadId: string, turnId: string): Promise<unknown>;
-  steerTurn(threadId: string, expectedTurnId: string, text: string, pictures?: string[]): Promise<unknown>;
+  steerTurn(threadId: string, expectedTurnId: string, text: string, pictures?: unknown[]): Promise<unknown>;
   watch(threadId: string, handlers?: CodexThreadHandlers): string;
   unwatch(threadId: string): boolean;
   close(note?: string): void;

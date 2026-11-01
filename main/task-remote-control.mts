@@ -1,6 +1,7 @@
 // Remote registration belongs to the existing task process and account.
 // No links or enabled state survive an app restart without a live provider.
 import { Name } from '../shared/product-name.mjs';
+import type { Product } from './supervisor.mts';
 
 export interface RemoteControlState {
   state: string;
@@ -19,9 +20,9 @@ export interface BridgeStateEvent {
 
 /** The part of a worker's child process that remote control drives. */
 export interface RemoteChild {
-  control(request: Record<string, unknown>, timeoutMs?: number): Promise<{ session_url: string; bridge_epoch: number }>;
-  holdInput(hold: boolean): void;
-  stdin: { writable: boolean; end(): void };
+  control?(request: Record<string, unknown>, timeoutMs?: number): Promise<{ session_url?: unknown; bridge_epoch?: unknown }>;
+  holdInput?(hold: boolean): void;
+  stdin?: { writable: boolean; end(): void } | null;
   on(event: 'bridge-state', listener: (event: BridgeStateEvent) => void): unknown;
   once(event: 'exit', listener: () => void): unknown;
 }
@@ -37,6 +38,7 @@ export interface RemoteSession {
 
 export interface RemoteItem {
   id: string;
+  product: string;
   agent?: unknown;
   title?: string;
 }
@@ -48,11 +50,11 @@ export interface RemoteSupervisor {
   sessions: Map<string, RemoteSession>;
   store: {
     readItem(product: string, id: string): RemoteItem | null | undefined;
-    listProducts(): { slug: string }[];
+    listProducts(): Product[];
   };
   _engineFor(item: RemoteItem): string;
-  rowSessionFor(item: RemoteItem, project: { slug: string } | undefined): { sessionId?: string; profile?: string } | null | undefined;
-  spawnWorker(item: RemoteItem & { product: string }, options: { continuation: boolean; resumeSessionId?: string; profile?: string; engine: string; remoteOnly: boolean }): unknown;
+  rowSessionFor(item: RemoteItem, project: Product | undefined): { sessionId?: string; profile?: string | null } | null | undefined;
+  spawnWorker(item: RemoteItem & { product: string }, options: { continuation: boolean; resumeSessionId?: string; profile?: string | null; engine: string; remoteOnly: boolean }): unknown;
 }
 
 export function remoteSessionUrl(value: string): string | null {
@@ -81,7 +83,7 @@ export async function taskRemoteControl(sup: RemoteSupervisor,product: string,id
  if(action==='disable') {
   if(!session?.remoteHeld)return publish('off');
   publish('disconnecting');
-  try { await session.child.control({subtype:'remote_control',enabled:false});session.remoteHeld=false;session.child.holdInput(false);if(session.remoteIdle&&session.child.stdin.writable)session.child.stdin.end();return publish('off'); }
+  try { await session.child.control!({subtype:'remote_control',enabled:false});session.remoteHeld=false;session.child.holdInput!(false);if(session.remoteIdle&&session.child.stdin!.writable)session.child.stdin!.end();return publish('off'); }
   catch(error){return publish('failed',{text:(error as Error).message,mayBeActive:true});}
  }
  const project=sup.store.listProducts().find(p=>p.slug===product);
@@ -91,7 +93,7 @@ export async function taskRemoteControl(sup: RemoteSupervisor,product: string,id
  try {
   if(!session){sup.spawnWorker({...item,product},{continuation:true,resumeSessionId:record!.sessionId,profile:record!.profile,engine:'claude',remoteOnly:true});session=sup.sessions.get(id);}
   if(!session?.child?.control)throw Error('This conversation could not start. Check its account and try again.');
-  session.child.holdInput(true);session.remoteHeld=true;
+  session.child.holdInput!(true);session.remoteHeld=true;
   if(!session.remoteListeners){
    session.remoteListeners=true;
    session.child.on('bridge-state',event=>{
@@ -105,14 +107,14 @@ export async function taskRemoteControl(sup: RemoteSupervisor,product: string,id
   session.remoteInit??=session.child.control({subtype:'initialize',hooks:{}});
   await session.remoteInit;
   const result=await session.child.control({subtype:'remote_control',enabled:true,name:item.title||`${Name} conversation`});
-  const url=remoteSessionUrl(result.session_url);
+  const url=remoteSessionUrl(result.session_url as string);
   if(!url)throw Error('Claude did not return a valid remote session link.');
-  return publish('ready',{url,epoch:result.bridge_epoch,mayBeActive:true});
+  return publish('ready',{url,epoch:result.bridge_epoch as number,mayBeActive:true});
  } catch(error) {
   // A timeout is not proof that registration failed. Explicitly turn it off;
   // if that cannot be confirmed, keep a visible stop action and the process.
   let mayBeActive=false;
-  if(session?.remoteHeld){try{await session.child.control({subtype:'remote_control',enabled:false},5000);session.remoteHeld=false;session.child.holdInput(false);if(session.remoteIdle&&session.child.stdin.writable)session.child.stdin.end();}catch{mayBeActive=true;}}
+  if(session?.remoteHeld){try{await session.child.control!({subtype:'remote_control',enabled:false},5000);session.remoteHeld=false;session.child.holdInput!(false);if(session.remoteIdle&&session.child.stdin!.writable)session.child.stdin!.end();}catch{mayBeActive=true;}}
   return publish('failed',{text:(error as Error).message,mayBeActive});
  }
 }

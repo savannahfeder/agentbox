@@ -137,7 +137,7 @@ export interface AdoptNewArgs extends AdoptArgs {
   body: string;
   command: string;
   choices: Record<string, unknown>;
-  repeat?: { rule: unknown; key: unknown };
+  repeat?: { rule: string; key: string };
 }
 
 export interface PhoneBackendCalls extends Partial<PhoneBackend> {

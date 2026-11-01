@@ -10,6 +10,7 @@ import { loadStore } from './store-modules.mts';
 import type { StoreModules } from './store-modules.mts';
 import { Repeats } from './repeats.mjs';
 import type { CodexThreadLike } from '../shared/codex-import.mts';
+import type { Callout } from '../shared/dashboard.mts';
 import { CLEAN_LABEL, isCleanRun } from '../shared/repeats.mjs';
 import { answerFor, describeFor } from './first-run.mts';
 import { checkProjectFolder } from '../shared/project-folder-check.mts';
@@ -507,7 +508,7 @@ export class Store {
   // but written as the app with the teammate named on the line, so it is never
   // read as yours. `hold` blocks the thread after it until you reply
   // (`heldForHer`).
-  tellItem(slug: string, id: string, { text, from, hold = false, hop = null }: { text: string; from?: string; hold?: boolean; hop?: number | null }) {
+  tellItem(slug: string, id: string, { text, from, hold = false, hop = null }: { text: string; from?: { teammate: string; name: string }; hold?: boolean; hop?: number | null }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     let item = workItemsDisk.updateWorkItem(dir, id, { answer: text, from }, { source: 'system' });
@@ -1389,7 +1390,7 @@ export class Store {
     // THE ANSWER IS THE PRE-WRITTEN SENTENCE, ours, with her folder's numbers in
     // it. The description is a different fact and it is only ever a sidebar
     // line; see main/first-run.mts and shared/first-run-shape.mts.
-    const line = answerFor({ folder, name });
+    const line = answerFor({ folder, name } as { folder: string; name: string });
     const item = workItemsDisk.updateWorkItem(
       this.productDir(slug), id, { result: line }, { source: 'agent' },
     );
@@ -1747,7 +1748,7 @@ export class Store {
       unmeasured: m?.value == null,
     });
     let headline = null;
-    let rows: { label: string; value: string; unit: string; unmeasured: boolean }[] = [];
+    let rows: { label: string; value: string | Callout; unit: string; unmeasured: boolean }[] = [];
     try {
       const { key, others } = dashboard.metricRow(picture, { others: 4 });
       headline = key ? asRow(key) : null;

@@ -5,6 +5,7 @@ import { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/c
 import { NO_METERED_KEY } from './harnesses/claude.mts';
 export { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/claude-stream.mts';
 import { taskRemoteControl } from './task-remote-control.mts';
+import type { BridgeStateEvent } from './task-remote-control.mts';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mts';
 import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
@@ -101,6 +102,7 @@ function whoHasIt(made: { taken?: boolean; reason?: string; heldBy?: number | nu
 import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mts';
 import { DEFAULT_SESSIONS_AT_ONCE } from './config.mjs';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mjs';
+import type { AccountIdentity } from './account-tooling.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
 import { referencedFiles, isImagePath } from '../shared/referenced-files.mts';
 import { namedThreadsBlock } from '../shared/named-threads.mts';
@@ -143,6 +145,7 @@ import { CLAUDE_MODELS } from '../shared/claude-models.generated.mjs';
 import { codexLaunchEnv } from './codex-launch-env.mts';
 import { CodexUsage, codexAccountReadings } from './codex-usage.mts';
 import { createCodexWorker, mcpServerNames, resumeThreadParams, workerThreadParams } from './codex-session.mts';
+import type { CodexServerClient } from './codex-session.mts';
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mjs';
 import { cloudCodexMode } from './cloud-permission.mts';
 import { createCodexApprovals } from './codex-approvals.mjs';
@@ -178,7 +181,7 @@ import type { ActiveTool } from './agent-activity.mts';
 import type { ShipItem, ShipProduct } from './ship-queue.mts';
 import type { CloudKit } from './cloud/kit.mts';
 import type { CatchUpCard } from './catch-up.mts';
-import type { QueuedLine } from './live-replies.mts';
+import type { QueuedLine, ReplyPayload } from './live-replies.mts';
 import type { Kit } from '../shared/cloud-kit.mjs';
 
 export type WorkItemStatus = 'open' | 'claimed' | 'done' | 'blocked';
@@ -305,6 +308,7 @@ export interface WorkerChild {
   on(event: 'error', listener: (error: Error) => void): unknown;
   on(event: 'input-turn', listener: () => void): unknown;
   on(event: 'remote-user', listener: (event: RemoteUserEvent) => void): unknown;
+  on(event: 'bridge-state', listener: (event: BridgeStateEvent) => void): unknown;
   once(event: 'spawn', listener: () => void): unknown;
   once(event: 'exit', listener: (code: number | null, signal: NodeJS.Signals | null) => void): unknown;
   holdInput?(value: unknown): void;
@@ -592,7 +596,7 @@ export interface SupervisorStore {
   readHistory?(slug: string, id: string, opts?: { max?: number; before?: number }): QueuedLine[];
   isDue(item: WorkItem, now?: number): boolean;
   answerItem(slug: string, id: string, patch: { answer?: string; status?: WorkItemStatus | null; [field: string]: unknown }): WorkItem | null | undefined;
-  tellItem(slug: string, id: string, opts: { text: string; from?: unknown; hold?: boolean; hop?: unknown }): WorkItem | null | undefined;
+  tellItem(slug: string, id: string, opts: { text: string; from?: { teammate: string; name: string }; hold?: boolean; hop?: number | null }): WorkItem | null | undefined;
   recordSessionResult(slug: string, id: string, opts: { result: string; status?: WorkItemStatus | null }): WorkItem | null | undefined;
   releaseRunClaim(slug: string, id: string, run: unknown): unknown;
   nameItem(slug: string, id: string, label: string): unknown;
@@ -5876,7 +5880,7 @@ export class Supervisor {
   _cloudAccounts() {
     const now = Date.now();
     const out: Record<string, unknown>[] = [];
-    let here: { profile: string; [fact: string]: unknown }[] | null = null;
+    let here: (Partial<AccountIdentity> & { profile: string })[] | null = null;
     for (const engine of [DEFAULT_ENGINE, 'codex']) {
       const inUse = cloudLoginInUse(engine, this._cloudAccountAsk(engine, now))?.key ?? null;
       listCloudLogins(engine, { home: this.config.home }).forEach((r) => {
@@ -8566,12 +8570,12 @@ export class Supervisor {
     };
     // A teammate's words on another teammate's thread take the same road, as
     // that teammate's. A held one never reaches a running session.
-    const tell = async (product: string, id: string, { text, from, hold = false, hop = null }: { text: string; from: { name: string } & Record<string, unknown>; hold?: boolean; hop?: unknown }) => {
-      const commit = () => this.store.tellItem(product, id, { text, from, hold, hop });
+    const tell = async (product: string | null, id: string, { text, from, hold = false, hop = null }: { text: string; from: { teammate: string; name: string }; hold?: boolean; hop?: number | null }) => {
+      const commit = () => this.store.tellItem(product as string, id, { text, from, hold, hop });
       if (hold) { commit(); this.wake?.(); return 'held'; }
       let timer: NodeJS.Timeout | undefined;
       const late = new Promise((resolve) => { timer = setTimeout(() => resolve('late'), TEAMMATE_REPLY_DEADLINE_MS); });
-      const sent = submitReply(this, { product, id, answer: text, from: from.name }, commit);
+      const sent = submitReply(this, { product, id, answer: text, from: from.name } as ReplyPayload, commit);
       const out = await Promise.race([sent, late]).finally(() => clearTimeout(timer));
       if (out === 'late') {
         sent.catch((err: Error) => teammates.noteTrouble(`A hand-off to a running teammate did not land: ${err.message}`));
@@ -9855,7 +9859,7 @@ export class Supervisor {
       say: (line: string) => worker?.stderr?.emit?.('data', line),
     });
     worker = createCodexWorker({
-      server: client,
+      server: client as CodexServerClient,
       // The handshake AND the isolation list, both of which have to be in hand
       // before `thread/start`: her MCP servers launch at the start, and a
       // thread already running cannot un-launch them. Read fresh for THIS start
@@ -10291,7 +10295,7 @@ export class Supervisor {
         proc.once('error', () => resolveExit({ code: 1, signal: null }));
         return proc;
       },
-      onNotification: (method: string, params: { rateLimits?: unknown } | null | undefined) => this._codexUsage().saw(method, params, home),
+      onNotification: (method: string, params: unknown) => this._codexUsage().saw(method, params as { rateLimits?: unknown } | null | undefined, home),
     });
     const handshake = client.initialize();
     handshake.catch(() => { /* the worker chains its own catch off this */ });
@@ -10327,7 +10331,7 @@ export class Supervisor {
       // is the whole reason the corner never starts a process to draw Codex's
       // meter. The home goes with it because there is one app-server per login
       // and a reading belongs to the one that gave it.
-      onNotification: (method: string, params: { rateLimits?: unknown } | null | undefined) => this._codexUsage().saw(method, params, home),
+      onNotification: (method: string, params: unknown) => this._codexUsage().saw(method, params as { rateLimits?: unknown } | null | undefined, home),
       // A REQUEST CODEX INVENTED SINCE WE LAST READ ITS SCHEMA (w-36c51443df).
       //
       // The transport refuses it, which is the right answer and is not in
@@ -12597,7 +12601,7 @@ export class Supervisor {
     // and the next Codex worker starts a server anyway and trusts it then.
     const live = server ?? (on ? this._codexServers?.get(home) : null);
     const request = live
-      ? async (method: string, params: unknown) => { await live.handshake; return live.client.request(method, params); }
+      ? async (method: string, params: unknown) => { await live.handshake; return live.client.request(method, params) as Promise<{ data?: unknown } | null | undefined>; }
       : null;
     return syncCodexMemoryGate({
       home,

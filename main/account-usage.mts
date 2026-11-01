@@ -25,7 +25,7 @@ export interface AccountUsageOptions {
   run?: UsageRunner;
   now?: () => number;
   where?: () => string;
-  identity?: (profile: string) => { accountUuid?: string } | null;
+  identity?: (profile: string) => { accountUuid?: string | null } | null;
 }
 
 export class AccountUsage {
@@ -35,7 +35,7 @@ export class AccountUsage {
   declare _run: UsageRunner | undefined;
   declare _now: () => number;
   declare _where: (() => string) | undefined;
-  declare _identity: (profile: string) => { accountUuid?: string } | null;
+  declare _identity: (profile: string) => { accountUuid?: string | null } | null;
   declare _readers: Map<string, ClaudeUsage>;
 
   /**
