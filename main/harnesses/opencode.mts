@@ -30,7 +30,7 @@ import {
   openCodePermissionConfig,
 } from '../opencode.mts';
 import { definitionMethods, commonUpdatePlan } from './common.mts';
-import type { Env, HarnessPlan, HarnessSession, HarnessSpawnContext, HarnessSupervisor, SignInFilesWhere, UpdatePlanOptions } from './common.mts';
+import type { BinKey, Env, HarnessConfig, HarnessPlan, HarnessSession, HarnessSpawnContext, HarnessSupervisor, SignInFilesWhere, UpdatePlanOptions } from './common.mts';
 
 const definition = harnessDefinition('opencode');
 
@@ -69,7 +69,7 @@ export const openCodeHarness = {
 
   // BINARY DISCOVERY. No bespoke resolver: the binary is whatever the config
   // names, the same question `common.mts` answers for the other two.
-  discover: (config: Record<string, string | null | undefined> | null = {}) => config?.[definition.binKey] ?? null,
+  discover: (config: HarnessConfig | null = {}) => config?.[definition.binKey as BinKey] ?? null,
 
   // SIGN-IN. `opencode auth login` writes to OpenCode's own store and
   // `opencode auth list` reports it. Agentbox launches those two and reads
@@ -117,7 +117,7 @@ export const openCodeHarness = {
   spawn(sup: HarnessSupervisor, plan: HarnessPlan & OpenCodePlan, { cwd, item, profile = 'default', env }: HarnessSpawnContext) {
     const configFile = writePermissionConfig(cwd);
     const password = sup._openCodePassword?.() ?? null;
-    const server = spawn(sup.config[definition.binKey], ['serve', '--hostname', '127.0.0.1', '--port', '0'], {
+    const server = spawn(sup.config[definition.binKey as BinKey]!, ['serve', '--hostname', '127.0.0.1', '--port', '0'], {
       cwd,
       env: {
         ...env,

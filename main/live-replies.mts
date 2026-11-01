@@ -48,7 +48,7 @@ export interface ReplySession {
   remoteIdle?: boolean;
   engine?: string;
   sessionId?: string;
-  lastLiveReply?: ReplyItem;
+  lastLiveReply?: ReplyItem | null;
   exitFailed?: boolean;
   stoppedByUs?: boolean;
 }

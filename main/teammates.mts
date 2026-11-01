@@ -17,6 +17,9 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RepeatShape } from '../shared/repeats.mjs';
+import type { ItemRef, TeammateStatus, Offer, WakeTrigger, WakeAction } from '../shared/teammates.mjs';
+
+export type { ItemRef, TeammateStatus, Offer, WakeTrigger, WakeAction };
 
 export type Works = RepeatShape;
 
@@ -57,8 +60,6 @@ export interface Teammate {
 export type TeammatePatch = Partial<Teammate> & { remember?: Memory; forget?: string };
 
 export interface ThreadRef { product?: string; id: string; title?: string }
-
-export interface ItemRef { id: string; product?: string; title?: string }
 
 export interface Turn { source?: string; field?: string; text?: string }
 
@@ -110,59 +111,6 @@ export interface Playbook {
   lessons: { id: string; text: string; ts: number; by: string | null; from: ThreadRef | null }[];
   updatedAt: number;
 }
-
-export interface TeammateStatus {
-  waiting: ItemRef[];
-  now: string | null;
-  running: { id: string; product: string } | null;
-  queued: number;
-  next: ItemRef[];
-  done: ItemRef[];
-  runsThisWeek: number;
-}
-
-export interface Offer {
-  key: string;
-  product: string;
-  count: number;
-  titles: string[];
-  asked: { title: string; n: number }[];
-  threads: ThreadRef[];
-  title: string;
-  said: string;
-}
-
-interface TriggerBase {
-  from?: string;
-  msg?: string;
-  hop?: number;
-  product?: string;
-  via?: string;
-  viaProduct?: string | null;
-  work?: string;
-  hold?: boolean;
-  key?: string;
-}
-
-export type WakeTrigger =
-  | (TriggerBase & { kind: 'schedule'; key: string; label: string })
-  | (TriggerBase & { kind: 'duty'; duty: string; what: string; tell?: string; key: string })
-  | (TriggerBase & { kind: 'pass'; title?: string; details?: string })
-  | (TriggerBase & { kind: 'message'; text?: string; opening?: 'start' | 'setup' });
-
-interface ActionBase { teammate: string; msg?: string; trigger?: WakeTrigger }
-
-export type WakeAction =
-  | (ActionBase & { type: 'run'; id: string; trigger: WakeTrigger; title: string; start: 'now' | 'later' })
-  | (ActionBase & { type: 'seen'; msg: string; run?: string })
-  | (ActionBase & { type: 'served'; key: string })
-  | (ActionBase & { type: 'dutyServed'; duty: string; key: string })
-  | (ActionBase & { type: 'answer'; item: string; product: string; text: string; msg: string })
-  | (ActionBase & { type: 'tell'; item: string; product: string | null; text: string; from: { teammate: string; name: string }; hop: number; hold: boolean; msg: string })
-  | (ActionBase & { type: 'release'; item: string; product: string })
-  | (ActionBase & { type: 'limit' })
-  | (ActionBase & { type: 'unread'; duty: string; what: string })
-  | (ActionBase & { type: 'hops'; msg: string; from: string });
 
 export interface TeammateStore {
   config: { storeRoot?: string; accountId?: string };

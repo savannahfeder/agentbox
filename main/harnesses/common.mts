@@ -6,6 +6,15 @@ import type { OpenCodeProperties } from '../opencode.mts';
 
 export type Env = NodeJS.ProcessEnv;
 
+export type BinKey = 'claudeBin' | 'codexBin' | 'opencodeBin';
+
+export interface HarnessConfig extends Partial<Record<BinKey, string | null>> {
+  home?: string;
+  accountId?: string;
+  storeRoot?: string;
+  cloudPermission?: string | null;
+}
+
 export interface HarnessRun {
   print?: string;
   outputFormat?: { flag: string; value: string };
@@ -125,7 +134,7 @@ export interface HarnessSession {
 }
 
 export interface HarnessSupervisor {
-  config: Record<string, string>;
+  config: HarnessConfig;
   _profiles(): string[];
   _claudeConfigDir(profile: string): string;
   _cloudDocsEnv(item: HarnessItem): Env;
@@ -162,7 +171,7 @@ export interface HarnessReaders {
 /** One operation of a harness as the registry hands it out: every name is a function, declined or absent ones refuse before doing anything. */
 export interface Harness extends Omit<HarnessDefinition, 'instructions'> {
   discover(configured?: unknown, where?: unknown): HarnessBinaryFound;
-  binary(config: Record<string, string | null | undefined> | null | undefined): string | null;
+  binary(config: HarnessConfig | null | undefined): string | null;
   workerArgs(options?: WorkerArgsOptions): string[];
   install(): HarnessCommand;
   signIn(bin: string): HarnessCommand;
@@ -246,7 +255,7 @@ export function definitionMethods(definition: HarnessDefinition) {
   const scrub = definition.scrubPatterns.map(pattern => new RegExp(pattern));
   return {
     ...definition,
-    binary: (config: Record<string, string | null | undefined> | null | undefined) => config?.[definition.binKey] ?? null,
+    binary: (config: HarnessConfig | null | undefined) => config?.[definition.binKey as BinKey] ?? null,
     workerArgs: (options?: WorkerArgsOptions) => workerArgsFrom(definition.run, options),
     // WHERE THE PERSON'S STANDING INSTRUCTIONS GO on this engine. A flag for
     // the one that has one, a file named in the definition for the ones that

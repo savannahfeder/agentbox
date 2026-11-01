@@ -7,6 +7,7 @@ import {promisify} from 'node:util';
 import {TaskTerminals,terminalEnv} from './task-terminals.mts';
 import { harnessFor } from './harnesses.mts';
 import { harnessDefinition } from '../shared/harness-definitions.mjs';
+import type { HarnessConfig } from './harnesses/common.mts';
 const exec=promisify(execFile);
 export interface UpdatePlan { feed: string; format?: string; file?: string; args?: string[]; env?: NodeJS.ProcessEnv; name?: string; home?: string }
 export interface Installation { engine: string; bin: string; real: string; home: string; version?: string; channel: string; disabled: boolean }
@@ -39,7 +40,7 @@ export function updatePlan({engine,bin,real,home=os.homedir(),channel='latest'}:
  if(!harnessDefinition(engine))return null;
  return harnessFor(engine).updatePlan({bin,real,home,channel});
 }
-export async function installedAgent(engine:string,config:Record<string,string|null|undefined>):Promise<Installation>{
+export async function installedAgent(engine:string,config:HarnessConfig):Promise<Installation>{
  const harness=harnessFor(engine), bin=harness.binary(config);
  if(!bin)throw Error('This agent is not installed.');
  const home=config.home||os.homedir();

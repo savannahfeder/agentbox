@@ -17,7 +17,7 @@ import { cloudClaudeMode, cloudPermissionArgs } from '../cloud-permission.mts';
 import { claudeActivity } from '../agent-activity.mts';
 import { captureStream, streamingText, summarizeStreamLine, traceStreamLine } from './claude-stream.mts';
 import { definitionMethods, commonUpdatePlan } from './common.mts';
-import type { Env, HarnessItem, HarnessPlan, HarnessRecord, HarnessSpawnContext, HarnessSupervisor, SignInFilesWhere, UpdatePlanOptions } from './common.mts';
+import type { BinKey, Env, HarnessItem, HarnessPlan, HarnessRecord, HarnessSpawnContext, HarnessSupervisor, SignInFilesWhere, UpdatePlanOptions } from './common.mts';
 import { findTranscript } from '../transcript-search.mts';
 const definition = harnessDefinition('claude');
 
@@ -69,9 +69,9 @@ export const claudeHarness = {
     }
     // The binary is the one this definition names, not a field spelled out
     // here: that is the last place an engine of this family needed code.
-    return spawn(sup.config[definition.binKey], streamInputArgs(definition.run, plan.args), {
+    return spawn(sup.config[definition.binKey as BinKey]!, streamInputArgs(definition.run, plan.args), {
       cwd,
-      env: { ...claudeLaunchEnv(sup.config[definition.binKey], env), STORE_ACCOUNT_ID: sup.config.accountId, ...storeRootEnv(sup.config.storeRoot),
+      env: { ...claudeLaunchEnv(sup.config[definition.binKey as BinKey], env), STORE_ACCOUNT_ID: sup.config.accountId, ...storeRootEnv(sup.config.storeRoot),
         ...(profile !== 'default' ? { [definition.homeEnv]: profile } : {}),
         ZERO_PRODUCT: item.product, ZERO_ITEM: item.id, ...sup.memoryGateEnv(item) },
       stdio: ['pipe', 'pipe', 'pipe'],

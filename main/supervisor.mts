@@ -277,6 +277,7 @@ export interface SupervisorConfig {
   cloudWhenOn?: string | null;
   cloudHost?: boolean | string | null;
   cloudCodexMode?: string | null;
+  cloudPermission?: string | null;
   memoryGate?: boolean | null;
   memoryGateSocket?: string | null;
   memoryGateLockPort?: number;
@@ -472,7 +473,7 @@ export interface FruitlessRecord {
   saidTs?: number;
   saidWhy?: string;
   saidGaveUp?: boolean;
-  resetsAt?: number;
+  resetsAt?: string;
   strandedSince?: number;
 }
 
@@ -722,7 +723,7 @@ export interface StrandedRow {
   id: string;
   since?: number;
   cause: string;
-  resetsAt: number | null;
+  resetsAt: string | null;
 }
 
 /** One reading of this Mac's memory pressure. */
