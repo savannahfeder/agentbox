@@ -137,6 +137,12 @@ describe('what the agent is told', () => {
     expect(b).toMatch(/1\. A small fix nobody sees/);
   });
 
+  // A synthetic payments engineer: on an API nothing is ever on screen, so a
+  // one-line money fix read as "a small fix nobody sees" and skipped review.
+  it('never counts a small fix to money, sign-in or stored data as a small fix', () => {
+    expect(shipModeBrief('unseen')).toMatch(/1\. A small fix nobody sees[\s\S]*touches none of\s+what 2 lists/);
+  });
+
   it('has a second model review a wide-reaching fix before it ships', () => {
     const b = shipModeBrief('unseen');
     expect(b).toMatch(/2\. A fix nobody sees, with a wide reach/);
