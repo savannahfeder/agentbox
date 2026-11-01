@@ -41,7 +41,7 @@ describe('the renderer cannot send anything', () => {
       return e.isDirectory() ? walk(full) : [full];
     });
     const offenders = walk(root)
-      .filter((f) => /\.(ts|tsx|js|jsx|mjs|cjs|html)$/.test(f))
+      .filter((f) => /\.(ts|tsx|js|jsx|mjs|mts|cjs|html)$/.test(f))
       .filter((f) => /posthog-js|from ['"]posthog|amplitude|mixpanel|@sentry/i.test(fs.readFileSync(f, 'utf8')));
     expect(offenders).toEqual([]);
   });

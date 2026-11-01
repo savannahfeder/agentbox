@@ -163,23 +163,27 @@
 .th-fold-mark { flex: none; transition: transform .12s ease; }
 .th-section.folded .th-fold-mark { transform: rotate(-90deg); }
 /* Thread, status, project, priority, updated. The status column is the width
-   of the longest word it draws ("Nothing came back") at its own type size. */
-.th-grid { display: grid; grid-template-columns: minmax(0, 1fr) 160px 150px 112px 96px; column-gap: 16px; align-items: center; width: 100%; min-height: 20px; }
+   of the longest word it draws ("Nothing came back") at its own type size, with
+   the Try again mark after it. */
+.th-grid { display: grid; grid-template-columns: minmax(0, 1fr) 176px 150px 112px 96px; column-gap: 16px; align-items: center; width: 100%; min-height: 20px; }
 .th-table .row { min-height: 0; }
 .th-grid > div { line-height: 20px; }
-.th-grid.with-person { grid-template-columns: minmax(0, 1fr) 160px 140px 130px 112px 96px; }
+.th-grid.with-person { grid-template-columns: minmax(0, 1fr) 176px 140px 130px 112px 96px; }
 /* A NARROW TABLE GIVES UP PRIORITY, THEN PROJECT, so the title keeps 240
    points. The steps are the list's own width, whose rows sit 76 inside it. */
 .th-table { container: th / inline-size; }
-@container th (max-width: 899px) {
+@container th (max-width: 915px) {
   .th-grid > .th-col-prio { display: none; }
-  .th-grid { grid-template-columns: minmax(0, 1fr) 160px 150px 96px; }
-  .th-grid.with-person { grid-template-columns: minmax(0, 1fr) 160px 140px 130px 96px; }
+  .th-grid { grid-template-columns: minmax(0, 1fr) 176px 150px 96px; }
+  .th-grid.with-person { grid-template-columns: minmax(0, 1fr) 176px 140px 130px 96px; }
 }
-@container th (max-width: 769px) {
+/* Narrowest, the status column gives the title back the mark's 16, and the
+   mark sits in the empty left of the right-aligned time. */
+@container th (max-width: 785px) {
   .th-grid > .th-col-proj { display: none; }
   .th-grid { grid-template-columns: minmax(0, 1fr) 160px 96px; }
-  .th-grid.with-person { grid-template-columns: minmax(0, 1fr) 160px 130px 96px; }
+  .th-cell-state.can-retry { overflow: visible; }
+  .th-grid.with-person { grid-template-columns: minmax(0, 1fr) 176px 130px 96px; }
 }
 .th-grid > .num { text-align: right; }
 .th-cell-title { font-size: 14px; line-height: 20px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -210,6 +214,14 @@
 .th-table .row:hover .has-act .th-when, .has-act:focus-within .th-when { visibility: hidden; }
 .th-row-act:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .th-row-act:focus-visible { outline: none; border-color: var(--line-strong); }
+/* TRY AGAIN (w-d08dcbb6fc), on a thread nothing will start: a mark after the
+   status word, always there. Its arrow starts as far after the word as the
+   ring ends before it: 2.5 + the 3.5 padding + the arc's 1.4 inset + the
+   word's trailing letter-spacing make the ring's 8. */
+.th-retry { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 18px; height: 18px; margin-left: 2.5px; padding: 0; border: 0; border-radius: var(--tag-radius); background: none; color: var(--text-dim); cursor: pointer; }
+/* The arrow's ink is as tall as the word's capitals (9px), and its line as heavy as theirs. */
+.th-retry svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.th-retry:hover, .th-retry:focus-visible { outline: none; color: var(--text); background: var(--wash-strong); }
 /* A THREAD CARRIED UP OR DOWN THE LIST OR A BOARD COLUMN (w-6e5b532a95).
    Four rounds with her. What it is now (round four, "make it a linear quality
    level"): the row STAYS in the list as its own empty slot, which slides to
@@ -276,6 +288,7 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-cell-person .tm-av { margin-right: 9px; flex: none; }
 .th-empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; padding: 32px 24px 12vh; color: var(--text-faint); font-size: 14px; line-height: 21px; }
 .th-empty > span { max-width: 420px; }
+.th-empty > .live-mark { margin-right: 12px; }
 
 /* ------------------------------------------------------------ the view row */
 .th-bar { display: flex; align-items: center; gap: 24px; padding: 14px var(--row-r, 24px) 8px var(--text-x, 32px); min-height: 30px; }
@@ -504,6 +517,8 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 /* Picked is a soft grey here, not an orange box: one small dot beside On is
    the menu's only orange (picked 2026-10-16 as calmer). */
 .th-cloud-pop .opts > button.picked, .th-cloud-pop .opts > button.picked:hover { border-color: var(--line-strong); background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); }
+/* A place this thread cannot go: dim and still, the note under it says why. */
+.th-cloud-pop .opts > button:disabled, .th-cloud-pop .opts > button:disabled:hover { opacity: .4; cursor: default; border-color: var(--line); color: var(--text-dim); }
 .th-cloud-pop .th-cloud-on-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-inline-end: 7px; vertical-align: 1px; }
 /* THE CLOUD ON: the cloud and its count orange, the box left plain. */
 .th-disp.th-cloud.lit svg, .th-disp.th-cloud.lit b { color: var(--accent); }
@@ -568,3 +583,8 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 :root[data-theme="light"] .th-why-card { background: var(--surface); box-shadow: 0 12px 32px rgba(0,0,0,.12); }
 .th-why-card b { display: block; margin-bottom: 3px; font-weight: 500; color: var(--text); }
 .th-cell-state.has-card:hover .th-why-card { display: block; }
+.phone-status-dismissible { display: flex; align-items: center; gap: 8px; padding-right: 0; }
+.phone-status-dismissible > span { flex: 1; min-width: 0; }
+.phone-status-dismissible > button { display: grid; place-items: center; flex: 0 0 44px; min-height: 44px; margin-block: -9px; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; cursor: pointer; }
+.phone-status-dismissible > button:hover { color: var(--text); }
+.phone-status-dismissible > button:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }

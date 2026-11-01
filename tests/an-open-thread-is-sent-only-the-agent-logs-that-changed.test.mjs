@@ -111,6 +111,10 @@ describe('through the real handler', () => {
     fs.writeFileSync(small, 'the first long version of this log\n');
     read.take(key, plain(await trace({}, { product: slug, id, have: read.have(key) })));
     fs.writeFileSync(small, 'short\n');
+    // Linux stamps two writes in one clock tick with the same time, and a smaller
+    // log at the same time reads as a late answer. A real replacement comes later.
+    const later = new Date(Date.now() + 2000);
+    fs.utimesSync(small, later, later);
     const got = read.take(key, plain(await trace({}, { product: slug, id, have: read.have(key) })));
     expect(got.sessions.find((s) => s.startedAt === 6000).text).toBe('short\n');
     fs.rmSync(small);
@@ -125,6 +129,19 @@ describe('through the real handler', () => {
     const answer = plain(await trace({}, { product: slug, id, have: read.have(key) }));
     expect(answer.sessions.filter((s) => !s.same).map((s) => s.startedAt)).toEqual([4000]);
     expect(read.take(key, answer).sessions.map((s) => s.startedAt)).toEqual([2000, 3000, 4000]);
+  });
+
+  it('a thread whose middle is opened gets every run whole, and the newest-runs read stays at 20', async () => {
+    const more = Array.from({ length: 22 }, (_, i) => 5000 + i);
+    for (const at of more) fs.writeFileSync(path.join(logs, `${at}.log`), `run ${at}\n`);
+    const all = fs.readdirSync(logs).sort().map((f) => Number(f.replace('.log', '')));
+    expect(all.length).toBeGreaterThan(22);
+    const every = plain(await trace({}, { product: slug, id, whole: true }));
+    expect(every.sessions.map((s) => s.startedAt)).toEqual(all);
+    expect(every.sessions.every((s) => !s.stamp && !s.same)).toBe(true);
+    const newest = plain(await trace({}, { product: slug, id, have: {} }));
+    expect(newest.sessions.map((s) => s.startedAt)).toEqual(all.slice(-20));
+    for (const at of more) fs.rmSync(path.join(logs, `${at}.log`));
   });
 });
 

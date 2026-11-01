@@ -120,6 +120,11 @@ export function agentsNeedingRows(chosen, existingItems = []) {
 /** The label every imported thread carries. */
 export const THREAD_LABEL = 'thread-import';
 
+/** A thread just brought in, owed one run that writes it up the way every thread here reads. Taken off as that run starts. */
+export const CATCH_UP_LABEL = 'catch-up';
+export const CATCH_UP_TRIES = 3;
+export const catchUpDue = (item) => (item?.labels ?? []).includes(CATCH_UP_LABEL) && item?.status === 'open';
+
 /**
  * And the one that says WHICH thread. The id is Claude Code's own session id,
  *  which is stable across renames and is what the transcript is filed under. */
@@ -213,7 +218,7 @@ export function threadImportRow(thread) {
     result: String(thread?.lastSaid || '').trim(),
     kind: 'question',
     priority: 3,
-    labels: [THREAD_LABEL, threadLabel(thread?.id)],
+    labels: [THREAD_LABEL, threadLabel(thread?.id), CATCH_UP_LABEL],
   };
 }
 

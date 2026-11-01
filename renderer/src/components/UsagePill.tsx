@@ -17,12 +17,10 @@
 // too, and the panel's numbers say "used" beside it rather than disagreeing
 // with the thing they sit under.
 //
-// AND THE DETAIL IS ONE MOVEMENT AWAY, not one screen away. Hover or click and
-// all three limits open underneath, named the way she named them. Both gestures,
-// because she asked for both: the hover is for the glance, the click is for
-// reading it without having to hold the mouse still.
-//
-// IT NO LONGER OPENS SETTINGS.
+// AND THE DETAIL IS ONE MOVEMENT AWAY, not one screen away. Hover and all
+// three limits open over it, named the way she named them. In the window's
+// corner a click pins them open; in the sidebar a click opens that agent's
+// page in Settings (w-07891cd502).
 //
 // NOTHING IS DRAWN UNTIL THERE IS SOMETHING TRUE TO DRAW. No dashes, no
 // skeleton, no "checking…". Reading the figure costs seconds and a launch is
@@ -71,9 +69,12 @@ export function UsagePill({ all, recent = null, ...props }: Parameters<typeof Us
   return <UsageOne {...props} usage={last} engineWord={engineLabel(last.engine)} agents={agents} />;
 }
 
-function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, agents = [] }: {
+function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, folded = false, agents = [] }: {
   usage: Usage | null;
   sidebar?: boolean;
+  /** The sidebar is folded to its icons. The panel hangs at the sidebar's
+   *  width, so it is not drawn there (w-07891cd502). */
+  folded?: boolean;
   /** In the sidebar, every agent in use, the one used last first. */
   agents?: { word: string; usage: Usage }[];
   /**
@@ -91,11 +92,8 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, agen
    *  this and returns null wherever there is only one agent to name -- so on
    *  that Mac nothing here draws anything new. */
   engineWord?: string | null;
-  /**
-   * Called when the panel opens. Kept so a caller that used to hand this a
-   *  destination still compiles; nothing in the app passes one any more, because
-   *  her answer was that this does not belong in Settings. */
-  onOpen?: () => void;
+  /** In the sidebar, a press opens this agent's Settings page instead of pinning the panel. */
+  onOpen?: (engine: string) => void;
 }) {
   // Only the windows this reading can still answer for (`limitsStillRunning`).
   const limits = limitsStillRunning(usage?.limits, now);
@@ -109,9 +107,16 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, agen
   const bar = useRef<HTMLButtonElement>(null);
   const panelId = useId();
 
-  const open = pinned || hovering;
+  const open = !folded && (pinned || hovering);
 
   useEffect(() => () => { if (linger.current) clearTimeout(linger.current); }, []);
+
+  useEffect(() => {
+    if (!folded) return;
+    if (linger.current) { clearTimeout(linger.current); linger.current = null; }
+    setHovering(false);
+    setPinned(false);
+  }, [folded]);
 
   // ESCAPE CLOSES IT, and a press anywhere else does too: the same two ways out
   // that everything else opening over this app has.
@@ -159,19 +164,30 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, agen
     ? agents.map((a) => usageSentence(a.usage.limits, now, a.word)).join(' ')
     : usageSentence(limits, now, engineWord) ?? '';
 
-  // In the sidebar it opens after a beat, so a pointer crossing the foot does not flash it.
+  // In the sidebar it opens after a beat, so a pointer crossing the foot does
+  // not flash it. A pointer that lands on the folded rail waits for its first
+  // move once the rail is open, so the panel never opens into a rail that is
+  // still widening.
   const enter = () => {
     if (linger.current) { clearTimeout(linger.current); linger.current = null; }
-    if (sidebar) linger.current = setTimeout(() => setHovering(true), 120);
-    else setHovering(true);
+    if (!sidebar) { setHovering(true); return; }
+    if (folded) return;
+    linger.current = setTimeout(() => { linger.current = null; setHovering(true); }, 120);
   };
+  const move = () => { if (sidebar && !folded && !hovering && !linger.current) enter(); };
   const leave = () => {
     if (linger.current) clearTimeout(linger.current);
-    linger.current = setTimeout(() => setHovering(false), LINGER_MS);
+    linger.current = setTimeout(() => { linger.current = null; setHovering(false); }, LINGER_MS);
+  };
+  const press = () => {
+    if (!sidebar || !onOpen || !usage) { setPinned(!pinned); return; }
+    if (linger.current) { clearTimeout(linger.current); linger.current = null; }
+    setHovering(false);
+    onOpen(usage.engine);
   };
 
   return (
-    <div className="usage-box" ref={box} onMouseEnter={enter} onMouseLeave={leave}>
+    <div className="usage-box" ref={box} onMouseEnter={enter} onMouseMove={move} onMouseLeave={leave}>
       <button
         type="button"
         ref={bar}
@@ -183,7 +199,7 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, agen
         // expanded. It is the only reading there is for somebody who cannot see
         // a bar.
         aria-label={sentence}
-        onClick={() => { const next = !pinned; setPinned(next); if (next) onOpen?.(); }}
+        onClick={press}
         onFocus={sidebar ? undefined : enter}
         onBlur={sidebar ? undefined : leave}
       >

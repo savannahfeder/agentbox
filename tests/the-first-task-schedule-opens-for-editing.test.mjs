@@ -3,9 +3,9 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { FirstTaskSchedule } from '../renderer/src/components/FirstRun';
+import { FirstTaskSchedule } from '../renderer/src/components/FirstRunClassic';
 import fs from 'node:fs';
-import { landing } from '../renderer/src/first-run';
+import { landing } from '../renderer/src/first-run-classic';
 
 globalThis.React = React;
 it('shows a task scheduled for later in Later after sending', () => {
@@ -13,7 +13,7 @@ it('shows a task scheduled for later in Later after sending', () => {
   expect(landing('w-now', Date.now() - 1000)).toEqual({ view: 'progress', select: 'w-now' });
 });
 it('checks the folder onboarding was handed, from either picker', () => {
-  const source = fs.readFileSync(new URL('../renderer/src/components/FirstRun.tsx', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../renderer/src/components/FirstRunClassic.tsx', import.meta.url), 'utf8');
   expect(source).toContain('<FolderPicker');
   expect(source).toContain('api.chooseFolder(');
   expect(source).toContain('checkProjectFolder(folder');

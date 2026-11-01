@@ -11,6 +11,7 @@ import type { ParsedOption } from '../../../renderer/src/format';
 import { stateWord } from '../../../renderer/src/threads-made';
 import type { FiledRow } from '../lib/thread';
 import { FILED_WORDS, waitingWords, type Live } from '../lib/thread-offers';
+import { Chevron as FoldArrow } from './icons';
 import { InlineMarkdown, type MessageFiles } from './Markdown';
 import { T } from './parts';
 import { color, font } from './theme';
@@ -153,6 +154,7 @@ export function LiveLine({ live }: { live: Live }) {
       <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 13.5, lineHeight: 20, fontFamily: font.medium, color: live.working ? color.text : color.dim }}>{live.word}</T>
       {live.working && live.more > 0 && <T style={{ fontSize: 13.5, lineHeight: 20, color: color.faint }}>{`+${live.more}`}</T>}
       {!!live.span && <T style={{ fontSize: 13.5, lineHeight: 20, color: color.faint }}>{live.span}</T>}
+      {!!live.place && <T style={{ fontSize: 13.5, lineHeight: 20, color: color.faint }}>{live.place}</T>}
     </>
   );
   return (
@@ -228,9 +230,11 @@ export function FiledList({ rows, label, open, approve, here, dismiss, inTurn }:
 }
 
 /** The options strip: the question, a row per option, and the close question's way out (OptionsOffer.tsx). */
-export function OptionsCard({ ask, options, busy, pick, keep, dir, files }: {
+export function OptionsCard({ ask, options, busy, pick, keep, dir, files, foot = false, onFold }: {
   ask: string; options: ParsedOption[]; busy: boolean; pick: (o: ParsedOption) => void;
   keep?: { label: string; onKeep: () => void }; dir?: string | null; files?: MessageFiles;
+  /** Over the reply box rather than in the thread, with the small arrow that folds it away. */
+  foot?: boolean; onFold?: () => void;
 }) {
   const row = (key: string, press: () => void, badge: ReactNode, body: ReactNode, aside?: ReactNode) => (
     <Pressable key={key} disabled={busy} onPress={press} accessibilityRole="button"
@@ -241,11 +245,19 @@ export function OptionsCard({ ask, options, busy, pick, keep, dir, files }: {
     </Pressable>
   );
   return (
-    <View style={{ marginTop: 22, borderWidth: 1, borderColor: color.line }}>
-      <View style={{ paddingTop: 11, paddingHorizontal: 16, paddingBottom: 7 }}>
-        {/* The same fallback the desktop draws (renderer/src/components/OptionsOffer.tsx). */}
-        <T style={{ fontSize: 12.5, lineHeight: 17.5, fontFamily: font.semibold }}>{ask || 'Pick one, or write your own answer'}</T>
-      </View>
+    <View style={{ marginTop: foot ? 0 : 22, borderWidth: 1, borderColor: color.line, backgroundColor: foot ? color.card : undefined, paddingTop: foot && !ask ? 6 : 0, paddingBottom: foot ? 4 : 0 }}>
+      {onFold && (
+        <Pressable onPress={onFold} accessibilityRole="button" accessibilityLabel="Fold the choices" hitSlop={8}
+          style={{ position: 'absolute', zIndex: 1, top: 4, right: 4, width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+          <FoldArrow />
+        </Pressable>
+      )}
+      {(!foot || !!ask) && (
+        <View style={{ paddingTop: 11, paddingLeft: 16, paddingRight: onFold ? 40 : 16, paddingBottom: 7 }}>
+          {/* The same fallback the desktop draws (renderer/src/components/OptionsOffer.tsx). */}
+          <T style={{ fontSize: 12.5, lineHeight: 17.5, fontFamily: font.semibold }}>{ask || 'Pick one, or write your own answer'}</T>
+        </View>
+      )}
       {options.map((o) => row(String(o.n), () => pick(o), (
         <View style={{ borderWidth: 1, borderColor: color.lineStrong, paddingHorizontal: 6, height: 19, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 1 }}>
           <T style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 16, color: color.dim }}>{o.n}</T>

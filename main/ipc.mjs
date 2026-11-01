@@ -50,6 +50,7 @@ import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './
 import { ClaudeUsage } from './claude-usage.mjs';
 import { AccountUsage } from './account-usage.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
+import { accountIdentity } from './account-tooling.mjs';
 import { usageEngine } from '../shared/usage.mjs';
 import { DEFAULT_ENGINE, isEngine } from '../shared/engines.mjs';
 import { routedPatch, PICKED_WHY } from '../shared/auto-route.mjs';
@@ -75,6 +76,7 @@ import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mjs';
 import { traceAnswer } from '../shared/trace-delta.mjs';
 import { saveAttachments } from './save-attachments.mjs';
 import { stageAttachment } from './stage-attachment.mjs';
+import { readRunTraces } from './run-traces.mjs';
 
 // WHAT A WORKER IS TOLD WHEN HER DECISION COULD NOT BE RECORDED.
 const SPOOL_REFUSED = `${Name} could not record the founder's decision, so nothing was allowed. Finish what your grants cover and file the rest as a review.`;
@@ -229,6 +231,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // appears): a browser SDK autocaptures the text of what was clicked, and in
   // Agentbox that text is task titles. A NUMBER MAY RIDE WITH THE NAME, and only
   // a number (2026-10-06): which setup step was reached.
+  ipcMain.handle('zero:onboarding-arm', () => analytics.onboardingArm?.() ?? 'tour');
   ipcMain.handle('zero:track', (_e, { name, count } = {}) => {
     if (!EVENT_NAMES.includes(name)) return false;
     onCount();
@@ -332,6 +335,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     bin: () => config.claudeBin,
     env: () => supervisor._workerEnv(DEFAULT_ENGINE),
     onReading: (profile, reading) => supervisor.noteUsageReading(profile, reading),
+    identity: (profile) => accountIdentity(profile === 'default' ? null : profile, { home: config.home }),
   });
   ipcMain.handle('zero:account-usage', async (event, { refresh = false, engine = DEFAULT_ENGINE } = {}) => {
     if (event.senderFrame?.parent || (event.sender && event.sender !== window.webContents)) throw Error('Usage is only available in the main app window.');
@@ -364,7 +368,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       //
       // AND WHICH ENGINE IT WAS (w-1116fbb68a, 2026-10-08). This list is Claude
       // Code processes and only ever has been; a Codex conversation has no
-      // process to find and is counted from main/codex-watch.mjs instead. The
+      // process to find and is counted from main/codex-watch.mts instead. The
       // engine is what lets the two be read apart, and without it on this side
       // the Codex count would look like a drop in the Claude one.
       for (const agent of live) {
@@ -837,7 +841,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // and the macOS release ride along so a report can be matched to a build.
   ipcMain.handle('zero:send-feedback', async (_e, { text, files } = {}) => sendFeedback({
     url: feedbackUrl(config),
-    payload: feedbackPayload({ text, files, app: { version: app.getVersion(), os: `${process.platform} ${os.release()}` } }),
+    payload: feedbackPayload({ text, files, app: { version: app.getVersion(), os: `${process.platform} ${os.release()}`, install: analytics.installId } }),
   }));
 
   // THE TEAM'S DOORS. Each answers { ok, team } or { ok: false, error } with
@@ -2272,14 +2276,16 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // The trace: what each session on this item actually did, from the logs the
   // supervisor persists under <product>/sessions/<item-id>/. Read-only.
-  // `have` holds the stamps of the logs the screen already has
-  // (shared/trace-delta.mjs).
-  ipcMain.handle('zero:session-trace', async (_e, { product, id, have } = {}) => {
+  // `whole` is a thread's middle being asked for: every log, whole, once
+  // (main/run-traces.mjs). Otherwise the newest, and `have` holds the stamps
+  // of the logs the screen already has (shared/trace-delta.mjs).
+  ipcMain.handle('zero:session-trace', async (_e, { product, id, have, whole } = {}) => {
     const fs = await import('node:fs');
     const path = await import('node:path');
     const dir = store.listProducts().find((p) => p.slug === product)?.dir;
     if (!dir || !/^[\w-]+$/.test(String(id ?? ''))) return { ok: false, sessions: [] };
     const traceDir = machineryPath(dir, path.join('sessions', id));
+    if (whole) return { ok: true, sessions: readRunTraces(traceDir, { whole: true }) };
     let files = [];
     try {
       files = fs.readdirSync(traceDir).filter((f) => f.endsWith('.log')).sort();
@@ -2301,7 +2307,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     }
   });
 
-  // UPDATES (main/updater.mjs). Two doors and no more: look now, and install
+  // UPDATES (main/updater.mts). Two doors and no more: look now, and install
   // what has been downloaded. There is deliberately no "download" door, because
   // the download already happened on its own; the only thing left for a person
   // to decide is when the app is allowed to disappear and come back.
@@ -2313,7 +2319,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // decision — nothing has been downloaded and nothing will be until the app
   // is somewhere macOS lets it write.
   // A copy run from source answers no to it rather than throwing: there is no
-  // bundle to move (main/source-updater.mjs).
+  // bundle to move (main/source-updater.mts).
   ipcMain.handle('zero:update-move', () => updater.move?.() ?? { moved: false, error: null });
 
   // Handed back so the Cmd+Y/Cmd+N chord answers through the same door the

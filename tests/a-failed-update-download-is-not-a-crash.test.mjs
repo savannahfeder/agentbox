@@ -29,7 +29,7 @@
 // after the error event has already carried the news to the screen.
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { createUpdater } from '../main/updater.mjs';
+import { createUpdater } from '../main/updater.mts';
 
 const quiet = { info() {}, warn() {}, error() {}, debug() {} };
 const app = { getVersion: () => '0.1.12' };

@@ -36,7 +36,7 @@ describe('words-only screens are centred', () => {
   it('an empty tab\'s line is in the middle of the pane', () => {
     // The words moved into ./page-rules (`emptyTabWords`) so a test can read
     // them; what is checked here is still that one span sits in the pane.
-    expect(pages).toMatch(/<div className="th-empty"><span>\{emptyTabWords\([^)]*\)\}<\/span><\/div>/);
+    expect(pages).toMatch(/<div className="th-empty">(?:\{starting && view === 'progress' && <LiveMark \/>\})?<span>\{emptyTabWords\([^)]*\)\}<\/span><\/div>/);
     expect(css).toMatch(/\.th-empty \{[^}]*flex: 1;[^}]*align-items: center;[^}]*justify-content: center;[^}]*text-align: center;/);
   });
 

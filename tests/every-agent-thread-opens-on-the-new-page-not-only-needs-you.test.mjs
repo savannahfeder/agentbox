@@ -41,7 +41,7 @@ describe('which threads get the page', () => {
 describe('what the page draws outside Needs you', () => {
   it('the same page: no side panel, the summary on top, choices at the foot, files in place', () => {
     expect(focus).toMatch(/const summaryOffered = summarised && !openDoc && !page;/);
-    expect(focus).toMatch(/queue=\{page \? \{ context: item\.problem \?\? null \} : undefined\}/);
+    expect(focus).toMatch(/queue=\{page \? \{ context: item\.problem \?\? null, repeats: repeat \? repeatsLine\(repeat\.rule\) : null \} : undefined\}/);
     expect(focus).toContain('{offerInPane && (page || closeAsk ? null : (');
     expect(focus).toContain('inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace)');
   });
@@ -66,7 +66,7 @@ describe('a thread you have answered since its answer', () => {
   });
   it('and is drawn from there, the work under it, the rest folded and counted', () => {
     expect(earlierThan(events, 1)).toBe(1);
-    expect(thread).toMatch(/const stands = queue && newest && !earlierOpen \? standsAt\(events, newest\) : -1;/);
+    expect(thread).toMatch(/const stands = !queue \? -1 : working \? workingFrom\(events\) : standsAt\(events, newest\);/);
     expect(thread).toMatch(/events=\{from >= 0 \? events\.slice\(from\) : events\}/);
   });
   it('not when the answer is still the newest word, which is the Needs you page as before', () => {

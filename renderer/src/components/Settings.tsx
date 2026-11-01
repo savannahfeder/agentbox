@@ -390,18 +390,19 @@ export function MiniMeters({ limits, now = Date.now(), none = 'No usage reading 
   return (
     <span className="acct-meters">
       {meters.map((m) => (
-        <span className={`acct-meter${m.percent >= 100 ? ' full' : ''}`} key={m.key}>
+        <span className={`acct-meter${(m.percent ?? 0) >= 100 ? ' full' : ''}`} key={m.key}>
           <span className="acct-meter-word">{m.word}</span>
-          <span className="usage-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, m.percent)}%` }} /></span>
-          <span className="acct-meter-pct">{m.percent}%</span>
-          <span className="acct-meter-when" title={m.resets ? `Resets ${m.resets}` : undefined}>{m.resets ?? ''}</span>
+          <span className="usage-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, m.percent ?? 0)}%` }} /></span>
+          <span className="acct-meter-pct">{m.percent == null ? '–' : `${m.percent}%`}</span>
+          <span className="acct-meter-when" title={m.percent == null ? 'Reset since this was read' : m.resets ? `Resets ${m.resets}` : undefined}>{m.resets ?? ''}</span>
         </span>
       ))}
     </span>
   );
 }
 
-// The header says the newest reading's time; a tile older than this says its own.
+// The header says the newest reading's time; a tile says its own when that
+// reads differently, or once it is this old.
 const OWN_TIME_AFTER_MS = 15 * 60_000;
 
 type Where = 'here' | 'cloud';
@@ -414,6 +415,9 @@ const PLACE_TAG: Record<Where, { word: string; Mark: typeof CloudMark }> = {
  *  beside the address (on the right margin it was missed), and the button
  *  that switches to an account sits in its top right corner. */
 export function PlaceTiles({ accounts, onAdd, now = Date.now() }: { accounts: PlaceAccount[]; onAdd?: () => void; now?: number }) {
+  const headerTime = usageCheckedAt(Math.max(0, ...accounts.map((a) => a.checkedAt ?? 0)) || null, now);
+  const ownTime = (a: PlaceAccount) => !!a.checkedAt
+    && (!!a.usageError || now - a.checkedAt >= OWN_TIME_AFTER_MS || usageCheckedAt(a.checkedAt, now) !== headerTime);
   return (
     <div className="acct-tiles">
       {accounts.map((a) => (
@@ -442,7 +446,7 @@ export function PlaceTiles({ accounts, onAdd, now = Date.now() }: { accounts: Pl
             {(!a.usageError || a.limits?.length) && <MiniMeters limits={a.limits} now={now} none={a.none} />}
             {a.usageError && <div className="acct-tile-trouble" role="status">{a.usageError}</div>}
           </>}
-          {!!a.checkedAt && (a.usageError || now - a.checkedAt >= OWN_TIME_AFTER_MS) && <div className="acct-reading-time">{usageCheckedAt(a.checkedAt, now)}</div>}
+          {ownTime(a) && <div className="acct-reading-time">{usageCheckedAt(a.checkedAt, now)}</div>}
         </div>
       ))}
       {onAdd && <button type="button" className="acct-tile acct-tile-add" onClick={onAdd}>Add account</button>}
@@ -511,7 +515,7 @@ export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, on
   return {
     key: a.key, name: a.name, plan: a.plan,
     about: signingIn ? ['Finish signing in to use it']
-      : limited && !meterPair(a.limits, now).some((m) => m.percent >= 100) ? ['At its limit'] : [],
+      : limited && !meterPair(a.limits, now).some((m) => (m.percent ?? 0) >= 100) ? ['At its limit'] : [],
     places,
     cloudAct: !cloud || signingIn ? null : broken ? signIn('Sign in to cloud again', c!.key) : h && !c ? signIn('Add to cloud', null) : null,
     // ONE ACCOUNT IS IN USE AND IT SAYS SO (w-dac993a554). This asked `picked`
@@ -1376,8 +1380,8 @@ const CodexCli = (props: EngineConnectionProps) => (
    disk. The words are all ../update-row.ts, shared with ⌘K.
 
    IT WORKS THE SAME ON BOTH KINDS OF COPY. Installed, the check is a release
-   feed (main/updater.mjs); run from a checkout, it is `git fetch` against the
-   branch (main/source-updater.mjs). Both answer the same door and the same
+   feed (main/updater.mts); run from a checkout, it is `git fetch` against the
+   branch (main/source-updater.mts). Both answer the same door and the same
    shape, so there is nothing here that knows which one it is talking to.
 
    NOTHING IS ASSUMED ABOUT THE PRESS. The check's own answer is drawn, and the

@@ -31,11 +31,12 @@ const labels = (html) => [...html.matchAll(/<button[^>]*aria-label="([^"]+)"/g)]
 const found = (n) => Array.from({ length: n }, (_, i) => ({ id: `thread-p-${i}`, label: `Thread ${i}`, run: () => {} }));
 
 describe('the sidebar opens ⌘K', () => {
-  it('has a Search row right under Threads, with the keys on it', () => {
+  // Above Threads since w-5988eed6f3 (search-sits-above-the-inbox-and-is-not-a-tab).
+  it('has a Search row above Threads, with the keys on it', () => {
     const html = nav({ onPalette: () => {} });
-    expect(labels(html)).toEqual(['Threads', 'Search', 'Feedback', 'Settings']);
+    expect(labels(html)).toEqual(['Search', 'Threads', 'Feedback', 'Settings']);
     expect(html).toMatch(/aria-label="Search"[^>]*title="Search · ⌘K"/);
-    expect(html).toContain('<kbd>⌘</kbd><kbd>K</kbd>');
+    expect(html).toContain('>⌘K</small>');
   });
 
   it('draws no Search row where nothing opens ⌘K', () => {

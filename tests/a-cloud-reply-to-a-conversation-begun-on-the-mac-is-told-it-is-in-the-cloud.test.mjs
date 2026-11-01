@@ -58,7 +58,7 @@ describe('the first message of a resumed Claude run in the cloud', () => {
   it('is told that a person asking to move the thread is answered with the hand-back line', () => {
     for (const note of [CLOUD_NOTE, PLAIN_CLOUD_NOTE]) {
       const last = note.split('\n\n').at(-1);
-      expect(last).toMatch(/asks to have this thread moved to their computer is answered with this line/i);
+      expect(last).toMatch(/asks to have this thread moved to their computer, or picks "Check from my computer", is answered with this line/i);
     }
   });
 

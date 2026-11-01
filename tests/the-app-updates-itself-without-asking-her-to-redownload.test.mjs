@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe as describeState, shortError } from '../main/updater.mjs';
+import { describe as describeState, shortError } from '../main/updater.mts';
 import { announcesUpdate } from '../renderer/src/update-row.ts';
 import { NAME, Name } from '../shared/product-name.mjs';
 import { RELEASE_REPO } from '../scripts/lib/live-download.mjs';
@@ -28,7 +28,7 @@ import { RELEASE_REPO } from '../scripts/lib/live-download.mjs';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const pkg = JSON.parse(read('package.json'));
-const updater = read('main/updater.mjs');
+const updater = read('main/updater.mts');
 const publish = read('scripts/publish-download.mjs');
 const ipc = read('main/ipc.mjs');
 const preload = read('preload.cjs');
@@ -341,7 +341,7 @@ describe('nothing loses the update', () => {
   // restart for as long as a version is waiting, and quitting installs it.
   it('leaves the restart in ⌘K and on quit whatever she pressed', () => {
     expect(read('renderer/src/components/Palette.tsx')).toContain('label: `Restart to update ${NAME}`');
-    expect(read('main/updater.mjs')).toContain('autoUpdater.autoInstallOnAppQuit = true');
+    expect(read('main/updater.mts')).toContain('autoUpdater.autoInstallOnAppQuit = true');
     expect(settings).not.toContain("restart: 'Restart to update'");
   });
 });

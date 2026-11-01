@@ -55,7 +55,7 @@ import { commandDraft } from '../../../shared/claude-commands.mjs';
 import { CompactionResult, runCompaction, runCommand } from './CompactionResult';
 import { codexCommand, COMPACTION_COPY } from '../../../shared/codex-commands.mjs';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mjs';
-import { dayLabel, itemOptions, offerIsLive, optionsFrom, parseOptions, parseRepeat, stripOptionsSection, type ParsedOption } from '../format';
+import { dayLabel, itemOptions, offerIsLive, optionsFrom, parseOptions, parseRepeat, repeatsLine, stripOptionsSection, type ParsedOption } from '../format';
 import { ruleIdOf } from '../../../shared/repeats.mjs';
 import { shownPriority } from '../../../shared/rank.mjs';
 import { WhenPicker } from './When';
@@ -73,7 +73,7 @@ import { referencedFiles, isImagePath } from '../referenced-files';
 import { pictureRoots } from '../message-folders';
 import { changePathFor } from '../code-artifact';
 import { fileCount, figuresFrom, figuresLabel, signed, type ChangeFigures } from '../change-figures';
-import { embeddedDocuments, isBookkeeping } from '../message-artifacts';
+import { embeddedDocuments, messageDocuments } from '../message-artifacts';
 import { PictureView, picturesFor, type Picture } from './PictureView';
 import { watchScrollGutter } from '../scroll-gutter';
 import { CODE_PATH, artifactUrlTransform, isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
@@ -102,7 +102,6 @@ import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mjs';
 import { recapFor } from '../recap';
 import type { LedgerLine } from '../thread-history';
 import type { LiveFacts } from '../live-line';
-import { whyWords } from '../where-why';
 import { offersRunNow } from '../run-now';
 import { AttachRow } from './AttachRow';
 import { BackToWhatSheWasReading } from './UrgentBar';
@@ -584,7 +583,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, queue = null, onePage = false, inChats = false }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, queue = null, onePage = false, inChats = false }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -724,6 +723,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   sending?: PendingSaid[];
   stalled?: boolean;
   onRedeliver: () => void;
+  /** Try again on a thread nothing will start (../try-again.ts). */
+  onTryAgain?: () => void;
   onUnschedule?: () => void;
   onClose: () => void;
   onResolve: () => void;
@@ -1334,7 +1335,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // A DESIGN OR A NOTE STILL GETS ITS CARD. Only code is doubled up; an html
     // page and a markdown file have no second door anywhere, and her screenshot
     // has one of each sitting above the code card she was pointing at.
-    : [...new Set([...htmlArtifacts, ...referencedFiles(item.result, item.note, item.body, item.answer, {dir: productDir}).filter(path => /\.(md|markdown)$/i.test(path) && !isBookkeeping(path))])];
+    : messageDocuments(item, productDir);
   const showOptions = offerIsLive(item);
   // WHETHER THE STRIP IS DRAWN, which is not the same question as whether the
   // row has a live offer. Everywhere else the two are the same. Opening the box
@@ -1538,8 +1539,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       place={canFinish ? runsIn : null}
       placeFacts={{
         running: !!session && session.where !== 'cloud',
-        moving: live.whyNotCloud?.why === 'moving',
-        why: live.whyNotCloud ? whyWords(live.whyNotCloud).body : null,
+        why: live.whyNotCloud ?? null,
         needs: item.needsMac ?? null,
       }}
       onPlace={onPlace}
@@ -1737,11 +1737,15 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
          */}
 
         {/* The agent stopped without finishing: the answer sits delivered-
-            on-paper with nobody on it. Say so, and make the fix one click. */}
+            on-paper with nobody on it. Say so, and make the fix one click.
+            Try again rather than the redelivery, which a thread the app
+            stopped starting, with no reply on it, refused. */}
         {stalled && (
-          <button className="stalled-bar" onClick={onRedeliver}>
-            <span className="stalled-bar-label">The agent stopped without finishing this. Your answer is still waiting.</span>
-            <span className="stalled-bar-go">restart the agent →</span>
+          <button className="stalled-bar" onClick={onTryAgain ?? onRedeliver}>
+            <span className="stalled-bar-label">{item.answer && item.answer !== '(withdrawn)'
+              ? 'The agent stopped without finishing this. Your answer is still waiting.'
+              : 'The agent stopped without finishing this.'}</span>
+            <span className="stalled-bar-go">try again →</span>
           </button>
         )}
 
@@ -1824,7 +1828,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               item={item}
               chat={direct}
               // One thing at a time: the summary on top and the newest answer, the rest behind one line.
-              queue={page ? { context: item.problem ?? null } : undefined}
+              queue={page ? { context: item.problem ?? null, repeats: repeat ? repeatsLine(repeat.rule) : null } : undefined}
               /*
                * WHICH CODING AGENT THIS ROW RUNS ON, because one sentence in the
                  conversation depends on it: `blocked` after one of Claude Code's
@@ -1959,7 +1963,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             (w-6246b0c91f). Handing them to `Live` as
             well is what made one screen say "Codex" twice. */}
         {/* A chat says nothing about agents until one you called in is working. */}
-        {!heldByPerson && !(inChats && !session) && <Live item={item} facts={{ ...live, session, stalled, scheduledUntil }} />}
+        {!heldByPerson && !(inChats && !session) && <Live item={item} facts={{ ...live, session, stalled, scheduledUntil }} onTryAgain={onTryAgain} />}
 
         {/* NO LINE UNDER A CONVERSATION OFFERING TO HAND IT TO AN AGENT
             (w-2e8aa16f0f): it read as one more message, and it made the whole

@@ -2,7 +2,7 @@
 // box means.
 import { instructionOf, isCleanRun } from '../../shared/repeats.mjs';
 import { teammateIdOf } from '../../shared/teammates.mjs';
-import { answerSettled } from '../../shared/answers.mjs';
+import { answerSettled, filedByThePerson } from '../../shared/answers.mjs';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mjs';
 import { notShippedLine } from '../../shared/not-shipped.mjs';
 import { firstRealLine, previewText, searchText } from './format';
@@ -35,7 +35,8 @@ export interface InboxItem {
   wrote?: Record<string, { ts: number; source: string } | undefined>;
 }
 
-const hers = (i: InboxItem) => (i.labels ?? []).includes('founder');
+// The queue's own rule, so In progress never holds a thread it will not start.
+const hers = (i: InboxItem) => filedByThePerson(i);
 const liveAnswer = (i: InboxItem) => (i.answer && i.answer !== '(withdrawn)' ? i.answer : undefined);
 
 /* ------------------- the one thing nothing may take away ------------------ */
