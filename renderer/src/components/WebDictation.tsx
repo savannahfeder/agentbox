@@ -24,11 +24,21 @@ export function useWebDictation(box: { text: string; setText: (text: string) => 
   latest.current = box;
   const paid = useSyncExternalStore(onDictationAllowed, dictationAllowedNow, dictationAllowedNow);
   const [now, setNow] = useState<Heard>(IDLE);
+  const wrote = useRef(false);
   const [ctl] = useState(() => speech && dictation({
     speech,
-    box: { read: () => latest.current.text, write: (text) => latest.current.setText(text) },
+    box: { read: () => latest.current.text, write: (text) => { wrote.current = true; latest.current.setText(text); } },
     changed: setNow,
   }));
+  // A value written by code does not move the box's view, so once the box is
+  // full the newest words would land out of sight below it. This runs after
+  // the effects a caller declares before this hook, such as one growing the box.
+  useEffect(() => {
+    if (!wrote.current) return;
+    wrote.current = false;
+    const field = latest.current.field.current;
+    if (field) field.scrollTop = field.scrollHeight;
+  });
   // The send waits a render, so it reads the box with the last words in it.
   const [sending, setSending] = useState(false);
   const sendLatest = useRef(send);

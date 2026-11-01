@@ -7,6 +7,7 @@ import { EFFORTS, defaultEffortFor, effortChoicesFor, effortPicked, effortShown,
 import { readLastEngine, startingEngine, writeLastEngine } from '../../../renderer/src/engines';
 import { priorityValueOf, type PriorityId } from '../../../renderer/src/priority';
 import { harnessFields, projectsOffered, startingProject, type Harness } from '../../../renderer/src/threads/composer-rules';
+import { readLastRecipient, writeLastRecipient } from '../../../renderer/src/threads/recipient';
 import type { Engine } from '../../../shared/engines.mjs';
 import type { Choices } from './actions';
 
@@ -19,6 +20,11 @@ const asStorage = (store: KeptStore) => store as unknown as Storage;
 const remembered = (store: KeptStore) => { try { return store.getItem(LAST_PRODUCT_KEY); } catch { return null; } };
 
 /** The project the page is on: her pick while it is there, else the one she last sent to, else the first. */
+export type Recipient = { to: string; mate: string | null; auto: boolean };
+/** Who a new thread went to last, Auto, an agent or one of your teammates, kept as the desktop keeps it (renderer/src/threads/recipient.ts). */
+export const openingRecipient = (mates: readonly { id: string }[], reach: boolean, store: KeptStore): Recipient => readLastRecipient([], mates, reach, asStorage(store));
+export const pickRecipient = (store: KeptStore, r: Recipient) => writeLastRecipient(r, asStorage(store));
+
 export function projectNow(products: readonly ProjectLike[], picked: string | null, store: KeptStore): string | null {
   const offered = projectsOffered(products);
   return offered.find((p) => p.slug === picked)?.slug ?? startingProject(offered, { remembered: remembered(store) })?.slug ?? null;

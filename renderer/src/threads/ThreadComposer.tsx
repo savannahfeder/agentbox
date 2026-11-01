@@ -1244,7 +1244,8 @@ export function ThreadComposer({
       </div>
   );
   if (inline) return box;
-  return <div className="modal-backdrop tc-veil" onClick={onClose}>{box}</div>;
+  // Closing the box ends its dictation, so a click outside it waits for Stop.
+  return <div className="modal-backdrop tc-veil" onClick={() => { if (!talk.on) onClose(); }}>{box}</div>;
 }
 
 /* ------------------------------- glyphs --------------------------------- */
