@@ -215,8 +215,10 @@
 .th-row-act:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .th-row-act:focus-visible { outline: none; border-color: var(--line-strong); }
 /* TRY AGAIN (w-d08dcbb6fc), on a thread nothing will start: a mark after the
-   status word, always there. */
-.th-retry { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 18px; height: 18px; margin-left: 6px; padding: 0; border: 0; border-radius: var(--tag-radius); background: none; color: var(--text-dim); cursor: pointer; }
+   status word, always there. Its arrow starts as far after the word as the
+   ring ends before it: 2.5 + the 3.5 padding + the arc's 1.4 inset + the
+   word's trailing letter-spacing make the ring's 8. */
+.th-retry { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 18px; height: 18px; margin-left: 2.5px; padding: 0; border: 0; border-radius: var(--tag-radius); background: none; color: var(--text-dim); cursor: pointer; }
 /* The arrow's ink is as tall as the word's capitals (9px), and its line as heavy as theirs. */
 .th-retry svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .th-retry:hover, .th-retry:focus-visible { outline: none; color: var(--text); background: var(--wash-strong); }
