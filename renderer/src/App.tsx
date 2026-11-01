@@ -290,8 +290,8 @@ const liveAnswer = (i: WorkItem) => (i.answer && i.answer !== '(withdrawn)' ? i.
 // on every snapshot.
 const NO_ORDER: string[] = [];
 const NO_RUNNING: RunningSession[] = [];
-// How soon a first read that missed is asked again, as the relay's own
-// patience does for the page (relay/phone/tunnel.mjs GAP_MS).
+// How soon a first read that missed is asked again, rather than at the next
+// 30 s phone poll.
 const FIRST_READ_AGAIN_MS = 1_500;
 
 // THE SCREEN BEFORE THERE IS A SCREEN. The logo, its orange dot running round
