@@ -1070,7 +1070,8 @@ export interface AccountSetting {
   // something about from a terminal ('org-blocked' needs an admin of that
   // workspace, which may not be her). `note` is the sentence to print.
   state: 'live' | 'resting' | TroubleCause;
-  trouble: { cause: TroubleCause; since: number; note: string } | null;
+  /** `at` is when it was last seen; `resetsAt` is when a limit said it lets go. */
+  trouble: { cause: TroubleCause; since: number; at?: number | null; resetsAt?: number | null; note: string } | null;
   cooldownUntil: number;
   running: number;
   /**

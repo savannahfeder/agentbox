@@ -43,7 +43,7 @@ import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, ty
 import { cloudBilling, planSummary, type PaidPlan } from '../cloud-upgrade';
 import { CloudPlanCards } from './CloudPlanCards';
 import type { CloudPlan } from '../types';
-import { cloudAccountState, meterPair } from '../account-words';
+import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-words';
 import { accountReadingFor, accountsOnce, codexAccountsOnce, type HereLogin, type OneAccount } from '../accounts-once';
 import { LOOKS, lookMeans, SKINS, TUNE_DEFAULT, TUNE_LIMITS, type Look, type SkinId, type SkinTune } from '../skins';
 import { readySkin } from '../look-switch';
@@ -333,6 +333,8 @@ function agentStory(w: WorkspaceSettings, readings: Usage[], engine: 'claude' | 
       signedIn: !!a.email,
       trouble: a.trouble?.note ?? null,
       atLimit: a.trouble?.cause === 'at-limit',
+      limitAt: a.trouble?.at ?? null,
+      limitResetsAt: a.trouble?.resetsAt ?? null,
       dir: a.dir ?? null,
     })),
   };
@@ -512,10 +514,15 @@ export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, on
   // At its limit, the meters say which limit it is and when it resets.
   const limited = !!h?.trouble && !!h.atLimit && !!a.limits?.length;
   const trouble = limited ? null : h?.trouble ?? null;
+  // A reading taken since the limit was seen is the newer fact, full meter or not.
+  const readSince = !!h?.limitAt && !!a.checkedAt && a.checkedAt >= h.limitAt;
+  const sayLimit = limited && !readSince && !meterPair(a.limits, now).some((m) => (m.percent ?? 0) >= 100);
+  const when = h?.limitResetsAt ? resetWords({ resetsAt: h.limitResetsAt } as UsageLimit, now) : null;
+  const back = !when ? '' : when === hourWords(h!.limitResetsAt!) ? `, back at ${when}` : `, back ${when}`;
   return {
     key: a.key, name: a.name, plan: a.plan,
     about: signingIn ? ['Finish signing in to use it']
-      : limited && !meterPair(a.limits, now).some((m) => (m.percent ?? 0) >= 100) ? ['At its limit'] : [],
+      : sayLimit ? [`At its limit${back}`] : [],
     places,
     cloudAct: !cloud || signingIn ? null : broken ? signIn('Sign in to cloud again', c!.key) : h && !c ? signIn('Add to cloud', null) : null,
     // ONE ACCOUNT IS IN USE AND IT SAYS SO (w-dac993a554). This asked `picked`
