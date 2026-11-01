@@ -2467,6 +2467,9 @@ export default function App() {
     if (back) { setView(back.view); setSelected(back.selected); }
   }, []);
 
+  // The sidebar's usage row opens the page its agent's limits and accounts are on.
+  const openAgentSettings = (engine: string) => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setSettingsPane(engine === 'codex' ? 'codex' : 'claude'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); };
+
   /*
    * WHAT THE WALK IS POINTING AT RIGHT NOW, worked out once and read in two
      places: the coaching card, which rings the first of these and answers a
@@ -6456,6 +6459,8 @@ export default function App() {
           usage={snap.usage ?? null}
           now={now}
           sidebar
+          folded={sideFolded}
+          onOpen={openAgentSettings}
           engineWord={engineWordFor({
             engineChoice: (snap.engines?.choices?.length ?? 1) > 1,
             engine: snap.usage?.engine ?? null,
