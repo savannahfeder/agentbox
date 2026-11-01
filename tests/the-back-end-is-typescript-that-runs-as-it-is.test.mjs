@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { stripTypeScriptTypes } from 'node:module';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -33,15 +33,19 @@ describe('the back end is TypeScript that runs as it is', () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  it('passes the strict type check', () => {
-    const tsc = spawnSync(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'), '--noEmit', '-p', 'main/tsconfig.json'], {
-      cwd: root,
-      encoding: 'utf8',
-      timeout: 170_000,
+  // Not spawnSync: a worker blocked for the whole check stops answering vitest,
+  // and on a busy machine the run then dies without naming a test.
+  it('passes the strict type check', async () => {
+    const tsc = await new Promise((resolve) => {
+      execFile(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'), '--noEmit', '-p', 'main/tsconfig.json'], {
+        cwd: root,
+        encoding: 'utf8',
+        timeout: 170_000,
+        maxBuffer: 16 * 1024 * 1024,
+      }, (error, stdout, stderr) => resolve({ error, text: stdout + stderr }));
     });
-    expect(tsc.error).toBeUndefined();
-    expect(tsc.stdout + tsc.stderr).toBe('');
-    expect(tsc.status).toBe(0);
+    expect(tsc.text).toBe('');
+    expect(tsc.error).toBeNull();
   }, 180_000);
 
   it.each(files)('%s is stripped by Node with nothing left to compile', (file) => {
