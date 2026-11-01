@@ -3,6 +3,14 @@ import { cloudSessionId } from '../../shared/cloud-kit.mjs';
 const segment = (v) => typeof v === 'string' && /^[A-Za-z0-9_-]{1,120}$/.test(v);
 const address = (p) => p && /^[0-9a-f]{12}$/.test(p.device ?? '') && segment(p.project) && segment(p.item);
 
+// Which helpers are out, by the events the Mac counts them from (main/harnesses/claude-stream.mjs `countHelpers`).
+function countHelpers(r, msg) {
+  if (msg.type !== 'system' || !msg.task_id) return;
+  const out = r.helpers.filter((id) => id !== msg.task_id);
+  if (msg.subtype === 'task_started') r.helpers = [...out, msg.task_id];
+  else if (msg.subtype === 'task_updated' && msg.patch?.status && msg.patch.status !== 'in_progress' && msg.patch.status !== 'running') r.helpers = out;
+}
+
 export function cloudRunSnapshot(snapshot, { runId, since, at }) {
   if (!snapshot?.item) return null;
   const live = snapshot.live;
@@ -46,6 +54,7 @@ export function createPhoneRunStatus({ db, objects, now, active, events, log }) 
           if (!done && events) {
             r.cursor ??= 0;
             r.working ??= true;
+            r.helpers ??= [];
             for (let n = 0; n < 4; n += 1) {
               const page = await events(r.owner, r.sessionId, r.runId, r.cursor);
               if (page?.error === 'no-run') { done = true; break; }
@@ -56,7 +65,9 @@ export function createPhoneRunStatus({ db, objects, now, active, events, log }) 
               if (r.partial.length > 256 * 1024) r.partial = '';
               for (const line of lines) {
                 let msg; try { msg = JSON.parse(line); } catch { continue; }
-                if (['turn/completed', 'turn/failed'].includes(msg.method) || msg.type === 'result') r.working = false;
+                // A turn can end with helpers still out, and then the run is still at work.
+                countHelpers(r, msg);
+                if (['turn/completed', 'turn/failed'].includes(msg.method) || msg.type === 'result') r.working = r.helpers.length > 0;
                 else if (msg.method === 'turn/started' || ['assistant', 'stream_event'].includes(msg.type)) r.working = true;
               }
               r.cursor += page.events.length;
