@@ -163,6 +163,7 @@ import { syncCodexMemoryGate } from './codex-memory-gate.mjs';
 import { autoAgents } from './machine.mjs';
 import { runEndedProps } from './analytics.mjs';
 import { appendRun, runLedgerPath } from './run-ledger.mjs';
+import { toolServerLaunch } from './tool-server-launch.mjs';
 
 const POLL_MS = 15_000;
 // The reasons a queued thread's line names (`status().cannotStart`).
@@ -9346,7 +9347,7 @@ export class Supervisor {
   _codexStoreServer(item) {
     const command = this.storeMcpCommand();
     if (!command) return null;
-    return {
+    return this._toolServer({
       name: STORE_SERVER,
       command,
       env: {
@@ -9356,7 +9357,7 @@ export class Supervisor {
         ZERO_PRODUCT: item.product,
         ZERO_ITEM: item.id,
       },
-    };
+    });
   }
 
   /**
@@ -11847,7 +11848,7 @@ export class Supervisor {
   }
 
   /** The servers themselves, apart from the file. */
-  mcpServers() {
+  mcpServers(platform = process.platform) {
     const storeCmd = this.storeMcpCommand();
     const servers = {
       // The approvals channel: gated actions pause here and ask the
@@ -11884,7 +11885,14 @@ export class Supervisor {
     }
     if (!Object.keys(servers).length) return null;
     if (!fs.existsSync(path.join(this.appDir, 'scripts', 'approval-server.sh')) && !storeCmd) return null;
+    for (const [name, server] of Object.entries(servers)) servers[name] = this._toolServer(server, platform);
     return servers;
+  }
+
+  /** One tool server's entry, started without a shell on Windows (main/tool-server-launch.mjs). */
+  _toolServer(server, platform = process.platform) {
+    const launch = toolServerLaunch(server.command, { appDir: this.appDir, platform, unpacked });
+    return { ...server, ...launch, env: { ...server.env, ...launch.env } };
   }
 }
 

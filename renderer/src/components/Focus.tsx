@@ -73,7 +73,7 @@ import { referencedFiles, isImagePath } from '../referenced-files';
 import { pictureRoots } from '../message-folders';
 import { changePathFor } from '../code-artifact';
 import { fileCount, figuresFrom, figuresLabel, signed, type ChangeFigures } from '../change-figures';
-import { embeddedDocuments, isBookkeeping } from '../message-artifacts';
+import { embeddedDocuments, messageDocuments } from '../message-artifacts';
 import { PictureView, picturesFor, type Picture } from './PictureView';
 import { watchScrollGutter } from '../scroll-gutter';
 import { CODE_PATH, artifactUrlTransform, isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
@@ -102,7 +102,6 @@ import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mjs';
 import { recapFor } from '../recap';
 import type { LedgerLine } from '../thread-history';
 import type { LiveFacts } from '../live-line';
-import { whyWords } from '../where-why';
 import { offersRunNow } from '../run-now';
 import { AttachRow } from './AttachRow';
 import { BackToWhatSheWasReading } from './UrgentBar';
@@ -1334,7 +1333,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // A DESIGN OR A NOTE STILL GETS ITS CARD. Only code is doubled up; an html
     // page and a markdown file have no second door anywhere, and her screenshot
     // has one of each sitting above the code card she was pointing at.
-    : [...new Set([...htmlArtifacts, ...referencedFiles(item.result, item.note, item.body, item.answer, {dir: productDir}).filter(path => /\.(md|markdown)$/i.test(path) && !isBookkeeping(path))])];
+    : messageDocuments(item, productDir);
   const showOptions = offerIsLive(item);
   // WHETHER THE STRIP IS DRAWN, which is not the same question as whether the
   // row has a live offer. Everywhere else the two are the same. Opening the box
@@ -1538,8 +1537,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       place={canFinish ? runsIn : null}
       placeFacts={{
         running: !!session && session.where !== 'cloud',
-        moving: live.whyNotCloud?.why === 'moving',
-        why: live.whyNotCloud ? whyWords(live.whyNotCloud).body : null,
+        why: live.whyNotCloud ?? null,
         needs: item.needsMac ?? null,
       }}
       onPlace={onPlace}

@@ -6216,16 +6216,18 @@ export default function App() {
   const ruleOf = (item: WorkItem) => repeats.find((r) => r.product === item.product && r.id === ruleIdOf(item)) ?? null;
   const focusedRule = focused ? ruleOf(focused) : null;
 
-  const moveToCloud = async (ids: string[], product?: string) => {
+  const moveToCloud = async (ids: string[], product?: string, said = true) => {
     const moving = await api.moveToCloud(ids, product);
+    if (moving && !said) return;
     showToast(moving
       ? `Moving ${moving === 1 ? 'this thread' : `${moving} threads`} to the cloud. ${moving === 1 ? 'It keeps' : 'They keep'} working until the cloud has room.`
       : 'The cloud can’t take this thread right now');
   };
-  const placeThread = (item: WorkItem, keep: PlaceAct) => {
-    if (keep === 'move') { void moveToCloud([item.id], item.product); return; }
+  // `said` false for a pick in the thread's own Runs on panel, which shows it there.
+  const placeThread = (item: WorkItem, keep: PlaceAct, said = true) => {
+    if (keep === 'move') { void moveToCloud([item.id], item.product, said); return; }
     void api.setThreadOnMac({ [item.id]: keep ? true : null });
-    showToast(keep ? 'This thread now runs only on this Mac' : 'This thread can run on the cloud again');
+    if (said) showToast(keep ? 'This thread now runs only on this Mac' : 'This thread can run on the cloud again');
   };
   // The write the summary panel's Visible to menu makes.
   const seeThread = async (item: WorkItem, to: 'team' | 'private') => {
@@ -6892,7 +6894,7 @@ export default function App() {
                   onRunNow={() => runNow(focused)}
                   onPin={focused.agent ? undefined : (pin) => pinThread(focused.id, pin, true)}
                   place={focused.agent ? null : threadPlace(focused, snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null, snap.cloud ?? null)}
-                  onPlace={(keep) => placeThread(focused, keep)}
+                  onPlace={(keep) => placeThread(focused, keep, false)}
                   pageAsk={threadAsk?.key === keyOf(focused) ? threadAsk : null}
                   onAsked={() => setThreadAsk(null)}
                   onShown={setOpenShows}

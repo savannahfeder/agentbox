@@ -8,7 +8,7 @@ it('shows multiple sample artifacts without changing real document discovery',()
  expect(s).toContain("previewSample === 'multiple'");
  expect(s).toContain('className="artifact-entry-list"');
  expect(s).toContain('aria-label="Attachments"');
- expect(s).toContain('referencedFiles(item.result');
+ expect(s).toContain('messageDocuments(item, productDir)');
  expect(read('App.tsx')).toContain('<option value="multiple">Multiple artifacts</option>');
 });
 it('bounds action height and reduces only task header inset',()=>{

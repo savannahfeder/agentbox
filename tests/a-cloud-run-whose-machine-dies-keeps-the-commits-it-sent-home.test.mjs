@@ -16,6 +16,13 @@
 // real sandbox server, a stand-in S3, and a stand-in Claude Code. Killing the
 // machine is closing the sandbox and putting a fresh one where it was, which
 // answers no-run, as AgentCore does for a session whose microVM is gone.
+//
+// ITS IMPORT SLOTS ARE ITS OWN. Imports are held to two at a time by slot files
+// in the machine's temp folder, which every test that brings a cloud run home
+// otherwise shares. This file lays in four runs, more than any other, so it is
+// the one left waiting. Measured 2026-10-31: with both slots held by another
+// process, five of these six tests time out; on its own the file passed
+// twenty-five times over. That is the only reading found of the red run on main.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -38,7 +45,7 @@ const FAKE_STORE = here('./fixtures/cloud/fake-store-server.mjs');
 const STUB = here('../cloud/sandbox/mcp-stub.mjs');
 const LOGIN = { engine: 'claude', id: 'L1', key: 'logins/claude/L1.json' };
 
-let tmp; let sandbox; let sandboxUrl; let s3; let objects; let mac; let vms;
+let tmp; let sandbox; let sandboxUrl; let s3; let objects; let mac; let vms; let oldTmp;
 const git = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim();
 
 async function freshSandbox() {
@@ -55,6 +62,9 @@ async function killTheMachine() {
 
 beforeEach(async () => {
   tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'cloudlost-')));
+  oldTmp = process.env.TMPDIR;
+  process.env.TMPDIR = path.join(tmp, 't');
+  fs.mkdirSync(process.env.TMPDIR);
   objects = new Map();
   vms = 0;
   s3 = http.createServer((req, res) => {
@@ -78,6 +88,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  if (oldTmp === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = oldTmp;
   await sandbox?.close();
   s3.closeAllConnections();
   await new Promise((r) => s3.close(r));
