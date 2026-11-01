@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
+import { stripTypesFlags } from './strip-types.mts';
 
 export const THRESHOLD_MS = 500;
 export const KEEP_DAYS = 7;
@@ -186,6 +187,7 @@ export function startFreezeRecorder({ dir, appDir = '', thresholdMs = THRESHOLD_
   let worker: Worker | null = null;
   try {
     worker = new Worker(new URL('./freeze-recorder-thread.mts', import.meta.url), {
+      execArgv: [...process.execArgv, ...stripTypesFlags()],
       workerData: { beat, dir, appDir: [appDir, realPath(appDir)], thresholdMs, rotateMs, intervalUs },
     });
   } catch (err) {

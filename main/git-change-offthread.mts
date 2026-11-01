@@ -11,6 +11,7 @@
 import { Worker } from 'node:worker_threads';
 import * as git from './git-change.mjs';
 import { saveRunChange } from './run-change.mts';
+import { stripTypesFlags } from './strip-types.mts';
 
 type Job = (...args: unknown[]) => unknown;
 
@@ -44,7 +45,7 @@ function giveUp() {
 function thread(): Worker | null {
   if (worker || broken) return worker;
   try {
-    worker = new Worker(new URL('./git-change-thread.mts', import.meta.url));
+    worker = new Worker(new URL('./git-change-thread.mts', import.meta.url), { execArgv: [...process.execArgv, ...stripTypesFlags()] });
   } catch (error) {
     console.warn('zero: the checkout will be read on the main thread:', (error as Error).message);
     broken = true;

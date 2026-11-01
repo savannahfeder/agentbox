@@ -8,6 +8,7 @@ import os from 'node:os';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { stripTypesFlags } from './strip-types.mts';
 import { PROTOCOL, HOST_ALREADY_THERE, terminalHostStamp, terminalHostSocket, terminalHostSockets } from './terminal-host.mts';
 import { ENDED } from './task-terminals.mts';
 import type { TaskTerminals, TerminalListing, TerminalPlaceSpec } from './task-terminals.mts';
@@ -55,7 +56,7 @@ export interface TerminalHostsOptions {
 export function launchTerminalHost(sockPath: string, { logFile = null }: { logFile?: string | null } = {}) {
   const out = logFile ? fs.openSync(logFile, 'a') : 'ignore';
   try {
-    const proc = spawn(process.execPath, [fileURLToPath(new URL('./terminal-host.mts', import.meta.url)), sockPath], {
+    const proc = spawn(process.execPath, [...stripTypesFlags(), fileURLToPath(new URL('./terminal-host.mts', import.meta.url)), sockPath], {
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
       detached: true,
       stdio: ['ignore', out, out],

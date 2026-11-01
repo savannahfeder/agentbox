@@ -31,6 +31,7 @@ import { RECENT_DAYS, isScratchFolder, isTaskFolder, shortFolder, threadTitle } 
 import { codexDataDirs } from './agent-homes.mts';
 import { WAS_SLUGS, nameSlug } from '../shared/product-name.mjs';
 import { howTheChatEnded } from '../shared/agent-import.mts';
+import { stripTypesFlags } from './strip-types.mts';
 
 export const CODEX_RECENT_DAYS = RECENT_DAYS;
 
@@ -490,7 +491,7 @@ const waiting = new Map<number, OffThreadWait>();
 export function readCodexThreadsOffThread(opts: CodexThreadsOptions = {}): Promise<CodexThreadsRead> {
   try {
     if (!worker) {
-      worker = new Worker(new URL('./codex-threads-worker.mts', import.meta.url));
+      worker = new Worker(new URL('./codex-threads-worker.mts', import.meta.url), { execArgv: [...process.execArgv, ...stripTypesFlags()] });
       worker.unref();
       worker.on('message', ({ id, ok, value, error }: OffThreadReply) => {
         const w = waiting.get(id);

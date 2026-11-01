@@ -25,6 +25,8 @@
 # the one file in MacOS/, because a bundle has exactly one and a Mac without
 # PlistBuddy should still start her agents.
 here="$(cd "$(dirname "$0")" && pwd)"
+# The server is .mts, which a Node below 22.18 loads only when asked (main/strip-types.mts).
+strip_flags() { ELECTRON_RUN_AS_NODE=1 "$1" -e 'process.exit(process.features.typescript ? 0 : 1)' >/dev/null 2>&1 || echo --experimental-strip-types --disable-warning=ExperimentalWarning; }
 case "$here" in
   *app.asar.unpacked/scripts)
     res="$(cd "$here/../.." && pwd)"
@@ -52,7 +54,7 @@ case "$here" in
     # branch above does. Nothing on the machine is needed.
     server="$(cd "$here/.." && pwd)/main/approval-prompt-server.mts"
     if [ -f "$ZERO_APPROVALS_RUNTIME" ] && [ -x "$ZERO_APPROVALS_RUNTIME" ]; then
-      exec env ELECTRON_RUN_AS_NODE=1 "$ZERO_APPROVALS_RUNTIME" "$server"
+      exec env ELECTRON_RUN_AS_NODE=1 "$ZERO_APPROVALS_RUNTIME" $(strip_flags "$ZERO_APPROVALS_RUNTIME") "$server"
     fi
     # Nobody handed one down, so this is somebody running the script by hand.
     # A node already on PATH wins; nvm's newest is the last resort, for the
@@ -62,6 +64,6 @@ case "$here" in
       newest="$(ls "$nvm" 2>/dev/null | tail -1)"
       [ -n "$newest" ] && export PATH="$nvm/$newest/bin:$PATH"
     fi
-    exec node "$server"
+    exec node $(strip_flags node) "$server"
     ;;
 esac

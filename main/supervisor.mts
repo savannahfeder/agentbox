@@ -41,6 +41,7 @@ import {fillName} from '../shared/product-name.mjs';
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { stripTypesFlags } from './strip-types.mts';
 import { cloudWorkPending, takeCloudNews, writeMarker, readMarker } from './cloud/marker.mts';
 import { cloudClients } from './cloud/clients.mts';
 import { kitCopyPath, kitFramePath, readKitCopy, markerForCloudRun } from './cloud/kit.mts';
@@ -6737,7 +6738,7 @@ export class Supervisor {
       child.on('exit', (code) => { if (code === 75 && this._cloudHostProc?.exitCode !== null) this._cloudHostProc = null; });
       return child;
     }
-    return spawn(process.execPath, [this._cloudRunPath(), ...args], { cwd, env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, stdio, detached: true });
+    return spawn(process.execPath, [...stripTypesFlags(), this._cloudRunPath(), ...args], { cwd, env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, stdio, detached: true });
   }
 
   // The host's socket, starting the host if none of this app's is running. It
@@ -6754,7 +6755,7 @@ export class Supervisor {
     if (had?.exitCode === HOST_ALREADY_THERE && there) return this._cloudHostSock;
     try {
       const log = fs.openSync(path.join(this.userDir, 'cloud-host.log'), 'a');
-      const proc = spawn(process.execPath, [fileURLToPath(new URL('./cloud/host.mts', import.meta.url)), this._cloudHostSock], {
+      const proc = spawn(process.execPath, [...stripTypesFlags(), fileURLToPath(new URL('./cloud/host.mts', import.meta.url)), this._cloudHostSock], {
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
         detached: true,
         stdio: ['ignore', log, log],
@@ -6788,7 +6789,7 @@ export class Supervisor {
     if (running || (had?.exitCode === RUN_HOST_ALREADY_THERE && fs.existsSync(this._runHostSock))) return this._runHostSock;
     try {
       const log = fs.openSync(path.join(this.userDir, 'run-host.log'), 'a');
-      const proc = spawn(process.execPath, [fileURLToPath(new URL('./run-host.mjs', import.meta.url)), this._runHostSock, this._runSpool()], {
+      const proc = spawn(process.execPath, [...stripTypesFlags(), fileURLToPath(new URL('./run-host.mjs', import.meta.url)), this._runHostSock, this._runSpool()], {
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
         detached: true,
         stdio: ['ignore', log, log],

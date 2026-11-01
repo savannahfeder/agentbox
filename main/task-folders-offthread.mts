@@ -21,6 +21,7 @@
 // than a task that never gets one.
 import { Worker } from 'node:worker_threads';
 import * as folders from './task-folders.mts';
+import { stripTypesFlags } from './strip-types.mts';
 
 export type FolderJobName =
   | 'restoreTaskFolder' | 'releaseTaskFolder' | 'parkTaskFolder' | 'listTaskFolders'
@@ -60,7 +61,7 @@ function giveUp() {
 function thread(): Worker | null {
   if (worker || broken) return worker;
   try {
-    worker = new Worker(new URL('./task-folders-thread.mts', import.meta.url));
+    worker = new Worker(new URL('./task-folders-thread.mts', import.meta.url), { execArgv: [...process.execArgv, ...stripTypesFlags()] });
   } catch (error) {
     console.warn('zero: task folders will be made on the main thread:', (error as Error).message);
     broken = true;
