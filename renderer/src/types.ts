@@ -576,6 +576,8 @@ export interface AccountUsageReading {
   limits?: UsageLimit[];
   at?: number;
   error?: string | null;
+  /** Main could not confirm whose numbers these were, so it sent none. */
+  unconfirmed?: boolean;
 }
 
 export interface SupervisorStatus {

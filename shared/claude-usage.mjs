@@ -161,9 +161,17 @@ export function readUsageReport(value, now = Date.now()) {
   }
   if (report?.rate_limits_available !== true || !report.rate_limits) return [];
   const data = report.rate_limits;
+  // `limits` is Anthropic's list of the limits that apply. When it is there,
+  // a named field it leaves out is a limit that has gone, whatever number it
+  // still holds (tests/a-limit-anthropic-no-longer-lists-is-not-drawn).
+  const listed = Array.isArray(data.limits) ? data.limits : null;
+  const fromList = (kind) => {
+    const row = listed.find((l) => l?.kind === kind);
+    return row ? { utilization: row.percent, resets_at: row.resets_at } : null;
+  };
   const windows = [
-    ['session', null, data.five_hour],
-    ['week', 'all models', data.seven_day],
+    ['session', null, listed ? fromList('session') : data.five_hour],
+    ['week', 'all models', listed ? fromList('weekly_all') : data.seven_day],
     ['week', 'OAuth apps', data.seven_day_oauth_apps],
     ['week', 'Opus', data.seven_day_opus],
     ['week', 'Sonnet', data.seven_day_sonnet],

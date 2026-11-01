@@ -121,13 +121,16 @@ export async function gatewayFromEnv(env = process.env, { readSecret = (arn) => 
   const objects = bucketObjects({ region, bucket });
   // Without it the server runs and says paying is not set up.
   const billing = env.STRIPE_SECRET_ARN ? JSON.parse(await readSecret(env.STRIPE_SECRET_ARN)) : null;
-  // Without it a phone's reply waits for its computer, as before.
+  // Without it a phone's reply waits for its computer, as before, and who is
+  // subscribed stays in the ledger alone.
   const database = env.SUPABASE_SERVICE_SECRET_ARN ? JSON.parse(await readSecret(env.SUPABASE_SERVICE_SECRET_ARN)) : null;
+  const db = database?.serviceKey ? supabaseRest({ url: env.SUPABASE_URL, serviceKey: database.serviceKey }) : null;
   return createGateway({
     ...(billing ? { stripe: stripeClient({ key: billing.key, webhookSecret: billing.webhookSecret, managedPayments: !!billing.managedPayments }) } : {}),
-    ...(database?.serviceKey ? {
+    ...(db ? {
+      db,
       phone: {
-        db: supabaseRest({ url: env.SUPABASE_URL, serviceKey: database.serviceKey }),
+        db,
         runFiles: linkedFiles({ links: { get: signer.getUrl, put: signer.putUrl } }),
         sendPush: (messages) => sendToExpo(messages),
       },

@@ -50,6 +50,7 @@ import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './
 import { ClaudeUsage } from './claude-usage.mjs';
 import { AccountUsage } from './account-usage.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
+import { accountIdentity } from './account-tooling.mjs';
 import { usageEngine } from '../shared/usage.mjs';
 import { DEFAULT_ENGINE, isEngine } from '../shared/engines.mjs';
 import { routedPatch, PICKED_WHY } from '../shared/auto-route.mjs';
@@ -330,6 +331,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     bin: () => config.claudeBin,
     env: () => supervisor._workerEnv(DEFAULT_ENGINE),
     onReading: (profile, reading) => supervisor.noteUsageReading(profile, reading),
+    identity: (profile) => accountIdentity(profile === 'default' ? null : profile, { home: config.home }),
   });
   ipcMain.handle('zero:account-usage', async (event, { refresh = false, engine = DEFAULT_ENGINE } = {}) => {
     if (event.senderFrame?.parent || (event.sender && event.sender !== window.webContents)) throw Error('Usage is only available in the main app window.');

@@ -70,6 +70,8 @@ const PERSON = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const FILE_MS = 60_000;
 // A test alert this old is not sent: whoever asked has stopped looking.
 const WEB_TEST_KEPT_MS = 10 * 60_000;
+// Plans asked for in the database that one sweep takes up.
+const PLANS_GIVEN_MAX = 200;
 
 const iso = (t) => new Date(t).toISOString();
 
@@ -153,6 +155,18 @@ export function supabaseRest({ url, serviceKey, fetchImpl = fetch, timeoutMs = D
     webAlerts: (owner) => call('GET', `phone_commands?select=payload,created_at&owner=eq.${q(owner)}&kind=eq.setting&payload->>key=eq.${WEB_ALERTS_KEY}&order=created_at.desc&limit=200`),
     waitingWebTests: ({ after, before, limit }) => call('GET', `phone_commands?select=id,owner,device,payload,created_at&kind=eq.setting&payload->>key=eq.${WEB_ALERTS_TEST_KEY}&taken_at=is.null&claimed_at=is.null&created_at=gt.${q(iso(after))}&created_at=lt.${q(iso(before))}&order=created_at.asc&limit=${limit}`),
     dropPushDevice: (owner, token) => call('DELETE', `push_devices?owner=eq.${q(owner)}&token=eq.${q(token)}`),
+    // WHO IS SUBSCRIBED (cloud_plans): the plan the ledger holds someone to,
+    // beside their account, and `give`, a plan the owner asks for there.
+    plansGiven: () => call('GET', `cloud_plans?select=person,give&give=not.is.null&order=person&limit=${PLANS_GIVEN_MAX}`),
+    async writePlan(person, { plan, source, rev, at }) {
+      const row = { plan, source: source ?? null, rev, at: iso(at) };
+      // Only ever forwards: a write the row has already passed changes
+      // nothing, and the insert gives way to the row that is there.
+      const moved = await call('PATCH', `cloud_plans?person=eq.${q(person)}&rev=lt.${rev}`, { body: row, prefer: 'return=representation' });
+      if (Array.isArray(moved) && moved.length) return;
+      await call('POST', 'cloud_plans?on_conflict=person', { body: { person, ...row }, prefer: 'resolution=ignore-duplicates,return=minimal' });
+    },
+    takeGive: (person, give) => call('PATCH', `cloud_plans?person=eq.${q(person)}&give=eq.${q(give)}`, { body: { give: null } }),
   };
 }
 
