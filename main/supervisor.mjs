@@ -6048,7 +6048,8 @@ export class Supervisor {
       const id = n.item || item?.id;
       if (!product || !id || !n.note) { console.warn(`zero: ${n.note || 'a cloud run was kept aside'} (${folder})`); continue; }
       try {
-        // A machine that died: the row is told, and runs on as before.
+        // A run the app will ask again (a dead machine, the time limit): the
+        // row is told why and runs on, rather than waiting for them.
         if (n.lost) this.store.noteItem?.(product, id, n.note);
         else if (this.store.cloudWorkKeptAside) this.store.cloudWorkKeptAside(product, id, n.note);
         else this.store.noteItem?.(product, id, n.note);
