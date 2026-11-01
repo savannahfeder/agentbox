@@ -106,8 +106,8 @@ describe('the client carries no part of the hub', () => {
   it('the app starts from a file that loads one or the other, never both', () => {
     expect(JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).main).toBe('main/start.mjs');
     const start = fs.readFileSync(path.join(root, 'main', 'start.mjs'), 'utf8');
-    expect(start).not.toMatch(/^\s*import\s[^(]*from\s*['"]\.\/(main|hub-client)\.mjs/m);
-    expect(start).toMatch(/import\(['"]\.\/main\.mjs['"]\)/);
+    expect(start).not.toMatch(/^\s*import\s[^(]*from\s*['"]\.\/(main|hub-client)\.m[jt]s/m);
+    expect(start).toMatch(/import\(['"]\.\/main\.mts['"]\)/);
     expect(start).toMatch(/import\(['"]\.\/hub-client\.mjs['"]\)/);
   });
 });

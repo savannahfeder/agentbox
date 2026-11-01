@@ -33,7 +33,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 // with a client that still speaks the old one.
 export const PROTOCOL = 1;
 export const HOST_ALREADY_THERE = 3;
-const MADE_OF = ['run-host.mjs', 'claude-input.mjs'];
+const MADE_OF = ['run-host.mjs', 'claude-input.mts'];
 // An ended run nobody attached to is forgotten after this.
 const KEEP_ENDED_MS = 6 * 60 * 60 * 1000;
 
