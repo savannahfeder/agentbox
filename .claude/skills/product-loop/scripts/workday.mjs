@@ -138,8 +138,8 @@ if (isMain) {
       const logged = loggedCodexLimits(codexHome);
       const p = paceFor(logged ? readingFromLimits(codexLimits(logged.snapshot)) : null, { target: Number(opt('target', 90)) });
       say(`pace: ${p.verdict}. ${p.why}`);
-      if (p.verdict === 'stop' || p.verdict === 'hold') break;
-      if (p.verdict === 'wait') {
+      if (p.verdict === 'stop') break;
+      if (p.verdict === 'wait' || p.verdict === 'hold') {
         if (p.until > deadline) break;
         await new Promise((r) => setTimeout(r, Math.max(0, p.until - Date.now()) + MIN));
         continue;
