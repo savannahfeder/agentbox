@@ -46,7 +46,39 @@ const KEEPALIVE_MAX = 16_000;
 // a phone's home-screen icon is saved from that address, and on a phone the
 // icon gets storage of its own, so a key kept anywhere else is lost to it.
 const LOOPBACK = /^(127\.\d+\.\d+\.\d+|localhost|\[::1\])$/;
-export const onPhoneDoor = (host = location.hostname) => !LOOPBACK.test(host);
+// A DESKTOP WINDOW ONTO A HUB is not a phone, wherever its hub is (main/hub-client.mjs).
+type DesktopShell = {
+  notify(payload: { arrivals: unknown; needsYou: unknown }): Promise<unknown>;
+  badge(count: unknown): Promise<unknown>;
+  open(address: string): Promise<unknown>;
+  onOpenItem?(fn: (payload: unknown) => void): () => void;
+};
+const desktopShell = (): DesktopShell | undefined => (typeof window === 'undefined' ? undefined : (window as any).agentboxShell);
+export const onPhoneDoor = (host = location.hostname, shell: unknown = desktopShell()) => !shell && !LOOPBACK.test(host);
+
+/** What stays on this Mac when the rest of the app is on a hub. */
+export function withDesktopShell(bridge: Record<string, any>, shell?: DesktopShell) {
+  if (!shell) return bridge;
+  const hubOpens = bridge.openArtifact;
+  const hubSays = bridge.onOpenItem;
+  return {
+    ...bridge,
+    onOpenItem: (fn: (payload: unknown) => void) => {
+      const offHub = hubSays?.(fn);
+      const offHere = shell.onOpenItem?.(fn);
+      return () => { offHub?.(); offHere?.(); };
+    },
+    notify: (arrivals: unknown, needsYou: unknown) => shell.notify({ arrivals, needsYou }),
+    badge: (count: unknown) => shell.badge(count),
+    openArtifact: async (p: { src?: string; mode?: string }) => {
+      if (p?.mode !== 'resolve' && /^https?:/.test(String(p?.src))) {
+        await shell.open(String(p.src));
+        return { ok: true, opened: p.src };
+      }
+      return hubOpens(p);
+    },
+  };
+}
 
 /** A made-up name for this browser, so Settings can list the phones. */
 function deviceId(): string {
@@ -233,7 +265,7 @@ export function installBrowserBridge(): boolean {
     deliver(message.channel, message.args?.[0]);
   };
 
-  (window as any).zero = bridge;
+  (window as any).zero = withDesktopShell(bridge, desktopShell());
   // A tapped alert opens its thread, the way the desktop's notification does.
   if (phone) {
     startPhoneAlerts({ token, device }, (id) => {
@@ -245,6 +277,6 @@ export function installBrowserBridge(): boolean {
   }
   // A tab has no title bar to clear, so the window's top inset can match its
   // bottom one (renderer/src/threads/pages.css reads this).
-  if (typeof document !== 'undefined') document.documentElement.dataset.shell = 'tab';
+  if (typeof document !== 'undefined' && !desktopShell()) document.documentElement.dataset.shell = 'tab';
   return true;
 }

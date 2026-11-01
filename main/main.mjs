@@ -425,6 +425,8 @@ async function createWindow() {
   // request so a project made after launch is not a folder of broken images.
   imageRoots = () => [config.accountRoot, ...store.listProducts().map((p) => p.repoPath).filter(Boolean)];
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
+  // Local runs outlive a quit or a restart of the app (main/run-host.mjs).
+  supervisor.hostRuns = true;
   // THAT agents start and stop work (main/analytics.mjs checks the switch).
   supervisor.count = (name, props) => analytics.track(name, props);
   // Whether anyone has touched the Mac since a wake (Supervisor#asleep).

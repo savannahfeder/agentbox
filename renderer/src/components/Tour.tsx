@@ -7,7 +7,7 @@ import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
 import { ConfettiBurst } from './ConfettiBurst';
-import { THREAD_CLOSED, cursorOwed, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, tourLive, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { THREAD_CLOSED, cursorOwed, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, tourLive, tourOver, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -42,7 +42,10 @@ const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
   inPalette: { words: <></>, side: 'below' },
   startHere: { words: <>Press <K k="N" /> to give an agent a new task</>, side: 'below-right' },
   palette: { words: <>Press <K k={CMD} /><K k="K" /> to find anything {Name} can do</>, side: 'below' },
+  urgent: { words: <>Urgent threads move up your list, and their agents start first</>, side: 'below-right' },
 };
+/** The urgent tip asks for nothing, so it goes by itself. */
+const URGENT_MS = 6000;
 
 /** Inside ⌘K: one thing worth trying on the thread it acts on, and the way out. */
 function InPalette() {
@@ -61,6 +64,8 @@ const firstRow = (running: boolean) => {
   if (running) return rows.find((r) => r.querySelector('.s-running')) ?? null;
   return rows.find((r) => r.classList.contains('selected')) ?? rows[0] ?? null;
 };
+
+const urgentCell = () => document.querySelector<HTMLElement>('.list-pane .row.selected .th-cell-prio.urgent');
 
 const needsYouTab = () => document.querySelector<HTMLElement>('.tm-tab[data-hint="state-tab"]');
 
@@ -87,6 +92,9 @@ function targetsOf(step: TourStep): HTMLElement[] {
     case 'inPalette': return one(document.querySelector('.palette'));
     case 'gettingReady': return one([...document.querySelectorAll('.list-pane .row[data-catching-up]')].at(-1));
     // Nothing on screen opens the command bar, so the card sits alone under the tabs.
+    // On the list, at the word Urgent on the thread just raised.
+    case 'urgent': if (urgentCell()) return one(urgentCell());
+    // falls through
     case 'palette': return one(document.querySelector('.tm-tab')?.parentElement ?? document.querySelector('.thread-crumb-from')?.parentElement);
   }
 }
@@ -104,7 +112,7 @@ function snug(el: HTMLElement): Box {
       x0 = Math.min(x0, r.left); y0 = Math.min(y0, r.top); x1 = Math.max(x1, r.right); y1 = Math.max(y1, r.bottom);
     }
   }
-  for (const icon of el.querySelectorAll('svg, .th-st, .live-mark')) {
+  for (const icon of el.querySelectorAll('svg, .th-st, .live-mark, .prio-bars')) {
     const r = icon.getBoundingClientRect();
     if (r.width) { x0 = Math.min(x0, r.left); x1 = Math.max(x1, r.right); }
   }
@@ -114,7 +122,7 @@ function snug(el: HTMLElement): Box {
 
 function boxOf(step: TourStep, els: HTMLElement[]): Box | null {
   if (!els.length) return null;
-  if (step === 'working' || step === 'answered' || step === 'open' || step === 'busy') return snug(els[0]);
+  if (step === 'working' || step === 'answered' || step === 'open' || step === 'busy' || (step === 'urgent' && els[0] === urgentCell())) return snug(els[0]);
   const rs = els.map((e) => e.getBoundingClientRect()).filter((r) => r.width);
   if (!rs.length) return null;
   const x = Math.min(...rs.map((r) => r.left)), y = Math.min(...rs.map((r) => r.top));
@@ -180,8 +188,7 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint }
   }, []);
 
   // THE END OF THE TUTORIAL: one burst of confetti, the way the old walk ended,
-  // once the first thread is closed and the command bar shown, and only when
-  // nothing is over the window to hide it.
+  // and only when nothing is over the window to hide it.
   const [burst, setBurst] = useState(0);
   const [tried, setTried] = useState(() => { try { return !!localStorage.getItem(NOTIFY_TRIED); } catch { return false; } });
   const tryNotifications = () => {
@@ -189,7 +196,7 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint }
     setTried(true);
     void (window.zero as { notifyTest?: () => Promise<unknown> } | undefined)?.notifyTest?.();
   };
-  const ended = (t: TourState | null) => !!t && !t.skipped && t.done.includes('close') && t.done.includes('palette') && (t.sent || t.done.includes('start'));
+  const ended = (t: TourState | null) => tourOver(t);
   const hadEnded = useRef(ended(tour));
   useEffect(() => {
     if (covered || hadEnded.current === ended(tour)) return;
@@ -263,7 +270,7 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint }
     const dialog = step === 'pick' ? document.querySelector('.tc-card:not(.tc-inline)')?.getBoundingClientRect() : null;
     if (dialog) top = dialog.bottom + GAP;
     if (step === 'gettingReady') left = document.querySelector('.list-pane .row[data-catching-up] .subject')?.getBoundingClientRect().left ?? left;
-    if (step === 'palette') {
+    if (step === 'palette' || (step === 'urgent' && !urgentCell())) {
       const pane = document.querySelector('.list-pane')?.getBoundingClientRect();
       left = pane ? pane.left + (pane.width - w) / 2 : (window.innerWidth - w) / 2;
       // Under the tabs on a list; on a thread, in the empty middle of its header line.
@@ -309,11 +316,23 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint }
     return () => { window.removeEventListener('pointerdown', down, true); window.removeEventListener('keydown', key, true); };
   }, [step, tour, thread, onChange]);
 
+  // The urgent tip goes after a while, or on the next key or click once it has been read.
+  useEffect(() => {
+    if (step !== 'urgent' || !tour) return undefined;
+    const since = Date.now();
+    const done = () => onChange(finishLesson(tour, 'urgent'));
+    const t = setTimeout(done, URGENT_MS);
+    const any = () => { if (Date.now() - since >= SEEN_MS) setTimeout(done, 0); };
+    window.addEventListener('keydown', any, true);
+    window.addEventListener('pointerdown', any, true);
+    return () => { clearTimeout(t); window.removeEventListener('keydown', any, true); window.removeEventListener('pointerdown', any, true); };
+  }, [step, tour, onChange]);
+
   if (!step || !box || !tour) return burst ? <ConfettiBurst key={burst} /> : null;
   return (
     <>
       {burst ? <ConfettiBurst key={burst} /> : null}
-      {step !== 'palette' && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && step !== 'startHere' && <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
+      {step !== 'palette' && !(step === 'urgent' && !urgentCell()) && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && step !== 'startHere' && <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
       <div key={`card-${step}`} ref={cardRef} className="tour-card" role="status"
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>
         <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : SAY[step].words}</span>

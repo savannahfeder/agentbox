@@ -25,7 +25,7 @@ describe('the card', () => {
   });
   // The status line changes length as the agent works and there is nothing on it to press.
   it('and lights nothing while the agent works', () => {
-    expect(tour).toContain("{step !== 'palette' && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && step !== 'startHere' && <div key={`glow-${step}`}");
+    expect(tour).toContain("{step !== 'palette' && !(step === 'urgent' && !urgentCell()) && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && step !== 'startHere' && <div key={`glow-${step}`}");
   });
   it('and stops asking you to watch the agent once it has said so', () => {
     expect(tour).toContain("const wanted = rawStep === 'working' && tried ? null : rawStep;");
