@@ -45,7 +45,7 @@ import { cloudClients } from './cloud/clients.mjs';
 import { kitCopyPath, kitFramePath, readKitCopy, markerForCloudRun } from './cloud/kit.mjs';
 import { REPLY_MARK, replyFrame, serverJoinedKey } from '../shared/cloud-kit.mjs';
 import { NEW_THREAD, NEW_THREAD_CODEX, NEW_ITEM_MARK, NEW_TITLE_MARK, NEW_BODY_MARK, fillNewThreadKit } from '../shared/cloud-kit.mjs';
-import { macAsleep, carryCommand, CARRY_AHEAD_MS, CARRY_FRESH_MS } from '../shared/cloud-carry.mjs';
+import { macAsleep, carryCommand, CARRY_AHEAD_MS, handOverSpent, notBeforeOf } from '../shared/cloud-carry.mjs';
 import { execFile as execFileCb } from 'node:child_process';
 import { CLOSED_UNSHIPPED, closedBeforeItShipped, shippedAs } from '../shared/not-shipped.mjs';
 import { handBackWhat, handsBack } from '../shared/cloud-hand-back.mjs';
@@ -96,7 +96,7 @@ function whoHasIt(made) {
   if (made?.taken !== false) return '';
   return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
-import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy } from '../shared/answers.mjs';
+import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mjs';
 import { DEFAULT_SESSIONS_AT_ONCE } from './config.mjs';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
@@ -164,10 +164,11 @@ import { syncCodexMemoryGate } from './codex-memory-gate.mjs';
 import { autoAgents } from './machine.mjs';
 import { runEndedProps } from './analytics.mjs';
 import { appendRun, runLedgerPath } from './run-ledger.mjs';
+import { toolServerLaunch } from './tool-server-launch.mjs';
 
 const POLL_MS = 15_000;
 // The reasons a queued thread's line names (`status().cannotStart`).
-const SAID_WHY_NOT_STARTED = new Set(['setup', 'asleep', 'engine', 'login', 'memory', 'slow-folder', 'error']);
+const SAID_WHY_NOT_STARTED = new Set(['setup', 'asleep', 'cloud-carried', 'engine', 'login', 'memory', 'slow-folder', 'error']);
 // Making a thread's folder takes seconds; past this it is said to be slow.
 const SLOW_FOLDER_MS = 2 * 60_000;
 // A project's kit for a new thread from the phone: left again at most this
@@ -258,7 +259,7 @@ const HUNG_QUIET_MS = 10 * 60_000;
 // A pass this late was not late, the Mac was asleep (forgiveSleep). Eight
 // missed passes: past any slow pass, well under the ten minutes above.
 const SLEPT_GAP_MS = 2 * 60_000;
-// Awake this long with no phone pass, a row handed to the cloud runs here (`_carriedHolds`).
+// Awake this long and not joined or taken back, a row handed to the cloud runs here (`_carriedHolds`).
 const PHONE_QUIET_MS = 10 * 60_000;
 // Two hangs on one row inside this window and the app stops restarting it and
 // tells her instead, so a row that hangs every time is not killed forever.
@@ -1093,7 +1094,7 @@ export class Supervisor {
       for (const key of Object.keys(this._deliveryAttempts)) if (key.startsWith(prefix)) delete this._deliveryAttempts[key];
       // Resuming a row by name is her saying run this now, which outranks a
       // rest the fleet earned on it exactly as it outranks the attempt cap.
-      delete this._fruitless[`${item.product}:${item.id}`];
+      this._endRest(item.product, item.id);
       this.forgetDeadStarts(item);
 
       if (this._roomFor(this._engineFor(item), item, { asked: true })) {
@@ -1672,14 +1673,34 @@ export class Supervisor {
     this._runNow.set(id, { product, at: Date.now(), started: false });
     // Asking for a row by name outranks a rest the fleet earned on it, the
     // same way `resumeItems` treats it.
-    if (this._fruitless[`${product}:${id}`]) {
-      delete this._fruitless[`${product}:${id}`];
-      this._saveState();
-    }
+    if (this._endRest(product, id)) this._saveState();
     this.forgetDeadStarts(item);
     this.onChange?.();
     this.wake();
     return { ok: true };
+  }
+
+  // A PUSH STARTS THE ROW EVEN WHERE THE QUEUE'S OWN RULES WOULD WALK PAST IT:
+  // the app's own note on it, a tag an agent wrote, a rest. She asked for it by
+  // name. Not a row nobody has given to an agent yet (the walk's own, one sent
+  // to Auto, a question waiting on her).
+  _pushedByHer(item) {
+    return this._runNow.has(item.id) && item.status === 'open'
+      && item.kind !== 'question' && item.kind !== 'review'
+      && !(item.labels ?? []).includes(FIRST_RUN_LABEL) && !isAuto(item);
+  }
+
+  // ASKING FOR A ROW BY NAME ENDS ITS REST AND KEEPS OUR PROMISE. The same
+  // record says our own words on the row promised a retry (`_weSaidItRunsAgain`).
+  // Deleting it made the queue read those words as an answer, so a row a usage
+  // limit stopped never started again once Run now had touched it.
+  _endRest(product, id) {
+    const key = `${product}:${id}`;
+    const seen = this._fruitless[key];
+    if (!seen) return false;
+    if (seen.saidTs) seen.runs = 0;
+    else delete this._fruitless[key];
+    return true;
   }
 
   // A push lasts while its task runs, so a second push cannot pause the first,
@@ -3313,8 +3334,8 @@ export class Supervisor {
    * What a sleeping Mac hands the cloud, each row once: what a pass would
    * have started now, what comes due in the next CARRY_AHEAD_MS with the
    * moment it may start (rows set for later, and each repeating task's next
-   * run under the id it will have), and anything handed over more than
-   * CARRY_FRESH_MS ago again, naming the command it `replaces`.
+   * run under the id it will have), and anything the cloud has not started
+   * CARRY_AGAIN_MS after its moment again, naming the command it `replaces`.
    */
   async carryWhileAsleep(now = Date.now()) {
     if (!this.asleep(now)) return [];
@@ -3323,7 +3344,7 @@ export class Supervisor {
     for (let i = 0; this._ticking && i < 50; i += 1) await new Promise((r) => { setTimeout(r, 100); });
     if (!this.asleep()) return [];
     const at = Date.now();
-    const stale = (id) => this._carried?.[id] && !(at - (this._carried[id].at ?? 0) < CARRY_FRESH_MS);
+    const stale = (id) => handOverSpent({ ...(this._carried?.[id] ?? {}), now: at });
     const wanted = new Map((this._asleepQueue ?? []).map((r) => [r.item.id, r]));
     const items = this.store.listItems(at);
     for (const item of items) {
@@ -3339,11 +3360,20 @@ export class Supervisor {
     const out = [];
     for (const { item, continuation, notBefore = null, repeat = null } of wanted.values()) {
       if ((this._carried?.[item.id] && !stale(item.id)) || this.threadOnMac?.[item.id] || !this.leavesKitsFor(item.product)) continue;
+      // The queue only tests these on its way to a start, which asleep it never makes.
+      if (continuation && (answerSettled(item) || this._answerDelivered(item))) continue;
+      if (this._liveSessions?.[item.id]?.cloud) continue;
       const engine = engineOf(this._engineFor(item));
       if (engine !== 'claude' && engine !== 'codex') continue;
       if (continuation) {
         const kit = readKitCopy(kitCopyPath(this.userDir, item.product, item.id));
         if (!kit || kit.item !== item.id || kit.project !== item.product) continue;
+        // A kit is left only after a run that finished, so a folder whose last
+        // cloud run never came home has one from before that run: starting
+        // the cloud on it would work from a branch missing the commits still
+        // in the cloud. The row waits for the wake that brings them home,
+        // which is the test `_whereToRun` already makes here.
+        if (cloudWorkPending(this._cloudPlace(kit.cwd, item.product, item.id))) continue;
       } else {
         // A row that has had a run resumes its conversation, which a new-thread kit does not carry.
         if (this._rowSessions?.[item.id]) continue;
@@ -3381,10 +3411,13 @@ export class Supervisor {
     return out;
   }
 
-  /** The phone pass wrote this row's hand-over (`command` is its id): nothing here starts it now. */
-  handedOver({ item, command, kind }) {
+  /** The phone pass wrote this row's hand-over (`command` is its id): nothing
+   *  here starts it now. The hand-over's own moment is kept, so one made for
+   *  tonight is not written again before tonight (`handOverSpent`). Called
+   *  again with the same command to say the cloud still has it. */
+  handedOver({ item, command, kind, payload = null }) {
     if (!item) return;
-    (this._carried ??= {})[item] = { command: command ?? null, kind: kind ?? null, at: Date.now() };
+    (this._carried ??= {})[item] = { command: command ?? null, kind: kind ?? null, at: Date.now(), notBefore: notBeforeOf({ payload }) };
     this._saveState();
   }
 
@@ -6054,6 +6087,12 @@ export class Supervisor {
         // Finished only when its work is home: 75 is the app going again, or
         // results that did not come back, and a later homecoming tries again.
         const session = { ...view, startedAt: rec.startedAt, child: { ranToTheEnd: () => code === 0 } };
+        // Same as a run the app started: its reply was marked heard when it was
+        // joined, so it is released here or nothing would run it on this Mac.
+        if (this.runFinished(session) && this._noteCloudHandBack(item, session)) {
+          const fresh = this.store.readItem?.(rec.product, itemId);
+          if (fresh?.answer) this.redeliverAnswer({ ...fresh, product: rec.product }, fresh.answer);
+        }
         if (this.speaksForTheSession(session)) {
           try { this.store.recordSessionResult(rec.product, itemId, { result: session.result || '(the session ended with an empty reply)' }); } catch (e) { console.warn('zero: writing a joined run\'s answer failed:', e.message); }
         } else if (this.closingMessageIsTheAnswer(session)) {
@@ -6061,7 +6100,7 @@ export class Supervisor {
         }
         // The reply this conversation heard is answered; one typed while it
         // was away is left for the next run.
-        if (this.runFinished(session)) {
+        if (this.runFinished(session) && !session.handedBack) {
           try {
             const fresh = this.store.readItem?.(rec.product, itemId);
             if (fresh?.answer && this._heardIn(fresh, rec.sessionId)) {
@@ -6089,7 +6128,10 @@ export class Supervisor {
       const id = n.item || item?.id;
       if (!product || !id || !n.note) { console.warn(`zero: ${n.note || 'a cloud run was kept aside'} (${folder})`); continue; }
       try {
-        if (this.store.cloudWorkKeptAside) this.store.cloudWorkKeptAside(product, id, n.note);
+        // A run the app will ask again (a dead machine, the time limit): the
+        // row is told why and runs on, rather than waiting for them.
+        if (n.lost) this.store.noteItem?.(product, id, n.note);
+        else if (this.store.cloudWorkKeptAside) this.store.cloudWorkKeptAside(product, id, n.note);
         else this.store.noteItem?.(product, id, n.note);
       } catch (e) { console.warn('zero: could not say a cloud run was kept aside:', e.message); }
     }
@@ -6797,8 +6839,11 @@ export class Supervisor {
         // tagged a finished thread QUEUED. Resting, settled and already
         // delivered are all inside those two, so a row the tick is going to
         // walk past is never advertised as waiting its turn.
+        // And what she asked for by name: a push (`_pushedByHer`) or a resume
+        // waiting for a slot (`_drainResumeQueue`).
         .filter((i) => (this._isContinuation(i) && !answerSettled(i) && !this._answerDelivered(i))
-          || this._isFreshWork(i, nowTs, autonomous) || settingUp(i.id))
+          || this._isFreshWork(i, nowTs, autonomous) || settingUp(i.id)
+          || this._pushedByHer(i) || this._resumeQueue.has(i.id))
         .map((i) => i.id);
       for (const id of this._recovering ?? []) if (heldBySweep(id) && !this._comingHome?.has(id) && !queued.includes(id)) queued.push(id);
     } catch {}
@@ -7248,15 +7293,10 @@ export class Supervisor {
    */
   _isFreshWork(item, now = Date.now(), autonomous = new Set(this.config.autonomousProducts ?? [])) {
     // A worker can put the 'founder' label on any row through the store MCP
-    // (create_work_item/update_work_item take a free labels array), and nothing
-    // else here checked who wrote it, so a forged label auto-spawned a run she
-    // never asked for. Every MCP write is source 'agent' and the fold refuses to
-    // let an agent line overwrite a founder-held label, so a label we KNOW an
-    // agent authored is the forged one and nothing else. A label with no
-    // recorded author (a legacy row from before `wrote` tracking) keeps its old
-    // treatment rather than being newly refused.
-    const founderInitiated = (item.labels ?? []).includes('founder')
-      && item.wrote?.labels?.source !== 'agent';
+    // (create_work_item/update_work_item take a free labels array), so a label
+    // we KNOW an agent authored is a forged one and starts nothing
+    // (`filedByThePerson`, which the lists read too).
+    const founderInitiated = filedByThePerson(item);
     return !(item.labels ?? []).includes(FIRST_RUN_LABEL)
       // Sent to Auto and not yet given to anyone (`routeTheThreads`).
       && !isAuto(item)
@@ -7451,9 +7491,12 @@ export class Supervisor {
       // a special case.
       if (!this.store.isDue(item, now)) continue;
       // Handed to the cloud while asleep: the phone pass takes it back or joins its run.
-      if (this._carriedHolds(item.id, now)) continue;
+      if (this._carriedHolds(item, now)) {
+        this._noteNotStarting(item, 'cloud-carried', this._engineFor(item));
+        continue;
+      }
       const continuation = this._isContinuation(item);
-      if (!continuation && !this._isFreshWork(item, now, autonomous)) continue;
+      if (!continuation && !this._isFreshWork(item, now, autonomous) && !this._pushedByHer(item)) continue;
       // ONE OF CLAUDE CODE'S OWN EIGHT COMMANDS, typed into this row's reply
       // box, ON A ROW THAT IS GOING TO CLAUDE CODE. `commandPrompt` is null for
       // everything else, so this is false for every ordinary message.
@@ -9387,7 +9430,7 @@ export class Supervisor {
   _codexStoreServer(item) {
     const command = this.storeMcpCommand();
     if (!command) return null;
-    return {
+    return this._toolServer({
       name: STORE_SERVER,
       command,
       env: {
@@ -9397,7 +9440,7 @@ export class Supervisor {
         ZERO_PRODUCT: item.product,
         ZERO_ITEM: item.id,
       },
-    };
+    });
   }
 
   /**
@@ -11048,15 +11091,24 @@ export class Supervisor {
   }
 
   /**
-   * Whether a row handed to the cloud is still held from starting here. Only
-   * the phone pass takes one back, so with the Mac awake ten minutes and no
-   * pass in that time (signed out, the cloud unreachable) each is let go and
-   * runs here, said once in the log, rather than waiting for ever.
+   * Whether a row handed to the cloud is still held from starting here. A pass
+   * joins or takes back a hand-over within a minute or two of waking, so one
+   * still here after ten minutes awake never will be, even with passes coming:
+   * it runs here, said once in the log. A reply written since the hand-over is
+   * one the cloud never saw, so nothing holds it.
    */
-  _carriedHolds(id, now = Date.now()) {
-    if (!this._carried?.[id]) return false;
+  _carriedHolds(item, now = Date.now()) {
+    const id = item?.id;
+    const mark = this._carried?.[id];
+    if (!mark) return false;
+    if (this.asleep(now)) return true;
     const awakeSince = Math.max(this._wokeAt ?? 0, this._bootAt ?? 0);
-    if (this.asleep(now) || now - awakeSince < PHONE_QUIET_MS || now - (this._phoneSeenAt ?? 0) < PHONE_QUIET_MS) return true;
+    const newerReply = answerTs(item) > (mark.at ?? 0);
+    if (!newerReply) {
+      if (now - awakeSince < PHONE_QUIET_MS) return true;
+      const passesComing = now - (this._phoneSeenAt ?? 0) < PHONE_QUIET_MS;
+      if (passesComing && now - (mark.at ?? 0) < PHONE_QUIET_MS) return true;
+    }
     console.warn(`zero: ${id} was handed to the cloud and nothing has taken it back; it runs here`);
     delete this._carried[id];
     this._saveState();
@@ -11888,7 +11940,7 @@ export class Supervisor {
   }
 
   /** The servers themselves, apart from the file. */
-  mcpServers() {
+  mcpServers(platform = process.platform) {
     const storeCmd = this.storeMcpCommand();
     const servers = {
       // The approvals channel: gated actions pause here and ask the
@@ -11925,7 +11977,14 @@ export class Supervisor {
     }
     if (!Object.keys(servers).length) return null;
     if (!fs.existsSync(path.join(this.appDir, 'scripts', 'approval-server.sh')) && !storeCmd) return null;
+    for (const [name, server] of Object.entries(servers)) servers[name] = this._toolServer(server, platform);
     return servers;
+  }
+
+  /** One tool server's entry, started without a shell on Windows (main/tool-server-launch.mjs). */
+  _toolServer(server, platform = process.platform) {
+    const launch = toolServerLaunch(server.command, { appDir: this.appDir, platform, unpacked });
+    return { ...server, ...launch, env: { ...server.env, ...launch.env } };
   }
 }
 

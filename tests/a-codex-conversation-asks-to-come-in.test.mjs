@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mjs';
-import { scanCodex } from '../main/codex-watch.mjs';
+import { scanCodex } from '../main/codex-watch.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 import {
   CODEX_IMPORT_LABEL, CODEX_MIRROR_LABEL, IMPORT_KIND, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow,

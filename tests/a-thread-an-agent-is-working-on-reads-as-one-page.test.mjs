@@ -32,13 +32,14 @@ describe('the line under the title while an agent works', () => {
 
 describe('the page', () => {
   const page = fs.readFileSync(new URL('../renderer/src/components/ItemThread.tsx', import.meta.url), 'utf8');
-  it('folds while the agent works, however short the thread', () => {
-    expect(page).toContain('const short = !earlierOpen && !working && drawnWhole(behind, broughtIn(item));');
+  // Since main's a-working-agent page (9d041d39), it shows every step since you spoke rather than folding.
+  it('draws the steps since you spoke while the agent works', () => {
+    expect(page).toContain('const stands = !queue ? -1 : working ? workingFrom(events) : standsAt(events, newest);');
   });
   it('says what you asked until the agent writes a summary of its own', () => {
     expect(page).toContain("context={working && !queue.context ? workingContext(item.body ?? item.title ?? '', pageTitle(item), queue.repeats ?? null) : queue.context}");
   });
-  it('draws only the title and your ask before the agent has said anything', () => {
-    expect(page).toContain('if (queue && working && !newest && !earlierOpen) return <>{queueHead}</>;');
+  it('never draws the answer alone while the agent works', () => {
+    expect(page).toContain('const alone = !!newest && !working && stands < 0;');
   });
 });

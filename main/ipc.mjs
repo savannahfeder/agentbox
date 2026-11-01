@@ -50,6 +50,7 @@ import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './
 import { ClaudeUsage } from './claude-usage.mjs';
 import { AccountUsage } from './account-usage.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
+import { accountIdentity } from './account-tooling.mjs';
 import { usageEngine } from '../shared/usage.mjs';
 import { DEFAULT_ENGINE, isEngine } from '../shared/engines.mjs';
 import { routedPatch, PICKED_WHY } from '../shared/auto-route.mjs';
@@ -331,6 +332,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     bin: () => config.claudeBin,
     env: () => supervisor._workerEnv(DEFAULT_ENGINE),
     onReading: (profile, reading) => supervisor.noteUsageReading(profile, reading),
+    identity: (profile) => accountIdentity(profile === 'default' ? null : profile, { home: config.home }),
   });
   ipcMain.handle('zero:account-usage', async (event, { refresh = false, engine = DEFAULT_ENGINE } = {}) => {
     if (event.senderFrame?.parent || (event.sender && event.sender !== window.webContents)) throw Error('Usage is only available in the main app window.');
@@ -363,7 +365,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       //
       // AND WHICH ENGINE IT WAS (w-1116fbb68a, 2026-10-08). This list is Claude
       // Code processes and only ever has been; a Codex conversation has no
-      // process to find and is counted from main/codex-watch.mjs instead. The
+      // process to find and is counted from main/codex-watch.mts instead. The
       // engine is what lets the two be read apart, and without it on this side
       // the Codex count would look like a drop in the Claude one.
       for (const agent of live) {
@@ -831,7 +833,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // and the macOS release ride along so a report can be matched to a build.
   ipcMain.handle('zero:send-feedback', async (_e, { text, files } = {}) => sendFeedback({
     url: feedbackUrl(config),
-    payload: feedbackPayload({ text, files, app: { version: app.getVersion(), os: `${process.platform} ${os.release()}` } }),
+    payload: feedbackPayload({ text, files, app: { version: app.getVersion(), os: `${process.platform} ${os.release()}`, install: analytics.installId } }),
   }));
 
   // THE TEAM'S DOORS. Each answers { ok, team } or { ok: false, error } with
@@ -2295,7 +2297,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     }
   });
 
-  // UPDATES (main/updater.mjs). Two doors and no more: look now, and install
+  // UPDATES (main/updater.mts). Two doors and no more: look now, and install
   // what has been downloaded. There is deliberately no "download" door, because
   // the download already happened on its own; the only thing left for a person
   // to decide is when the app is allowed to disappear and come back.
@@ -2307,7 +2309,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // decision — nothing has been downloaded and nothing will be until the app
   // is somewhere macOS lets it write.
   // A copy run from source answers no to it rather than throwing: there is no
-  // bundle to move (main/source-updater.mjs).
+  // bundle to move (main/source-updater.mts).
   ipcMain.handle('zero:update-move', () => updater.move?.() ?? { moved: false, error: null });
 
   // Handed back so the Cmd+Y/Cmd+N chord answers through the same door the

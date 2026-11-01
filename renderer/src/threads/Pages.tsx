@@ -33,6 +33,7 @@ import { Name } from '../../../shared/product-name.mjs';
 import { FleetContext } from '../fleet';
 import { TeammateLead } from '../teammates/row-lead';
 import { factsFor, saysOnCard, statusCell, type StatusCell } from '../status-word';
+import { offersTryAgain } from '../try-again';
 import { shownPriority } from '../../../shared/rank.mjs';
 import { api } from '../api';
 import { CLOUD_KEY, CLOUD_WHEN_ON, cloudButtonCount, cloudFootLine, cloudIsOn, cloudMonthLine, cloudMoveLine, countedAccounts, type CloudMode, type CloudStatus } from '../cloud-menu';
@@ -129,6 +130,17 @@ export const WaitingContext = createContext<Map<string, number>>(new Map());
 
 /** The threads queued while this Mac runs all it can (App.tsx provides it). */
 export const FreeAgentContext = createContext<Set<string>>(new Set());
+
+/** What Try again does (App.tsx provides it); absent, no row offers it. */
+export const TryAgainContext = createContext<((item: WorkItem) => void) | null>(null);
+
+/** TRY AGAIN, a mark after a stuck thread's status word (../try-again.ts). */
+export function TryAgainButton({ onPress }: { onPress: () => void }) {
+  return <button type="button" className="th-retry" aria-label="Try again" title="Try again"
+    onClick={(e) => { e.stopPropagation(); onPress(); }}>
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M14 8a6 6 0 1 1-6-6c1.7 0 3.3.7 4.5 1.8L14 5.3" /><path d="M14 2v3.3h-3.3" /></svg>
+  </button>;
+}
 
 /** The cloud's offer at the end of In progress, and what its button does (../cloud-upgrade.ts). */
 export const CloudOfferContext = createContext<{ offer: Offer; onGo: (go: OfferGo) => void } | null>(null);
@@ -597,7 +609,9 @@ export const RepeatMark = () => <svg className="th-repeat" width="13" height="13
   <path d="M13 6.5A5.5 5.5 0 0 0 3.2 4.8M3 2.5v2.6h2.6" /><path d="M3 9.5a5.5 5.5 0 0 0 9.8 1.7M13 13.5v-2.6h-2.6" />
 </svg>;
 
-export function RowCells({ status, lead, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, pinned = false, aside, where, person, priority, updatedAt, when, now, action }: {
+export function RowCells({ status, retry, lead, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, pinned = false, aside, where, person, priority, updatedAt, when, now, action }: {
+  /** Try again, on a thread nothing will start (TryAgainButton). */
+  retry?: ReactNode;
   /** Pinned to the top of the list (w-20323283e6): a faint pin after the title. */
   pinned?: boolean;
   /**
@@ -627,7 +641,7 @@ export function RowCells({ status, lead, title, hidden = false, lock = false, sh
         people with a small count beside them for a thread only a few people
         see. The whole team, the default, carries nothing (2026-10-02). */}
     <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{lead}{title}{aside && <span className="th-aside">{aside}</span>}{held && <span className="th-aside">not started</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{pinned && <PinMark size={13} className="th-pin" />}</div>
-    <div className={`th-cell-state${status?.why ? ' has-card' : ''}`} title={status?.why ? undefined : status?.title}>{status && <><StatusMark status={status} />{status.word}</>}
+    <div className={`th-cell-state${status?.why ? ' has-card' : ''}${retry ? ' can-retry' : ''}`} title={status?.why ? undefined : status?.title}>{status && <><StatusMark status={status} />{status.word}</>}{retry}
       {status?.why && <span className="th-why-card" role="tooltip"><b>{status.why.head}</b><span>{status.why.body}</span></span>}</div>
     <div className="th-cell-proj th-col-proj">{where}</div>
     {person !== undefined && <div className="th-cell-person">{person}</div>}
@@ -676,7 +690,10 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // this row is drawn under: the words about agents waiting their turn are
   // only ever true there, which is the gate live-line has always had.
   const fleet = useContext(FleetContext);
-  const status = statusCell(item, { ...factsFor(fleet, item.id), inProgress: tab === 'progress', now, practice: !!product?.practice });
+  const facts = { ...factsFor(fleet, item.id), inProgress: tab === 'progress', now, practice: !!product?.practice };
+  const status = statusCell(item, facts);
+  const tryAgain = useContext(TryAgainContext);
+  const retry = tryAgain && offersTryAgain(item, facts) ? <TryAgainButton onPress={() => tryAgain(item)} /> : undefined;
   // WHO SEES IT, AT A GLANCE AND ONE CLICK FROM CHANGING (2026-10-01). One
   // mark after the title, always: the people on a thread the team or chosen
   // people can see, the lock on one only you can see. A thread shared with
@@ -732,7 +749,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // the Status column says Queued on exactly those rows, and one fact in two
   // places on one row is what the column was drawn to end. `FreeAgentContext`
   // is untouched and still decides whether the cloud offers itself.
-  return <RowCells status={status} lead={<TeammateLead item={item} />} title={rowTitle(item)} aside={toApproveWords(waiting.get(`${item.product}/${item.id}`))} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} pinned={!!item.pinned && item.status !== 'done'} where={product?.name ?? ''} person={person}
+  return <RowCells status={status} retry={retry} lead={<TeammateLead item={item} />} title={rowTitle(item)} aside={toApproveWords(waiting.get(`${item.product}/${item.id}`))} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} pinned={!!item.pinned && item.status !== 'done'} where={product?.name ?? ''} person={person}
     priority={shownPriority(item)} updatedAt={when} when={back} now={now} action={action} />;
 }
 

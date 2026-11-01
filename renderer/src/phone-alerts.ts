@@ -58,15 +58,7 @@ const keyOf = (sub: PushSubscription) => {
   return k ? btoa(String.fromCharCode(...new Uint8Array(k))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') : null;
 };
 
-// THROUGH THE RELAY the page is already run by the relay's worker, which
-// carries every request to the Mac and handles alerts too (relay/phone/sw.mjs).
-// Registering /phone-sw.js over it would replace it and cut the phone off.
-const RELAY_WORKER = '/relay-sw.js';
-const worker = async () => {
-  const running = await navigator.serviceWorker.getRegistration('/');
-  if (running?.active?.scriptURL && new URL(running.active.scriptURL).pathname === RELAY_WORKER) return running;
-  return navigator.serviceWorker.register('/phone-sw.js', { scope: '/' });
-};
+const worker = () => navigator.serviceWorker.register('/phone-sw.js', { scope: '/' });
 
 export async function alertsState(): Promise<AlertsState> {
   if (!via) return 'unsupported';

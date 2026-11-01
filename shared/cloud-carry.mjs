@@ -20,9 +20,13 @@ export const ASLEEP_SETTLE_MS = 60_000;
 // How far ahead a sleeping Mac hands over what comes due, each with its
 // moment, so it starts on time even if the Mac never wakes again.
 export const CARRY_AHEAD_MS = 12 * 3600_000;
-// A hand-over older than this is written again: the server looks back a day
-// (CLOUD_TAKES_UNTIL_MS), and one it no longer sees would wait for ever.
-export const CARRY_FRESH_MS = 12 * 3600_000;
+// A hand-over the cloud has not started this long after the moment it could
+// have is written again, as a fresh command. The server gives one command
+// three tries five minutes apart (cloud/gateway/phone.mjs PHONE_TRIES) and
+// then leaves it to the computer for good, and a sleeping computer takes
+// nothing back, so without this a reply sent to a cloud that was failing
+// waited for the lid to open.
+export const CARRY_AGAIN_MS = 30 * 60_000;
 
 /**
  * Whether the computer is in one of a sleeping Mac's short wakes, where a run
@@ -73,3 +77,14 @@ export function carryCommand({ item, continuation = false, engine = null, notBef
 
 /** The moment a command may start, or 0 for at once. */
 export const notBeforeOf = (cmd) => (Number.isFinite(Number(cmd?.payload?.notBefore)) ? Number(cmd.payload.notBefore) : 0);
+
+/**
+ * Whether a hand-over the computer is holding a row for is to be written
+ * again: the cloud has neither started it nor given it back CARRY_AGAIN_MS
+ * after the moment it could have run. `at` is when it was handed over,
+ * `notBefore` the moment it was handed over for.
+ */
+export function handOverSpent({ at = 0, notBefore = 0, now = Date.now(), againMs = CARRY_AGAIN_MS } = {}) {
+  if (!at) return false;
+  return now - Math.max(at, notBefore || 0) >= againMs;
+}

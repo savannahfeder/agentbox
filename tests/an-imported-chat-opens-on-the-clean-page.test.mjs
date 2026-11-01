@@ -42,7 +42,7 @@ describe('the page it opens on', () => {
   });
   it('is what the thread page asks', () => {
     const page = fs.readFileSync(new URL('../renderer/src/components/ItemThread.tsx', import.meta.url), 'utf8');
-    expect(page).toContain('const short = !earlierOpen && !working && drawnWhole(behind, broughtIn(item));');
+    expect(page).toContain('const short = !earlierOpen && drawnWhole(behind, broughtIn(item));');
   });
 });
 

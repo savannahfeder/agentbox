@@ -149,7 +149,9 @@ const WAKE_GRACE_MS = 2 * 60 * 1000;
 // How long a cancelled command gets before its group is killed outright.
 const KILL_GRACE_MS = 15_000;
 // AgentCore ends a session at 8 hours; stop the command a quarter hour before.
-const DEFAULT_DEADLINE_MS = (8 * 60 - 15) * 60_000;
+// Exported so the relay can hold its own copy to this one (main/cloud/run.mjs
+// RUN_LIMIT_MS), which is the number the agent is told at the start.
+export const DEFAULT_DEADLINE_MS = (8 * 60 - 15) * 60_000;
 
 const DONE_STATES = new Set(['collected', 'failed']);
 

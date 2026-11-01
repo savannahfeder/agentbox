@@ -6,6 +6,7 @@
 // twice with two numbers (tests/an-account-shows-one-reading-wherever-it-is-signed-in).
 import { accountLabel, type CloudAccount } from './cloud-menu';
 import type { AccountUsageReading, Usage, UsageLimit } from './types';
+import { readingsDisagree } from '../../shared/usage.mjs';
 
 /** A login on this computer, as the Claude Code page reads it. */
 export type HereLogin = {
@@ -34,8 +35,13 @@ export type OneAccount = {
   usageError: string | null;
 };
 
-/** A login's own reading here, or the corner's when the corner is reading that same login. */
+/**
+ * A login's own reading here, or the corner's when the corner is reading that
+ *  same login. None when main could not confirm whose its reading was: the
+ *  corner's copy came off the same login and is no better.
+ */
 export function accountReadingFor(profile: string, readings: AccountUsageReading[], current: Usage | null): Usage | null {
+  if (readings.some(r => r.profile === profile && r.unconfirmed)) return null;
   const own = readings.find(r => r.profile === profile && r.limits?.length && r.at);
   const candidates = [own ? { engine: 'claude' as const, profile, at: own.at!, limits: own.limits! } : null,
     current && (current.profile ?? 'default') === profile ? current : null];
@@ -63,7 +69,9 @@ export function accountsOnce({ here, cloud = [], readings = [], current = null }
   function one(h: HereLogin | null, c: CloudAccount | null): OneAccount {
     const local = h ? accountReadingFor(h.profile, readings, current) : null;
     const remote = c?.limits?.length && c.readAt ? { limits: c.limits, at: c.readAt } : null;
-    const fromCloud = !!remote && (!local || remote.at > local.at);
+    // When the two cannot both be true, the cloud's wins whatever its age: its
+    // organization comes back on the same reply as its numbers.
+    const fromCloud = !!remote && (!local || remote.at > local.at || readingsDisagree(local, remote));
     const shown = fromCloud ? remote : local;
     const localError = h ? readings.find((r) => r.profile === h.profile)?.error ?? null : null;
     return {

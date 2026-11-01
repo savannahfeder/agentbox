@@ -12,7 +12,7 @@
 // That is Squirrel.Mac refusing to update an app that is being run out of the
 // disk image, or out of Downloads under macOS App Translocation. Every one is
 // 0.1.11, from two installs, one report every six hours, which is `EVERY_MS`
-// in main/updater.mjs. The app carries on running; the reports stopped being
+// in main/updater.mts. The app carries on running; the reports stopped being
 // filed as crashes in 292d419.
 //
 // THE REPORT WAS NEVER THE PROBLEM. These two Macs cannot update themselves
@@ -36,7 +36,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPlace, placeOfApp, sayWhere } from '../shared/where-it-runs-from.mjs';
-import { createUpdater, shortError } from '../main/updater.mjs';
+import { createUpdater, shortError } from '../main/updater.mts';
 import { MOVE_SAY, updateLook } from '../renderer/src/update-row.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -88,7 +88,7 @@ describe('where this copy is running from', () => {
   });
 
   // A CHECKOUT IS NOT AN INSTALL. It updates by `git fetch`
-  // (main/source-updater.mjs) and it has no bundle to move.
+  // (main/source-updater.mts) and it has no bundle to move.
   it('never offers to move a copy run from a checkout', () => {
     const where = placeOfApp(mac({ packaged: false, exePath: '/Volumes/work/agentbox/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron' }));
     expect(where.place).toBe('source');

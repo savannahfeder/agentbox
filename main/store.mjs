@@ -1405,7 +1405,7 @@ export class Store {
   /* ---------------------------- codex conversations ----------------------- */
   // HER CODEX CONVERSATIONS ASK TO COME IN, AND HER YES OR NO DECIDES. The
   // words and the rules are in shared/codex-import.mjs;
-  // main/codex-watch.mjs calls the first two every minute; the bridge calls
+  // main/codex-watch.mts calls the first two every minute; the bridge calls
   // answerCodexImport when she answers.
 
   /** Every row in every product, each stamped with its product slug. */

@@ -39,7 +39,10 @@ export const HARNESS_DEFINITIONS = freeze([
       // Replies arrive on stdin, so the prompt leaves the line when they do.
       input: ['--input-format', 'stream-json', '--replay-user-messages'],
     },
-    scrubPatterns: ['^ANTHROPIC_', '^CLAUDE_CODE_', '^CLAUDECODE$', '^CLAUDE_PID$', '^CLAUDE_EFFORT$', '^CLAUDE_CONFIG_DIR$'],
+    // CLAUDE_SECURESTORAGE_CONFIG_DIR, set or empty, picks the keychain login
+    // ahead of CLAUDE_CONFIG_DIR, and Claude Code hands it to the sessions it
+    // starts (tests/a-usage-check-reads-only-the-login-of-the-folder-it-names).
+    scrubPatterns: ['^ANTHROPIC_', '^CLAUDE_CODE_', '^CLAUDECODE$', '^CLAUDE_PID$', '^CLAUDE_EFFORT$', '^CLAUDE_CONFIG_DIR$', '^CLAUDE_SECURESTORAGE_CONFIG_DIR$'],
     capabilities: { nativeCommands: true, fork: true, nativeReview: false, remoteControl: true, inlineImages: false, claudeEffort: true },
     imageInstruction: 'Open each one with the Read tool, at the absolute path below.',
   },
@@ -53,7 +56,7 @@ export const HARNESS_DEFINITIONS = freeze([
     // app-server RPC: the prompt is a turn's `input`, the system block a
     // thread's `developerInstructions`, the resume a thread id. An engine with
     // no command line is handed none rather than handed Claude Code's.
-    scrubPatterns: ['^ANTHROPIC_', '^CLAUDE_CODE_', '^CLAUDECODE$', '^CLAUDE_PID$', '^CLAUDE_EFFORT$', '^CLAUDE_CONFIG_DIR$', '^OPENAI_', '^CODEX_'],
+    scrubPatterns: ['^ANTHROPIC_', '^CLAUDE_CODE_', '^CLAUDECODE$', '^CLAUDE_PID$', '^CLAUDE_EFFORT$', '^CLAUDE_CONFIG_DIR$', '^CLAUDE_SECURESTORAGE_CONFIG_DIR$', '^OPENAI_', '^CODEX_'],
     capabilities: { nativeCommands: false, fork: false, nativeReview: true, remoteControl: false, inlineImages: true, claudeEffort: false },
     imageInstruction: 'Each one is attached to this message as an image, and is also on disk at the absolute path below.',
   },
@@ -83,7 +86,7 @@ export const HARNESS_DEFINITIONS = freeze([
     loginArgs: ['auth', 'login'], statusArgs: ['auth', 'list'],
     credentialFiles: ['auth.json'],
     scrubPatterns: [
-      '^ANTHROPIC_', '^CLAUDE_CODE_', '^CLAUDECODE$', '^CLAUDE_PID$', '^CLAUDE_EFFORT$', '^CLAUDE_CONFIG_DIR$',
+      '^ANTHROPIC_', '^CLAUDE_CODE_', '^CLAUDECODE$', '^CLAUDE_PID$', '^CLAUDE_EFFORT$', '^CLAUDE_CONFIG_DIR$', '^CLAUDE_SECURESTORAGE_CONFIG_DIR$',
       '^OPENAI_', '^CODEX_', '^OPENCODE_', '^OPENROUTER_', '^GEMINI_', '^GOOGLE_',
       '^AWS_', '^AZURE_', '^GROQ_', '^MISTRAL_', '^DEEPSEEK_', '^XAI_', '^CEREBRAS_',
       '^TOGETHER_', '^FIREWORKS_', '^DEEPINFRA_', '^BASETEN_', '^NVIDIA_', '^GITLAB_TOKEN$',

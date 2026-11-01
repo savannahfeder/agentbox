@@ -1,4 +1,5 @@
 import { previewFocus } from './preview-focus';
+import { PhoneStatus } from './components/PhoneStatus';
 import { cloudChord, cloudToggleNote, cloudToggleTarget, threadPlace } from './cloud-menu';
 import { usePhoneBack, onCloudPhone, onPhone } from './phone-screen';
 import { holdsReplies, writeHeldWhenHidden } from './phone-holds';
@@ -86,6 +87,7 @@ import { approvalAnswered, approvalReads } from './approval-card';
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
 import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
+import { filedByThePerson } from '../../shared/answers.mjs';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { focusTheReplyBox } from './focus-at-end';
 import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
@@ -118,6 +120,8 @@ import { RoomBoard } from './team/rooms/RoomBoard';
 import { directConversations } from './team/rooms/conversations';
 import { isPresenceCard, roomMateCards, roomMatesById } from './team/rooms/room-rules';
 import { MARK_UNREAD, SAY } from './team/chat-events';
+import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
+import { aBoxIsListening } from './dictation';
 import { MentionRows } from './team/rooms/MentionRows';
 import { AgentsLine, CornerFaces, MateThreads, PersonThreads, SpaceBar, TeamStrip, TeamThreads } from './team/everything/TeamStrip';
 import { buildMembers, hideMember, mateRunsOf, orderMembers, personCardsOf, readCardRows, readHidden, readOrder, splitHidden, teamRunsOf, unhideMember, writeCardRows, writeHidden, writeOrder, type CardRows, type Hidden, type Member } from './team/everything/members';
@@ -186,7 +190,8 @@ import { Face, TeamContext, firstName, teamView } from './team/people';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
-import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, CloudContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, WaitingContext } from './threads/Pages';
+import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, CloudContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
+import { offersTryAgain } from './try-again';
 import { cloudOffer, type OfferGo } from './cloud-upgrade';
 import { FleetContext, queuedWithHeld, type Fleet } from './fleet';
 import { factsFor } from './status-word';
@@ -306,8 +311,8 @@ const liveAnswer = (i: WorkItem) => (i.answer && i.answer !== '(withdrawn)' ? i.
 // on every snapshot.
 const NO_ORDER: string[] = [];
 const NO_RUNNING: RunningSession[] = [];
-// How soon a first read that missed is asked again, as the relay's own
-// patience does for the page (relay/phone/tunnel.mjs GAP_MS).
+// How soon a first read that missed is asked again, rather than at the next
+// 30 s phone poll.
 const FIRST_READ_AGAIN_MS = 1_500;
 
 // THE SCREEN BEFORE THERE IS A SCREEN. The logo, its orange dot running round
@@ -497,7 +502,7 @@ export default function App() {
       // a send still in this page's own queue is not drawn twice.
       const mine = new Set(here.map((s) => s.text.trim()));
       const away = (snap?.phoneWaiting ?? []).filter((w) => w.product === item.product && w.id === item.id && !mine.has(w.text.trim()));
-      return [...here, ...away.map((w) => ({ at: w.at, text: w.text, ...(w.refused ? { refused: w.refused } : {}), ...(w.cloud ? { cloud: true } : {}) }))];
+      return [...here, ...away.map((w) => ({ at: w.at, text: w.text, ...(w.refused ? { refused: w.refused } : {}), ...(w.cloud ? { cloud: true } : {}), ...(w.sent ? { sent: true } : {}) }))];
     },
     [sending, snap?.phoneWaiting],
   );
@@ -1727,7 +1732,7 @@ export default function App() {
   // A RELOAD WRITES WHAT IS HELD BEFORE IT HAPPENS (w-47218417a5). The window
   // above lives only in this page, so ⌘R inside it used to throw the close or
   // answer away and the thread came back to her inbox untouched. main asks
-  // before it reloads and waits for this to finish (main/write-before-reload.mjs).
+  // before it reloads and waits for this to finish (main/write-before-reload.mts).
   // `pagehide` covers the window closing or the app quitting, where nobody
   // asks: the write's first step leaves for main before the page goes.
   // A PHONE PUT AWAY never sends `pagehide`: iOS hides the page, freezes it and
@@ -2498,6 +2503,9 @@ export default function App() {
     if (back) { setView(back.view); setSelected(back.selected); }
   }, []);
 
+  // The sidebar's usage row opens the page its agent's limits and accounts are on.
+  const openAgentSettings = (engine: string) => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setSettingsPane(engine === 'codex' ? 'codex' : 'claude'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); };
+
   /*
    * WHAT THE WALK IS POINTING AT RIGHT NOW, worked out once and read in two
      places: the coaching card, which rings the first of these and answers a
@@ -2921,7 +2929,7 @@ export default function App() {
    */
   useEffect(() => {
     if (!fullScreenDoc || modal !== 'reply') return;
-    const foldBack = () => setModal(null);
+    const foldBack = () => { if (!aVoiceNoteIsRecording() && !aBoxIsListening()) setModal(null); };
     const awayInTheApp = (e: MouseEvent) => {
       const at = e.target as HTMLElement | null;
       if (at?.closest?.('.focus-dock')) return;
@@ -3285,6 +3293,7 @@ export default function App() {
     const away = (e: MouseEvent) => {
       const el = e.target as HTMLElement | null;
       if (el?.closest?.(SOMETHING_WITH_A_JOB)) return;
+      if (aVoiceNoteIsRecording() || aBoxIsListening()) return;
       setModal(null);
       (document.activeElement as HTMLElement | null)?.blur?.();
     };
@@ -4137,7 +4146,7 @@ export default function App() {
     const options = itemOptions(item);
     const recommended = options.find((o) => o.recommended) ?? options[0];
     const isProposal = item.status === 'open' && item.kind !== 'question' && item.kind !== 'review'
-      && !(item.labels ?? []).includes('founder') && !liveAnswer(item);
+      && !filedByThePerson(item) && !liveAnswer(item);
     const approveWith = async (answer: string, toast: string) => {
       const undid = [{ product: item.product, id: item.id, words: 'Undid your approval' }];
       await deferCommit(item, async () => {
@@ -5213,6 +5222,18 @@ export default function App() {
     if (started > 0) leaveResolved(list[0]);
     await refresh();
   }, [refresh, showToast, leaveResolved]);
+
+  // TRY AGAIN on one thread nothing will start (try-again.ts): Resume's own
+  // path, from the row, the thread and ⌘K. It leaves you where you are.
+  const tryAgain = useCallback(async (item: WorkItem) => {
+    if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
+    const r = await (window.zero as any)?.resumeItems?.({ ids: [item.id] });
+    showToast(r?.resumed ? 'Trying again now.'
+      : r?.queued ? 'Queued. It starts as soon as an agent is free.'
+      : r?.working ? 'Already running.'
+      : 'It cannot start on this computer.');
+    await refresh();
+  }, [refresh, showToast]);
 
   const undo = useCallback(async () => {
     // Inside the grace window: a perfect undo, nothing was ever written.
@@ -6299,16 +6320,18 @@ export default function App() {
   const ruleOf = (item: WorkItem) => repeats.find((r) => r.product === item.product && r.id === ruleIdOf(item)) ?? null;
   const focusedRule = focused ? ruleOf(focused) : null;
 
-  const moveToCloud = async (ids: string[], product?: string) => {
+  const moveToCloud = async (ids: string[], product?: string, said = true) => {
     const moving = await api.moveToCloud(ids, product);
+    if (moving && !said) return;
     showToast(moving
       ? `Moving ${moving === 1 ? 'this thread' : `${moving} threads`} to the cloud. ${moving === 1 ? 'It keeps' : 'They keep'} working until the cloud has room.`
       : 'The cloud can’t take this thread right now');
   };
-  const placeThread = (item: WorkItem, keep: PlaceAct) => {
-    if (keep === 'move') { void moveToCloud([item.id], item.product); return; }
+  // `said` false for a pick in the thread's own Runs on panel, which shows it there.
+  const placeThread = (item: WorkItem, keep: PlaceAct, said = true) => {
+    if (keep === 'move') { void moveToCloud([item.id], item.product, said); return; }
     void api.setThreadOnMac({ [item.id]: keep ? true : null });
-    showToast(keep ? 'This thread now runs only on this Mac' : 'This thread can run on the cloud again');
+    if (said) showToast(keep ? 'This thread now runs only on this Mac' : 'This thread can run on the cloud again');
   };
   // The write the summary panel's Visible to menu makes.
   const seeThread = async (item: WorkItem, to: 'team' | 'private') => {
@@ -6490,6 +6513,7 @@ export default function App() {
     <TeammatesContext.Provider value={teammatesById}>
     <ChatsContext.Provider value={chatsValue}>
     <FreeAgentContext.Provider value={freeWaitIds}>
+    <TryAgainContext.Provider value={tryAgain}>
     <CloudOfferContext.Provider value={cloudOfferNow ? { offer: cloudOfferNow, onGo: (go) => void onCloudGo(go) } : null}>
     <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${railOpen ? ' gt-rail-open' : ''}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}`}>
 
@@ -6537,6 +6561,8 @@ export default function App() {
           usage={snap.usage ?? null}
           now={now}
           sidebar
+          folded={sideFolded}
+          onOpen={openAgentSettings}
           engineWord={engineWordFor({
             engineChoice: (snap.engines?.choices?.length ?? 1) > 1,
             engine: snap.usage?.engine ?? null,
@@ -6947,6 +6973,7 @@ export default function App() {
                   // Auto asking her who takes it is stalled for the list, not a dead agent.
                   stalled={(snap.supervisor.stalled?.includes(focused.id) ?? false) && !asksWho(focused)}
                   onRedeliver={() => redeliver(focused)}
+                  onTryAgain={() => void tryAgain(focused)}
                   onClose={closeThreadOntoItsTab}
                   onResolve={() => markDone(focused)}
                   onPick={(n) => pickAimedHere(focused, n)}
@@ -6975,11 +7002,11 @@ export default function App() {
                   onRunNow={() => runNow(focused)}
                   onPin={focused.agent ? undefined : (pin) => pinThread(focused.id, pin, true)}
                   place={focused.agent ? null : threadPlace(focused, snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null, snap.cloud ?? null)}
-                  onPlace={(keep) => placeThread(focused, keep)}
+                  onPlace={(keep) => placeThread(focused, keep, false)}
                   pageAsk={threadAsk?.key === keyOf(focused) ? threadAsk : null}
                   onAsked={() => setThreadAsk(null)}
                   onShown={setOpenShows}
-                  aboveDock={<>{snap.phoneStatus && <div className="phone-status" role="status">{snap.phoneStatus}</div>}{whereItWent}</>}
+                  aboveDock={<><PhoneStatus message={snap.phoneStatus} />{whereItWent}</>}
                   onReveal={() => revealAgent(focused)}
                   // Remind me later and stop this task are neither of the two
                   // ways a task ends, and the card beside the bar names exactly
@@ -7047,7 +7074,7 @@ export default function App() {
                 )}
                 {evTop}
                 {roomShown ? roomsUi.page : evSpace ? evSpace : <>
-                {snap.phoneStatus && <div className="phone-status" role="status">{snap.phoneStatus}</div>}
+                <PhoneStatus message={snap.phoneStatus} />
                 {snap.phoneConnect ? <ConnectComputer email={snap.phoneConnect.email} onSignOut={() => { void api.teamSignOut().then(() => refresh()); }} />
                 : clearMoves || (emptyView && !theirRows.length && !(view === 'inbox' && search === null && roomsUi.mentions.length)) ? (
                   // A FILTER IS READ FIRST, so it can never fall through to
@@ -7372,7 +7399,7 @@ export default function App() {
         staleFiles={snap.restartNeeded?.files ?? []}
         /*
          * A newer Agentbox that has already downloaded itself. The palette is
-           the glance surface for it, not the rail (main/updater.mjs).
+           the glance surface for it, not the rail (main/updater.mts).
 
            `closed` is empty ON PURPOSE and it is the whole of "rejecting an
            update loses nothing": closing the row hides the ROW, and ⌘K goes
@@ -7473,7 +7500,7 @@ export default function App() {
             // Approve lives here by NAME only, for everything resolve
             // covers; no key drives it. E is archive, never approval.
             ...(!target.agent && !target.answer && (target.kind === 'review' || (target.kind === 'question' && recommended)
-              || (target.status === 'open' && target.kind !== 'question' && !(target.labels ?? []).includes('founder')))
+              || (target.status === 'open' && target.kind !== 'question' && !filedByThePerson(target)))
               ? [{ id: 'approve',
                   label: target.kind === 'question' ? 'Approve recommended'
                     : target.kind === 'review' ? 'Approve (proceed as proposed)' : 'Approve (run it)',
@@ -7496,7 +7523,12 @@ export default function App() {
             // then unreachable by every path that spawns anything. Resume is
             // for a row that has STOPPED. A row already under way is
             // excluded, and the stop above is what it gets instead.
-            ...(!target.agent && !working(target) && !stoppableNow(target)
+            // TRY AGAIN on a thread nothing will start (try-again.ts), in place
+            // of Resume this agent, which is the same press under another name.
+            ...(offersTryAgain(target, { ...factsFor(fleet, target.id), inProgress: stoppableNow(target), now })
+              ? [{ id: 'try-again', label: 'Try again', keywords: 'resume restart retry start stuck run again',
+                   run: () => { setModal(null); void tryAgain(target); } }]
+              : !target.agent && !working(target) && !stoppableNow(target)
               ? [{ id: 'resume-any',
                    label: target.status === 'done' ? 'Resume this agent (reopen and carry on)' : 'Resume this agent',
                    run: () => { setModal(null); putAgentBackOn([target]); } }]
@@ -7593,7 +7625,7 @@ export default function App() {
             ...(target.status === 'blocked'
               ? [{ id: 'send-back', label: 'Send back to agent', run: () => { setModal(null); sendBack(target); } }]
               : []),
-            ...(snap.supervisor.stalled?.includes(target.id)
+            ...(snap.supervisor.stalled?.includes(target.id) && !offersTryAgain(target, { ...factsFor(fleet, target.id), now })
               ? [{ id: 'redeliver', label: 'Restart the agent (it stopped)', run: () => { setModal(null); redeliver(target); } }]
               : []),
             ...(!focused ? [{ id: 'open', label: 'Open', keyHint: '↵', run: () => { setModal(null); open(); } }] : []),
@@ -8306,6 +8338,7 @@ export default function App() {
       <FindBar />
     </div>
     </CloudOfferContext.Provider>
+    </TryAgainContext.Provider>
     </FreeAgentContext.Provider>
     </ChatsContext.Provider>
     </TeammatesContext.Provider>

@@ -25,7 +25,7 @@ describe('the app a stranger downloads is called Powerup', () => {
     // The window's own title bar. It said the app until the first rename landed,
     // so the app shipped under the internal name for as long as there was a
     // build. It reads the name now rather than holding one, and since a
-    // throwaway copy's window says so in its own title (main/new-user-window.mjs)
+    // throwaway copy's window says so in its own title (main/new-user-window.mts)
     // the name is handed there rather than written on the window.
     const main = fs.readFileSync(path.join(repo, 'main', 'main.mjs'), 'utf8');
     expect(main).toMatch(/name: NAME,/);
@@ -159,7 +159,7 @@ describe('what actually goes in the bundle', () => {
         return e.isDirectory() ? walk(full) : [full];
       });
       for (const file of walk(path.join(repo, dir))) {
-        if (!/\.(mjs|js|ts|tsx|cjs)$/.test(file)) continue;
+        if (!/\.(mjs|mts|js|ts|tsx|cjs)$/.test(file)) continue;
         expect(fs.readFileSync(file, 'utf8')).not.toContain('@emulatorjs');
       }
     }
