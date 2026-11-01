@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {execFileSync} from 'node:child_process';
+import {execFile,execFileSync} from 'node:child_process';
 import {commandRunning} from '../shared/terminal-state.mjs';
 import {terminalShell,windowsRoot} from './shell-path.mjs';
 import {loadPty} from './pty.mjs';
@@ -41,12 +41,13 @@ export function terminalPlace({store,supervisor,product,id,agent}){
 export function terminalFolder(args){return terminalPlace(args).cwd;}
 // Enumerate only descendants of our own shell, including background process
 // groups. Kill children before shell; closing a pane never calls this.
-export function disposeTerminalProcess(pty,platform=process.platform,run=execFileSync){
+export function disposeTerminalProcess(pty,platform=process.platform,run=execFile){
   // node-pty on Windows throws on any signal, and its kill misses a child with
-  // a console of its own. taskkill by full path, never from the shell's folder.
+  // a console of its own. taskkill by full path, never from the shell's folder,
+  // and without holding the window. The shell goes last, or its tree is lost.
   if(platform==='win32'){
-    try{run(path.win32.join(windowsRoot(),'System32','taskkill.exe'),['/T','/F','/PID',String(pty.pid)],{windowsHide:true,timeout:5000,stdio:'ignore'});}catch{}
-    try{pty.kill();}catch{}
+    const kill=()=>{try{pty.kill();}catch{}};
+    try{run(path.win32.join(windowsRoot(),'System32','taskkill.exe'),['/T','/F','/PID',String(pty.pid)],{windowsHide:true,timeout:5000},kill);}catch{kill();}
     return;
   }
   const descendants=[];

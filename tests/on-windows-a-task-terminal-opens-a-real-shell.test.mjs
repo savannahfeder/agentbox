@@ -14,7 +14,9 @@
 //
 // So on Windows the terminal runs pwsh.exe when it is on Path, else Windows
 // PowerShell, else ComSpec, with no arguments, and closing it runs taskkill on
-// its tree and then a bare kill(). Only drive-rooted paths count, since a bare
+// its tree and then a bare kill(). taskkill runs without blocking, since the
+// window's process closes terminals and could wait up to its five second
+// deadline, and kill() waits for it. Only drive-rooted paths count, since a bare
 // name resolves in the cwd first. A Mac and Linux keep the login shell, -l and
 // SIGKILL.
 
@@ -94,7 +96,8 @@ describe('a terminal spawns the shell it was given', () => {
   const opened = (shell) => {
     const calls = [];
     const pty = { pid: 1, onData() {}, onExit() {}, kill() {} };
-    const t = new TaskTerminals({ spawn: (...a) => { calls.push(a); return pty; }, resolve: () => 'C:\\work', shell, sweepMs: 0 });
+    // The real close would end every process under pid 1 on a Mac or Linux.
+    const t = new TaskTerminals({ spawn: (...a) => { calls.push(a); return pty; }, resolve: () => 'C:\\work', shell, sweepMs: 0, disposeProcess: () => {} });
     t.open('k');
     t.dispose();
     return calls[0];
@@ -117,28 +120,34 @@ describe('closing a terminal ends its shell', () => {
   // node-pty's Windows kill throws on any signal and leaves the shell running.
   const windowsPty = (log) => ({ pid: 4321, kill(signal) { if (signal) throw new Error('Signals not supported on windows.'); log.push('kill'); } });
 
-  it('on Windows, ends the tree with taskkill by full path, then kills the pty with no signal', () => {
+  it('on Windows, ends the tree with taskkill by full path without waiting on it, then kills the pty with no signal', () => {
     const log = [];
-    disposeTerminalProcess(windowsPty(log), 'win32', (file, args, opts) => { log.push([file, args, opts.windowsHide]); });
-    expect(log).toHaveLength(2);
-    const [[file, args, hidden], last] = log;
+    let done;
+    disposeTerminalProcess(windowsPty(log), 'win32', (file, args, opts, callback) => { log.push([file, args, opts.windowsHide]); done = callback; });
+    expect(log).toHaveLength(1);
+    const [[file, args, hidden]] = log;
     expect(w.isAbsolute(file)).toBe(true);
     expect(w.basename(file)).toBe('taskkill.exe');
     expect(w.basename(w.dirname(file))).toBe('System32');
     expect(args).toEqual(['/T', '/F', '/PID', '4321']);
     expect(hidden).toBe(true);
-    expect(last).toBe('kill');
+    done(null);
+    expect(log.at(-1)).toBe('kill');
   });
 
-  it('on Windows, still kills the pty when taskkill fails', () => {
-    const log = [];
-    disposeTerminalProcess(windowsPty(log), 'win32', () => { throw new Error('not found'); });
-    expect(log).toEqual(['kill']);
+  it('on Windows, still kills the pty when taskkill fails or cannot start', () => {
+    const failed = [];
+    disposeTerminalProcess(windowsPty(failed), 'win32', (file, args, opts, callback) => callback(new Error('exit 128')));
+    expect(failed).toEqual(['kill']);
+    const unstarted = [];
+    disposeTerminalProcess(windowsPty(unstarted), 'win32', () => { throw new Error('not found'); });
+    expect(unstarted).toEqual(['kill']);
   });
 
   it('on a Mac, still with SIGKILL and no taskkill', () => {
     const signals = [];
-    disposeTerminalProcess({ pid: 999999, kill: (s) => signals.push(s) }, 'darwin', () => { throw new Error('ps is not here'); });
+    // No process has -1 as its parent, so this ends no real process.
+    disposeTerminalProcess({ pid: -1, kill: (s) => signals.push(s) }, 'darwin', () => { throw new Error('taskkill is not run on a Mac'); });
     expect(signals).toEqual(['SIGKILL']);
   });
 });
