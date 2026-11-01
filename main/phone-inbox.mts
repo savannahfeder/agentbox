@@ -125,7 +125,7 @@ export interface PhoneApprovalAsk { id: string; product?: string; item?: string;
 
 export interface AdoptArgs {
   project: string;
-  item?: string | null;
+  item: string;
   runId: string;
   replies: string[];
   commands?: string[];
@@ -188,7 +188,7 @@ export interface PhoneInboxOptions {
   kitsFor?: ((slug: string) => unknown) | null;
   adopt?: ((arg: AdoptArgs) => Promise<string>) | null;
   cloudReplies?: ((arg: { project: string; item: string; runId: string; replies: string[] }) => Promise<unknown>) | null;
-  runHome?: ((arg: { project: string; item: string | null | undefined; runId: string }) => unknown) | null;
+  runHome?: ((arg: { project: string; item: string; runId: string }) => unknown) | null;
   newThreadKits?: ((arg: { device: string; slugs: string[] }) => unknown) | null;
   adoptNew?: ((arg: AdoptNewArgs) => Promise<string>) | null;
   asleep?: () => boolean;
@@ -715,14 +715,14 @@ export function createPhoneInbox({
           try { body = (await withPhoneFiles({ ...started, kind: 'new' })).payload!.body as string ?? body; } catch (err) { if (err instanceof SignedOut) throw err; }
           // An agent in the cloud already took it, so Auto has nobody left to pick.
           const { labels: _auto, ...choices } = phoneChoices('new', p);
-          try { out = await adoptNew({ project, item, runId, title, body, command: started.id, replies, choices }); } catch (err) {
+          try { out = await adoptNew({ project, item, runId, title, body, command: started.id, replies, choices } as AdoptNewArgs); } catch (err) {
             out = 'failed';
             sayOnce(`adopt:${(err as Thrown)?.message}`, `phone: could not take in the new thread the cloud started (${item}): ${(err as Thrown)?.message ?? err}`);
           }
         } else if (handed && adoptNew) {
           const p = handed.payload ?? {};
           const repeat = p.repeat && typeof p.repeat.rule === 'string' && typeof p.repeat.key === 'string' ? { repeat: { rule: p.repeat.rule, key: p.repeat.key } } : {};
-          try { out = await adoptNew({ project, item, runId, title: String(p.title ?? ''), body: String(p.body ?? ''), command: handed.id, replies, carried: true, choices: p.engine ? { engine: p.engine } : {}, ...repeat }); } catch (err) {
+          try { out = await adoptNew({ project, item, runId, title: String(p.title ?? ''), body: String(p.body ?? ''), command: handed.id, replies, carried: true, choices: p.engine ? { engine: p.engine } : {}, ...repeat } as AdoptNewArgs); } catch (err) {
             out = 'failed';
             sayOnce(`adopt:${(err as Thrown)?.message}`, `phone: could not join the cloud's run for ${item}: ${(err as Thrown)?.message ?? err}`);
           }
@@ -751,7 +751,7 @@ export function createPhoneInbox({
         rec.placed.push(...fresh.map((c) => c.id));
       }
       if (!rec.home) {
-        try { rec.home = !runHome || !!runHome({ project, item, runId }); } catch { rec.home = false; }
+        try { rec.home = !runHome || !!runHome({ project, item, runId } as { project: string; item: string; runId: string }); } catch { rec.home = false; }
       }
       if (!rec.home) holdCopy(project, item, cmds);
       if (rec.home) {

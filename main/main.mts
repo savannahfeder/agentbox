@@ -507,12 +507,12 @@ async function createWindow() {
       // A reply she sends with the lid shut carries on in the cloud (shared/cloud-kit.mjs).
       carrying: (c) => supervisor.phoneCarrying(c),
       kitsFor: (slug) => supervisor.leavesKitsFor(slug),
-      adopt: ({ project, item, ...rest }) => supervisor.adoptCloudRun({ product: project, itemId: item as string, ...rest }),
+      adopt: ({ project, item, ...rest }) => supervisor.adoptCloudRun({ product: project, itemId: item, ...rest }),
       cloudReplies: ({ project, item, replies }) => supervisor.cloudRunReplies({ product: project, itemId: item, replies }),
-      runHome: ({ project, item, runId }) => supervisor.cloudRunHome({ product: project, itemId: item as string, runId }),
+      runHome: ({ project, item, runId }) => supervisor.cloudRunHome({ product: project, itemId: item, runId }),
       // And a new thread she starts with the lid shut.
       newThreadKits: (c) => supervisor.leaveNewThreadKits(c),
-      adoptNew: ({ project, item, ...rest }) => supervisor.adoptCloudNewThread({ product: project, itemId: item as string, ...rest }),
+      adoptNew: ({ project, item, ...rest }) => supervisor.adoptCloudNewThread({ product: project, itemId: item, ...rest }),
       // And this Mac's own waiting rows, handed over in its dark wakes (shared/cloud-carry.mjs).
       asleep: () => supervisor.asleep(),
       toCarry: () => supervisor.carryWhileAsleep(),
