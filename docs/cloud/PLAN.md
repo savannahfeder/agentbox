@@ -589,13 +589,19 @@ Settled, not to be reopened:
   so a computer and the function can never both run it.
 - **One turn, one run.** A sandbox runs one turn: restore, run the harness, collect,
   stop. `done.json` already goes last (cloud/sandbox/server.mjs) and already wakes
-  the function through S3's notice, so it is the turn's checkpoint: a turn counts as
-  finished only once it exists, holding the files, the harness's session and its
-  version. The next reply is a new run that resumes from it. No sandbox stays warm
-  between turns, so the 20 minutes of `IDLE_CLOSE_MS` does not apply here. A reply
-  sent while a turn runs goes in through the numbered input that exists. The cold
-  start is measured in the first days; if it is too slow, a short warm wait comes
-  after, not before.
+  the function through S3's notice, so it marks the checkpoint: a turn counts as
+  finished only once it exists. The next reply is a new run that resumes from it. No
+  sandbox stays warm between turns, so the 20 minutes of `IDLE_CLOSE_MS` does not
+  apply here. A reply sent while a turn runs goes in through the numbered input that
+  exists. The cold start is measured in the first days; if it is too slow, a short
+  warm wait comes after, not before.
+- **A checkpoint can restore by itself.** Today a run sends home only what it added to
+  a conversation, for the Mac to append (`stageTails`, and incremental git bundles),
+  so it cannot restore a sandbox alone. These runs turn that off (`tails`) and upload
+  the folder and the harness's session whole, to a new prefix per turn. The manifest
+  adds the session id, the harness and its version. Whole is wasteful only for big
+  folders, which people on this path do not have yet; developers need parents and
+  changes when they come to this path.
 - **Runs are rows, and every step is a state change.** `queued`, `starting`,
   `running`, `waiting` (on an approval), `collecting`, `done`, `failed`. A
   conditional write moves a run from one state to the next, and carries the
@@ -607,9 +613,13 @@ Settled, not to be reopened:
   ambiguous start is checked against AgentCore before it is replaced.
 - **Knowing a run is alive.** Each run has `last_heard_at` and `next_check_at`. A run
   silent for five minutes gets a status request to its sandbox. The sandbox answering
-  is proof of life whatever the agent is doing, including a long quiet tool. No
-  answer twice, or a sandbox that does not know the run, is death: the function
-  collects what it can and the thread goes to Needs you.
+  with the run is proof of life whatever the agent is doing, including a long quiet
+  tool. AgentCore makes a machine for any session it is asked about
+  (cloud/gateway/gateway.mjs:309), so asking about a dead one makes a new empty one,
+  which answers `state: 'none'`. That answer is the proof of death, and the function
+  stops that session in the same step. It costs seconds of one machine, once per dead
+  run. No answer twice also counts as dead. Either way the thread goes to Needs you
+  from its last checkpoint.
 - **The sweep cannot starve.** It reads only rows whose `next_check_at` has passed,
   oldest first, at most a fixed number per pass, and stops starting new work at 60 of
   its 90 seconds. It relays no output, unlike today's (cloud/gateway/phone.mjs:294,
@@ -622,21 +632,30 @@ Settled, not to be reopened:
   CLAUDE.md rule that names `spawnWorker`.
 - **Reporting.** The sandbox uploads what it made and writes `done.json`. Usage goes
   in `done.json`, as it does today. An open thread reads live output through the
-  function, only while it is on screen. A reader of each harness's stream ends the
-  turn inside the sandbox, because nobody is connected to do it. Today only Claude's
-  exists (cloud/sandbox/server.mjs:502).
+  function, only while it is on screen.
+- **The harness adapter runs in the sandbox,** because nobody is connected. It answers
+  whatever the harness asks, sends approvals out as cards, and ends the turn. Today
+  only Claude's turn end is read there (cloud/sandbox/server.mjs:502), and Codex's
+  requests are answered from the function as it reads output
+  (cloud/gateway/phone.mjs:374), so with no reader its turn would hang. Codex's adapter
+  is new work, tested on a resumed turn with tool calls and nobody watching. The first
+  test also settles whether it uses `codex exec`, which exits by itself, or the
+  app-server.
 - **The record.** Ordered messages and events, runs, file versions and approvals
   live in the database, and file bytes and transcripts in S3 under the person.
   `phone_threads` stays as a copy the function writes under its own device id for
   phones not yet updated. It truncates (shared/phone-snapshot.mjs:16), so it cannot
   be the truth. Clients write to it by device (`owner,device,project,item`), so an old
   app does not overwrite a cloud thread.
-- **Approvals.** The run holds a card for up to 15 minutes in `waiting`, which costs
-  little and needs nothing new (the sandbox holds the call today,
-  cloud/sandbox/server.mjs:449). After that the turn checkpoints and ends. A later
-  Allow starts a new turn that tells the agent exactly what was allowed, and the agent
-  makes the call again. `cardDigest` binds the answer to that exact action, so a
-  changed action asks again.
+- **Approvals.** The run holds a card for up to 15 minutes in `waiting`, with the
+  deadline on its row. The sandbox can hold a call today (cloud/sandbox/server.mjs:449),
+  but for ever, and only while it believes a Mac is away (`macAway`). These runs have
+  no Mac, so holding does not depend on that. At the deadline the sandbox answers the
+  held call with a refusal saying the person has not answered yet, the agent ends its
+  turn, and the turn checkpoints. A process that still has not ended is killed and
+  collected. A later Allow starts a new turn that tells the agent exactly what was
+  allowed, and the agent makes the call again. `cardDigest` binds the answer to that
+  exact action, so a changed action asks again.
 - **Tools.** The agent's Agentbox tools are an HTTP MCP endpoint on the function. A
   run's credential names the person, the thread, the run and the generation, and every
   call checks that the run is still active, so Stop or a move ends its authority at
@@ -712,7 +731,10 @@ Anything a thread keeps coming back to the computer for should stop needing it.
   person. It generalises what the plans' sign-ins do: the tool's own login runs on a
   throwaway sandbox, the person finishes it through a link or code on whichever
   device, and the tool's config files are kept in that person's `logins/`. A tool is
-  a small recipe: the login command, the files to keep, a check, and how it expires.
+  a small recipe: the login command, the files to keep, a check, how it expires, and
+  whether it can renew without the person. A tool whose refresh token is spent on use
+  cannot safely sit in many sandboxes at once, so its recipe says one renewal in the
+  sweep with short-lived copies to runs, or one run at a time.
 - **Asked for in the moment.** An agent asks for a sign-in the cloud does not have,
   and the person sees "Sign in to Expo for the cloud". It stays afterwards.
 - **Learned.** The function counts what each person's threads came back for
