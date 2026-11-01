@@ -100,6 +100,7 @@ export const REQUEST_CHANNELS = {
   updateMove: 'zero:update-move',
   notify: 'zero:notify',
   notifyTest: 'zero:notify-test',
+  onboardingArm: 'zero:onboarding-arm',
   stopSession: 'zero:stop-session',
   runNow: 'zero:run-now',
   reopen: 'zero:reopen',
