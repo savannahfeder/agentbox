@@ -459,8 +459,10 @@ body.chat-thread-dragging * { cursor: col-resize !important; }
 
 .chat-thread-body {
   flex: 1 1 auto; min-height: 0; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 20px; padding: 24px 28px 20px;
+  display: flex; flex-direction: column; padding: 24px 28px 20px;
 }
+/* One element holding every reply, so the hold at the bottom sees the thread grow. */
+.chat-thread-msgs { flex: none; display: flex; flex-direction: column; gap: 20px; }
 .chat-thread-body .chat-day { margin: 2px 0 -2px; }
 /* The panel is drawn outside the reading pane, which is the one place that
    undoes the body's `user-select: none`, so its words opt back in here. */

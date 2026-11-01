@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-export const FOLDERS = ['.', 'mobile', 'relay'];
+export const FOLDERS = ['.', 'mobile'];
 
 export const KNOWN = {
   'GHSA-5xrq-8626-4rwp': 'vitest: needs the Vitest UI server, which nothing here starts. Goes with the vitest upgrade.',

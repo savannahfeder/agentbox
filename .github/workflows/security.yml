@@ -9,7 +9,7 @@
 #   the code that ships (not tests). A finding fails the run. A false positive
 #   someone has read is silenced with a `nosemgrep` comment on that line, never
 #   by dropping the rule for everyone.
-# audit: npm's advisory database over all three lockfiles (root, mobile, relay),
+# audit: npm's advisory database over both lockfiles (root and mobile),
 #   dev packages included, failing on high or critical. An advisory with no fix
 #   yet is listed by id in scripts/audit-packages.mjs with why it reaches nobody.
 #
@@ -50,7 +50,7 @@ jobs:
           semgrep scan --error --metrics off
           --config p/javascript --config p/typescript --config p/secrets
           --exclude tests --exclude node_modules --exclude dist
-          main shared mcp cloud relay bin scripts renderer/src mobile/src preload.cjs
+          main shared mcp cloud bin scripts renderer/src mobile/src preload.cjs
 
   audit:
     runs-on: ubuntu-latest

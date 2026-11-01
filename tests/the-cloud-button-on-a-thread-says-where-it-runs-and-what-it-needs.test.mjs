@@ -95,7 +95,7 @@ describe('the button and its panel', () => {
     expect(placeView({ place: 'cloud' })).toMatchObject({ word: 'Cloud', on: 'cloud', pickMac: true });
     expect(placeView({ place: 'kept' })).toMatchObject({ word: 'This Mac', on: 'mac', pickCloud: false, pickMac: null });
     expect(placeView({ place: 'move' })).toMatchObject({ word: 'This Mac', on: 'mac', pickCloud: 'move' });
-    expect(placeView({ place: 'move', moving: true }).note).toMatch(/as soon as the cloud has room/);
+    expect(placeView({ place: 'move', why: { at: 'mac', why: 'moving' } }).note).toMatch(/as soon as the cloud has room/);
   });
 
   it('marks a thread that needs this Mac with a dot and names what it needs', () => {
@@ -103,8 +103,9 @@ describe('the button and its panel', () => {
     expect(v).toMatchObject({ word: 'This Mac', on: 'mac', dot: true, needs: 'Your Stripe key', pickCloud: false });
   });
 
-  it('a run here the cloud cannot take says why, and offers no Cloud', () => {
-    const v = placeView({ place: 'here', running: true, why: 'It works in a folder that stays on this computer.' });
+  // A run here that only this reply keeps here is picking-cloud-on-a-thread-shows-cloud-picked's.
+  it('a run here the cloud can never take says why, and offers no Cloud', () => {
+    const v = placeView({ place: 'here', running: true, why: { at: 'mac', why: 'folder' } });
     expect(v).toMatchObject({ word: 'This Mac', on: 'mac', pickCloud: null, note: 'It works in a folder that stays on this computer.' });
   });
 

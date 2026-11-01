@@ -113,6 +113,24 @@ export function documentCandidates(item: {
   return [...named, ...made.filter((p) => keep(p) && !seen.has(p.toLowerCase()))];
 }
 
+/**
+ * Every document framed under the message: its designs, then its markdown files.
+ *
+ * A markdown file the check-in note alone names gets no card. Notes name one to
+ * say where a fact came from, and framed under the answer it reads as the file
+ * the agent returned.
+ */
+export function messageDocuments(item: {
+  result?: string | null;
+  note?: string | null;
+  body?: string | null;
+  answer?: string | null;
+}, dir: string | null = null): string[] {
+  const notes = referencedFiles(item.result, item.body, item.answer, { dir })
+    .filter((path) => /\.(md|markdown)$/i.test(path) && !isBookkeeping(path));
+  return [...new Set([...embeddedDocuments(item, dir), ...notes])];
+}
+
 const BESIDE = /\.(md|markdown|html?)$/i;
 const LINK_LINE = /^\[[^\]]*\]\(<?([^)>\s]+)>?\)$/;
 const PATH_LINE = /^[`*_<]*([^\s`*_<>]+)[`*_>]*$/;

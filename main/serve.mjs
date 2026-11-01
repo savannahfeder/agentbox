@@ -406,8 +406,8 @@ export function createHandler({ channels, token, listeners = new Set(), dist = p
     // AND THE HOST HEADER IS NOT CHECKED, asked and answered 2026-10-24.
     // Refusing a Host that is not localhost is the usual guard against a page
     // whose own name resolves to this machine, and it cannot go here:
-    // main/phone-link.mjs serves this same handler to a phone through a relay
-    // or over Tailscale, where the Host is neither. The token is the key,
+    // main/phone-link.mjs serves this same handler to a phone over Wi-Fi or
+    // Tailscale, where the Host is neither. The token is the key,
     // whatever name the request arrives under
     // (tests/the-doing-half-runs-with-no-electron).
     const guarded = url.pathname === '/events' || url.pathname.startsWith('/api/') || url.pathname === '/file-key';
@@ -527,8 +527,7 @@ function readBody(req) {
       // This is here so a stuck client cannot eat the process. A PHONE'S
       // UPLOADS DO COME THROUGH HERE, though: it has no file paths, so a
       // picture is posted whole, as base64, to zero:stage-attachment. 8 MB of
-      // that was a 6 MB photo; an iPhone's is often more (2026-10-12). The
-      // relay passes up to 32 MB (relay/worker.mjs).
+      // that was a 6 MB photo; an iPhone's is often more (2026-10-12).
       if (body.length > 32 * 1024 * 1024) reject(new Error('Body too large'));
     });
     req.on('end', () => resolve(body));

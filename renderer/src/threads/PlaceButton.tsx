@@ -3,17 +3,22 @@
 // thread runs; a press opens a panel saying why and offering the other place,
 // since a hover card was turned down as the way to explain it. Drawn with the
 // cloud menu's own parts (`.th-pop.th-cloud-pop`, pages.css).
+//
+// THE PICKER SHOWS THE THREAD'S SETTING, NOT WHERE THE REPLY UNDER WAY IS
+// (w-bac3eb6bd2). A reply already running here often cannot move, so a picker
+// that showed its place could not take a pick of Cloud. The note says where
+// that reply finishes.
 import { useEffect, useRef, useState } from 'react';
 import { CloudMark, MacMark, type PlaceAct, type ThreadPlace } from './ThreadMenu';
+import { whyWords } from '../where-why';
+import type { WhyNotCloud } from '../types';
 
 export interface PlaceFacts {
   place: ThreadPlace;
   /** An agent is working on it on this Mac now. */
   running?: boolean;
-  /** Everything is moving it to the cloud by itself (`whyNotCloud` 'moving'). */
-  moving?: boolean;
-  /** Why a run here cannot go to the cloud, in where-why.ts's words. */
-  why?: string | null;
+  /** Why a run here is not in the cloud (the supervisor's `whyNotCloud`), given only while the cloud takes Everything. */
+  why?: WhyNotCloud | null;
   /** What the cloud handed it back for ("your Stripe key"). */
   needs?: string | null;
 }
@@ -31,27 +36,68 @@ export interface PlaceView {
 
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export function placeView({ place, running = false, moving = false, why = null, needs = null }: PlaceFacts): PlaceView {
+// No reply of the thread can go to the cloud while one of these holds, so Cloud cannot be picked.
+const STAYS = new Set(['folder', 'project', 'teammate', 'codex-reply', 'no-account', 'version']);
+// The cloud is out for now, so the next reply may run here as well.
+const FOR_NOW = new Set(['cloud-failing', 'cloud-account-limited']);
+const MOVING = 'Working on this Mac now. It moves to the cloud as soon as the cloud has room.';
+
+// A reply under way here while the thread may use the cloud. A keep just
+// undone is no reason any more, and with no reason at all the cloud is on
+// "when this Mac is full", where the next reply may stay here too.
+function finishesHere(why: WhyNotCloud | null): string {
+  if (!why) return 'This reply finishes on this Mac.';
+  if (why.why === 'kept') return 'This reply finishes on this Mac, and the next one starts in the cloud.';
+  const detail = String(why.detail ?? '');
+  if (why.why === 'handed-back' && detail && !/^merging into main\b/i.test(detail)) return `This reply needs ${detail}, so it finishes on this Mac. The next one starts in the cloud.`;
+  const body = whyWords(why).body;
+  return FOR_NOW.has(why.why) ? `${body} This reply finishes on this Mac.` : `${body} This reply finishes on this Mac, and the next one starts in the cloud.`;
+}
+
+export function placeView({ place, running = false, why = null, needs = null }: PlaceFacts): PlaceView {
   const mac = { word: 'This Mac' as const, on: 'mac' as const, dot: false, needs: null, pickMac: null };
+  const cloud = { word: 'Cloud' as const, on: 'cloud' as const, dot: false, needs: null, pickCloud: null, pickMac: true };
+  const moving = why?.why === 'moving';
   switch (place) {
     case 'cloud':
-      return { word: 'Cloud', on: 'cloud', dot: false, needs: null, pickCloud: null, pickMac: true, note: 'Running in the cloud now. Pick This Mac and its work comes back here and carries on.' };
+      return { ...cloud, note: 'Running in the cloud now. Pick This Mac and its work comes back here and carries on.' };
     case 'move':
-      return { ...mac, pickCloud: 'move', note: moving ? 'Working on this Mac now. It moves to the cloud as soon as the cloud has room.' : 'Working on this Mac now. Pick Cloud and it carries on there from where it is.' };
+      return moving ? { ...cloud, note: MOVING } : { ...mac, pickCloud: 'move', note: 'Working on this Mac now. Pick Cloud and it carries on there from where it is.' };
     case 'kept':
       return { ...mac, pickCloud: false, note: 'You kept it here. Its replies run on this Mac until you pick Cloud.' };
     case 'needs':
       return { ...mac, dot: true, pickCloud: false, needs: needs ? capital(needs) : 'Something only this Mac has', note: 'Its replies run here until you pick Cloud.' };
     default:
-      if (running) return { ...mac, pickCloud: null, note: why || 'Working on this Mac now.' };
-      return { word: 'Cloud', on: 'cloud', dot: false, needs: null, pickCloud: null, pickMac: true, note: 'Its next reply starts in the cloud, so it keeps going with your Mac shut.' };
+      if (!running) return { ...cloud, note: 'Its next reply starts in the cloud, so it keeps going with your Mac shut.' };
+      if (moving) return { ...cloud, note: MOVING };
+      if (why && STAYS.has(why.why)) return { ...mac, pickCloud: null, note: whyWords(why).body };
+      return { ...cloud, note: finishesHere(why) };
   }
 }
 
+/** The facts a pick leads to, drawn until the app's own arrive. */
+export function afterPick(facts: PlaceFacts, act: PlaceAct): PlaceFacts {
+  if (act === 'move') return { ...facts, place: 'move', why: { at: 'mac', why: 'moving' } };
+  return { ...facts, place: act ? 'kept' : 'here', needs: null };
+}
+
+// Long enough for the app's next snapshot, which follows a write by about half a second.
+const PICK_SHOWS_MS = 4000;
+
 export function PlaceButton({ onPlace, startOpen = false, ...facts }: PlaceFacts & { onPlace?: (act: PlaceAct) => void; startOpen?: boolean }) {
   const [open, setOpen] = useState(startOpen);
+  const [picked, setPicked] = useState<PlaceAct | null>(null);
   const wrap = useRef<HTMLSpanElement>(null);
-  const v = placeView(facts);
+  // A pick is drawn until the app says anything new about this thread, or it
+  // gives up waiting: a pick the app refused then shows as refused.
+  const said = `${facts.place}|${facts.running}|${facts.why?.at}:${facts.why?.why}|${facts.needs}`;
+  useEffect(() => setPicked(null), [said]);
+  useEffect(() => {
+    if (picked === null) return undefined;
+    const t = setTimeout(() => setPicked(null), PICK_SHOWS_MS);
+    return () => clearTimeout(t);
+  }, [picked]);
+  const v = placeView(picked === null ? facts : afterPick(facts, picked));
 
   // Closed by Escape and by a press outside it, caught first so the window's
   // own Escape ("go back") does not also leave the thread.
@@ -64,9 +110,10 @@ export function PlaceButton({ onPlace, startOpen = false, ...facts }: PlaceFacts
     return () => { document.removeEventListener('pointerdown', away); window.removeEventListener('keydown', keys, true); };
   }, [open]);
 
+  // The panel stays open, so the pick and what it does show where it was pressed.
   const pick = (act: PlaceAct | null) => {
     if (act === null) return;
-    setOpen(false);
+    setPicked(act);
     onPlace?.(act);
   };
   const choice = (where: 'cloud' | 'mac', act: PlaceAct | null) => {

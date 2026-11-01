@@ -353,6 +353,23 @@ made-up threads), not yet on a phone:
   Monday morning, or a typed time (composer-rules.ts).
 - Not yet on the phone: search and View and filters (the site's search draws
   nothing without a Mac), Repeat it, and messages between people.
+- AI teammates (2026-10-30): the computer's settings copy carries them and
+  their chat (`phoneTeammatesOf`, in whatever room the copy has left under
+  its 200KB check), and the phone's asks of them ride as `setting` commands
+  with scope `teammate` (post, describe, goAhead) into `zero:teammates`. The
+  app has Chats as its fifth tab (teammates, then groups), a chat per
+  teammate, a New teammate page, Auto and teammates in To, and signed
+  answers. Talking to a teammate needs the computer awake: teammates run
+  there. Still only on the desktop: editing a teammate, its method, pausing it
+  and making it primary. Also caught up: group mentions in Needs you, Mark
+  unread, and "in the cloud" on a cloud run's working line.
+- Caught up with the web app (2026-10-30): a thread as one page
+  (`lib/one-page.ts`), Needs you, Everything else and Chats with a team on
+  (`lib/everything.ts`, by the desktop's own card rules, without dragging or
+  hiding a card), commands behind the magnifier (`lib/palette.ts`), Minimize
+  and Review on a permission card, files and pictures in group messages (read,
+  not sent), and Settings search. A page or a note an answer names still opens
+  from its tile rather than reading in place under the answer.
 
 Tests: tests/the-phone-app-*.test.mjs pin the tabs, the thread and its
 commands, sign-in and the kept session, the request deadline and the
