@@ -1,4 +1,5 @@
 import { previewFocus } from './preview-focus';
+import { PhoneStatus } from './components/PhoneStatus';
 import { cloudChord, cloudToggleNote, cloudToggleTarget, threadPlace } from './cloud-menu';
 import { usePhoneBack, onCloudPhone, onPhone } from './phone-screen';
 import { useLessonPlace } from './lesson-position';
@@ -6898,7 +6899,7 @@ export default function App() {
                   pageAsk={threadAsk?.key === keyOf(focused) ? threadAsk : null}
                   onAsked={() => setThreadAsk(null)}
                   onShown={setOpenShows}
-                  aboveDock={<>{snap.phoneStatus && <div className="phone-status" role="status">{snap.phoneStatus}</div>}{whereItWent}</>}
+                  aboveDock={<><PhoneStatus message={snap.phoneStatus} />{whereItWent}</>}
                   onReveal={() => revealAgent(focused)}
                   // Remind me later and stop this task are neither of the two
                   // ways a task ends, and the card beside the bar names exactly
@@ -6965,7 +6966,7 @@ export default function App() {
                 )}
                 {evTop}
                 {roomShown ? roomsUi.page : evSpace ? evSpace : <>
-                {snap.phoneStatus && <div className="phone-status" role="status">{snap.phoneStatus}</div>}
+                <PhoneStatus message={snap.phoneStatus} />
                 {snap.phoneConnect ? <ConnectComputer email={snap.phoneConnect.email} onSignOut={() => { void api.teamSignOut().then(() => refresh()); }} />
                 : clearMoves || (emptyView && !theirRows.length && !(view === 'inbox' && search === null && roomsUi.mentions.length)) ? (
                   // A FILTER IS READ FIRST, so it can never fall through to

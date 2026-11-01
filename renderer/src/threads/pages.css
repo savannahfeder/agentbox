@@ -570,3 +570,8 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 :root[data-theme="light"] .th-why-card { background: var(--surface); box-shadow: 0 12px 32px rgba(0,0,0,.12); }
 .th-why-card b { display: block; margin-bottom: 3px; font-weight: 500; color: var(--text); }
 .th-cell-state.has-card:hover .th-why-card { display: block; }
+.phone-status-dismissible { display: flex; align-items: center; gap: 8px; padding-right: 0; }
+.phone-status-dismissible > span { flex: 1; min-width: 0; }
+.phone-status-dismissible > button { display: grid; place-items: center; flex: 0 0 44px; min-height: 44px; margin-block: -9px; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; cursor: pointer; }
+.phone-status-dismissible > button:hover { color: var(--text); }
+.phone-status-dismissible > button:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }
