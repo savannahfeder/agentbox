@@ -17,14 +17,16 @@ export function shipModeOf(config, slug) {
 
 export const SHIP_MODE_WORDS = {
   ask: 'Ask me first',
-  unseen: 'Ship what I won’t see',
-  tested: 'Ship everything once tested',
+  unseen: 'Ship fixes on their own',
+  tested: 'Ship everything after testing',
 };
 
+// "Ship what I won't see" was the first name, and four synthetic users read it
+// as "ship behind my back".
 export const SHIP_MODE_SENTENCE = {
-  ask: 'Every change waits for your yes.',
-  unseen: 'Fixes nobody can see ship on their own, with a second model checking the risky ones. Anything on screen comes to you with pictures.',
-  tested: 'Changes on screen ship too, once synthetic users have tried them. Threads that ship close themselves.',
+  ask: 'Every change waits for your yes before it merges into main.',
+  unseen: 'Fixes that change no design merge into main once their tests pass, and a second AI model reviews the risky ones first. Design changes come to you with pictures. Threads that ship close themselves.',
+  tested: 'Design changes merge too, after synthetic users have tried them. Threads that ship close themselves.',
 };
 
 /** The section a worker's brief carries for this mode, or '' for `ask`. */
@@ -78,5 +80,8 @@ export function shipModeBrief(mode) {
     '',
     'When you are unsure between two, take the later one. A change that is partly',
     'seen is a seen change. A failing test is never shipped.',
+    '',
+    'Your answer says which of the four your change was and why, in one sentence, and',
+    'what reviewed or tested it.',
   ].join('\n');
 }

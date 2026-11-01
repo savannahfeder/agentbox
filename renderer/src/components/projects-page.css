@@ -16,6 +16,8 @@
 }
 .pp-head-name { flex: 1; padding-left: 32px; }
 .pp-head-move { width: 132px; text-align: right; margin-right: 30px; }
+.pp-head-ship, .pp-ship { flex: none; width: 200px; }
+.pp-ship { color: var(--text-dim); font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .pp-list { position: relative; list-style: none; margin: 0; padding: 0; }
 

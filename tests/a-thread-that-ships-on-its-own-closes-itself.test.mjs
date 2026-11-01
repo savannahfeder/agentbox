@@ -82,8 +82,25 @@ describe('the store', async () => {
     expect(item.labels).toEqual(['founder']);
   });
 
+  // Four synthetic users asked the same thing of the Done list: which of
+  // these did the app close, rather than me?
+  it('says on the row that it closed itself', async () => {
+    expect((await shipped(true)).note).toBe('Shipped to main as abc1234, and closed itself.');
+    expect((await shipped(false)).note).toBe('Shipped to main as abc1234.');
+  });
+
   it('leaves it open otherwise, as it always did', async () => {
     expect((await shipped(false)).status).not.toBe('done');
     expect((await shipped(undefined)).status).not.toBe('done');
+  });
+});
+
+describe('the note', async () => {
+  const { isShippedNote, shippedNote } = await import('../shared/shipped-note.mjs');
+  it('is still read as the app\'s own, either way', () => {
+    expect(isShippedNote(shippedNote('abc1234', true))).toBe(true);
+    expect(isShippedNote(shippedNote(null, true))).toBe(true);
+    expect(isShippedNote(shippedNote('abc1234'))).toBe(true);
+    expect(isShippedNote('Shipped to main, and closed itself, I think.')).toBe(false);
   });
 });

@@ -439,7 +439,7 @@ export class Store {
   shipped(slug, id, { sha, labels, close = false }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
-    return workItemsDisk.updateWorkItem(dir, id, { labels, note: shippedNote(sha), ...(close ? { status: 'done' } : {}) }, { source: 'system' });
+    return workItemsDisk.updateWorkItem(dir, id, { labels, note: shippedNote(sha, close), ...(close ? { status: 'done' } : {}) }, { source: 'system' });
   }
 
   shipFailed(slug, id, { note, labels }) {

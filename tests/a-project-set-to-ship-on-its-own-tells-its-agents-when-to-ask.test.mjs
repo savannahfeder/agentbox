@@ -161,6 +161,10 @@ describe('what the agent is told', () => {
     expect(b).toMatch(/ship it without asking/);
   });
 
+  it('has the agent say which kind of change it was, so the person can check its call', () => {
+    expect(shipModeBrief('unseen')).toMatch(/Your answer says which of the four your change was and why/);
+  });
+
   it('settles a doubt by asking more, and lets the person still ask to see anything', () => {
     for (const mode of ['unseen', 'tested']) {
       const b = shipModeBrief(mode);
