@@ -40,6 +40,7 @@ const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
   busy: { words: <>This agent is working. You can leave and come back when it’s done</>, side: 'below' },
   gettingReady: { words: <>Getting your chats ready. You can wait here or press <K k="N" /> to start something new</>, side: 'below' },
   inPalette: { words: <></>, side: 'below' },
+  startHere: { words: <>Press <K k="N" /> to give an agent a new task</>, side: 'below' },
   palette: { words: <>Press <K k={CMD} /><K k="K" /> to find anything {Name} can do</>, side: 'below' },
 };
 
@@ -82,6 +83,7 @@ function targetsOf(step: TourStep): HTMLElement[] {
     case 'reply': return one(document.querySelector('.dock-pill'));
     case 'close': return one(document.querySelector('.ts-done'));
     case 'busy': return one(document.querySelector('.live-activity .live-brief'));
+    case 'startHere': return one(document.querySelector('.thread-crumb-from')?.parentElement);
     case 'inPalette': return one(document.querySelector('.palette'));
     case 'gettingReady': return one([...document.querySelectorAll('.list-pane .row[data-catching-up]')].at(-1));
     // Nothing on screen opens the command bar, so the card sits alone under the tabs.
@@ -261,7 +263,7 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint }
     const dialog = step === 'pick' ? document.querySelector('.tc-card:not(.tc-inline)')?.getBoundingClientRect() : null;
     if (dialog) top = dialog.bottom + GAP;
     if (step === 'gettingReady') left = document.querySelector('.list-pane .row[data-catching-up] .subject')?.getBoundingClientRect().left ?? left;
-    if (step === 'palette') {
+    if (step === 'palette' || step === 'startHere') {
       const pane = document.querySelector('.list-pane')?.getBoundingClientRect();
       left = pane ? pane.left + (pane.width - w) / 2 : (window.innerWidth - w) / 2;
       // Under the tabs on a list; on a thread, in the empty middle of its header line.
@@ -305,7 +307,7 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint }
   return (
     <>
       {burst ? <ConfettiBurst key={burst} /> : null}
-      {step !== 'palette' && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
+      {step !== 'palette' && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && step !== 'startHere' && <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
       <div key={`card-${step}`} ref={cardRef} className="tour-card" role="status"
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>
         <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : SAY[step].words}</span>

@@ -44,7 +44,7 @@ describe('someone who brought chats in', () => {
   it('then at closing it, once one of those is done', () => {
     expect(tourStep(after('open', 'choose'), at({ thread: true }))).toBe('close');
     expect(tourStep(after('open', 'reply'), at({ thread: true }))).toBe('close');
-    expect(tourStep(after('open', 'choose', 'close'), at({ thread: true }))).toBe(null);
+    expect(tourStep(after('open', 'choose', 'close'), at({ thread: true }))).toBe('startHere');
   });
   it('then back on the list, at New thread', () => {
     expect(tourStep(after('open'), inbox)).toBe('start');
@@ -283,7 +283,7 @@ describe('the command bar', () => {
   });
   it('not before, not inside a thread, and not once it has been opened', () => {
     expect(tourStep(after('compose', 'open'), at({ rows: 0 }))).not.toBe('palette');
-    expect(tourStep(after('compose', 'open', 'reply', 'close'), at({ thread: true }))).toBe(null);
+    expect(tourStep(after('compose', 'open', 'reply', 'close'), at({ thread: true }))).toBe('startHere');
     expect(tourStep(noteSent(after('open', 'reply', 'close', 'palette')), at({ rows: 0 }))).toBe(null);
     // Someone who brought chats in and has not sent anything is then shown New thread.
     expect(tourStep(after('open', 'reply', 'close', 'palette'), at({ rows: 0 }))).toBe('start');
@@ -297,7 +297,7 @@ describe('the command bar', () => {
     // Drawn first on the page title: the glow hugged "Threads" and the card covered the tabs.
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
-    expect(tour).toContain("{step !== 'palette' && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && <div key={`glow-${step}`}");
+    expect(tour).toContain("{step !== 'palette' && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && step !== 'startHere' && <div key={`glow-${step}`}");
   });
 });
 

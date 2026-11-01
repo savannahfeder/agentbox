@@ -5,7 +5,7 @@
 // to do in it, and the Later tab stood empty on a first day with nothing in it.
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { finishLesson, startTour, tourStep, noteSent } from '../renderer/src/tour';
+import { finishLesson, keyLearns, lessonOf, startTour, tourStep, noteSent } from '../renderer/src/tour';
 import { laterTabShown } from '../renderer/src/later-tab';
 
 const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
@@ -25,6 +25,29 @@ describe('closing a thread', () => {
     const at = app.indexOf('const markDone = useCallback(');
     const body = app.slice(at, app.indexOf('const resolve = useCallback(', at));
     expect(body.indexOf('THREAD_CLOSED')).toBeGreaterThan(body.indexOf('if (closesAgain(pendingRef.current, item)) return;'));
+  });
+});
+
+describe('after closing an imported chat, with the next one open', () => {
+  // Seen on the Mac: E closed it, the next chat opened, and no tip came at all, because the
+  // New thread tip is pointed at a button a thread does not draw.
+  const closed = ['open', 'choose', 'close'].reduce(finishLesson, startTour());
+  it('moves on to the next thing, a new task, since N works there too', () => {
+    expect(tourStep(closed, at({ thread: true, options: true }))).toBe('startHere');
+  });
+  it('even when the next chat is still getting ready', () => {
+    expect(tourStep(closed, at({ thread: true, preparing: true }))).toBe('startHere');
+    expect(tourStep(noteSent(closed), at({ thread: true, preparing: true }))).toBe('palette');
+  });
+  it('and pressing N learns it', () => {
+    expect(keyLearns('startHere', { key: 'n' })).toBe(true);
+    expect(lessonOf('startHere')).toBe('start');
+  });
+  it('then goes on to the command bar', () => {
+    expect(tourStep(finishLesson(closed, 'start'), at({ thread: true, options: true }))).toBe('palette');
+  });
+  it('and asks nothing new of someone who has already sent a task', () => {
+    expect(tourStep(noteSent(closed), at({ thread: true, options: true }))).toBe('palette');
   });
 });
 

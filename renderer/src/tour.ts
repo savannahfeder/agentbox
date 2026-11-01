@@ -3,7 +3,7 @@
 // tests/the-tutorial-walks-you-through-your-first-real-thread.test.mjs holds
 // what each rule is for.
 
-export type TourStep = 'start' | 'folder' | 'pick' | 'write' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'gettingReady' | 'inPalette';
+export type TourStep = 'start' | 'folder' | 'pick' | 'write' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'gettingReady' | 'inPalette' | 'startHere';
 /** Each tip shows until it is done or put away, then never again. The New thread box's three steps are one. */
 export type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy';
 /** Every lesson there is; a tour with all of them done has nothing left to say. */
@@ -61,9 +61,9 @@ export const tourLive = (t: Tour | null): boolean => !!t && !t.skipped && LESSON
 export const noteSent = (t: Tour): Tour => finishLesson({ ...t, sent: true }, 'compose');
 export const finishLesson = (t: Tour, l: Lesson): Tour => (t.done.includes(l) ? t : { ...t, done: [...t.done, l] });
 export const lessonOf = (s: TourStep): Lesson =>
-  s === 'folder' || s === 'pick' || s === 'write' || s === 'send' ? 'compose' : s === 'answered' || s === 'gettingReady' ? 'open' : s === 'inPalette' ? 'palette' : s;
+  s === 'folder' || s === 'pick' || s === 'write' || s === 'send' ? 'compose' : s === 'answered' || s === 'gettingReady' ? 'open' : s === 'inPalette' ? 'palette' : s === 'startHere' ? 'start' : s;
 
-const KEYS: Partial<Record<TourStep, RegExp>> = { start: /^n$/i, working: /^Enter$/, open: /^Enter$/, choose: /^[1-9]$/, reply: /^r$/i, close: /^e$/i };
+const KEYS: Partial<Record<TourStep, RegExp>> = { start: /^n$/i, startHere: /^n$/i, working: /^Enter$/, open: /^Enter$/, choose: /^[1-9]$/, reply: /^r$/i, close: /^e$/i };
 
 /** Whether this key press is the one the tip on screen asks for, which is the lesson learned. */
 export function keyLearns(step: TourStep, e: { key: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean }): boolean {
@@ -75,7 +75,7 @@ export function keyLearns(step: TourStep, e: { key: string; metaKey?: boolean; c
 export function learnedBy(step: TourStep, before: TourScreen | null, after: TourScreen): boolean {
   if (after.covered || after.menu || !before) return false;
   switch (step) {
-    case 'start': return after.composer !== 'none';
+    case 'start': case 'startHere': return after.composer !== 'none';
     case 'open': return after.thread;
     case 'answered': return after.view === 'inbox';
     case 'working': return after.thread || after.view !== before.view;
@@ -120,7 +120,9 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
     if (s.text) return 'send';
     return s.ideas === false ? 'write' : 'pick';
   }
-  if (s.preparing) return !s.thread && s.view === 'inbox' && todo('open') ? 'gettingReady' : null;
+  if (s.preparing && !s.thread) return s.view === 'inbox' && todo('open') ? 'gettingReady' : null;
+  if (s.preparing && todo('close')) return null;
+  if (s.preparing) return todo('palette') && (t.sent || !todo('start')) ? 'palette' : !t.sent && todo('start') ? 'startHere' : null;
   if (s.thread) {
     if (s.typing) return null;
     if (s.busy) return todo('busy') ? 'busy' : null;
@@ -128,6 +130,7 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
     if (!s.options && todo('reply') && todo('choose')) return 'reply';
     if ((!todo('choose') || !todo('reply')) && todo('close')) return 'close';
     if (!todo('close') && todo('palette') && (t.sent || !todo('start'))) return 'palette';
+    if (!todo('close') && !t.sent && todo('start')) return 'startHere';
     return null;
   }
   if (s.composer === 'card') return null;
