@@ -42,6 +42,13 @@ import { WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY, webAlertsOn } from '../../shared/w
 export const PHONE_TRIES = 3;
 // A start the cloud refused is tried again no sooner than this.
 const TRY_AGAIN_MS = 5 * 60_000;
+// GIVING UP IS NOT FOR EVER. Three tries five minutes apart answers a reply
+// this server cannot start; it does not answer a cloud that is down for a
+// quarter of an hour, because the computer whose reply it is may be asleep
+// and takes nothing back. So a give-up rests this long and the three tries
+// come round again, until the sweep stops looking at the command at all
+// (CLOUD_TAKES_UNTIL_MS).
+export const GIVEN_UP_FOR_MS = 30 * 60_000;
 // A run's end is looked for by the sweep once its notice may have been missed.
 const END_LOOK_AFTER_MS = 2 * 60_000;
 // The links a run is started with outlive its 8 hours.
@@ -177,6 +184,13 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
     const problem = checkKit(kit, { now: now() }) || (elsewhere ? 'a kit for another thread' : null);
     if (problem) { once(`kit:${problem}`, `phone: a kit was left to its computer: ${problem}`); return null; }
     return kit;
+  }
+
+  // What this command has already been turned down for, while a give-up still
+  // stands; past that it is as if it had never been tried.
+  async function triesSoFar(person, cmd) {
+    const t = await readJson(tryKey(person, cmd.id));
+    return t && now() - Number(t.at) < GIVEN_UP_FOR_MS ? t : null;
   }
 
   async function failed(person, cmd, tries, why) {
@@ -709,7 +723,7 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
     if (!PERSON.test(person) || cmd.item) return 'left';
     const itemId = madeHere(cmd.id);
     if (open.has(threadOf({ owner: person, device: cmd.device, project: cmd.project, item: itemId }))) return 'left';
-    const tries = await readJson(tryKey(person, cmd.id));
+    const tries = await triesSoFar(person, cmd);
     if (tries && (tries.n >= PHONE_TRIES || now() - tries.at < TRY_AGAIN_MS)) return 'left';
     // A computer that is awake makes the thread within seconds.
     if (now() - Date.parse(cmd.created_at) < CLOUD_TAKES_AFTER_MS) return 'left';
@@ -726,7 +740,7 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
     const person = String(cmd.owner || '').toLowerCase();
     if (!PERSON.test(person) || typeof cmd.item !== 'string' || !/^[A-Za-z0-9._-]{1,120}$/.test(cmd.item)) return 'left';
     if (notBeforeOf(cmd) > now() || open.has(threadOf({ owner: person, ...cmd }))) return 'left';
-    const tries = await readJson(tryKey(person, cmd.id));
+    const tries = await triesSoFar(person, cmd);
     if (tries && (tries.n >= PHONE_TRIES || now() - tries.at < TRY_AGAIN_MS)) return 'left';
     const made = await startNewRun(person, cmd, cmd.item, tries, { carried: true });
     if (!made) return 'left';
@@ -742,7 +756,7 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
     const text = cmd.payload?.text;
     if (!PERSON.test(person) || typeof text !== 'string' || !text.trim() || !cmd.item) return 'left';
     if (isCarried(cmd) && notBeforeOf(cmd) > now()) return 'left';
-    const tries = await readJson(tryKey(person, cmd.id));
+    const tries = await triesSoFar(person, cmd);
     if (tries && (tries.n >= PHONE_TRIES || now() - tries.at < TRY_AGAIN_MS)) return 'left';
     const rec = open.get(threadOf({ owner: person, ...cmd }));
     if (rec) return follow(rec, cmd, text, tries);

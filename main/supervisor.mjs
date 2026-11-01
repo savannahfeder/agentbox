@@ -45,7 +45,7 @@ import { cloudClients } from './cloud/clients.mjs';
 import { kitCopyPath, kitFramePath, readKitCopy, markerForCloudRun } from './cloud/kit.mjs';
 import { REPLY_MARK, replyFrame, serverJoinedKey } from '../shared/cloud-kit.mjs';
 import { NEW_THREAD, NEW_THREAD_CODEX, NEW_ITEM_MARK, NEW_TITLE_MARK, NEW_BODY_MARK, fillNewThreadKit } from '../shared/cloud-kit.mjs';
-import { macAsleep, carryCommand, CARRY_AHEAD_MS, CARRY_FRESH_MS } from '../shared/cloud-carry.mjs';
+import { macAsleep, carryCommand, CARRY_AHEAD_MS, handOverSpent, notBeforeOf } from '../shared/cloud-carry.mjs';
 import { execFile as execFileCb } from 'node:child_process';
 import { CLOSED_UNSHIPPED, closedBeforeItShipped, shippedAs } from '../shared/not-shipped.mjs';
 import { handBackWhat, handsBack } from '../shared/cloud-hand-back.mjs';
@@ -167,7 +167,7 @@ import { toolServerLaunch } from './tool-server-launch.mjs';
 
 const POLL_MS = 15_000;
 // The reasons a queued thread's line names (`status().cannotStart`).
-const SAID_WHY_NOT_STARTED = new Set(['setup', 'asleep', 'engine', 'login', 'memory', 'slow-folder', 'error']);
+const SAID_WHY_NOT_STARTED = new Set(['setup', 'asleep', 'cloud-carried', 'engine', 'login', 'memory', 'slow-folder', 'error']);
 // Making a thread's folder takes seconds; past this it is said to be slow.
 const SLOW_FOLDER_MS = 2 * 60_000;
 // A project's kit for a new thread from the phone: left again at most this
@@ -3309,8 +3309,8 @@ export class Supervisor {
    * What a sleeping Mac hands the cloud, each row once: what a pass would
    * have started now, what comes due in the next CARRY_AHEAD_MS with the
    * moment it may start (rows set for later, and each repeating task's next
-   * run under the id it will have), and anything handed over more than
-   * CARRY_FRESH_MS ago again, naming the command it `replaces`.
+   * run under the id it will have), and anything the cloud has not started
+   * CARRY_AGAIN_MS after its moment again, naming the command it `replaces`.
    */
   async carryWhileAsleep(now = Date.now()) {
     if (!this.asleep(now)) return [];
@@ -3319,7 +3319,7 @@ export class Supervisor {
     for (let i = 0; this._ticking && i < 50; i += 1) await new Promise((r) => { setTimeout(r, 100); });
     if (!this.asleep()) return [];
     const at = Date.now();
-    const stale = (id) => this._carried?.[id] && !(at - (this._carried[id].at ?? 0) < CARRY_FRESH_MS);
+    const stale = (id) => handOverSpent({ ...(this._carried?.[id] ?? {}), now: at });
     const wanted = new Map((this._asleepQueue ?? []).map((r) => [r.item.id, r]));
     const items = this.store.listItems(at);
     for (const item of items) {
@@ -3340,6 +3340,12 @@ export class Supervisor {
       if (continuation) {
         const kit = readKitCopy(kitCopyPath(this.userDir, item.product, item.id));
         if (!kit || kit.item !== item.id || kit.project !== item.product) continue;
+        // A kit is left only after a run that finished, so a folder whose last
+        // cloud run never came home has one from before that run: starting
+        // the cloud on it would work from a branch missing the commits still
+        // in the cloud. The row waits for the wake that brings them home,
+        // which is the test `_whereToRun` already makes here.
+        if (cloudWorkPending(this._cloudPlace(kit.cwd, item.product, item.id))) continue;
       } else {
         // A row that has had a run resumes its conversation, which a new-thread kit does not carry.
         if (this._rowSessions?.[item.id]) continue;
@@ -3377,10 +3383,13 @@ export class Supervisor {
     return out;
   }
 
-  /** The phone pass wrote this row's hand-over (`command` is its id): nothing here starts it now. */
-  handedOver({ item, command, kind }) {
+  /** The phone pass wrote this row's hand-over (`command` is its id): nothing
+   *  here starts it now. The hand-over's own moment is kept, so one made for
+   *  tonight is not written again before tonight (`handOverSpent`). Called
+   *  again with the same command to say the cloud still has it. */
+  handedOver({ item, command, kind, payload = null }) {
     if (!item) return;
-    (this._carried ??= {})[item] = { command: command ?? null, kind: kind ?? null, at: Date.now() };
+    (this._carried ??= {})[item] = { command: command ?? null, kind: kind ?? null, at: Date.now(), notBefore: notBeforeOf({ payload }) };
     this._saveState();
   }
 
@@ -7412,7 +7421,10 @@ export class Supervisor {
       // a special case.
       if (!this.store.isDue(item, now)) continue;
       // Handed to the cloud while asleep: the phone pass takes it back or joins its run.
-      if (this._carriedHolds(item.id, now)) continue;
+      if (this._carriedHolds(item.id, now)) {
+        this._noteNotStarting(item, 'cloud-carried', this._engineFor(item));
+        continue;
+      }
       const continuation = this._isContinuation(item);
       if (!continuation && !this._isFreshWork(item, now, autonomous)) continue;
       // ONE OF CLAUDE CODE'S OWN EIGHT COMMANDS, typed into this row's reply
