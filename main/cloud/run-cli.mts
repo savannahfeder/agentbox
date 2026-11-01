@@ -12,8 +12,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { cloudRun, IMPORT_FAILED, LOGIN_TROUBLE } from './run.mts';
+import type { CloudKit, CodexAsk, NewThreadAsk, SignalSource } from './run.mts';
+import type { Readable, Writable } from 'node:stream';
 import { NEW_THREAD, NEW_THREAD_CODEX } from '../../shared/cloud-kit.mjs';
 import { cloudClients } from './clients.mts';
+import type { CloudConfig } from './clients.mts';
 import { readCloudConfig, readCloudKey, imageCapsToTry, noteImageCaps } from './config.mjs';
 import { pickCloudLogin, markCloudLogin, loginObjectKey, cloudAccountsFrom, cloudAccountFrom, cloudLoginInUse, noCloudAccountSentence } from './logins.mts';
 
@@ -21,7 +24,7 @@ import { pickCloudLogin, markCloudLogin, loginObjectKey, cloudAccountsFrom, clou
 // keys from the environment before they read a named profile, so an app
 // started from a shell signed in as an admin would run every cloud call as
 // that admin. Those keys go, and the `agentbox-cloud` profile is what signs.
-export function dropAwsSignIns(env = process.env) {
+export function dropAwsSignIns(env: NodeJS.ProcessEnv = process.env) {
   for (const k of Object.keys(env)) {
     if (/^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN|SECURITY_TOKEN|PROFILE|DEFAULT_PROFILE|CREDENTIAL_EXPIRATION|WEB_IDENTITY_TOKEN_FILE|ROLE_ARN)$/.test(k)) delete env[k];
   }
@@ -34,7 +37,7 @@ export function dropAwsSignIns(env = process.env) {
  * because Claude's token is long-lived and Codex's is not. Named only, like the
  * run's own.
  */
-export function loginsCarriedBy(engine, { only = null, prefer = null, home } = {}) {
+export function loginsCarriedBy(engine: string, { only = null, prefer = null, home }: { only?: string[] | null; prefer?: string | null; home?: string } = {}) {
   if (engine !== 'claude') return [];
   const codex = pickCloudLogin('codex', { only, prefer, ...(home ? { home } : {}) });
   return codex ? [{ engine: 'codex', id: codex.id, key: loginObjectKey('codex', codex.id) }] : [];
@@ -45,23 +48,35 @@ export function loginsCarriedBy(engine, { only = null, prefer = null, home } = {
  * the test copy's list and the account this Mac runs on. With none to take,
  * `trouble` is why.
  */
-export function loginForCloudRun(engine, env, { home, now = Date.now() } = {}) {
+export function loginForCloudRun(engine: string, env: NodeJS.ProcessEnv, { home, now = Date.now() }: { home?: string; now?: number } = {}) {
   const ask = { only: cloudAccountsFrom(env), prefer: cloudAccountFrom(env, engine), now, ...(home ? { home } : {}) };
   const rec = pickCloudLogin(engine, ask);
   return { rec, trouble: rec ? null : noCloudAccountSentence(engine, cloudLoginInUse(engine, ask), { now }) };
 }
 
 // One client pair per account and cloud key, shared by every run in a process.
-const clients = new Map();
-function clientsFor(config) {
+const clients = new Map<string, ReturnType<typeof cloudClients>>();
+function clientsFor(config: CloudConfig) {
   const k = JSON.stringify([config, typeof config.gateway === 'string' ? readCloudKey() : null]);
   if (!clients.has(k)) clients.set(k, cloudClients(config).catch((err) => { clients.delete(k); throw err; }));
-  return clients.get(k);
+  return clients.get(k)!;
 }
 
 /** One cloud run from the relay's own arguments; resolves to its exit code. */
-export async function cloudRunFromArgs({ args, env, cwd, stdin, stdout, stderr, signals, pid, watchParent }) {
-  const say = (m) => stderr.write(`agentbox cloud: ${m}\n`);
+export interface CloudRunArgs {
+  args: string[];
+  env: NodeJS.ProcessEnv;
+  cwd: string;
+  stdin?: Readable;
+  stdout?: Writable;
+  stderr: Writable;
+  signals?: SignalSource;
+  pid?: number;
+  watchParent?: boolean;
+}
+
+export async function cloudRunFromArgs({ args, env, cwd, stdin, stdout, stderr, signals, pid, watchParent }: CloudRunArgs) {
+  const say = (m: string) => stderr.write(`agentbox cloud: ${m}\n`);
   const config = readCloudConfig();
   if (!config) { say('cloud runs are not set up on this Mac (run scripts/cloud-setup.mjs)'); return 1; }
   // `--agentbox-import-only`: bring an earlier run in this folder home, and
@@ -81,10 +96,10 @@ export async function cloudRunFromArgs({ args, env, cwd, stdin, stdout, stderr, 
   const { rec, trouble } = importOnly ? { rec: null, trouble: null } : loginForCloudRun(engine, env);
   if (!importOnly && !rec) { say(trouble); return LOGIN_TROUBLE; }
   const dir = rec?.key;
-  let made;
-  try { made = await clientsFor(config); } catch (err) { say(err.message); return LOGIN_TROUBLE; }
+  let made: Awaited<ReturnType<typeof clientsFor>>;
+  try { made = await clientsFor(config); } catch (err) { say((err as Error).message); return LOGIN_TROUBLE; }
   const { transport, storage } = made;
-  let kit = null;
+  let kit: CloudKit | null = null;
   if (kitOnly) {
     kit = kitFrom(env);
     if (!kit) { say('no kit: the thread, its project, this computer or the reply\'s place was not named'); return 1; }
@@ -119,12 +134,12 @@ export async function cloudRunFromArgs({ args, env, cwd, stdin, stdout, stderr, 
 // What the supervisor names for a kit: the thread, its project, this computer
 // as the phone knows it, the reply's place (a file, read once) and where the
 // copy is kept here.
-export function kitFrom(env) {
-  const device = env.AGENTBOX_KIT_DEVICE;
+export function kitFrom(env: NodeJS.ProcessEnv): CloudKit | null {
+  const device = env.AGENTBOX_KIT_DEVICE!;
   const project = env.ZERO_PRODUCT;
   const item = env.ZERO_ITEM;
   if (!/^[0-9a-f]{12}$/.test(device || '') || !project || !item || !env.AGENTBOX_KIT_FRAME) return null;
-  let frame = null;
+  let frame: { before?: unknown; after?: unknown } | null = null;
   try { frame = JSON.parse(fs.readFileSync(env.AGENTBOX_KIT_FRAME, 'utf8')); } catch { return null; }
   fs.rmSync(env.AGENTBOX_KIT_FRAME, { force: true });
   if (typeof frame?.before !== 'string' || typeof frame?.after !== 'string') return null;
@@ -141,8 +156,8 @@ export function kitFrom(env) {
 // A project's kit for a new thread (Supervisor#_leaveNewThreadKit) names where
 // the thread's folder will be, its first prompt with the marks, and the model
 // and effort its command line runs, in a file read once.
-function newThreadAsked(file) {
-  let n = null;
+function newThreadAsked(file: string): NewThreadAsk | null {
+  let n: { cwd?: unknown; brief?: unknown; model?: unknown; effort?: unknown; defaultEngine?: unknown } | null = null;
   try { n = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
   fs.rmSync(file, { force: true });
   if (typeof n?.cwd !== 'string' || !path.isAbsolute(n.cwd) || typeof n.brief !== 'string') return null;
@@ -156,8 +171,8 @@ function newThreadAsked(file) {
 // A Codex thread's kit also names the thread to resume and its turn's
 // settings (Supervisor#_writeKit), in a file read once; a new thread's names
 // the thread to start instead (Supervisor#_leaveCodexNewThreadKit).
-function codexKitAsked(file) {
-  let asked = null;
+function codexKitAsked(file: string): CodexAsk | null {
+  let asked: { start?: Record<string, unknown>; resume?: { threadId?: string } & Record<string, unknown>; turn?: { threadId?: string } & Record<string, unknown> } | null = null;
   try { asked = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
   fs.rmSync(file, { force: true });
   if (asked?.start && typeof asked.start === 'object' && asked.turn && typeof asked.turn === 'object' && asked.turn.threadId === undefined) return { start: asked.start, turn: asked.turn };

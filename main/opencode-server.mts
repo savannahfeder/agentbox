@@ -28,6 +28,7 @@
 // every run quietly approve its own file writes and shell commands.
 import { EventEmitter } from 'node:events';
 import { Name } from '../shared/product-name.mjs';
+import type { OpenCodeProperties } from './opencode.mts';
 
 /** How long a single HTTP call to the local server may take. */
 const CALL_MS = 60_000;
@@ -41,12 +42,27 @@ const CALL_MS = 60_000;
  * `~/.local/share/opencode/auth.json`. Agentbox never has one to pass, which
  * is the rule in CLAUDE.md and the reason this harness can exist at all.
  */
-export function openCodeClient({ baseUrl, password = null, username = 'opencode', fetchImpl = globalThis.fetch } = {}) {
+export interface OpenCodeEvent { type?: unknown; properties?: OpenCodeProperties }
+
+export interface OpenCodeRequestOptions {
+  method?: string;
+  body?: unknown;
+  signal?: AbortSignal;
+  stream?: boolean;
+}
+
+export type OpenCodeRequest = (path: string, options?: OpenCodeRequestOptions) => Promise<unknown>;
+
+export interface OpenCodeEventStream extends AsyncIterable<OpenCodeEvent> { close(): void }
+
+type Thrown = { message?: unknown } | null | undefined;
+
+export function openCodeClient({ baseUrl, password = null, username = 'opencode', fetchImpl = globalThis.fetch }: { baseUrl?: string | null; password?: string | null; username?: string; fetchImpl?: typeof fetch } = {}) {
   if (!baseUrl) throw Error('openCodeClient needs the address of a running OpenCode server');
   const root = String(baseUrl).replace(/\/+$/, '');
   const authorization = password ? `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}` : null;
 
-  const request = async (path, { method = 'GET', body, signal, stream = false } = {}) => {
+  const request: OpenCodeRequest = async (path, { method = 'GET', body, signal, stream = false } = {}) => {
     const response = await fetchImpl(root + path, {
       method,
       headers: {
@@ -67,21 +83,21 @@ export function openCodeClient({ baseUrl, password = null, username = 'opencode'
   return {
     url: root,
     request,
-    createSession: (body = {}) => request('/session', { method: 'POST', body }),
-    prompt: (sessionId, body) => request(`/session/${encodeURIComponent(sessionId)}/prompt_async`, { method: 'POST', body }),
-    abort: sessionId => request(`/session/${encodeURIComponent(sessionId)}/abort`, { method: 'POST', body: {} }),
+    createSession: (body: Record<string, unknown> = {}) => request('/session', { method: 'POST', body }) as Promise<{ id?: string } | null>,
+    prompt: (sessionId: string, body: unknown) => request(`/session/${encodeURIComponent(sessionId)}/prompt_async`, { method: 'POST', body }),
+    abort: (sessionId: string) => request(`/session/${encodeURIComponent(sessionId)}/abort`, { method: 'POST', body: {} }),
     // `{ response }` and not `{ action }`: the field name is off the real
     // OpenAPI document the running server serves at /doc.
-    replyPermission: (sessionId, permissionId, response) =>
+    replyPermission: (sessionId: string, permissionId: string, response: string) =>
       request(`/session/${encodeURIComponent(sessionId)}/permissions/${encodeURIComponent(permissionId)}`, { method: 'POST', body: { response } }),
-    summarize: (sessionId, model) =>
+    summarize: (sessionId: string, model: unknown) =>
       request(`/session/${encodeURIComponent(sessionId)}/summarize`, { method: 'POST', body: splitModel(model) }),
-    runCommand: (sessionId, body) => request(`/session/${encodeURIComponent(sessionId)}/command`, { method: 'POST', body }),
+    runCommand: (sessionId: string, body: unknown) => request(`/session/${encodeURIComponent(sessionId)}/command`, { method: 'POST', body }),
     providers: () => request('/config/providers'),
     commands: () => request('/command'),
     config: () => request('/config'),
     health: () => request('/global/health'),
-    events: ({ signal } = {}) => eventStream(request, signal),
+    events: ({ signal }: { signal?: AbortSignal } = {}) => eventStream(request, signal),
   };
 }
 
@@ -94,7 +110,7 @@ export function openCodeClient({ baseUrl, password = null, username = 'opencode'
  * guessed at: it is left for the server's own default to answer, because
  * inventing a provider here is how a run dies on a model nobody chose.
  */
-export function splitModel(model) {
+export function splitModel(model: unknown): { providerID?: string; modelID?: string } {
   const text = typeof model === 'string' ? model.trim() : '';
   const at = text.indexOf('/');
   if (at <= 0 || at === text.length - 1) return {};
@@ -102,7 +118,7 @@ export function splitModel(model) {
 }
 
 /** The `/event` stream, as an async iterable of `{ type, properties }`. */
-function eventStream(request, outerSignal) {
+function eventStream(request: OpenCodeRequest, outerSignal?: AbortSignal): OpenCodeEventStream {
   const controller = new AbortController();
   outerSignal?.addEventListener('abort', () => controller.abort(), { once: true });
   const opened = request('/event', { stream: true, signal: controller.signal });
@@ -110,8 +126,8 @@ function eventStream(request, outerSignal) {
   return {
     close: () => controller.abort(),
     async *[Symbol.asyncIterator]() {
-      const response = await opened;
-      const reader = response.body.getReader();
+      const response = (await opened) as Response;
+      const reader = response.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
       try {
@@ -119,7 +135,7 @@ function eventStream(request, outerSignal) {
           const { value, done } = await reader.read();
           if (done) return;
           buffer += decoder.decode(value, { stream: true });
-          let index;
+          let index: number;
           while ((index = buffer.indexOf('\n')) >= 0) {
             const line = buffer.slice(0, index).trim();
             buffer = buffer.slice(index + 1);
@@ -158,6 +174,28 @@ const DENY = 'reject';
  * a crashed inbox silently approves shell commands, which is the one failure
  * here that cannot be taken back.
  */
+export type OpenCodeClient = ReturnType<typeof openCodeClient>;
+
+export interface OpenCodePlan { model?: unknown; agent?: unknown; prompt?: unknown }
+
+export interface OpenCodeWorker extends EventEmitter {
+  stderr: EventEmitter;
+  stdout: EventEmitter;
+  sessionId: string | null;
+  error?: unknown;
+  kill(): void;
+  done: Promise<void>;
+}
+
+export interface OpenCodeWorkerOptions {
+  client?: OpenCodeClient | null;
+  plan?: OpenCodePlan;
+  cwd?: string | null;
+  resumeSessionId?: string | null;
+  onApproval?: ((type: string, properties: OpenCodeProperties) => unknown) | null;
+  title?: string | null;
+}
+
 export function createOpenCodeWorker({
   client,
   plan = {},
@@ -165,22 +203,22 @@ export function createOpenCodeWorker({
   resumeSessionId = null,
   onApproval = null,
   title = null,
-} = {}) {
+}: OpenCodeWorkerOptions = {}): OpenCodeWorker {
   if (!client) throw Error('createOpenCodeWorker needs a client for a running OpenCode server');
 
-  const worker = new EventEmitter();
+  const worker = new EventEmitter() as OpenCodeWorker;
   worker.stderr = new EventEmitter();
   worker.stdout = new EventEmitter();
   worker.sessionId = resumeSessionId ?? null;
 
-  const say = text => {
+  const say = (text: unknown) => {
     const line = String(text ?? '').trim();
     if (line) worker.stderr.emit('data', line);
   };
 
   let ended = false;
-  let stream = null;
-  const answered = new Set();
+  let stream: OpenCodeEventStream | null = null;
+  const answered = new Set<unknown>();
 
   const stop = async () => {
     if (ended) return;
@@ -196,7 +234,7 @@ export function createOpenCodeWorker({
    * repeats -- which it does, `permission.asked` can arrive again for a request
    * still open -- costs one card and not two.
    */
-  const decide = async (type, properties) => {
+  const decide = async (type: string, properties: OpenCodeProperties) => {
     const id = properties?.id;
     const session = properties?.sessionID;
     if (!id || session !== worker.sessionId || answered.has(id)) return;
@@ -206,15 +244,15 @@ export function createOpenCodeWorker({
     try {
       allowed = onApproval ? await onApproval(type, properties) === true : false;
     } catch (error) {
-      say(`${Name} could not ask about ${String(properties?.metadata?.command ?? 'a tool call')}: ${error?.message ?? error}`);
+      say(`${Name} could not ask about ${String(properties?.metadata?.command ?? 'a tool call')}: ${(error as Thrown)?.message ?? error}`);
       allowed = false;
     }
     if (ended) allowed = false;
 
     try {
-      await client.replyPermission(session, id, allowed ? ALLOW : DENY);
+      await client.replyPermission(session as string, id as string, allowed ? ALLOW : DENY);
     } catch (error) {
-      say(`OpenCode did not take the answer to that question: ${error?.message ?? error}`);
+      say(`OpenCode did not take the answer to that question: ${(error as Thrown)?.message ?? error}`);
     }
   };
 
@@ -231,7 +269,7 @@ export function createOpenCodeWorker({
       // our own subscription, and nothing would ever answer that card.
       stream = client.events();
       const reading = (async () => {
-        for await (const event of stream) {
+        for await (const event of stream!) {
           if (ended) return;
           const type = String(event?.type ?? '');
           const properties = event?.properties ?? {};
@@ -254,7 +292,7 @@ export function createOpenCodeWorker({
 
       await reading;
     } catch (error) {
-      worker.error = error?.message ?? String(error);
+      worker.error = (error as Thrown)?.message ?? String(error);
       say(worker.error);
     } finally {
       const already = ended;

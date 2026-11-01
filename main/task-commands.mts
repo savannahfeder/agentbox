@@ -6,6 +6,76 @@ import { harnessFor } from './harnesses.mts';
 import { NAME } from '../shared/product-name.mjs';
 const exec = promisify(execFile);
 
+export interface CommandResult {
+  state: string;
+  text?: string;
+  name?: string;
+  at: number;
+}
+
+type ParsedCommand = NonNullable<ReturnType<typeof providerCommand>>;
+type Publish = (state: string, message?: string, name?: string) => CommandResult;
+
+export interface CommandItem {
+  id: string;
+  agent?: unknown;
+  title?: string;
+  priority?: number;
+  engine?: string;
+  model?: string;
+  effort?: string | null;
+}
+
+export interface CommandProduct {
+  slug: string;
+  repoPath?: string;
+  dir: string;
+}
+
+export interface CommandSession {
+  remoteIdle?: boolean;
+}
+
+export interface CompactionJob {
+  threadId?: string;
+  profile?: string;
+}
+
+export interface CodexUsageReport {
+  at: number;
+  limits: { name: string; percent: number; resetsAt?: number | string | null }[];
+}
+
+/** The part of the supervisor that slash commands read and call. */
+export interface TaskCommandSupervisor {
+  onChange?: () => void;
+  config: unknown;
+  sessions: Map<string, CommandSession>;
+  _compactions?: Record<string, CommandResult>;
+  _compactionJobs?: Map<string, CompactionJob>;
+  _nativeCommands?: Record<string, string[] | undefined>;
+  _saveState(): void;
+  _engineFor(item: CommandItem): string;
+  _codexUsageHome(): string;
+  codexUsage(): CodexUsageReport | null;
+  rowSessionFor(item: CommandItem, product: CommandProduct | undefined): { sessionId?: string; profile?: string } | null | undefined;
+  remoteControl(product: string, id: string, action: string): Promise<unknown>;
+  compactItem(product: string, id: string): Promise<CommandResult>;
+  store: {
+    readItem(product: string, id: string): CommandItem | null | undefined;
+    listProducts(): CommandProduct[];
+    composeItem(product: string, fields: Record<string, unknown>): { id?: string; title?: string } | null | undefined;
+    productDir(product: string): string;
+    modules: { workItemsDisk: { updateWorkItem(dir: string, id: string, patch: Record<string, unknown>, options: { source: string }): unknown } };
+  };
+}
+
+/** What a failed provider call carries. */
+interface CommandError {
+  code?: number | string;
+  message?: string;
+}
+
 /**
  * A FORK IS A NEW TASK THAT STARTS WHERE THIS ONE GOT TO (MP-08, w-5ebf7bf7bb).
  *
@@ -28,7 +98,7 @@ const exec = promisify(execFile);
  * is rather than which row it came from. Whitespace flattened because a title
  * is one line and a paragraph can be pasted.
  */
-export function forkTitle(words, cap = 60) {
+export function forkTitle(words: unknown, cap = 60): string {
   const flat = String(words ?? '').replace(/\s+/g, ' ').trim();
   if (!flat) return 'A fork of this conversation';
   const stop = flat.search(/[.!?](\s|$)/);
@@ -36,7 +106,7 @@ export function forkTitle(words, cap = 60) {
   return first.length <= cap ? first : `${first.slice(0, cap - 1).trimEnd()}…`;
 }
 
-function forkTask(sup, productSlug, id, item, engine, op, publish) {
+function forkTask(sup: TaskCommandSupervisor, productSlug: string, id: string, item: CommandItem, engine: string, op: ParsedCommand, publish: Publish) {
   if (!harnessFor(engine).capabilities.fork) {
     return publish('failed', 'Forking a Codex conversation is not connected yet. Its protocol has thread/fork and that call has never been made here, so this refuses rather than pretending. Your draft has been kept.', op.name);
   }
@@ -66,9 +136,9 @@ function forkTask(sup, productSlug, id, item, engine, op, publish) {
   return publish('done', `Forked into a new task, starting from everything this conversation knows: ${made.title}`, op.name);
 }
 
-export async function taskCommand(sup, productSlug, id, text) {
+export async function taskCommand(sup: TaskCommandSupervisor, productSlug: string, id: string, text: string): Promise<CommandResult> {
  const key=JSON.stringify([productSlug,id]);
- const publish=(state,message,name)=>{
+ const publish=(state: string,message?: string,name?: string)=>{
   const value={state,text:message,name,at:Date.now()};
   sup._compactions??={};sup._compactions[key]=value;sup._saveState();sup.onChange?.();return value;
  };
@@ -84,11 +154,11 @@ export async function taskCommand(sup, productSlug, id, text) {
  if(op.name==='compact')return op.args ? publish('failed','Run /compact on its own. Your draft has been kept.',op.name) : sup.compactItem(productSlug,id);
  if(op.name==='review') {
   try { reviewTarget(op.args); return publish('forward'); }
-  catch(error) { return publish('failed',error.message,op.name); }
+  catch(error) { return publish('failed',(error as CommandError).message,op.name); }
  }
  if(sup._compactionJobs?.has(key))return {state:'busy',text:'A command is already running on this task. Your draft has been kept.',at:Date.now()};
  const readOnly = ['status','usage','skills','diff','copy','help'].includes(op.name) || (['model','effort'].includes(op.name) && !op.args);
- if(sup.sessions.has(id) && !readOnly)return publish('busy',sup.sessions.get(id).remoteIdle?'Turn off Remote Control before changing this task’s local settings. Your draft has been kept.':'Wait for the current response to finish. Your draft has been kept.',op.name);
+ if(sup.sessions.has(id) && !readOnly)return publish('busy',sup.sessions.get(id)!.remoteIdle?'Turn off Remote Control before changing this task’s local settings. Your draft has been kept.':'Wait for the current response to finish. Your draft has been kept.',op.name);
  const product=sup.store.listProducts().find(p=>p.slug===productSlug);
  if(!product)return publish('failed','This project is no longer available.',op.name);
  const cwd=product.repoPath&&fs.existsSync(product.repoPath)?product.repoPath:product.dir;
@@ -97,30 +167,30 @@ export async function taskCommand(sup, productSlug, id, text) {
  if(rec?.sessionId&&[...sup._compactionJobs.values()].some(job=>job.threadId===rec.sessionId&&job.profile===rec.profile))return publish('busy','This conversation is busy. Your draft has been kept.',op.name);
  sup._compactionJobs.set(key,{threadId:rec?.sessionId,profile:rec?.profile});
  try {
-  let result;
-  const write=patch=>sup.store.modules.workItemsDisk.updateWorkItem(sup.store.productDir(productSlug),id,patch,{source:'founder'});
+  let result: string;
+  const write=(patch: Record<string, unknown>)=>sup.store.modules.workItemsDisk.updateWorkItem(sup.store.productDir(productSlug),id,patch,{source:'founder'});
   const home=harness.profileHome(sup,rec?.profile??'default');
   const model=item.model||harness.workspaceModel(sup)||harness.defaultModel({home});
   if(op.name==='model') {
    // Both halves read off this Mac, so /model lists what its CLIs can actually
    // be asked for today rather than what was true when Agentbox was built.
    const models=harness.models({home,bin:harness.binary(sup.config)});
-   if(!op.args)result=`Task model: ${model||'provider default'}\n${models.map(m=>`/model ${m.id} · ${m.label}`).join('\n')}`;
-   else {if(!models.some(m=>m.id===op.args))throw new Error('Choose one of the models listed by /model. Your draft has been kept.');
+   if(!op.args)result=`Task model: ${model||'provider default'}\n${models.map((m: { id: string; label: string })=>`/model ${m.id} · ${m.label}`).join('\n')}`;
+   else {if(!models.some((m: { id: string })=>m.id===op.args))throw new Error('Choose one of the models listed by /model. Your draft has been kept.');
     // Model changes cannot carry an incompatible effort into the next run.
     const levels=harness.effortLevels(op.args,{home});
     write({model:op.args,...(item.effort&&levels&&!levels.includes(item.effort)?{effort:null}:{})});
     result=`This task will use ${op.args} on its next response.`;}
   } else if(op.name==='effort') {
    const levels=harness.effortLevels(model,{home});
-   if(!op.args)result=`Task effort: ${item.effort||'provider default'}\n${levels?.map(l=>`/effort ${l}`).join('\n')||'The provider has not reported available levels.'}`;
+   if(!op.args)result=`Task effort: ${item.effort||'provider default'}\n${levels?.map((l: string)=>`/effort ${l}`).join('\n')||'The provider has not reported available levels.'}`;
    else {if(!levels?.includes(op.args))throw new Error('Choose one of the levels listed by /effort. Your draft has been kept.');write({effort:op.args});result=`This task will use ${op.args} effort on its next response.`;}
   } else if(op.name==='rename') {
    if(!op.args||op.args.includes('\n')||op.args.length>200)throw new Error('Use /rename followed by a title of up to 200 characters.');
    write({title:op.args});result=`Task renamed to ${op.args}.`;
   } else if(op.name==='help') {
    if(op.args)throw new Error('Run /help on its own.');
-   const names = (sup._nativeCommands?.[id] ?? []).filter(n=>!providerCommands(engine).some(c=>c.name===n));
+   const names = (sup._nativeCommands?.[id] ?? []).filter((n: string)=>!providerCommands(engine).some(c=>c.name===n));
    // WHAT IS STILL MISSING, KEPT TRUE. Forking is connected now, on Claude Code
    // (MP-08), so the old sentence naming it was out of date the day it shipped.
    // A list of gaps nobody maintains is worse than no list: it teaches her that
@@ -128,7 +198,7 @@ export async function taskCommand(sup, productSlug, id, text) {
    const missing = !harness.capabilities.fork
     ? 'Native terminal settings, forking a conversation, rewind and integration setup are not connected here yet.'
     : 'Native terminal settings, rewind and integration setup are not connected here yet.';
-   result=[...providerCommands(engine).map(c=>`/${c.name}${c.argumentHint?' '+c.argumentHint:''} · ${c.description}`), ...(harness.capabilities.nativeCommands?names.map(n=>`/${n} · Native ${harness.label} command`):[])].join('\n')+`\n\n${missing} Unavailable commands keep your draft and never run as a prompt.`;
+   result=[...providerCommands(engine).map(c=>`/${c.name}${c.argumentHint?' '+c.argumentHint:''} · ${c.description}`), ...(harness.capabilities.nativeCommands?names.map((n: string)=>`/${n} · Native ${harness.label} command`):[])].join('\n')+`\n\n${missing} Unavailable commands keep your draft and never run as a prompt.`;
   } else if(op.name==='diff') {
    if(op.args)throw new Error('Run /diff on its own.');
    const opts={cwd,timeout:15000,maxBuffer:2*1024*1024};
@@ -149,7 +219,7 @@ export async function taskCommand(sup, productSlug, id, text) {
   if(op.name==='copy')return {state:'copy',text:result,at:Date.now()};
   return publish('done',result,op.name);
  } catch(error) {
-  const message=error?.code===-32601||/unknown (method|variant)|method not found/i.test(error?.message??'')?'This command is not available in the installed provider version. Your draft has been kept.':error.message||'The command failed. Your draft has been kept.';
+  const message=(error as CommandError)?.code===-32601||/unknown (method|variant)|method not found/i.test((error as CommandError)?.message??'')?'This command is not available in the installed provider version. Your draft has been kept.':(error as CommandError).message||'The command failed. Your draft has been kept.';
   return publish('failed',message,op.name);
  } finally {sup._compactionJobs.delete(key);}
 }

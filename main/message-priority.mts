@@ -11,7 +11,20 @@
 import { askSmallModel } from './row-label.mts';
 
 /** The four words, onto the app's own values (renderer/src/priority.ts). */
-export const LEVELS = { urgent: 9, high: 7, medium: 5, low: 2 };
+export const LEVELS: Record<string, number> = { urgent: 9, high: 7, medium: 5, low: 2 };
+
+interface Wrote { by?: string | null; ts: number; source?: string }
+export interface MessageItem {
+  agent?: unknown;
+  status?: string;
+  assignee?: string | null;
+  answer?: string | null;
+  body?: string | null;
+  priority?: number;
+  wrote?: { answer?: Wrote; body?: Wrote; priority?: Wrote };
+}
+export interface MessageProduct { team?: { direct?: unknown } }
+export interface LatestMessage { text: string; by: string | null; ts: number }
 
 const LIVE = new Set(['open', 'claimed', 'blocked']);
 
@@ -19,7 +32,7 @@ const LIVE = new Set(['open', 'claimed', 'blocked']);
  * PURE. The newest message on a conversation: its words, who wrote it and
  * when. A reply is the newest when there is one; otherwise the opening body.
  */
-export function latestMessage(item) {
+export function latestMessage(item?: MessageItem | null): LatestMessage | null {
   const a = item?.wrote?.answer;
   const b = item?.wrote?.body;
   const answered = !!a && !!item?.answer && item.answer !== '(withdrawn)' && (!b || a.ts >= b.ts);
@@ -36,7 +49,7 @@ export function latestMessage(item) {
  * person set by hand: the fold keeps theirs over ours, so asking would only
  * repeat forever.
  */
-export function wantsPriority(item, product, me) {
+export function wantsPriority(item: MessageItem | null | undefined, product: MessageProduct | null | undefined, me?: string | null): boolean {
   if (!me || !item || item.agent) return false;
   if (!product?.team?.direct) return false;
   if (!LIVE.has(item.status)) return false;
@@ -57,7 +70,7 @@ export function wantsPriority(item, product, me) {
 }
 
 /** PURE. The one question, about the message alone, cut short. */
-export function priorityPrompt(latest) {
+export function priorityPrompt(latest?: { text?: unknown } | null): string {
   const text = String(latest?.text ?? '').replace(/\r/g, '').trim().slice(0, 1500);
   return [
     'A teammate sent this message to the person you work for. How soon do they',
@@ -75,13 +88,13 @@ export function priorityPrompt(latest) {
 }
 
 /** PURE. The model's reply as one of the four words, or '' when it is not one. */
-export function cleanPriority(text) {
+export function cleanPriority(text: unknown): string {
   const first = String(text ?? '').split('\n').map((l) => l.trim()).filter(Boolean)[0] ?? '';
   const word = first.replace(/^["'`“”‘’]+|["'`“”‘’.!]+$/g, '').trim().toLowerCase();
   return Object.hasOwn(LEVELS, word) ? word : '';
 }
 
 /** Ask the small model about one message. '' on every failure, never a throw. */
-export function sortMessage(latest, opts = {}) {
+export function sortMessage(latest: LatestMessage | null, opts: Parameters<typeof askSmallModel>[2] = {}) {
   return askSmallModel(priorityPrompt(latest), cleanPriority, opts);
 }

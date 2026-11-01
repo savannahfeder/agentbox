@@ -33,7 +33,9 @@ import path from 'node:path';
 import http from 'node:http';
 import { execFile } from 'node:child_process';
 import { MemoryGate, pressureFrom } from './memory-gate.mts';
+import type { GateAnswer, MemoryGateOptions, Pressure, PressureReading } from './memory-gate.mts';
 import { CommandHistory } from './memory-gate-history.mts';
+import type { Verdict } from './memory-gate-history.mts';
 import { etimeSeconds } from './leftovers.mts';
 
 export const PROTOCOL = 1;
@@ -46,20 +48,20 @@ export function defaultSocketPath() {
 }
 
 /** The deny Claude Code reads from a PreToolUse hook. */
-export function denyOutput(reason) {
+export function denyOutput(reason: string): string {
   return JSON.stringify({
     hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason },
   });
 }
 
-function run(cmd, args) {
-  return new Promise((resolve) => {
+function run(cmd: string, args: string[]): Promise<string | null> {
+  return new Promise<string | null>((resolve) => {
     execFile(cmd, args, { timeout: 5_000, maxBuffer: 16 * 1024 * 1024 }, (err, stdout) => resolve(err ? null : stdout));
   });
 }
 
 /** `kern.memorystatus_vm_pressure_level` and `kern.memorystatus_level`, or nulls. */
-export async function readMacPressure() {
+export async function readMacPressure(): Promise<{ level: number | null; freePct: number | null }> {
   const out = await run('/usr/sbin/sysctl', ['-n', 'kern.memorystatus_vm_pressure_level', 'kern.memorystatus_level']);
   const [level, freePct] = String(out ?? '').trim().split(/\s+/).map(Number);
   return { level: Number.isFinite(level) ? level : null, freePct: Number.isFinite(freePct) ? freePct : null };
@@ -72,11 +74,19 @@ export { etimeSeconds };
  * the second) and its command line. One `ps` costs about 33 ms on a loaded
  * Mac (measured 2026-10-04), and it only runs while a command is granted.
  */
-export async function listProcesses() {
+export interface ProcessSample {
+  pid: number;
+  ppid: number;
+  mb: number;
+  startedAt: number | undefined;
+  args: string;
+}
+
+export async function listProcesses(): Promise<ProcessSample[]> {
   const out = await run('/bin/ps', ['-axo', 'pid=,ppid=,rss=,etime=,args=']);
   if (!out) return [];
   const now = Date.now();
-  const list = [];
+  const list: ProcessSample[] = [];
   for (const line of out.split('\n')) {
     const m = line.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/);
     if (!m) continue;
@@ -90,7 +100,101 @@ export async function listProcesses() {
 // Used only to find whose command a hook was, never to decide anything.
 const AGENT = /(^|\/)(claude|codex)(\s|$)/;
 
+export interface HookPayload {
+  session_id?: unknown;
+  tool_use_id?: unknown;
+  tool_input?: { command?: unknown; run_in_background?: unknown };
+  duration_ms?: unknown;
+}
+
+export interface HookBody {
+  item?: unknown;
+  product?: string | null;
+  ppid?: unknown;
+  score?: unknown;
+  hook?: HookPayload;
+}
+
+export interface Grant {
+  id: string;
+  ppid: number | null;
+  anchor: number | null;
+  anchorArgs: string | null;
+  baseline: Set<number>;
+  wallStart: number;
+  startedAt: number;
+  ambiguous: boolean;
+  emptySince: number | null;
+}
+
+export interface GrantLine {
+  refused: boolean;
+  cls?: Verdict | null;
+  waitMs: unknown;
+  ranMs: unknown;
+  peakMb: unknown;
+  shared?: boolean;
+  pressure?: Pressure | null;
+  command: unknown;
+}
+
+export interface MemoryGateServerOptions {
+  socketPath?: string;
+  historyFile?: string | null;
+  history?: CommandHistory | null;
+  grantLogFile?: string | null;
+  grantLogMaxBytes?: number;
+  gate?: MemoryGateOptions;
+  scoreFor?: ((product: string | null, item: string | null) => number | null | undefined) | null;
+  ownerOf?: ((session: string) => { item?: unknown; product?: string | null } | null | undefined) | null;
+  urgentFor?: ((product: string | null, item: string | null) => unknown) | null;
+  readPressure?: () => Promise<PressureReading>;
+  sampleProcesses?: () => Promise<ProcessSample[]>;
+  pollMs?: number;
+  takeoverMs?: number;
+  lockPort?: number;
+  idleReleaseMs?: number;
+  maxGrantMs?: number;
+  sharedGrantMs?: number | null;
+  clock?: () => number;
+  log?: (line: string) => void;
+}
+
 export class MemoryGateServer {
+  declare socketPath: string;
+  declare historyFile: string | null;
+  declare grantLogFile: string | null;
+  declare grantLogMaxBytes: number;
+  declare history: CommandHistory;
+  declare clock: () => number;
+  declare idleReleaseMs: number;
+  declare maxGrantMs: number;
+  declare gate: MemoryGate;
+  declare sharedGrantMs: number;
+  declare scoreFor: MemoryGateServerOptions['scoreFor'];
+  declare ownerOf: MemoryGateServerOptions['ownerOf'];
+  declare urgentFor: MemoryGateServerOptions['urgentFor'];
+  declare readPressure: () => Promise<PressureReading>;
+  declare sampleProcesses: () => Promise<ProcessSample[]>;
+  declare pollMs: number;
+  declare takeoverMs: number;
+  declare lockPort: number;
+  declare log: (line: string) => void;
+  declare role: 'stopped' | 'owner' | 'standby';
+  declare grants: Map<string, Grant>;
+  declare lastPids: Set<number>;
+  declare reading: PressureReading;
+  declare counts: { asked: number; waited: number; refused: number; foreign: number };
+  declare dirty: boolean;
+  declare stopping?: boolean;
+  declare takeoverTimer?: NodeJS.Timeout;
+  declare pollTimer?: NodeJS.Timeout;
+  declare server?: http.Server | null;
+  declare lock?: net.Server | null;
+  declare polling?: boolean;
+  declare saves?: number;
+  declare grantBytes?: number;
+
   constructor({
     socketPath = defaultSocketPath(),
     historyFile = null,
@@ -130,7 +234,7 @@ export class MemoryGateServer {
     sharedGrantMs = null,
     clock = Date.now,
     log = () => {},
-  } = {}) {
+  }: MemoryGateServerOptions = {}) {
     this.socketPath = socketPath;
     this.historyFile = historyFile;
     this.grantLogFile = grantLogFile;
@@ -140,7 +244,7 @@ export class MemoryGateServer {
     this.idleReleaseMs = idleReleaseMs;
     this.maxGrantMs = maxGrantMs;
     this.gate = new MemoryGate({ ...gate, history: this.history, clock });
-    this.sharedGrantMs = Number.isFinite(sharedGrantMs) ? sharedGrantMs : this.gate.maxWaitMs;
+    this.sharedGrantMs = Number.isFinite(sharedGrantMs) ? sharedGrantMs as number : this.gate.maxWaitMs;
     this.scoreFor = scoreFor;
     this.ownerOf = ownerOf;
     this.urgentFor = urgentFor;
@@ -178,7 +282,7 @@ export class MemoryGateServer {
     if (this.server) {
       const server = this.server;
       this.server = null;
-      await new Promise((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => server.close(() => resolve()));
       server.closeAllConnections?.();
       try { fs.unlinkSync(this.socketPath); } catch {}
     }
@@ -186,13 +290,13 @@ export class MemoryGateServer {
     if (this.lock) {
       const lock = this.lock;
       this.lock = null;
-      await new Promise((resolve) => lock.close(() => resolve()));
+      await new Promise<void>((resolve) => lock.close(() => resolve()));
     }
     this._saveHistory();
     this.role = 'stopped';
   }
 
-  setSlots(n) { this.gate.setSlots(n); }
+  setSlots(n: unknown) { this.gate.setSlots(n); }
 
   status() {
     const snap = this.gate.snapshot();
@@ -226,8 +330,8 @@ export class MemoryGateServer {
   // unlink and bind the socket, and an app that cannot get the port stands by
   // and never touches anything.
   async _listen() {
-    const bind = (server, where) => new Promise((resolve) => {
-      const onError = (err) => { server.off('listening', onListen); resolve(err); };
+    const bind = (server: net.Server, where: string | net.ListenOptions) => new Promise<NodeJS.ErrnoException | null>((resolve) => {
+      const onError = (err: NodeJS.ErrnoException) => { server.off('listening', onListen); resolve(err); };
       const onListen = () => { server.off('error', onError); resolve(null); };
       server.once('error', onError);
       server.once('listening', onListen);
@@ -250,7 +354,7 @@ export class MemoryGateServer {
     }
     if (err) {
       this.log(`memory gate: could not listen: ${err.message}`);
-      await new Promise((r) => lock.close(() => r()));
+      await new Promise<void>((r) => lock.close(() => r()));
       return false;
     }
     try { fs.chmodSync(this.socketPath, 0o600); } catch {}
@@ -261,7 +365,7 @@ export class MemoryGateServer {
 
   /* ------------------------------- requests ------------------------------- */
 
-  _handle(req, res) {
+  _handle(req: http.IncomingMessage, res: http.ServerResponse) {
     if (req.method === 'GET' && req.url === '/status') {
       res.setHeader('content-type', 'application/json');
       res.end(JSON.stringify(this.status()));
@@ -271,8 +375,8 @@ export class MemoryGateServer {
     req.setEncoding('utf8');
     req.on('data', (d) => { if (raw.length < 1_000_000) raw += d; });
     req.on('end', () => {
-      let body;
-      try { body = JSON.parse(raw); } catch { res.end(''); return; }
+      let body: HookBody | null;
+      try { body = JSON.parse(raw) as HookBody | null; } catch { res.end(''); return; }
       if (req.url === '/pre') this._pre(body, req, res);
       else if (req.url === '/post') { this._post(body); res.end(''); }
       else res.end('');
@@ -302,9 +406,9 @@ export class MemoryGateServer {
    * recognise. Treating a nameless ask as a stranger's would have been a way for
    * a payload we failed to read to walk past the gate unmeasured.
    */
-  _whose(body, hook) {
+  _whose(body: HookBody | null, hook: HookPayload): { item: string | null; product: string | null; session?: string } | null {
     const item = typeof body?.item === 'string' ? body.item.trim() : '';
-    if (item) return { item, product: body.product || null };
+    if (item) return { item, product: body!.product || null };
     const session = typeof hook?.session_id === 'string' ? hook.session_id.trim() : '';
     if (!session) return { item: null, product: body?.product || null };
     if (typeof this.ownerOf !== 'function') return null;
@@ -322,7 +426,7 @@ export class MemoryGateServer {
    * Only grants that named this thread are touched: a Claude worker's names its
    * row, and goes when its own process does.
    */
-  releaseSession(session) {
+  releaseSession(session: unknown) {
     if (typeof session !== 'string' || !session) return;
     for (const r of [...this.gate.running.values()]) {
       if (r.session !== session) continue;
@@ -331,7 +435,7 @@ export class MemoryGateServer {
     }
   }
 
-  _pre(body, req, res) {
+  _pre(body: HookBody | null, req: http.IncomingMessage, res: http.ServerResponse) {
     const hook = body?.hook ?? {};
     const command = hook?.tool_input?.command;
     if (typeof command !== 'string' || !command.trim()) { res.end(''); return; }
@@ -341,9 +445,9 @@ export class MemoryGateServer {
     // stranger's command behind our queue would stall somebody's terminal with
     // nothing on any screen to say why.
     if (!whose) { this.counts.foreign++; res.end(''); return; }
-    const id = String(hook.tool_use_id || `${body.ppid}-${Date.now()}-${Math.random()}`);
+    const id = String(hook.tool_use_id || `${body!.ppid}-${Date.now()}-${Math.random()}`);
     const live = typeof this.scoreFor === 'function' ? this.scoreFor(whose.product, whose.item) : null;
-    const score = Number.isFinite(live) ? live : Number(body.score) || 0;
+    const score = Number.isFinite(live) ? live : Number(body!.score) || 0;
     let urgent = false;
     try { urgent = typeof this.urgentFor === 'function' && this.urgentFor(whose.product, whose.item) === true; } catch { urgent = false; }
     this.counts.asked++;
@@ -351,11 +455,11 @@ export class MemoryGateServer {
     this.gate.submit({
       id, command, score, urgent, item: whose.item, product: whose.product, session: whose.session ?? null,
       background: !!hook?.tool_input?.run_in_background,
-    }, (decision) => {
+    }, (decision: GateAnswer) => {
       answered = true;
       if (decision.allow) {
-        const grant = this.grants.get(id) ?? {
-          id, ppid: Number(body.ppid) || null, anchor: null, anchorArgs: null,
+        const grant: Grant = this.grants.get(id) ?? {
+          id, ppid: Number(body!.ppid) || null, anchor: null, anchorArgs: null,
           baseline: this.lastPids, wallStart: Date.now(), startedAt: this.clock(), ambiguous: false, emptySince: null,
         };
         this.grants.set(id, grant);
@@ -376,7 +480,7 @@ export class MemoryGateServer {
     });
   }
 
-  _post(body) {
+  _post(body: HookBody | null) {
     const hook = body?.hook ?? {};
     const id = String(hook.tool_use_id ?? '');
     const grant = this.grants.get(id);
@@ -423,7 +527,7 @@ export class MemoryGateServer {
       this.gate.tick();
       if (this.dirty && (this.saves = (this.saves ?? 0) + 1) % 15 === 0) this._saveHistory();
     } catch (err) {
-      this.log(`memory gate: poll failed: ${err.message}`);
+      this.log(`memory gate: poll failed: ${(err as Error).message}`);
     } finally {
       this.polling = false;
     }
@@ -436,14 +540,14 @@ export class MemoryGateServer {
    * agent at once share what they find, so neither claims that figure; each
    * still teaches the history how long it took (`_post`).
    */
-  _sample(procs) {
-    const byPid = new Map(procs.map((p) => [p.pid, p]));
-    const children = new Map();
+  _sample(procs: ProcessSample[]) {
+    const byPid = new Map<number | null, ProcessSample>(procs.map((p) => [p.pid, p]));
+    const children = new Map<number, ProcessSample[]>();
     for (const p of procs) {
       if (!children.has(p.ppid)) children.set(p.ppid, []);
-      children.get(p.ppid).push(p);
+      children.get(p.ppid)!.push(p);
     }
-    const perAnchor = new Map();
+    const perAnchor = new Map<number, Grant[]>();
     const now = this.clock();
     for (const grant of this.grants.values()) {
       if (!this.gate.running.has(grant.id)) { this.grants.delete(grant.id); continue; }
@@ -483,7 +587,7 @@ export class MemoryGateServer {
       }
       if (!anchor) continue;
       if (!perAnchor.has(anchor.pid)) perAnchor.set(anchor.pid, []);
-      perAnchor.get(anchor.pid).push(grant);
+      perAnchor.get(anchor.pid)!.push(grant);
     }
     for (const [anchorPid, grants] of perAnchor) {
       // A process is the command's when it started after the earliest grant
@@ -491,12 +595,12 @@ export class MemoryGateServer {
       // errs toward counting. Without a start time, anything not seen in the
       // previous look counts instead.
       const since = Math.min(...grants.map((g) => g.wallStart)) - 1_000;
-      const baseline = grants.reduce((acc, g) => (acc && g.baseline.size < acc.size ? g.baseline : acc ?? g.baseline), null);
-      const ours = (p) => (typeof p.startedAt === 'number' ? p.startedAt >= since : !baseline.has(p.pid));
+      const baseline = grants.reduce<Set<number> | null>((acc, g) => (acc && g.baseline.size < acc.size ? g.baseline : acc ?? g.baseline), null);
+      const ours = (p: ProcessSample) => (typeof p.startedAt === 'number' ? p.startedAt >= since : !baseline!.has(p.pid));
       let mb = 0;
       const stack = [...(children.get(anchorPid) ?? [])];
       while (stack.length) {
-        const p = stack.pop();
+        const p = stack.pop()!;
         if (ours(p)) mb += p.mb;
         stack.push(...(children.get(p.pid) ?? []));
       }
@@ -530,7 +634,7 @@ export class MemoryGateServer {
    * Every shell command on the Mac waits on this path, so a write that fails
    * is logged and swallowed rather than returned to the agent.
    */
-  _writeGrant({ refused, cls, waitMs, ranMs, peakMb, shared = false, pressure = null, command }) {
+  _writeGrant({ refused, cls, waitMs, ranMs, peakMb, shared = false, pressure = null, command }: GrantLine) {
     if (!this.grantLogFile) return;
     try {
       if (this.grantBytes === undefined) {
@@ -558,7 +662,7 @@ export class MemoryGateServer {
       fs.appendFileSync(this.grantLogFile, line);
       this.grantBytes += Buffer.byteLength(line);
     } catch (err) {
-      this.log(`memory gate: could not write the grant log: ${err.message}`);
+      this.log(`memory gate: could not write the grant log: ${(err as Error).message}`);
     }
   }
 
@@ -569,11 +673,11 @@ export class MemoryGateServer {
       fs.writeFileSync(tmp, JSON.stringify(this.history.toJSON()));
       fs.renameSync(tmp, this.historyFile);
       this.dirty = false;
-    } catch (err) { this.log(`memory gate: could not save history: ${err.message}`); }
+    } catch (err) { this.log(`memory gate: could not save history: ${(err as Error).message}`); }
   }
 }
 
-function loadHistory(file) {
+function loadHistory(file: string | null) {
   if (!file) return new CommandHistory();
   try { return CommandHistory.fromJSON(JSON.parse(fs.readFileSync(file, 'utf8'))); } catch { return new CommandHistory(); }
 }

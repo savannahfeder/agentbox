@@ -17,6 +17,11 @@
 import fsDefault from 'node:fs';
 import path from 'node:path';
 import { artifactRoots } from './artifact-path.mts';
+import type { ArtifactProduct } from './artifact-path.mts';
+
+export type DocFs = Pick<typeof fsDefault, 'existsSync' | 'statSync' | 'readFileSync' | 'writeFileSync'>;
+
+export type DocResult = { ok: boolean; error?: string; stale?: boolean; tooBig?: boolean; path?: string; text?: string; mtime?: number };
 
 export const EDITABLE_RE = /\.(md|markdown)$/i;
 export const READABLE_RE = /\.(md|markdown|html?)$/i;
@@ -27,7 +32,7 @@ export const READABLE_RE = /\.(md|markdown|html?)$/i;
 export const MAX_DOC_BYTES = 1_500_000;
 
 /** Is `file` inside `dir`, without a prefix match like /a/bc counting as /a/b. */
-export function isInside(dir, file) {
+export function isInside(dir: string | null | undefined, file: string | null | undefined): boolean {
   if (!dir || !file) return false;
   const d = path.resolve(dir);
   const f = path.resolve(file);
@@ -35,7 +40,7 @@ export function isInside(dir, file) {
 }
 
 /** May the pane write to this file, on this product. */
-export function canWrite({ file, product, fs = fsDefault }) {
+export function canWrite({ file, product, fs = fsDefault }: { file: string; product?: ArtifactProduct | null; fs?: Pick<DocFs, 'existsSync'> }): DocResult {
   if (!file || !EDITABLE_RE.test(file)) {
     return { ok: false, error: 'Only markdown files can be edited here.' };
   }
@@ -51,9 +56,9 @@ export function canWrite({ file, product, fs = fsDefault }) {
 }
 
 /** The text of a document the pane has open, with what it is and when it changed. */
-export function readDoc({ file, fs = fsDefault }) {
+export function readDoc({ file, fs = fsDefault }: { file: string; fs?: DocFs }): DocResult {
   if (!file || !READABLE_RE.test(file)) return { ok: false, error: 'That is not a document this pane can open.' };
-  let stat;
+  let stat: ReturnType<DocFs['statSync']>;
   try { stat = fs.statSync(file); } catch { return { ok: false, error: 'That file is no longer there.' }; }
   if (stat.size > MAX_DOC_BYTES) {
     return { ok: false, error: 'That file is too big to open here. It opened outside instead.', tooBig: true };
@@ -61,7 +66,7 @@ export function readDoc({ file, fs = fsDefault }) {
   try {
     return { ok: true, path: file, text: fs.readFileSync(file, 'utf8'), mtime: stat.mtimeMs };
   } catch (err) {
-    return { ok: false, error: String(err?.message ?? err).slice(0, 200) };
+    return { ok: false, error: String((err as Error)?.message ?? err).slice(0, 200) };
   }
 }
 
@@ -75,7 +80,7 @@ export function readDoc({ file, fs = fsDefault }) {
  * same rule from the other end; here the file is the shared thing, so the check
  * is on the file.
  */
-export function writeDoc({ file, product, text, mtime, fs = fsDefault }) {
+export function writeDoc({ file, product, text, mtime, fs = fsDefault }: { file: string; product?: ArtifactProduct | null; text: unknown; mtime?: number; fs?: DocFs }): DocResult {
   const allowed = canWrite({ file, product, fs });
   if (!allowed.ok) return allowed;
   if (typeof text !== 'string') return { ok: false, error: 'Nothing to save.' };
@@ -94,6 +99,7 @@ export function writeDoc({ file, product, text, mtime, fs = fsDefault }) {
     try { after = fs.statSync(file).mtimeMs; } catch { /* the write succeeded */ }
     return { ok: true, mtime: after };
   } catch (err) {
-    return { ok: false, error: String(err?.message ?? err).slice(0, 200) };
+    return { ok: false, error: String((err as Error)?.message ?? err).slice(0, 200) };
+
   }
 }

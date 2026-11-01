@@ -48,15 +48,15 @@ export const QUICK_MS = 2_000;
  * is computed at run time ($(...) or backticks outside single quotes), which
  * this cannot see into.
  */
-export function commandSegments(command) {
+export function commandSegments(command: unknown): { keys: string[]; opaque: boolean } {
   const text = String(command ?? '');
-  const segments = [];
-  let words = [];
+  const segments: string[][] = [];
+  let words: string[] = [];
   let word = '';
   let inWord = false;
-  let quote = null;
+  let quote: string | null = null;
   let opaque = false;
-  const heredocs = [];
+  const heredocs: string[] = [];
   const endWord = () => {
     if (inWord) words.push(word);
     word = ''; inWord = false;
@@ -116,7 +116,7 @@ export function commandSegments(command) {
   }
   endSegment();
 
-  const keys = [];
+  const keys: string[] = [];
   for (const seg of segments) {
     const key = keyOf(seg);
     if (key) keys.push(key);
@@ -124,8 +124,8 @@ export function commandSegments(command) {
   return { keys, opaque };
 }
 
-function keyOf(segmentWords) {
-  const words = [];
+function keyOf(segmentWords: string[]): string | null {
+  const words: string[] = [];
   for (let i = 0; i < segmentWords.length; i++) {
     const w = segmentWords[i];
     if (REDIRECT.test(w)) {
@@ -149,13 +149,13 @@ function keyOf(segmentWords) {
   return arg ? `${program} ${arg.slice(0, 80)}` : program;
 }
 
-function basename(p) {
+function basename(p: unknown): string {
   const s = String(p);
   const at = s.lastIndexOf('/');
   return at === -1 ? s : s.slice(at + 1);
 }
 
-const programOf = (key) => key.split(' ')[0];
+const programOf = (key: string) => key.split(' ')[0];
 
 /**
  * The observations that are evidence, which is all of them but `?`.
@@ -175,7 +175,7 @@ const programOf = (key) => key.split(' ')[0];
  * command light. It cannot, because a `?` is dropped rather than counted, and
  * what is left still has to be light and still has to be more than one run.
  */
-const measured = (list) => (list ?? []).filter((o) => o !== '?');
+const measured = (list?: string[] | null) => (list ?? []).filter((o) => o !== '?');
 
 /**
  * Light, however it was learned: `l` measured on its own, `c` only as part of
@@ -183,7 +183,7 @@ const measured = (list) => (list ?? []).filter((o) => o !== '?');
  * be counted. Pinned by
  * tests/the-record-says-whether-it-learned-light-from-a-chain.test.mjs.
  */
-const isLight = (o) => o === 'l' || o === 'c';
+const isLight = (o: string) => o === 'l' || o === 'c';
 
 /**
  * The learned record. Each key and each program keeps its last ten
@@ -194,8 +194,25 @@ const isLight = (o) => o === 'l' || o === 'c';
  * Both maps are kept in least-recently-seen-first order so the oldest falls off
  * first when either passes `maxKeys`.
  */
+export type Verdict = 'light' | 'unknown' | 'heavy';
+
+export interface CommandHistoryOptions { lightMb?: number; heavyMb?: number; maxKeys?: number }
+
+export interface RecordOptions {
+  peakMb?: number | null;
+  durationMs?: number | null;
+  background?: boolean;
+  onlyIfLight?: boolean;
+}
+
 export class CommandHistory {
-  constructor({ lightMb = LIGHT_MB, heavyMb = HEAVY_MB, maxKeys = 2_000 } = {}) {
+  declare lightMb: number;
+  declare heavyMb: number;
+  declare maxKeys: number;
+  declare keys: Map<string, string[]>;
+  declare programs: Map<string, string[]>;
+
+  constructor({ lightMb = LIGHT_MB, heavyMb = HEAVY_MB, maxKeys = 2_000 }: CommandHistoryOptions = {}) {
     this.lightMb = lightMb;
     this.heavyMb = heavyMb;
     this.maxKeys = maxKeys;
@@ -216,10 +233,10 @@ export class CommandHistory {
    * app has seen light before, and missing evidence must never move a command
    * either way.
    */
-  record(command, { peakMb = null, durationMs = null, background = false, onlyIfLight = false } = {}) {
+  record(command: unknown, { peakMb = null, durationMs = null, background = false, onlyIfLight = false }: RecordOptions = {}): boolean {
     const { keys, opaque } = commandSegments(command);
     if (!keys.length) return false;
-    let obs;
+    let obs: string;
     if (typeof peakMb === 'number' && Number.isFinite(peakMb)) {
       obs = peakMb >= this.heavyMb ? 'h' : peakMb < this.lightMb ? 'l' : 'm';
     } else {
@@ -250,11 +267,11 @@ export class CommandHistory {
   }
 
   /** 'light' | 'unknown' | 'heavy' for a command about to run. */
-  classify(command) {
+  classify(command: unknown): Verdict {
     const { keys, opaque } = commandSegments(command);
     if (!keys.length && !opaque) return 'light';
-    let verdict = 'light';
-    const worse = (v) => {
+    let verdict: Verdict = 'light';
+    const worse = (v: Verdict) => {
       if (v === 'heavy' || verdict === 'heavy') verdict = 'heavy';
       else if (v === 'unknown') verdict = 'unknown';
     };
@@ -273,7 +290,7 @@ export class CommandHistory {
     return verdict;
   }
 
-  _classifyKey(key) {
+  _classifyKey(key: string): Verdict {
     const own = this.keys.get(key);
     const recent = measured(own?.slice(-5));
     if (recent.includes('h')) return 'heavy';
@@ -284,12 +301,12 @@ export class CommandHistory {
     return 'unknown';
   }
 
-  _push(map, key, obs) {
+  _push(map: Map<string, string[]>, key: string, obs: string) {
     const list = map.get(key) ?? [];
     map.delete(key);
     list.push(obs);
     map.set(key, list.slice(-10));
-    while (map.size > this.maxKeys) map.delete(map.keys().next().value);
+    while (map.size > this.maxKeys) map.delete(map.keys().next().value!);
   }
 
   toJSON() {
@@ -297,10 +314,10 @@ export class CommandHistory {
   }
 
   /** Anything unreadable is an empty history, which only means "unknown". */
-  static fromJSON(raw, opts) {
+  static fromJSON(raw: { v?: unknown; keys?: unknown; programs?: unknown } | null | undefined, opts?: CommandHistoryOptions): CommandHistory {
     const h = new CommandHistory(opts);
     if (!raw || raw.v !== 1) return h;
-    const load = (map, entries) => {
+    const load = (map: Map<string, string[]>, entries: unknown) => {
       if (!Array.isArray(entries)) return;
       for (const e of entries) {
         if (Array.isArray(e) && typeof e[0] === 'string' && Array.isArray(e[1])) {
@@ -314,6 +331,6 @@ export class CommandHistory {
   }
 }
 
-function chainKey(keys, opaque) {
+function chainKey(keys: string[], opaque: boolean) {
   return `${opaque ? '$( ' : ''}${keys.join(' && ')}`;
 }

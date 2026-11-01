@@ -13,20 +13,84 @@ import { withDeadline } from '../team/session.mjs';
 import { plainAuthError } from '../team/auth-words.mjs';
 import { signInWithGoogle, cancelGoogleSignIn, sendPasswordReset, waitForTheConfirmationLink } from '../team/sign-in.mjs';
 import { Name } from '../../shared/product-name.mjs';
+import type { SupabaseClient, createClient as createSupabaseClient } from '@supabase/supabase-js';
+
+export interface CloudAccountConfig {
+  gateway: string;
+  supabaseUrl: string;
+  anonKey: string;
+  signInReturn?: string;
+}
+
+type Cancelable = Error & { cancelled?: boolean };
+
+export interface GatewayBody {
+  terms?: unknown;
+  key?: string;
+  error?: string;
+  message?: string;
+  url?: unknown;
+  where?: unknown;
+  [field: string]: unknown;
+}
+
+export interface AccountOutcome {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  terms?: unknown;
+  [field: string]: unknown;
+}
+
+export interface CloudAccountSession {
+  google(): Promise<string>;
+  email(email: unknown, password: unknown): Promise<string>;
+  signUp(details: { name?: unknown; email?: unknown; password?: unknown }): Promise<string | null>;
+  resend(): Promise<void>;
+  confirmation(): Promise<string | null>;
+  startReset(email: unknown): Promise<void>;
+  waitForReset(): Promise<void>;
+  newPassword(password: unknown): Promise<string>;
+  cancel(): unknown;
+  reopen(): unknown;
+  held?: string | null;
+}
+
+export interface CloudAccountSessionOptions {
+  config: CloudAccountConfig;
+  openExternal: (url: string) => unknown;
+  log?(message?: string): void;
+  createClient?: typeof createSupabaseClient | null;
+  confirmWaitMs?: number | null;
+}
+
+export interface CloudSignInRequest {
+  config: CloudAccountConfig;
+  session: CloudAccountSession;
+  method: string;
+  email?: unknown;
+  password?: unknown;
+  name?: unknown;
+  acceptTerms?: boolean;
+  env?: NodeJS.ProcessEnv;
+  home?: string;
+}
+
+export interface StoreDirs { env?: NodeJS.ProcessEnv; home?: string }
 
 const CALL_MS = 30_000;
 const RETURN_URL = 'http://127.0.0.1:54783/auth/callback';
 
 export { cloudAccountConfig };
 
-async function ask(gateway, route, { method = 'GET', key, body } = {}) {
+async function ask(gateway: string, route: string, { method = 'GET', key, body }: { method?: string; key?: string | null; body?: unknown } = {}): Promise<{ status: number; body: GatewayBody }> {
   const init = { method, headers: { ...(key ? { authorization: `Bearer ${key}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined };
   const res = await fetch(`${gateway.replace(/\/+$/, '')}${route}`, { ...init, signal: AbortSignal.timeout(CALL_MS) });
-  return { status: res.status, body: await res.json().catch(() => ({})) };
+  return { status: res.status, body: await res.json().catch(() => ({})) as GatewayBody };
 }
 
 /** The version of the terms a person accepts now. */
-export async function currentCloudTerms(config) {
+export async function currentCloudTerms(config: { gateway: string }) {
   return (await ask(config.gateway, '/v1/terms')).body.terms ?? null;
 }
 
@@ -36,30 +100,30 @@ export async function currentCloudTerms(config) {
  * token of a fresh sign-in, held in memory only: the cloud key is what this
  * Mac keeps, so nothing asks the keychain.
  */
-export function cloudAccountSession({ config, openExternal, log = () => {}, createClient = null, confirmWaitMs = null }) {
-  let lastUrl = null;
+export function cloudAccountSession({ config, openExternal, log = () => {}, createClient = null, confirmWaitMs = null }: CloudAccountSessionOptions): CloudAccountSession {
+  let lastUrl: string | null | undefined = null;
   // A reset is one client from the email to the new password: the client that
   // asked for the link holds the other half of the code the link carries.
-  let resetting = null;
+  let resetting: { client: SupabaseClient; opened: Promise<unknown> } | null = null;
   // A new account is the same, from the sign-up to its confirmation link.
-  let confirming = null;
+  let confirming: { client: SupabaseClient; email: string } | null = null;
   const returnUrl = () => config.signInReturn || RETURN_URL;
   const client = async () => {
     const make = createClient || (await import('@supabase/supabase-js')).createClient;
-    const mem = new Map();
+    const mem = new Map<string, string>();
     return make(config.supabaseUrl, config.anonKey, {
-      auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: false, storage: { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v), removeItem: (k) => mem.delete(k) } },
+      auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: false, storage: { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => { mem.set(k, v); }, removeItem: (k) => { mem.delete(k); } } },
       global: { fetch: withDeadline() },
     });
   };
-  const tokenOf = (data) => {
+  const tokenOf = (data: { session?: { access_token?: string } | null } | null | undefined) => {
     if (!data?.session?.access_token) throw new Error('Signing in came back without a session. Try again.');
     return data.session.access_token;
   };
   return {
     async google() {
       const c = await client();
-      await signInWithGoogle({ client: c, openExternal, returnUrl: returnUrl(), log, onUrl: (u) => { lastUrl = u; } });
+      await signInWithGoogle({ client: c, openExternal, returnUrl: returnUrl(), log, onUrl: (u?: string) => { lastUrl = u; } });
       return tokenOf((await c.auth.getSession()).data);
     },
     async email(email, password) {
@@ -134,7 +198,7 @@ export function cloudAccountSession({ config, openExternal, log = () => {}, crea
  * otherwise a person who never agreed gets `needsTerms`, and `agree` finishes
  * that same sign-in once they do.
  */
-export async function cloudSignIn({ config, session, method, email, password, name, acceptTerms = false, env = process.env, home = os.homedir() }) {
+export async function cloudSignIn({ config, session, method, email, password, name, acceptTerms = false, env = process.env, home = os.homedir() }: CloudSignInRequest): Promise<AccountOutcome> {
   // A reset is three presses, and only the last one has an account to open:
   // send the email, wait for its link, then take the new password.
   if (method === 'reset' || method === 'reset-wait') {
@@ -143,10 +207,10 @@ export async function cloudSignIn({ config, session, method, email, password, na
       await session.waitForReset();
       return { ok: true, opened: true };
     } catch (err) {
-      return { ok: false, error: err?.message || String(err), ...(err?.cancelled ? { cancelled: true } : {}) };
+      return { ok: false, error: (err as Cancelable)?.message || String(err), ...((err as Cancelable)?.cancelled ? { cancelled: true } : {}) };
     }
   }
-  let token;
+  let token: string | null | undefined;
   let agreeing = acceptTerms;
   try {
     if (method === 'google') token = await session.google();
@@ -165,7 +229,7 @@ export async function cloudSignIn({ config, session, method, email, password, na
       if (!token) return { ok: false, error: 'Sign in again to finish.' };
     } else return { ok: false, error: 'No such way to sign in.' };
   } catch (err) {
-    return { ok: false, error: err?.message || String(err), ...(err?.cancelled ? { cancelled: true } : {}) };
+    return { ok: false, error: (err as Cancelable)?.message || String(err), ...((err as Cancelable)?.cancelled ? { cancelled: true } : {}) };
   }
   session.held = token;
   const acceptedTerms = agreeing ? await currentCloudTerms(config) : undefined;
@@ -180,20 +244,20 @@ export async function cloudSignIn({ config, session, method, email, password, na
  * the link to come back, then finishes the same sign-in, with nothing else to
  * press. Creating the account is what agrees to the terms, as on the page.
  */
-export async function waitForEmailConfirmation({ config, session, env = process.env, home = os.homedir() }) {
-  let token;
-  try { token = await session.confirmation(); } catch (err) { return { ok: false, error: err?.message || String(err), ...(err?.cancelled ? { cancelled: true } : {}) }; }
+export async function waitForEmailConfirmation({ config, session, env = process.env, home = os.homedir() }: { config: CloudAccountConfig; session: CloudAccountSession } & StoreDirs): Promise<AccountOutcome> {
+  let token: string | null | undefined;
+  try { token = await session.confirmation(); } catch (err) { return { ok: false, error: (err as Cancelable)?.message || String(err), ...((err as Cancelable)?.cancelled ? { cancelled: true } : {}) }; }
   if (!token) return { ok: false, error: 'nothing-waiting' };
   const out = await signInToCloud({ config, acceptedTerms: await currentCloudTerms(config), googleSignIn: async () => token, env, home });
   return out.ok ? out : { ok: false, error: out.message || out.error };
 }
 
 // `googleSignIn` gives the access token of whichever sign-in the page made.
-export async function signInToCloud({ config, acceptedTerms, name = os.hostname(), env = process.env, home = os.homedir(), googleSignIn }) {
+export async function signInToCloud({ config, acceptedTerms, name = os.hostname(), env = process.env, home = os.homedir(), googleSignIn }: { config: { gateway: string }; acceptedTerms?: unknown; name?: string; googleSignIn: () => Promise<string | null | undefined> } & StoreDirs): Promise<AccountOutcome> {
   const now = readCloudConfig(env, home);
   if (now?.bucket) return { ok: false, error: 'own-aws', message: 'This Mac runs the cloud in its own AWS account.' };
-  let token;
-  try { token = await googleSignIn(); } catch (err) { return { ok: false, error: 'google', message: err?.message || String(err) }; }
+  let token: string | null | undefined;
+  try { token = await googleSignIn(); } catch (err) { return { ok: false, error: 'google', message: (err as Cancelable)?.message || String(err) }; }
   const made = await ask(config.gateway, '/v1/devices', { method: 'POST', key: token, body: { acceptedTerms, name: String(name).slice(0, 80) } });
   if (made.status !== 200 || !made.body.key) return { ok: false, error: made.body.error || 'refused', message: made.body.message || `the cloud said ${made.status}`, ...(made.body.terms ? { terms: made.body.terms } : {}) };
   writeCloudKey(made.body.key, env, home);
@@ -205,14 +269,14 @@ export async function signInToCloud({ config, acceptedTerms, name = os.hostname(
 }
 
 // The server's cloud and this Mac's key for it, or null when signed out.
-function signedIn(env, home) {
+function signedIn(env: NodeJS.ProcessEnv, home: string) {
   const gateway = readCloudConfig(env, home)?.gateway;
   const key = gateway ? readCloudKey(env, home) : null;
   return key ? { gateway, key } : null;
 }
 
 /** The plan, its agents and hours, and what is used, as the server counts them. */
-export async function cloudPlan({ env = process.env, home = os.homedir() } = {}) {
+export async function cloudPlan({ env = process.env, home = os.homedir() }: StoreDirs = {}) {
   const at = signedIn(env, home);
   if (!at) return { signedIn: false };
   const me = await ask(at.gateway, '/v1/me', { key: at.key });
@@ -221,7 +285,7 @@ export async function cloudPlan({ env = process.env, home = os.homedir() } = {})
 }
 
 /** End every other Mac's cloud key, for a Mac that was lost; this one stays signed in. */
-export async function signOutOtherMacs({ env = process.env, home = os.homedir() } = {}) {
+export async function signOutOtherMacs({ env = process.env, home = os.homedir() }: StoreDirs = {}) {
   const at = signedIn(env, home);
   if (!at) return { ok: false, error: 'signed-out', message: `Sign in to ${Name} Cloud first.` };
   const out = await ask(at.gateway, '/v1/devices', { method: 'DELETE', key: at.key, body: { others: true } });
@@ -232,7 +296,7 @@ export async function signOutOtherMacs({ env = process.env, home = os.homedir() 
 // Only Stripe's own two pages are opened: whatever else a server answers stays shut.
 const STRIPE_PAGE = /^https:\/\/(checkout|billing)\.stripe\.com\//;
 
-async function openStripe(route, body, openExternal, env, home) {
+async function openStripe(route: string, body: unknown, openExternal: (url: string) => unknown, env: NodeJS.ProcessEnv, home: string) {
   const at = signedIn(env, home);
   if (!at) return { ok: false, error: 'signed-out', message: `Sign in to ${Name} Cloud first.` };
   const out = await ask(at.gateway, route, { method: 'POST', key: at.key, body });
@@ -243,13 +307,13 @@ async function openStripe(route, body, openExternal, env, home) {
 }
 
 /** Stripe's checkout for a plan, in the browser; the billing page for someone already paying. */
-export const payForCloud = ({ plan, openExternal, env = process.env, home = os.homedir() }) => openStripe('/v1/checkout', { plan }, openExternal, env, home);
+export const payForCloud = ({ plan, openExternal, env = process.env, home = os.homedir() }: { plan: unknown; openExternal: (url: string) => unknown } & StoreDirs) => openStripe('/v1/checkout', { plan }, openExternal, env, home);
 
 /** Stripe's billing page: change plan, cancel, the card, invoices. */
-export const openCloudBilling = ({ openExternal, env = process.env, home = os.homedir() }) => openStripe('/v1/billing', {}, openExternal, env, home);
+export const openCloudBilling = ({ openExternal, env = process.env, home = os.homedir() }: { openExternal: (url: string) => unknown } & StoreDirs) => openStripe('/v1/billing', {}, openExternal, env, home);
 
 /** Let this Mac's cloud key go, there and here. An own-AWS setup is left alone. */
-export async function signOutOfCloud({ env = process.env, home = os.homedir() } = {}) {
+export async function signOutOfCloud({ env = process.env, home = os.homedir() }: StoreDirs = {}) {
   const now = readCloudConfig(env, home);
   if (!now?.gateway) return { ok: true };
   const key = readCloudKey(env, home);

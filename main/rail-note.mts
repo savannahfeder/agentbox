@@ -32,14 +32,16 @@ export const NOTE_NAME = 'pinned.md';
 export const MAX_NOTE_BYTES = 200_000;
 
 /** The file this product's sidebar note lives in, or null if it has no folder. */
-export function notePath(prod) {
+export function notePath(prod?: { dir?: string | null } | null) {
   return prod?.dir ? path.join(prod.dir, NOTE_NAME) : null;
 }
 
 /**
  * What she has written on this product. A note that has never been started is
  *  empty text, not an error: the sidebar draws its placeholder from that. */
-export function readNote({ product, fs = fsDefault }) {
+export type NoteFs = Pick<typeof fsDefault, 'statSync' | 'readFileSync' | 'mkdirSync' | 'writeFileSync'>;
+
+export function readNote({ product, fs = fsDefault }: { product?: { dir?: string | null } | null; fs?: NoteFs }) {
   const file = notePath(product);
   if (!file) return { ok: false, error: 'That project has no folder to keep a note in.' };
   try {
@@ -49,7 +51,7 @@ export function readNote({ product, fs = fsDefault }) {
     }
     return { ok: true, text: fs.readFileSync(file, 'utf8'), mtime: stat.mtimeMs };
   } catch (err) {
-    if (err?.code === 'ENOENT') return { ok: true, text: '', mtime: 0 };
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return { ok: true, text: '', mtime: 0 };
     return { ok: false, error: 'That note could not be read.' };
   }
 }
@@ -57,7 +59,7 @@ export function readNote({ product, fs = fsDefault }) {
 /**
  * Her note, written back. The file is CREATED on the first keystroke rather
  *  than at install time, so a product she never writes on never grows a file. */
-export function writeNote({ product, text, fs = fsDefault }) {
+export function writeNote({ product, text, fs = fsDefault }: { product?: { dir?: string | null } | null; text?: unknown; fs?: NoteFs }) {
   const file = notePath(product);
   if (!file) return { ok: false, error: 'That project has no folder to keep a note in.' };
   const out = typeof text === 'string' ? text : '';

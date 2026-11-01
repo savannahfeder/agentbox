@@ -38,6 +38,7 @@ import { catchUpDue } from '../shared/agent-import.mjs';
 // words the moment they open the row (shared/work-items.mjs).
 
 import { spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { codexLaunchEnv } from './codex-launch-env.mts';
 
 /**
@@ -45,6 +46,26 @@ import { codexLaunchEnv } from './codex-launch-env.mts';
  *  happens on a timer, and it must never be worth thinking about. Measured
  *  through the CLI over ten real rows: 14.1s median a call,
  *  nearly all of it the CLI starting a session rather than the model working. */
+export interface RowItem {
+  status?: string;
+  title?: string;
+  body?: string;
+  label?: string;
+  result?: string;
+  note?: string;
+  labels?: string[];
+  [field: string]: unknown;
+}
+
+export interface SmallModelOptions {
+  claudeBin?: string | null;
+  codexBin?: string | null;
+  engine?: string;
+  model?: string;
+  timeoutMs?: number;
+  env?: NodeJS.ProcessEnv;
+}
+
 export const NAME_MODEL = 'claude-haiku-4-5-20251001';
 
 /**
@@ -89,8 +110,8 @@ const LIVE = new Set(['open', 'claimed', 'blocked']);
  * than our label is a rename, so `rowTitle` draws theirs (list-rules.ts) and
  * this stays quiet rather than answering it with another name of ours.
  */
-export function wantsName(item) {
-  if (!item || !LIVE.has(item.status)) return false;
+export function wantsName(item?: RowItem | null) {
+  if (!item || !LIVE.has(item.status!)) return false;
   if (teammateIdOf(item)) return false;
   // A chat just brought in is named by its rewrite (main/catch-up.mts).
   if (catchUpDue(item)) return false;
@@ -103,8 +124,8 @@ export function wantsName(item) {
  *  thing written on the row, which is what makes the name describe the thread
  *  rather than its opening line. Truncated hard: a name does not get better for
  *  having read six thousand words, and this is spawned on a timer. */
-export function namePrompt(item) {
-  const cut = (s, n) => String(s ?? '').replace(/\r/g, '').trim().slice(0, n);
+export function namePrompt(item?: RowItem | null) {
+  const cut = (s: unknown, n: number) => String(s ?? '').replace(/\r/g, '').trim().slice(0, n);
   const latest = cut(item?.result || item?.note, 700);
   return [
     'Here is a work thread: the message that opened it, and the latest thing',
@@ -134,7 +155,7 @@ export function namePrompt(item) {
  * every rule returns '' and the row keeps the name it had, which is always safe
  * because the fallback is her own title.
  */
-export function cleanName(text) {
+export function cleanName(text?: unknown) {
   const first = String(text ?? '')
     .split('\n')
     .map((l) => l.trim())
@@ -158,11 +179,11 @@ export function cleanName(text) {
  *  alone on stdout and everything else on stderr, so the reading below is the
  *  same. No session is kept, none of her Codex config or MCP servers is loaded,
  *  and nothing may be written. Measured 2026-10-01, codex-cli 0.160.0: 5.6s. */
-export function codexNameArgs(item) {
+export function codexNameArgs(item?: RowItem | null) {
   return codexArgs(namePrompt(item));
 }
 
-function codexArgs(prompt) {
+function codexArgs(prompt: string) {
   return harnessFor('codex').smallModelArgs(prompt);
 }
 
@@ -172,7 +193,7 @@ function codexArgs(prompt) {
  * is not a name. Never throws and never rejects, because this is called from a
  * timer whose only correct behaviour on failure is to leave the row alone.
  */
-export function nameRow(item, opts = {}) {
+export function nameRow(item: RowItem | null | undefined, opts: SmallModelOptions = {}) {
   return askSmallModel(namePrompt(item), cleanName, opts);
 }
 
@@ -188,13 +209,13 @@ export function nameRow(item, opts = {}) {
  * was named for a day, while agents ran on the second account. The supervisor
  * passes one per account and walks them (`_askSmall` in main/supervisor.mts).
  */
-export function askSmallModel(prompt, clean, { claudeBin, codexBin = null, engine = 'claude', model = NAME_MODEL, timeoutMs = NAME_TIMEOUT_MS, env } = {}) {
-  return new Promise((resolve) => {
+export function askSmallModel(prompt: string, clean: (text: string) => string, { claudeBin, codexBin = null, engine = 'claude', model = NAME_MODEL, timeoutMs = NAME_TIMEOUT_MS, env }: SmallModelOptions = {}) {
+  return new Promise<string>((resolve) => {
     let harness;
     try { harness = harnessFor(engine); } catch { return resolve(''); }
     const bin = harness.binary({ claudeBin, codexBin });
     if (!bin) return resolve('');
-    let child;
+    let child: ChildProcess;
     try {
       child = spawn(bin, harness.smallModelArgs(prompt, model), {
         // Somewhere that is nobody's project. A naming call must not pick up a
@@ -208,7 +229,7 @@ export function askSmallModel(prompt, clean, { claudeBin, codexBin = null, engin
     }
     let out = '';
     let done = false;
-    const finish = (value) => {
+    const finish = (value: string) => {
       if (done) return;
       done = true;
       clearTimeout(timer);
@@ -216,7 +237,7 @@ export function askSmallModel(prompt, clean, { claudeBin, codexBin = null, engin
       resolve(value);
     };
     const timer = setTimeout(() => finish(''), timeoutMs);
-    child.stdout.on('data', (d) => { out += d.toString(); if (out.length > 4000) finish(clean(out)); });
+    child.stdout!.on('data', (d) => { out += d.toString(); if (out.length > 4000) finish(clean(out)); });
     child.on('error', () => finish(''));
     child.on('close', (code) => finish(code === 0 ? clean(out) : ''));
   });

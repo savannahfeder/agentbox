@@ -63,18 +63,19 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { pressureFrom } from './memory-gate.mts';
+import type { Pressure } from './memory-gate.mts';
 
 const LSTART = String.raw`\w{3} \w{3} [ \d]\d \d\d:\d\d:\d\d \d{4}`;
 
 /** `ps` elapsed time, `[[dd-]hh:]mm:ss`, in seconds. */
-export function etimeSeconds(etime) {
+export function etimeSeconds(etime: unknown): number | null {
   const m = String(etime).match(/^(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)$/);
   if (!m) return null;
   return (+(m[1] ?? 0)) * 86_400 + (+(m[2] ?? 0)) * 3_600 + (+m[3]) * 60 + (+m[4]);
 }
 
 /** `ps` lstart, "Mon Oct  5 11:11:52 2026" in local time, as epoch seconds. */
-export function lstartSeconds(text) {
+export function lstartSeconds(text: unknown): number | null {
   const m = String(text).trim().match(/^\w{3} (\w{3}) +(\d+) (\d\d):(\d\d):(\d\d) (\d{4})$/);
   if (!m) return null;
   const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].indexOf(m[1]);
@@ -88,9 +89,21 @@ export function lstartSeconds(text) {
  *   argv: `ps -ww -axo pid=,lstart=,command=`
  *   full: `ps -E -ww -axo pid=,lstart=,command=`   (arguments, then environment)
  */
-export function parseListings({ base, argv, full }) {
-  const lines = (text, re) => {
-    const map = new Map();
+export interface ProcessRecord {
+  pid: number;
+  ppid: number;
+  mb: number;
+  start: number | null;
+  exe: string;
+  cmd: string;
+  item: string | null;
+  product: string | null;
+  keep: boolean;
+}
+
+export function parseListings({ base, argv, full }: { base: unknown; argv: unknown; full: unknown }): ProcessRecord[] {
+  const lines = (text: unknown, re: RegExp) => {
+    const map = new Map<number, RegExpMatchArray>();
     for (const line of String(text ?? '').split('\n')) {
       const m = line.match(re);
       if (m) map.set(+m[1], m);
@@ -100,13 +113,13 @@ export function parseListings({ base, argv, full }) {
   const cmdRe = new RegExp(`^\\s*(\\d+)\\s+(${LSTART})\\s+(.*)$`);
   const a = lines(argv, cmdRe);
   const f = lines(full, cmdRe);
-  const out = [];
+  const out: ProcessRecord[] = [];
   for (const m of lines(base, new RegExp(`^\\s*(\\d+)\\s+(\\d+)\\s+(\\d+)\\s+(${LSTART})\\s*(.*)$`)).values()) {
     const pid = +m[1];
     const start = lstartSeconds(m[4]);
     const args = a.get(pid);
     const all = f.get(pid);
-    let env = null;
+    let env: string | null = null;
     // The environment is only what `ps -E` adds after the arguments, and only
     // when both looks are of the same program.
     if (args && all && lstartSeconds(args[2]) === start && lstartSeconds(all[2]) === start
@@ -128,8 +141,8 @@ export function parseListings({ base, argv, full }) {
   return out;
 }
 
-function ps(args) {
-  return new Promise((resolve, reject) => {
+function ps(args: string[]): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     execFile('/bin/ps', args, { timeout: 10_000, maxBuffer: 256 * 1024 * 1024 }, (err, stdout) => (err ? reject(err) : resolve(stdout)));
   });
 }
@@ -142,14 +155,14 @@ function ps(args) {
  * real file; its first `n` line per process is the executable. A process lsof
  * cannot read keeps its name, and so stays protected.
  */
-export function applyExecutables(procs, lsofText) {
-  const real = new Map();
-  let pid = null;
+export function applyExecutables(procs: ProcessRecord[], lsofText: unknown): ProcessRecord[] {
+  const real = new Map<number, string>();
+  let pid: number | null = null;
   for (const line of String(lsofText ?? '').split('\n')) {
     if (line[0] === 'p') pid = Number(line.slice(1));
     else if (line[0] === 'n' && pid !== null && !real.has(pid) && line.slice(1).startsWith('/')) real.set(pid, line.slice(1));
   }
-  for (const p of procs) if (!p.exe?.startsWith('/') && real.has(p.pid)) p.exe = real.get(p.pid);
+  for (const p of procs) if (!p.exe?.startsWith('/') && real.has(p.pid)) p.exe = real.get(p.pid)!;
   return procs;
 }
 
@@ -157,7 +170,7 @@ export function applyExecutables(procs, lsofText) {
 const USER_HZ = 100;
 
 /** When this computer booted, which /proc/<pid>/stat counts a start time from. */
-function bootSeconds(root) {
+function bootSeconds(root: string): number {
   const stat = fs.readFileSync(path.join(root, 'stat'), 'utf8').match(/^btime (\d+)$/m);
   if (stat) return +stat[1];
   const up = Number(String(fs.readFileSync(path.join(root, 'uptime'), 'utf8')).split(/\s+/)[0]);
@@ -173,13 +186,13 @@ function bootSeconds(root) {
  * belonging to somebody else keeps an empty executable and no environment,
  * which is what leaves it protected.
  */
-export function readLinuxProcesses({ root = '/proc', hz = USER_HZ, btime = null } = {}) {
+export function readLinuxProcesses({ root = '/proc', hz = USER_HZ, btime = null }: { root?: string; hz?: number; btime?: number | null } = {}): ProcessRecord[] {
   const boot = btime ?? bootSeconds(root);
-  const out = [];
+  const out: ProcessRecord[] = [];
   for (const name of fs.readdirSync(root)) {
     if (!/^\d+$/.test(name)) continue;
     const dir = path.join(root, name);
-    let stat;
+    let stat: string;
     try { stat = fs.readFileSync(path.join(dir, 'stat'), 'utf8'); } catch { continue; }
     const close = stat.lastIndexOf(')');
     if (close < 0) continue;
@@ -187,9 +200,9 @@ export function readLinuxProcesses({ root = '/proc', hz = USER_HZ, btime = null 
     // The fields after the command, which is the only one that can hold spaces
     // and brackets: state, the parent, and on to the start time.
     const rest = stat.slice(close + 2).split(' ');
-    const read = (f) => { try { return fs.readFileSync(path.join(dir, f), 'utf8'); } catch { return null; } };
-    const words = (text) => String(text ?? '').split('\0').filter(Boolean);
-    const env = new Map(words(read('environ')).map((s) => {
+    const read = (f: string) => { try { return fs.readFileSync(path.join(dir, f), 'utf8'); } catch { return null; } };
+    const words = (text: unknown) => String(text ?? '').split('\0').filter(Boolean);
+    const env = new Map<string, string>(words(read('environ')).map((s): [string, string] => {
       const eq = s.indexOf('=');
       return eq < 0 ? [s, ''] : [s.slice(0, eq), s.slice(eq + 1)];
     }));
@@ -205,7 +218,7 @@ export function readLinuxProcesses({ root = '/proc', hz = USER_HZ, btime = null 
       start: boot + Math.floor(+rest[19] / hz),
       exe,
       cmd: (argv || `[${comm}]`).slice(0, 300),
-      item: /^w-[0-9a-f]+$/.test(item ?? '') ? item : null,
+      item: /^w-[0-9a-f]+$/.test(item ?? '') ? item! : null,
       product: env.get('ZERO_PRODUCT')?.split(/\s/)[0] || null,
       keep: env.get('AGENTBOX_KEEP') === '1',
     });
@@ -214,7 +227,7 @@ export function readLinuxProcesses({ root = '/proc', hz = USER_HZ, btime = null 
 }
 
 /** Every process, tagged with its task where it can be: `ps` on a Mac (about 100 ms), /proc on Linux. */
-export async function listProcesses(platform = process.platform) {
+export async function listProcesses(platform: string = process.platform): Promise<ProcessRecord[]> {
   if (platform !== 'darwin') return readLinuxProcesses();
   const [base, argv, full] = await Promise.all([
     ps(['-axo', 'pid=,ppid=,rss=,lstart=,comm=']),
@@ -224,7 +237,7 @@ export async function listProcesses(platform = process.platform) {
   const procs = parseListings({ base, argv, full });
   const renamed = procs.filter((p) => !p.exe.startsWith('/')).map((p) => p.pid);
   if (renamed.length) {
-    const out = await new Promise((resolve) => {
+    const out = await new Promise<string>((resolve) => {
       execFile('/usr/sbin/lsof', ['-a', '-p', renamed.join(','), '-d', 'txt', '-Fpn'], { timeout: 10_000, maxBuffer: 16 * 1024 * 1024 },
         (_err, stdout) => resolve(stdout ?? ''));
     });
@@ -233,8 +246,8 @@ export async function listProcesses(platform = process.platform) {
   return procs;
 }
 
-export async function readMacPressureWord() {
-  const out = await new Promise((resolve) => {
+export async function readMacPressureWord(): Promise<Pressure> {
+  const out = await new Promise<string>((resolve) => {
     execFile('/usr/sbin/sysctl', ['-n', 'kern.memorystatus_vm_pressure_level', 'kern.memorystatus_level'], { timeout: 5_000 },
       (err, stdout) => resolve(err ? '' : stdout));
   });
@@ -249,7 +262,7 @@ export async function readMacPressureWord() {
  * treating /sbin or /bin as protective protected every dev server an agent ever
  * left (found by Codex in review, 2026-10-05).
  */
-export function isAppPath(exe, home = os.homedir()) {
+export function isAppPath(exe: string | null | undefined, home: string = os.homedir()): boolean {
   if (!exe || !exe.startsWith('/')) return false;
   return /^\/Applications\/[^/]+\.app\//.test(exe)
     || /^\/System\//.test(exe)
@@ -257,21 +270,131 @@ export function isAppPath(exe, home = os.homedir()) {
 }
 
 /** An executable we could not read is kept, for itself only. */
-const unreadable = (exe) => !exe || !exe.startsWith('/');
+const unreadable = (exe: string | null | undefined) => !exe || !exe.startsWith('/');
 
 /** An agent itself, which is never stopped and keeps its task alive. */
-export function isAgentProcess(p) {
+export function isAgentProcess(p: { cmd?: string | null; exe?: string | null }): boolean {
   const first = String(p.cmd ?? '').split(/\s/)[0];
   return [p.exe, first].some((s) => /(^|\/)(claude|codex)$/.test(String(s ?? '')) || /\/claude\/versions\//.test(String(s ?? '')));
 }
 
-const idOf = (p) => `${p.pid}:${p.start}:${p.exe}`;
+const idOf = (p: ProcessRecord) => `${p.pid}:${p.start}:${p.exe}`;
 const FORMAT = 2;
 
+interface Resolved { item: string | null; inherits: boolean; guard?: boolean; agent?: boolean }
+
+type EndedRun = Extract<RunRecord, { state: 'ended' }>;
+
+interface SavedFile {
+  v?: unknown;
+  runs?: Record<string, RunRecord>;
+  protectedIds?: string[];
+  taskOf?: [string, string][];
+  stopping?: Record<string, StoppingRecord>;
+}
+
+export type RunRecord =
+  | { state: 'running'; since: number; worker: { pid: number; id: string | null } | null }
+  | { state: 'ended'; endedAt: number; why?: string };
+
+export interface StoppingRecord {
+  item: string;
+  pid: number;
+  cmd: string;
+  exe: string;
+  at: number;
+  seenAt?: number;
+}
+
+export interface LeftoverReport {
+  item: string;
+  product: string | null;
+  programs: number;
+  kept: number;
+  mb: number;
+  oldest: number;
+  stopsAt: number | null;
+}
+
+export interface StoppedSummary {
+  at: number;
+  programs: number;
+  tasks: number;
+  mb: number;
+  items: string[];
+}
+
+export interface CleanerStatus {
+  pressure: Pressure;
+  leftovers: LeftoverReport[];
+  survivors: StoppingRecord[];
+  stopped: StoppedSummary | null;
+}
+
+interface TaskView {
+  item: string;
+  product: string | null;
+  procs: ProcessRecord[];
+  guarded: ProcessRecord[];
+  agents: ProcessRecord[];
+}
+
+interface ProcessView {
+  procs: ProcessRecord[];
+  byPid: Map<number, ProcessRecord>;
+  tasks: Map<string, TaskView>;
+  seen: Set<string>;
+}
+
+interface DueProgram { item: string; id: string; pid: number }
+
+export interface LeftoverCleanerOptions {
+  list?: () => Promise<ProcessRecord[]> | ProcessRecord[];
+  kill?: (pid: number, sig: NodeJS.Signals) => unknown;
+  clock?: () => number;
+  readPressure?: () => Promise<Pressure> | Pressure;
+  file?: string | null;
+  enabledSince?: number;
+  live?: (item: string) => boolean;
+  owns?: (item: string, product: string | null) => boolean;
+  closedAt?: (item: string, product: string | null) => number | null;
+  closeGraceMs?: number;
+  tightIdleMs?: number;
+  confirmMs?: number;
+  settleMs?: number;
+  home?: string;
+  enabled?: boolean;
+  log?: (line: string) => void;
+}
+
 export class LeftoverCleaner {
+  declare list: NonNullable<LeftoverCleanerOptions['list']>;
+  declare kill: NonNullable<LeftoverCleanerOptions['kill']>;
+  declare clock: () => number;
+  declare readPressure: NonNullable<LeftoverCleanerOptions['readPressure']>;
+  declare file: string | null;
+  declare enabledSince: number;
+  declare live: (item: string) => boolean;
+  declare owns: (item: string, product: string | null) => boolean;
+  declare closedAt: (item: string, product: string | null) => number | null;
+  declare closeGraceMs: number;
+  declare tightIdleMs: number;
+  declare confirmMs: number;
+  declare settleMs: number;
+  declare home: string;
+  declare enabled: boolean;
+  declare log: (line: string) => void;
+  declare firstSeen: Map<string, number>;
+  declare withPrograms: Set<string>;
+  declare lastStatus: CleanerStatus;
+  declare runs: Record<string, RunRecord>;
+  declare protectedIds: Set<string>;
+  declare taskOf: Map<string, string>;
+  declare stopping: Record<string, StoppingRecord>;
+
   constructor({
     list = listProcesses,
-    kill = (pid, sig) => process.kill(pid, sig),
+    kill = (pid: number, sig: NodeJS.Signals) => process.kill(pid, sig),
     clock = Date.now,
     readPressure = readMacPressureWord,
     file = null,
@@ -289,7 +412,7 @@ export class LeftoverCleaner {
     // sees what turning it on would stop before they do).
     enabled = true,
     log = () => {},
-  } = {}) {
+  }: LeftoverCleanerOptions = {}) {
     Object.assign(this, { list, kill, clock, readPressure, file, enabledSince, live, owns, closedAt, closeGraceMs, tightIdleMs, confirmMs, settleMs, home, enabled, log });
     this.firstSeen = new Map();
     this.withPrograms = new Set();
@@ -309,7 +432,7 @@ export class LeftoverCleaner {
    * sentence for the agent when programs of this task are still shutting down,
    * or null.
    */
-  starting(item) {
+  starting(item: string | null | undefined): string | null {
     if (!item) return null;
     this.runs[item] = { state: 'running', since: this.clock(), worker: null };
     this._save();
@@ -317,14 +440,14 @@ export class LeftoverCleaner {
   }
 
   /** The sentence for an agent about this task's programs still shutting down, or null. */
-  stoppingNote(item) {
+  stoppingNote(item: string): string | null {
     const left = Object.values(this.stopping).filter((s) => s.item === item);
     if (!left.length) return null;
     return `Programs from an earlier run of this task were asked to stop and may still be shutting down: ${left.map((s) => `pid ${s.pid} (${s.cmd || s.exe})`).join(', ')}. Do not reuse them; start what you need afresh.`;
   }
 
   /** The worker process of the run just started, so a crash can be told from a run. */
-  worker(item, pid) {
+  worker(item: string, pid: number) {
     const run = this.runs[item];
     if (!run || run.state !== 'running') return;
     run.worker = { pid, id: null };
@@ -332,21 +455,21 @@ export class LeftoverCleaner {
   }
 
   /** The run on `item` ended in this app. */
-  ended(item) {
+  ended(item: string | null | undefined) {
     if (!item) return;
     this.runs[item] = { state: 'ended', endedAt: this.clock() };
     this._save();
   }
 
-  status() { return this.lastStatus; }
+  status(): CleanerStatus { return this.lastStatus; }
 
   /** Whether the last look found programs of this task's that could be stopped. */
-  hasPrograms(item) { return this.withPrograms.has(item); }
+  hasPrograms(item: string): boolean { return this.withPrograms.has(item); }
 
   /** Stop signalling from this moment, even in a look already under way. */
   disable() { this.enabled = false; }
 
-  enable(since = this.clock()) {
+  enable(since: number = this.clock()) {
     this.enabled = true;
     this.enabledSince = since;
   }
@@ -356,7 +479,7 @@ export class LeftoverCleaner {
    * this task were asked to stop under `settleMs` ago and may still be on their
    * way out. 0 when there is nothing to wait for.
    */
-  holdMs(item) {
+  holdMs(item: string): number {
     const now = this.clock();
     let wait = 0;
     for (const s of Object.values(this.stopping)) {
@@ -367,13 +490,13 @@ export class LeftoverCleaner {
 
   /* ---------------------------------- a look ---------------------------------- */
 
-  async tick() {
+  async tick(): Promise<CleanerStatus> {
     const now = this.clock();
-    let pressure = 'normal';
+    let pressure: Pressure = 'normal';
     try { pressure = await this.readPressure(); } catch {}
-    let procs;
+    let procs: ProcessRecord[];
     try { procs = await this.list(); } catch (err) {
-      this.log(`leftovers: could not list processes: ${err.message}`);
+      this.log(`leftovers: could not list processes: ${(err as Error).message}`);
       return this.lastStatus;
     }
     const view = this._view(procs, now);
@@ -381,7 +504,7 @@ export class LeftoverCleaner {
     this._reconcileRuns(view, now);
     this._trackStopping(view, now);
     const due = this._due(view, now, pressure);
-    let stopped = null;
+    let stopped: StoppedSummary | null = null;
     if (due.length) stopped = await this._stop(due, pressure);
     this.lastStatus = {
       pressure,
@@ -397,12 +520,12 @@ export class LeftoverCleaner {
    * Processes by task, with protection worked out. Remembers when each
    * identity was first seen, and every identity found protected.
    */
-  _view(procs, now) {
+  _view(procs: ProcessRecord[], now: number): ProcessView {
     const byPid = new Map(procs.map((p) => [p.pid, p]));
-    const memo = new Map();
-    const none = { item: null, inherits: false };
-    const resolve = (p, depth = 0) => {
-      if (memo.has(p.pid)) return memo.get(p.pid);
+    const memo = new Map<number, Resolved>();
+    const none: Resolved = { item: null, inherits: false };
+    const resolve = (p: ProcessRecord, depth = 0): Resolved => {
+      if (memo.has(p.pid)) return memo.get(p.pid)!;
       memo.set(p.pid, none);
       const parent = depth < 64 ? byPid.get(p.ppid) : null;
       const up = parent && parent.pid !== p.pid ? resolve(parent, depth + 1) : none;
@@ -417,12 +540,12 @@ export class LeftoverCleaner {
       // (Codex's reviews, 2026-10-05).
       const inherits = !!(p.keep || isAppPath(p.exe, this.home) || this.protectedIds.has(idOf(p))
         || (item && unreadable(p.exe)) || (up.item && up.inherits));
-      const r = { item, inherits, guard: inherits || unreadable(p.exe), agent: isAgentProcess(p) };
+      const r: Resolved = { item, inherits, guard: inherits || unreadable(p.exe), agent: isAgentProcess(p) };
       memo.set(p.pid, r);
       return r;
     };
-    const seen = new Set();
-    const tasks = new Map();
+    const seen = new Set<string>();
+    const tasks = new Map<string, TaskView>();
     for (const p of procs) {
       const id = idOf(p);
       seen.add(id);
@@ -432,7 +555,7 @@ export class LeftoverCleaner {
       if (r.inherits) this.protectedIds.add(id);
       this.taskOf.set(id, r.item);
       if (!tasks.has(r.item)) tasks.set(r.item, { item: r.item, product: null, procs: [], guarded: [], agents: [] });
-      const t = tasks.get(r.item);
+      const t = tasks.get(r.item)!;
       if (p.product && !t.product) t.product = p.product;
       // An agent is never a leftover: it is the run itself, alive.
       if (r.agent) t.agents.push(p);
@@ -446,7 +569,7 @@ export class LeftoverCleaner {
   }
 
   /** Crashes and unknown tasks, turned into records the rules can use. */
-  _reconcileRuns(view, now) {
+  _reconcileRuns(view: ProcessView, now: number) {
     for (const [item, run] of Object.entries(this.runs)) {
       if (run.state !== 'running' || !run.worker) continue;
       const p = view.byPid.get(run.worker.pid);
@@ -466,11 +589,11 @@ export class LeftoverCleaner {
   }
 
   /** A task with a session in this app, or any agent process carrying its id. */
-  _alive(t) {
+  _alive(t: TaskView): boolean {
     return this.live(t.item) || t.agents.length > 0;
   }
 
-  _trackStopping(view, now) {
+  _trackStopping(view: ProcessView, now: number) {
     for (const [id, s] of Object.entries(this.stopping)) {
       if (!view.seen.has(id)) delete this.stopping[id];
       else s.seenAt = now;
@@ -478,14 +601,14 @@ export class LeftoverCleaner {
   }
 
   /** When this task's programs stop, or null while nothing says they should. */
-  _stopsAt(item, product, pressure) {
+  _stopsAt(item: string, product: string | null, pressure: Pressure): number | null {
     const run = this.runs[item];
     if (!run || run.state !== 'ended') return null;
     const from = Math.max(run.endedAt, this.enabledSince);
-    let closed = null;
+    let closed: number | null = null;
     try { closed = this.closedAt(item, product); } catch { closed = null; }
-    const times = [];
-    if (Number.isFinite(closed)) times.push(Math.max(from, closed) + this.closeGraceMs);
+    const times: number[] = [];
+    if (Number.isFinite(closed)) times.push(Math.max(from, closed!) + this.closeGraceMs);
     if (pressure !== 'normal') times.push(from + this.tightIdleMs);
     return times.length ? Math.min(...times) : null;
   }
@@ -495,10 +618,10 @@ export class LeftoverCleaner {
    * closed task's, and while memory is short, one more task's, the one whose
    * run ended longest ago.
    */
-  _due(view, now, pressure) {
-    const due = [];
+  _due(view: ProcessView, now: number, pressure: Pressure): DueProgram[] {
+    const due: DueProgram[] = [];
     if (!this.enabled) return due;
-    let short = null;
+    let short: { ended: number; ready: DueProgram[] } | null = null;
     for (const t of view.tasks.values()) {
       if (this._alive(t)) continue;
       const closed = this._stopsAt(t.item, t.product, 'normal');
@@ -506,15 +629,15 @@ export class LeftoverCleaner {
       const at = pressure === 'normal' ? null : this._stopsAt(t.item, t.product, pressure);
       if (at === null || now < at) continue;
       const ready = this._ready(t, now);
-      const ended = this.runs[t.item].endedAt;
+      const ended = (this.runs[t.item] as EndedRun).endedAt;
       if (ready.length && (!short || ended < short.ended)) short = { ended, ready };
     }
     if (short) due.push(...short.ready);
     return due;
   }
 
-  _ready(t, now) {
-    const out = [];
+  _ready(t: TaskView, now: number): DueProgram[] {
+    const out: DueProgram[] = [];
     for (const p of t.procs) {
       const id = idOf(p);
       if (this.stopping[id]) continue;
@@ -525,15 +648,15 @@ export class LeftoverCleaner {
   }
 
   /** One fresh look, every rule again, then SIGTERM to what still passes. */
-  async _stop(due, pressure) {
-    let procs;
+  async _stop(due: DueProgram[], pressure: Pressure): Promise<StoppedSummary | null> {
+    let procs: ProcessRecord[];
     try { procs = await this.list(); } catch { return null; }
     const now = this.clock();
     const view = this._view(procs, now);
     const byId = new Map(procs.map((p) => [idOf(p), p]));
     let programs = 0;
     let mb = 0;
-    const items = new Set();
+    const items = new Set<string>();
     for (const d of due) {
       const p = byId.get(d.id);
       if (!p) continue;
@@ -555,8 +678,8 @@ export class LeftoverCleaner {
     return { at: now, programs, tasks: items.size, mb, items: [...items] };
   }
 
-  _report(view, now, pressure) {
-    const out = [];
+  _report(view: ProcessView, now: number, pressure: Pressure): LeftoverReport[] {
+    const out: LeftoverReport[] = [];
     for (const t of view.tasks.values()) {
       if (this._alive(t)) continue;
       const run = this.runs[t.item];
@@ -568,7 +691,7 @@ export class LeftoverCleaner {
         programs: t.procs.length,
         kept: t.guarded.length,
         mb: all.reduce((n, p) => n + (p.mb ?? 0), 0),
-        oldest: Math.min(...all.map((p) => p.start * 1000)),
+        oldest: Math.min(...all.map((p) => p.start! * 1000)),
         stopsAt: t.procs.length ? this._stopsAt(t.item, t.product, pressure) : null,
       });
     }
@@ -577,11 +700,11 @@ export class LeftoverCleaner {
 
   /* --------------------------------- on disk --------------------------------- */
 
-  _load() {
+  _load(): { runs: Record<string, RunRecord>; protectedIds: string[]; taskOf: [string, string][]; stopping: Record<string, StoppingRecord> } {
     const empty = { runs: {}, protectedIds: [], taskOf: [], stopping: {} };
     if (!this.file) return empty;
     try {
-      const raw = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+      const raw = JSON.parse(fs.readFileSync(this.file, 'utf8')) as SavedFile | null;
       // Protection and attribution saved by an earlier format were worked out
       // by rules since found wrong (protection spread from launchd and shells),
       // so they are thrown away rather than trusted; run records stay.
@@ -605,6 +728,6 @@ export class LeftoverCleaner {
       const tmp = `${this.file}.${process.pid}.tmp`;
       fs.writeFileSync(tmp, JSON.stringify({ v: FORMAT, runs: this.runs, protectedIds: [...this.protectedIds], taskOf: [...this.taskOf], stopping: this.stopping }));
       fs.renameSync(tmp, this.file);
-    } catch (err) { this.log(`leftovers: could not save: ${err.message}`); }
+    } catch (err) { this.log(`leftovers: could not save: ${(err as Error).message}`); }
   }
 }

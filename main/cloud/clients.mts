@@ -3,7 +3,18 @@
 // so a Mac that never uses the cloud never loads AWS.
 import { readCloudKey, forgetCloudKey } from './config.mjs';
 
-export async function cloudClients(config, { env = process.env, home } = {}) {
+export interface CloudConfig {
+  gateway?: string;
+  region?: string;
+  runtimeArn?: string;
+  bucket?: string;
+  profile?: string;
+  endpoint?: string;
+  credentials?: unknown;
+  timeoutMs?: number;
+}
+
+export async function cloudClients(config: CloudConfig | null | undefined, { env = process.env, home }: { env?: NodeJS.ProcessEnv; home?: string } = {}) {
   if (typeof config?.gateway === 'string') {
     const key = readCloudKey(env, home);
     if (!key) throw new Error('this Mac has no cloud key yet; sign in for the cloud');
@@ -11,5 +22,5 @@ export async function cloudClients(config, { env = process.env, home } = {}) {
     return managedClients({ url: config.gateway, key, onSignedOut: () => forgetCloudKey(key, env, home) });
   }
   const { awsTransport, awsStorage } = await import('./aws.mjs');
-  return { transport: awsTransport(config), storage: awsStorage(config) };
+  return { transport: awsTransport(config as Parameters<typeof awsTransport>[0]), storage: awsStorage(config as Parameters<typeof awsStorage>[0]) };
 }

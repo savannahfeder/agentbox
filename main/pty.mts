@@ -21,7 +21,7 @@ export function loadPty(get = load) {
   } catch (err) {
     // Only a missing package is a missing compiler. A binary that will not load
     // is a different problem and keeps its own words.
-    if (err?.code === 'MODULE_NOT_FOUND') throw Error(NO_TERMINAL);
+    if ((err as NodeJS.ErrnoException)?.code === 'MODULE_NOT_FOUND') throw Error(NO_TERMINAL);
     throw err;
   }
 }

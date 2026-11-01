@@ -1,16 +1,30 @@
 import { spawn } from 'node:child_process';
+import type { ChildProcessByStdio } from 'node:child_process';
+import type { Readable, Writable } from 'node:stream';
 import { attachClaudeInput } from './claude-input.mts';
+import type { ClaudeInput } from './claude-input.mts';
+
+export interface UsageRunOptions {
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  timeout: number;
+  maxBuffer: number;
+  encoding?: string;
+}
+
+export type UsageDone = (error: Error | null, report?: string) => void;
+export type UsageRunner = (bin: string, args: string[], opts: UsageRunOptions, done: UsageDone) => unknown;
 
 // No user message is submitted. The CLI owns authentication and the provider request.
-export function runClaudeUsage(bin, args, opts, done) {
-  let child, timer, killTimer, finished = false, bytes = 0;
-  const finish = (error, report = '') => {
+export function runClaudeUsage(bin: string, args: string[], opts: UsageRunOptions, done: UsageDone) {
+  let child: (ChildProcessByStdio<Writable, Readable, null> & ClaudeInput) | undefined, timer: NodeJS.Timeout | undefined, killTimer: NodeJS.Timeout | undefined, finished = false, bytes = 0;
+  const finish = (error: Error | null, report = '') => {
     if (finished) return;
     finished = true;
     clearTimeout(timer);
     if (child?.exitCode == null && child?.pid) {
       child.kill('SIGTERM');
-      killTimer = setTimeout(() => child.kill('SIGKILL'), 1000);
+      killTimer = setTimeout(() => child!.kill('SIGKILL'), 1000);
       killTimer.unref();
     }
     done(error, report);
@@ -33,8 +47,8 @@ export function runClaudeUsage(bin, args, opts, done) {
         await child.control({ subtype: 'initialize' }, opts.timeout);
         const report = await child.control({ subtype: 'get_usage', skip_behaviors: true }, opts.timeout);
         finish(null, JSON.stringify(report));
-      } catch (error) { finish(error); }
+      } catch (error) { finish(error as Error); }
     })();
-  } catch (error) { finish(error); }
+  } catch (error) { finish(error as Error); }
   return child;
 }

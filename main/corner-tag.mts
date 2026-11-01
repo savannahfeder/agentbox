@@ -37,6 +37,10 @@
 // is, so it hands over what is ready and how many are working on
 // `zero:corner-tag`; shared/corner-tag.mjs puts it newest first.
 
+import type { BrowserWindow, IpcMain, Menu, PowerMonitor, Screen } from 'electron';
+import type { GlassOptions, LiquidGlass } from './liquid-glass.mts';
+
+import type { Grip } from '../shared/corner-tag.mjs';
 import { cardPlacement, cornerPlace, EDGE_SLACK, MARGIN, hiddenUntil, keepCorner, newSince, notDismissed, readyNow, restingSpot, spotFor, tagScaleOn, tagShows, tagZoom, toneFromLuma, zoomStep, GRIPS, HIDE_CHOICES } from '../shared/corner-tag.mjs';
 
 // How long the pointer may be off both the tag and its list before the list
@@ -62,7 +66,55 @@ export const TONE_EVERY_MS = 500;
 // the longest that can now last.
 export const MEASURE_EVERY_MS = 2000;
 
-const HIDE_LABELS = { '5m': 'Hide for 5 minutes', '30m': 'Hide for 30 minutes', today: 'Hide for the rest of today' };
+type Part = 'tag' | 'card';
+type Point = { x: number; y: number };
+type Size = { width: number; height: number };
+type Rect = Point & Size;
+type Timer = ReturnType<typeof setTimeout>;
+
+export interface ReadyThread {
+  id: string;
+  since?: number;
+  [key: string]: unknown;
+}
+
+export interface CornerTagPlace {
+  corner: Grip;
+  dx: number;
+  dy: number;
+}
+
+export interface CornerTagConfig {
+  cornerTag?: boolean;
+  cornerTagLookedAt?: number;
+  cornerTagDismissed?: Record<string, number>;
+  cornerTagHiddenUntil?: number;
+  cornerTagPlace?: CornerTagPlace | null;
+  cornerTagSpot?: Point | null;
+  cornerTagZoom?: number;
+}
+
+export interface CornerTagDeps {
+  BrowserWindow: typeof BrowserWindow;
+  screen: Screen;
+  ipcMain: IpcMain;
+  Menu: typeof Menu;
+  powerMonitor?: PowerMonitor | null;
+  config: CornerTagConfig;
+  saveConfig: (config: CornerTagConfig, patch: Partial<CornerTagConfig>) => unknown;
+  mainWindow?: BrowserWindow | null;
+  load: (win: BrowserWindow, part: Part) => unknown;
+  preload: string;
+  count?: (name: string, props?: Record<string, unknown>) => void;
+  now?: () => number;
+  setTimer?: typeof setTimeout;
+  clearTimer?: typeof clearTimeout;
+  mac?: boolean;
+  glass?: LiquidGlass | null;
+  told?: () => { id: string; at: number }[];
+}
+
+const HIDE_LABELS: Record<string, string> = { '5m': 'Hide for 5 minutes', '30m': 'Hide for 30 minutes', today: 'Hide for the rest of today' };
 const CHANNELS = [
   'zero:corner-tag', 'corner-tag:ready', 'corner-tag:size', 'corner-tag:hover', 'corner-tag:toggle',
   'corner-tag:press', 'corner-tag:release', 'corner-tag:go', 'corner-tag:hide', 'corner-tag:settings', 'corner-tag:menu',
@@ -78,25 +130,25 @@ export function createCornerTag({
   // What a notification has told you about since you were last at the app,
   // [{ id, at }] (main/notify.mts). All of it counts as new.
   told = () => [],
-}) {
-  const wins = { tag: null, card: null };
+}: CornerTagDeps) {
+  const wins: Record<Part, BrowserWindow | null> = { tag: null, card: null };
   const loaded = { tag: false, card: false };
   const hovered = { tag: false, card: false };
-  let ready = [];
+  let ready: ReadyThread[] = [];
   let working = 0;
   // The tag's rectangle on screen; its window is exactly this.
-  let tag = null;
-  let tagSize = { width: 96, height: 26 };
+  let tag: Rect | null = null;
+  let tagSize: Size = { width: 96, height: 26 };
   let measured = false;
-  let cardSize = null;
+  let cardSize: Size | null = null;
   let open = false;
   // A press on the tag: where the cursor and the tag were when it went down,
   // and whether it has moved far enough to be a drag.
-  let press = null;
-  let wake = null;
-  let closing = null;
-  let watching = null;
-  let opening = null;
+  let press: { start: Point; from: Point; moved: boolean; at: number; timer: Timer | null } | null = null;
+  let wake: Timer | null = null;
+  let closing: Timer | null = null;
+  let watching: Timer | null = null;
+  let opening: Timer | null = null;
   // After a drag the pointer is still on the tag; the list waits for it to
   // leave and come back rather than opening under it.
   let settling = false;
@@ -106,15 +158,15 @@ export function createCornerTag({
   let lookedAt = Number(config.cornerTagLookedAt) || 0;
   // Anything handed over without the moment it started waiting is dated from
   // when this file first saw it, rather than counted new forever.
-  const firstSeen = new Map();
+  const firstSeen = new Map<string, number>();
   // Threads crossed off the tray, and when (shared/corner-tag.mjs,
   // notDismissed). Kept across a restart, forgotten once a thread leaves the list.
-  let dismissed = { ...(config.cornerTagDismissed ?? {}) };
+  let dismissed: Record<string, number> = { ...(config.cornerTagDismissed ?? {}) };
   const toldNow = () => { try { return told() ?? []; } catch { return []; } };
 
   const fresh = () => readyNow(notDismissed(newSince(ready, lookedAt, toldNow()), dismissed), now());
   const areas = () => screen.getAllDisplays().map((d) => d.workArea);
-  const areaOf = (r) => screen.getDisplayMatching({ x: Math.round(r.x), y: Math.round(r.y), width: Math.max(1, Math.round(r.width)), height: Math.max(1, Math.round(r.height)) }).workArea;
+  const areaOf = (r: Rect) => screen.getDisplayMatching({ x: Math.round(r.x), y: Math.round(r.y), width: Math.max(1, Math.round(r.width)), height: Math.max(1, Math.round(r.height)) }).workArea;
   // THE CLEAR BAND. The tag's window is the glass plus a few points of nothing
   // on every side. Everything that places the window therefore works against
   // a screen grown by that band, which puts the GLASS where the gap from the
@@ -122,10 +174,10 @@ export function createCornerTag({
   // the window. A click in the band is not the tag's: the page says so and the
   // window lets it through (corner-tag:clickable).
   let frame = 0;
-  const framed = (a) => (frame ? { x: a.x - frame, y: a.y - frame, width: a.width + 2 * frame, height: a.height + 2 * frame } : a);
+  const framed = (a: Rect) => (frame ? { x: a.x - frame, y: a.y - frame, width: a.width + 2 * frame, height: a.height + 2 * frame } : a);
   // Where she may park it: the screen, plus the band, plus the slack that lets
   // her tuck it past the edge (shared/corner-tag.mjs, EDGE_SLACK).
-  const parkable = (a) => {
+  const parkable = (a: Rect) => {
     const f = framed(a);
     return { x: f.x - EDGE_SLACK, y: f.y - EDGE_SLACK, width: f.width + 2 * EDGE_SLACK, height: f.height + 2 * EDGE_SLACK };
   };
@@ -135,22 +187,22 @@ export function createCornerTag({
   // with a window edge that was no longer the glass's: "it is a little too far
   // to the right... it's just the right sides that seem to be improperly
   // aligned" (2026-10-13).
-  let inset = null;
-  const glassOf = (r) => {
+  let inset: Rect | null = null;
+  const glassOf = (r: Rect) => {
     if (inset) return { x: r.x + inset.x, y: r.y + inset.y, width: inset.width, height: inset.height };
     return frame ? { x: r.x + frame, y: r.y + frame, width: r.width - 2 * frame, height: r.height - 2 * frame } : r;
   };
   const inApp = () => {
     try { return !!mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused(); } catch { return false; }
   };
-  const alive = (part) => !!wins[part] && !wins[part].isDestroyed();
-  const rounded = (r) => ({ x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) });
-  const send = (part, channel, payload) => { if (alive(part) && loaded[part]) wins[part].webContents.send(channel, payload); };
+  const alive = (part: Part) => !!wins[part] && !wins[part]!.isDestroyed();
+  const rounded = (r: Rect) => ({ x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) });
+  const send = (part: Part, channel: string, payload?: unknown) => { if (alive(part) && loaded[part]) wins[part]!.webContents.send(channel, payload); };
   // Back to 100%, then measure: a zoomed page drew the tag smaller than the
   // size it reported, and the glass stood out past it (w-93b3a1a796). Its own
   // zoom only; the app's window keeps whatever zoom it has.
-  const atFull = (part) => { try { if (alive(part)) wins[part].webContents.setZoomFactor?.(1); } catch { /* measured in points anyway */ } };
-  const remeasure = (part) => { atFull(part); send(part, 'corner-tag:measure'); };
+  const atFull = (part: Part) => { try { if (alive(part)) wins[part]!.webContents.setZoomFactor?.(1); } catch { /* measured in points anyway */ } };
+  const remeasure = (part: Part) => { atFull(part); send(part, 'corner-tag:measure'); };
   // How big the tag draws, from the width of the screen it is resting on. The
   // page multiplies everything by it, reports the size it came out, and this
   // file places that. A tag dragged to another screen is measured again there.
@@ -170,14 +222,14 @@ export function createCornerTag({
   });
   // The list may only appear beside a tag that is on screen and should be.
   // A click that was on its way while the tag hid must not open it alone.
-  const tagUp = () => !gone && alive('tag') && wins.tag.isVisible() && shouldShow();
+  const tagUp = () => !gone && alive('tag') && wins.tag!.isVisible() && shouldShow();
 
   // WHICH SCREEN IT BELONGS TO, AND WHERE ON IT. The corner it was parked in
   // and the gap from that corner are what is remembered (shared/corner-tag.mjs,
   // cornerPlace), because a point on the whole desktop stops meaning anything
   // the moment a monitor is plugged in or taken away: every screen's
   // coordinates move underneath it and the tag jumps.
-  let place = config.cornerTagPlace ?? null;
+  let place: CornerTagPlace | null = config.cornerTagPlace ?? null;
   const screenFor = () => {
     const known = tag ?? (config.cornerTagSpot ? { ...config.cornerTagSpot, ...tagSize } : null);
     return known ? areaOf(known) : areas()[0];
@@ -190,44 +242,44 @@ export function createCornerTag({
     const soFar = tag ? { x: tag.x, y: tag.y } : config.cornerTagSpot ?? null;
     const spot = held ?? restingSpot(soFar, tagSize, areas().map(soFar ? parkable : framed));
     tag = { ...spot, ...tagSize };
-    if (alive('tag')) wins.tag.setBounds(rounded(tag));
+    if (alive('tag')) wins.tag!.setBounds(rounded(tag!));
   };
 
   const placeCard = () => {
     if (!tag || !cardSize || !alive('card')) return;
-    wins.card.setBounds(rounded(cardPlacement(glassOf(tag), cardSize, areaOf(tag)).card));
+    wins.card!.setBounds(rounded(cardPlacement(glassOf(tag), cardSize, areaOf(tag)).card));
   };
 
   /* ------------------------- the Mac's own glass ------------------------- */
   // Where each page draws its glass, and how round, as it last said. The Mac's
   // glass is put exactly there, and the page draws no fill of its own.
-  const shape = { tag: null, card: null };
+  const shape: Record<Part, { rect: Rect; radius: number } | null> = { tag: null, card: null };
   // Light or dark, from how bright the screen behind the tag is. The glass's
   // own light-or-dark follows the Mac's setting rather than the screen
   // (tests/the-tray-goes-light-or-dark-from-how-bright-the-screen-behind-it-is),
   // so it is only the fallback, and only a brightness reading holds the tag:
   // a tone read from the tag's appearance would read back its own hold.
-  let tone = null;
+  let tone: 'light' | 'dark' | null = null;
   let toneFromScreen = false;
-  const toneSent = { tag: null, card: null };
-  let toneTimer = null;
+  const toneSent: Record<Part, string | null> = { tag: null, card: null };
+  let toneTimer: Timer | null = null;
   const shareTone = () => {
-    for (const part of ['tag', 'card']) {
+    for (const part of ['tag', 'card'] as const) {
       if (!tone || !alive(part) || !loaded[part] || toneSent[part] === tone) continue;
       toneSent[part] = tone;
       send(part, 'corner-tag:tone', tone);
     }
   };
   const readTone = () => {
-    if (!glass || !shape.tag || !alive('tag') || !wins.tag.isVisible()) return;
-    let read = null;
+    if (!glass || !shape.tag || !alive('tag') || !wins.tag!.isVisible()) return;
+    let read: unknown = null;
     let fromLuma = false;
     try {
-      read = toneFromLuma(glass.luma?.(wins.tag), tone);
+      read = toneFromLuma(glass.luma?.(wins.tag!), tone);
       fromLuma = read !== null;
       // Once measured, the tag is held, and its appearance says only that.
       if (!fromLuma && toneFromScreen) return;
-      read ??= glass.tone(wins.tag);
+      read ??= glass.tone(wins.tag!);
     } catch { /* no reading, keep the last */ }
     if ((read !== 'light' && read !== 'dark') || (read === tone && fromLuma === toneFromScreen)) return;
     tone = read;
@@ -242,7 +294,7 @@ export function createCornerTag({
     let measuredAt = now();
     const tick = () => {
       toneTimer = null;
-      if (gone || !alive('tag') || !wins.tag.isVisible()) return;
+      if (gone || !alive('tag') || !wins.tag!.isVisible()) return;
       readTone();
       if (now() - measuredAt >= MEASURE_EVERY_MS) {
         measuredAt = now();
@@ -252,18 +304,18 @@ export function createCornerTag({
     };
     toneTimer = setTimer(tick, TONE_EVERY_MS);
   };
-  const dress = (part) => {
+  const dress = (part: Part) => {
     if (!glass || !shape[part] || !alive(part)) return;
     // The tag is clear glass, so a light page shows through it the way a dark
     // one does; the regular glass frosts over light pages. The list keeps the
     // regular glass, because it is read.
-    const opts = part === 'tag' ? { radius: shape.tag.radius, style: 'clear', ...(toneFromScreen ? { tone } : {}) }
-      : tone ? { radius: shape.card.radius, tone } : { radius: shape.card.radius };
-    try { glass.set(wins[part], shape[part].rect, opts); } catch { return; }
+    const opts = part === 'tag' ? { radius: shape.tag!.radius, style: 'clear', ...(toneFromScreen ? { tone } as GlassOptions : {}) }
+      : tone ? { radius: shape.card!.radius, tone } : { radius: shape.card!.radius };
+    try { glass.set(wins[part]!, shape[part]!.rect, opts); } catch { return; }
     if (part === 'tag') { readTone(); watchTones(); }
   };
 
-  const make = (part) => {
+  const make = (part: Part) => {
     const win = new BrowserWindow({
       show: false,
       frame: false,
@@ -318,15 +370,15 @@ export function createCornerTag({
     cancelClose();
     open = false;
     hovered.card = false;
-    if (alive('card') && wins.card.isVisible()) wins.card.hide();
+    if (alive('card') && wins.card!.isVisible()) wins.card!.hide();
     send('tag', 'corner-tag:open', false);
     // The list goes back to its threads, so it never reopens on the corners.
     send('card', 'corner-tag:open', false);
   }
 
   const showCard = () => {
-    if (open && tagUp() && loaded.card && cardSize && alive('card') && !wins.card.isVisible()) {
-      wins.card.showInactive();
+    if (open && tagUp() && loaded.card && cardSize && alive('card') && !wins.card!.isVisible()) {
+      wins.card!.showInactive();
       remeasure('card');
       readTone();
     }
@@ -348,12 +400,12 @@ export function createCornerTag({
   // The page says when the pointer comes and goes, and that is trusted, but a
   // boundary event can go missing, so while the list is open the real cursor
   // is read a few times a second and wins. Nothing is read otherwise.
-  const within = (pt, r) => !!r && pt.x >= r.x && pt.x < r.x + r.width && pt.y >= r.y && pt.y < r.y + r.height;
-  const drawn = (part) => (alive(part) && wins[part].isVisible() ? wins[part].getBounds() : null);
+  const within = (pt: Point, r: Rect | null) => !!r && pt.x >= r.x && pt.x < r.x + r.width && pt.y >= r.y && pt.y < r.y + r.height;
+  const drawn = (part: Part) => (alive(part) && wins[part]!.isVisible() ? wins[part]!.getBounds() : null);
   const readCursor = () => {
     const pt = screen.getCursorScreenPoint?.();
     if (!pt || press) return false;
-    for (const part of ['tag', 'card']) hovered[part] = within(pt, drawn(part));
+    for (const part of ['tag', 'card'] as const) hovered[part] = within(pt, drawn(part));
     return true;
   };
 
@@ -411,8 +463,8 @@ export function createCornerTag({
       send('tag', 'corner-tag:dragging', true);
     }
     if (press.moved && alive('tag')) {
-      tag = { ...tag, x: press.from.x + dx, y: press.from.y + dy };
-      wins.tag.setPosition(Math.round(tag.x), Math.round(tag.y));
+      tag = { ...tag!, x: press.from.x + dx, y: press.from.y + dy };
+      wins.tag!.setPosition(Math.round(tag.x), Math.round(tag.y));
     }
   };
 
@@ -426,7 +478,7 @@ export function createCornerTag({
 
   // The button came up (or the press was taken away). A drag lands where the
   // cursor left it and is remembered; a press that never moved is a click.
-  function endPress(cancelled) {
+  function endPress(cancelled: boolean) {
     if (!press) return;
     if (press.timer) clearTimer(press.timer);
     press.timer = null;
@@ -434,12 +486,12 @@ export function createCornerTag({
     if (!cancelled) follow();
     press = null;
     if (p.moved) {
-      tag = { ...restingSpot({ x: tag.x, y: tag.y }, tagSize, areas().map(parkable)), ...tagSize };
-      if (alive('tag')) wins.tag.setBounds(rounded(tag));
+      tag = { ...restingSpot({ x: tag!.x, y: tag!.y }, tagSize, areas().map(parkable)), ...tagSize };
+      if (alive('tag')) wins.tag!.setBounds(rounded(tag!));
       // Where she left it, said as a corner and a gap so it means the same
       // thing on whatever screen it is on next.
-      place = cornerPlace(tag, framed(areaOf(tag)));
-      saveConfig(config, { cornerTagSpot: { x: Math.round(tag.x), y: Math.round(tag.y) }, cornerTagPlace: place });
+      place = cornerPlace(tag!, framed(areaOf(tag!)));
+      saveConfig(config, { cornerTagSpot: { x: Math.round(tag!.x), y: Math.round(tag!.y) }, cornerTagPlace: place });
       send('tag', 'corner-tag:dragging', false);
       // Dragged onto another screen, it draws at that screen's size.
       sendState();
@@ -458,7 +510,7 @@ export function createCornerTag({
     closeCard();
     hovered.tag = false;
     send('tag', 'corner-tag:reset', null);
-    if (alive('tag') && tag) wins.tag.setBounds(rounded(tag));
+    if (alive('tag') && tag) wins.tag!.setBounds(rounded(tag));
   };
 
   function refresh() {
@@ -469,14 +521,14 @@ export function createCornerTag({
     if (until > now()) wake = setTimer(refresh, until - now() + 50);
     if (!shouldShow()) {
       stopTones();
-      if (alive('tag') && wins.tag.isVisible()) { wins.tag.hide(); reset(); }
+      if (alive('tag') && wins.tag!.isVisible()) { wins.tag!.hide(); reset(); }
       else if (open) closeCard();
       return;
     }
     if (!alive('tag')) { make('tag'); return; }
     sendState();
-    if (loaded.tag && !wins.tag.isVisible()) {
-      wins.tag.showInactive();
+    if (loaded.tag && !wins.tag!.isVisible()) {
+      wins.tag!.showInactive();
       // A page that redrew while hidden may never have said its new size, and
       // the glass only moves when it does.
       remeasure('tag');
@@ -495,13 +547,13 @@ export function createCornerTag({
 
   // Into the app: on a thread when a line of the list was picked, or just the
   // app as it is when it was the tag.
-  function goTo(id) {
+  function goTo(id: unknown) {
     closeCard();
     if (!bringAppForward()) return;
-    if (typeof id === 'string' && id) mainWindow.webContents.send('zero:open-item', { id });
+    if (typeof id === 'string' && id) mainWindow!.webContents.send('zero:open-item', { id });
   }
 
-  const hide = (choice) => {
+  const hide = (choice: unknown) => {
     const until = hiddenUntil(choice, now());
     if (!until) return;
     saveConfig(config, { cornerTagHiddenUntil: until });
@@ -511,13 +563,13 @@ export function createCornerTag({
 
   const openSettings = () => {
     closeCard();
-    if (bringAppForward()) mainWindow.webContents.send('zero:open-settings', { pane: 'general' });
+    if (bringAppForward()) mainWindow!.webContents.send('zero:open-settings', { pane: 'general' });
   };
 
-  const partOf = (p) => (p?.part === 'card' ? 'card' : 'tag');
+  const partOf = (p: { part?: unknown } | null | undefined): Part => (p?.part === 'card' ? 'card' : 'tag');
 
   /* ------------------------------ from the app's page ---------------------- */
-  ipcMain.handle('zero:corner-tag', (_e, state) => {
+  ipcMain.handle('zero:corner-tag', (_e, state: { ready?: ReadyThread[]; working: number } | null | undefined) => {
     const given = Array.isArray(state?.ready) ? state.ready : [];
     const ids = new Set(given.map((r) => r.id));
     for (const id of firstSeen.keys()) if (!ids.has(id)) firstSeen.delete(id);
@@ -526,7 +578,7 @@ export function createCornerTag({
       if (!firstSeen.has(r.id)) firstSeen.set(r.id, now());
       return { ...r, since: firstSeen.get(r.id) };
     });
-    working = Number.isFinite(state?.working) ? state.working : 0;
+    working = Number.isFinite(state?.working) ? state!.working : 0;
     const kept = Object.fromEntries(Object.entries(dismissed).filter(([id]) => ids.has(id)));
     if (Object.keys(kept).length !== Object.keys(dismissed).length) {
       dismissed = kept;
@@ -537,7 +589,7 @@ export function createCornerTag({
   });
 
   /* ------------------------------ from the tag's pages --------------------- */
-  ipcMain.handle('corner-tag:ready', (_e, p) => {
+  ipcMain.handle('corner-tag:ready', (_e, p: { part?: unknown } | null | undefined) => {
     const part = partOf(p);
     loaded[part] = true;
     sendState();
@@ -547,10 +599,10 @@ export function createCornerTag({
     return null;
   });
 
-  ipcMain.handle('corner-tag:size', (_e, p) => {
+  ipcMain.handle('corner-tag:size', (_e, p: { part?: unknown; width: number; height: number; radius?: number; glass?: Rect } | null) => {
     if (!p || !(p.width > 0) || !(p.height > 0)) return null;
     const size = { width: Math.ceil(p.width), height: Math.ceil(p.height) };
-    const radius = (rect) => (Number.isFinite(p.radius) && p.radius >= 0 ? p.radius : rect.height / 2);
+    const radius = (rect: Rect) => (Number.isFinite(p.radius) && p.radius! >= 0 ? p.radius! : rect.height / 2);
     if (partOf(p) === 'card') {
       cardSize = size;
       const rect = { x: 0, y: 0, ...size };
@@ -584,7 +636,7 @@ export function createCornerTag({
     return null;
   });
 
-  ipcMain.handle('corner-tag:hover', (_e, p) => {
+  ipcMain.handle('corner-tag:hover', (_e, p: { part?: unknown; inside?: boolean } | null | undefined) => {
     const part = partOf(p);
     hovered[part] = !!p?.inside;
     if (part === 'tag') {
@@ -605,8 +657,8 @@ export function createCornerTag({
   // after the cursor has already moved, and starting from the cursor then put
   // the tag about 30 px off under it. A press on a tag that has since hidden
   // starts nothing.
-  ipcMain.handle('corner-tag:press', (_e, at) => {
-    const pt = Number.isFinite(at?.x) && Number.isFinite(at?.y) ? { x: at.x, y: at.y } : screen.getCursorScreenPoint?.();
+  ipcMain.handle('corner-tag:press', (_e, at: Partial<Point> | null | undefined) => {
+    const pt = Number.isFinite(at?.x) && Number.isFinite(at?.y) ? { x: at!.x!, y: at!.y! } : screen.getCursorScreenPoint?.();
     if (!pt || !tag || !tagUp() || press) return null;
     // Every press moves the tag, wherever on it it lands. A drag never
     // resizes: corners that did caught presses meant to move it (w-7da9244ef7).
@@ -614,25 +666,25 @@ export function createCornerTag({
     press.timer = setTimer(step, FRAME_MS);
     return null;
   });
-  ipcMain.handle('corner-tag:release', (_e, p) => { endPress(!!p?.cancelled); return null; });
+  ipcMain.handle('corner-tag:release', (_e, p: { cancelled?: boolean } | null | undefined) => { endPress(!!p?.cancelled); return null; });
 
-  ipcMain.handle('corner-tag:go', (_e, id) => { goTo(id); return null; });
+  ipcMain.handle('corner-tag:go', (_e, id: unknown) => { goTo(id); return null; });
   // The X on a line of the list: off the tray, and only the tray.
-  ipcMain.handle('corner-tag:dismiss', (_e, id) => {
-    if (typeof id !== 'string' || !fresh().some((r) => r.id === id)) return null;
+  ipcMain.handle('corner-tag:dismiss', (_e, id: unknown) => {
+    if (typeof id !== 'string' || !fresh().some((r: ReadyThread) => r.id === id)) return null;
     dismissed = { ...dismissed, [id]: now() };
     try { saveConfig(config, { cornerTagDismissed: dismissed }); } catch { /* kept for this run only */ }
     refresh();
     return null;
   });
-  ipcMain.handle('corner-tag:hide', (_e, choice) => { hide(choice); return null; });
+  ipcMain.handle('corner-tag:hide', (_e, choice: unknown) => { hide(choice); return null; });
   ipcMain.handle('corner-tag:settings', () => { openSettings(); return null; });
 
   // A right-click on the tag offers the same choices as the list does.
   // One place sets the size, whether it came from the list's steps or the menu:
   // the page is told, it redraws and reports what it came out, and that is
   // what gets placed.
-  const setZoom = (next) => {
+  const setZoom = (next: number) => {
     zoom = tagZoom(next);
     saveConfig(config, { cornerTagZoom: zoom });
     sendState();
@@ -648,19 +700,19 @@ export function createCornerTag({
   //
   // It is never switched while a press is live: a press that began on the tag
   // ends on the tag, wherever the cursor has got to.
-  let clickable = null;
-  const letClicksThrough = (on) => {
+  let clickable: boolean | null = null;
+  const letClicksThrough = (on: boolean) => {
     if (!alive('tag') || press) return;
     if (clickable === on) return;
     clickable = on;
-    try { wins.tag.setIgnoreMouseEvents?.(!on, { forward: true }); } catch { /* an older Electron: the band stays clickable */ }
+    try { wins.tag!.setIgnoreMouseEvents?.(!on, { forward: true }); } catch { /* an older Electron: the band stays clickable */ }
   };
-  ipcMain.handle('corner-tag:clickable', (_e, p) => { letClicksThrough(!!p?.on); return null; });
+  ipcMain.handle('corner-tag:clickable', (_e, p: { on?: boolean } | null | undefined) => { letClicksThrough(!!p?.on); return null; });
 
   // A notch bigger or smaller, from the list's foot. The list stays open and
   // is placed again as the tag changes size, because the whole point of
   // sizing it from there is watching the tag while you do it.
-  ipcMain.handle('corner-tag:resize', (_e, p) => {
+  ipcMain.handle('corner-tag:resize', (_e, p: { by?: unknown } | null | undefined) => {
     const by = Number(p?.by) < 0 ? -1 : 1;
     setZoom(zoomStep(zoom, by));
     return null;
@@ -669,7 +721,7 @@ export function createCornerTag({
   // A corner picked from the list's Place: the usual gap in, on the screen
   // it is on now, remembered the way a drag is. The list shuts because it
   // was left behind in the old corner.
-  ipcMain.handle('corner-tag:place', (_e, corner) => {
+  ipcMain.handle('corner-tag:place', (_e, corner: Grip) => {
     if (!GRIPS.includes(corner) || !tag || press) return null;
     place = { corner, dx: MARGIN, dy: MARGIN };
     placeTag();
@@ -691,7 +743,7 @@ export function createCornerTag({
       ...HIDE_CHOICES.map((c) => ({ label: HIDE_LABELS[c.key], click: () => hide(c.key) })),
       { type: 'separator' },
       { label: 'Turn off in Settings…', click: openSettings },
-    ]).popup({ window: wins.tag });
+    ]).popup({ window: wins.tag! });
     return null;
   });
 
@@ -730,7 +782,7 @@ export function createCornerTag({
     if (watching) { clearTimer(watching); watching = null; }
     stopTones();
     cancelOpen();
-    for (const part of ['tag', 'card']) if (alive(part)) wins[part].destroy();
+    for (const part of ['tag', 'card'] as const) if (alive(part)) wins[part]!.destroy();
     for (const ch of CHANNELS) { try { ipcMain.removeHandler?.(ch); } catch {} }
     try {
       screen.removeListener?.('display-added', reseat);
@@ -757,6 +809,7 @@ export function createCornerTag({
     refresh,
     dispose,
     // Tests, and nothing else.
-    _state: () => ({ ready: fresh(), working, tag, open, visible: alive('tag') && wins.tag.isVisible() }),
+    _state: () => ({ ready: fresh(), working, tag, open, visible: alive('tag') && wins.tag!.isVisible() }),
+
   };
 }

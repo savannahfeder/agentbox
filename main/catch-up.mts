@@ -5,13 +5,18 @@
 // (tests/an-imported-chat-is-rewritten-the-way-every-thread-reads).
 
 import { askSmallModel, NAME_MODEL } from './row-label.mts';
+import type { SmallModelOptions } from './row-label.mts';
 
 /** A rewrite writes more than a name, so it gets longer than the namer's 90s. */
 export const CATCH_UP_TIMEOUT_MS = 150_000;
 
-const cut = (s, n) => String(s ?? '').replace(/\r/g, '').trim().slice(0, n);
+const cut = (s: unknown, n: number) => String(s ?? '').replace(/\r/g, '').trim().slice(0, n);
 
-export function catchUpPrompt(item) {
+export interface CatchUpItem { body?: string | null; title?: string | null; result?: string | null }
+
+export interface CatchUpCard { title: string; context: string; ask: string; said: string; options: string[] }
+
+export function catchUpPrompt(item: CatchUpItem | null | undefined) {
   return [
     'A conversation between a person and a coding agent has been brought into an inbox',
     'that shows each thread as a short card, not as a chat. Rewrite where it stands as',
@@ -35,15 +40,15 @@ export function catchUpPrompt(item) {
   ].join('\n');
 }
 
-const line = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+const line = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').trim();
 
 /** PURE. A reply is a card only with every part and at least two options; '' otherwise. */
-export function cleanCatchUp(text) {
+export function cleanCatchUp(text: unknown): CatchUpCard | '' {
   const raw = String(text ?? '');
   const from = raw.indexOf('{');
   const to = raw.lastIndexOf('}');
   if (from < 0 || to <= from) return '';
-  let got;
+  let got: Record<string, unknown> | null;
   try { got = JSON.parse(raw.slice(from, to + 1)); } catch { return ''; }
   const card = {
     title: line(got?.title).replace(/[.。]+$/, ''),
@@ -57,7 +62,7 @@ export function cleanCatchUp(text) {
 }
 
 /** The answer as every worker writes one: the ask in bold, the words, then the options. */
-export function catchUpResult(card) {
+export function catchUpResult(card: CatchUpCard) {
   return [
     `**${card.ask.replace(/\*+/g, '')}**`,
     '',
@@ -69,6 +74,6 @@ export function catchUpResult(card) {
 }
 
 /** One rewrite. Resolves to a card, or '' for every failure, never a throw. */
-export function catchUpRow(item, opts = {}) {
-  return askSmallModel(catchUpPrompt(item), cleanCatchUp, { model: NAME_MODEL, timeoutMs: CATCH_UP_TIMEOUT_MS, ...opts });
+export function catchUpRow(item: CatchUpItem | null | undefined, opts: SmallModelOptions = {}) {
+  return askSmallModel(catchUpPrompt(item), cleanCatchUp as (text: string) => string, { model: NAME_MODEL, timeoutMs: CATCH_UP_TIMEOUT_MS, ...opts });
 }

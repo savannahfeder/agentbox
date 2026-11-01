@@ -44,6 +44,7 @@
 //     own off the test run's gigabyte. A command known heavy still holds its own.
 
 import { CommandHistory, HEAVY_MB } from './memory-gate-history.mts';
+import type { Verdict } from './memory-gate-history.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 /**
@@ -52,21 +53,34 @@ import { NAME } from '../shared/product-name.mjs';
  * (`kern.memorystatus_level`), as one of three words. Free memory is the early
  * signal: the kernel only says "warn" once it is already compressing hard.
  */
-export function pressureFrom({ level, freePct } = {}, { tightPct = 12, criticalPct = 5 } = {}) {
+export type Pressure = 'normal' | 'tight' | 'critical';
+
+export interface PressureReading { level?: number | null; freePct?: number | null }
+
+export function pressureFrom({ level, freePct }: PressureReading = {}, { tightPct = 12, criticalPct = 5 }: { tightPct?: number; criticalPct?: number } = {}): Pressure {
   const free = typeof freePct === 'number' && Number.isFinite(freePct) ? freePct : null;
-  if (level >= 4 || (free !== null && free < criticalPct)) return 'critical';
-  if (level >= 2 || (free !== null && free < tightPct)) return 'tight';
+  if (level! >= 4 || (free !== null && free < criticalPct)) return 'critical';
+  if (level! >= 2 || (free !== null && free < tightPct)) return 'tight';
   return 'normal';
 }
 
 /** One heavy slot per 8 GB, at least one; two on a machine it cannot read. */
-export function autoSlots(memBytes) {
+export function autoSlots(memBytes: unknown): number {
   const gb = Math.round((Number(memBytes) || 0) / 1024 ** 3);
   if (gb <= 0) return 2;
   return Math.max(1, Math.floor(gb / 8));
 }
 
-export const DEFAULTS = {
+export interface GateSettings {
+  slots: number;
+  specWindowMs: number;
+  heavyMb: number;
+  lightLane: number;
+  maxWaitMs: number;
+  agingMs: number;
+}
+
+export const DEFAULTS: GateSettings = {
   slots: 2,
   specWindowMs: 10_000,
   heavyMb: HEAVY_MB,
@@ -84,7 +98,7 @@ export const DEFAULTS = {
  * for a fault that was not there. A queue behind heavier work and a computer that
  * is genuinely short are different things to be told.
  */
-export function refusal(waitedMs, pressure = 'normal') {
+export function refusal(waitedMs: number, pressure: Pressure = 'normal'): string {
   const minutes = Math.max(1, Math.round(waitedMs / 60_000));
   const held = `${NAME} held this command for ${minutes} minute${minutes === 1 ? '' : 's'}`;
   const why = pressure === 'normal'
@@ -94,8 +108,72 @@ export function refusal(waitedMs, pressure = 'normal') {
     + 'or end your turn and say what you are waiting for.';
 }
 
+export interface GateRequest {
+  id: unknown;
+  command?: unknown;
+  item?: string | null;
+  product?: string | null;
+  score?: unknown;
+  urgent?: boolean;
+  session?: string | null;
+  background?: unknown;
+}
+
+export type GateAnswer =
+  | { allow: true; cls?: Verdict }
+  | { allow: false; reason: string; cls: Verdict; waitedMs: number; pressure: Pressure };
+
+export type GateReply = (answer: GateAnswer) => void;
+
+export interface WaitingCommand {
+  id: string;
+  item: string | null;
+  product: string | null;
+  command: string;
+  score: number;
+  urgent: boolean;
+  session: string | null;
+  background: boolean;
+  cls: Verdict;
+  arrived: number;
+  replies: GateReply[];
+}
+
+export interface RunningCommand {
+  id: string;
+  item: string | null;
+  product: string | null;
+  command: string;
+  cls: Verdict;
+  urgent: boolean;
+  session: string | null;
+  background: boolean;
+  startedAt: number;
+  peakMb: number | null;
+  shared: number | null;
+  waitedMs: number;
+  pressureAt: Pressure;
+}
+
+export interface MemoryGateOptions extends Partial<GateSettings> {
+  history?: CommandHistory;
+  clock?: () => number;
+}
+
 export class MemoryGate {
-  constructor({ history = new CommandHistory(), clock = Date.now, ...opts } = {}) {
+  declare slots: number;
+  declare specWindowMs: number;
+  declare heavyMb: number;
+  declare lightLane: number;
+  declare maxWaitMs: number;
+  declare agingMs: number;
+  declare history: CommandHistory;
+  declare clock: () => number;
+  declare pressure: Pressure;
+  declare running: Map<string, RunningCommand>;
+  declare waiting: Map<string, WaitingCommand>;
+
+  constructor({ history = new CommandHistory(), clock = Date.now, ...opts }: MemoryGateOptions = {}) {
     Object.assign(this, DEFAULTS, opts);
     this.history = history;
     this.clock = clock;
@@ -104,13 +182,13 @@ export class MemoryGate {
     this.waiting = new Map();
   }
 
-  setPressure(p) {
+  setPressure(p: Pressure) {
     if (p === this.pressure) return;
     this.pressure = p;
     this._pump();
   }
 
-  setSlots(n) {
+  setSlots(n: unknown) {
     this.slots = Math.max(1, Math.round(Number(n) || 1));
     this._pump();
   }
@@ -119,9 +197,9 @@ export class MemoryGate {
    * Ask to run `req.command`. `reply` is called exactly once per call with
    * `{ allow: true }` or `{ allow: false, reason }`, now or later.
    */
-  submit(req, reply) {
+  submit(req: GateRequest, reply: GateReply) {
     const id = String(req.id);
-    if (this.running.has(id)) { reply({ allow: true, cls: this.running.get(id).cls }); return; }
+    if (this.running.has(id)) { reply({ allow: true, cls: this.running.get(id)!.cls }); return; }
     const already = this.waiting.get(id);
     if (already) { already.replies.push(reply); return; }
     this.waiting.set(id, {
@@ -141,7 +219,7 @@ export class MemoryGate {
   }
 
   /** The command ended (or its asker went away). Returns what it was, or null. */
-  finish(id) {
+  finish(id: unknown): RunningCommand | null {
     const key = String(id);
     const was = this.running.get(key) ?? null;
     if (was) this.running.delete(key);
@@ -150,7 +228,7 @@ export class MemoryGate {
   }
 
   /** A sampled footprint of a running command, in MB. Only the peak is kept. */
-  observe(id, mb) {
+  observe(id: unknown, mb: number) {
     const r = this.running.get(String(id));
     if (!r || !Number.isFinite(mb)) return;
     r.peakMb = Math.max(r.peakMb ?? 0, mb);
@@ -160,7 +238,7 @@ export class MemoryGate {
    * This running command's memory reading is shared with others on the same
    * agent process (`group`), so it is not its own figure. Nothing clears it.
    */
-  share(id, group) {
+  share(id: unknown, group: number) {
     const r = this.running.get(String(id));
     if (!r || r.shared === group) return;
     r.shared = group;
@@ -185,7 +263,7 @@ export class MemoryGate {
     };
   }
 
-  _holdsSlot(r, now) {
+  _holdsSlot(r: RunningCommand, now: number): boolean {
     if ((r.peakMb ?? 0) >= this.heavyMb) return true;
     if (r.cls === 'heavy') return true;
     if (r.cls === 'unknown') {
@@ -196,8 +274,8 @@ export class MemoryGate {
     return false;
   }
 
-  _ordered(now) {
-    const eff = (w) => w.score + Math.floor((now - w.arrived) / this.agingMs);
+  _ordered(now: number): WaitingCommand[] {
+    const eff = (w: WaitingCommand) => w.score + Math.floor((now - w.arrived) / this.agingMs);
     return [...this.waiting.values()].sort((a, b) => (eff(b) - eff(a)) || (a.arrived - b.arrived));
   }
 
@@ -220,7 +298,7 @@ export class MemoryGate {
     if (this.pressure === 'critical') return;
     let slotsUsed = 0;
     let lightUsed = 0;
-    const sharedGroups = new Set();
+    const sharedGroups = new Set<number>();
     for (const r of this.running.values()) {
       if (this._holdsSlot(r, now)) {
         if (r.shared != null && r.cls !== 'heavy') {
@@ -244,7 +322,7 @@ export class MemoryGate {
     }
   }
 
-  _admit(w, now) {
+  _admit(w: WaitingCommand, now: number) {
     this.waiting.delete(w.id);
     this.running.set(w.id, {
       id: w.id, item: w.item, product: w.product, command: w.command, cls: w.cls,

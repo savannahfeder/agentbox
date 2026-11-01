@@ -13,10 +13,13 @@ import path from 'node:path';
  * `files` are `{ name, dataBase64 }` or `{ name, srcPath }`. Answers what was
  * saved: `{ rel, name, image }`, in order, skipping one with neither.
  */
-export function saveAttachments(dir, files) {
+export interface AttachmentFile { name?: string; dataBase64?: string; srcPath?: string }
+export interface SavedAttachment { rel: string; name: string; image: boolean }
+
+export function saveAttachments(dir: string, files?: AttachmentFile[] | null) {
   const outDir = path.join(dir, 'attachments');
   fs.mkdirSync(outDir, { recursive: true });
-  const saved = [];
+  const saved: SavedAttachment[] = [];
   for (const file of files ?? []) {
     const safe = String(file?.name ?? 'file').replace(/[^\w.-]+/g, '-').slice(0, 80);
     // A RANDOM SUFFIX, THE SAME ONE THE STAGING PATH ALREADY USES. The name
@@ -36,6 +39,6 @@ export function saveAttachments(dir, files) {
 }
 
 /** The links a message carries for what was saved, one per line. */
-export function attachmentMarkdown(saved) {
+export function attachmentMarkdown(saved: SavedAttachment[]) {
   return saved.map((s) => (s.image ? `![${s.name}](${s.rel})` : `[${s.name}](${s.rel})`)).join('\n');
 }

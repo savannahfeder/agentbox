@@ -24,23 +24,67 @@
 // A tool part carries `state.status` of pending | running | completed | error,
 // with `state.input`, `state.output` and `state.error` beside it.
 
+export type OpenCodeError = string | { name?: unknown; message?: unknown; data?: { message?: unknown } };
+
+export interface OpenCodePart {
+  id?: unknown;
+  type?: unknown;
+  text?: unknown;
+  tool?: unknown;
+  cost?: unknown;
+  tokens?: unknown;
+  state?: {
+    status?: unknown;
+    input?: { filePath?: unknown; path?: unknown; command?: unknown; pattern?: unknown };
+  };
+}
+
+export interface OpenCodeProperties {
+  id?: unknown;
+  sessionID?: unknown;
+  info?: { cost?: unknown; tokens?: unknown };
+  error?: OpenCodeError | null;
+  part?: OpenCodePart | null;
+  partID?: unknown;
+  field?: unknown;
+  delta?: unknown;
+  permission?: unknown;
+  patterns?: unknown;
+  metadata?: { command?: unknown; filepath?: unknown; diff?: unknown };
+}
+
+export interface OpenCodeSession {
+  sessionId?: string | null;
+  opencodeCost?: unknown;
+  opencodeStepCost?: unknown;
+  opencodeTokens?: unknown;
+  result?: string;
+  resultIsError?: boolean;
+  opencodeChange?: string[];
+  saying?: string;
+  sayingAt?: number;
+  opencodeProsePart?: string | null;
+}
+
+type Properties = OpenCodeProperties | null | undefined;
+
 /** How much streamed prose is kept before it is dropped, as the others do. */
 const SAYING_CAP = 20_000;
 
 /** Tool names worth naming on the row, in the words a person would use. */
-const TOOL_WORDS = {
+const TOOL_WORDS: Record<string, string> = {
   bash: 'Bash', edit: 'Edit', write: 'Write', read: 'Read', glob: 'Glob',
   grep: 'Grep', list: 'List', webfetch: 'Fetch', websearch: 'Search',
   task: 'Task', todowrite: 'Todo', patch: 'Edit', skill: 'Skill',
 };
 
-const toolWord = name => {
+const toolWord = (name: unknown) => {
   const id = String(name ?? '').trim();
   if (!id) return null;
   return TOOL_WORDS[id.toLowerCase()] ?? id;
 };
 
-const partOf = properties => (properties && typeof properties === 'object' ? properties.part ?? null : null);
+const partOf = (properties: Properties): OpenCodePart | null => (properties && typeof properties === 'object' ? properties.part ?? null : null);
 
 /**
  * WHAT THE RUN WAS, kept on the session as it goes.
@@ -56,7 +100,7 @@ const partOf = properties => (properties && typeof properties === 'object' ? pro
  * answer. So each completed text part overwrites the last, and whatever is
  * standing when the session goes idle is the result.
  */
-export function captureOpenCodeEvent(session, type, properties) {
+export function captureOpenCodeEvent(session: OpenCodeSession | null | undefined, type: unknown, properties?: Properties) {
   try {
     if (!session || typeof type !== 'string') return;
     const p = properties ?? {};
@@ -109,7 +153,7 @@ export function captureOpenCodeEvent(session, type, properties) {
 }
 
 /** The error on `session.error`, which is an object and not a string. */
-export function openCodeErrorText(error) {
+export function openCodeErrorText(error?: OpenCodeError | null): string | null {
   if (!error) return null;
   if (typeof error === 'string') return error.trim() || null;
   const name = typeof error.name === 'string' ? error.name : '';
@@ -127,7 +171,7 @@ export function openCodeErrorText(error) {
  * model's private thinking, and streaming those onto her row would put words
  * on screen that are not what the run decided.
  */
-export function openCodeStreamingText(session, type, properties) {
+export function openCodeStreamingText(session: OpenCodeSession | null | undefined, type: unknown, properties?: Properties): boolean {
   try {
     if (!session) return false;
     const p = properties ?? {};
@@ -158,7 +202,7 @@ export function openCodeStreamingText(session, type, properties) {
 }
 
 /** Which part the prose is going into, so reasoning deltas can be told apart. */
-export function rememberOpenCodeProsePart(session, type, properties) {
+export function rememberOpenCodeProsePart(session: OpenCodeSession | null | undefined, type: unknown, properties?: Properties) {
   if (!session || type !== 'message.part.updated') return;
   const part = partOf(properties);
   if (part?.type === 'text' && typeof part.id === 'string') session.opencodeProsePart = part.id;
@@ -166,7 +210,7 @@ export function rememberOpenCodeProsePart(session, type, properties) {
 }
 
 /** One short line for the row: what it just did. */
-export function summarizeOpenCodeEvent(type, properties) {
+export function summarizeOpenCodeEvent(type: unknown, properties?: Properties): string | null {
   try {
     const p = properties ?? {};
     if (type !== 'message.part.updated') return null;
@@ -187,7 +231,7 @@ export function summarizeOpenCodeEvent(type, properties) {
 }
 
 /** One line for the run trace, the record she can open afterwards. */
-export function traceOpenCodeEvent(type, properties) {
+export function traceOpenCodeEvent(type: unknown, properties?: Properties): string | null {
   try {
     const p = properties ?? {};
     const at = new Date().toISOString().slice(11, 19);
@@ -222,7 +266,7 @@ export function traceOpenCodeEvent(type, properties) {
 }
 
 /** What it is doing right now, for the row's activity line. */
-export function openCodeActivity(type, properties) {
+export function openCodeActivity(type: unknown, properties?: Properties): { tool: string } | null {
   try {
     if (type !== 'message.part.updated') return null;
     const part = partOf(properties);
@@ -244,7 +288,7 @@ export function openCodeActivity(type, properties) {
  * arrives with, and it means an OpenCode card can show the change itself
  * rather than a filename.
  */
-export function openCodeApprovalCard(properties) {
+export function openCodeApprovalCard(properties?: Properties) {
   const p = properties ?? {};
   const kind = typeof p.permission === 'string' ? p.permission : '';
   const metadata = p.metadata ?? {};

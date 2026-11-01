@@ -54,7 +54,7 @@ export const DEMO_ACCOUNT = '00000000-0000-4000-8000-000000000000';
 /**
  * Named by the clock, like a fresh-user home, so the newest sorts last and two
  *  demos opened a minute apart are told apart on disk. */
-export function makeDemoHome(now = new Date()) {
+export function makeDemoHome(now = new Date()): string {
   const stamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const home = path.join(HOMES, stamp);
   fs.mkdirSync(home, { recursive: true });
@@ -62,7 +62,7 @@ export function makeDemoHome(now = new Date()) {
 }
 
 /** The demo homes on disk, oldest first. */
-export function demoHomes() {
+export function demoHomes(): string[] {
   if (!fs.existsSync(HOMES)) return [];
   return fs
     .readdirSync(HOMES)
@@ -74,12 +74,12 @@ export function demoHomes() {
 /**
  * Delete every demo home. Only ever this /tmp folder: `HOMES` is not
  *  configurable, and that is on purpose. */
-export function clearDemoHomes() {
+export function clearDemoHomes(): { ok: boolean; error?: string } {
   try {
     fs.rmSync(HOMES, { recursive: true, force: true });
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err?.message ?? String(err) };
+    return { ok: false, error: (err as Error)?.message ?? String(err) };
   }
 }
 
@@ -95,7 +95,7 @@ export function clearDemoHomes() {
  *  THE FOLDER IS THAT FUNCTION, not a second spelling of it. A literal next
  *  to the default is how the demo once wrote its store in one place and
  *  looked for it in another. */
-export function demoPaths(home) {
+export function demoPaths(home: string): { storeRoot: string; accountRoot: string; appHome: string } {
   const storeRoot = defaultStoreRoot({ home, env: {} });
   return {
     storeRoot,
@@ -118,10 +118,19 @@ export function demoPaths(home) {
  * `.origin` is written alongside, because that is what the app writes on first
  * use and what `removeMachinery` refuses to act without.
  */
-export function seedDemoStore(home, { now = Date.now() } = {}) {
+export interface SeededProduct {
+  slug: string;
+  dir: string;
+  machinery: string;
+  rows: number;
+}
+
+type LedgerLine = { id: string; [key: string]: unknown };
+
+export function seedDemoStore(home: string, { now = Date.now() }: { now?: number } = {}): { accountRoot: string; appHome: string; products: SeededProduct[] } {
   const { accountRoot, appHome } = demoPaths(home);
-  const ledgers = demoLedgerLines(now);
-  const written = [];
+  const ledgers = demoLedgerLines(now) as Record<string, LedgerLine[]>;
+  const written: SeededProduct[] = [];
 
   for (const product of DEMO_PRODUCTS) {
     const dir = path.join(accountRoot, product.slug);
@@ -138,7 +147,7 @@ export function seedDemoStore(home, { now = Date.now() } = {}) {
     // The documents, and the catalog that makes them visible. A file on disk
     // with no entry in index.json is a file the pane does not know about
     // (main/store/project.mjs), so both halves or neither.
-    const docs = DEMO_DOCS[product.slug] ?? [];
+    const docs = DEMO_DOCS[product.slug as keyof typeof DEMO_DOCS] ?? [];
     for (const doc of docs) {
       const file = path.join(dir, doc.path);
       fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -188,9 +197,9 @@ export function seedDemoStore(home, { now = Date.now() } = {}) {
  *  process that happens to have it set (every session Agentbox spawns does) would
  *  hand it straight through and the demo copy would read HER ledger while
  *  standing in an invented store. */
-export function demoEnv(home, env = process.env) {
+export function demoEnv(home: string, env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const { appHome } = demoPaths(home);
-  const next = { ...env, HOME: home, CFFIXED_USER_HOME: home, ...storeRootEnv(appHome), [DEMO_ENV]: '1' };
+  const next: NodeJS.ProcessEnv = { ...env, HOME: home, CFFIXED_USER_HOME: home, ...storeRootEnv(appHome), [DEMO_ENV]: '1' };
   // The copy's store is defaultStoreRoot of ITS home. The parent's
   // XDG_DATA_HOME is the real data directory, and leaving it set points the
   // demo at that directory. The other base directories go for the same reason.
@@ -213,7 +222,7 @@ export function openDemo({
   packaged = true,
   spawnFn = spawn,
   now,
-} = {}) {
+}: { execPath?: string; argv?: string[]; packaged?: boolean; spawnFn?: typeof spawn; now?: number } = {}) {
   let home;
   let prepared;
   let seeded;
@@ -222,7 +231,7 @@ export function openDemo({
     prepared = prepareHome(home, { withAgents: false });
     seeded = seedDemoStore(home, { now: now ?? Date.now() });
   } catch (err) {
-    return { ok: false, error: `Could not lay out a demo under ${HOMES}: ${err?.message ?? err}` };
+    return { ok: false, error: `Could not lay out a demo under ${HOMES}: ${(err as Error)?.message ?? err}` };
   }
 
   const { bin, args } = relaunchCommand({ execPath, argv, packaged });
@@ -235,7 +244,8 @@ export function openDemo({
     child = spawnFn(bin, args, { detached: true, stdio: 'ignore', env: demoEnv(home) });
     child.unref?.();
   } catch (err) {
-    return { ok: false, error: `Could not start a second ${NAME}: ${err?.message ?? err}`, home };
+    return { ok: false, error: `Could not start a second ${NAME}: ${(err as Error)?.message ?? err}`, home };
+
   }
 
   // THE NOTES ARE THE HONEST PART, the same as the new-user row's. Both of

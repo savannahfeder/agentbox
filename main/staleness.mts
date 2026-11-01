@@ -33,15 +33,18 @@ const WATCHED_FILES = ['preload.cjs'];
 
 // PURE, and the whole rule: a file written after the process read it is code
 // that exists and is not running.
-export function changedSinceBoot(bootedAt, files) {
+export interface WatchedFile { name: string; mtimeMs: number }
+export interface RestartNeeded { files: string[]; since: number }
+
+export function changedSinceBoot(bootedAt: number, files: WatchedFile[]) {
   return files
     .filter((f) => Number.isFinite(f.mtimeMs) && f.mtimeMs > bootedAt)
     .sort((a, b) => b.mtimeMs - a.mtimeMs)
     .map((f) => f.name);
 }
 
-function listWatched(appDir) {
-  const found = [];
+function listWatched(appDir: string) {
+  const found: WatchedFile[] = [];
   for (const rel of WATCHED_FILES) {
     try { found.push({ name: rel, mtimeMs: fs.statSync(path.join(appDir, rel)).mtimeMs }); } catch {}
   }
@@ -60,10 +63,10 @@ function listWatched(appDir) {
 
 // Cached: the snapshot is polled every ten seconds and pushed on every store
 // change, and this is a disk walk. Staleness is not urgent to the second.
-let cache = { at: 0, value: null };
+let cache: { at: number; value: RestartNeeded | null } = { at: 0, value: null };
 const TTL_MS = 15_000;
 
-export function restartNeeded(appDir, bootedAt = BOOTED_AT, now = Date.now()) {
+export function restartNeeded(appDir: string, bootedAt = BOOTED_AT, now = Date.now()) {
   if (cache.value !== undefined && now - cache.at < TTL_MS) return cache.value;
   const files = changedSinceBoot(bootedAt, listWatched(appDir));
   const value = files.length ? { files, since: bootedAt } : null;

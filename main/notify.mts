@@ -14,6 +14,7 @@
 // fix, and shared/notify-rules.mjs carries the rule.
 
 import path from 'node:path';
+import type { BrowserWindow, IpcMain, NativeImage, Notification as ElectronNotification, PowerMonitor } from 'electron';
 import { atTheApp, banner, shouldSpeak } from '../shared/notify-rules.mjs';
 import { NAME } from '../shared/product-name.mjs';
 
@@ -39,7 +40,7 @@ import { NAME } from '../shared/product-name.mjs';
 // and the banner then looks exactly as it did before any of this.
 export const MARK_FILE = path.join('build', 'notification-icon.png');
 
-export function markFor({ root, createFromPath }) {
+export function markFor<I extends { isEmpty(): boolean }>({ root, createFromPath }: { root: string; createFromPath: (p: string) => I }): I | null {
   try {
     const img = createFromPath(path.join(root, MARK_FILE));
     return img && !img.isEmpty() ? img : null;
@@ -55,14 +56,25 @@ const COALESCE_MS = 1500;
 // `onChange` hears that what it has told you about changed: the tray counts
 // all of it (main/corner-tag.mts), so a banner never speaks for a thread the
 // tray leaves out.
-export function createNotifier({ window, Notification, powerMonitor, icon = null, coalesceMs = COALESCE_MS, onChange = () => {} }) {
+export interface Arrival { id: string; title?: string; product?: string; productName?: string; kind?: string }
+
+export interface NotifierOptions {
+  window: BrowserWindow | null;
+  Notification: typeof ElectronNotification;
+  powerMonitor: PowerMonitor;
+  icon?: NativeImage | null;
+  coalesceMs?: number;
+  onChange?: () => void;
+}
+
+export function createNotifier({ window, Notification, powerMonitor, icon = null, coalesceMs = COALESCE_MS, onChange = () => {} }: NotifierOptions) {
   // Everything she has not seen since she last had the window, keyed by id so
   // a repeated push is idempotent. Insertion order is arrival order.
-  const unseen = new Map();
-  const toldAt = new Map();
+  const unseen = new Map<string, Arrival>();
+  const toldAt = new Map<string, number>();
   const changed = () => { try { onChange(); } catch { /* the tray catches up on its next look */ } };
-  let live = null;      // the one notification currently on screen, if any
-  let timer = null;
+  let live: ElectronNotification | null = null;      // the one notification currently on screen, if any
+  let timer: NodeJS.Timeout | null = null;
   // HOW MANY TIMES SHE HAS BEEN INTERRUPTED SINCE SHE LAST HAD THE WINDOW.
   // Both reset in seen, so a stretch away is the unit. shouldSpeak in
   // shared/notify-rules.mjs is the rule these two feed; the short version is
@@ -109,7 +121,7 @@ export function createNotifier({ window, Notification, powerMonitor, icon = null
     const say = banner(items);
     if (!say) return;
     takeDown();
-    let n;
+    let n: ElectronNotification;
     try {
       // No subtitle. macOS puts that field directly under the title in nearly
       // the same type, and she read a lone project name there as the title
@@ -166,7 +178,7 @@ export function createNotifier({ window, Notification, powerMonitor, icon = null
     // Fresh arrivals from the renderer, which owns what counts as news (it is
     // the only place that knows what the inbox is). Each is
     // { id, title, product, productName, kind }.
-    add(arrivals) {
+    add(arrivals: Arrival[] | null | undefined) {
       if (!Array.isArray(arrivals) || !arrivals.length) return;
       // Asked before banking anything, so that a burst arriving while she is
       // at the app is dropped rather than saved up for when she leaves.
@@ -195,17 +207,30 @@ export function createNotifier({ window, Notification, powerMonitor, icon = null
 
 // `onArrivals` hears every arrival too, with the inbox they arrived in, for
 // the phone's alerts (main/phone-alerts.mjs), which make their own call.
-const needsYouOf = (payload) => (Array.isArray(payload.needsYou) ? payload.needsYou : []);
-export function installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage, onArrivals = () => {}, onChange = () => {} }) {
+interface NotifyPayload { arrivals?: unknown; needsYou?: unknown }
+const needsYouOf = (payload: NotifyPayload): unknown[] => (Array.isArray(payload.needsYou) ? payload.needsYou : []);
+
+export interface InstallNotifierOptions {
+  app: { getAppPath(): string };
+  window: BrowserWindow;
+  Notification: typeof ElectronNotification;
+  powerMonitor: PowerMonitor;
+  ipcMain: IpcMain;
+  nativeImage?: { createFromPath(p: string): NativeImage } | null;
+  onArrivals?: (arrivals: Arrival[], needsYou: unknown[]) => void;
+  onChange?: () => void;
+}
+
+export function installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage, onArrivals = () => {}, onChange = () => {} }: InstallNotifierOptions) {
   if (Notification.isSupported && !Notification.isSupported()) {
-    ipcMain.handle('zero:notify', (_e, payload = {}) => { try { onArrivals(Array.isArray(payload.arrivals) ? payload.arrivals : [], needsYouOf(payload)); } catch {} });
+    ipcMain.handle('zero:notify', (_e, payload: NotifyPayload = {}) => { try { onArrivals(Array.isArray(payload.arrivals) ? payload.arrivals : [], needsYouOf(payload)); } catch {} });
     ipcMain.handle('zero:notify-test', () => null);
     return { add() {}, seen() {}, told: () => [], sample() {} };
   }
   // app.getAppPath() is the repo from source and the asar inside the bundle
   // when it is packaged, and the mark sits at the same place in both.
   const icon = nativeImage
-    ? markFor({ root: app.getAppPath(), createFromPath: (p) => nativeImage.createFromPath(p) })
+    ? markFor({ root: app.getAppPath(), createFromPath: (p: string) => nativeImage.createFromPath(p) })
     : null;
   const notifier = createNotifier({ window, Notification, powerMonitor, icon, onChange });
   window.on('focus', () => notifier.seen());
@@ -214,7 +239,7 @@ export function installNotifier({ app, window, Notification, powerMonitor, ipcMa
   // locked would sit in Notification Center after she is back at the row.
   try { powerMonitor.on('unlock-screen', () => { if (window.isFocused()) notifier.seen(); }); } catch {}
   ipcMain.handle('zero:notify-test', () => { notifier.sample(); return null; });
-  ipcMain.handle('zero:notify', (_e, payload = {}) => {
+  ipcMain.handle('zero:notify', (_e, payload: NotifyPayload = {}) => {
     const arrivals = Array.isArray(payload.arrivals) ? payload.arrivals : [];
     try { onArrivals(arrivals, needsYouOf(payload)); } catch {}
     notifier.add(arrivals);

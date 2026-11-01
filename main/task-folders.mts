@@ -64,6 +64,81 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Name, nameSlug } from '../shared/product-name.mjs';
 import { carryLocalFiles, copyTree, onlyTrackedContent, trackedTopLevel } from './worktree-include.mts';
+import type { ExecFailure } from './worktree-include.mts';
+
+/** The answer of a git call that does not throw. */
+export interface GitResult {
+  ok: boolean;
+  out: string;
+}
+
+/** One entry of `git worktree list --porcelain`. */
+export interface RegisteredWorktree {
+  path: string;
+  branch?: string;
+  lock?: string;
+  prunable?: boolean;
+}
+
+/** A folder this process holds, made now or already there. */
+export interface TaskFolderTaken {
+  taken: true;
+  heldBy: number;
+  path: string;
+  branch: string;
+  created: boolean;
+  how: 'clone' | 'checkout' | 'kept';
+}
+
+/** A folder somebody else has, or that could not be given. */
+export interface TaskFolderRefused {
+  taken: false;
+  reason: string;
+  heldBy: number | null;
+  path: null;
+}
+
+export interface TaskFolderOptions {
+  pid?: number;
+  dependencies?: boolean;
+  again?: boolean;
+}
+
+/** Who holds a folder, as `holder` answers. */
+export type FolderHolder =
+  | { ok: true; heldBy: number | null; free?: true; stale?: true }
+  | { ok: false; reason: 'locked' | 'held'; heldBy: number | null };
+
+/** What `whoEndedUpInTheLock` and `acquireTaskFolder` answer. */
+export interface LockTaken { taken: true; heldBy: number; again?: undefined }
+export interface LockRefused { taken: false; reason: string; heldBy: number | null; detail?: string; again?: undefined }
+export interface LockAgain { again: true; taken?: undefined }
+
+/** One worktree of the project, whoever made it. */
+export interface WorktreeInventory {
+  path: string;
+  registeredAs: string;
+  primary: boolean;
+  branch: string;
+  lock: string | null;
+  heldBy: number | null;
+  unfinished: boolean;
+  missing: boolean;
+  prunable: boolean;
+  atOurPath: boolean;
+  ours: boolean;
+}
+
+/** One task folder and what deleting it would lose. */
+export interface TaskFolderListing {
+  id: string;
+  path: string;
+  branch: string;
+  dirty: boolean;
+  merged: boolean;
+  touchedAt: number | null;
+  heldBy: number | null;
+}
 
 /** Where Claude Code puts its own, so both engines and a human agree. */
 const WORKTREES = ['.claude', 'worktrees'];
@@ -84,10 +159,10 @@ const BUILDING = '.building-';
 // (post-commit, reference-transaction), so the app's every git in a linked
 // worktree runs hook-free. The primary checkout, where `worktree add` runs its
 // own post-checkout, keeps its hooks: a linked worktree's `.git` is a file.
-const inLinkedWorktree = (cwd) => {
+const inLinkedWorktree = (cwd: string) => {
   try { return fs.lstatSync(path.join(cwd, '.git')).isFile(); } catch { return false; }
 };
-const git = (cwd, args) => execFileSync('git', [
+const git = (cwd: string, args: string[]): string => execFileSync('git', [
   ...(inLinkedWorktree(cwd) ? ['-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false'] : []),
   ...args,
 ], {
@@ -99,7 +174,7 @@ const git = (cwd, args) => execFileSync('git', [
  * something, because the only decision taken on this answer is whether the
  * directory is safe to delete, and "we could not look" is not a yes.
  */
-function tryRead(dir) {
+function tryRead(dir: string): string[] {
   try { return fs.readdirSync(dir); } catch { return ['we could not look']; }
 }
 
@@ -107,12 +182,12 @@ function tryRead(dir) {
 // writes when it recreates its deleted folder to keep its shell alive. A
 // folder holding only these is as good as empty.
 const LEFTOVER_MARKERS = new Set(['.DS_Store', '.keep-session']);
-const isPlainFile = (file) => { try { return fs.lstatSync(file).isFile(); } catch { return false; } };
+const isPlainFile = (file: string) => { try { return fs.lstatSync(file).isFile(); } catch { return false; } };
 
 /** Git that answers rather than throws, for the questions where "no" is fine. */
-function tryGit(cwd, args) {
+function tryGit(cwd: string, args: string[]): GitResult {
   try { return { ok: true, out: git(cwd, args) }; }
-  catch (error) { return { ok: false, out: String(error?.stderr ?? error?.message ?? '').trim() }; }
+  catch (error) { return { ok: false, out: String((error as ExecFailure)?.stderr ?? (error as ExecFailure)?.message ?? '').trim() }; }
 }
 
 /**
@@ -142,7 +217,7 @@ function tryGit(cwd, args) {
  * already exists` has its own road a few lines above (ask again, then attach),
  * and that road is the 2026-10-07 fix which must not be routed around.
  */
-export function somebodyIsBuilding(out) {
+export function somebodyIsBuilding(out: unknown): boolean {
   const said = String(out ?? '');
   if (!said) return false;
   // A BRANCH THAT ALREADY EXISTS IS NOT A FOLDER THAT ALREADY EXISTS, and it
@@ -164,9 +239,9 @@ export function somebodyIsBuilding(out) {
 }
 
 /** `safeTaskName`'s question, asked of a folder already on the disk without throwing. */
-const couldBeATaskName = (name) => SAFE_NAME.test(name) && String(name).length <= 64;
+const couldBeATaskName = (name: string) => SAFE_NAME.test(name) && String(name).length <= 64;
 
-export function safeTaskName(id) {
+export function safeTaskName(id: unknown): string {
   const name = String(id ?? '');
   if (!couldBeATaskName(name)) {
     throw Error(`Not a name a task folder may be given: ${JSON.stringify(id)}`);
@@ -180,9 +255,9 @@ export function safeTaskName(id) {
  * one spelling and looked for by the other is two different folders as far as
  * every comparison in the supervisor is concerned.
  */
-export const real = (dir) => { try { return fs.realpathSync(dir); } catch { return dir; } };
+export const real = (dir: string) => { try { return fs.realpathSync(dir); } catch { return dir; } };
 
-export function taskFolderPath(repoPath, id) {
+export function taskFolderPath(repoPath: string, id: unknown): string {
   return path.join(real(repoPath), ...WORKTREES, safeTaskName(id));
 }
 
@@ -208,14 +283,14 @@ export function taskFolderPath(repoPath, id) {
  * existing question correct without any of them learning a new one, and it
  * leaves the rollback below nothing to delete but its own unfinished copy.
  */
-export function buildingFolderPath(repoPath, id) {
+export function buildingFolderPath(repoPath: string, id: unknown): string {
   return path.join(real(repoPath), ...WORKTREES, `${BUILDING}${safeTaskName(id)}`);
 }
 
-export function taskBranch(id) { return `${BRANCH_PREFIX}${safeTaskName(id)}`; }
+export function taskBranch(id: unknown): string { return `${BRANCH_PREFIX}${safeTaskName(id)}`; }
 
 /** The repository root, or null when this is not a checkout at all. */
-export function repoRoot(dir) {
+export function repoRoot(dir: string | null | undefined): string | null {
   if (!dir || !fs.existsSync(dir)) return null;
   const found = tryGit(dir, ['rev-parse', '--show-toplevel']);
   return found.ok && found.out ? found.out : null;
@@ -236,14 +311,14 @@ export function repoRoot(dir) {
  * too big to commit by itself (`FIRST_COMMIT_LIMIT`) is left exactly as it was,
  * the repository just started here removed again, and the refusal says why.
  */
-function startRepository(dir) {
+function startRepository(dir: string): string | null {
   if (!dir || !fs.existsSync(dir)) return null;
   const why = gitWillNotRun(dir);
   if (why) throw Error(why);
   if (!tryGit(dir, ['init', '-q']).ok) return null;
   const root = repoRoot(dir);
-  try { firstCommitIfNone(root); }
-  catch (error) { fs.rmSync(path.join(root, '.git'), { recursive: true, force: true }); throw error; }
+  try { firstCommitIfNone(root!); }
+  catch (error) { fs.rmSync(path.join(root!, '.git'), { recursive: true, force: true }); throw error; }
   return root;
 }
 
@@ -259,7 +334,7 @@ function startRepository(dir) {
  * else's repository on the way. The sentence returned here is what the task's
  * row says, after "could not be given a folder of its own to work in: ".
  */
-function gitWillNotRun(dir) {
+function gitWillNotRun(dir: string): string | null {
   const asked = tryGit(dir, ['rev-parse', '--show-toplevel']);
   if (asked.ok) return null;
   if (/xcrun: error|invalid active developer path|no developer tools were found/i.test(asked.out)) {
@@ -284,12 +359,12 @@ function gitWillNotRun(dir) {
  */
 const FIRST_COMMIT_LIMIT = 500 * 1024 * 1024;
 
-const sizeSaid = (bytes) => (bytes >= 1024 ** 3
+const sizeSaid = (bytes: number) => (bytes >= 1024 ** 3
   ? `${(bytes / 1024 ** 3).toFixed(1)} GB`
   : `${Math.round(bytes / 1024 ** 2)} MB`);
 
 /** What a first commit would take, in bytes, stopping once past the limit. */
-function sizeOfFirstCommit(root) {
+function sizeOfFirstCommit(root: string): number {
   // Its own call rather than `tryGit`, for the buffer: a folder of media lists
   // far past the default megabyte of output.
   const listed = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
@@ -310,7 +385,7 @@ function sizeOfFirstCommit(root) {
  * theirs. `--allow-empty` because an empty folder is a real first project.
  * Made `asTheApp`, like every commit in this file.
  */
-function firstCommitIfNone(root) {
+function firstCommitIfNone(root: string): void {
   if (tryGit(root, ['rev-parse', '--verify', '-q', 'HEAD']).ok) return;
   hideFromTheCheckout(root);
   const size = sizeOfFirstCommit(root);
@@ -338,8 +413,8 @@ function firstCommitIfNone(root) {
  *   park left every later task in every project without a folder. Signing is
  *   off for the app's commits only; the person's own still sign.
  */
-function asTheApp(cwd) {
-  const set = (key) => { const got = tryGit(cwd, ['config', key]); return got.ok && got.out !== ''; };
+function asTheApp(cwd: string): string[] {
+  const set = (key: string) => { const got = tryGit(cwd, ['config', key]); return got.ok && got.out !== ''; };
   return [
     ...(set('user.name') ? [] : ['-c', `user.name=${Name}`]),
     ...(set('user.email') ? [] : ['-c', `user.email=${nameSlug}@localhost`]),
@@ -352,31 +427,31 @@ function asTheApp(cwd) {
  * whatever has not been pushed, and on this Mac that is routinely 20+ commits,
  * so branching from origin would start every task without the last day of work.
  */
-export function baseRef(repoPath) {
+export function baseRef(repoPath: string): string {
   for (const name of ['main', 'master']) {
     if (tryGit(repoPath, ['rev-parse', '--verify', '-q', `refs/heads/${name}`]).ok) return `refs/heads/${name}`;
   }
   return 'HEAD';
 }
 
-const lockReason = (pid) => `agentbox pid=${pid}`;
-const pidInReason = (reason) => {
+const lockReason = (pid: number) => `agentbox pid=${pid}`;
+const pidInReason = (reason: string | null | undefined) => {
   const found = /agentbox pid=(\d+)/.exec(reason ?? '');
   return found ? Number(found[1]) : null;
 };
 // Signal 0 asks the kernel whether a pid exists without touching it. EPERM
 // means it exists and belongs to somebody else, which still counts as alive.
-const alive = (pid) => {
+const alive = (pid: number | null) => {
   if (!pid) return false;
-  try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; }
+  try { process.kill(pid, 0); return true; } catch (error) { return (error as ExecFailure)?.code === 'EPERM'; }
 };
 
 /** Every worktree git knows about, as records rather than as text. */
-function registered(repoPath) {
+function registered(repoPath: string): RegisteredWorktree[] {
   const listed = tryGit(repoPath, ['worktree', 'list', '--porcelain']);
   if (!listed.ok) return [];
-  const out = [];
-  let current = null;
+  const out: RegisteredWorktree[] = [];
+  let current: RegisteredWorktree | null = null;
   for (const line of listed.out.split('\n')) {
     if (line.startsWith('worktree ')) { if (current) out.push(current); current = { path: line.slice(9) }; }
     else if (line.startsWith('branch ') && current) current.branch = line.slice(7).replace(/^refs\/heads\//, '');
@@ -387,7 +462,7 @@ function registered(repoPath) {
   return out;
 }
 
-const record = (repoPath, folder) => registered(repoPath).find((w) => w.path === folder) ?? null;
+const record = (repoPath: string, folder: string) => registered(repoPath).find((w) => w.path === folder) ?? null;
 
 /**
  * WHO HOLDS THIS FOLDER, which is the one question every answer here is built
@@ -402,7 +477,7 @@ const record = (repoPath, folder) => registered(repoPath).find((w) => w.path ===
  *   another pid, gone        free, but only through a takeover that writes
  *                            the new owner (`stale`)
  */
-function holder(root, folder, pid) {
+function holder(root: string, folder: string, pid: number): FolderHolder {
   const held = record(root, folder)?.lock;
   if (held === undefined) return { ok: true, heldBy: null, free: true };
   const owner = pidInReason(held);
@@ -437,9 +512,9 @@ function holder(root, folder, pid) {
  * a path it does not know -- is this machine failing, and that one carries
  * git's words out rather than naming a session that does not exist.
  */
-const alreadyLocked = (out) => /is already locked/i.test(String(out ?? ''));
+const alreadyLocked = (out: unknown) => /is already locked/i.test(String(out ?? ''));
 
-export function whoEndedUpInTheLock({ pid, locked, after, triesLeft }) {
+export function whoEndedUpInTheLock({ pid, locked, after, triesLeft }: { pid: number; locked: GitResult; after: string | undefined; triesLeft: number }): LockTaken | LockRefused | LockAgain {
   const now = pidInReason(after);
   if (now === pid) return { taken: true, heldBy: pid };
   if (after !== undefined) return { taken: false, reason: now ? 'held' : 'locked', heldBy: now ?? null };
@@ -470,7 +545,7 @@ export function whoEndedUpInTheLock({ pid, locked, after, triesLeft }) {
  * `worktree list`, which is the only pause the gap needs: the gap is one git
  * command wide.
  */
-export function acquireTaskFolder(root, folder, { pid = process.pid, tries = 5 } = {}) {
+export function acquireTaskFolder(root: string, folder: string, { pid = process.pid, tries = 5 }: { pid?: number; tries?: number } = {}): LockTaken | LockRefused {
   for (let triesLeft = tries - 1; ; triesLeft -= 1) {
     const held = holder(root, folder, pid);
     if (!held.ok) return { taken: false, reason: held.reason, heldBy: held.heldBy };
@@ -505,7 +580,7 @@ export function acquireTaskFolder(root, folder, { pid = process.pid, tries = 5 }
  * every assertion about the folder's contents would still pass. Codex made that
  * point reviewing this file on 2026-10-07 and it was right.
  */
-export function ensureTaskFolder(dir, id, { pid = process.pid, dependencies = true, again = false } = {}) {
+export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, dependencies = true, again = false }: TaskFolderOptions = {}): TaskFolderTaken | TaskFolderRefused | null {
   const name = safeTaskName(id);
   const root = repoRoot(dir) ?? startRepository(dir);
   if (!root) return null;
@@ -516,7 +591,7 @@ export function ensureTaskFolder(dir, id, { pid = process.pid, dependencies = tr
   // and every reason above names somebody or something; this one names this
   // machine, so it leaves by the road failures leave by, which puts git's words
   // on the row (`_couldNotGetAFolder` in main/supervisor.mts).
-  const refused = (held) => {
+  const refused = (held: { reason: string; heldBy?: number | null; detail?: string }): TaskFolderRefused => {
     if (held.reason === 'unlockable') throw Error(`Could not take the folder for ${name}: ${held.detail}`);
     return { taken: false, reason: held.reason, heldBy: held.heldBy ?? null, path: null };
   };
@@ -579,7 +654,7 @@ export function ensureTaskFolder(dir, id, { pid = process.pid, dependencies = tr
   const hasBranch = () => tryGit(root, ['rev-parse', '--verify', '-q', `refs/heads/${branch}`]).ok;
   const branchExists = hasBranch();
   const from = branchExists ? branch : baseRef(root);
-  let how = 'clone';
+  let how: 'clone' | 'checkout' = 'clone';
   if (!cloneCheckout(root, staging, branch, from, branchExists, pid)) {
     how = 'checkout';
     // THE BRANCH IS ASKED ABOUT AGAIN, AND THAT IS NOT BELT AND BRACES.
@@ -652,7 +727,7 @@ export function ensureTaskFolder(dir, id, { pid = process.pid, dependencies = tr
   // somebody will read it, and the task waits instead of running wrong.
   if (dependencies) {
     try { carryLocalFiles(root, staging); }
-    catch (error) { clearUnfinished(root, staging); throw Error(`Could not make a folder for ${name}: ${error.message}`); }
+    catch (error) { clearUnfinished(root, staging); throw Error(`Could not make a folder for ${name}: ${(error as ExecFailure).message}`); }
   }
 
   // `worktree move` rather than a rename, so git's own record of where this
@@ -704,7 +779,7 @@ export function ensureTaskFolder(dir, id, { pid = process.pid, dependencies = tr
  * git and leaves nothing registered, so a registered folder with a commit in
  * it is one the hook complained about after the fact, and it is ours.
  */
-function addOwned(root, folder, rest, pid) {
+function addOwned(root: string, folder: string, rest: string[], pid: number): GitResult {
   const owned = tryGit(root, ['worktree', 'add', '--lock', '--reason', lockReason(pid), ...rest]);
   if (owned.ok) return owned;
   if (record(root, folder) && tryGit(folder, ['rev-parse', '--verify', '-q', 'HEAD']).ok) {
@@ -728,7 +803,7 @@ function addOwned(root, folder, rest, pid) {
  * folder and one from a checkout. Since the local files started being carried
  * in, the build is slower, so the window is wider.
  */
-function clearUnfinished(root, staging, pid = process.pid) {
+function clearUnfinished(root: string, staging: string, pid: number = process.pid): { cleared: true } | { cleared: false; reason: string; heldBy: number | null } {
   if (!fs.existsSync(staging) && !record(root, staging)) return { cleared: true };
   const held = holder(root, staging, pid);
   if (!held.ok) {
@@ -768,7 +843,7 @@ function clearUnfinished(root, staging, pid = process.pid) {
  * shares blocks where the filesystem can and copies where it cannot, and `-c`
  * is not an option there at all.
  */
-function cloneCheckout(root, folder, branch, from, branchExists, pid = process.pid) {
+function cloneCheckout(root: string, folder: string, branch: string, from: string, branchExists: boolean, pid: number = process.pid): boolean {
   // TRACKED CONTENT ONLY, on both sides of this. Her checkout permanently
   // carries a couple of untracked files (a scratch `:memory:.ses`, a folder of
   // screenshots somebody left), and counting those as dirty turned the fast
@@ -834,7 +909,7 @@ function cloneCheckout(root, folder, branch, from, branchExists, pid = process.p
  * under `.claude` gets it and no task ever receives a copy of another task's
  * work.
  */
-function copyIn(root, folder, entry) {
+function copyIn(root: string, folder: string, entry: string): void {
   if (entry !== WORKTREES[0]) { copyTree(path.join(root, entry), folder); return; }
   const to = path.join(folder, entry);
   fs.mkdirSync(to, { recursive: true });
@@ -850,7 +925,7 @@ function copyIn(root, folder, entry) {
  * would carry them. `.git/info/exclude` rather than `.gitignore`, because this
  * is a fact about this machine and not a line to commit into her project.
  */
-function hideFromTheCheckout(root) {
+function hideFromTheCheckout(root: string): void {
   const line = `${WORKTREES.join('/')}/`;
   const gitDir = tryGit(root, ['rev-parse', '--git-common-dir']);
   if (!gitDir.ok) return;
@@ -873,7 +948,7 @@ function hideFromTheCheckout(root) {
 // writes.
 
 /** Is there anything in here that deleting the folder would lose? */
-export function folderState(root, folder) {
+export function folderState(root: string, folder: string): { dirty: boolean; merged: boolean } {
   const status = tryGit(folder, ['status', '--porcelain']);
   const dirty = !status.ok || status.out.length > 0;
   const head = tryGit(folder, ['rev-parse', 'HEAD']);
@@ -897,7 +972,7 @@ export function folderState(root, folder) {
  * folder is refused rather than quietly swapped for one. Called with no path at
  * all it answers exactly as it always did, which is every ordinary call.
  */
-function ownFolder(root, name, given) {
+function ownFolder(root: string, name: string, given: string | null | undefined): string | null {
   const mine = taskFolderPath(root, name);
   if (given === null || given === undefined) return mine;
   return real(given) === mine ? mine : null;
@@ -910,7 +985,7 @@ function ownFolder(root, name, given) {
  * would be committed onto the wrong one, or, on no branch at all, onto nothing
  * and then deleted.
  */
-const onItsOwnBranch = (root, folder, name) => record(root, folder)?.branch === taskBranch(name);
+const onItsOwnBranch = (root: string, folder: string, name: string) => record(root, folder)?.branch === taskBranch(name);
 
 /**
  * Give the folder back when the session is done with it. Removal is the rare
@@ -918,7 +993,7 @@ const onItsOwnBranch = (root, folder, name) => record(root, folder)?.branch === 
  * uncommitted. Every other answer names what is in the way, so the app can say
  * it rather than leave another invisible folder on her disk.
  */
-export function releaseTaskFolder(dir, id, { pid = process.pid, path: given = null } = {}) {
+export function releaseTaskFolder(dir: string, id: unknown, { pid = process.pid, path: given = null }: { pid?: number; path?: string | null } = {}) {
   const name = safeTaskName(id);
   const root = repoRoot(dir);
   if (!root) return { removed: false, reason: 'no-repo' };
@@ -965,14 +1040,14 @@ export function releaseTaskFolder(dir, id, { pid = process.pid, path: given = nu
  * submodule repository already on one of its remotes. Anything else stays
  * refused, kept and reported as before.
  */
-function removeWorktree(root, folder) {
+function removeWorktree(root: string, folder: string): GitResult {
   const removed = tryGit(root, ['worktree', 'remove', folder]);
   if (removed.ok || !/submodules/.test(removed.out)) return removed;
   if (!submodulesHoldNothingOfTheirOwn(folder)) return removed;
   return tryGit(root, ['worktree', 'remove', '--force', folder]);
 }
 
-function submodulesHoldNothingOfTheirOwn(folder) {
+function submodulesHoldNothingOfTheirOwn(folder: string): boolean {
   try {
     const status = tryGit(folder, ['status', '--porcelain', '--ignore-submodules=none']);
     if (!status.ok || status.out !== '') return false;
@@ -992,7 +1067,7 @@ function submodulesHoldNothingOfTheirOwn(folder) {
  * deletes it with the files. Asked of every level, since a submodule can hold
  * its own.
  */
-function everySubmoduleKeepsItsRepositoryOutside(at) {
+function everySubmoduleKeepsItsRepositoryOutside(at: string): boolean {
   const staged = tryGit(at, ['ls-files', '-s']);
   if (!staged.ok) return false;
   for (const line of staged.out.split('\n')) {
@@ -1006,10 +1081,10 @@ function everySubmoduleKeepsItsRepositoryOutside(at) {
 }
 
 /** Every repository in a `modules` directory, nested ones included. Throws on one it cannot read. */
-function repositoriesUnder(dir) {
+function repositoriesUnder(dir: string): string[] {
   if (!fs.existsSync(dir)) return [];
-  const found = [];
-  const walk = (at) => {
+  const found: string[] = [];
+  const walk = (at: string): void => {
     if (fs.existsSync(path.join(at, 'HEAD')) && fs.existsSync(path.join(at, 'objects'))) {
       found.push(at);
       if (fs.existsSync(path.join(at, 'modules'))) walk(path.join(at, 'modules'));
@@ -1060,7 +1135,7 @@ export const PARKED_INDEX = 'Parked when the task was closed (what was staged)';
  * wrote itself goes. That is the same boundary as removing any worktree, and the
  * alternative is committing secrets onto a branch.
  */
-export function parkTaskFolder(dir, id, { pid = process.pid, path: given = null } = {}) {
+export function parkTaskFolder(dir: string, id: unknown, { pid = process.pid, path: given = null }: { pid?: number; path?: string | null } = {}) {
   const name = safeTaskName(id);
   const root = repoRoot(dir);
   if (!root) return { parked: false, reason: 'no-repo' };
@@ -1125,7 +1200,7 @@ export function parkTaskFolder(dir, id, { pid = process.pid, path: given = null 
  * it, and still has to come back: there are parked branches on this Mac from
  * the old shape. One mixed reset is what it always was.
  */
-export function restoreTaskFolder(dir, id, { pid = process.pid } = {}) {
+export function restoreTaskFolder(dir: string, id: unknown, { pid = process.pid }: { pid?: number } = {}) {
   const made = ensureTaskFolder(dir, id, { pid });
   if (!made || made.taken === false) return made ?? null;
   const last = tryGit(made.path, ['log', '-1', '--format=%s']);
@@ -1172,7 +1247,7 @@ export function restoreTaskFolder(dir, id, { pid = process.pid } = {}) {
  * working in the folder could delete, turning a folder the app made into one it
  * will never reclaim).
  */
-export function inventoryWorktrees(dir) {
+export function inventoryWorktrees(dir: string): WorktreeInventory[] {
   const root = repoRoot(dir);
   if (!root) return [];
   const list = registered(root);
@@ -1219,7 +1294,7 @@ export function inventoryWorktrees(dir) {
  * registration pointing at nothing: that is a different fact with its own field
  * and its own answer, `pruneMissingWorktrees`.
  */
-export function strayWorktrees(dir) {
+export function strayWorktrees(dir: string): WorktreeInventory[] {
   return inventoryWorktrees(dir)
     .filter((w) => !w.primary && !w.ours && !w.unfinished && !w.missing && !w.prunable);
 }
@@ -1237,7 +1312,7 @@ export function strayWorktrees(dir) {
  * the app locks every folder it makes, which would otherwise leave the
  * registration of a deleted folder wedged there forever.
  */
-export function pruneMissingWorktrees(dir) {
+export function pruneMissingWorktrees(dir: string): string[] {
   const root = repoRoot(dir);
   if (!root) return [];
   const gone = inventoryWorktrees(dir).filter((w) => !w.primary && (w.missing || w.prunable));
@@ -1257,7 +1332,7 @@ export function pruneMissingWorktrees(dir) {
  * `inventoryWorktrees` above is the wider one, and the comment there is why they
  * are not the same list.
  */
-export function listTaskFolders(dir) {
+export function listTaskFolders(dir: string): TaskFolderListing[] {
   const root = repoRoot(dir);
   if (!root) return [];
   return inventoryWorktrees(dir)

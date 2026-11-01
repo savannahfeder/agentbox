@@ -23,6 +23,7 @@
 // answered by the code the desktop app answers with.
 
 import http from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -34,11 +35,14 @@ import { mediaResponse, mediaType, servable } from './img-scheme.mts';
 import { readPictureShape } from './picture-shape.mts';
 import { loadConfig } from './config.mjs';
 import { Store } from './store.mts';
+import type { StoreConfig, StoreProduct } from './store.mts';
 import { Supervisor } from './supervisor.mts';
+import type { SupervisorConfig } from './supervisor.mts';
 import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mts';
 import { registerIpc } from './ipc.mts';
 import { reportFromRenderer } from './crash-report.mts';
 import { createAnalytics, createDailyCount } from './analytics.mts';
+import type { AnalyticsConfig } from './analytics.mts';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mts';
 import { ensurePersonalProject } from './team/projects.mts';
@@ -58,8 +62,57 @@ const repoRoot = path.dirname(here);
  *  fire-and-forget half, and over http a caller who does not want the answer
  *  can simply ignore it.
  */
-export function collectingIpcMain() {
-  const handlers = new Map();
+export type IpcHandler = { bivarianceHack(event: { sender: unknown }, payload?: unknown): unknown }['bivarianceHack'];
+
+export interface CollectingIpcMain {
+  handlers: Map<string, IpcHandler>;
+  handle(channel: string, fn: IpcHandler): void;
+  on(channel: string, fn: IpcHandler): void;
+  removeHandler(channel: string): void;
+}
+
+export interface PushMessage { channel: string; args: unknown[] }
+
+export type PushListener = (message: PushMessage) => void;
+
+export interface NodeHost {
+  ipcMain: CollectingIpcMain;
+  shell: { openExternal(url: string): Promise<void> };
+  app: {
+    isPackaged: boolean;
+    getVersion(): string;
+    on(event: string, fn: (event: { preventDefault(): void }) => void): void;
+    quit(): void;
+  };
+  dialog: { showOpenDialog(): Promise<{ canceled: boolean; noDialog: boolean; filePaths: string[] }> };
+}
+
+export interface PictureRule { allows(kind: string, file: string): boolean }
+
+export type HeadlessConfig = StoreConfig & SupervisorConfig & AnalyticsConfig & { accountRoot: string; storeRoot: string };
+
+export interface BootOptions {
+  dataDir?: string;
+  appDir?: string;
+  userDir?: string;
+  openExternal?: (url: string) => void;
+  host?: NodeHost | null;
+  countClient?: Parameters<typeof createAnalytics>[0] extends infer O ? O extends { client?: infer C } ? C : never : never;
+  now?: () => number;
+}
+
+export type DoorToken = string | (() => string);
+
+export interface HandlerOptions {
+  channels: Map<string, IpcHandler>;
+  token: DoorToken;
+  listeners?: Set<PushListener>;
+  dist?: string;
+  files?: PictureRule | null;
+}
+
+export function collectingIpcMain(): CollectingIpcMain {
+  const handlers = new Map<string, IpcHandler>();
   return {
     handlers,
     handle(channel, fn) { handlers.set(channel, fn); },
@@ -76,12 +129,12 @@ export function collectingIpcMain() {
  *  what the websocket half will hand to the tab.
  */
 export function broadcastingWindow() {
-  const listeners = new Set();
+  const listeners = new Set<PushListener>();
   return {
     listeners,
     isDestroyed: () => false,
     webContents: {
-      send(channel, ...args) {
+      send(channel: string, ...args: unknown[]) {
         for (const send of listeners) {
           try { send({ channel, args }); } catch { /* a closed tab is not an error */ }
         }
@@ -104,11 +157,11 @@ export function broadcastingWindow() {
  *  back with a real absolute path. `noDialog` is the flag that tells it to.
  *  See main/folders.mts.
  */
-export function nodeHost({ onQuit = () => {}, openExternal = openInBrowser } = {}) {
-  const quitHooks = [];
+export function nodeHost({ onQuit = () => {}, openExternal = openInBrowser }: { onQuit?: () => void; openExternal?: (url: string) => void } = {}): NodeHost {
+  const quitHooks: ((event: { preventDefault(): void }) => void)[] = [];
   return {
     ipcMain: collectingIpcMain(),
-    shell: { openExternal: async (url) => { openExternal(url); } },
+    shell: { openExternal: async (url: string) => { openExternal(url); } },
     app: {
       isPackaged: false,
       getVersion: () => readVersion(),
@@ -121,7 +174,7 @@ export function nodeHost({ onQuit = () => {}, openExternal = openInBrowser } = {
   };
 }
 
-function openInBrowser(url) {
+function openInBrowser(url: string) {
   const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
   try {
     spawn(cmd, [url], { detached: true, stdio: 'ignore', shell: process.platform === 'win32' }).unref();
@@ -151,7 +204,7 @@ function readVersion() {
  *  same scrubbed path as the desktop's, which writes nothing until crash
  *  reports are set up for this process.
  */
-export function answerWhatOnlyTheWindowAnswered(ipcMain) {
+export function answerWhatOnlyTheWindowAnswered(ipcMain: CollectingIpcMain) {
   ipcMain.handle('zero:badge', () => null);
   ipcMain.handle('zero:corner-tag', () => null);
   ipcMain.handle('zero:notify', () => null);
@@ -174,8 +227,8 @@ export function answerWhatOnlyTheWindowAnswered(ipcMain) {
  *  writes into it, and a checkout carries none and sends nothing.
  *  `countClient` and `now` are for tests.
  */
-export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, userDir = dataDir, openExternal = openInBrowser, host = null, countClient = null, now = Date.now } = {}) {
-  const config = loadConfig(dataDir);
+export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, userDir = dataDir, openExternal = openInBrowser, host = null, countClient = null, now = Date.now }: BootOptions = {}) {
+  const config = loadConfig(dataDir) as unknown as HeadlessConfig;
   // The browser editor uses the same user files as the desktop. Finish the
   // older migrations first so only user content enters the combined file.
   carryHerBriefsAcross(appDir, userDir);
@@ -200,7 +253,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   // opens, so a project made after that is one the first snapshot does not carry.
   try {
     ensurePersonalProject(config.accountRoot);
-  } catch (err) { console.warn(`zero: could not make My Workspace: ${err.message}`); }
+  } catch (err) { console.warn(`zero: could not make My Workspace: ${(err as Error).message}`); }
   const store = await new Store(config).init();
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   const window = broadcastingWindow();
@@ -259,9 +312,9 @@ export const newToken = () => crypto.randomBytes(24).toString('base64url');
  * Pictures only. A whole document is served under a grant the pane opens one
  * at a time (main/doc-scheme.mts) and this copy opens none.
  */
-export function picturesTheAppOwns({ config, store }) {
+export function picturesTheAppOwns({ config, store }: { config?: { accountRoot?: string } | null; store?: { listProducts?: () => { repoPath?: string | null }[] } | null }): PictureRule {
   return {
-    allows: (kind, file) => kind === 'img' && servable(file, [
+    allows: (kind: string, file: string) => kind === 'img' && servable(file, [
       config?.accountRoot,
       ...(store?.listProducts?.() ?? []).map((p) => p.repoPath),
     ].filter(Boolean)),
@@ -274,7 +327,7 @@ export function picturesTheAppOwns({ config, store }) {
  * the phone's key, which starts agents and approves their requests. This is
  * made from that key, changes when it is reset, and opens nothing but /f/.
  */
-export const fileKey = (token) => crypto.createHmac('sha256', String(token ?? '')).update('agentbox-files').digest('base64url').slice(0, 32);
+export const fileKey = (token?: unknown) => crypto.createHmac('sha256', String(token ?? '')).update('agentbox-files').digest('base64url').slice(0, 32);
 
 /**
  * THE PAGE SAYS WHICH DOOR IT CAME THROUGH.
@@ -288,7 +341,7 @@ export const fileKey = (token) => crypto.createHmac('sha256', String(token ?? ''
  */
 export const DOOR_MARK = '<meta name="agentbox-door" content="this-computer">';
 
-export function markTheDoor(html) {
+export function markTheDoor(html: unknown) {
   const text = typeof html === 'string' ? html : String(html);
   if (text.includes('name="agentbox-door"')) return text;
   const head = /<head[^>]*>/i.exec(text);
@@ -297,7 +350,7 @@ export function markTheDoor(html) {
   return text.slice(0, after) + DOOR_MARK + text.slice(after);
 }
 
-const MIME = {
+const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.htm': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -329,15 +382,15 @@ const MIME = {
  * `..` cannot climb out of what it allows. Never from memory, for the reason
  * the desktop's schemes give: a picture an agent redraws keeps its name.
  */
-async function answerFile(req, res, url, { token, files }) {
+async function answerFile(req: IncomingMessage, res: ServerResponse, url: URL, { token, files }: { token: DoorToken; files: PictureRule }) {
   const [, , key, kind, ...rest] = url.pathname.split('/');
   if (kind !== 'doc' && kind !== 'img' && kind !== 'shape') { res.writeHead(404).end('No such kind of file.'); return; }
   if (!sameKey(key, fileKey(typeof token === 'function' ? token() : token))) { res.writeHead(403).end('Wrong key.'); return; }
-  let file;
+  let file: string;
   try { file = path.normalize('/' + rest.map(decodeURIComponent).join('/')); } catch { res.writeHead(400).end('Bad path.'); return; }
   // A shape is asked of a picture, under the picture's own rule.
   if (!path.isAbsolute(file) || !files.allows(kind === 'shape' ? 'img' : kind, file)) { res.writeHead(403).end('Not available.'); return; }
-  let stat;
+  let stat: fs.Stats;
   try { stat = await fs.promises.stat(file); } catch { res.writeHead(404).end('Not there.'); return; }
   if (!stat.isFile()) { res.writeHead(404).end('Not there.'); return; }
   // ITS WIDTH AND HEIGHT, so a picture the phone has never seen holds its
@@ -374,7 +427,7 @@ async function answerFile(req, res, url, { token, files }) {
  *  `listeners` is the Set off `broadcastingWindow`, which is where the pushes
  *  going the other way are waiting for somewhere to go.
  */
-export function createServer(options) {
+export function createServer(options: HandlerOptions) {
   return http.createServer(createHandler(options));
 }
 
@@ -383,9 +436,9 @@ export function createServer(options) {
  * own server in front of it. `token` may be a function, read on every request,
  * so a key that is reset stops working at once.
  */
-export function createHandler({ channels, token, listeners = new Set(), dist = path.join(repoRoot, 'renderer', 'dist'), files = null }) {
-  return async (req, res) => {
-    const url = new URL(req.url, 'http://127.0.0.1');
+export function createHandler({ channels, token, listeners = new Set(), dist = path.join(repoRoot, 'renderer', 'dist'), files = null }: HandlerOptions) {
+  return async (req: IncomingMessage, res: ServerResponse) => {
+    const url = new URL(req.url!, 'http://127.0.0.1');
 
     // A file for the phone, behind the file key rather than the phone's own.
     // Only a server that was handed `files` has any to give.
@@ -436,7 +489,7 @@ export function createHandler({ channels, token, listeners = new Set(), dist = p
         connection: 'keep-alive',
       });
       res.write('retry: 1000\n\n');
-      const send = (message) => res.write(`data: ${JSON.stringify(message)}\n\n`);
+      const send = (message: PushMessage) => res.write(`data: ${JSON.stringify(message)}\n\n`);
       listeners.add(send);
       // A proxy or a sleeping laptop will drop a silent connection, and the
       // screen only finds out when a push goes missing. A comment every twenty
@@ -454,7 +507,7 @@ export function createHandler({ channels, token, listeners = new Set(), dist = p
         res.end(JSON.stringify({ error: `No channel named ${channel}` }));
         return;
       }
-      let payload;
+      let payload: unknown;
       try {
         const body = await readBody(req);
         payload = body ? JSON.parse(body) : undefined;
@@ -471,7 +524,7 @@ export function createHandler({ channels, token, listeners = new Set(), dist = p
         res.end(JSON.stringify(value ?? null));
       } catch (err) {
         res.writeHead(500, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: String(err?.message ?? err) }));
+        res.end(JSON.stringify({ error: String((err as Error)?.message ?? err) }));
       }
       return;
     }
@@ -514,16 +567,16 @@ export function createHandler({ channels, token, listeners = new Set(), dist = p
  * the refusals. Both sides are hashed first because a length that differs is
  * itself a thing `timingSafeEqual` would refuse at once.
  */
-export function sameKey(given, key) {
+export function sameKey(given: unknown, key: unknown) {
   if (typeof given !== 'string' || typeof key !== 'string' || !given || !key) return false;
-  const digest = (s) => crypto.createHash('sha256').update(s).digest();
+  const digest = (s: string) => crypto.createHash('sha256').update(s).digest();
   return crypto.timingSafeEqual(digest(given), digest(key));
 }
 
-function readBody(req) {
-  return new Promise((resolve, reject) => {
+function readBody(req: IncomingMessage) {
+  return new Promise<string>((resolve, reject) => {
     let body = '';
-    req.on('data', (c) => {
+    req.on('data', (c: Buffer) => {
       body += c;
       // This is here so a stuck client cannot eat the process. A PHONE'S
       // UPLOADS DO COME THROUGH HERE, though: it has no file paths, so a

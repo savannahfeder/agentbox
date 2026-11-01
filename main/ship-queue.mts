@@ -23,31 +23,76 @@
 // anything at all.
 
 import { spawn, execFile } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Name } from '../shared/product-name.mjs';
 import { SHIP_FAILED } from '../shared/not-shipped.mjs';
 import { conflictBrief, earlyConflictNote } from './ship-conflict-brief.mts';
+import type { ConflictThread } from './ship-conflict-brief.mts';
 import { redOnMain } from './main-went-red.mts';
 
 export const SHIP_LABEL = 'ship';
 const SHIP_MS = 20 * 60 * 1000;
 const KEEP = 4000;
 
-export const shipSettingsFile = (userDir) => path.join(userDir, 'ship.json');
+export interface ShipItem {
+  id: string;
+  product: string;
+  status?: string;
+  priority?: number;
+  labels?: string[];
+  updatedAt?: number;
+  wrote?: { labels?: { ts?: number } };
+}
+
+export interface ShipProduct { slug: string; repoPath?: string | null }
+
+export type ShipSettings = Record<string, { script?: unknown } | undefined>;
+
+export type ShipHandled = Record<string, number>;
+
+export interface ShipJob { item: ShipItem; product: ShipProduct; script: string; cwd: string }
+
+export interface ShipRun { code: number; out: string }
+
+export interface ShipStore {
+  readItem?(slug: string, id: string): ConflictThread | null | undefined;
+  shipped(slug: string, id: string, result: { sha: string | null; labels: string[] }): unknown;
+  shipFailed(slug: string, id: string, result: { note: string; labels: string[] }): unknown;
+}
+
+export interface ShipLog {
+  info?: (...args: unknown[]) => void;
+  warn?: (...args: unknown[]) => void;
+}
+
+export interface ShipQueueOptions {
+  store: ShipStore;
+  userDir: string;
+  folderFor: (item: ShipItem, product: ShipProduct) => string | null;
+  isLive: (item: ShipItem) => boolean;
+  liveSince?: (item: ShipItem) => number | null;
+  handBack?: (item: ShipItem, reply: string) => void;
+  run?: (script: string, cwd: string, options?: { timeout?: number; env?: NodeJS.ProcessEnv }) => Promise<ShipRun>;
+  afterShip?: (shipped: { item: ShipItem; product: ShipProduct; sha: string | null }) => void;
+  log?: ShipLog;
+}
+
+export const shipSettingsFile = (userDir: string) => path.join(userDir, 'ship.json');
 
 // WHICH "READY" EACH TASK HAS ALREADY BEEN SHIPPED FOR, by the moment its
 // label was written. Taking the label off is not enough: a label the person
 // put on outranks the app on the ledger, so the app's removal is ignored, and
 // on the first real run that shipped a task and then ran it twice more
 // (2026-10-02). A new label carries a new moment and ships again.
-const handledFile = (userDir) => path.join(userDir, 'ship-handled.json');
-const keyOf = (item) => `${item.product}/${item.id}`;
-const markedAt = (item) => item.wrote?.labels?.ts ?? item.updatedAt ?? 0;
-function readHandled(userDir) {
+const handledFile = (userDir: string) => path.join(userDir, 'ship-handled.json');
+const keyOf = (item: ShipItem) => `${item.product}/${item.id}`;
+const markedAt = (item: ShipItem) => item.wrote?.labels?.ts ?? item.updatedAt ?? 0;
+function readHandled(userDir: string): ShipHandled {
   try { const raw = JSON.parse(fs.readFileSync(handledFile(userDir), 'utf8')); return raw && typeof raw === 'object' ? raw : {}; } catch { return {}; }
 }
-function writeHandled(userDir, all) {
+function writeHandled(userDir: string, all: ShipHandled) {
   try {
     const tmp = `${handledFile(userDir)}.${process.pid}.tmp`;
     fs.writeFileSync(tmp, `${JSON.stringify(all)}\n`);
@@ -56,7 +101,7 @@ function writeHandled(userDir, all) {
 }
 
 /** `{ [projectSlug]: { script: 'scripts/ship.mjs' } }`, or `{}`. */
-export function readShipSettings(userDir) {
+export function readShipSettings(userDir: string): ShipSettings {
   try {
     const raw = JSON.parse(fs.readFileSync(shipSettingsFile(userDir), 'utf8'));
     return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
@@ -66,8 +111,8 @@ export function readShipSettings(userDir) {
 }
 
 /** The script that ships this project, inside its base checkout, or null. */
-export function shipScriptFor(product, settings) {
-  const rel = settings?.[product?.slug]?.script;
+export function shipScriptFor(product: ShipProduct | null | undefined, settings?: ShipSettings | null) {
+  const rel = settings?.[product?.slug as string]?.script;
   if (!product?.repoPath || typeof rel !== 'string' || !rel || path.isAbsolute(rel)) return null;
   const base = path.resolve(product.repoPath);
   const script = path.resolve(base, rel);
@@ -75,9 +120,9 @@ export function shipScriptFor(product, settings) {
   return fs.existsSync(script) ? script : null;
 }
 
-const labelsOf = (item) => (Array.isArray(item?.labels) ? item.labels : []);
-export const wantsShipping = (item) => labelsOf(item).includes(SHIP_LABEL);
-export const withoutShipLabel = (item) => labelsOf(item).filter((l) => l !== SHIP_LABEL);
+const labelsOf = (item?: { labels?: unknown } | null): string[] => (Array.isArray(item?.labels) ? item.labels : []);
+export const wantsShipping = (item?: { labels?: unknown } | null) => labelsOf(item).includes(SHIP_LABEL);
+export const withoutShipLabel = (item?: { labels?: unknown } | null) => labelsOf(item).filter((l) => l !== SHIP_LABEL);
 
 /**
  * Every task this queue still owes a ship, whether or not a session is on it.
@@ -90,19 +135,19 @@ export const withoutShipLabel = (item) => labelsOf(item).filter((l) => l !== SHI
  * A CLOSED ROW STILL SHIPS, because a close is not a cancel. The window
  * leaves closed rows out (`waitingIds`), so one stays in Done while it ships.
  */
-export const owedAShip = (item, handled = {}) => wantsShipping(item) && !(markedAt(item) <= (handled[keyOf(item)] ?? -1));
+export const owedAShip = (item: ShipItem, handled: ShipHandled = {}) => wantsShipping(item) && !(markedAt(item) <= (handled[keyOf(item)] ?? -1));
 
-export function waitingToShip(items, products, settings, { folderFor, handled = {} }) {
+export function waitingToShip(items: ShipItem[], products: ShipProduct[], settings: ShipSettings, { folderFor, handled = {} }: { folderFor: ShipQueueOptions['folderFor']; handled?: ShipHandled }): ShipJob[] {
   const bySlug = new Map(products.map((p) => [p.slug, p]));
   return items
     .filter((i) => owedAShip(i, handled))
     .map((item) => {
       const product = bySlug.get(item.product);
       const script = product ? shipScriptFor(product, settings) : null;
-      const cwd = script ? folderFor(item, product) : null;
+      const cwd = script ? folderFor(item, product!) : null;
       return script && cwd && fs.existsSync(cwd) ? { item, product, script, cwd } : null;
     })
-    .filter(Boolean);
+    .filter(Boolean) as ShipJob[];
 }
 
 /**
@@ -118,17 +163,17 @@ export function waitingToShip(items, products, settings, { folderFor, handled = 
  * Priority before age, the way `shared/work-items.mjs` orders the queue a
  * puller sees: a thread the person is waiting on queued behind every older one.
  */
-export function nextToShip(items, products, settings, {
+export function nextToShip(items: ShipItem[], products: ShipProduct[], settings: ShipSettings, {
   isLive = () => false, liveSince = () => null, folderFor, handled = {},
-}) {
+}: { isLive?: ShipQueueOptions['isLive']; liveSince?: NonNullable<ShipQueueOptions['liveSince']>; folderFor: ShipQueueOptions['folderFor']; handled?: ShipHandled }) {
   const ready = waitingToShip(items, products, settings, { folderFor, handled })
-    .filter(({ item }) => !isLive(item) || liveSince(item) > markedAt(item));
+    .filter(({ item }) => !isLive(item) || liveSince(item)! > markedAt(item));
   ready.sort((a, b) => (b.item.priority ?? 0) - (a.item.priority ?? 0) || markedAt(a.item) - markedAt(b.item));
   return ready[0] ?? null;
 }
 
 /** The commit the script reports, from its own `ship: shipped <sha>.` line. */
-export function shippedSha(output) {
+export function shippedSha(output?: unknown) {
   return String(output ?? '').match(/ship: shipped ([0-9a-f]{7,40})\./)?.[1] ?? null;
 }
 
@@ -182,9 +227,8 @@ const DIED = 'the test run died without naming a failing test';
  * have to be told apart: offering the nearest line instead sends whoever
  * reads it after a fault that is not there.
  *
- * @returns {{ died: boolean, why: string|null, last: string|null, failed: number|null }}
  */
-export function whyItDidNotShip(output) {
+export function whyItDidNotShip(output?: unknown): { died: boolean; why: string | null; last: string | null; failed: number | null } {
   const lines = String(output ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
   const said = lines.filter((l) => !TICKED_GREEN.test(l) && !QUOTED_SOURCE.test(l));
   const named = said.filter((l) => NAMES_A_FAILURE.test(l));
@@ -199,13 +243,13 @@ export function whyItDidNotShip(output) {
 }
 
 /** "3 tests failed, the first is FAIL tests/…", or just the line. */
-function diagnosis({ why, failed }) {
+function diagnosis({ why, failed }: { why: string | null; failed: number | null }) {
   if (!why || !failed) return why;
   return `${failed} test${failed === 1 ? '' : 's'} failed, the first is ${why}`;
 }
 
 /** What the agent is told when its branch did not ship. */
-export function failureReply(output, { brief = null } = {}) {
+export function failureReply(output: unknown, { brief = null }: { brief?: string | null } = {}) {
   const tail = String(output ?? '').trim().slice(-KEEP);
   const { died, ...rest } = whyItDidNotShip(output);
   return [
@@ -235,9 +279,9 @@ export function failureReply(output, { brief = null } = {}) {
 }
 
 /** The line the thread shows: the app's own, short, and the first error in it. */
-export function failureNote(output) {
+export function failureNote(output: unknown) {
   const { died, last, ...rest } = whyItDidNotShip(output);
-  const said = died ? `${DIED}. It last said: ${last ?? 'nothing at all'}` : diagnosis(rest);
+  const said = died ? `${DIED}. It last said: ${last ?? 'nothing at all'}` : diagnosis(rest)!;
   return `${SHIP_FAILED}${said.slice(0, 300)}`;
 }
 
@@ -247,8 +291,8 @@ export function failureNote(output) {
  * relative 'scripts/hooks' resolving to the branch's own, worker-edited copy.
  * Pinning the base copy here is what keeps the gate the branch cannot change.
  */
-function baseHooksPath(cwd) {
-  return new Promise((resolve) => {
+function baseHooksPath(cwd: string) {
+  return new Promise<string | null>((resolve) => {
     execFile('git', ['-C', cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', timeout: 10_000 }, (err, stdout) => {
       const common = err ? '' : String(stdout).trim();
       resolve(common ? path.resolve(common, '..', 'scripts', 'hooks') : null);
@@ -256,26 +300,26 @@ function baseHooksPath(cwd) {
   });
 }
 
-export async function runScript(script, cwd, { timeout = SHIP_MS, env = process.env } = {}) {
+export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, env = process.env }: { timeout?: number; env?: NodeJS.ProcessEnv } = {}): Promise<ShipRun> {
   const node = env.npm_node_execpath && fs.existsSync(env.npm_node_execpath) ? env.npm_node_execpath : 'node';
   const hooks = await baseHooksPath(cwd);
   const baseGate = hooks
     ? { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.hooksPath', GIT_CONFIG_VALUE_0: hooks }
     : {};
-  return new Promise((resolve) => {
+  return new Promise<ShipRun>((resolve) => {
     let out = '';
-    let child;
+    let child: ChildProcess;
     try {
       child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0', ...baseGate }, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (e) {
-      resolve({ code: 1, out: String(e?.message ?? e) });
+      resolve({ code: 1, out: String((e as Error)?.message ?? e) });
       return;
     }
-    const keep = (b) => { out = (out + b).slice(-64 * 1024); };
-    child.stdout.on('data', keep);
-    child.stderr.on('data', keep);
+    const keep = (b: Buffer | string) => { out = (out + b).slice(-64 * 1024); };
+    child.stdout!.on('data', keep);
+    child.stderr!.on('data', keep);
     const timer = setTimeout(() => { keep('\nship: stopped after 20 minutes.'); child.kill('SIGTERM'); }, timeout);
-    child.on('error', (e) => keep(`\n${e.message}`));
+    child.on('error', (e: Error) => keep(`\n${e.message}`));
     child.on('close', (code) => { clearTimeout(timer); resolve({ code: code ?? 1, out }); });
   });
 }
@@ -285,13 +329,25 @@ export async function runScript(script, cwd, { timeout = SHIP_MS, env = process.
  * supervisor's own tick and returns at once; the run happens beside it.
  */
 export class ShipQueue {
-  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, log = console }) {
+  declare store: ShipStore;
+  declare userDir: string;
+  declare folderFor: ShipQueueOptions['folderFor'];
+  declare isLive: ShipQueueOptions['isLive'];
+  declare liveSince: NonNullable<ShipQueueOptions['liveSince']>;
+  declare handBack: NonNullable<ShipQueueOptions['handBack']>;
+  declare run: NonNullable<ShipQueueOptions['run']>;
+  declare afterShip: NonNullable<ShipQueueOptions['afterShip']>;
+  declare log: ShipLog;
+  declare busy: Promise<unknown> | null;
+  declare earlyConflicts: Map<string, string>;
+
+  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, log = console }: ShipQueueOptions) {
     Object.assign(this, { store, userDir, folderFor, isLive, liveSince, handBack, run, afterShip, log });
     this.busy = null;
     this.earlyConflicts = new Map();
   }
 
-  tick(items, products) {
+  tick(items: ShipItem[], products: ShipProduct[]) {
     if (this.busy) return null;
     const settings = readShipSettings(this.userDir);
     if (!Object.keys(settings).length) return null;
@@ -309,7 +365,7 @@ export class ShipQueue {
   }
 
   /** The ids of the rows still waiting on this queue, for the window. */
-  waitingIds(items, products) {
+  waitingIds(items: ShipItem[], products: ShipProduct[]) {
     const settings = readShipSettings(this.userDir);
     if (!Object.keys(settings).length) return [];
     return waitingToShip(items, products, settings, { folderFor: this.folderFor, handled: readHandled(this.userDir) })
@@ -318,7 +374,7 @@ export class ShipQueue {
   }
 
   /** Whether this row's folder must stay for a ship still to come. */
-  owes(item, products) {
+  owes(item: ShipItem, products: ShipProduct[]) {
     const settings = readShipSettings(this.userDir);
     if (!Object.keys(settings).length) return false;
     return waitingToShip([item], products, settings, { folderFor: this.folderFor, handled: readHandled(this.userDir) }).length > 0;
@@ -326,7 +382,7 @@ export class ShipQueue {
 
   // A thread id from a merge on main, read from this project or another one on
   // the same checkout.
-  _readThread(id, product, products) {
+  _readThread(id: string, product: ShipProduct, products?: ShipProduct[] | null) {
     const slugs = [product.slug, ...(products ?? []).filter((p) => p.slug !== product.slug && p.repoPath && p.repoPath === product.repoPath).map((p) => p.slug)];
     for (const slug of slugs) {
       const found = this.store.readItem?.(slug, id);
@@ -338,7 +394,7 @@ export class ShipQueue {
   // After a ship lands, every other open branch of a project that ships is
   // checked against the new main with `git merge-tree`, which reads commits and
   // touches no task folder. A conflict waits here for that thread's next run.
-  async _findNewConflicts(shipped, items, products) {
+  async _findNewConflicts(shipped: ShipItem, items?: ShipItem[] | null, products?: ShipProduct[] | null) {
     const settings = readShipSettings(this.userDir);
     const bySlug = new Map((products ?? []).map((p) => [p.slug, p]));
     for (const other of items ?? []) {
@@ -347,20 +403,20 @@ export class ShipQueue {
       const cwd = this.folderFor(other, product);
       if (!cwd || !fs.existsSync(cwd)) continue;
       try {
-        const note = await earlyConflictNote({ cwd, readThread: (id) => this._readThread(id, product, products) });
+        const note = await earlyConflictNote({ cwd, readThread: (id: string) => this._readThread(id, product, products) });
         if (note) this.earlyConflicts.set(keyOf(other), note); else this.earlyConflicts.delete(keyOf(other));
-      } catch (e) { this.log.warn?.(`zero: could not check ${other.id} against main:`, e.message); }
+      } catch (e) { this.log.warn?.(`zero: could not check ${other.id} against main:`, (e as Error).message); }
     }
   }
 
   /** What main's last ship means for this thread's branch, once, or null. */
-  takeEarlyConflict(item) {
+  takeEarlyConflict(item: ShipItem) {
     const note = this.earlyConflicts.get(keyOf(item)) ?? null;
     this.earlyConflicts.delete(keyOf(item));
     return note;
   }
 
-  async ship({ item, product, script, cwd }, products = [], items = []) {
+  async ship({ item, product, script, cwd }: ShipJob, products: ShipProduct[] = [], items: ShipItem[] = []) {
     this.log.info?.(`zero: shipping ${item.id} from ${cwd}`);
     // The push hook leaves tests already red on main out of its refusal.
     const red = redOnMain(this.userDir);
@@ -379,17 +435,17 @@ export class ShipQueue {
         await this._findNewConflicts(item, items, products);
       } else {
         this.store.shipFailed(product.slug, item.id, { note: failureNote(out), labels: withoutShipLabel(item) });
-        let brief = null;
+        let brief: string | null = null;
         try {
-          brief = await conflictBrief({ cwd, output: out, readThread: (id) => this._readThread(id, product, products) });
-        } catch (e) { this.log.warn?.(`zero: could not brief the conflict on ${item.id}:`, e.message); }
+          brief = await conflictBrief({ cwd, output: out, readThread: (id: string) => this._readThread(id, product, products) });
+        } catch (e) { this.log.warn?.(`zero: could not brief the conflict on ${item.id}:`, (e as Error).message); }
         // Straight back to the session that wrote the change. Not through the
         // reply on the row: that field is hers, and the app's words written
         // there would be drawn as hers and could not replace hers anyway.
         this.handBack(item, failureReply(out, { brief }));
       }
     } catch (e) {
-      this.log.warn?.(`zero: could not record the ship of ${item.id}:`, e.message);
+      this.log.warn?.(`zero: could not record the ship of ${item.id}:`, (e as Error).message);
     }
     return { code };
   }

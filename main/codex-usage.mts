@@ -63,7 +63,16 @@
 
 import { codexLimits, mergeRateLimits } from '../shared/codex-usage.mjs';
 import { limitsStillRunning } from '../shared/usage.mjs';
+import type { UsageLimit } from '../shared/usage.mjs';
 import { loggedCodexLimits } from './codex-usage-file.mts';
+import type { LoggedLimits } from './codex-usage-file.mts';
+
+export interface LimitsReading {
+  limits: UsageLimit[];
+  at: number;
+}
+
+type ReadLog = (home: string | null, opts: { now: number }) => LoggedLimits | null;
 
 const LOG_EVERY_MS = 30_000;
 
@@ -84,30 +93,50 @@ const PUSH_FRESH_MS = 60_000;
  * no limits rather than zeroes, and a window that has reset since is dropped,
  * because a login not in use can go days without a new reading.
  */
-export function codexAccountReadings({ profiles, homeOf, current = null, currentHome = null, now = Date.now(), readLog = loggedCodexLimits }) {
+export function codexAccountReadings<P>({ profiles, homeOf, current = null, currentHome = null, now = Date.now(), readLog = loggedCodexLimits }: {
+  profiles: P[];
+  homeOf: (profile: P) => string | null;
+  current?: LimitsReading | null;
+  currentHome?: string | null;
+  now?: number;
+  readLog?: ReadLog;
+}): { profile: P; limits?: UsageLimit[]; at?: number }[] {
   return profiles.map((profile) => {
     const home = homeOf(profile);
     const live = !!current?.limits?.length && home === currentHome;
-    const reading = live ? current : readLog(home, { now });
+    const reading: { snapshot?: object; at: number } | null = live ? current : readLog(home, { now });
     const limits = limitsStillRunning(live ? current.limits : codexLimits(reading?.snapshot), now);
-    return limits.length ? { profile, limits, at: reading.at } : { profile };
+    return limits.length ? { profile, limits, at: reading!.at } : { profile };
   });
 }
 
 export class CodexUsage {
+  declare _home: () => string | null;
+  declare _onChange: () => void;
+  declare _now: () => number;
+  declare _readLog: ReadLog;
+  declare _snapshot: object | null;
+  declare _at: number;
+  declare _takenUnder: string | null;
+  declare _loggedRead: { home: string | null; at: number; value: LimitsReading | null } | null;
+
   /**
-   * @param {object} how @param { => string|null} how.home Which CODEX_HOME the
+   * @param how @param how.home Which CODEX_HOME the
    * current login is, so a reading taken under another one is dropped rather
-   * than redrawn. @param { => void} [how.onChange] Told when the figures move,
+   * than redrawn. @param [how.onChange] Told when the figures move,
    * so the window redraws. Never called for an update that changed nothing.
    */
-  constructor({ home = () => null, onChange = () => {}, now = () => Date.now(), readLog = loggedCodexLimits } = {}) {
+  constructor({ home = () => null, onChange = () => {}, now = () => Date.now(), readLog = loggedCodexLimits }: {
+    home?: () => string | null;
+    onChange?: () => void;
+    now?: () => number;
+    readLog?: ReadLog;
+  } = {}) {
     this._home = home;
     this._onChange = onChange;
     this._now = now;
     /** Handed in so a test can answer without a session log on disk. */
     this._readLog = readLog;
-    /** @type {{ primary: object|null, secondary: object|null }|null} */
     this._snapshot = null;
     this._at = 0;
     this._takenUnder = null;
@@ -121,7 +150,7 @@ export class CodexUsage {
    * than a bar full of zeroes: a limit nobody has read is not a limit at
    * nothing.
    */
-  read() {
+  read(): LimitsReading | null {
     if (this._takenUnder !== null && this._takenUnder !== this._home()) this._forget();
     const limits = codexLimits(this._snapshot);
     const pushed = limits.length ? { limits, at: this._at } : null;
@@ -141,7 +170,7 @@ export class CodexUsage {
    * `read()` with the log cache dropped, for a person who pressed Refresh:
    *  inside `LOG_EVERY_MS` a press would otherwise change nothing. It asks
    *  nobody anything, so both rules at the top of this file still hold. */
-  refreshNow() {
+  refreshNow(): LimitsReading | null {
     this._loggedRead = null;
     return this.read();
   }
@@ -149,7 +178,7 @@ export class CodexUsage {
   /**
    * The last figure in Codex's own session log under this home, shaped exactly
    *  like a pushed one. Null on a Mac where Codex has never run. */
-  _logged() {
+  _logged(): LimitsReading | null {
     // Asked on every request the window makes; the log is walked at most
     // every half minute.
     const home = this._home();
@@ -157,7 +186,7 @@ export class CodexUsage {
     if (this._loggedRead && this._loggedRead.home === home && now - this._loggedRead.at < LOG_EVERY_MS) return this._loggedRead.value;
     const reading = this._readLog(home, { now });
     const limits = codexLimits(reading?.snapshot);
-    const value = limits.length ? { limits, at: reading.at } : null;
+    const value = limits.length ? { limits, at: reading!.at } : null;
     this._loggedRead = { home, at: now, value };
     return value;
   }
@@ -172,7 +201,7 @@ export class CodexUsage {
    * the schema's own wording -- so a notification carrying only the five hour
    * window must not take the week away with it.
    */
-  saw(method, params, home = this._home()) {
+  saw(method: string, params: { rateLimits?: unknown } | null | undefined, home: string | null = this._home()): boolean {
     if (method !== 'account/rateLimits/updated') return false;
     // A login that is not the one the corner is about has nothing to say about
     // it. There is one app-server per home and they all report through here.
@@ -180,7 +209,7 @@ export class CodexUsage {
     return this._keep(mergeRateLimits(this._snapshot, params?.rateLimits), home);
   }
 
-  _keep(snapshot, home) {
+  _keep(snapshot: object, home: string | null): boolean {
     const before = JSON.stringify(this._snapshot);
     this._snapshot = snapshot;
     this._at = this._now();
@@ -190,7 +219,8 @@ export class CodexUsage {
     return true;
   }
 
-  _forget() {
+  _forget(): void {
+
     this._snapshot = null;
     this._at = 0;
     this._takenUnder = null;

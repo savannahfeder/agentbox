@@ -22,13 +22,34 @@ import path from 'node:path';
 
 export const INCLUDE_FILE = '.worktreeinclude';
 
+/** What a failed child process or file call carries beyond a plain Error. */
+export interface ExecFailure extends NodeJS.ErrnoException {
+  stderr?: unknown;
+  status?: number | null;
+}
+
+/** A path that was not carried into a folder, and the reason. */
+export interface Refusal {
+  path: string;
+  why: string;
+}
+
+export interface IncludeList {
+  patterns: string[];
+  source: string;
+}
+
+export interface LocalFiles extends IncludeList {
+  paths: string[];
+}
+
 /**
  * macOS `cp -c` asks APFS for a block-sharing clone. GNU `cp` has no `-c`;
  * `-a --reflink=auto` shares blocks where the filesystem can and copies where
  * it cannot. Lives here rather than in `main/task-folders.mts`, the other
  * caller, because that file imports this one.
  */
-export function copyTree(from, to) {
+export function copyTree(from: string, to: string): void {
   const args = process.platform === 'darwin'
     ? ['-c', '-R', from, to]
     : ['-a', '--reflink=auto', from, to];
@@ -47,11 +68,11 @@ export const DEFAULT_PATTERNS = ['/node_modules'];
  *  them, and carrying them would copy every other task into this one. */
 const MANAGED = '.claude/worktrees';
 
-const git = (cwd, args, input) => execFileSync('git', args, {
+const git = (cwd: string, args: string[], input?: string): string => execFileSync('git', args, {
   cwd, input, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
 });
 
-const patternsIn = (text) => text.split('\n')
+const patternsIn = (text: string) => text.split('\n')
   .map((line) => line.replace(/\r$/, ''))
   .filter((line) => line.trim() !== '' && !line.trimStart().startsWith('#'));
 
@@ -60,18 +81,18 @@ const patternsIn = (text) => text.split('\n')
  * repository can ask for a bare folder. One that exists and cannot be read
  * throws rather than falling back to a guess.
  */
-export function askedFor(root) {
+export function askedFor(root: string): IncludeList {
   const file = path.join(root, INCLUDE_FILE);
   if (!fs.existsSync(file)) return { patterns: DEFAULT_PATTERNS, source: 'the default list' };
   try { return { patterns: patternsIn(fs.readFileSync(file, 'utf8')), source: INCLUDE_FILE }; }
-  catch (error) { throw Error(`${INCLUDE_FILE} is there and could not be read: ${error.message}`); }
+  catch (error) { throw Error(`${INCLUDE_FILE} is there and could not be read: ${(error as ExecFailure).message}`); }
 }
 
 /**
  * `--directory` collapses a wholly untracked directory to one entry, so
  * node_modules is one `cp`. `-z` because a filename may contain a newline.
  */
-export function localFilesIn(root) {
+export function localFilesIn(root: string): LocalFiles {
   const { patterns, source } = askedFor(root);
   if (!patterns.length) return { paths: [], patterns, source };
   const held = fs.mkdtempSync(path.join(os.tmpdir(), 'worktree-include-'));
@@ -85,7 +106,7 @@ export function localFilesIn(root) {
       .filter(keepable);
     return { paths, patterns, source };
   } catch (error) {
-    throw Error(`${source} could not be read against this checkout: ${String(error?.stderr ?? error?.message ?? '').trim()}`);
+    throw Error(`${source} could not be read against this checkout: ${String((error as ExecFailure)?.stderr ?? (error as ExecFailure)?.message ?? '').trim()}`);
   } finally {
     try { fs.rmSync(held, { recursive: true, force: true }); } catch { /* a temp dir */ }
   }
@@ -97,7 +118,7 @@ export function localFilesIn(root) {
  * rather than narrowed by a matcher of ours. A repository that needs one file
  * from `.claude` names it exactly, and that still comes through.
  */
-function keepable(rel) {
+function keepable(rel: string): boolean {
   if (rel.split('/')[0] === '.git') return false;
   if (rel === MANAGED || rel.startsWith(`${MANAGED}/`)) return false;
   if (MANAGED.startsWith(`${rel}/`)) return false;
@@ -109,14 +130,14 @@ function keepable(rel) {
  * exits 1 for "none of them"; any other failure throws rather than reading as
  * "not ignored".
  */
-function ignoredIn(cwd, paths) {
+function ignoredIn(cwd: string, paths: string[]): Set<string> {
   if (!paths.length) return new Set();
   try {
     const out = git(cwd, ['check-ignore', '-z', '--stdin'], `${paths.join('\0')}\0`);
     return new Set(out.split('\0').filter(Boolean));
   } catch (error) {
-    if (error?.status === 1) return new Set();
-    throw Error(`git could not say what this checkout ignores: ${String(error?.stderr ?? error?.message ?? '').trim()}`);
+    if ((error as ExecFailure)?.status === 1) return new Set();
+    throw Error(`git could not say what this checkout ignores: ${String((error as ExecFailure)?.stderr ?? (error as ExecFailure)?.message ?? '').trim()}`);
   }
 }
 
@@ -126,31 +147,31 @@ function ignoredIn(cwd, paths) {
  * decide whether something may be written through a link nobody inspected.
  * Pinned by tests/a-file-the-app-cannot-look-at-is-not-a-file-that-is-missing.test.mjs.
  */
-function lookAt(p) {
+function lookAt(p: string): fs.Stats | null {
   try { return fs.lstatSync(p); }
   catch (error) {
-    if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') return null;
-    throw Error(`${p} could not be looked at: ${error.message}`);
+    if ((error as ExecFailure)?.code === 'ENOENT' || (error as ExecFailure)?.code === 'ENOTDIR') return null;
+    throw Error(`${p} could not be looked at: ${(error as ExecFailure).message}`);
   }
 }
 
-const isLink = (p) => lookAt(p)?.isSymbolicLink() === true;
+const isLink = (p: string) => lookAt(p)?.isSymbolicLink() === true;
 /** On disk at all, including a link with nothing at the end of it. */
-const stillThere = (p) => lookAt(p) !== null;
+const stillThere = (p: string) => lookAt(p) !== null;
 
 /**
  * Where a link points, or null if it went away (ENOENT) or is no longer a link
  * (EINVAL). A link that cannot be read cannot be judged, so that throws.
  */
-function linkTarget(p) {
+function linkTarget(p: string): string | null {
   try { return fs.readlinkSync(p); }
   catch (error) {
-    if (['ENOENT', 'ENOTDIR', 'EINVAL'].includes(error?.code)) return null;
-    throw Error(`${p} is a link whose target could not be read: ${error.message}`);
+    if (['ENOENT', 'ENOTDIR', 'EINVAL'].includes((error as ExecFailure & { code: string })?.code)) return null;
+    throw Error(`${p} is a link whose target could not be read: ${(error as ExecFailure).message}`);
   }
 }
 
-function reachedThroughALink(folder, rel) {
+function reachedThroughALink(folder: string, rel: string): boolean {
   let at = folder;
   for (const part of rel.split('/').slice(0, -1)) {
     at = path.join(at, part);
@@ -163,12 +184,12 @@ function reachedThroughALink(folder, rel) {
  * Whether a path is under a folder, by its text only. `..` is checked as a
  * whole component so a directory named `..deps` is not read as a climb out.
  */
-const climbsOut = (rel) => rel === '..' || rel.startsWith(`..${path.sep}`);
-const within = (folder, abs) => {
+const climbsOut = (rel: string) => rel === '..' || rel.startsWith(`..${path.sep}`);
+const within = (folder: string, abs: string) => {
   const rel = path.relative(folder, abs);
   return rel !== '' && !climbsOut(rel) && !path.isAbsolute(rel);
 };
-const withinOrIs = (folder, abs) => {
+const withinOrIs = (folder: string, abs: string) => {
   const rel = path.relative(folder, abs);
   return !climbsOut(rel) && !path.isAbsolute(rel);
 };
@@ -178,7 +199,7 @@ const withinOrIs = (folder, abs) => {
  * judged: with a tracked `bridge -> /shared`, a carried link to
  * `../../bridge/newfile` dangles but would write into `/shared`.
  */
-function nearestReal(abs) {
+function nearestReal(abs: string): string | null {
   let at = abs;
   for (;;) {
     if (stillThere(at)) {
@@ -186,8 +207,8 @@ function nearestReal(abs) {
       catch (error) {
         // ENOENT means it went away between the two calls. Any other error
         // would skip the containment check, so it throws.
-        if (error?.code === 'ENOENT') return null;
-        throw Error(`${at} could not be followed: ${error.message}`);
+        if ((error as ExecFailure)?.code === 'ENOENT') return null;
+        throw Error(`${at} could not be followed: ${(error as ExecFailure).message}`);
       }
     }
     const up = path.dirname(at);
@@ -207,18 +228,18 @@ function nearestReal(abs) {
  * because `node_modules/@scope/` hides links a level down. `find` does not follow
  * links while walking, so a link cannot lead the walk out.
  */
-function linksThatDoNotHold(root, folder, rel) {
+function linksThatDoNotHold(root: string, folder: string, rel: string): Refusal[] {
   const to = path.join(folder, rel);
-  let found = [];
+  let found: string[] = [];
   try {
     // `find <path>` on a path that is itself a link reports that link, so an
     // entry that is a link gets the same check as the links inside a directory.
     found = execFileSync('find', [to, '-type', 'l', '-print0'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
       .split('\0').filter(Boolean);
   } catch (error) {
-    throw Error(`the links inside ${rel} could not be checked: ${String(error?.stderr ?? error?.message ?? '').trim()}`);
+    throw Error(`the links inside ${rel} could not be checked: ${String((error as ExecFailure)?.stderr ?? (error as ExecFailure)?.message ?? '').trim()}`);
   }
-  const bad = [];
+  const bad: Refusal[] = [];
   for (const link of found) {
     const name = path.relative(folder, link);
     const target = linkTarget(link);
@@ -252,12 +273,12 @@ function linksThatDoNotHold(root, folder, rel) {
  * this machine lacks. Anything else that cannot be carried throws, with every
  * path and reason, so the caller gets a complete folder or none.
  */
-export function carryLocalFiles(root, folder) {
+export function carryLocalFiles(root: string, folder: string): { carried: string[]; source: string } {
   const { paths, source } = localFilesIn(root);
   const theirs = ignoredIn(root, paths);
-  const carried = [];
-  const refused = [];
-  const no = (rel, why) => refused.push({ path: rel, why });
+  const carried: string[] = [];
+  const refused: Refusal[] = [];
+  const no = (rel: string, why: string) => refused.push({ path: rel, why });
 
   for (const rel of paths) {
     const from = path.join(root, rel);
@@ -277,7 +298,7 @@ export function carryLocalFiles(root, folder) {
       fs.mkdirSync(path.dirname(to), { recursive: true });
       copyTree(copyFrom, to);
     } catch (error) {
-      no(rel, `it could not be copied: ${String(error?.stderr ?? error?.message ?? '').trim()}`);
+      no(rel, `it could not be copied: ${String((error as ExecFailure)?.stderr ?? (error as ExecFailure)?.message ?? '').trim()}`);
       continue;
     }
     // Asked only after the copy: a trailing-slash pattern like `node_modules/`
@@ -304,7 +325,7 @@ export function carryLocalFiles(root, folder) {
 }
 
 /** The directory a link leads to, or null when it leads nowhere or to a file. */
-function realDirOf(abs) {
+function realDirOf(abs: string): string | null {
   try { const real = fs.realpathSync(abs); return fs.statSync(real).isDirectory() ? real : null; } catch { return null; }
 }
 
@@ -313,7 +334,7 @@ function realDirOf(abs) {
  * check that matters runs in the folder after every copy; this one keeps an
  * obviously shared link from being copied at all.
  */
-function carriableLink(root, abs) {
+function carriableLink(root: string, abs: string): boolean {
   const target = linkTarget(abs);
   if (target === null) return false;
   if (path.isAbsolute(target)) return false;
@@ -324,9 +345,9 @@ function carriableLink(root, abs) {
   return !home || !reached || withinOrIs(home, reached);
 }
 
-const tracksIt = (folder, rel) => {
+const tracksIt = (folder: string, rel: string) => {
   try { git(folder, ['ls-files', '--error-unmatch', '-z', '--', rel]); return true; }
-  catch (error) { if (error?.status === 1) return false; throw Error(`git could not say whether this branch tracks ${rel}: ${String(error?.stderr ?? error?.message ?? '').trim()}`); }
+  catch (error) { if ((error as ExecFailure)?.status === 1) return false; throw Error(`git could not say whether this branch tracks ${rel}: ${String((error as ExecFailure)?.stderr ?? (error as ExecFailure)?.message ?? '').trim()}`); }
 };
 
 /**
@@ -334,18 +355,18 @@ const tracksIt = (folder, rel) => {
  * a tracked top-level directory, so a cloned folder matches a checked-out one.
  * Runs before anything is carried in, so it never removes what was asked for.
  */
-export function onlyTrackedContent(folder) {
-  let found;
+export function onlyTrackedContent(folder: string): string[] {
+  let found: string;
   try { found = git(folder, ['ls-files', '-z', '--others', '--directory', '--no-empty-directory']); }
-  catch (error) { throw Error(`what is in this folder could not be listed: ${String(error?.stderr ?? error?.message ?? '').trim()}`); }
-  const gone = [];
+  catch (error) { throw Error(`what is in this folder could not be listed: ${String((error as ExecFailure)?.stderr ?? (error as ExecFailure)?.message ?? '').trim()}`); }
+  const gone: string[] = [];
   for (const rel of found.split('\0').map((p) => p.replace(/\/$/, '')).filter(Boolean)) {
     if (!keepable(rel)) continue;
     const at = path.join(folder, rel);
     try { fs.rmSync(at, { recursive: true, force: true }); }
     // `lstat`, because existsSync follows links and would report a dangling
     // link that failed to be removed as gone.
-    catch (error) { if (stillThere(at)) throw Error(`${rel} came with the clone and could not be cleared: ${error.message}`); }
+    catch (error) { if (stillThere(at)) throw Error(`${rel} came with the clone and could not be cleared: ${(error as ExecFailure).message}`); }
     gone.push(rel);
   }
   return gone;
@@ -359,11 +380,11 @@ export function onlyTrackedContent(folder) {
  * another repository's git data, and `git worktree move` refuses a worktree
  * holding one. A plain `git worktree add` handles submodules.
  */
-export function trackedTopLevel(root) {
-  let listed;
+export function trackedTopLevel(root: string): { entries: string[]; submodules: boolean } {
+  let listed: string;
   try { listed = git(root, ['ls-files', '-s', '-z']); }
-  catch (error) { throw Error(`the tracked files could not be listed: ${String(error?.stderr ?? error?.message ?? '').trim()}`); }
-  const top = new Set();
+  catch (error) { throw Error(`the tracked files could not be listed: ${String((error as ExecFailure)?.stderr ?? (error as ExecFailure)?.message ?? '').trim()}`); }
+  const top = new Set<string>();
   for (const line of listed.split('\0').filter(Boolean)) {
     const [modes, rel] = line.split('\t');
     if (modes?.startsWith('160000')) return { entries: [], submodules: true };

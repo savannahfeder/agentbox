@@ -37,11 +37,14 @@ import os from 'node:os';
 import { threadSnapshot, threadsWorthCarrying, snapshotKey, checkCommand, madeHere, hideSecrets, bytesOf, phoneChoices, phoneApproval, phoneRepeatsOf, phoneTeammatesOf, SNAPSHOT_LIMITS, TEAMMATES_LIMITS } from '../shared/phone-snapshot.mjs';
 import { phoneSettingsOf, settingRoute } from '../shared/phone-settings.mjs';
 import { createPhoneUploads, UPLOAD_LIMITS } from './phone-uploads.mts';
+import type { PhoneBackend, ThreadSnapshot, UploadedFile } from './phone-uploads.mts';
 import { createPhoneAlerts } from './phone-alerts.mjs';
 import { PHONE_FILES_MAX, phoneFilesIn, phoneFileSafeName, phoneAttachmentRel } from '../shared/phone-files.mjs';
 import { runOfClaim, cloudCard } from '../shared/cloud-kit.mjs';
 import { isCarried } from '../shared/cloud-carry.mjs';
 import { heldForUndo } from '../shared/phone-undo.mjs';
+import type { CarriedCommand } from '../shared/cloud-carry.mjs';
+import type { PhoneWait } from '../shared/phone-snapshot.mjs';
 
 // A file her phone sent with a reply or a new thread (shared/phone-files.mjs).
 export { phoneFilesIn };
@@ -74,6 +77,162 @@ const CLOUD_COPY_HELD_MS = 12 * 3600_000;
 const SETTINGS_EVERY_MS = 60_000;
 
 export class SignedOut extends Error {}
+
+type Thrown = { message?: unknown } | null | undefined;
+
+export interface CommandPayload {
+  text?: unknown;
+  body?: unknown;
+  title?: unknown;
+  until?: unknown;
+  runAt?: unknown;
+  approval?: unknown;
+  allow?: unknown;
+  note?: unknown;
+  card?: unknown;
+  repeat?: { rule?: unknown; key?: unknown } | null;
+  engine?: unknown;
+  [key: string]: unknown;
+}
+
+export interface PhoneCommand {
+  id: string;
+  kind: string;
+  project: string;
+  item?: string | null;
+  payload?: CommandPayload;
+  claimedBy?: unknown;
+  takenAt?: unknown;
+  createdAt?: string;
+  created_at?: string;
+}
+
+export interface PhoneProject { slug: string; name: string; dir?: string | null; repoPath?: string | null }
+
+export interface PhoneItem { id: string; status?: string; updatedAt?: number; fromPhone?: string; [key: string]: unknown }
+
+export interface PhoneHistoryLine { patch?: { fromPhone?: unknown; [key: string]: unknown } }
+
+export interface PhoneLiveRun {
+  since?: unknown;
+  where?: string;
+  movable?: boolean;
+  runId?: string;
+  doing?: { label?: unknown; startedAt?: unknown }[];
+}
+
+export interface PhoneApprovalAsk { id: string; product?: string; item?: string; card?: unknown; [key: string]: unknown }
+
+export interface AdoptArgs {
+  project: string;
+  item?: string | null;
+  runId: string;
+  replies: string[];
+  commands?: string[];
+  carried?: boolean;
+}
+
+export interface AdoptNewArgs extends AdoptArgs {
+  title: string;
+  body: string;
+  command: string;
+  choices: Record<string, unknown>;
+  repeat?: { rule: unknown; key: unknown };
+}
+
+export interface PhoneBackendCalls extends Partial<PhoneBackend> {
+  putPhoneProject(project: { owner: string; device: string; project: string; name: string; cloud?: boolean }): Promise<unknown>;
+  putPhoneThreads(device: string, slug: string, threads: { item: string; snapshot: unknown }[], owner: string): Promise<unknown>;
+  dropPhoneThreads(device: string, slug: string, items: string[], owner: string): Promise<unknown>;
+  dropPhoneProject(device: string, slug: string, owner: string): Promise<unknown>;
+  waitingPhoneCommands(device: string): Promise<PhoneCommand[]>;
+  claimPhoneCommand(id: string, owner: string): Promise<string>;
+  markPhoneCommand(id: string, outcome: string, owner: string): Promise<unknown>;
+  cloudPhoneCommands?(device: string, since: string): Promise<PhoneCommand[]>;
+  addPhoneCommand(command: object): Promise<unknown>;
+  getPhoneFile?(file: { owner: string; device: string; name: string }): Promise<Buffer | null>;
+  putPhoneSettings?(settings: { owner: string; device: string; name: string; settings: unknown }): Promise<unknown>;
+  pushDevices?: unknown;
+}
+
+export interface ChannelResult { ok?: unknown; error?: string; reason?: string; id?: unknown; [key: string]: unknown }
+
+export interface PhoneInboxOptions {
+  backend: PhoneBackendCalls;
+  owner: string;
+  alive?: () => boolean;
+  device?: string | null;
+  projects: () => PhoneProject[];
+  listItems: (slug: string) => PhoneItem[];
+  historyOf: (slug: string, id: string, options?: { all?: boolean }) => (PhoneHistoryLine | null)[];
+  apply: (command: PhoneCommand) => Promise<ChannelResult | null | undefined>;
+  stateFile: string;
+  home?: string;
+  now?: () => number;
+  undoHoldMs?: number;
+  log?: (line: string) => void;
+  build?: typeof threadSnapshot;
+  liveOf?: (slug: string, id: string) => PhoneLiveRun | null;
+  waitsOf?: () => { byId?: Record<string, PhoneWait>; paused?: boolean } | null;
+  approvalsOf?: () => PhoneApprovalAsk[];
+  readSettings?: (() => unknown) | null;
+  pinsOf?: () => Record<string, boolean>;
+  repeatsOf?: (() => unknown) | null;
+  teammatesOf?: (() => unknown) | null;
+  version?: string;
+  name?: string;
+  idleMs?: (() => number) | null;
+  sendPush?: Parameters<typeof createPhoneAlerts>[0]['send'];
+  sendWebPush?: Parameters<typeof createPhoneAlerts>[0]['sendWebPush'];
+  carrying?: ((arg: { device: string; slugs: string[] }) => unknown) | null;
+  kitsFor?: ((slug: string) => unknown) | null;
+  adopt?: ((arg: AdoptArgs) => Promise<string>) | null;
+  cloudReplies?: ((arg: { project: string; item: string; runId: string; replies: string[] }) => Promise<unknown>) | null;
+  runHome?: ((arg: { project: string; item: string | null | undefined; runId: string }) => unknown) | null;
+  newThreadKits?: ((arg: { device: string; slugs: string[] }) => unknown) | null;
+  adoptNew?: ((arg: AdoptNewArgs) => Promise<string>) | null;
+  asleep?: () => boolean;
+  toCarry?: (() => Promise<(CarriedCommand & { replaces?: string })[]>) | null;
+  handedOver?: (command: CarriedCommand & { command: string }) => unknown;
+  takenBack?: (command: { project: string; item?: string | null; command: string }) => unknown;
+  carriedFinished?: (commands: string[]) => unknown;
+}
+
+interface AdoptedRun {
+  at: number;
+  tries: number;
+  placed: string[];
+  marked: string[];
+  over?: boolean;
+  done?: boolean;
+  home?: boolean;
+}
+
+export interface PhoneState {
+  device: string | null;
+  forDevice: string | null;
+  sent: Record<string, string>;
+  failed: Record<string, { key: string; tries: number; next: number }>;
+  done: Record<string, string>;
+  doing: Record<string, { at: number }>;
+  made: Record<string, { id: string; at: number }>;
+  uploaded: Record<string, UploadedFile>;
+  alerted: Record<string, unknown>;
+  adopted: Record<string, AdoptedRun>;
+  webAlerts: Record<string, unknown>;
+}
+
+type Snapshot = ReturnType<typeof threadSnapshot>;
+type Manifest = ReturnType<ReturnType<typeof createPhoneUploads>['manifest']>;
+type LiveCopy = { since: number; where: 'cloud' | 'mac'; doing: { label: string; startedAt: number }[]; at: number; movable?: boolean; runId?: string };
+type BuiltCopy = { inputs: string; key: string; live: LiveCopy | null; files: Manifest | null; askKey: string; waitKey: string; base: Snapshot | null };
+
+declare module '../shared/phone-snapshot.mjs' {
+  export function phoneApproval(request: { id: unknown; at?: unknown; tool?: unknown; input?: unknown }, card: unknown, ctx?: { home?: string | null }): Record<string, unknown>;
+  export function phoneRepeatsOf(rules: unknown, slugs: string[], opts?: { home?: string | null }): unknown[];
+  export function phoneTeammatesOf(view: unknown, opts?: { home?: string | null; limits?: typeof TEAMMATES_LIMITS }): Record<string, unknown> | null;
+  export const TEAMMATES_LIMITS: { mates: number; lines: number; textChars: number; bytes: number };
+}
 
 export function createPhoneInbox({
   backend,
@@ -146,11 +305,11 @@ export function createPhoneInbox({
   // Every pass, the commands of runs it has finished joining, so a hand-over
   // still held for one of them is let go (Supervisor#carriedFinished).
   carriedFinished = () => {},
-}) {
+}: PhoneInboxOptions) {
   const state = readState(stateFile);
   const save = () => writeState(stateFile, state);
   if (!given && !state.device) { state.device = crypto.randomBytes(6).toString('hex'); save(); }
-  const device = given ?? state.device;
+  const device = given ?? state.device!;
   if (!/^[0-9a-f]{12}$/.test(device)) throw new Error('a computer id is twelve hex digits');
   // WHAT WAS SENT WAS SENT AS ONE COMPUTER (Codex's third review, finding 2).
   // Under another id (a store copied here, or the id made a new way) nothing
@@ -167,10 +326,10 @@ export function createPhoneInbox({
   }
   const still = () => { if (!alive()) throw new SignedOut('signed out'); };
   // The files threads name, when this cloud can hold them (main/phone-uploads.mts).
-  const uploads = backend.putPhoneFile ? createPhoneUploads({ backend, owner, device, alive, state, save, home, now, log }) : null;
+  const uploads = backend.putPhoneFile ? createPhoneUploads({ backend: backend as PhoneBackend, owner, device, alive, state, save, home, now, log }) : null;
   const alerts = idleMs && backend.pushDevices ? createPhoneAlerts({ backend, owner, device, state, save, now, log, idleMs, send: sendPush, sendWebPush, still }) : null;
   let swept = 0;
-  const homeWritten = (p) => (p && home && (p === home || p.startsWith(`${home}/`)) ? `~${p.slice(home.length)}` : p ?? null);
+  const homeWritten = (p: string | null | undefined) => (p && home && (p === home || p.startsWith(`${home}/`)) ? `~${p.slice(home.length)}` : p ?? null);
 
   // WHAT EACH THREAD'S COPY WAS LAST BUILT FROM, so a pass skips building the
   // copies of threads that did not change. Building them is the costly part of
@@ -178,12 +337,12 @@ export function createPhoneInbox({
   // 2026-10-14), and it runs on the thread that draws the window every few
   // seconds. A copy is made of the row and its lines and nothing else, so the
   // same row and lines make the same copy.
-  const built = new Map();
-  const inputsOf = (item, history) => crypto.createHash('sha1').update(JSON.stringify(item)).update('\0').update(JSON.stringify(history)).digest('base64');
+  const built = new Map<string, BuiltCopy>();
+  const inputsOf = (item: unknown, history: unknown) => crypto.createHash('sha1').update(JSON.stringify(item)).update('\0').update(JSON.stringify(history)).digest('base64');
   // What each running thread's copy last said about the run, by thread.
-  const lives = new Map();
-  const liveNow = (sk, slug, id) => {
-    let raw = null;
+  const lives = new Map<string, LiveCopy>();
+  const liveNow = (sk: string, slug: string, id: string): LiveCopy | null => {
+    let raw: PhoneLiveRun | null = null;
     try { raw = liveOf(slug, id); } catch { /* the supervisor's trouble, not the phone's */ }
     if (!raw) { lives.delete(sk); return null; }
     const doing = (Array.isArray(raw.doing) ? raw.doing : []).slice(0, 3).map((d) => {
@@ -195,10 +354,10 @@ export function createPhoneInbox({
     const sameRun = was && was.since === raw.since && was.where === raw.where && !!was.movable === movable;
     const runId = raw.runId ?? (sameRun ? was.runId : undefined);
     const same = sameRun && was.runId === runId;
-    const steps = (l) => JSON.stringify(l.doing.map((d) => d.label));
+    const steps = (l: { doing: { label: string }[] }) => JSON.stringify(l.doing.map((d) => d.label));
     if (same && now() - was.at < STEP_EVERY_MS) return was;
     if (same && now() - was.at < STILL_RUNNING_MS && steps(was) === steps({ doing })) return was;
-    const live = { since: Number(raw.since) || now(), where: raw.where === 'cloud' ? 'cloud' : 'mac', doing, at: now(), ...(movable ? { movable } : {}),
+    const live: LiveCopy = { since: Number(raw.since) || now(), where: raw.where === 'cloud' ? 'cloud' : 'mac', doing, at: now(), ...(movable ? { movable } : {}),
       ...(raw.where === 'cloud' && /^[A-Za-z0-9._-]{1,120}$/.test(runId ?? '') ? { runId } : {}),
     };
     lives.set(sk, live);
@@ -215,13 +374,13 @@ export function createPhoneInbox({
     const chosen = projects();
     try { carrying?.({ device, slugs: chosen.map((p) => p.slug) }); } catch { /* the supervisor's trouble, not the phone's */ }
     try { newThreadKits?.({ device, slugs: chosen.map((p) => p.slug) }); } catch { /* the supervisor's trouble, not the phone's */ }
-    let asks = [];
+    let asks: PhoneApprovalAsk[] = [];
     try { asks = approvalsOf() ?? []; } catch { /* the cards' trouble, not the phone's */ }
-    let waits = null;
+    let waits: ReturnType<NonNullable<PhoneInboxOptions['waitsOf']>> = null;
     try { waits = waitsOf(); } catch { /* the supervisor's trouble, not the phone's */ }
-    const waitOf = (item) => waits?.byId?.[item.id] ?? (waits?.paused && item.status !== 'done' ? { state: 'paused' } : null);
+    const waitOf = (item: PhoneItem) => waits?.byId?.[item.id] ?? (waits?.paused && item.status !== 'done' ? { state: 'paused' } : null);
     const known = new Set(chosen.map((p) => p.slug));
-    let pins = {};
+    let pins: Record<string, boolean> = {};
     try { pins = pinsOf() ?? {}; } catch { /* the supervisor's trouble, not the phone's */ }
     for (const p of chosen) {
       await breathe();
@@ -237,8 +396,8 @@ export function createPhoneInbox({
         if (state.sent[key] !== said) { state.sent[key] = said; save(); }
       }
       const rows = threadsWorthCarrying(listItems(p.slug), { now: now() });
-      const batch = [];
-      const here = new Set();
+      const batch: { item: string; snapshot: unknown; key: string }[] = [];
+      const here = new Set<string>();
       for (const raw of rows) {
         const item = pins[raw.id] === true ? { ...raw, pinned: true } : raw;
         if (here.size && here.size % THREADS_PER_TURN === 0) await breathe();
@@ -257,9 +416,9 @@ export function createPhoneInbox({
         // Only the run or its files moved: the copy of the row and its lines is the one already made.
         let base = was?.inputs === inputs ? was.base : null;
         const made = () => (base ??= build(item, history, SNAPSHOT_LIMITS, { home }));
-        const files = uploads && p.dir ? uploads.manifest(sk, made, { dir: p.dir, repoPath: p.repoPath, updatedAt: item.updatedAt ?? 0, base: inputs }) : null;
+        const files = uploads && p.dir ? uploads.manifest(sk, made as () => ThreadSnapshot, { dir: p.dir, repoPath: p.repoPath, updatedAt: item.updatedAt ?? 0, base: inputs }) : null;
         if (was && was.inputs === inputs && was.live === live && was.files === files && was.askKey === askKey && was.waitKey === waitKey && state.sent[sk] === was.key) continue;
-        let snap = live ? { ...made(), live } : made();
+        let snap: Record<string, unknown> = live ? { ...made(), live } : made();
         if (waitingOn.length) snap = { ...snap, approvals: waitingOn };
         if (wait) snap = { ...snap, wait };
         // Where the files are on this Mac, written from her home as the words are, so the phone can follow a path the words give in full.
@@ -295,24 +454,24 @@ export function createPhoneInbox({
       save();
     }
     uploads?.kick();
-    if (uploads && now() - swept > SWEEP_EVERY_MS) { swept = now(); try { await uploads.sweep(); } catch (err) { log(`phone: could not clear old files: ${err?.message ?? err}`); } }
+    if (uploads && now() - swept > SWEEP_EVERY_MS) { swept = now(); try { await uploads.sweep(); } catch (err) { log(`phone: could not clear old files: ${(err as Thrown)?.message ?? err}`); } }
     return sent;
   }
 
   // THIS COMPUTER'S SETTINGS FOR HER PHONE'S SETTINGS PAGES. A failure waits
   // for the next read, a minute on, and is said once until it changes.
-  const settings = { readAt: -Infinity, sentAt: -Infinity, key: null, trouble: null };
+  const settings: { readAt: number; sentAt: number; key: string | null; trouble: string | null } = { readAt: -Infinity, sentAt: -Infinity, key: null, trouble: null };
   const computer = String(name || 'This computer').slice(0, 200);
-  const troubled = (what, err) => {
-    const line = `phone: could not ${what} your settings: ${err?.message ?? err}`;
+  const troubled = (what: string, err: unknown) => {
+    const line = `phone: could not ${what} your settings: ${(err as Thrown)?.message ?? err}`;
     if (settings.trouble !== line) log(line);
     settings.trouble = line;
   };
-  async function publishSettings(soon) {
+  async function publishSettings(soon?: boolean) {
     if (!readSettings || !backend.putPhoneSettings) return false;
     if (!soon && now() - settings.readAt < SETTINGS_EVERY_MS) return false;
     settings.readAt = now();
-    let carried = null;
+    let carried: Record<string, unknown> | null = null;
     try { carried = phoneSettingsOf(await readSettings(), { version }); } catch (err) { troubled('read', err); return false; }
     if (!carried) return false;
     if (repeatsOf) {
@@ -344,9 +503,9 @@ export function createPhoneInbox({
   // a thread it will not take never holds up the others (finding 9). A copy
   // that fails is NOT counted as sent: it is tried again, later each time
   // (second review, finding 5), and at once when it changes.
-  async function sendAll(slug, batch) {
+  async function sendAll(slug: string, batch: { item: string; snapshot: unknown; key: string }[]): Promise<number> {
     if (!batch.length) return 0;
-    const sk = (b) => `${slug}:${b.item}`;
+    const sk = (b: { item: string }) => `${slug}:${b.item}`;
     try {
       still();
       await backend.putPhoneThreads(device, slug, batch.map(({ item, snapshot }) => ({ item, snapshot })), owner);
@@ -360,7 +519,7 @@ export function createPhoneInbox({
         const tries = state.failed[sk(b)]?.key === b.key ? state.failed[sk(b)].tries + 1 : 1;
         state.failed[sk(b)] = { key: b.key, tries, next: now() + RETRY_MS[Math.min(tries, RETRY_MS.length) - 1] };
         save();
-        log(`phone: could not send ${b.item} (try ${tries}): ${err?.message ?? err}`);
+        log(`phone: could not send ${b.item} (try ${tries}): ${(err as Thrown)?.message ?? err}`);
         return 0;
       }
       let n = 0;
@@ -373,7 +532,7 @@ export function createPhoneInbox({
   // attachments, and linked there. A file that is missing or is not what its
   // name says refuses the command; trouble reaching the cloud leaves it for
   // the next pass.
-  async function withPhoneFiles(cmd) {
+  async function withPhoneFiles(cmd: PhoneCommand): Promise<PhoneCommand> {
     const field = cmd.kind === 'reply' ? 'text' : cmd.kind === 'new' ? 'body' : null;
     const words = field && typeof cmd.payload?.[field] === 'string' ? cmd.payload[field] : '';
     const found = phoneFilesIn(words);
@@ -397,14 +556,14 @@ export function createPhoneInbox({
       // The same file the uploader would send for the thread, already there.
       if (uploads) { state.uploaded[f.name] = { bytes: data.length, named: now() }; save(); }
     }
-    return { ...cmd, payload: { ...cmd.payload, [field]: out } };
+    return { ...cmd, payload: { ...cmd.payload, [field!]: out } };
   }
 
   // What a command already did, if this computer did it before it stopped:
   // the line or the row that carries the command's own id (`fromPhone`,
   // shared/work-items.mjs). Nothing else counts, however alike its words.
-  function landed(cmd, item) {
-    if (cmd.kind === 'reply') return historyOf(cmd.project, item, { all: true }).some((l) => l?.patch?.fromPhone === cmd.id) ? item : null;
+  function landed(cmd: PhoneCommand, item: string | null | undefined) {
+    if (cmd.kind === 'reply') return historyOf(cmd.project, item!, { all: true }).some((l) => l?.patch?.fromPhone === cmd.id) ? item : null;
     if (cmd.kind === 'new') return listItems(cmd.project).find((i) => i.fromPhone === cmd.id)?.id ?? null;
     return null;
   }
@@ -414,7 +573,7 @@ export function createPhoneInbox({
     still();
     const waiting = (await backend.waitingPhoneCommands(device)).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
     let taken = 0;
-    const newCommands = [];
+    const newCommands: { id: string; project: string; item: string }[] = [];
     let changedSettings = false;
     for (const cmd of waiting) {
       still();
@@ -457,22 +616,22 @@ export function createPhoneInbox({
           } else {
             state.doing[cmd.id] = { at: now() };
             save();
-            let ready = null;
+            let ready: PhoneCommand | null = null;
             try { ready = await withPhoneFiles(resolved); } catch (err) {
               if (err instanceof SignedOut) throw err;
               // The cloud not answering just now: this one waits for the next pass, the rest go on.
-              if (!(err instanceof Refused)) { log(`phone: could not take a file for ${cmd.id} yet: ${err?.message ?? err}`); continue; }
+              if (!(err instanceof Refused)) { log(`phone: could not take a file for ${cmd.id} yet: ${(err as Thrown)?.message ?? err}`); continue; }
               outcome = `refused: ${err.message}`;
             }
             if (ready) {
               try {
                 const ownAlerts = cmd.kind === 'setting' && !!alerts?.takesSetting(ready.payload);
-                const out = ownAlerts ? await alerts.setting(ready.payload) : await apply(ready);
+                const out: ChannelResult | null | undefined = ownAlerts ? await alerts!.setting(ready.payload) : await apply(ready);
                 if (cmd.kind === 'new' && typeof out?.id === 'string') state.made[madeHere(cmd.id)] = { id: out.id, at: now() };
                 if (cmd.kind === 'setting' && !ownAlerts) changedSettings = true;
                 outcome = 'done';
               } catch (err) {
-                outcome = `refused: ${String(err?.message || err).slice(0, 200)}`;
+                outcome = `refused: ${String((err as Thrown)?.message || err).slice(0, 200)}`;
               }
             }
           }
@@ -504,32 +663,32 @@ export function createPhoneInbox({
   // (Supervisor#adoptCloudRun). A reply the server fed it after that goes on
   // the row too. Its commands are marked taken once it is home. A run that
   // cannot be made its own after a few tries is said once and let go.
-  const adoptTrouble = new Set();
-  const sayOnce = (kind, line) => { if (!adoptTrouble.has(kind)) log(line); adoptTrouble.add(kind); };
+  const adoptTrouble = new Set<string>();
+  const sayOnce = (kind: string, line: string) => { if (!adoptTrouble.has(kind)) log(line); adoptTrouble.add(kind); };
   // THE THREADS WHOSE COPY ONLINE IS THE CLOUD'S FOR NOW (2026-10-31,
   // w-3e955eadb4). The cloud server writes her reply and its answer into the
   // thread's copy (cloud/gateway/phone.mjs relayTurn). Until the run is home,
   // this computer's ledger has neither, and a copy sent from here would write
   // over both: that is how a message she sent at 11:41 was nowhere for hours.
   // Filled by every adoptCloudRuns pass, read by the publish that follows it.
-  let cloudCopies = new Set();
+  let cloudCopies = new Set<string>();
   async function adoptCloudRuns() {
     cloudCopies = new Set();
     if (!adopt || !backend.cloudPhoneCommands) return 0;
     still();
     const claimed = (await backend.cloudPhoneCommands(device, new Date(now() - ADOPT_WITHIN_MS).toISOString()))
       .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
-    const runs = new Map();
+    const runs = new Map<string, PhoneCommand[]>();
     for (const cmd of claimed) {
       const runId = runOfClaim(cmd.claimedBy);
       if (!runId) continue;
       if (!runs.has(runId)) runs.set(runId, []);
-      runs.get(runId).push(cmd);
+      runs.get(runId)!.push(cmd);
     }
     let n = 0;
     for (const [runId, cmds] of runs) {
       still();
-      const rec = state.adopted[runId] ?? { at: now(), tries: 0, placed: [], marked: [] };
+      const rec: AdoptedRun = state.adopted[runId] ?? { at: now(), tries: 0, placed: [], marked: [] };
       if (rec.over) continue;
       const first = cmds[0];
       const project = first.project;
@@ -539,11 +698,11 @@ export function createPhoneInbox({
       const handed = first.kind === 'run-now' && isCarried(first) ? first : null;
       const item = started ? madeHere(started.id) : first.item && state.made[first.item] ? state.made[first.item].id : first.item;
       const fresh = cmds.filter((c) => c.kind === 'reply' && !rec.placed.includes(c.id));
-      const replies = [];
+      const replies: string[] = [];
       // A reply this computer handed over is on the row already.
       for (const c of fresh.filter((x) => !isCarried(x))) {
         let text = typeof c.payload?.text === 'string' ? c.payload.text : '';
-        try { text = (await withPhoneFiles({ ...c, item })).payload.text; } catch (err) { if (err instanceof SignedOut) throw err; }
+        try { text = (await withPhoneFiles({ ...c, item })).payload!.text as string; } catch (err) { if (err instanceof SignedOut) throw err; }
         replies.push(text);
       }
       if (!rec.done) {
@@ -553,25 +712,25 @@ export function createPhoneInbox({
           const title = String(p.title ?? '').trim() || String(p.body ?? '').trim().split('\n')[0].slice(0, 200);
           // Its files saved here where the cloud put them, so the row links them.
           let body = String(p.body ?? '');
-          try { body = (await withPhoneFiles({ ...started, kind: 'new' })).payload.body ?? body; } catch (err) { if (err instanceof SignedOut) throw err; }
+          try { body = (await withPhoneFiles({ ...started, kind: 'new' })).payload!.body as string ?? body; } catch (err) { if (err instanceof SignedOut) throw err; }
           // An agent in the cloud already took it, so Auto has nobody left to pick.
           const { labels: _auto, ...choices } = phoneChoices('new', p);
           try { out = await adoptNew({ project, item, runId, title, body, command: started.id, replies, choices }); } catch (err) {
             out = 'failed';
-            sayOnce(`adopt:${err?.message}`, `phone: could not take in the new thread the cloud started (${item}): ${err?.message ?? err}`);
+            sayOnce(`adopt:${(err as Thrown)?.message}`, `phone: could not take in the new thread the cloud started (${item}): ${(err as Thrown)?.message ?? err}`);
           }
         } else if (handed && adoptNew) {
           const p = handed.payload ?? {};
           const repeat = p.repeat && typeof p.repeat.rule === 'string' && typeof p.repeat.key === 'string' ? { repeat: { rule: p.repeat.rule, key: p.repeat.key } } : {};
           try { out = await adoptNew({ project, item, runId, title: String(p.title ?? ''), body: String(p.body ?? ''), command: handed.id, replies, carried: true, choices: p.engine ? { engine: p.engine } : {}, ...repeat }); } catch (err) {
             out = 'failed';
-            sayOnce(`adopt:${err?.message}`, `phone: could not join the cloud's run for ${item}: ${err?.message ?? err}`);
+            sayOnce(`adopt:${(err as Thrown)?.message}`, `phone: could not join the cloud's run for ${item}: ${(err as Thrown)?.message ?? err}`);
           }
         } else if (item && fresh.length) {
           const carried = fresh.some(isCarried) ? { carried: true } : {};
           try { out = await adopt({ project, item, runId, replies, commands: fresh.map((c) => c.id), ...carried }); } catch (err) {
             out = 'failed';
-            sayOnce(`adopt:${err?.message}`, `phone: could not join the cloud's run for ${item}: ${err?.message ?? err}`);
+            sayOnce(`adopt:${(err as Thrown)?.message}`, `phone: could not join the cloud's run for ${item}: ${(err as Thrown)?.message ?? err}`);
           }
         }
         if (out === 'busy') {
@@ -587,7 +746,7 @@ export function createPhoneInbox({
         n += 1;
       } else if (fresh.length && item) {
         if (replies.length) {
-          try { await cloudReplies?.({ project, item, runId, replies }); } catch (err) { sayOnce(`late:${runId}`, `phone: could not put a late reply on ${item}: ${err?.message ?? err}`); }
+          try { await cloudReplies?.({ project, item, runId, replies }); } catch (err) { sayOnce(`late:${runId}`, `phone: could not put a late reply on ${item}: ${(err as Thrown)?.message ?? err}`); }
         }
         rec.placed.push(...fresh.map((c) => c.id));
       }
@@ -598,7 +757,7 @@ export function createPhoneInbox({
       if (rec.home) {
         for (const c of cmds) {
           if (c.takenAt || rec.marked.includes(c.id)) continue;
-          try { still(); await backend.markPhoneCommand(c.id, 'done', owner); rec.marked.push(c.id); } catch (err) { if (err instanceof SignedOut) throw err; sayOnce('mark', `phone: could not mark a cloud reply taken: ${err?.message ?? err}`); }
+          try { still(); await backend.markPhoneCommand(c.id, 'done', owner); rec.marked.push(c.id); } catch (err) { if (err instanceof SignedOut) throw err; sayOnce('mark', `phone: could not mark a cloud reply taken: ${(err as Thrown)?.message ?? err}`); }
         }
         if (cmds.every((c) => c.takenAt || rec.marked.includes(c.id))) rec.over = true;
       }
@@ -613,7 +772,7 @@ export function createPhoneInbox({
   }
 
   // A reply the cloud took into this run, sent within CLOUD_COPY_HELD_MS, leaves the thread's copy to the cloud.
-  function holdCopy(project, item, cmds) {
+  function holdCopy(project: string | null | undefined, item: string | null | undefined, cmds: PhoneCommand[]) {
     if (!project || !item) return;
     const newest = Math.max(...cmds.filter((c) => c.kind === 'reply' && !isCarried(c)).map((c) => Date.parse(c.createdAt ?? c.created_at ?? '') || 0), 0);
     if (newest && now() - newest < CLOUD_COPY_HELD_MS) cloudCopies.add(`${project}:${item}`);
@@ -640,7 +799,7 @@ export function createPhoneInbox({
           await backend.markPhoneCommand(replaces, 'done', owner);
         } catch (err) {
           if (err instanceof SignedOut) throw err;
-          sayOnce(`carry-old:${err?.message}`, `phone: could not take back an old hand-over of ${c.item}: ${err?.message ?? err}`);
+          sayOnce(`carry-old:${(err as Thrown)?.message}`, `phone: could not take back an old hand-over of ${c.item}: ${(err as Thrown)?.message ?? err}`);
           continue;
         }
       }
@@ -652,20 +811,20 @@ export function createPhoneInbox({
       } catch (err) {
         takenBack({ ...c, command: id });
         if (err instanceof SignedOut) throw err;
-        sayOnce(`carry:${err?.message}`, `phone: could not hand ${c.item} to the cloud: ${err?.message ?? err}`);
+        sayOnce(`carry:${(err as Thrown)?.message}`, `phone: could not hand ${c.item} to the cloud: ${(err as Thrown)?.message ?? err}`);
       }
     }
     return n;
   }
 
   // A thread's row when its copy is on the phone, each project read once a pass.
-  let alertTrouble = null;
+  let alertTrouble: string | null = null;
   const carriedNow = () => {
-    const rowsOf = new Map();
-    return (slug, id) => {
+    const rowsOf = new Map<string, Map<string, PhoneItem>>();
+    return (slug: string, id: string) => {
       if (!state.sent[`${slug}:${id}`]) return null;
       if (!rowsOf.has(slug)) rowsOf.set(slug, new Map(listItems(slug).map((i) => [i.id, i])));
-      return rowsOf.get(slug).get(id) ?? null;
+      return rowsOf.get(slug)!.get(id) ?? null;
     };
   };
 
@@ -674,7 +833,7 @@ export function createPhoneInbox({
     /** The uploads going on behind the passes; a test waits on them. */
     filesSettled: () => uploads?.kick() ?? Promise.resolve(),
     /** What the desktop's banner was told arrived (main/notify.mts), and the inbox then: [{ id, product }]. */
-    arrivals: (list, needsYou) => alerts?.arrived(list, needsYou),
+    arrivals: (list: unknown[], needsYou: unknown[]) => alerts?.arrived(list, needsYou),
     async syncOnce() {
       try {
         const commands = await takeCommands();
@@ -683,7 +842,7 @@ export function createPhoneInbox({
         let adopted = 0;
         try { adopted = await adoptCloudRuns(); } catch (err) {
           if (err instanceof SignedOut) throw err;
-          sayOnce(`read:${err?.message}`, `phone: could not read what the cloud took: ${err?.message ?? err}`);
+          sayOnce(`read:${(err as Thrown)?.message}`, `phone: could not read what the cloud took: ${(err as Thrown)?.message ?? err}`);
         }
         const handed = await handOver();
         if (handed) log(`phone: asleep, handed ${handed} to the cloud`);
@@ -702,7 +861,7 @@ export function createPhoneInbox({
           if (taken) alerts.phoneUsed();
           try { await alerts.pass(carriedNow()); alertTrouble = null; } catch (err) {
             if (err instanceof SignedOut) throw err;
-            const line = `phone: could not alert: ${err?.message ?? err}`;
+            const line = `phone: could not alert: ${(err as Thrown)?.message ?? err}`;
             if (line !== alertTrouble) log(line);
             alertTrouble = line;
           }
@@ -721,9 +880,9 @@ export function createPhoneInbox({
 // app's own folder and never in the store, joined with which store it runs.
 // A store copied to another computer, or restored there, is another device
 // (Codex's second review, finding 7); two stores on one computer are two.
-export function phoneDevice(appDataDir, storeRoot) {
+export function phoneDevice(appDataDir: string, storeRoot: string): string {
   const file = path.join(appDataDir, 'phone-install-id');
-  let id = null;
+  let id: string | null = null;
   try { id = fs.readFileSync(file, 'utf8').trim(); } catch { /* first time */ }
   if (!/^[0-9a-f]{32}$/.test(id ?? '')) {
     id = crypto.randomBytes(16).toString('hex');
@@ -737,7 +896,11 @@ export function phoneDevice(appDataDir, storeRoot) {
 // (main/ipc.mts), reached the way the phone link reaches them: the Map
 // main/main.mts files every channel in. A handler that answers `ok: false`
 // turned it down, and that is what the phone is told.
-const ROUTES = {
+type Route = [string, Record<string, unknown>, ([string, Record<string, unknown>] | null)?];
+type RouteCommand = PhoneCommand & { payload: CommandPayload };
+export type PhoneChannel = { bivarianceHack(event: { sender: null }, args?: unknown): unknown }['bivarianceHack'];
+
+const ROUTES: Record<string, (c: RouteCommand) => Route> = {
   reply: (c) => {
     const { unschedule, ...picked } = phoneChoices('reply', c.payload);
     return ['zero:answer', { product: c.project, id: c.item, answer: c.payload.text, fromPhone: c.id, ...picked },
@@ -755,29 +918,34 @@ const ROUTES = {
   approve: (c) => ['zero:approve', { id: c.payload.approval, allow: c.payload.allow === true, ...(typeof c.payload.note === 'string' ? { note: c.payload.note } : {}), card: c.payload.card }],
   new: (c) => ['zero:compose', { product: c.project, title: c.payload.title ?? '', body: c.payload.body ?? '', fromPhone: c.id, ...phoneChoices('new', c.payload) }],
 };
-export function applyThrough(channels) {
-  const routeOf = async (cmd) => {
+export function applyThrough(channels: Map<string, PhoneChannel>) {
+  const routeOf = async (cmd: RouteCommand): Promise<Route | []> => {
     if (cmd.kind !== 'setting') return ROUTES[cmd.kind]?.(cmd) ?? [];
     const read = channels.get('zero:settings-read');
     if (!read) return [];
     return settingRoute(cmd.payload, await read({ sender: null }));
   };
-  return async (cmd) => {
+  return async (cmd: PhoneCommand): Promise<ChannelResult | null | undefined> => {
     const [channel, args, then] = await routeOf({ ...cmd, payload: cmd.payload || {} });
     const fn = channel && channels.get(channel);
     if (!fn) throw new Error('this computer cannot do that yet');
-    const out = await fn({ sender: null }, args);
+    const out = (await fn({ sender: null }, args)) as ChannelResult | null | undefined;
     if (out && out.ok === false) throw new Error(out.error || (out.reason ? `the app turned it down (${out.reason})` : 'the app turned it down'));
     // Done already; what follows is tidying, and its trouble is not the command's.
-    if (then && channels.get(then[0])) { try { await channels.get(then[0])({ sender: null }, then[1]); } catch { /* the schedule stays */ } }
+    if (then && channels.get(then[0])) { try { await channels.get(then[0])!({ sender: null }, then[1]); } catch { /* the schedule stays */ } }
     return out;
   };
 }
 
-function readState(file) {
+interface SavedState extends Partial<Omit<PhoneState, 'made' | 'device'>> {
+  device?: unknown;
+  made?: Record<string, string | { id: string; at: number }>;
+}
+
+function readState(file: string): PhoneState {
   try {
-    const s = JSON.parse(fs.readFileSync(file, 'utf8'));
-    const made = {};
+    const s = JSON.parse(fs.readFileSync(file, 'utf8')) as SavedState;
+    const made: PhoneState['made'] = {};
     for (const [k, v] of Object.entries(s.made || {})) made[k] = typeof v === 'string' ? { id: v, at: Date.now() } : v;
     return { device: typeof s.device === 'string' && /^[0-9a-f]{12}$/.test(s.device) ? s.device : null, forDevice: s.forDevice ?? null, sent: s.sent || {}, failed: s.failed || {}, done: s.done || {}, doing: s.doing || {}, made, uploaded: s.uploaded && typeof s.uploaded === 'object' ? s.uploaded : {}, alerted: s.alerted && typeof s.alerted === 'object' ? s.alerted : {}, adopted: s.adopted && typeof s.adopted === 'object' ? s.adopted : {}, webAlerts: s.webAlerts && typeof s.webAlerts === 'object' ? s.webAlerts : {} };
   } catch {
@@ -785,7 +953,7 @@ function readState(file) {
   }
 }
 
-function writeState(file, state) {
+function writeState(file: string, state: PhoneState) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(state), { mode: 0o600 });

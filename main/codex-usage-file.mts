@@ -35,6 +35,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+export type CodexSnapshot = Record<string, unknown>;
+
+export interface LoggedLimits {
+  snapshot: CodexSnapshot;
+  at: number;
+}
+
+type LogFile = { file: string; at: number };
+
 /**
  * How much of the end of a session log to read. Her records sit roughly 1.6 MB
  *  apart in the biggest file measured, so this holds several of them; a file
@@ -53,12 +62,12 @@ const FILES = 3;
  *  is rather than hiding it, so this only has to catch the absurd cases. */
 const TOO_OLD_MS = 14 * 24 * 60 * 60 * 1000;
 
-const plain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+const plain = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /**
  * A window is only worth having if it says how much is spent. Either spelling,
  *  because the log is snake_case and the push is camel. */
-const usable = (window) => plain(window)
+const usable = (window: unknown): boolean => plain(window)
   && (Number.isFinite(window.used_percent) || Number.isFinite(window.usedPercent));
 
 /**
@@ -68,11 +77,11 @@ const usable = (window) => plain(window)
  * walk is three levels of directory and never a full recursive scan of a folder
  * holding a thousand files. Only the newest day or two is ever opened.
  */
-function newestLogs(home, limit = FILES) {
+function newestLogs(home: string, limit = FILES): LogFile[] {
   const root = path.join(home, 'sessions');
-  const found = [];
-  const descend = (dir, depth) => {
-    let entries;
+  const found: LogFile[] = [];
+  const descend = (dir: string, depth: number): void => {
+    let entries: fs.Dirent[];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
     if (depth === 0) {
       for (const entry of entries) {
@@ -92,8 +101,8 @@ function newestLogs(home, limit = FILES) {
 }
 
 /** The end of a file, without reading the front of it. */
-function tail(file, bytes = TAIL_BYTES) {
-  let fd = null;
+function tail(file: string, bytes = TAIL_BYTES): { text: string; whole: boolean } | null {
+  let fd: number | null = null;
   try {
     fd = fs.openSync(file, 'r');
     const size = fs.fstatSync(fd).size;
@@ -117,7 +126,7 @@ function tail(file, bytes = TAIL_BYTES) {
  * `premium` family, every field null), and taking one of those would blank a
  * panel that had a real figure a moment earlier.
  */
-function lastLimitsIn(file) {
+function lastLimitsIn(file: string): { snapshot: CodexSnapshot; at: number | null } | null {
   const read = tail(file);
   if (!read) return null;
   const lines = read.text.split('\n');
@@ -127,7 +136,7 @@ function lastLimitsIn(file) {
   for (let i = lines.length - 1; i >= 0; i -= 1) {
     const line = lines[i];
     if (!line || !line.includes('"rate_limits"')) continue;
-    let event = null;
+    let event: { timestamp?: string } | null = null;
     try { event = JSON.parse(line); } catch { continue; }
     const limits = find(event);
     if (!limits) continue;
@@ -144,7 +153,7 @@ function lastLimitsIn(file) {
 /**
  * `rate_limits` sits a couple of levels inside the event and Codex has moved it
  *  before, so it is looked for rather than reached for. */
-function find(node, depth = 0) {
+function find(node: unknown, depth = 0): Record<string, unknown> | null {
   if (!plain(node) || depth > 6) return null;
   if (plain(node.rate_limits)) return node.rate_limits;
   for (const value of Object.values(node)) {
@@ -157,16 +166,15 @@ function find(node, depth = 0) {
 /**
  * What was read last, so an app nobody is touching re-reads nothing. Keyed by
  *  home, and thrown away when the newest log is written to again. */
-const remembered = new Map();
+const remembered = new Map<string, { file: string; at: number; reading: LoggedLimits | null }>();
 
 /**
  * THE LAST FIGURE CODEX WROTE DOWN UNDER THIS HOME, or null because it never
  * wrote one. Null is an ordinary answer on a Mac where Codex has never run.
  *
- * @param {string|null} home The CODEX_HOME this reading would belong to.
- * @returns {{ snapshot: object, at: number }|null}
+ * @param home The CODEX_HOME this reading would belong to.
  */
-export function loggedCodexLimits(home, { now = Date.now() } = {}) {
+export function loggedCodexLimits(home: string | null, { now = Date.now() }: { now?: number } = {}): LoggedLimits | null {
   if (!home) return null;
   const logs = newestLogs(home);
   if (!logs.length) return null;
@@ -175,15 +183,16 @@ export function loggedCodexLimits(home, { now = Date.now() } = {}) {
   const seen = remembered.get(home);
   if (seen && seen.file === logs[0].file && seen.at === logs[0].at) return seen.reading;
 
-  let reading = null;
+  let reading: LoggedLimits | null = null;
   for (const log of logs) {
-    reading = lastLimitsIn(log.file);
-    if (reading) {
+    const read = lastLimitsIn(log.file);
+    if (read) {
       // The event's own timestamp when it has one, and the file's otherwise.
-      if (reading.at === null) reading = { ...reading, at: log.at };
+      reading = { snapshot: read.snapshot, at: read.at ?? log.at };
       break;
     }
   }
+
   remembered.set(home, { file: logs[0].file, at: logs[0].at, reading });
   return reading;
 }

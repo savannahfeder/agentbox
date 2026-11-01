@@ -24,9 +24,40 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import readline from 'node:readline';
+import type { Readable, Writable } from 'node:stream';
 import { answerIsHers, appendSpoolLine, cardDigest, readSpoolJson, removeSpoolEntry, spoolEntryExists, writeSpoolFile } from './approvals.mjs';
 
 const POLL_MS = 2_000;
+
+export interface ApprovalArgs { tool_name?: string; input?: Record<string, unknown> }
+
+export interface ApprovalRequest {
+  id: string;
+  at: number;
+  product: string | null;
+  item: string | null;
+  tool: string;
+  input: Record<string, unknown>;
+}
+
+export interface ApprovalDecision {
+  behavior: 'allow' | 'deny';
+  message?: string;
+  updatedInput?: Record<string, unknown>;
+}
+
+export interface ApprovalsChannel {
+  env?: NodeJS.ProcessEnv;
+  input?: Readable;
+  output?: Writable;
+  warn?: (message: string) => void;
+}
+
+interface RpcMessage {
+  id?: string | number | null;
+  method?: string;
+  params?: { protocolVersion?: string; name?: string; arguments?: ApprovalArgs };
+}
 
 // A QUESTION IS NOT AN APPROVAL. Workers launch without AskUserQuestion
 // (Supervisor.prepareClaudePermissions); one that arrives here anyway is
@@ -39,7 +70,7 @@ const ASK_IN_THE_THREAD = 'Questions are not asked here. Finish what you can wit
  * a cloud run's connection when many share one process: main/cloud/run.mts).
  * `env` is that worker's: the spool, the public key, and which row it is.
  */
-export function serveApprovals({ env = process.env, input = process.stdin, output = process.stdout, warn = console.warn } = {}) {
+export function serveApprovals({ env = process.env, input = process.stdin, output = process.stdout, warn = console.warn }: ApprovalsChannel = {}) {
   const SPOOL = env.ZERO_APPROVALS_DIR;
   // THE KEY THAT SAYS AN ANSWER IS THE USER'S, AND IT IS SAFE TO HAND US.
   //
@@ -52,14 +83,14 @@ export function serveApprovals({ env = process.env, input = process.stdin, outpu
   const PUBLIC_KEY = env.ZERO_APPROVALS_PUBKEY;
   // Closed when its run has gone: a question still waiting stops at once.
   let closed = false;
-  const sleepers = new Set();
-  const nap = () => new Promise((resolve) => {
+  const sleepers = new Set<() => void>();
+  const nap = () => new Promise<void>((resolve) => {
     const wake = () => { clearTimeout(timer); sleepers.delete(wake); resolve(); };
     const timer = setTimeout(wake, POLL_MS);
     sleepers.add(wake);
   });
-  const send = (msg) => { if (!output.writableEnded && !output.destroyed) output.write(JSON.stringify(msg) + '\n'); };
-  async function decide(args) {
+  const send = (msg: unknown) => { if (!output.writableEnded && !output.destroyed) output.write(JSON.stringify(msg) + '\n'); };
+  async function decide(args: ApprovalArgs): Promise<ApprovalDecision> {
     try {
       if (args?.tool_name === 'AskUserQuestion') return { behavior: 'deny', message: ASK_IN_THE_THREAD };
       if (!SPOOL) return { behavior: 'deny', message: 'approvals spool is not configured' };
@@ -70,7 +101,7 @@ export function serveApprovals({ env = process.env, input = process.stdin, outpu
       if (!PUBLIC_KEY) return { behavior: 'deny', message: 'the approvals channel was given no key to check the founder\'s answer with, so nothing here can be approved' };
       fs.mkdirSync(SPOOL, { recursive: true });
       const id = crypto.randomUUID();
-      const request = {
+      const request: ApprovalRequest = {
         id,
         at: Date.now(),
         product: env.ZERO_PRODUCT ?? null,
@@ -151,19 +182,19 @@ export function serveApprovals({ env = process.env, input = process.stdin, outpu
       finish(id, request, { allow: false, gone: true });
       return { behavior: 'deny', message: 'the run that asked has ended' };
     } catch (err) {
-      return { behavior: 'deny', message: `approvals channel error: ${err.message}` };
+      return { behavior: 'deny', message: `approvals channel error: ${(err as Error).message}` };
     }
   }
 
   // One audit line per decision; the request/answer pair leaves the spool.
-  function finish(id, request, answer) {
+  function finish(id: string, request: ApprovalRequest, answer: unknown) {
     appendSpoolLine(SPOOL, 'log.jsonl', `${JSON.stringify({ ...request, answer, decidedAt: Date.now() })}\n`);
     for (const f of [`${id}.request.json`, `${id}.answer.json`]) removeSpoolEntry(SPOOL, f);
   }
 
   const rl = readline.createInterface({ input });
   rl.on('line', async (line) => {
-    let msg;
+    let msg: RpcMessage;
     try { msg = JSON.parse(line); } catch { return; }
     const { id, method, params } = msg;
     if (method === 'initialize') {

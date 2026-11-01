@@ -37,21 +37,20 @@ import { codexAccount, codexAuthFile } from './codex-account.mts';
 import { signInFiles, signInStamp } from './sign-in-files.mts';
 
 /** keyed by engine, home and folder, valued by the stamp it was read at. */
-const remembered = new Map();
+const remembered = new Map<string, { stamp: number; value: { engine: string } | null }>();
 
 /**
  * WHAT THE FLEET IS RUNNING ON, or null because nothing readable is signed in.
  *
- * @param {object} facts
- * @param {string} facts.engine Which coding agent the workspace runs on, which
+ * @param facts
+ * @param facts.engine Which coding agent the workspace runs on, which
  *   the supervisor has already decided (`Supervisor#engineFacts`). Never worked
  *   out here: the capability gate lives there, and a line that guessed could
  *   name the subscription the fleet is not spending.
- * @param {string} [facts.claudeProfile] The Claude login, `default` or a folder.
- * @param {string} [facts.codexHome] The CODEX_HOME this workspace runs on.
- * @returns {{ engine: string }|null}
+ * @param facts.claudeProfile The Claude login, `default` or a folder.
+ * @param facts.codexHome The CODEX_HOME this workspace runs on.
  */
-export function runsOn({ engine = null, home = os.homedir(), claudeProfile = 'default', codexHome = null } = {}) {
+export function runsOn({ engine = null, home = os.homedir(), claudeProfile = 'default', codexHome = null }: { engine?: string | null; home?: string; claudeProfile?: string | null; codexHome?: string | null } = {}): { engine: string } | null {
   if (engine !== 'claude' && engine !== 'codex') return null;
   const folder = engine === 'codex'
     ? (codexHome || path.join(home, '.codex'))
@@ -70,7 +69,7 @@ export function runsOn({ engine = null, home = os.homedir(), claudeProfile = 'de
 }
 
 /** Whether there is a login in there at all. Never throws, never guesses. */
-function signedIn(engine, { home, claudeProfile, folder }) {
+function signedIn(engine: string, { home, claudeProfile, folder }: { home: string; claudeProfile?: string | null; folder: string | null }) {
   if (engine === 'codex') return !!codexAccount(null, { file: codexAuthFile(folder) });
   // `oauthAccount` is the object Claude Code writes when somebody signs in, and
   // its absence is the honest "nobody is". A file with no account in it is an

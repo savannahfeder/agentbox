@@ -12,7 +12,7 @@ import { NAME } from '../../shared/product-name.mjs';
 
 // Where an OpenAI sign-in link sends the browser back, when that is this
 // computer's own address; null otherwise.
-export function wayBack(link) {
+export function wayBack(link: string) {
   try {
     const back = new URL(new URL(link).searchParams.get('redirect_uri') || '');
     const port = Number(back.port);
@@ -23,7 +23,7 @@ export function wayBack(link) {
   }
 }
 
-const page = (ok) => {
+const page = (ok: boolean) => {
   const line = ok ? 'Signed in to Codex. You can close this tab.' : `That didn’t finish. Go back to ${NAME} and try again.`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${ok ? 'Signed in to Codex' : 'Codex sign-in'}</title>`
     + '<style>:root{color-scheme:light dark}body{margin:0;min-height:100vh;display:grid;place-items:center;background:Canvas;color:CanvasText;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}p{margin:0 24px;text-align:center}</style>'
@@ -33,7 +33,13 @@ const page = (ok) => {
 // Listens at `port` until closed; anything but `path` is not found, including
 // the /cancel a local `codex login` sends whatever holds its port.
 // `onReturn(query)` says whether the cloud took it, and the browser is told.
-export function listenForWayBack({ port, path, onReturn }) {
+export interface WayBackListener {
+  port: number;
+  path: string;
+  onReturn: (query: string) => unknown;
+}
+
+export function listenForWayBack({ port, path, onReturn }: WayBackListener) {
   // Every answer closes its connection, so closing the server lets the port
   // go at once and still lets a page being answered reach the browser.
   const server = http.createServer(async (req, res) => {
@@ -48,7 +54,7 @@ export function listenForWayBack({ port, path, onReturn }) {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', connection: 'close' });
     res.end(page(ok));
   });
-  return new Promise((resolve, reject) => {
+  return new Promise<{ close(): void }>((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, '127.0.0.1', () => {
       server.off('error', reject);

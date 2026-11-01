@@ -57,13 +57,13 @@ const ICON_STEM = 'icon';
  * name pasted out of a document does not arrive with a newline in it and push
  * every row below it down.
  */
-export function cleanName(value) {
+export function cleanName(value?: unknown) {
   const name = String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
   return name || null;
 }
 
 /** PURE. Whether this file is a picture a mark can be made of. */
-export function isIconKind(file) {
+export function isIconKind(file?: unknown) {
   return ICON_KINDS.includes(path.extname(String(file ?? '')).toLowerCase());
 }
 
@@ -74,7 +74,7 @@ export function isIconKind(file) {
  * carries: a write that re-derives its folder from an id lands wherever that id
  * happens to name, and two products can hold the same id.
  */
-export function setProjectName(dir, value) {
+export function setProjectName(dir: string, value?: unknown) {
   const name = cleanName(value);
   if (!name) throw new Error('a project needs a name');
   if (!loadProjectAt(dir)) throw new Error('not a project folder');
@@ -95,10 +95,10 @@ export function setProjectName(dir, value) {
  * another Mac. The caller joins it to the project's own dir, which it already
  * has.
  */
-export function setProjectIcon(dir, source) {
+export function setProjectIcon(dir: string, source: string) {
   if (!loadProjectAt(dir)) throw new Error('not a project folder');
   if (!isIconKind(source)) throw new Error(`that file is not a picture ${NAME} can draw`);
-  let stat = null;
+  let stat: fs.Stats | null = null;
   try { stat = fs.statSync(source); } catch { throw new Error('that file could not be read'); }
   if (!stat.isFile()) throw new Error('that is not a file');
 
@@ -117,14 +117,14 @@ export function setProjectIcon(dir, source) {
  * Back to the drawn burst. The picture is deleted with the setting: leaving it
  *  behind means "no icon" and a file called icon.png sitting in her folder, which
  *  is the kind of thing that gets asked about a month later. */
-export function clearProjectIcon(dir) {
+export function clearProjectIcon(dir: string) {
   if (!loadProjectAt(dir)) throw new Error('not a project folder');
   clearIconFiles(dir);
   patchProjectAt(dir, { logo: null });
   return null;
 }
 
-function clearIconFiles(dir) {
+function clearIconFiles(dir: string) {
   for (const ext of ICON_KINDS) {
     try { fs.rmSync(path.join(dir, `${ICON_STEM}${ext}`), { force: true }); } catch { /* nothing to remove */ }
   }
@@ -139,11 +139,11 @@ function clearIconFiles(dir) {
  * broken image is not. This is the same rule the attachment chips follow: resolve
  * before you promise.
  */
-export function iconPathFor(product) {
+export function iconPathFor(product?: { logo?: unknown; dir: string } | null) {
   const rel = typeof product?.logo === 'string' ? product.logo.trim() : '';
   // Only ever the one file this module writes. A project.json edited by hand to
   // say `../../../somewhere` must not turn into a read outside the folder.
   if (!rel || rel !== path.basename(rel) || !isIconKind(rel)) return null;
-  const full = path.join(product.dir, rel);
+  const full = path.join(product!.dir, rel);
   try { return fs.statSync(full).isFile() ? full : null; } catch { return null; }
 }

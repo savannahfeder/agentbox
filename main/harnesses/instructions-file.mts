@@ -42,14 +42,30 @@ export const INSTRUCTIONS_END = '<!-- /agentbox:instructions -->';
  * it is an engine that cannot be offered, because the person's rules would not
  * reach it and nothing on screen would say so.
  */
-export function carriesInstructions(definition) {
+export interface InstructionsSpec { file?: string; in?: string }
+
+export interface InstructionsSource {
+  label?: string;
+  run?: { system?: string };
+  instructions?: InstructionsSpec;
+}
+
+export interface InstructionsContext {
+  cwd?: string | null;
+  home?: string | null;
+  text?: string;
+}
+
+export type InstructionsAnswer = { by: 'flag' } | { by: 'thread' } | { by: 'file'; file: string | null; written: boolean };
+
+export function carriesInstructions(definition: InstructionsSource | null | undefined): 'flag' | 'file' | null {
   if (definition?.run?.system) return 'flag';
   if (definition?.instructions?.file) return 'file';
   return null;
 }
 
 /** The absolute path this engine's instructions belong at, or null. */
-export function instructionsTarget(definition, { cwd, home } = {}) {
+export function instructionsTarget(definition: InstructionsSource | null | undefined, { cwd, home }: InstructionsContext = {}): string | null {
   const spec = definition?.instructions;
   if (!spec?.file) return null;
   const root = spec.in === 'cwd' ? cwd : home;
@@ -57,7 +73,7 @@ export function instructionsTarget(definition, { cwd, home } = {}) {
 }
 
 /** Whether this repository has the file under version control. */
-export function fileIsTracked(file, cwd) {
+export function fileIsTracked(file: string, cwd?: string | null): boolean {
   const where = cwd ?? path.dirname(file);
   try {
     execFileSync('git', ['ls-files', '--error-unmatch', '--', file], { cwd: where, stdio: 'ignore' });
@@ -74,7 +90,7 @@ export function fileIsTracked(file, cwd) {
  * block again, so the test that matters is that there is exactly one of them
  * afterwards. Returns the path written.
  */
-export function writeInstructions({ file, text, cwd = null, tracked = null }) {
+export function writeInstructions({ file, text, cwd = null, tracked = null }: { file: string | null; text: string; cwd?: string | null; tracked?: boolean | null }): string {
   if (!file) throw Error('There is nowhere to write these instructions');
   const isTracked = tracked ?? fileIsTracked(file, cwd);
   if (isTracked) {
@@ -85,7 +101,7 @@ export function writeInstructions({ file, text, cwd = null, tracked = null }) {
   const block = `${INSTRUCTIONS_BEGIN}\n${text}\n${INSTRUCTIONS_END}`;
   let before = '';
   try { before = fs.readFileSync(file, 'utf8'); } catch {}
-  let next;
+  let next: string;
   const begins = before.indexOf(INSTRUCTIONS_BEGIN);
   const ends = before.indexOf(INSTRUCTIONS_END);
   if (begins >= 0 && ends > begins) {
@@ -106,7 +122,8 @@ export function writeInstructions({ file, text, cwd = null, tracked = null }) {
  * they are on disk. An engine that carries them neither way has no business
  * being offered, so this throws rather than returning a shrug.
  */
-export function instructionsFor(definition, { cwd, home, text } = {}) {
+export function instructionsFor(definition: InstructionsSource | null | undefined, { cwd, home, text }: InstructionsContext = {}): InstructionsAnswer {
+
   const how = carriesInstructions(definition);
   if (how === 'flag') return { by: 'flag' };
   if (how !== 'file') throw Error(`${definition?.label ?? 'This engine'} has nowhere to put standing instructions`);

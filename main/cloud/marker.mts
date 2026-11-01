@@ -15,14 +15,35 @@ import path from 'node:path';
 
 const NAME = 'agentbox-cloud.json';
 
+export type MarkerFolder = string | null | undefined | { folder?: string; file?: string | null };
+
+export interface CloudMarker {
+  runId?: string;
+  sessionId?: string;
+  state?: string;
+  pid?: number | null;
+  at?: number;
+  [field: string]: unknown;
+}
+
+export interface CloudNews {
+  runId?: string;
+  item?: string | null;
+  product?: string | null;
+  branch?: string | null;
+  note?: string;
+  lost?: boolean;
+  at?: number;
+}
+
 // Read off the folder's `.git` rather than asked of `git rev-parse`: this runs
 // for every task folder on the app's main process and at every marker read in
 // the relay all cloud runs share, and a busy Mac takes half a second to start git.
-export function gitDirOf(folder) {
+export function gitDirOf(folder: string | null | undefined) {
   if (!folder) return null;
   for (let dir = path.resolve(folder); ; dir = path.dirname(dir)) {
     const dotGit = path.join(dir, '.git');
-    let st = null;
+    let st: fs.Stats | null = null;
     try { st = fs.statSync(dotGit); } catch { /* not here */ }
     if (st?.isDirectory() && fs.existsSync(path.join(dotGit, 'HEAD'))) return dotGit;
     if (st?.isFile()) {
@@ -35,7 +56,7 @@ export function gitDirOf(folder) {
 }
 
 // The main repository's git directory, which a linked worktree's names in `commondir`.
-export function commonGitDirOf(folder) {
+export function commonGitDirOf(folder: string | null | undefined) {
   const dir = gitDirOf(folder);
   if (!dir) return null;
   try { return path.resolve(dir, fs.readFileSync(path.join(dir, 'commondir'), 'utf8').trim()); } catch { return dir; }
@@ -44,19 +65,19 @@ export function commonGitDirOf(folder) {
 // `folder` is a task folder, or `{ folder, file }` for a project with no
 // repository: its threads share one documents folder, so each keeps its own
 // marker at `file` (Supervisor#_plainMarker).
-export function markerPath(folder) {
+export function markerPath(folder: MarkerFolder) {
   if (folder && typeof folder === 'object') return folder.file || null;
   const dir = gitDirOf(folder);
   return dir ? path.join(dir, NAME) : null;
 }
 
-export function readMarker(folder) {
+export function readMarker(folder: MarkerFolder): CloudMarker | null {
   const file = markerPath(folder);
   if (!file) return null;
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
 }
 
-export function writeMarker(folder, record) {
+export function writeMarker(folder: MarkerFolder, record: CloudMarker) {
   const file = markerPath(folder);
   if (!file) throw new Error(`${folder} is not a git folder`);
   if (typeof folder === 'object') fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -65,14 +86,14 @@ export function writeMarker(folder, record) {
   fs.renameSync(tmp, file);
 }
 
-export function clearMarker(folder) {
+export function clearMarker(folder: MarkerFolder) {
   const file = markerPath(folder);
   if (file) fs.rmSync(file, { force: true });
 }
 
 // The one question the ship queue and the folder cleaner ask. A folder that
 // is not there, or not a git folder, has nothing pending.
-export function cloudWorkPending(folder) {
+export function cloudWorkPending(folder: MarkerFolder) {
   if (folder && typeof folder === 'object') return !!folder.file && !!readMarker(folder);
   if (!folder || !fs.existsSync(folder)) return false;
   return !!readMarker(folder);
@@ -82,22 +103,22 @@ export function cloudWorkPending(folder) {
 // written by the relay, which cannot reach the store, and said by the
 // supervisor (`_sayCloudNews`). Beside the marker, and outliving it.
 const NEWS = 'agentbox-cloud-news.json';
-const newsPath = (folder) => { const dir = gitDirOf(folder); return dir ? path.join(dir, NEWS) : null; };
+const newsPath = (folder: string | null | undefined) => { const dir = gitDirOf(folder); return dir ? path.join(dir, NEWS) : null; };
 
-export function addCloudNews(folder, news) {
+export function addCloudNews(folder: string | null | undefined, news: CloudNews) {
   const file = newsPath(folder);
   if (!file) return;
-  let all = [];
+  let all: unknown = [];
   try { all = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* none yet */ }
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify([...(Array.isArray(all) ? all : []), { ...news, at: Date.now() }], null, 2));
   fs.renameSync(tmp, file);
 }
 
-export function takeCloudNews(folder) {
+export function takeCloudNews(folder: string | null | undefined): CloudNews[] {
   const file = folder && fs.existsSync(folder) ? newsPath(folder) : null;
   if (!file || !fs.existsSync(file)) return [];
-  let all = [];
+  let all: unknown = [];
   try { all = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* unreadable: dropped */ }
   fs.rmSync(file, { force: true });
   return Array.isArray(all) ? all : [];

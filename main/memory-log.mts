@@ -17,25 +17,39 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { listProcesses } from './leftovers.mts';
+import type { ProcessRecord } from './leftovers.mts';
 import { readMacPressure } from './memory-gate-server.mts';
 import { pressureFrom } from './memory-gate.mts';
+import type { PressureReading } from './memory-gate.mts';
 
 /** Days of files kept, today included. */
 export const KEEP_DAYS = 7;
 const FILE = /^memory-(\d{4}-\d{2}-\d{2})\.jsonl$/;
 
-const name = (exe) => String(exe ?? '').split('/').filter(Boolean).pop() || String(exe ?? '');
-const top = (list, n) => [...list].sort((a, b) => b.mb - a.mb).slice(0, n).map((p) => ({ name: name(p.exe), mb: Math.round(p.mb) }));
+type Owner = { item: string; product: string | null } | 'app' | null;
+
+export interface MemoryLogOptions {
+  dir: string;
+  appPid?: number;
+  list?: () => Promise<ProcessRecord[]> | ProcessRecord[];
+  readPressure?: () => Promise<PressureReading> | PressureReading;
+  now?: () => number;
+  facts?: () => Record<string, unknown> | null | undefined;
+  keepDays?: number;
+}
+
+const name = (exe: unknown) => String(exe ?? '').split('/').filter(Boolean).pop() || String(exe ?? '');
+const top = (list: ProcessRecord[], n: number) => [...list].sort((a, b) => b.mb - a.mb).slice(0, n).map((p) => ({ name: name(p.exe), mb: Math.round(p.mb) }));
 
 /** One minute's line, from one listing. Pure. */
-export function summarizeMemory(procs, { appPid = process.pid, at = Date.now(), reading = {} } = {}) {
+export function summarizeMemory(procs: ProcessRecord[], { appPid = process.pid, at = Date.now(), reading = {} }: { appPid?: number; at?: number; reading?: PressureReading } = {}) {
   const byPid = new Map(procs.map((p) => [p.pid, p]));
-  const owner = new Map();
-  const ownerOf = (p) => {
-    if (owner.has(p.pid)) return owner.get(p.pid);
-    let found = null;
-    const seen = new Set();
-    for (let q = p; q && !seen.has(q.pid); q = byPid.get(q.ppid)) {
+  const owner = new Map<number, Owner>();
+  const ownerOf = (p: ProcessRecord): Owner => {
+    if (owner.has(p.pid)) return owner.get(p.pid)!;
+    let found: Owner = null;
+    const seen = new Set<number>();
+    for (let q: ProcessRecord | undefined = p; q && !seen.has(q.pid); q = byPid.get(q.ppid)) {
       seen.add(q.pid);
       if (q.item) { found = { item: q.item, product: q.product ?? null }; break; }
       if (q.pid === appPid) { found = 'app'; break; }
@@ -43,9 +57,9 @@ export function summarizeMemory(procs, { appPid = process.pid, at = Date.now(), 
     owner.set(p.pid, found);
     return found;
   };
-  const tasks = new Map();
-  const app = [];
-  const others = [];
+  const tasks = new Map<string, { item: string; product: string | null; list: ProcessRecord[] }>();
+  const app: ProcessRecord[] = [];
+  const others: ProcessRecord[] = [];
   for (const p of procs) {
     const o = ownerOf(p);
     if (o === 'app') app.push(p);
@@ -56,7 +70,7 @@ export function summarizeMemory(procs, { appPid = process.pid, at = Date.now(), 
       tasks.set(o.item, t);
     } else others.push(p);
   }
-  const sum = (list) => Math.round(list.reduce((n, p) => n + (Number(p.mb) || 0), 0));
+  const sum = (list: ProcessRecord[]) => Math.round(list.reduce((n, p) => n + (Number(p.mb) || 0), 0));
   const level = Number.isFinite(reading?.level) ? reading.level : null;
   const freePct = Number.isFinite(reading?.freePct) ? reading.freePct : null;
   return {
@@ -73,16 +87,26 @@ export function summarizeMemory(procs, { appPid = process.pid, at = Date.now(), 
   };
 }
 
-const dayOf = (ms) => {
+const dayOf = (ms: number) => {
   const d = new Date(ms);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 export class MemoryLog {
+  declare dir: string;
+  declare appPid: number;
+  declare list: NonNullable<MemoryLogOptions['list']>;
+  declare readPressure: NonNullable<MemoryLogOptions['readPressure']>;
+  declare now: () => number;
+  declare facts: NonNullable<MemoryLogOptions['facts']>;
+  declare keepDays: number;
+  declare _pruned: string | null;
+  declare _busy?: boolean;
+
   constructor({
     dir, appPid = process.pid, list = listProcesses, readPressure = readMacPressure,
     now = Date.now, facts = () => ({}), keepDays = KEEP_DAYS,
-  }) {
+  }: MemoryLogOptions) {
     Object.assign(this, { dir, appPid, list, readPressure, now, facts, keepDays });
     this._pruned = null;
   }
@@ -97,21 +121,21 @@ export class MemoryLog {
         Promise.resolve().then(() => this.readPressure()).catch(() => ({})),
       ]);
       const at = this.now();
-      let facts = {};
+      let facts: Record<string, unknown> = {};
       try { facts = this.facts() ?? {}; } catch { /* the line goes without them */ }
       const line = { ...summarizeMemory(procs, { appPid: this.appPid, at, reading }), ...facts };
       fs.mkdirSync(this.dir, { recursive: true });
       fs.appendFileSync(path.join(this.dir, `memory-${dayOf(at)}.jsonl`), `${JSON.stringify(line)}\n`);
       this._prune(at);
     } catch (err) {
-      console.warn('zero: memory log:', err.message);
+      console.warn('zero: memory log:', (err as Error).message);
     } finally {
       this._busy = false;
     }
   }
 
   /** Once a day: removes this log's own files older than `keepDays`, and nothing else. */
-  _prune(at) {
+  _prune(at: number) {
     const today = dayOf(at);
     if (this._pruned === today) return;
     this._pruned = today;

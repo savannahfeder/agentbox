@@ -22,20 +22,31 @@
 import { Worker } from 'node:worker_threads';
 import * as folders from './task-folders.mts';
 
-const JOBS = new Set([
+export type FolderJobName =
+  | 'restoreTaskFolder' | 'releaseTaskFolder' | 'parkTaskFolder' | 'listTaskFolders'
+  | 'inventoryWorktrees' | 'strayWorktrees' | 'pruneMissingWorktrees';
+
+interface FolderJobRequest {
+  name: FolderJobName;
+  args: unknown[];
+  resolve: (value: unknown) => void;
+  reject: (reason: unknown) => void;
+}
+
+const JOBS = new Set<string>([
   'restoreTaskFolder', 'releaseTaskFolder', 'parkTaskFolder', 'listTaskFolders',
   // Looking over every copy of the project, which is a `git worktree list` plus
   // a `stat` each and belongs on this thread for the same reason as the rest.
   'inventoryWorktrees', 'strayWorktrees', 'pruneMissingWorktrees',
 ]);
 
-let worker = null;
+let worker: Worker | null = null;
 let broken = false;
 let seq = 0;
-const waiting = new Map();
+const waiting = new Map<number, FolderJobRequest>();
 
-function runHere({ name, args, resolve, reject }) {
-  try { resolve(folders[name](...args)); } catch (error) { reject(error); }
+function runHere({ name, args, resolve, reject }: FolderJobRequest) {
+  try { resolve((folders[name] as (...args: unknown[]) => unknown)(...args)); } catch (error) { reject(error); }
 }
 
 function giveUp() {
@@ -46,23 +57,23 @@ function giveUp() {
   for (const job of left) runHere(job);
 }
 
-function thread() {
+function thread(): Worker | null {
   if (worker || broken) return worker;
   try {
     worker = new Worker(new URL('./task-folders-thread.mts', import.meta.url));
   } catch (error) {
-    console.warn('zero: task folders will be made on the main thread:', error.message);
+    console.warn('zero: task folders will be made on the main thread:', (error as Error).message);
     broken = true;
     return null;
   }
-  worker.on('message', ({ id, ok, value, error }) => {
+  worker.on('message', ({ id, ok, value, error }: { id: number; ok: boolean; value: unknown; error: string }) => {
     const job = waiting.get(id);
     if (!job) return;
     waiting.delete(id);
     if (!waiting.size) worker?.unref();
     if (ok) job.resolve(value); else job.reject(new Error(error));
   });
-  worker.on('error', (error) => {
+  worker.on('error', (error: Error) => {
     console.warn('zero: the task folder thread failed:', error.message);
     giveUp();
   });
@@ -75,15 +86,15 @@ function thread() {
 }
 
 /** Run one of task-folders.mts's exports without blocking this thread. */
-export function folderJob(name, ...args) {
+export function folderJob<N extends FolderJobName>(name: N, ...args: Parameters<(typeof folders)[N]>): Promise<Awaited<ReturnType<(typeof folders)[N]>>> {
   if (!JOBS.has(name)) return Promise.reject(new Error(`not a folder job: ${name}`));
-  return new Promise((resolve, reject) => {
-    const job = { name, args, resolve, reject };
+  return new Promise<unknown>((resolve, reject) => {
+    const job: FolderJobRequest = { name, args, resolve, reject };
     const w = thread();
     if (!w) { runHere(job); return; }
     const id = ++seq;
     waiting.set(id, job);
     w.ref();
     w.postMessage({ id, name, args });
-  });
+  }) as Promise<Awaited<ReturnType<(typeof folders)[N]>>>;
 }

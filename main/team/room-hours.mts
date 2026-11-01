@@ -6,17 +6,26 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { allRuns, backfillRuns, runLedgerPath } from '../run-ledger.mts';
+import type { CloudUsageLine } from '../run-ledger.mts';
 import { summarizeRuns } from '../../shared/agent-hours.mjs';
 
 const RECHECK_MS = 10 * 60_000;
 
-export function createRoomHours({ home, products = () => [], cloudLines = () => [], now = Date.now, log = () => {} }) {
+export interface RoomHoursOptions {
+  home: string;
+  products?: () => { dir?: string | null; slug?: string | null }[];
+  cloudLines?: () => CloudUsageLine[] | null | undefined;
+  now?: () => number;
+  log?: (line: string) => void;
+}
+
+export function createRoomHours({ home, products = () => [], cloudLines = () => [], now = Date.now, log = () => {} }: RoomHoursOptions) {
   const file = runLedgerPath(home);
   const marker = path.join(home, 'runs.backfilled');
-  let cached = null;
-  let seen = null;
+  let cached: ReturnType<typeof summarizeRuns> | null = null;
+  let seen: string | null = null;
   let at = 0;
-  let backfilling = null;
+  let backfilling: Promise<void> | null = null;
 
   function backfillOnce() {
     if (backfilling || fs.existsSync(marker)) return backfilling;
@@ -37,7 +46,7 @@ export function createRoomHours({ home, products = () => [], cloudLines = () => 
       let stamp = '';
       try { const s = fs.statSync(file); stamp = `${s.size}:${s.mtimeMs}`; } catch { stamp = 'none'; }
       if (cached && stamp === seen && now() - at < RECHECK_MS) return cached;
-      let cloud = [];
+      let cloud: CloudUsageLine[] = [];
       try { cloud = cloudLines() ?? []; } catch { cloud = []; }
       cached = summarizeRuns(allRuns({ file, cloudLines: cloud }), { now: now() });
       seen = stamp;

@@ -18,7 +18,20 @@ const ENTRIES = [
  * are rewritten, so a store command outside the app runs as configured. `env`
  * is merged over the server's own by the caller.
  */
-export function toolServerLaunch(command, { appDir, platform = process.platform, runtime = process.execPath, unpacked = (p) => p } = {}) {
+export interface ToolServerLaunch {
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+}
+
+export interface ToolServerLaunchOptions {
+  appDir?: string;
+  platform?: NodeJS.Platform;
+  runtime?: string;
+  unpacked?: (p: string) => string;
+}
+
+export function toolServerLaunch(command: string, { appDir, platform = process.platform, runtime = process.execPath, unpacked = (p) => p }: ToolServerLaunchOptions = {}): ToolServerLaunch {
   if (platform !== 'win32' || !command || !appDir) return { command };
   const p = path.win32;
   const known = ENTRIES.find(({ launcher }) => samePath(command, unpacked(p.join(appDir, ...launcher))));
@@ -26,4 +39,4 @@ export function toolServerLaunch(command, { appDir, platform = process.platform,
   return { command: runtime, args: [p.join(appDir, ...known.entry)], env: { ELECTRON_RUN_AS_NODE: '1' } };
 }
 
-const samePath = (a, b) => path.win32.resolve(a).toLowerCase() === path.win32.resolve(b).toLowerCase();
+const samePath = (a: string, b: string) => path.win32.resolve(a).toLowerCase() === path.win32.resolve(b).toLowerCase();

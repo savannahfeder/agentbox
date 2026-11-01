@@ -13,6 +13,7 @@ import { PassThrough } from 'node:stream';
 import { EventEmitter } from 'node:events';
 import { execFileSync } from 'node:child_process';
 import { cloudRun } from './run.mts';
+import type { CloudStorage, CloudTransport } from './managed.mts';
 import { loginObjectKey } from './logins.mts';
 import { Name, nameSlug } from '../../shared/product-name.mjs';
 
@@ -21,17 +22,17 @@ const SANDBOX_NODE = '/usr/local/bin/node';
 const PROBE = `fetch('https://api.anthropic.com/v1/messages/count_tokens',{method:'POST',headers:{Authorization:'Bearer '+process.env.CLAUDE_CODE_OAUTH_TOKEN,'anthropic-beta':'oauth-2025-04-20','anthropic-version':'2023-06-01','content-type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5',messages:[{role:'user',content:'hi'}]})}).then(r=>console.log('${MARK}'+(r.headers.get('anthropic-organization-id')||''))).catch(()=>console.log('${MARK}'))`;
 
 /** The id on the probe's own line, when it is one; null otherwise. */
-export function orgFromOutput(text) {
+export function orgFromOutput(text: unknown) {
   const line = String(text ?? '').split('\n').find((l) => l.startsWith(MARK));
   const id = line?.slice(MARK.length).trim();
   return id && /^[0-9a-f-]{8,64}$/i.test(id) ? id : null;
 }
 
 /** The organization of one cloud Claude account, or null when the cloud would not say. */
-export async function readCloudOrg(rec, { transport, storage }) {
+export async function readCloudOrg(rec: { id: string }, { transport, storage }: { transport: CloudTransport; storage: CloudStorage }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-org-'));
   try {
-    const git = (...a) => execFileSync('git', a, { cwd: dir, stdio: 'pipe' });
+    const git = (...a: string[]) => execFileSync('git', a, { cwd: dir, stdio: 'pipe' });
     git('init', '-q', '-b', 'main', '.');
     git('-c', `user.name=${Name}`, '-c', `user.email=${nameSlug}@localhost`, 'commit', '-q', '--allow-empty', '-m', 'org check');
     git('checkout', '-q', '-b', 'agentbox/org-check');

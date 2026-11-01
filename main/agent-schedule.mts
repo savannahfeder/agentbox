@@ -38,8 +38,15 @@ import path from 'node:path';
 // Imported rather than re-derived: what identifies an agent is a rule, and
 // there is one copy of it.
 import { agentKey } from '../shared/agents.mjs';
+import type { AgentLike } from '../shared/agents.d.mts';
 
-const num = (v) => (Number.isFinite(Number(v)) ? Math.max(0, Math.trunc(Number(v))) : 0);
+export interface SpokeTurn { at: number; text: string }
+
+export interface ScheduleEntry { runAt: number; doneThrough: number; repliedAt: number; spoke: SpokeTurn[]; setAt: number }
+
+export interface ScheduledAgent extends AgentLike { spoke?: SpokeTurn[] }
+
+const num = (v: unknown) => (Number.isFinite(Number(v)) ? Math.max(0, Math.trunc(Number(v))) : 0);
 
 // THE USER'S SIDE OF A THREAD IS SMALL, and this file is read on every draw. A
 // real session has a handful of human turns, typically a sentence or two each.
@@ -49,8 +56,8 @@ const num = (v) => (Number.isFinite(Number(v)) ? Math.max(0, Math.trunc(Number(v
 const KEEP_SPOKE = 8;
 const SPOKE_CHARS = 600;
 
-function trimSpoke(list) {
-  const out = [];
+function trimSpoke(list: unknown) {
+  const out: SpokeTurn[] = [];
   for (const t of Array.isArray(list) ? list : []) {
     const at = num(t?.at);
     const text = String(t?.text ?? '').trim().slice(0, SPOKE_CHARS);
@@ -61,15 +68,18 @@ function trimSpoke(list) {
 }
 
 export class AgentSchedule {
-  constructor(root) {
+  declare file: string;
+  declare byKey: Record<string, ScheduleEntry>;
+
+  constructor(root: string) {
     this.file = path.join(root, '.zero-agent-schedule.json');
     this.byKey = this._read();
   }
 
   _read() {
     try {
-      const raw = JSON.parse(fs.readFileSync(this.file, 'utf8'));
-      const out = {};
+      const raw: Record<string, Partial<ScheduleEntry> | null> | null = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+      const out: Record<string, ScheduleEntry> = {};
       for (const [key, value] of Object.entries(raw ?? {})) {
         const runAt = num(value?.runAt);
         const doneThrough = num(value?.doneThrough);
@@ -97,21 +107,21 @@ export class AgentSchedule {
   }
 
   /** The moment set on one agent, or 0. */
-  runAt(key) {
+  runAt(key: string) {
     return this.byKey[key]?.runAt ?? 0;
   }
 
   /** The activity she has already seen and closed, or 0. */
-  doneThrough(key) {
+  doneThrough(key: string) {
     return this.byKey[key]?.doneThrough ?? 0;
   }
 
   /** When she last spoke to this session from Agentbox, or 0. */
-  repliedAt(key) {
+  repliedAt(key: string) {
     return this.byKey[key]?.repliedAt ?? 0;
   }
 
-  _entry(key) {
+  _entry(key: string): ScheduleEntry {
     return this.byKey[key] ?? { runAt: 0, doneThrough: 0, repliedAt: 0, spoke: [], setAt: 0 };
   }
 
@@ -119,7 +129,7 @@ export class AgentSchedule {
   // the user said" is not an entry. The last of those four is why this is not the
   // same list as it was: the user's words outlive the reply that carried them, so an
   // entry holding only `spoke` is still the record of a conversation.
-  _keep(key, entry, now) {
+  _keep(key: string, entry: ScheduleEntry, now: number) {
     if (entry.runAt > now || entry.doneThrough > 0 || entry.repliedAt > 0 || entry.spoke?.length) this.byKey[key] = entry;
     else delete this.byKey[key];
     this._write();
@@ -132,7 +142,7 @@ export class AgentSchedule {
    * be false the instant it was written, so storing it would only leave a row
    * in the file that means nothing and outlives the session it named.
    */
-  set(key, runAt, now = Date.now()) {
+  set(key: string, runAt: unknown, now = Date.now()) {
     if (!key) return 0;
     const when = Math.max(0, Math.trunc(Number(runAt) || 0));
     const entry = this._entry(key);
@@ -146,7 +156,7 @@ export class AgentSchedule {
    *
    * ANY MARK ABOVE ZERO MEANS CLOSED.
    */
-  close(key, through, now = Date.now()) {
+  close(key: string, through: unknown, now = Date.now()) {
     if (!key) return 0;
     const mark = Math.max(0, Math.trunc(Number(through) || 0));
     const entry = this._entry(key);
@@ -181,7 +191,7 @@ export class AgentSchedule {
    * a send that failed would move the row into In progress over a message that
    * never arrived, which is the failure this codebase cares about most.
    */
-  replied(key, at, now = Date.now(), text = '') {
+  replied(key: string, at: unknown, now = Date.now(), text: unknown = '') {
     if (!key) return 0;
     const mark = Math.max(0, Math.trunc(Number(at) || 0));
     const entry = this._entry(key);
@@ -209,7 +219,7 @@ export class AgentSchedule {
    * is written at the moment of delivery, by the only process that knows it
    * delivered it.
    */
-  spoke(key) {
+  spoke(key: string) {
     return this.byKey[key]?.spoke ?? [];
   }
 
@@ -225,9 +235,9 @@ export class AgentSchedule {
    * those would clear every moment she has set, at every app start, with no
    * symptom except her deferred rows all coming back.
    */
-  decorate(agents, now = Date.now()) {
-    const live = new Set();
-    const out = agents.map((agent) => {
+  decorate(agents: ScheduledAgent[], now = Date.now()) {
+    const live = new Set<string>();
+    const out = agents.map((agent): ScheduledAgent => {
       const key = agentKey(agent);
       live.add(key);
       const entry = this.byKey[key];

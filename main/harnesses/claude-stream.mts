@@ -1,13 +1,51 @@
 import { hookFailure } from '../../shared/hook-failure.mjs';
 import { SAYING_CAP } from '../codex.mjs';
 
+export interface StreamBlock {
+  type?: string;
+  text?: string;
+  name?: string;
+  id?: string;
+  input?: Record<string, unknown> & { id?: string };
+  tool_use_id?: string;
+  content?: string | { text?: string }[];
+  delta?: { type?: string; text?: unknown };
+  [key: string]: unknown;
+}
+
+export interface StreamLine {
+  type?: string;
+  subtype?: string;
+  session_id?: string;
+  result?: unknown;
+  is_error?: boolean;
+  num_turns?: number;
+  task_id?: string;
+  patch?: { status?: string };
+  message?: { content?: StreamBlock[] };
+  event?: { type?: string; content_block?: StreamBlock; delta?: { type?: string; text?: unknown } };
+}
+
+export interface StreamSession {
+  sessionId?: string;
+  itemId?: string;
+  result?: string | null;
+  resultIsError?: boolean;
+  child?: { waitingOn?: () => unknown[] } | null;
+  helperIds?: Set<string>;
+  claimCalls?: Set<string | undefined>;
+  claimRefused?: boolean;
+  saying?: string;
+  sayingAt?: number;
+}
+
 // The stream's own metadata, kept on the session object: the session id (what
 // a personal reply resumes) and the final result message (what the founder
 // reads). Recorded for every session because it is one parse we are already
 // paying for; acted on where someone needs it.
-export function captureStream(session, line) {
+export function captureStream(session: StreamSession, line: string): void {
   try {
-    const obj = JSON.parse(line);
+    const obj: StreamLine = JSON.parse(line);
     if (obj.session_id) session.sessionId = obj.session_id;
     if (obj.type === 'result') {
       session.result = String(obj.result ?? '');
@@ -27,7 +65,7 @@ export function captureStream(session, line) {
 // `closingMessageIsTheAnswer` reads it: a refused worker is told to end saying
 // nothing, and whatever it does say must not land on a row someone else holds.
 // A later claim that succeeds clears it.
-function noteClaimAnswer(session, obj) {
+function noteClaimAnswer(session: StreamSession, obj: StreamLine): void {
   const blocks = Array.isArray(obj?.message?.content) ? obj.message.content : [];
   for (const b of blocks) {
     if (obj.type === 'assistant' && b?.type === 'tool_use' && /claim_work_item$/.test(b.name ?? '')
@@ -63,9 +101,9 @@ function noteClaimAnswer(session, obj) {
  *
  * Returns true when the string moved, which is what earns a push.
  */
-export function streamingText(session, line) {
+export function streamingText(session: StreamSession, line: string): boolean {
   try {
-    const obj = JSON.parse(line);
+    const obj: StreamLine = JSON.parse(line);
     if (obj.type !== 'stream_event') return false;
     const event = obj.event ?? {};
     // A new message. Whatever the last one ended on is the last one's, and the
@@ -139,11 +177,11 @@ export function streamingText(session, line) {
 // row, and this one because it only looked for a result that was absent. Each
 // was right on its own and together they left the case that matters most with
 // no writer at all.
-export function saidNothingSheCanUse(session) {
+export function saidNothingSheCanUse(session: StreamSession | null | undefined): boolean {
   return session?.result == null || !!session.resultIsError;
 }
 
-export function countHelpers(session, obj) {
+export function countHelpers(session: StreamSession, obj: StreamLine | null | undefined): void {
   if (obj?.type !== 'system') return;
   if (obj.subtype === 'task_started' && obj.task_id) {
     (session.helperIds ??= new Set()).add(obj.task_id);
@@ -160,14 +198,14 @@ export function countHelpers(session, obj) {
 // The persisted trace line: fuller than the tail. Tool calls carry their key
 // input (the file written, the command run), because "tool: Bash" answers
 // nothing when the founder asks what a session actually did.
-export function traceStreamLine(line) {
+export function traceStreamLine(line: string): string | null {
   try {
-    const obj = JSON.parse(line);
+    const obj: StreamLine = JSON.parse(line);
     const at = new Date().toISOString().slice(11, 19);
     const hook = hookFailure(obj);
     if (hook) return `${at}  ${hook}`;
     if (obj.type === 'assistant' && obj.message?.content) {
-      const parts = [];
+      const parts: string[] = [];
       for (const c of obj.message.content) {
         if (c.type === 'text' && c.text?.trim()) parts.push(c.text.trim());
         if (c.type === 'tool_use') {
@@ -189,9 +227,9 @@ export function traceStreamLine(line) {
 }
 
 // Stream-json lines are verbose; the In Progress tail wants the gist.
-export function summarizeStreamLine(line) {
+export function summarizeStreamLine(line: string): string | null {
   try {
-    const obj = JSON.parse(line);
+    const obj: StreamLine = JSON.parse(line);
     const hook = hookFailure(obj);
     if (hook) return hook;
     if (obj.type === 'assistant' && obj.message?.content) {

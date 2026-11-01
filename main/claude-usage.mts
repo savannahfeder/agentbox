@@ -7,6 +7,8 @@ import path from 'node:path';
 import { readUsageReport } from '../shared/claude-usage.mjs';
 import { localZone, USAGE_UNREADABLE } from '../shared/usage.mjs';
 import { runClaudeUsage } from './claude-usage-process.mts';
+import type { UsageRunner } from './claude-usage-process.mts';
+import type { UsageLimit } from '../shared/usage.d.mts';
 import { NO_METERED_KEY } from './harnesses/claude.mts';
 import { CERTIFICATES, LOCALE, PROXIES } from './shell-path.mjs';
 
@@ -17,8 +19,8 @@ import { CERTIFICATES, LOCALE, PROXIES } from './shell-path.mjs';
 // and the language.
 const USAGE_KEEPS = ['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', ...LOCALE, ...PROXIES, ...CERTIFICATES];
 
-export function usageEnv(input, profile) {
-  const env = {};
+export function usageEnv(input: Record<string, string | undefined> | null | undefined, profile: string) {
+  const env: Record<string, string> = {};
   for (const key of USAGE_KEEPS) if (typeof input?.[key] === 'string') env[key] = input[key];
   if (profile !== 'default') env.CLAUDE_CONFIG_DIR = profile;
   return env;
@@ -59,14 +61,43 @@ const TIMEOUT_MS = 30_000;
 // asked every five minutes forever.
 const AFTER_A_MISS_MS = 30 * 60_000;
 
+export interface UsageReading { limits: UsageLimit[]; at: number; profile: string }
+
+export interface UsageResult { ok: boolean; error?: string; reading?: UsageReading | null }
+
+export interface UsageAccount { profile: string; env?: NodeJS.ProcessEnv }
+
+export interface ClaudeUsageOptions {
+  bin?: () => string | null;
+  onChange?: () => void;
+  run?: UsageRunner;
+  now?: () => number;
+  where?: () => string;
+  account?: () => UsageAccount | null;
+}
+
 export class ClaudeUsage {
+  declare _bin: (() => string | null) | undefined;
+  declare _selectedProfile: string | null;
+  declare _generation: number;
+  declare _pending: Promise<UsageResult> | null;
+  declare _pendingGeneration: number | null | undefined;
+  declare _onChange: () => void;
+  declare _run: UsageRunner;
+  declare _now: () => number;
+  declare _where: () => string;
+  declare _account: () => UsageAccount | null;
+  declare _last: { limits: UsageLimit[], at: number, zone: string|null, profile: string }|null;
+  declare _busy: boolean;
+  declare _missedUntil: number;
+
   /**
-   * @param {object} how @param { => string|null} how.bin Where Claude Code
+   * @param how @param how.bin Where Claude Code
    * is, asked each time rather than captured: it can be installed while the
    * app is running, and the settings screen already promises that works.
-   * @param { => void} [how.onChange] Told when a new reading lands, so the
+   * @param [how.onChange] Told when a new reading lands, so the
    * window redraws, including a new checked time on unchanged percentages.
-   * @param { => { profile: string, env?: object }} [how.account] WHOSE LIMIT
+   * @param [how.account] WHOSE LIMIT
    * IS READ, asked each time. It used to be nobody's in particular: the
    * command ran with the app's own environment, which is the default login,
    * so a Mac with a second account picked as In use showed "No usage reading
@@ -75,7 +106,7 @@ export class ClaudeUsage {
    * the account's name ('default' or its CLAUDE_CONFIG_DIR) and `env` is the
    * environment to run it in. Supervisor.usageAccount is the real one.
    */
-  constructor({ bin, onChange = () => {}, run = runClaudeUsage, now = () => Date.now(), where = usageCwd, account = () => ({ profile: 'default' }) } = {}) {
+  constructor({ bin, onChange = () => {}, run = runClaudeUsage, now = () => Date.now(), where = usageCwd, account = () => ({ profile: 'default' }) }: ClaudeUsageOptions = {}) {
     this._bin = bin;
     this._selectedProfile = null;
     this._generation = 0;
@@ -85,7 +116,6 @@ export class ClaudeUsage {
     this._now = now;
     this._where = where;
     this._account = account;
-    /** @type {{ limits: any[], at: number, zone: string|null, profile: string }|null} */
     this._last = null;
     this._busy = false;
     this._missedUntil = 0;
@@ -113,7 +143,7 @@ export class ClaudeUsage {
 
   // The secondary subscription can show its last reading without starting
   // another coding process merely to populate the sidebar.
-  peek() {
+  peek(): UsageReading | null {
     this._syncProfile();
     return this._last ? { limits: this._last.limits, at: this._last.at, profile: this._last.profile } : null;
   }
@@ -143,7 +173,7 @@ export class ClaudeUsage {
   }
 
   /** Ask again now, whatever the cache says. The settings screen's own button. */
-  async refreshNow() {
+  async refreshNow(): Promise<UsageResult> {
     if (this._syncProfile() === null) return { ok: false, error: USAGE_WHOSE_UNKNOWN };
     this._missedUntil = 0;
     // Join an existing reading, including one begun by the background poll.
@@ -160,16 +190,16 @@ export class ClaudeUsage {
   _refresh() {
     const profile = this._syncProfile();
     const generation = this._generation;
-    const bin = (() => { try { return this._bin(); } catch { return null; } })();
-    const failure = (error = USAGE_UNREADABLE) => ({ ok: false, error });
+    const bin = (() => { try { return this._bin?.(); } catch { return null; } })();
+    const failure = (error: string = USAGE_UNREADABLE) => ({ ok: false, error });
     if (profile === null) return Promise.resolve(failure(USAGE_WHOSE_UNKNOWN));
     if (!bin) { this._missed(); return Promise.resolve(failure()); }
     this._busy = true;
     this._pendingGeneration = generation;
-    let resolve;
-    const pending = new Promise(done => { resolve = done; });
+    let resolve: (value: UsageResult) => void;
+    const pending = new Promise<UsageResult>(done => { resolve = done; });
     this._pending = pending;
-    const finish = (err, stdout) => {
+    const finish = (err: Error | null, stdout?: string) => {
       this._busy = false;
       this._pending = null;
       this._pendingGeneration = null;
@@ -197,7 +227,7 @@ export class ClaudeUsage {
       // `cwd` is the whole fix for the permission panels; see usageCwd above.
       { cwd: this._where(), env, timeout: TIMEOUT_MS, maxBuffer: 4 * 1024 * 1024, encoding: 'utf8' },
       finish,
-    ); } catch (err) { finish(err, ''); }
+    ); } catch (err) { finish(err as Error, ''); }
     return pending;
   }
 

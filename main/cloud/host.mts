@@ -23,6 +23,26 @@ import { PassThrough } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { nameSlug } from '../../shared/product-name.mjs';
 
+export interface CloudRunOptions {
+  args: string[];
+  env: Record<string, string>;
+  cwd: string;
+  stdin: PassThrough;
+  stdout: PassThrough;
+  stderr: PassThrough;
+  signals: EventEmitter;
+  pid: number | undefined;
+  watchParent: boolean;
+}
+
+export interface CloudHostOptions {
+  sockPath: string;
+  runOne: (opts: CloudRunOptions) => unknown;
+  idleMs?: number;
+  onIdle?: () => void;
+  log?: (message: string) => void;
+}
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // The files a host is made of. A host started by an older app serves only the
 // stand-ins of that app: a newer one starts its own beside it.
@@ -34,7 +54,7 @@ let hosts = 0;
 
 // Whether this perl has every module the stand-in uses: some Linux perls ship
 // without JSON::PP.
-export function perlRunsTheShim(perl) {
+export function perlRunsTheShim(perl: string) {
   try {
     return spawnSync(perl, ['-MIO::Socket::UNIX', '-MIO::Select', '-MMIME::Base64', '-MJSON::PP', '-MCwd', '-MPOSIX', '-e1'], { stdio: 'ignore', timeout: 10_000 }).status === 0;
   } catch { return false; }
@@ -47,7 +67,7 @@ export function hostStamp() {
 }
 
 // Short enough for a socket's path (104 bytes on macOS), and this user's own.
-export function hostSocketPath({ stamp = hostStamp(), dir = os.tmpdir(), uid = process.getuid?.() ?? 0 } = {}) {
+export function hostSocketPath({ stamp = hostStamp(), dir = os.tmpdir(), uid = process.getuid?.() ?? 0 }: { stamp?: string; dir?: string; uid?: number } = {}) {
   return path.join(dir, `${nameSlug}-cloud-${uid}-${stamp}.sock`);
 }
 
@@ -55,11 +75,11 @@ export function hostSocketPath({ stamp = hostStamp(), dir = os.tmpdir(), uid = p
  * Serves runs on `sockPath`; `runOne(opts)` is one run, resolving to its exit
  * code. `started` says 'serving', or 'taken' when a host already answers there.
  */
-export function startCloudHost({ sockPath, runOne, idleMs = 60_000, onIdle = () => {}, log = () => {} }) {
+export function startCloudHost({ sockPath, runOne, idleMs = 60_000, onIdle = () => {}, log = () => {} }: CloudHostOptions) {
   let live = 0;
-  let idleTimer = null;
+  let idleTimer: NodeJS.Timeout | null = null;
   const idle = () => {
-    clearTimeout(idleTimer);
+    clearTimeout(idleTimer ?? undefined);
     if (live === 0) { idleTimer = setTimeout(() => { if (live === 0) onIdle(); }, idleMs); idleTimer.unref?.(); }
   };
   const server = net.createServer((sock) => {
@@ -70,13 +90,13 @@ export function startCloudHost({ sockPath, runOne, idleMs = 60_000, onIdle = () 
     const stdout = new PassThrough();
     const stderr = new PassThrough();
     const signals = new EventEmitter();
-    const send = (line) => { if (!sock.destroyed) return sock.write(line + '\n'); return true; };
+    const send = (line: string) => { if (!sock.destroyed) return sock.write(line + '\n'); return true; };
     // What the run prints goes out as it comes, never faster than the
     // stand-in takes it.
-    for (const [stream, tag] of [[stdout, 'o'], [stderr, 'e']]) {
+    for (const [stream, tag] of [[stdout, 'o'], [stderr, 'e']] as const) {
       stream.on('data', (b) => { if (send(`${tag} ${b.toString('base64')}`) === false && !sock.destroyed) { stream.pause(); sock.once('drain', () => stream.resume()); } });
     }
-    const finish = (code) => {
+    const finish = (code: unknown) => {
       if (done) return;
       done = true;
       let open = 2;
@@ -88,19 +108,19 @@ export function startCloudHost({ sockPath, runOne, idleMs = 60_000, onIdle = () 
     sock.setEncoding('utf8');
     sock.on('data', (d) => {
       buf += d;
-      let n;
+      let n: number;
       while ((n = buf.indexOf('\n')) >= 0) {
         const line = buf.slice(0, n);
         buf = buf.slice(n + 1);
         if (!started) {
-          let hello = null;
+          let hello: { argv?: unknown; env?: Record<string, string>; cwd?: unknown; pid?: unknown } | null = null;
           try { hello = JSON.parse(line); } catch { /* not a hello */ }
           if (!Array.isArray(hello?.argv) || typeof hello.cwd !== 'string') { send(`e ${Buffer.from('agentbox cloud: the stand-in sent no run\n').toString('base64')}`); send(`x ${TRANSPORT_FAULT}`); sock.end(); return; }
           started = true;
           live += 1;
-          clearTimeout(idleTimer);
+          clearTimeout(idleTimer ?? undefined);
           Promise.resolve()
-            .then(() => runOne({ args: hello.argv, env: hello.env || {}, cwd: hello.cwd, stdin, stdout, stderr, signals, pid: Number(hello.pid) || undefined, watchParent: false }))
+            .then(() => runOne({ args: hello!.argv as string[], env: hello!.env || {}, cwd: hello!.cwd as string, stdin, stdout, stderr, signals, pid: Number(hello!.pid) || undefined, watchParent: false }))
             .then((code) => finish(code), (err) => { stderr.write(`agentbox cloud: stopped: ${err?.message || err}\n`); finish(TRANSPORT_FAULT); });
           continue;
         }
@@ -120,16 +140,16 @@ export function startCloudHost({ sockPath, runOne, idleMs = 60_000, onIdle = () 
   // newer host may have put its own at the same path. Node deletes the path a
   // server listened on as it closes, so it listens on a name of its own and
   // moves it into place.
-  let mine = null;
+  let mine: number | null = null;
   const own = `${sockPath}.${process.pid}${(hosts += 1)}`;
   const ours = () => { try { return mine !== null && fs.statSync(sockPath).ino === mine; } catch { return false; } };
-  const started = new Promise((resolve) => {
+  const started = new Promise<string>((resolve) => {
     const probe = net.connect(sockPath);
     probe.once('connect', () => { probe.destroy(); resolve('taken'); });
     probe.once('error', () => {
       try { fs.unlinkSync(own); } catch { /* not there */ }
       server.listen(own, () => {
-        try { fs.chmodSync(own, 0o600); fs.renameSync(own, sockPath); mine = fs.statSync(sockPath).ino; } catch (err) { log(`cloud host: ${err.message}`); }
+        try { fs.chmodSync(own, 0o600); fs.renameSync(own, sockPath); mine = fs.statSync(sockPath).ino; } catch (err) { log(`cloud host: ${(err as Error).message}`); }
         idle();
         resolve('serving');
       });
@@ -139,8 +159,8 @@ export function startCloudHost({ sockPath, runOne, idleMs = 60_000, onIdle = () 
     server,
     started,
     live: () => live,
-    close: () => started.then(() => new Promise((resolve) => {
-      clearTimeout(idleTimer);
+    close: () => started.then(() => new Promise<void>((resolve) => {
+      clearTimeout(idleTimer ?? undefined);
       if (ours()) { try { fs.unlinkSync(sockPath); } catch { /* gone */ } }
       if (server.listening) server.close(() => resolve()); else resolve();
     })),
@@ -161,5 +181,5 @@ if (path.basename(process.argv[1] || '') === 'host.mts') {
   if (await host.started === 'taken') process.exit(HOST_ALREADY_THERE);
   // A run's stray error is that run's, not every run's.
   process.on('uncaughtException', (err) => process.stderr.write(`cloud host: ${err?.stack || err}\n`));
-  process.on('unhandledRejection', (err) => process.stderr.write(`cloud host: ${err?.stack || err}\n`));
+  process.on('unhandledRejection', (err) => process.stderr.write(`cloud host: ${(err as Error | undefined)?.stack || err}\n`));
 }

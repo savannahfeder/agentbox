@@ -8,17 +8,38 @@ import {TaskTerminals,terminalEnv} from './task-terminals.mts';
 import { harnessFor } from './harnesses.mts';
 import { harnessDefinition } from '../shared/harness-definitions.mjs';
 const exec=promisify(execFile);
-const valid=v=>typeof v==='string'&&/^\d+\.\d+\.\d+$/.test(v);
-export function newerVersion(installed,latest){
+export interface UpdatePlan { feed: string; format?: string; file?: string; args?: string[]; env?: NodeJS.ProcessEnv; name?: string; home?: string }
+export interface Installation { engine: string; bin: string; real: string; home: string; version?: string; channel: string; disabled: boolean }
+export interface UpdateEntry { engine: string; state: string; message?: string; checkedAt?: number; installed?: string; latest?: string }
+export interface UpdateTerminals {
+  resolve?: (engine: string) => unknown;
+  open(engine: string): unknown;
+  close(engine: string): unknown;
+  get(engine: string): { exitPromise: Promise<unknown>; exitCode?: number | null };
+  read(engine: string, offset?: number, wait?: number): unknown;
+  write(engine: string, data: unknown): unknown;
+  resize(engine: string, cols: unknown, rows: unknown): unknown;
+  shutdown(): unknown;
+}
+export interface AgentUpdatesOptions {
+  installation: (engine: string) => Promise<Installation>;
+  latest?: (plan: UpdatePlan) => Promise<string>;
+  refresh?: (engine: string) => Promise<unknown>;
+  terminals?: UpdateTerminals;
+  now?: () => number;
+}
+export interface TerminalAction { action?: string; offset?: number; wait?: number; data?: string; cols?: number; rows?: number }
+const valid=(v:unknown):v is string=>typeof v==='string'&&/^\d+\.\d+\.\d+$/.test(v);
+export function newerVersion(installed:unknown,latest:unknown){
  if(!valid(installed)||!valid(latest))return false;
  const a=installed.split('.').map(Number),b=latest.split('.').map(Number);
  for(let i=0;i<3;i++){if(b[i]!==a[i])return b[i]>a[i];}return false;
 }
-export function updatePlan({engine,bin,real,home=os.homedir(),channel='latest'}){
+export function updatePlan({engine,bin,real,home=os.homedir(),channel='latest'}:{engine:string,bin:string,real:string,home?:string,channel?:string}){
  if(!harnessDefinition(engine))return null;
  return harnessFor(engine).updatePlan({bin,real,home,channel});
 }
-export async function installedAgent(engine,config){
+export async function installedAgent(engine:string,config:Record<string,string|null|undefined>):Promise<Installation>{
  const harness=harnessFor(engine), bin=harness.binary(config);
  if(!bin)throw Error('This agent is not installed.');
  const home=config.home||os.homedir();
@@ -30,27 +51,37 @@ export async function installedAgent(engine,config){
  const channel=settings.autoUpdatesChannel==='stable'?'stable':'latest';
  return {engine,bin,real:fs.realpathSync(bin),home,version,channel,disabled:settings.env?.DISABLE_UPDATES==='1'||process.env.DISABLE_UPDATES==='1'};
 }
-export async function latestRelease(plan){
+export async function latestRelease(plan:UpdatePlan):Promise<string>{
  const r=await fetch(plan.feed,{signal:AbortSignal.timeout(10000),headers:{Accept:plan.format==='text'?'text/plain':'application/json'}});
  if(!r.ok)throw Error('Release check failed.');
  const body=await r.text();if(body.length>2_000_000)throw Error('Release response too large.');
- const data=plan.format==='text'?null:JSON.parse(body);
- const version=plan.format==='text'?body.trim():plan.format==='codex'?String(data.version||data.tag_name||'').replace(/^(rust-v|v)/,''):data.version;
+ const data:{version?:unknown,tag_name?:unknown}|null=plan.format==='text'?null:JSON.parse(body);
+ const version=plan.format==='text'?body.trim():plan.format==='codex'?String(data!.version||data!.tag_name||'').replace(/^(rust-v|v)/,''):data!.version;
  if(!valid(version))throw Error('Release version could not be read.');return version;
 }
 export class AgentUpdates{
- constructor({installation,latest=latestRelease,refresh=async()=>{},terminals,now=()=>Date.now()}={}){
+ declare installation:(engine:string)=>Promise<Installation>;
+ declare latest:(plan:UpdatePlan)=>Promise<string>;
+ declare refresh:(engine:string)=>Promise<unknown>;
+ declare now:()=>number;
+ declare entries:Map<string,UpdateEntry>;
+ declare checks:Map<string,Promise<UpdateEntry>>;
+ declare starts:Map<string,Promise<UpdateEntry>>;
+ declare finishes:Map<string,Promise<void>>;
+ declare plans:Map<string,UpdatePlan>;
+ declare terminals:UpdateTerminals;
+ constructor({installation,latest=latestRelease,refresh=async()=>{},terminals,now=()=>Date.now()}:AgentUpdatesOptions={} as AgentUpdatesOptions){
   this.installation=installation;this.latest=latest;this.refresh=refresh;this.now=now;this.entries=new Map();this.checks=new Map();this.starts=new Map();this.finishes=new Map();this.plans=new Map();
   this.terminals=terminals||new TaskTerminals({sweepMs:0});
   this.terminals.resolve=engine=>{const p=this.plans.get(engine);if(!p)throw Error('Click Update now first.');return {cwd:p.home,command:{file:p.file,args:p.args,env:p.env},notice:`Updating ${p.name}.`}};
  }
- status(engine){return this.entries.get(engine)||{engine,state:'unknown'};}
- check(engine,force=false){
+ status(engine:string):UpdateEntry{return this.entries.get(engine)||{engine,state:'unknown'};}
+ check(engine:string,force=false):Promise<UpdateEntry>{
   if(!harnessDefinition(engine))return Promise.reject(Error('Unknown agent.'));
   if(this.starts.has(engine)||this.status(engine).state==='running')return Promise.resolve(this.status(engine));
-  if(this.checks.has(engine))return this.checks.get(engine);
+  if(this.checks.has(engine))return this.checks.get(engine)!;
   const saved=this.status(engine);if(!force&&saved.checkedAt&&this.now()-saved.checkedAt<3600000)return Promise.resolve(saved);
-  const work=(async()=>{let result;try{
+  const work=(async()=>{let result:UpdateEntry;try{
    const install=await this.installation(engine);const plan=install.disabled?null:updatePlan(install);
    if(!plan)result={engine,state:'unsupported',message:'Update this installation using its own installer.'};
    else{const latest=await this.latest(plan);result={engine,state:newerVersion(install.version,latest)?'available':'current',installed:install.version,latest};if(!valid(install.version))throw Error('Installed version could not be read.');}
@@ -58,8 +89,8 @@ export class AgentUpdates{
   result.checkedAt=this.now();if(this.starts.has(engine)||this.status(engine).state==='running')return this.status(engine);this.entries.set(engine,result);return result;})().finally(()=>this.checks.delete(engine));
   this.checks.set(engine,work);return work;
  }
- start(engine){
-  if(this.starts.has(engine))return this.starts.get(engine);
+ start(engine:string):Promise<UpdateEntry>{
+  if(this.starts.has(engine))return this.starts.get(engine)!;
   if(this.status(engine).state==='running')return Promise.resolve(this.status(engine));
   // Validate again at click time: an installation may have changed since
   // the picker opened. Never trust a command or a release passed by the UI.
@@ -81,13 +112,13 @@ export class AgentUpdates{
      if(!valid(after.version)||newerVersion(after.version,target))throw Error('The installed version is still older. Check the terminal output before retrying.');
      await this.refresh(engine);
      this.entries.set(engine,{engine,state:'current',installed:after.version,latest:target,checkedAt:this.now(),message:'Updated. Available models refreshed.'});
-    }catch(error){this.entries.set(engine,{...running,state:'failed',message:error.message});}
+    }catch(error){this.entries.set(engine,{...running,state:'failed',message:(error as Error).message});}
    });this.finishes.set(engine,finished);return running;
   })().catch(error=>{this.entries.set(engine,{engine,state:'failed',message:error.message});throw error;}).finally(()=>this.starts.delete(engine));
   this.starts.set(engine,work);return work;
  }
- settled(engine){return this.finishes.get(engine)||Promise.resolve();}
- terminal(engine,p){
+ settled(engine:string){return this.finishes.get(engine)||Promise.resolve();}
+ terminal(engine:string,p:TerminalAction){
   // Opening the viewer is never an install action, including after it ended.
   if(!this.plans.has(engine))throw Error('Click Update now first.');
   switch(p.action){

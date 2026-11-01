@@ -42,21 +42,56 @@ const STATE = 'main-tests.json';
 const WORKFLOW = 'tests';
 const LOG_BYTES = 16 * 1024 * 1024;
 
+export interface RedRecord {
+  product: string;
+  id: string;
+  sha?: string;
+  tests: string[];
+  tries?: number;
+}
+
+export interface MainTestsState { red?: RedRecord | null }
+
+export interface GhResult { code: number | string; out: string }
+
+export interface GhRun {
+  databaseId?: number;
+  headSha?: string;
+  status?: string;
+  conclusion?: string | null;
+  displayTitle?: string;
+  url?: string;
+}
+
+export interface GhJob {
+  id?: number;
+  name?: string;
+  labels?: string[];
+  conclusion?: string | null;
+}
+
+export interface MachineReport {
+  machine: string;
+  tests: string[];
+  read?: boolean;
+  said?: string[];
+}
+
 /** The label on a row that is fixing main, and how many such rows one red spell gets. */
 export const MAIN_RED_LABEL = 'main-red';
 export const FIX_TRIES = 2;
 
 /** The test files main is known red on, as GitHub's log names them; [] when it is not. */
-export function redOnMain(userDir) {
+export function redOnMain(userDir: string): string[] {
   try {
-    const red = JSON.parse(fs.readFileSync(path.join(userDir, STATE), 'utf8'))?.red;
+    const red: MainTestsState['red'] = JSON.parse(fs.readFileSync(path.join(userDir, STATE), 'utf8'))?.red;
     return Array.isArray(red?.tests) ? red.tests.filter((t) => typeof t === 'string' && t) : [];
   } catch { return []; }
 }
 
 /** `gh`, with its own words back and never a throw. */
-export function runGh(args, { cwd, timeout = 60 * 1000 } = {}) {
-  return new Promise((resolve) => {
+export function runGh(args: string[], { cwd, timeout = 60 * 1000 }: { cwd?: string; timeout?: number } = {}): Promise<GhResult> {
+  return new Promise<GhResult>((resolve) => {
     execFile('gh', args, { cwd, encoding: 'utf8', timeout, maxBuffer: LOG_BYTES }, (error, stdout, stderr) => {
       if (error) resolve({ code: error.code ?? 1, out: `${stdout ?? ''}${stderr ?? ''}${error.message ?? ''}` });
       else resolve({ code: 0, out: String(stdout ?? '') });
@@ -71,7 +106,7 @@ export function runGh(args, { cwd, timeout = 60 * 1000 } = {}) {
  * `scripts/ship.mjs` reports the SHORT sha and GitHub answers with the full
  * forty, so either may be the prefix of the other.
  */
-export function runFor(runs, sha) {
+export function runFor(runs: GhRun[] | null | undefined, sha: unknown): GhRun | null {
   const want = String(sha ?? '').trim().toLowerCase();
   if (!want) return null;
   return (runs ?? []).find((run) => {
@@ -91,7 +126,7 @@ export function runFor(runs, sha) {
  * was a payment method, not a commit (the head of that workflow file says so).
  * A row per push during a spell like that is noise with no fix in it.
  */
-export function verdict(run) {
+export function verdict(run: GhRun | null | undefined): 'waiting' | 'passing' | 'failing' | 'ignore' {
   if (!run || run.status !== 'completed') return 'waiting';
   const how = String(run.conclusion ?? '');
   if (how === 'success') return 'passing';
@@ -100,7 +135,7 @@ export function verdict(run) {
 }
 
 /** Which machine a job ran on, by the label the workflow asked for. */
-export function machineOf(job) {
+export function machineOf(job: GhJob | null | undefined): string {
   const labels = (job?.labels ?? []).join(' ').toLowerCase();
   const name = String(job?.name ?? '');
   if (/ubuntu|linux/.test(`${labels} ${name}`)) return 'Linux';
@@ -114,7 +149,7 @@ const ANSI = /\u001b\[[0-9;]*m/g;
 // lines carry a kind in front of them.
 const STAMP = /^\S+Z\s/;
 const GITHUB_SAYS = /^##\[[a-z]+\]/;
-const clean = (raw) => String(raw).replace(ANSI, '').replace(STAMP, '').replace(GITHUB_SAYS, '').trim();
+const clean = (raw: unknown) => String(raw).replace(ANSI, '').replace(STAMP, '').replace(GITHUB_SAYS, '').trim();
 // Vitest's own `FAIL  tests/x.test.mjs > suite > case`, and ONLY at the start
 // of the line. A LINE VITEST QUOTED IS NOT THE RUNNER SPEAKING: the ship queue
 // learned that three times over (w-560647d4db). A failing text assertion
@@ -125,8 +160,8 @@ const clean = (raw) => String(raw).replace(ANSI, '').replace(STAMP, '').replace(
 const NAMES_A_RED_TEST = /^FAIL\s+(\S+?\.(?:test|spec)\.[a-z]+)(?:\s|$)/;
 
 /** Every test file the runner printed a FAIL for, once each, in order. */
-export function failedTestsIn(log) {
-  const found = [];
+export function failedTestsIn(log: unknown): string[] {
+  const found: string[] = [];
   for (const raw of String(log ?? '').split('\n')) {
     const name = NAMES_A_RED_TEST.exec(clean(raw))?.[1];
     if (name && !found.includes(name)) found.push(name);
@@ -149,10 +184,10 @@ const ADVICE = /^(?:Vitest caught|This might cause|Serialized Error)/;
 const SAID_AT_MOST = 5;
 
 /** What the runner itself said, for a row that can name no failing test. */
-export function whatTheRunnerSaid(log) {
+export function whatTheRunnerSaid(log: unknown): string[] {
   const lines = String(log ?? '').split('\n').map(clean);
-  const said = [];
-  const keep = (line) => {
+  const said: string[] = [];
+  const keep = (line: string | undefined) => {
     if (line && !ADVICE.test(line) && !said.includes(line)) said.push(line);
   };
   lines.forEach((line, i) => {
@@ -162,21 +197,21 @@ export function whatTheRunnerSaid(log) {
   return said.slice(0, SAID_AT_MOST);
 }
 
-const shortSha = (sha) => String(sha ?? '').slice(0, 7);
+const shortSha = (sha: unknown) => String(sha ?? '').slice(0, 7);
 const NOTHING_NAMED = 'nothing in its log names a failing test';
 // A log `gh` could not hand over says nothing about the run, and a row that
 // reported it as "names no failing test" would be making that up.
 const NOT_READ = 'its log could not be read from here';
-const unread = (machines) => machines.length > 0 && machines.every((m) => m.read === false);
+const unread = (machines: MachineReport[]) => machines.length > 0 && machines.every((m) => m.read === false);
 /** The first thing any machine said, cut to something a title can hold. */
-const firstWords = (machines, max) => {
+const firstWords = (machines: MachineReport[], max: number) => {
   const said = machines.flatMap((m) => m.said ?? []).find(Boolean);
   if (!said) return '';
   return said.length > max ? `${said.slice(0, max - 1).trimEnd()}…` : said;
 };
 
 /** The row's title: the one test, or the count and the machines. */
-export function redTitle(machines) {
+export function redTitle(machines: MachineReport[]): string {
   const names = [...new Set(machines.flatMap((m) => m.tests))];
   if (names.length === 1) return `main went red on GitHub: ${names[0]}`;
   if (!names.length) {
@@ -190,7 +225,7 @@ export function redTitle(machines) {
 }
 
 /** The row's Context: what a reader gets before they open anything. */
-export function redContext({ sha, machines }) {
+export function redContext({ sha, machines }: { sha: unknown; machines: MachineReport[] }): string {
   const names = [...new Set(machines.flatMap((m) => m.tests))];
   const where = machines.filter((m) => m.tests.length).map((m) => m.machine);
   if (!names.length) {
@@ -208,7 +243,7 @@ export function redContext({ sha, machines }) {
 }
 
 /** What the row asks of whoever picks it up: an agent on its own, or a person once the fixes have failed. */
-function whatToDo({ tries, before }) {
+function whatToDo({ tries, before }: { tries: number; before: string | null }) {
   const after = before ? [`The fix in ${before} shipped and main is still red, so this is try ${tries}.`, ''] : [];
   if (tries > FIX_TRIES) {
     return [
@@ -233,7 +268,7 @@ function whatToDo({ tries, before }) {
 }
 
 /** The whole row: what failed, where, the commit that did it, and what to do. */
-export function redRow({ sha, subject, url, machines, tries = 1, before = null }) {
+export function redRow({ sha, subject, url, machines, tries = 1, before = null }: { sha: unknown; subject?: string | null; url?: string | null; machines: MachineReport[]; tries?: number; before?: string | null }) {
   const title = redTitle(machines);
   return {
     title: tries > 1 ? title.replace(/^main went red on GitHub/, 'main is still red after a fix') : title,
@@ -258,11 +293,11 @@ export function redRow({ sha, subject, url, machines, tries = 1, before = null }
 }
 
 /** What that row hears when main comes back. */
-export function greenAgain({ sha, subject }) {
+export function greenAgain({ sha, subject }: { sha: unknown; subject?: string | null }): string {
   return `main's tests are green again on GitHub, as of ${shortSha(sha)}${subject ? ` (${subject})` : ''}.`;
 }
 
-const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms).unref?.(); });
+const sleep = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms).unref?.(); });
 
 /**
  * The watch itself: one per successful ship, and never anything a person waits
@@ -274,8 +309,33 @@ const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms).unref?.
  * this ever sees files a row: requiring a green first would have kept it silent
  * through exactly the four days that put this here.
  */
+export interface MainTestsStore {
+  fileItem(slug: string, row: object): { id: string };
+  fileMainFix(slug: string, row: object): { id: string };
+  noteItem(product: string, id: string, text: string): unknown;
+}
+
+export interface MainTestsProduct { slug: string; repoPath?: string | null }
+
+export interface MainTestsOptions {
+  store?: MainTestsStore;
+  userDir?: string;
+  gh?: (args: string[], options?: { cwd?: string }) => Promise<GhResult>;
+  wait?: (ms: number) => Promise<void>;
+  now?: () => number;
+  log?: { warn?: (line: string) => void; info?: (line: string) => void };
+}
+
 export class MainTests {
-  constructor({ store, userDir, gh = runGh, wait = sleep, now = Date.now, log = console } = {}) {
+  declare store: MainTestsStore;
+  declare userDir: string;
+  declare gh: NonNullable<MainTestsOptions['gh']>;
+  declare wait: NonNullable<MainTestsOptions['wait']>;
+  declare now: () => number;
+  declare log: NonNullable<MainTestsOptions['log']>;
+  declare stopped: boolean;
+
+  constructor({ store, userDir, gh = runGh, wait = sleep, now = Date.now, log = console }: MainTestsOptions = {}) {
     Object.assign(this, { store, userDir, gh, wait, now, log });
     this.stopped = false;
   }
@@ -284,34 +344,34 @@ export class MainTests {
 
   stateFile() { return path.join(this.userDir, STATE); }
 
-  read() {
+  read(): MainTestsState {
     try {
-      const raw = JSON.parse(fs.readFileSync(this.stateFile(), 'utf8'));
+      const raw = JSON.parse(fs.readFileSync(this.stateFile(), 'utf8')) as MainTestsState | null;
       return raw && typeof raw === 'object' ? raw : {};
     } catch { return {}; }
   }
 
-  write(state) {
+  write(state: MainTestsState) {
     try {
       const tmp = `${this.stateFile()}.${process.pid}.tmp`;
       fs.writeFileSync(tmp, `${JSON.stringify(state)}\n`);
       fs.renameSync(tmp, this.stateFile());
-    } catch (e) { this.log.warn?.(`main-tests: could not record where main stands: ${e.message}`); }
+    } catch (e) { this.log.warn?.(`main-tests: could not record where main stands: ${(e as Error).message}`); }
   }
 
   /** gh's JSON, or null if this machine cannot ask. */
-  async ask(args, cwd) {
+  async ask<T = unknown>(args: string[], cwd?: string): Promise<T | null> {
     const { code, out } = await this.gh(args, { cwd });
     if (code !== 0) return null;
-    try { return JSON.parse(out); } catch { return null; }
+    try { return JSON.parse(out) as T; } catch { return null; }
   }
 
-  async watch({ product, sha, item } = {}) {
+  async watch({ product, sha, item }: { product?: MainTestsProduct; sha?: string; item?: { id?: string } | null } = {}) {
     const cwd = product?.repoPath;
     if (!cwd || !sha || !fs.existsSync(cwd)) return null;
     const until = this.now() + GIVE_UP_MS;
     while (!this.stopped) {
-      const runs = await this.ask(
+      const runs = await this.ask<GhRun[]>(
         ['run', 'list', '--branch', 'main', '--workflow', WORKFLOW, '-L', '20',
           '--json', 'databaseId,headSha,status,conclusion,displayTitle,url'],
         cwd,
@@ -321,8 +381,8 @@ export class MainTests {
       const run = runFor(runs, sha);
       const says = verdict(run);
       if (says === 'ignore') return null;
-      if (says === 'passing') return this.wentGreen(product, run);
-      if (says === 'failing') return this.wentRed(product, run, cwd, item);
+      if (says === 'passing') return this.wentGreen(product!, run!);
+      if (says === 'failing') return this.wentRed(product!, run!, cwd, item);
       if (this.now() >= until) {
         this.log.info?.(`main-tests: ${shortSha(sha)}'s run has not finished in half an hour; leaving it.`);
         return null;
@@ -333,9 +393,9 @@ export class MainTests {
   }
 
   /** Each failed job's machine, the tests it names, and what the runner said. */
-  async machinesIn(run, cwd) {
-    const jobs = (await this.ask(['api', `repos/{owner}/{repo}/actions/runs/${run.databaseId}/jobs`, '--paginate'], cwd))?.jobs ?? [];
-    const machines = [];
+  async machinesIn(run: GhRun, cwd: string) {
+    const jobs = (await this.ask<{ jobs?: GhJob[] }>(['api', `repos/{owner}/{repo}/actions/runs/${run.databaseId}/jobs`, '--paginate'], cwd))?.jobs ?? [];
+    const machines: MachineReport[] = [];
     for (const job of jobs) {
       if (String(job?.conclusion ?? '') !== 'failure') continue;
       const { code, out } = await this.gh(['api', `repos/{owner}/{repo}/actions/jobs/${job.id}/logs`], { cwd });
@@ -351,7 +411,7 @@ export class MainTests {
    * Any other red run while main is known red only refreshes the tests it
    * names, and a run whose log names none leaves the last list alone.
    */
-  async wentRed(product, run, cwd, shipped) {
+  async wentRed(product: MainTestsProduct, run: GhRun, cwd: string, shipped?: { id?: string } | null) {
     const state = this.read();
     const machines = await this.machinesIn(run, cwd);
     const tests = [...new Set(machines.flatMap((m) => m.tests))];
@@ -365,13 +425,13 @@ export class MainTests {
       ...redRow({ sha: run.headSha, subject: run.displayTitle, url: run.url, machines, tries, before: state.red?.id ?? null }),
       kind: 'task',
     };
-    let filed = null;
+    let filed: { id: string } | null = null;
     try {
       filed = tries > FIX_TRIES
         ? this.store.fileItem(product.slug, row)
         : this.store.fileMainFix(product.slug, { ...row, labels: [MAIN_RED_LABEL] });
     } catch (e) {
-      this.log.warn?.(`main-tests: could not file the red main: ${e.message}`);
+      this.log.warn?.(`main-tests: could not file the red main: ${(e as Error).message}`);
       return null;
     }
     this.write({ ...state, red: { product: product.slug, id: filed.id, sha: run.headSha, tests: known, tries } });
@@ -380,13 +440,13 @@ export class MainTests {
   }
 
   /** The green again, on the row that reported the red. */
-  wentGreen(product, run) {
+  wentGreen(product: MainTestsProduct, run: GhRun) {
     const state = this.read();
     if (!state.red) return null;
     try {
       this.store.noteItem(state.red.product, state.red.id, greenAgain({ sha: run.headSha, subject: run.displayTitle }));
     } catch (e) {
-      this.log.warn?.(`main-tests: could not say main is green again: ${e.message}`);
+      this.log.warn?.(`main-tests: could not say main is green again: ${(e as Error).message}`);
     }
     this.write({ ...state, red: null });
     return null;

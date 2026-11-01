@@ -18,6 +18,46 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { hideSecrets } from '../shared/phone-snapshot.mjs';
 import { readPictureShapeSync } from './picture-shape.mts';
+import type { PictureShape } from './picture-shape.mts';
+
+export interface UploadedFile { bytes?: number; named?: number; rank?: number }
+
+export interface UploadState { uploaded: Record<string, UploadedFile> }
+
+export interface ThreadSnapshot {
+  item?: Record<string, unknown> & { id?: string };
+  history?: ({ patch?: Record<string, unknown> } | null)[];
+}
+
+export interface NamedFile { key: string; file: string }
+
+export interface NamedFolder { key: string; pictures: NamedFile[] }
+
+export interface ManifestFile { n?: string; s: number; big?: boolean; w?: number; h?: number }
+
+export interface ThreadManifest { files: Record<string, ManifestFile>; folders?: Record<string, string[]> }
+
+export interface PhoneBackend {
+  putPhoneFile(upload: { owner: string; device: string; name: string; data: Buffer; type: string | null }): Promise<unknown>;
+  dropPhoneFiles(drop: { owner: string; device: string; names: string[] }): Promise<unknown>;
+}
+
+export interface PhoneUploadsOptions {
+  backend: PhoneBackend;
+  owner: string;
+  device: string;
+  alive?: () => boolean;
+  state: UploadState;
+  save: () => void;
+  home: string;
+  now?: () => number;
+  limits?: typeof UPLOAD_LIMITS;
+  log?: (message: string) => void;
+}
+
+interface UploadJob { bytes: number; rank: number; roots: string[]; threads: Set<string> }
+
+interface Roots { docs?: string | null; repo?: string | null }
 
 // A tenth of the Pro plan's 100 GB, which the organization's projects share;
 // past it the oldest threads' files make way (`trimBelow`).
@@ -28,7 +68,7 @@ const LOOK_AGAIN_MS = 5 * 60_000;
 // uploader rests, rather than reading every queued file again to be refused again.
 const REST_AFTER_REFUSAL_MS = 30 * 60_000;
 
-const TYPES = {
+const TYPES: Record<string, string> = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.avif': 'image/avif', '.svg': 'image/svg+xml',
   '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.ogg': 'audio/ogg',
   '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.m4v': 'video/mp4', '.webm': 'video/webm',
@@ -36,14 +76,14 @@ const TYPES = {
 };
 // Documents, named anywhere in the words as the kinds above are.
 const OFFICE = 'application/vnd.openxmlformats-officedocument';
-const DOCUMENTS = {
+const DOCUMENTS: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8', '.log': 'text/plain; charset=utf-8', '.json': 'application/json', '.csv': 'text/csv; charset=utf-8', '.tsv': 'text/tab-separated-values; charset=utf-8',
   '.yaml': 'text/yaml; charset=utf-8', '.yml': 'text/yaml; charset=utf-8', '.xml': 'text/xml', '.rtf': 'application/rtf', '.heic': 'image/heic',
   '.doc': 'application/msword', '.docx': `${OFFICE}.wordprocessingml.document`, '.xls': 'application/vnd.ms-excel', '.xlsx': `${OFFICE}.spreadsheetml.sheet`,
   '.ppt': 'application/vnd.ms-powerpoint', '.pptx': `${OFFICE}.presentationml.presentation`, '.pages': 'application/vnd.apple.pages', '.numbers': 'application/vnd.apple.numbers', '.zip': 'application/zip',
 };
 // What a page may bring with it, besides the kinds above.
-const PAGE_PARTS = { '.css': 'text/css', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.otf': 'font/otf' };
+const PAGE_PARTS: Record<string, string> = { '.css': 'text/css', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.otf': 'font/otf' };
 const PICTURE = /\.(png|jpe?g|gif|webp|avif)$/i;
 // Keys, certificates and databases never go, whatever way they are named.
 const NEVER = /\.(pem|key|p12|pfx|kdbx|keystore|jks|der|crt|cer|asc|gpg|sqlite3?|db)$/i;
@@ -71,7 +111,7 @@ const PAGE_READ_MAX = 2 * 1024 * 1024;
 const PAGES_READ_MAX = 6 * 1024 * 1024;
 
 /** At most `max` bytes of a file, through one open handle; null for a bigger one. */
-function readAtMost(file, max) {
+function readAtMost(file: string, max: number) {
   const fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
   try {
     const buf = Buffer.alloc(max + 1);
@@ -83,15 +123,15 @@ function readAtMost(file, max) {
   }
 }
 
-const knownType = (file) => TYPES[path.extname(file).toLowerCase()] ?? PAGE_PARTS[path.extname(file).toLowerCase()] ?? null;
+const knownType = (file: string) => TYPES[path.extname(file).toLowerCase()] ?? PAGE_PARTS[path.extname(file).toLowerCase()] ?? null;
 /** What a file goes up as, or null for one that never goes. */
-export const typeOf = (file) => {
+export const typeOf = (file: string) => {
   if (NEVER.test(file) || SECRET_NAME.test(path.basename(file))) return null;
   return knownType(file) ?? DOCUMENTS[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
 };
 
-const cellsOf = (line, sep) => {
-  const out = [];
+const cellsOf = (line: string, sep: string) => {
+  const out: string[] = [];
   let cell = '';
   let quoted = false;
   for (const ch of line) {
@@ -102,7 +142,7 @@ const cellsOf = (line, sep) => {
   return out;
 };
 /** A spreadsheet's text with every column whose heading names a secret emptied. */
-export function hideCsvSecrets(text) {
+export function hideCsvSecrets(text: unknown) {
   const lines = String(text).split('\n');
   const head = (lines[0] ?? '').replace(/\r$/, '');
   const sep = head.includes('\t') && !head.includes(',') ? '\t' : ',';
@@ -118,28 +158,28 @@ export function hideCsvSecrets(text) {
 }
 
 // Bytes that read as text: no NUL near the start, and whole UTF-8.
-function readsAsText(buf) {
+function readsAsText(buf: Buffer) {
   if (buf.subarray(0, 8000).includes(0)) return false;
   try { new TextDecoder('utf-8', { fatal: true }).decode(buf); return true; } catch { return false; }
 }
 
 // Newest first, so a long thread's latest messages are the ones its bound keeps.
-function textsOf(snapshot) {
-  const out = [];
-  const add = (v) => { if (typeof v === 'string' && v) out.push(v); };
+function textsOf(snapshot?: ThreadSnapshot | null) {
+  const out: string[] = [];
+  const add = (v: unknown) => { if (typeof v === 'string' && v) out.push(v); };
   for (const v of Object.values(snapshot?.item ?? {})) add(v);
   for (const l of [...(snapshot?.history ?? [])].reverse()) for (const v of Object.values(l?.patch ?? {})) add(v);
   return out;
 }
 
-const real = (p) => { try { return fs.realpathSync(p); } catch { return null; } };
-const within = (root, file) => !!root && (file === root || file.startsWith(root + path.sep));
+const real = (p: string) => { try { return fs.realpathSync(p); } catch { return null; } };
+const within = (root: string | null | undefined, file: string) => !!root && (file === root || file.startsWith(root + path.sep));
 
 /**
  * Where a file is, as the phone knows it: relative to the project's documents
  * folder, or `@repo/` and relative to its code. Null outside both.
  */
-export function keyOf(file, { docs, repo }) {
+export function keyOf(file: string, { docs, repo }: Roots) {
   if (docs && within(docs, file)) return path.relative(docs, file).split(path.sep).join('/');
   if (repo && within(repo, file)) return `@repo/${path.relative(repo, file).split(path.sep).join('/')}`;
   return null;
@@ -150,38 +190,38 @@ export function keyOf(file, { docs, repo }) {
  * own folders only. A bare name is looked for where the screens look for it
  * (renderer/src/message-folders.ts pictureRoots), in that order.
  */
-export function filesNamed(snapshot, { dir, repoPath = null, home }) {
+export function filesNamed(snapshot: ThreadSnapshot | null | undefined, { dir, repoPath = null, home }: { dir?: string | null; repoPath?: string | null; home: string }): NamedFile[] {
   const docs = dir && real(dir);
   if (!docs) return [];
   const repo = repoPath ? real(repoPath) : null;
   const id = snapshot?.item?.id;
-  const found = new Map();
-  const take = (abs) => {
+  const found = new Map<string, string>();
+  const take = (abs: string) => {
     const file = real(abs);
     if (!file || file.split(path.sep).some((seg) => SKIP_SEGMENTS.has(seg)) || SECRET_NAME.test(path.basename(file))) return false;
     const key = keyOf(file, { docs, repo });
     if (!key) return false;
-    let st;
+    let st: fs.Stats;
     try { st = fs.statSync(file); } catch { return false; }
     if (!st.isFile() || !typeOf(file)) return false;
     if (!found.has(key)) found.set(key, file);
     return true;
   };
-  const full = (p) => path.resolve(p.startsWith('~/') ? path.join(home, p.slice(2)) : p);
+  const full = (p: string) => path.resolve(p.startsWith('~/') ? path.join(home, p.slice(2)) : p);
   const texts = textsOf(snapshot);
-  const named = [];
+  const named: string[] = [];
   for (const text of texts) {
     for (const m of text.matchAll(NAMED)) named.push((m[1] ?? m[2]).trim());
     for (const m of text.matchAll(LINKED)) { try { named.push(decodeURI(m[1] ?? m[2]).trim()); } catch { named.push((m[1] ?? m[2]).trim()); } }
   }
   // The folders the words name come first, as they do on the screens.
-  const folders = [];
+  const folders: string[] = [];
   for (const n of named) if (n.includes('/')) folders.push(path.dirname(n.startsWith('/') || n.startsWith('~/') ? full(n) : path.join(docs, n)));
   for (const text of texts) for (const m of text.matchAll(FOLDER_LINE)) folders.push(full(m[1]));
   const roots = [...new Set([
     ...folders, id && path.join(docs, 'designs', id), repo && id && path.join(repo, '.claude', 'worktrees', id),
     docs, path.join(docs, 'designs'), path.join(docs, 'attachments'), repo, repo && path.join(repo, 'designs'),
-  ].filter(Boolean))];
+  ].filter(Boolean) as string[])];
   for (const n of named) {
     if (/^[a-z]+:\/\//i.test(n)) continue;
     if (n.startsWith('/') || n.startsWith('~/')) { take(full(n)); continue; }
@@ -193,11 +233,11 @@ export function filesNamed(snapshot, { dir, repoPath = null, home }) {
 }
 
 /** The folders a thread's copy names on a line of their own, as [{ key, pictures: [{ key, file }] }], newest pictures first. */
-export function foldersNamed(snapshot, { dir, repoPath = null, home, limit = 6 }) {
+export function foldersNamed(snapshot: ThreadSnapshot | null | undefined, { dir, repoPath = null, home, limit = 6 }: { dir?: string | null; repoPath?: string | null; home: string; limit?: number }): NamedFolder[] {
   const docs = dir && real(dir);
   if (!docs) return [];
   const repo = repoPath ? real(repoPath) : null;
-  const out = [];
+  const out: NamedFolder[] = [];
   for (const text of textsOf(snapshot)) {
     for (const m of text.matchAll(FOLDER_LINE)) {
       const named = m[1];
@@ -205,7 +245,7 @@ export function foldersNamed(snapshot, { dir, repoPath = null, home, limit = 6 }
       const folder = real(path.resolve(named.startsWith('~/') ? path.join(home, named.slice(2)) : named));
       const key = folder && keyOf(folder, { docs, repo });
       if (!key || out.some((f) => f.key === `${key}/`)) continue;
-      let entries = [];
+      let entries: fs.Dirent[] = [];
       try { entries = fs.readdirSync(folder, { withFileTypes: true }).filter((e) => e.isFile() && PICTURE.test(e.name)); } catch { continue; }
       const pictures = entries
         .map((e) => ({ key: `${key}/${e.name}`, file: path.join(folder, e.name), m: fs.statSync(path.join(folder, e.name)).mtimeMs }))
@@ -221,8 +261,8 @@ export function foldersNamed(snapshot, { dir, repoPath = null, home, limit = 6 }
 // What a page draws from beside it: src, href, poster, srcset and url() that
 // name a file next to it rather than a site. A stylesheet's own url()s too.
 const REFS = /\b(?:src|href|poster|data-src)\s*=\s*["']([^"'#?]+)[^"']*["']|\bsrcset\s*=\s*["']([^"']+)["']|url\(\s*["']?([^"')#?]+)[^"')]*["']?\s*\)/gi;
-export function partsOf(text) {
-  const out = new Set();
+export function partsOf(text: unknown) {
+  const out = new Set<string>();
   for (const m of String(text).matchAll(REFS)) {
     const list = m[2] ? m[2].split(',').map((s) => s.trim().split(/\s+/)[0]) : [m[1] ?? m[3]];
     for (const ref of list) {
@@ -234,10 +274,10 @@ export function partsOf(text) {
 }
 
 /** A page's own files, as [{ key, file }], one stylesheet deep, inside the project's folders only. */
-export function pageParts(page, { docs, repo, budget = { bytes: PAGES_READ_MAX } }) {
-  const out = new Map();
-  const visit = (file, depth) => {
-    let text;
+export function pageParts(page: { file: string }, { docs, repo, budget = { bytes: PAGES_READ_MAX } }: Roots & { budget?: { bytes: number } }): NamedFile[] {
+  const out = new Map<string, string>();
+  const visit = (file: string, depth: number) => {
+    let text: string;
     try {
       const raw = readAtMost(file, Math.min(PAGE_READ_MAX, budget.bytes));
       if (!raw) return;
@@ -263,14 +303,14 @@ export function pageParts(page, { docs, repo, budget = { bytes: PAGES_READ_MAX }
  * and queues the rest; `kick()` uploads what is queued, one file at a time, in
  * the background; `sweep()` deletes what nothing has named for days.
  */
-export function createPhoneUploads({ backend, owner, device, alive = () => true, state, save, home, now = Date.now, limits = UPLOAD_LIMITS, log = () => {} }) {
+export function createPhoneUploads({ backend, owner, device, alive = () => true, state, save, home, now = Date.now, limits = UPLOAD_LIMITS, log = () => {} }: PhoneUploadsOptions) {
   state.uploaded ??= {}; // name -> { bytes, named: last moment a thread named it, rank: newest thread naming it }
   // What each file on this Mac is called online, learnt by the upload (off
   // the window's thread, a piece at a time) and good while it is unchanged.
-  const names = new Map(); // file -> { size, mtimeMs, name }
-  const queue = new Map(); // file -> { bytes, rank, roots, threads }
-  const memo = new Map(); // thread -> { base, at, sig, out }
-  let running = null;
+  const names = new Map<string, { size: number; mtimeMs: number; name: string }>(); // file -> { size, mtimeMs, name }
+  const queue = new Map<string, UploadJob>(); // file -> { bytes, rank, roots, threads }
+  const memo = new Map<string, { base: string; at: number; sig: string; out: ThreadManifest | null }>(); // thread -> { base, at, sig, out }
+  let running: Promise<void> | null = null;
   let restUntil = 0;
   let saidFull = false;
   let madeRoom = 0;
@@ -278,27 +318,27 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
   // taken until every thread has looked again and said how new its files are.
   const startedAt = now();
 
-  const known = (file, st) => {
+  const known = (file: string, st: { size: number; mtimeMs: number }) => {
     const was = names.get(file);
     return was && was.size === st.size && was.mtimeMs === st.mtimeMs ? was.name : null;
   };
   // A picture's width and height, so the phone draws its box at that shape
   // before the picture arrives; read again only when the file changes.
-  const shapes = new Map(); // file -> { size, mtimeMs, shape }
-  const shapeOf = (file, st) => {
+  const shapes = new Map<string, { size: number; mtimeMs: number; shape: PictureShape | null }>(); // file -> { size, mtimeMs, shape }
+  const shapeOf = (file: string, st: { size: number; mtimeMs: number }) => {
     if (!PICTURE.test(file)) return null;
     const was = shapes.get(file);
     if (was && was.size === st.size && was.mtimeMs === st.mtimeMs) return was.shape;
-    let shape = null;
+    let shape: PictureShape | null = null;
     try { shape = readPictureShapeSync(file); } catch { /* drawn 4:3 until it arrives, as before */ }
     shapes.set(file, { size: st.size, mtimeMs: st.mtimeMs, shape });
     return shape;
   };
   const total = () => Object.values(state.uploaded).reduce((n, u) => n + (u.bytes || 0), 0);
-  const olderThan = (rank) => Object.entries(state.uploaded)
+  const olderThan = (rank: number) => Object.entries(state.uploaded)
     .filter(([, u]) => (u.rank ?? 0) < rank)
     .sort((a, b) => (a[1].rank ?? 0) - (b[1].rank ?? 0) || (a[1].named ?? 0) - (b[1].named ?? 0));
-  const roomFor = (bytes, rank) => {
+  const roomFor = (bytes: number, rank: number) => {
     const over = total() + bytes - limits.totalBytes;
     if (over <= 0) return true;
     if (now() - startedAt < LOOK_AGAIN_MS) return false;
@@ -308,10 +348,10 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
   // files leave to make room, and never those of a thread as new as this one.
   // Only after the new file is up, so a refused upload takes nothing away; the
   // space runs over by that one file until then.
-  async function trimBelow(rank) {
+  async function trimBelow(rank: number) {
     const over = total() - limits.totalBytes;
     if (over <= 0) return;
-    const drop = [];
+    const drop: string[] = [];
     let freed = 0;
     for (const [n, u] of olderThan(rank)) {
       if (freed >= over) break;
@@ -338,11 +378,11 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
    * its files looked at again every five minutes, since a page can change under the
    * same words.
    */
-  function manifest(sk, made, { dir, repoPath = null, updatedAt = 0, base = '' }) {
+  function manifest(sk: string, made: ThreadSnapshot | (() => ThreadSnapshot), { dir, repoPath = null, updatedAt = 0, base = '' }: { dir: string; repoPath?: string | null; updatedAt?: number | string; base?: string }) {
     const was = memo.get(sk);
     if (was && was.base === base && now() - was.at < LOOK_AGAIN_MS) return was.out;
     const rank = Number(updatedAt) || 0;
-    let out = null;
+    let out: ThreadManifest | null = null;
     if (now() - rank <= limits.days * 24 * 3600_000) {
       const snapshot = typeof made === 'function' ? made() : made;
       const named = filesNamed(snapshot, { dir, repoPath, home });
@@ -357,10 +397,10 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
         if (/\.html?$/i.test(f.file) && budget.bytes > 0) for (const p of pageParts(f, { ...where, budget })) if (!all.has(p.key)) all.set(p.key, p.file);
       }
       for (const f of folders) for (const p of f.pictures) if (!all.has(p.key)) all.set(p.key, p.file);
-      const files = {};
+      const files: Record<string, ManifestFile> = {};
       let bytes = 0;
       for (const [key, file] of [...all].slice(0, limits.files)) {
-        let st;
+        let st: fs.Stats;
         try { st = fs.statSync(file); } catch { continue; }
         if (st.size > limits.fileBytes || bytes + st.size > limits.threadBytes) { files[key] = { s: st.size, big: true }; continue; }
         bytes += st.size;
@@ -371,7 +411,7 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
           state.uploaded[name].named = now();
           state.uploaded[name].rank = Math.max(state.uploaded[name].rank ?? 0, rank);
         } else {
-          const job = queue.get(file) ?? { bytes: st.size, rank, roots: [where.docs, where.repo].filter(Boolean), threads: new Set() };
+          const job = queue.get(file) ?? { bytes: st.size, rank, roots: [where.docs, where.repo].filter(Boolean) as string[], threads: new Set() };
           job.rank = Math.max(job.rank, rank);
           job.threads.add(sk);
           queue.set(file, job);
@@ -379,7 +419,7 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
       }
       if (Object.keys(files).length) {
         out = { files };
-        const listed = Object.fromEntries(folders.map((f) => [f.key, f.pictures.map((p) => p.key).filter((k) => files[k]?.n)]).filter(([, keys]) => keys.length));
+        const listed = Object.fromEntries(folders.map((f) => [f.key, f.pictures.map((p) => p.key).filter((k) => files[k]?.n)] as [string, string[]]).filter(([, keys]) => keys.length));
         if (Object.keys(listed).length) out.folders = listed;
       }
     }
@@ -394,7 +434,7 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
 
   // The file as it is now, read only if it is still the one that was checked:
   // no link anywhere on its way, inside the project, a plain file within the bound.
-  async function readChecked(file, roots) {
+  async function readChecked(file: string, roots: string[]) {
     if (real(file) !== file || !roots.some((r) => within(r, file))) return null;
     const fh = await fs.promises.open(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
     try {
@@ -440,7 +480,7 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
         // The threads that name it look again at what they list.
         for (const sk of job.threads) { const m = memo.get(sk); if (m) m.at = -Infinity; }
       } catch (err) {
-        log(`phone: could not send a file, trying again in half an hour (${err?.message ?? err})`);
+        log(`phone: could not send a file, trying again in half an hour (${(err as Error)?.message ?? err})`);
         restUntil = now() + REST_AFTER_REFUSAL_MS;
         return;
       }
@@ -471,6 +511,6 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
       save();
       return old.length;
     },
-    forget(sk) { memo.delete(sk); },
+    forget(sk: string) { memo.delete(sk); },
   };
 }

@@ -18,6 +18,8 @@ const mods = { workItemsDisk, workItemsCore, dashboard, project, lock };
 // Kept as a function, and async, because every caller already awaits it and
 // the shape of the returned object is what store.mts and repeats.mjs destructure.
 // There is nothing left to fail, so there is nothing left to throw.
+export type StoreModules = typeof mods;
+
 export async function loadStore() {
   return mods;
 }

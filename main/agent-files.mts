@@ -17,6 +17,7 @@
 // or renderer/src mentioned `.claude/agents` before this one.
 
 import fs from 'node:fs';
+import type { Dirent } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { titleFromFileName } from '../shared/name-words.mjs';
@@ -46,12 +47,16 @@ const RECENT_MS = RECENT_DAYS * 24 * 60 * 60 * 1000;
  *  writes `name`, `description` and `tools` between two `---` fences. A file
  *  with no fence is still an agent as far as Claude Code is concerned, so it
  *  is kept and named after itself rather than dropped. */
-export function parseAgentFile(text, file = '') {
+export interface ParsedAgentFile { name: string; description: string }
+
+export interface AgentFileRow { name: string; title: string; line: string; scope: string; path: string }
+
+export function parseAgentFile(text: string | null | undefined, file = ''): ParsedAgentFile {
   const fallback = path.basename(file, '.md');
   const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text ?? '');
   if (!m) return { name: fallback, description: firstFromBody(text, fallback) };
-  const out = {};
-  let key = null;
+  const out: Record<string, string> = {};
+  let key: string | null = null;
   for (const raw of m[1].split(/\r?\n/)) {
     // A description can run onto its own indented lines, which is how Claude
     // Code writes the long ones. An indented line with no key continues the
@@ -72,7 +77,7 @@ export function parseAgentFile(text, file = '') {
   // file and a person can write one by hand with nothing but a heading in it.
   // So when the front matter has no description, the body is read for the next
   // best thing rather than the row being left blank.
-  const description = strip(out.description) || firstFromBody(text.slice(m[0].length), name);
+  const description = strip(out.description) || firstFromBody(text!.slice(m[0].length), name);
   return { name, description };
 }
 
@@ -81,8 +86,8 @@ export function parseAgentFile(text, file = '') {
  *  matter name and a heading all reach the screen and are often one word apart.
  *  Letters and digits only, so `Docs Reviewer`, `docs-reviewer` and
  *  `Docs reviewer.` are one string. */
-function sameThing(a, b) {
-  const k = (v) => (v ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+function sameThing(a: string | null | undefined, b: string | null | undefined) {
+  const k = (v: string | null | undefined) => (v ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
   return !!k(a) && k(a) === k(b);
 }
 
@@ -98,7 +103,7 @@ function sameThing(a, b) {
  *  What is skipped on the way: blank lines, code fences and anything inside
  *  one, list bullets, quotes and horizontal rules. A row reading "```bash" or
  *  "---" says less than an empty row does. */
-export function firstFromBody(text, avoid = '') {
+export function firstFromBody(text: string | null | undefined, avoid = '') {
   const lines = (text ?? '').split(/\r?\n/);
   let heading = '';
   let prose = '';
@@ -124,7 +129,7 @@ export function firstFromBody(text, avoid = '') {
   return strip(pick).replace(/[*_`#]/g, '').trim();
 }
 
-function strip(v) {
+function strip(v: string | null | undefined) {
   const s = (v ?? '').trim();
   if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
     return s.slice(1, -1).trim();
@@ -144,7 +149,7 @@ function strip(v) {
  *
  *  The width of the row is the real limit and CSS does that cut; `max` here is
  *  only a stop on a sentence long enough to be worth cutting in the string. */
-export function oneLine(description, max = 160) {
+export function oneLine(description: string | null | undefined, max = 160) {
   const d = (description ?? '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -167,16 +172,16 @@ export function oneLine(description, max = 160) {
  *  called it and a screen that renames her own agents is worse than one that
  *  shows the file name raw. The list of them is shared/name-words.mjs, which
  *  the project names read too (F-137). */
-export function agentTitle(name) {
+export function agentTitle(name: string | null | undefined) {
   const n = (name ?? '').trim();
   if (!n || /[A-Z\s]/.test(n)) return n;
   return titleFromFileName(n);
 }
 
-function readDir(dir, scope, { now = Date.now() } = {}) {
-  let names = [];
+function readDir(dir: string, scope: string, { now = Date.now() }: { now?: number } = {}) {
+  let names: string[] = [];
   try { names = fs.readdirSync(dir); } catch { return []; }
-  const out = [];
+  const out: AgentFileRow[] = [];
   for (const f of names.sort()) {
     if (!f.endsWith('.md') || f.startsWith('.')) continue;
     const full = path.join(dir, f);
@@ -204,7 +209,7 @@ function readDir(dir, scope, { now = Date.now() } = {}) {
  * BOTH SCOPES, in the order the screen shows them. `folder` is the project's
  *  own directory and may be null, which is the case where she has not pointed
  *  Agentbox at any code yet and only the home folder set exists. */
-export function readAgentFiles({ home = os.homedir(), folder = null, now = Date.now() } = {}) {
+export function readAgentFiles({ home = os.homedir(), folder = null, now = Date.now() }: { home?: string; folder?: string | null; now?: number } = {}) {
   const user = readDir(path.join(home, '.claude', 'agents'), 'all', { now });
   const project = folder
     ? readDir(path.join(folder, '.claude', 'agents'), 'project', { now })
@@ -258,7 +263,7 @@ const NOT_A_PROJECT = new Set([
  *  first-run.mts states: a folder called `Documents` inside somebody's code
  *  folder is their folder, and `~/Documents` is not. A project INSIDE a guarded
  *  folder is still reachable, by the door below rather than by a walk. */
-function guardedPaths(home) {
+function guardedPaths(home: unknown): Set<string> {
   const here = path.resolve(String(home ?? ''));
   return here ? new Set(GUARDED.map((n) => path.join(here, n))) : new Set();
 }
@@ -281,14 +286,14 @@ function guardedPaths(home) {
  *  A temp directory is not a project and neither is a worktree Claude made for
  *  itself, so `isScratchFolder` and the dot-folder rule throw those out here the
  *  same way the walk throws them out below. */
-export function claudeProjectFolders({ home = os.homedir() } = {}) {
+export function claudeProjectFolders({ home = os.homedir() }: { home?: string } = {}) {
   const here = path.resolve(String(home ?? ''));
-  let parsed = null;
+  let parsed: { projects?: Record<string, unknown> } | null = null;
   try {
     parsed = JSON.parse(fs.readFileSync(path.join(here, '.claude.json'), 'utf8'));
   } catch { return []; }
   const keys = Object.keys(parsed?.projects ?? {});
-  const out = [];
+  const out: string[] = [];
   for (const key of keys) {
     if (typeof key !== 'string' || !path.isAbsolute(key)) continue;
     const full = path.resolve(key);
@@ -309,7 +314,7 @@ export function claudeProjectFolders({ home = os.homedir() } = {}) {
  *  The age window is applied here too, because a count and the list underneath
  *  it are the same fact said twice and a heading reading "four" over an empty
  *  list is worse than either. */
-function countAgentFiles(dir, now = Date.now()) {
+function countAgentFiles(dir: string, now = Date.now()) {
   try {
     return fs.readdirSync(dir).filter((f) => {
       if (!f.endsWith('.md') || f.startsWith('.')) return false;
@@ -337,7 +342,7 @@ function countAgentFiles(dir, now = Date.now()) {
 export function findAgentFolders({
   home = os.homedir(), roots = [], depth = 2, max = 4000, now = Date.now(),
   named = null,
-} = {}) {
+}: { home?: string; roots?: string[]; depth?: number; max?: number; now?: number; named?: string[] | null } = {}) {
   const here = path.resolve(home);
   const guarded = guardedPaths(here);
   // `~/Desktop` WAS A SEED AND IS NOT ANY MORE. It was here because a first run
@@ -351,8 +356,8 @@ export function findAgentFolders({
     // A project sitting directly in `~/Desktop` hands this walk `~/Desktop` as
     // its root, which is the guarded folder again by another door.
     .filter((r) => !guarded.has(r));
-  const found = new Map();
-  const seen = new Set();
+  const found = new Map<string, number>();
+  const seen = new Set<string>();
   const queue = seeds.map((dir) => ({ dir, left: depth }));
   let looked = 0;
   // THE FOLDERS CLAUDE CODE NAMES ARE PROBED, NEVER ENUMERATED. One `readdir`
@@ -367,7 +372,7 @@ export function findAgentFolders({
     if (n > 0) found.set(full, n);
   }
   while (queue.length) {
-    const { dir, left } = queue.shift();
+    const { dir, left } = queue.shift()!;
     if (seen.has(dir)) continue;
     seen.add(dir);
     if (++looked > max) break;
@@ -376,7 +381,7 @@ export function findAgentFolders({
       if (n > 0) found.set(dir, n);
     }
     if (left <= 0) continue;
-    let entries = [];
+    let entries: Dirent[] = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
     for (const e of entries) {
       // isDirectory is false for a symlink, which is also how this cannot
@@ -399,7 +404,7 @@ export function findAgentFolders({
  * `/Users/you/Desktop/dev/astral-desktop` → `~/Desktop/dev/astral-desktop`. The
  * card prints this, and a path with her account name in it reads like a system
  * string rather than a folder she recognises. */
-export function shortPath(folder, home = os.homedir()) {
+export function shortPath(folder: string | null | undefined, home = os.homedir()) {
   const here = path.resolve(home);
   const full = path.resolve(folder ?? '');
   return full === here || full.startsWith(`${here}/`) ? `~${full.slice(here.length)}` : full;
@@ -413,6 +418,6 @@ export function shortPath(folder, home = os.homedir()) {
  *  the card with its agents listed under it needs the agents themselves, so
  *  this reads them. Same `readDir`, same scope tag as a project's own folder,
  *  because that is exactly what this folder is about to become. */
-export function readFolderAgents(folder, { now = Date.now() } = {}) {
+export function readFolderAgents(folder: string | null | undefined, { now = Date.now() }: { now?: number } = {}) {
   return folder ? readDir(path.join(folder, '.claude', 'agents'), 'project', { now }) : [];
 }

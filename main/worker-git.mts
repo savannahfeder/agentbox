@@ -1,11 +1,11 @@
 export const COMMIT_IDENTITY_CHECK = 'git -c user.useConfigOnly=true var GIT_AUTHOR_IDENT && git -c user.useConfigOnly=true var GIT_COMMITTER_IDENT';
 
-export function withWorkerGitBrief(prompt, repoPath) {
+export function withWorkerGitBrief(prompt: string, repoPath?: string | null): string {
   const guidance = workerGitBrief(repoPath);
   return guidance && !prompt.includes(guidance) ? `${prompt}\n\n${guidance}` : prompt;
 }
 
-export function workerGitBrief(repoPath) {
+export function workerGitBrief(repoPath?: string | null): string {
   if (!repoPath) return '';
   return `# Committing this task
 

@@ -13,18 +13,45 @@ import path from 'node:path';
 // runs; v2 is $0.1276 and $0.0169.
 export const AGENTCORE_RATES = { vcpuHour: 0.0895, gbHour: 0.00945 };
 
-export function cloudUsagePath({ home = os.homedir() } = {}) {
+export interface CloudUsageMeasure {
+  wallSeconds?: number | null;
+  cpuSeconds?: number | null;
+  peakMemoryBytes?: number | null;
+  source?: string | null;
+}
+
+export interface CloudUsageLine {
+  at: string;
+  runId: string | null;
+  item: string | null;
+  engine: string | null;
+  exitCode: number | null;
+  wallSeconds: number | null;
+  cpuSeconds: number | null;
+  peakMemoryBytes: number | null;
+  source: string | null;
+}
+
+export interface CloudUsageRun {
+  runId?: string | null;
+  item?: string | null;
+  engine?: string | null;
+  exitCode?: number | null;
+  usage?: CloudUsageMeasure | null;
+}
+
+export function cloudUsagePath({ home = os.homedir() }: { home?: string } = {}) {
   return path.join(home || os.homedir(), '.agentbox', 'cloud-usage.jsonl');
 }
 
-export function appendCloudUsage({ runId, item, engine, exitCode, usage }, { home, now = Date.now } = {}) {
+export function appendCloudUsage({ runId, item, engine, exitCode, usage }: CloudUsageRun, { home, now = Date.now }: { home?: string; now?: () => number } = {}) {
   const file = cloudUsagePath({ home });
-  const line = {
+  const line: CloudUsageLine = {
     at: new Date(now()).toISOString(),
     runId: runId ?? null,
     item: item ?? null,
     engine: engine ?? null,
-    exitCode: Number.isInteger(exitCode) ? exitCode : null,
+    exitCode: Number.isInteger(exitCode) ? exitCode as number : null,
     wallSeconds: usage?.wallSeconds ?? null,
     cpuSeconds: usage?.cpuSeconds ?? null,
     peakMemoryBytes: usage?.peakMemoryBytes ?? null,
@@ -40,10 +67,10 @@ export function appendCloudUsage({ runId, item, engine, exitCode, usage }, { hom
   return line;
 }
 
-export function readCloudUsage({ home, file = cloudUsagePath({ home }) } = {}) {
-  let text;
+export function readCloudUsage({ home, file = cloudUsagePath({ home }) }: { home?: string; file?: string } = {}): CloudUsageLine[] {
+  let text: string;
   try { text = fs.readFileSync(file, 'utf8'); } catch { return []; }
-  const out = [];
+  const out: CloudUsageLine[] = [];
   for (const l of text.split('\n')) {
     if (!l.trim()) continue;
     try { out.push(JSON.parse(l)); } catch { /* one broken line loses only itself */ }
@@ -54,7 +81,7 @@ export function readCloudUsage({ home, file = cloudUsagePath({ home }) } = {}) {
 // Agent-hours since `since`, and the cost of the runs that measured
 // themselves. Memory is billed on its high-water mark for the whole run, the
 // way Runtime v1 bills it.
-export function summarizeCloudUsage(lines, { since = 0 } = {}) {
+export function summarizeCloudUsage(lines: CloudUsageLine[], { since = 0 }: { since?: number } = {}) {
   let runs = 0; let seconds = 0; let measured = 0; let cost = 0;
   for (const l of lines) {
     if (Date.parse(l.at) < since) continue;

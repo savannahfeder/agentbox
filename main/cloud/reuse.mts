@@ -11,32 +11,34 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { run } from './exec.mts';
 import { commonGitDirOf, markerPath } from './marker.mts';
+import type { MarkerFolder } from './marker.mts';
+import type { CloudStorage } from './managed.mts';
 
 // The bucket deletes everything under `runs/` seven days after it was written
 // (scripts/cloud-setup.mjs). Names carry the six-day period they were written
 // in and are only reused inside it, so nothing reused is ever that old.
 export const CACHE_PERIOD_MS = 6 * 24 * 60 * 60_000;
 
-export const periodOf = (now = Date.now()) => Math.floor(now / CACHE_PERIOD_MS);
-export const cacheKey = (name, now = Date.now()) => `runs/cache/${periodOf(now)}/${name}`;
+export const periodOf = (now: number = Date.now()) => Math.floor(now / CACHE_PERIOD_MS);
+export const cacheKey = (name: string, now: number = Date.now()) => `runs/cache/${periodOf(now)}/${name}`;
 
 // What a folder holds, as tar -h packs it: every file, following links, by its
 // path, size, time and mode. Unchanged files give the same name; any change
 // gives a new one.
-export async function folderKey(dir) {
+export async function folderKey(dir: string) {
   const h = crypto.createHash('sha256');
-  const seen = new Set();
-  async function walk(d, rel) {
-    let real;
+  const seen = new Set<string>();
+  async function walk(d: string, rel: string): Promise<void> {
+    let real: string;
     try { real = await fs.promises.realpath(d); } catch { return; }
     if (seen.has(real)) return;
     seen.add(real);
-    let names;
+    let names: string[];
     try { names = (await fs.promises.readdir(d)).sort(); } catch { return; }
     for (const name of names) {
       const p = path.join(d, name);
       const r = rel ? `${rel}/${name}` : name;
-      let st;
+      let st: fs.Stats;
       try { st = await fs.promises.stat(p); } catch { continue; }
       if (st.isDirectory()) await walk(p, r);
       else if (st.isFile()) h.update(`${r}\0${st.size}\0${st.mtimeMs}\0${st.mode}\n`);
@@ -48,14 +50,14 @@ export async function folderKey(dir) {
 
 // Puts `make()` at `key` unless the bucket already has it. A storage that
 // cannot say what it has gets everything sent, as before.
-export async function sendOnce(storage, key, make) {
+export async function sendOnce(storage: CloudStorage, key: string, make: () => string | Buffer | Promise<string | Buffer>) {
   if (storage.exists && await storage.exists(key).catch(() => false)) return { key, sent: false };
   const body = await make();
   await storage.put(key, body);
   return { key, sent: true };
 }
 
-const has = (storage, key) => (storage.exists ? storage.exists(key).catch(() => false) : false);
+const has = (storage: CloudStorage, key: string) => (storage.exists ? storage.exists(key).catch(() => false) : false);
 
 // S3 copies a part only from 5 MiB, so a conversation smaller than that is
 // sent whole every time.
@@ -63,16 +65,16 @@ export const MIN_JOIN_BYTES = 5 * 1024 * 1024;
 
 // Where this Mac notes the conversation it last sent from a folder: beside
 // the folder's cloud marker.
-export function sentRecordPath(here) {
+export function sentRecordPath(here: MarkerFolder) {
   const marker = markerPath(here);
   return marker ? `${marker.replace(/\.json$/, '')}-sent.json` : null;
 }
 
 // The hash of the first `upTo` bytes (null when the file is shorter) and of
 // the whole file, in one read.
-async function hashes(file, upTo) {
+async function hashes(file: string, upTo: number) {
   const whole = crypto.createHash('sha256');
-  let prefix = null;
+  let prefix: string | null = null;
   let seen = 0;
   for await (const chunk of fs.createReadStream(file)) {
     if (prefix === null && upTo > 0 && seen + chunk.length >= upTo) {
@@ -94,21 +96,28 @@ async function hashes(file, upTo) {
  * join is a new object under this period's name. `record` is where the last
  * send is noted.
  */
-export async function sendConversation(storage, file, { record = null, now = Date.now() } = {}) {
+export interface SentRecord {
+  period?: number;
+  key?: string;
+  size?: number;
+  sha?: string;
+}
+
+export async function sendConversation(storage: CloudStorage, file: string, { record = null, now = Date.now() }: { record?: string | null; now?: number } = {}) {
   // Hashed and sent from one copy, so the key always names what was sent.
   const copy = path.join(os.tmpdir(), `agentbox-conversation-${crypto.randomUUID()}.jsonl`);
   try {
     fs.copyFileSync(file, copy, fs.constants.COPYFILE_FICLONE);
-    let had = null;
+    let had: SentRecord | null = null;
     try { had = record ? JSON.parse(fs.readFileSync(record, 'utf8')) : null; } catch { /* none yet */ }
     const joinable = !!storage.extend && Number.isInteger(had?.size)
-      && had.size >= MIN_JOIN_BYTES && typeof had.key === 'string' && typeof had.sha === 'string';
-    const { prefix, whole, size } = await hashes(copy, joinable ? had.size : 0);
+      && had!.size! >= MIN_JOIN_BYTES && typeof had!.key === 'string' && typeof had!.sha === 'string';
+    const { prefix, whole, size } = await hashes(copy, joinable ? had!.size! : 0);
     const key = cacheKey(`conversation-${whole}.jsonl`, now);
     let sent = 0;
     if (!(await has(storage, key))) {
-      if (joinable && prefix === had.sha && size > had.size && await has(storage, had.key)) {
-        try { await storage.extend(key, had.key, copy, had.size); sent = size - had.size; } catch { /* sent whole below */ }
+      if (joinable && prefix === had!.sha && size > had!.size! && await has(storage, had!.key!)) {
+        try { await storage.extend!(key, had!.key!, copy, had!.size!); sent = size - had!.size!; } catch { /* sent whole below */ }
       }
       if (!sent) {
         if (storage.putFile) await storage.putFile(key, copy);
@@ -129,17 +138,17 @@ export async function sendConversation(storage, file, { record = null, now = Dat
   }
 }
 
-const git = (cwd, args) => run('git', args, { cwd });
-const gitOk = (cwd, args) => git(cwd, args).then(() => true, () => false);
+const git = (cwd: string, args: string[]) => run('git', args, { cwd }) as Promise<string>;
+const gitOk = (cwd: string, args: string[]) => git(cwd, args).then(() => true, () => false);
 
-async function mergeBase(cwd) {
+async function mergeBase(cwd: string) {
   for (const r of ['refs/remotes/origin/main', 'refs/heads/main']) {
     try { return (await git(cwd, ['merge-base', 'HEAD', r])).trim(); } catch { /* not there */ }
   }
   return (await git(cwd, ['rev-parse', 'HEAD'])).trim();
 }
 
-const baseRecordPath = (cwd) => {
+const baseRecordPath = (cwd: string) => {
   const common = commonGitDirOf(cwd);
   return common ? path.join(common, 'agentbox-cloud-base.json') : null;
 };
@@ -150,20 +159,20 @@ const baseRecordPath = (cwd) => {
  * the period; made afresh, from where the branch meets main, when the period
  * has turned or the bucket no longer has it.
  */
-export async function pickBase(cwd, storage, { now = Date.now(), runId = crypto.randomUUID() } = {}) {
+export async function pickBase(cwd: string, storage: CloudStorage, { now = Date.now(), runId = crypto.randomUUID() as string }: { now?: number; runId?: string } = {}) {
   const record = baseRecordPath(cwd);
   const period = periodOf(now);
-  let had = null;
-  try { had = JSON.parse(fs.readFileSync(record, 'utf8')); } catch { /* none yet */ }
+  let had: { period?: number; sha: string } | null = null;
+  try { had = JSON.parse(fs.readFileSync(record!, 'utf8')); } catch { /* none yet */ }
   if (had?.period === period && /^[0-9a-f]{40,64}$/.test(had.sha || '')
     && await gitOk(cwd, ['cat-file', '-e', `${had.sha}^{commit}`])) {
     const key = cacheKey(`base-${had.sha}.bundle`, now);
-    if (await storage.exists(key).catch(() => false)) return { sha: had.sha, key, sent: false };
+    if (await storage.exists!(key).catch(() => false)) return { sha: had.sha, key, sent: false };
   }
   const sha = await mergeBase(cwd);
   const key = cacheKey(`base-${sha}.bundle`, now);
   let sent = false;
-  if (!(await storage.exists(key).catch(() => false))) {
+  if (!(await storage.exists!(key).catch(() => false))) {
     const ref = `refs/agentbox/cloud-base/${runId}`;
     const file = path.join(os.tmpdir(), `agentbox-cloud-base-${runId}.bundle`);
     try {
@@ -191,8 +200,8 @@ export async function pickBase(cwd, storage, { now = Date.now(), runId = crypto.
  * The commits of `refs` past `base`, as a bundle file, or null when the base
  * already holds every one of them (git refuses a bundle with nothing in it).
  */
-export async function bundlePast(cwd, refs, base, file) {
-  const ahead = [];
+export async function bundlePast(cwd: string, refs: string[], base: string, file: string) {
+  const ahead: string[] = [];
   for (const r of refs) if (!(await gitOk(cwd, ['merge-base', '--is-ancestor', r, base]))) ahead.push(r);
   if (!ahead.length) return null;
   await git(cwd, ['bundle', 'create', '-q', file, ...ahead, `^${base}`]);
@@ -201,8 +210,8 @@ export async function bundlePast(cwd, refs, base, file) {
 
 // Each ref the run takes, with the commit it names, so the cloud can set the
 // ones a thin bundle leaves out because the base already holds them.
-export async function refsAt(cwd, refs) {
-  const out = {};
+export async function refsAt(cwd: string, refs: string[]) {
+  const out: Record<string, string> = {};
   for (const r of refs) out[r] = (await git(cwd, ['rev-parse', `${r}^{commit}`])).trim();
   return out;
 }

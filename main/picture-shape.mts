@@ -15,19 +15,21 @@ import fs from 'node:fs';
 /** How much of a file is read. A JPEG's frame sits after its Exif and colour profile. */
 const HEAD_BYTES = 256 * 1024;
 
-const shape = (w, h) => (w > 0 && h > 0 ? { w, h } : null);
+export interface PictureShape { w: number; h: number }
 
-function png(b) {
+const shape = (w: number, h: number): PictureShape | null => (w > 0 && h > 0 ? { w, h } : null);
+
+function png(b: Buffer) {
   if (b.length < 24 || b.readUInt32BE(0) !== 0x89504e47 || b.toString('latin1', 12, 16) !== 'IHDR') return null;
   return shape(b.readUInt32BE(16), b.readUInt32BE(20));
 }
 
-function gif(b) {
+function gif(b: Buffer) {
   if (b.length < 10 || b.toString('latin1', 0, 4) !== 'GIF8') return null;
   return shape(b.readUInt16LE(6), b.readUInt16LE(8));
 }
 
-function webp(b) {
+function webp(b: Buffer) {
   if (b.length < 30 || b.toString('latin1', 0, 4) !== 'RIFF' || b.toString('latin1', 8, 12) !== 'WEBP') return null;
   const chunk = b.toString('latin1', 12, 16);
   if (chunk === 'VP8X') return shape(1 + b.readUIntLE(24, 3), 1 + b.readUIntLE(27, 3));
@@ -40,13 +42,13 @@ function webp(b) {
 }
 
 /** The Exif orientation in an APP1 block, or 0. 5 to 8 mean it is drawn turned a quarter. */
-function orientation(b, start, end) {
+function orientation(b: Buffer, start: number, end: number) {
   if (b.toString('latin1', start, start + 6) !== 'Exif\0\0') return 0;
   const tiff = start + 6;
   if (tiff + 8 > end) return 0;
   const little = b.toString('latin1', tiff, tiff + 2) === 'II';
-  const u16 = (at) => (little ? b.readUInt16LE(at) : b.readUInt16BE(at));
-  const u32 = (at) => (little ? b.readUInt32LE(at) : b.readUInt32BE(at));
+  const u16 = (at: number) => (little ? b.readUInt16LE(at) : b.readUInt16BE(at));
+  const u32 = (at: number) => (little ? b.readUInt32LE(at) : b.readUInt32BE(at));
   const ifd = tiff + u32(tiff + 4);
   if (ifd + 2 > end) return 0;
   const count = u16(ifd);
@@ -58,7 +60,7 @@ function orientation(b, start, end) {
   return 0;
 }
 
-function jpeg(b) {
+function jpeg(b: Buffer) {
   if (b.length < 4 || b[0] !== 0xff || b[1] !== 0xd8) return null;
   let turned = 0;
   let i = 2;
@@ -82,7 +84,7 @@ function jpeg(b) {
 }
 
 /** `{ w, h }` as the browser will draw it, or null. */
-export function pictureShape(bytes) {
+export function pictureShape(bytes?: Buffer | null) {
   if (!bytes?.length) return null;
   try {
     return png(bytes) ?? gif(bytes) ?? webp(bytes) ?? jpeg(bytes);
@@ -92,7 +94,7 @@ export function pictureShape(bytes) {
 }
 
 /** The same, read off a file on disk without waiting, for a pass that lists many. */
-export function readPictureShapeSync(file) {
+export function readPictureShapeSync(file: string) {
   const fd = fs.openSync(file, 'r');
   try {
     const buffer = Buffer.alloc(HEAD_BYTES);
@@ -103,7 +105,7 @@ export function readPictureShapeSync(file) {
 }
 
 /** The same, read off a file on disk. */
-export async function readPictureShape(file) {
+export async function readPictureShape(file: string) {
   const handle = await fs.promises.open(file, 'r');
   try {
     const { buffer, bytesRead } = await handle.read({ buffer: Buffer.alloc(HEAD_BYTES), position: 0 });

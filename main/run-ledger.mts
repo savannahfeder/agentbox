@@ -16,11 +16,34 @@ const TAIL_BYTES = 400;
 // going; it writes its own line when it ends.
 const STILL_GOING_MS = 30 * 60_000;
 
+export interface LedgerRun {
+  key?: string;
+  at?: number;
+  start?: number;
+  item?: string | null;
+  product?: string | null;
+  engine?: string | null;
+  seconds?: number;
+  failed?: boolean | null;
+  where?: string;
+  backfilled?: boolean;
+  [field: string]: unknown;
+}
+
+export interface CloudUsageLine {
+  at: string;
+  wallSeconds?: unknown;
+  runId?: string | number;
+  item?: string;
+  engine?: string;
+  exitCode?: unknown;
+}
+
 export function runLedgerPath(home = appHome()) {
   return path.join(home, 'runs.jsonl');
 }
 
-export function appendRun(run, { file = runLedgerPath() } = {}) {
+export function appendRun(run: unknown, { file = runLedgerPath() }: { file?: string } = {}) {
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.appendFileSync(file, JSON.stringify(run) + '\n');
@@ -31,19 +54,19 @@ export function appendRun(run, { file = runLedgerPath() } = {}) {
   }
 }
 
-export function readRuns({ file = runLedgerPath() } = {}) {
+export function readRuns({ file = runLedgerPath() }: { file?: string } = {}): LedgerRun[] {
   let text;
   try { text = fs.readFileSync(file, 'utf8'); } catch { return []; }
-  const out = [];
+  const out: LedgerRun[] = [];
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
-    try { out.push(JSON.parse(line)); } catch { /* one broken line loses only itself */ }
+    try { out.push(JSON.parse(line) as LedgerRun); } catch { /* one broken line loses only itself */ }
   }
   return out;
 }
 
-export function runsFromCloudUsage(lines) {
-  const out = [];
+export function runsFromCloudUsage(lines?: CloudUsageLine[] | null) {
+  const out: LedgerRun[] = [];
   for (const l of lines ?? []) {
     const at = Date.parse(l?.at);
     const seconds = Number(l?.wallSeconds);
@@ -67,8 +90,8 @@ export function allRuns({ file = runLedgerPath(), cloudLines = [] } = {}) {
   return dedupeRuns([...readRuns({ file }), ...runsFromCloudUsage(cloudLines)]);
 }
 
-function tailOf(file) {
-  let fd;
+function tailOf(file: string) {
+  let fd: number | undefined;
   try {
     fd = fs.openSync(file, 'r');
     const size = fs.fstatSync(fd).size;
@@ -90,12 +113,12 @@ function tailOf(file) {
 const YIELD_EVERY = 200;
 const breathe = () => new Promise((r) => setImmediate(r));
 
-export async function backfillRuns({ home = appHome(), products = [], file = runLedgerPath(home), now = Date.now() } = {}) {
+export async function backfillRuns({ home = appHome(), products = [], file = runLedgerPath(home), now = Date.now() }: { home?: string; products?: { dir?: string | null; slug?: string | null }[]; file?: string; now?: number } = {}) {
   const have = new Set(readRuns({ file }).map((r) => r?.key));
   const since = now - BACKFILL_DAYS * 86_400_000;
   let added = 0;
   let read = 0;
-  let pending = [];
+  let pending: LedgerRun[] = [];
   const flush = () => {
     if (!pending.length) return;
     try {

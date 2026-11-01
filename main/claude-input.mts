@@ -1,5 +1,49 @@
 import { randomUUID } from 'node:crypto';
+import type { ChildProcess } from 'node:child_process';
+import type { Readable, Writable } from 'node:stream';
 import { Name } from '../shared/product-name.mjs';
+
+export interface BackgroundTask { task_id?: string; description?: string }
+
+export interface StreamEvent {
+  type?: string;
+  subtype?: string;
+  uuid?: string;
+  isMeta?: boolean;
+  parent_tool_use_id?: string | null;
+  response?: { request_id?: string; subtype?: string; response?: Record<string, unknown>; error?: string };
+  message?: { content?: string | { type?: string; text?: string }[] };
+  tasks?: BackgroundTask[];
+}
+
+export interface InputRun { print: string; input?: readonly string[] }
+
+export type ControlResult = Record<string, unknown>;
+
+export interface ClaudeInput {
+  waitingOn(): BackgroundTask[];
+  ranToTheEnd(): boolean;
+  holdInput(value: unknown): void;
+  control(request: Record<string, unknown>, timeoutMs?: number): Promise<ControlResult>;
+  interrupt(): Promise<{ interrupted: boolean }>;
+  steer(text: string): Promise<{ accepted: boolean }>;
+  lastInterruptAt?: number;
+}
+
+export type PipedChild = ChildProcess & { stdin: Writable; stdout: Readable };
+
+interface PendingSteer {
+  resolve: (value: { accepted: boolean }) => void;
+  reject: (error: Error) => void;
+  taken: boolean;
+  timer?: NodeJS.Timeout;
+}
+
+interface PendingControl {
+  resolve: (value: ControlResult) => void;
+  reject: (error: Error) => void;
+  timer: NodeJS.Timeout;
+}
 
 // THE SESSION STOPPED LISTENING BEFORE IT TOOK THIS MESSAGE. Not a refusal:
 // the turn closed, or the process went, in the seconds between her pressing
@@ -7,8 +51,8 @@ import { Name } from '../shared/product-name.mjs';
 // ordinary reply, which the next run picks up, instead of throwing it back
 // at her with "The turn has ended" (w-12730c6506).
 export const TURN_CLOSED = 'TURN_CLOSED';
-function turnClosed(message) {
-  const error = Error(message);
+function turnClosed(message: string) {
+  const error: Error & { code?: string } = Error(message);
   error.code = TURN_CLOSED;
   return error;
 }
@@ -20,8 +64,8 @@ const WAKE_GRACE_MS = 2 * 60 * 1000;
 // Said to the agent, never shown to the person: the trace keeps no user turns.
 // Paths are cut to their last part: a cloud run's relay uploads any file its
 // input names outside the task folder (main/cloud/run.mts `filesNamedIn`).
-export function stillRunningNote(tasks) {
-  const plain = (text) => String(text).replace(/(^|[\s"'`(=:])\/(?:[^\s"'`<>()[\]{},;\\]*\/)+/g, '$1');
+export function stillRunningNote(tasks: BackgroundTask[]) {
+  const plain = (text: unknown) => String(text).replace(/(^|[\s"'`(=:])\/(?:[^\s"'`<>()[\]{},;\\]*\/)+/g, '$1');
   const names = tasks.map((t) => `"${plain(t.description || t.task_id).slice(0, 120)}"`).join(', ');
   return `This is ${Name}, not the person. Your turn ended with ${tasks.length === 1 ? 'this' : 'these'} still running in the background: ${names}. `
     + 'Your run stays open, and your answer is not delivered, until nothing you started is still running. '
@@ -33,7 +77,7 @@ export function stillRunningNote(tasks) {
 // engine of this family that spells either of them differently is a definition
 // and not a change here. An engine with no `input` cannot take corrections on
 // stdin, and gets its line back as it was.
-export function streamInputArgs(run, args) {
+export function streamInputArgs(run: InputRun | null | undefined, args: string[]) {
   if (!run?.input) return [...args];
   const copy = [...args];
   const index = copy.indexOf(run.print);
@@ -44,11 +88,12 @@ export function streamInputArgs(run, args) {
 
 // Replay-user-messages acknowledges the exact UUID when Claude consumes it.
 // A result for earlier work must not close stdin over queued corrections.
-export function attachClaudeInput(child) {
+export function attachClaudeInput<C extends PipedChild>(child: C): C & ClaudeInput;
+export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput): C & ClaudeInput {
   let closed = false, buffer = '', atResult = false, held = false;
-  const controls = new Map();
-  const seenUsers = new Set();
-  const pending = new Map();
+  const controls = new Map<string | undefined, PendingControl>();
+  const seenUsers = new Set<string>();
+  const pending = new Map<string | undefined, PendingSteer>();
   // WHAT THE AGENT STARTED AND HAS NOT HEARD BACK FROM: a background command,
   // a command Claude Code moved to the background past its time limit, a
   // background helper. Claude Code lists them in `background_tasks_changed`
@@ -56,7 +101,7 @@ export function attachClaudeInput(child) {
   // result with any of these out is "I'll report once it finishes", not the
   // end of the run, and closing there killed the suite it was waiting on
   // (tests/an-agent-waiting-on-its-own-tests-does-not-come-back-to-you).
-  let waiting = [], wakeTimer = null;
+  let waiting: BackgroundTask[] = [], wakeTimer: NodeJS.Timeout | null = null;
   // Jobs the agent has been told are still out, and the messages that told it.
   // A forgotten job holds a finished answer until Claude Code's own limit
   // stops it, thirty minutes and more
@@ -73,7 +118,7 @@ export function attachClaudeInput(child) {
   // Claude replays it only when that turn first speaks. Send now must not cut
   // that turn: it was the answer (w-0202576e73).
   let inTurn = false;
-  const closeInput = () => { closed = true; ended = true; clearTimeout(wakeTimer); child.stdin.end(); };
+  const closeInput = () => { closed = true; ended = true; clearTimeout(wakeTimer ?? undefined); child.stdin.end(); };
   const mayClose = () => !held && atResult && !pending.size && !waiting.length;
   // Not into a session she is driving, and not when her own message is about
   // to start the next turn. Kept out of `pending`, so it never holds input open.
@@ -86,7 +131,7 @@ export function attachClaudeInput(child) {
       child.stdin.write(JSON.stringify({ type: 'user', uuid, message: { role: 'user', content: stillRunningNote(waiting) }, parent_tool_use_id: null, session_id: '' }) + '\n');
     } catch { /* the input is gone; `fail` hears it */ }
   };
-  const fail = reason => {
+  const fail: (reason: string) => void = reason => {
     closed = true;
     for (const request of pending.values()) {
       clearTimeout(request.timer);
@@ -105,13 +150,13 @@ export function attachClaudeInput(child) {
     while ((index = buffer.indexOf('\n')) >= 0) {
       const line = buffer.slice(0, index);
       buffer = buffer.slice(index + 1);
-      let event;
-      try { event = JSON.parse(line); } catch { continue; }
+      let event: StreamEvent;
+      try { event = JSON.parse(line) as StreamEvent; } catch { continue; }
       if (event.type === 'control_response') {
         const response = event.response, request = controls.get(response?.request_id);
-        if (request) { controls.delete(response.request_id); clearTimeout(request.timer);
-          if (response.subtype === 'success') request.resolve(response.response ?? {});
-          else request.reject(Error(response.error || 'The provider rejected this operation.'));
+        if (request) { controls.delete(response?.request_id); clearTimeout(request.timer);
+          if (response?.subtype === 'success') request.resolve(response.response ?? {});
+          else request.reject(Error(response?.error || 'The provider rejected this operation.'));
         }
       }
       if (event.type === 'system' && event.subtype === 'bridge_state') child.emit('bridge-state', event);
@@ -132,7 +177,7 @@ export function attachClaudeInput(child) {
         if (text) { atResult = false; child.emit('input-turn', event); }
       }
       if (event.type === 'user' && pending.has(event.uuid)) {
-        const request = pending.get(event.uuid);
+        const request = pending.get(event.uuid)!;
         pending.delete(event.uuid);
         clearTimeout(request.timer);
         atResult = false;
@@ -143,7 +188,7 @@ export function attachClaudeInput(child) {
         // The last one ended between turns. Claude Code wakes the agent for
         // it, and that turn's result closes as usual. The timer is only for a
         // wake that never comes, so a session cannot sit open forever.
-        clearTimeout(wakeTimer);
+        clearTimeout(wakeTimer ?? undefined);
         if (!waiting.length && atResult && !closed) {
           wakeTimer = setTimeout(() => { if (mayClose() && !closed) closeInput(); }, WAKE_GRACE_MS);
           wakeTimer.unref?.();
@@ -202,7 +247,7 @@ export function attachClaudeInput(child) {
       child.stdin.write(JSON.stringify({ type: 'user', uuid, message: { role: 'user', content: text }, parent_tool_use_id: null, session_id: '' }) + '\n');
     } catch (error) {
       pending.delete(uuid);
-      reject(turnClosed(error?.message || 'The agent input connection closed.'));
+      reject(turnClosed((error as Error)?.message || 'The agent input connection closed.'));
     }
   });
   return child;

@@ -34,11 +34,22 @@ import os from 'node:os';
 import path from 'node:path';
 import { shellDataDirsNow } from './shell-path.mjs';
 
-const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+export interface DataDirOptions {
+  home?: string;
+  env?: Record<string, string | undefined>;
+  configured?: unknown;
+}
+
+export interface HomesSupervisor {
+  _codexProfiles?: () => unknown;
+  _codexProfileHome: (profile: unknown) => unknown;
+}
+
+const isDir = (p: string) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
 
 /** `.claude`, `.claude-work`, `.codex-2`: every directory under home named `.<tool>` or `.<tool>-<anything>`. */
-function shapedUnderHome(home, tool) {
-  let names = [];
+function shapedUnderHome(home: string, tool: string) {
+  let names: string[] = [];
   try { names = fs.readdirSync(home); } catch { return []; }
   return names
     .filter((n) => n === `.${tool}` || n.startsWith(`.${tool}-`))
@@ -50,9 +61,9 @@ function shapedUnderHome(home, tool) {
  * The candidates, in the order given, kept when they hold `inner/` and named
  *  once each. Two spellings of one folder (a trailing slash, a symlink) are
  *  one folder. */
-function keepWithSessions(candidates, inner) {
-  const out = [];
-  const seen = new Set();
+function keepWithSessions(candidates: unknown[], inner: string) {
+  const out: string[] = [];
+  const seen = new Set<string>();
   for (const c of candidates) {
     if (typeof c !== 'string' || !c.trim()) continue;
     const dir = path.resolve(c.trim());
@@ -67,7 +78,7 @@ function keepWithSessions(candidates, inner) {
 }
 
 /** A configured profile is 'default' (the tool's own default folder) or a folder. */
-const profileDirs = (configured, dflt) => (Array.isArray(configured) ? configured : [configured])
+const profileDirs = (configured: unknown, dflt: string) => (Array.isArray(configured) ? configured : [configured])
   .filter((p) => typeof p === 'string' && p.trim())
   .map((p) => (p === 'default' ? dflt : p));
 
@@ -80,7 +91,7 @@ const profileDirs = (configured, dflt) => (Array.isArray(configured) ? configure
  *  last candidate is `~/.config/claude`, where some Claude Code versions kept
  *  their data; 2.1.293 no longer does, but a machine that still has sessions
  *  there gets them read. */
-export function claudeDataDirs({ home = os.homedir(), env = {}, configured = [] } = {}) {
+export function claudeDataDirs({ home = os.homedir(), env = {}, configured = [] }: DataDirOptions = {}) {
   const dflt = path.join(home, '.claude');
   const xdg = env?.XDG_CONFIG_HOME ? path.join(env.XDG_CONFIG_HOME, 'claude') : path.join(home, '.config', 'claude');
   return keepWithSessions([
@@ -97,7 +108,7 @@ export function claudeDataDirs({ home = os.homedir(), env = {}, configured = [] 
  *  profiles it was configured with, and the Codex homes its supervisor runs on.
  *  The one call the import card, the Codex watch and the import answer share,
  *  so the three cannot disagree about where somebody's sessions are. */
-export function sessionFolders({ claudeProfiles = [], codexHomes = [], env = process.env, home = os.homedir() } = {}) {
+export function sessionFolders({ claudeProfiles = [], codexHomes = [], env = process.env, home = os.homedir() }: { claudeProfiles?: unknown; codexHomes?: unknown; env?: Record<string, string | undefined>; home?: string } = {}) {
   return {
     dirs: claudeDataDirs({ home, env, configured: claudeProfiles }),
     codexDirs: codexDataDirs({ home, env, configured: codexHomes }),
@@ -108,14 +119,14 @@ export function sessionFolders({ claudeProfiles = [], codexHomes = [], env = pro
  * THE CODEX HOMES THE SUPERVISOR RUNS ON, or as many of them as can be named.
  *  Each profile is resolved on its own, so one that throws costs that one home
  *  and not the list (found by Codex's review of this change, 2026-10-11). */
-export function codexHomesOf(supervisor) {
-  let profiles = [];
+export function codexHomesOf(supervisor: HomesSupervisor | null | undefined) {
+  let profiles: unknown = [];
   try { profiles = supervisor?._codexProfiles?.() ?? []; } catch { profiles = []; }
   if (!Array.isArray(profiles)) return [];
-  const out = [];
+  const out: string[] = [];
   for (const p of profiles) {
     try {
-      const h = supervisor._codexProfileHome(p);
+      const h = supervisor!._codexProfileHome(p);
       if (typeof h === 'string' && h.trim()) out.push(h);
     } catch { /* that one home is unknown; the rest still count */ }
   }
@@ -129,8 +140,8 @@ export function codexHomesOf(supervisor) {
  *  both lists inside one try, so any one of those left the import reading
  *  nothing beyond the defaults, and without the app's own CLAUDE_CONFIG_DIR or
  *  CODEX_HOME either. */
-export function appSessionFolders({ config = null, supervisor = null, env = process.env, shellEnv = shellDataDirsNow(), home = os.homedir() } = {}) {
-  let claudeProfiles = [];
+export function appSessionFolders({ config = null, supervisor = null, env = process.env, shellEnv = shellDataDirsNow(), home = os.homedir() }: { config?: { authProfiles?: string[] | string } | null; supervisor?: HomesSupervisor | null; env?: Record<string, string | undefined>; shellEnv?: { CLAUDE_CONFIG_DIR?: string; CODEX_HOME?: string }; home?: string } = {}) {
+  let claudeProfiles: string[] | string = [];
   try { claudeProfiles = config?.authProfiles ?? []; } catch { claudeProfiles = []; }
   if (!Array.isArray(claudeProfiles)) claudeProfiles = [claudeProfiles];
   // AND WHAT THE LOGIN SHELL EXPORTS (main/shell-path.mjs), which an app opened
@@ -147,7 +158,7 @@ export function appSessionFolders({ config = null, supervisor = null, env = proc
  * EVERY CODEX DATA FOLDER ON THIS MACHINE THAT HOLDS SESSIONS. Same rule:
  *  `CODEX_HOME`, whatever the app was configured with, `~/.codex` and every
  *  `~/.codex-<name>`. */
-export function codexDataDirs({ home = os.homedir(), env = {}, configured = [] } = {}) {
+export function codexDataDirs({ home = os.homedir(), env = {}, configured = [] }: DataDirOptions = {}) {
   const dflt = path.join(home, '.codex');
   return keepWithSessions([
     env?.CODEX_HOME,

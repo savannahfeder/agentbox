@@ -4,10 +4,20 @@
 import { changeFromRepo } from './git-change.mjs';
 import { writeChangeForRun } from './code-change.mjs';
 
-export function saveRunChange({ repoBefore = null, ...run }) {
-  let repos = [];
+export interface RunChangeInput {
+  repoBefore?: Parameters<typeof changeFromRepo>[0] | null;
+  transcript?: string;
+  docsDir?: string;
+  itemId?: string;
+  roots?: string[];
+  since?: number;
+  change?: unknown;
+}
+
+export function saveRunChange({ repoBefore = null, ...run }: RunChangeInput) {
+  let repos: ReturnType<typeof changeFromRepo>[] = [];
   try {
     if (repoBefore) repos = [changeFromRepo(repoBefore)];
-  } catch (e) { console.warn('zero: could not read the repository back:', e.message); }
-  return writeChangeForRun({ ...run, repos });
+  } catch (e) { console.warn('zero: could not read the repository back:', (e as Error).message); }
+  return writeChangeForRun({ ...run, repos } as Parameters<typeof writeChangeForRun>[0]);
 }

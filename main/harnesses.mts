@@ -3,6 +3,17 @@
 import { claudeHarness } from './harnesses/claude.mts';
 import { codexHarness } from './harnesses/codex.mts';
 import { openCodeHarness } from './harnesses/opencode.mts';
+import type { Harness, HarnessCapabilities } from './harnesses/common.mts';
+
+type HarnessFunction = (...args: unknown[]) => unknown;
+
+export interface HarnessAdapter {
+  id: string;
+  label: string;
+  capabilities?: Partial<HarnessCapabilities>;
+  available?: (name: string) => boolean;
+  [operation: string]: unknown;
+}
 
 export const HARNESS_OPERATIONS = Object.freeze([
   'discover', 'binary', 'workerArgs', 'install', 'signIn', 'signInStatus', 'signInFiles',
@@ -13,8 +24,8 @@ export const HARNESS_OPERATIONS = Object.freeze([
   'smallModelArgs', 'updateSettings', 'runCommand', 'instructions',
 ]);
 const OPTIONAL_READS = new Set(['usage', 'models', 'effortLevels']);
-export function createHarnessRegistry(adapters) {
-  const entries = new Map();
+export function createHarnessRegistry(adapters: HarnessAdapter[]) {
+  const entries = new Map<string, { adapter: HarnessAdapter; complete: Harness }>();
   for (const adapter of adapters) {
     if (!adapter || typeof adapter.id !== 'string' || !/^[a-z][a-z0-9-]*$/.test(adapter.id) || !adapter.label) throw Error('A harness needs an id and label.');
     if (entries.has(adapter.id)) throw Error(`Duplicate harness: ${adapter.id}`);
@@ -30,26 +41,26 @@ export function createHarnessRegistry(adapters) {
     // tool can do is what it negotiated when the session opened. So an adapter
     // may declare an operation unavailable, and a declined one is refused
     // exactly as a missing one is — before it does anything.
-    const declines = name => adapter.available ? adapter.available(name) !== true : false;
-    const complete = { ...adapter };
+    const declines = (name: string) => adapter.available ? adapter.available(name) !== true : false;
+    const complete: Record<string, HarnessFunction> = { ...adapter } as Record<string, HarnessFunction>;
     for (const name of HARNESS_OPERATIONS) {
       if (adapter[name] != null && typeof adapter[name] !== 'function') throw Error(`${adapter.id}.${name} must be a function or absent.`);
-      const absent = (..._args) => {
+      const absent = (..._args: unknown[]) => {
         if (OPTIONAL_READS.has(name)) return { supported: false, engine: adapter.id, capability: name };
         throw Error(`${adapter.label} does not support ${name}.`);
       };
       const own = complete[name];
-      complete[name] = own ? ((...args) => declines(name) ? absent(...args) : own(...args)) : absent;
+      complete[name] = own ? ((...args: unknown[]) => declines(name) ? absent(...args) : own(...args)) : absent;
     }
-    entries.set(adapter.id, { adapter, complete: Object.freeze(complete) });
+    entries.set(adapter.id, { adapter, complete: Object.freeze(complete) as unknown as Harness });
   }
   return Object.freeze({
-    get(id = 'claude') {
+    get(id = 'claude'): Harness {
       const entry = entries.get(id);
       if (!entry) throw Error(`Unknown coding agent: ${String(id)}`);
       return entry.complete;
     },
-    supports(id, capability) {
+    supports(id: string, capability: string): boolean {
       const adapter = entries.get(id)?.adapter;
       if (typeof adapter?.[capability] !== 'function') return false;
       return adapter.available ? adapter.available(capability) === true : true;
@@ -61,5 +72,6 @@ export function createHarnessRegistry(adapters) {
 // (shared/engines.mjs) so no row can choose it and no picker draws it until
 // that is turned on deliberately. The two decisions are separate on purpose.
 const registry = createHarnessRegistry([claudeHarness, codexHarness, openCodeHarness]);
-export const harnessFor = id => registry.get(id);
-export const supportsHarnessOperation = (id, name) => registry.supports(id, name);
+export const harnessFor = (id?: string): Harness => registry.get(id);
+export const supportsHarnessOperation = (id: string, name: string) => registry.supports(id, name);
+

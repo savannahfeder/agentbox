@@ -49,7 +49,36 @@ const DEFAULT_HOST = 'https://us.i.posthog.com';
 // ONE SETTING, ON WHEN YOU INSTALL AGENTBOX (privacy page, section 10). Stored as
 // an opt-OUT so that a config she has never touched means on, and so turning it
 // off is a real, visible key in her own file rather than an absence.
-export function diagnosticsOn(config) {
+export interface AnalyticsConfig { diagnostics?: boolean; posthogKey?: unknown; posthogHost?: string }
+
+export interface AnalyticsClient {
+  capture(event: { distinctId: string | null; event: string; properties: Record<string, unknown> }): void;
+  flush?(): Promise<unknown>;
+  shutdown?(): Promise<unknown>;
+}
+
+export interface AnalyticsOptions {
+  config?: AnalyticsConfig | null;
+  version?: string;
+  dir?: string;
+  client?: AnalyticsClient | null;
+  env?: NodeJS.ProcessEnv;
+  kind?: string;
+}
+
+export interface CrashPayload {
+  kind?: unknown;
+  upMs?: unknown;
+  v?: unknown;
+  error?: unknown;
+  ts?: unknown;
+  app?: { version?: unknown };
+  reason?: unknown;
+  exitCode?: unknown;
+  processType?: unknown;
+}
+
+export function diagnosticsOn(config: AnalyticsConfig | null | undefined) {
   return config?.diagnostics !== false;
 }
 
@@ -63,7 +92,7 @@ export function diagnosticsOn(config) {
 // Measured 2026-08-21: before this, the key came only from the user's own
 // `zero.config.json`, which no download contains, so every install but hers
 // sent nothing and the north star could not be counted.
-function bakedKey() {
+function bakedKey(): unknown {
   try {
     const pkg = createRequire(import.meta.url)('../package.json');
     return pkg?.bakedPosthogKey ?? null;
@@ -81,12 +110,12 @@ const BAKED = bakedKey();
 // HER OWN FILE STILL WINS. A `posthogKey` in `zero.config.json` outranks the
 // baked one, so pointing a copy at a different project stays a one-line edit,
 // and `diagnostics: false` still turns all of it off at every send.
-export function analyticsKey(config, baked = BAKED) {
+export function analyticsKey(config: AnalyticsConfig | null | undefined, baked: unknown = BAKED) {
   const key = config?.posthogKey ?? readEnv('POSTHOG_KEY') ?? baked ?? null;
   return typeof key === 'string' && key.trim() ? key.trim() : null;
 }
 
-export function createAnalytics({ config, version, dir, client, env = process.env, kind = 'desktop' } = {}) {
+export function createAnalytics({ config, version, dir, client, env = process.env, kind = 'desktop' }: AnalyticsOptions = {}) {
   const key = analyticsKey(config);
   const hasDestination = !!key || !!client;
   // BOTH HALVES, AT EVERY SEND. See note 4 above.
@@ -120,7 +149,7 @@ export function createAnalytics({ config, version, dir, client, env = process.en
   // Which first run this install was shown, for the test of the two (shared/onboarding-arm.mjs). Set here, never by a caller.
   let armWord = dir ? readArm(dir) : null;
   const arm = () => armWord;
-  let posthog = client ?? null;
+  let posthog: AnalyticsClient | null = client ?? null;
   const load = () => {
     if (posthog) return posthog;
     try {
@@ -129,13 +158,13 @@ export function createAnalytics({ config, version, dir, client, env = process.en
       const { PostHog } = createRequire(import.meta.url)('posthog-node');
       posthog = new PostHog(key, { host: config?.posthogHost || DEFAULT_HOST, flushAt: 20, flushInterval: 10000 });
     } catch (err) {
-      console.warn('zero: analytics could not start:', err.message);
+      console.warn('zero: analytics could not start:', (err as Error).message);
       posthog = null;
     }
     return posthog;
   };
 
-  const send = (event, properties) => {
+  const send = (event: string, properties: object) => {
     if (!on()) return false;
     const ph = load();
     if (!ph) return false;
@@ -144,14 +173,14 @@ export function createAnalytics({ config, version, dir, client, env = process.en
       return true;
     } catch (err) {
       // A failed send is never allowed to be a failed app.
-      console.warn('zero: analytics send failed:', err.message);
+      console.warn('zero: analytics send failed:', (err as Error).message);
       return false;
     }
   };
 
   return {
     /** Draws this install's first run the first time one starts, and every count after carries it. */
-    onboardingArm({ random } = {}) {
+    onboardingArm({ random }: { random?: () => number } = {}) {
       armWord = armFor(dir, { env, ...(random ? { random } : {}) });
       return armWord;
     },
@@ -169,7 +198,7 @@ export function createAnalytics({ config, version, dir, client, env = process.en
     // ONE DOOR. `name` must be one of hers, and the properties are filtered to
     // numbers, booleans and one closed enum. Anything else is dropped rather
     // than sent, because the caller is often the renderer.
-    track(name, props) {
+    track(name: string, props?: Record<string, unknown>) {
       if (!on()) return false;
       const clean = sanitize(name, props);
       if (!clean) return false;
@@ -180,7 +209,7 @@ export function createAnalytics({ config, version, dir, client, env = process.en
     // already scrubbed and already checked; it is checked once more here, and a
     // report that fails is dropped whole rather than trimmed, which is the rule
     // the scrub itself follows.
-    crashTransport(payload) {
+    crashTransport(payload: CrashPayload | null | undefined): boolean {
       if (!on()) return false;
       if (!payload || typeof payload !== 'object') return false;
       const leaks = findPrivate(payload, ctx);
@@ -230,11 +259,11 @@ export function createAnalytics({ config, version, dir, client, env = process.en
     // synchronous: the queue on disk is drained on the NEXT launch. A file is
     // removed only once its send has been accepted, and a file that will not
     // parse is removed rather than retried forever.
-    drainCrashes(files = []) {
+    drainCrashes(files: string[] = []) {
       if (!on()) return 0;
       let sent = 0;
       for (const file of files) {
-        let payload = null;
+        let payload: CrashPayload | null = null;
         try { payload = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { payload = null; }
         if (!payload) { try { fs.unlinkSync(file); } catch {} continue; }
         if (this.crashTransport(payload)) {
@@ -263,9 +292,9 @@ export function createAnalytics({ config, version, dir, client, env = process.en
 // time the window comes forward, and sends only on the first touch of each
 // local day. Kept in memory: a relaunch on the same day may send it again,
 // which PostHog's per-install, per-day counting absorbs.
-export function createDailyCount(track) {
-  let last = null;
-  return (now) => {
+export function createDailyCount(track: (name: string) => unknown) {
+  let last: string | null = null;
+  return (now: number) => {
     const d = new Date(now);
     const day = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
     if (day === last) return;
@@ -276,7 +305,7 @@ export function createDailyCount(track) {
 
 // WHAT AN AGENT'S RUN REPORTS WHEN IT ENDS: how long, whether it failed, and
 // which engine. Nothing about the task it was on.
-export function runEndedProps(session, now) {
+export function runEndedProps(session: { startedAt?: number; exitFailed?: unknown; engine?: string }, now: number) {
   return {
     seconds: Math.round((now - (session.startedAt ?? now)) / 1000),
     failed: !!session.exitFailed,

@@ -19,7 +19,7 @@ import { TURN_CLOSED } from './claude-input.mts';
 // context, and nothing of ours is written after it. `files` is the supervisor's
 // `attachmentBlock` for this reply: the pictures in it by absolute path, which
 // is also what a cloud run reads to send them up (main/cloud/run.mts).
-export function liveReplyBrief(answer, files = '') {
+export function liveReplyBrief(answer: string, files: string = ''): string {
   return [
     'This arrived in your thread just now, while you work, and they are watching',
     'for a reply. Do what it asks. If it asks you anything, or says it did not',
@@ -37,7 +37,45 @@ export function liveReplyBrief(answer, files = '') {
 
 // `from` names the teammate whose words these are: they reach a running
 // session framed as that teammate's, never as the person's or as a command.
-export function submitReply(supervisor, payload, commit) {
+export interface ReplyItem { answer?: string | null; [key: string]: unknown }
+
+export interface ReplySession {
+  product?: string;
+  child?: {
+    steer?(answer: string, pictures?: unknown[]): unknown;
+    interrupt?(): Promise<unknown> | undefined;
+  };
+  remoteIdle?: boolean;
+  engine?: string;
+  sessionId?: string;
+  lastLiveReply?: ReplyItem;
+  exitFailed?: boolean;
+  stoppedByUs?: boolean;
+}
+
+export interface ReplySupervisor {
+  _replySends?: Map<string, Promise<unknown>>;
+  sessions?: Map<string, ReplySession>;
+  replyFiles?(product: string, answer: string, engine: string | undefined, id: string): { block?: string; pictures?: unknown[] } | null | undefined;
+  _handledAnswers: Set<string>;
+  _answerKey(item: ReplyItem): string;
+  _noteHeard?(item: ReplyItem, sessionId: string | undefined): unknown;
+  _saveState(): unknown;
+  redeliverAnswer(item: ReplyItem, answer: string | null | undefined): unknown;
+  deliverMidflightReply(item: ReplyItem, files: null): unknown;
+}
+
+export interface ReplyPayload {
+  product: string;
+  id: string;
+  status?: string;
+  permissionMode?: unknown;
+  now?: boolean;
+  from?: string | null;
+  answer?: unknown;
+}
+
+export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, commit: () => Promise<ReplyItem | null | undefined> | ReplyItem | null | undefined) {
   const { product, id, status, permissionMode, now = false, from = null } = payload;
   const answer = from ? framedTeammate(from, payload.answer) : payload.answer;
   const key = JSON.stringify([product, id]);
@@ -49,7 +87,7 @@ export function submitReply(supervisor, payload, commit) {
     && status !== 'done' && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)';
   // Observe rejections immediately, including when an earlier reply is still
   // waiting. The ordered commit below rethrows them to their own caller.
-  const delivery = Promise.resolve().then(() => {
+  const delivery: Promise<{ ok: boolean; error?: { code?: unknown } | null }> = Promise.resolve().then(() => {
     if (!live) return;
     if (permissionMode != null) throw Error('A running turn keeps its current permissions. Stop it before sending with a different permission mode.');
     if (answer.trimStart().startsWith('/') && !session.remoteIdle) throw Error('Wait for the current turn to finish before running a slash command.');
@@ -58,12 +96,12 @@ export function submitReply(supervisor, payload, commit) {
     // round them. Both reach it exactly as typed.
     const files = session.remoteIdle ? null : supervisor.replyFiles?.(product, answer, session.engine, id);
     const taken = session.remoteIdle
-      ? session.child.steer(answer)
-      : session.child.steer(liveReplyBrief(answer, files?.block), files?.pictures ?? []);
+      ? session.child!.steer!(answer)
+      : session.child!.steer!(liveReplyBrief(answer, files?.block), files?.pictures ?? []);
     // SENT NOW: her words go in line first, then the step is cut, in the same
     // tick, so the cut turn's result can never close the input ahead of them.
     // A cut that fails leaves the message waiting its turn, which is still sent.
-    if (now) session.child.interrupt?.()?.catch?.(() => {});
+    if (now) session.child!.interrupt?.()?.catch?.(() => {});
     return taken;
   }).then(() => ({ ok: true }), error => ({ ok: false, error }));
   const operation = previous.catch(() => {}).then(async () => {
@@ -107,8 +145,23 @@ export function submitReply(supervisor, payload, commit) {
 // the preceding response/delivery, preserving repeated words and write order.
 // `answeredThrough` is the newest reply a finished run settled, which may have
 // spoken by a rewrite rather than a result.
-export function queuedReplyText(item, history, delivered) {
- const pending=[];
+export interface QueuedItem {
+  answer?: string | null;
+  answeredThrough?: number;
+  wrote?: { answer?: { ts?: number; source?: string; from?: string } };
+  [key: string]: unknown;
+}
+
+export interface QueuedLine {
+  ts: number;
+  heartbeat?: unknown;
+  release?: unknown;
+  source?: string;
+  patch?: { result?: unknown; answer?: unknown; from?: { name?: string } };
+}
+
+export function queuedReplyText(item: QueuedItem, history: QueuedLine[], delivered: (candidate: QueuedItem) => boolean) {
+ const pending: { answer: string; from: string | null | undefined }[]=[];
  const latestTs=item.wrote?.answer?.ts;
  const settled=item.answeredThrough??0;
  for(let i=history.length-1;i>=0;i--){
@@ -133,11 +186,11 @@ export function queuedReplyText(item, history, delivered) {
  return pending.map((p)=>(p.from?framedTeammate(p.from,p.answer):`The person wrote:\n\n${p.answer}`)).join('\n\n');
 }
 
-const toldNameOf=(item)=>(item.wrote?.answer?.source==='system'?item.wrote.answer.from:null);
+const toldNameOf=(item: QueuedItem)=>(item.wrote?.answer?.source==='system'?item.wrote.answer.from:null);
 
 // A teammate's words, as a turn reads them. A hand-off from a teammate is work
 // to do, not the person's yes to anything.
-export function framedTeammate(name,text){
+export function framedTeammate<T>(name: string | null | undefined,text: T): T | string{
  if(!name)return text;
  return `${name}, a teammate (not the person), wrote this to you:\n\n${String(text).split('\n').map((l)=>`> ${l}`).join('\n')}`;
 }

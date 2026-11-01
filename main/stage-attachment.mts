@@ -15,7 +15,7 @@ const SIPS_MS = 30_000;
  * Answers `{ path }`, and `name` too when the file was turned into another
  * format, which is the name it goes on under.
  */
-export async function stageAttachment(dir, { name, dataBase64, srcPath } = {}, { turn = turnIntoPicture } = {}) {
+export async function stageAttachment(dir: string, { name, dataBase64, srcPath }: { name?: string; dataBase64?: string; srcPath?: string } = {}, { turn = turnIntoPicture }: { turn?: (file: string) => Promise<string | null> | string | null } = {}): Promise<{ path: string; name?: string }> {
   fs.mkdirSync(dir, { recursive: true });
   // Sweep on the way in rather than on a timer: an abandoned paste is only
   // ever discovered by the next one, and a week is longer than any draft has
@@ -51,7 +51,7 @@ export async function stageAttachment(dir, { name, dataBase64, srcPath } = {}, {
  * and answers the new file's path. Null off a Mac, for any other file, or
  * when sips fails or writes nothing.
  */
-export async function turnIntoPicture(file, { platform = process.platform, run = sips } = {}) {
+export async function turnIntoPicture(file: string, { platform = process.platform, run = sips }: { platform?: string; run?: (args: string[]) => Promise<void> } = {}) {
   const as = turnedName(path.basename(file));
   if (!as || platform !== 'darwin') return null;
   const out = path.join(path.dirname(file), as);
@@ -63,6 +63,6 @@ export async function turnIntoPicture(file, { platform = process.platform, run =
   }
 }
 
-const sips = (args) => new Promise((resolve, reject) => {
+const sips = (args: string[]) => new Promise<void>((resolve, reject) => {
   execFile('/usr/bin/sips', args, { timeout: SIPS_MS }, (err) => (err ? reject(err) : resolve()));
 });

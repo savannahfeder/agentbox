@@ -6,8 +6,99 @@ import {commandRunning} from '../shared/terminal-state.mjs';
 import {loginShell} from './shell-path.mjs';
 import {loadPty} from './pty.mts';
 const LIMIT=262144;
-export function terminalEnv(source=process.env){
-  const env={...source,TERM:'xterm-256color',COLORTERM:'truecolor'};
+
+/** The part of node-pty's terminal that the shells here use. */
+export interface TerminalPty {
+  pid: number;
+  process?: string;
+  kill(signal?: string): void;
+  write(data: string): void;
+  resize(cols: number, rows: number): void;
+  onData(listener: (data: string) => void): unknown;
+  onExit(listener: (event: { exitCode: number }) => void): unknown;
+}
+
+export type PtySpawn = (file: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; cols: number; rows: number; name: string }) => TerminalPty;
+
+/** One shell and everything held for its panel. */
+export interface TerminalSession {
+  token: string;
+  pty: TerminalPty;
+  cwd: string;
+  buffer: string;
+  offset: number;
+  exitCode: number | null;
+  exited: boolean;
+  exitPromise: Promise<void>;
+  lastReadAt: number;
+  waiters: Set<() => void>;
+  seenTo?: number;
+  waking?: boolean;
+}
+
+/** What a read answers. */
+export interface TerminalState {
+  token: string;
+  cwd: string;
+  data: string;
+  offset: number;
+  truncated: boolean;
+  exited: boolean;
+  exitCode: number | null;
+  process: string;
+  live?: true;
+}
+
+/** Where, and optionally as what, a terminal opens. A bare string is just the folder. */
+export interface TerminalPlaceSpec {
+  cwd: string;
+  notice?: string;
+  command?: { file?: string; args?: string[]; env?: NodeJS.ProcessEnv };
+  shell?: string;
+  env?: NodeJS.ProcessEnv;
+}
+export type TerminalPlace = string | TerminalPlaceSpec;
+type NoPlaceFields = { [K in keyof TerminalPlaceSpec]?: undefined };
+
+export interface TaskTerminalsOptions {
+  spawn?: PtySpawn;
+  resolve?: (key: string) => TerminalPlace;
+  disposeProcess?: (pty: TerminalPty) => void;
+  env?: NodeJS.ProcessEnv;
+  shell?: string;
+  idleMs?: number;
+  sweepMs?: number;
+  now?: () => number;
+  readPressure?: (() => Promise<string>) | null;
+  watchedMs?: number;
+}
+
+export interface TerminalListing {
+  key: string;
+  busy: boolean;
+  exited: boolean;
+  unread: boolean;
+  lastReadAt: number;
+  cwd: string;
+  pid: number;
+}
+
+export interface TerminalPlaceArgs {
+  store: {
+    listItems(): { id: string; product: string }[];
+    listProducts(): { slug: string; repoPath?: string; dir?: string }[];
+  };
+  supervisor: {
+    _liveSessions?: Record<string, { product?: string; cwd?: string | null } | undefined>;
+    _rowSessions?: Record<string, { product?: string; cwd?: string | null } | undefined>;
+  };
+  product: string;
+  id: string;
+  agent?: { cwd?: string } | null;
+}
+
+export function terminalEnv(source: NodeJS.ProcessEnv=process.env): NodeJS.ProcessEnv{
+  const env: NodeJS.ProcessEnv={...source,TERM:'xterm-256color',COLORTERM:'truecolor'};
   // CLAUDE_SECURESTORAGE_CONFIG_DIR would save a sign-in typed here into another account's keychain slot.
   for(const key of Object.keys(env)) if(/^(ANTHROPIC_|OPENAI_API_KEY$|CLAUDE_CODE_|CLAUDECODE$|CLAUDE_PID$|CLAUDE_EFFORT$|CLAUDE_SECURESTORAGE_CONFIG_DIR$|ELECTRON_|NODE_OPTIONS$)/.test(key)) delete env[key];
   // NPM'S STAND-IN EDITOR IS NOBODY'S CHOICE. `npm start` gives everything it
@@ -25,23 +116,23 @@ export function terminalEnv(source=process.env){
    terminal opens in the project folder instead, and says so in its first line,
    because a shell quietly sitting somewhere other than the task's folder is the
    thing this file has always refused to do. */
-export function terminalPlace({store,supervisor,product,id,agent}){
+export function terminalPlace({store,supervisor,product,id,agent}: TerminalPlaceArgs){
   const item=store.listItems().find(i=>i.id===id&&i.product===product);
   if(!item&&!agent) throw Error('This task is no longer available.');
   const prod=store.listProducts().find(p=>p.slug===product);
   const rec=supervisor._liveSessions?.[id] ?? supervisor._rowSessions?.[id];
-  const isDir=p=>!!p&&fs.existsSync(p)&&fs.statSync(p).isDirectory();
+  const isDir=(p: string|null|undefined)=>!!p&&fs.existsSync(p)&&fs.statSync(p).isDirectory();
   const own=agent?.cwd ?? (rec?.product===product?rec.cwd:null);
   const cwd=[own,prod?.repoPath,prod?.dir].find(isDir);
   if(!cwd) throw Error('This task’s working folder is unavailable. Restore it or update the project folder.');
   const notice=own&&cwd!==own?`This task’s own folder is gone, usually because its work was merged. Opened in the project folder, ${cwd}.`:undefined;
   return {cwd,notice};
 }
-export function terminalFolder(args){return terminalPlace(args).cwd;}
+export function terminalFolder(args: TerminalPlaceArgs){return terminalPlace(args).cwd;}
 // Enumerate only descendants of our own shell, including background process
 // groups. Kill children before shell; closing a pane never calls this.
-export function disposeTerminalProcess(pty){
-  const descendants=[];
+export function disposeTerminalProcess(pty: Pick<TerminalPty,'pid'|'kill'>){
+  const descendants: number[]=[];
   try{
     const rows=execFileSync('/bin/ps',['-axo','pid=,ppid='],{encoding:'utf8',timeout:2000}).trim().split('\n').map(s=>s.trim().split(/\s+/).map(Number));
     const parents=new Set([pty.pid]);
@@ -98,7 +189,7 @@ const KEPT_SHELLS=40;
 /*
  * THE END OF A SCREEN, CUT AT A LINE. Cutting mid-line would start the replay
    halfway through a word or an escape sequence. */
-function keptScreen(buffer){
+function keptScreen(buffer: string){
   if(buffer.length<=KEPT_SCREEN)return buffer;
   const tail=buffer.slice(-KEPT_SCREEN);
   const line=tail.indexOf('\n');
@@ -122,8 +213,20 @@ export const ENDED={
 // While memory is critical, a terminal looked at this recently is still in use.
 const WATCHED_MS=600000;
 export class TaskTerminals {
-  constructor({spawn,resolve,disposeProcess=disposeTerminalProcess,env=terminalEnv(),shell=loginShell(),idleMs=IDLE_MS,sweepMs=SWEEP_MS,now=()=>Date.now(),readPressure=null,watchedMs=WATCHED_MS}={}){
-    this.spawn=spawn??((...args)=>loadPty().spawn(...args));this.resolve=resolve;this.disposeProcess=disposeProcess;this.env=env;this.shell=shell;this.sessions=new Map();
+  declare spawn: PtySpawn;
+  declare resolve: ((key: string) => TerminalPlace) | undefined;
+  declare disposeProcess: (pty: TerminalPty) => void;
+  declare env: NodeJS.ProcessEnv;
+  declare shell: string;
+  declare sessions: Map<string, TerminalSession>;
+  declare idleMs: number;
+  declare now: () => number;
+  declare readPressure: (() => Promise<string>) | null;
+  declare watchedMs: number;
+  declare reaped: Map<string, { why: string; screen: string }>;
+  declare timer: ReturnType<typeof setInterval> | null | undefined;
+  constructor({spawn,resolve,disposeProcess=disposeTerminalProcess,env=terminalEnv(),shell=loginShell(),idleMs=IDLE_MS,sweepMs=SWEEP_MS,now=()=>Date.now(),readPressure=null,watchedMs=WATCHED_MS}: TaskTerminalsOptions={}){
+    this.spawn=spawn??((...args: Parameters<PtySpawn>)=>loadPty().spawn(...args));this.resolve=resolve;this.disposeProcess=disposeProcess;this.env=env;this.shell=shell;this.sessions=new Map();
     this.idleMs=idleMs;this.now=now;this.readPressure=readPressure;this.watchedMs=watchedMs;
     // Keys whose shell this class ended on its own, and WHY. The next open on
     // one says so rather than handing her a blank screen where her scrollback
@@ -143,19 +246,19 @@ export class TaskTerminals {
      getter onto a real process that may have gone between the sweep deciding to
      look and the kernel answering; a throw there must read as idle-and-dead
      rather than take the sweep down with it. */
-  busy(session){
+  busy(session: TerminalSession){
     if(session.exited)return false;
     try{return commandRunning(session.pty.process||'Shell',false);}catch{return false;}
   }
   // Output past the last byte a read handed to the panel.
-  unread(session){return session.offset+session.buffer.length>(session.seenTo??0);}
+  unread(session: TerminalSession){return session.offset+session.buffer.length>(session.seenTo??0);}
   /*
    * THE ONE THE CAP TAKES: one she has read everything in before one she has
      not, then least recently watched, and never a busy one. Null means every
      slot is genuinely working, which is the only case left where she is told
      no. */
   oldestIdle(){
-    let pick=null,pickUnread=true,at=Infinity;
+    let pick: string|null=null,pickUnread=true,at=Infinity;
     for(const [key,s] of this.sessions){
       if(this.busy(s))continue;
       const unread=this.unread(s),seen=s.lastReadAt??0;
@@ -167,13 +270,13 @@ export class TaskTerminals {
    * THE APP ENDS A SHELL, AND KEEPS WHAT IT SAID. Only these two paths keep the
      screen: when she presses End shell herself, `close` is called directly and
      nothing comes back, because she chose to throw it away. */
-  retire(key,why){
+  retire(key: string,why: string){
     const s=this.sessions.get(key);
     const screen=s?keptScreen(s.buffer):'';
     this.close(key);
     this.reaped.delete(key);
     this.reaped.set(key,{why,screen});
-    while(this.reaped.size>KEPT_SHELLS)this.reaped.delete(this.reaped.keys().next().value);
+    while(this.reaped.size>KEPT_SHELLS)this.reaped.delete(this.reaped.keys().next().value!);
   }
   sweepIdle(){
     const cutoff=this.now()-this.idleMs;
@@ -183,8 +286,8 @@ export class TaskTerminals {
       this.retire(key,'The previous shell here was closed after an hour idle.');
     }
   }
-  end(key,why){if(this.sessions.has(key))this.retire(key,why);}
-  list(){
+  end(key: string,why: string){if(this.sessions.has(key))this.retire(key,why);}
+  list(): TerminalListing[]{
     return [...this.sessions].map(([key,s])=>({key,busy:this.busy(s),exited:s.exited,unread:this.unread(s),lastReadAt:s.lastReadAt??0,cwd:s.cwd,pid:s.pty.pid}));
   }
   /*
@@ -197,7 +300,7 @@ export class TaskTerminals {
     let pressure='normal';
     try{pressure=await this.readPressure();}catch{}
     if(pressure!=='critical')return [];
-    const cutoff=this.now()-this.watchedMs,idle=[];let busy=null,at=Infinity;
+    const cutoff=this.now()-this.watchedMs,idle: string[]=[];let busy: string|null=null,at=Infinity;
     for(const [key,s] of this.sessions){
       if(s.exited||(s.lastReadAt??0)>cutoff)continue;
       if(!this.busy(s)){idle.push(key);continue;}
@@ -209,7 +312,7 @@ export class TaskTerminals {
   }
   // `given` is where to open it when the caller has already worked that out:
   // the terminal host (./terminal-host.mts) cannot read the store.
-  open(key,given){
+  open(key: string,given?: TerminalPlace){
     if(this.sessions.has(key))return this.read(key,0);
     if(this.sessions.size>=MAX_TERMINALS){
       /*
@@ -223,12 +326,12 @@ export class TaskTerminals {
       if(victim===null)throw Error('20 terminals are open and every one of them is running something. Stop one of those commands before opening another terminal.');
       this.retire(victim,'This shell was closed to make room for a newer terminal.');
     }
-    const place=given??this.resolve(key);
+    const place=(given??this.resolve!(key)) as (string & NoPlaceFields)|TerminalPlaceSpec;
     const cwd=typeof place==='string'?place:place.cwd;
     const command=place?.command;
     const pty=this.spawn(command?.file??place?.shell??this.shell,command?.args??['-l'],{cwd,env:{...(place?.env??this.env),...command?.env},cols:80,rows:24,name:'xterm-256color'});
-    let resolveExit;const exitPromise=new Promise(resolve=>{resolveExit=resolve;});
-    const session={token:randomUUID(),pty,cwd,buffer:'',offset:0,exitCode:null,exited:false,exitPromise,lastReadAt:this.now(),waiters:new Set()};this.sessions.set(key,session);
+    let resolveExit: () => void;const exitPromise=new Promise<void>(resolve=>{resolveExit=resolve;});
+    const session: TerminalSession={token:randomUUID(),pty,cwd,buffer:'',offset:0,exitCode:null,exited:false,exitPromise,lastReadAt:this.now(),waiters:new Set()};this.sessions.set(key,session);
     /*
      * AND IT SAYS WHAT HAPPENED TO THE LAST ONE. Without this line, reopening a
        terminal the app tidied away looks exactly like the app losing her
@@ -241,14 +344,16 @@ export class TaskTerminals {
       session.buffer=`${old}\x1b[2m[${gone.why}${old?' Its output is above.':''} This is a new one.]\x1b[0m\r\n`;
     }
     if(place?.notice)session.buffer+=`\x1b[2m[${place.notice}]\x1b[0m\r\n`;
-    pty.onData(data=>{session.buffer+=data;const trim=Math.max(0,session.buffer.length-LIMIT);session.buffer=session.buffer.slice(trim);session.offset+=trim;this.wake(session);});
-    pty.onExit(({exitCode})=>{session.exited=true;session.exitCode=exitCode;resolveExit();this.wake(session);});
+    pty.onData((data: string)=>{session.buffer+=data;const trim=Math.max(0,session.buffer.length-LIMIT);session.buffer=session.buffer.slice(trim);session.offset+=trim;this.wake(session);});
+    pty.onExit(({exitCode}: {exitCode: number})=>{session.exited=true;session.exitCode=exitCode;resolveExit();this.wake(session);});
     return this.read(key,0);
   }
-  get(key){const s=this.sessions.get(key);if(!s)throw Error('Terminal session ended. Open a new terminal to continue.');return s;}
+  get(key: string){const s=this.sessions.get(key);if(!s)throw Error('Terminal session ended. Open a new terminal to continue.');return s;}
   // EVERY READ IS THE PANEL SAYING IT IS STILL THERE. This one line is the whole
   // attention signal the sweep runs on; see the note on the class.
-  read(key,offset=0,wait=0){
+  read(key: string,offset?: number,wait?: 0): TerminalState;
+  read(key: string,offset: number,wait: number): TerminalState|Promise<TerminalState>;
+  read(key: string,offset=0,wait=0): TerminalState|Promise<TerminalState>{
     const s=this.get(key);if(!Number.isSafeInteger(offset)||offset<0)throw Error('Invalid terminal cursor.');s.lastReadAt=this.now();
     const end=s.offset+s.buffer.length;
     /*
@@ -258,25 +363,25 @@ export class TaskTerminals {
        screen after she deleted them (w-16e47d0836). `live` tells the panel this
        main can wait, so it asks again at once instead of in 150ms; a main
        older than its renderer (⌘R ahead of a restart) answers without it. */
-    if(wait>0&&!s.exited&&offset>=end)return new Promise((resolve,reject)=>{
+    if(wait>0&&!s.exited&&offset>=end)return new Promise<TerminalState>((resolve,reject)=>{
       const done=()=>{clearTimeout(timer);s.waiters.delete(done);try{if(this.sessions.get(key)!==s)throw Error('Terminal session ended. Open a new terminal to continue.');resolve({...this.read(key,offset),live:true});}catch(e){reject(e);}};
       const timer=setTimeout(done,Math.min(wait,READ_WAIT_MS));
       s.waiters.add(done);
     });
     s.seenTo=end;
-    const state={token:s.token,cwd:s.cwd,data:s.buffer.slice(Math.max(0,offset-s.offset)),offset:end,truncated:offset<s.offset,exited:s.exited,exitCode:s.exitCode,process:s.exited?'Exited':s.pty.process||'Shell'};
+    const state: TerminalState={token:s.token,cwd:s.cwd,data:s.buffer.slice(Math.max(0,offset-s.offset)),offset:end,truncated:offset<s.offset,exited:s.exited,exitCode:s.exitCode,process:s.exited?'Exited':s.pty.process||'Shell'};
     return wait>0?{...state,live:true}:state;
   }
   // Answers every waiting read. Deferred a turn so the pieces of one echo the
   // pty hands over back to back go out as one answer.
-  wake(s){if(!s.waiters.size||s.waking)return;s.waking=true;setImmediate(()=>{s.waking=false;for(const done of [...s.waiters])done();});}
-  write(key,data){const s=this.get(key);if(s.exited)throw Error('This shell has exited. Start a new session.');if(typeof data!=='string'||data.length>65536)throw Error('Terminal input is too large. Paste at most 64 KB at a time.');s.pty.write(data);}
-  resize(key,cols,rows){if(!Number.isInteger(cols)||!Number.isInteger(rows)||cols<2||cols>500||rows<2||rows>300)throw Error('Invalid terminal size.');const s=this.get(key);if(!s.exited)s.pty.resize(cols,rows);}
-  close(key){const s=this.sessions.get(key);if(s){if(!s.exited)this.disposeProcess(s.pty);this.sessions.delete(key);for(const done of [...s.waiters])done();}}
+  wake(s: TerminalSession){if(!s.waiters.size||s.waking)return;s.waking=true;setImmediate(()=>{s.waking=false;for(const done of [...s.waiters])done();});}
+  write(key: string,data: unknown){const s=this.get(key);if(s.exited)throw Error('This shell has exited. Start a new session.');if(typeof data!=='string'||data.length>65536)throw Error('Terminal input is too large. Paste at most 64 KB at a time.');s.pty.write(data);}
+  resize(key: string,cols: number,rows: number){if(!Number.isInteger(cols)||!Number.isInteger(rows)||cols<2||cols>500||rows<2||rows>300)throw Error('Invalid terminal size.');const s=this.get(key);if(!s.exited)s.pty.resize(cols,rows);}
+  close(key: string){const s=this.sessions.get(key);if(s){if(!s.exited)this.disposeProcess(s.pty);this.sessions.delete(key);for(const done of [...s.waiters])done();}}
   async shutdown(){
     const exits=[...this.sessions.values()].map(s=>s.exitPromise);
     this.dispose();
-    let timer;
+    let timer: ReturnType<typeof setTimeout>|undefined;
     await Promise.race([Promise.all(exits),new Promise(resolve=>{timer=setTimeout(resolve,2000);})]);
     clearTimeout(timer);
     await new Promise(resolve=>setImmediate(resolve));

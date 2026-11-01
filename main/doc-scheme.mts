@@ -51,7 +51,7 @@ export { DOC_SCHEME, DOC_SCHEMES };
 export const DOC_HOST = 'file';
 
 /** The url the pane points its frame at, for a file already resolved on disk. */
-export function docUrl(file) {
+export function docUrl(file: unknown): string | null {
   if (typeof file !== 'string' || !path.isAbsolute(file)) return null;
   // Each segment on its own: encodeURIComponent would eat the separators, and
   // encodeURI would leave '#' and '?' in a filename to be read as url syntax.
@@ -60,11 +60,11 @@ export function docUrl(file) {
 }
 
 /** The file a request under this scheme is asking for, or null if it is not one. */
-export function docPath(url) {
-  let parsed;
+export function docPath(url: unknown): string | null {
+  let parsed: URL;
   try { parsed = new URL(String(url)); } catch { return null; }
   if (!isScheme(DOC_SCHEMES, parsed.protocol)) return null;
-  let file;
+  let file: string;
   try { file = decodeURIComponent(parsed.pathname); } catch { return null; }
   if (!file.startsWith('/')) return null;
   // The url is the only thing between a page and the disk, so a climb written
@@ -74,7 +74,7 @@ export function docPath(url) {
 }
 
 /** Is `file` inside `dir`, without /a/bc counting as inside /a/b. */
-function inside(dir, file) {
+function inside(dir: string | null | undefined, file: string | null | undefined): boolean {
   if (!dir || !file) return false;
   const d = path.resolve(dir);
   const f = path.resolve(file);
@@ -90,13 +90,16 @@ function inside(dir, file) {
  * for real rather than asserted against the source.
  */
 export class DocGrants {
+  declare limit: number;
+  declare roots: string[];
+
   constructor(limit = 8) {
     this.limit = limit;
     this.roots = [];
   }
 
   /** Open this file, and the folders that come with it, to the scheme. */
-  grant(file, roots = []) {
+  grant(file: unknown, roots: string[] = []): void {
     if (typeof file !== 'string' || !path.isAbsolute(file)) return;
     const add = [path.dirname(file), ...roots.filter((r) => typeof r === 'string' && r)];
     for (const root of add) {
@@ -108,7 +111,8 @@ export class DocGrants {
   }
 
   /** May the scheme read this path. */
-  allows(file) {
+  allows(file: unknown): boolean {
+
     if (typeof file !== 'string' || !path.isAbsolute(file)) return false;
     return this.roots.some((root) => inside(root, file));
   }

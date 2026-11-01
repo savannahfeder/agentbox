@@ -39,12 +39,32 @@
 
 import { execFileSync } from 'node:child_process';
 import { pressureFrom } from './memory-gate.mts';
+import type { Pressure, PressureReading } from './memory-gate.mts';
+
+export interface PressureSample extends PressureReading { at: number }
+
+export interface StartDecisionInput {
+  on?: boolean;
+  reading?: PressureSample | null;
+  recent?: PressureSample[];
+  now: number;
+  running: number;
+  urgent?: boolean;
+  asked?: boolean;
+  swap?: boolean;
+  lastStartAt?: number;
+  heldSince?: number | null;
+  roomy?: number;
+  staleMs?: number;
+  maxHoldMs?: number;
+  settleMs?: number;
+}
 
 /** One reading, synchronously, for the moment before a restart brings the
  *  fleet back. Nulls (so no hold) when it cannot be read. */
-export function readMacPressureNow() {
-  let level = null;
-  let freePct = null;
+export function readMacPressureNow(): PressureSample {
+  let level: number | null = null;
+  let freePct: number | null = null;
   try {
     const out = execFileSync('/usr/sbin/sysctl', ['-n', 'kern.memorystatus_vm_pressure_level', 'kern.memorystatus_level'],
       { timeout: 2_000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
@@ -60,13 +80,13 @@ export const MAX_HOLD_MS = 10 * 60_000;
 /** How far back a short reading still holds starts after a normal one. */
 export const SETTLE_MS = 3 * 60_000;
 
-const RANK = { normal: 0, tight: 1, critical: 2 };
+const RANK: Record<Pressure, number> = { normal: 0, tight: 1, critical: 2 };
 /** `kern.memorystatus_vm_pressure_level`'s warn; 1 is normal and 4 critical. */
 const WARN_LEVEL = 2;
 
 /** The worst of the readings stamped inside `windowMs` of `now`. Pure. */
-export function worstPressure(readings, now, windowMs = SETTLE_MS) {
-  let worst = 'normal';
+export function worstPressure(readings: (PressureSample | null | undefined)[] | null | undefined, now: number, windowMs = SETTLE_MS): Pressure {
+  let worst: Pressure = 'normal';
   for (const r of readings ?? []) {
     if (!r || !(Math.abs(now - Number(r.at)) <= windowMs)) continue;
     if (!Number.isFinite(r.level) && !Number.isFinite(r.freePct)) continue;
@@ -89,7 +109,7 @@ export function startDecision({
   urgent = false, asked = false, swap = false,
   lastStartAt = 0, heldSince = null, roomy = 0,
   staleMs = STALE_MS, maxHoldMs = MAX_HOLD_MS, settleMs = SETTLE_MS,
-}) {
+}: StartDecisionInput): { start: boolean; why: string } {
   if (!on) return { start: true, why: 'off' };
   if (!(running > 0)) return { start: true, why: 'nothing-running' };
   if (swap) return { start: true, why: 'swap' };

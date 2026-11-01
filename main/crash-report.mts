@@ -25,18 +25,39 @@ import { NAME, nameSlug } from '../shared/product-name.mjs';
 
 const MAX_KEPT = 50;
 
-let ctx = null;          // { home, username, appDir, dir, version, startedAt }
-let transport = null;    // set once she picks where reports go
-let installId = null;
+export interface CrashContext {
+  home: string;
+  username: string | null;
+  appDir: string;
+  dir: string;
+  version: string;
+  startedAt: number;
+}
+
+export type CrashPayload = {
+  v: number;
+  kind: string;
+  ts: string;
+  installId: string | null;
+  app: { name: string; version: string };
+  os: { platform: string; release: string; arch: string };
+  [key: string]: unknown;
+};
+
+export type CrashTransport = (payload: CrashPayload) => unknown;
+
+let ctx: CrashContext | null = null;          // { home, username, appDir, dir, version, startedAt }
+let transport: CrashTransport | null = null;    // set once she picks where reports go
+let installId: string | null = null;
 let fired = false;       // one hard crash is one report, never a loop
 
 // The same random per-install id the approved counts use, and it now lives in
 // ONE file (`shared/install-id.mjs`) because two copies of "it is not a
 // fingerprint" is one copy too many. No account, no email, no machine id.
 
-export function report(kind, err, extra = {}) {
+export function report(kind: string, err: unknown, extra: Record<string, unknown> = {}): string | null {
   if (!ctx) return null;
-  const payload = {
+  const payload: CrashPayload = {
     v: 1,
     kind,                                   // where it died, not what was on screen
     ts: new Date().toISOString(),
@@ -73,10 +94,10 @@ export function report(kind, err, extra = {}) {
 // a worse app.
 const DIES_REPORTING = new Set(['main-uncaught']);
 
-function write(payload) {
+function write(payload: CrashPayload): string | null {
   try {
-    fs.mkdirSync(ctx.dir, { recursive: true });
-    const file = path.join(ctx.dir, `crash-${payload.ts.replace(/[:.]/g, '-')}-${Math.floor(Math.random() * 1e6)}.json`);
+    fs.mkdirSync(ctx!.dir, { recursive: true });
+    const file = path.join(ctx!.dir, `crash-${payload.ts.replace(/[:.]/g, '-')}-${Math.floor(Math.random() * 1e6)}.json`);
     fs.writeFileSync(file, JSON.stringify(payload, null, 2));
     prune();
     // ON DISK FIRST, ALWAYS, because this can run while the process is dying
@@ -99,25 +120,33 @@ function write(payload) {
   } catch { return null; }
 }
 
-function prune() {
+function prune(): void {
   try {
-    const files = fs.readdirSync(ctx.dir).filter((f) => f.startsWith('crash-')).sort();
+    const files = fs.readdirSync(ctx!.dir).filter((f) => f.startsWith('crash-')).sort();
     for (const f of files.slice(0, Math.max(0, files.length - MAX_KEPT))) {
-      fs.unlinkSync(path.join(ctx.dir, f));
+      fs.unlinkSync(path.join(ctx!.dir, f));
     }
   } catch {}
 }
 
 // Her pick on lands here and nowhere else.
-export function setTransport(fn) { transport = typeof fn === 'function' ? fn : null; }
+export function setTransport(fn?: CrashTransport | null): void { transport = typeof fn === 'function' ? fn : null; }
 
-export function pending() {
+export function pending(): string[] {
   try {
-    return fs.readdirSync(ctx.dir).filter((f) => f.startsWith('crash-')).map((f) => path.join(ctx.dir, f));
+    return fs.readdirSync(ctx!.dir).filter((f) => f.startsWith('crash-')).map((f) => path.join(ctx!.dir, f));
   } catch { return []; }
 }
 
-export function installCrashReports({ app, appDir, dir, version, crashReporter } = {}) {
+export interface CrashReportOptions {
+  app?: { on(event: string, listener: (...args: never[]) => void): unknown } | null;
+  appDir?: string;
+  dir?: string;
+  version?: string;
+  crashReporter?: { start(options: Record<string, unknown>): unknown } | null;
+}
+
+export function installCrashReports({ app, appDir, dir, version, crashReporter }: CrashReportOptions = {}) {
   ctx = {
     home: os.homedir(),
     username: (() => { try { return os.userInfo().username; } catch { return null; } })(),
@@ -139,7 +168,7 @@ export function installCrashReports({ app, appDir, dir, version, crashReporter }
     try { crashReporter.start({ uploadToServer: false, compress: true, ignoreSystemCrashHandler: false }); } catch {}
   }
 
-  const onUncaught = (err) => {
+  const onUncaught = (err: unknown): void => {
     if (fired) return;
     fired = true;
     report('main-uncaught', err);
@@ -151,7 +180,7 @@ export function installCrashReports({ app, appDir, dir, version, crashReporter }
   };
   process.on('uncaughtException', onUncaught);
 
-  const onRejection = (reason) => {
+  const onRejection = (reason: unknown): void => {
     report('main-rejection', reason instanceof Error ? reason : new Error(String(reason)));
   };
   process.on('unhandledRejection', onRejection);
@@ -159,10 +188,10 @@ export function installCrashReports({ app, appDir, dir, version, crashReporter }
   if (app?.on) {
     // The window's process died. `details.reason` is Electron's own vocabulary
     // (`crashed`, `oom`, `killed`) and carries nothing of theirs.
-    app.on('render-process-gone', (_e, _wc, details = {}) => {
+    app.on('render-process-gone', (_e: unknown, _wc: unknown, details: { reason?: unknown; exitCode?: unknown } = {}) => {
       report('renderer-gone', new Error('render process gone'), { reason: String(details.reason || 'unknown'), exitCode: Number(details.exitCode ?? -1) });
     });
-    app.on('child-process-gone', (_e, details = {}) => {
+    app.on('child-process-gone', (_e: unknown, details: { reason?: unknown; type?: unknown; exitCode?: unknown } = {}) => {
       report('child-gone', new Error('child process gone'), { reason: String(details.reason || 'unknown'), processType: String(details.type || 'unknown'), exitCode: Number(details.exitCode ?? -1) });
     });
   }
@@ -172,7 +201,8 @@ export function installCrashReports({ app, appDir, dir, version, crashReporter }
 // The renderer's uncaught errors arrive here over IPC. They are the ones most
 // likely to carry a task title inside the message, which is why they go through
 // exactly the same scrub as everything else and get no shortcut of their own.
-export function reportFromRenderer(payload = {}) {
+export function reportFromRenderer(payload: { name?: unknown; message?: unknown; stack?: unknown } = {}) {
+
   return report('renderer-error', {
     name: typeof payload.name === 'string' ? payload.name : 'Error',
     message: typeof payload.message === 'string' ? payload.message : 'renderer error',

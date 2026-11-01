@@ -17,13 +17,13 @@ export const CLOUD_CODEX_DEFAULT = 'full-access';
  * already has: this computer's, or the mode set on the thread itself, which
  * the cloud must not loosen.
  */
-export function cloudClaudeMode(setting, threadMode = null) {
-  if (CLAUDE_PERMISSION_MODES.includes(threadMode) || setting === CLOUD_SAME) return null;
-  return CLAUDE_PERMISSION_MODES.includes(setting) ? setting : CLOUD_CLAUDE_DEFAULT;
+export function cloudClaudeMode(setting: string | null | undefined, threadMode: string | null = null) {
+  if (CLAUDE_PERMISSION_MODES.includes(threadMode!) || setting === CLOUD_SAME) return null;
+  return CLAUDE_PERMISSION_MODES.includes(setting!) ? setting : CLOUD_CLAUDE_DEFAULT;
 }
 
 /** The Codex mode a cloud run starts in, by the same rule. */
-export function cloudCodexMode(setting, threadMode, here) {
+export function cloudCodexMode(setting: string | null | undefined, threadMode: string | null | undefined, here: string | null | undefined) {
   if (isCodexMode(threadMode)) return threadMode;
   if (setting === CLOUD_SAME) return here;
   return isCodexMode(setting) ? setting : CLOUD_CODEX_DEFAULT;
@@ -34,10 +34,10 @@ export function cloudCodexMode(setting, threadMode, here) {
  * leaves the run on this computer's mode. With no flag to replace it goes
  * first, where a list flag such as --allowedTools cannot take it as a value.
  */
-export function cloudPermissionArgs(args, mode) {
+export function cloudPermissionArgs(args: string[], mode: string | null | undefined) {
   if (mode == null) return args;
   if (!CLAUDE_PERMISSION_MODES.includes(mode)) throw new Error(`unknown permission mode: ${mode}`);
-  const out = [];
+  const out: string[] = [];
   let at = -1;
   for (let i = 0; i < args.length; i += 1) {
     const arg = String(args[i]);

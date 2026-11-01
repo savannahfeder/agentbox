@@ -10,6 +10,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { PROTOCOL, HOST_ALREADY_THERE, terminalHostStamp, terminalHostSocket, terminalHostSockets } from './terminal-host.mts';
 import { ENDED } from './task-terminals.mts';
+import type { TaskTerminals, TerminalListing, TerminalPlaceSpec } from './task-terminals.mts';
 import { SETTINGS_TERMINAL } from '../shared/settings-terminal.mjs';
 import { NAME } from '../shared/product-name.mjs';
 
@@ -20,7 +21,38 @@ export const CLOSE_GRACE_MS = 2 * 60_000;
 // A host that would not start is not tried again for this long.
 const RETRY_MS = 5 * 60_000;
 
-export function launchTerminalHost(sockPath, { logFile = null } = {}) {
+/** Where a terminal's calls go: a host over a socket, or the app itself. */
+export interface TerminalRoute {
+  local?: boolean;
+  closed?: boolean;
+  call(op: string, ...args: unknown[]): Promise<unknown>;
+}
+
+export interface HostConnection extends TerminalRoute {
+  sockPath: string;
+  closed: boolean;
+  close(): void;
+}
+
+/** What a started host process shows the app. */
+export interface HostProcess {
+  exitCode?: number | null;
+}
+
+export interface TerminalHostsOptions {
+  local: TaskTerminals;
+  stamp?: string;
+  dir?: string;
+  uid?: number;
+  launch?: (sockPath: string, options: { logFile: string | null }) => HostProcess | null | undefined;
+  connect?: (sockPath: string) => Promise<HostConnection>;
+  logFile?: string | null;
+  startMs?: number;
+  now?: () => number;
+  log?: (message: string) => void;
+}
+
+export function launchTerminalHost(sockPath: string, { logFile = null }: { logFile?: string | null } = {}) {
   const out = logFile ? fs.openSync(logFile, 'a') : 'ignore';
   try {
     const proc = spawn(process.execPath, [fileURLToPath(new URL('./terminal-host.mts', import.meta.url)), sockPath], {
@@ -37,19 +69,19 @@ export function launchTerminalHost(sockPath, { logFile = null } = {}) {
 }
 
 /** One socket to one host, every call with a deadline that ends it. */
-export function connectTerminalHost(sockPath, { connectMs = 2_000, callMs = 5_000 } = {}) {
-  return new Promise((resolve, reject) => {
+export function connectTerminalHost(sockPath: string, { connectMs = 2_000, callMs = 5_000 }: { connectMs?: number; callMs?: number } = {}): Promise<HostConnection> {
+  return new Promise<HostConnection>((resolve, reject) => {
     const sock = net.connect(sockPath);
-    const pending = new Map();
+    const pending = new Map<number, { res: (value: unknown) => void; rej: (reason: Error) => void; timer: ReturnType<typeof setTimeout> }>();
     let next = 1;
     let buf = '';
-    const conn = {
+    const conn: HostConnection = {
       sockPath,
       closed: false,
-      call(op, ...args) {
+      call(op: string, ...args: unknown[]) {
         if (conn.closed) return Promise.reject(new Error(ENDED_SESSION));
         const id = next++;
-        return new Promise((res, rej) => {
+        return new Promise<unknown>((res, rej) => {
           const timer = setTimeout(() => { pending.delete(id); rej(new Error('The terminal did not answer.')); }, callMs);
           pending.set(id, { res, rej, timer });
           sock.write(`${JSON.stringify({ id, op, args })}\n`);
@@ -62,7 +94,7 @@ export function connectTerminalHost(sockPath, { connectMs = 2_000, callMs = 5_00
     sock.once('connect', () => { clearTimeout(timer); resolve(conn); });
     sock.on('data', (d) => {
       buf += d;
-      let n;
+      let n: number;
       while ((n = buf.indexOf('\n')) >= 0) {
         let msg = null;
         try { msg = JSON.parse(buf.slice(0, n)); } catch { /* not ours */ }
@@ -88,7 +120,7 @@ export function connectTerminalHost(sockPath, { connectMs = 2_000, callMs = 5_00
  * it cannot find may be another store's, and the sign-in terminal and an
  * outside agent's belong to no task.
  */
-export const taskClosed = (store) => (key) => {
+export const taskClosed = (store: { readItem?: (product: string, id: string) => { status?: string } | null | undefined }) => (key: string) => {
   const { product, id } = JSON.parse(key);
   if (product === SETTINGS_TERMINAL.product || String(id).startsWith('agent:')) return false;
   return store.readItem?.(product, id)?.status === 'done';
@@ -98,21 +130,39 @@ export const taskClosed = (store) => (key) => {
  * Terminals whose task has been closed for `graceMs` on every look since. `seen`
  * carries when each was first seen closed from one look to the next.
  */
-export function closedTerminals(list, isClosed, seen, now, graceMs = CLOSE_GRACE_MS) {
+export function closedTerminals(list: { key: string }[], isClosed: (key: string) => unknown, seen: Map<string, number>, now: number, graceMs = CLOSE_GRACE_MS): string[] {
   const keys = new Set(list.map((s) => s.key));
   for (const key of [...seen.keys()]) if (!keys.has(key)) seen.delete(key);
-  const due = [];
+  const due: string[] = [];
   for (const { key } of list) {
     let closed = false;
     try { closed = !!isClosed(key); } catch { closed = false; }
     if (!closed) { seen.delete(key); continue; }
     if (!seen.has(key)) seen.set(key, now);
-    if (now - seen.get(key) >= graceMs) due.push(key);
+    if (now - seen.get(key)! >= graceMs) due.push(key);
   }
   return due;
 }
 
 export class TerminalHosts {
+  declare local: TaskTerminals;
+  declare stamp: string;
+  declare dir: string;
+  declare uid: number;
+  declare launch: NonNullable<TerminalHostsOptions['launch']>;
+  declare connect: NonNullable<TerminalHostsOptions['connect']>;
+  declare logFile: string | null;
+  declare startMs: number;
+  declare now: () => number;
+  declare log: (message: string) => void;
+  declare ownPath: string;
+  declare conns: Map<string, HostConnection>;
+  declare where: Map<string, TerminalRoute>;
+  declare closedSeen: Map<string, number>;
+  declare failedAt: number | null;
+  declare failure: string | null;
+  declare inApp: TerminalRoute;
+  declare discovered: Promise<void> | undefined;
   /**
    * `local` is the app's own TaskTerminals, for when no host will start.
    */
@@ -127,7 +177,7 @@ export class TerminalHosts {
     startMs = 8_000,
     now = () => Date.now(),
     log = () => {},
-  }) {
+  }: TerminalHostsOptions) {
     Object.assign(this, { local, stamp, dir, uid, launch, connect, logFile, startMs, now, log });
     this.ownPath = terminalHostSocket({ stamp, dir, uid });
     this.conns = new Map();
@@ -136,19 +186,19 @@ export class TerminalHosts {
     this.failedAt = null;
     this.failure = null;
     const t = local;
-    this.inApp = { local: true, call: async (op, ...args) => t[op](...args) };
+    this.inApp = { local: true, call: async (op: string, ...args: unknown[]) => (t[op as keyof TaskTerminals] as (...args: unknown[]) => unknown)(...args) };
   }
 
-  async _hello(sockPath) {
+  async _hello(sockPath: string): Promise<HostConnection | null> {
     const had = this.conns.get(sockPath);
     if (had && !had.closed) return had;
     // Every open hands over this user's environment, so never to a socket
     // somebody else put at the name.
     try { if (process.getuid && fs.statSync(sockPath).uid !== process.getuid()) return null; } catch { return null; }
-    let conn;
+    let conn: HostConnection;
     try { conn = await this.connect(sockPath); } catch { return null; }
     try {
-      const hi = await conn.call('hello');
+      const hi = await conn.call('hello') as { protocol?: number } | null | undefined;
       if (hi?.protocol !== PROTOCOL) { conn.close(); return null; }
     } catch { conn.close(); return null; }
     this.conns.set(sockPath, conn);
@@ -165,45 +215,45 @@ export class TerminalHosts {
   }
 
   /** The host made of this app's code, started if there is none. */
-  async _mine() {
+  async _mine(): Promise<HostConnection> {
     const there = await this._hello(this.ownPath);
     if (there) return there;
-    if (this.failedAt !== null && this.now() - this.failedAt < RETRY_MS) throw new Error(this.failure);
-    let proc;
-    try { proc = this.launch(this.ownPath, { logFile: this.logFile }); } catch (err) { return this._failed(err.message); }
+    if (this.failedAt !== null && this.now() - this.failedAt < RETRY_MS) throw new Error(this.failure!);
+    let proc: HostProcess | null | undefined;
+    try { proc = this.launch(this.ownPath, { logFile: this.logFile }); } catch (err) { return this._failed((err as Error).message); }
     const end = Date.now() + this.startMs;
     while (Date.now() < end) {
       await new Promise((r) => setTimeout(r, 100));
       const conn = await this._hello(this.ownPath);
       if (conn) { this.failedAt = null; this.failure = null; return conn; }
-      if (Number.isInteger(proc?.exitCode) && proc.exitCode !== HOST_ALREADY_THERE) return this._failed(`it exited with code ${proc.exitCode}`);
+      if (Number.isInteger(proc?.exitCode) && proc!.exitCode !== HOST_ALREADY_THERE) return this._failed(`it exited with code ${proc!.exitCode}`);
     }
     return this._failed(`no answer in ${Math.round(this.startMs / 1000)} seconds`);
   }
 
-  _failed(why) {
+  _failed(why: string): never {
     this.failedAt = this.now();
     this.failure = why;
     this.log(`terminal host: ${why}`);
     throw new Error(why);
   }
 
-  _at(key) {
+  _at(key: string): TerminalRoute {
     const at = this.where.get(key);
     if (!at || at.closed) throw new Error(ENDED_SESSION);
     return at;
   }
 
-  async open(key, place) {
+  async open(key: string, place: TerminalPlaceSpec) {
     await this.ready();
     const at = this.where.get(key);
     if (at && !at.closed && (!at.local || this.local.sessions.has(key))) {
       try { return await at.call('open', key); } catch { /* ended there: a new one below */ }
     }
     this.where.delete(key);
-    let host;
+    let host: HostConnection;
     try { host = await this._mine(); } catch (err) {
-      const notice = `This terminal ends when ${NAME} quits, because the process that keeps terminals running through a restart would not start (${err.message}).`;
+      const notice = `This terminal ends when ${NAME} quits, because the process that keeps terminals running through a restart would not start (${(err as Error).message}).`;
       const state = this.local.open(key, { ...place, notice: [place?.notice, notice].filter(Boolean).join(' ') });
       this.where.set(key, this.inApp);
       return state;
@@ -213,27 +263,27 @@ export class TerminalHosts {
     return state;
   }
 
-  read(key, offset, wait) { return this._at(key).call('read', key, offset, wait); }
-  write(key, data) { return this._at(key).call('write', key, data); }
-  resize(key, cols, rows) { return this._at(key).call('resize', key, cols, rows); }
-  async close(key) {
+  read(key: string, offset?: number, wait?: number) { return this._at(key).call('read', key, offset, wait); }
+  write(key: string, data: unknown) { return this._at(key).call('write', key, data); }
+  resize(key: string, cols: number, rows: number) { return this._at(key).call('resize', key, cols, rows); }
+  async close(key: string) {
     const at = this.where.get(key);
     this.where.delete(key);
     if (at && !at.closed) await at.call('close', key);
   }
-  async end(key, why) {
+  async end(key: string, why: string) {
     const at = this.where.get(key);
     if (at && !at.closed) await at.call('end', key, why);
   }
 
   /** Every terminal, in every host and in the app, freshly asked. */
-  async list() {
-    const out = [];
-    const answered = new Set();
+  async list(): Promise<TerminalListing[]> {
+    const out: TerminalListing[] = [];
+    const answered = new Set<TerminalRoute>();
     for (const [sockPath, conn] of this.conns) {
       if (conn.closed) { this.conns.delete(sockPath); continue; }
-      let got = [];
-      try { got = await conn.call('list'); } catch { continue; }
+      let got: TerminalListing[] = [];
+      try { got = await conn.call('list') as TerminalListing[]; } catch { continue; }
       answered.add(conn);
       // An older host with nothing left ends itself once nobody is connected.
       if (!got.length && sockPath !== this.ownPath) { conn.close(); this.conns.delete(sockPath); continue; }
@@ -248,12 +298,12 @@ export class TerminalHosts {
   }
 
   /** Whether this task has a terminal, as far as the app last knew. */
-  hasTerminal(id) {
+  hasTerminal(id: string) {
     for (const key of this.where.keys()) { try { if (JSON.parse(key).id === id) return true; } catch { /* not a task's */ } }
     return false;
   }
 
-  async endClosed(isClosed) {
+  async endClosed(isClosed: (key: string) => unknown) {
     const due = closedTerminals(await this.list(), isClosed, this.closedSeen, this.now());
     for (const key of due) { try { await this.end(key, ENDED.closed); } catch { /* gone already */ } }
     return due;

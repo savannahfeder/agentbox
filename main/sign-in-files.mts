@@ -21,12 +21,12 @@ import fs from 'node:fs';
  *  - Claude Code, a CLAUDE_CONFIG_DIR: those files inside that folder.
  *  - Codex: `auth.json` inside its CODEX_HOME.
  */
-export function signInFiles({ engine = 'claude', folder = null, home }) {
+export function signInFiles({ engine = 'claude', folder = null, home }: { engine?: string; folder?: string | null; home: string }) {
   return harnessFor(engine).signInFiles({ folder, home });
 }
 
 /** The newest modification time among them, or 0 when none can be read. */
-export function signInStamp(files, stat = fs.statSync) {
+export function signInStamp(files: string[] | null | undefined, stat: (file: string) => { mtimeMs: number } = fs.statSync) {
   let newest = 0;
   for (const f of files ?? []) {
     try { newest = Math.max(newest, stat(f).mtimeMs); } catch {}

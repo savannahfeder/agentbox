@@ -9,6 +9,7 @@
 // files one: waiting on you to Needs you, finished to Done. Nothing asks about
 // a chat first; asking rows are what the old Codex watch was removed for.
 import { productsForThread } from '../shared/codex-import.mjs';
+import type { CodexThreadLike } from '../shared/codex-import.mjs';
 import { isShared } from '../shared/team-rules.mjs';
 import { appSessionFolders } from './agent-homes.mts';
 import { outsideAgentsMode } from './settings.mts';
@@ -21,8 +22,27 @@ export const NEW_CHATS_POLL_MS = 60_000;
 export const QUIET_MS = 10 * 60_000;
 const PASS_DEADLINE_MS = 90_000;
 
-function idsWithRows(items) {
-  const ids = new Set();
+export interface NewChatThread extends CodexThreadLike { source?: string }
+
+export interface NewChatProduct {
+  slug: string;
+  repoPath?: string | null;
+  team?: { projectId?: string; sharedBy?: string | null } | null;
+}
+
+export interface NewChatsConfig { importNew?: unknown; importNewSince?: unknown }
+
+export interface NewChatsStore {
+  listProducts(): NewChatProduct[];
+  listItems(): { labels?: unknown[] }[];
+  importThreadRows(slug: string, list: NewChatThread[], opts: { now: number; land: string }): { added: number };
+  importCodexThreads(slug: string, list: NewChatThread[], opts: { now: number; land: string }): { added: number };
+}
+
+export type ReadThreads = (opts: { days: number; since: number; folders: (string | null | undefined)[]; now: number }) => Promise<NewChatThread[]> | NewChatThread[];
+
+function idsWithRows(items: { labels?: unknown[] }[] | null | undefined) {
+  const ids = new Set<string>();
   for (const item of items ?? []) {
     for (const label of item?.labels ?? []) {
       if (typeof label !== 'string') continue;
@@ -34,9 +54,19 @@ function idsWithRows(items) {
 }
 
 /** Which of `threads` come in now, grouped by the project each lands in. */
-export function newChatsToBring(threads, { products, items, since, now, isOpen = () => false, openShownLive = false }) {
+export function newChatsToBring(
+  threads: NewChatThread[] | null | undefined,
+  { products, items, since, now, isOpen = () => false, openShownLive = false }: {
+    products: NewChatProduct[];
+    items?: { labels?: unknown[] }[];
+    since: number;
+    now: number;
+    isOpen?: (t: NewChatThread) => boolean;
+    openShownLive?: boolean;
+  },
+): Map<string, NewChatThread[]> {
   const had = idsWithRows(items);
-  const bySlug = new Map();
+  const bySlug = new Map<string, NewChatThread[]>();
   for (const t of threads ?? []) {
     const id = String(t?.id ?? '').trim();
     if (!id || had.has(id)) continue;
@@ -46,13 +76,21 @@ export function newChatsToBring(threads, { products, items, since, now, isOpen =
     const slug = productsForThread(t, products)[0]?.slug;
     if (!slug) continue;
     if (!bySlug.has(slug)) bySlug.set(slug, []);
-    bySlug.get(slug).push(t);
+    bySlug.get(slug)!.push(t);
     had.add(id);
   }
   return bySlug;
 }
 
-export async function scanNewChats({ store, config, readThreads, isOpen, now = Date.now() }) {
+export interface ScanNewChatsOptions {
+  store: NewChatsStore;
+  config?: NewChatsConfig | null;
+  readThreads: ReadThreads;
+  isOpen: (t: NewChatThread) => boolean;
+  now?: number;
+}
+
+export async function scanNewChats({ store, config, readThreads, isOpen, now = Date.now() }: ScanNewChatsOptions): Promise<{ brought: number }> {
   if (config?.importNew !== true) return { brought: 0 };
   const since = Number(config.importNewSince) || now;
   // Only as far back as the switch, and never further than the import card reads.
@@ -72,22 +110,29 @@ export async function scanNewChats({ store, config, readThreads, isOpen, now = D
   return { brought };
 }
 
+export interface NewChatsTiming {
+  everyMs?: number;
+  firstDelayMs?: number;
+  deadlineMs?: number;
+  log?: (...args: unknown[]) => void;
+}
+
 export function startNewChatsWatch({
   store, config, readThreads, isOpen,
   everyMs = NEW_CHATS_POLL_MS, firstDelayMs = 30_000, deadlineMs = PASS_DEADLINE_MS, log = console.warn,
-}) {
+}: ScanNewChatsOptions & NewChatsTiming) {
   // One pass at a time, and a pass that never answers is given up on so the
   // next one still runs.
-  let running = null;
+  let running: Promise<unknown> | null = null;
   const run = () => {
     if (running) return running;
-    let timer = null;
-    const deadline = new Promise((_, reject) => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const deadline = new Promise<never>((_, reject) => {
       timer = setTimeout(() => reject(new Error(`no answer in ${Math.round(deadlineMs / 1000)}s`)), deadlineMs);
     });
     running = Promise.race([scanNewChats({ store, config, readThreads, isOpen }), deadline])
       .catch((e) => log('new chats watch:', e?.message ?? e))
-      .finally(() => { clearTimeout(timer); running = null; });
+      .finally(() => { clearTimeout(timer!); running = null; });
     return running;
   };
   const first = setTimeout(run, firstDelayMs);
@@ -99,7 +144,7 @@ export function startNewChatsWatch({
 }
 
 /** The watch as the app runs it, on the desktop (main/main.mts) and in the browser copy (bin/agentbox.mjs). */
-export function watchNewChatsFor({ store, config, supervisor, ...timing }) {
+export function watchNewChatsFor({ store, config, supervisor, ...timing }: { store: NewChatsStore; config: NewChatsConfig | null | undefined; supervisor: unknown } & NewChatsTiming) {
   return startNewChatsWatch({
     store,
     config,

@@ -22,6 +22,7 @@ import { codexChoiceToOpen, saveConfig } from './config.mjs';
 import { forgetClaudeBin, INSTALL_URL } from './claude-bin.mjs';
 import { lookAgain } from './engine-bin.mjs';
 import { AGENT_MODES } from '../shared/agents.mjs';
+import type { AgentMode } from '../shared/agents.mjs';
 import { analyticsKey, diagnosticsOn } from './analytics.mts';
 import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mjs';
 import { accountSentence, engineTroubleNote, refineCause } from '../shared/spawn-trouble.mjs';
@@ -40,6 +41,122 @@ import { CLOUD_SAME, CLOUD_CLAUDE_DEFAULT, CLOUD_CODEX_DEFAULT } from './cloud-p
 import { isPackagedElectron } from './team/session.mjs';
 import { claudeModels } from './claude-models.mjs';
 import { forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mjs';
+
+export interface SettingsConfig {
+  home?: string;
+  appDir?: string;
+  accountRoot?: string;
+  claudeBin?: string | null;
+  claudeFound?: boolean | null;
+  claudeCertain?: boolean;
+  claudeBinConfigured?: string | null;
+  claudeFrom?: string | null;
+  codexBin?: string | null;
+  codexCertain?: boolean;
+  codexBinConfigured?: string | null;
+  codexFrom?: string | null;
+  codexMode?: string | null;
+  codexModel?: string;
+  outsideAgents?: unknown;
+  sessionArgs?: string[] | null;
+  projectSessionArgs?: Record<string, string[]>;
+  projectCodexMode?: Record<string, string>;
+  projectAccounts?: Record<string, string>;
+  projectAgents?: Record<string, string[]>;
+  authProfiles?: string[] | null;
+  codexProfiles?: (string | null)[] | null;
+  autonomousProducts?: string[] | null;
+  phoneProducts?: unknown;
+  agentsAtOnce?: unknown;
+  agentsAuto?: boolean | null;
+  agentsNudge?: number;
+  planSlotsFrom?: unknown;
+  maxConcurrentSessions?: number;
+  memoryGate?: boolean | null;
+  memoryGateSlots?: number | null;
+  cleanupLeftovers?: boolean | null;
+  cloudRuns?: unknown;
+  cloudPermission?: string | null;
+  cloudCodexMode?: string | null;
+  adhdMode?: boolean | null;
+  importNew?: boolean | null;
+  cornerTag?: boolean | null;
+  activeAccount?: Record<string, string | null> | null;
+  alphaRooms?: boolean | null;
+  diagnostics?: boolean;
+  posthogKey?: unknown;
+  posthogHost?: string;
+  alphaTeammates?: boolean | null;
+  alphaMultiplayer?: boolean | null;
+  [key: string]: unknown;
+}
+
+export interface SettingsProduct {
+  slug: string;
+  name?: string;
+  dir?: string;
+  repoPath?: string | null;
+  logo?: string | null;
+  archived?: boolean;
+}
+
+export interface SettingsSession { engine?: string | null; profile?: string | null; product?: string }
+
+export interface MemoryGateReading {
+  role?: string;
+  running?: { holdsSlot?: boolean }[];
+  waiting?: unknown[];
+  pressure?: string;
+  freePct?: number;
+  counts?: { asked?: number; waited?: number; refused?: number };
+}
+
+export interface LeftoverReading {
+  leftovers?: { programs: number; kept: number; stopsAt: number }[];
+  survivors?: unknown[];
+}
+
+export interface SettingsSupervisor {
+  sessions: Map<unknown, SettingsSession>;
+  paused: boolean;
+  cloudPlan?: unknown;
+  _profileCooldown?: Record<string, number>;
+  status(): { capacity?: number; accountTrouble?: Record<string, unknown>; [fact: string]: unknown };
+  readStanding(): string;
+  readMessageRules(): string;
+  readProjectInstructions(slug: string): string;
+  projectSessionArgs(slug: string): string[] | null | undefined;
+  _projectProfile?(slug: string): string | null;
+  _profilesFor?(engine: string): string[];
+  _accountKey(engine: string | null | undefined, profile: string | null | undefined): string;
+  engineChoices(): unknown[];
+  engineFacts(): { workspace: string; [fact: string]: unknown };
+  engineTrouble(engine: string): { cause: string } | null | undefined;
+  _codexHome(): string;
+  _codexOfferHomes(): string[];
+  _codexWorkspaceModel(): string | null;
+  _codexProfiles(): string[];
+  _codexProfileHome(profile: string): string;
+  memoryGateStatus?(): MemoryGateReading | null | undefined;
+  startHoldStatus?(): { holding?: boolean } | null | undefined;
+  leftoverStatus?(): LeftoverReading | null | undefined;
+  strayFolders?(): { project?: string; path: string }[] | null | undefined;
+  onChange?(): void;
+  wake?(): void;
+  accountChosen?(engine: string, profile: string | null): void;
+  setMemoryGate?(on: boolean): Promise<unknown> | undefined;
+  setLeftoverCleanup?(on: boolean): Promise<unknown> | undefined;
+}
+
+export interface SettingsStore {
+  listProducts(options?: { includeArchived?: boolean }): SettingsProduct[];
+}
+
+export interface SettingsDeps {
+  config: SettingsConfig;
+  supervisor: SettingsSupervisor;
+  store: SettingsStore;
+}
 
 // Her Claude Code sessions in her inbox: all of them, only the ones stopped on
 // a question, or none. One reader, here, so the settings screen and the
@@ -65,8 +182,8 @@ import { forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mj
 // separate path from this one.
 //
 // A setting actually chosen still wins over this line.
-export function outsideAgentsMode(config) {
-  if (AGENT_MODES.includes(config?.outsideAgents)) return config.outsideAgents;
+export function outsideAgentsMode(config?: SettingsConfig | null) {
+  if (AGENT_MODES.includes(config?.outsideAgents as AgentMode)) return config!.outsideAgents;
   return 'off';
 }
 
@@ -125,11 +242,11 @@ const TAKES_A_VALUE = new Set([
 // itself look like a flag. That is right for the required ones too, and it means
 // a flag missing from the set above costs nothing worse than landing in `other`
 // beside its value, in order, which is what always happened.
-const takesValue = (flag, next) => TAKES_A_VALUE.has(flag) && next !== undefined && !next.startsWith('--');
+const takesValue = (flag: string, next: string | undefined) => TAKES_A_VALUE.has(flag) && next !== undefined && !next.startsWith('--');
 
-export function parseSessionArgs(args) {
+export function parseSessionArgs(args?: unknown) {
   const list = Array.isArray(args) ? args.map(String) : [];
-  const out = { model: null, allowedTools: [], permissionMode: null, allowsBypass: false, other: [] };
+  const out: { model: string | null; allowedTools: string[]; permissionMode: string | null; allowsBypass: boolean; other: string[] } = { model: null, allowedTools: [], permissionMode: null, allowsBypass: false, other: [] };
   let sink = out.other;
   for (let i = 0; i < list.length; i += 1) {
     const arg = list[i];
@@ -180,9 +297,9 @@ export const CLAUDE_MODES = CLAUDE_PERMISSION_MODES;
 
 // The alias the CLI takes for `default`, read back as `default` so one mode
 // never shows up as two.
-const MODE_ALIASES = { manual: 'default' };
+const MODE_ALIASES: Record<string, string> = { manual: 'default' };
 
-export function permissionMode(args) {
+export function permissionMode(args?: unknown) {
   const parsed = parseSessionArgs(args);
   // Auto is Claude Code's own classifier: every tool call is checked for risk
   // and for prompt injection first, the lower-risk ones run, the rest are
@@ -194,16 +311,16 @@ export function permissionMode(args) {
   const raw = parsed.permissionMode;
   if (!raw) return 'custom';
   const named = MODE_ALIASES[raw] ?? raw;
-  return CLAUDE_MODES.includes(named) ? named : 'custom';
+  return CLAUDE_MODES.includes(named as string) ? named : 'custom';
 }
 
-export function buildSessionArgs(base, mode) {
+export function buildSessionArgs(base: unknown, mode: unknown) {
   // A mode this file does not know is a bug upstream, and the safe answer is
   // to refuse rather than to quietly drop the grant that is there. Silently
   // removing --permission-mode and adding nothing hands the session back to
   // whatever the machine's own settings say, which is the inheritance this
   // whole feature exists to stop.
-  if (!CLAUDE_MODES.includes(mode)) throw new Error(`unknown permission mode: ${mode}`);
+  if (!CLAUDE_MODES.includes(mode as string)) throw new Error(`unknown permission mode: ${mode}`);
   const parsed = parseSessionArgs(base);
   const model = parsed.model ? ['--model', parsed.model] : [];
   // HER TOOL GRANTS ARE CARRIED THROUGH UNTOUCHED. The old 'read' shape used to
@@ -216,7 +333,7 @@ export function buildSessionArgs(base, mode) {
   // `parsed.other` cannot contain a second way of setting the mode: the parser
   // above lifts the equals form and the bypass shorthand out of it, so exactly
   // one permission flag reaches the CLI and it is the one on the screen.
-  const grant = ['--permission-mode', mode];
+  const grant = ['--permission-mode', mode as string];
   return [...model, ...(tools.length ? ['--allowedTools', ...tools] : []), ...grant, ...parsed.other];
 }
 
@@ -233,9 +350,9 @@ export { cloudPermissionArgs } from './cloud-permission.mts';
 // Everything else in the list is carried through untouched and in its original
 // order, for the same reason permission changes are: her grants took a day to
 // get right and choosing a model must not quietly drop one of them.
-export function setModelArg(base, model) {
+export function setModelArg(base: unknown, model: unknown) {
   const list = Array.isArray(base) ? base.map(String) : [];
-  const out = [];
+  const out: string[] = [];
   for (let i = 0; i < list.length; i += 1) {
     if (list[i] === '--model') { i += 1; continue; }
     // AND THE EQUALS FORM. Teaching parseSessionArgs to read `--model=x` while
@@ -252,12 +369,12 @@ export function setModelArg(base, model) {
 
 /* -------------------------------- reading -------------------------------- */
 
-const lineCount = (text) => (text.trim() ? text.trim().split('\n').length : 0);
+const lineCount = (text: string) => (text.trim() ? text.trim().split('\n').length : 0);
 
 // What launch found, or the last Check again, in the finder's own shape. For a
 // read nobody is looking at: the search starts a login shell on the window's
 // thread, and the phone reads settings every minute.
-function knownEngine(config, engine) {
+function knownEngine(config: SettingsConfig, engine: string) {
   if (engine === 'claude') {
     return {
       path: config.claudeBin ?? null,
@@ -277,7 +394,7 @@ function knownEngine(config, engine) {
 
 // Claude Code: the path, whether it is really there, and where to get it when
 // it is not. One reader, here, so the screen and the config cannot disagree.
-export function claudeState(config, { search = true } = {}) {
+export function claudeState(config: SettingsConfig, { search = true }: { search?: boolean } = {}) {
   const found = search ? harnessFor('claude').discover(config.claudeBinConfigured ?? null) : knownEngine(config, 'claude');
   return {
     claudeBin: found.path ?? config.claudeBin,
@@ -300,7 +417,7 @@ export function claudeState(config, { search = true } = {}) {
 // who installs Claude Code and presses this within those thirty seconds would
 // be told no by a memory rather than by a search. That is exactly the promise
 // `forgetClaudeBin` exists for.
-export function recheckClaude(config) {
+export function recheckClaude(config: SettingsConfig) {
   forgetClaudeBin();
   return takeClaude(config);
 }
@@ -310,12 +427,12 @@ export function recheckClaude(config) {
  * and this settles once its answer is on the config. For every caller that can
  * wait (the buttons, setup, the update check).
  */
-export async function lookAgainFor(engine, config) {
+export async function lookAgainFor(engine: string, config: SettingsConfig) {
   await lookAgain(engine);
   return engine === 'claude' ? takeClaude(config) : takeCodex(config);
 }
 
-function takeClaude(config) {
+function takeClaude(config: SettingsConfig) {
   const state = claudeState(config);
   // The config carries the path everything else spawns from, so a search that
   // has just found Claude Code updates it rather than leaving the rest of the
@@ -361,7 +478,7 @@ function takeClaude(config) {
  * checked by uninstalling Codex from the machine running the suite is a card
  * whose unsure state is not checked. Nothing in the app passes it.
  */
-export function codexState(config, where = {}, { search = true } = {}) {
+export function codexState(config: SettingsConfig, where = {}, { search = true }: { search?: boolean } = {}) {
   const found = search ? harnessFor('codex').discover(config.codexBinConfigured ?? null, where) : knownEngine(config, 'codex');
   return {
     // Empty rather than a path when there is nothing there, which is the same
@@ -380,7 +497,7 @@ export function codexState(config, where = {}, { search = true } = {}) {
 }
 
 /** `codexState` under the names the walk's last card reads beside Claude's. */
-export function codexFoundState(config, where = {}, how = {}) {
+export function codexFoundState(config: SettingsConfig, where = {}, how: { search?: boolean } = {}) {
   const state = codexState(config, where, how);
   return { codexFound: state.found, codexCertain: state.certain, codexInstallUrl: state.url };
 }
@@ -391,12 +508,12 @@ export function codexFoundState(config, where = {}, how = {}) {
  *  what puts `codexBin` on the config, which is what `engineChoices` reads, so
  *  a search that succeeds is also what makes the Coding agent row appear
  *  without a restart. */
-export function recheckCodex(config) {
+export function recheckCodex(config: SettingsConfig) {
   forgetCodexBin();
   return takeCodex(config);
 }
 
-function takeCodex(config) {
+function takeCodex(config: SettingsConfig) {
   const state = codexState(config);
   config.codexBin = state.found ? state.bin : null;
   config.codexCertain = state.certain;
@@ -434,14 +551,14 @@ function takeCodex(config) {
  * open panel itself produced. The sibling rule is
  * tests/where-codex-runs-from-is-not-a-file-a-worker-can-write.test.mjs.
  */
-const BIN_KEY = { claude: 'claudeBin', codex: 'codexBin' };
+const BIN_KEY: Record<string, string> = { claude: 'claudeBin', codex: 'codexBin' };
 
 /** The sentence, or null when the file really is one we could run. */
-function whyNotAnAgent(chosen) {
+function whyNotAnAgent(chosen: unknown) {
   if (typeof chosen !== 'string' || !path.isAbsolute(chosen)) {
     return `${Name} needs the file itself, picked from your computer.`;
   }
-  let stat;
+  let stat: fs.Stats | null;
   try { stat = fs.statSync(chosen); } catch { stat = null; }
   if (!stat) return `${Name} could not find anything there. It may have moved since.`;
   if (stat.isDirectory()) return 'That is a folder. Open it and pick the file inside.';
@@ -460,7 +577,7 @@ function whyNotAnAgent(chosen) {
  * recheck afterwards is what puts the path the fleet spawns from in step with
  * it, the same way the Check again button does.
  */
-export function pointAtEngineBin(config, engine, chosen) {
+export function pointAtEngineBin(config: SettingsConfig, engine: string, chosen: unknown) {
   const key = BIN_KEY[engine];
   if (!key) return { ok: false, say: `${Name} does not know a coding agent called that.` };
   const why = whyNotAnAgent(chosen);
@@ -478,7 +595,7 @@ export function pointAtEngineBin(config, engine, chosen) {
  * a deletion, and an empty string left behind would read as a setting that means
  * something else (main/config.mjs only treats a non-empty string as chosen).
  */
-export function searchForEngineBin(config, engine) {
+export function searchForEngineBin(config: SettingsConfig, engine: string) {
   const key = BIN_KEY[engine];
   if (!key) return { ok: false, say: `${Name} does not know a coding agent called that.` };
   if (!config.appDir) return { ok: false, say: `${Name} has nowhere to save that.` };
@@ -491,7 +608,7 @@ export function searchForEngineBin(config, engine) {
 // THE ALPHA FEATURES SWITCHES (w-3d0fa23ffb). Off unless someone turned them
 // on in Settings; only a real `true` counts. Multiplayer, the team version, is
 // the exception in a checkout, where it was always on.
-export function alphaFeatures(config, { packaged = isPackagedElectron() } = {}) {
+export function alphaFeatures(config?: SettingsConfig | null, { packaged = isPackagedElectron() }: { packaged?: boolean } = {}) {
   return {
     rooms: config?.alphaRooms === true,
     teammates: teammatesOn(config),
@@ -500,7 +617,7 @@ export function alphaFeatures(config, { packaged = isPackagedElectron() } = {}) 
 }
 
 // `search: false` is for a read on a timer (`knownEngine`).
-export function readSettings({ config, supervisor, store }, { search = true } = {}) {
+export function readSettings({ config, supervisor, store }: SettingsDeps, { search = true }: { search?: boolean } = {}) {
   const products = store.listProducts();
   const status = supervisor.status();
   const sessions = [...supervisor.sessions.values()];
@@ -632,7 +749,7 @@ export function readSettings({ config, supervisor, store }, { search = true } = 
 
   // ARCHIVED PROJECTS, only so the Projects page can bring one back. Name and
   // folder, the two things that tell three projects called Daydream apart.
-  let archivedProjects = [];
+  let archivedProjects: { slug: string; name?: string; dir?: string }[] = [];
   try {
     archivedProjects = store.listProducts({ includeArchived: true })
       .filter((p) => p.archived === true)
@@ -748,11 +865,11 @@ export function readSettings({ config, supervisor, store }, { search = true } = 
       // of Agentbox. Read off the binary, cached against its own mtime, and
       // falling back to the table committed at build time on a Mac that has no
       // Claude Code on it (main/claude-models.mjs).
-      claudeModels: claudeModels({ bin: config.claudeBin }).models
+      claudeModels: claudeModels({ bin: config.claudeBin as never }).models
         // WITH THE LEVEL EACH ONE THINKS AT WHEN NOBODY PICKS, beside its name
         // rather than as a list of its own, the same shape the Codex rows
         // above already use. It is per model and it really differs.
-        .map((m) => ({ id: m.alias, label: m.label, model: m.id, defaultLevel: m.defaultLevel })),
+        .map((m: { alias: string; label: string; id: string; defaultLevel?: string }) => ({ id: m.alias, label: m.label, model: m.id, defaultLevel: m.defaultLevel })),
       standingLines: lineCount(standing),
       messageRulesLines: lineCount(messageRules),
       projectsWithInstructions: projects.filter((p) => p.instructions.trim()).length,
@@ -786,12 +903,12 @@ export function readSettings({ config, supervisor, store }, { search = true } = 
  * ONE SENTENCE OR NOTHING, and the words are shared/spawn-trouble.mjs's, not
  *  this file's: every sentence the app says about a dead run lives there, once,
  *  so two surfaces cannot end up with two vocabularies. */
-function engineTroubleFor(supervisor, engine) {
+function engineTroubleFor(supervisor: SettingsSupervisor, engine: string) {
   const trouble = supervisor.engineTrouble(engine);
   return trouble ? engineTroubleNote(trouble.cause) : null;
 }
 
-function engineSettings(supervisor, config, { search = true } = {}) {
+function engineSettings(supervisor: SettingsSupervisor, config: SettingsConfig, { search = true }: { search?: boolean } = {}) {
   const choices = supervisor.engineChoices();
   const engine = supervisor.engineFacts().workspace;
   // WHETHER THIS MAC HAS ASKED TO HEAR ABOUT CODEX AT ALL, which is a different
@@ -840,7 +957,7 @@ function engineSettings(supervisor, config, { search = true } = {}) {
     // strip in the model drawer draws the picked model's list, so they travel
     // beside the name rather than as a list of their own that could disagree
     // with it.
-    codexModels: codexModelsAcross(offered).map((m) => ({
+    codexModels: codexModelsAcross(offered).map((m: { id: string; label: string; levels: { id: string }[]; defaultLevel?: string }) => ({
       id: m.id, label: m.label, levels: m.levels.map((l) => l.id), defaultLevel: m.defaultLevel,
     })),
     // Set when every login offered is on ChatGPT's free plan, so the menu can
@@ -864,7 +981,7 @@ function engineSettings(supervisor, config, { search = true } = {}) {
 
 /* -------------------------------- writing -------------------------------- */
 
-const withSlug = (list, slug, on) => {
+const withSlug = (list: unknown, slug: string, on: boolean) => {
   const set = new Set(Array.isArray(list) ? list : []);
   if (on) set.add(slug); else set.delete(slug);
   return [...set];
@@ -875,7 +992,7 @@ const withSlug = (list, slug, on) => {
 // `paused` and `driven` were the other three and all three are gone from the
 // app: the first two because she could not tell what they did and would never
 // have used them, the third because the self-driving it belonged to is deleted.
-export function setProjectSetting({ config, supervisor, store }, { product, key, value }) {
+export function setProjectSetting({ config, supervisor, store }: SettingsDeps, { product, key, value }: { product?: string; key: string; value?: unknown }) {
   if (!product) throw new Error('no project');
   switch (key) {
     case 'autonomous':
@@ -901,7 +1018,7 @@ export function setProjectSetting({ config, supervisor, store }, { product, key,
     // unknown mode too; this is the check at the boundary, where the message
     // can say which setting was wrong.
     case 'permission': {
-      if (value !== 'workspace' && !CLAUDE_MODES.includes(value)) {
+      if (value !== 'workspace' && !CLAUDE_MODES.includes(value as string)) {
         throw new Error(`unknown permission mode: ${value}`);
       }
       const map = { ...(config.projectSessionArgs ?? {}) };
@@ -919,7 +1036,7 @@ export function setProjectSetting({ config, supervisor, store }, { product, key,
       if (value !== 'workspace' && !isCodexMode(value)) throw new Error(`unknown codex mode: ${value}`);
       const map = { ...(config.projectCodexMode ?? {}) };
       if (value === 'workspace') delete map[product];
-      else map[product] = value;
+      else map[product] = value as string;
       saveConfig(config, { projectCodexMode: Object.keys(map).length ? map : undefined });
       break;
     }
@@ -934,10 +1051,10 @@ export function setProjectSetting({ config, supervisor, store }, { product, key,
     // against a list we just read has no excuse to be wrong.
     case 'account': {
       const known = effectiveProfiles(config.authProfiles, { home: config.home });
-      if (value !== 'any' && !known.includes(value)) throw new Error(`unknown Claude account: ${value}`);
+      if (value !== 'any' && !known.includes(value as string)) throw new Error(`unknown Claude account: ${value}`);
       const map = { ...(config.projectAccounts ?? {}) };
       if (value === 'any') delete map[product];
-      else map[product] = value;
+      else map[product] = value as string;
       saveConfig(config, { projectAccounts: Object.keys(map).length ? map : undefined });
       break;
     }
@@ -960,7 +1077,7 @@ export function setProjectSetting({ config, supervisor, store }, { product, key,
  * can remove, and a row that vanishes silently is worse than one saying it is
  * not signed in.
  */
-function codexAccountRows(supervisor) {
+function codexAccountRows(supervisor: SettingsSupervisor) {
   // THE ONE THAT RUNS, the same way the Claude rows answer it: the supervisor's
   // own pick, which is the chosen account or the primary login (w-dac993a554).
   const chosen = supervisor._profilesFor?.('codex')?.[0] ?? null;
@@ -999,7 +1116,7 @@ function codexAccountRows(supervisor) {
  * abandons leaves something she can see and remove rather than an empty folder
  * nothing mentions.
  */
-export function addCodexAccount({ config, supervisor }) {
+export function addCodexAccount({ config, supervisor }: { config: SettingsConfig; supervisor: SettingsSupervisor }) {
   const made = makeCodexHome({ home: config.home });
   const existing = (config.codexProfiles ?? []).map((x) => x || 'default');
   const list = existing.length ? existing : ['default'];
@@ -1033,7 +1150,7 @@ export function addCodexAccount({ config, supervisor }) {
  * settings terminal. Linking here means her skills, commands and agents are
  * already there when she signs in.
  */
-export function addClaudeAccount({ config, supervisor }) {
+export function addClaudeAccount({ config, supervisor }: { config: SettingsConfig; supervisor: SettingsSupervisor }) {
   const made = makeClaudeHome({ home: config.home });
   // A failure here is a folder without her skills in it, which is a smaller
   // thing than a sign in that does not happen: the links are retried at every
@@ -1048,14 +1165,14 @@ export function addClaudeAccount({ config, supervisor }) {
  * once (null is Auto), what Auto works out to here, and one sentence about
  * right now while it is on.
  */
-export function memoryGateSettings({ config, supervisor }) {
+export function memoryGateSettings({ config, supervisor }: { config: SettingsConfig; supervisor: SettingsSupervisor }) {
   const on = !!config.memoryGate;
   const slots = Number.isFinite(config.memoryGateSlots) ? config.memoryGateSlots : null;
   // What Auto works out to on this Mac, whether or not somebody picked.
   const slotsAuto = autoSlots(os.totalmem());
-  let now = null;
+  let now: string | null = null;
   if (on) {
-    let s = null;
+    let s: MemoryGateReading | null = null;
     try { s = supervisor.memoryGateStatus?.() ?? null; } catch {}
     if (s?.role === 'standby') now = `Another ${NAME} on this computer is coordinating.`;
     else if (s) {
@@ -1081,23 +1198,23 @@ export function memoryGateSettings({ config, supervisor }) {
  * `usedPct` is the kernel's own `kern.memorystatus_level` turned round, which is
  * what the gate already polls, so the bar and the word above it cannot disagree.
  */
-export function memoryReading({ config, supervisor }) {
-  const out = { heavy: null, waiting: null, pressure: null, usedPct: null, asked: null, waited: null, refused: null };
+export function memoryReading({ config, supervisor }: { config: SettingsConfig; supervisor: SettingsSupervisor }) {
+  const out: { heavy: number | null; waiting: number | null; pressure: string | null; usedPct: number | null; asked: number | null; waited: number | null; refused: number | null; holding?: boolean } = { heavy: null, waiting: null, pressure: null, usedPct: null, asked: null, waited: null, refused: null };
   if (!config.memoryGate) return out;
   // The supervisor's own hold on new agents (main/start-hold.mts), which does
   // not depend on which copy of the app is coordinating the command queue.
   try { out.holding = !!supervisor.startHoldStatus?.()?.holding; } catch { out.holding = false; }
-  let s = null;
+  let s: MemoryGateReading | null = null;
   try { s = supervisor.memoryGateStatus?.() ?? null; } catch { return out; }
   if (!s || s.role === 'standby') return out;
   out.heavy = (s.running ?? []).filter((r) => r.holdsSlot).length;
   out.waiting = (s.waiting ?? []).length;
   out.pressure = s.pressure ?? null;
-  if (Number.isFinite(s.freePct)) out.usedPct = Math.max(0, Math.min(100, 100 - s.freePct));
+  if (Number.isFinite(s.freePct)) out.usedPct = Math.max(0, Math.min(100, 100 - s.freePct!));
   const c = s.counts ?? {};
-  if (Number.isFinite(c.asked)) out.asked = c.asked;
-  if (Number.isFinite(c.waited)) out.waited = c.waited;
-  if (Number.isFinite(c.refused)) out.refused = c.refused;
+  if (Number.isFinite(c.asked)) out.asked = c.asked!;
+  if (Number.isFinite(c.waited)) out.waited = c.waited!;
+  if (Number.isFinite(c.refused)) out.refused = c.refused!;
   return out;
 }
 
@@ -1105,10 +1222,10 @@ export function memoryReading({ config, supervisor }) {
  * The Agents page's leftovers row: the switch, and one sentence about what
  * finished agents have left running while it is on.
  */
-export function leftoverSettings({ config, supervisor }) {
+export function leftoverSettings({ config, supervisor }: { config: SettingsConfig; supervisor: SettingsSupervisor }) {
   const on = !!config.cleanupLeftovers;
-  let now = null;
-  let s = null;
+  let now: string | null = null;
+  let s: LeftoverReading | null = null;
   try { s = supervisor.leftoverStatus?.() ?? null; } catch {}
   const list = s?.leftovers ?? [];
   const stoppable = list.reduce((n, l) => n + (l.programs ?? 0), 0);
@@ -1130,11 +1247,11 @@ export function leftoverSettings({ config, supervisor }) {
       const next = timed.map((l) => l.stopsAt).sort((a, b) => a - b)[0];
       const soon = timed.reduce((n, l) => n + l.programs, 0);
       const open = stoppable - soon;
-      const when = (ms) => {
+      const when = (ms: number) => {
         const m = Math.max(1, Math.round((ms - Date.now()) / 60_000));
         return m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} m` : ''}` : `${m} m`;
       };
-      const parts = [];
+      const parts: string[] = [];
       if (soon) parts.push(`${soon} ${next > Date.now() ? `stop${soon === 1 ? 's' : ''} in ${when(next)}` : `${soon === 1 ? 'is' : 'are'} stopping`}`);
       if (open) parts.push(`${open} stop${open === 1 ? 's' : ''} when you close ${open === 1 ? 'its task' : 'their tasks'}`);
       if (kept) parts.push(`${kept} ${kept === 1 ? 'is' : 'are'} kept`);
@@ -1160,8 +1277,8 @@ export function leftoverSettings({ config, supervisor }) {
  * entirely when there is nothing to say, because a row that is usually quiet
  * trains the reaction it exists to prevent.
  */
-export function strayFolderSettings({ supervisor }, home = os.homedir()) {
-  let list = [];
+export function strayFolderSettings({ supervisor }: { supervisor?: SettingsSupervisor }, home = os.homedir()) {
+  let list: { project?: string; path: string }[] = [];
   try { list = supervisor?.strayFolders?.() ?? []; } catch { list = []; }
   if (!list.length) return null;
   const count = list.length;
@@ -1174,15 +1291,15 @@ export function strayFolderSettings({ supervisor }, home = os.homedir()) {
   return { count, now };
 }
 
-export function cornerTagTurnedOff({ key, value } = {}) {
+export function cornerTagTurnedOff({ key, value }: { key?: string; value?: unknown } = {}) {
   return key === 'cornerTag' && !value;
 }
 
-export function countsTurnedOff({ key, value } = {}) {
+export function countsTurnedOff({ key, value }: { key?: string; value?: unknown } = {}) {
   return key === 'diagnostics' && !value;
 }
 
-export function setWorkspaceSetting({ config, supervisor, store }, { key, value }) {
+export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps, { key, value }: { key: string; value?: unknown }) {
   switch (key) {
     // EVERY PROJECT ON HER PHONE, or none (shared/phone-snapshot.mjs). Which
     // ones she keeps here is remembered either way.
@@ -1195,8 +1312,9 @@ export function setWorkspaceSetting({ config, supervisor, store }, { key, value 
       const person = process.env.AGENTBOX_PERSON_ID;
       if (!person) throw new Error('sign in first');
       const every = phoneEligible(store?.listProducts?.() ?? []);
-      const except = Array.isArray(value?.except) ? value.except.filter((s) => every.includes(s)) : [];
-      saveConfig(config, { phoneProducts: { owner: person, all: value?.all !== false, except } });
+      const asked = value as { all?: unknown; except?: unknown } | null | undefined;
+      const except = Array.isArray(asked?.except) ? asked.except.filter((s: string) => every.includes(s)) : [];
+      saveConfig(config, { phoneProducts: { owner: person, all: asked?.all !== false, except } });
       break;
     }
     case 'agentsRunning':
@@ -1263,10 +1381,10 @@ export function setWorkspaceSetting({ config, supervisor, store }, { key, value 
     // off, 'full' sends what does not fit here, 'all' sends everything first.
     // Read by the supervisor per call, so it takes effect on the next tick.
     case 'cloudRuns': {
-      const map = { mac: false, full: null, all: 'all' };
-      if (!(value in map)) throw new Error(`unknown cloud mode: ${value}`);
+      const map: Record<string, boolean | string | null> = { mac: false, full: null, all: 'all' };
+      if (!((value as string) in map)) throw new Error(`unknown cloud mode: ${value}`);
       // Turning the cloud on to one meaning makes that the one C goes back to.
-      const patch = value === 'mac' ? { cloudRuns: false } : { cloudRuns: map[value], cloudWhenOn: value };
+      const patch = value === 'mac' ? { cloudRuns: false } : { cloudRuns: map[value as string], cloudWhenOn: value };
       saveConfig(config, patch);
       Object.assign(config, patch);
       supervisor.wake?.();
@@ -1288,7 +1406,7 @@ export function setWorkspaceSetting({ config, supervisor, store }, { key, value 
     // for the cloud's default (main/cloud-permission.mts).
     case 'cloudPermission':
     case 'cloudCodexMode': {
-      const known = key === 'cloudPermission' ? CLAUDE_MODES.includes(value) : isCodexMode(value);
+      const known = key === 'cloudPermission' ? CLAUDE_MODES.includes(value as string) : isCodexMode(value);
       if (value != null && value !== CLOUD_SAME && !known) throw new Error(`unknown permission mode: ${value}`);
       const patch = { [key]: value ?? null };
       saveConfig(config, patch);
@@ -1356,11 +1474,12 @@ export function setWorkspaceSetting({ config, supervisor, store }, { key, value 
     // `Supervisor#_theOneAccount` also ignores a name that no longer exists, so
     // a login she removes cannot wedge the fleet.
     case 'activeAccount': {
-      const engineId = value?.engine;
+      const chosen = value as { engine?: string; profile?: unknown } | null | undefined;
+      const engineId = chosen?.engine;
       if (!isEngine(engineId)) throw new Error(`unknown coding agent: ${engineId}`);
-      const profile = typeof value?.profile === 'string' && value.profile ? value.profile : null;
-      saveConfig(config, { activeAccount: { ...(config.activeAccount ?? {}), [engineId]: profile } });
-      supervisor.accountChosen?.(engineId, profile);
+      const profile = typeof chosen?.profile === 'string' && chosen.profile ? chosen.profile : null;
+      saveConfig(config, { activeAccount: { ...(config.activeAccount ?? {}), [engineId as string]: profile } });
+      supervisor.accountChosen?.(engineId as string, profile);
       supervisor.onChange?.();
       break;
     }
@@ -1369,12 +1488,12 @@ export function setWorkspaceSetting({ config, supervisor, store }, { key, value 
     // silently shows her nothing, which is the failure mode this codebase cares
     // about most wearing different clothes.
     case 'outsideAgents': {
-      if (!AGENT_MODES.includes(value)) throw new Error(`unknown agent mode: ${value}`);
+      if (!AGENT_MODES.includes(value as AgentMode)) throw new Error(`unknown agent mode: ${value}`);
       saveConfig(config, { outsideAgents: value });
       break;
     }
     case 'permission':
-      if (!CLAUDE_MODES.includes(value)) throw new Error(`unknown permission mode: ${value}`);
+      if (!CLAUDE_MODES.includes(value as string)) throw new Error(`unknown permission mode: ${value}`);
       saveConfig(config, { sessionArgs: buildSessionArgs(config.sessionArgs ?? [], value) });
       break;
     // THE SAME QUESTION FOR THE OTHER ENGINE, and it is a separate key because

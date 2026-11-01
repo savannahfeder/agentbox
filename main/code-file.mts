@@ -22,14 +22,25 @@ import fsDefault from 'node:fs';
 import path from 'node:path';
 import { artifactRoots } from './artifact-path.mts';
 import { isInside } from './doc-file.mts';
+import type { ArtifactProduct } from './artifact-path.mts';
+
+export type CodeFs = Pick<typeof fsDefault, 'statSync' | 'existsSync' | 'readFileSync' | 'writeFileSync'>;
+
+export interface CodeChange {
+  roots?: unknown[];
+  files?: ({ path?: string; abs?: unknown } | null | undefined)[];
+}
+
+export interface CodeFileFound { ok: true; path: string }
+export interface CodeFileRefused { ok: false; error: string; stale?: boolean }
 
 // Half a megabyte of one source file. Past that the change artifact is not what
 // she should be editing in, and a truncation would eat the file on save.
 export const MAX_CODE_BYTES = 800_000;
 
 /** The roots a change's files may sit under: the run's own, plus the product's. */
-export function rootsFor(change, product) {
-  const out = [];
+export function rootsFor(change: CodeChange | null | undefined, product: ArtifactProduct | null | undefined) {
+  const out: string[] = [];
   for (const r of change?.roots ?? []) if (typeof r === 'string' && r) out.push(r);
   for (const r of artifactRoots(product)) if (r) out.push(r);
   return out;
@@ -47,12 +58,12 @@ export function rootsFor(change, product) {
  * A change written before 2026-08-24 has neither, and then there is nothing
  * honest to do but say so.
  */
-export function findFile({ change, product, filePath, fs = fsDefault }) {
+export function findFile({ change, product, filePath, fs = fsDefault }: { change?: CodeChange | null; product?: ArtifactProduct | null; filePath?: string | null; fs?: CodeFs }): CodeFileFound | CodeFileRefused {
   if (!filePath) return { ok: false, error: 'No file was named.' };
   const entry = (change?.files ?? []).find((f) => f?.path === filePath) ?? null;
   if (!entry) return { ok: false, error: 'That file is not part of this change.' };
 
-  const tries = [];
+  const tries: string[] = [];
   if (typeof entry.abs === 'string' && entry.abs) tries.push(entry.abs);
   if (path.isAbsolute(filePath)) tries.push(filePath);
   for (const root of rootsFor(change, product)) tries.push(path.join(root, filePath));
@@ -67,7 +78,7 @@ export function findFile({ change, product, filePath, fs = fsDefault }) {
 }
 
 /** May the pane write onto this file, for this product? */
-export function canWriteCode({ file, change, product, fs = fsDefault }) {
+export function canWriteCode({ file, change, product, fs = fsDefault }: { file: string; change?: CodeChange | null; product?: ArtifactProduct | null; fs?: CodeFs }): { ok: true } | CodeFileRefused {
   const roots = rootsFor(change, product);
   if (!roots.length) return { ok: false, error: 'This change does not say which folder it came from, so nothing was saved.' };
   if (!roots.some((root) => isInside(root, file))) {
@@ -78,8 +89,8 @@ export function canWriteCode({ file, change, product, fs = fsDefault }) {
 }
 
 /** The bytes of one file of a change, with when it last moved. */
-export function readCodeFile({ file, fs = fsDefault }) {
-  let stat;
+export function readCodeFile({ file, fs = fsDefault }: { file: string; fs?: CodeFs }) {
+  let stat: ReturnType<CodeFs['statSync']>;
   try { stat = fs.statSync(file); } catch { return { ok: false, error: 'That file is no longer there.' }; }
   if (stat.size > MAX_CODE_BYTES) {
     return { ok: false, error: 'That file is too big to edit here.' };
@@ -87,14 +98,14 @@ export function readCodeFile({ file, fs = fsDefault }) {
   try {
     return { ok: true, path: file, text: fs.readFileSync(file, 'utf8'), mtime: stat.mtimeMs };
   } catch (err) {
-    return { ok: false, error: String(err?.message ?? err).slice(0, 200) };
+    return { ok: false, error: String((err as Error)?.message ?? err).slice(0, 200) };
   }
 }
 
 /**
  * Her edit, onto the source file.
  */
-export function writeCodeFile({ file, change, product, text, mtime, fs = fsDefault }) {
+export function writeCodeFile({ file, change, product, text, mtime, fs = fsDefault }: { file: string; change?: CodeChange | null; product?: ArtifactProduct | null; text: unknown; mtime?: number; fs?: CodeFs }) {
   const allowed = canWriteCode({ file, change, product, fs });
   if (!allowed.ok) return allowed;
   if (typeof text !== 'string') return { ok: false, error: 'Nothing to save.' };
@@ -111,6 +122,6 @@ export function writeCodeFile({ file, change, product, text, mtime, fs = fsDefau
     try { after = fs.statSync(file).mtimeMs; } catch { /* the write succeeded */ }
     return { ok: true, mtime: after, path: file };
   } catch (err) {
-    return { ok: false, error: String(err?.message ?? err).slice(0, 200) };
+    return { ok: false, error: String((err as Error)?.message ?? err).slice(0, 200) };
   }
 }

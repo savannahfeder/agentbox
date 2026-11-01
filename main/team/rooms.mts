@@ -8,6 +8,211 @@ import { wallCards, myPresence, displayNameOf, withoutHidden } from '../../share
 import { GENERAL_ROOM } from './rooms-memory.mts';
 import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mjs';
 
+/** A room as `roomOut` shapes it. */
+export interface RoomRow {
+  id: string;
+  name: string;
+  kind: string;
+  teamId: string | null;
+  listed: boolean;
+  inviteOnly: boolean;
+  role: string;
+  members: number;
+  createdAt: number;
+}
+
+export interface RoomMessage {
+  id: string;
+  roomId: string;
+  by: string | null;
+  body: string;
+  inReplyTo: string | null;
+  mentions: string[];
+  at: number;
+  editedAt: number | null;
+  deleted: boolean;
+  reactions?: Record<string, (string | null)[]>;
+}
+
+export interface RoomReaction {
+  messageId: string;
+  roomId: string;
+  by: string | null;
+  emoji: string;
+  on: boolean;
+  at: number;
+}
+
+/** A person's room card, in the columns the cloud keeps. */
+export interface RoomProfile {
+  person_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  headline: string | null;
+  bio: string | null;
+  show_working: string;
+  show_agents: boolean;
+  show_level: boolean;
+  show_status: boolean;
+  show_activity: boolean;
+  invisible_until: string | null;
+  status_text: string | null;
+  status_until: string | null;
+  updated_at: string;
+}
+
+export interface RoomPresenceRow {
+  person_id: string;
+  device: string;
+  gone: boolean;
+  agents_running: number;
+  working_on: string | null;
+  working_private: boolean;
+  working_at: string | null;
+  hours_total: number;
+  hours_week: number;
+  week_start: string | null;
+  hours_today: number;
+  day: string | null;
+  streak_days: number;
+  active_days: unknown[];
+  hours_by_month: unknown[];
+  activity: unknown[];
+  updated_at: string;
+}
+
+/** Who is in a room, by the name the room knows them by. */
+export interface RoomNameRow {
+  person_id: string;
+  name: string;
+  avatar_url: string | null;
+  has_card: boolean;
+}
+
+export interface RoomInviteRow {
+  roomId: string;
+  roomName: string;
+  invitedBy: string;
+  invitedByName: string | null;
+}
+
+export type RoomEvent =
+  | { kind: 'message'; message: RoomMessage; roomId?: string }
+  | { kind: 'reaction'; reaction: RoomReaction }
+  | { kind: 'subscribed' | 'membership' | 'profile' | 'presence' };
+
+/** The calls the rooms code makes of the cloud; the two backends both answer them. */
+export interface RoomsBackend {
+  myRooms(): Promise<RoomRow[]>;
+  roomPeople(roomId: string): Promise<string[]>;
+  roomNames?(roomId: string): Promise<RoomNameRow[] | null>;
+  roomProfiles(ids: string[]): Promise<RoomProfile[]>;
+  roomPresence(ids: string[]): Promise<RoomPresenceRow[]>;
+  myRoomProfile(): Promise<RoomProfile | null>;
+  saveRoomProfile(fields: Record<string, unknown>): Promise<RoomProfile>;
+  putPresence(device: string, fields: Record<string, unknown>): Promise<void>;
+  roomMessages(roomId: string, options?: { before?: number | null; limit?: number }): Promise<RoomMessage[]>;
+  roomMentions(options?: { limit?: number }): Promise<RoomMessage[]>;
+  sendRoomMessage(roomId: string, message: { body: string; inReplyTo: string | null; mentions: string[] }): Promise<RoomMessage>;
+  editRoomMessage(messageId: string, message: { body: string; mentions: string[] }): Promise<RoomMessage>;
+  deleteRoomMessage(messageId: string): Promise<void>;
+  roomReactions(roomId: string): Promise<RoomReaction[]>;
+  reactRoomMessage(messageId: string, emoji: string, on: boolean): Promise<void>;
+  putRoomFile(roomId: string, name: string, data: string): Promise<string | void>;
+  roomFile(roomId: string, name: string): Promise<string | null>;
+  roomReads(): Promise<{ roomId: string; readAt: number }[]>;
+  markRoomRead(roomId: string, at: number): Promise<void>;
+  markRoomUnread(roomId: string, at: number): Promise<void>;
+  roomLink(roomId: string): Promise<string>;
+  revokeRoomLink(roomId: string): Promise<string>;
+  joinRoomByLink(token: string): Promise<string>;
+  joinListedRoom(roomId: string): Promise<string>;
+  listedRooms(): Promise<unknown[]>;
+  roomPreview(token: string): Promise<unknown>;
+  createRoom(room: { name: string; kind: string; listed: boolean; inviteOnly: boolean; people: string[] }): Promise<string>;
+  renameRoom(roomId: string, name: string): Promise<void>;
+  leaveRoom(roomId: string): Promise<void>;
+  removeRoomMember(roomId: string, personId: string): Promise<void>;
+  inviteToRoom(roomId: string, email: string): Promise<void>;
+  roomInvitesSent(roomId: string): Promise<unknown[]>;
+  pendingRoomInvites(): Promise<RoomInviteRow[]>;
+  acceptRoomInvite(roomId: string): Promise<string>;
+  agentboxRanks(ids: string[]): Promise<Record<string, number>>;
+  subscribeRooms(onEvent: (event: RoomEvent) => void): () => void;
+}
+
+/** This Mac's pins, mutes and unread marks for one person. */
+export interface RoomPrefs {
+  pinned: string[];
+  muted: string[];
+  markedUnread: string[];
+  autoPinned: boolean;
+}
+
+/** A room as the window draws it. */
+export interface RoomView extends RoomRow {
+  pinned: boolean;
+  muted: boolean;
+  readAt: number;
+  markedUnread: boolean;
+  unread: number;
+  lastAt: number;
+  agents: number;
+  wall: WallCard[];
+  people: { id: string; name: string; avatarUrl: string | null }[] | null;
+}
+
+export interface WallCard {
+  agents?: number;
+  [key: string]: unknown;
+}
+
+export interface RoomMention {
+  id: string;
+  messageId: string;
+  roomId: string;
+  roomName: string;
+  by: string | null;
+  byName: string;
+  body: string;
+  at: number;
+}
+
+export interface RoomsState {
+  on: boolean;
+  ready: boolean;
+  rooms: RoomView[];
+  messages: Record<string, RoomMessage[]>;
+  me: RoomProfile | null;
+  ranks: Record<string, number>;
+  invites: RoomInviteRow[];
+  mentions: RoomMention[];
+  error: string | null;
+  rawRooms?: RoomRow[];
+}
+
+/** What this Mac knows to say about its own work, for the presence row. */
+export interface PresenceFacts {
+  running?: { itemId: string; product: string; startedAt?: number }[];
+  items?: { id: string; label?: string; title?: string }[];
+  products?: unknown[];
+  summary?: unknown;
+}
+
+export interface RoomsOptions {
+  backend: () => RoomsBackend | null;
+  me: () => { id: string; name?: string; avatarUrl?: string | null; status?: { text?: string | null; until?: number | string | null } | null } | null | undefined;
+  team: () => { people?: { id: string }[]; cards?: unknown[]; team?: unknown } | null | undefined;
+  enabled: () => boolean;
+  device: () => string;
+  presenceFacts: () => PresenceFacts | null | undefined;
+  prefsFile: string;
+  now?: () => number;
+  log?: (line: string) => void;
+  onChange?: () => void;
+  timers?: Pick<typeof globalThis, 'setTimeout' | 'clearTimeout'>;
+}
+
 const MESSAGES_HELD = 200;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 // Played voice notes and opened attachments, so a second play is not a second
@@ -19,36 +224,36 @@ const SETTLE_MS = 400;
 
 // Pins, mutes, rooms marked unread and the first-room pin are this Mac's,
 // kept per person.
-export function roomPrefsFile(storeRoot) {
+export function roomPrefsFile(storeRoot: string) {
   return path.join(storeRoot, '.rooms.json');
 }
 
-const PREFS = { pinned: [], muted: [], markedUnread: [], autoPinned: false };
+const PREFS: RoomPrefs = { pinned: [], muted: [], markedUnread: [], autoPinned: false };
 
-function prefsStore(file) {
-  const read = () => { try { return JSON.parse(fs.readFileSync(file, 'utf8')) ?? {}; } catch { return {}; } };
+function prefsStore(file: string) {
+  const read = (): Record<string, Partial<RoomPrefs>> => { try { return JSON.parse(fs.readFileSync(file, 'utf8')) ?? {}; } catch { return {}; } };
   return {
-    get: (who) => ({ ...PREFS, ...(read()[who] ?? {}) }),
-    set: (who, patch) => {
+    get: (who: string | null): RoomPrefs => ({ ...PREFS, ...(read()[who as string] ?? {}) }),
+    set: (who: string | null, patch: Partial<RoomPrefs>) => {
       const all = read();
-      all[who] = { ...PREFS, ...(all[who] ?? {}), ...patch };
+      all[who as string] = { ...PREFS, ...(all[who as string] ?? {}), ...patch };
       try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(all, null, 2)); } catch { /* a pin that is not kept is not worth failing over */ }
-      return all[who];
+      return all[who as string];
     },
   };
 }
 
-const EMPTY = { on: false, ready: false, rooms: [], messages: {}, me: null, ranks: {}, invites: [], mentions: [], error: null };
+const EMPTY: RoomsState = { on: false, ready: false, rooms: [], messages: {}, me: null, ranks: {}, invites: [], mentions: [], error: null };
 
-const reactionKey = (x) => `${x.messageId}\n${x.by}\n${x.emoji}`;
+const reactionKey = (x: { messageId: string; by: string | null; emoji: string }) => `${x.messageId}\n${x.by}\n${x.emoji}`;
 
 // Only reactions that are on, in the order they were made. Built from Maps so
 // an emoji spelled "__proto__" is an ordinary key.
-function withReactions(held, rows) {
+function withReactions(held: RoomMessage[], rows: Map<string, RoomReaction> | undefined) {
   const on = [...(rows?.values() ?? [])].filter((x) => x.on).sort((a, b) => a.at - b.at);
-  const byMessage = new Map();
+  const byMessage = new Map<string, Map<string, (string | null)[]>>();
   for (const x of on) {
-    const emojis = byMessage.get(x.messageId) ?? new Map();
+    const emojis = byMessage.get(x.messageId) ?? new Map<string, (string | null)[]>();
     emojis.set(x.emoji, [...(emojis.get(x.emoji) ?? []), x.by]);
     byMessage.set(x.messageId, emojis);
   }
@@ -56,7 +261,7 @@ function withReactions(held, rows) {
 }
 
 // Padding taken off, so a file of exactly 10 MB is not refused.
-const bytesOf = (b64) => Math.floor((b64.length * 3) / 4) - (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0);
+const bytesOf = (b64: string) => Math.floor((b64.length * 3) / 4) - (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0);
 
 export function createRooms({
   backend, // () => the signed-in backend, or null
@@ -70,27 +275,27 @@ export function createRooms({
   log = () => {},
   onChange = () => {},
   timers = { setTimeout, clearTimeout },
-}) {
+}: RoomsOptions) {
   const prefs = prefsStore(prefsFile);
-  let state = { ...EMPTY };
-  let people = new Map(); // roomId -> [personId]
-  let names = new Map(); // roomId -> room_names rows, or null on a cloud without them
-  let profiles = new Map(); // personId -> row
-  let presence = []; // rows
-  let messages = new Map(); // roomId -> [message], oldest first
-  let reads = new Map(); // roomId -> ms
-  let reactions = new Map(); // roomId -> Map(reactionKey -> reaction), off ones too
-  let files = new Map(); // `${roomId}/${name}` -> base64, oldest first
-  let mentioned = []; // my newest mentions, which may be older than the messages held
-  let unsubscribe = null;
-  let started = null; // the backend rooms were started on
+  let state: RoomsState = { ...EMPTY };
+  let people = new Map<string, string[]>(); // roomId -> [personId]
+  let names = new Map<string, RoomNameRow[] | null>(); // roomId -> room_names rows, or null on a cloud without them
+  let profiles = new Map<string, RoomProfile>(); // personId -> row
+  let presence: RoomPresenceRow[] = []; // rows
+  let messages = new Map<string, RoomMessage[]>(); // roomId -> [message], oldest first
+  let reads = new Map<string, number>(); // roomId -> ms
+  let reactions = new Map<string, Map<string, RoomReaction>>(); // roomId -> Map(reactionKey -> reaction), off ones too
+  let files = new Map<string, string>(); // `${roomId}/${name}` -> base64, oldest first
+  let mentioned: RoomMessage[] = []; // my newest mentions, which may be older than the messages held
+  let unsubscribe: (() => void) | null = null;
+  let started: RoomsBackend | null = null; // the backend rooms were started on
   let setUp = false; // my profile made, Coworking joined if I have nowhere else, realtime on
-  let lastSent = null;
+  let lastSent: string | null = null;
   let lastSentAt = 0;
-  let refreshing = null;
+  let refreshing: Promise<void> | null = null;
   let again = false;
   let gen = 0; // bumped by every change made here, see refresh
-  let settle = null;
+  let settle: ReturnType<typeof setTimeout> | null = null;
 
   const meId = () => me()?.id ?? null;
 
@@ -104,10 +309,10 @@ export function createRooms({
     const muted = new Set(p.muted);
     const marked = new Set(p.markedUnread);
     const at = now();
-    const mentions = [];
+    const mentions: RoomMention[] = [];
     const mine = ownWork();
-    const shown = new Map();
-    const rooms = (state.rawRooms ?? []).map((r) => {
+    const shown = new Map<string, ReturnType<typeof withReactions>>();
+    const rooms = (state.rawRooms ?? []).map((r): RoomView => {
       const held = messages.get(r.id) ?? [];
       shown.set(r.id, withReactions(held, reactions.get(r.id)));
       const readAt = reads.get(r.id) ?? 0;
@@ -115,12 +320,12 @@ export function createRooms({
       const called = names.get(r.id) ?? null;
       // Everyone in the room by name, invisible or with no card, for the chat.
       const everyone = called?.map((n) => ({ id: n.person_id, name: n.has_card ? n.name : displayNameOf(n.name), avatarUrl: n.avatar_url ?? null })) ?? null;
-      const nameOf = (id) => profiles.get(id)?.display_name || everyone?.find((p) => p.id === id)?.name || '';
-      const pool = new Map([...mentioned.filter((m) => m.roomId === r.id && m.at > readAt && m.by !== who && !m.deleted), ...unreadMsgs].map((m) => [m.id, m]));
+      const nameOf = (id: string | null) => profiles.get(id as string)?.display_name || everyone?.find((p) => p.id === id)?.name || '';
+      const pool = new Map([...mentioned.filter((m) => m.roomId === r.id && m.at > readAt && m.by !== who && !m.deleted), ...unreadMsgs].map((m): [string, RoomMessage] => [m.id, m]));
       for (const m of pool.values()) {
-        if (m.mentions.includes(who)) mentions.push({ id: `room-mention:${m.id}`, messageId: m.id, roomId: r.id, roomName: r.name, by: m.by, byName: nameOf(m.by), body: m.body, at: m.at });
+        if (m.mentions.includes(who as string)) mentions.push({ id: `room-mention:${m.id}`, messageId: m.id, roomId: r.id, roomName: r.name, by: m.by, byName: nameOf(m.by), body: m.body, at: m.at });
       }
-      const wall = wallCards({ members: people.get(r.id) ?? [], profiles: [...profiles.values()], presence, teammates, teamCards: t.cards ?? [], meId: who, now: at, mine, names: called, listed: !!r.listed });
+      const wall = wallCards({ members: people.get(r.id) ?? [], profiles: [...profiles.values()], presence, teammates, teamCards: t.cards ?? [], meId: who, now: at, mine, names: called, listed: !!r.listed }) as WallCard[];
       return {
         ...r,
         pinned: pinned.has(r.id),
@@ -140,7 +345,7 @@ export function createRooms({
       ...state,
       on: true,
       rooms,
-      messages: Object.fromEntries(rooms.map((r) => [r.id, shown.get(r.id)])),
+      messages: Object.fromEntries(rooms.map((r) => [r.id, shown.get(r.id)!])),
       mentions: mentions.sort((a, b) => b.at - a.at),
     };
   }
@@ -149,12 +354,12 @@ export function createRooms({
 
   // The thread this Mac's newest agent is on, for my own card only.
   function ownWork() {
-    let f = {};
+    let f: PresenceFacts = {};
     try { f = presenceFacts() ?? {}; } catch { return null; }
     const lead = [...(f.running ?? [])].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
     if (!lead) return { workingOn: null, agents: 0 };
     const item = (f.items ?? []).find((i) => i.id === lead.itemId);
-    return { workingOn: (String(item?.label ?? '').trim() || String(item?.title ?? '')).slice(0, 64) || null, agents: f.running.length };
+    return { workingOn: (String(item?.label ?? '').trim() || String(item?.title ?? '')).slice(0, 64) || null, agents: f.running!.length };
   }
   const local = () => { gen += 1; };
 
@@ -176,53 +381,53 @@ export function createRooms({
     const g = gen;
     try {
       const rooms = await b.myRooms();
-      const ids = new Map();
-      const named = new Map();
+      const ids = new Map<string, string[]>();
+      const named = new Map<string, RoomNameRow[] | null>();
       await Promise.all(rooms.map(async (r) => {
         const [who, called] = await Promise.all([b.roomPeople(r.id), b.roomNames ? b.roomNames(r.id).catch(() => null) : null]);
         ids.set(r.id, who);
         named.set(r.id, called);
       }));
-      const everyone = [...new Set([meId(), ...[...ids.values()].flat()])].filter(Boolean);
+      const everyone = [...new Set([meId(), ...[...ids.values()].flat()])].filter(Boolean) as string[];
       const [profileRows, presenceRows, readRows, mine, invites, ranks, mentionRows] = await Promise.all([
         b.roomProfiles(everyone), b.roomPresence(everyone), b.roomReads(), b.myRoomProfile(),
         b.pendingRoomInvites().catch(() => []), b.agentboxRanks(everyone).catch(() => ({})),
         b.roomMentions({ limit: 50 }).catch(() => []),
       ]);
-      const held = new Map();
-      const reacted = new Map();
+      const held = new Map<string, RoomMessage[]>();
+      const reacted = new Map<string, Map<string, RoomReaction>>();
       await Promise.all(rooms.map(async (r) => {
         const [fresh, rows] = await Promise.all([b.roomMessages(r.id, { limit: MESSAGES_HELD }), b.roomReactions(r.id)]);
         held.set(r.id, merge(messages.get(r.id), fresh));
-        reacted.set(r.id, new Map(rows.map((x) => [reactionKey(x), x])));
+        reacted.set(r.id, new Map(rows.map((x): [string, RoomReaction] => [reactionKey(x), x])));
       }));
       if (backend() !== b || started !== b) return;
       if (g !== gen) { again = true; return; }
       people = ids;
       names = named;
-      profiles = new Map(profileRows.map((row) => [row.person_id, row]));
+      profiles = new Map(profileRows.map((row): [string, RoomProfile] => [row.person_id, row]));
       presence = presenceRows;
       messages = held;
       reactions = reacted;
-      reads = new Map(readRows.map((r) => [r.roomId, r.readAt]));
+      reads = new Map(readRows.map((r): [string, number] => [r.roomId, r.readAt]));
       mentioned = mentionRows;
       autoPin(rooms);
       state = { ...state, ready: true, rawRooms: rooms, me: mine, invites, ranks, error: null };
     } catch (err) {
-      state = { ...state, error: String(err?.message ?? err) };
+      state = { ...state, error: String((err as Error)?.message ?? err) };
       log(`rooms: ${state.error}`);
     }
     changed();
   }
 
-  function merge(old = [], fresh = []) {
-    const byId = new Map(old.map((m) => [m.id, m]));
+  function merge(old: RoomMessage[] = [], fresh: RoomMessage[] = []) {
+    const byId = new Map(old.map((m): [string, RoomMessage] => [m.id, m]));
     for (const m of fresh) byId.set(m.id, m);
     return [...byId.values()].sort((a, b) => a.at - b.at || String(a.id).localeCompare(String(b.id))).slice(-MESSAGES_HELD);
   }
 
   // The first room I am ever in is pinned for me, once.
-  function autoPin(rooms) {
+  function autoPin(rooms: RoomRow[]) {
     const who = meId();
     const p = prefs.get(who);
     if (p.autoPinned || !rooms.length) return;
@@ -237,25 +442,25 @@ export function createRooms({
   }
 
   // An edit or a delete of a message not held is left for when it is read.
-  function holdMessage(m) {
+  function holdMessage(m: RoomMessage) {
     const held = messages.get(m.roomId) ?? [];
     if ((m.editedAt == null && !m.deleted) || held.some((x) => x.id === m.id)) messages.set(m.roomId, merge(held, [m]));
     mentioned = mentioned.map((x) => (x.id === m.id ? m : x));
     if (m.deleted) dropReactions(m.roomId, m.id);
   }
 
-  function holdReaction(x) {
-    const held = reactions.get(x.roomId) ?? new Map();
+  function holdReaction(x: RoomReaction) {
+    const held = reactions.get(x.roomId) ?? new Map<string, RoomReaction>();
     held.set(reactionKey(x), x);
     reactions.set(x.roomId, held);
   }
 
-  function dropReactions(roomId, messageId) {
+  function dropReactions(roomId: string, messageId: string) {
     const held = reactions.get(roomId);
     if (held) for (const [k, x] of held) if (x.messageId === messageId) held.delete(k);
   }
 
-  function hear(e) {
+  function hear(e: RoomEvent) {
     if (e.kind === 'message' || e.kind === 'reaction') {
       const roomId = e.kind === 'message' ? e.message.roomId : e.reaction.roomId;
       if (!messages.has(roomId)) { later(); return; }
@@ -268,7 +473,7 @@ export function createRooms({
     later();
   }
 
-  function keepFile(key, data) {
+  function keepFile(key: string, data: string) {
     files.delete(key);
     files.set(key, data);
     let total = 0;
@@ -282,7 +487,7 @@ export function createRooms({
 
   // What this Mac sends, when it differs from what it last sent, and every
   // few minutes regardless so others do not read it as gone quiet.
-  async function publish({ force = false } = {}) {
+  async function publish({ force = false }: { force?: boolean } = {}) {
     const b = backend();
     if (!b || !started) return false;
     const facts = presenceFacts() ?? {};
@@ -296,7 +501,7 @@ export function createRooms({
     return true;
   }
 
-  async function ensureProfile(b) {
+  async function ensureProfile(b: RoomsBackend) {
     const mine = await b.myRoomProfile();
     if (mine) return mine;
     // The cloud keeps an address of up to 500 characters, not a picture's bytes.
@@ -309,7 +514,7 @@ export function createRooms({
 
   // Tried on every pass until it works: a cloud without the rooms tables yet,
   // or a dropped network, must not leave me nameless and deaf for the session.
-  async function setUpOnce(b) {
+  async function setUpOnce(b: RoomsBackend) {
     try {
       const mine = await ensureProfile(b);
       state = { ...state, me: mine };
@@ -320,7 +525,7 @@ export function createRooms({
       setUp = true;
       state = { ...state, error: null };
     } catch (err) {
-      state = { ...state, error: String(err?.message ?? err) };
+      state = { ...state, error: String((err as Error)?.message ?? err) };
       log(`rooms: starting: ${state.error}`);
     }
   }
@@ -360,7 +565,7 @@ export function createRooms({
     if (want && started !== backend()) return start();
     if (!want && started) return stop();
     if (!want) return;
-    if (!setUp) { await setUpOnce(started); if (setUp) await refresh(); }
+    if (!setUp) { await setUpOnce(started!); if (setUp) await refresh(); }
     await syncName().catch((err) => log(`rooms: name: ${err.message}`));
     await syncStatus().catch((err) => log(`rooms: status: ${err.message}`));
     await publish().catch((err) => log(`rooms: presence: ${err.message}`));
@@ -371,7 +576,7 @@ export function createRooms({
     const mine = state.me;
     const name = displayNameOf(me()?.name ?? '');
     if (!mine || !name || (mine.display_name && mine.display_name !== 'Someone')) return;
-    const saved = await backend().saveRoomProfile({ display_name: name });
+    const saved = await backend()!.saveRoomProfile({ display_name: name });
     local();
     state = { ...state, me: saved };
     changed();
@@ -385,20 +590,20 @@ export function createRooms({
     const text = s?.text ?? null;
     const until = text && s?.until ? new Date(s.until).toISOString() : null;
     if ((mine.status_text ?? null) === text && (mine.status_until ? new Date(mine.status_until).toISOString() : null) === until) return;
-    const saved = await backend().saveRoomProfile({ status_text: text, status_until: until });
+    const saved = await backend()!.saveRoomProfile({ status_text: text, status_until: until });
     local();
     state = { ...state, me: saved };
     changed();
   }
 
   const need = () => { const b = backend(); if (!b || !started) throw new Error('turn on Rooms and sign in first'); return b; };
-  const after = async (p) => { const out = await p; await refresh(); return out; };
+  const after = async <T,>(p: Promise<T>) => { const out = await p; await refresh(); return out; };
 
   return {
     state: () => { const { rawRooms, ...shown } = state; return shown; },
     start, stop, tick, refresh, publish,
 
-    async send(roomId, body, { inReplyTo = null, mentions = [] } = {}) {
+    async send(roomId: string, body: unknown, { inReplyTo = null, mentions = [] }: { inReplyTo?: string | null; mentions?: string[] } = {}) {
       const b = need();
       const m = await b.sendRoomMessage(roomId, { body: String(body ?? '').trim(), inReplyTo, mentions });
       local();
@@ -408,7 +613,7 @@ export function createRooms({
       return m;
     },
 
-    async markRead(roomId) {
+    async markRead(roomId: string) {
       const b = need();
       const who = meId();
       const p = prefs.get(who);
@@ -424,7 +629,7 @@ export function createRooms({
     },
 
     // `at` is the time of the first message that should read as unread.
-    async markUnread(roomId, at) {
+    async markUnread(roomId: string, at: unknown) {
       const b = need();
       const from = Number(at);
       if (!Number.isFinite(from) || from <= 0) throw new Error('Pick the message to mark unread from.');
@@ -437,7 +642,7 @@ export function createRooms({
       await b.markRoomUnread(roomId, from - 1);
     },
 
-    async react(roomId, messageId, emoji, on = true) {
+    async react(roomId: string, messageId: string, emoji: string, on = true) {
       const b = need();
       await b.reactRoomMessage(messageId, emoji, !!on);
       const key = reactionKey({ messageId, by: meId(), emoji });
@@ -447,7 +652,7 @@ export function createRooms({
       changed();
     },
 
-    async edit(roomId, messageId, body, { mentions = [] } = {}) {
+    async edit(roomId: string, messageId: string, body: unknown, { mentions = [] }: { mentions?: string[] } = {}) {
       const b = need();
       const m = await b.editRoomMessage(messageId, { body: String(body ?? '').trim(), mentions });
       local();
@@ -456,7 +661,7 @@ export function createRooms({
       return m;
     },
 
-    async deleteMessage(roomId, messageId) {
+    async deleteMessage(roomId: string, messageId: string) {
       const b = need();
       await b.deleteRoomMessage(messageId);
       const was = messages.get(roomId)?.find((m) => m.id === messageId);
@@ -467,7 +672,7 @@ export function createRooms({
       changed();
     },
 
-    async putFile(roomId, { name, dataBase64 } = {}) {
+    async putFile(roomId: string, { name, dataBase64 }: { name?: unknown; dataBase64?: unknown } = {}) {
       const b = need();
       const n = String(name ?? '');
       if (!ROOM_FILE_NAME.test(n)) throw new Error(`A room cannot keep a file named “${n}”: a name starts with a letter or number and has only letters, numbers, dots, dashes and underscores, up to 160.`);
@@ -477,16 +682,16 @@ export function createRooms({
         await b.putRoomFile(roomId, n, data);
         keepFile(`${roomId}/${n}`, data);
       } catch (err) {
-        if (err?.code !== FILE_EXISTS) throw err;
+        if ((err as { code?: string })?.code !== FILE_EXISTS) throw err;
       }
       return n;
     },
 
-    async file(roomId, name) {
+    async file(roomId: string, name: string) {
       const b = need();
       const key = `${roomId}/${name}`;
       if (files.has(key)) {
-        const data = files.get(key);
+        const data = files.get(key)!;
         keepFile(key, data);
         return data;
       }
@@ -496,7 +701,7 @@ export function createRooms({
       return data;
     },
 
-    async older(roomId) {
+    async older(roomId: string) {
       const b = need();
       const held = messages.get(roomId) ?? [];
       const got = await b.roomMessages(roomId, { before: held[0]?.at ?? now(), limit: 100 });
@@ -508,7 +713,7 @@ export function createRooms({
     },
 
     // My card: what it says and who sees what.
-    async saveProfile(fields = {}) {
+    async saveProfile(fields: Record<string, unknown> = {}) {
       const b = need();
       const patch = { ...fields };
       if ('fullName' in patch) {
@@ -527,46 +732,46 @@ export function createRooms({
     },
 
     // No minutes is until I turn it off, held as a date ten years ahead.
-    goInvisible(minutes = null) {
+    goInvisible(minutes: number | null = null) {
       const m = minutes == null ? 3650 * 24 * 60 : Math.max(1, Math.min(48 * 60, Number(minutes) || 60));
       return this.saveProfile({ invisible_until: new Date(now() + m * 60_000).toISOString() });
     },
     comeBack() { return this.saveProfile({ invisible_until: null }); },
 
-    link: (roomId) => need().roomLink(roomId),
-    revokeLink: (roomId) => need().revokeRoomLink(roomId),
-    preview: (token) => need().roomPreview(token),
+    link: (roomId: string) => need().roomLink(roomId),
+    revokeLink: (roomId: string) => need().revokeRoomLink(roomId),
+    preview: (token: string) => need().roomPreview(token),
     listed: () => need().listedRooms(),
-    invitesSent: (roomId) => need().roomInvitesSent(roomId),
-    joinByLink: (token) => after(need().joinRoomByLink(token)),
-    joinListed: (roomId) => after(need().joinListedRoom(roomId)),
-    acceptInvite: (roomId) => after(need().acceptRoomInvite(roomId)),
-    invite: async (roomId, email) => {
+    invitesSent: (roomId: string) => need().roomInvitesSent(roomId),
+    joinByLink: (token: string) => after(need().joinRoomByLink(token)),
+    joinListed: (roomId: string) => after(need().joinListedRoom(roomId)),
+    acceptInvite: (roomId: string) => after(need().acceptRoomInvite(roomId)),
+    invite: async (roomId: string, email: unknown) => {
       const clean = String(email ?? '').trim();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) throw new Error(`${clean || 'that'} is not an email address`);
       await need().inviteToRoom(roomId, clean);
     },
-    async create({ name, kind = 'room', listed = false, inviteOnly = false, people: who = [] }) {
+    async create({ name, kind = 'room', listed = false, inviteOnly = false, people: who = [] }: { name: unknown; kind?: string; listed?: boolean; inviteOnly?: boolean; people?: string[] }) {
       const id = await need().createRoom({ name: String(name ?? '').trim(), kind, listed, inviteOnly, people: who });
       prefs.set(meId(), { pinned: [...new Set([...prefs.get(meId()).pinned, id])] });
       await refresh();
       return id;
     },
-    rename: (roomId, name) => after(need().renameRoom(roomId, name)),
-    leave: async (roomId) => {
+    rename: (roomId: string, name: string) => after(need().renameRoom(roomId, name)),
+    leave: async (roomId: string) => {
       await need().leaveRoom(roomId);
       const p = prefs.get(meId());
       prefs.set(meId(), { pinned: p.pinned.filter((x) => x !== roomId), muted: p.muted.filter((x) => x !== roomId), markedUnread: p.markedUnread.filter((x) => x !== roomId) });
       await refresh();
     },
-    remove: (roomId, personId) => after(need().removeRoomMember(roomId, personId)),
+    remove: (roomId: string, personId: string) => after(need().removeRoomMember(roomId, personId)),
 
-    pin(roomId, on = true) {
+    pin(roomId: string, on = true) {
       const p = prefs.get(meId());
       prefs.set(meId(), { pinned: on ? [...new Set([...p.pinned, roomId])] : p.pinned.filter((x) => x !== roomId) });
       changed();
     },
-    mute(roomId, on = true) {
+    mute(roomId: string, on = true) {
       const p = prefs.get(meId());
       prefs.set(meId(), { muted: on ? [...new Set([...p.muted, roomId])] : p.muted.filter((x) => x !== roomId) });
       changed();

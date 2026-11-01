@@ -25,6 +25,7 @@
 // product at all.
 
 import fsDefault from 'node:fs';
+import type { Dirent } from 'node:fs';
 import path from 'node:path';
 import { machineryDir } from './store/home.mjs';
 import { NAME } from '../shared/product-name.mjs';
@@ -42,7 +43,21 @@ import { NAME } from '../shared/product-name.mjs';
 //
 // It goes LAST, after her own folder, so nothing of hers is ever shadowed by
 // one of ours.
-export function artifactRoots(prod) {
+export interface ArtifactProduct { slug?: string; name?: string; dir?: string; repoPath?: string }
+
+export type ArtifactFs = Pick<typeof fsDefault, 'existsSync'> & { promises: Pick<typeof fsDefault.promises, 'readdir' | 'stat'> };
+
+export interface ArtifactRequest {
+  src: unknown;
+  product?: string | null;
+  products?: ArtifactProduct[];
+  accountRoot?: string | null;
+  storeRoot?: string | null;
+  fs?: ArtifactFs;
+  now?: number;
+}
+
+export function artifactRoots(prod: ArtifactProduct | null | undefined) {
   if (!prod) return [];
   return [
     prod.dir,
@@ -51,7 +66,7 @@ export function artifactRoots(prod) {
     prod.repoPath,
     prod.repoPath && path.join(prod.repoPath, 'designs'),
     prod.dir && machineryDir(prod.dir),
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
 }
 
 // Machinery, not artifacts. Walking these is slow and never finds the file a
@@ -70,21 +85,21 @@ const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'session
 // mentions the moment it opens, so the walk has to outlive that burst; a
 // picture that lands later is found by the next look, which comes after this.
 export const HUNT_FRESH_MS = 5000;
-const walks = new Map();
+const walks = new Map<string, { at: number; fs: ArtifactFs; names: Promise<Map<string, string[]>> }>();
 
 // Every file name in one tree, read without holding the main process.
-async function walkNames(tree, fs) {
-  const names = new Map();
-  const walk = async (dir, depth) => {
+async function walkNames(tree: string, fs: ArtifactFs) {
+  const names = new Map<string, string[]>();
+  const walk = async (dir: string, depth: number): Promise<void> => {
     if (depth > 6) return;
-    let entries;
+    let entries: Dirent[];
     try { entries = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { return; }
-    const below = [];
+    const below: Promise<void>[] = [];
     for (const e of entries) {
       if (e.name.startsWith('.')) continue;
       const full = path.join(dir, e.name);
       if (e.isDirectory()) { if (!SKIP.has(e.name)) below.push(walk(full, depth + 1)); }
-      else if (names.has(e.name)) names.get(e.name).push(full);
+      else if (names.has(e.name)) names.get(e.name)!.push(full);
       else names.set(e.name, [full]);
     }
     await Promise.all(below);
@@ -93,12 +108,12 @@ async function walkNames(tree, fs) {
   return names;
 }
 
-function namesIn(tree, fs, now) {
+function namesIn(tree: string, fs: ArtifactFs, now: number) {
   const kept = walks.get(tree);
   if (kept && kept.fs === fs && now - kept.at < HUNT_FRESH_MS) return kept.names;
   const names = walkNames(tree, fs);
   walks.set(tree, { at: now, fs, names });
-  if (walks.size > 32) walks.delete(walks.keys().next().value);
+  if (walks.size > 32) walks.delete(walks.keys().next().value!);
   return names;
 }
 
@@ -106,11 +121,11 @@ function namesIn(tree, fs, now) {
 // Workers write links relative to whatever directory they were standing in, so
 // a fixed root list will always miss some of them, and every miss cost her a
 // 10-minute detour (2026-08-05). Bounded: six levels, own product only.
-async function huntByName(base, trees, fs, now) {
-  let best = null;
+async function huntByName(base: string, trees: string[], fs: ArtifactFs, now: number) {
+  let best: { full: string; m: number } | null = null;
   for (const tree of trees) {
     for (const full of (await namesIn(tree, fs, now)).get(base) ?? []) {
-      let m;
+      let m: number;
       try { m = (await fs.promises.stat(full)).mtimeMs; } catch { continue; }
       if (!best || m > best.m) best = { full, m };
     }
@@ -120,7 +135,7 @@ async function huntByName(base, trees, fs, now) {
 
 // What she reads when the file is not there. Plain sentences, her vocabulary:
 // this ends up in a toast under her cursor, not in a log.
-export function notFoundMessage(raw, own, product) {
+export function notFoundMessage(raw: string, own: ArtifactProduct | null | undefined, product: string | null | undefined) {
   const name = own?.name || product || 'this project';
   if (!own) return `${raw} could not be opened. ${product ? `“${product}”` : 'That project'} is not set up in ${NAME}.`;
   return `${raw} is not in ${name}. Nothing was opened.`;
@@ -131,20 +146,20 @@ export function notFoundMessage(raw, own, product) {
 //
 // `products` is the whole list only so the card's own product can be found in
 // it. Nothing in here reads another entry.
-export async function resolveArtifact({ src, product, products = [], accountRoot, storeRoot, fs = fsDefault, now = Date.now() }) {
+export async function resolveArtifact({ src, product, products = [], accountRoot, storeRoot, fs = fsDefault, now = Date.now() }: ArtifactRequest) {
   if (typeof src !== 'string' || !src) return { ok: false, error: 'No file was named.' };
   const raw = decodeURIComponent(src.replace(/^file:\/\//, '')).replace(/^\.\//, '');
   const own = products.find((x) => x.slug === product) ?? null;
   const roots = artifactRoots(own);
 
-  const candidates = [];
+  const candidates: string[] = [];
   if (path.isAbsolute(raw)) {
     // Said in full, so taken at its word.
     candidates.push(raw);
     // Workers also write an absolute path with a segment missing (the account
     // root straight onto reports/, no product slug). The remainder is a guess,
     // so it is retried under THIS product's roots and no other.
-    for (const base of [accountRoot, storeRoot].filter(Boolean)) {
+    for (const base of [accountRoot, storeRoot].filter(Boolean) as string[]) {
       if (raw.startsWith(base + path.sep)) {
         const rest = raw.slice(base.length + 1);
         for (const root of roots) candidates.push(path.join(root, rest));
@@ -174,7 +189,7 @@ export async function resolveArtifact({ src, product, products = [], accountRoot
   // A run's change record is never hunted for: `runs` is skipped, so the walk
   // could not find it, and the open thread asks for it on every refresh.
   const base = path.basename(raw);
-  const trees = own ? [own.dir, own.repoPath].filter(Boolean) : [];
+  const trees = own ? [own.dir, own.repoPath].filter(Boolean) as string[] : [];
   if (base && trees.length && raw.split('/')[0] !== 'runs') {
     const found = await huntByName(base, trees, fs, now);
     if (found) return { ok: true, path: found };

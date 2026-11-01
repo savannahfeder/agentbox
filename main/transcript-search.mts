@@ -14,22 +14,22 @@ import path from 'node:path';
 
 export const MISS_KEPT_MS = 10 * 60_000;
 
-const found = new Map();  // `${projects}\0${id}` -> transcript path
-const missed = new Map(); // `${projects}\0${id}` -> when it was last looked for and not found
-const wanted = new Map(); // projects folder -> session ids to look for
-let search = null;
+const found = new Map<string, string>();  // `${projects}\0${id}` -> transcript path
+const missed = new Map<string, number>(); // `${projects}\0${id}` -> when it was last looked for and not found
+const wanted = new Map<string, Set<string>>(); // projects folder -> session ids to look for
+let search: Promise<void> | null = null;
 
-export const slugFor = (cwd) => String(cwd || '').replace(/[^a-zA-Z0-9]/g, '-');
-const keyOf = (projects, id) => `${projects}\0${id}`;
+export const slugFor = (cwd: unknown) => String(cwd || '').replace(/[^a-zA-Z0-9]/g, '-');
+const keyOf = (projects: string, id: string) => `${projects}\0${id}`;
 
-function remember(projects, id, file) {
+function remember(projects: string, id: string, file: string | null) {
   if (file) { found.set(keyOf(projects, id), file); missed.delete(keyOf(projects, id)); return; }
   missed.set(keyOf(projects, id), Date.now());
-  while (missed.size > 1000) missed.delete(missed.keys().next().value);
+  while (missed.size > 1000) missed.delete(missed.keys().next().value!);
 }
 
 /** The transcript's path, or null. `look` says where else to look when it is not at the slug path. */
-export function findTranscript(projects, sessionId, cwd, { look = 'later' } = {}) {
+export function findTranscript(projects: string | null | undefined, sessionId: string | null | undefined, cwd: string | null | undefined, { look = 'later' }: { look?: 'now' | 'later' | 'never' } = {}): string | null {
   if (!projects || !sessionId) return null;
   const key = keyOf(projects, sessionId);
   const known = found.get(key);
@@ -43,7 +43,7 @@ export function findTranscript(projects, sessionId, cwd, { look = 'later' } = {}
   }
   if (look === 'never' || Date.now() - (missed.get(key) ?? -Infinity) < MISS_KEPT_MS) return null;
   if (look === 'later') { lookEverywhere(projects, sessionId); return null; }
-  let file = null;
+  let file: string | null = null;
   try {
     for (const dir of fs.readdirSync(projects)) {
       const p = path.join(projects, dir, `${sessionId}.jsonl`);
@@ -54,15 +54,15 @@ export function findTranscript(projects, sessionId, cwd, { look = 'later' } = {}
   return file;
 }
 
-function lookEverywhere(projects, sessionId) {
+function lookEverywhere(projects: string, sessionId: string) {
   if (!wanted.has(projects)) wanted.set(projects, new Set());
-  wanted.get(projects).add(sessionId);
+  wanted.get(projects)!.add(sessionId);
   search ??= (async () => {
     while (wanted.size) {
-      const [root, ids] = wanted.entries().next().value;
+      const [root, ids] = wanted.entries().next().value!;
       wanted.delete(root);
       const left = new Set(ids);
-      let dirs = [];
+      let dirs: string[] = [];
       try { dirs = await fs.promises.readdir(root); } catch { /* no projects folder */ }
       for (const dir of dirs) {
         if (!left.size) break;

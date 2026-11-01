@@ -18,20 +18,34 @@
 //     the work could not be brought home (75), or the account's cloud sign-in
 //     was missing, refused or ran out (77), each of which goes out as a
 //     transport fault: not a delivered reply, not an attempt spent.
+import type { EventEmitter } from 'node:events';
 import { TURN_CLOSED } from '../claude-input.mts';
 
 export const IMPORT_FAILED = 75;
 export const LOGIN_TROUBLE = 77;
 
-export function holdUntilHome({ worker, client, procExit, onTurnEnd = () => {} }) {
+type ExitArgs = [code?: number | null, signal?: string | null, how?: Record<string, unknown>];
+
+export interface HomeWorker extends EventEmitter {
+  steer?: (...args: unknown[]) => Promise<unknown>;
+}
+
+export interface HomeWait {
+  worker: HomeWorker;
+  client: { close(reason: string): void };
+  procExit: PromiseLike<{ code?: number | null; signal?: string | null } | null | undefined>;
+  onTurnEnd?: () => void;
+}
+
+export function holdUntilHome({ worker, client, procExit, onTurnEnd = () => {} }: HomeWait) {
   const realEmit = worker.emit.bind(worker);
-  let held = null;
-  worker.emit = (event, ...args) => {
+  let held: ExitArgs | null = null;
+  worker.emit = (event: string | symbol, ...args: unknown[]) => {
     if (event !== 'exit') return realEmit(event, ...args);
     if (held) return true;
-    held = args; // [code, signal, how]
+    held = args as ExitArgs; // [code, signal, how]
     worker.steer = () => {
-      const err = new Error('The turn has ended; this reply will start the next one.');
+      const err: Error & { code?: string } = new Error('The turn has ended; this reply will start the next one.');
       err.code = TURN_CLOSED;
       return Promise.reject(err);
     };
@@ -40,12 +54,12 @@ export function holdUntilHome({ worker, client, procExit, onTurnEnd = () => {} }
     // A proxy that exits with a code finished: the code is the remote's, or
     // 75 for work it could not bring home. One that was killed, or exited with
     // no code at all, never said, so the work is not known to be home.
-    const notHome = (extra = {}) => realEmit('exit', IMPORT_FAILED, null, { ...(held[2] || {}), transportFault: true, ...extra });
+    const notHome = (extra: Record<string, unknown> = {}) => realEmit('exit', IMPORT_FAILED, null, { ...(held![2] || {}), transportFault: true, ...extra });
     Promise.resolve(procExit).then((out) => {
       const code = out?.code;
       if (code === LOGIN_TROUBLE) notHome({ cloudLoginTrouble: true });
       else if (code === IMPORT_FAILED || !Number.isInteger(code) || out?.signal) notHome();
-      else realEmit('exit', ...held);
+      else realEmit('exit', ...held!);
     }, notHome);
     return true;
   };

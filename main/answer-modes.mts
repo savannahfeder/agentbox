@@ -28,6 +28,7 @@
 // there is no `source` to check and no line for anyone else to forge.
 
 import fs from 'node:fs';
+import type { Stats } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -37,18 +38,24 @@ import { CODEX_MODE_ORDER } from '../shared/codex-modes.mjs';
 
 const FILE = 'answer-modes.json';
 
+export interface AnswerEntry { mode: string | null; at: number }
+
+export type AnswerTable = Record<string, AnswerEntry>;
+
+export interface AnswerModeOptions { home?: string; now?: number }
+
 // Set once at start by `keepAnswerModesIn`. Until then nothing is read or kept:
 // a process that never said where must not fall back to the store root.
-let where = null;
+let where: string | null = null;
 let saidNowhere = false;
 
-const inside = (file, dir) => {
+const inside = (file: string, dir: string) => {
   const f = path.resolve(file);
   const d = path.resolve(dir);
   return f === d || f.startsWith(d + path.sep);
 };
 
-function configHome(home, env) {
+function configHome(home: string, env: NodeJS.ProcessEnv | undefined) {
   const given = typeof env?.XDG_CONFIG_HOME === 'string' ? env.XDG_CONFIG_HOME.trim() : '';
   return given && path.isAbsolute(given) ? given : path.join(home, '.config');
 }
@@ -62,8 +69,8 @@ function configHome(home, env) {
  * nowhere: every thread runs on its project's mode, which is the safe side.
  * Returns the file, or null.
  */
-export function keepAnswerModesIn({ userDir, storeRoot, home = os.homedir(), env = process.env }) {
-  let target = userDir ? path.join(userDir, FILE) : null;
+export function keepAnswerModesIn({ userDir, storeRoot, home = os.homedir(), env = process.env }: { userDir?: string | null; storeRoot?: string | null; home?: string; env?: NodeJS.ProcessEnv }) {
+  let target: string | null = userDir ? path.join(userDir, FILE) : null;
   if (target && storeRoot && inside(target, storeRoot)) {
     const tag = crypto.createHash('sha256').update(path.resolve(storeRoot)).digest('hex').slice(0, 16);
     target = path.join(configHome(home, env), nameSlug, 'grants', tag, FILE);
@@ -84,14 +91,14 @@ export const answerModesFile = () => where;
 // nothing to carry, because that is what makes the carry happen once: without
 // it, a file a worker wrote into the store later would be carried at the next
 // start.
-function carryFromTheStore(old) {
-  let found = null;
+function carryFromTheStore(old: string) {
+  let found: Stats | null = null;
   try { found = fs.lstatSync(old); } catch { /* nothing there */ }
   if (where && !fs.existsSync(where)) {
     writeAll(where, sweep(found?.isFile() ? readAll(old) : {}, Date.now()));
   }
   if (found) {
-    try { fs.rmSync(old, { force: true }); } catch (err) { console.warn(`zero: could not remove ${old}: ${err.message}`); }
+    try { fs.rmSync(old, { force: true }); } catch (err) { console.warn(`zero: could not remove ${old}: ${(err as Error).message}`); }
   }
 }
 
@@ -113,15 +120,15 @@ function carryFromTheStore(old) {
 // the file does not grow without limit. Swept on every write.
 const KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 
-const fileFor = (home) => (home === undefined ? where : path.join(home, FILE));
+const fileFor = (home: string | undefined) => (home === undefined ? where : path.join(home, FILE));
 
 // Never through a link, and never anything but a regular file, so a link left
 // in place of one cannot point the read at a file somebody else writes.
 const READ_FLAGS = fs.constants.O_RDONLY | fs.constants.O_NONBLOCK | (fs.constants.O_NOFOLLOW ?? 0);
 
-function readAll(target) {
+function readAll(target: string | null | undefined): AnswerTable {
   if (!target) return {};
-  let fd = null;
+  let fd: number | null = null;
   try {
     fd = fs.openSync(target, READ_FLAGS);
     if (!fs.fstatSync(fd).isFile()) return {};
@@ -136,7 +143,7 @@ function readAll(target) {
 
 // tmp + rename, so a reader never sees half a file and a crash mid-write leaves
 // the previous one intact.
-function writeAll(target, all) {
+function writeAll(target: string | null | undefined, all: AnswerTable) {
   if (!target) {
     if (!saidNowhere) console.warn('zero: a mode was picked with nowhere to keep it, so the thread runs on its project\'s mode');
     saidNowhere = true;
@@ -148,9 +155,9 @@ function writeAll(target, all) {
   fs.renameSync(tmp, target);
 }
 
-const keyOf = (slug, id) => `${slug}/${id}`;
+const keyOf = (slug: string, id: string) => `${slug}/${id}`;
 
-function sweep(all, now) {
+function sweep(all: AnswerTable, now: number) {
   for (const [key, entry] of Object.entries(all)) {
     if (!entry || typeof entry !== 'object' || !Number.isFinite(entry.at) || now - entry.at > KEEP_MS) {
       delete all[key];
@@ -189,7 +196,7 @@ function sweep(all, now) {
  */
 const ALLOWED_MODES = [...CLAUDE_PERMISSION_MODES, ...CODEX_MODE_ORDER];
 
-export function answerMode(slug, id, { home, now = Date.now() } = {}) {
+export function answerMode(slug: string, id: string, { home, now = Date.now() }: AnswerModeOptions = {}) {
   const entry = readAll(fileFor(home))[keyOf(slug, id)];
   if (!entry || typeof entry !== 'object') return undefined;
   if (Number.isFinite(entry.at) && now - entry.at > KEEP_MS) return undefined;
@@ -198,8 +205,8 @@ export function answerMode(slug, id, { home, now = Date.now() } = {}) {
 }
 
 /** Every row that currently carries one, as `{ "<slug>/<id>": mode }`. */
-export function answerModes({ home, now = Date.now() } = {}) {
-  const out = {};
+export function answerModes({ home, now = Date.now() }: AnswerModeOptions = {}) {
+  const out: Record<string, string | null> = {};
   for (const [key, entry] of Object.entries(readAll(fileFor(home)))) {
     if (!entry || typeof entry !== 'object') continue;
     if (Number.isFinite(entry.at) && now - entry.at > KEEP_MS) continue;
@@ -216,7 +223,7 @@ export function answerModes({ home, now = Date.now() } = {}) {
  * A mode that is not one of the six is refused outright rather than stored,
  * which is what the ledger's own check used to do.
  */
-export function setAnswerMode(slug, id, mode, { home, now = Date.now() } = {}) {
+export function setAnswerMode(slug: string, id: string, mode: string | null, { home, now = Date.now() }: AnswerModeOptions = {}) {
   if (mode !== null && !ALLOWED_MODES.includes(mode)) return answerMode(slug, id, { home, now });
   const all = sweep(readAll(fileFor(home)), now);
   all[keyOf(slug, id)] = { mode, at: now };
@@ -236,7 +243,7 @@ export function setAnswerMode(slug, id, mode, { home, now = Date.now() } = {}) {
  * the worst this call can do is keep a grant she already made alive one more
  * month.
  */
-export function touchAnswerMode(slug, id, used, { home, now = Date.now() } = {}) {
+export function touchAnswerMode(slug: string, id: string, used: string | null | undefined, { home, now = Date.now() }: AnswerModeOptions = {}) {
   const all = sweep(readAll(fileFor(home)), now);
   const key = keyOf(slug, id);
   const entry = all[key];
@@ -259,7 +266,7 @@ export function touchAnswerMode(slug, id, used, { home, now = Date.now() } = {})
  * NOW, for the same reason as above. Clearing is not "less": it means back to
  * the project's setting, which can be the wider one.
  */
-export function clearAnswerMode(slug, id, spent, { home, now = Date.now() } = {}) {
+export function clearAnswerMode(slug: string, id: string, spent: string | null | undefined, { home, now = Date.now() }: AnswerModeOptions = {}) {
   const all = sweep(readAll(fileFor(home)), now);
   const key = keyOf(slug, id);
   const current = all[key]?.mode;
@@ -269,4 +276,4 @@ export function clearAnswerMode(slug, id, spent, { home, now = Date.now() } = {}
   return null;
 }
 
-export const _internals = { file: fileFor, KEEP_MS, useFile: (f) => { where = f ?? null; } };
+export const _internals = { file: fileFor, KEEP_MS, useFile: (f?: string | null) => { where = f ?? null; } };

@@ -9,9 +9,11 @@
 // file someone changed on this Mac while the run was away, and never over one
 // the run did not take with it: those are kept, and the run's copy goes beside.
 import fs from 'node:fs';
+import type { Dirent, Stats } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import type { BinaryLike } from 'node:crypto';
 import { run } from './exec.mts';
 
 // The folders that hold pictures by the gigabyte. Only this thread's own
@@ -25,16 +27,20 @@ export const DOCS_LIMITS = {
   files: 5000,
 };
 
-const inside = (p, root) => p === root || p.startsWith(root + path.sep);
+export type DocsLimits = typeof DOCS_LIMITS;
+
+export interface LaidFile { stamp: string | null; hash: string }
+
+const inside = (p: string, root: string) => p === root || p.startsWith(root + path.sep);
 
 /** The files, by path inside `dir`, that go up with a cloud run for `item`. */
-export function docsToSend(dir, { item = null, limits = DOCS_LIMITS } = {}) {
+export function docsToSend(dir: string, { item = null, limits = DOCS_LIMITS }: { item?: string | null; limits?: DocsLimits } = {}) {
   const own = item && /^[A-Za-z0-9_-]+$/.test(item) ? `designs/${item}` : null;
-  const picked = [];
+  const picked: string[] = [];
   let total = 0;
   let ownTotal = 0;
-  const walk = (rel) => {
-    let entries = [];
+  const walk = (rel: string) => {
+    let entries: Dirent[] = [];
     try { entries = fs.readdirSync(path.join(dir, rel), { withFileTypes: true }); } catch { return; }
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const e of entries) {
@@ -48,7 +54,7 @@ export function docsToSend(dir, { item = null, limits = DOCS_LIMITS } = {}) {
         continue;
       }
       if (!e.isFile()) continue;
-      let size;
+      let size: number;
       try { size = fs.statSync(path.join(dir, r)).size; } catch { continue; }
       if (size > limits.file || total + size > limits.total) continue;
       picked.push(r);
@@ -58,11 +64,11 @@ export function docsToSend(dir, { item = null, limits = DOCS_LIMITS } = {}) {
   // Newest first: a thread whose designs do not all fit takes its latest
   // work, and the rest stays on this Mac.
   const walkOwn = () => {
-    const found = [];
-    const stack = [own];
+    const found: { r: string; size: number; at: number }[] = [];
+    const stack: string[] = [own!];
     while (stack.length) {
-      const rel = stack.shift();
-      let entries = [];
+      const rel = stack.shift()!;
+      let entries: Dirent[] = [];
       try { entries = fs.readdirSync(path.join(dir, rel), { withFileTypes: true }); } catch { continue; }
       for (const e of entries) {
         if (e.name.startsWith('.')) continue;
@@ -70,7 +76,7 @@ export function docsToSend(dir, { item = null, limits = DOCS_LIMITS } = {}) {
         if (/[\n\r]/.test(r)) continue;
         if (e.isDirectory()) { stack.push(r); continue; }
         if (!e.isFile()) continue;
-        let st;
+        let st: Stats;
         try { st = fs.statSync(path.join(dir, r)); } catch { continue; }
         if (st.size <= limits.ownFile) found.push({ r, size: st.size, at: st.mtimeMs });
       }
@@ -88,15 +94,15 @@ export function docsToSend(dir, { item = null, limits = DOCS_LIMITS } = {}) {
 }
 
 /** Those files as one gzipped tar, paths inside `dir`. */
-export function tarDocs(dir, files) {
+export function tarDocs(dir: string, files: string[]) {
   return run('tar', ['-czf', '-', '-C', dir, '--null', '-T', '-'], { input: files.join('\0') + '\0', encoding: null, env: { ...process.env, COPYFILE_DISABLE: '1' } });
 }
 
-const stampOf = (st) => `${st.size}:${Math.round(st.mtimeMs)}`;
-const hashOf = (body) => crypto.createHash('sha256').update(body).digest('hex');
+const stampOf = (st: { size: number; mtimeMs: number }) => `${st.size}:${Math.round(st.mtimeMs)}`;
+const hashOf = (body: BinaryLike) => crypto.createHash('sha256').update(body).digest('hex');
 
 // `notes.md` -> `notes (cloud).md`, then `notes (cloud 2).md`, and so on.
-function besideName(file) {
+function besideName(file: string): string {
   const ext = path.extname(file);
   const base = file.slice(0, file.length - ext.length);
   for (let i = 1; ; i += 1) {
@@ -120,9 +126,9 @@ function besideName(file) {
  * them was never the run's to change, however old it is, so its copy goes
  * beside it too. A run recorded before the list was kept passes none.
  */
-export async function layDocs({ tgz, dir, sentAt = 0, laid = {}, sent = null }) {
+export async function layDocs({ tgz, dir, sentAt = 0, laid = {}, sent = null }: { tgz: string | Uint8Array; dir: string; sentAt?: number; laid?: Record<string, LaidFile>; sent?: Iterable<string> | null }) {
   const took = sent ? new Set(sent) : null;
-  const out = { written: [], beside: [], moved: [] };
+  const out: { written: string[]; beside: string[]; moved: string[] } = { written: [], beside: [], moved: [] };
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-docs-'));
   try {
     // From a file, not a pipe: tar may stop reading at the archive's end
@@ -134,8 +140,8 @@ export async function layDocs({ tgz, dir, sentAt = 0, laid = {}, sent = null }) 
     await run('tar', ['-xzf', file, '-C', into]);
     fs.mkdirSync(dir, { recursive: true });
     const root = fs.realpathSync(dir);
-    const files = [];
-    const walk = (rel) => {
+    const files: string[] = [];
+    const walk = (rel: string): void => {
       for (const e of fs.readdirSync(path.join(into, rel), { withFileTypes: true })) {
         const r = rel ? `${rel}/${e.name}` : e.name;
         if (e.isDirectory()) walk(r);
@@ -145,7 +151,7 @@ export async function layDocs({ tgz, dir, sentAt = 0, laid = {}, sent = null }) 
     walk('');
     // The nearest folder that exists, after links, must be this one or in
     // it: a link inside the folder never carries a file out of it.
-    const safeParent = (file) => {
+    const safeParent = (file: string) => {
       let parent = path.dirname(file);
       while (!fs.existsSync(parent)) parent = path.dirname(parent);
       if (!inside(fs.realpathSync(parent), root)) return false;
@@ -165,7 +171,7 @@ export async function layDocs({ tgz, dir, sentAt = 0, laid = {}, sent = null }) 
         if (!safeParent(target)) throw new Error(`nowhere safe to put ${rel}`);
         out.moved.push(path.relative(root, target));
       }
-      let here = null;
+      let here: Stats | null = null;
       try { here = fs.lstatSync(target); } catch { /* new */ }
       // A link or a folder where the file goes is left as it is, and the
       // run's copy goes beside it.
@@ -208,10 +214,10 @@ export async function layDocs({ tgz, dir, sentAt = 0, laid = {}, sent = null }) 
 }
 
 /** The documents folder a run may take, or null: it must exist and must not hold, or sit in, the task folder. */
-export function docsFolderFor(docs, cwd) {
+export function docsFolderFor(docs: string | null | undefined, cwd: string) {
   if (!docs || !path.isAbsolute(docs)) return null;
-  let real;
-  let realCwd;
+  let real: string;
+  let realCwd: string;
   try { real = fs.realpathSync(docs); realCwd = fs.realpathSync(cwd); } catch { return null; }
   if (!fs.statSync(real).isDirectory()) return null;
   if (inside(real, realCwd) || inside(realCwd, real)) return null;
