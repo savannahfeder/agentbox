@@ -49,7 +49,14 @@ it as a subagent allowed only its `phone` and `diary`, and write
 
 Read `report.md` and open the pictures. Reproduce each broken or wrong issue
 with `phone` yourself before calling it a bug: the threads are made up, and a
-tester can be wrong. Fix the real ones in one branch, test first as CLAUDE.md
+tester can be wrong. Testers do not know the preview's own limits and will log
+them; they are not the app's:
+
+- No computer is behind it, so nothing sent ever runs, new threads stay
+  Queued or In progress, and the banner says the computer is offline.
+- What the phone sends is kept in memory and gone on reload.
+- Testers working at the same time cannot see each other's diaries, so one
+  bug can appear under two titles in the report. Fix the real ones in one branch, test first as CLAUDE.md
 says, and ship by the project's ship rules: fixes nobody sees ship, wide ones
 get `handoff` first, and anything on screen goes to the person with
 screenshots taken with `phone shot`. The next workday's testers are told what
