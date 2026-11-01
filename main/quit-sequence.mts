@@ -30,6 +30,17 @@
 // have heard, and the crash report explaining it is still sitting on their disk
 // waiting for a launch that is not coming.
 
+interface QuitLog { warn?: (message: string) => void }
+
+interface QuitEvent { preventDefault?: () => void }
+
+interface QuitApp {
+  on(event: string, listener: (event?: QuitEvent) => void): unknown;
+  once?(event: string, listener: () => void): unknown;
+  quit(): void;
+  exit(code?: number): void;
+}
+
 /** How long the quit is held open for the last batch of counts, and no longer. */
 export const FLUSH_DEADLINE_MS = 2000;
 
@@ -59,7 +70,7 @@ export const SECOND_QUIT_DEADLINE_MS = 2000;
  *  `killAll` or a `close` run twice is at best wasted and at worst a second
  *  teardown of something already gone.
  */
-export function quitStep(app, event, name, fn, { log = console } = {}) {
+export function quitStep(app: QuitApp, event: string, name: string, fn: () => void, { log = console }: { log?: QuitLog | null } = {}): void {
   let ran = false;
   app.on(event, () => {
     if (ran) return;
@@ -69,7 +80,7 @@ export function quitStep(app, event, name, fn, { log = console } = {}) {
     } catch (err) {
       // Never rethrown: the app is on its way out and every step after this one
       // still has to happen.
-      log?.warn?.(`zero: ${name} failed while quitting: ${err?.message ?? err}`);
+      log?.warn?.(`zero: ${name} failed while quitting: ${(err as Error)?.message ?? err}`);
     }
   });
 }
@@ -91,9 +102,9 @@ export function quitStep(app, event, name, fn, { log = console } = {}) {
  *     `quitThenExit` is for
  *     (tests/a-quit-held-for-the-last-counts-still-ends-the-app).
  */
-export function flushBeforeQuit(app, flush, { deadlineMs = FLUSH_DEADLINE_MS, log = console } = {}) {
+export function flushBeforeQuit(app: QuitApp, flush: () => unknown, { deadlineMs = FLUSH_DEADLINE_MS, log = console }: { deadlineMs?: number; log?: QuitLog | null } = {}): void {
   let held = false;
-  app.on('will-quit', (event) => {
+  app.on('will-quit', (event?: QuitEvent) => {
     if (held) return;          // the second time round is the one we asked for
     held = true;
     event?.preventDefault?.();
@@ -109,7 +120,7 @@ export function flushBeforeQuit(app, flush, { deadlineMs = FLUSH_DEADLINE_MS, lo
     // throws synchronously is covered by the same promise as one that rejects.
     Promise.resolve()
       .then(() => flush())
-      .catch((err) => { log?.warn?.(`zero: the last counts did not get out: ${err?.message ?? err}`); })
+      .catch((err: unknown) => { log?.warn?.(`zero: the last counts did not get out: ${(err as Error)?.message ?? err}`); })
       .then(go, go);
   });
 }
@@ -128,7 +139,7 @@ export function flushBeforeQuit(app, flush, { deadlineMs = FLUSH_DEADLINE_MS, lo
  *  screenshot run has a whole quit ahead of it, the flush above has nothing
  *  left but the `quit` event. The timer is unreffed: an app with nothing left
  *  to do must not be kept alive by the thing watching it. */
-export function quitThenExit(app, { what = 'this run', deadlineMs = EXIT_DEADLINE_MS, log = console } = {}) {
+export function quitThenExit(app: QuitApp, { what = 'this run', deadlineMs = EXIT_DEADLINE_MS, log = console }: { what?: string; deadlineMs?: number; log?: QuitLog | null } = {}): NodeJS.Timeout {
   let over = false;
   const timer = setTimeout(() => {
     if (over) return;

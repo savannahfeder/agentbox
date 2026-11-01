@@ -108,7 +108,9 @@ describe('end to end, with the stand-in worker', () => {
     try { booted?.supervisor.killAll(); booted?.supervisor.stop?.(); } catch { /* done */ }
     await wait(100);
     clearAppHome();
-    if (dir) fs.rmSync(dir, { recursive: true, force: true });
+    // The killed worker can still be writing under `dir`, which on macOS ends
+    // the rmdir in ENOTEMPTY; a retry sees it empty.
+    if (dir) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     dir = null; booted = null;
   });
 
@@ -132,7 +134,10 @@ describe('end to end, with the stand-in worker', () => {
     const row = booted.store.composeItem('sandbox', { title: 'Paginate the list [[stub:hang]]' });
     booted.supervisor.start();
 
-    let end = Date.now() + 15_000;
+    // Longer than one sweep of the supervisor, for the reason measured in
+    // tests/a-run-that-worked-and-then-died-is-not-called-unstarted: a run its
+    // first tick misses only starts on the next one, 15 s later.
+    let end = Date.now() + 50_000;
     while (!booted.supervisor.sessions.has(row.id) && Date.now() < end) await wait(50);
     expect(booted.supervisor.stopSession(row.id)).toBe(true);
 
@@ -146,5 +151,5 @@ describe('end to end, with the stand-in worker', () => {
     const log = logs().find((l) => /^# exited/m.test(l));
     expect(readDeadRunTrace(log).stoppedOnRequest).toBe(true);
     expect(traceShowsASilentDeath(readDeadRunTrace(log))).toBe(false);
-  }, 30_000);
+  }, 90_000);
 });

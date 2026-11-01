@@ -12,7 +12,7 @@
 // to be softened, on a screen she cannot name to us.
 
 import { describe, expect, it } from 'vitest';
-import { screenDetailFor } from '../main/screen-detail.mjs';
+import { screenDetailFor } from '../main/screen-detail.mts';
 import { applySkinDetail, resolveSkinDetail } from '../renderer/src/skins.ts';
 
 describe('which set of theme pictures a screen gets', () => {

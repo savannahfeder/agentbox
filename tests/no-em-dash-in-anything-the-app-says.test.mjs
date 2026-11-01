@@ -30,7 +30,7 @@ const EM_DASH = '—';
 // by another name. `fixtures.ts` IS included, because she never runs on
 // fixtures but every screenshot an agent sends her is drawn from them.
 const ROOTS = ['renderer/src', 'main', 'shared'];
-const EXTS = new Set(['.ts', '.tsx', '.mjs', '.js']);
+const EXTS = new Set(['.ts', '.tsx', '.mjs', '.mts', '.js']);
 
 // THE ONES THAT STAY, EACH A DECISION AND NOT AN OVERSIGHT. Matched on the
 // fragment rather than a line number, so the allowance cannot drift onto some

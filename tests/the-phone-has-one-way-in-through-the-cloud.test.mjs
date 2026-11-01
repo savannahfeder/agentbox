@@ -24,8 +24,8 @@ describe('the computer', () => {
   const main = read('main/main.mjs');
 
   it('opens no door of its own for phones, and no link to the relay', () => {
-    expect(main).not.toMatch(/createPhoneLink|phone-link\.mjs/);
-    expect(main).not.toMatch(/relayAddress|relay-address\.mjs|relay-client/);
+    expect(main).not.toMatch(/createPhoneLink|phone-link\.m[jt]s/);
+    expect(main).not.toMatch(/relayAddress|relay-address\.m[jt]s|relay-client/);
     expect(main).not.toMatch(/'zero:phone-link'/);
   });
 

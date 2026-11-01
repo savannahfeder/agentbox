@@ -361,7 +361,7 @@ describe('nothing in the app can reach the second engine yet', () => {
     for (const entry of readdirSync(dir)) {
       const path = join(dir, entry);
       if (statSync(path).isDirectory()) out.push(...sources(path));
-      else if (/\.(mjs|cjs|js|ts|tsx)$/.test(entry)) out.push(path);
+      else if (/\.(mjs|mts|cjs|js|ts|tsx)$/.test(entry)) out.push(path);
     }
     return out;
   };

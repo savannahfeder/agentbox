@@ -24,7 +24,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { writeHeldThenReload, WRITE_HELD, WROTE_HELD } from '../main/write-before-reload.mjs';
+import { writeHeldThenReload, WRITE_HELD, WROTE_HELD } from '../main/write-before-reload.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (...p) => {

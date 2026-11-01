@@ -1,6 +1,6 @@
 // WHICH SET OF PICTURES A SCREEN GETS., 2026-08-22.
 //
-// Kept out of main.mjs and free of Electron, like zoom-keys.mjs, so the rule can
+// Kept out of main.mjs and free of Electron, like zoom-keys.mts, so the rule can
 // be tested against made-up displays instead of against whatever monitor the
 // machine running the tests happens to have.
 //
@@ -22,7 +22,7 @@
 // through the running app: one display, `internal: true`, `scaleFactor: 2`,
 // 1710x1107 points, window zoom 1.2.
 
-/** @typedef {'soft' | 'sharp'} ScreenDetail */
+export type ScreenDetail = 'soft' | 'sharp';
 
 /**
  * Which picture set a display should paint.
@@ -31,11 +31,8 @@
  * screen got before this existed and an unreadable display is not a reason to
  * quietly downgrade one. `internal` is undefined on some platforms; that is a
  * 'sharp' too, for the same reason.
- *
- * @param {{ internal?: boolean, scaleFactor?: number } | null | undefined} display
- * @returns {ScreenDetail}
  */
-export function screenDetailFor(display) {
+export function screenDetailFor(display: { internal?: boolean; scaleFactor?: number } | null | undefined): ScreenDetail {
   if (!display || typeof display !== 'object') return 'sharp';
   if (display.internal !== true) return 'sharp';
   const s = display.scaleFactor;

@@ -15,7 +15,7 @@
 //
 // Measured in PostHog on 2026-10-12: 23 crash reports over three weeks, two
 // installs, both on 0.1.11, one report every six hours (`EVERY_MS` in
-// main/updater.mjs) for as long as the app was open. The reports stopped being
+// main/updater.mts) for as long as the app was open. The reports stopped being
 // filed as crashes in 292d419. The two Macs are still on 0.1.11.
 //
 // SO THE APP READS WHERE IT IS AND OFFERS THE ONE PRESS THAT FIXES IT. Electron
@@ -31,7 +31,7 @@
 import { Name } from './product-name.mjs';
 
 // THE WORDS, IN ONE PLACE, and main and the renderer both read them from here.
-// `cannotUpdateHere` is the sentence `shortError` in main/updater.mjs puts in
+// `cannotUpdateHere` is the sentence `shortError` in main/updater.mts puts in
 // place of Squirrel's own paragraph, which is 240 characters with a URL in the
 // middle and was arriving on the Settings row cut off at 160.
 //
@@ -76,7 +76,7 @@ export const PLACE = {
   applications: 'applications',
   /** Somewhere writable that is not Applications: updates itself fine. */
   elsewhere: 'elsewhere',
-  /** `npm start` from a checkout: main/source-updater.mjs, nothing to move. */
+  /** `npm start` from a checkout: main/source-updater.mts, nothing to move. */
   source: 'source',
   /** No Applications folder and no `moveToApplicationsFolder`. */
   notMac: 'not-mac',

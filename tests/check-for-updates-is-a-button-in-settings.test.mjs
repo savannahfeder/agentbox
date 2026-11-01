@@ -8,8 +8,8 @@
 // `zero:update-check` calls `updater.check({ manual: true })` (main/ipc.mjs:1824)
 // and `api.updateCheck()` is in renderer/src/api.ts, but `grep -rn updateCheck
 // renderer/src` found one caller, api.ts itself. So the installed app checked
-// every 6 hours (main/updater.mjs EVERY_MS), a copy run from a checkout every
-// 30 minutes (main/source-updater.mjs), and a person who wanted to know now
+// every 6 hours (main/updater.mts EVERY_MS), a copy run from a checkout every
+// 30 minutes (main/source-updater.mts), and a person who wanted to know now
 // had no way to ask.
 //
 // WHAT THIS FILE HOLDS, and the trap behind each:
@@ -20,7 +20,7 @@
 //   that failed.
 //
 //   A FAILED CHECK NEVER READS AS A HEALTHY ONE. This is the whole reason the
-//   button exists: main/updater.mjs is silent when it fails on purpose
+//   button exists: main/updater.mts is silent when it fails on purpose
 //   (point 2 at the top of that file), and Settings is the one screen allowed
 //   to say so. So the error and unsupported phases say what went wrong, and
 //   they must not say the app is up to date.
@@ -46,7 +46,7 @@ import { searchSettings } from '../renderer/src/settings-search.ts';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
-/** What main hands the screens (`describe` in main/updater.mjs), by phase. */
+/** What main hands the screens (`describe` in main/updater.mts), by phase. */
 const state = (over = {}) => ({
   phase: 'idle',
   currentVersion: '0.1.0',

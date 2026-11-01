@@ -45,6 +45,7 @@ const BY_ID: Record<string, string> = {
   done: '□',
   reply: `↩${TEXT}`,
   'resume-any': '↻',
+  'try-again': '↻',
   resume: '↻',
   read: '○',
   unread: '●',

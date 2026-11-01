@@ -1,4 +1,4 @@
-// What the zoom readout says. Kept apart from the menu, like zoom-keys.mjs, so
+// What the zoom readout says. Kept apart from the menu, like zoom-keys.mts, so
 // it imports without Electron and the ladder can be tested for real.
 //
 // So this file computes one number and nothing else. Chromium's zoom factor is
@@ -14,7 +14,7 @@ const CHROMIUM_ZOOM_BASE = 1.2;
  * 120%, level -0.5 is 91%. Returns null for a level that is not a number, so a
  * caller can tell "no readout" from a readout of 0.
  */
-export function zoomPercentFor(level) {
+export function zoomPercentFor(level: unknown): number | null {
   if (typeof level !== 'number' || !Number.isFinite(level)) return null;
   return Math.round(CHROMIUM_ZOOM_BASE ** level * 100);
 }

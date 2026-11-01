@@ -9,8 +9,20 @@
 /** How far down and across a second copy stands. */
 export const OFFSET = 48;
 
+interface ScreenArea { x: number; y: number; width: number; height: number }
+
+interface NewUserWindowFacts {
+  fresh?: boolean;
+  name?: string;
+  screen?: ScreenArea | null;
+  width?: number;
+  height?: number;
+}
+
+interface NewUserWindowOptions { title: string | undefined; x?: number; y?: number }
+
 /** The window options a copy adds, given whether it is a throwaway one. */
-export function newUserWindow({ fresh, name, screen, width = 1440, height = 900 } = {}) {
+export function newUserWindow({ fresh, name, screen, width = 1440, height = 900 }: NewUserWindowFacts = {}): NewUserWindowOptions {
   if (!fresh) return { title: name };
   const title = `${name} (new user)`;
   if (!screen) return { title };

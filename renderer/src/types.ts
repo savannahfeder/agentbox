@@ -868,7 +868,7 @@ export interface AgentConversation {
 }
 
 /**
- * Where Agentbox is in keeping itself current. Written only by main/updater.mjs.
+ * Where Agentbox is in keeping itself current. Written only by main/updater.mts.
  *
  * `idle` nothing has been asked yet, `checking` mid-question, `current` there
  * is nothing newer, `downloading` one is coming, `ready` it is on disk and the
@@ -892,7 +892,7 @@ export interface UpdateState {
   // The one question the screens ask. Kept on the state so no screen has to
   // learn which phase strings mean "there is a button to press".
   ready: boolean;
-  // A COPY RUN FROM SOURCE (main/source-updater.mjs): that it is one, the
+  // A COPY RUN FROM SOURCE (main/source-updater.mts): that it is one, the
   // newest change titles, how many changes there are in all, and whether the
   // restart was pressed and it is rebuilding. Optional so fixtures written
   // before them still type.
@@ -945,7 +945,7 @@ export interface Snapshot {
   usage?: Usage | null;
   usageByEngine?: Usage[];
   // Whether a newer Agentbox has already downloaded itself and is waiting for a
-  // restart (main/updater.mjs). It rides the snapshot rather than boot-info for
+  // restart (main/updater.mts). It rides the snapshot rather than boot-info for
   // the same reason `restartNeeded` does: it becomes true hours into a session,
   // on a screen she is already looking at.
   update?: UpdateState;
@@ -1501,12 +1501,12 @@ declare global {
       // The corner tag's "Turn off…": open Settings on this page.
       onOpenSettings?(fn: (p: { pane?: string }) => void): () => void;
       // screenDetail is which set of theme pictures this screen wants, 'soft' or
-      // 'sharp' (main/screen-detail.mjs). It rides here rather than being
+      // 'sharp' (main/screen-detail.mts). It rides here rather than being
       // pushed because the answer is needed on the first paint.
       bootInfo?(): Promise<{ reloaded: boolean; builtAt: number; recovered?: string | null; revived?: string | null; screenDetail?: string }>;
       onJoinRoom?(fn: () => void): () => void;
       takeJoin?(): Promise<string | null>;
-      // Keeping Agentbox current (main/updater.mjs). Look again now, and restart
+      // Keeping Agentbox current (main/updater.mts). Look again now, and restart
       // onto the version that already downloaded itself.
       updateCheck(): Promise<UpdateState>;
       updateInstall(): Promise<{ started: boolean }>;

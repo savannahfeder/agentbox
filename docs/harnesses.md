@@ -57,7 +57,7 @@ does anything, and reported as absent rather than as zero.
 
 ## The Agent Client Protocol, and what it settles
 
-`main/acp.mjs` is one transport for every agent that speaks ACP: JSON-RPC 2.0
+`main/acp.mts` is one transport for every agent that speaks ACP: JSON-RPC 2.0
 over stdio, one object per line. It holds the wire and no opinion about which
 tool is on the other end. Decided while building it, with Codex reviewing:
 

@@ -583,7 +583,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, queue = null, onePage = false, inChats = false }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, queue = null, onePage = false, inChats = false }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -723,6 +723,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   sending?: PendingSaid[];
   stalled?: boolean;
   onRedeliver: () => void;
+  /** Try again on a thread nothing will start (../try-again.ts). */
+  onTryAgain?: () => void;
   onUnschedule?: () => void;
   onClose: () => void;
   onResolve: () => void;
@@ -1735,11 +1737,15 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
          */}
 
         {/* The agent stopped without finishing: the answer sits delivered-
-            on-paper with nobody on it. Say so, and make the fix one click. */}
+            on-paper with nobody on it. Say so, and make the fix one click.
+            Try again rather than the redelivery, which a thread the app
+            stopped starting, with no reply on it, refused. */}
         {stalled && (
-          <button className="stalled-bar" onClick={onRedeliver}>
-            <span className="stalled-bar-label">The agent stopped without finishing this. Your answer is still waiting.</span>
-            <span className="stalled-bar-go">restart the agent →</span>
+          <button className="stalled-bar" onClick={onTryAgain ?? onRedeliver}>
+            <span className="stalled-bar-label">{item.answer && item.answer !== '(withdrawn)'
+              ? 'The agent stopped without finishing this. Your answer is still waiting.'
+              : 'The agent stopped without finishing this.'}</span>
+            <span className="stalled-bar-go">try again →</span>
           </button>
         )}
 
@@ -1957,7 +1963,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             (w-6246b0c91f). Handing them to `Live` as
             well is what made one screen say "Codex" twice. */}
         {/* A chat says nothing about agents until one you called in is working. */}
-        {!heldByPerson && !(inChats && !session) && <Live item={item} facts={{ ...live, session, stalled, scheduledUntil }} />}
+        {!heldByPerson && !(inChats && !session) && <Live item={item} facts={{ ...live, session, stalled, scheduledUntil }} onTryAgain={onTryAgain} />}
 
         {/* NO LINE UNDER A CONVERSATION OFFERING TO HAND IT TO AN AGENT
             (w-2e8aa16f0f): it read as one more message, and it made the whole

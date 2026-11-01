@@ -17,10 +17,11 @@
 // A frame whose sandbox has no allow-scripts cannot be handed this (measured:
 // "Script not run"). The one such frame is the small preview under a message,
 // and that one is told not to scroll at all (ArtifactThumbnail.tsx).
+import type { WebContents, WebFrameMain } from 'electron';
 import { DOC_SCHEMES, isScheme } from '../shared/schemes.mjs';
-import { DOCUMENT_HEIGHT_SCRIPT, wantsDocumentHeight } from './frame-document-height.mjs';
+import { DOCUMENT_HEIGHT_SCRIPT, wantsDocumentHeight } from './frame-document-height.mts';
 
-const RULES = (thumb) => `@layer agentbox-scrollbars {
+const RULES = (thumb: string) => `@layer agentbox-scrollbars {
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-corner { background: transparent; }
@@ -34,10 +35,35 @@ export const AT_REST = RULES('transparent');
 export const SHOWN = RULES('rgba(140, 140, 140, 0.45)');
 
 /** Is this a page of ours or a file, rather than a running app or the web. */
-export function wantsQuietScrollbars(url) {
-  let parsed;
+export function wantsQuietScrollbars(url: string | null | undefined): boolean {
+  let parsed: URL;
   try { parsed = new URL(String(url ?? '')); } catch { return false; }
   return parsed.protocol === 'file:' || isScheme(DOC_SCHEMES, parsed.protocol);
+}
+
+interface PageSheet {
+  agentboxScrollbars?: boolean;
+  replaceSync(text: string): void;
+}
+
+interface PageMouseEvent {
+  clientX: number;
+  relatedTarget: unknown;
+}
+
+interface ScrollPage {
+  document: {
+    adoptedStyleSheets: PageSheet[];
+    documentElement: { clientWidth: number };
+  };
+  CSSStyleSheet: new () => PageSheet;
+  setTimeout(callback: () => void, ms: number): number;
+  clearTimeout(id: number | null): void;
+  addEventListener(
+    type: string,
+    listener: (event: PageMouseEvent) => void,
+    options?: { capture?: boolean; passive?: boolean; once?: boolean },
+  ): void;
 }
 
 /**
@@ -46,7 +72,7 @@ export function wantsQuietScrollbars(url) {
  * scrolls and for a moment after, and while the pointer is at the right edge
  * where the thumb would be grabbed.
  */
-export function quietScrollbars(page, atRest, shown) {
+export function quietScrollbars(page: ScrollPage, atRest: string, shown: string): void {
   const doc = page.document;
   if (doc.adoptedStyleSheets.some((s) => s.agentboxScrollbars)) return;
   const sheet = new page.CSSStyleSheet();
@@ -55,7 +81,7 @@ export function quietScrollbars(page, atRest, shown) {
   doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
   let showing = false;
   let atEdge = false;
-  let timer = null;
+  let timer: number | null = null;
   const show = () => { if (!showing) { sheet.replaceSync(shown); showing = true; } };
   const hideSoon = () => {
     page.clearTimeout(timer);
@@ -77,7 +103,7 @@ export function quietScrollbars(page, atRest, shown) {
 
 const SCRIPT = `(${quietScrollbars.toString()})(window, ${JSON.stringify(AT_REST)}, ${JSON.stringify(SHOWN)})`;
 
-function quiet(frame) {
+function quiet(frame: WebFrameMain) {
   if (!frame || !wantsQuietScrollbars(frame.url)) return;
   frame.executeJavaScript(SCRIPT).catch(() => { /* a sandbox without scripts, or the frame went away */ });
   if (wantsDocumentHeight(frame.url)) {
@@ -86,7 +112,7 @@ function quiet(frame) {
 }
 
 /** Every page frame in this window gets the quiet scrollbar as its document is ready. */
-export function quietTheFramesScrollbars(contents) {
+export function quietTheFramesScrollbars(contents: WebContents) {
   contents.on('frame-created', (_event, { frame }) => {
     if (!frame || frame === contents.mainFrame) return;
     frame.on('dom-ready', () => quiet(frame));

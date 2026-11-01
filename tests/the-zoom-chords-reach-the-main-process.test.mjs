@@ -18,12 +18,12 @@ import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { zoomDeltaFor, zoomTarget } from '../main/zoom-keys.mjs';
+import { zoomDeltaFor, zoomTarget } from '../main/zoom-keys.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (...p) => fs.readFileSync(path.join(here, '..', ...p), 'utf8');
 const main = read('main', 'main.mjs');
-const menu = read('main', 'menu.mjs');
+const menu = read('main', 'menu.mts');
 
 const down = (over) => ({ type: 'keyDown', meta: true, control: false, alt: false, shift: false, ...over });
 
@@ -85,7 +85,7 @@ describe('the zoom chords', () => {
   // getFocusedWebContents returning null was a silent no-op, and a silent
   // no-op is the entire complaint. The keystroke's own contents is the target.
   it('act on the contents the keystroke arrived on', () => {
-    expect(menu).toMatch(/export function applyZoom\(delta, target = null\)/);
+    expect(menu).toMatch(/export function applyZoom\(delta: number, target: WebContents \| null = null\)/);
     expect(menu).toMatch(/named: target/);
   });
 
@@ -169,7 +169,7 @@ describe('applyZoom itself, with nothing focused', () => {
         getAllWindows: () => [{ isDestroyed: () => false, webContents: inbox }],
       },
     }));
-    const { applyZoom } = await import('../main/menu.mjs');
+    const { applyZoom } = await import('../main/menu.mts');
 
     applyZoom(0.5);
     expect(inbox.level).toBe(1.5);
@@ -201,7 +201,7 @@ describe('the View menu items', () => {
   });
 
   it('hand that window through to the main process', () => {
-    expect(menu).toMatch(/const zoom = \(delta, window\) =>/);
+    expect(menu).toMatch(/const zoom = \(delta: number, window: BaseWindow \| undefined\) =>/);
     expect(main).toMatch(/onZoom: \(delta, target\) => applyZoom\(delta, target \?\? window\?\.webContents \?\? null\)/);
   });
 });

@@ -886,7 +886,7 @@ describe('Codex readers stay behind the engine and approval boundary', () => {
       for (const entry of readdirSync(dir)) {
         const full = join(dir, entry);
         if (statSync(full).isDirectory()) out.push(...sources(full));
-        else if (/\.(mjs|cjs|js|ts|tsx)$/.test(entry)) out.push(full);
+        else if (/\.(mjs|mts|cjs|js|ts|tsx)$/.test(entry)) out.push(full);
       }
       return out;
     };

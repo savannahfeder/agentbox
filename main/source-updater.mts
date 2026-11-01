@@ -1,7 +1,7 @@
 // A COPY RUN FROM SOURCE KEEPS ITSELF CURRENT TOO (w-7a39dace23, 2026-10-01).
 //
 // Teammates run the team build from a git checkout (docs/team/PLAN.md), and
-// main/updater.mjs cannot help them: electron-updater reads published releases
+// main/updater.mts cannot help them: electron-updater reads published releases
 // and does nothing at all unpackaged. Their updates are pushes to main, several
 // a day, so this watches the branch instead of a release feed.
 //
@@ -32,7 +32,9 @@
 
 import { execFile, execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
-import { describe } from './updater.mjs';
+import type { PathLike } from 'node:fs';
+import { describe } from './updater.mts';
+import type { UpdaterState, UpdaterView } from './updater.mts';
 import { loginShell } from './shell-path.mjs';
 
 const FIRST_CHECK_MS = 20_000;
@@ -42,6 +44,15 @@ const INSTALL_MS = 10 * 60 * 1000;
 const BUILD_MS = 5 * 60 * 1000;
 // How many change titles the row lists. The rest are counted, not named.
 const LISTED = 5;
+
+interface GitResult { code: number; out: string; err: string }
+
+interface CollectResult { code: number; out: string }
+
+interface SourceLog {
+  info?: (...args: unknown[]) => void;
+  warn?: (...args: unknown[]) => void;
+}
 
 const SAY = {
   notRepo: 'This folder is not a git checkout, so it does not update itself.',
@@ -62,14 +73,14 @@ const SAY = {
 // back while main ran 21 commits ahead. An edit to the dependencies themselves
 // is in package.json, which still blocks
 // (tests/a-package-install-does-not-stop-the-next-update.test.mjs).
-const isBuildOutput = (file) => file === 'package-lock.json' || /^shared\/[^/]+\.generated\.[cm]?[jt]s$/.test(file);
+const isBuildOutput = (file: string) => file === 'package-lock.json' || /^shared\/[^/]+\.generated\.[cm]?[jt]s$/.test(file);
 // The status code is one or two letters and `gitIn` trims the output, which
 // takes the leading space off the first line, so it is matched, not sliced.
-const changedPaths = (porcelain) => String(porcelain ?? '').split('\n').filter(Boolean).map((l) => l.replace(/^[ MADRCUT?!]{1,2} /, '').replace(/^"|"$/g, ''));
-const theirEdits = (porcelain) => changedPaths(porcelain).filter((f) => !isBuildOutput(f));
+const changedPaths = (porcelain: unknown) => String(porcelain ?? '').split('\n').filter(Boolean).map((l) => l.replace(/^[ MADRCUT?!]{1,2} /, '').replace(/^"|"$/g, ''));
+const theirEdits = (porcelain: unknown) => changedPaths(porcelain).filter((f) => !isBuildOutput(f));
 
-function gitIn(appDir) {
-  return (args, { timeout = 30_000 } = {}) => new Promise((resolve) => {
+function gitIn(appDir: string) {
+  return (args: string[], { timeout = 30_000 }: { timeout?: number } = {}) => new Promise<GitResult>((resolve) => {
     execFile('git', args, {
       cwd: appDir,
       timeout,
@@ -83,17 +94,17 @@ function gitIn(appDir) {
   });
 }
 
-function collect(bin, args, { cwd, timeout }) {
-  return new Promise((resolve) => {
+function collect(bin: string, args: string[], { cwd, timeout }: { cwd: string; timeout: number }) {
+  return new Promise<CollectResult>((resolve) => {
     let out = '';
     let child;
     try {
       child = spawn(bin, args, { cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (e) {
-      resolve({ code: 1, out: String(e?.message ?? e) });
+      resolve({ code: 1, out: String((e as Error)?.message ?? e) });
       return;
     }
-    const keep = (b) => { out = (out + b).slice(-64 * 1024); };
+    const keep = (b: string | Buffer) => { out = (out + b).slice(-64 * 1024); };
     child.stdout.on('data', keep);
     child.stderr.on('data', keep);
     const timer = setTimeout(() => { keep('\nerror: timed out'); child.kill('SIGTERM'); }, timeout);
@@ -110,7 +121,7 @@ function collect(bin, args, { cwd, timeout }) {
 // to nothing and every update on a box without zsh failed in two seconds. With
 // no shell at all, npm on PATH is the better guess. The arguments are fixed
 // strings from this file, never anything read from disk.
-export function npmCommand(args, { env = process.env, exists = fs.existsSync } = {}) {
+export function npmCommand(args: string[], { env = process.env, exists = fs.existsSync }: { env?: NodeJS.ProcessEnv; exists?: (path: PathLike) => boolean } = {}): [string, string[]] {
   const node = env.npm_node_execpath;
   const cli = env.npm_execpath;
   if (node && cli && exists(node) && exists(cli)) return [node, [cli, ...args]];
@@ -119,8 +130,8 @@ export function npmCommand(args, { env = process.env, exists = fs.existsSync } =
   return [shell, ['-lic', `npm ${args.join(' ')}`]];
 }
 
-export function defaultNpm(appDir, env = process.env) {
-  return (args) => {
+export function defaultNpm(appDir: string, env: NodeJS.ProcessEnv = process.env) {
+  return (args: string[]) => {
     const timeout = args[0] === 'install' ? INSTALL_MS : BUILD_MS;
     const [bin, argv] = npmCommand(args, { env });
     return collect(bin, argv, { cwd: appDir, timeout });
@@ -129,7 +140,7 @@ export function defaultNpm(appDir, env = process.env) {
 
 // The line of a failed build worth showing a person: the first that says
 // error, else the last thing it printed.
-export function failureLine(out) {
+export function failureLine(out: unknown): string {
   const lines = String(out ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
   const named = lines.find((l) => /error/i.test(l));
   const line = named ?? lines[lines.length - 1] ?? 'it stopped without saying why';
@@ -155,16 +166,24 @@ export function createSourceUpdater({
   // runs from source, where the script is on disk.
   brand = async () => (await import('../scripts/brand-electron.mjs')).brandElectron(),
   relaunch = () => { app?.relaunch(); app?.quit(); },
-} = {}) {
+}: {
+  appDir: string;
+  app?: { relaunch(): void; quit(): void } | null;
+  log?: SourceLog;
+  onChanged?: (view: UpdaterView) => void;
+  npm?: (args: string[]) => Promise<CollectResult>;
+  brand?: () => Promise<unknown>;
+  relaunch?: () => void;
+}) {
   const git = gitIn(appDir);
   // The commit this process booted from. Read once, now, because it is the
   // code in memory and nothing on disk can change that.
-  let bootHead = null;
+  let bootHead: string | null = null;
   try {
     bootHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: appDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || null;
   } catch { /* not a checkout; check() says so */ }
 
-  let state = {
+  let state: UpdaterState = {
     phase: 'idle',
     source: true,
     currentVersion: bootHead ? bootHead.slice(0, 7) : null,
@@ -176,18 +195,18 @@ export function createSourceUpdater({
     changes: [],
     behind: null,
   };
-  let timer = null;
+  let timer: NodeJS.Timeout | null = null;
   let stopped = false;
   let pending = Promise.resolve();
 
-  const set = (next) => {
+  const set = (next: Partial<UpdaterState>) => {
     state = { ...state, ...next };
     try { onChanged(describe(state)); } catch {}
   };
 
   // Everything that has to be true before an update is offered or applied.
   // Returns the upstream commit, or the sentence saying why not.
-  async function preconditions() {
+  async function preconditions(): Promise<{ why: string; up?: undefined } | { up: string; why?: undefined }> {
     if (!bootHead) return { why: SAY.notRepo };
     const upstream = await git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
     if (upstream.code !== 0) return { why: SAY.noUpstream };
@@ -227,7 +246,7 @@ export function createSourceUpdater({
     const range = `${bootHead}..${ok.up}`;
     const titles = await git(['log', '--no-merges', '--format=%s', `-n${LISTED}`, range]);
     const count = await git(['rev-list', '--no-merges', '--count', range]);
-    const newVersion = ok.up.slice(0, 7);
+    const newVersion = ok.up?.slice(0, 7);
     set({
       phase: 'ready',
       newVersion,
@@ -290,7 +309,7 @@ export function createSourceUpdater({
     // the Info.plist. And never fatally, for the reason brand-electron.mjs
     // opens with about itself — an app that does not come back up is worse
     // than one wearing the wrong icon.
-    try { await brand(); } catch (e) { log.warn?.('[source-updater] could not rebrand the bundle:', e?.message ?? e); }
+    try { await brand(); } catch (e) { log.warn?.('[source-updater] could not rebrand the bundle:', (e as Error)?.message ?? e); }
     log.info?.('[source-updater] built', state.newVersion, '- relaunching');
     relaunch();
   }
@@ -300,8 +319,8 @@ export function createSourceUpdater({
   function install() {
     if (stopped || state.phase !== 'ready') return false;
     set({ phase: 'installing', error: null });
-    pending = apply().catch((e) => {
-      set({ phase: 'ready', error: `The update stopped: ${failureLine(e?.message ?? e)}` });
+    pending = apply().catch((e: unknown) => {
+      set({ phase: 'ready', error: `The update stopped: ${failureLine((e as Error)?.message ?? e)}` });
     });
     return true;
   }

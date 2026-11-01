@@ -92,6 +92,15 @@ export function stoppedByHer(item) {
     && (answerTs(item) <= (status.ts ?? 0) || !!toldBy(item));
 }
 
+// THE PERSON'S OWN WORK: the `founder` tag, unless the ledger says an agent wrote
+// it. An agent can put the tag on any row through the store tools, and an agent
+// may not start its own work, so the queue refuses that tag. The lists read the
+// same rule, or they promise an agent is coming to a thread none will start. A
+// tag with no recorded author predates `wrote` and keeps counting.
+export function filedByThePerson(item) {
+  return (item?.labels ?? []).includes('founder') && item?.wrote?.labels?.source !== 'agent';
+}
+
 // The teammate whose words are this row's newest reply, or null when the
 // newest reply is the person's own.
 export function toldBy(item) {

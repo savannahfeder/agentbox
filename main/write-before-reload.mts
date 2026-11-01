@@ -23,18 +23,33 @@ export const WROTE_HELD = 'zero:wrote-held';
 // for ⌘R not arriving.
 const WAIT_MS = 2000;
 
-export async function writeHeldThenReload({ webContents, ipcMain, reload, timeoutMs = WAIT_MS }) {
+interface HeldContents {
+  isDestroyed(): boolean;
+  send(channel: string, ...args: unknown[]): void;
+}
+
+type WroteListener = (event: { sender?: unknown } | null | undefined, answered: unknown) => void;
+
+interface HeldIpc {
+  on(channel: string, listener: WroteListener): unknown;
+  removeListener(channel: string, listener: WroteListener): unknown;
+}
+
+export async function writeHeldThenReload(
+  { webContents, ipcMain, reload, timeoutMs = WAIT_MS }:
+    { webContents: HeldContents | null | undefined; ipcMain: HeldIpc; reload: () => void; timeoutMs?: number },
+) {
   if (!webContents || webContents.isDestroyed()) return;
   // Each ask carries its own id, so an answer meant for another one (a page
   // from before the last reload, a second press) is not taken for this one.
   const nonce = randomUUID();
-  await new Promise((resolve) => {
+  await new Promise<void>((resolve) => {
     const finish = () => {
       clearTimeout(timer);
       ipcMain.removeListener(WROTE_HELD, onWrote);
       resolve();
     };
-    const onWrote = (event, answered) => {
+    const onWrote: WroteListener = (event, answered) => {
       if (answered === nonce && event?.sender === webContents) finish();
     };
     const timer = setTimeout(finish, timeoutMs);

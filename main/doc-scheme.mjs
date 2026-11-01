@@ -120,9 +120,9 @@ export class DocGrants {
 // page it served, so a pinch with the cursor inside the document could reach
 // the app and zoom the page on its own.
 //
-// So the document has no zoom of its own. The app zoom (main/menu.mjs,
-// main/zoom-keys.mjs) scales the window, and the pane is an ordinary iframe in
+// So the document has no zoom of its own. The app zoom (main/menu.mts,
+// main/zoom-keys.mts) scales the window, and the pane is an ordinary iframe in
 // that window, so an open file follows it like everything else. Do not put a
 // listener back into a served page: nothing is injected into a file she reads.
 // The one thing added to a page is its scrollbar's look, from outside and after
-// it is served, and frame-scrollbars.mjs says why that is not this.
+// it is served, and frame-scrollbars.mts says why that is not this.

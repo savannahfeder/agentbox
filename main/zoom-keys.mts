@@ -10,15 +10,26 @@
 // 'Equal'. Matching on BOTH key and code is what makes the shifted form, the
 // unshifted form and the numpad all land on the same command.
 
-const IN = { Equal: 0.5, NumpadAdd: 0.5, Minus: -0.5, NumpadSubtract: -0.5, Digit0: 0, Numpad0: 0 };
-const KEYS = { '=': 0.5, '+': 0.5, '-': -0.5, _: -0.5, 0: 0 };
+import type { WebContents } from 'electron';
+
+const IN: Partial<Record<string, number>> = { Equal: 0.5, NumpadAdd: 0.5, Minus: -0.5, NumpadSubtract: -0.5, Digit0: 0, Numpad0: 0 };
+const KEYS: Partial<Record<string, number>> = { '=': 0.5, '+': 0.5, '-': -0.5, _: -0.5, 0: 0 };
+
+interface ZoomInput {
+  type?: string;
+  key?: string;
+  code?: string;
+  meta?: boolean;
+  control?: boolean;
+  alt?: boolean;
+}
 
 /**
  * The zoom step a before-input-event describes, or null if it is not a zoom
  * chord. 0.5 in, -0.5 out, 0 actual size. The app is a real answer here, so
  * callers must test for null, not for falsiness.
  */
-export function zoomDeltaFor(input) {
+export function zoomDeltaFor(input?: ZoomInput | null): number | null {
   if (!input || input.type !== 'keyDown') return null;
   if (!(input.meta || input.control)) return null;
   if (input.alt) return null; // ⌥⌘- and friends belong to whoever else wants them
@@ -46,7 +57,11 @@ export function zoomDeltaFor(input) {
  * from), then whatever is focused, then the app's own window. Returns null only
  * if there is genuinely nothing on screen.
  */
-export function zoomTarget({ named = null, focused = null, appWindow = null } = {}) {
+export function zoomTarget({ named = null, focused = null, appWindow = null }: {
+  named?: WebContents | null;
+  focused?: WebContents | null;
+  appWindow?: WebContents | null;
+} = {}): WebContents | null {
   for (const contents of [named, focused, appWindow]) {
     if (contents && !contents.isDestroyed?.()) return contents;
   }

@@ -1,0 +1,22 @@
+{
+  // The back end runs its .mts files as they are: Electron's Node strips the
+  // types at load, so there is no build, and only syntax that strips cleanly
+  // is allowed (no enums, namespaces or parameter properties).
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": false,
+    "skipLibCheck": true
+  },
+  "include": ["**/*.mts"]
+}

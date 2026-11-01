@@ -36,7 +36,7 @@
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { CODEX_SEEN_MS, scanCodex } from '../main/codex-watch.mjs';
+import { CODEX_SEEN_MS, scanCodex } from '../main/codex-watch.mts';
 import { ALLOWED_PROPS, EVENT_NAMES, sanitize } from '../shared/analytics-events.mjs';
 
 const read = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
@@ -120,7 +120,7 @@ describe('a Codex conversation is an agent that was seen', () => {
   });
 
   it('is wired to the switch, with a set that lasts one run of the app', () => {
-    expect(read('main/codex-watch.mjs')).toMatch(/const seen = new Set\(\)/);
+    expect(read('main/codex-watch.mts')).toMatch(/const seen = new Set\(\)/);
     // The watch also takes a reader of every Codex folder since w-e46f2e9cea,
     // so the call spans lines; the counter is still the analytics switch.
     expect(read('main/main.mjs')).toMatch(/startCodexWatch\(\{\s*store,\s*count: \(name, props\) => analytics\.track\(name, props\),/);

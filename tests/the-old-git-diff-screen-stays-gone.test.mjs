@@ -60,7 +60,7 @@ describe('the code an agent wrote comes out of the conversation, never out of gi
   // they are refusing to do. Matching the prose made writing down the reason
   // fail the test.
   it('reads git in one file and nowhere else in the main process', () => {
-    const files = fs.readdirSync(path.join(ROOT, 'main')).filter((f) => f.endsWith('.mjs'));
+    const files = fs.readdirSync(path.join(ROOT, 'main')).filter((f) => /\.m[jt]s$/.test(f));
     const code = (src) => src
       .replace(/\/\*[\s\S]*?\*\//g, ' ')
       .split('\n').map((l) => l.replace(/(^|\s)\/\/.*$/, '')).join('\n');

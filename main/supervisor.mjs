@@ -96,7 +96,7 @@ function whoHasIt(made) {
   if (made?.taken !== false) return '';
   return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
-import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy } from '../shared/answers.mjs';
+import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mjs';
 import { DEFAULT_SESSIONS_AT_ONCE } from './config.mjs';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
@@ -1089,7 +1089,7 @@ export class Supervisor {
       for (const key of Object.keys(this._deliveryAttempts)) if (key.startsWith(prefix)) delete this._deliveryAttempts[key];
       // Resuming a row by name is her saying run this now, which outranks a
       // rest the fleet earned on it exactly as it outranks the attempt cap.
-      delete this._fruitless[`${item.product}:${item.id}`];
+      this._endRest(item.product, item.id);
       this.forgetDeadStarts(item);
 
       if (this._roomFor(this._engineFor(item), item, { asked: true })) {
@@ -1668,14 +1668,34 @@ export class Supervisor {
     this._runNow.set(id, { product, at: Date.now(), started: false });
     // Asking for a row by name outranks a rest the fleet earned on it, the
     // same way `resumeItems` treats it.
-    if (this._fruitless[`${product}:${id}`]) {
-      delete this._fruitless[`${product}:${id}`];
-      this._saveState();
-    }
+    if (this._endRest(product, id)) this._saveState();
     this.forgetDeadStarts(item);
     this.onChange?.();
     this.wake();
     return { ok: true };
+  }
+
+  // A PUSH STARTS THE ROW EVEN WHERE THE QUEUE'S OWN RULES WOULD WALK PAST IT:
+  // the app's own note on it, a tag an agent wrote, a rest. She asked for it by
+  // name. Not a row nobody has given to an agent yet (the walk's own, one sent
+  // to Auto, a question waiting on her).
+  _pushedByHer(item) {
+    return this._runNow.has(item.id) && item.status === 'open'
+      && item.kind !== 'question' && item.kind !== 'review'
+      && !(item.labels ?? []).includes(FIRST_RUN_LABEL) && !isAuto(item);
+  }
+
+  // ASKING FOR A ROW BY NAME ENDS ITS REST AND KEEPS OUR PROMISE. The same
+  // record says our own words on the row promised a retry (`_weSaidItRunsAgain`).
+  // Deleting it made the queue read those words as an answer, so a row a usage
+  // limit stopped never started again once Run now had touched it.
+  _endRest(product, id) {
+    const key = `${product}:${id}`;
+    const seen = this._fruitless[key];
+    if (!seen) return false;
+    if (seen.saidTs) seen.runs = 0;
+    else delete this._fruitless[key];
+    return true;
   }
 
   // A push lasts while its task runs, so a second push cannot pause the first,
@@ -6778,8 +6798,11 @@ export class Supervisor {
         // tagged a finished thread QUEUED. Resting, settled and already
         // delivered are all inside those two, so a row the tick is going to
         // walk past is never advertised as waiting its turn.
+        // And what she asked for by name: a push (`_pushedByHer`) or a resume
+        // waiting for a slot (`_drainResumeQueue`).
         .filter((i) => (this._isContinuation(i) && !answerSettled(i) && !this._answerDelivered(i))
-          || this._isFreshWork(i, nowTs, autonomous) || settingUp(i.id))
+          || this._isFreshWork(i, nowTs, autonomous) || settingUp(i.id)
+          || this._pushedByHer(i) || this._resumeQueue.has(i.id))
         .map((i) => i.id);
       for (const id of this._recovering ?? []) if (heldBySweep(id) && !this._comingHome?.has(id) && !queued.includes(id)) queued.push(id);
     } catch {}
@@ -7229,15 +7252,10 @@ export class Supervisor {
    */
   _isFreshWork(item, now = Date.now(), autonomous = new Set(this.config.autonomousProducts ?? [])) {
     // A worker can put the 'founder' label on any row through the store MCP
-    // (create_work_item/update_work_item take a free labels array), and nothing
-    // else here checked who wrote it, so a forged label auto-spawned a run she
-    // never asked for. Every MCP write is source 'agent' and the fold refuses to
-    // let an agent line overwrite a founder-held label, so a label we KNOW an
-    // agent authored is the forged one and nothing else. A label with no
-    // recorded author (a legacy row from before `wrote` tracking) keeps its old
-    // treatment rather than being newly refused.
-    const founderInitiated = (item.labels ?? []).includes('founder')
-      && item.wrote?.labels?.source !== 'agent';
+    // (create_work_item/update_work_item take a free labels array), so a label
+    // we KNOW an agent authored is a forged one and starts nothing
+    // (`filedByThePerson`, which the lists read too).
+    const founderInitiated = filedByThePerson(item);
     return !(item.labels ?? []).includes(FIRST_RUN_LABEL)
       // Sent to Auto and not yet given to anyone (`routeTheThreads`).
       && !isAuto(item)
@@ -7435,7 +7453,7 @@ export class Supervisor {
         continue;
       }
       const continuation = this._isContinuation(item);
-      if (!continuation && !this._isFreshWork(item, now, autonomous)) continue;
+      if (!continuation && !this._isFreshWork(item, now, autonomous) && !this._pushedByHer(item)) continue;
       // ONE OF CLAUDE CODE'S OWN EIGHT COMMANDS, typed into this row's reply
       // box, ON A ROW THAT IS GOING TO CLAUDE CODE. `commandPrompt` is null for
       // everything else, so this is false for every ordinary message.
