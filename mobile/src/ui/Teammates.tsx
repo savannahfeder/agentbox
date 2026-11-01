@@ -145,13 +145,13 @@ export function ChatsPlace({ tabs, openGroup }: { tabs: ReactNode; openGroup: (i
     <>
       <TopBar title="Chats" right={<IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>} below={tabs} />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }}>
-        <Head title="AI teammates" count={mates.length} />
+        {team && <Head title="AI teammates" count={mates.length} />}
         {mates.map((t, i) => (
           <ChatRow key={t.id} first={i === 0} lead={<TeammateMark t={t} size={32} />} name={t.name} aside={t.primary && !t.paused && t.status !== 'draft' ? 'Primary' : undefined}
             line={team ? nowLine(t, team.view, c.now) : undefined} need={!!team && waitsOnYou(t, team.view)} label={t.name}
             onPress={() => router.push({ pathname: '/teammate/[id]', params: { id: t.id } })} />
         ))}
-        <ChatRow first={mates.length === 0} lead={<TeammateMark t={null} size={32} />} name="New teammate" onPress={() => router.push('/teammate/new')} />
+        {team && <ChatRow first={mates.length === 0} lead={<TeammateMark t={null} size={32} />} name="New teammate" onPress={() => router.push('/teammate/new')} />}
         {!!team?.view.trouble && <T style={{ paddingHorizontal: size.inset, paddingTop: 10, fontSize: 13, lineHeight: 19, color: color.dim }}>{team.view.trouble}</T>}
         {g.on && (
           <>

@@ -221,7 +221,11 @@ export function previewGroups(now = Date.now()) {
   messages.push(msg('r-team', 'p-2', at(47), 'Checked: it says 6:19pm, which is right.', { in_reply_to: sentence.id }));
   messages.push(msg('r-team', 'p-3', at(46), 'Thanks.', { in_reply_to: sentence.id }));
   const reads = [{ room_id: 'r-team', read_at: at(20) }, { room_id: 'r-launch', read_at: at(100) }, { room_id: 'r-maya', read_at: at(130) }];
-  const cards = [{ person_id: 'p-3', title: 'Fix the login meter', state: 'running', visible: true, updated_at: at(10) }];
+  messages.push(msg('r-launch', 'p-4', at(16), 'Here is the frame I mean. ![The opening frame](attachments/opening-frame.png)\n\nThe notes are in [cut-notes.pdf](attachments/cut-notes.pdf).'));
+  const cards = [
+    { person_id: 'p-3', thread_id: 'w-card-1', title: 'Fix the login meter', project: 'Agentbox', state: 'running', priority: 5, problem: 'The meter shows the wrong reset time on Max accounts.', progress: 'Found where the time is read.', solution: null, visible: true, updated_at: at(10) },
+    { person_id: 'p-2', thread_id: 'w-card-2', title: 'Pick the sign-in screen', project: 'Website', state: 'waiting', priority: 5, problem: 'Two sign-in screens are left.', progress: null, solution: null, visible: true, updated_at: at(25) },
+  ];
   const names: Record<string, string> = { preview: 'Ada Lovelace', 'p-2': 'Sam Rivera', 'p-3': 'Kai Ito', 'p-4': 'Maya Chen', 'p-5': 'Lee Park' };
   return {
     rpc(name: string, args: Record<string, any>) {
@@ -237,6 +241,8 @@ export function previewGroups(now = Date.now()) {
       if (table === 'room_presence') return presence;
       if (table === 'room_reads') return reads;
       if (table === 'thread_cards') return cards;
+      // A small drawing of a screen, as a stored file comes back.
+      if (table === 'room_files') return [{ data: 'iVBORw0KGgoAAAANSUhEUgAAADAAAAAkCAIAAABAJy5dAAAAXElEQVR42u3VsQ0AEBBAUWNYQcRORlGoLKqQsIJGIdpDJH7y68srLnfKWfNUChAgQIBGreSjAQIEiDsESApKMQibp1WvlwBtB+0N0AWQfIfmAF0A8ToAAQL0K6gDciTequifOckAAAAASUVORK5CYII=' }];
       if (table !== 'room_messages') return null;
       let rows = [...messages];
       const room = q.get('room_id')?.slice(3);

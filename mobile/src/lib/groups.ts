@@ -3,19 +3,40 @@
 import { TABS, type TabId } from './tabs';
 import type { Room, RoomCard, RoomMessage } from '../../../renderer/src/types';
 
-export type PlaceId = TabId | 'groups' | 'chats';
+export type PlaceId = TabId | 'everything' | 'chats';
 
 /**
- * The bottom bar: the four tabs, then Chats while the computer has AI
- * teammates on (your teammates and your groups are one page, as the desktop's
- * Chats is), else Groups while it has Groups on.
+ * The tabs: the four, or with a team on (Groups or AI teammates) Needs you,
+ * Everything else, which holds your In progress, Later and Done as your card's
+ * work (threads/Pages.tsx `StateTabsRow`), and Chats.
  */
-export function bottomTabs(groups: boolean, teammates = false): { id: PlaceId; label: string }[] {
-  if (teammates) return [...TABS, { id: 'chats', label: 'Chats' }];
-  return groups ? [...TABS, { id: 'groups', label: 'Groups' }] : [...TABS];
+export function bottomTabs(team: boolean): { id: PlaceId; label: string }[] {
+  return team ? [TABS[0], { id: 'everything', label: 'Everything else' }, { id: 'chats', label: 'Chats' }] : [...TABS];
 }
 
 export const LAST_GROUP_KEY = 'groups.last';
+
+export type BodyPart = { kind: 'words'; text: string } | { kind: 'picture'; name: string; alt: string } | { kind: 'file'; name: string; label: string };
+const STORED = /!?\[([^\]]*)\]\(attachments\/([A-Za-z0-9][\w.-]{0,159})\)/g;
+
+/** A message's words, and the files it links as `attachments/<name>`, in order (RoomChat.tsx `storedIn`). */
+export function bodyParts(text: string): BodyPart[] {
+  const out: BodyPart[] = [];
+  let at = 0;
+  for (const m of text.matchAll(STORED)) {
+    const words = text.slice(at, m.index).trim();
+    if (words) out.push({ kind: 'words', text: words });
+    out.push(m[0].startsWith('!') ? { kind: 'picture', name: m[2], alt: m[1] } : { kind: 'file', name: m[2], label: m[1] || m[2] });
+    at = m.index + m[0].length;
+  }
+  const rest = text.slice(at).trim();
+  // The full stop that followed a link means nothing alone under its file.
+  if (rest && !(at > 0 && /^[.,;:!?]+$/.test(rest))) out.push({ kind: 'words', text: rest });
+  return out;
+}
+
+const PICTURE_TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', heic: 'image/heic' };
+export const pictureType = (name: string) => PICTURE_TYPES[name.split('.').pop()?.toLowerCase() ?? ''] ?? 'image/png';
 
 /** The group Groups opens on: the one open last while you are still in it, else your team's, else the newest. */
 export function groupToOpen(rooms: readonly Room[], last: string | null): Room | null {
