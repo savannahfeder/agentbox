@@ -52,7 +52,7 @@ describe('after closing an imported chat, with the next one open', () => {
     expect(tour).not.toContain("step === 'palette' || step === 'startHere'");
   });
   it('and the confetti waits for the real end, when N has been learned too', () => {
-    expect(read('renderer/src/components/Tour.tsx')).toContain("t.done.includes('close') && t.done.includes('palette') && (t.sent || t.done.includes('start'));");
+    expect(read('renderer/src/tour.ts')).toContain("t.done.includes('close') && t.done.includes('palette') && (t.sent || t.done.includes('start'))");
   });
   it('and pressing N learns it', () => {
     expect(keyLearns('startHere', { key: 'n' })).toBe(true);
