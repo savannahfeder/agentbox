@@ -3,10 +3,12 @@
 /* The name is said once, on the page; the bar keeps the way back. A rename still opens its box there. */
 .app.one-at-a-time .thread-crumb-sep:has(+ .thread-crumb-name), .app.one-at-a-time .thread-crumb-name { display: none; }
 
-.one-nav { display: inline-flex; align-items: center; gap: 6px; margin-right: 6px; }
-.one-pos { margin-right: 8px; font: 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-faint); white-space: nowrap; }
+/* The arrows are a quiet pair, not two more boxes beside Cloud and Done. */
+.one-nav { display: inline-flex; align-items: center; gap: 0; }
+.ts-more.one-step { border-color: transparent; }
+.ts-more.one-step:hover { border-color: transparent; }
 .one-step:disabled { opacity: .35; cursor: default; }
-.one-step:disabled:hover { color: var(--text-dim); border-color: var(--line); background: none; }
+.one-step:disabled:hover { color: var(--text-dim); border-color: transparent; background: none; }
 
 /* Spaced so the link and its text read as one block under the name, with clear
    room before the question: 17, 13 and 27px of blank between the ink. */

@@ -166,7 +166,7 @@ import { useLessonPlace } from './lesson-position';
 import { ideasFor, runOfRule } from './first-run';
 import { Tour } from './components/Tour';
 import { laterTabShown } from './later-tab';
-import { THREAD_CLOSED, finishLesson, firstTask, noteSent, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, type Tour as TourState } from './tour';
+import { THREAD_CLOSED, finishLesson, firstTask, madeUrgent, noteSent, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   finishedCleared, firstRunNeeded, projectsOfTheirOwn, inboxCleared, laterCleared, laterId, laterIndex,
@@ -180,7 +180,7 @@ import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from
 import { runNowCommands } from './run-now';
 import { withOlder } from './older-threads';
 import { NO_FILTER, filterBox, isFiltering, type BoxFilter as BoxFilterState, type Harness } from './box-filter';
-import { itemPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mjs';
+import { URGENT_PRIORITY, itemPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mjs';
 import { rankProducts } from './project-priority';
 import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT } from './threads-made';
 import { waitingCounts } from './threads-made';
@@ -1131,6 +1131,10 @@ export default function App() {
   const setTour = useCallback((t: TourState) => { saveTour(localStorage, t); setTourState(t); }, []);
   const tourRef = useRef(tour);
   tourRef.current = tour;
+  // Making a thread urgent from that bar earns one more tip, saying what urgent does.
+  const urgentTold = useCallback((c: { value: number }) => {
+    if (c.value === URGENT_PRIORITY && tourLive(tourRef.current)) setTour(madeUrgent(finishLesson(tourRef.current!, 'palette')));
+  }, [setTour]);
   // The tutorial's last tip is the command bar, learned the moment it opens.
   const paletteWasOpen = useRef(false);
   useEffect(() => {
@@ -8152,7 +8156,7 @@ export default function App() {
                      run: () => { setModal(null); putAgentBackOn(sel.filter((i) => !working(i))); } }]
                 : []),
               ...priorityCommands(sel, directSlugs).map((c) => ({
-                ...c, run: () => { setModal(null); void retag(sel, c.value); },
+                ...c, run: () => { setModal(null); urgentTold(c); void retag(sel, c.value); },
               })),
             ];
           }
@@ -8314,7 +8318,7 @@ export default function App() {
             // one place she went looking for it was the one place it was
             // missing.
             ...priorityCommands([target], directSlugs).map((c) => ({
-              ...c, run: () => { setModal(null); void retag([target], c.value); },
+              ...c, run: () => { setModal(null); urgentTold(c); void retag([target], c.value); },
             })),
           ];
         })()}

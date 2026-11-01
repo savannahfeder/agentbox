@@ -135,10 +135,10 @@ describe('signed in to the cloud at all', () => {
 // 2026-10-17, later: with every run's relay in one shared host (main/cloud/host.mjs),
 // a run costs this Mac about 11 MB instead of about 110 (measured, 50 runs).
 describe('the cloud\'s cap', () => {
-  it('is fifty through the shared host, twenty without it, and hers when she sets one', () => {
+  it('is two hundred through the shared host, twenty without it, and hers when she sets one', () => {
     const { sup } = make();
     sup._cloudHostAvailable = () => true;
-    expect(sup._maxCloud()).toBe(50);
+    expect(sup._maxCloud()).toBe(200);
     sup._cloudHostAvailable = () => false;
     expect(sup._maxCloud()).toBe(20);
     sup.config.maxCloudSessions = 80;

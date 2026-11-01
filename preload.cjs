@@ -39,7 +39,7 @@ ipcRenderer.on('zero:write-held', async (_e, nonce) => {
 contextBridge.exposeInMainWorld('zero', {
   terminal: (payload) => ipcRenderer.invoke('zero:terminal', payload),
   agentUpdate: (payload) => ipcRenderer.invoke('zero:agent-update', payload),
-  snapshot: () => ipcRenderer.invoke('zero:snapshot'),
+  snapshot: (ask) => ipcRenderer.invoke('zero:snapshot', ask),
   // Which thread is on screen, so the approval card in front is its own and
   // ⌘Y answers the card being read (shared/which-card-is-in-front.mjs).
   looking: (payload) => ipcRenderer.invoke('zero:looking', payload),

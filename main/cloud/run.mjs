@@ -1759,7 +1759,7 @@ export async function cloudRun({
       }
       await layConversations(conversations);
     } catch (err) {
-      const said = String(err.message).split('\n')[0];
+      const said = String(err.message).split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 2).join(': ');
       if (tries >= 3) return park(rec, { record, conversations, why: `laying it into this folder failed ${tries} times (${said}); what the folder held before is on refs/agentbox/before-cloud/${stamp}` });
       writeMarker(here,{ ...rec, pid: null, state: 'import-failed' });
       return { ok: false, state: 'import-failed', laying: rec.laying, why: `laying the run into the folder failed (${said}); the earlier state is on refs/agentbox/before-cloud/${stamp}` };

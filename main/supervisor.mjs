@@ -60,6 +60,8 @@ import { cloudLoginState, mayRunOn, startCloudSignIn, renewCloudCodexLogin, swee
 import { execFileSync } from 'node:child_process';
 import { holdUntilHome } from './cloud/codex-cloud.mjs';
 import { hostSocketPath, perlRunsTheShim, HOST_ALREADY_THERE } from './cloud/host.mjs';
+import { runHostSocket, spoolFiles, HOST_ALREADY_THERE as RUN_HOST_ALREADY_THERE } from './run-host.mjs';
+import { HostedRun, HOST_LOST } from './hosted-run.mjs';
 import { readCloudUsage, summarizeCloudUsage } from './cloud/usage.mjs';
 import { buildSessionArgs, CLAUDE_MODES, permissionMode } from './settings.mjs';
 import fs from 'node:fs';
@@ -165,7 +167,8 @@ import { runsOn } from './runs-on.mjs';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mjs';
 import { startDecision, readMacPressureNow, SETTLE_MS } from './start-hold.mjs';
 import { MemoryLog } from './memory-log.mjs';
-import { autoSlots, DEFAULTS as MEMORY_GATE } from './memory-gate.mjs';
+import { StartBudget } from './cloud/start-budget.mjs';
+import { autoSlots, DEFAULTS as MEMORY_GATE, pressureFrom } from './memory-gate.mjs';
 import { LeftoverCleaner } from './leftovers.mjs';
 import { syncCodexMemoryGate } from './codex-memory-gate.mjs';
 import { autoAgents } from './machine.mjs';
@@ -289,9 +292,6 @@ const STORM_WINDOW_MS = 10 * 60_000;
 // the try before, in case what stopped it has gone away. Then it waits for a
 // person.
 const HELD_RETRY_MS = [30 * 60_000, 2 * 3_600_000, 8 * 3_600_000];
-// How many cloud runs may be packing and sending at once (`_cloudStarting`).
-// Turning the cloud on with Everything once started up to ten together.
-const CLOUD_STARTING_AT_ONCE = 2;
 // How long a cloud run may take to start before it stops holding others back.
 const CLOUD_START_PATIENCE_MS = 10 * 60_000;
 // A run paused to move to the cloud whose resume has not gone there by then
@@ -363,6 +363,10 @@ const FRUITLESS_RESTS_MS = [15 * 60_000, 60 * 60_000, 4 * 3_600_000, 12 * 3_600_
 export const QUIT_GRACE_MS = 500;
 
 /** SIGINT, SIGTERM or SIGHUP, as a signal or as the CLI's own exit code for one (130, 143, 129). */
+function pidAlive(pid) {
+  try { process.kill(pid, 0); return true; } catch (err) { return err?.code === 'EPERM'; }
+}
+
 export function diedOfAStopSignal(code, signal) {
   return ['SIGINT', 'SIGTERM', 'SIGHUP'].includes(signal) || [129, 130, 143].includes(code);
 }
@@ -515,6 +519,8 @@ export class Supervisor {
         this.spawnWorker(fresh, { continuation: true, shipFailure: reply });
       },
       afterShip: (shipped) => { this.onShipped(); this.watchMainsTests(shipped); this.reclaimShippedFolder(shipped); },
+      memoryGate: () => this._memoryGate?.gate ?? null,
+      shipScore: (item) => this.memoryGateScore(item.product, item.id) ?? 0,
     });
     // AND THEN SOMEBODY WATCHES THE RUN THAT SHIP STARTED. The whole suite runs
     // on GitHub for every push and takes about five minutes, which is after the
@@ -532,6 +538,7 @@ export class Supervisor {
     // The first run's hold, in memory only and never persisted: firstRunWalking
     // below says why.
     this._firstRunUntil = 0;
+    this._startBudget = new StartBudget();
     this._stateFile = path.join(config.storeRoot, '.zero-supervisor.json');
     try {
       const state = JSON.parse(fs.readFileSync(this._stateFile, 'utf8'));
@@ -998,7 +1005,7 @@ export class Supervisor {
     // or installing an update gets here BEFORE `killAll` does, so a Claude
     // cloud run is left going from here as well: SIGTERM would cancel it.
     this._quitting = true;
-    for (const s of this.sessions.values()) this._kill(s, s.cloud && s.engine !== 'codex' ? 'SIGHUP' : undefined);
+    for (const s of this.sessions.values()) if (!this._letGoOfHostedRun(s)) this._kill(s, s.cloud && s.engine !== 'codex' ? 'SIGHUP' : undefined);
     this.sessions.clear();
   }
 
@@ -1047,8 +1054,9 @@ export class Supervisor {
     this._quitting = true;
     // A Claude run in the cloud is left going, not stopped: SIGHUP tells its
     // proxy the app is quitting (main/cloud/run.mjs), and the run is joined and
-    // brought home when the app opens again.
-    for (const session of this.sessions.values()) this._kill(session, session.cloud && session.engine !== 'codex' ? 'SIGHUP' : undefined);
+    // brought home when the app opens again. A local run the run host holds is
+    // let go, and picked back up at the next start.
+    for (const session of this.sessions.values()) if (!this._letGoOfHostedRun(session)) this._kill(session, session.cloud && session.engine !== 'codex' ? 'SIGHUP' : undefined);
     this._closeCodex(`${Name} is quitting`);
     this.stopMemoryGate();
     clearInterval(this._leftoverTimer);
@@ -1344,6 +1352,13 @@ export class Supervisor {
         continue;
       }
       const item = items.find((i) => i.id === itemId && i.product === rec.product);
+      // Still going in the run host, whatever its row says: picked back up, not resumed.
+      if (item && this._adoptHostedRun(item, rec)) {
+        out.running += 1;
+        this._announcedRecovery.delete(itemId);
+        dirty = true;
+        continue;
+      }
       // A CLOUD RUN'S WORK COMES HOME WHATEVER BECAME OF ITS ROW. A worker
       // that marked its row done, or a row she archived, still left commits
       // in S3, and they are kept there only seven days. So the record stays
@@ -4199,7 +4214,7 @@ export class Supervisor {
     if (!this._cloudFirst() && !this._moveAsked?.size) return;
     if (!this._cloudUsable('claude')) return;
     const pausing = [...(this._toCloud?.keys() ?? [])].filter((id) => !this.sessions.has(id)).length;
-    let starts = CLOUD_STARTING_AT_ONCE - this._cloudStarting(now) - pausing;
+    let starts = this._startBudget.now() - this._cloudStarting(now) - pausing;
     let room = this._maxCloud() - this._cloudLoad() - pausing;
     if (starts <= 0 || room <= 0) return;
     const byId = new Map((items ?? []).map((i) => [i.id, i]));
@@ -5366,6 +5381,7 @@ export class Supervisor {
     if (!times) return;
     session.cloudSentAt = Date.now();
     session.cloudTimes = times;
+    this._startBudget.started(this._howTheMachineIs());
     this.wake?.();
   }
 
@@ -5460,7 +5476,13 @@ export class Supervisor {
     const set = this.config.maxCloudSessions;
     const n = Number(set);
     if (set !== null && set !== undefined && set !== '' && Number.isFinite(n) && n >= 0) return n;
-    return this._cloudHostAvailable() ? 50 : 20;
+    return this._cloudHostAvailable() ? 200 : 20;
+  }
+
+  // What a cloud start that just went out says about whether another may.
+  _howTheMachineIs() {
+    const reading = this._memReading;
+    return { pressure: reading ? pressureFrom(reading) : undefined, stallMs: this.stalls?.longestNow?.() ?? 0 };
   }
 
   _cloudHostAvailable() {
@@ -5480,7 +5502,7 @@ export class Supervisor {
   // the proxy's command; Codex as its own app-server in the sandbox
   // (main/cloud/codex-cloud.mjs).
   _cloudSlotFor(engine) {
-    return this._cloudUsable(engine) && this._cloudRoom(engine) && this._cloudStarting() < CLOUD_STARTING_AT_ONCE;
+    return this._cloudUsable(engine) && this._cloudRoom(engine) && this._cloudStarting() < this._startBudget.now();
   }
 
   // Not resting after failures of its own (`_noteCloudOutcome`), and not a
@@ -5556,6 +5578,7 @@ export class Supervisor {
     // down and the thread runs here (main/cloud/run.mjs `NO_PLAIN_HERE`).
     if (said && /earlier cloud run in this folder|cannot take a project with no repository/.test(said)) return;
     h.faults += 1;
+    this._startBudget.failed();
     h.lastError = said || `a cloud run ended (${signal || code}) before its agent started`;
     if (h.faults >= CLOUD_FAULTS_TO_REST) h.restUntil = Date.now() + CLOUD_REST_MS;
     this.onChange?.();
@@ -5608,7 +5631,8 @@ export class Supervisor {
       product: item.product ?? null,
       engine: session.engine ?? null,
       seconds: Math.max(0, Math.round((at - session.startedAt) / 1000)),
-      failed: !!session.exitFailed,
+      // A quit or an update cut it off; the worker did not fail.
+      failed: !!session.exitFailed && !session.cutOffByQuit,
     }, { file: this.runLedger ?? runLedgerPath() });
   }
 
@@ -5881,7 +5905,7 @@ export class Supervisor {
 
   // Why a thread `_waitsForCloud` has no cloud slot yet, the way `_cloudSlotFor` asks.
   _whyWaitingForCloud(engine) {
-    if (this._cloudStarting() >= CLOUD_STARTING_AT_ONCE) return { why: 'two-at-a-time' };
+    if (this._cloudStarting() >= this._startBudget.now()) return { why: 'starting-in-turn' };
     if (this._cloudLoad() >= this._maxCloud()) return { why: 'cloud-full', detail: this._maxCloud() };
     if (!this._cloudReady(engine)) return { why: 'accounts-limited' };
     return { why: 'cloud-busy' };
@@ -5943,6 +5967,89 @@ export class Supervisor {
       console.warn('zero: the cloud host could not start, so cloud runs each run their own relay:', error.message);
       return null;
     }
+  }
+
+  /** Where the run host keeps what this app's runs print. */
+  _runSpool() {
+    return path.join(this.userDir, 'run-spool');
+  }
+
+  // THE RUN HOST'S SOCKET (main/run-host.mjs), starting one if none of this
+  // code's is running. It outlives the app, so a quit leaves its runs going.
+  // A host that lost a run before it started is not used again for ten
+  // minutes: runs start directly, as they did before there was one.
+  _runHost() {
+    if (Date.now() - (this._runHostBroken ?? 0) < 10 * 60_000) return null;
+    this._runHostSock ??= runHostSocket();
+    const had = this._runHostProc;
+    const running = had?.exitCode === null && had.signalCode === null;
+    if (running || (had?.exitCode === RUN_HOST_ALREADY_THERE && fs.existsSync(this._runHostSock))) return this._runHostSock;
+    try {
+      const log = fs.openSync(path.join(this.userDir, 'run-host.log'), 'a');
+      const proc = spawn(process.execPath, [fileURLToPath(new URL('./run-host.mjs', import.meta.url)), this._runHostSock, this._runSpool()], {
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+        detached: true,
+        stdio: ['ignore', log, log],
+      });
+      fs.closeSync(log);
+      proc.on('error', () => {});
+      proc.unref();
+      this._runHostProc = proc;
+      return this._runHostSock;
+    } catch (error) {
+      console.warn(`${nameSlug}: the run host could not start, so runs start directly:`, error.message);
+      return null;
+    }
+  }
+
+  // A LOCAL RUN THE RUN HOST HOLDS IS LET GO, NOT STOPPED, on a quit or a
+  // restart, and picked back up at the next start (`_adoptHostedRun`). One
+  // whose session id has not arrived has nothing to be found again by, so it
+  // is stopped and resumed as before.
+  _letGoOfHostedRun(s) {
+    if (!s?.hosted || !(s.child instanceof HostedRun)) return false;
+    const rec = this._liveSessions?.[s.itemId];
+    if (!rec || !s.sessionId || rec.sessionId !== s.sessionId) return false;
+    const read = s.child.detach();
+    if (!read) return false;
+    s.letGo = true;
+    this._liveSessions[s.itemId] = {
+      ...rec,
+      hosted: { runId: s.child.runId, sock: s.child.sockPath, pid: s.child.pid ?? null, ...read },
+      heard: s.carrying ?? null,
+      carriesHandBack: !!s.carriesHandBack,
+      resumed: !!s.resumed,
+      spawnFiles: s.spawnFiles ?? [],
+      repoHead: s.repoBefore ? { root: s.repoBefore.root, head: s.repoBefore.head, at: s.repoBefore.at } : null,
+    };
+    this._saveState();
+    return true;
+  }
+
+  // A RUN THAT CARRIED ON WHILE THE APP WAS AWAY IS THIS THREAD'S RUN AGAIN:
+  // the same session, its output read on from where the app stopped, its end
+  // handled as any run's. False when there is nothing to attach to, and the
+  // restart sweep resumes it from its transcript as before.
+  _adoptHostedRun(item, rec) {
+    const h = rec?.hosted;
+    if (!this.hostRuns || !h?.runId || !h.sock || rec.cloud || this.sessions.has(item.id)) return false;
+    const alive = Number.isInteger(h.pid) && pidAlive(h.pid);
+    if (!alive && !fs.existsSync(spoolFiles(this._runSpool(), h.runId).exit)) return false;
+    if (!fs.existsSync(h.sock)) return false;
+    const product = this.store.listProducts().find((p) => p.slug === item.product);
+    if (!product) return false;
+    const child = new HostedRun({ sockPath: h.sock, runId: h.runId, out: h.out ?? null, err: h.err ?? null, pid: h.pid });
+    // The session holds it now; a record left pointing at it would be attached to again.
+    const { hosted: _taken, ...kept } = rec;
+    this._liveSessions[item.id] = kept;
+    // A reply written while the app was away was not heard by this run.
+    const heard = !!rec.heard && !!item.answer && this._answerKey(item) === rec.heard;
+    this._startSession(heard ? item : { ...item, answer: null }, {
+      product, cwd: rec.cwd, profile: rec.profile, engine: rec.engine ?? 'claude', where: 'local',
+      plan: { args: [], command: false, resumeId: rec.resumed ? rec.sessionId : null },
+      continuation: !!rec.continuation, spawnFiles: rec.spawnFiles ?? [], adopted: { child, rec },
+    });
+    return true;
   }
 
   // The Claude account folder a profile names, spelled out, because the
@@ -9972,8 +10079,9 @@ export class Supervisor {
       refuse('practice', engine);
       return;
     }
-    if (this._folderFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, asked })) return;
-    if (this._photoFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, asked })) return;
+    const startAgain = { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, shipFailure, asked };
+    if (this._folderFirst(item, product, engine, startAgain)) return;
+    if (this._photoFirst(item, product, engine, startAgain)) return;
 
     // THE ROW'S OWN FOLDER, RESOLVED BEFORE ANYTHING IS ALLOCATED FOR THE RUN.
     // Everything downstream follows this one word: the snapshot the change card
@@ -10107,6 +10215,13 @@ export class Supervisor {
         return;
       }
     }
+    this._startSession(item, { product, cwd, profile, engine, plan, where, whyLocal, remoteOnly, continuation, model, spawnFiles });
+  }
+
+  // From the process on: the session, its readers and its exit. A run the app
+  // reattached to after a restart comes in here with its process (`_adoptHostedRun`).
+  _startSession(item, { product, cwd, profile, engine, plan, where, whyLocal = null, remoteOnly = false, continuation = false, model = null, spawnFiles = [], adopted = null }) {
+    const { args } = plan;
     // A SECOND ACCOUNT ARRIVES EMPTY, AND THIS IS WHERE IT STOPS BEING EMPTY.
     // Our own Accounts page tells a person to log in with a brand new folder,
     // and Claude Code reads a session's skills, commands and subagents out of
@@ -10132,7 +10247,11 @@ export class Supervisor {
     // A CLOUD RUN IS THE SAME HARNESS, A DIFFERENT PROGRAM: Claude Code's runs
     // main/cloud/run-cli.mjs with the same arguments (main/harnesses/claude.mjs),
     // Codex's talks to an app-server in the sandbox (`_spawnCodexWorker`).
-    const child = harness.spawn(this, plan, { cwd, item, profile, env, cloud: where === 'cloud' });
+    // A LOCAL RUN IS HELD BY THE RUN HOST, so a quit or a restart leaves it
+    // and its helpers going (main/run-host.mjs).
+    const hosted = !!this.hostRuns && where !== 'cloud' && !remoteOnly && !plan.command;
+    const child = adopted?.child ?? harness.spawn(this, plan, { cwd, item, profile, env, cloud: where === 'cloud', host: hosted ? this._runHost() : null });
+    if (child instanceof HostedRun && !adopted) child.once('exit', (code) => { if (code === HOST_LOST && !Number.isInteger(child.pid)) this._runHostBroken = Date.now(); });
 
     // `command` RIDES ON THE SESSION so the cap can leave it out (`_load`).
     // The exit handler already needed the same fact from `plan`; this is that
@@ -10145,8 +10264,10 @@ export class Supervisor {
     // from the session and not from the item. Reading `item.engine` again down
     // there would be a second decision that could disagree with `_engineFor`.
     const session = {
-      child, itemId: item.id, product: item.product, startedAt: Date.now(), tail: [], profile,
+      child, itemId: item.id, product: item.product, startedAt: adopted?.rec.startedAt ?? Date.now(), tail: [], profile,
       command: !!plan.command, engine,
+      hosted: child instanceof HostedRun,
+      ...(adopted ? { sessionId: adopted.rec.sessionId, idRemembered: true, adopted: true } : {}),
       // Picking up a conversation an earlier run had, so a death says "not finished".
       resumed: !!plan.resumeId,
       // Which model, so a plan that refuses it strikes that model off this login.
@@ -10161,18 +10282,20 @@ export class Supervisor {
       // Mac's slots (`_loadFor`), shown on the thread, remembered for a
       // restart (`_liveSessions`).
       cloud: where === 'cloud',
-      carriesHandBack: where !== 'cloud' && this._noteCarryingHandBack(item.id),
+      carriesHandBack: adopted ? !!adopted.rec.carriesHandBack : where !== 'cloud' && this._noteCarryingHandBack(item.id),
       whyLocal:where === 'cloud' || plan.command ? null : whyLocal ?? this._whyLocal({ item, product, cwd, engine, remoteOnly }),
     };
     this._noteRunCarrying(item, session, { continuation });
     if (session.cloud) this._rememberCloudStart(item, session, { continuation });
     // The memory gate's clock counts starts on this Mac only: a cloud start
     // uses none of its memory (Codex's review, 2026-10-13).
-    if (this._startsOnThisMac(session)) this._lastStartAt = session.startedAt;
+    if (this._startsOnThisMac(session) && !adopted) this._lastStartAt = session.startedAt;
     // THAT an agent started work, and on which engine; nothing about the task.
     // `count` is set by main.mjs and is absent wherever nothing is sent.
-    this.count?.('run_started', { engine });
+    if (!adopted) this.count?.('run_started', { engine });
     this._notStarting?.delete(item.id);
+    // A hosted worker's pid arrives once the host has started it.
+    if (!Number.isInteger(child?.pid)) child.once?.('spawn', () => { if (Number.isInteger(child.pid)) this._leftoverCleaner?.worker(item.id, child.pid); });
     // Its worker, so a run left "running" by a crash can later be told ended.
     if (Number.isInteger(child?.pid)) this._leftoverCleaner?.worker(item.id, child.pid);
     if (harness.capabilities.remoteControl) {
@@ -10214,7 +10337,9 @@ export class Supervisor {
     // and the conversation carries the card exactly as it did before.
     // Taken off the main thread a moment ago by `_photoFirst`, before the
     // process existed; read here inline only when that step did not run.
-    if (this._photos?.has(item.id)) session.repoBefore = this._photos.get(item.id);
+    // A reattached run kept only the commit it started from; its files' text was not saved.
+    if (adopted) session.repoBefore = adopted.rec.repoHead ? { ...adopted.rec.repoHead, before: new Map() } : null;
+    else if (this._photos?.has(item.id)) session.repoBefore = this._photos.get(item.id);
     else { try { session.repoBefore = snapshotRepo(cwd); } catch { session.repoBefore = null; } }
 
     // A MODE BELONGS TO THE THREAD, NOT TO ONE SEND, AND THIS IS WHERE THAT
@@ -10305,7 +10430,8 @@ export class Supervisor {
       // nulls `trace` and a second error on the same dead stream must still
       // find a listener rather than escaping as an uncaught exception.
       opening.on('error', (err) => { if (trace === opening) traceFailed(err); });
-      trace.write(`# ${item.title}\n# ${item.id} · spawned ${new Date(session.startedAt).toISOString()}${continuation ? ' · continuation (the founder answered)' : ''}\n\n`);
+      if (adopted) trace.write(`\n# picked back up ${new Date().toISOString()} · ${Name} restarted and the run carried on\n\n`);
+      else trace.write(`# ${item.title}\n# ${item.id} · spawned ${new Date(session.startedAt).toISOString()}${continuation ? ' · continuation (the founder answered)' : ''}\n\n`);
     } catch (err) { traceFailed(err); }
     // Said once, on the spawn that made the links, and never again after that.
     const toolingSaid = toolingLine(tooling);
@@ -10395,11 +10521,15 @@ export class Supervisor {
           // brought home, so a restart that finds none waits for that rather
           // than leaving the row stranded (`recoverInterrupted`).
           ...(session.cloud ? { cloud: true } : {}),
+          // Where to find it again after a restart (`_adoptHostedRun`). With no
+          // read position saved, as after a crash, it is read on from then.
+          ...(session.hosted ? { hosted: { runId: child.runId, sock: child.sockPath, pid: child.pid ?? null } } : {}),
         };
         // AND THE ROW'S CHAT, written at the same instant and for the same
         // reason. A resumed session announces the id it is resuming, so this
         // records the same id it already held and the thread keeps its name
         // across as many replies as she writes.
+        if (session.hosted) child.keep();
         this.rememberRowSession(item, { sessionId: session.sessionId, cwd, profile, engine, startedAt: session.startedAt });
         this._stoppedSessionTakenUp(item, session);
         this._saveState();
@@ -10640,13 +10770,13 @@ export class Supervisor {
       // starts quitting within the grace, the person stopped it, not the task.
       if (!session.stoppedByUs && !this._quitting && diedOfAStopSignal(code, signal)) {
         const t = setTimeout(() => {
-          if (this._quitting) session.stoppedByUs = true;
+          if (this._quitting) session.stoppedByUs = session.cutOffByQuit = true;
           settleExit(code, signal, how);
         }, QUIT_GRACE_MS);
         t.unref?.();
         return;
       }
-      if (this._quitting) session.stoppedByUs = true;
+      if (this._quitting) session.stoppedByUs = session.cutOffByQuit = true;
       settleExit(code, signal, how);
     });
     this.onChange?.();

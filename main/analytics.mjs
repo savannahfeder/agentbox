@@ -279,7 +279,7 @@ export function createDailyCount(track) {
 export function runEndedProps(session, now) {
   return {
     seconds: Math.round((now - (session.startedAt ?? now)) / 1000),
-    failed: !!session.exitFailed,
+    failed: !!session.exitFailed && !session.cutOffByQuit,
     engine: session.engine,
   };
 }

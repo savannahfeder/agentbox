@@ -15,6 +15,7 @@ import { useLook } from '../state/look';
 import { PriorityBars, T, Wall } from '../ui/parts';
 import { SETTINGS_PAGES } from '../ui/SettingsPages';
 import { color, font, size } from '../ui/theme';
+import { StatusNotice } from '../ui/StatusNotice';
 
 const Glass = () => (
   <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={color.faint} strokeWidth={1.1} strokeLinecap="round"><Circle cx={10.8} cy={10.8} r={6.6} /><Path d="M15.6 15.6 20 20" /></Svg>
@@ -106,11 +107,7 @@ export default function Search() {
           </View>
         </View>
       </View>
-      {c.status && (
-        <View accessibilityRole="alert" style={{ marginTop: 6, marginHorizontal: size.inset, marginBottom: 2, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: color.lineStrong }}>
-          <T style={{ fontSize: 13, lineHeight: 18.2, color: color.dim }}>{c.status}</T>
-        </View>
-      )}
+      <StatusNotice message={c.status} />
       <FlatList
         data={all ? found : found.slice(0, THREADS_SHOWN)}
         keyExtractor={(h) => h.key}
