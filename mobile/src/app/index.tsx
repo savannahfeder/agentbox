@@ -30,6 +30,7 @@ import type { PhoneRepeat } from '../../../renderer/src/phone-repeats';
 import { barsFor } from '../ui/Pickers';
 import { footRoom, IconButton, PriorityBars, RunningMark, T, TopBar, Wall } from '../ui/parts';
 import { color, font, size } from '../ui/theme';
+import { StatusNotice } from '../ui/StatusNotice';
 
 // The desktop's own words for an empty tab (renderer/src/threads/Pages.tsx `EmptyTab`).
 const EMPTY: Record<Exclude<TabId, 'inbox'>, string> = {
@@ -364,12 +365,7 @@ export default function Threads() {
         <ViewButton display={display} open={menu} onPress={() => setMenu(!menu)} />
         <IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>
       </>} below={board ? undefined : <Tabs on={onEverything ? 'everything' : tab} counts={counts} pick={setPlace} team={teamMode} />} />
-      {/* `.phone-status` (threads/pages.css): the line saying what you see may be out of date. */}
-      {c.status && (
-        <View accessibilityRole="alert" style={{ marginTop: 6, marginHorizontal: size.inset, marginBottom: 2, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: color.lineStrong }}>
-          <T style={{ fontSize: 13, lineHeight: 18.2, color: color.dim }}>{c.status}</T>
-        </View>
-      )}
+      <StatusNotice message={c.status} />
       {onEverything
         ? <EverythingPlace mine={mineBoard ? <Board columns={mineBoard} foot={foot} inset={size.inset} /> : list} mineTabs={mineTabs} row={threadRow} openGroup={openGroup} />
         : board ? <Board columns={board} foot={foot} /> : list}
