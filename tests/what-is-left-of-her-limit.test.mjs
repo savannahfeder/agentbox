@@ -10,11 +10,11 @@
 // so a pill that is an hour out is worse than no pill.
 
 import { describe, it, expect } from 'vitest';
-import { pillText, readUsage, resetAt } from '../shared/claude-usage.mjs';
-// The words the panel prints left shared/claude-usage.mjs on 2026-09-05, because
+import { pillText, readUsage, resetAt } from '../shared/claude-usage.mts';
+// The words the panel prints left shared/claude-usage.mts on 2026-09-05, because
 // the corner draws Codex's limits too now and a Codex reading may not flow
 // through a module called `claude-usage`. Same functions, same rules, one home.
-import { sessionLimit, untilReset, usageSentence } from '../shared/usage.mjs';
+import { sessionLimit, untilReset, usageSentence } from '../shared/usage.mts';
 
 const REAL = `You are currently using your subscription to power your Claude Code usage
 

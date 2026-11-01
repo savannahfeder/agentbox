@@ -15,7 +15,7 @@
 // words, other causes say nothing of a plan's limit, and the opener that
 // `deadRunCause` reads back off stored threads is unchanged.
 import { describe, it, expect } from 'vitest';
-import { deadRunCause, deadRunSentence } from '../shared/spawn-trouble.mjs';
+import { deadRunCause, deadRunSentence } from '../shared/spawn-trouble.mts';
 import { cloudFootLine } from '../renderer/src/cloud-menu';
 
 const limit = (extra) => deadRunSentence({ cause: 'at-limit', ...extra });

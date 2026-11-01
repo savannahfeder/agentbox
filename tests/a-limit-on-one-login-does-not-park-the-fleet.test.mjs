@@ -34,7 +34,7 @@ import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
 import { readSettings } from '../main/settings.mts';
 import { forgetDiscovery } from '../main/account-discovery.mjs';
-import { limitResetsAt, limitResetMoment, deadRunSentence } from '../shared/spawn-trouble.mjs';
+import { limitResetsAt, limitResetMoment, deadRunSentence } from '../shared/spawn-trouble.mts';
 
 // The line Claude Code printed on the login that hit the limit, copied off the
 // run that started this.

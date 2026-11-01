@@ -1,6 +1,6 @@
 import { openSourceFile } from './open-source-file.mts';
 import {submitReply} from './live-replies.mts';
-import { whyItCannotMove } from '../shared/move-thread.mjs';
+import { whyItCannotMove } from '../shared/move-thread.mts';
 import { createEngineSetup } from './engine-setup.mts';
 // IPC: a thin, typed-by-convention surface. The renderer asks; the main
 // process derives from files and answers. Pushes go one way: "state changed,
@@ -23,19 +23,19 @@ import { createEngineSetup } from './engine-setup.mts';
 import {terminalSenderAllowed} from './terminal-access.mts';
 import {TaskTerminals,terminalPlace,terminalEnv} from './task-terminals.mts';
 import {TerminalHosts,taskClosed} from './terminal-hosts.mts';
-import {SETTINGS_TERMINAL} from '../shared/settings-terminal.mjs';
+import {SETTINGS_TERMINAL} from '../shared/settings-terminal.mts';
 import {AgentUpdates,installedAgent} from './agent-updates.mts';
 import {refreshAgentModels} from './refresh-agent-models.mts';
 import {readInstruction,writeInstruction,listVersions,readVersion} from './instruction-settings.mts';
 import path from 'node:path';
 import os from 'node:os';
-import { looksLikeClaudeCode } from '../shared/claude-code-shape.mjs';
+import { looksLikeClaudeCode } from '../shared/claude-code-shape.mts';
 import fsWatch from 'node:fs';
 import { listFolders } from './folders.mts';
 import { feedbackUrl, sendFeedback } from './feedback.mts';
 import { feedbackPayload } from '../shared/feedback.mjs';
 import * as approvals from './approvals.mjs';
-import { cardsInFront } from '../shared/which-card-is-in-front.mjs';
+import { cardsInFront } from '../shared/which-card-is-in-front.mts';
 import { restartNeeded } from './staleness.mts';
 import { artifactRoots, resolveArtifact } from './artifact-path.mts';
 import { folderPictures } from './folder-pictures.mts';
@@ -51,7 +51,7 @@ import { ClaudeUsage } from './claude-usage.mts';
 import { AccountUsage } from './account-usage.mts';
 import { effectiveProfiles } from './account-discovery.mjs';
 import { accountIdentity } from './account-tooling.mjs';
-import { usageEngine } from '../shared/usage.mjs';
+import { usageEngine } from '../shared/usage.mts';
 import { DEFAULT_ENGINE, isEngine } from '../shared/engines.mjs';
 import { routedPatch, PICKED_WHY } from '../shared/auto-route.mjs';
 import * as agents from './agents.mts';
@@ -60,18 +60,18 @@ import { readCodexThreadsOffThread } from './codex-threads.mts';
 import { appSessionFolders } from './agent-homes.mts';
 import { readImportableThreads, readSearchableThreads } from './importable-threads.mts';
 import { readChatEnds } from './agent-sessions.mts';
-import { markImported } from '../shared/agent-import.mjs';
-import { codexIdOf, importChoice, isCodexImportRow, isNotImportedRow } from '../shared/codex-import.mjs';
-import { checkProjectFolder, chooserStartsIn } from '../shared/project-folder-check.mjs';
+import { markImported } from '../shared/agent-import.mts';
+import { codexIdOf, importChoice, isCodexImportRow, isNotImportedRow } from '../shared/codex-import.mts';
+import { checkProjectFolder, chooserStartsIn } from '../shared/project-folder-check.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { openDemo } from './demo.mts';
 import { AgentSchedule } from './agent-schedule.mts';
 import { agentKey } from '../shared/agents.mjs';
 import { machineryPath } from './store/home.mjs';
-import { EVENT_NAMES } from '../shared/analytics-events.mjs';
+import { EVENT_NAMES } from '../shared/analytics-events.mts';
 import { Name } from '../shared/product-name.mjs';
 import { handedOnByReply } from '../shared/team-rules.mjs';
-import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mjs';
+import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mts';
 import { saveAttachments } from './save-attachments.mts';
 import { stageAttachment } from './stage-attachment.mts';
 import type { AnswerInput, ComposeInput, Store, StoreConfig } from './store.mts';
@@ -205,7 +205,7 @@ const NO_UPDATER: IpcUpdater = {
   check: async () => NO_UPDATER.state(),
   install: () => false,
   // Nowhere to move to and nothing to move: a copy with no updater behind it
-  // is a copy run from source (shared/where-it-runs-from.mjs).
+  // is a copy run from source (shared/where-it-runs-from.mts).
   move: () => ({ moved: false, error: null }),
 };
 
@@ -341,7 +341,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   };
 
   // THE THREAD ON SCREEN, WHICH IS WHOSE CARD IS IN FRONT. The rule itself is
-  // shared/which-card-is-in-front.mjs, because the chord and the Agents menu
+  // shared/which-card-is-in-front.mts, because the chord and the Agents menu
   // answer in THIS process, ahead of the page: reading a different order from
   // the one on screen means ⌘Y allows a command nobody was reading.
   let looking: { product: string | null; id: string } | null = null;
@@ -590,7 +590,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const running = supervisor.status();
     const engines = supervisor.engineFacts(items);
     // WHICH CODING AGENT THE CORNER IS ABOUT, ANSWERED ONCE, HERE.
-    // `usageEngine` is the rule (shared/usage.mjs) and it is the byline's own
+    // `usageEngine` is the rule (shared/usage.mts) and it is the byline's own
     // -- what is running beats what would run -- asked about the app instead of
     // about a row.
     const usageFor = usageEngine({ workspace: engines.workspace, running: running.running });
@@ -616,7 +616,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       teammates: alpha.teammates ? (() => { try { return store.teammatesView(items, now); } catch (err) { return { list: [], chat: [], runs: [], error: (err as Error).message }; } })() : null,
       agents: liveAgents(),
       // The open thread's own card first, which is the order the chord and the
-      // Agents menu answer in too (shared/which-card-is-in-front.mjs).
+      // Agents menu answer in too (shared/which-card-is-in-front.mts).
       approvals: pendingApprovals(),
       supervisor: running,
       // WHETHER THERE ARE TWO CODING AGENTS TO CHOOSE BETWEEN, AND WHICH ONE
@@ -793,7 +793,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped }: AnswerInput & { product: string; id: string; now?: unknown; inReplyTo?: unknown; closeUnshipped?: boolean }) => {
     if (isAgentRow(id)) return { ok: false };
-    // WORK THAT NEVER REACHED MAIN IS NOT CLOSED UNASKED (shared/not-shipped.mjs).
+    // WORK THAT NEVER REACHED MAIN IS NOT CLOSED UNASKED (shared/not-shipped.mts).
     // The window asks first and says so with `closeUnshipped`; the phone and
     // anything else are turned down with the reason.
     if (status === 'done' && product && id) {
@@ -1048,7 +1048,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     }
   });
   // MOVE A THREAD TO ANOTHER PROJECT (w-c9da359466). Only a thread nothing has
-  // ever run on: shared/move-thread.mjs says why, and the store asks again.
+  // ever run on: shared/move-thread.mts says why, and the store asks again.
   // The one fact only this side has is whether a worker is inside it right
   // now, which no field on the row can stand in for.
   ipcMain.handle('zero:move-item', (_e, { product, id, to }: { product: string; id: string; to: string }) => {
@@ -1369,7 +1369,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // AND IT OPENS WHERE THE PROJECTS ARE, NOT ON HOME (F-148). A first run with
   // nothing connected yet opened the window on the home folder, which is the
   // one folder the check above refuses: a tester saw a single folder listed and
-  // had to press Ctrl+L to type a path. shared/project-folder-check.mjs orders
+  // had to press Ctrl+L to type a path. shared/project-folder-check.mts orders
   // the candidates; the first that exists on this disk is the one.
   ipcMain.handle('zero:choose-folder', async (_e, { startIn }: { startIn?: string } = {}) => {
     const connected = store.listProducts().map((p) => p.repoPath).filter(Boolean);
@@ -2403,7 +2403,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:update-check', async () => updater.check({ manual: true }));
   ipcMain.handle('zero:update-install', () => ({ started: updater.install() }));
   // AND A THIRD, for the copy that cannot update itself from where it is: move
-  // the app into Applications (shared/where-it-runs-from.mjs). It is a door of
+  // the app into Applications (shared/where-it-runs-from.mts). It is a door of
   // its own rather than part of the install, because it is the opposite
   // decision — nothing has been downloaded and nothing will be until the app
   // is somewhere macOS lets it write.

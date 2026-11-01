@@ -620,7 +620,7 @@ export function refusedCodexWorker(sentence: unknown): CodexWorker {
  * Why a turn did not finish: the server's message, with the `codexErrorInfo`
  * code in front when it is a plain string.
  *
- * shared/spawn-trouble.mjs classifies on that code (for example
+ * shared/spawn-trouble.mts classifies on that code (for example
  * `usageLimitExceeded` or `unauthorized`), which cannot drift the way prose
  * can; a signed-out run carries raw HTTP text, not Codex's words. The code goes
  * first because `noteExitForBackoff` cuts the last stderr line to 300

@@ -21,9 +21,9 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   MAX_LINE, clip, firstRunAnswer, fromDescription, fromReadme, plainText,
-} from '../shared/first-run-line.mjs';
+} from '../shared/first-run-line.mts';
 import { answerFor, countFolder, describeFor, readDescription, readReadme } from '../main/first-run.mts';
-import { howLongAgo, mainLanguage, projectSentence } from '../shared/first-run-shape.mjs';
+import { howLongAgo, mainLanguage, projectSentence } from '../shared/first-run-shape.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { ANSWER_AFTER_MS, FIRST_RUN_LABEL, coach, walkRows } from '../renderer/src/onboarding.ts';
 import { NAME, Name } from '../shared/product-name.mjs';

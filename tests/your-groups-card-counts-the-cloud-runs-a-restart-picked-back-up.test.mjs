@@ -19,7 +19,7 @@ import { PassThrough } from 'node:stream';
 import { Supervisor } from '../main/supervisor.mts';
 import { Store } from '../main/store.mts';
 import { roomsSetup } from '../main/team/room-setup.mts';
-import { myPresence } from '../shared/room-cards.mjs';
+import { myPresence } from '../shared/room-cards.mts';
 
 let tmp; let store; let sup; let rooms; let joined; let folder; let relays; let homeWas;
 

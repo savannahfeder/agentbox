@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { analyticsKey, createAnalytics, diagnosticsOn } from '../main/analytics.mts';
-import { EVENTS, EVENT_NAMES, sanitize } from '../shared/analytics-events.mjs';
+import { EVENTS, EVENT_NAMES, sanitize } from '../shared/analytics-events.mts';
 import { Name } from '../shared/product-name.mjs';
 
 const tmpdir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-analytics-'));

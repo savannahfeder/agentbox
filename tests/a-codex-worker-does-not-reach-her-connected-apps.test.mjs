@@ -48,7 +48,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { workerThreadParams, resumeThreadParams, createCodexWorker } from '../main/codex-session.mts';
-import { troubleCause } from '../shared/spawn-trouble.mjs';
+import { troubleCause } from '../shared/spawn-trouble.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 /* ============================== the switch =============================== */

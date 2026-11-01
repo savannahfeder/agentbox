@@ -21,7 +21,7 @@ import {
   importedAgentBrief,
   importedAgentName,
   shortenHome,
-} from '../shared/agent-import.mjs';
+} from '../shared/agent-import.mts';
 import { belongsInInbox } from '../renderer/src/list-rules.ts';
 
 const HOME = '/Users/someone';

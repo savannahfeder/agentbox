@@ -1,5 +1,5 @@
 // A THREAD NAMED WITH # REACHES THE AGENT'S BRIEF, read off the real store
-// (w-c110f2371d). shared/named-threads.mjs writes the section; this drives the
+// (w-c110f2371d). shared/named-threads.mts writes the section; this drives the
 // Supervisor's briefs over a real ledger on disk, because a section that stops
 // being added throws nothing: the agent just arrives holding a bare id again.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

@@ -19,8 +19,8 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { codexLimits, windowSpan } from '../shared/codex-usage.mjs';
-import { headlineLimit, sessionLimit, usageSentence } from '../shared/usage.mjs';
+import { codexLimits, windowSpan } from '../shared/codex-usage.mts';
+import { headlineLimit, sessionLimit, usageSentence } from '../shared/usage.mts';
 import { loggedCodexLimits, forgetLoggedLimits } from '../main/codex-usage-file.mts';
 import { CodexUsage } from '../main/codex-usage.mts';
 

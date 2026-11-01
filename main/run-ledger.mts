@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { appHome, machineryDir } from './store/home.mjs';
-import { dedupeRuns, runFromTrace } from '../shared/agent-hours.mjs';
+import { dedupeRuns, runFromTrace } from '../shared/agent-hours.mts';
 
 const BACKFILL_DAYS = 400;
 const TAIL_BYTES = 400;

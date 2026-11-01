@@ -10,7 +10,7 @@
 // passed to it, a report is written to disk and nothing leaves the machine.
 // That is also the honest default for a build we have not shipped yet.
 //
-// Every payload is built by `shared/crash-scrub.mjs`'s allowlist and then
+// Every payload is built by `shared/crash-scrub.mts`'s allowlist and then
 // checked again by `findPrivate` before it is written. A report that fails the
 // check is not sent minus the bad field; the whole report is dropped and a
 // counter is written instead, because a scrub that quietly half-works is how a
@@ -19,8 +19,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { findPrivate, scrubError, scrubText } from '../shared/crash-scrub.mjs';
-import { readInstallId } from '../shared/install-id.mjs';
+import { findPrivate, scrubError, scrubText } from '../shared/crash-scrub.mts';
+import { readInstallId } from '../shared/install-id.mts';
 import { NAME, nameSlug } from '../shared/product-name.mjs';
 
 const MAX_KEPT = 50;
@@ -52,7 +52,7 @@ let installId: string | null = null;
 let fired = false;       // one hard crash is one report, never a loop
 
 // The same random per-install id the approved counts use, and it now lives in
-// ONE file (`shared/install-id.mjs`) because two copies of "it is not a
+// ONE file (`shared/install-id.mts`) because two copies of "it is not a
 // fingerprint" is one copy too many. No account, no email, no machine id.
 
 export function report(kind: string, err: unknown, extra: Record<string, unknown> = {}): string | null {

@@ -12,8 +12,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
-import { codexMirrorPatch, codexIdOf } from '../shared/codex-import.mjs';
-import { CATCH_UP_LABEL, catchUpDue } from '../shared/agent-import.mjs';
+import { codexMirrorPatch, codexIdOf } from '../shared/codex-import.mts';
+import { CATCH_UP_LABEL, catchUpDue } from '../shared/agent-import.mts';
 
 const NOW = Date.UTC(2026, 9, 29, 9);
 

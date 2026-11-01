@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {commandRunning} from '../shared/terminal-state.mjs';
+import {commandRunning} from '../shared/terminal-state.mts';
 import {loginShell} from './shell-path.mjs';
 import {loadPty} from './pty.mts';
 const LIMIT=262144;
@@ -150,7 +150,7 @@ export function disposeTerminalProcess(pty: Pick<TerminalPty,'pid'|'kill'>){
  * TWO FACTS THE APP ALREADY HAD, and the whole design falls out of them.
  *
  * WHICH SHELLS ARE WORTH KEEPING: one with a command in it. `commandRunning`
- * (../shared/terminal-state.mjs) reads node-pty's foreground process name, and
+ * (../shared/terminal-state.mts) reads node-pty's foreground process name, and
  * it is the same call the toolbar makes to decide whether to draw Stop command,
  * deliberately, so a shell she can see is busy can never be one this reaps.
  *

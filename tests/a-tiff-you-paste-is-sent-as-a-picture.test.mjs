@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { turnedName } from '../shared/picture-formats.mjs';
+import { turnedName } from '../shared/picture-formats.mts';
 import { stageAttachment, turnIntoPicture } from '../main/stage-attachment.mts';
 import { saveAttachments } from '../main/save-attachments.mts';
 import { collectFiles } from '../renderer/src/attachments';

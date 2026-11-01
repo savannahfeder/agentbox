@@ -4,7 +4,7 @@
 // and find it had stopped at a card asking again. Typing it now turns remote
 // control on, or off when it is already on, with nothing left to press.
 import {it,expect} from 'vitest';
-import {providerCommand} from '../shared/provider-commands.mjs';
+import {providerCommand} from '../shared/provider-commands.mts';
 import {remoteSessionUrl,taskRemoteControl} from '../main/task-remote-control.mts';
 import {taskCommand} from '../main/task-commands.mts';
 it('routes only the exact Claude command and alias locally',()=>{for(const word of ['/remote-control','/rc'])expect(providerCommand(word,'claude').route).toBe('remote');expect(providerCommand('/rc','codex').route).toBe('unavailable');expect(providerCommand('/rc-extra','claude').route).toBe('unavailable');});

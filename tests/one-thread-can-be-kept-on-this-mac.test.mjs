@@ -80,7 +80,7 @@ describe('a thread kept on this Mac', () => {
 
 describe('the plumbing', () => {
   it('reaches the supervisor from the menu', () => {
-    expect(read('shared/bridge-map.mjs')).toMatch(/setThreadOnMac: 'zero:set-thread-on-mac'/);
+    expect(read('shared/bridge-map.mts')).toMatch(/setThreadOnMac: 'zero:set-thread-on-mac'/);
     expect(read('main/ipc.mts')).toMatch(/ipcMain\.handle\('zero:set-thread-on-mac'[\s\S]{0,120}supervisor\.setThreadOnMac\(/);
     expect(read('preload.cjs')).toMatch(/setThreadOnMac: \(payload\) => ipcRenderer\.invoke\('zero:set-thread-on-mac', payload\)/);
     expect(read('renderer/src/api.ts')).toMatch(/async setThreadOnMac\(/);

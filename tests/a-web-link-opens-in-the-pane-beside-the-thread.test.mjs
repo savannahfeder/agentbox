@@ -20,7 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { isWebsiteAddress, canFrameAWebsite, WEBSITE_PARTITION } from '../shared/websites.mjs';
+import { isWebsiteAddress, canFrameAWebsite, WEBSITE_PARTITION } from '../shared/websites.mts';
 import { addressParts } from '../renderer/src/components/BrowserChrome.tsx';
 import { docKind, opensInPane } from '../renderer/src/doc-pane.ts';
 import { whereALinkGoes } from '../renderer/src/link-click.ts';

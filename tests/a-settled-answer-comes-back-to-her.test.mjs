@@ -29,7 +29,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Supervisor } from '../main/supervisor.mts';
-import { answerSettled } from '../shared/answers.mjs';
+import { answerSettled } from '../shared/answers.mts';
 import { belongsInInbox, belongsInProgress } from '../renderer/src/list-rules';
 
 const T = 1_786_410_863_019; // when she answered w-417ee07635, 2026-08-10

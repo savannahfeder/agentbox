@@ -49,7 +49,7 @@
 import { createRequire } from 'node:module';
 import type { AppUpdater } from 'electron-updater';
 import { Name } from '../shared/product-name.mjs';
-import { MOVE_SAY } from '../shared/where-it-runs-from.mjs';
+import { MOVE_SAY } from '../shared/where-it-runs-from.mts';
 
 const require = createRequire(import.meta.url);
 
@@ -329,7 +329,7 @@ export function shortError(e: unknown): string {
   // https://github.com/Squirrel/Squirrel.Mac …" — the whole of what 23 of the
   // 26 main-rejection reports carried (PostHog, 2026-10-12), and the Settings
   // row showed the first 160 characters of it. The app knows where it is
-  // running from (shared/where-it-runs-from.mjs), so this is one sentence and
+  // running from (shared/where-it-runs-from.mts), so this is one sentence and
   // the row beside it is the press that fixes it.
   if (/read-only volume/i.test(raw)) return MOVE_SAY.cannotUpdateHere;
   if (/ERR_UPDATER_ZIP_FILE_NOT_FOUND/.test(named)) return 'That release has no app in it to install.';

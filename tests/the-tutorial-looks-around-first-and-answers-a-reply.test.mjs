@@ -31,8 +31,8 @@ import {
   ANCHOR, BEAT, COACHED, FLOOR, START, STEPS, advance, beatRows, coach, finishCard, readFirstRun,
   replyAnswered, replyWritten, skipStep, walkMayOpen, walkRows,
 } from '../renderer/src/onboarding.ts';
-import { PRACTICE_ANSWER, PRACTICE_REPLY, PRACTICE_REPLY_ANSWER, PRACTICE_SLUG } from '../shared/first-run-practice.mjs';
-import { answerSettled } from '../shared/answers.mjs';
+import { PRACTICE_ANSWER, PRACTICE_REPLY, PRACTICE_REPLY_ANSWER, PRACTICE_SLUG } from '../shared/first-run-practice.mts';
+import { answerSettled } from '../shared/answers.mts';
 import { Store } from '../main/store.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

@@ -1,4 +1,4 @@
-import { hookFailure } from '../../shared/hook-failure.mjs';
+import { hookFailure } from '../../shared/hook-failure.mts';
 import { SAYING_CAP } from '../codex.mjs';
 
 export interface StreamBlock {

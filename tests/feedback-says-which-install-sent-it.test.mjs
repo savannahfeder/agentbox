@@ -3,7 +3,7 @@
 // Three feedback emails arrived on 2026-10-29, all from Agentbox 0.1.20 on
 // darwin 25.6.0, and nothing in them said whether one person sent all three
 // or three people sent one each. The footer carried only the version and the
-// OS. The app already keeps one random install id (shared/install-id.mjs),
+// OS. The app already keeps one random install id (shared/install-id.mts),
 // so feedback now carries it and the email footer shows its first 8
 // characters: enough to tell senders apart, and nothing about the person.
 import fs from 'node:fs';

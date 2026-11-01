@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chooserStartsIn } from '../shared/project-folder-check.mjs';
+import { chooserStartsIn } from '../shared/project-folder-check.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

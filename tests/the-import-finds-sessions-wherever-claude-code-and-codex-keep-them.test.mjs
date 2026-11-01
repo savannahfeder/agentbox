@@ -35,7 +35,7 @@ import path from 'node:path';
 import { readSessionThreads, startedByHand } from '../main/agent-sessions.mts';
 import { readCodexThreads } from '../main/codex-threads.mts';
 import { claudeDataDirs, codexDataDirs } from '../main/agent-homes.mts';
-import { startedIn, threadImportRow } from '../shared/agent-import.mjs';
+import { startedIn, threadImportRow } from '../shared/agent-import.mts';
 
 const NOW = Date.UTC(2026, 9, 11, 18, 0, 0);
 const ago = (mins) => NOW - mins * 60 * 1000;

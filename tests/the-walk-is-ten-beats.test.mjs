@@ -19,7 +19,7 @@ import {
   ANCHOR, COACHED, BEAT, N_BEATS, RING_PAD_MAX, RING_PAD_MIN, TEXT_GAP, TEXT_MAX,
   advance, coach, forcedStep, inboxCleared, ring, START, STEPS, walkRows,
 } from '../renderer/src/onboarding.ts';
-import { EXAMPLES, stampsFor } from '../shared/first-run-examples.mjs';
+import { EXAMPLES, stampsFor } from '../shared/first-run-examples.mts';
 import * as workItems from '../main/store/work-items.mjs';
 import { fileURLToPath } from 'node:url';
 

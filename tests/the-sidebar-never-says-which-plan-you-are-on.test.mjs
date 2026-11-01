@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as words from '../shared/runs-on.mjs';
+import * as words from '../shared/runs-on.mts';
 import { forgetRunsOn, runsOn } from '../main/runs-on.mts';
 import { WorkspaceNavigation } from '../renderer/src/components/WorkspaceNavigation';
 

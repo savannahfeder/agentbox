@@ -15,7 +15,7 @@ import {
   CODEX_IMPORT_LABEL, CODEX_MIRROR_LABEL, IMPORT_KIND, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow,
   codexMirrorPatch, importChoice, isCodexImportRow, isCodexMirrorRow, isNotImportedRow, productsForThread,
   plainQuote, threadFactsLine, threadsNeedingRows, whereThreadLands,
-} from '../shared/codex-import.mjs';
+} from '../shared/codex-import.mts';
 
 const NOW = Date.parse('2026-09-14T19:30:00-07:00');
 

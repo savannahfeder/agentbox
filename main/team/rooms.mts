@@ -4,7 +4,7 @@
 // switched on in Alpha features and someone is signed in.
 import fs from 'node:fs';
 import path from 'node:path';
-import { wallCards, myPresence, displayNameOf, withoutHidden } from '../../shared/room-cards.mjs';
+import { wallCards, myPresence, displayNameOf, withoutHidden } from '../../shared/room-cards.mts';
 import { GENERAL_ROOM } from './rooms-memory.mts';
 import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mjs';
 

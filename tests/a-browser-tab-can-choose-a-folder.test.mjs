@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 import { listFolders, absolute } from '../main/folders.mts';
 import { bootHeadless, createServer, newToken, nodeHost } from '../main/serve.mts';
-import { checkProjectFolder } from '../shared/project-folder-check.mjs';
+import { checkProjectFolder } from '../shared/project-folder-check.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(here, '..');

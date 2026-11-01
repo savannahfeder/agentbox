@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import type { Readable } from 'node:stream';
 import { harnessDefinition } from '../../shared/harness-definitions.mjs';
-import { EFFORT_LEVELS } from '../../shared/effort-levels.mjs';
+import { EFFORT_LEVELS } from '../../shared/effort-levels.mts';
 import { storeRootEnv } from '../store/home.mjs';
 import { resolveClaudeBin } from '../claude-bin.mjs';
 import { claudeModelRows } from '../claude-models.mjs';

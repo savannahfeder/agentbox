@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { troubleCause } from '../shared/spawn-trouble.mjs';
+import { troubleCause } from '../shared/spawn-trouble.mts';
 
 let root;
 

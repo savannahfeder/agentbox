@@ -21,7 +21,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { readShellDataDirs } from '../main/shell-path.mjs';
 import { readImportableThreads } from '../main/importable-threads.mts';
-import { markImported } from '../shared/agent-import.mjs';
+import { markImported } from '../shared/agent-import.mts';
 
 const NOW = Date.UTC(2026, 9, 11, 18, 0, 0);
 const DAY = 86400000;

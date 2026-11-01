@@ -25,7 +25,7 @@ import { AGENT_MODES } from '../shared/agents.mjs';
 import type { AgentMode } from '../shared/agents.mjs';
 import { analyticsKey, diagnosticsOn } from './analytics.mts';
 import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mjs';
-import { accountSentence, engineTroubleNote, refineCause } from '../shared/spawn-trouble.mjs';
+import { accountSentence, engineTroubleNote, refineCause } from '../shared/spawn-trouble.mts';
 import { readPlan } from './claude-plan.mjs';
 import { effectiveProfiles, troubleForProfile } from './account-discovery.mjs';
 import { machineSlots, machineNote, autoAgents, MAX_SLOTS } from './machine.mjs';
@@ -177,7 +177,7 @@ export interface SettingsDeps {
 //
 // WHAT SHE IMPORTS IS UNAFFECTED, and it never came through here. The agents
 // taken in during the first run are FILES (~/.claude/agents/*.md), and each one
-// files its own work item asking for a first job (shared/agent-import.mjs).
+// files its own work item asking for a first job (shared/agent-import.mts).
 // That is the "imported manually" side of her answer, and it is already a
 // separate path from this one.
 //
@@ -900,7 +900,7 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
  * the snapshot instead, and both come from the same method.
  */
 /**
- * ONE SENTENCE OR NOTHING, and the words are shared/spawn-trouble.mjs's, not
+ * ONE SENTENCE OR NOTHING, and the words are shared/spawn-trouble.mts's, not
  *  this file's: every sentence the app says about a dead run lives there, once,
  *  so two surfaces cannot end up with two vocabularies. */
 function engineTroubleFor(supervisor: SettingsSupervisor, engine: string) {

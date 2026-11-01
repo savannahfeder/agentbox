@@ -13,7 +13,7 @@
 // transient", and its "OAuth" filed it as signed out, which benches the
 // account and asks for a sign-in a minute would have made unnecessary.
 import { describe, it, expect } from 'vitest';
-import { troubleCause, deadRunSentence } from '../shared/spawn-trouble.mjs';
+import { troubleCause, deadRunSentence } from '../shared/spawn-trouble.mts';
 
 const NEWLY_SIGNED_OUT = [
   'Login expired · Run /login to sign in again, or re-authenticate your Anthropic profile',

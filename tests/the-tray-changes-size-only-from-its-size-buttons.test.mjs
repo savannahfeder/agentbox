@@ -12,7 +12,7 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import { createCornerTag } from '../main/corner-tag.mts';
-import { GRIPS, cardScale } from '../shared/corner-tag.mjs';
+import { GRIPS, cardScale } from '../shared/corner-tag.mts';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const page = read('renderer/src/corner-tag/main.tsx');

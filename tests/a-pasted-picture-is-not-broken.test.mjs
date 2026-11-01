@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { imgUrl, imgPath, servable, IMG_SCHEME } from '../main/img-scheme.mts';
-import { DOC_SCHEME } from '../shared/schemes.mjs';
+import { DOC_SCHEME } from '../shared/schemes.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');

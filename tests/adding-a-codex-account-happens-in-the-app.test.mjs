@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { codexLoginCommand, makeCodexHome } from '../main/codex-account.mts';
-import { SETTINGS_TERMINAL } from '../shared/settings-terminal.mjs';
+import { SETTINGS_TERMINAL } from '../shared/settings-terminal.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -106,7 +106,7 @@ describe('the reserved terminal key', () => {
   // A KEY THE RENDERER CANNOT AIM. Every other shell resolves through a work
   // item that has to exist; this one resolves to the folder main just made.
   it('is shared by both sides rather than spelled twice', () => {
-    expect(read('main/ipc.mts')).toContain("import {SETTINGS_TERMINAL} from '../shared/settings-terminal.mjs';");
+    expect(read('main/ipc.mts')).toContain("import {SETTINGS_TERMINAL} from '../shared/settings-terminal.mts';");
     expect(read('renderer/src/components/Settings.tsx')).toContain("import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mjs';");
   });
 

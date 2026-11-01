@@ -19,7 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { createNotifier } from '../main/notify.mts';
-import { REQUEST_CHANNELS as CHANNELS } from '../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS as CHANNELS } from '../shared/bridge-map.mts';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 

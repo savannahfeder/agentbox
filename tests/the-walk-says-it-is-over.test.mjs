@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import { COPY, BEAT, N_BEATS, coach, finishCard, forcedStep, walkRows } from '../renderer/src/onboarding.ts';
-import { EXAMPLES } from '../shared/first-run-examples.mjs';
+import { EXAMPLES } from '../shared/first-run-examples.mts';
 
 const css = fs.readFileSync(new URL('../renderer/src/styles.css', import.meta.url), 'utf8');
 const card = fs.readFileSync(new URL('../renderer/src/components/Onboarding.tsx', import.meta.url), 'utf8');

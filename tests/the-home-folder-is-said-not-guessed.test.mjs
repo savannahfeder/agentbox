@@ -29,7 +29,7 @@
 
 import { describe, expect, it } from 'vitest';
 import os from 'node:os';
-import { proposeParent, checkProjectFolder } from '../shared/project-folder-check.mjs';
+import { proposeParent, checkProjectFolder } from '../shared/project-folder-check.mts';
 import { shortPath } from '../renderer/src/onboarding.ts';
 import { NAME } from '../shared/product-name.mjs';
 

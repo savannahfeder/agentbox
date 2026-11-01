@@ -90,7 +90,7 @@ describe('nothing spells a name this app has had', () => {
     'Astral-Agent', 'astral-releases', 'Astral-arm64', 'Astral.app',
     // THE ONE ENVIRONMENT VARIABLE AND THE TWO URL SCHEMES THAT MUST KEEP
     // ANSWERING TO AN OLD NAME. Both are derived rather than typed now
-    // (shared/product-name.mjs and shared/schemes.mjs), and both are still
+    // (shared/product-name.mjs and shared/schemes.mts), and both are still
     // SPOKEN here, because what is on the other end of them is not in this
     // repo: a launchd job exporting the old variable, and a product logo
     // stored months ago as a url on the old scheme.

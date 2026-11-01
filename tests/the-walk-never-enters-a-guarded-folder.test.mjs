@@ -9,7 +9,7 @@
 // with a consent panel carrying our name.
 //
 // The picker refusing the home folder is the first door and it is in
-// shared/project-folder-check.mjs. This is the second: whatever folder the walk
+// shared/project-folder-check.mts. This is the second: whatever folder the walk
 // is handed, and by whatever caller, it does not open a guarded one.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

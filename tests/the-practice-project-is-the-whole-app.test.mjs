@@ -19,7 +19,7 @@ import { machineryPath } from '../main/store/home.mjs';
 import { traceLines } from '../renderer/src/terminal.ts';
 import {
   PRACTICE_ANSWER, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_ROWS, PRACTICE_SLUG, PRACTICE_TASK,
-} from '../shared/first-run-practice.mjs';
+} from '../shared/first-run-practice.mts';
 import {
   BREATHE_AFTER_MS, BEAT, IN_PRACTICE, INTRO, N_BEATS, SLAB_OF, START, STEPS, WRONG_MS,
   COPY, advance, keyToken, practising, pressCounts, walkRows, wrongPress,
@@ -96,7 +96,7 @@ describe('what is already waiting in it', () => {
       // THE AGENT'S HALF HAS TO BE LATER THAN HERS or the row is real and
       // simply never drawn: `answeredHerAsk` in renderer/src/list-rules.ts is
       // what puts a row in an inbox. Same trick as the old three; see
-      // shared/first-run-examples.mjs.
+      // shared/first-run-examples.mts.
       expect(row.wrote.result.source).toBe('agent');
       expect(row.wrote.result.ts).toBeGreaterThan(row.wrote.title.ts);
       // The walk's own label, which is what stops the supervisor treating any

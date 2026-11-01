@@ -1,4 +1,4 @@
-import { hookFailure } from '../shared/hook-failure.mjs';
+import { hookFailure } from '../shared/hook-failure.mts';
 // Reads the Claude Code sessions running on this machine, and replies to one.
 // What the readings mean is decided in shared/agents.mjs; this file only
 // measures and delivers. Everything here is read-only except `reply`, which

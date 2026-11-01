@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createAnalytics } from '../main/analytics.mts';
-import { readInstallId } from '../shared/install-id.mjs';
+import { readInstallId } from '../shared/install-id.mts';
 import {
   FRESH_INSTALL_ID,
   FRESH_USER_ENV,

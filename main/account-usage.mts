@@ -8,7 +8,7 @@ import { ClaudeUsage, STALE_MS, USAGE_WHOSE_UNKNOWN } from './claude-usage.mts';
 import type { UsageResult } from './claude-usage.mts';
 import type { UsageRunner } from './claude-usage-process.mts';
 import type { UsageLimit } from '../shared/usage.d.mts';
-import { SAME_MOMENT_MS, USAGE_SAME_AS_ANOTHER, sameUsage } from '../shared/usage.mjs';
+import { SAME_MOMENT_MS, USAGE_SAME_AS_ANOTHER, sameUsage } from '../shared/usage.mts';
 
 export interface AccountReading {
   profile: string;

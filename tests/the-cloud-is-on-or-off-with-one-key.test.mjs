@@ -18,7 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { CLOUD_KEY, cloudIsOn, cloudToggleTarget, cloudToggleNote, cloudCommands, CLOUD_WHEN_ON } from '../renderer/src/cloud-menu';
 import { HINTS } from '../renderer/src/hint-plate';
-import { SHORTCUTS } from '../shared/shortcuts.mjs';
+import { SHORTCUTS } from '../shared/shortcuts.mts';
 import { setWorkspaceSetting } from '../main/settings.mts';
 import { Supervisor } from '../main/supervisor.mts';
 

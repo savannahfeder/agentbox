@@ -12,7 +12,7 @@ import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
 import { queuedReplyText, submitReply, framedTeammate } from './live-replies.mts';
 import { taskCommand } from './task-commands.mts';
-import { providerCommand, reviewTarget, nativeCommandNames } from '../shared/provider-commands.mjs';
+import { providerCommand, reviewTarget, nativeCommandNames } from '../shared/provider-commands.mts';
 import {agentInstructionsUnified, readSystemTemplate, writeInstruction} from './instruction-settings.mts';
 import {fillName} from '../shared/product-name.mjs';
 // The supervisor: deterministic, boring, and the only part of the app that talks
@@ -47,11 +47,11 @@ import { REPLY_MARK, replyFrame, serverJoinedKey } from '../shared/cloud-kit.mjs
 import { NEW_THREAD, NEW_THREAD_CODEX, NEW_ITEM_MARK, NEW_TITLE_MARK, NEW_BODY_MARK, fillNewThreadKit } from '../shared/cloud-kit.mjs';
 import { macAsleep, carryCommand, CARRY_AHEAD_MS, handOverSpent, notBeforeOf } from '../shared/cloud-carry.mjs';
 import { execFile as execFileCb } from 'node:child_process';
-import { CLOSED_UNSHIPPED, closedBeforeItShipped, shippedAs } from '../shared/not-shipped.mjs';
+import { CLOSED_UNSHIPPED, closedBeforeItShipped, shippedAs } from '../shared/not-shipped.mts';
 import { handBackWhat, handsBack } from '../shared/cloud-hand-back.mjs';
-import { CLOUD_SENT, readSent } from '../shared/cloud-start.mjs';
+import { CLOUD_SENT, readSent } from '../shared/cloud-start.mts';
 import { readCloudConfig, cloudAccountConfig, OLD_TOKEN_SERVICE, imageCapsToTry } from './cloud/config.mjs';
-import { cloudVersionGaps } from '../shared/cloud-versions.mjs';
+import { cloudVersionGaps } from '../shared/cloud-versions.mts';
 import { cloudLoginState, mayRunOn, startCloudSignIn, renewCloudCodexLogin, sweepRetiredLogins, forgetOldCloudTokens, listCloudLogins, removeCloudLogin, newCloudAccountKey, lookAtCloudLogin, cloudLimits, markCloudLogin, cloudLoginInUse, cloudAccountsFrom, CLOUD_ACCOUNT_ENV } from './cloud/logins.mts';
 import { execFileSync } from 'node:child_process';
 import { holdUntilHome } from './cloud/codex-cloud.mts';
@@ -62,7 +62,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, placedScore, productRankScore } from '../shared/rank.mjs';
-import { keysForAgents } from '../shared/shortcuts.mjs';
+import { keysForAgents } from '../shared/shortcuts.mts';
 import { isCleanRun, ruleIdOf, nextRunAt, periodKey, occurrenceId } from '../shared/repeats.mjs';
 import { occurrenceFields } from './repeats.mjs';
 import { teammateIdOf, mentionsIn, teammatesOn, primaryOf, OFFER_LABEL, CHAT_LABEL } from '../shared/teammates.mjs';
@@ -96,26 +96,26 @@ function whoHasIt(made: { taken?: boolean; reason?: string; heldBy?: number | nu
   if (made?.taken !== false) return '';
   return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
-import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mjs';
+import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mts';
 import { DEFAULT_SESSIONS_AT_ONCE } from './config.mjs';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
-import { referencedFiles, isImagePath } from '../shared/referenced-files.mjs';
-import { namedThreadsBlock } from '../shared/named-threads.mjs';
+import { referencedFiles, isImagePath } from '../shared/referenced-files.mts';
+import { namedThreadsBlock } from '../shared/named-threads.mts';
 import { changePath } from './code-change.mjs';
 import { snapshotRepo } from './git-change.mjs';
-import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mjs';
+import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mts';
 import { readTranscriptHead } from './agent-sessions.mts';
 import { claudeSessionOpen } from './claude-session-open.mts';
 import { planStamp, readPlan } from './claude-plan.mjs';
-import { troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown } from '../shared/spawn-trouble.mjs';
-import { readDeadRunTrace, traceShowsASilentDeath, tracesAToolCall, STOPPED_ON_REQUEST } from '../shared/dead-run-trace.mjs';
-import { commandPrompt } from '../shared/claude-commands.mjs';
+import { troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown } from '../shared/spawn-trouble.mts';
+import { readDeadRunTrace, traceShowsASilentDeath, tracesAToolCall, STOPPED_ON_REQUEST } from '../shared/dead-run-trace.mts';
+import { commandPrompt } from '../shared/claude-commands.mts';
 import { machineryPath, storeRootEnv } from './store/home.mjs';
 import { answerModesFile } from './answer-modes.mts';
 import { isInside } from './doc-file.mts';
 import { setModelArg } from './settings.mts';
-import { isEffort, isEffortWord } from '../shared/effort-levels.mjs';
+import { isEffort, isEffortWord } from '../shared/effort-levels.mts';
 // THE SECOND ENGINE, AND THIS FILE IS NOW THE ONE PLACE THAT HOLDS THE GATE.
 //
 // It did not used to be. The capability Symbol was deliberately unimported and
@@ -147,7 +147,7 @@ import { createCodexApprovals } from './codex-approvals.mjs';
 import { approvalPublicKey, listPending } from './approvals.mjs';
 import { codexDefaultModel, codexHome, codexKnownSlugs, codexModelLevels, codexModels } from './codex-models.mts';
 import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.mts';
-import { accountName } from '../shared/account-names.mjs';
+import { accountName } from '../shared/account-names.mts';
 import { nameRow, wantsName, askSmallModel } from './row-label.mts';
 import { catchUpRow, catchUpResult } from './catch-up.mts';
 import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mjs';
@@ -3218,7 +3218,7 @@ export class Supervisor {
   }
 
   // A CLOSED THREAD WHOSE WORK NEVER REACHED MAIN COMES BACK, ONCE
-  // (shared/not-shipped.mjs). The note it comes back with is what stops a
+  // (shared/not-shipped.mts). The note it comes back with is what stops a
   // second time, and a close after being asked writes one that ends it.
   bringBackWhatNeverShipped(items: WorkItem[] | null | undefined) {
     for (const item of items ?? []) {
@@ -3834,7 +3834,7 @@ export class Supervisor {
       // AND WRITE IT ON THE ITEM, not only in here. This memory is invisible to
       // her inbox and is wiped by every resume, so a finished thread read as a
       // stranded one everywhere she could actually see it: out of the inbox,
-      // red in In progress, and respawnable forever (shared/answers.mjs).
+      // red in In progress, and respawnable forever (shared/answers.mts).
       try { this.store.settleAnswer?.(item.product, item.id, carried); }
       catch (e) { console.warn('zero: could not record the settled answer:', (e as Error).message); }
       return 'delivered';
@@ -4671,7 +4671,7 @@ export class Supervisor {
         // she was looking at, because this is the pass that covers deaths that
         // happened before the app was open — got "when the limit resets"
         // instead of "at 6pm". The trace carries the line that named the limit
-        // (`stderr` in shared/dead-run-trace.mjs is stderr AND the error
+        // (`stderr` in shared/dead-run-trace.mts is stderr AND the error
         // result), so the hour was there to be read the whole time.
         const resetsAt = cause === 'at-limit' ? limitResetsAt(trace.stderr) : null;
         // AND THE LOGIN IT WAS SPENDING, which the run recorded when it died
@@ -5294,7 +5294,7 @@ export class Supervisor {
 
   /**
    * WHAT TO CALL ONE OF THIS ENGINE'S LOGINS, by the rule the Settings page
-   * names its rows with (shared/account-names.mjs): the email the vendor gave,
+   * names its rows with (shared/account-names.mts): the email the vendor gave,
    * else a counted name.
    *
    * Null where naming it would say nothing: one login on that engine, or a key
@@ -6110,7 +6110,7 @@ export class Supervisor {
     return n;
   }
 
-  // The relay's line saying the cloud took its start (shared/cloud-start.mjs).
+  // The relay's line saying the cloud took its start (shared/cloud-start.mts).
   // The next run waiting for a slot starts packing now, not at the next tick.
   _noteCloudSent(session: RunState, text: unknown) {
     if (!session?.cloud || session.cloudSentAt) return;
@@ -6243,7 +6243,7 @@ export class Supervisor {
     return !this._cloudVersionGaps().some((g) => g.engine === which && g.blocks);
   }
 
-  // THE CLOUD IMAGE'S VERSIONS AGAINST THIS MAC'S (shared/cloud-versions.mjs).
+  // THE CLOUD IMAGE'S VERSIONS AGAINST THIS MAC'S (shared/cloud-versions.mts).
   // The image's are in cloud.json, read at most every minute; this Mac's are
   // asked of each CLI off the window's thread, at most every hour.
   _cloudVersionGaps(now = Date.now()) {
@@ -7316,7 +7316,7 @@ export class Supervisor {
     if (connectionLost) session.transportFault = true;
     if ((Date.now() - session.startedAt! < FAST_EXIT_MS && !quickButReal) || limitHit || connectionLost) {
       // The last words of a fast-dead session are the diagnosis. They are kept,
-      // but as EVIDENCE now, not as copy: shared/spawn-trouble.mjs turns them
+      // but as EVIDENCE now, not as copy: shared/spawn-trouble.mts turns them
       // into a cause, and only our own sentence for that cause ever reaches a
       // screen.
       const lastWords = (limitHit || connectionLost) && session.resultIsError && session.result != null
@@ -8883,7 +8883,7 @@ export class Supervisor {
      * whole prompt and the brief is skipped.
      *
      * The eight supported ones are in the reply box's slash menu;
-     * shared/claude-commands.mjs is the list and the reason.
+     * shared/claude-commands.mts is the list and the reason.
      *
      * IT HAS TO REPLACE THE PROMPT RATHER THAN RIDE IN FRONT OF IT, and that is
      * measured rather than assumed. On 2026-08-27 a prompt of `/context`, a
@@ -8948,7 +8948,7 @@ export class Supervisor {
     // chooses for the model. Same rule as the model above.
     //
     // TWO GATES, ONE PER ENGINE, because the words differ. Claude Code's is the
-    // CLI's own five (shared/effort-levels.mjs): a stray word on its command
+    // CLI's own five (shared/effort-levels.mts): a stray word on its command
     // line would stop the run with a usage error instead of running the task,
     // so any other word is dropped here. Codex's levels are per model and read
     // off this Mac, so the plan carries any word SHAPED like a level and
@@ -11464,7 +11464,7 @@ export class Supervisor {
       ...(item?.id ? [`If they want ${named.length > 1 ? 'them' : who} to learn from this thread, put this thread's id, ${item.id}, in the details: the teammate is given it whole to learn from.`] : [])].join('\n');
   }
 
-  /** The other threads these words name, summed up (shared/named-threads.mjs). */
+  /** The other threads these words name, summed up (shared/named-threads.mts). */
   namedThreadsBlock(item: WorkItem, product: Product | null | undefined, texts: unknown[]) {
     return [this._namedThreads(item, product, texts), this.teammateNamedBlock(item, texts)].filter(Boolean).join('\n\n');
   }

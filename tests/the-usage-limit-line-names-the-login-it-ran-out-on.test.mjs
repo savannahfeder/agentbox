@@ -9,7 +9,7 @@
 // whether my personal account got billed for work."
 //
 // An account is named by the rule the Settings page already uses, which is now
-// shared (shared/account-names.mjs): the email the vendor gave, else a counted
+// shared (shared/account-names.mts): the email the vendor gave, else a counted
 // name. Only the login that was spent is named: w-dac993a554 took away the
 // move to a second account, so there is no "which one answered next".
 //
@@ -20,8 +20,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { accountName } from '../shared/account-names.mjs';
-import { deadRunCause, deadRunSentence } from '../shared/spawn-trouble.mjs';
+import { accountName } from '../shared/account-names.mts';
+import { deadRunCause, deadRunSentence } from '../shared/spawn-trouble.mts';
 import { Store } from '../main/store.mts';
 import { Supervisor } from '../main/supervisor.mts';
 

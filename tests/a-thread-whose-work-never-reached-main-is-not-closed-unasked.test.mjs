@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import { failureNote } from '../main/ship-queue.mts';
 import {
   KEPT_ASIDE, CLOSED_UNSHIPPED, notShipped, notShippedLine, closeRefusal, closedAnywayNote, shipItAsk,
-} from '../shared/not-shipped.mjs';
+} from '../shared/not-shipped.mts';
 import { rowSummary } from '../renderer/src/list-rules';
 import { liveOption } from '../renderer/src/format';
 import { unshippedAsk } from '../renderer/src/close-asks-first';

@@ -3,7 +3,7 @@
 // confuse request acceptance or another thread's completion with success.
 import { describe, it, expect, vi } from 'vitest';
 import { compactCodexThread } from '../main/codex-compaction.mts';
-import { codexCommand } from '../shared/codex-commands.mjs';
+import { codexCommand } from '../shared/codex-commands.mts';
 
 const flush = async () => { for(let i=0;i<12;i++) await Promise.resolve(); };
 function setup({busy=false,error=null}={}) {

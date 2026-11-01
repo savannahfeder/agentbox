@@ -8,8 +8,8 @@
 // carries on a copy (Supervisor#importedThreadFor). It is filed the way setup
 // files one: waiting on you to Needs you, finished to Done. Nothing asks about
 // a chat first; asking rows are what the old Codex watch was removed for.
-import { productsForThread } from '../shared/codex-import.mjs';
-import type { CodexThreadLike } from '../shared/codex-import.mjs';
+import { productsForThread } from '../shared/codex-import.mts';
+import type { CodexThreadLike } from '../shared/codex-import.mts';
 import { isShared } from '../shared/team-rules.mjs';
 import { appSessionFolders } from './agent-homes.mts';
 import type { HomesSupervisor } from './agent-homes.mts';

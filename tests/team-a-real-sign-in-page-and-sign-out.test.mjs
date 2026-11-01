@@ -12,7 +12,7 @@ import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
 import { memorySession, plainAuthError } from '../main/team/session.mjs';
-import { REQUEST_CHANNELS } from '../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS } from '../shared/bridge-map.mts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');

@@ -33,7 +33,7 @@ import {
   COPY, afterCheck, foundHead, foundLede, foundRows, readyEngines,
 } from '../renderer/src/plan-setup.ts';
 import { PlanQuestion } from '../renderer/src/components/PlanSetup.tsx';
-import { deadRunCause, deadRunSentence, needsHerHands, refineCause, troubleCause } from '../shared/spawn-trouble.mjs';
+import { deadRunCause, deadRunSentence, needsHerHands, refineCause, troubleCause } from '../shared/spawn-trouble.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 
@@ -124,7 +124,7 @@ describe('the sentence on a thread nothing could run', () => {
 
 describe('which of the two a refusal is', () => {
   // The words are the same either way: this is the app-server's own 401, off a
-  // CODEX_HOME with no auth.json (shared/spawn-trouble.mjs).
+  // CODEX_HOME with no auth.json (shared/spawn-trouble.mts).
   const REFUSAL = 'unexpected status 401 Unauthorized: Missing bearer or basic authentication in header';
 
   it('is "no plan" when nobody has ever signed in on that login', () => {

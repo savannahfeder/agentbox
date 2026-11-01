@@ -19,7 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { SETUP, menuSetupLine, activeSignIn, signInView, anyReady, WHERE_ROWS } from '../renderer/src/cloud-setup';
-import { looksLikeClaudeCode } from '../shared/claude-code-shape.mjs';
+import { looksLikeClaudeCode } from '../shared/claude-code-shape.mts';
 
 const status = (accounts = [], signIns = []) => ({ setUp: true, mode: 'full', running: 0, month: { runs: 0, agentHours: 0, estimatedCost: 0, costPerAgentHour: null }, accounts, signIns });
 const acct = (extra) => ({ engine: 'claude', key: 'acct-1', name: null, ready: true, state: 'ready', ...extra });

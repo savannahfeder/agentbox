@@ -9,16 +9,16 @@ import path from 'node:path';
 import { loadStore } from './store-modules.mts';
 import type { StoreModules } from './store-modules.mts';
 import { Repeats } from './repeats.mjs';
-import type { CodexThreadLike } from '../shared/codex-import.mjs';
+import type { CodexThreadLike } from '../shared/codex-import.mts';
 import { CLEAN_LABEL, isCleanRun } from '../shared/repeats.mjs';
 import { answerFor, describeFor } from './first-run.mts';
-import { checkProjectFolder } from '../shared/project-folder-check.mjs';
-import { SAME_PROJECT, movedAway, movedHere, splitForCompose, whatMoves, whyItCannotMove } from '../shared/move-thread.mjs';
-import { EXAMPLES, stampsFor } from '../shared/first-run-examples.mjs';
+import { checkProjectFolder } from '../shared/project-folder-check.mts';
+import { SAME_PROJECT, movedAway, movedHere, splitForCompose, whatMoves, whyItCannotMove } from '../shared/move-thread.mts';
+import { EXAMPLES, stampsFor } from '../shared/first-run-examples.mts';
 import {
   PRACTICE_ANSWER, PRACTICE_BACKDROP, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG,
   PRACTICE_REPLY_ANSWER, PRACTICE_TASK_TRACE,
-} from '../shared/first-run-practice.mjs';
+} from '../shared/first-run-practice.mts';
 import { NOTE_NAME } from './rail-note.mts';
 import { iconPathFor } from './project-identity.mts';
 import { patchProjectAt } from './store/project.mjs';
@@ -26,14 +26,14 @@ import { imgUrl } from './img-scheme.mts';
 import { teamOf, PERSONAL_FLAG } from './team/projects.mts';
 import {
   agentImportRow, agentsNeedingRows, threadImportRow, threadsNeedingRows, CATCH_UP_LABEL,
-} from '../shared/agent-import.mjs';
+} from '../shared/agent-import.mts';
 import {
   CODEX_IMPORT_LABEL, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow, codexMirrorPatch, isCodexImportRow, isCodexMirrorRow,
   productsForThread, threadsNeedingRows as codexThreadsNeedingRows,
-} from '../shared/codex-import.mjs';
+} from '../shared/codex-import.mts';
 import { buildClaimLine, buildReleaseLine } from '../shared/work-items.mjs';
-import { isEffortWord } from '../shared/effort-levels.mjs';
-import { shippedNote } from '../shared/shipped-note.mjs';
+import { isEffortWord } from '../shared/effort-levels.mts';
+import { shippedNote } from '../shared/shipped-note.mts';
 import { machineryPath, removeMachinery } from './store/home.mjs';
 import { Teammates } from './teammates.mts';
 import type { WorkItem } from './supervisor.mts';
@@ -632,7 +632,7 @@ export class Store {
   // session exits, because the worker cannot be relied on to close a thread
   // that is still alive: the ordinary and correct end of the loop leaves the
   // row open with her answer still on it, and that state used to be
-  // indistinguishable from a worker that died (shared/answers.mjs).
+  // indistinguishable from a worker that died (shared/answers.mts).
   //
   // Source 'system': it is machinery's record of what happened, not a word
   // anyone said, and it must never hold the field against her. She cannot
@@ -785,7 +785,7 @@ export class Store {
   /**
    * MOVE A THREAD TO ANOTHER PROJECT (w-c9da359466, power-test-1 issue 20).
    *
-   * Only a thread nothing has ever run on, and shared/move-thread.mjs carries
+   * Only a thread nothing has ever run on, and shared/move-thread.mts carries
    * the whole of why: the rest of a thread is its session traces, its task
    * folder and the git branch named after it, and a branch cannot change
    * repository.
@@ -814,7 +814,7 @@ export class Store {
     const said = movedHere(from?.name ?? fromSlug);
     const body = compose.body ? `${compose.body}\n\n${said}` : said;
     let made = this.composeItem(toSlug, { ...compose, body });
-    // The three `composeItem` has no argument for (shared/move-thread.mjs).
+    // The three `composeItem` has no argument for (shared/move-thread.mts).
     if (Object.keys(after).length) {
       made = { ...this.modules.workItemsDisk.updateWorkItem(this.productDir(toSlug), made.id, after, { source: 'founder' }), product: toSlug };
     }
@@ -1178,9 +1178,9 @@ export class Store {
   /**
    * THE THREE ROWS ALREADY WAITING WHEN THE PRACTICE PROJECT OPENS.
    *
-   * The copy is in shared/first-run-practice.mjs and the two-writes-per-row
+   * The copy is in shared/first-run-practice.mts and the two-writes-per-row
    * trick is the same one `stageFirstRunExamples` uses; see
-   * shared/first-run-examples.mjs for why a row needs its agent half stamped
+   * shared/first-run-examples.mts for why a row needs its agent half stamped
    * later than its founder half before an inbox will draw it. */
   stagePracticeRows(slug: string, { now = Date.now(), label = 'first-run' }: { now?: number; label?: string } = {}) {
     const { workItemsDisk } = this.modules;
@@ -1231,7 +1231,7 @@ export class Store {
   /**
    * THE REST OF THE PRACTICE TEAM'S WORK, so the tour and the board are not
    * empty (w-58c8f466e7). The copy, and which column each row lands in, is
-   * `PRACTICE_BACKDROP` in shared/first-run-practice.mjs. The ids come back in
+   * `PRACTICE_BACKDROP` in shared/first-run-practice.mts. The ids come back in
    * its order, which is how `walkRows` knows which one is which.
    *
    *  The column is the app's own reading of the row, so each is written in the
@@ -1239,7 +1239,7 @@ export class Store {
    *  with a run and no result yet, and a scheduled one is the ask with a time
    *  in the future, set as hers. None of them carries a result, because a
    *  result is what puts a row back in the inbox and nothing here may land
-   *  there (shared/first-run-practice.mjs). */
+   *  there (shared/first-run-practice.mts). */
   stagePracticeBackdrop(slug: string, { now = Date.now(), label = 'first-run' }: { now?: number; label?: string } = {}) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
@@ -1352,7 +1352,7 @@ export class Store {
     // and no second trace, because the run it did is already on the thread.
     // AND THE REPLY IS SETTLED FIRST, the way the supervisor settles one when a
     // session exits: without it the row reads as an answer still waiting for an
-    // agent and stays in In progress (`answerSettled`, shared/answers.mjs).
+    // agent and stays in In progress (`answerSettled`, shared/answers.mts).
     if (product?.practice && round > 0) {
       const before = this.readItem(slug, id);
       this.settleAnswer(slug, id, before?.wrote?.answer?.ts ?? 0);
@@ -1388,7 +1388,7 @@ export class Store {
     const name = product?.name ?? slug;
     // THE ANSWER IS THE PRE-WRITTEN SENTENCE, ours, with her folder's numbers in
     // it. The description is a different fact and it is only ever a sidebar
-    // line; see main/first-run.mts and shared/first-run-shape.mjs.
+    // line; see main/first-run.mts and shared/first-run-shape.mts.
     const line = answerFor({ folder, name });
     const item = workItemsDisk.updateWorkItem(
       this.productDir(slug), id, { result: line }, { source: 'agent' },
@@ -1517,7 +1517,7 @@ export class Store {
 
   /* ---------------------------- codex conversations ----------------------- */
   // HER CODEX CONVERSATIONS ASK TO COME IN, AND HER YES OR NO DECIDES. The
-  // words and the rules are in shared/codex-import.mjs;
+  // words and the rules are in shared/codex-import.mts;
   // main/codex-watch.mts calls the first two every minute; the bridge calls
   // answerCodexImport when she answers.
 

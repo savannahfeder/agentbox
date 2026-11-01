@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { deadRunSentence, troubleRemedy, causeNext, accountSentence } from '../shared/spawn-trouble.mjs';
+import { deadRunSentence, troubleRemedy, causeNext, accountSentence } from '../shared/spawn-trouble.mts';
 import { COPY } from '../renderer/src/plan-setup';
 import { pickCloudLogin, recordCloudLogin, markCloudLogin } from '../main/cloud/logins.mts';
 

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { providerCommand, providerCommands, reviewTarget } from '../shared/provider-commands.mjs';
+import { providerCommand, providerCommands, reviewTarget } from '../shared/provider-commands.mts';
 import { harnessFor } from './harnesses.mts';
 import type { HarnessSupervisor } from './harnesses/common.mts';
 import { NAME } from '../shared/product-name.mjs';

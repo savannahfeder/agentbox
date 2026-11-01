@@ -1,6 +1,6 @@
 // WHAT CODEX HAS ALREADY SAID IS LEFT, AND NOTHING IS SPENT ASKING.
 //
-// The pure half is shared/codex-usage.mjs: the payload in, the limits out. This
+// The pure half is shared/codex-usage.mts: the payload in, the limits out. This
 // is the half that holds what a running app-server reported, and the whole of
 // its shape is two rules.
 //
@@ -61,9 +61,9 @@
 // over login B's work is exactly the defect this whole slice is fixing, one
 // level down.
 
-import { codexLimits, mergeRateLimits } from '../shared/codex-usage.mjs';
-import { limitsStillRunning } from '../shared/usage.mjs';
-import type { UsageLimit } from '../shared/usage.mjs';
+import { codexLimits, mergeRateLimits } from '../shared/codex-usage.mts';
+import { limitsStillRunning } from '../shared/usage.mts';
+import type { UsageLimit } from '../shared/usage.mts';
 import { loggedCodexLimits } from './codex-usage-file.mts';
 import type { LoggedLimits } from './codex-usage-file.mts';
 
@@ -197,7 +197,7 @@ export class CodexUsage {
    * (main/codex-app-server.mjs `onNotification`), so this is handed every one of
    * them and keeps the one it is about.
    *
-   * IT MERGES. The update is documented sparse -- see shared/codex-usage.mjs for
+   * IT MERGES. The update is documented sparse -- see shared/codex-usage.mts for
    * the schema's own wording -- so a notification carrying only the five hour
    * window must not take the week away with it.
    */

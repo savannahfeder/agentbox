@@ -26,7 +26,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cardsInFront } from '../shared/which-card-is-in-front.mjs';
+import { cardsInFront } from '../shared/which-card-is-in-front.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (...p) => fs.readFileSync(path.join(here, '..', ...p), 'utf8');

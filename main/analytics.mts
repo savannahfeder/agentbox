@@ -18,7 +18,7 @@
 //    and repo names. `posthog-node` takes only what it is handed. A test fails
 //    the build if `posthog-js` ever appears under `renderer/`.
 // 2. The renderer cannot send. It hands a NAME over IPC and this file decides
-//    whether that name is one of hers (`shared/analytics-events.mjs`).
+//    whether that name is one of hers (`shared/analytics-events.mts`).
 // 3. NOTHING IS SENT WITHOUT A DESTINATION AND THE SWITCH. No key configured
 //    means no client is ever constructed. The shipped app carries a key baked
 //    into its own package.json at build time; a copy run from source carries
@@ -35,10 +35,10 @@
 import os from 'node:os';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
-import { sanitize } from '../shared/analytics-events.mjs';
-import { findPrivate } from '../shared/crash-scrub.mjs';
-import { readInstallId } from '../shared/install-id.mjs';
-import { armFor, readArm } from '../shared/onboarding-arm.mjs';
+import { sanitize } from '../shared/analytics-events.mts';
+import { findPrivate } from '../shared/crash-scrub.mts';
+import { readInstallId } from '../shared/install-id.mts';
+import { armFor, readArm } from '../shared/onboarding-arm.mts';
 import { readEnv } from '../shared/product-name.mjs';
 
 // PostHog's own default host. Kept here rather than left to the config so a
@@ -123,7 +123,7 @@ export function createAnalytics({ config, version, dir, client, env = process.en
 
   // `env` is here for ONE reason: a copy launched into a throwaway home is a
   // first-run test of hers and sends under a fixed id rather than a fresh
-  // random one. The decision lives in `shared/install-id.mjs` with the
+  // random one. The decision lives in `shared/install-id.mts` with the
   // identifier itself, because two copies of it is how the counts and the
   // crash reports start telling different stories.
   const installId = dir ? readInstallId(dir, env) : null;
@@ -146,7 +146,7 @@ export function createAnalytics({ config, version, dir, client, env = process.en
     username: (() => { try { return os.userInfo().username; } catch { return null; } })(),
   };
 
-  // Which first run this install was shown, for the test of the two (shared/onboarding-arm.mjs). Set here, never by a caller.
+  // Which first run this install was shown, for the test of the two (shared/onboarding-arm.mts). Set here, never by a caller.
   let armWord = dir ? readArm(dir) : null;
   const arm = () => armWord;
   let posthog: AnalyticsClient | null = client ?? null;

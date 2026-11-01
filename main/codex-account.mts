@@ -206,7 +206,7 @@ export function codexLoginMode(home: string | null = null, { file = null }: { fi
  * out that way (the verify skill's `codex-api-key-login` setup), every request
  * a worker sent was signed with the key, and the task was answered as though
  * nothing were wrong. There is no plan in such a home to fall back on, so the
- * run is refused, in words shared/spawn-trouble.mjs files as 'api-key'. The
+ * run is refused, in words shared/spawn-trouble.mts files as 'api-key'. The
  * key is never in the sentence.
  */
 export function codexKeyRefusal(home: string | null = null, opts: { file?: string | null } = {}): string | null {

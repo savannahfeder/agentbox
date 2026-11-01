@@ -26,7 +26,7 @@
 // THE TWO ARE SEPARABLE, AND THE LEDGER ALREADY HOLDS WHAT SEPARATES THEM. The
 // fold records `wrote[field] = { ts, source }` per field and stops deleting it
 // on the way out precisely because readers needed it (shared/work-items.mjs:324;
-// shared/answers.mjs reads `wrote.answer.ts` the same way). So "Codex may be
+// shared/answers.mts reads `wrote.answer.ts` the same way). So "Codex may be
 // chosen from now on" is a real, checkable statement: honour a row's `engine`
 // only when `wrote.engine.ts` is at or after the moment she opened the gate.
 // An August row is not a choice she is making now, so it is not honoured, and

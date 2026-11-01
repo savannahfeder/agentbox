@@ -15,10 +15,10 @@ import fs from 'node:fs';
 import { COPY as plan } from '../renderer/src/plan-setup.ts';
 import { COPY as walk } from '../renderer/src/onboarding.ts';
 import { CARD } from '../renderer/src/agent-import-card.ts';
-import { checkProjectFolder } from '../shared/project-folder-check.mjs';
-import { troubleSentence } from '../shared/spawn-trouble.mjs';
+import { checkProjectFolder } from '../shared/project-folder-check.mts';
+import { troubleSentence } from '../shared/spawn-trouble.mts';
 import { CODEX_MODES } from '../shared/codex-modes.mjs';
-import { agentImportRow } from '../shared/agent-import.mjs';
+import { agentImportRow } from '../shared/agent-import.mts';
 import { machineNote } from '../main/machine.mjs';
 
 const APPLE = /\bMac\b|macOS|\bApple\b|\biPhone\b|\biPad\b|\bFinder\b/;
@@ -37,9 +37,9 @@ const SPOKEN_FILES = [
   // box it read "This Mac is running all it can" at the moment it asked for
   // money (2026-10-25).
   'renderer/src/cloud-upgrade.ts',
-  'shared/project-folder-check.mjs',
-  'shared/spawn-trouble.mjs',
-  'shared/agent-import.mjs',
+  'shared/project-folder-check.mts',
+  'shared/spawn-trouble.mts',
+  'shared/agent-import.mts',
   'shared/codex-modes.mjs',
   'shared/demo-world.mjs',
   'main/machine.mjs',

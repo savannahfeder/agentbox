@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { PROTOCOL, HOST_ALREADY_THERE, terminalHostStamp, terminalHostSocket, terminalHostSockets } from './terminal-host.mts';
 import { ENDED } from './task-terminals.mts';
 import type { TaskTerminals, TerminalListing, TerminalPlaceSpec } from './task-terminals.mts';
-import { SETTINGS_TERMINAL } from '../shared/settings-terminal.mjs';
+import { SETTINGS_TERMINAL } from '../shared/settings-terminal.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 const ENDED_SESSION = 'Terminal session ended. Open a new terminal to continue.';

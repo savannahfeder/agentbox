@@ -1,4 +1,4 @@
-import { providerCommands, CODEX_COMMANDS } from '../shared/provider-commands.mjs';
+import { providerCommands, CODEX_COMMANDS } from '../shared/provider-commands.mts';
 // THE MENU WENT ON OFFERING CLAUDE CODE'S COMMANDS AFTER CODEX CAME BACK.
 //
 // `slashRows` took a third argument, `commands`, from the day the eight landed,
@@ -56,7 +56,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Supervisor } from '../main/supervisor.mts';
-import { CLAUDE_COMMANDS } from '../shared/claude-commands.mjs';
+import { CLAUDE_COMMANDS } from '../shared/claude-commands.mts';
 import { DEFAULT_ENGINE } from '../shared/engines.mjs';
 import { slashRows } from '../renderer/src/slash-menu.ts';
 import { MODE_ORDER } from '../renderer/src/modes.ts';

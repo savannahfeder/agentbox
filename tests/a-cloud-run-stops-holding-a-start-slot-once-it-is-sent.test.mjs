@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
 import { cloudRun } from '../main/cloud/run.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { CLOUD_SENT, sentLine, readSent } from '../shared/cloud-start.mjs';
+import { CLOUD_SENT, sentLine, readSent } from '../shared/cloud-start.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');

@@ -151,7 +151,7 @@ describe('the plumbing', () => {
   const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 
   it('has a door from the window to the supervisor', () => {
-    expect(read('shared/bridge-map.mjs')).toMatch(/setThreadPins: 'zero:set-thread-pins'/);
+    expect(read('shared/bridge-map.mts')).toMatch(/setThreadPins: 'zero:set-thread-pins'/);
     expect(read('main/ipc.mts')).toMatch(/'zero:set-thread-pins'/);
   });
 

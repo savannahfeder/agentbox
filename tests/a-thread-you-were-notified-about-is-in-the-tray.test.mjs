@@ -21,7 +21,7 @@ import { describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { newSince } from '../shared/corner-tag.mjs';
+import { newSince } from '../shared/corner-tag.mts';
 import { AWAY_AFTER_MS } from '../shared/notify-rules.mjs';
 import { createNotifier } from '../main/notify.mts';
 import { cornerTagRig } from './helpers/corner-tag-rig.mjs';

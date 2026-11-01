@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { deadRunSentence } from '../shared/spawn-trouble.mjs';
+import { deadRunSentence } from '../shared/spawn-trouble.mts';
 import { Name } from '../shared/product-name.mjs';
 
 const MIN = 60_000;

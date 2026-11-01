@@ -29,7 +29,7 @@ import { Store } from '../main/store.mts';
 import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
 import { installNotifier } from '../main/notify.mts';
-import { WRAPPED_ARGS } from '../shared/bridge-map.mjs';
+import { WRAPPED_ARGS } from '../shared/bridge-map.mts';
 
 const NOW = Date.parse('2026-10-23T12:00:00Z');
 const TOKEN = 'ExponentPushToken[abcdefghij0123456789AB]';

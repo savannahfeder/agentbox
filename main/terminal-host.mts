@@ -23,7 +23,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const PROTOCOL = 1;
 // A host started by older code keeps the terminals it has; new terminals open
 // in a host made of the code the app is running now.
-const MADE_OF = ['terminal-host.mts', 'task-terminals.mts', '../shared/terminal-state.mjs'];
+const MADE_OF = ['terminal-host.mts', 'task-terminals.mts', '../shared/terminal-state.mts'];
 export const HOST_ALREADY_THERE = 3;
 export type HostOp = 'open' | 'read' | 'write' | 'resize' | 'close' | 'end' | 'list';
 

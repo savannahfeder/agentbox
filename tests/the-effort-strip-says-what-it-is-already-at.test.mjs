@@ -1,6 +1,6 @@
 // THE EFFORT STRIP SAYS WHAT THE RUN IS ALREADY AT, INSTEAD OF SAYING NOTHING.
 //
-// WHY IT WAS BLANK, AND WHY THAT WAS RIGHT AT THE TIME. shared/effort-levels.mjs
+// WHY IT WAS BLANK, AND WHY THAT WAS RIGHT AT THE TIME. shared/effort-levels.mts
 // says it outright: "a level nobody picked is the engine's own choice for the
 // model... and this app does not know what that is per model, so it does not
 // claim to." An app that lit a word it had guessed would be worse than a blank

@@ -2,7 +2,7 @@
 //
 // What broke: `npx agentbox-app` opened a tab that hammered the server with
 // about five thousand failing requests a second. Four channels in
-// shared/bridge-map.mjs (badge, bootInfo, notify, crash) were only ever
+// shared/bridge-map.mts (badge, bootInfo, notify, crash) were only ever
 // registered by main/main.mts, inside the desktop window, so the browser server
 // answered each with 404. The screen turned the failed `badge` into an uncaught
 // error, reported it on `crash`, which also failed, which was reported on
@@ -21,7 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { bootHeadless } from '../main/serve.mts';
-import { REQUEST_CHANNELS } from '../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS } from '../shared/bridge-map.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(here, '..');

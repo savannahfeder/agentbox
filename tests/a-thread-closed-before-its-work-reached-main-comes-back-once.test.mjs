@@ -15,7 +15,7 @@ import path from 'node:path';
 import { Store } from '../main/store.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { failureNote } from '../main/ship-queue.mts';
-import { CLOSED_UNSHIPPED, closedAnywayNote } from '../shared/not-shipped.mjs';
+import { CLOSED_UNSHIPPED, closedAnywayNote } from '../shared/not-shipped.mts';
 
 let tmp; let store; let sup;
 beforeEach(async () => {

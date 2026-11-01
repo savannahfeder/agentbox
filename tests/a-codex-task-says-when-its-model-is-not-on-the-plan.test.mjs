@@ -37,7 +37,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { troubleCause, deadRunSentence, deadRunCause, needsHerHands, causeBreakdown } from '../shared/spawn-trouble.mjs';
+import { troubleCause, deadRunSentence, deadRunCause, needsHerHands, causeBreakdown } from '../shared/spawn-trouble.mts';
 import { shortNext } from '../renderer/src/trouble-row.ts';
 
 // Copied off the two dead runs' trace logs.

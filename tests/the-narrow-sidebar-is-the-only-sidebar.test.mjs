@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WorkspaceNavigation } from '../renderer/src/components/WorkspaceNavigation';
-import { everyKey, keysForAgents } from '../shared/shortcuts.mjs';
+import { everyKey, keysForAgents } from '../shared/shortcuts.mts';
 import { HINTS } from '../renderer/src/hint-plate';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

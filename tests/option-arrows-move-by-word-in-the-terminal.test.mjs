@@ -20,7 +20,7 @@
 //    sends ESC b, which moved back one word (`[one two X]three`).
 import { describe, it, expect } from 'vitest';
 import { terminalEnv } from '../main/task-terminals.mts';
-import { optionWordKey } from '../shared/terminal-keys.mjs';
+import { optionWordKey } from '../shared/terminal-keys.mts';
 
 const key = (k, mods = {}) => ({ type: 'keydown', key: k, altKey: true, ctrlKey: false, metaKey: false, shiftKey: false, ...mods });
 

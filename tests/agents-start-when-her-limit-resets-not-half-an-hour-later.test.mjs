@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { limitResetMoment } from '../shared/spawn-trouble.mjs';
+import { limitResetMoment } from '../shared/spawn-trouble.mts';
 
 const ONE_ACCOUNT_HOME = '/nonexistent-home-with-no-second-account';
 const HER_LIMIT = "You've hit your session limit · resets 6:50pm (America/Los_Angeles)";

@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { cornerTagRig } from './helpers/corner-tag-rig.mjs';
 import { TONE_EVERY_MS } from '../main/corner-tag.mts';
 import { loadLiquidGlass } from '../main/liquid-glass.mts';
-import { toneFromLuma } from '../shared/corner-tag.mjs';
+import { toneFromLuma } from '../shared/corner-tag.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const T = 1_000_000_000;

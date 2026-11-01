@@ -20,7 +20,7 @@ import {
   coach, finishedCleared, laterCleared, laterId, laterIndex, waitingIndex, walkRows,
 } from '../renderer/src/onboarding.ts';
 import { SECTION, fold } from '../renderer/src/agent-import-card.ts';
-import { PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG } from '../shared/first-run-practice.mjs';
+import { PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG } from '../shared/first-run-practice.mts';
 import { NOTE_NAME, readNote } from '../main/rail-note.mts';
 import { Store } from '../main/store.mts';
 

@@ -8,7 +8,7 @@ import {
   dutyWhen, dutyOf, DUTY_LABEL_PREFIX, CHAT_LABEL, yesFirst, WORK_LABEL_PREFIX, isActiveRun, isQueued, STOPPED_NOTE,
   METHOD_CAP, recordOf, sourceText, pausedNow, WEEK_MS, workOf, UNREAD_HOLD,
 } from '../shared/teammates.mjs';
-import { isShippedNote } from '../shared/shipped-note.mjs';
+import { isShippedNote } from '../shared/shipped-note.mts';
 import { ruleLabel, periodKey } from '../shared/repeats.mjs';
 import {
   teamDir, readTeammates, readChat, writeTeammate, writeChat, newTeammateId, newMemoryId, readPlaybooks,

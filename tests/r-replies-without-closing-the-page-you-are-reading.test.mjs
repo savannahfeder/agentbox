@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HER_LETTERS_IN_A_PAGE } from '../shared/artifact-keys.mjs';
+import { HER_LETTERS_IN_A_PAGE } from '../shared/artifact-keys.mts';
 import { keyWhileABoxIsOpen } from '../renderer/src/keys';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
 import { Name } from '../shared/product-name.mjs';
-import { IMG_SCHEME } from '../shared/schemes.mjs';
+import { IMG_SCHEME } from '../shared/schemes.mts';
 import {
   cleanName,
   clearProjectIcon,

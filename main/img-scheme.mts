@@ -39,11 +39,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
-import { IMG_SCHEME, IMG_SCHEMES, isScheme } from '../shared/schemes.mjs';
+import { IMG_SCHEME, IMG_SCHEMES, isScheme } from '../shared/schemes.mts';
 
 // The name is read rather than typed, and every spelling this app has used is
 // still answered: a product's logo is kept in the store as a url on this
-// scheme. shared/schemes.mjs carries that argument in full.
+// scheme. shared/schemes.mts carries that argument in full.
 export { IMG_SCHEME, IMG_SCHEMES };
 
 // One host, so every picture in the window shares one origin. Same reason

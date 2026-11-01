@@ -32,8 +32,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { limitRows, sessionLimit, usageEngine, usageSentence } from '../shared/usage.mjs';
-import { readUsage } from '../shared/claude-usage.mjs';
+import { limitRows, sessionLimit, usageEngine, usageSentence } from '../shared/usage.mts';
+import { readUsage } from '../shared/claude-usage.mts';
 import { UsagePill } from '../renderer/src/components/UsagePill.tsx';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));

@@ -15,7 +15,7 @@
 import { it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
-import { DOC_SCHEMES } from '../shared/schemes.mjs';
+import { DOC_SCHEMES } from '../shared/schemes.mts';
 import {
   wantsQuietScrollbars, quietScrollbars, quietTheFramesScrollbars, AT_REST, SHOWN,
 } from '../main/frame-scrollbars.mts';

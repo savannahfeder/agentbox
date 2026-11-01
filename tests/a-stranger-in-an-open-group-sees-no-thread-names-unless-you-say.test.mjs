@@ -16,7 +16,7 @@ import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
-import { wallCards } from '../shared/room-cards.mjs';
+import { wallCards } from '../shared/room-cards.mts';
 import { Name } from '../shared/product-name.mjs';
 import { PeoplePanel } from '../renderer/src/team/rooms/GroupPage.tsx';
 import { OpenGroupNotice } from '../renderer/src/team/rooms/OpenGroupNotice.tsx';

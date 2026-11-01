@@ -1,4 +1,4 @@
-// THE CORNER TAG'S WINDOWS (w-dafae58a23). shared/corner-tag.mjs decides what
+// THE CORNER TAG'S WINDOWS (w-dafae58a23). shared/corner-tag.mts decides what
 // it says, when it shows and where it sits; this file is the live half: the
 // tag's own small window, the list that opens beside it, the screens they sit
 // on, and her choices about them.
@@ -35,13 +35,13 @@
 //
 // What the tag counts is not decided here. Only the page knows what the inbox
 // is, so it hands over what is ready and how many are working on
-// `zero:corner-tag`; shared/corner-tag.mjs puts it newest first.
+// `zero:corner-tag`; shared/corner-tag.mts puts it newest first.
 
 import type { BrowserWindow, IpcMain, Menu, PowerMonitor, Screen } from 'electron';
 import type { GlassOptions, LiquidGlass } from './liquid-glass.mts';
 
-import type { Grip } from '../shared/corner-tag.mjs';
-import { cardPlacement, cornerPlace, EDGE_SLACK, MARGIN, hiddenUntil, keepCorner, newSince, notDismissed, readyNow, restingSpot, spotFor, tagScaleOn, tagShows, tagZoom, toneFromLuma, zoomStep, GRIPS, HIDE_CHOICES } from '../shared/corner-tag.mjs';
+import type { Grip } from '../shared/corner-tag.mts';
+import { cardPlacement, cornerPlace, EDGE_SLACK, MARGIN, hiddenUntil, keepCorner, newSince, notDismissed, readyNow, restingSpot, spotFor, tagScaleOn, tagShows, tagZoom, toneFromLuma, zoomStep, GRIPS, HIDE_CHOICES } from '../shared/corner-tag.mts';
 
 // How long the pointer may be off both the tag and its list before the list
 // shuts: long enough to cross the gap between them, short enough to feel like
@@ -159,7 +159,7 @@ export function createCornerTag({
   // Anything handed over without the moment it started waiting is dated from
   // when this file first saw it, rather than counted new forever.
   const firstSeen = new Map<string, number>();
-  // Threads crossed off the tray, and when (shared/corner-tag.mjs,
+  // Threads crossed off the tray, and when (shared/corner-tag.mts,
   // notDismissed). Kept across a restart, forgotten once a thread leaves the list.
   let dismissed: Record<string, number> = { ...(config.cornerTagDismissed ?? {}) };
   const toldNow = () => { try { return told() ?? []; } catch { return []; } };
@@ -176,7 +176,7 @@ export function createCornerTag({
   let frame = 0;
   const framed = (a: Rect) => (frame ? { x: a.x - frame, y: a.y - frame, width: a.width + 2 * frame, height: a.height + 2 * frame } : a);
   // Where she may park it: the screen, plus the band, plus the slack that lets
-  // her tuck it past the edge (shared/corner-tag.mjs, EDGE_SLACK).
+  // her tuck it past the edge (shared/corner-tag.mts, EDGE_SLACK).
   const parkable = (a: Rect) => {
     const f = framed(a);
     return { x: f.x - EDGE_SLACK, y: f.y - EDGE_SLACK, width: f.width + 2 * EDGE_SLACK, height: f.height + 2 * EDGE_SLACK };
@@ -225,7 +225,7 @@ export function createCornerTag({
   const tagUp = () => !gone && alive('tag') && wins.tag!.isVisible() && shouldShow();
 
   // WHICH SCREEN IT BELONGS TO, AND WHERE ON IT. The corner it was parked in
-  // and the gap from that corner are what is remembered (shared/corner-tag.mjs,
+  // and the gap from that corner are what is remembered (shared/corner-tag.mts,
   // cornerPlace), because a point on the whole desktop stops meaning anything
   // the moment a monitor is plugged in or taken away: every screen's
   // coordinates move underneath it and the tag jumps.

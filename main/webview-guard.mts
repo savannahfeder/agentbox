@@ -5,7 +5,7 @@
 //
 // The partition is deliberately left alone. It says WHERE a page's sign-ins
 // go rather than what the page may reach, and flattening it would merge the
-// website pane's store into the default one (shared/websites.mjs).
+// website pane's store into the default one (shared/websites.mts).
 //
 // Pinned by tests/a-website-in-the-pane-cannot-reach-the-app.test.mjs.
 

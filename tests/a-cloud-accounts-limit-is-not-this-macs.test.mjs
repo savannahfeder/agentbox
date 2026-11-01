@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { limitResetMoment } from '../shared/spawn-trouble.mjs';
+import { limitResetMoment } from '../shared/spawn-trouble.mts';
 import { recordCloudLogin, markCloudLogin, cloudLoginState, mayRunOn, pickCloudLogin } from '../main/cloud/logins.mts';
 import { limitInResultLine } from '../main/cloud/run.mts';
 

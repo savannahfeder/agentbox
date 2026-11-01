@@ -14,7 +14,7 @@
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { markImported } from '../shared/agent-import.mjs';
+import { markImported } from '../shared/agent-import.mts';
 import { CARD } from '../renderer/src/agent-import-card';
 
 const t = (id, source = 'codex') => ({ id, source, title: `t ${id}`, folder: '/w', when: 1 });

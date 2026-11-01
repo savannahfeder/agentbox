@@ -36,7 +36,7 @@ import { answerWhatOnlyTheWindowAnswered } from './serve.mts';
 import type { CollectingIpcMain, IpcHandler } from './serve.mts';
 import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mts';
 import * as approvals from './approvals.mjs';
-import { recoveryToast } from '../shared/recovery.mjs';
+import { recoveryToast } from '../shared/recovery.mts';
 import { phoneWaitsOf } from '../shared/phone-snapshot.mjs';
 import { teammatesOn } from '../shared/teammates.mjs';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mjs';
@@ -48,7 +48,7 @@ import { keepThePageAlive } from './when-the-page-stops.mts';
 import { createAnalytics, createDailyCount } from './analytics.mts';
 import { createUpdater } from './updater.mts';
 import { quitStep, flushBeforeQuit, quitThenExit } from './quit-sequence.mts';
-import { createPlace } from '../shared/where-it-runs-from.mjs';
+import { createPlace } from '../shared/where-it-runs-from.mts';
 import { createSourceUpdater } from './source-updater.mts';
 import { learnShellDataDirs, recoverShellPath } from './shell-path.mjs';
 import { installNotifier } from './notify.mts';
@@ -61,7 +61,7 @@ import { hardenAttachedWebview } from './webview-guard.mts';
 import { IMG_SCHEMES, imgPath, mediaResponse, mediaType, servable } from './img-scheme.mts';
 import { hotWindowVerdict, storeHasWork } from './dev-window.mjs';
 import { writeHeldThenReload } from './write-before-reload.mts';
-import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterInAPage } from '../shared/artifact-keys.mjs';
+import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterInAPage } from '../shared/artifact-keys.mts';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
 import { JOIN_SCHEME, ourLink, tokenFromLink } from '../shared/room-links.mjs';
 import { getMic } from './mic.mts';
@@ -376,7 +376,7 @@ async function createWindow() {
     return false;
   };
   // THE CARD IN FRONT, which is the open thread's own and not simply the oldest
-  // (shared/which-card-is-in-front.mjs). Late-bound beside the door above,
+  // (shared/which-card-is-in-front.mts). Late-bound beside the door above,
   // because only the IPC surface knows which thread is on screen, and before it
   // exists the spool's own order is the whole of what is known.
   let cardInFront: () => { id: string } | null = () => approvals.listPending(config.storeRoot)[0] ?? null;
@@ -832,7 +832,7 @@ async function createWindow() {
   // feed (main/source-updater.mts), because that is how teammates run the team
   // build and their updates are pushes to main, not releases.
   //
-  // AND WHERE THIS COPY IS RUNNING FROM (shared/where-it-runs-from.mjs). An
+  // AND WHERE THIS COPY IS RUNNING FROM (shared/where-it-runs-from.mts). An
   // app run out of the disk image, or out of a read-only copy macOS made of
   // it, can never update itself, and until 2026-10-12 nothing in the app said
   // so: two installs sat on 0.1.11 for a week. The fact rides the updater's
@@ -917,7 +917,7 @@ async function createWindow() {
     // renderer that day: with the keyboard inside a page in the pane, ⌘K was
     // dead. Escape was the only key this branch had ever forwarded, so it was
     // the only one that worked. The rule for which keys are the app's is
-    // written once, in shared/artifact-keys.mjs, and read here and by the pane.
+    // written once, in shared/artifact-keys.mts, and read here and by the pane.
     //
     // HER LETTERS COME UP TOO, FROM A PAGE ONLY.E is not ⌘K: measured that day,
     // it archives the card perfectly well while her keyboard is on the message,

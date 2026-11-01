@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { limitResetMoment, troubleCause } from '../shared/spawn-trouble.mjs';
+import { limitResetMoment, troubleCause } from '../shared/spawn-trouble.mts';
 import { limitInResultLine } from '../main/cloud/run.mts';
 import { liveLine } from '../renderer/src/live-line.ts';
 

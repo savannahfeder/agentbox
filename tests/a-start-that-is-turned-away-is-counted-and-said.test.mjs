@@ -20,7 +20,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { EVENTS, sanitize, WAIT_REASONS } from '../shared/analytics-events.mjs';
+import { EVENTS, sanitize, WAIT_REASONS } from '../shared/analytics-events.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { liveLine, shortWord } from '../renderer/src/live-line.ts';
 

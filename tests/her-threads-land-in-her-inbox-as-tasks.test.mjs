@@ -25,7 +25,7 @@ import { Store } from '../main/store.mts';
 import { Name } from '../shared/product-name.mjs';
 import {
   THREAD_LABEL, startedIn, threadImportRow, threadLabel, threadsNeedingRows, whenWords,
-} from '../shared/agent-import.mjs';
+} from '../shared/agent-import.mts';
 import {
   allPicked, bringAllLine, canBring, countKinds, destinations, goLine, kindPhrase,
   picksOf, pressLine, sectionState, toggleSection, togglePicked, totalLine, willMake,

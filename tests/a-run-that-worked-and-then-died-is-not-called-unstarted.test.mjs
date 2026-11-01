@@ -20,8 +20,8 @@ import { fileURLToPath } from 'node:url';
 
 import { bootHeadless } from '../main/serve.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { deadRunSentence, deadRunCause } from '../shared/spawn-trouble.mjs';
-import { readDeadRunTrace } from '../shared/dead-run-trace.mjs';
+import { deadRunSentence, deadRunCause } from '../shared/spawn-trouble.mts';
+import { readDeadRunTrace } from '../shared/dead-run-trace.mts';
 import { Name } from '../shared/product-name.mjs';
 import { machineryPath } from '../main/store/home.mjs';
 import { setAppHome, clearAppHome } from './app-home.mjs';

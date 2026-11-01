@@ -30,7 +30,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store } from '../main/store.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { PRACTICE_ROWS, PRACTICE_SLUG } from '../shared/first-run-practice.mjs';
+import { PRACTICE_ROWS, PRACTICE_SLUG } from '../shared/first-run-practice.mts';
 import { needsStaging, walkStageKey } from '../renderer/src/walk-staging.ts';
 import { practiceRemembered, rememberProject, rememberedProject, resolveProject } from '../renderer/src/compose-project.ts';
 

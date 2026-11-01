@@ -16,7 +16,7 @@
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { EVENTS, sanitize } from '../shared/analytics-events.mjs';
+import { EVENTS, sanitize } from '../shared/analytics-events.mts';
 import { createAnalytics } from '../main/analytics.mts';
 import { countsTurnedOff } from '../main/settings.mts';
 

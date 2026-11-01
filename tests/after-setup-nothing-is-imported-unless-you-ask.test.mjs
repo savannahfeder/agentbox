@@ -18,7 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
 import { scanCodex } from '../main/codex-watch.mts';
-import { codexIdOf, isCodexMirrorRow } from '../shared/codex-import.mjs';
+import { codexIdOf, isCodexMirrorRow } from '../shared/codex-import.mts';
 
 const NOW = Date.parse('2026-10-05T14:00:00-07:00');
 

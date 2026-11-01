@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, threadImportRow, THREAD_LABEL } from '../shared/agent-import.mjs';
+import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, threadImportRow, THREAD_LABEL } from '../shared/agent-import.mts';
 
 const dirs = [];
 afterEach(() => { while (dirs.length) fs.rmSync(dirs.pop(), { recursive: true, force: true }); });

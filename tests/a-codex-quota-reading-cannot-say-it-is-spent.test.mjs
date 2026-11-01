@@ -33,7 +33,7 @@
 // manufactures a hundred: a window is only drawn at 100 when it really is
 // finished.
 import { describe, expect, it } from 'vitest';
-import { codexLimits, codexPlan, mergeRateLimits, windowSpan } from '../shared/codex-usage.mjs';
+import { codexLimits, codexPlan, mergeRateLimits, windowSpan } from '../shared/codex-usage.mts';
 
 /** The push above, verbatim, as it arrived. */
 const MEASURED = Object.freeze({

@@ -21,7 +21,7 @@ import path from 'node:path';
 import {
   claudeProjectFolders, findAgentFolders, readAgentFiles, readFolderAgents,
 } from '../main/agent-files.mts';
-import { GUARDED } from '../shared/project-folder-check.mjs';
+import { GUARDED } from '../shared/project-folder-check.mts';
 
 const DAY = 24 * 60 * 60 * 1000;
 

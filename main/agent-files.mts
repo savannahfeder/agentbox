@@ -20,8 +20,8 @@ import fs from 'node:fs';
 import type { Dirent } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { titleFromFileName } from '../shared/name-words.mjs';
-import { GUARDED } from '../shared/project-folder-check.mjs';
+import { titleFromFileName } from '../shared/name-words.mts';
+import { GUARDED } from '../shared/project-folder-check.mts';
 import { RECENT_DAYS, isScratchFolder } from './agent-sessions.mts';
 
 /**
@@ -170,7 +170,7 @@ export function oneLine(description: string | null | undefined, max = 160) {
  *
  *  The short words stay shouted, because "Leon Okafor Qa" is not what she
  *  called it and a screen that renames her own agents is worse than one that
- *  shows the file name raw. The list of them is shared/name-words.mjs, which
+ *  shows the file name raw. The list of them is shared/name-words.mts, which
  *  the project names read too (F-137). */
 export function agentTitle(name: string | null | undefined) {
   const n = (name ?? '').trim();

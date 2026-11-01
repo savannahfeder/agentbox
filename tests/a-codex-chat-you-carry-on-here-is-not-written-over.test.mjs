@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
-import { codexMirrorPatch, codexIdOf } from '../shared/codex-import.mjs';
+import { codexMirrorPatch, codexIdOf } from '../shared/codex-import.mts';
 
 const NOW = Date.UTC(2026, 9, 24, 12);
 

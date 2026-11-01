@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { claudeDataDirs } from './agent-homes.mts';
-import { howTheChatEnded } from '../shared/agent-import.mjs';
+import { howTheChatEnded } from '../shared/agent-import.mts';
 
 export interface ImportThread {
   id: string;

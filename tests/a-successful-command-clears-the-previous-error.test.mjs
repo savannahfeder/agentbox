@@ -26,7 +26,7 @@ it('keeps a new genuine refusal and does not change another task',async()=>{
 
 import fs from 'node:fs';
 import ts from 'typescript';
-import {providerCommand,reviewTarget} from '../shared/provider-commands.mjs';
+import {providerCommand,reviewTarget} from '../shared/provider-commands.mts';
 // Exercise the actual composer send function, with only its UI/IPC boundaries
 // replaced. Built-in Claude commands and Codex review used to bypass dispatch.
 it.each([['claude','/reload-skills'],['codex','/review --base main'],['claude','/project-proof']])('the composer dispatches %s %s before forwarding',async(runningEngine,text)=>{

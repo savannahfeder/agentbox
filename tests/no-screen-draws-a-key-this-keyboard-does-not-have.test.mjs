@@ -3,7 +3,7 @@
 // The Send button, the walk's cards, the shortcuts page and a dozen tooltips
 // each wrote ⌘ into their own string, so on Linux the app named a key the
 // keyboard does not have while Ctrl was what worked. Every one of them now asks
-// shared/key-caps.mjs, through renderer/src/this-keyboard.ts.
+// shared/key-caps.mts, through renderer/src/this-keyboard.ts.
 //
 // What is pinned here is the rule rather than the fourteen labels: a glyph in a
 // string a person reads has to come from the table. Comments are stripped

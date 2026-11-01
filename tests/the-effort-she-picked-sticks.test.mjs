@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EFFORT_LEVELS, effortLabel, isEffort, isEffortWord } from '../shared/effort-levels.mjs';
+import { EFFORT_LEVELS, effortLabel, isEffort, isEffortWord } from '../shared/effort-levels.mts';
 import {
   EFFORTS,
   LAST_EFFORT_KEY,

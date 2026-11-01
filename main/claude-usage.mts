@@ -4,8 +4,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readUsageReport } from '../shared/claude-usage.mjs';
-import { localZone, USAGE_UNREADABLE } from '../shared/usage.mjs';
+import { readUsageReport } from '../shared/claude-usage.mts';
+import { localZone, USAGE_UNREADABLE } from '../shared/usage.mts';
 import { runClaudeUsage } from './claude-usage-process.mts';
 import type { UsageRunner } from './claude-usage-process.mts';
 import type { UsageLimit } from '../shared/usage.d.mts';

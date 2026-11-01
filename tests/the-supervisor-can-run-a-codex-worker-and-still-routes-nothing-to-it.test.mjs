@@ -142,7 +142,7 @@ vi.mock('../main/account-tooling.mjs', async (importActual) => {
 
 import { Supervisor, readersFor } from '../main/supervisor.mts';
 import { captureCodexEvent, codexStreamingText, summarizeCodexEvent, traceCodexEvent } from '../main/codex.mjs';
-import { troubleCause, deadRunSentence } from '../shared/spawn-trouble.mjs';
+import { troubleCause, deadRunSentence } from '../shared/spawn-trouble.mts';
 import { foldWorkItems } from '../shared/work-items.mjs';
 import { NAME } from '../shared/product-name.mjs';
 

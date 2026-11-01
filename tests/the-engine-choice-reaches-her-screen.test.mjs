@@ -397,7 +397,7 @@ describe('the door asks the supervisor rather than deciding', () => {
 
   // IT WAS `engines: supervisor.engineFacts(...)` ON THE LITERAL UNTIL
   // 2026-09-05, and the value is now bound a few lines above it because the
-  // corner's own rule needs the same answer (`usageEngine`, shared/usage.mjs):
+  // corner's own rule needs the same answer (`usageEngine`, shared/usage.mts):
   // deriving the workspace engine a second time inside the snapshot would be a
   // second copy of exactly the rule this describe block exists to keep in one
   // place. The claim is unchanged and is asserted in two halves -- the answer

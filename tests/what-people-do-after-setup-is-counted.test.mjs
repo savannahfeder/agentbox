@@ -21,7 +21,7 @@
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { EVENTS, sanitize } from '../shared/analytics-events.mjs';
+import { EVENTS, sanitize } from '../shared/analytics-events.mts';
 import { createCornerTag } from '../main/corner-tag.mts';
 import { cornerTagTurnedOff } from '../main/settings.mts';
 

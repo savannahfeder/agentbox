@@ -45,7 +45,7 @@ import { fileURLToPath } from 'node:url';
 import { staysOnTheTask } from '../renderer/src/stay-with-a-command';
 import { threadEvents } from '../renderer/src/thread-history';
 import { itemThread } from '../renderer/src/item-thread';
-import { commandPrompt, CLAUDE_COMMANDS } from '../shared/claude-commands.mjs';
+import { commandPrompt, CLAUDE_COMMANDS } from '../shared/claude-commands.mts';
 import { DEFAULT_ENGINE } from '../shared/engines.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

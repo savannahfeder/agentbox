@@ -16,7 +16,7 @@ import path from 'node:path';
 import { TaskTerminals, ENDED } from '../main/task-terminals.mts';
 import { TerminalHosts, closedTerminals, taskClosed, CLOSE_GRACE_MS } from '../main/terminal-hosts.mts';
 import { serveTerminals, terminalHostSocket } from '../main/terminal-host.mts';
-import { SETTINGS_TERMINAL } from '../shared/settings-terminal.mjs';
+import { SETTINGS_TERMINAL } from '../shared/settings-terminal.mts';
 
 const MIN = 60_000;
 const key = (id, product = 'p') => JSON.stringify({ product, id });

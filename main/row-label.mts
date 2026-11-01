@@ -1,6 +1,6 @@
 import { harnessFor } from './harnesses.mts';
 import { teammateIdOf } from '../shared/teammates.mjs';
-import { catchUpDue } from '../shared/agent-import.mjs';
+import { catchUpDue } from '../shared/agent-import.mts';
 // THE NAME ON THE ROW, WRITTEN RATHER THAN TAKEN FROM THE FIRST SENTENCE.
 //
 // A dictated message keeps its first line as its title, verbatim and forever

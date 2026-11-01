@@ -30,7 +30,7 @@ import path from 'node:path';
 import { RECENT_DAYS, isScratchFolder, isTaskFolder, shortFolder, threadTitle } from './agent-sessions.mts';
 import { codexDataDirs } from './agent-homes.mts';
 import { WAS_SLUGS, nameSlug } from '../shared/product-name.mjs';
-import { howTheChatEnded } from '../shared/agent-import.mjs';
+import { howTheChatEnded } from '../shared/agent-import.mts';
 
 export const CODEX_RECENT_DAYS = RECENT_DAYS;
 

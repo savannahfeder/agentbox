@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { findPrivate, scrubError, scrubStack, scrubText, withoutOurOwnPaths } from '../shared/crash-scrub.mjs';
+import { findPrivate, scrubError, scrubStack, scrubText, withoutOurOwnPaths } from '../shared/crash-scrub.mts';
 import { installCrashReports, report } from '../main/crash-report.mts';
 
 const HOME = '/Users/you';

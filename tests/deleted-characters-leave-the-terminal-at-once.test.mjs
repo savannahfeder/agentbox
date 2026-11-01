@@ -17,7 +17,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import { TaskTerminals } from '../main/task-terminals.mts';
-import { inputQueue } from '../shared/terminal-input.mjs';
+import { inputQueue } from '../shared/terminal-input.mts';
 
 function fixture() {
   let emit = () => {}, exit = () => {};

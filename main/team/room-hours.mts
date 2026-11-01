@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { allRuns, backfillRuns, runLedgerPath } from '../run-ledger.mts';
 import type { CloudUsageLine } from '../run-ledger.mts';
-import { summarizeRuns } from '../../shared/agent-hours.mjs';
+import { summarizeRuns } from '../../shared/agent-hours.mts';
 
 const RECHECK_MS = 10 * 60_000;
 

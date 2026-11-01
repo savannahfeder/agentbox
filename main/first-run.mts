@@ -6,15 +6,15 @@
 // is the point: the sentence on screen says the answer comes back in a few
 // seconds, and this is the only version of the task that can keep that promise.
 //
-// The judgement about what makes a good line is in shared/first-run-line.mjs,
+// The judgement about what makes a good line is in shared/first-run-line.mts,
 // where the tests are. This file only reads.
 
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { firstRunAnswer } from '../shared/first-run-line.mjs';
-import { DEPTH, SKIP, projectSentence } from '../shared/first-run-shape.mjs';
+import { firstRunAnswer } from '../shared/first-run-line.mts';
+import { DEPTH, SKIP, projectSentence } from '../shared/first-run-shape.mts';
 
 /**
  * The names a readme is actually called, in the order worth trying. Case is
@@ -111,7 +111,7 @@ export function describeFor({ folder, name, shortFolder }: { folder: string | nu
 /**
  * THE GUARDED FOLDERS AS FULL PATHS, for the walk to refuse to enter.
  *
- * The picker refuses these as a project (shared/project-folder-check.mjs) and
+ * The picker refuses these as a project (shared/project-folder-check.mts) and
  * that is the door a tester actually walked through. This is the second door.
  * The walk is three levels deep, so ANY caller that hands it the home folder
  * makes it read ~/Desktop, ~/Downloads, ~/Music, ~/Pictures, ~/Movies,

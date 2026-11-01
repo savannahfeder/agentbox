@@ -21,7 +21,7 @@
 // Nothing new may leave: the event names, the property allowlist and the two
 // closed word lists are all unchanged, which is why the README's twelve
 // sentences do not move either. `engine` and `kind` and `count` were already
-// approved properties (shared/analytics-events.mjs), and this is the first
+// approved properties (shared/analytics-events.mts), and this is the first
 // caller of each on these three events.
 //
 // The cases, including the ones that must NOT count:
@@ -37,7 +37,7 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import { CODEX_SEEN_MS, scanCodex } from '../main/codex-watch.mts';
-import { ALLOWED_PROPS, EVENT_NAMES, sanitize } from '../shared/analytics-events.mjs';
+import { ALLOWED_PROPS, EVENT_NAMES, sanitize } from '../shared/analytics-events.mts';
 
 const read = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 const ipc = () => read('main/ipc.mts');

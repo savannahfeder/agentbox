@@ -10,7 +10,7 @@
 // and the browser route quietly loses a feature. Nothing throws. The button is
 // just dead, and only in the door nobody on this team uses daily.
 //
-// shared/bridge-map.mjs is what stops that, by being the list both doors read.
+// shared/bridge-map.mts is what stops that, by being the list both doors read.
 // This file is what stops the map itself drifting: it reads preload.cjs as text
 // and asserts the map says exactly what preload does, name for name and channel
 // for channel.
@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { REQUEST_CHANNELS, PUSH_CHANNELS, WRAPPED_ARGS, DESKTOP_ONLY } from '../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS, PUSH_CHANNELS, WRAPPED_ARGS, DESKTOP_ONLY } from '../shared/bridge-map.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(here, '..');
@@ -38,7 +38,7 @@ const exposedPushes = Object.fromEntries(
     .map((m) => [m[1], m[2]]),
 );
 
-describe('shared/bridge-map.mjs', () => {
+describe('shared/bridge-map.mts', () => {
   it('lists every request channel preload exposes, under the same name', () => {
     expect(REQUEST_CHANNELS).toEqual(exposedRequests);
   });

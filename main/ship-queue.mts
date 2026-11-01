@@ -27,7 +27,7 @@ import type { ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Name } from '../shared/product-name.mjs';
-import { SHIP_FAILED } from '../shared/not-shipped.mjs';
+import { SHIP_FAILED } from '../shared/not-shipped.mts';
 import { conflictBrief, earlyConflictNote } from './ship-conflict-brief.mts';
 import type { ConflictThread } from './ship-conflict-brief.mts';
 import { redOnMain } from './main-went-red.mts';

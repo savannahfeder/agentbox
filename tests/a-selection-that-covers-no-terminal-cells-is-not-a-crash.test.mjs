@@ -32,7 +32,7 @@
 // minified, and a dependency rewritten at build time is machinery that has to
 // survive `npm ci` on two CI runners and every release. The handler is reached
 // as `() => this._handleSelectionChange()`, so one own property on the manager
-// instance shadows it, and shared/xterm-invalid-range.mjs puts a try/catch
+// instance shadows it, and shared/xterm-invalid-range.mts puts a try/catch
 // there that swallows exactly this one message and nothing else.
 //
 // CLEARING THE SELECTION IS THE PART THAT IS EASY TO GET WRONG. Codex flagged
@@ -49,7 +49,7 @@ import { describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { INVALID_RANGE, guardInvalidRange } from '../shared/xterm-invalid-range.mjs';
+import { INVALID_RANGE, guardInvalidRange } from '../shared/xterm-invalid-range.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');

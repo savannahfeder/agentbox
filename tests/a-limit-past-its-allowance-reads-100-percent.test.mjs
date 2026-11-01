@@ -7,7 +7,7 @@
 // away, so a meter that was over its limit vanished instead of reading full.
 import { describe, expect, it } from 'vitest';
 import { cloudLimits } from '../main/cloud/logins.mts';
-import { readUsageReport } from '../shared/claude-usage.mjs';
+import { readUsageReport } from '../shared/claude-usage.mts';
 
 const report = (session) => ({ rate_limits_available: true, rate_limits: { five_hour: { utilization: session, resets_at: null } } });
 

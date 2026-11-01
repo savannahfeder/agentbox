@@ -21,7 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { LATTICE, TAG_BASE, TAG_HEIGHTS, latticeGrid, tagHeight, tagScale } from '../shared/corner-tag.mjs';
+import { LATTICE, TAG_BASE, TAG_HEIGHTS, latticeGrid, tagHeight, tagScale } from '../shared/corner-tag.mts';
 import { Lattice, markMoves } from '../renderer/src/corner-tag/lattice.tsx';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

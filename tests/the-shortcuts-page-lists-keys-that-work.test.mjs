@@ -260,7 +260,7 @@ describe('what the page refuses to say', () => {
 
   it('says out loud, in the file itself, why each of those is missing', () => {
     // The list moved to shared/ so agents are told the same keys (w-7ec8553e23).
-    const src = read('shared/shortcuts.mjs');
+    const src = read('shared/shortcuts.mts');
     expect(src).toContain('WHAT IS DELIBERATELY NOT HERE');
     expect(src).toContain('⌘1..4');
     expect(src).toContain('Y, N and I on a row in the list');

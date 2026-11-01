@@ -25,7 +25,7 @@ import path from 'node:path';
 import {
   troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, accountSentence,
   deadRunSentence, deadRunCause, runStoppedLine, causeWord, causeWhat, causeNext, causeAct, causeBreakdown,
-} from '../shared/spawn-trouble.mjs';
+} from '../shared/spawn-trouble.mts';
 import { readPlan, slotsForPlans } from '../main/claude-plan.mjs';
 import { Supervisor } from '../main/supervisor.mts';
 

@@ -21,7 +21,7 @@
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { EVENTS, sanitize } from '../shared/analytics-events.mjs';
+import { EVENTS, sanitize } from '../shared/analytics-events.mts';
 import { createDailyCount, runEndedProps } from '../main/analytics.mts';
 import { setupStepCount, tutorialRun } from '../renderer/src/onboarding.ts';
 

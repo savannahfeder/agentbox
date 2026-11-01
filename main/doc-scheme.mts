@@ -37,10 +37,10 @@
 // product point at ../attachments, ../landing and ../../landing/assets — which
 // is why the roots are granted and not just the folder.
 import path from 'node:path';
-import { DOC_SCHEME, DOC_SCHEMES, isScheme } from '../shared/schemes.mjs';
+import { DOC_SCHEME, DOC_SCHEMES, isScheme } from '../shared/schemes.mts';
 
 // The name is read rather than typed, and every spelling this app has used is
-// still answered, because a url on this scheme is STORED. shared/schemes.mjs
+// still answered, because a url on this scheme is STORED. shared/schemes.mts
 // carries that argument in full.
 export { DOC_SCHEME, DOC_SCHEMES };
 

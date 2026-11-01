@@ -10,7 +10,7 @@
 // how many and how long, and that a thread fewer people can see than the row is
 // never summed up into it (a team thread must not quote a private one).
 import { describe, it, expect } from 'vitest';
-import { namedThreadIds, namedThreadsBlock } from '../shared/named-threads.mjs';
+import { namedThreadIds, namedThreadsBlock } from '../shared/named-threads.mts';
 
 const T = Date.parse('2026-10-20T14:02:00Z');
 const team = { slug: 'agentbox-team', name: 'Agentbox Team' };

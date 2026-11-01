@@ -53,7 +53,7 @@ import { fileURLToPath } from 'node:url';
 import { readSettings } from '../main/settings.mts';
 import { forgetCodexBin } from '../main/codex-bin.mjs';
 import { Supervisor } from '../main/supervisor.mts';
-import { engineTroubleNote } from '../shared/spawn-trouble.mjs';
+import { engineTroubleNote } from '../shared/spawn-trouble.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const settingsTsx = fs.readFileSync(path.join(root, 'renderer/src/components/Settings.tsx'), 'utf8');

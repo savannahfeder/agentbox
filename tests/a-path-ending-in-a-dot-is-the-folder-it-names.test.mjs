@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { checkProjectFolder, tidyFolder } from '../shared/project-folder-check.mjs';
+import { checkProjectFolder, tidyFolder } from '../shared/project-folder-check.mts';
 import { bootHeadless, nodeHost } from '../main/serve.mts';
 
 const HOME = '/Users/esther';

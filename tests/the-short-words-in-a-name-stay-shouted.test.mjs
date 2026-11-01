@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { SHOUTED, titleFromFileName } from '../shared/name-words.mjs';
+import { SHOUTED, titleFromFileName } from '../shared/name-words.mts';
 import { nameFromFolder } from '../renderer/src/onboarding.ts';
 import { projectNameFor } from '../renderer/src/agent-import-card.ts';
 import { agentTitle } from '../main/agent-files.mts';

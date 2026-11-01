@@ -51,7 +51,7 @@ import { CLAUDE_MODELS, READ_FROM } from '../shared/claude-models.generated.mjs'
 // The build writes this instead. It is gitignored, it is absent on a machine
 // that has never built, and it is read with `fs` rather than imported, for the
 // one reason that decides the whole shape: this module is node, but
-// shared/claude-commands.mjs next door is shared with the renderer, where an
+// shared/claude-commands.mts next door is shared with the renderer, where an
 // import of a file that may not exist cannot be made to resolve. A read is a
 // read in node and nothing at all in a bundle.
 const LOCAL = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'shared', 'claude-models.local.json');
@@ -122,7 +122,7 @@ export const nameOf = (names, id) => names.find((n) => n.id === id)?.label;
 // AND HOW HARD THAT MODEL THINKS WHEN NOBODY SAYS.
 //
 // The strip drew nothing lit because this app genuinely did not know the answer,
-// and shared/effort-levels.mjs says so in as many words: "a level nobody picked
+// and shared/effort-levels.mts says so in as many words: "a level nobody picked
 // is the engine's own choice for the model... and this app does not know what
 // that is per model, so it does not claim to." That was true and it is not any
 // more. Claude Code's catalog carries `default_effort` on each model, beside the
