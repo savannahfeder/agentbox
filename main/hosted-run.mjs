@@ -8,6 +8,8 @@ import { PassThrough, Writable } from 'node:stream';
 
 // The host went away without saying how the run ended.
 export const HOST_LOST = 75;
+const CONNECT_TRIES = 50;
+const CONNECT_EVERY_MS = 100;
 
 export class HostedRun extends EventEmitter {
   /**
@@ -32,15 +34,22 @@ export class HostedRun extends EventEmitter {
       final(cb) { self._send({ t: 'I' }); cb(); },
     });
     this.stdin.on('error', () => {});
-    const sock = net.connect(sockPath);
+    this._queued = [];
+    this._connect(start ? { op: 'start', runId, ...start } : { op: 'attach', runId, out, err }, CONNECT_TRIES);
+  }
+
+  // A host just started takes a moment to listen.
+  _connect(first, tries) {
+    const sock = net.connect(this.sockPath);
     this._sock = sock;
+    let connected = false;
     sock.setEncoding('utf8');
     sock.once('connect', () => {
-      sock.write(`${JSON.stringify(start ? { op: 'start', runId, ...start } : { op: 'attach', runId, out, err })}\n`);
+      connected = true;
+      sock.write(`${JSON.stringify(first)}\n`);
       for (const line of this._queued ?? []) sock.write(line);
       this._queued = null;
     });
-    this._queued = [];
     let buf = '';
     sock.on('data', (d) => {
       buf += d;
@@ -56,6 +65,7 @@ export class HostedRun extends EventEmitter {
     sock.on('error', () => {});
     sock.on('close', () => {
       if (this._over || this._detached) return;
+      if (!connected && tries > 1) { setTimeout(() => this._connect(first, tries - 1), CONNECT_EVERY_MS).unref?.(); return; }
       this.stderr.write(`agentbox: the run host stopped answering for this run\n`);
       this._end(HOST_LOST, null);
     });
@@ -74,6 +84,7 @@ export class HostedRun extends EventEmitter {
       this.emit('spawn');
     } else if (msg.t === 'state') {
       if (Number.isInteger(msg.pid)) this.pid = msg.pid;
+      if (msg.from) this.read = { out: msg.from.out, err: msg.from.err };
       this.emit('input-state', msg);
     } else if (msg.t === 'o' || msg.t === 'e') {
       const b = Buffer.from(String(msg.d ?? ''), 'base64');
@@ -99,7 +110,9 @@ export class HostedRun extends EventEmitter {
     // child whose streams have closed.
     this.stdout.end();
     this.stderr.end();
-    setImmediate(() => { this.emit('exit', code, signal); this.emit('close', code, signal); });
+    // A lost host is not the agent failing (Supervisor `settleExit` reads `how`).
+    const how = code === HOST_LOST ? { transportFault: true } : undefined;
+    setImmediate(() => { this.emit('exit', code, signal, how); this.emit('close', code, signal); });
   }
 
   kill(signal = 'SIGTERM') {

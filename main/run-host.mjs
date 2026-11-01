@@ -149,17 +149,19 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
     if (run.clientSock && run.clientSock !== sock) run.clientSock.destroy();
     run.client = true;
     run.clientSock = sock;
-    if (!fresh && run.input) {
-      const s = run.input.inputState?.() ?? null;
-      send({ t: 'state', pid: run.child?.pid ?? null, ...(s ?? {}), closed: !!run.inputClosed });
+    // A negative position is "from now": the app did not save where it was.
+    const from = { out: out >= 0 ? Math.min(out, run.out) : run.out, err: err >= 0 ? Math.min(err, run.err) : run.err };
+    if (!fresh) {
+      const s = run.input?.inputState?.() ?? null;
+      send({ t: 'state', pid: run.child?.pid ?? null, from, ...(s ?? {}), closed: !!run.inputClosed });
     }
-    for (const [key, tag, from] of [['out', 'o', out], ['err', 'e', err]]) {
-      if (!(from < run[key])) continue;
+    for (const [key, tag] of [['out', 'o'], ['err', 'e']]) {
+      if (!(from[key] < run[key])) continue;
       try {
         const fd = fs.openSync(run.files[key], 'r');
         try {
-          const buf = Buffer.alloc(run[key] - from);
-          fs.readSync(fd, buf, 0, buf.length, from);
+          const buf = Buffer.alloc(run[key] - from[key]);
+          fs.readSync(fd, buf, 0, buf.length, from[key]);
           send({ t: tag, d: buf.toString('base64') });
         } finally { fs.closeSync(fd); }
       } catch (e) { log(`run host: ${e.message}`); }
@@ -200,7 +202,7 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
           if (msg.op === 'attach') {
             run = runs.get(msg.runId) ?? null;
             if (!run) { send({ t: 'gone' }); sock.end(); continue; }
-            attach(run, sock, Number(msg.out) || 0, Number(msg.err) || 0, send);
+            attach(run, sock, Number.isFinite(msg.out) ? msg.out : -1, Number.isFinite(msg.err) ? msg.err : -1, send);
             continue;
           }
           sock.end();
