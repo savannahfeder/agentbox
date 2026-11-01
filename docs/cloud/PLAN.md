@@ -587,38 +587,78 @@ Settled, not to be reopened:
 - **One place in charge.** A thread has `placement` (`local` or `cloud`) and an
   owner generation. Every write carries the generation and a stale one is refused,
   so a computer and the function can never both run it.
-- **Starting.** A new command row calls the function through a database webhook,
-  so the run starts at once. The one-minute sweep stays as the backstop for a
-  missed call. The run id is stored before the launch, there is at most one active
-  run per thread, and an ambiguous start is checked against AgentCore before it
-  is replaced.
+- **One turn, one run.** A sandbox runs one turn: restore, run the harness, collect,
+  stop. `done.json` already goes last (cloud/sandbox/server.mjs) and already wakes
+  the function through S3's notice, so it is the turn's checkpoint: a turn counts as
+  finished only once it exists, holding the files, the harness's session and its
+  version. The next reply is a new run that resumes from it. No sandbox stays warm
+  between turns, so the 20 minutes of `IDLE_CLOSE_MS` does not apply here. A reply
+  sent while a turn runs goes in through the numbered input that exists. The cold
+  start is measured in the first days; if it is too slow, a short warm wait comes
+  after, not before.
+- **Runs are rows, and every step is a state change.** `queued`, `starting`,
+  `running`, `waiting` (on an approval), `collecting`, `done`, `failed`. A
+  conditional write moves a run from one state to the next, and carries the
+  generation. A command and its run are created in one transaction, with a claim that
+  expires, so a function killed mid-start leaves a row the sweep can finish, not a
+  command stranded as claimed (today's gap: cloud/gateway/phone.mjs:513 to :550).
+- **Starting.** The database webhook is only a wake-up: it carries no authority and
+  the function rereads the row. The one-minute sweep picks up any missed wake-up. An
+  ambiguous start is checked against AgentCore before it is replaced.
+- **Knowing a run is alive.** Each run has `last_heard_at` and `next_check_at`. A run
+  silent for five minutes gets a status request to its sandbox. The sandbox answering
+  is proof of life whatever the agent is doing, including a long quiet tool. No
+  answer twice, or a sandbox that does not know the run, is death: the function
+  collects what it can and the thread goes to Needs you.
+- **The sweep cannot starve.** It reads only rows whose `next_check_at` has passed,
+  oldest first, at most a fixed number per pass, and stops starting new work at 60 of
+  its 90 seconds. It relays no output, unlike today's (cloud/gateway/phone.mjs:294,
+  :811). It is its own function with its own reserved share, so traffic from apps and
+  sandboxes cannot use up its capacity, and the 200 limit shared by the rest goes up
+  before the 200-agent test.
 - **The guards come too.** A held thread, a bounded number of attempts, and a
   thread nothing will start being in Needs you (CLAUDE.md) are extracted so both
   the supervisor and the function use one copy. Building this updates the
   CLAUDE.md rule that names `spawnWorker`.
-- **Reporting.** The sandbox posts each turn's end and its usage to the function
-  with a credential good for that run only, and uploads what it made. Nothing
-  polls a run nobody is watching. The sweep's `peek` remains the backstop, and a run
-  that stops reporting is declared dead by the sweep. An open thread reads its live
-  output through the function, only while it is on screen. Today the server only
-  recognises Claude's turn end (cloud/sandbox/server.mjs:502), so each harness
-  adapter brings a reader.
+- **Reporting.** The sandbox uploads what it made and writes `done.json`. Usage goes
+  in `done.json`, as it does today. An open thread reads live output through the
+  function, only while it is on screen. A reader of each harness's stream ends the
+  turn inside the sandbox, because nobody is connected to do it. Today only Claude's
+  exists (cloud/sandbox/server.mjs:502).
 - **The record.** Ordered messages and events, runs, file versions and approvals
   live in the database, and file bytes and transcripts in S3 under the person.
-  `phone_threads` stays as a copy for apps not yet updated: it truncates
-  (shared/phone-snapshot.mjs:16), so it cannot be the truth.
-- **Between turns.** A sandbox is restored from S3 for each turn, then waits briefly
-  for the next reply and stops. Waiting costs memory, so the wait is set from a
-  measured cold start, not the 20 minutes `IDLE_CLOSE_MS` uses today.
-- **Tools.** The agent's Agentbox tools are an HTTP MCP endpoint on the function,
-  which checks the run's credential on every call. The credential names one person
-  and one thread. No service key enters a sandbox.
-- **The window.** A person with only cloud threads runs main/hub-client.mjs pointed
-  at the cloud, with no store or supervisor. A person with both runs the full app,
-  which shows cloud threads from the database as it shows phone rows today.
+  `phone_threads` stays as a copy the function writes under its own device id for
+  phones not yet updated. It truncates (shared/phone-snapshot.mjs:16), so it cannot
+  be the truth. Clients write to it by device (`owner,device,project,item`), so an old
+  app does not overwrite a cloud thread.
+- **Approvals.** The run holds a card for up to 15 minutes in `waiting`, which costs
+  little and needs nothing new (the sandbox holds the call today,
+  cloud/sandbox/server.mjs:449). After that the turn checkpoints and ends. A later
+  Allow starts a new turn that tells the agent exactly what was allowed, and the agent
+  makes the call again. `cardDigest` binds the answer to that exact action, so a
+  changed action asks again.
+- **Tools.** The agent's Agentbox tools are an HTTP MCP endpoint on the function. A
+  run's credential names the person, the thread, the run and the generation, and every
+  call checks that the run is still active, so Stop or a move ends its authority at
+  once. Storage paths come from the server, never from the sandbox. No service key
+  enters a sandbox.
+- **The window.** A person with only cloud threads runs the Electron shell with the
+  app's own bundled screens on `renderer/src/cloud-bridge.ts`, the bridge the phone
+  site already uses to read rows and leave commands, extended to do everything a
+  cloud thread needs. main/hub-client.mjs today loads a page from a hub, and Lambda
+  hosts no page, so its window code changes but its shell stays. A person with both
+  runs the full app, which shows cloud threads from the database as it shows phone
+  rows today.
 - **Signing up** makes a workspace and first project with no computer, which today
   it does not (mobile/src/state/cloud.tsx:127), and asks for a Claude or ChatGPT
-  sign-in.
+  sign-in started from the app, through the function.
+- **Sign-ins renew in the cloud.** Codex's login lasts about ten days, and today the
+  Mac renews it (main/cloud/logins.mjs:465), which a person with no computer does not
+  have. The sweep takes this over: one renewal at a time per login, a fence written
+  first, a new object per renewal, as the Mac does. Refresh secrets stay out of agent
+  sandboxes, as they do today (cloud/sandbox/server.mjs:965).
+- **Who is on this path.** New accounts, by invitation. Nothing moves an existing
+  person across, and today's path is untouched.
 
 ### Asking for things: one tool, whatever is missing
 
@@ -628,17 +668,24 @@ a file or folder, a saved sign-in, or (where allowed) running something on the
 computer. Every call answers within a deadline:
 
 1. **The cloud already has it** (uploaded file, saved sign-in): delivered now.
-2. **The computer is online** (it reported in the last minute; `macSeenOf` already
-   tracks this): the request goes in a row, the desktop app picks it up over its
-   outbound connection, and what it may hand over without asking goes up to S3.
-   Anything else shows the person Allow once, Always for this folder, or No.
-3. **The computer is shut, or has not picked it up in 60 seconds:** the tool answers
-   `computer_unavailable` at once. The agent tries another way. If there is none it
-   says what it needs and ends its turn. The sandbox stops and the thread goes to
-   Needs you, on the phone too, with the choices: upload it, open the computer, or
-   carry on without. The answer starts the next turn.
+2. **The computer that has it is online.** Presence is per device: the desktop app
+   writes its own `seen` row each minute while it runs, and a request names the device
+   holding the thing. (`macSeenOf` will not do: it is the newest of all a person's
+   computers, renderer/src/phone-rows.ts:352.) The request goes in a row, the app
+   picks it up, and what it may hand over without asking goes up to S3. Anything else
+   shows the person Allow once, Always for this folder, or No.
+3. **That computer is shut, or has not picked it up in 60 seconds:** the tool answers
+   `computer_unavailable`, and the request's row closes, so a late delivery is refused.
+   The agent tries another way. If there is none it says what it needs and ends its
+   turn. The sandbox stops and the thread goes to Needs you, on the phone too, with
+   the choices: upload it, open the computer, or carry on without. The answer starts
+   the next turn.
 
-No sandbox ever sits waiting on a person, and no request waits for ever.
+A person with no computer connected always lands on 3, with upload as the choice.
+Picking up requests is part of the desktop app. The thin window gets it once it is
+built, off by default, because people who only use the cloud need never connect
+anything. No sandbox waits on a person beyond the 15-minute approval hold, and no
+request waits for ever.
 
 Rules: a path keeps the checks in main/cloud/resources.mjs (real path, inside a
 granted root, size limits). Grants name person, device, folder, read or write, and
@@ -650,8 +697,10 @@ who turned on running things on their computer. People who are not developers ge
 files only:
 
 - **Move the turn.** The thread's placement moves to the computer for one turn
-  (a new generation), the worker runs there through the supervisor, then it goes
-  back. This is the hand-back that exists today, plus the return.
+  (a new generation, from the last checkpoint), the worker runs there through the
+  supervisor, then it goes back. Today's hand-back already sends the next reply to
+  the cloud (main/supervisor.mjs:4161), but with the computer in charge throughout;
+  moving the record is what is new.
 - **Borrow one command.** One bounded command runs in a dedicated task folder on
   the computer and its output comes back. Built after moving the turn.
 
@@ -681,10 +730,13 @@ own browser and its sign-ins, and files they never upload. These go local or ask
 
 0. **Now:** ship the window, ship-queue and earned-start fixes on this branch. They
    help everyone on today's path.
-1. **The week, for people with no computer involved:** signing up with no computer,
-   a run started and reported by the function, the record in the database, uploads
-   and downloads, Stop, approvals, push, the thin window. Invitation only. Out of
-   it: Gmail and Drive, repeating tasks, teams, mixed local and cloud.
+1. **The week, one whole path for people with no computer involved,** by invitation.
+   In this order, because what comes first is what the rest stands on: the run's
+   states and recovery; signing up and signing in with no computer, with renewal; a
+   Claude turn from message to reply, resume included; uploads and downloads; Stop and
+   approvals; the shell on the cloud bridge, and the phone; push; then Codex through
+   the same path. If the week runs short, the end of that list moves, not the start.
+   Out of it: Gmail and Drive, repeating tasks, teams, mixed local and cloud.
 2. **Asking and saved sign-ins:** the asking tool across computer online and shut,
    then the sign-in recipes, starting with whichever hand-backs are most common.
 3. **Developers on this path:** code from GitHub through one GitHub App, publishing
@@ -701,7 +753,9 @@ own browser and its sign-ins, and files they never upload. These go local or ask
   it.
 - The computer shutting mid-request: the agent gets its answer within the deadline.
 - One person's credential reaching another's thread, file, or sign-in: refused.
-- The cost of a real task, with the cold start measured and the wait chosen from it.
+- A person who signed up two weeks ago, with no computer, whose Codex login has
+  renewed by itself in that time.
+- The cost and wait of a real task, with the cold start measured.
 
 Known limits: a person's plan limit is the vendor's and is shared by all their
 threads, however many sandboxes run. Sign-ins saved in the cloud are held by us and
