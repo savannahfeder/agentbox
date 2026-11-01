@@ -6026,6 +6026,12 @@ export class Supervisor {
         // Finished only when its work is home: 75 is the app going again, or
         // results that did not come back, and a later homecoming tries again.
         const session = { ...view, startedAt: rec.startedAt, child: { ranToTheEnd: () => code === 0 } };
+        // Same as a run the app started: its reply was marked heard when it was
+        // joined, so it is released here or nothing would run it on this Mac.
+        if (this.runFinished(session) && this._noteCloudHandBack(item, session)) {
+          const fresh = this.store.readItem?.(rec.product, itemId);
+          if (fresh?.answer) this.redeliverAnswer({ ...fresh, product: rec.product }, fresh.answer);
+        }
         if (this.speaksForTheSession(session)) {
           try { this.store.recordSessionResult(rec.product, itemId, { result: session.result || '(the session ended with an empty reply)' }); } catch (e) { console.warn('zero: writing a joined run\'s answer failed:', e.message); }
         } else if (this.closingMessageIsTheAnswer(session)) {
@@ -6033,7 +6039,7 @@ export class Supervisor {
         }
         // The reply this conversation heard is answered; one typed while it
         // was away is left for the next run.
-        if (this.runFinished(session)) {
+        if (this.runFinished(session) && !session.handedBack) {
           try {
             const fresh = this.store.readItem?.(rec.product, itemId);
             if (fresh?.answer && this._heardIn(fresh, rec.sessionId)) {
