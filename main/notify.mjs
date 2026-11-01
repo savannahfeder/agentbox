@@ -156,6 +156,13 @@ export function createNotifier({ window, Notification, powerMonitor, icon = null
   };
 
   return {
+    // One banner on asking, from the tutorial: on a Mac it is also what asks whether banners are allowed.
+    sample() {
+      try {
+        const n = new Notification({ title: NAME, body: 'Notifications are on. You’ll get one when an agent is done.', silent: false, ...(icon ? { icon } : {}) });
+        n.show();
+      } catch { /* nothing to show it on */ }
+    },
     // Fresh arrivals from the renderer, which owns what counts as news (it is
     // the only place that knows what the inbox is). Each is
     // { id, title, product, productName, kind }.
@@ -192,7 +199,8 @@ const needsYouOf = (payload) => (Array.isArray(payload.needsYou) ? payload.needs
 export function installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage, onArrivals = () => {}, onChange = () => {} }) {
   if (Notification.isSupported && !Notification.isSupported()) {
     ipcMain.handle('zero:notify', (_e, payload = {}) => { try { onArrivals(Array.isArray(payload.arrivals) ? payload.arrivals : [], needsYouOf(payload)); } catch {} });
-    return { add() {}, seen() {}, told: () => [] };
+    ipcMain.handle('zero:notify-test', () => null);
+    return { add() {}, seen() {}, told: () => [], sample() {} };
   }
   // app.getAppPath() is the repo from source and the asar inside the bundle
   // when it is packaged, and the mark sits at the same place in both.
@@ -205,6 +213,7 @@ export function installNotifier({ app, window, Notification, powerMonitor, ipcMa
   // lost it), so without this the banner that fired while the screen was
   // locked would sit in Notification Center after she is back at the row.
   try { powerMonitor.on('unlock-screen', () => { if (window.isFocused()) notifier.seen(); }); } catch {}
+  ipcMain.handle('zero:notify-test', () => { notifier.sample(); return null; });
   ipcMain.handle('zero:notify', (_e, payload = {}) => {
     const arrivals = Array.isArray(payload.arrivals) ? payload.arrivals : [];
     try { onArrivals(arrivals, needsYouOf(payload)); } catch {}

@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { defaultNpm, npmCommand } from '../main/source-updater.mjs';
+import { defaultNpm, npmCommand } from '../main/source-updater.mts';
 
 const onlyThese = (...have) => (file) => have.includes(file);
 

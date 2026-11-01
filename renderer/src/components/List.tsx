@@ -28,6 +28,7 @@ import { toApproveWords } from '../threads-made';
 import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mjs';
+import { catchUpDue } from '../../../shared/agent-import.mjs';
 
 /**
  * THE AGENT A ROW WITH NOTHING RUNNING WOULD RUN ON.
@@ -450,6 +451,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                    itself, by id, rather than at whatever is drawn first
                    (w-0b60195a14, 2026-08-21). Nothing else reads this. */
                 data-item-id={item.id}
+                data-catching-up={catchUpDue(item) ? '1' : undefined}
                 /*
                  * THE HOVER HINT, AND ONLY IN THE INBOX. `hint-plate.ts` says
                    ↵ Open task, E Mark done, S Schedule for later, which are the

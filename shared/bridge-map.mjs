@@ -99,6 +99,8 @@ export const REQUEST_CHANNELS = {
   updateInstall: 'zero:update-install',
   updateMove: 'zero:update-move',
   notify: 'zero:notify',
+  notifyTest: 'zero:notify-test',
+  onboardingArm: 'zero:onboarding-arm',
   stopSession: 'zero:stop-session',
   runNow: 'zero:run-now',
   reopen: 'zero:reopen',
@@ -209,6 +211,6 @@ export const WRAPPED_ARGS = {
 // this one is absent there rather than wrong. The screen already reads null.
 //
 // `onWriteHeld` is the desktop's ⌘R asking the page to write what the undo
-// window holds before it reloads (main/write-before-reload.mjs). A browser
+// window holds before it reloads (main/write-before-reload.mts). A browser
 // reload asks nobody; the page writes on `pagehide` there instead.
 export const DESKTOP_ONLY = ['pathForFile', 'onWriteHeld'];

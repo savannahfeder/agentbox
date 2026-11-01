@@ -9,8 +9,10 @@ import { folderToUse, pickerNote } from '../renderer/src/components/FolderPicker
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
-describe('onboarding', () => {
-  const source = read('renderer/src/components/FirstRun.tsx');
+// The first task's folder is chosen with New project in the New thread box
+// since w-31c71743b5, which opens the new project card.
+describe('the new project card', () => {
+  const source = read('renderer/src/components/NewProject.tsx');
 
   it('asks for the system folder window before drawing its own', () => {
     expect(source).toMatch(/browse\s*\}\s*=\s*await api\.chooseFolder/);

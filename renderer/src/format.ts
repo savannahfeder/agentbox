@@ -389,6 +389,8 @@ function timeOf(text: string): string | null {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+export const repeatsLine = (rule: RepeatRuleValue): string => `Repeats ${ruleLabel(rule)}`;
+
 function repeatRule(rule: RepeatRuleValue): RepeatParse {
   return { rule, label: ruleLabel(rule) };
 }

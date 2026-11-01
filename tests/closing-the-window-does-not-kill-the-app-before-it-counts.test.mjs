@@ -35,7 +35,7 @@ import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
 import { createAnalytics } from '../main/analytics.mjs';
-import { quitStep, flushBeforeQuit, FLUSH_DEADLINE_MS } from '../main/quit-sequence.mjs';
+import { quitStep, flushBeforeQuit, FLUSH_DEADLINE_MS } from '../main/quit-sequence.mts';
 
 /** Electron's `app`, as far as quitting goes: before-quit, then will-quit, then quit. */
 function fakeApp() {
@@ -186,7 +186,7 @@ describe('and the app is wired that way', () => {
   const main = fs.readFileSync(new URL('../main/main.mjs', import.meta.url), 'utf8');
 
   it('every quit step goes through the wrapper, and the flush holds the quit', () => {
-    expect(main).toMatch(/import \{[^}]*flushBeforeQuit[^}]*\} from '\.\/quit-sequence\.mjs'/);
+    expect(main).toMatch(/import \{[^}]*flushBeforeQuit[^}]*\} from '\.\/quit-sequence\.mts'/);
     expect(main).toMatch(/flushBeforeQuit\(app, \(\) => analytics\.flush\(\)/);
     // No bare quit listeners left: a step added without the wrapper is a step
     // that can kill the app on the way out again.

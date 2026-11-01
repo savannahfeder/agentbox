@@ -74,6 +74,7 @@ import { handedOnByReply } from '../shared/team-rules.mjs';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mjs';
 import { saveAttachments } from './save-attachments.mjs';
 import { stageAttachment } from './stage-attachment.mjs';
+import { readRunTraces } from './run-traces.mjs';
 
 // WHAT A WORKER IS TOLD WHEN HER DECISION COULD NOT BE RECORDED.
 const SPOOL_REFUSED = `${Name} could not record the founder's decision, so nothing was allowed. Finish what your grants cover and file the rest as a review.`;
@@ -228,6 +229,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // appears): a browser SDK autocaptures the text of what was clicked, and in
   // Agentbox that text is task titles. A NUMBER MAY RIDE WITH THE NAME, and only
   // a number (2026-10-06): which setup step was reached.
+  ipcMain.handle('zero:onboarding-arm', () => analytics.onboardingArm?.() ?? 'tour');
   ipcMain.handle('zero:track', (_e, { name, count } = {}) => {
     if (!EVENT_NAMES.includes(name)) return false;
     onCount();
@@ -364,7 +366,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       //
       // AND WHICH ENGINE IT WAS (w-1116fbb68a, 2026-10-08). This list is Claude
       // Code processes and only ever has been; a Codex conversation has no
-      // process to find and is counted from main/codex-watch.mjs instead. The
+      // process to find and is counted from main/codex-watch.mts instead. The
       // engine is what lets the two be read apart, and without it on this side
       // the Codex count would look like a drop in the Claude one.
       for (const agent of live) {
@@ -2267,23 +2269,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // The trace: what each session on this item actually did, from the logs the
   // supervisor persists under <product>/sessions/<item-id>/. Read-only.
-  ipcMain.handle('zero:session-trace', async (_e, { product, id }) => {
-    const fs = await import('node:fs');
+  ipcMain.handle('zero:session-trace', async (_e, { product, id, whole }) => {
     const path = await import('node:path');
     const dir = store.listProducts().find((p) => p.slug === product)?.dir;
     if (!dir || !/^[\w-]+$/.test(String(id ?? ''))) return { ok: false, sessions: [] };
-    const traceDir = machineryPath(dir, path.join('sessions', id));
-    let files = [];
-    try {
-      files = fs.readdirSync(traceDir).filter((f) => f.endsWith('.log')).sort();
-    } catch { return { ok: true, sessions: [] }; }
-    const sessions = files.slice(-20).map((f) => {
-      let text = '';
-      try { text = fs.readFileSync(path.join(traceDir, f), 'utf8'); } catch {}
-      if (text.length > 120_000) text = `… truncated (${text.length} bytes total)\n\n${text.slice(-120_000)}`;
-      return { startedAt: Number(f.replace('.log', '')) || 0, text };
-    });
-    return { ok: true, sessions };
+    return { ok: true, sessions: readRunTraces(machineryPath(dir, path.join('sessions', id)), { whole: !!whole }) };
   });
 
   // The thread history behind the time under a task's title. Raw ledger lines,
@@ -2296,7 +2286,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     }
   });
 
-  // UPDATES (main/updater.mjs). Two doors and no more: look now, and install
+  // UPDATES (main/updater.mts). Two doors and no more: look now, and install
   // what has been downloaded. There is deliberately no "download" door, because
   // the download already happened on its own; the only thing left for a person
   // to decide is when the app is allowed to disappear and come back.
@@ -2308,7 +2298,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // decision — nothing has been downloaded and nothing will be until the app
   // is somewhere macOS lets it write.
   // A copy run from source answers no to it rather than throwing: there is no
-  // bundle to move (main/source-updater.mjs).
+  // bundle to move (main/source-updater.mts).
   ipcMain.handle('zero:update-move', () => updater.move?.() ?? { moved: false, error: null });
 
   // Handed back so the Cmd+Y/Cmd+N chord answers through the same door the

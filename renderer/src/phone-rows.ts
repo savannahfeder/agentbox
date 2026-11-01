@@ -20,12 +20,34 @@ export interface PhoneRows {
   commands: { id: string; device: string; project: string | null; item: string | null; kind: string; payload: any; created_at: string; claimed_at?: string | null; claimed_by?: string | null; taken_at: string | null; outcome: string | null }[];
 }
 
-export interface Waiting { product: string; id: string; at: number; text: string; refused?: string; cloud?: true }
+// `sent`: taken, by her computer or the cloud, and not yet in the thread's copy.
+export interface Waiting { product: string; id: string; at: number; text: string; refused?: string; cloud?: true; sent?: true }
 
 // How long a refusal stays on her screen: long enough to be read the next time
 // she looks, not forever.
 const REFUSAL_SHOWN_MS = 24 * 3600_000;
 const LANDING_SHOWN_MS = 2 * 3600_000;
+// A copy's line this much before her send still counts as hers: the moment a
+// line carries is the cloud's clock or her computer's, not the phone's.
+const CLOCKS_DIFFER_MS = 60_000;
+const plainWords = (text: unknown) => String(text ?? '').replace(/\s+/g, ' ').trim();
+
+/**
+ * WHETHER A THREAD'S COPY SHOWS A MESSAGE SHE SENT (2026-10-31, w-3e955eadb4):
+ * a line of hers at or after it with its words, or with any words when her
+ * computer rewrote them to link her files, or a copy that has let go of lines
+ * older than it. Until then the phone draws it itself, so a message taken by
+ * the cloud or her computer is never on neither screen.
+ */
+export function copyShows(snapshot: any, text: string, at: number) {
+  const history: any[] = Array.isArray(snapshot?.history) ? snapshot.history : [];
+  const from = at - CLOCKS_DIFFER_MS;
+  if (Number(snapshot?.olderLines) > 0 && history.length && Number(history[0]?.ts) > at) return true;
+  const words = plainWords(text);
+  const linked = /\]\(phone-files\//.test(text);
+  return history.some((l) => l?.source === 'founder' && typeof l.patch?.answer === 'string' && Number(l.ts) >= from
+    && (linked || plainWords(l.patch.answer) === words));
+}
 // A run the Mac has not said is still going for this long is not drawn as
 // running: the Mac went to sleep or lost the network mid-run, and its copy
 // online would otherwise say "working" forever (main/phone-inbox.mjs sends it
@@ -154,24 +176,26 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
     const at = Date.parse(c.created_at) || now;
     const refused = c.outcome?.startsWith('refused') ? c.outcome.replace(/^refused:\s*/, '') : null;
     const takenAt = c.taken_at ? Date.parse(c.taken_at) || at : null;
-    // A reply her Mac took shows until a copy of its thread made after that arrives.
-    const copyAt = Date.parse(rows.threads.find((t) => t.device === c.device && t.project === c.project && t.item === c.item)?.updated_at ?? '') || 0;
-    const landing = c.kind === 'reply' && c.outcome === 'done' && takenAt !== null && copyAt < takenAt && now - takenAt < LANDING_SHOWN_MS;
-    if (takenAt !== null && !landing && !(refused && now - takenAt < REFUSAL_SHOWN_MS)) continue;
+    const copy = rows.threads.find((t) => t.device === c.device && t.project === c.project && t.item === c.item);
+    const copyAt = Date.parse(copy?.updated_at ?? '') || 0;
     // Taken back on the phone: nothing to show.
     if (c.outcome === UNDONE) continue;
+    // A reply taken, by her Mac or the cloud, shows until its thread's copy
+    // does: the copy can be one made before it, or one written over since.
+    const sent = c.kind === 'reply' && takenAt !== null && !refused && !copyShows(copy?.snapshot, String(c.payload?.text ?? ''), at);
+    if (takenAt !== null && !sent && !(refused && now - takenAt < REFUSAL_SHOWN_MS)) continue;
     const slug = phoneSlug(c.device, c.project);
     const key = `${slug}/${c.item}`;
     const row = items.get(key);
     const id = screenId.get(key) ?? c.item;
     const cloud = c.kind === 'reply' && takenAt === null && !!runOfClaim(c.claimed_by);
-    const said = (text: string) => waiting.push({ product: slug, id: id as string, at, text, ...(refused ? { refused } : {}), ...(cloud ? { cloud: true as const } : {}) });
+    const said = (text: string) => waiting.push({ product: slug, id: id as string, at, text, ...(refused ? { refused } : {}), ...(cloud ? { cloud: true as const } : {}), ...(sent ? { sent: true as const } : {}) });
     if (c.kind === 'reply' && c.item) {
       said(String(c.payload?.text ?? ''));
       if (!refused && takenAt === null && !cloud) queue(id as string);
       // Answered, as the window marks a row the moment she sends, so it is In
       // progress until her Mac takes it and its own copy says what happened.
-      if (row && !refused) items.set(key, { ...row, status: statusForReply(row.status) ?? row.status, answer: String(c.payload?.text ?? ''), wrote: { ...row.wrote, answer: { ts: at, source: 'founder' } }, updatedAt: at });
+      if (row && !refused && (!sent || copyAt < takenAt!)) items.set(key, { ...row, status: statusForReply(row.status) ?? row.status, answer: String(c.payload?.text ?? ''), wrote: { ...row.wrote, answer: { ts: at, source: 'founder' } }, updatedAt: at });
     }
     else if (refused && c.item && (c.kind === 'close' || c.kind === 'snooze')) {
       said(c.kind === 'close' ? 'Close this thread' : Number(c.payload?.until) > 0 ? 'Move to Later' : 'Bring back from Later');
@@ -236,7 +260,8 @@ export async function readCommands(select: Select, now = Date.now()): Promise<Ph
     if (page.length < 500) break;
   }
   const since = new Date(now - 2 * 24 * 3600_000).toISOString();
-  const done = await select('phone_commands', `${COMMANDS}&taken_at=gte.${since}&limit=500`);
+  // Newest first: a busy two days must cut off the oldest, not the message she just sent.
+  const done = await select('phone_commands', `select=*&order=created_at.desc&taken_at=gte.${since}&limit=500`);
   return [...waiting, ...done];
 }
 

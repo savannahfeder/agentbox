@@ -301,7 +301,7 @@ export function updateShape(wanted: string): UpdateState {
     // moment it is read.
     ready: { phase: 'ready', newVersion: '0.2.0', percent: 100, ready: true, readyAt: Date.now() - 62 * 60_000 },
     downloading: { phase: 'downloading', newVersion: '0.2.0', percent: 47 },
-    // A copy run from source (main/source-updater.mjs): versions are commit
+    // A copy run from source (main/source-updater.mts): versions are commit
     // ids, and the row lists what changed.
     source: {
       phase: 'ready', ready: true, source: true, currentVersion: '5c6afa7', newVersion: '9e1b204',
@@ -325,7 +325,7 @@ export function updateShape(wanted: string): UpdateState {
       moveError: 'The move did not work.',
     },
     // WHY A COPY DOES NOT UPDATE ITSELF AT ALL, which is the state most
-    // teammates' checkouts are actually in (main/source-updater.mjs SAY).
+    // teammates' checkouts are actually in (main/source-updater.mts SAY).
     unsupported: {
       phase: 'unsupported', source: true, currentVersion: '5c6afa7',
       error: 'This folder has changes of your own in it, so it does not update itself.',
@@ -655,7 +655,7 @@ export const api = {
   // The session traces behind the working notes. It comes through the seam
   // like everything else, so the notes can be built, reviewed and screenshotted
   // from fixtures instead of only against a live fleet.
-  async sessionTrace(p: { product: string; id: string }): Promise<{ sessions: Array<{ startedAt: number; text: string }> }> {
+  async sessionTrace(p: { product: string; id: string; whole?: boolean }):Promise<{ sessions: Array<{ startedAt: number; text: string }> }> {
     if (useFixtures) return { sessions: (fixtureTraces as any)[p.id] ?? [] };
     return (window.zero as any)?.sessionTrace?.(p) ?? { sessions: [] };
   },

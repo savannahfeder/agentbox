@@ -82,9 +82,12 @@ export function rememberOffered(store: Pick<Storage, 'setItem'>): void {
  *  assumed, because "not reachable" is a fact about this month's screens.
  *
  *  `made` is whether the store really took the project. Nothing is offered off
- *  the back of a failure. */
-export function offerOnNewProject(p: { made: boolean; walking: boolean; offered: boolean }): boolean {
-  return p.made && !p.walking && !p.offered;
+ *  the back of a failure.
+ *
+ *  `touring` is someone the new first run took through (../tour.ts): their
+ *  tutorial is on their own inbox, so a practice round is never offered. */
+export function offerOnNewProject(p: { made: boolean; walking: boolean; offered: boolean; touring?: boolean }): boolean {
+  return p.made && !p.walking && !p.offered && !p.touring;
 }
 
 /**

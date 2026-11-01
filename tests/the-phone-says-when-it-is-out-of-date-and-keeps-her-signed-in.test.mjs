@@ -147,16 +147,20 @@ describe('the bridge', () => {
 // A reply her Mac had taken left the screen at once, and stayed gone until
 // the thread's next copy arrived, which a copy in retry could hold back an hour.
 describe('a reply her Mac has taken', () => {
-  it('stays on the screen until a copy of the thread from after it arrives, for two hours at most', async () => {
+  // Since 2026-10-31 (w-3e955eadb4) until a copy that HOLDS it arrives: a newer
+  // copy without it was how a message the cloud answered vanished.
+  it('stays on the screen until a copy of the thread that holds it arrives', async () => {
     const { phoneView, phoneSlug } = await import('../renderer/src/cloud-bridge');
     const DEV = 'a1b2c3d4e5f6';
     const iso = (ms) => new Date(ms).toISOString();
-    const thread = (updated) => ({ device: DEV, project: 'alpha', item: 'w-1', updated_at: iso(updated), snapshot: { v: 3, item: { id: 'w-1', title: 'T', status: 'blocked', updatedAt: updated }, history: [] } });
+    const thread = (updated, history = []) => ({ device: DEV, project: 'alpha', item: 'w-1', updated_at: iso(updated), snapshot: { v: 3, item: { id: 'w-1', title: 'T', status: 'blocked', updatedAt: updated }, history } });
+    const holds = [{ id: 'w-1', ts: NOW - 2 * MIN, source: 'founder', patch: { answer: 'go' } }];
     const reply = { id: 'c1', device: DEV, project: 'alpha', item: 'w-1', kind: 'reply', payload: { text: 'go' }, created_at: iso(NOW - 3 * MIN), claimed_at: iso(NOW - 2 * MIN), taken_at: iso(NOW - 2 * MIN), outcome: 'done' };
     const view = (t, now = NOW) => phoneView({ projects: [{ device: DEV, project: 'alpha', name: 'Alpha' }], threads: [t], commands: [reply] }, now);
     expect(view(thread(NOW - 10 * MIN)).waiting.map((w) => w.text)).toEqual(['go']);
-    expect(view(thread(NOW - MIN)).waiting).toEqual([]);
-    expect(view(thread(NOW - 10 * MIN), NOW + 3 * 60 * MIN).waiting).toEqual([]);
+    expect(view(thread(NOW - MIN)).waiting.map((w) => w.text)).toEqual(['go']);
+    expect(view(thread(NOW - MIN, holds)).waiting).toEqual([]);
+    expect(view(thread(NOW - 10 * MIN), NOW + 3 * 60 * MIN).waiting.map((w) => w.text)).toEqual(['go']);
     expect(phoneSlug(DEV, 'alpha')).toBe('alpha@a1b2c3d4e5f6');
   });
 });

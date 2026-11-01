@@ -43,13 +43,13 @@ describe('a thread in a teammate\'s chat', () => {
   });
 
   it('drops priority, and its column, on a narrower list', () => {
-    expect(step(899)).toMatch(/\.th-grid > \.th-col-prio \{ display: none; \}/);
-    expect(tracks(columnsIn(step(899), '.th-grid'))).toBe(4);
+    expect(step(915)).toMatch(/\.th-grid > \.th-col-prio \{ display: none; \}/);
+    expect(tracks(columnsIn(step(915), '.th-grid'))).toBe(4);
   });
 
   it('drops project as well, and its column, on a narrow one', () => {
-    expect(step(769)).toMatch(/\.th-grid > \.th-col-proj \{ display: none; \}/);
-    expect(tracks(columnsIn(step(769), '.th-grid'))).toBe(3);
+    expect(step(785)).toMatch(/\.th-grid > \.th-col-proj \{ display: none; \}/);
+    expect(tracks(columnsIn(step(785), '.th-grid'))).toBe(3);
   });
 
   it('does not count a minmax as two columns', () => {

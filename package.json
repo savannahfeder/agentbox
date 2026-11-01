@@ -31,6 +31,7 @@
   "files": [
     "bin/",
     "main/**/*.mjs",
+    "main/**/*.mts",
     "main/native/*/build/*.node",
     "shared/**/*.mjs",
     "shared/**/*.mts",
@@ -56,7 +57,7 @@
     "start": "npm run build && node scripts/brand-electron.mjs && electron .",
     "test": "vitest run",
     "read:claude": "node scripts/read-claude-commands.mjs --snapshot && node scripts/read-claude-models.mjs --snapshot",
-    "typecheck": "node node_modules/typescript/bin/tsc --noEmit -p renderer/tsconfig.json",
+    "typecheck": "node node_modules/typescript/bin/tsc --noEmit -p renderer/tsconfig.json && node node_modules/typescript/bin/tsc --noEmit -p main/tsconfig.json",
     "test:changed": "node scripts/test-what-changed.mjs",
     "icon": "electron --force-color-profile=srgb scripts/make-icon.mjs",
     "pack": "node scripts/release.mjs --no-sign",

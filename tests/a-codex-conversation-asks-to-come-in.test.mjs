@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mjs';
-import { scanCodex } from '../main/codex-watch.mjs';
+import { scanCodex } from '../main/codex-watch.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 import {
   CODEX_IMPORT_LABEL, CODEX_MIRROR_LABEL, IMPORT_KIND, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow,
@@ -121,7 +121,7 @@ describe('the words on the asking row', () => {
     expect(p.body).toBe('I want to make my recipe app look a lot tidier.');
     expect(p.result).toBe('Starting with the sidebar.');
     expect(p.kind).toBe('directive');
-    expect(p.labels).toEqual([CODEX_MIRROR_LABEL, 'codex:t1']);
+    expect(p.labels).toEqual([CODEX_MIRROR_LABEL, 'codex:t1', 'catch-up']);
   });
 });
 
@@ -224,7 +224,7 @@ describe('the store, end to end', () => {
     expect(after.result).toBe('Starting with the sidebar.');
     expect(after.wrote.result.source).toBe('agent');
     expect(after.wrote.result.ts).toBeGreaterThan(after.wrote.body.ts);
-    expect(after.labels).toEqual([CODEX_MIRROR_LABEL, 'codex:t1']);
+    expect(after.labels).toEqual([CODEX_MIRROR_LABEL, 'codex:t1', 'catch-up']);
   });
 
   it('yes still works when the transcript cannot be read again: the row already knows its words', async () => {
