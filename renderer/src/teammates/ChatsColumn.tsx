@@ -7,6 +7,7 @@ import type { GroupChoice } from '../team/rooms/GroupList';
 import { GroupMark } from '../team/rooms/GroupList';
 import { groupsInOrder } from '../team/rooms/GroupsSidebar';
 import { I } from '../team/rooms/icons';
+import { groupTag } from '../team/rooms/room-rules';
 import { TeammateMark } from './TeammatesRail';
 import { FOLD_KEY, foldedSet, matesInOrder, rowName, toggleFold } from './chat-lines';
 
@@ -77,7 +78,7 @@ export function ChatsColumn({ current }: { current: string | null }) {
   function row(g: GroupChoice) {
     const on = current === g.key;
     return <button type="button" key={g.key} className={`cx-row${on ? ' on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => openGroup(g.key)}>
-      <GroupMark g={g} size={20} /><span className="cx-n">{g.name}</span>{g.unread && !on && <i className="cx-need" aria-label="New messages" />}
+      <GroupMark g={g} size={20} /><span className="cx-n">{g.name}</span>{g.unread && !on ? <i className="cx-need" aria-label="New messages" /> : groupTag(g) && <span className="cx-st">{groupTag(g)}</span>}
     </button>;
   }
 }

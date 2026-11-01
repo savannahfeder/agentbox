@@ -17,10 +17,17 @@
 // priority, labels, answeredThrough, epochs, lease heartbeats and releases are
 // how the machinery keeps its place, not things that happened to her.
 
+import { hasSpot } from './artifact-pins';
 import { readNotes, type Notes, type TraceSession } from './notes';
 import { commandPrompt } from '../../shared/claude-commands.mjs';
 import { DEFAULT_ENGINE } from '../../shared/engines.mjs';
 import { instructionOf } from '../../shared/repeats.mjs';
+import { baseName, familyName, filesInLines, placeWords, threadFiles } from '../../shared/artifact-marks.mjs';
+import { handedFrom } from '../../shared/team-departures.mjs';
+import { isContinuedNote } from '../../shared/thread-continued.mjs';
+import type { AgentVoice, ArtifactMark, FileMarkLink } from './types';
+
+const fileShownName = (id: string) => id.replace(/#\d+$/, '');
 
 export interface LedgerLine {
   id: string;
@@ -81,6 +88,12 @@ export interface ThreadEvent {
   field?: 'body' | 'answer' | 'result' | 'note';
   /** The agent teammate who handed this over, on a reply the app wrote for it. */
   from?: string;
+  /** The agent that wrote this message on its owner's behalf. */
+  voice?: AgentVoice;
+  /** A comment or approval on a file: which file, and for a comment where on it. */
+  fileMark?: FileMarkLink;
+  /** A teammate's comment (reaches the owner, starts nothing) or an agent's checkpoint. */
+  says?: 'comment' | 'progress';
   // The runs that began at this pickup, oldest first. Set by withRuns, and
   // an array because a session that never got its claim in still has to land
   // somewhere rather than disappear.
@@ -172,14 +185,19 @@ const COMPOSE_GAP_MS = 60_000;
  * pane was handed on the snapshot (`byItem[id] ?? workspace`), passed down
  * through `itemThread`. Absent means Claude Code, which is what every Mac with
  * one coding agent answers.
+ *
+ * `numbers` is each file path's number on its version line (file-numbers.ts),
+ * so a note names the version as Files does.
  */
-export function threadEvents(lines: LedgerLine[], engine?: string | null): ThreadEvent[] {
+export function threadEvents(lines: LedgerLine[], engine?: string | null, numbers?: Record<string, number> | null): ThreadEvent[] {
   const events: ThreadEvent[] = [];
   // Folded forward as we walk, so a rename can say what the name WAS. The fold
   // keeps only the latest value per field, so this is the one place the old
   // title still exists.
   let title: string | null = null;
   let first = true;
+  // Made of someone's work when they left: it opens in their name, not as yours.
+  let leaver: string | null = null;
   // WHETHER THE ASK HAS BEEN SAID YET, and it is not the same as `first`.
   //
   // The store writes a new row as TWO lines: the system stamps the title, the
@@ -234,17 +252,25 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
   let markUid: string | undefined;
   // And which message it answers, when the line is a reply in a thread.
   let markReply: string | undefined;
+  let markVoice: AgentVoice | undefined;
   // YOUR LAST REPLY, read by the `runAt` branch. A reply lifts a snooze
   // (`replyClearsSchedule`, list-rules), and the app writes that a moment
   // after the answer, so it is part of the reply and not a second thing you
   // did. It read "Brought it back" under a teammate's "Working on it" and
   // they could not think why they had (w-2b0cd0f741).
   let replied: { at: number; by: string | undefined } | null = null;
+  const pinsSoFar = new Map<string, number>();
+  // A version is called by its file's one name and its number, as the big view counts them.
+  const versionWords = new Map<string, string>();
+  for (const family of threadFiles(filesInLines(lines), numbers)) {
+    for (const v of family.versions) versionWords.set(v.id, family.versions.length > 1 || v.n > 1 ? `${family.versions.length > 1 ? familyName(family, v) : baseName(v.name)}, v${v.n}` : v.name);
+  }
   const tagWriter = () => {
     for (let k = markAt; k < events.length; k += 1) {
       if (markBy && !events[k].by) events[k].by = markBy;
       if (markUid && !events[k].uid) events[k].uid = markUid;
       if (markReply && events[k].message && !events[k].inReplyTo) events[k].inReplyTo = markReply;
+      if (markVoice && events[k].message) events[k].voice = markVoice;
     }
   };
 
@@ -255,6 +281,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     markUid = typeof line.uid === 'string' ? line.uid : undefined;
     const reply = line.patch?.inReplyTo;
     markReply = typeof reply === 'string' && reply ? reply : undefined;
+    markVoice = (line.patch?.voice as AgentVoice | undefined) ?? undefined;
     const patch = line.patch ?? null;
     if (has(patch, 'label')) label = String(patch!.label ?? '');
     if (has(patch, 'engine')) ranEngine = String(patch!.engine ?? '') || undefined;
@@ -262,6 +289,38 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     const mine = line.source === 'founder';
     const who: ThreadEvent['who'] = mine ? 'you' : 'agent';
     const at = line.ts;
+
+    // A teammate's comment: their words, under their name, whichever line it
+    // lands between. It opens nothing and answers nothing.
+    const comment = (patch as { comment?: { text?: unknown } } | null)?.comment;
+    if (comment) {
+      const text = words(comment.text);
+      if (isContinuedNote(comment.text)) events.push({ at, who: 'you', said: 'continued this in their own thread' });
+      else if (text) events.push({ at, who: 'you', said: 'They commented', words: text, message: true, says: 'comment' });
+      continue;
+    }
+
+    // A comment or an approval on a file. Resolving and being seen are not news.
+    const mark = patch?.artifact as ArtifactMark | undefined;
+    if (mark) {
+      if (mark.do === 'note' && mark.id) {
+        const n = (pinsSoFar.get(mark.file ?? '') ?? 0) + (mark.place?.kind === 'pin' || hasSpot(mark.place) ? 1 : 0);
+        pinsSoFar.set(mark.file ?? '', n);
+        events.push({
+          at, who: 'you', said: 'Commented', words: mark.text ?? '', message: true,
+          fileMark: { kind: 'note', file: mark.file ?? '', id: mark.id, place: placeWords({ place: mark.place, pin: n }), ...(versionWords.has(mark.file ?? '') ? { shown: versionWords.get(mark.file ?? '') } : {}) },
+        });
+      } else if (mark.do === 'reply' && typeof mark.on === 'string') {
+        events.push({ at, who: 'you', said: 'Replied', words: mark.text ?? '', message: true, fileMark: { kind: 'note', file: mark.file ?? '', id: mark.on } });
+      } else if (mark.do === 'approve' && mark.file) {
+        events.push({ at, who: 'you', said: 'You approved', words: fileShownName(mark.file), fileMark: { kind: 'approved', file: mark.file } });
+      } else if (mark.do === 'edit' && mark.path) {
+        const name = mark.path.split('/').pop() ?? mark.path;
+        const shown = versionWords.get(mark.file ?? name) ?? versionWords.get(name);
+        events.push({ at, who: 'you', said: 'Edited', words: name, fileMark: { kind: 'edited', file: name, ...(shown ? { shown } : {}) } });
+      }
+      continue;
+    }
 
     // The lease. A heartbeat extends it, a release ends it, and neither is
     // news: an agent that held a task for an hour did one thing, not thirty.
@@ -274,6 +333,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     // The row's birth. Its body is the ask, whoever wrote it: she composes
     // directives, agents file most of the inbox, and putting her name on an
     // agent's words inside her own thread is the one thing this must not do.
+    if (first && Array.isArray(patch?.labels)) leaver = handedFrom(patch!.labels as string[]) ?? leaver;
     if (first && has(patch, 'title')) {
       // A PERSON'S OWN APP STAMPED IT (the team version). On a signed-in Mac
       // every line carries who wrote it, so the system's wordless stamp that
@@ -315,7 +375,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
       const broughtIn = Array.isArray(patch!.labels) && patch!.labels.includes('thread-import');
       events.push({
         at, who: ruled ? 'you' : who,
-        said: mine || ruled ? 'You opened this' : broughtIn ? 'Started in Claude Code' : 'An agent opened this',
+        said: leaver ? 'Handed over to you' : mine || ruled ? 'You opened this' : broughtIn ? 'Started in Claude Code' : 'An agent opened this',
+        ...(leaver ? { by: leaver } : {}),
         ...(opening ? { words: opening, message: true as const, field: 'body' as const } : {}),
       });
       continue;
@@ -378,6 +439,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     // on the same line; an agent's finished word outranks its progress.
     // A TEAMMATE'S HAND-OFF, which the app wrote as a reply on this thread
     // (main/store.mjs, `tellItem`). It is theirs, and never drawn as yours.
+    // Notes on a file handed to the agent: the notes are already drawn, as themselves.
+    if (has(patch, 'answer') && Array.isArray(patch!.fromNotes)) continue;
     const from = line.source === 'system' && has(patch, 'answer') ? (patch!.from as { name?: string } | undefined)?.name : undefined;
     if (from && words(patch.answer)) {
       events.push({ at, who: 'agent', said: `${from} handed this over`, words: words(patch.answer)!, message: true, field: 'answer', from });
@@ -412,7 +475,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     }
 
     if (words(patch.note)) {
-      events.push({ at, who: 'agent', said: 'It checked in', words: words(patch.note)!, message: true, field: 'note', ...(ranNow() ? { ran: ranNow() } : {}) });
+      events.push({ at, who: 'agent', said: 'It checked in', words: words(patch.note)!, message: true, field: 'note', says: 'progress', ...(ranNow() ? { ran: ranNow() } : {}) });
       continue;
     }
 

@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadStore } from './store-modules.mjs';
+import { hasCode } from '../shared/has-code.mjs';
 import { Repeats } from './repeats.mjs';
 import { CLEAN_LABEL, isCleanRun } from '../shared/repeats.mjs';
 import { answerFor, describeFor } from './first-run.mjs';
@@ -29,7 +30,7 @@ import {
   CODEX_IMPORT_LABEL, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow, codexMirrorPatch, isCodexImportRow, isCodexMirrorRow,
   productsForThread, threadsNeedingRows as codexThreadsNeedingRows,
 } from '../shared/codex-import.mjs';
-import { buildClaimLine, buildReleaseLine } from '../shared/work-items.mjs';
+import { buildClaimLine, buildReleaseLine, GIVEN_TASK } from '../shared/work-items.mjs';
 import { isEffortWord } from '../shared/effort-levels.mjs';
 import { shippedNote } from '../shared/shipped-note.mjs';
 import { machineryPath, removeMachinery } from './store/home.mjs';
@@ -121,6 +122,7 @@ export class Store {
         name: project.name || entry.name,
         oneLiner: project.oneLiner || '',
         repoPath: project.repoPath || null,
+        code: hasCode(project.repoPath),
         // What puts an unplaced project under the ones already there rather
         // than alphabetically among them (renderer/src/project-priority.ts).
         createdAt: Number.isFinite(Date.parse(project.createdAt)) ? Date.parse(project.createdAt) : null,
@@ -338,7 +340,7 @@ export class Store {
   // `inReplyTo` makes the answer a reply in a thread (w-920461cbe6): the uid
   // of the message it answers, on THE SAME LINE as the words, so the reply's
   // own uid (what its reactions hang off) is the line that says where it goes.
-  answerItem(slug, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo, fromPhone }) {
+  answerItem(slug, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo, fromPhone, voice, forAgent, fromNotes, putAway }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     let item = null;
@@ -361,7 +363,7 @@ export class Store {
     if (engine !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { engine: engine ?? '' }, { source: 'founder' });
     if (model !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { model: model ?? '' }, { source: 'founder' });
     if (effort !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { effort: effort ?? '' }, { source: 'founder' });
-    if (answer) item = workItemsDisk.updateWorkItem(dir, id, { answer, ...(inReplyTo ? { inReplyTo } : {}), ...(fromPhone ? { fromPhone } : {}) }, { source: 'founder' });
+    if (answer) item = workItemsDisk.updateWorkItem(dir, id, { answer, ...(inReplyTo ? { inReplyTo } : {}), ...(fromPhone ? { fromPhone } : {}), ...(voice ? { voice } : {}), ...(forAgent ? { forAgent } : {}), ...(fromNotes?.length ? { fromNotes } : {}) }, { source: 'founder' });
     // A REPLY ON A RUN THAT FINISHED QUIETLY MAKES IT NEWS AGAIN (w-5e3f2e047f).
     // A quiet run is kept out of her inbox, and a repeating task now opens on
     // its latest run, so without this the answer to what she just asked there
@@ -386,6 +388,7 @@ export class Store {
     // whatever the filing agent chose.
     if (priority != null) item = workItemsDisk.updateWorkItem(dir, id, { priority }, { source: 'founder' });
     if (status) item = workItemsDisk.updateWorkItem(dir, id, { status }, { source: 'founder' });
+    if (typeof putAway === 'boolean') item = workItemsDisk.updateWorkItem(dir, id, { putAway }, { source: 'founder' });
     return item;
   }
 
@@ -394,10 +397,10 @@ export class Store {
   // but written as the app with the teammate named on the line, so it is never
   // read as yours. `hold` blocks the thread after it until you reply
   // (`heldForHer`).
-  tellItem(slug, id, { text, from, hold = false, hop = null }) {
+  tellItem(slug, id, { text, from, hold = false, hop = null, fromNotes = null }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
-    let item = workItemsDisk.updateWorkItem(dir, id, { answer: text, from }, { source: 'system' });
+    let item = workItemsDisk.updateWorkItem(dir, id, { answer: text, from, ...(fromNotes?.length ? { fromNotes } : {}) }, { source: 'system' });
     // The hop count travels on the thread, so its own hand-offs carry it on.
     const raise = Number.isInteger(hop) && hop > hopOf(item);
     const had = item.labels ?? [];
@@ -581,6 +584,12 @@ export class Store {
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { edit }, { source: 'founder' });
   }
 
+  // A COMMENT, RESOLVE, APPROVAL OR "SEEN" ON ONE FILE OF A THREAD
+  // (shared/artifact-marks.mjs). Starts nothing, on any Mac.
+  fileMark(slug, id, mark) {
+    return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { artifact: mark }, { source: 'founder' });
+  }
+
   // AN EDIT TO A THREAD FROM ITS SUMMARY (approved 2026-10-01): the summary's
   // three lines and its links, who sees it, and its priority. Written as the
   // person's own words; on the summary the later write wins either way
@@ -591,7 +600,7 @@ export class Store {
     // `label` is a rename (w-ab3d51dc7d): the name every row shows. Never
     // `title`, which is the message the thread was started with and briefs
     // every run. Written on her authority, it outranks the namer's.
-    const fields = ['problem', 'progress', 'solution', 'visibility', 'visibleTo', 'priority', 'blockedBy', 'blocks', 'start', 'label'];
+    const fields = ['problem', 'progress', 'solution', 'visibility', 'visibleTo', 'priority', 'blockedBy', 'blocks', 'start', 'label', 'shippedAt'];
     const allowed = Object.fromEntries(Object.entries(patch ?? {}).filter(([k]) => fields.includes(k)));
     if ('label' in allowed) {
       allowed.label = String(allowed.label ?? '').replace(/\s+/g, ' ').trim();
@@ -601,7 +610,7 @@ export class Store {
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, allowed, { source: 'founder' });
   }
 
-  composeItem(slug, { id = null, title, body, kind = 'directive', priority = 0, labels, runAt, start, engine, model, effort, assignee, due, people, visibility, visibleTo, fromPhone }) {
+  composeItem(slug, { id = null, title, body, kind = 'directive', priority = 0, labels, runAt, start, engine, model, effort, assignee, due, people, visibility, visibleTo, blockedBy, fromPhone, voice, forAgent }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     // The 'founder' label is the human-in-the-loop marker: only items the
@@ -611,6 +620,11 @@ export class Store {
     // The phone command that asked for it, on the very line that makes the
     // row, so no row it made is ever without it (Codex's fourth review).
     const first = { title, kind, priority, labels: allLabels, ...(fromPhone ? { fromPhone: String(fromPhone) } : {}) };
+    // A task's audience rides the line that makes it, the only one a teammate's
+    // copy takes it from (shared/team-rules.mjs whatATeammateMaySet).
+    if (allLabels.includes(GIVEN_TASK) && (visibility === 'team' || (visibility === 'people' && Array.isArray(visibleTo) && visibleTo.length))) {
+      Object.assign(first, { visibility, ...(visibility === 'people' ? { visibleTo: [...new Set(visibleTo.map(String))] } : {}) });
+    }
     // A thread the cloud started from the phone keeps the id it ran under there.
     const created = id
       ? workItemsDisk.createWorkItemIfAbsent(dir, id, first, { source: 'system' }).item
@@ -621,6 +635,8 @@ export class Store {
     const contentPatch = {
       title,
       ...(body ? { body } : {}),
+      ...(voice ? { voice } : {}),
+      ...(forAgent ? { forAgent } : {}),
       ...(runAt ? { runAt: Math.max(0, Math.trunc(runAt)) } : {}),
       // "Add it to Later" on the card: the thread exists now and starts when
       // she says, which is the one answer on that menu with no clock in it.
@@ -652,6 +668,7 @@ export class Store {
       ...(assignee ? { assignee: String(assignee) } : {}),
       ...(due ? { due: String(due) } : {}),
       ...(Array.isArray(people) && people.length ? { people } : {}),
+      ...(Array.isArray(blockedBy) && blockedBy.length ? { blockedBy: blockedBy.map(String) } : {}),
       // WHO SEES IT (approved 2026-10-01): the team by default, nobody but its
       // owner, or the people she chose (w-41ff964775). No field at all reads
       // as the team, except in your personal project, where it reads as Only

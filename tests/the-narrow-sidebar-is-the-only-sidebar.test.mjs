@@ -38,8 +38,10 @@ describe('every install gets the narrow sidebar', () => {
     expect(app).not.toMatch(/narrowSidebar = roomsUi\.live/);
   });
 
-  it('is narrow until pointed at, and nothing else widens it', () => {
-    expect(app).toContain('const sideFolded = !railOpen;');
+  // It holds its words unless a person turned shrinking on
+  // (tests/the-sidebar-keeps-its-words-unless-you-turned-that-off).
+  it('narrows, when it does, by the one rule and the pointer', () => {
+    expect(app).toMatch(/const sideFolded = sidebarFolded\(/);
     expect(app).toMatch(/rail=\{narrowSidebar\} onHover=\{setRailOpen\}/);
   });
 

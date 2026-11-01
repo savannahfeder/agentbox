@@ -150,6 +150,8 @@
    inline it ran on under the faint words on an urgent row. */
 .th-repeat { margin-right: 9px; vertical-align: -2px; color: var(--text-faint); flex: none; }
 .th-aside { display: inline-block; margin-left: 12px; color: var(--text-faint); }
+.th-aside.late { color: var(--text-dim); }
+.th-aside.late::before { content: ''; display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: var(--accent); vertical-align: 2px; }
 
 /* ------------------------------------------------------------ the list as a table */
 .th-table .row.th-head { padding-top: 10px; padding-bottom: 8px; font: 10.5px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); cursor: default; }
@@ -387,6 +389,7 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-card .th-msg-who::after { content: none; }
 .th-card .th-msg .tm-av { margin-right: 0; top: 0; }
 .th-card .m { display: flex; align-items: center; font: 11px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); min-width: 0; }
+.th-card-doing { margin-top: 6px; font-size: 12.5px; line-height: 17px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .th-card .m .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* What is happening on the card, on the card's own line, ahead of its project
    and in the ink the row's status cell wears (w-ec2b04d449). */
@@ -400,8 +403,37 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-pop .opts .th-prio-mark { margin-right: 0; }
 
 /* ------------------------------------------------------------ a teammate's thread */
-.th-card-page { padding: 14px var(--row-r, 24px) 32px var(--text-x, 32px); max-width: 760px; }
-.th-card-bar { display: flex; align-items: center; justify-content: space-between; margin: 0 0 18px; }
+/* The whole window: the name and what it waits on across the top, then the
+   conversation on the left and what it is about on the right. */
+.tp-page { padding: 14px 40px 48px; }
+.tp-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 28px; }
+.tp-acts { display: flex; align-items: center; gap: 10px; }
+.tp-top { margin: 0 0 28px; padding: 0 0 24px; border-bottom: 1px solid var(--line); }
+.tp-whose { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13px; color: var(--text-dim); }
+.tp-whose .tm-av { width: 20px; height: 20px; line-height: 18px; font-size: 8px; }
+.tp-top .th-card-title { margin: 0 0 14px; font-size: 28px; line-height: 34px; font-weight: 500; letter-spacing: -.02em; color: var(--text); }
+.tp-standing { display: flex; align-items: center; flex-wrap: wrap; gap: 0 10px; margin: 0; font-size: 14px; color: var(--text-dim); }
+.tp-standing .ts-st { margin-right: 0; }
+.tp-standing b { font-weight: 500; color: var(--text); }
+.tp-standing .tp-ago { margin-left: auto; font-size: 12.5px; color: var(--text-faint); }
+.tp-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 64px; align-items: start; }
+.tp-side { position: sticky; top: 0; }
+.tp-side .ts-ticket { max-width: none; margin: 0; padding: 20px 22px 18px; border-radius: 10px; }
+.tp-side .ts-tk-part { padding: 0 0 18px; margin: 0 0 18px; border-bottom: 1px solid var(--line); }
+.tp-side .ts-tk-part > .ts-h { margin: 0 0 8px; }
+.tp-side .ts-tk-lead { margin: 0; font-size: 14px; line-height: 21px; }
+.tp-side .ts-tk-grid { grid-template-columns: 1fr; gap: 14px; padding-top: 0; border-top: 0; }
+.ts-tk-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ts-tk-files button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px 7px 7px; border: 1px solid var(--line); border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.ts-tk-files button:hover { background: var(--wash); border-color: var(--line-strong); }
+.ts-tk-ext { flex: none; width: 34px; padding: 5px 0; border-radius: 5px; background: var(--wash); font: 9.5px var(--mono); letter-spacing: .04em; text-transform: uppercase; text-align: center; color: var(--text-dim); }
+.ts-tk-fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ts-tk-notes { flex: none; font-size: 12px; color: var(--text-faint); }
+.ts-tk-props { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px 12px; margin: 0; font-size: 13px; }
+.ts-tk-props dt { color: var(--text-faint); }
+.ts-tk-props dd { display: flex; align-items: center; gap: 7px; margin: 0; min-width: 0; color: var(--text); }
+.ts-tk-props .tm-av { width: 18px; height: 18px; line-height: 16px; font-size: 7.5px; }
+.tp-side .ts-tk-foot { display: block; margin: 16px 0 0; padding: 0; font-size: 12px; color: var(--text-faint); }
 .th-back { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px 0 6px; margin-left: -6px; border: 0; border-radius: var(--radius); background: none; color: var(--text-dim); font: inherit; font-size: 13.5px; cursor: pointer; }
 .th-back:hover { background: var(--wash); color: var(--text); }
 
@@ -476,7 +508,27 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .workspace-navigation .th-me-btn > span:nth-child(2) { min-width: 0; overflow: hidden; }
 .workspace-collapsed .workspace-navigation .th-me-btn { width: 38px; padding: 0 0 0 8px; }
 .workspace-collapsed .workspace-navigation .th-me-btn > .tm-av { display: inline-block; }
-.th-card-title { margin: 0 0 14px; font-size: 18px; font-weight: 500; letter-spacing: -.01em; color: var(--text); }
+.th-work { min-width: 0; }
+.th-work .msg-body p, .th-work .appendix p { margin: 0 0 10px; }
+.th-work .msg-body ul, .th-work .msg-body ol, .th-work .appendix ul, .th-work .appendix ol { margin: 0 0 10px; }
+.th-follow { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); background: none; color: var(--text-dim); font: inherit; font-size: 13px; cursor: pointer; }
+.th-follow:hover { color: var(--text); border-color: var(--text-faint); background: var(--wash); }
+.th-follow.on { border-color: var(--line); color: var(--text-faint); }
+.th-work-note { margin: 0 0 18px; font-size: 13px; color: var(--text-dim); }
+.th-comment { margin: 28px 0 0; }
+.tp-comment-box { display: flex; align-items: flex-start; gap: 10px; padding: 10px 10px 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--wash); }
+.tp-comment-box:focus-within { border-color: var(--text-faint); }
+.tp-comment-box > .tm-av { margin-top: 5px; }
+.th-comment textarea { flex: 1; min-width: 0; padding: 6px 0; border: 0; background: none; color: var(--text); font: inherit; font-size: 14px; line-height: 20px; resize: none; }
+.th-comment textarea:focus { outline: none; }
+.th-comment button { height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.th-comment button:hover:not(:disabled) { background: var(--wash-strong, var(--wash)); }
+.th-comment button:disabled { color: var(--text-faint); border-color: var(--line); cursor: default; }
+.tp-comment-where { margin: 8px 0 0 2px; font-size: 12.5px; color: var(--text-faint); }
+@media (max-width: 1100px) {
+  .tp-grid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .tp-side { position: static; }
+}
 /* Collapsed, the Inbox still says something is waiting: a dot where the
    number was (a persona lost the count when the sidebar was shut). */
 .workspace-collapsed .workspace-navigation .workspace-tab.has-count { position: relative; }
@@ -585,6 +637,6 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-cell-state.has-card:hover .th-why-card { display: block; }
 .phone-status-dismissible { display: flex; align-items: center; gap: 8px; padding-right: 0; }
 .phone-status-dismissible > span { flex: 1; min-width: 0; }
-.phone-status-dismissible > button { display: grid; place-items: center; flex: 0 0 44px; min-height: 44px; margin-block: -9px; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; cursor: pointer; }
+.phone-status-dismissible > button { display: grid; place-items: center; flex: 0 0 44px; min-height: 44px; margin-block: -9px; padding: 0; border: 0; border-radius: var(--radius); background: transparent; color: inherit; cursor: pointer; }
 .phone-status-dismissible > button:hover { color: var(--text); }
 .phone-status-dismissible > button:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }

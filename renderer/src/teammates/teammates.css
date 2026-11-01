@@ -3,7 +3,7 @@
    with what it is on beside it. Only the app's own tokens. */
 
 .tq { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box; font-style: normal;
-  width: 18px; height: 18px; border: 1px dashed var(--line-strong); color: var(--text-dim); font: 400 9.5px/1 var(--mono); }
+  width: 18px; height: 18px; border: 1px dashed var(--line-strong); border-radius: var(--mate-corner); color: var(--text-dim); font: 400 9.5px/1 var(--mono); }
 .tq-hd { width: 20px; height: 20px; font-size: 10px; }
 .tq-pic { width: 32px; height: 32px; font-size: 12px; }
 .tq-big { width: 40px; height: 40px; font-size: 14px; }
@@ -28,8 +28,8 @@
 .rm-cm.tq-m { position: relative; padding: 10px 0 4px 52px; }
 .rm-cm.tq-m.tq-cont { padding-top: 2px; }
 .rm-cm.tq-m .h { font-size: 15px; gap: 8px; }
-.rm-cm.tq-m .h > .tq, .rm-cm.tq-m .h > .rm-pic { position: absolute; left: 0; top: 10px; }
-.rm-cm.tq-m .h > .rm-pic { width: 32px; height: 32px; line-height: 30px; font-size: 10px; }
+.rm-cm.tq-m .h > .tq, .rm-cm.tq-m .h > .tm-av { position: absolute; left: 0; top: 10px; }
+.rm-cm.tq-m .h > .tm-av { width: 32px; height: 32px; line-height: 30px; font-size: 10px; }
 .rm-cm.tq-m .tx { font-size: 16px; line-height: 25px; }
 .rm-cm.tq-m .tx p { white-space: pre-wrap; }
 /* A pasted brief's headings are words in a message, not page titles. */
@@ -53,7 +53,7 @@
 .tq-key:hover { color: var(--text); }
 
 .tq-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-.tq-chip { height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); background: none; font: inherit; font-size: 13.5px; color: var(--text); display: inline-flex; align-items: center; cursor: default; }
+.tq-chip { height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; font: inherit; font-size: 13.5px; color: var(--text); display: inline-flex; align-items: center; cursor: default; }
 .tq-chip:hover { background: var(--wash-strong); }
 
 .rm-compose.tq-compose { margin: 8px 32px 24px 32px; }
@@ -90,7 +90,7 @@ button.tq-li:hover { color: var(--text); }
 .tq-f .s { display: block; font-size: 12.5px; color: var(--text-faint); margin-top: 5px; }
 .tq-f ul { list-style: none; padding: 0; margin: 0; }
 .tq-f li { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0; font-size: 14px; line-height: 20px; color: var(--text); }
-.tq-in { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--line); background: var(--control-face); font: inherit; font-size: 14px; line-height: 20px; color: var(--text); outline: 0; resize: vertical; }
+.tq-in { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--control-face); font: inherit; font-size: 14px; line-height: 20px; color: var(--text); outline: 0; resize: vertical; }
 .tq-in:focus { border-color: var(--text-faint); }
 select.tq-in { height: 32px; padding: 0 6px; }
 .tq-row2 { display: flex; gap: 8px; }
@@ -99,13 +99,13 @@ select.tq-in { height: 32px; padding: 0 6px; }
 .tq-x { margin-left: auto; width: 20px; height: 20px; flex: none; background: none; border: 0; color: var(--text-faint); font-size: 15px; line-height: 1; cursor: default; }
 .tq-x:hover { color: var(--text); }
 .tq-foot { padding-top: 16px; border-top: 1px solid var(--line); }
-.tq-quiet { height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); background: none; font: inherit; font-size: 13.5px; color: var(--text-dim); cursor: default; }
+.tq-quiet { height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; font: inherit; font-size: 13.5px; color: var(--text-dim); cursor: default; }
 .tq-quiet:hover { color: var(--text); background: var(--wash); }
 
 /* An inbox row a teammate sent you, led by its mark */
 .tq-from { display: inline-flex; align-items: center; gap: 7px; flex: none; color: var(--text-dim); }
 .list-pane.tq-open { display: flex; flex-direction: column; overflow: hidden; }
-.rm-cm.tq-m .h > .tq-you { display: inline-flex; align-items: center; justify-content: center; }
+.rm-cm.tq-m .h > .tm-av:has(svg) { display: inline-flex; align-items: center; justify-content: center; }
 /* Sat on the line's baseline, an inline-flex box takes the mark's small letter
    as its baseline and drops the name below the title. */
 .tq-from { margin-right: 10px; vertical-align: top; height: 20px; }
@@ -185,7 +185,7 @@ span.tq-link:focus-visible { outline: 1px solid var(--text-faint); outline-offse
 .tq-saved > svg { color: var(--text-dim); }
 .tq-menu { min-width: 200px; }
 
-/* About: its description in its own words, and what it knows, square. */
+/* About: its description in its own words, and what it knows. */
 .tq-doc { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; }
 .tq-doc-in { max-width: 720px; padding: 28px 40px 28px var(--text-x, 40px); }
 .tq-doc-id { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
@@ -201,6 +201,34 @@ span.tq-link:focus-visible { outline: 1px solid var(--text-faint); outline-offse
 .tq-method > h1:first-child { display: none; }
 .tq-doc .rm-compose.tq-compose { margin: 22px 0 0; }
 .tq-doc .tq-error { margin-left: 0; }
+/* About: over the chat when you ask for it, gone with a click anywhere else. */
+.tq-chats .gr-body { position: relative; }
+.tq-sheet-away { position: absolute; inset: 0; z-index: 4; }
+.tq-sheet { position: absolute; top: 0; right: 0; bottom: 0; z-index: 5; width: min(440px, 80%); box-sizing: border-box; padding: 18px 28px 28px; overflow-y: auto; background: var(--bg); border-left: 1px solid var(--line); }
+.tq-sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; font-size: 14px; color: var(--text); }
+.tq-sheet .tq-details dl, .tq-sheet dl { grid-template-columns: 96px minmax(0, 1fr); }
+.tq-sheet-links { gap: 6px; }
+.tq-sheet-more { margin-top: 24px; font-size: 13.5px; }
+.tq-sheet-more summary { color: var(--text-faint); cursor: default; list-style: none; line-height: 20px; }
+.tq-sheet-more summary::-webkit-details-marker { display: none; }
+.tq-sheet-more summary::after { content: ''; display: inline-block; width: 5px; height: 5px; margin: 0 2px 3px 9px; border-right: 1.25px solid currentColor; border-bottom: 1.25px solid currentColor; transform: rotate(45deg); }
+.tq-sheet-more[open] summary { margin-bottom: 16px; }
+.tq-sheet-more:not([open]) summary:hover { color: var(--text-dim); }
+.tq-about-key { border: 0; padding: 4px 8px; margin-right: 4px; background: none; font: inherit; font-size: 13.5px; color: var(--text-dim); cursor: default; }
+.tq-about-key:hover, .tq-about-key.on { color: var(--text); }
+/* How it writes */
+.tq-voice { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; width: 100%; }
+.tq-voice .tq-chips { margin-top: 0; gap: 6px; }
+.tq-voice-sample { font-size: 13.5px; line-height: 20px; color: var(--text-dim); }
+.tq-voice-own { font-size: 13.5px; line-height: 20px; }
+.tq-m .tx .tq-new-ask { margin: 22px 0 10px; }
+/* A document open beside the chat takes the Chats list's room, or the chat is one letter wide. */
+.app.doc-open .tq-chats .cx-list, .app.doc-open .tq-head .gc-head-col { display: none; }
+/* A long answer: the card beside one sentence. */
+.tq-doc-card { display: flex; align-items: center; gap: 8px; max-width: 360px; margin-top: 8px; padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: var(--artifact-corner); background: none; font: inherit; font-size: 13.5px; color: var(--text); text-align: left; cursor: default; }
+.tq-doc-card:hover { background: var(--wash-strong); }
+.tq-doc-card svg { flex: none; color: var(--text-faint); }
+.tq-doc-card span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gr-side.tq-details { padding: 22px 24px; background: var(--bg); }
 .tq-details dl { display: grid; grid-template-columns: 86px minmax(0, 1fr); column-gap: 14px; row-gap: 16px; margin: 0; font-size: 13.5px; line-height: 20px; }
 .tq-details dt { color: var(--text-faint); }
@@ -210,6 +238,14 @@ span.tq-link:focus-visible { outline: 1px solid var(--text-faint); outline-offse
 .tq-details .s { font-size: 12px; color: var(--text-faint); }
 .tq-details .dim { color: var(--text-faint); }
 .tq-duty small { display: block; font-size: 12.5px; color: var(--text-faint); }
+.tq-field { width: 100%; box-sizing: border-box; font: inherit; color: var(--text); background: none; border: 1px solid transparent; border-radius: var(--radius); padding: 1px 4px; margin-left: -5px; }
+.tq-field:hover { border-color: var(--line); }
+.tq-field:focus { outline: 0; border-color: var(--line-strong); }
+textarea.tq-field { resize: vertical; border-color: var(--line); margin-left: 0; }
+.tq-job-edit { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.tq-job-keys { display: flex; align-items: center; gap: 8px; }
+.tq-when-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; }
+.tq-time { font: inherit; font-size: 13px; color: var(--text); background: none; border: 1px solid var(--line); border-radius: var(--radius); padding: 1px 4px; }
 .tq-book { display: inline-flex; align-items: center; gap: 7px; border: 0; padding: 0; background: none; font: inherit; color: var(--text); text-align: left; cursor: default; }
 .tq-book svg { color: var(--text-faint); flex: none; }
 .tq-book:hover span { text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
@@ -222,7 +258,7 @@ span.tq-link:focus-visible { outline: 1px solid var(--text-faint); outline-offse
 .tq-known li > span { flex: 1; min-width: 0; }
 .tq-details > .tq-st { margin: 16px 0 0; }
 
-/* A playbook, with its table on square corners like the rest of the app. */
+/* A playbook. Its table stays square: a table's rows are lines, not cards. */
 .tq-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-faint); margin-bottom: 14px; }
 .tq-crumb .tq-link { color: var(--text-dim); }
 .tq-h { margin: 0; font-weight: 500; font-size: 22px; letter-spacing: -.01em; color: var(--text); }
@@ -239,19 +275,16 @@ span.tq-link:focus-visible { outline: 1px solid var(--text-faint); outline-offse
 
 /* The Chats page as drawn in round 6 (designs/w-4bd7b5548b/round-6): softer
    than the inbox, only here, so a group's own chat keeps its look. */
-.cx-row img, .cx-row .rm-pic { border-radius: 50%; }
-.cx-row .tq { border-radius: 6px; }
 .tq-chats .tq-chat .rm-day { display: flex; align-items: center; gap: 12px; margin: 18px 0 14px; }
 .tq-chats .tq-chat .rm-day::before, .tq-chats .tq-chat .rm-day::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .tq-chats .tq-chat .rm-day .rm-label { font: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--text-faint); }
 .tq-chats .tq-chat .rm-cm.tq-m .h > span { font-weight: 600; }
 .tq-chats .tq-chat .rm-cm.tq-m .h em { font-family: inherit; font-size: 12px; letter-spacing: 0; font-style: normal; color: var(--text-faint); }
-.tq-chats .tq-chat .rm-cm.tq-m .h .rm-pic { width: 36px; height: 36px; border-radius: 6px; }
-.tq-chats .tq-chat .rm-cm.tq-m .h .tq-pic { width: 36px; height: 36px; border-radius: 6px; }
-.tq-chats .tq-chip { border-radius: 6px; }
-.tq-chats .tq-doc-id .tq, .tq-chats .tq-title .tq { border-radius: 6px; }
+.tq-chats .tq-chat .rm-cm.tq-m .h .tm-av { width: 36px; height: 36px; line-height: 34px; font-size: 11px; }
+.tq-chats .tq-chat .rm-cm.tq-m .h .tq-pic { width: 36px; height: 36px; }
 /* A thread it sent you, as a window onto your inbox: the tab it is in over its row. */
-.tq-sent { margin: 14px 0 10px; border: 1px solid var(--line); background: rgba(255,255,255,.015); }
+.tq-sent { margin: 14px 0 10px; border: 1px solid var(--line); border-radius: var(--artifact-corner); background: rgba(255,255,255,.015); }
+.tq-inrows .row:last-child { border-radius: 0 0 var(--artifact-corner) var(--artifact-corner); }
 .tq-sent-bar { display: flex; align-items: center; padding: 6px 20px 0; border-bottom: 1px solid var(--line); }
 /* Its underline sits on the bar's line, as a tab's does over the inbox. */
 .tq-sent-bar .tm-tab { margin-bottom: -1px; }
@@ -271,6 +304,6 @@ span.tq-link:focus-visible { outline: 1px solid var(--text-faint); outline-offse
 .cx-frame-main .focus { margin-left: 40px; }
 .cx-frame-main .focus-dock-inner { margin-left: 40px; }
 /* The side panel's menus read as plain words with a chevron, not underlined. */
-.tq-details .compose-word { text-decoration: none; color: var(--text); }
+.tq-details .compose-word { text-decoration: none; color: var(--text); text-align: left; }
 .tq-details .compose-word::after { content: ''; display: inline-block; width: 5px; height: 5px; margin: 0 2px 3px 9px; border-right: 1.25px solid currentColor; border-bottom: 1.25px solid currentColor; transform: rotate(45deg); color: var(--text-faint); vertical-align: middle; }
 .tq-details .compose-word:hover::after, .tq-details .compose-word.open::after { color: var(--text-dim); }

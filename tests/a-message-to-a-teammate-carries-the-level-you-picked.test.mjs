@@ -74,7 +74,7 @@ describe('the level crosses with the message', () => {
     await maya.on(() => maya.service.message(theo.personId, 'The checkout page is down for everyone.', LEVELS.urgent));
     await theo.service.syncNow();
     const got = theirMessage();
-    expect(got.title).toBe('The checkout page is down for everyone.');
+    expect(got.title).toBe('The checkout page is down');
     expect(got.priority).toBe(LEVELS.urgent);
     // And the inbox's own reading of it, which is what decides where it sorts.
     expect(itemPriority(got)).toBe(LEVELS.urgent);
@@ -153,7 +153,7 @@ describe('the card says so', () => {
   const src = read('renderer/src/threads/ThreadComposer.tsx');
   // The person branch of the bottom bar: everything between "{person && sendAs === 'message' ? (" and
   // the agent's branch that follows it. It held a line and Send and no more.
-  const from = src.indexOf("{person && sendAs === 'message' ? (");
+  const from = src.indexOf('{person ? (\n');
   const messageBar = src.slice(from, src.indexOf('\n        ) : (', from));
 
   it('draws the one priority control on a message to a person', () => {

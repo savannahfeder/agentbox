@@ -22,14 +22,16 @@ import { isWebsiteAddress } from '../../shared/websites.mjs';
  * shared/websites.mjs decides which addresses those are, and a local app is
  * NOT one of them: it already has its own way through here.
  */
-export type DocKind = 'html' | 'markdown' | 'code' | 'image' | 'website';
+export type DocKind = 'html' | 'markdown' | 'code' | 'image' | 'website' | 'pdf' | 'film';
+export type PaneKind = DocKind | 'text';
 
 /**
  * What the pane would do with this path, or null when it should be handed to
  * the operating system the way every other file always has been.
  *
- * A pdf opens in Preview and a source file in her editor. Those are still
- * better than anything this pane could draw.
+ * A deck and a film used to go outside, and on a teammate's screen that read as
+ * a click that did nothing. A script does not have a kind here but the pane
+ * draws it as text (isPlainText); on a browser copy there is no editor to go to.
  *
  * A PNG USED TO BE ON THAT LIST AND IS NOT ANY MORE. She asked for the picture
  * back on 2026-09-20. Preview is still one press away: the open mark in the
@@ -46,12 +48,17 @@ export function docKind(path: string | undefined | null): DocKind | null {
   if (/\.(md|markdown)$/i.test(clean)) return 'markdown';
   if (/\.change$/i.test(clean)) return 'code';
   if (/\.(png|jpe?g|gif|webp|svg)$/i.test(clean)) return 'image';
+  if (/\.pdf$/i.test(clean)) return 'pdf';
+  if (/\.(mp4|mov|m4v|webm)$/i.test(clean)) return 'film';
   return null;
 }
 
 /** Is this a file the pane can open at all. */
+/** A script or text file handed to the pane anyway, as Files does: shown as its text. */
+export const isPlainText = (path: string) => /\.(py|ipynb|js|mjs|ts|tsx|jsx|rb|go|rs|sh|sql|css|txt|csv|tsv|json|ya?ml|xml)$/i.test(path.split(/[?#]/)[0]);
+
 export function opensInPane(path: string | undefined | null): boolean {
-  return docKind(path) !== null;
+  return docKind(path) !== null || (!!path && isPlainText(path));
 }
 
 /**
@@ -66,6 +73,9 @@ export function opensInPane(path: string | undefined | null): boolean {
 export function crumbParts(fullPath: string, roots: string[] = []): string[] {
   const clean = String(fullPath ?? '').replace(/^file:\/\//, '').replace(/\/+$/, '');
   if (!clean) return [];
+  // A file that came with a message: its own path, not where this computer shelved it.
+  const carried = /\/attachments\/carried\/[0-9a-f]{16}\/(.+)$/.exec(clean);
+  if (carried) return carried[1].split('/');
   // The deepest root that actually contains the file wins, so `designs/` inside
   // the docs dir does not swallow the folder the drawing is in.
   let best = '';

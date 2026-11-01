@@ -15,6 +15,7 @@
 // The rules (which replies, the line, the width) are ./chat-threads.ts.
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type SetStateAction } from 'react';
 import { Face, TeamContext } from './people';
+import { voiceName } from '../../../shared/agent-voice.mjs';
 import { ChatFold } from './ChatFold';
 import { MessageActions, Reactions } from './ChatActions';
 import { DeleteMessage, MessageEditor } from './MessageMore';
@@ -30,9 +31,10 @@ import { FormatBar } from './FormatBar';
 import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type VoiceControl } from './useVoiceRecorder';
 import { RichReply, type RichBox } from './RichReply';
 import { AttachRow } from '../components/AttachRow';
-import { collectFiles, persistAttachments, type PendingAttachment } from '../attachments';
+import { persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { draftKey, readDraft, readDraftAttachments, restoreFailedDraft, saveDraft, saveDraftAttachments } from '../drafts';
 import type { AgentTurn } from '../types';
+import { sendKeyFor, unsentWords } from '../reply-keys';
 import './chat.css';
 
 // Before the frame is drawn in the app; a plain effect where there is no window.
@@ -45,7 +47,8 @@ export function ThreadPanel(props: Parameters<typeof ThreadPanelBody>[0]) {
   return <ThreadPanelBody key={JSON.stringify([props.product, props.id, props.parent.uid ?? props.parent.at])} {...props} />;
 }
 
-function ThreadPanelBody({ product, id, people, parent, replies, md, width, reactions, onReact, onEdit, onMarkUnread, onCopied, onHandToAgent, onSend, onClose, onResize }: {
+function ThreadPanelBody({ product, id, people, parent, replies, md, width, reactions, onReact, onEdit, onMarkUnread, onCopied, onHandToAgent, onSend, onClose, onResize, takeKeyboard = true }: {
+  takeKeyboard?: boolean;
   /** The conversation's project, where a picture sent here is saved. */
   product: string;
   /** The conversation, which the @ menu remembers an agent's last project under. */
@@ -65,7 +68,7 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
   onEdit?: (uid: string, change: { text: string } | { gone: true }) => void;
   onMarkUnread?: (at: number) => void;
   onCopied?: () => void;
-  onHandToAgent?: () => void;
+  onHandToAgent?: (message: AgentTurn) => void;
   /** Send a reply in this thread; false (or a rejection) when it did not go,
    *  or the words as written when starting a mentioned agent changed them. */
   onSend: (text: string) => unknown;
@@ -81,6 +84,7 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
   const [draftItem] = useState(() => ({ product, id: `chat-thread:${JSON.stringify([id ?? '', parent.uid ?? parent.at])}` }));
   const [draft, setDraftState] = useState(() => typeof localStorage === 'undefined' ? '' : readDraft(draftItem));
   const [attachments, setAttachmentsState] = useState<PendingAttachment[]>(() => typeof localStorage === 'undefined' ? [] : readDraftAttachments(draftItem));
+  const { attaching, collect } = useAttaching();
   const currentDraft = useRef(draft);
   const currentAttachments = useRef(attachments);
   const [tooBig, setTooBig] = useState(0);
@@ -115,6 +119,7 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
   const finishing = useRef(false);
   const [recording, setRecording] = useState(false);
   useEffect(() => { setNotice(null); }, [draft]);
+  const unsent = unsentWords({ words: draft, files: attachments.length, sending: false });
   // WHAT YOU SENT AND THE LEDGER DOES NOT HAVE YET, drawn at once and dropped
   // when your own committed copy arrives, so a reply never appears to vanish
   // between Enter and the next read of the row.
@@ -125,7 +130,9 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
   // The message being edited in place, by uid, and the one asking to be deleted.
   const [editing, setEditing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-  useEffect(() => { box.current?.focus(); }, []);
+  // Only a press takes the keyboard. A panel that opened itself because a thread
+  // is waiting must not catch the R meant for the thread on the page.
+  useEffect(() => { if (takeKeyboard) box.current?.focus(); }, []);
 
   // THE CHAT BOX'S @ AND # MENUS (Focus.tsx, DockComposer), counting in the
   // words as shown and editing through the editor so formatting round a
@@ -172,6 +179,7 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
     }
     const words = draft.trim();
     if (!words && !files.length) return;
+    if (attaching.length) { setNotice(`${attaching[0].name} is still being attached. Send once it is in.`); return; }
     // An agent with no project does not go out; the line under the box says why.
     if (chat.block) { setNotice(chat.block); return; }
     const putBack = (why: string) => {
@@ -256,9 +264,9 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
     return (
       <div key={`${uid ?? 'p'}-${e.at}`} className="thread-block is-msg">
         <div className={`msg chat-msg${pending ? ' sending' : ''}`}>
-          <div className="chat-gutter"><Face person={person} me={mine} size="lg" /></div>
+          <div className="chat-gutter"><Face person={person} me={mine && !e.voice} agent={!!e.voice} size="lg" /></div>
           <div className="msg-head">
-            <span className="msg-who">{mine ? 'You' : person?.name ?? 'A teammate'}</span>
+            <span className="msg-who">{e.voice ? voiceName(e.voice, person?.name ?? '', { mine }) : mine ? 'You' : person?.name ?? 'A teammate'}</span>
             <span className="msg-when">{clock(e.at)}</span>
             {e.edited && <span className="msg-edited" title="Edited">edited</span>}
           </div>
@@ -278,7 +286,7 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
               quick={false}
               onReact={(emoji) => onReact(uid, emoji, (reactions?.[uid]?.[emoji] ?? []).includes(me ?? ''))}
               onQuote={() => quote(e)}
-              onHandToAgent={onHandToAgent}
+              onHandToAgent={onHandToAgent ? () => onHandToAgent(e) : undefined}
               more={messageMore({
                 mine,
                 text: e.text ?? '',
@@ -336,7 +344,7 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
           onDragOver={(e) => e.preventDefault()}
           onDrop={async (e) => {
             e.preventDefault();
-            const dropped = await collectFiles(e.dataTransfer.files);
+            const dropped = await collect(e.dataTransfer.files);
             if (dropped.length) setAttachments((a) => [...a, ...dropped]);
           }}
         >
@@ -368,13 +376,13 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
             ]}
             onKeyDown={onKey}
             onFiles={async (files) => {
-              const got = await collectFiles(files);
+              const got = await collect(files);
               if (got.length) setAttachments((a) => [...a, ...got]);
             }}
             onCaret={(b) => { chat.track(b as unknown as HTMLTextAreaElement); named.track(b as unknown as HTMLTextAreaElement); }}
             onClick={(b) => chat.click(b as unknown as HTMLTextAreaElement)}
           />
-          <AttachRow attachments={attachments} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
+          <AttachRow attachments={attachments} attaching={attaching} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
           {tooBig > 0 && <div className="compose-note" role="alert">{tooBig === 1
             ? 'One pasted image is too big to save. Closing the box loses it.'
             : `${tooBig} pasted images are too big to save. Closing the box loses them.`}</div>}
@@ -387,17 +395,18 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
             multiple
             style={{ display: 'none' }}
             onChange={async (e) => {
-              const picked = await collectFiles(e.target.files ?? []);
+              const picked = await collect(e.target.files ?? []);
               if (picked.length) setAttachments((a) => [...a, ...picked]);
               e.target.value = '';
             }}
           />
           <div className="chat-thread-bar">
-            <FormatBar box={box} onChange={setDraft} onAttach={() => filePicker.current?.click()}
+            <FormatBar box={box} onChange={setDraft} onAttach={() => filePicker.current?.click()} onFromFiles={(f) => setAttachments((a) => [...a, f])}
               onVoice={(note) => setAttachments((a) => (a.some((x) => x.draftId === note.draftId)
                 ? a : [...a, { name: note.name, dataBase64: note.dataBase64, image: false, draftId: note.draftId }]))}
               onNotice={setNotice} voiceKey={voiceKey} voice={voiceCtl} onRecording={setRecording} />
-            <button type="button" className="dock-send" disabled={!ready} onClick={() => void send()} title="Send · ↵">Send <kbd>↵</kbd></button>
+            {unsent && <span className="dock-unsent">{unsent}</span>}
+            <button type="button" className="dock-send" disabled={!ready} onClick={() => void send()} title={`Send · ${sendKeyFor(true)}`}>Send <kbd>{sendKeyFor(true)}</kbd></button>
           </div>
         </div>
       </div>

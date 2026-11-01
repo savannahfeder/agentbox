@@ -51,7 +51,9 @@ describe('the tab draws it', () => {
     expect(pages).toMatch(/t\.view === 'inbox' && lit && view !== 'inbox' \? ' fresh' : ''/);
   });
   it('from App, which remembers when you last had Needs You open', () => {
-    expect(read('App.tsx')).toMatch(/lit=\{needsYouLit\(inbox, needsLookedAt\)\}/);
+    expect(read('App.tsx')).toMatch(/lit=\{needsYouLit\(arrivals, needsLookedAt\)\}/);
+    // A group's row is an arrival too, timed by its newest message.
+    expect(read('App.tsx')).toMatch(/arrivals = useMemo\(\(\) => \[\.\.\.inbox, \.\.\.groupRows\.map\(\(m\) => \(\{ id: m\.id, createdAt: m\.at \}\)\)\]/);
   });
 
   const css = read('team/team.css');

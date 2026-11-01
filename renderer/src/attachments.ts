@@ -2,7 +2,9 @@
 // send, then persisted into the product's attachments/ dir and embedded in
 // the body as markdown (relative paths: workers read them through the MCP,
 // the message view renders them).
+import { useCallback, useState } from 'react';
 import { turnedName } from '../../shared/picture-formats.mjs';
+import { MAX_SENT_MB, sizeWords, tooBigToSend } from '../../shared/carried-files.mjs';
 
 export interface PendingAttachment {
   name: string;
@@ -13,22 +15,58 @@ export interface PendingAttachment {
   draftId?: string;
   /** In a room, the name it is stored under, the same on every try. */
   storedAs?: string;
+  /** Bytes, so the box can say a file is too big to send before it is sent. */
+  size?: number;
+  /** Why it could not be attached, in words for the box. Nothing of it is sent. */
+  failed?: string;
+}
+
+/** A file still on its way into the box, `done` bytes of `size`. */
+export type Attaching = { key: string; name: string; size: number; done: number };
+
+// A tab's file has no path and one request carries 32 MB at most
+// (main/serve.mjs), so a bigger file crosses in pieces.
+export const PIECE_BYTES = 4 * 1024 * 1024;
+
+async function base64Of(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+const pieceId = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) => b.toString(16).padStart(2, '0')).join('');
+
+async function stageInPieces(file: File, name: string, onDone: (bytes: number) => void): Promise<string> {
+  const put = window.zero?.stageAttachmentPart;
+  if (!put) throw new Error('this app cannot take a file this big here');
+  const id = pieceId();
+  let staged = '';
+  for (let at = 0; at === 0 || at < file.size; at += PIECE_BYTES) {
+    const end = Math.min(file.size, at + PIECE_BYTES);
+    staged = (await put({ id, name, at, dataBase64: await base64Of(file.slice(at, end)) })).path;
+    onDone(end);
+  }
+  return staged;
+}
+
+/** What stops the box sending, said for the person: a file that could not be attached, or one too big to go. */
+export function attachProblem(list: PendingAttachment[]): string | null {
+  const failed = list.find((a) => a.failed);
+  if (failed) return `${failed.failed} Remove it to send the rest.`;
+  const big = list.find((a) => tooBigToSend(a.size ?? 0));
+  if (big) return `${big.name} is ${sizeWords(big.size ?? 0)}, over the ${MAX_SENT_MB} MB a message can send. Remove it to send the rest.`;
+  return null;
 }
 
 export const isImageName = (name: string) => /\.(png|jpe?g|gif|webp)$/i.test(name);
 
-function blobToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-export async function collectFiles(files: FileList | File[]): Promise<PendingAttachment[]> {
+export async function collectFiles(files: FileList | File[], onAttaching?: (now: Attaching[]) => void): Promise<PendingAttachment[]> {
   const out: PendingAttachment[] = [];
-  for (const file of Array.from(files)) {
+  const list = Array.from(files);
+  const attaching: Attaching[] = list.map((f, i) => ({ key: String(i), name: f.name || 'file', size: f.size, done: 0 }));
+  const shown = () => onAttaching?.(attaching.filter((a) => a.done < a.size || a.size === 0));
+  for (const [i, file] of list.entries()) {
     const path = window.zero?.pathForFile?.(file) ?? null;
     if (path) {
       let name = file.name || 'file';
@@ -54,7 +92,21 @@ export async function collectFiles(files: FileList | File[]): Promise<PendingAtt
           name = got?.name ?? name;
         } catch { staged = null; }
       }
-      out.push({ name, srcPath: staged ?? path, image: isImageName(name) });
+      out.push({ name, srcPath: staged ?? path, image: isImageName(name), size: file.size });
+    } else if (tooBigToSend(file.size)) {
+      // Not read at all: the box says it is over the limit and will not send it.
+      out.push({ name: file.name || 'file', image: false, size: file.size });
+    } else if (file.size > PIECE_BYTES && window.zero?.stageAttachmentPart) {
+      const name = file.name || 'file';
+      shown();
+      try {
+        const srcPath = await stageInPieces(file, name, (done) => { attaching[i].done = done; shown(); });
+        out.push({ name, srcPath, image: isImageName(name), size: file.size });
+      } catch (err) {
+        out.push({ name, image: false, size: file.size, failed: `${name} could not be attached: ${String((err as Error)?.message ?? err).replace(/\.$/, '')}.` });
+      }
+      attaching[i].done = file.size;
+      shown();
     } else {
       // No path means clipboard data (a pasted screenshot).
       //
@@ -71,7 +123,7 @@ export async function collectFiles(files: FileList | File[]): Promise<PendingAtt
       // still works exactly as it did, budget and all. Losing the screenshot
       // would be a worse failure than the one being fixed.
       let name = file.name && file.name !== 'image.png' ? file.name : `pasted-${Date.now() % 100000}.png`;
-      const dataBase64 = await blobToBase64(file);
+      const dataBase64 = await base64Of(file);
       let staged: string | null = null;
       try {
         const got = await window.zero?.stageAttachment?.({ name, dataBase64 });
@@ -80,10 +132,23 @@ export async function collectFiles(files: FileList | File[]): Promise<PendingAtt
       } catch { staged = null; }
       // A TIFF staging could not turn is still a file: drawn, it is a broken picture.
       const image = isImageName(name) || (file.type.startsWith('image/') && !turnedName(name));
-      out.push(staged ? { name, srcPath: staged, image } : { name, dataBase64, image });
+      out.push(staged ? { name, srcPath: staged, image, size: file.size } : { name, dataBase64, image, size: file.size });
     }
   }
   return out;
+}
+
+let collections = 0;
+
+/** `collect` takes files into a box and `attaching` is what is still on its way, for AttachRow. */
+export function useAttaching() {
+  const [attaching, setAttaching] = useState<Attaching[]>([]);
+  const collect = useCallback(async (files: FileList | File[]) => {
+    const call = `c${++collections}:`;
+    const show = (now: Attaching[]) => setAttaching((was) => [...was.filter((a) => !a.key.startsWith(call)), ...now.map((a) => ({ ...a, key: call + a.key }))]);
+    try { return await collectFiles(files, show); } finally { show([]); }
+  }, []);
+  return { attaching, collect };
 }
 
 export async function fromPaste(e: React.ClipboardEvent): Promise<PendingAttachment[]> {
@@ -100,6 +165,8 @@ export async function fromPaste(e: React.ClipboardEvent): Promise<PendingAttachm
 // Persist staged attachments for a product; returns the markdown block to
 // append to the message body (empty string when nothing staged).
 export async function persistAttachments(product: string, pending: PendingAttachment[]): Promise<string> {
+  const problem = attachProblem(pending);
+  if (problem) throw new Error(problem);
   if (!pending.length || !window.zero?.saveAttachments) return '';
   const saved = await window.zero.saveAttachments({
     product,

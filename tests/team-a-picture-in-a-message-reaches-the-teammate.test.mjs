@@ -233,13 +233,17 @@ it('never replaces a file the reader already has under that name', async () => {
   expect(onDisk(theo, 'clash.png').toString()).toBe('theirs');
 });
 
-it('leaves a picture too big to send on the sender\'s Mac, and still sends the words', async () => {
+// A picture over one call's 10 MB used to stay on the sender's Mac. It now goes
+// in parts (tests/team-a-file-over-10-mb-goes-in-parts-and-opens-whole), so no
+// single cloud call is over the limit, and the words go either way.
+it('sends a picture over 10 MB in parts of no more than 10 MB, and still sends the words', async () => {
   const md = paste(maya, 'huge.png', Buffer.alloc(MAX_MESSAGE_FILE_BYTES + 1));
   await maya.on(() => maya.service.message(theo.personId, `big one\n\n${md}`));
   await maya.service.syncNow();
   await theo.service.syncNow();
-  expect(cloud.files.size).toBe(0);
-  expect(onDisk(theo, 'huge.png')).toBeNull();
+  const sizes = [...cloud.files.values()].map((f) => Buffer.from(f.data, 'base64').length);
+  expect(sizes.length).toBeGreaterThan(1);
+  expect(Math.max(...sizes)).toBeLessThanOrEqual(MAX_MESSAGE_FILE_BYTES);
   const row = theo.store.listItems().find((i) => i.product === conversation(theo).slug);
   expect(row.answer).toContain('big one');
 });

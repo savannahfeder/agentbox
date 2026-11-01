@@ -58,6 +58,12 @@
 .one-frame.is-expanded { height: max(560px, calc(100vh - 260px)); }
 .one-notebody { padding: 14px 22px 6px; }
 .one-notebody hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
+/* A note reads as a page held in the thread: rounded paper, the words at a
+   reading measure in the middle of it (doc-reading.css). */
+.one-note { border-radius: 12px; overflow: hidden; border-color: var(--line); background: var(--doc-page, var(--surface)); container-type: inline-size; }
+.one-note .one-filehead { background: none; font-family: inherit; font-size: 13px; line-height: 18px; color: var(--text-dim); padding: 11px 16px; }
+.one-note .one-notebody.doc-prose { box-sizing: content-box; max-width: 700px; margin: 0 auto; padding: 40px clamp(22px, 6cqi, 48px) 20px; }
+.one-note .document-preview-toggle { background: none; }
 
 /* The choices, as the app draws them but tighter, apart from the reply box at
    the foot. A long one is cut to a line; hovering it shows it whole

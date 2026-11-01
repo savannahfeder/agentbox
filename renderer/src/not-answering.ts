@@ -24,6 +24,14 @@ export const RESTART_IT_MS = 45_000;
 /** The waiting screens: the boot screen and a conversation being read. */
 export const NOT_ANSWERING = `${Name} is not answering.`;
 
+/** A conversation that is slow to read: the app is busy, not gone. */
+export const STILL_READING = 'Still reading this conversation. The app is busy.';
+export const THREAD_NOT_ANSWERING_MS = 30_000;
+
+/** What a conversation being read says once it has waited this long; null for its own head. */
+export const threadWaitWords = (waited: number) => (waited >= THREAD_NOT_ANSWERING_MS ? NOT_ANSWERING
+  : waited >= NOT_ANSWERING_MS ? STILL_READING : null);
+
 /** The boot screen alone, once waiting has plainly stopped being the advice. */
 export const RESTART_IT = `${Name} is not answering. Quit and open it again if it stays like this.`;
 

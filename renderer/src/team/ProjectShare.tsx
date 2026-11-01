@@ -10,6 +10,7 @@ import type { Person, Product } from '../types';
 import { projectSeenBy } from '../../../shared/thread-cards.mjs';
 import { chosenWords, teammates } from '../threads/composer-rules';
 import { LockIcon, TeamContext } from './people';
+import { PROJECT_CROSSES } from './project-crosses';
 
 type ProjectSeen = Pick<Product, 'name'> & Partial<Pick<Product, 'personal' | 'seenBy' | 'seenByPeople'>>;
 type Who = 'private' | 'team' | 'people';
@@ -85,6 +86,7 @@ export function ProjectShare({ product, onChange }: {
         <span>{words.long}</span>
         {!locked && <Caret />}
       </button>
+      <small className="ps-crosses">{PROJECT_CROSSES[words.who]}</small>
       {open && !locked && (
         <div className="ps-menu" role="menu" aria-label={`Who sees ${product.name}`}>
           {page === 'rows' ? <>

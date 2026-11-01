@@ -143,6 +143,9 @@ export async function connect(wsUrl, { width = 1440, height = 900, targetId: exi
   const call = (m, p) => send(m, p, sessionId);
   await call('Page.enable');
   await call('Runtime.enable');
+  // A tab the app opened (a sign-in, Open outside) leaves this one hidden, and
+  // Chrome loads no film in a hidden tab: black, 0:00 / 0:00, for good.
+  await call('Page.bringToFront');
   await call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 2, mobile: false });
   // Dark, because that is how the people who use this read it.
   await call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });

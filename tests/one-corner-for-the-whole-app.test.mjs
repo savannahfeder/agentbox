@@ -60,8 +60,10 @@ function ruleFor(sel) {
 }
 
 describe('one corner for the whole app', () => {
-  it('defines the corner exactly once, as 3px', () => {
-    expect(css).toMatch(/--radius:\s*3px;/)
+  it('defines the corner exactly once, as the small artifact corner', () => {
+    // It was 3px and read as square beside round faces and soft tiles (2026-10-31,
+    // tests/buttons-chips-cards-and-menus-are-soft-and-an-ai-teammate-is-round).
+    expect(css).toMatch(/--radius:\s*var\(--artifact-corner-small\);/)
     // ONE THEME MAY SQUARE IT, AND ONLY TO ZERO. Ember Grid is the launch film's
     // look (w-b3e123a0af) and the film's corners are square, so its token block
     // turns the same one number to 0px. Every corner still follows the token;
@@ -74,10 +76,9 @@ describe('one corner for the whole app', () => {
 
   it('leaves no loose number anywhere in the stylesheet', () => {
     const loose = radiiIn(css).filter(
-      // --tag-radius is the second token, for tags (square in every theme,
-      // tests/the-threads-header-is-quieter-and-every-tag-is-square.test.mjs).
-      // It is still a token, not a loose number, so it passes here.
-      (v) => v !== 'var(--radius)' && v !== 'var(--tag-radius)' && v !== '0' && !NOT_A_CORNER.includes(v) &&
+      // --tag-radius is the token tags name
+      // (tests/the-threads-header-is-quieter-and-every-tag-names-one-corner.test.mjs).
+      (v) => v !== 'var(--radius)' && v !== 'var(--tag-radius)' && v !== 'var(--artifact-corner)' && v !== 'var(--artifact-corner-small)' && v !== '0' && !NOT_A_CORNER.includes(v) &&
              v !== '0 0 var(--radius) var(--radius)' && v !== 'var(--radius) var(--radius) 0 0',
     )
     // If this fails it prints the offenders, which is the whole point.
@@ -122,7 +123,7 @@ describe('one corner for the whole app', () => {
     // The Send button and the key chips live inside the reply card, so they go
     // with it. The second change covered the inbox page and not this, so this
     // half of the exception stands. One line each to change if it is retired.
-    for (const sel of ['.dock-card', '.dock-send', '.focus-dock kbd', '.attach-remove']) {
+    for (const sel of ['.dock-card', '.dock-send', '.focus-dock kbd']) {
       const rule = ruleFor(sel)
       expect(rule, `${sel} has no rule`).toBeTruthy()
       expect(rule, `${sel} must stay at 0`).toMatch(/border-radius:\s*0/)
@@ -142,15 +143,10 @@ describe('one corner for the whole app', () => {
     expect(typing).toMatch(/background:\s*var\(--surface\)/)
   })
 
-  it('leaves pictures square, because content takes no corner', () => {
-    // Traced off a Superhuman screenshot: the pane has a corner, the
-    // picture inside it is at the same pixel on every row from top to bottom.
-    // `.made-preview img` was a third one until 2026-08-19, when the made
-    // screen was deleted whole.
-    for (const sel of ['.inline-image', '.attach-thumb img']) {
-      const rule = ruleFor(sel)
-      expect(rule, `${sel} has no rule`).toBeTruthy()
-      expect(rule, `${sel} must stay at 0`).toMatch(/border-radius:\s*0/)
-    }
+  it('gives pictures their own token, because "the artifacts themselves would do cleaner with rounded corners"', () => {
+    // This test used to hold pictures at 0. The owner reversed that in 2026-10,
+    // and tests/a-persons-face-is-drawn-by-the-one-component holds the rest.
+    expect(ruleFor('.inline-image')).toMatch(/border-radius:\s*var\(--artifact-corner\)/)
+    expect(ruleFor('.attach-thumb img')).toMatch(/border-radius:\s*var\(--artifact-corner-small\)/)
   })
 })

@@ -1,0 +1,30 @@
+/* The Tasks page: one column of rows, lined up with the tabs over it, in Today's type. */
+.tk { flex: 1; min-height: 0; overflow-y: auto; padding: 18px var(--row-r, 24px) 64px var(--text-x, 32px); }
+.tk-col { max-width: 1120px; }
+.tk-sum { margin: 0 0 26px; padding-bottom: 22px; border-bottom: 1px solid var(--line); font-size: 17px; line-height: 26px; color: var(--text); }
+
+.tk-sec { margin-bottom: 26px; }
+.tk-sec ul { list-style: none; margin: 0; padding: 0; }
+.tk-label { margin: 0 0 4px; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); line-height: 16px; }
+
+/* Who has it, what it is, what blocks it, who gave it, when it is due: the same columns on every row. */
+.tk-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) minmax(0, 250px) 104px 112px; align-items: center; column-gap: 14px;
+  margin: 0 -8px; padding: 5px 8px; border-radius: var(--radius); cursor: pointer; }
+.tk-row:hover { background: var(--wash); }
+.tk-row.is-picked { background: var(--wash-strong, var(--wash)); }
+.tk-who { display: flex; width: 20px; height: 20px; }
+.tk-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; line-height: 20px; color: var(--text); }
+.tk-new { display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--accent); vertical-align: 2px; }
+.tk-block { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--text-faint); }
+.tk-on { color: var(--text-dim); }
+.tk-link { padding: 0; border: 0; background: none; font: inherit; color: var(--text-dim); cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-strong, var(--line)); text-underline-offset: 3px; }
+.tk-link:hover { color: var(--text); text-decoration-color: currentColor; }
+.tk-from { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--text-faint); }
+.tk-due { justify-self: end; white-space: nowrap; font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.tk-due.late { color: var(--text); }
+.tk-due.late::before { content: ''; display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: var(--accent); vertical-align: 2px; }
+.tk-row.is-done .tk-t { color: var(--text-dim); }
+
+.tk-fold { display: inline-flex; align-items: baseline; gap: 8px; padding: 0; border: 0; background: none; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; }
+.tk-fold:hover { color: var(--text); }
+.tk-fold b { font-weight: 400; }

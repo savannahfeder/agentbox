@@ -1,0 +1,139 @@
+.pdf-view, .film-view { flex: 1; min-height: 0; display: flex; flex-direction: column; outline: none; position: relative; }
+.pdf-bar, .film-bar {
+  display: flex; align-items: center; gap: 12px; flex: none;
+  padding: 8px 16px; border-bottom: 1px solid var(--line);
+  font: 11.5px var(--mono); color: var(--text-dim);
+}
+.film-bar { border-bottom: 0; border-top: 1px solid var(--line); padding: 10px 16px; gap: 12px; }
+.film-track { position: relative; display: block; flex: 1; height: 24px; min-width: 60px; touch-action: none; cursor: pointer; }
+.film-rail, .film-gone { position: absolute; left: 0; top: 10px; height: 4px; border-radius: 2px; }
+.film-rail { right: 0; background: var(--line-strong); }
+.film-gone { background: var(--text-dim); }
+.film-mark {
+  position: absolute; top: 6px; width: 6px; height: 12px; margin-left: -3px; padding: 0;
+  border: 0; border-radius: 3px; background: var(--accent); opacity: .7; cursor: pointer;
+}
+.film-mark.is-pin { top: 7px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; box-shadow: 0 0 0 2px var(--bg); opacity: 1; }
+.film-mark:hover, .film-mark.is-on { opacity: 1; }
+.film-mark.is-on { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent); }
+.film-tool { flex: none; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 7px; background: none; color: var(--text-dim); cursor: pointer; }
+.film-tool:hover { background: var(--wash); color: var(--text); }
+.film-view:fullscreen { background: #000; }
+.pdf-count { font-variant-numeric: tabular-nums; }
+.pdf-step {
+  padding: 3px 10px; border: 1px solid var(--line); border-radius: 0; background: none;
+  font: inherit; color: var(--text); cursor: pointer;
+}
+.pdf-step:hover:not(:disabled) { background: var(--wash); }
+.pdf-step:disabled { color: var(--text-faint); cursor: default; }
+
+/* Pages sit on the window's ground like paper on a desk: a soft corner and a
+   shadow, nothing else. A slide-shaped PDF stops on each page. */
+.pdf-pages { flex: 1; min-height: 0; overflow: auto; padding: 28px 24px 84px; position: relative; }
+.pdf-page { margin: 0 auto 20px; width: fit-content; background: #fff; line-height: 0; border-radius: var(--artifact-corner); overflow: hidden; box-shadow: var(--artifact-lift); }
+.pdf-pages.is-fit { scroll-snap-type: y mandatory; padding-top: 0; padding-bottom: 0; }
+.pdf-pages.is-fit .pdf-page { scroll-snap-align: center; margin: var(--pdf-gap, 40px) auto calc(2 * var(--pdf-gap, 40px)); }
+.pdf-pages.is-fit .pdf-page + .pdf-page { margin-top: 0; }
+.pdf-pages.is-fit .pdf-page:last-child { margin-bottom: var(--pdf-gap, 40px); }
+
+/* The pager: one pill floating at the foot of the pages. */
+.file-pager {
+  position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 3;
+  display: flex; align-items: center; gap: 2px; height: 36px; padding: 0 4px;
+  border-radius: 10px; border: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--pop, var(--surface)) 92%, transparent);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  backdrop-filter: blur(8px);
+}
+.file-pager-step {
+  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 7px; background: none; color: var(--text-dim); cursor: pointer; padding: 0;
+}
+.file-pager-step:hover:not(:disabled) { background: var(--wash-strong, var(--wash)); color: var(--text); }
+.file-pager-step:disabled { opacity: .35; cursor: default; }
+.file-pager-count { padding: 0 8px; font: 12px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--text); white-space: nowrap; }
+.file-pager-count i { font-style: normal; color: var(--text-faint); }
+
+.deck-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; padding-bottom: 40px; }
+.deck-slide { position: relative; flex: none; overflow: hidden; background: #fff; color: #15181e; border-radius: var(--artifact-corner); box-shadow: var(--artifact-lift); }
+.deck-slide.is-small { border-radius: var(--artifact-corner-small); box-shadow: none; pointer-events: none; }
+/* Every slide, small, under the one being read; the one on screen has the orange edge. */
+.deck-strip { flex: none; display: flex; gap: 10px; padding: 12px 20px 16px; overflow-x: auto; justify-content: safe center; border-top: 1px solid var(--line); }
+.deck-thumb { flex: none; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0; border: 0; background: none; cursor: pointer; font-family: inherit; color: var(--text-faint); }
+.deck-thumb-n { position: relative; font: 10.5px/1 var(--mono); }
+.deck-thumb-n i { position: absolute; left: calc(100% + 5px); top: 2px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.deck-thumb .deck-slide { outline: 1px solid var(--line); outline-offset: 0; opacity: .9; }
+.deck-thumb:hover .deck-slide { opacity: 1; outline-color: var(--line-strong); }
+.deck-thumb.is-on .deck-slide { opacity: 1; outline: 1.5px solid var(--accent); outline-offset: 2px; }
+.deck-thumb.is-on { color: var(--text); }
+.pdf-stage { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.pdf-thumb { display: block; }
+.pdf-thumb .pdf-page { margin: 0; border-radius: var(--artifact-corner-small); box-shadow: none; }
+/* No side padding: it is in ems, so a title and the body under it would start at different places. */
+.deck-words { position: absolute; overflow: hidden; line-height: 1.25; padding: .3em 0; box-sizing: border-box; text-align: left; }
+.deck-words.is-title { font-weight: 600; }
+.deck-words p { margin: 0 0 .35em; }
+.deck-picture { position: absolute; object-fit: contain; }
+
+.film-stage { flex: 1; min-height: 0; margin: 16px; display: flex; align-items: center; justify-content: center; container-type: size; }
+.film-frame { position: relative; width: 100%; height: 100%; line-height: 0; cursor: pointer; }
+.film-frame[style] { border-radius: var(--artifact-corner); box-shadow: var(--artifact-lift); }
+.film-frame.can-pin { cursor: crosshair; }
+.film-picture, .film-poster { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: inherit; }
+.film-poster { position: absolute; inset: 0; pointer-events: none; }
+.film-frame .av-pin-tag i { margin-left: 5px; font-style: normal; opacity: .72; }
+.film-play {
+  flex: none; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line-strong); background: none; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--text); cursor: pointer;
+}
+.film-play:hover { background: var(--wash-strong, var(--wash)); }
+.film-play svg { margin-left: 1px; }
+.film-clock i { font-style: normal; color: var(--text-faint); }
+.film-cannot { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+
+/* A script: numbers drawn from an attribute, so selecting and copying takes only the code. */
+.code-file { font: 12.5px/1.65 var(--mono); color: var(--text); padding: 18px 0 40px; min-width: fit-content; box-sizing: border-box; user-select: text; -webkit-user-select: text; }
+.code-file-line { display: flex; }
+.code-file-n { flex: none; width: 56px; padding-right: 18px; box-sizing: border-box; text-align: right; color: var(--text-faint); user-select: none; -webkit-user-select: none; }
+.code-file-n::before { content: attr(data-n); }
+.code-file-text { flex: 1; white-space: pre; padding-right: 32px; font: inherit; background: none; }
+.doc-card > .code-scroll, .file-sheet-body > .code-scroll { flex: 1; min-height: 0; overflow: auto; }
+.av-code-scroll { flex: 1; min-height: 0; overflow: auto; }
+.av-code-sheet { width: min(980px, calc(100% - 104px)); min-width: fit-content; margin: 28px auto 48px; background: var(--code-ground, var(--doc-page)); border: 1px solid var(--line); border-radius: 12px; }
+.av-page-wrap { flex: 1; min-height: 0; min-width: 0; position: relative; display: flex; }
+.av-page { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; padding: 24px 52px 76px; overflow: auto; scrollbar-width: none; }
+.av-page::-webkit-scrollbar { display: none; }
+.av-page-sheet { position: relative; flex: 1 0 auto; display: flex; border-radius: var(--artifact-corner); box-shadow: var(--artifact-lift); background: #fff; }
+.av-page.is-whole .av-page-sheet { flex: none; }
+.av-page-sheet iframe { flex: 1; min-width: 0; border: 0; background: #fff; border-radius: inherit; }
+/* While pinning, the page holds still and a click is a spot on it. */
+.av-page-catch { position: absolute; inset: 0; z-index: 1; cursor: crosshair; }
+.av-page-pins { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.av-page-pins .av-pin-tag { pointer-events: auto; }
+.av-pin-mode {
+  height: 28px; display: inline-flex; align-items: center; gap: 7px; padding: 0 10px;
+  border: 0; border-radius: var(--radius); background: none; color: var(--text-dim); font: 12px/1 var(--mono); cursor: pointer; white-space: nowrap;
+}
+.av-pin-mode:hover { background: var(--wash-strong, var(--wash)); color: var(--text); }
+.av-pin-mode.is-on { background: var(--wash-strong, var(--wash)); color: var(--text); }
+.av-pin-mode.is-on svg { color: var(--accent); }
+/* A spot on a slide or a page of a PDF. */
+.deck-pin-box { position: relative; flex: none; }
+.deck-pin-box.can-pin, .pdf-page.can-pin { cursor: crosshair; }
+.pdf-page { position: relative; }
+
+.file-sheet { position: fixed; inset: 0; z-index: 900; display: flex; background: var(--bg, #111); }
+.file-sheet-card { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.file-sheet-head {
+  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text);
+}
+.file-sheet-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+.file-sheet-body > img { margin: auto; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: var(--artifact-corner); }
+.file-sheet-body > iframe { flex: 1; border: 0; background: #fff; }
+.file-sheet-text { padding: 24px 32px; max-width: 760px; font-size: 14px; line-height: 1.55; color: var(--text); }
+.file-sheet-text img { max-width: 100%; border-radius: var(--artifact-corner); }
+
+.doc-pane .ProseMirror img { display: block; max-width: 100%; height: auto; border-radius: var(--artifact-corner); }
+
+.carried-note { display: block; margin-top: 4px; font-size: 12.5px; color: var(--text-faint); }

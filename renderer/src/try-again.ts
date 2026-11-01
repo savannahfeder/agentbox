@@ -26,3 +26,16 @@ export function offersTryAgain(item: WorkItem, facts: LiveFacts & { practice?: b
   // Out of In progress, the newest word on it is the app's own note that a run stopped.
   return item.status === 'open' && item.wrote?.result?.source === 'agent' && saysARunGotNowhere(item.result);
 }
+
+export interface TryAgainOutcome { resumed?: number; queued?: number; working?: number; missing?: number; failed?: number; why?: string }
+
+/** What a press of Try again says, whatever came back, so a press is never silent. */
+export function tryAgainWords(r: TryAgainOutcome | null | undefined): string {
+  if (!r) return 'Try again did not reach the app. Quit and reopen it, then try again.';
+  if (r.resumed) return 'Trying again now.';
+  if (r.queued) return 'Queued. It starts as soon as an agent is free.';
+  if (r.working) return 'Already running.';
+  if (r.failed) return `It could not start: ${String(r.why ?? 'the app did not say why').replace(/\.$/, '')}.`;
+  if (r.missing) return 'This thread is gone from this computer.';
+  return 'It cannot start on this computer: another computer runs it.';
+}

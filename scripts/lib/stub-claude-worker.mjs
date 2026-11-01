@@ -211,6 +211,25 @@ async function actAsTeammate(brief, prompt, answer) {
 
 let said = plan.say ?? 'the stub worker ran';
 
+// [[stub:act:<name>]] makes the store-tool calls its plan lists under
+// acts.<name> ({ calls: [{ tool, args }], say }), so a proof can have an agent
+// write a document or attach a file. A refused call is said in the answer.
+async function actFromPlan({ calls = [], say: words }) {
+  const server = Object.entries(mcpServers()).find(([name, s]) => name !== 'zero-approvals' && s?.env?.STORE_ACCOUNT_ID)?.[1];
+  if (!server) return 'the stub had no store tools to act with';
+  const session = mcpSession(server);
+  const refused = [];
+  try {
+    for (const { tool, args } of calls) {
+      const r = await session.call(tool, args ?? {});
+      if (r?.error || r?.result?.isError) refused.push(`${tool}: ${r?.error?.message ?? r?.result?.content?.[0]?.text ?? 'refused'}`);
+    }
+  } finally {
+    session.close();
+  }
+  return [words ?? 'Done.', ...refused].join('\n\n');
+}
+
 // WHAT THE TASK ITSELF ASKS OF THE STAND-IN. A proof that runs several threads
 // at once needs each worker to behave differently, and one plan file is shared
 // by all of them, so the task's own words carry the script:
@@ -285,6 +304,8 @@ if (slow > 0) {
 try {
   const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
   if (brief.includes('team_post') && process.env.ZERO_ITEM) await actAsTeammate(brief, promptText, said);
+  const act = directive('stub:act')?.[1];
+  if (act && plan.acts?.[act]) said = await actFromPlan(plan.acts[act]);
   if (plan.approval) {
     const decision = await askTheFounder(plan.approval);
     say({ type: 'assistant', message: { content: [{ type: 'text', text: `the founder said: ${decision.behavior}` }] } });

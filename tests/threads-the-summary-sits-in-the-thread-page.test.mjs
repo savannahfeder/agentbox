@@ -81,7 +81,7 @@ describe('a message from a person', () => {
   // handler stays on the pane for a message's own action to call.
   it('has no summary and no state, and no line offering to hand it to an agent', () => {
     expect(focus).toMatch(/team\?\.direct === true/);
-    expect(focus).toMatch(/onHandToAgent\?: \(item: WorkItem\) => void/);
+    expect(focus).toMatch(/onHandToAgent\?: \(item: WorkItem, message\?: AgentTurn\) => void/);
     expect(focus).not.toContain('Hand it to an agent');
     expect(focus).not.toContain('to turn it into a task.');
     expect(focus).not.toContain('className="ts-hand"');

@@ -16,7 +16,7 @@ import { SummaryPanel } from '../renderer/src/threads/Summary.tsx';
 import { ThreadCells } from '../renderer/src/threads/Pages.tsx';
 import { TeamContext } from '../renderer/src/team/people.tsx';
 import { chosenNames, whoSees, VISIBILITY_WORD } from '../renderer/src/threads/summary-rules.ts';
-import { rowSharing, sharePatch } from '../renderer/src/threads/page-rules.ts';
+import { rowSharing } from '../renderer/src/threads/page-rules.ts';
 import { chosenWords, sharingFields, VISIBILITY_ROWS } from '../renderer/src/threads/composer-rules.ts';
 globalThis.React = React;
 
@@ -173,16 +173,13 @@ describe('the inbox row', () => {
     expect(pagesCss).not.toMatch(/\.th-shared-n \{[^}]*background/);
   });
 
-  it('offers Unshare on it, and that takes it away from those people', () => {
-    expect(text(row(item({ visibility: 'people', visibleTo: [THEO] })))).toContain('Unshare');
-    expect(sharePatch('people')).toEqual({ visibility: 'private' });
-    expect(sharePatch('team')).toEqual({ visibility: 'private' });
-    expect(sharePatch('private')).toEqual({ visibility: 'team' });
+  it('offers no Unshare on the row, where a click that landed by mistake would take it from those people', () => {
+    expect(text(row(item({ visibility: 'people', visibleTo: [THEO] })))).not.toContain('Unshare');
   });
 
   it('draws nothing at all on a thread only she can see', () => {
     const mine = row(item({ visibility: 'private' }));
     expect(mine).not.toContain('th-shared');
-    expect(text(mine)).toContain('Share');
+    expect(text(mine)).not.toContain('Share');
   });
 });

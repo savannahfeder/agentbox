@@ -2,9 +2,10 @@
 // press away ("Open beside"), and so is Preview.
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { clickZoom, fitScale, isDoubleTap, panToKeep, picturesBeside, pinchTo, readyAround, stepTo, swipeStep, zoomBy, PICTURE_WAIT_MS, type Picture } from '../picture-view';
+import { clickZoom, isDoubleTap, lowestZoom, panLimits, panToKeep, pictureFit, picturesBeside, pinchTo, readyAround, stepTo, swipeStep, zoomBy, PICTURE_WAIT_MS, type Picture } from '../picture-view';
 import { doubleTapScale, onPhone } from '../phone-screen';
 import { CrossIcon } from './CrossIcon';
+import { focusTheReplyBox } from '../focus-at-end';
 
 export type { Picture };
 
@@ -158,24 +159,44 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
       if (e.metaKey || e.ctrlKey) return;
       e.stopImmediatePropagation();
       wake();
-      if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); requestAnimationFrame(() => focusTheReplyBox()); }
       else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); setIndex((i) => stepTo(i, pictures.length, e.key === 'ArrowRight' ? 1 : -1)); }
-      else if (e.key === '=' || e.key === '+') setZoom((z) => zoomBy(z, 1.5));
-      else if (e.key === '-') { setZoom((z) => zoomBy(z, 1 / 1.5)); setPan({ x: 0, y: 0 }); }
-      else if (e.key === '0') { setZoom(1); setPan({ x: 0, y: 0 }); }
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'PageDown' || e.key === 'PageUp') {
+        e.preventDefault();
+        const by = e.key.startsWith('Page') ? boxNow.current.h * 0.9 : 80;
+        scrollBy(0, e.key.endsWith('Up') ? by : -by);
+      }
+      else if (e.key === '=' || e.key === '+') setZoom((z) => zoomBy(z, 1.5, floorNow.current));
+      else if (e.key === '-') { setZoom((z) => { const next = zoomBy(z, 1 / 1.5, floorNow.current); setPan((p) => clampNow.current(p, next)); return next; }); }
+      else if (e.key === '0') { setZoom(1); setPan(clampNow.current({ x: 0, y: Infinity }, 1)); }
     };
     window.addEventListener('keydown', key, true);
     return () => window.removeEventListener('keydown', key, true);
   }, [pictures.length]);
 
   const natural = drawn ? { w: drawn.w, h: drawn.h } : { w: 0, h: 0 };
-  const fit = fitScale(natural, box);
+  // One rule with the file view: a long picture fits its width and scrolls, a phone screen fits whole.
+  const fitted = pictureFit(natural, box);
+  const fit = fitted.scale;
+  const floor = lowestZoom(fitted);
   const size = { w: natural.w * fit, h: natural.h * fit };
   const clampPan = (p: { x: number; y: number }, z: number) => {
-    const lx = Math.max(0, (size.w * z - box.w) / 2);
-    const ly = Math.max(0, (size.h * z - box.h) / 2);
-    return { x: Math.max(-lx, Math.min(lx, p.x)), y: Math.max(-ly, Math.min(ly, p.y)) };
+    const lim = panLimits(size, z, box);
+    return { x: Math.max(-lim.x, Math.min(lim.x, p.x)), y: Math.max(-lim.y, Math.min(lim.y, p.y)) };
   };
+  const boxNow = useRef(box);
+  boxNow.current = box;
+  const floorNow = useRef(floor);
+  floorNow.current = floor;
+  const clampNow = useRef(clampPan);
+  clampNow.current = clampPan;
+  const zoomNow = useRef(zoom);
+  zoomNow.current = zoom;
+  const scrollBy = (dx: number, dy: number) => setPan((p) => clampNow.current({ x: p.x + dx, y: p.y + dy }, zoomNow.current));
+  // Taller than the window, it opens at its top.
+  const opensAt = `${drawn?.url}:${fitted.tall}:${Math.round(box.h)}`;
+  useEffect(() => { if (fitted.tall) setPan(clampPan({ x: 0, y: Infinity }, 1)); }, [opensAt]);
+  const overflows = size.w * zoom > box.w + 1 || size.h * zoom > box.h + 1;
 
   const down = (e: ReactPointerEvent) => {
     if (e.button !== 0 || e.pointerType === 'touch') return;
@@ -187,7 +208,7 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
     if (!d) return;
     const dx = e.clientX - d.px, dy = e.clientY - d.py;
     if (Math.abs(dx) + Math.abs(dy) > 3) d.moved = true;
-    if (zoom > 1 && d.moved) setPan(clampPan({ x: d.x + dx, y: d.y + dy }, zoom));
+    if (overflows && d.moved) setPan(clampPan({ x: d.x + dx, y: d.y + dy }, zoom));
   };
   const fromMiddle = (e: { clientX: number; clientY: number }) => {
     const r = stage.current?.getBoundingClientRect();
@@ -199,7 +220,7 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
     if (!d || d.moved) return;
     const next = clickZoom(zoom, fit);
     setZoom(next);
-    setPan(next === 1 ? { x: 0, y: 0 } : clampPan(panToKeep(fromMiddle(e), pan, zoom, next), next));
+    setPan(clampPan(panToKeep(fromMiddle(e), pan, zoom, next), next));
   };
 
   // FINGERS: one pans an enlarged picture or swipes to the next, two pinch,
@@ -227,13 +248,13 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
     const g = touching.current;
     if (g?.kind === 'two' && fingers.current.size >= 2) {
       const now = two();
-      const next = pinchTo(g, now.distance, now.mid);
+      const next = pinchTo(g, now.distance, now.mid, floor);
       setZoom(next.zoom);
       setPan(clampPan(next.pan, next.zoom));
     } else if (g?.kind === 'one') {
       const dx = e.clientX - g.x, dy = e.clientY - g.y;
       if (Math.abs(dx) + Math.abs(dy) > 8) g.moved = true;
-      if (g.moved && g.zoom > 1) setPan(clampPan({ x: g.pan.x + dx, y: g.pan.y + dy }, g.zoom));
+      if (g.moved && (g.zoom > 1 || overflows)) setPan(clampPan({ x: g.pan.x + dx, y: g.pan.y + dy }, g.zoom));
     }
   };
   const fingerUp = (e: ReactPointerEvent) => {
@@ -244,13 +265,13 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
       // The finger still down carries on as a pan, never as a tap.
       const [rest] = [...fingers.current.values()];
       touching.current = rest ? { kind: 'one', x: rest.x, y: rest.y, t: 0, pan, zoom, moved: true } : null;
-      if (zoom < 1.01) { setZoom(1); setPan({ x: 0, y: 0 }); }
+      if (zoom < 1.01 && floor >= 1) { setZoom(1); setPan({ x: 0, y: 0 }); }
       return;
     }
     touching.current = null;
     if (!g || e.type === 'pointercancel') return;
     if (g.moved) {
-      if (g.zoom <= 1.01) {
+      if (g.zoom <= 1.01 && !overflows) {
         const by = swipeStep(e.clientX - g.x, e.clientY - g.y);
         if (by) setIndex((i) => stepTo(i, pictures.length, by));
       }
@@ -262,7 +283,7 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
       lastTap.current = null;
       const next = doubleTapScale(zoom);
       setZoom(next);
-      setPan(next === 1 ? { x: 0, y: 0 } : clampPan(panToKeep(fromMiddle(e), pan, zoom, next), next));
+      setPan(clampPan(panToKeep(fromMiddle(e), pan, zoom, next), next));
       return;
     }
     lastTap.current = tap;
@@ -275,11 +296,11 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
 
   const wheel = (e: ReactWheelEvent) => {
     if (e.ctrlKey) {
-      const next = zoomBy(zoom, Math.exp(-e.deltaY * 0.01));
+      const next = zoomBy(zoom, Math.exp(-e.deltaY * 0.01), floor);
       const at = fromMiddle(e);
       setZoom(next);
-      setPan((p) => (next === 1 ? { x: 0, y: 0 } : clampPan(panToKeep(at, p, zoom, next), next)));
-    } else if (zoom > 1) {
+      setPan((p) => clampPan(panToKeep(at, p, zoom, next), next));
+    } else if (overflows) {
       setPan((p) => clampPan({ x: p.x - e.deltaX, y: p.y - e.deltaY }, zoom));
     }
   };

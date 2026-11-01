@@ -8,13 +8,16 @@
 import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mjs';
 import type { Seen } from './summary-rules';
 import { hiddenUntil } from '../list-rules';
-import type { Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
+import type { AgentVoice, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
+import { voiceName } from '../../../shared/agent-voice.mjs';
 import { priorityIdOf, priorityValueOf, type PriorityId } from '../priority';
 import { dayAndTime, firstRealLine } from '../format';
 import { threadState } from '../../../shared/thread-cards.mjs';
 import { dropPlaces, placeScore, placedScore, shownPriority } from '../../../shared/rank.mjs';
 import { plainWords } from '../team/agent-mentions';
-import { whatWaits } from '../../../shared/team-rules.mjs';
+import { heldByAPerson, iSpokeLast, isTaskRow, isWorkThread, lastSpeaker, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mjs';
+import { taskWords } from '../team/company';
+import { shownTitle } from '../../../shared/thread-title.mjs';
 
 export type PageId = 'inbox' | 'team';
 export type UpdatedWindow = 'today' | 'week' | 'any';
@@ -168,12 +171,17 @@ export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>
 // shows (9, 7, 5, 2, all under a project's 100), or the thread's own place,
 // which replaces it (`placedScore`, shared/rank.mjs). A drop works out that
 // place from this same number (`dropPlaces`).
+//
+// A MESSAGE NOBODY LEVELLED CARRIES 0, which the sorter reads as no level and so
+// Medium; it was reading as Low, under every agent thread. And at one level a
+// person comes before an agent.
 export const rankScore = (r: Ranked, projectOrder: string[] = [], direct?: ReadonlySet<string>): number =>
-  placedScore(r.place, placeScore(projectOrder, r.product ?? '', direct) + priorityValueOf(priorityIdOf(shownPriority(r, !!direct?.has(r.product ?? '')))));
+  placedScore(r.place, placeScore(projectOrder, r.product ?? '', direct) + priorityValueOf(priorityIdOf(shownPriority(r, !!direct?.has(r.product ?? '')) || null)));
+const fromAPerson = (r: Ranked, direct?: ReadonlySet<string>) => (direct?.has(r.product ?? '') || heldByAPerson(r) ? 1 : 0);
 export const byPriority = (projectOrder: string[] = [], direct?: ReadonlySet<string>) => (a: Ranked, b: Ranked) =>
-  rankScore(b, projectOrder, direct) - rankScore(a, projectOrder, direct) || b.updatedAt - a.updatedAt;
+  rankScore(b, projectOrder, direct) - rankScore(a, projectOrder, direct) || fromAPerson(b, direct) - fromAPerson(a, direct) || b.updatedAt - a.updatedAt;
 /** `product` is the project's slug, which is what the running order holds. */
-export type Ranked = { priority?: number | null; updatedAt: number; createdAt?: number; start?: string; status?: string; wrote?: WorkItem['wrote']; product?: string | null; place?: number; pinned?: boolean };
+export type Ranked = { priority?: number | null; updatedAt: number; createdAt?: number; start?: string; status?: string; wrote?: WorkItem['wrote']; product?: string | null; place?: number; pinned?: boolean; assignee?: string };
 
 /**
  * WHEN A PERSON LAST WROTE ON THE THREAD (w-21b638d821): the newest of the
@@ -525,6 +533,38 @@ export function peopleInConversation(
   return { to: ids[0], also: ids.slice(1) };
 }
 
+/** Who the small menu on an agent thread offers. */
+export function peopleToAdd<P extends { id: string }>({ item, me, company }: {
+  item: { visibleTo?: string[] };
+  me: string | null;
+  company: readonly P[];
+}): P[] {
+  if (!me) return [];
+  const on = new Set(item.visibleTo ?? []);
+  return company.filter((p) => p.id !== me && !on.has(p.id));
+}
+
+/** What an agent thread saves when someone is added. One the team sees stays seen by the team. */
+export function addPeopleToAgentThread(item: { visibility?: string; visibleTo?: string[] }, person: string): { visibility: 'team' | 'people'; visibleTo: string[] } {
+  return { visibility: item.visibility === 'team' ? 'team' : 'people', visibleTo: [...new Set([...(item.visibleTo ?? []), person])] };
+}
+
+/** Add people on the thread on screen: a conversation opens New thread and is
+ *  never written to; an agent thread takes the person it was given. */
+export function whatAddPeopleDoes({ product, item, person, me, company }: {
+  product: Product | undefined | null;
+  item: { visibility?: string; visibleTo?: string[] };
+  person?: string;
+  me: string | null;
+  company: ReadonlyArray<{ id: string }>;
+}): { opens: { to: string; also: string[] } } | { edits: { visibility: 'team' | 'people'; visibleTo: string[] } } | null {
+  if (isDirect(product)) {
+    const who = peopleInConversation(product, me, company);
+    return who ? { opens: who } : null;
+  }
+  return person ? { edits: addPeopleToAgentThread(item, person) } : null;
+}
+
 /**
  * WHO SEES A ROW, AS THE INBOX SAYS IT (2026-10-01). Her threads from before
  * she joined stay hers unless she shares them, so the inbox has to say which
@@ -554,7 +594,7 @@ export function rowSharing(
  * on anything that is not a conversation.
  */
 export function messageLine(item: WorkItem, product: Product | undefined | null, me: string | null, nameOf: (id: string) => string = () => 'Someone'): { people: string[]; fromMe: boolean; text: string } | null {
-  if (!isDirect(product)) return null;
+  if (!isDirect(product) || isTaskRow(item)) return null;
   const team = (product as { team?: { people?: string[]; sharedBy?: string | null } }).team;
   const everyone = [...(team?.people ?? []), ...(team?.sharedBy ? [team.sharedBy] : []), ...(item.people ?? [])];
   let people = [...new Set(everyone)].filter((p) => p && p !== me);
@@ -580,7 +620,7 @@ export function messageLine(item: WorkItem, product: Product | undefined | null,
       return { people: from(newest.lastBy), fromMe: false, text: `${nameOf(newest.lastBy)} in ${where}: ${line(newest.last)}` };
     }
     const said = item.talk.chat[item.talk.chat.length - 1];
-    if (said) return { people: from(said.by), fromMe: !!me && said.by === me, text: line(said.text) };
+    if (said) return { people: from(said.by), ...signedLine(said, line(said.text), me, nameOf) };
   }
   const answered = !!item.answer && item.answer !== '(withdrawn)';
   // An agent mentioned in the message reads as its words, not its link (w-7b9cb8636a).
@@ -593,8 +633,32 @@ export function messageLine(item: WorkItem, product: Product | undefined | null,
   // runs AFTER the mention links are flattened, so a message opening on a
   // mention is judged on the words somebody actually reads.
   const text = firstRealLine(plainWords(String((answered ? item.answer : item.body) || item.title || '')));
-  const by = (answered ? item.wrote?.answer?.by : item.wrote?.body?.by) ?? item.createdBy ?? null;
-  return { people: from(by), fromMe: !!me && by === me, text };
+  const wrote = answered ? item.wrote?.answer : item.wrote?.body;
+  const by = wrote?.by ?? item.createdBy ?? null;
+  return { people: from(by), ...signedLine({ by, voice: wrote?.voice, forAgent: wrote?.forAgent }, text, me, nameOf) };
+}
+
+// An agent's message is its own, on its owner's list too: "You:" is only for what
+// a person typed.
+function signedLine(said: { by: string | null; voice?: AgentVoice; forAgent?: AgentVoice }, words: string, me: string | null, nameOf: (id: string) => string): { fromMe: boolean; text: string } {
+  const mine = !!me && said.by === me;
+  if (said.voice) return { fromMe: false, text: `${voiceName(said.voice, mine || !said.by ? '' : nameOf(said.by), { mine })}: ${words}` };
+  return { fromMe: mine, text: said.forAgent ? `For ${said.forAgent.name}: ${words}` : words };
+}
+
+/** A waiting row on a team says on whom; with nobody signed in there is only you. */
+export function waitingWord(item: Pick<WorkItem, 'assignee' | 'people' | 'wrote' | 'createdBy'>, product: Product | undefined | null, me: string | null, nameOf: (id: string) => string = () => 'Someone', { inNeedsYou = false } = {}): string {
+  if (!me) return 'Waiting';
+  // Needs you is on you, whoever spoke last: a comment on a file is not a message.
+  if (inNeedsYou) return 'Waiting on you';
+  const on = (id: string | null | undefined) => (id && id !== me ? `Waiting on ${nameOf(id)}` : 'Waiting on you');
+  if (isDirect(product)) {
+    if (!iSpokeLast(item, product, me)) return on(me);
+    const t = (product as { team?: { people?: string[]; sharedBy?: string | null } }).team;
+    const others = [...new Set([...(item.people ?? []), ...(t?.people ?? []), t?.sharedBy])].filter((p): p is string => !!p && p !== me);
+    return others.length ? `Waiting on ${others.map(nameOf).join(', ')}` : on(me);
+  }
+  return heldByAPerson(item) ? on(item.assignee) : on(me);
 }
 
 /**
@@ -606,15 +670,6 @@ export function messagePriority(item: WorkItem): number | null {
   const set = item.wrote?.priority;
   return set && set.source !== 'system' ? item.priority ?? null : null;
 }
-
-/**
- * What one click on Share or Unshare writes. Share puts a thread in front of
- * the whole team; Unshare takes it away from everyone, whether it was the
- * team's or a few people's. The list of people is left where it is, so
- * unsharing and sharing again does not quietly rebuild it from memory.
- */
-export const sharePatch = (now: Seen): { visibility: 'team' | 'private' } =>
-  ({ visibility: now === 'private' ? 'team' : 'private' });
 
 // ------------------------------------------------------------------ the board
 
@@ -633,6 +688,8 @@ export interface BoardEntry {
   live?: boolean;
   /** A conversation with people, on your own Inbox board: who, and whether you spoke last. */
   message?: { people: string[]; fromMe: boolean };
+  /** A task given to a person, on your own board: what its row says. */
+  task?: { word: string; unread: boolean; other: string | null; held?: boolean };
 }
 
 /**
@@ -665,10 +722,20 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
     // (w-2ad23ca814: a message from a teammate was on no column at all). The
     // Team page's board stays about work, so it never draws one.
     if (isDirect(product)) {
+      const task = allMine ? taskWords(item, product, me, nameOf ?? (() => 'Someone'), stateOf?.(item) === 'waiting', { items, cards }) : null;
+      if (task) {
+        const state = stateOf?.(item);
+        if (!state || (state === 'done' && !(item.updatedAt >= today))) continue;
+        out.push({
+          key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: shownTitle(item), project: 'Task',
+          projectSlug: product.slug, priority: shownPriority(item), updatedAt: item.updatedAt, item, card: null, task,
+        });
+        continue;
+      }
       const said = allMine ? messageLine(item, product, me, nameOf) : null;
       const state = said && stateOf?.(item);
-      if (!said || !state) continue;
-      if (state === 'done' && !(item.updatedAt >= today)) continue;
+      // A closed conversation is not finished work: replying is what closes it.
+      if (!said || !state || state === 'done') continue;
       out.push({
         key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: said.text, project: 'Message',
         projectSlug: product.slug, priority: messagePriority(item), updatedAt: item.updatedAt, item, card: null,
@@ -689,7 +756,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
     const state = stateOf?.(item) ?? threadState(item, now);
     if (state === 'done' && !(item.updatedAt >= today)) continue;
     out.push({
-      key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: item.label || item.title, project: product.name,
+      key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: shownTitle(item), project: product.name,
       projectSlug: product.slug, priority: shownPriority(item), updatedAt: item.updatedAt, item, card: null,
       live: !!live?.has(item.id),
     });
@@ -799,7 +866,7 @@ export function teamKeeps(e: BoardEntry, { person, projectName }: { person: stri
  * to walk the current tab's list, which a card from another column is not in,
  * so J stopped with the board still full (2026-10-02).
  */
-export function boardColumns({ items, products, display, now, stateOf, cards = [], picked, me, since = null, live, order = DEFAULT_COLUMN_ORDER, projectOrder = [], nameOf }: {
+export function boardColumns({ items, products, display, now, stateOf, cards = [], picked, me, since = null, live, order = DEFAULT_COLUMN_ORDER, projectOrder = [], nameOf, waitingIsInProgress = false }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number;
   nameOf?: (id: string) => string;
   stateOf?: (item: WorkItem) => ThreadStateWord | null;
@@ -808,13 +875,19 @@ export function boardColumns({ items, products, display, now, stateOf, cards = [
   order?: ThreadStateWord[];
   /** Your running order of projects, which Sort by Priority reads first. */
   projectOrder?: string[];
+  /** The team's board: your own waiting threads count as in progress too, as the team's cards count them. */
+  waitingIsInProgress?: boolean;
 }): { state: ThreadStateWord; label: string; rows: BoardEntry[] }[] {
   const who = picked ?? (me ? [me] : []);
   // A teammate's card is shared with you by definition, so it is never private.
   const seen = (e: BoardEntry): Seen | null => (e.item
     ? rowSharing(e.item, products.find((p) => p.slug === e.item!.product), me ? { me, since } : null)
     : 'team');
+  // A board with no Waiting column (Everything else) still shows a teammate's
+  // waiting thread: for you it is in progress, and it was simply dropped.
+  const noWaiting = !order.includes('waiting');
   const entries = teamEntries({ items: me && !who.includes(me) ? [] : items, products, cards: cards.filter((c) => who.includes(c.personId)), me, now, since, stateOf, live, allMine: true, nameOf })
+    .map((e) => (noWaiting && (e.card || waitingIsInProgress) && e.state === 'waiting' ? { ...e, state: 'running' as const } : e))
     .filter((e) => !e.item || e.message || (display.projects.length === 0 || display.projects.includes(e.item.product)))
     .filter((e) => keepsPrivacy(seen(e), display.privacy))
     .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
@@ -871,8 +944,27 @@ export function conversationWith(personIds: string | string[], { products, items
     .filter((p) => p.team?.direct && exactly(p.team))
     .sort((a, b) => String(a.team!.projectId).localeCompare(String(b.team!.projectId)))[0];
   if (!record) return null;
-  return items.filter((i) => i.product === record.slug && !i.agent)
+  return items.filter((i) => i.product === record.slug && !i.agent && !isTaskRow(i) && !isWorkThread(i))
     .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0] ?? null;
+}
+
+const othersIn = (item: WorkItem, product: Product, me: string | null) => {
+  const t = product.team!;
+  return [...new Set([...(t.people ?? []), ...(t.sharedBy ? [t.sharedBy] : []), ...(item.people ?? [])])].filter((p) => p && p !== me);
+};
+
+/** "with Dev, Maya" beside the name of a thread about work; null where the name already is the people. */
+export function workAudience(item: WorkItem, product: Product | undefined | null, me: string | null, nameOf: (id: string) => string): string | null {
+  if (!isDirect(product) || !isWorkThread(item)) return null;
+  const ids = othersIn(item, product!, me);
+  return ids.length ? `with ${ids.map(nameOf).join(', ')}` : null;
+}
+
+/** "Dev, Maya": the conversation itself is named for who is in it, unless someone renamed it. */
+export function conversationName(item: WorkItem, product: Product | undefined | null, me: string | null, nameOf: (id: string) => string): string | null {
+  if (!isDirect(product) || isWorkThread(item) || isTaskRow(item) || nameIsAPersons(item)) return null;
+  const ids = othersIn(item, product!, me);
+  return ids.length ? ids.map(nameOf).join(', ') : null;
 }
 
 /** The tab that holds a thread in this state, for opening it from elsewhere. */

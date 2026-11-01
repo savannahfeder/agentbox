@@ -212,6 +212,7 @@
   --shadow-card: 0 1px 2px rgba(17, 25, 48, 0.04), 0 6px 20px rgba(17, 25, 48, 0.045);
   --shadow-md: 0 8px 24px rgba(17, 25, 48, 0.09);
   --shadow-lg: 0 24px 60px rgba(17, 25, 48, 0.16);
+  --artifact-lift: 0 0 0 1px var(--line), 0 8px 24px rgba(17, 25, 48, 0.08);
   --scrim: rgba(17, 25, 48, 0.28);
   /* The chess set, and the one place in this file where a colour is not a
      surface of the app. A chess board's SQUARES are the app's greys; its
@@ -236,26 +237,16 @@
      right-side details while the original font stays everywhere else. The body stays Avenir Next; only what reads var(--mono)
      takes Geist Mono. Its @font-face sits with Ember's block below. */
   --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, 'DejaVu Sans Mono', monospace;
-  /* Before this there were TEN different corner sizes on one opened task at the
-     same time (13, 9, 8, 7, 6, 4, 20, two two-corner shapes and 50%), measured
-     in the running app, not counted off the file. Now there is one number and a
-     short list of things that are deliberately not a rectangle. WHAT STAYS AT
-     0, and it is a deliberate exception, not a leftover: the inbox's own surfaces
-     (.list-pane, .tab, .rail, .modal, .shelf-card) and the reply card
-     (.dock-card and its parts). Those were already square and stay so. WHAT STAYS ROUND: true circles (dots, avatars, the switch knob),
-     the settings switch track, and pictures, which take no corner at all
-     because content stays square while the box around it softens. Change this
-     ONE line to change every corner in the app.
-  */
-  --radius: 3px;
-  /* A TAG IS SQUARE IN EVERY THEME. The chips in the Display menu, the Share
-     button at the end of a row, the composer's chips and the Summary button
-     all took --radius, which is 3px here and 0 only under the Ember Grid
-     skin, so they were rounded in every theme but one. This is a SECOND token
-     on purpose: cards, menus, fields and the app's other corners keep their
-     3px, and no skin may re-declare this one, which is what makes a tag
-     square whatever is worn. */
-  --tag-radius: 0px;
+  /* Three corners: the small one for what you press or type in, the artifact
+     one for cards, sheets, menus and what somebody made, and round for faces.
+     Rows, dividers, tabs and the window's panels stay square. --radius is the
+     small corner under its old name, so the Ember Grid skin can still square it. */
+  --artifact-corner: 10px;
+  --artifact-corner-small: 6px;
+  --radius: var(--artifact-corner-small);
+  /* An AI teammate is round like a person; its dashed ring tells it apart. */
+  --mate-corner: 50%;
+  --tag-radius: var(--radius);
   /* THE PICTURE THEMES ANSWER HERE TOO, with no picture (see skins.ts). A skin
      is a second axis laid over dark, not a third theme, and these five tokens
      are the whole of its surface. They are declared in BOTH themes and set to
@@ -542,6 +533,7 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24), 0 6px 20px rgba(0, 0, 0, 0.22);
   --shadow-md: 0 10px 32px rgba(0, 0, 0, 0.38);
   --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.55);
+  --artifact-lift: 0 0 0 1px var(--line), 0 18px 48px rgba(0, 0, 0, 0.32);
   --scrim: rgba(0, 0, 0, 0.45);
   /* The chess set, and the one place in this file where a colour is not a
      surface of the app. A chess board's SQUARES are the app's greys; its
@@ -1117,7 +1109,7 @@ body {
 .usage-lim { margin-bottom: 11px; }
 .usage-lim:last-of-type { margin-bottom: 0; }
 .usage-lim-top {
-  display: flex; justify-content: space-between; align-items: baseline;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; white-space: nowrap;
   font-size: 12.5px; margin-bottom: 5px;
 }
 .usage-lim-name { color: var(--text-dim); }
@@ -1916,6 +1908,9 @@ body {
    foot animates, per the 2026-09-19 lattice + shimmer selection.
 */
 .focus-meta.by-lead { gap: 7px; }
+.th-continued { margin: 0 0 14px; color: var(--text-faint); font-size: 13px; }
+.th-continued button { padding: 0; border: 0; background: none; font: inherit; color: var(--text-dim); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-strong); cursor: pointer; }
+.th-continued button:hover { color: var(--text); }
 .by-lead .live-word { font-size: 13px; }
 /* THE DOT ONLY EXISTS WHEN SOMETHING LEADS. On a row with nothing running there
    is no mark and no word, and the line opens on "In your inbox" with no orphan
@@ -2059,7 +2054,7 @@ body {
 /* Half the raised grey: the full one pulled the eye to the header first. */
 .markdown th { background: color-mix(in srgb, var(--bg-raised) 50%, transparent); font-weight: 650; }
 .markdown td:first-child { font-weight: 600; }
-.inline-image { max-width: 100%; border-radius: 0; border: 1px solid var(--line); margin: 8px 0; }
+.inline-image { max-width: 100%; border-radius: var(--artifact-corner); border: 1px solid var(--line); margin: 8px 0; }
 
 
 .inline-image-open {
@@ -2068,6 +2063,7 @@ body {
 }
 .inline-image-open:hover .inline-image { border-color: var(--text-faint); }
 .inline-image-open:focus-visible .inline-image { outline: 1px solid var(--text-faint); outline-offset: 2px; }
+.inline-image-name { display: block; margin: -2px 0 8px; font-size: 12px; line-height: 16px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* A PICTURE HOLDS ITS PLACE WHILE IT LOADS, as a shimmering box, then fades
    in, in every window. Without it a picture with no bytes yet is a 2 x 2 dot
@@ -2120,9 +2116,29 @@ body {
 .inline-media-player { display: block; }
 .inline-media audio { display: block; width: min(420px, 100%); height: 36px; }
 .inline-media-missing .inline-media-name.mention { display: inline; margin: 0 -3px; }
+/* What a sentence names, together under it, one height so the row reads as one. */
+.media-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px; margin: 2px 0 18px; }
+.media-row > * { flex: 0 1 auto; min-width: 0; max-width: 100%; margin: 0; }
+.media-row .inline-image { display: block; height: 240px; width: auto; max-width: 100%; object-fit: cover; margin: 0; }
+.media-row .inline-image-name { margin: 6px 0 0; }
+.media-row .inline-media { display: flex; flex-direction: column-reverse; margin: 0; width: 356px; }
+.media-row .inline-media-name.mention { margin: 6px 0 0; padding: 0; font-size: 12px; line-height: 16px; color: var(--text-dim); }
+.media-row .inline-media-name.mention svg { display: none; }
+.media-row .inline-media-name.mention .mention-name { border: 0; text-decoration: none; }
+.media-row .inline-media video { display: block; width: 100%; height: 240px; object-fit: cover; }
 /* The column's width at a fixed height from the first frame: before its size is
    known a film is the browser's 300 x 150, and it resized once it was. */
-.inline-media video { display: block; width: 100%; height: 360px; object-fit: contain; background: var(--bg-raised); border: 1px solid var(--line); }
+.inline-media video { display: block; width: 100%; height: 360px; object-fit: contain; background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--artifact-corner); }
+/* A film in a thread is one card: the picture and our bar. Beside a picture, the two come to its height. */
+.inline-film { position: relative; display: block; overflow: hidden; background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--artifact-corner); }
+.inline-film video, .media-row .inline-film video { border: 0; border-radius: 0; cursor: pointer; }
+.media-row .inline-film video { height: 198px; object-fit: contain; }
+.inline-film .film-bar { padding: 4px 10px; height: 40px; box-sizing: border-box; }
+.inline-film .film-play { width: 28px; height: 28px; }
+.inline-film-poster { position: absolute; left: 0; top: 0; width: 100%; height: calc(100% - 40px); object-fit: contain; background: var(--bg-raised); pointer-events: none; }
+.inline-film:fullscreen { display: flex; flex-direction: column; background: #000; }
+.inline-film:fullscreen .inline-media-player { flex: 1; min-height: 0; }
+.inline-film:fullscreen video { height: 100%; }
 
 /* A folder a worker named on its own line: its name, then its newest pictures,
    three across (FolderPreview in Focus.tsx). Spans, because it sits in a <p>. */
@@ -2151,9 +2167,9 @@ body {
 }
 .folder-preview-shot img {
   display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top;
-  border: 1px solid var(--line); background: var(--bg-raised);
+  border: 1px solid var(--line); border-radius: var(--artifact-corner-small); background: var(--bg-raised);
 }
-.folder-preview-shot.arriving { aspect-ratio: 16 / 10; border: 1px solid var(--line); cursor: default; }
+.folder-preview-shot.arriving { aspect-ratio: 16 / 10; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); cursor: default; }
 .folder-preview-shot:hover img { border-color: var(--text-faint); }
 .folder-preview-shot:focus-visible img { outline: 1px solid var(--text-faint); outline-offset: 2px; }
 .folder-preview-label {
@@ -2459,7 +2475,7 @@ body {
 }
 .dock-stop svg { width: 9px; height: 9px; display: block; }
 .dock-stop:hover { color: var(--text); background: var(--wash); border-color: var(--text-faint); }
-.dock-stop:active { transform: translateY(1px); }
+.dock-stop:active { filter: brightness(.88); }
 /* IN THE OPEN COMPOSER IT RIDES ON THE FOOTER, beside Send. `.dock-send` takes
    the free space with its own auto margin, so the stop is pushed out by the
    same margin and the two travel together at the right-hand end of the row. */
@@ -2593,11 +2609,21 @@ body {
   white-space: pre-wrap;
 }
 .dock-ghost-typed { visibility: hidden; }
+/* Whose thread this goes to, over the box. */
+.dock-to { display: flex; align-items: center; gap: 6px; padding: 10px 22px 0; font-size: 11.5px; line-height: 16px; color: var(--text-faint); white-space: nowrap; overflow: hidden; }
+.dock-to > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+/* A person is the one to notice before a send: their face, their name in the text's own colour. */
+.dock-to-person { font-size: 12.5px; color: var(--text); }
+.dock-to-person > * { flex: none; }
+.dock-to-mark { flex: none; width: 8px; height: 8px; border: 1.5px solid var(--text-faint); }
+/* Words in a box have not gone: the difference from a posted message has to be read, not inferred. */
+.dock-unsent { margin-left: auto; margin-right: 10px; font-size: 12px; color: var(--accent); white-space: nowrap; }
+.dock-unsent + .dock-send { margin-left: 0; }
 
 /* Approval cards: a worker is frozen mid-action until the user answers,
    so these sit above everything, bottom-right, and say exactly what runs. */
 .approvals {
-  position: fixed; right: 22px; bottom: 22px; z-index: 90; width: 440px;
+  position: fixed; right: 22px; bottom: var(--approval-lift, 22px); z-index: 90; width: 440px;
 }
 /* One card in front, the queue as stacked edges peeking above it. The ghosts
    are pure chrome: depth without height, so ten pending asks occupy the same
@@ -2772,7 +2798,7 @@ body {
 .approval-cmd {
   font-family: var(--mono); font-size: 12px; line-height: 1.5; color: var(--text);
   background: var(--bg); border-radius: var(--radius); padding: 9px 11px; margin-bottom: 10px;
-  white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow-y: auto;
+  white-space: pre-wrap; word-break: break-all; max-height: min(45vh, 360px); overflow-y: auto;
   user-select: text;
 }
 /* AND THE BLOCK INSIDE IT IS A FILM, NOT THE GROUND. `--bg` is the window's own
@@ -3065,7 +3091,8 @@ body {
   transition: background 0.15s, border-color 0.15s, transform 0.05s;
 }
 .dock-send:hover { background: var(--wash-strong); border-color: var(--text-faint); }
-.dock-send:active { transform: translateY(1px); }
+/* Darkens rather than moves: a button that moves under a press loses a press on its edge. */
+.dock-send:active { filter: brightness(.88); }
 
 /* THE OFFER IS A BLOCK IN THE THREAD NOW, NOT A LID ON THE REPLY CARD
    (w-560647d4db). It used to be the top edge of the dock, so one hairline along
@@ -3206,37 +3233,43 @@ body {
 .reply-dock textarea:focus { border-color: var(--text-faint); }
 .reply-hint { margin-top: 8px; color: var(--text-faint); font-size: 12px; }
 
-.attach-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 18px 0; }
+.attach-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; padding: 8px 18px 0; }
 .reply-dock .attach-row { padding: 8px 0 0; }
 .attach-chip {
   background: var(--bg-raised);
   border: 1px solid var(--line);
   color: var(--text-dim);
-  border-radius: var(--radius);
+  border-radius: var(--artifact-corner-small);
   padding: 3px 10px;
   font-size: 12px;
   cursor: pointer;
   font-family: inherit;
 }
 .attach-chip:hover { color: var(--text); border-color: var(--text-faint); }
+.attach-chip.attach-too-big { color: var(--text); border-color: var(--text-faint); white-space: normal; text-align: left; }
+.attach-size { color: var(--text-faint); font-variant-numeric: tabular-nums; }
+/* On its way in: the chip fills from the left as the pieces land. */
+.attach-chip.attach-coming { position: relative; overflow: hidden; cursor: default; }
+.attach-coming .attach-bar { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--text-faint); transition: width 0.2s linear; }
+.compose-note.attach-problem { color: var(--text-dim); padding-top: 6px; }
+.reply-dock .compose-note.attach-problem { padding-left: 0; padding-right: 0; }
 
 .attach-thumb { position: relative; }
 .attach-thumb img {
   height: 84px;
   max-width: 220px;
   object-fit: cover;
-  border-radius: 0;
+  border-radius: var(--artifact-corner-small);
   border: 1px solid var(--line);
   display: block;
 }
-/* Card A squares this too, and tucks it INTO the picture's corner instead of
-   hanging it off the corner as a circle. A circle bolted to a square thumbnail
-   was the loudest round thing left in the composer. */
+/* Sits inside the picture's rounded corner: flush with it, its own square corner
+   would poke out past the curve. */
 .attach-remove {
   position: absolute;
-  top: 0; right: 0;
+  top: 4px; right: 4px;
   width: 18px; height: 18px;
-  border-radius: 0;
+  border-radius: var(--radius);
   background: var(--surface);
   border: 1px solid var(--line-strong);
   color: var(--text-dim);
@@ -3716,7 +3749,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 .dictate-level i { width: 2px; background: var(--text-dim); transition: height .08s linear; }
 .dictate-word { flex: 1; min-width: 0; font-size: 13px; color: var(--text-dim); }
 .dictate-button {
-  flex: none; height: 29px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 0; background: none;
+  flex: none; height: 29px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none;
   font: inherit; font-size: 13px; font-weight: 500; color: var(--text-dim); cursor: pointer;
 }
 .dictate-button.strong { padding: 0 16px; font-weight: 600; color: var(--text); background: var(--wash); }
@@ -4064,6 +4097,26 @@ img.product-mark { object-fit: cover; opacity: 1; }
 .palette-k .palette-section:first-child { padding-top: 8px; }
 /* A long title gives way, never the project's name. */
 .palette-k .palette-thread .palette-hint { flex: none; }
+/* A line, file, comment or decision found inside something: its words, then who
+   and where under them in the faint ink. Two lines, so the row is taller. */
+.palette-k .palette-found { height: auto; min-height: 50px; padding: 7px 18px; align-items: flex-start; }
+.palette-k .palette-found .palette-glyph { padding-top: 3px; }
+.palette-k .palette-found .palette-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.palette-k .palette-found .palette-sub { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.palette-k .palette-found .palette-file { margin-right: 8px; color: var(--text); font-weight: 500; }
+.palette-k .palette-found .hit { color: var(--text); font-weight: 600; }
+
+/* A found line, landed on from the results: marked for a moment. */
+[data-line] { transition: background-color .5s ease, box-shadow .5s ease; }
+[data-line].line-found { background: var(--wash); box-shadow: inset 2px 0 0 var(--accent); }
+
+/* The search page's own groups of what was found besides threads. */
+.found-inside { padding-bottom: 12px; }
+.found-inside .found-who { margin-right: 8px; color: var(--text-faint); }
+.found-inside .found-row { cursor: pointer; }
+.found-inside .found-row:hover .subject { text-decoration-color: var(--line-strong); }
+.found-inside .found-more { padding: 6px var(--row-r) 0 var(--text-x); font-size: 12px; color: var(--text-faint); }
+.found-inside .found-group:first-child > .day-label { margin-top: 24px; }
 
 .snooze-input-row { position: relative; display: flex; align-items: center; }
 .snooze-input { flex: 1; }
@@ -4085,7 +4138,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 .artifact-embed {
   margin: 18px 0;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--artifact-corner);
   overflow: hidden;
 }
 .artifact-embed-bar {
@@ -4445,6 +4498,12 @@ img.product-mark { object-fit: cover; opacity: 1; }
 /* A message with no task: its sentence is the whole card. */
 .toast-plain { width: auto; max-width: 360px; display: flex; gap: 12px; padding: 11px 16px; }
 .toast-plain .toast-line { font-size: 13.5px; color: var(--text); white-space: normal; }
+/* An agent's message in its Undo seconds: who it goes to over the words. */
+.agent-sending { display: grid; grid-template-columns: 1fr auto; column-gap: 14px; row-gap: 3px; align-items: center; }
+.agent-sending .toast-title { grid-column: 1; font-size: 12px; color: var(--text-faint); }
+.agent-sending .toast-line { grid-column: 1; }
+.agent-sending .toast-keys { grid-column: 2; grid-row: 1 / span 2; }
+.agent-sending-raised { bottom: 96px; }
 
 
 /* It keeps the top bar's own 22px right margin so it lines up with the settings
@@ -7574,38 +7633,25 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
    scaling down to fit is the only way to see it whole. It never scales UP
    past its own size, which would turn a small icon into a blur.
 */
-.doc-pane.doc-image .doc-card { background: var(--doc-page); }
+.doc-pane.doc-image .doc-card { background: var(--doc-page); padding-bottom: 16px; }
+/* Sized to the picture, with margin rather than padding: a box that fills the
+   pane would round the empty air around a letterboxed picture, not the picture. */
 .doc-picture {
+  flex: 0 1 auto; width: auto; height: auto; min-height: 0;
   object-fit: contain;
   align-self: center;
-  max-width: 100%; max-height: 100%;
-  padding: 0 16px 16px;
-  box-sizing: border-box;
+  max-width: calc(100% - 32px); max-height: calc(100% - 16px);
+  margin: auto 16px;
+  border-radius: var(--artifact-corner);
 }
 
 
-.doc-rich { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 40px 40px; }
+/* The reading look itself is components/doc-reading.css, shared with the big view. */
+.doc-rich { flex: 1; min-height: 0; overflow-y: auto; padding: 0; }
 .doc-rich-content { outline: none; }
 .doc-rich .ProseMirror { outline: none; min-height: 100%; }
-.doc-rich .ProseMirror h1 { font-size: 23px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 2px; color: var(--text); }
-.doc-rich .ProseMirror h2 { font-size: 17px; font-weight: 600; margin: 20px 0 6px; color: var(--text); }
-.doc-rich .ProseMirror h3 { font-size: 15px; font-weight: 600; margin: 16px 0 4px; color: var(--text); }
-.doc-rich .ProseMirror p { margin: 8px 0; }
-.doc-rich .ProseMirror ul, .doc-rich .ProseMirror ol { margin: 8px 0 8px 22px; }
-.doc-rich .ProseMirror li { margin: 3px 0; }
-.doc-rich .ProseMirror li p { margin: 0; }
-.doc-rich .ProseMirror blockquote { margin: 10px 0; padding-left: 14px; border-left: 2px solid var(--line-strong); color: var(--text-dim); }
-.doc-rich .ProseMirror hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
-.doc-rich .ProseMirror code { font-family: var(--mono); font-size: 13px; background: var(--bg-raised); padding: 1px 5px; border-radius: var(--radius); }
-.doc-rich .ProseMirror pre { background: var(--bg-raised); padding: 12px 14px; border-radius: var(--radius); overflow-x: auto; margin: 10px 0; }
-.doc-rich .ProseMirror pre code { background: none; padding: 0; }
-.doc-rich .ProseMirror a { color: var(--accent); text-decoration: none; cursor: pointer; }
-.doc-rich .ProseMirror a:hover { text-decoration: underline; }
-.doc-rich .ProseMirror table { border-collapse: collapse; margin: 12px 0; }
+.doc-rich .ProseMirror a { cursor: pointer; }
 .doc-rich .ProseMirror th, .doc-rich .ProseMirror td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; }
-.doc-rich .ProseMirror ul[data-type="taskList"] { list-style: none; margin-left: 0; padding: 0; }
-.doc-rich .ProseMirror ul[data-type="taskList"] li { display: flex; gap: 8px; align-items: flex-start; }
-.doc-rich .ProseMirror ul[data-type="taskList"] li > label { margin-top: 3px; }
 .doc-rich .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--text-faint);
 }
@@ -9279,7 +9325,7 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .pv-chrome button, .pv-tools button { touch-action: manipulation; }
 @keyframes pv-in { from { opacity: 0; } }
 .pv-stage { position: absolute; inset: 86px 104px 116px; z-index: 1; display: flex; align-items: center; justify-content: center; }
-.pv-img { display: block; flex: none; cursor: zoom-in; user-select: none; border-radius: var(--radius); will-change: transform;
+.pv-img { display: block; flex: none; cursor: zoom-in; user-select: none; border-radius: var(--artifact-corner); will-change: transform;
   transition: transform .2s cubic-bezier(.2, .8, .2, 1); animation: pv-pic-in .32s cubic-bezier(.2, .8, .2, 1); }
 @keyframes pv-pic-in { from { opacity: 0; scale: .97; } }
 .pv-img.pv-zoomed { cursor: grab; transition: none; }
@@ -9308,7 +9354,7 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 
 .pv-strip { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px;
   max-width: calc(100% - 64px); overflow-x: auto; }
-.pv-thumb { flex: none; width: 72px; height: 45px; padding: 0; border: 0; border-radius: var(--radius); overflow: hidden; cursor: pointer;
+.pv-thumb { flex: none; width: 72px; height: 45px; padding: 0; border: 0; border-radius: var(--artifact-corner-small); overflow: hidden; cursor: pointer;
   background: color-mix(in srgb, var(--read-paper) 6%, transparent); opacity: .38;
   outline: 1px solid transparent; outline-offset: 3px; transition: opacity .2s, outline-color .2s; }
 .pv-thumb:hover { opacity: .75; }
@@ -9358,3 +9404,12 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .cloud-plan-bar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
 .cloud-counts { margin: 0; padding: 4px 0 0 18px; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.55; color: var(--text-dim); user-select: text; -webkit-user-select: text; }
 .cloud-plans-say { margin: 14px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--text-faint); user-select: text; -webkit-user-select: text; }
+
+/* What a message is, beside its time: Comment, Checkpoint, Note on a file. */
+.msg-kind { display: inline-flex; align-items: baseline; gap: 6px; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: var(--tag-radius); background: none; font: 11px var(--mono); letter-spacing: .02em; color: var(--text-dim); text-align: left; }
+.msg-kind-why { color: var(--text-faint); letter-spacing: 0; }
+.msg-kind-why::before { content: '\00b7'; margin-right: 6px; }
+button.msg-kind { cursor: pointer; }
+button.msg-kind:hover { color: var(--text); border-color: var(--text-faint); }
+/* A comment is said beside the work, not to the agent: it reads at the size of what it answers. */
+.msg.yours:has(> .msg-head > .msg-kind) .msg-body { font-size: 15px; line-height: 1.6; font-weight: 400; }

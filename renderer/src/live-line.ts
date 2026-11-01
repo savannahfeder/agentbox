@@ -60,7 +60,7 @@ import type { RunningSession, WhyNotCloud, WorkItem } from './types';
 export type LiveState = 'asking' | 'working' | 'elsewhere' | 'shipping' | 'next' | 'queued' | 'cannot' | 'signin' | 'limit' | 'paused' | 'silent' | 'idle';
 
 export interface CannotStart {
-  why: 'setup' | 'asleep' | 'cloud-carried' | 'engine' | 'login' | 'memory' | 'slow-folder' | 'error' | string;
+  why: 'setup' | 'asleep' | 'cloud-carried' | 'engine' | 'login' | 'memory' | 'slow-folder' | 'error' | 'brake' | string;
   /** "Claude Code" or "Codex". */
   tool: string;
 }
@@ -79,6 +79,7 @@ export function cannotStartLine({ why, tool }: CannotStart): string | null {
   if (why === 'memory') return 'This computer is short of memory, so this waits for heavier work to finish.';
   if (why === 'slow-folder') return 'Making this thread\'s own copy of the project is taking much longer than it should, so the agent has not started.';
   if (why === 'error') return 'Starting an agent on this failed. The app tries again on its own.';
+  if (why === 'brake') return `${tool}'s last runs stopped before they began, so the app is waiting before it tries again. Run now tries at once.`;
   return null;
 }
 
@@ -278,6 +279,22 @@ export function cameBackEmpty(
   silent: { endedAt: number } | null | undefined,
 ): boolean {
   return !!silent && !said(item.result) && !said(item.note);
+}
+
+const DOING_MOST = 80;
+const SAY_HOW_LONG_MS = 60_000;
+
+/** The one line a long run's row carries: the step it is on and for how long, or that it is thinking. */
+export function doingWords(session: { startedAt: number; activity?: { label?: string; startedAt?: number }[] } | null | undefined, now = Date.now()): string | null {
+  if (!session) return null;
+  const step = session.activity?.at(-1);
+  const label = step?.label?.trim();
+  const since = label ? step?.startedAt ?? session.startedAt : session.startedAt;
+  const span = now - since;
+  if (!label && span < SAY_HOW_LONG_MS) return null;
+  const words = (label || 'Thinking').replace(/\s+/g, ' ');
+  const cut = words.length > DOING_MOST - 6 ? `${words.slice(0, DOING_MOST - 7).trimEnd()}…` : words;
+  return span < SAY_HOW_LONG_MS ? cut : `${cut}, ${shortSpan(span)}`;
 }
 
 export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null {

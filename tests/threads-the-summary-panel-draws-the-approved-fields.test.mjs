@@ -109,10 +109,11 @@ describe('a teammate’s card', () => {
   };
   // CHANGED 2026-10-05 (w-54e9c7243f): the card follows the panel, Context as
   // the lead and then the Done trail; Problem and Solution are gone.
-  it('is exactly the summary’s fields: state, priority, project, visible to, context first, then done, the links, then the owner', () => {
+  // CHANGED 2026-10-30: the card is the column beside the conversation, and the
+  // state ("Waiting on Maya") heads the page (TeammateStanding) instead.
+  it('is exactly the summary’s fields: context first, then done, the links, then the properties', () => {
     const words = text(draw(React.createElement(TeammateCard, { card, person: maya })));
-    // "Waiting on Maya": a persona (2026-10-01) could not tell who a waiting card waits on.
-    expect(words).toBe('Waiting on Maya High Northwind Visible to the team Acme’s contract ends on the 14th. Done Terms are drafted at 8% over last year. Blocked by Sign in with Google Blocks A thread you cannot see Ma Maya Chen · kept up to date by the agent · 19 min ago');
+    expect(words).toBe('About Acme’s contract ends on the 14th. Done Terms are drafted at 8% over last year. Blocked by Sign in with Google Blocks A thread you cannot see Owner Ma Maya Chen Priority High Project Northwind Who sees it The team The agent keeps this summary up to date.');
   });
   it('shows nothing of a private thread but that it is private, whose it is and its state', () => {
     const words = text(draw(React.createElement(TeammateCard, { card: { ...card, visible: false, title: null, project: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [] }, person: maya })));

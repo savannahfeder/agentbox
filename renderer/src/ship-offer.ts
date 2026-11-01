@@ -127,5 +127,10 @@ export function shipOfferLive(item: Finished, { change, running }: { change: boo
   // all of: it has shipped (the queue writes its note after), its ship failed
   // (the same), and you have already answered it (a run is on its way).
   if (at(item, 'result') < at(item, 'note') || at(item, 'result') < at(item, 'answer')) return false;
+  if (NOTHING_LEFT.test(item.result ?? '')) return false;
   return !offerIsLive(item);
 }
+
+// The agent's last word that the work has landed or that no decision is left. The
+// change the run left says nothing about what happened to it after.
+const NOTHING_LEFT = /^\s*merged\b|\bnothing (?:is )?left (?:for you )?to (?:decide|do)\b|\bnothing (?:more )?for you to (?:decide|do)\b|\bno decision (?:is )?(?:needed|left)\b/i;

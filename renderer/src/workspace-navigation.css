@@ -35,7 +35,8 @@
 /* The task stays inside the same raised foreground as the list. */
 .workspace-layout .focus-pane { position: relative; min-height: 0; }
 .workspace-layout .focus-pane > .back-esc { position: absolute; left: 12px; top: 14px; }
-.workspace-layout .focus-scroll { background: transparent; }
+/* What runs under the reply box dissolves before it, rather than being cut against its edge. */
+.workspace-layout .focus-scroll { background: transparent; -webkit-mask-image: linear-gradient(#000 calc(100% - 22px), transparent); mask-image: linear-gradient(#000 calc(100% - 22px), transparent); }
 .workspace-layout .focus-dock { background: transparent; padding-bottom: 24px; }
 .workspace-layout .focus-dock::before { background: none; }
 .workspace-layout .dock-card { background: var(--wash); border-radius: var(--radius); }
@@ -204,7 +205,8 @@
 .workspace-navigation .usage-row-num { margin-left: auto; font-variant-numeric: tabular-nums; }
 .workspace-navigation .usage-pill.is-close .usage-row-num { color: var(--text); }
 /* Its limits open above it as wide as the sidebar, the way your account menu opens from your row. */
-.workspace-navigation .workspace-usage .usage-panel { top: auto; bottom: calc(100% + 8px); left: 0; right: 0; width: auto; border-radius: 0; }
+/* Its own width, not the rail's: on the narrow rail that was 44px, and "This session" and "28% used" ran into each other. */
+.workspace-navigation .workspace-usage .usage-panel { top: auto; bottom: calc(100% + 8px); left: 0; right: auto; width: 268px; border-radius: 0; }
 .workspace-navigation .usage-panel .usage-meter, .workspace-navigation .usage-panel .usage-meter > i { border-radius: 0; }
 /* Using more than one agent, its limits list each under a hairline, the one used last tagged. */
 .usage-panel .usage-other { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
@@ -423,8 +425,15 @@
 }
 .workspace-task-header > .back-esc svg { width:16px; height:16px; }
 .workspace-layout.workspace-task > .topbar { height:88px; min-height:88px; flex-basis:88px; }
-.workspace-layout[data-reading-width="balanced"] .focus { max-width:980px; }
-.workspace-layout[data-reading-width="balanced"] .focus-dock-inner { max-width:916px; }
+.workspace-layout[data-reading-width="balanced"] .focus { max-width:1180px; }
+.workspace-layout[data-reading-width="balanced"] .focus-dock-inner { max-width:1116px; }
+@media (min-width:1800px) {
+ .workspace-layout[data-reading-width="balanced"] .focus { max-width:1360px; }
+ .workspace-layout[data-reading-width="balanced"] .focus-dock-inner { max-width:1296px; }
+}
+/* Sentences keep a reading measure in the wide column; what is drawn uses all of it. */
+.workspace-layout .focus .markdown :is(p, ul, ol, blockquote, h1, h2, h3, h4):not(:has(img, video, .inline-media, .inline-image)),
+.workspace-layout .focus .msg-body.typed:not(:has(img, video, .inline-media, .inline-image)) { max-width:760px; }
 .workspace-artifact-header { display:none; min-width:0; flex:1; }
 .workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .workspace-task-header { display:none; }
 .workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .workspace-artifact-header { display:block; }
@@ -986,7 +995,7 @@ body {
    design board to a strip down the middle of an empty window. It still never
    grows past its own size. */
 .workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .doc-pane.doc-image .doc-card { overflow-y:auto; }
-.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .doc-picture { flex:none; width:auto; height:auto; max-height:none; padding:16px; }
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .doc-picture { flex:none; width:auto; height:auto; max-height:none; margin:16px; }
 .workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body > .list-pane {
   order:2; display:flex; flex-direction:column; flex:0 0 auto; min-width:0;
   background:transparent; border-radius:0; overflow:visible;

@@ -1,0 +1,92 @@
+/* 44px is where the page title's text starts. */
+.cn-page { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 44px 48px; }
+.cn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.cn-bar { display: flex; justify-content: flex-end; min-height: 32px; }
+.cn-group { margin-top: 22px; }
+.cn-group:first-of-type { margin-top: 10px; }
+.cn-group h2 { margin: 0 0 10px; font-size: 12.5px; font-weight: 500; color: var(--text-dim); }
+.cn-none { margin: 26px 0 0; font-size: 13.5px; line-height: 20px; color: var(--text-faint); }
+.cn-add { margin-top: 28px; max-width: 532px; }
+.cn-add-row { display: flex; gap: 8px; }
+.cn-add-note { margin: 8px 0 0; font-size: 12.5px; line-height: 18px; color: var(--text-dim); }
+.cn-input {
+  flex: 1; min-width: 0; width: 100%; height: 30px; padding: 0 10px; box-sizing: border-box; background: var(--wash); border: 1px solid var(--line);
+  border-radius: var(--radius); outline: 0; font: inherit; font-size: 13px; color: var(--text);
+}
+.cn-input:focus { border-color: var(--line-strong); }
+.cn-input::placeholder { color: var(--text-faint); }
+.cn-form { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.cn-form .cn-input { flex: none; }
+.cn-form + .cn-when { margin-top: 14px; }
+.cn-actions:empty { display: none; }
+.cn-form .cn-actions { margin-top: 2px; }
+.cn-label { margin: 0; font-size: 12px; color: var(--text-dim); }
+.cn-address { display: block; padding: 6px 10px; border-radius: var(--radius); background: var(--wash); font-size: 12px; color: var(--text); user-select: text; }
+.cn-copy-line { font-size: 12px; line-height: 16px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cn-copy-actions { margin-top: 8px; }
+.cn-failures { margin: 6px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; line-height: 17px; color: var(--text-dim); }
+.cn-picks { margin: 0 0 10px; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 13px; color: var(--text); }
+.cn-pick { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.cn-pick input {
+  flex: none; appearance: none; width: 14px; height: 14px; margin: 0; background: transparent; border: 1px solid var(--line-strong); border-radius: var(--radius);
+}
+.cn-pick input:checked { background: var(--text); border-color: var(--text); box-shadow: inset 0 0 0 2.5px var(--bg-raised); }
+.cn-pick input:focus-visible { outline: 1px solid var(--text-dim); outline-offset: 1px; }
+.cn-pick span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.cn-tile {
+  display: flex; align-items: center; gap: 12px; min-width: 0; padding: 14px;
+  background: var(--wash); border: 1px solid var(--line); border-radius: var(--artifact-corner);
+  text-align: left; font: inherit; color: inherit; cursor: default; transition: border-color .12s ease;
+}
+.cn-tile:hover, .cn-tile:focus-visible { border-color: var(--line-strong); outline: none; }
+
+.cn-mark {
+  flex: none; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius); background: var(--wash-strong); color: var(--text);
+}
+.cn-mark-letter { font-size: 15px; font-weight: 600; }
+
+.cn-tile-words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cn-tile-name { font-size: 14px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cn-state { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; }
+.cn-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); }
+.cn-dot-good { background: #2f9e62; }
+.cn-dot-hurt { background: #d9822b; }
+.cn-state-words { overflow: hidden; text-overflow: ellipsis; }
+.cn-who { flex: none; display: flex; align-items: center; gap: 3px; }
+
+.cn-backdrop { place-items: center; padding-top: 0; }
+.cn-sheet {
+  width: 400px; max-width: 92vw; max-height: 84vh; overflow-y: auto; padding: 18px;
+  background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--artifact-corner); box-shadow: var(--shadow-lg);
+}
+.cn-sheet-head { display: flex; align-items: center; gap: 12px; }
+.cn-read, .cn-todo { margin: 14px 0 0; font-size: 13px; line-height: 1.45; color: var(--text); }
+.cn-found { margin: 14px 0 0; font-size: 13px; line-height: 1.45; color: var(--text); font-weight: 500; }
+.cn-when { margin: 4px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--text-dim); }
+.cn-read { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.cn-read-label { color: var(--text-dim); }
+.cn-actions { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+.cn-button {
+  height: 30px; padding: 0 12px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: transparent;
+  font: inherit; font-size: 13px; color: var(--text); cursor: default;
+}
+.cn-button:hover:not(:disabled) { background: var(--wash); }
+.cn-button:disabled { opacity: .5; }
+.cn-button-main { background: var(--text); color: var(--bg-raised); border-color: var(--text); }
+.cn-button-main:hover:not(:disabled) { background: var(--text); opacity: .88; }
+.cn-button-quiet { margin-left: auto; padding-right: 0; border-color: transparent; color: var(--text-dim); }
+.cn-button-quiet:hover:not(:disabled) { background: none; color: var(--text); }
+.cn-waiting { flex: 1; font-size: 13px; color: var(--text-dim); }
+.cn-inline { padding: 0; border: 0; background: none; font: inherit; color: var(--text); text-decoration: underline; text-underline-offset: 3px; cursor: default; }
+.cn-section { margin-top: 18px; }
+.cn-section h3 { margin: 0 0 6px; font-size: 12px; font-weight: 500; color: var(--text-dim); }
+.cn-tools { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 12px; font-size: 13px; color: var(--text); }
+.cn-foot { margin: 18px 0 0; font-size: 12px; color: var(--text-faint); }
+.cn-foot + .cn-foot { margin-top: 4px; }
+
+.cn-link {
+  display: inline; padding: 0; border: 0; background: none; font: inherit; color: inherit;
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}

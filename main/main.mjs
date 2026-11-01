@@ -5,7 +5,9 @@ import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialo
 import './no-default-menu.mjs';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mjs';
+import { startConnections } from './connections/start.mjs';
 import { roomsSetup } from './team/room-setup.mjs';
+import { matesForTheTeam } from './teammate-reach.mjs';
 import { loadCloudConfig, supabaseSession } from './team/session.mjs';
 // MY WORKSPACE IS NOT A TEAM FEATURE ANY MORE (w-f8d123be62), even though it
 // still lives in the team folder next to the sharing rules it has to obey.
@@ -470,6 +472,8 @@ async function createWindow() {
     // exists; until then a change has nobody to tell.
     onChange: () => { try { pushUpdate(); } catch { /* no window yet */ } },
     log: (line) => console.log(line),
+    runningIds: () => supervisor.runsGoing().map((s) => s.itemId),
+    ownMates: () => matesForTheTeam(store, config),
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mjs). What it left is done
     // through the window's own handlers, filed below once the window exists.
     phone: {
@@ -515,6 +519,7 @@ async function createWindow() {
     rooms: roomsSetup({ config, store, supervisor, userDir }),
   }) : null;
   if (team) {
+    store.teammates?.bindTeam(team);
     team.start().then(() => supervisor.wake?.()).catch((err) => console.warn(`team: ${err.message}`));
     quitStep(app, 'before-quit', 'team.stop', () => team.stop());
   }
@@ -857,16 +862,33 @@ async function createWindow() {
       ? getMic({ systemPreferences, openExternal: (url) => shell.openExternal(url) })
       : 'granted'),
   };
+  // Like the team's sign-in, a connection's is sealed by the keychain only on
+  // a copy with a team cloud; without one the vault keeps nothing.
+  const connectionsKeychain = cloudConfig ? {
+    encrypt: (text) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : null),
+    decrypt: (buf) => (safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : null),
+  } : null;
+  const connected = startConnections({
+    config, supervisor, appDir, userDir,
+    cipher: connectionsKeychain,
+    openExternal: (url) => shell.openExternal(url),
+    packaged: app.isPackaged,
+    onChange: () => { try { pushUpdate(); } catch { /* no window yet */ } },
+    onWhoChanged: () => { void team?.publishConnections?.(); },
+  });
+  quitStep(app, 'before-quit', 'connections.stop', () => connected.stop());
   const ipc = registerIpc({
     store, supervisor, config, window, analytics, docGrants, updater,
     host: filingHost,
     team,
+    connections: connected.connections,
+    copies: connected.copies,
   });
-  pushUpdate = ipc.push;
   // The Agents menu's Allow/Deny, bound to the real door now that there is one.
   // See the `installMenu` call above for what writing the file instead did to a
   // Codex card.
   answerApproval = ipc.answerApproval;
+  pushUpdate = ipc.push;
   cardInFront = () => ipc.pendingApprovals()[0] ?? null;
   // What the window answers itself (badge, boot info) gets the plain stand-ins
   // a browser tab gets.

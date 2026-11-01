@@ -6,10 +6,13 @@
 // Every message carries what a direct chat's does: reactions, the bar on
 // pointing with its more menu (edit, copy, mark unread, delete), an edited
 // mark, and voice notes and files. The box is the direct chat's too.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { ConnectionLink } from '../../connections/ConnectionsPlace';
+import { connectionLinkOf, keepConnectionLinks } from '../../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
 import type { Room, RoomMessage } from '../../types';
+import { voiceName } from '../../../../shared/agent-voice.mjs';
 import { chatLayout } from '../chat-layout';
 import { MessageActions, Reactions } from '../ChatActions';
 import { DeleteMessage, MessageEditor } from '../MessageMore';
@@ -19,12 +22,20 @@ import { RichReply, type RichBox } from '../RichReply';
 import { VoiceNote } from '../VoiceNote';
 import { voiceNoteOf } from '../voice-note';
 import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type VoiceControl } from '../useVoiceRecorder';
+import { createPortal } from 'react-dom';
+import { FileSheet } from '../../components/FileSheet';
+import { FileCover } from '../../components/FileCover';
+import { reviewKind, shownName } from '../../../../shared/artifact-marks.mjs';
+import { RoomFileView, type RoomFileOpening, type RoomFiles } from './RoomFileView';
 import { AttachRow } from '../../components/AttachRow';
 import { collectFiles, isImageName, type PendingAttachment } from '../../attachments';
 import { pictureUrl } from '../../picture';
 import { holdAtBottom } from '../../thread-bottom';
+import { sendKeyFor, unsentWords } from '../../reply-keys';
 import { I } from './icons';
-import { RoomFace } from './RoomFace';
+import type { MessageMarks } from '../decisions';
+import { LINE_MISSING } from '../../reveal-line';
+import { Face } from '../people';
 import { cardName, chatWidth, clockOf, mentionsIn, readChatWidth, writeChatWidth } from './room-rules';
 import { drawnRoots, holdsRead, mentionMarkdown, myNewest, newLineAt, quickOnBar, roomReader, storedName, wordsLeftAfterSend } from './room-chat-rules';
 
@@ -41,9 +52,21 @@ export type RoomChatCalls = {
   onMarkUnread?: (at: number) => void;
   /** Store a file in the room under this name. */
   onPutFile?: (name: string, dataBase64: string) => Promise<string | null>;
+  /** Store a file on this Mac in the room, read by the Mac itself, in parts when it is big. */
+  onPutFileFrom?: (name: string, srcPath: string) => Promise<string | null>;
+  /** Files going up in parts: `${roomId}/${name}` -> parts sent of how many. */
+  sending?: Record<string, { done: number; total: number }>;
+  /** What opens a picture, film, PDF, deck or document big, with its comments. */
+  files?: RoomFiles;
+  /** A file a Needs you row asked to open. */
+  openingFile?: RoomFileOpening | null;
+  onFileOpening?: () => void;
   /** A file stored in the room, as bytes, or null when it is not there. */
   loadFile?: (name: string) => Promise<Blob | null>;
   onNotice?: (text: string) => void;
+  /** Where this room keeps a list of what it decided. */
+  marks?: ReadonlyMap<string, MessageMarks>;
+  onDecide?: (messageId: string, kind: 'decision' | 'priority', on: boolean) => void;
 };
 
 export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand, onSwitch, switchOpen, full = false, head, hang = false, ...calls }: {
@@ -55,8 +78,27 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   /** Faces at 32, hung beside the words, as a chat that is the whole page draws them. */
   hang?: boolean;
 } & RoomChatCalls) {
-  const { onSend, onRead, onReact, onEdit, onDelete, onMarkUnread, onNotice } = calls;
+  const { onSend, onRead, onReact, onEdit, onDelete, onMarkUnread, onNotice, marks, onDecide } = calls;
   const [thread, setThread] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<RoomFileOpening | null>(null);
+  const opensBig = useCallback((name: string) => {
+    if (!calls.files || !reviewKind(name)) return false;
+    setViewing({ name, at: Date.now() });
+    return true;
+  }, [!!calls.files]);
+  // An edited document goes into the group as its next version: the same name, a new copy.
+  const newVersion = async (name: string, text: string) => {
+    const stored = storedName(shownName(name));
+    const bytes = new TextEncoder().encode(text);
+    let binary = '';
+    for (const b of bytes) binary += String.fromCharCode(b);
+    const why = await calls.onPutFile!(stored, btoa(binary));
+    if (why) return why;
+    return onSend(`Updated ${shownName(name)}.\n\n[${shownName(name)}](attachments/${stored})`, { inReplyTo: null, mentions: [] });
+  };
+  const opening = calls.openingFile;
+  // Taken once, or coming back to the group would open it again.
+  useEffect(() => { if (opening) { setViewing(opening); calls.onFileOpening?.(); } }, [opening?.at]);
   const [editing, setEditing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [width, setWidth] = useState(readChatWidth);
@@ -82,6 +124,15 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
     const out = new Map<string, RoomMessage[]>();
     for (const m of messages) if (m.inReplyTo && !m.deleted) out.set(m.inReplyTo, [...(out.get(m.inReplyTo) ?? []), m]);
     return out;
+  }, [messages]);
+  // A found reply is drawn only in its side thread, so the thread opens for it.
+  useEffect(() => {
+    const open = (e: Event) => {
+      const reply = messages.find((m) => m.id === (e as CustomEvent<string>).detail);
+      if (reply?.inReplyTo) setThread(reply.inReplyTo);
+    };
+    window.addEventListener(LINE_MISSING, open);
+    return () => window.removeEventListener(LINE_MISSING, open);
   }, [messages]);
   const root = thread ? messages.find((m) => m.id === thread) ?? null : null;
   const shown = root ? [root, ...(replies.get(root.id) ?? [])] : roots;
@@ -136,7 +187,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
     return people.filter((p) => first(p.name) === mine).length === 1 ? [name, name.split(/\s+/)[0]] : [name];
   }, [people]);
   const body = (m: RoomMessage) => (
-    <RoomMarkdown text={m.body} names={names} loadFile={calls.loadFile} roomId={room.id} mine={m.by === meId}
+    <RoomMarkdown text={m.body} names={names} loadFile={calls.loadFile} findFile={calls.files?.find} opensBig={opensBig} roomId={room.id} mine={m.by === meId}
       me={meId && m.by !== meId && m.mentions.includes(meId) ? myNames : NOBODY} />
   );
 
@@ -149,7 +200,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
           <span className="rm-label" style={{ marginLeft: 'auto', marginRight: 4 }}>{(replies.get(root.id)?.length ?? 0)} {(replies.get(root.id)?.length ?? 0) === 1 ? 'reply' : 'replies'}</span></>
         : <button type="button" className={`rm-switch${switchOpen ? ' open' : ''}`} onClick={(e) => onSwitch?.(e.currentTarget.getBoundingClientRect())}>
           {room.kind === 'group'
-            ? <><span className="rm-faces">{others.slice(0, 3).map((p) => <RoomFace key={p.id} name={p.name} url={p.avatarUrl} size={18} />)}</span>
+            ? <><span className="rm-faces">{others.slice(0, 3).map((p) => <Face key={p.id} name={p.name} url={p.avatarUrl} size={18} />)}</span>
               <span>{others.map((p) => p.name).join(', ') || room.name}</span></>
             : <>{I.hash(15)}<span>{room.name}</span></>}
           {onSwitch && I.down()}
@@ -164,13 +215,13 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
         const reps = !root ? replies.get(m.id) ?? [] : [];
         const p = who(m.by);
         const headed = slot.head || (root && i === 0) || m.id === newAt;
-        return <div key={m.id}>
+        return <div key={m.id} data-line={m.id}>
           {slot.day && <div className="rm-day"><span className="rm-label">{slot.day}</span></div>}
           {m.id === newAt && <div className="rm-new" role="separator"><span>New</span></div>}
           <div className={`rm-cm${headed ? '' : ' cont'}${root && i === 0 ? ' root' : ''}`}>
             {headed && <div className="h">
-              <RoomFace name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 32 : 16} />
-              <span>{nameOf(m.by)}</span><em>{clockOf(m.at)}</em>
+              <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 32 : 16} />
+              <span>{m.voice ? voiceName(m.voice, p?.name ?? '', { mine }) : nameOf(m.by)}</span><em>{clockOf(m.at)}</em>
               {m.editedAt && !m.deleted && <em className="rm-edited">edited</em>}
             </div>}
             {editing === m.id && onEdit
@@ -186,9 +237,10 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
                 ? <div className="tx rm-gone">This message was deleted.</div>
                 : <div className="tx">{body(m)}</div>}
             {!headed && m.editedAt && !m.deleted && editing !== m.id && <em className="rm-edited">edited</em>}
+            {!m.deleted && marks?.get(m.id) && <em className="rm-decided">{marks.get(m.id)?.priority ? 'This week’s priorities' : 'Decision'}</em>}
             {!m.deleted && onReact && <Reactions on={m.reactions} me={meId} onReact={(emoji, off) => onReact(m.id, emoji, !off)} />}
             {reps.length > 0 && <button type="button" className="rep" onClick={() => setThread(m.id)}>
-              {[...new Set(reps.map((r) => r.by))].slice(0, 3).map((id) => <RoomFace key={id ?? 'x'} name={who(id)?.name ?? '?'} url={who(id)?.avatarUrl} size={13} />)}
+              {[...new Set(reps.map((r) => r.by))].slice(0, 3).map((id) => <Face key={id ?? 'x'} name={who(id)?.name ?? '?'} url={who(id)?.avatarUrl} size={13} />)}
               <span style={{ marginLeft: 5 }}>{reps.length} {reps.length === 1 ? 'reply' : 'replies'}</span>
             </button>}
             {!m.deleted && editing !== m.id && onReact && <MessageActions
@@ -202,6 +254,8 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
                 onDelete: onDelete ? () => setDeleting(m.id) : undefined,
                 onMarkUnread: markUnread && !m.inReplyTo ? () => markUnread(m.at) : undefined,
                 onCopied: () => onNotice?.('Copied'),
+                onDecide: onDecide ? (kind, on) => onDecide(m.id, kind, on) : undefined,
+                marks: marks?.get(m.id),
               })} />}
             {deleting === m.id && onDelete && <DeleteMessage onClose={() => setDeleting(null)} onDelete={() => { if (thread === m.id) setThread(null); onDelete(m.id); }} />}
           </div>
@@ -210,16 +264,17 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
     </div></div>
     <Composer key={`${room.id}:${thread ?? ''}`} roomId={room.id} threadId={thread} people={others}
       placeholder={root ? `Reply to ${nameOf(root.by)}` : `Message ${room.kind === 'group' ? others.map((p) => p.name.split(' ')[0]).join(', ') || room.name : room.name}`}
-      onPutFile={calls.onPutFile} onNotice={onNotice}
+      onPutFile={calls.onPutFile} onPutFileFrom={calls.onPutFileFrom} sending={calls.sending} onNotice={onNotice}
       onEditLast={() => { const mine = myNewest(messages, meId, root?.id ?? null); if (mine) setEditing(mine.id); }}
       onSend={(body) => onSend(body, { inReplyTo: root?.id ?? null, mentions: mentionsIn(body, others) })} />
+    {viewing && calls.files && <RoomFileView room={room} messages={messages} people={people} meId={meId} opening={viewing} files={calls.files} onNewVersion={calls.onPutFile ? newVersion : undefined} onClose={() => setViewing(null)} />}
   </div>;
 }
 
 // Room files arrive as bytes and are drawn from an address made for them once.
 const pictures = new Map<string, Promise<string | null>>();
 
-function RoomPicture({ roomId, name, alt, loadFile }: { roomId: string; name: string; alt: string; loadFile?: (name: string) => Promise<Blob | null> }) {
+function RoomPicture({ roomId, name, alt, loadFile, opensBig }: { roomId: string; name: string; alt: string; loadFile?: (name: string) => Promise<Blob | null>; opensBig?: (name: string) => boolean }) {
   const [src, setSrc] = useState<string | null | undefined>(undefined);
   useEffect(() => {
     if (!loadFile) { setSrc(null); return; }
@@ -231,8 +286,37 @@ function RoomPicture({ roomId, name, alt, loadFile }: { roomId: string; name: st
     return () => { live = false; };
   }, [roomId, name, loadFile]);
   if (src === undefined) return <span className="inline-image arriving" aria-hidden="true" />;
-  if (!src) return <span className="rm-file">{alt || name}</span>;
-  return <img className="inline-image" src={src} alt={alt} />;
+  if (!src) return <RoomFile name={name} shown={alt || name} load={loadFile} opensBig={opensBig} />;
+  return <RoomFile name={name} shown={alt || name} load={loadFile} opensBig={opensBig}><img className="inline-image" src={src} alt={alt} /></RoomFile>;
+}
+
+/** A film is a tile like a picture: its frame and length once it is on this computer. */
+function RoomFilm({ name, shown, find, load, opensBig }: { name: string; shown: string; find?: (name: string) => Promise<string | null>; load?: (name: string) => Promise<Blob | null>; opensBig?: (name: string) => boolean }) {
+  const [path, setPath] = useState<string | null>(null);
+  const [length, setLength] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    find?.(name).then((p) => { if (live) setPath(p); }).catch(() => {});
+    return () => { live = false; };
+  }, [name, find]);
+  return <RoomFile name={name} shown={shown} load={load} opensBig={opensBig} film>
+    <span className="rm-film-face">
+      {path ? <FileCover kind="film" opened={path} onSize={setLength} /> : <span className="file-cover-play" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.2v9.6a.6.6 0 0 0 .9.5l7.6-4.8a.6.6 0 0 0 0-1L5.9 2.7a.6.6 0 0 0-.9.5Z" /></svg></span>}
+      {length && <span className="rm-film-length">{length}</span>}
+    </span>
+    <span className="rm-film-name">{shown}</span>
+  </RoomFile>;
+}
+
+/** A file a room's message carries: press it and it opens, big with its comments when it is a kind that can. */
+function RoomFile({ name, shown, load, opensBig, film = false, children }: { name: string; shown: string; load?: (name: string) => Promise<Blob | null>; opensBig?: (name: string) => boolean; film?: boolean; children?: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const bytes = useCallback(() => load?.(name) ?? Promise.resolve(null), [load, name]);
+  const close = useCallback(() => setOpen(false), []);
+  return <>
+    <button type="button" className={film ? 'inline-image-open rm-film' : children ? 'inline-image-open' : 'rm-file'} title={`Open ${shown}`} onClick={() => { if (!opensBig?.(name)) setOpen(true); }}>{children ?? shown}</button>
+    {open && createPortal(<FileSheet name={name} shown={shown} load={bytes} onClose={close} />, document.body)}
+  </>;
 }
 
 /** A room message as markdown: @names marked, voice notes and pictures drawn, other files named. */
@@ -240,8 +324,10 @@ const MARKDOWN_PLUGINS = [remarkGfm];
 const NOBODY: readonly string[] = [];
 const storedIn = (href: string) => /^attachments\/([A-Za-z0-9][\w.-]{0,159})$/.exec(href)?.[1] ?? null;
 
-function RoomMarkdown({ text, names, loadFile, roomId, mine, me }: {
+function RoomMarkdown({ text, names, loadFile, findFile, opensBig, roomId, mine, me }: {
   text: string; names: string[]; roomId: string; mine: boolean; loadFile?: (name: string) => Promise<Blob | null>;
+  findFile?: (name: string) => Promise<string | null>;
+  opensBig?: (name: string) => boolean;
   /** What you answer to, when this message names you. */
   me: readonly string[];
 }) {
@@ -250,25 +336,35 @@ function RoomMarkdown({ text, names, loadFile, roomId, mine, me }: {
   // for the same reason.
   const load = useRef(loadFile);
   load.current = loadFile;
+  const big = useRef(opensBig);
+  big.current = opensBig;
+  const found = useRef(findFile);
+  found.current = findFile;
   const components = useMemo(() => {
     const fetchFile = (name: string) => load.current?.(name) ?? Promise.resolve(null);
+    const openBig = (name: string) => big.current?.(name) ?? false;
+    const findOnDisk = (name: string) => found.current?.(name) ?? Promise.resolve(null);
     return {
       a: ({ href, children }: { href?: string; children?: ReactNode }) => {
         if (href === '#mention') return <b className="rm-at">{children}</b>;
         if (href === '#mention-me') return <b className="rm-at me">{children}</b>;
+        const connection = connectionLinkOf(href);
+        if (connection) return <ConnectionLink id={connection.id}>{children}</ConnectionLink>;
         const name = href ? storedIn(href) : null;
         const note = name ? voiceNoteOf(name) : null;
         if (name && note) return <VoiceNote id={`room:${roomId}:${name}`} ms={note.ms} mine={mine} load={() => fetchFile(name)} />;
-        if (name) return <span className="rm-file">{children}</span>;
+        const shown = typeof children === 'string' ? children : (Array.isArray(children) ? children.join('') : name ?? '');
+        if (name && reviewKind(name) === 'film') return <RoomFilm name={name} shown={shown} find={findOnDisk} load={fetchFile} opensBig={openBig} />;
+        if (name) return <RoomFile name={name} shown={shown} load={fetchFile} opensBig={openBig} />;
         return <a href={href} target="_blank" rel="noreferrer">{children}</a>;
       },
       img: ({ src, alt }: { src?: string; alt?: string }) => {
         const name = src ? storedIn(src) : null;
-        return name ? <RoomPicture roomId={roomId} name={name} alt={alt ?? ''} loadFile={fetchFile} /> : null;
+        return name ? <RoomPicture roomId={roomId} name={name} alt={alt ?? ''} loadFile={fetchFile} opensBig={openBig} /> : null;
       },
     };
   }, [roomId, mine]);
-  return <ReactMarkdown remarkPlugins={MARKDOWN_PLUGINS} components={components}>{mentionMarkdown(text, names, me)}</ReactMarkdown>;
+  return <ReactMarkdown remarkPlugins={MARKDOWN_PLUGINS} components={components} urlTransform={keepConnectionLinks}>{mentionMarkdown(text, names, me)}</ReactMarkdown>;
 }
 
 // Keeps the newest message in view while you are at the bottom, and leaves
@@ -304,13 +400,21 @@ async function base64Of(a: PendingAttachment): Promise<string | null> {
   return btoa(bin);
 }
 
+/** "Sending 40%" while a big file in the box goes up in parts. */
+function sendingWords(sending: Record<string, { done: number; total: number }> | undefined, roomId: string, files: PendingAttachment[]): string {
+  const going = files.map((a) => sending?.[`${roomId}/${a.storedAs}`]).find(Boolean);
+  return going ? `Sending ${Math.round((going.done / going.total) * 100)}%` : 'Sending…';
+}
+
 // A file in the box is given the name it will be stored under once, here.
 const staged = (a: PendingAttachment): PendingAttachment => (a.storedAs ? a : { ...a, storedAs: storedName(a.name) });
 
-function Composer({ roomId, threadId, placeholder, people, onSend, onPutFile, onNotice, onEditLast }: {
+function Composer({ roomId, threadId, placeholder, people, onSend, onPutFile, onPutFileFrom, sending, onNotice, onEditLast }: {
   roomId: string; threadId: string | null; placeholder: string; people: ChatPerson[];
   onSend: (body: string) => Promise<string | null>;
   onPutFile?: (name: string, dataBase64: string) => Promise<string | null>;
+  onPutFileFrom?: (name: string, srcPath: string) => Promise<string | null>;
+  sending?: Record<string, { done: number; total: number }>;
   onNotice?: (text: string) => void;
   onEditLast: () => void;
 }) {
@@ -343,6 +447,7 @@ function Composer({ roomId, threadId, placeholder, people, onSend, onPutFile, on
   // A send that failed, so it can be tried again, and is when the connection comes back.
   const [failed, setFailed] = useState(false);
   const ready = !!text.trim() || attachments.length > 0 || recording;
+  const unsent = unsentWords({ words: text, files: attachments.length, sending: busy });
   // EVERYTHING STAYS IN THE BOX UNTIL THE ROOM HAS IT. Each file keeps the
   // name it was given when it went into the box, so a second try puts the
   // same file rather than another copy, and a file the room already has
@@ -373,10 +478,15 @@ function Composer({ roomId, threadId, placeholder, people, onSend, onPutFile, on
       const links: string[] = [];
       for (const a of files) {
         if (!onPutFile) throw new Error('Files cannot be sent in this room yet');
-        const data = await base64Of(a);
-        if (!data) throw new Error(`${a.name} could not be read`);
         const name = a.storedAs ?? storedName(a.name);
-        const err = await onPutFile(name, data);
+        let err: string | null;
+        if (a.srcPath && onPutFileFrom) {
+          err = await onPutFileFrom(name, a.srcPath);
+        } else {
+          const data = await base64Of(a);
+          if (!data) throw new Error(`${a.name} could not be read`);
+          err = await onPutFile(name, data);
+        }
         if (err) throw new Error(err);
         links.push(a.image ? `![${a.name}](attachments/${name})` : `[${a.name}](attachments/${name})`);
       }
@@ -423,7 +533,7 @@ function Composer({ roomId, threadId, placeholder, people, onSend, onPutFile, on
   return <>
     {matches.length > 0 && <div className="rm-picker rm-pop rm-menu" style={{ position: 'absolute' }}>
       {matches.map((p, i) => <button type="button" key={p.id} className={`row${i === pick ? ' on' : ''}`} onMouseDown={(e) => { e.preventDefault(); choose(p); }}>
-        <RoomFace name={p.name} url={p.avatarUrl} size={18} /><span>{p.name}</span></button>)}
+        <Face name={p.name} url={p.avatarUrl} size={18} /><span>{p.name}</span></button>)}
     </div>}
     {error && <div className="rm-chat-err" role="alert">{error}
       {failed && !busy && <button type="button" className="rm-retry" onClick={() => void send()}>Try again</button>}</div>}
@@ -449,10 +559,12 @@ function Composer({ roomId, threadId, placeholder, people, onSend, onPutFile, on
       <div className="rm-compose-bar">
         <FormatBar box={ref as unknown as { current: HTMLTextAreaElement | null }} onChange={setText}
           onAttach={onPutFile ? () => filePicker.current?.click() : undefined}
+          onFromFiles={onPutFile ? (f) => add([f]) : undefined}
           onVoice={onPutFile ? (note) => add([{ name: note.name, dataBase64: note.dataBase64, image: isImageName(note.name), draftId: note.draftId }]) : undefined}
           onNotice={setError} voiceKey={voiceKey} voice={voiceCtl} onRecording={setRecording} />
-        <button type="button" className="dock-send" disabled={!ready || busy} onClick={() => void send()} title="Send · ↵">
-          {busy ? 'Sending…' : <>Send <kbd>↵</kbd></>}
+        {unsent && <span className="dock-unsent">{unsent}</span>}
+        <button type="button" className="dock-send" disabled={!ready || busy} onClick={() => void send()} title={`Send · ${sendKeyFor(true)}`}>
+          {busy ? sendingWords(sending, roomId, attachments) : <>Send <kbd>{sendKeyFor(true)}</kbd></>}
         </button>
       </div>
     </div>

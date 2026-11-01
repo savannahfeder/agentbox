@@ -117,8 +117,11 @@ describe('three quarters, and no line down the middle', () => {
     for (const dead of ['onecard', 'stacked', 'quiet', 'edge', 'wide', 'column', 'roomy', 'today']) {
       expect(css).not.toContain(`data-doc-layout="${dead}"`)
     }
-    // `column` capped the file's words at a reading column and `wide` and
-    // `edge` took the card off. Both are gone as behaviour, not just as a name.
+    // `wide` and `edge` took the card off and are gone as behaviour. `column`,
+    // a reading measure, came back on 2026-10-30 when the owner asked for
+    // documents to read like a Claude artifact or a Notion page: the words sit
+    // in a 700px column inside the card (components/doc-reading.css), and the
+    // card itself is untouched.
     expect(css).not.toMatch(/\.doc-rich \.ProseMirror \{[^}]*max-width/)
     const card = css.match(/\n\.doc-card \{[^}]*\}/)
     expect(card[0]).toContain('margin: 14px 16px 16px 14px')

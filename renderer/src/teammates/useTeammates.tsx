@@ -3,16 +3,17 @@
 // useRooms, whose every field App reads is pinned by its own tests.
 import { useMemo, useState, type ReactNode } from 'react';
 import type { Product, RunningSession, TeammatesView, WorkItem } from '../types';
-import { TeammateMenu, TeammatesPage, TeammatesTitle, shownOf, type TeammateModels } from './TeammatesPage';
+import { TeammateChat, TeammateMenu, TeammatesPage, TeammatesTitle, shownOf, type TeammateModels } from './TeammatesPage';
 import { SidebarGroups } from '../team/rooms/GroupsSidebar';
 import { api } from '../api';
 import { asksYou, heldFor } from './chat-lines';
 import type { TabView } from '../threads/Pages';
 
-/** `new`, a teammate's id, or `log:`, `about:` or `book:` one of its pages; 'team' opens the first chat. */
+/** `new`, a teammate's id, or `sheet:`, `log:`, `about:` or `book:` one of its pages; 'team' opens the first chat. */
 export type TeammatesOpen = string | null;
 
-export function useTeammates({ items = [], view: stored, asking = [], running = [], products, engines, models, me, mePic = null, onEnter, onOpenThread, tabOf, onOpenList, onChanged }: {
+export function useTeammates({ items = [], view: stored, asking = [], running = [], queued = [], products, engines, models, me, mePic = null, onEnter, onOpenThread, onOpenFile, tabOf, onOpenList, onChanged }: {
+  onOpenFile?: (product: string, src: string) => void;
   /** Every thread the app holds, so what a teammate sent you is drawn as its inbox row. */
   items?: WorkItem[];
   models?: TeammateModels;
@@ -20,6 +21,8 @@ export function useTeammates({ items = [], view: stored, asking = [], running = 
   view: TeammatesView | null | undefined;
   /** The agents running now (`snapshot.supervisor.running`). */
   running?: RunningSession[];
+  /** The threads waiting for an agent, next first (`snapshot.supervisor.queued`). */
+  queued?: string[];
   /** Threads waiting for you to allow or deny a command. */
   asking?: (string | null)[];
   products: Product[];
@@ -59,7 +62,7 @@ export function useTeammates({ items = [], view: stored, asking = [], running = 
   const mate = shown && shown.kind !== 'new' ? team.find((t) => t.id === shown.id) ?? null : null;
   const page: ReactNode = shownOpen && view
     ? <TeammatesPage view={view} items={items} open={shownOpen} products={products} engines={engines} me={me}
-        onOpen={go} onOpenThread={onOpenThread} tabOf={tabOf} onOpenList={onOpenList} onChanged={onChanged} sessions={sessions} models={models} mePic={mePic} />
+        onOpen={go} onOpenThread={onOpenThread} onOpenFile={onOpenFile} tabOf={tabOf} onOpenList={onOpenList} onChanged={onChanged} sessions={sessions} queued={queued} models={models} mePic={mePic} />
     : null;
   const call = async (op: string, args: Record<string, unknown>) => { const r = await api.teammates(op, args); if (r.ok) onChanged(); return r.ok; };
   return {
@@ -68,7 +71,7 @@ export function useTeammates({ items = [], view: stored, asking = [], running = 
     go,
     leave,
     /** Escape: from About, its Log or a playbook back to its chat; from a chat, out of Chats. */
-    back: () => (shown && (shown.kind === 'about' || shown.kind === 'log' || shown.kind === 'book') ? go(shown.id) : leave()),
+    back: () => (shown && (shown.kind === 'about' || shown.kind === 'sheet' || shown.kind === 'log' || shown.kind === 'book') ? go(shown.id) : leave()),
     list: team,
     onNew: () => go('new'),
     /** The wide sidebar's one Chats row; with Groups on, the Groups row is it. */
@@ -76,5 +79,17 @@ export function useTeammates({ items = [], view: stored, asking = [], running = 
     title: shownOpen ? <TeammatesTitle view={view ?? null} open={shownOpen} /> : null,
     right: mate && shown ? <div className="th-right"><TeammateMenu t={mate} shown={shown} onOpen={go} call={call} onDeleted={() => { leave(); onChanged(); }} /></div> : null,
     page,
+    /** One AI teammate's chat, drawn on its place rather than on Chats. */
+    chatWith: (id: string): ReactNode => {
+      const t = team.find((x) => x.id === id);
+      return t && view ? <TeammateChat key={t.id} view={view} items={items} products={products} t={t} me={me} mePic={mePic} sessions={sessions} queued={queued}
+        onOpen={go} onOpenThread={onOpenThread} onOpenFile={onOpenFile} onChanged={onChanged} tabOf={tabOf} onOpenList={onOpenList} /> : null;
+    },
+    /** Change what an AI teammate you own does: null once saved, or why not. */
+    setJob: async (id: string, job: string): Promise<string | null> => {
+      const r = await api.teammates('update', { id, patch: { job } });
+      if (r.ok) onChanged();
+      return r.ok ? null : r.error ?? 'Its job did not save';
+    },
   };
 }

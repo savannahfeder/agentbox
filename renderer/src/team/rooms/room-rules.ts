@@ -2,6 +2,7 @@
 // drawing so they can be tested. tests/a-room-reads-the-way-it-was-approved.
 import type { Person, Room, RoomCard, RoomMention, RoomProfile, ThreadCard } from '../../types';
 import { Name } from '../../../../shared/product-name.mjs';
+import { mentionsIn } from '../../../../shared/room-needs-you.mjs';
 
 type Shares = { me: boolean; teammate: boolean; showActivity: boolean; activity?: unknown[] | null; away?: boolean };
 /** Whose threads reach me as the team's thread cards: my own, or a teammate's who shares them. */
@@ -114,14 +115,20 @@ export function openGroupWords(me: Pick<RoomProfile, 'show_working' | 'show_leve
 }
 
 /** The room in the Threads tab: the one picked, else the first pinned room, else the first room. Never a group chat. */
-export function tabRoom<R extends Pick<Room, 'id' | 'kind' | 'pinned'>>(rooms: readonly R[], choice: string | null): R | null {
+export function tabRoom<R extends Pick<Room, 'id' | 'kind' | 'pinned'> & { teamId?: string | null }>(rooms: readonly R[], choice: string | null): R | null {
   if (choice === 'none') return null;
   const own = rooms.filter((r) => r.kind !== 'group');
-  return own.find((r) => r.id === choice) ?? own.find((r) => r.pinned) ?? own[0] ?? null;
+  return own.find((r) => r.id === choice) ?? own.find((r) => r.teamId) ?? own.find((r) => r.pinned) ?? own[0] ?? null;
 }
 
+/** Over a group's list of people, so teammates and strangers are not read alike. */
+export const peopleHeading = (room: { teamId?: string | null; listed?: boolean }) => (room.teamId ? 'Your team' : room.listed ? 'Everyone here' : 'People');
+
+/** Beside a group's name, for the two that need saying. */
+export const groupTag = (g: { team?: boolean; open?: boolean }) => (g.team ? 'Your team' : g.open ? 'Public' : null);
+
 /** The group Groups opens: the one open last while you are still in it, else as tabRoom picks, else any chat. */
-export function groupInTab<R extends Pick<Room, 'id' | 'kind' | 'pinned'>>(rooms: readonly R[], last: string | null): R | null {
+export function groupInTab<R extends Pick<Room, 'id' | 'kind' | 'pinned'> & { teamId?: string | null }>(rooms: readonly R[], last: string | null): R | null {
   return rooms.find((r) => r.id === last) ?? tabRoom(rooms, null) ?? rooms[0] ?? null;
 }
 
@@ -179,39 +186,7 @@ export function clockOf(ms: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-type Named = { id: string; name: string };
-
-// "@Maya C." or "@Maya" names Maya. A first name two people share names
-// neither, so a mention never lands on the wrong person.
-export function mentionsIn(body: string, people: readonly Named[]): string[] {
-  const text = ` ${String(body ?? '')} `;
-  const lower = text.toLowerCase();
-  const out = new Set<string>();
-  const firsts = new Map<string, string[]>();
-  for (const p of people) {
-    const first = p.name.split(/\s+/)[0]?.toLowerCase();
-    if (first) firsts.set(first, [...(firsts.get(first) ?? []), p.id]);
-  }
-  for (const p of people) {
-    if (!p.name) continue;
-    const full = `@${p.name.toLowerCase()}`;
-    const first = `@${p.name.split(/\s+/)[0].toLowerCase()}`;
-    if (hasWord(lower, full)) out.add(p.id);
-    else if (hasWord(lower, first) && (firsts.get(first.slice(1))?.length ?? 0) === 1) out.add(p.id);
-  }
-  return [...out];
-}
-
-function hasWord(text: string, word: string): boolean {
-  let at = text.indexOf(word);
-  while (at >= 0) {
-    const before = text[at - 1];
-    const after = text[at + word.length];
-    if (!/[\p{L}\p{N}]/u.test(before ?? ' ') && !/[\p{L}\p{N}]/u.test(after ?? ' ')) return true;
-    at = text.indexOf(word, at + 1);
-  }
-  return false;
-}
+export { mentionsIn };
 
 /** A message cut into plain text and the @names in it, for drawing. */
 export function markMentions(body: string, names: readonly string[]): { text: string; mention: boolean }[] {
@@ -291,17 +266,12 @@ export function withMe<T extends { me: boolean }>(people: readonly T[], me: T | 
   return !me || people.some((p) => p.me) ? [...people] : [...people, me];
 }
 
-export type MentionRow = RoomMention & { count: number };
-
-/** One Needs you row per person per room, with how many they sent and the
- *  newest one's time: every row of one room opens the same chat, and a read
- *  clears them together. */
-export function mentionRows(mentions: readonly RoomMention[]): MentionRow[] {
-  const rows = new Map<string, MentionRow>();
+/** One Needs you row per group, the newest: a Mac's rooms already give one, a phone's give one per message. */
+export function mentionRows(mentions: readonly RoomMention[]): RoomMention[] {
+  const rows = new Map<string, RoomMention>();
   for (const m of mentions) {
-    const id = `room-mention:${m.roomId}:${m.by ?? ''}`;
-    const had = rows.get(id);
-    rows.set(id, { ...(!had || m.at > had.at ? m : had), id, count: (had?.count ?? 0) + 1 });
+    const had = rows.get(m.roomId);
+    if (!had || m.at > had.at) rows.set(m.roomId, { ...m, id: `room-mention:${m.roomId}` });
   }
   return [...rows.values()].sort((a, b) => b.at - a.at);
 }

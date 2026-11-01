@@ -5,7 +5,7 @@
 // pins it to the top, mutes it, or leaves it.
 import { useState, type ReactNode } from 'react';
 import { I } from './icons';
-import { RoomFace } from './RoomFace';
+import { Face } from '../people';
 import { clockOf } from './room-rules';
 import { MoreMenu, type MoreItem } from '../MessageMore';
 
@@ -16,6 +16,8 @@ export type Conversation = {
   id: string;
   name: string;
   faces: { name: string; url: string | null }[];
+  /** Who a chat with people is with, by id, so one person is one row. */
+  people?: string[];
   last: string;
   at: number;
   unread: boolean;
@@ -110,8 +112,8 @@ export function MessagesPage({ list, onKey, now, onPick, onAction, pins: pinsGiv
               {c.kind === 'room'
                 ? <span className="fc room">{I.hash()}</span>
                 : c.faces.length > 1
-                  ? <span className="fc two">{c.faces.slice(0, 2).map((f, i) => <RoomFace key={i} name={f.name} url={f.url} size={18} />)}</span>
-                  : <span className="fc"><RoomFace name={c.faces[0]?.name ?? c.name} url={c.faces[0]?.url} size={28} /></span>}
+                  ? <span className="fc two">{c.faces.slice(0, 2).map((f, i) => <Face key={i} name={f.name} url={f.url} size={18} />)}</span>
+                  : <span className="fc"><Face name={c.faces[0]?.name ?? c.name} url={c.faces[0]?.url} size={28} /></span>}
               <span className="t">
                 <span className="nm"><b>{c.name}</b>{c.pinned && <span className="rm-conv-pin" aria-label="Pinned">{I.pinMark()}</span>}</span>
                 <span className="ls">{c.last}</span>
@@ -135,7 +137,7 @@ export function MessagesPage({ list, onKey, now, onPick, onAction, pins: pinsGiv
 /** The head of a room or group chat on the messages page. */
 export function FullChatHead({ title, faces, actions }: { title: string; faces?: { name: string; url: string | null }[]; actions?: ReactNode }) {
   return <div className="hd">
-    {faces?.length ? <span style={{ display: 'flex' }}>{faces.slice(0, 3).map((f, i) => <RoomFace key={i} name={f.name} url={f.url} size={22} />)}</span>
+    {faces?.length ? <span style={{ display: 'flex' }}>{faces.slice(0, 3).map((f, i) => <Face key={i} name={f.name} url={f.url} size={22} />)}</span>
       : <span style={{ color: 'var(--text-faint)', display: 'flex' }}>{I.hash(15)}</span>}
     <span>{title}</span>
     {actions && <span className="ic">{actions}</span>}

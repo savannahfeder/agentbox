@@ -22,6 +22,7 @@ const BY_ID: Record<string, string> = {
   'view-done': '→',
   'view-groups': '→',
   'view-teammates': '→',
+  'view-connections': '→',
   'new-teammate': '+',
   update: '↓',
   'update-move': '→',
@@ -67,6 +68,9 @@ const BY_ID: Record<string, string> = {
   place: `☁${TEXT}`,
   'end-repeat': '⊘',
   'add-people': '+',
+  shipped: '↗',
+  decide: '◆',
+  'wait-stop': '⊘',
 };
 
 // Longest prefix first, so `teammate-pause-` is read before `teammate-`.
@@ -74,6 +78,10 @@ const BY_PREFIX: [string, string][] = [
   ['teammate-pause-', '‖'],
   ['teammate-', '@'],
   ['thread-', '›'],
+  ['line-', '“'],
+  ['file-', '▢'],
+  ['comment-', '◌'],
+  ['decision-', '◆'],
   ['priority-urgent', '↑'],
   ['priority-high', '↑'],
   ['priority-', '↓'],
@@ -84,6 +92,8 @@ const BY_PREFIX: [string, string][] = [
   ['cloud-', `☁${TEXT}`],
   ['route-', '→'],
   ['theme-', '◐'],
+  ['wait-', '…'],
+  ['team-list-', '≡'],
 ];
 
 export function glyphFor(row: { id: string; label: string }): string {

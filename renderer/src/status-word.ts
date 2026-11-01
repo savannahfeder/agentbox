@@ -68,7 +68,8 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
   // Said over "Waiting" and "Done", which do not tell a shipped thread from
   // one that never shipped (shared/not-shipped.mjs).
   const ship = shippedAs(item);
-  const shipped = ship ? says('Shipped', 'done', false, ship.sha ? `Shipped to main as ${ship.sha}` : 'Shipped to main') : null;
+  const shipped = (item.shippedAt ?? 0) > 0 ? says('Shipped', 'done', false, 'Marked as shipped')
+    : ship && item.shippedAt !== 0 ? says('Shipped', 'done', false, ship.sha ? `Shipped to main as ${ship.sha}` : 'Shipped to main') : null;
 
   if (state === 'done') {
     if (shipped) return shipped;
@@ -140,8 +141,8 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
  * the Status cell says: a hole in the column would read as a thread nothing
  * knows anything about.
  */
-export function cardStatus(state: ThreadStateWord): StatusCell {
-  return { word: STATE_WORD[state], mark: state === 'running' ? 'queued' : state === 'waiting' ? 'need' : state === 'scheduled' ? 'sched' : 'done', agent: false, live: false, cloud: false };
+export function cardStatus(state: ThreadStateWord, whose?: string | null): StatusCell {
+  return { word: state === 'waiting' && whose ? `Waiting on ${whose}` : STATE_WORD[state], mark: state === 'running' ? 'queued' : state === 'waiting' ? 'need' : state === 'scheduled' ? 'sched' : 'done', agent: false, live: false, cloud: false };
 }
 
 /** One thread's facts, read off the fleet by id and nothing else. */

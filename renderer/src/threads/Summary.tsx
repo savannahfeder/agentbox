@@ -21,7 +21,7 @@ import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityIdOf, priorityLabelOf, priorityValueOf, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName, type TeamView } from '../team/people';
 import {
-  STATE_WORD, stateWordOf, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, updatedWord, ownerName,
+  STATE_WORD, stateWordOf, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, linkPerson, linkWords, updatedWord, ownerName,
   readSummaryOpen, stateGlyph, statusChoices, type StateGlyph, type SummaryField,
 } from './summary-rules';
 import { crumbName, renameTo } from './crumb-rules';
@@ -38,6 +38,7 @@ import { factsFor, statusCell, type StatusCell } from '../status-word';
 import { TicketText } from '../components/TicketReference';
 import { repeatTag } from '../components/List';
 import { joinMessage } from '../message-split';
+import { standingLine } from './teammate-thread';
 import './summary.css';
 
 /* ------------------------------------------------------------------ pieces */
@@ -796,8 +797,10 @@ export function useRename(name: string, onRename: ((name: string) => Promise<boo
  * The name keeps whole words up to 59 letters (crumb-rules.ts) and the whole
  * of it is one hover away.
  */
-export function ThreadCrumb({ from, name, onBack, onRename, threadKey = '', renameAsk = 0, onAsked }: {
+export function ThreadCrumb({ from, name, audience = null, onBack, onRename, threadKey = '', renameAsk = 0, onAsked }: {
   from: string; name: string; onBack: () => void;
+  /** Who a thread about work is with, drawn after its name. */
+  audience?: string | null;
   onRename?: (name: string) => Promise<boolean>; threadKey?: string;
   /** When ⌘K's Rename Thread… was pressed; a new moment opens the name box. */
   renameAsk?: number;
@@ -830,57 +833,95 @@ export function ThreadCrumb({ from, name, onBack, onRename, threadKey = '', rena
       ) : (
         <span className="thread-crumb-name" title={r.shown}>{crumbName(r.shown)}</span>
       )}
+      {audience && !r.editing && <span className="thread-crumb-with">{audience}</span>}
     </div>
   );
 }
 
 /* ----------------------------------------------------------- a teammate's */
 
+/** What a teammate's thread waits on, and from whom: the line under its name. */
+export function TeammateStanding({ card, person, now = Date.now() }: { card: ThreadCard; person: Person | null; now?: number }) {
+  const team = useContext(TeamContext);
+  const owner = firstName(person) || 'Someone';
+  const waits = card.state !== 'done' ? linkWords(card.blockedBy, team?.byId) : null;
+  const word = card.shippedAt ? 'Shipped' : waits ? `Waits on ${waits}` : card.state === 'waiting' ? `Waiting on ${owner}` : STATE_WORD[card.state];
+  const line = card.shippedAt ? null : standingLine(card.state, owner, waits);
+  return (
+    <p className="tp-standing">
+      <Glyph kind={stateGlyph(card.state, false)} />
+      <b>{word}</b>
+      {line && <span className="tp-standing-line">{line}</span>}
+      <span className="tp-ago">Updated {agoWords(card.updatedAt, now)}</span>
+    </p>
+  );
+}
+
 /**
- * A teammate's thread, as one card made of exactly the summary's fields and
- * nothing new: state, priority, project and who can see it; progress as the
- * lead sentence; problem and solution side by side; blocked by and blocks side
- * by side; whose it is. A private thread's card says only that it is private,
- * whose it is and its state, because the Mac that published it sent nothing
- * else (shared/thread-cards.mjs cardsFor).
+ * A teammate's thread, beside its conversation: what it is about and what is
+ * done, the files it links to, what it waits on or holds up when anything
+ * does, and its properties. Its state heads the page (TeammateStanding). A
+ * private thread's card says only that it is private, because the Mac that
+ * published it sent nothing else (shared/thread-cards.mjs cardsFor).
  */
-export function TeammateCard({ card, person, now = Date.now() }: { card: ThreadCard; person: Person | null; now?: number }) {
-  const word = STATE_WORD[card.state];
-  const glyph = <Glyph kind={stateGlyph(card.state, false)} />;
+export function TeammateCard({ card, person, files = [] }: {
+  card: ThreadCard; person: Person | null; now?: number;
+  files?: { src: string; name: string; notes: number; open: () => void }[];
+}) {
+  const team = useContext(TeamContext);
   const name = person?.name || 'Someone';
   if (!card.visible) {
     return (
       <article className="ts-ticket ts-ticket-private">
         <p className="ts-tk-lead dim">Private thread</p>
-        <div className="ts-tk-foot"><Face person={person} /><b>{name}</b><span className="ts-tk-state">{glyph}{word}</span></div>
+        <div className="ts-tk-foot"><Face person={person} /><b>{name}</b><span className="ts-tk-state"><Glyph kind={stateGlyph(card.state, false)} />{card.shippedAt ? 'Shipped' : STATE_WORD[card.state]}</span></div>
       </article>
     );
   }
   const pid = Number.isFinite(card.priority) ? priorityIdOf(card.priority) : null;
-  const titles = (links: ThreadCard['blockedBy']) => (links.length
-    ? <p>{links.map((l, i) => <span key={l.id} className={l.title ? '' : 'dim'}>{i > 0 && ', '}{l.title ?? UNSEEN_THREAD}</span>)}</p>
-    : <p className="dim">Nothing</p>);
+  const titles = (links: ThreadCard['blockedBy']) => (
+    <p>{links.map((l, i) => { const who = linkPerson(l.id, team?.byId); return <span key={l.id} className={l.title || who ? '' : 'dim'}>{i > 0 && ', '}{l.title ?? who ?? UNSEEN_THREAD}</span>; })}</p>
+  );
   return (
     <article className="ts-ticket">
-      <div className="ts-tk-top">
-        {/* Who it waits on, which a persona could not tell from "Waiting". */}
-        <span>{glyph}{card.state === 'waiting' ? `Waiting on ${name.split(/\s+/)[0]}` : word}</span>
-        {pid && <><i className="ts-sep" /><span><PriorityIcon id={pid} />{priorityLabelOf(pid)}</span></>}
-        {card.project && <><i className="ts-sep" /><span>{card.project}</span></>}
-        <i className="ts-sep" /><span>Visible to the team</span>
-      </div>
       {/* THE SAME TWO PARTS AS THE PANEL (w-54e9c7243f): Context as the lead,
-          then the Done trail when anything is done. Problem and Solution
-          left the card with the panel. */}
-      <p className={`ts-tk-lead${card.problem ? '' : ' dim'}`}>{card.problem || NOT_WRITTEN}</p>
+          then the Done trail when anything is done. */}
+      <section className="ts-tk-part">
+        <span className="ts-h">About</span>
+        <p className={`ts-tk-lead${card.problem ? '' : ' dim'}`}>{card.problem || NOT_WRITTEN}</p>
+      </section>
       {doneSteps(card.progress).length > 0 && (
-        <div className="ts-tk-done"><span className="ts-h">Done</span><DoneTrail steps={doneSteps(card.progress)} /></div>
+        <section className="ts-tk-part ts-tk-done"><span className="ts-h">Done</span><DoneTrail steps={doneSteps(card.progress)} /></section>
       )}
-      <div className="ts-tk-grid ts-tk-next">
-        <div><span className="ts-h">Blocked by</span>{titles(card.blockedBy)}</div>
-        <div><span className="ts-h">Blocks</span>{titles(card.blocks)}</div>
-      </div>
-      <div className="ts-tk-foot"><Face person={person} /><b>{name}</b><span>· kept up to date by the agent · {agoWords(card.updatedAt, now)}</span></div>
+      {files.length > 0 && (
+        <section className="ts-tk-part">
+          <span className="ts-h">Files</span>
+          <ul className="ts-tk-files">
+            {files.map((f) => (
+              <li key={f.src}>
+                <button type="button" onClick={f.open} title={`Open ${f.name}`}>
+                  <span className="ts-tk-ext" aria-hidden="true">{(f.name.includes('.') ? f.name.split('.').pop() ?? '' : 'file').slice(0, 4)}</span>
+                  <span className="ts-tk-fname">{f.name}</span>
+                  {f.notes > 0 && <span className="ts-tk-notes">{f.notes === 1 ? '1 note' : `${f.notes} notes`}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {(card.blockedBy.length > 0 || card.blocks.length > 0) && (
+        <div className="ts-tk-part ts-tk-grid ts-tk-next">
+          {card.blockedBy.length > 0 && <div><span className="ts-h">Blocked by</span>{titles(card.blockedBy)}</div>}
+          {card.blocks.length > 0 && <div><span className="ts-h">Blocks</span>{titles(card.blocks)}</div>}
+        </div>
+      )}
+      <dl className="ts-tk-props">
+        <dt>Owner</dt><dd><Face person={person} />{name}</dd>
+        {pid && <><dt>Priority</dt><dd><PriorityIcon id={pid} />{priorityLabelOf(pid)}</dd></>}
+        {card.project && <><dt>Project</dt><dd>{card.project}</dd></>}
+        <dt>Who sees it</dt><dd>{card.people?.length && team ? chosenNames(card.people, team.byId) : 'The team'}</dd>
+      </dl>
+      <p className="ts-tk-foot">The agent keeps this summary up to date.</p>
     </article>
   );
 }

@@ -7,6 +7,7 @@ import '@fontsource-variable/source-sans-3';
 import './styles.css';
 import './workspace-navigation.css';
 import './phone.css';
+import './soft-corners.css';
 import { applyTheme, machineTheme, resolvePick, resolveTheme, THEME_KEY } from './theme';
 import { applySkin, applyTune, normalizeSavedLook, resolveSkin, resolveTune, SKIN_KEY, TUNE_KEY, wornSkin } from './skins';
 // The shape an opened task is, while that is still an open question on.
@@ -16,6 +17,7 @@ import { applyTaskShape, resolveTaskShape, TASK_SHAPE_KEY } from './task-shape';
 import { installPictureWatch } from './phone-files';
 import { theDoorNeedsItsKey } from './browser-bridge';
 import { comeBackFromABlankScreen, writeHeldBeforeReload } from './after-a-crash';
+import { installStrayLetters } from './stray-letters';
 
 // A thrown React error takes the screen down without taking the process down,
 // so nothing in the main process ever hears about it. These two lines are the
@@ -82,6 +84,7 @@ const boot = () => {
   paintTheLook();
   // A picture holds its place while it loads, in every window (phone.css).
   installPictureWatch();
+  installStrayLetters();
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <ScreenCrash><AgentUpdates><App /></AgentUpdates></ScreenCrash>

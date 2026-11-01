@@ -8,10 +8,9 @@
 //   - a small people mark after the title of a thread the team can see, and
 //     nothing at all on the rest (usually most rows), so the mark means one
 //     thing and the list stays quiet;
-//   - hovering a row shows Share or Unshare at its right end, in place of
-//     when it was updated, and one click writes 'team' or 'private' through
-//     threadEdit;
-//   - no mark and no button where the question does not arise: nobody signed
+//   - changing it is in the thread, not on the row: round two's three clicks
+//     landed on a row's one-click Unshare when the rows moved;
+//   - no mark where the question does not arise: nobody signed
 //     in, a message between people, an agent's own row, a teammate's thread.
 // The approved columns stay exactly Thread, Project, Priority, Updated.
 import { describe, it, expect } from 'vitest';
@@ -20,7 +19,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ThreadCells, TableHead } from '../renderer/src/threads/Pages.tsx';
 import { TeamContext } from '../renderer/src/team/people.tsx';
-import { rowSharing, sharePatch } from '../renderer/src/threads/page-rules.ts';
+import { rowSharing } from '../renderer/src/threads/page-rules.ts';
 globalThis.React = React;
 
 const NOW = Date.now();
@@ -63,29 +62,24 @@ describe('rowSharing: who sees a row, as the inbox says it', () => {
   it('a row with no author is yours, as every thread was before teams', () => {
     expect(rowSharing(row({ createdBy: undefined }), northwind, T)).toBe('private');
   });
-  it('one click writes the other one', () => {
-    expect(sharePatch('private')).toEqual({ visibility: 'team' });
-    expect(sharePatch('team')).toEqual({ visibility: 'private' });
-  });
 });
 
 describe('the row', () => {
   // Since 2026-10-02 the team, being the default, wears no mark at all
   // (tests/a-thread-the-whole-team-sees-wears-no-mark.test.mjs).
-  it('draws nothing after the title of a thread the team can see, and offers Unshare', () => {
+  it('draws nothing after the title of a thread the team can see, and no Unshare', () => {
     const html = draw(row({ createdAt: SINCE + DAY }));
     expect(html).toMatch(/th-cell-title[^>]*>Acme renewal terms<\/div>/);
-    expect(html).toMatch(/<button[^>]*class="th-row-act"[^>]*>.*Unshare<\/button>/);
+    expect(text(html)).not.toContain('Unshare');
   });
   // A private thread wears the LOCK here rather than nothing: the mark is
   // unconditional now. Its own rule is pinned in
   // tests/a-private-thread-always-wears-the-lock.test.mjs.
-  it('draws the lock on a thread only you can see, and offers Share', () => {
+  it('draws the lock on a thread only you can see, and no Share', () => {
     const html = draw(row());
     expect(html).not.toContain('th-shared');
     expect(html).toContain('th-lock');
-    expect(html).toMatch(/<button[^>]*class="th-row-act"[^>]*>.*Share<\/button>/);
-    expect(text(html)).not.toContain('Unshare');
+    expect(html).not.toContain('th-row-act');
   });
   it('draws neither on a message between people', () => {
     const html = draw(row({ product: 'direct-1', body: 'Can you take the call?' }), direct);

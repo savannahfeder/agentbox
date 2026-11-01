@@ -1,0 +1,32 @@
+/* Things a person writes in or presses, softened beside the round tiles and faces.
+   Loaded after styles.css. List rows and the window's frame stay as they are. */
+.dock-card, .workspace-layout .dock-card, .modal.compose, .rm-compose, .tc-card, .tc-menu {
+  border-radius: var(--artifact-corner);
+  /* The chips and buttons inside take the token they already name. */
+  --tag-radius: var(--artifact-corner-small);
+}
+.dock-card > :first-child, .modal.compose > :first-child { border-top-left-radius: inherit; border-top-right-radius: inherit; }
+/* Send is two buttons sharing one outline, each drawing its own outer corners from this token. */
+.tc-send { --radius: var(--artifact-corner-small); }
+.dock-send, .dock-stop, .tc-chip, .tc-word, .tc-icon, .tc-seg,
+.ts-done, .ts-more, .ts-msgbtn, .rm-btn, .cx-search, .av-step, .th-new, .th-disp {
+  border-radius: var(--artifact-corner-small);
+}
+.doc-plain-text { margin: 0; padding: 20px 24px; height: 100%; overflow: auto; box-sizing: border-box; font: 12.5px/1.6 var(--mono); color: var(--text); white-space: pre; user-select: text; -webkit-user-select: text; }
+.av-note { border-radius: var(--artifact-corner); }
+.av-note.is-on { border-radius: var(--artifact-corner); }
+
+/* Cards, sheets, dialogs and menus: the artifact corner. */
+.modal, .approval-card, .opt-peek, .toast, .link-pop, .theme-picker, .si-card, .fb-card, .tm-face-card, .th-why-card,
+.th-menu, .th-pop, .th-acct-menu, .th-me-pop, .tm-add-menu, .ev-hidden-menu, .rm-pop, .av-names, .ps-menu,
+.prio-menu, .when-menu, .slash-menu, .proj-menu, .repeat-menu, .mention-menu, .mention-card, .set-picker-menu,
+.instr-scope-menu, .instruction-restore-menu, .rm-notice, .rm-opt, .one-file, .instr-card-ours {
+  border-radius: var(--artifact-corner);
+}
+
+/* Things you press or type in that never had a corner. */
+.approval-allow, .approval-deny, .fr-go, .fr-submit, .fr-pick, .remote-primary, .remote-secondary,
+.chat-edit, .fmt-done, .rm-btn, .rm-input, .rm-search, .gc-find, .tm-seg, .tm-every, .th-follow,
+.gr-tile, .fb-tile, .direct-review .review-accept, .direct-review .review-feedback {
+  border-radius: var(--artifact-corner-small);
+}

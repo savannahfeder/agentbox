@@ -14,12 +14,13 @@
 import { z } from 'zod';
 import { resolveAccount } from './core/account.mjs';
 import { listProducts, getProduct, createProduct, updateProduct } from './core/products.mjs';
-import { listDocuments, readDocument, writeDocument } from './core/documents.mjs';
+import { listDocuments, nameOnThread, noteWrittenForRun, readDocument, writeDocument } from './core/documents.mjs';
 import { listSkills, fetchSkill, fetchReference } from './core/skills.mjs';
 import { listWorkItems, updateItem, createClaimRegistry } from './core/work.mjs';
 import { readStandingInstruction, setStandingInstruction } from './core/repeats.mjs';
-import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire } from './core/teammates.mjs';
-import { readTeammates, teamDir } from '../main/store/teammates-files.mjs';
+import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire, noteToAnotherThread } from './core/teammates.mjs';
+import { documentVersion, documentsWithFolders, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mjs';
+import { readTeammates, readTeamView, teamDir } from '../main/store/teammates-files.mjs';
 import { legacyRoot } from '../main/store/project.mjs';
 import { listProductChats, readProductChat } from './core/chat.mjs';
 import { lookAtPage } from './core/page.mjs';
@@ -39,6 +40,7 @@ const CAPABILITIES = [
   'personas and transcripts (they are documents)', 'skills', 'work items', 'past chats (read only)',
   'the standing instruction behind a repeating task, on a thread that is one of its runs',
   'the team chat and passing work to a teammate, from any thread; remembering and setting up, on a thread that is a teammate\'s run',
+  'writing to people on the team and reading the team\'s threads, when your owner is on a team',
   'looking at a page running on this machine (look_at_page, local addresses only)',
 ];
 const MISSING = [
@@ -60,8 +62,10 @@ const guard = (fn) => async (args) => {
 export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, requestCloudResource = null } = {}) {
   const account = resolveAccount();
   const claims = createClaimRegistry({ holder: holder ?? `mcp-${process.pid}` });
-  const hasTeam = teammatesExist(String(process.env.STORE_ACCOUNT_ID ?? '').trim() || account.accountId);
-  const capabilities = hasTeam ? CAPABILITIES : CAPABILITIES.filter((c) => !c.includes('teammate'));
+  const accountId = String(process.env.STORE_ACCOUNT_ID ?? '').trim() || account.accountId;
+  const hasTeam = teammatesExist(accountId);
+  const hasPeople = onATeam(accountId);
+  const capabilities = CAPABILITIES.filter((c) => (c.includes('teammate') ? hasTeam : c.includes('on a team') ? hasPeople : true));
 
   const tools = [
     /* ------------------------------- products ------------------------------ */
@@ -113,7 +117,11 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
         query: z.string().optional(),
         catalogedOnly: z.boolean().optional().describe('only what the library index lists; omit to see everything'),
       },
-      run: ({ product, ...filter }) => json(listDocuments(product, filter)),
+      // The folder filter goes after the list: a folder in Files holds more than a directory of its name.
+      run: ({ product, folder, ...filter }) => {
+        const all = documentsWithFolders(listDocuments(product, filter), { folder });
+        return json(all.filter((d) => !folder || d.folder === folder || d.filesFolder));
+      },
     },
     {
       name: 'read_document',
@@ -123,7 +131,7 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
     },
     {
       name: 'write_document',
-      description: 'Create or update a document, and also how you retitle, move, or change the status of one. Pass content to write it; omit content to change only the metadata, which is how a rename happens without reading the whole document back first. A new document needs a path, a title, and content. The founder sees these in the app, so the title is what a person would call it, and the path says where it belongs (personas/, reports/, transcripts/, designs/). The extension is a real choice, not a formality: a .html document opens as a rendered page, a .md one as markdown, and which of those a founder can actually read is worth knowing before you pick.',
+      description: 'Create or update a document, and also how you retitle, move, or change the status of one. Pass content to write it; omit content to change only the metadata, which is how a rename happens without reading the whole document back first. A new document needs a path, a title, and content. The founder sees these in the app, so the title is what a person would call it, and the path says where it belongs (personas/, reports/, transcripts/, designs/). The extension is a real choice, not a formality: a .html document opens as a rendered page, a .md one as markdown, and which of those a founder can actually read is worth knowing before you pick. Written from a thread, it is named on that thread, which is what puts it in their Files; when it could not be, the result says so in `say`.',
       schema: {
         product: z.string(),
         id: z.string().optional().describe('omit to create; pass to update a known document'),
@@ -132,8 +140,18 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
         kind: z.enum(AGENT_CREATION_KINDS).optional().describe('follows the path when you leave it out: .html renders as a page, anything else as markdown. Name it only when the path does not say enough (persona, transcript, canvas, app).'),
         content: z.string().optional(),
         status: z.enum(['current', 'history', 'exploration']).optional(),
+        folder: z.string().optional().describe('a folder in Files to put it in, by name, such as Product specs. Made if there is none. The answer\'s filedIn says it happened; a directory in path is not a folder in Files'),
+        versionOf: z.string().optional().describe('the name of a file someone already has, on this thread or in Files, that this content revises. It is saved as that file\'s next version (-v2, -v3) in this thread\'s folder and opens as the same file, with its comments; no path is needed and nobody has to be sent it. A copy of such a file written under its own name elsewhere is saved this way too'),
       },
-      run: async ({ product, ...doc }) => json(await writeDocument(product, doc)),
+      run: async ({ product, folder, versionOf, ...doc }) => {
+        const version = doc.content == null ? null : documentVersion({ product, versionOf, path: doc.path ?? null, ownItem });
+        const into = version ? version.product : product;
+        const written = await writeDocument(into, version ? { ...doc, id: undefined, path: version.path, title: doc.title ?? version.title } : doc);
+        if (doc.content == null) return json(written);
+        noteWrittenForRun(into, written.path);
+        const named = await nameOnThread(written, { ownItem, update: (id, patch) => claims.update(id, patch), note: version?.note });
+        return json({ ...written, ...named, ...(version ? { versionOf: version.of } : {}), ...fileWrittenDocument({ path: written.path, folder }) });
+      },
     },
 
     /* -------------------------------- skills ------------------------------- */
@@ -204,7 +222,7 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
     },
     {
       name: 'update_work_item',
-      description: 'Report progress on an item: set status to done when it is finished, blocked when it cannot proceed until something outside it changes, and leave a note saying where things stand. Keep the summary current with problem (shown as Context) and progress (shown as the Done list), which is all a teammate sees of the thread. A worker the app started for a row ends with its answer as its last message, and the app writes that message onto the row as the result, so such a worker does not pass result for its own row: the same answer written twice is what they then read twice. A row the founder wrote (labelled founder) is closed only when they asked for it: answering them is not finishing it, so the row stays open for them. To close one, pass closeBecause with their exact words asking you to; without them the rest of the write lands and the row is left open. A runAt you set holds workers off but keeps the row in their inbox; when they asked for it to be put off ("remind me Friday"), pass deferBecause with their exact words and it leaves their inbox until then. Writing to a row this session is not holding takes the row first, so there is no need to claim before you speak; the write is only refused when another session is genuinely on it, and that refusal is kept rather than thrown away, parked where the error says and handed to whoever takes the row next. Finishing a row hands the claim straight back, and you can still answer on it afterwards.',
+      description: 'Report progress on an item: set status to done when it is finished, blocked when it cannot proceed until something outside it changes, and leave a note saying where things stand. Keep the summary current with problem (shown as Context) and progress (shown as the Done list), which is all a teammate sees of the thread. A worker the app started for a row ends with its answer as its last message, and the app writes that message onto the row as the result, so such a worker does not pass result for its own row: the same answer written twice is what they then read twice. A row the founder wrote (labelled founder) is closed only when they asked for it: answering them is not finishing it, so the row stays open for them. To close one, pass closeBecause with their exact words asking you to; without them the rest of the write lands and the row is left open. A runAt you set holds workers off but keeps the row in their inbox; when they asked for it to be put off ("remind me Friday"), pass deferBecause with their exact words and it leaves their inbox until then. Writing to a row this session is not holding takes the row first, so there is no need to claim before you speak; the write is only refused when another session is genuinely on it, and that refusal is kept rather than thrown away, parked where the error says and handed to whoever takes the row next. Finishing a row hands the claim straight back, and you can still answer on it afterwards. A note or result alone on another agent\'s thread that is not running reaches it as your words and starts a turn there, unless its owner stopped it; its own note is left as it was.',
       schema: {
         id: z.string(),
         status: z.enum(WORK_ITEM_STATUSES).optional(),
@@ -218,10 +236,13 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
         problem: z.string().optional().describe(`the summary's CONTEXT: a few plain sentences, ${CONTEXT_WORDS} words at most, about the whole thread for someone who has forgotten it: what the thread is for, then where it stands overall. Never only the latest round, which the answer gives`),
         progress: z.string().optional().describe(`the summary's DONE list: the steps taken so far, one per line, oldest first and newest last, ${DONE_STEPS} lines at most of ${DONE_STEP_WORDS} words each. Send the whole list each time; it replaces the last one. Every line is a step that FINISHED: one you are about to take goes on after it happens, never before`),
         solution: z.string().optional().describe(`no longer shown; leave it out (older threads may still carry one, ${SUMMARY_WORDS} words at most)`),
-        blockedBy: z.array(z.string()).optional().describe('ids of threads this one waits on'),
+        blockedBy: z.array(z.string()).optional().describe('ids of threads this one waits on, or "person:<name>" for someone on the team whose code, answer or review it waits on. A thread that waits only on others leaves their Needs you, says whom it waits on, and comes back when that person writes or after 3 days, so set this rather than offering "wait for them" as a choice'),
         blocks: z.array(z.string()).optional().describe('ids of threads that wait on this one'),
       },
-      run: async ({ id, ...patch }) => json(await claims.update(id, patch)),
+      run: async ({ id, ...patch }) => {
+        if (patch.blockedBy) patch.blockedBy = waitsNamed(patch.blockedBy);
+        return json(noteToAnotherThread(id, patch, { ownItem }) ?? await claims.update(id, patch));
+      },
     },
     {
       name: 'release_work_item',
@@ -254,13 +275,14 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
     // does, because they asked. Which comes from the run, never an argument.
     {
       name: 'team_post',
-      description: 'Say something in the team chat: as the teammate this run belongs to, or, on any other thread, for the person when they ask you to tell a teammate something. The person and every teammate read it, so say "you" to the person, never "the person". From a teammate, naming another in `to` or with @Name tells them: they read it on their next turn, and it wakes nobody. To have a teammate act, use team_pass. For the person, naming a teammate wakes them. Keep it short and plain. Add up to four short `options` when asking the person something they can answer in a tap.',
+      description: 'Say something in the team chat: as the teammate this run belongs to, or, on any other thread, for the person when they ask you to tell a teammate something. The person and every teammate read it, so say "you" to the person, never "the person". From a teammate, naming another in `to` or with @Name tells them: they read it on their next turn, and it wakes nobody. To have a teammate act, use team_pass. For the person, naming a teammate wakes them. A line or two, then stop; call it again for a second thing. Add up to four short `options` when asking the person something they can answer in a tap.',
       schema: {
-        text: z.string().describe('what to say, one to three sentences'),
+        text: z.string().describe('what to say, as a colleague would in Slack: a line or two, no headings, bold or lists. Over 500 characters is refused'),
         to: z.array(z.string()).optional().describe('names of teammates it is for'),
         options: z.array(z.string()).optional().describe('short answers the person can tap, when asking them a question'),
+        document: z.string().optional().describe('a document you wrote in this project, by its path, for anything long. It shows as a card to open beside your one sentence'),
       },
-      run: ({ text: words, to, options }) => json(teamPost({ text: words, to, options })),
+      run: ({ text: words, to, options, document }) => json(teamPost({ text: words, to, options, document })),
     },
     {
       name: 'team_pass',
@@ -329,6 +351,9 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
         runsOn: z.enum(['claude', 'codex']).optional(),
         handoffsNeedYes: z.boolean().optional(),
         pausedUntil: z.string().nullable().optional(),
+        readsMessages: z.boolean().optional().describe('whether you may read the person\'s direct messages, as they answered when you asked'),
+        voice: z.string().optional().describe('how you write: blunt, warm, dry, careful or curious'),
+        voiceWords: z.string().optional().describe('how you write, in one sentence of your own, instead of voice'),
         ready: z.boolean().optional(),
       },
       run: (args) => json(teamSetup(args)),
@@ -338,6 +363,65 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
       description: 'The person\'s teammates (agents with standing jobs) with their role and job, and the last twenty things said in the team chat. Works on any thread.',
       schema: {},
       run: () => json(teamRoster()),
+    },
+
+    /* ---------------------------- people on the team ------------------------ */
+    // Under the agent's own name with its owner shown, never as the owner. Which
+    // agent comes from the run, never an argument.
+    {
+      name: 'team_tell',
+      description: 'Write to people on the team, under your own name with your owner shown ("Chief of staff, Maya\'s"): one person, several in one conversation, a group, or the people on this thread. They get it in their inbox. The first time you write to someone it waits for your owner\'s yes on one card the app shows them with your exact words; do not ask them for that yes yourself. After that it goes in about ten seconds, unless your owner takes it back. A reply comes back to this thread as a turn. To hand them a file you made, attach it with files. Use this instead of asking your owner to pass something on. team_post is only for your owner\'s AI teammates.',
+      schema: {
+        text: z.string().optional().describe('what to say, as a colleague would in Slack: a line or two, the news or the ask first, no headings, bold or lists. Over 500 characters is refused: attach a document with files for anything long, and send one sentence with it.'),
+        to: z.array(z.string()).optional().describe('people\'s names; an error names who is on the team'),
+        group: z.string().optional().describe('a group\'s name, instead of to'),
+        thread: z.boolean().optional().describe('true: the people on this thread, instead of to'),
+        outside: z.boolean().optional().describe('true when this is meant to leave the team (a customer, an investor). It waits for your owner\'s yes every time'),
+        files: z.array(z.string()).optional().describe('files to attach, as a person attaches them: paths in this thread\'s own folder, its project or the project\'s code, up to 200 MB each. They arrive as files that open and play, not as paths. A file anywhere else is refused: copy it into your folder first'),
+        versionOf: z.string().optional().describe('the name of a file already on this thread or conversation that the one file in files replaces. It is sent under that name with the next -v2, -v3, so it opens as the next version of the same file, with its comments. Without it a file is a separate file'),
+        folder: z.string().optional().describe('a folder of this thread\'s project to file these in, by name, such as Launch. It is made if there is none'),
+      },
+      run: (args) => json(teamTell(args)),
+    },
+    {
+      name: 'team_file',
+      description: 'Put files you made, of any kind, in a folder in Files by the folder\'s name, so people and agents find them there. The folder is looked for in the project the name gives, then this thread\'s, then any project that has one of that name, and made only if none has it. It holds every version of a file, past and to come, and teammates see it under the same rules as the file. The answer says where it went: say that place, not the one you were asked for.',
+      schema: {
+        files: z.array(z.string()).describe('the files, by path in this thread\'s folder, its project or the project\'s code'),
+        folder: z.string().describe('the folder\'s name, such as Launch, or with its project, such as Company > Launch'),
+      },
+      run: (args) => json(teamFile(args)),
+    },
+    {
+      name: 'team_task',
+      description: 'Hand one person a task: it lands in their inbox as a task from you, with your owner shown, and no agent starts on it. The first time you write to someone it waits for your owner\'s yes on one card the app shows them; do not ask them for that yes yourself. Their replies, and their finishing it, come back to this thread as a turn.',
+      schema: {
+        to: z.string().describe('the person\'s name'),
+        title: z.string().describe('the task, in a short line'),
+        details: z.string().optional().describe('what they need to do it, and what done looks like'),
+        due: z.string().optional().describe('a day, YYYY-MM-DD, or a day and a time, YYYY-MM-DDTHH:MM'),
+        files: z.array(z.string()).optional().describe('files to attach, as a person attaches them: paths in this thread\'s own folder, its project or the project\'s code, up to 200 MB each. They arrive as files that open and play, not as paths. A file anywhere else is refused: copy it into your folder first'),
+        versionOf: z.string().optional().describe('the name of a file already on this thread or conversation that the one file in files replaces. It is sent under that name with the next -v2, -v3, so it opens as the next version of the same file, with its comments. Without it a file is a separate file'),
+        folder: z.string().optional().describe('a folder of this thread\'s project to file these in, by name, such as Launch. It is made if there is none'),
+        blockedBy: z.array(z.string()).optional().describe('what it waits on: a person\'s name, or a thread id from team_threads (a task is a thread there). Their row says Blocked on, and it clears by itself when that thread is finished or that person writes to them'),
+      },
+      run: (args) => json(teamTask(args)),
+    },
+    {
+      name: 'team_threads',
+      description: 'What the team is working on: every thread your owner can see, with who has it and where it stands, and their direct messages if your owner lets you read them. A task given to a person carries `task`: who gave it, the day or moment it is due, whether it is late, and what blocks it. Look before you start new work: if someone is already on it, say so instead of starting a second.',
+      schema: {},
+      run: () => json(teamThreads()),
+    },
+    {
+      name: 'team_read',
+      description: 'Read one thread from team_threads (person and thread), or a direct conversation with someone (person alone, when your owner lets you read their messages). A thread comes with its files: each version of each file the thread names, who approved it, and every comment on it with where it sits and whether it is open. A comment still open on an earlier version is listed again on the later ones, marked as carried from that version, so you answer it rather than ask for it again. Comments made on a copy of the file sent into a conversation are listed too, with `in` naming the conversation. Leave person and thread out to read the files and comments on this thread itself.',
+      schema: {
+        person: z.string().optional().describe('whose thread, or who the conversation is with; leave out with thread to read this thread'),
+        thread: z.string().optional().describe('the thread id'),
+        folder: z.string().optional().describe('a folder\'s name: what is in it, with each file\'s path. Read with no arguments, this also lists every folder'),
+      },
+      run: (args) => json(teamRead(args)),
     },
 
     /* -------------------------------- chats -------------------------------- */
@@ -395,8 +479,15 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
   return {
     account,
     claims,
-    tools: tools.filter((t) => hasTeam || !t.name.startsWith('team_')).map((t) => ({ ...t, run: guard(t.run) })),
+    tools: tools.filter((t) => !t.name.startsWith('team_') || (PEOPLE_TOOLS.has(t.name) ? hasPeople : hasTeam)).map((t) => ({ ...t, run: guard(t.run) })),
   };
+}
+
+const PEOPLE_TOOLS = new Set(['team_tell', 'team_task', 'team_file', 'team_threads', 'team_read']);
+
+// The app writes who is on the team once someone is signed in on one.
+function onATeam(accountId) {
+  try { return !!readTeamView(teamDir(legacyRoot(), accountId))?.me; } catch { return false; }
 }
 
 function teammatesExist(accountId) {

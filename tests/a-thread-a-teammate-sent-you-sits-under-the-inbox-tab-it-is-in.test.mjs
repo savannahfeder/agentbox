@@ -109,9 +109,9 @@ describe('its look', () => {
   const css = fs.readFileSync(new URL('../renderer/src/teammates/teammates.css', import.meta.url), 'utf8');
   const rule = (sel) => css.match(new RegExp(`(?:^|\\n)${sel.replace(/[.*]/g, '\\$&')} \\{([^}]*)\\}`))?.[1] ?? '';
 
-  it('is a square frame on the theme\'s own line, with no fill a light theme would show', () => {
+  it('is a card on the theme\'s own line, with no fill a light theme would show', () => {
     expect(rule('.tq-sent')).toMatch(/border: 1px solid var\(--line\);/);
-    expect(rule('.tq-sent')).not.toMatch(/border-radius/);
+    expect(rule('.tq-sent')).toMatch(/border-radius: var\(--artifact-corner\)/);
     expect(rule('.tq-sent')).not.toMatch(/background: (?:#fff|white|var\(--surface\))/);
   });
 

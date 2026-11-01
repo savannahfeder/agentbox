@@ -25,11 +25,11 @@ describe('a teammate\'s chat', () => {
     expect(css).toMatch(/\.tq-chats \.tq-chat \.rm-day::before, \.tq-chats \.tq-chat \.rm-day::after \{[^}]*background: var\(--line\)/);
   });
 
-  it('draws names in the heavier weight, times in the body face, and soft-cornered faces', () => {
+  it('draws names in the heavier weight, times in the body face, and faces a size up', () => {
     expect(rule('.tq-chats .tq-chat .rm-cm.tq-m .h > span')).toMatch(/font-weight: 600/);
     expect(rule('.tq-chats .tq-chat .rm-cm.tq-m .h em')).toMatch(/font-family: inherit/);
-    expect(rule('.tq-chats .tq-chat .rm-cm.tq-m .h .rm-pic')).toMatch(/border-radius: 6px/);
-    expect(rule('.tq-chats .tq-chat .rm-cm.tq-m .h .tq-pic')).toMatch(/border-radius: 6px/);
+    expect(rule('.tq-chats .tq-chat .rm-cm.tq-m .h .tm-av')).toMatch(/width: 36px/);
+    expect(rule('.tq-chats .tq-chat .rm-cm.tq-m .h .tq-pic')).toMatch(/width: 36px/);
   });
 
   it('shows what it sent you in its own block after its name', () => {
@@ -41,14 +41,13 @@ describe('a teammate\'s chat', () => {
   });
 
   it('lets you tap an answer on soft-cornered buttons', () => {
-    expect(rule('.tq-chats .tq-chip')).toMatch(/border-radius: 6px/);
+    expect(rule('.tq-chip')).toMatch(/border-radius: var\(--radius\)/);
   });
 });
 
 describe('the Chats list and a teammate\'s details', () => {
   it('sits on the page\'s own background, with round faces for people', () => {
     expect(rule('.cx-list')).toMatch(/background: var\(--bg\)/);
-    expect(css).toMatch(/\.cx-row img[^{]*\{[^}]*border-radius: 50%/);
   });
 
   it('picks where it works from a short menu, not a row of buttons', () => {
@@ -57,7 +56,7 @@ describe('the Chats list and a teammate\'s details', () => {
     expect(page).toMatch(/function PickOne\(/);
   });
 
-  it('keeps the details beside it on the page\'s own background', () => {
-    expect(rule('.gr-side.tq-details')).toMatch(/background: var\(--bg\)/);
+  it('keeps About over it on the page\'s own background', () => {
+    expect(rule('.tq-sheet')).toMatch(/background: var\(--bg\)/);
   });
 });

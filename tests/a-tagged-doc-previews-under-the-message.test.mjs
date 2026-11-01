@@ -89,7 +89,8 @@ describe('a document path in a sentence is a link', () => {
     linkArtifactPaths(tree);
     expect(only(tree).map((n) => n.type)).toEqual(['text', 'link', 'text']);
     expect(only(tree)[1].url).toBe('designs/round19.html');
-    expect(only(tree)[1].children[0].value).toBe('designs/round19.html');
+    // It reads as the file's name: no disk paths in what a person reads.
+    expect(only(tree)[1].children[0].value).toBe('round19.html');
     expect(only(tree)[2].value).toBe(', have a look.');
   });
 

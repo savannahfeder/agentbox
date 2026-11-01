@@ -8,11 +8,11 @@
 .tm-av { box-sizing: border-box; display: inline-block; width: 18px; height: 18px; vertical-align: middle;
   border: 1px solid var(--line-strong); background: var(--film-strong); color: var(--text-dim);
   font: 500 9px/16px var(--mono); letter-spacing: .02em; text-transform: uppercase; text-align: center;
-  border-radius: var(--radius); object-fit: cover; flex: 0 0 auto; }
+  border-radius: 50%; object-fit: cover; flex: 0 0 auto; }
 img.tm-av { background: var(--bg-selected); }
 .tm-av.lg { width: 28px; height: 28px; line-height: 26px; font-size: 10.5px; }
 .tm-av.you { color: var(--on-solid); background: var(--text-dim); border-color: var(--text-dim); }
-.tm-av.bot { border-style: dashed; background: transparent; }
+.tm-av.bot { border-style: dashed; background: transparent; border-radius: var(--mate-corner); }
 
 /* the row end: who sent it, then the due day, then the app's own time */
 .row-end .tm-who { white-space: nowrap; font: 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
@@ -29,7 +29,8 @@ img.tm-av { background: var(--bg-selected); }
 .workspace-task-header .focus-meta .ts-lead,
 .workspace-task-header .focus-meta .live-word,
 .workspace-task-header .focus-meta .live-span { font: 12px/18px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
-.fm-said .tm-due-word { color: var(--accent); }
+/* The accent is a dot beside the due day, not the words. */
+.fm-said .tm-due-word::before { content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 6px 1px 0; border-radius: 50%; background: var(--accent); vertical-align: middle; }
 
 /* who is on a thread, in the topbar beside the app's own icons */
 .tm-people { display: flex; align-items: center; gap: 4px; height: 34px; margin-right: 4px; }
@@ -49,6 +50,12 @@ img.tm-av { background: var(--bg-selected); }
   height: 24px; padding: 0 7px; border: 0; border-radius: var(--radius); background: none; cursor: pointer;
   white-space: nowrap; font: 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
 .tm-people + .tm-add-people { margin-left: 2px; }
+.tm-add-wrap { position: relative; display: inline-flex; flex: none; margin-left: auto; }
+.tm-people + .tm-add-wrap { margin-left: 2px; }
+.tm-add-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; min-width: 220px; padding: 6px; background: var(--surface); border: 1px solid var(--line-strong); box-shadow: var(--shadow-lg); -webkit-app-region: no-drag; }
+.tm-add-menu p { margin: 2px 6px 6px; font-size: 12px; line-height: 17px; color: var(--text-faint); white-space: normal; text-transform: none; letter-spacing: 0; }
+.tm-add-menu button { display: flex; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 6px; border: 0; background: none; font-size: 13px; color: var(--text); text-align: left; cursor: pointer; }
+.tm-add-menu button:hover, .tm-add-menu button:focus-visible { background: var(--wash); outline: none; }
 .tm-add-people svg { width: 15px; height: 15px; flex: 0 0 auto; }
 .tm-add-people:hover { background: var(--wash); color: var(--text-dim); }
 
@@ -159,10 +166,18 @@ img.tm-av { background: var(--bg-selected); }
 .tm-signed { display: flex; align-items: center; gap: 10px; color: var(--text-dim); font-size: 13px; margin-bottom: 20px; }
 .tm-signed button { margin-left: auto; }
 .tm-invited { color: var(--text-dim); }
-.tm-av-empty { width: 24px; height: 24px; border: 1px dashed var(--line-strong); box-sizing: border-box; flex: none; background: none; }
 /* Team settings (2026-10-01): a quiet action at the end of a person's line. */
 .tm-line-act { margin-left: 14px; flex: none; height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim); font: inherit; font-size: 12.5px; cursor: pointer; }
 .tm-line-act:hover:not(:disabled) { border-color: var(--line-strong); color: var(--text); background: var(--wash); }
+.tm-handover { margin: 2px 0 12px 38px; padding: 12px 14px 0; border-left: 2px solid var(--line-strong); }
+.tm-handover-q { font-size: 14px; color: var(--text); margin-bottom: 8px; }
+.tm-handover-note { font-size: 12.5px; color: var(--text-faint); margin: 8px 0 12px; }
+.tm-handover-mate { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--text-dim); margin-bottom: 8px; }
+.tm-handover-mate > span { min-width: 120px; }
+.tm-choices { display: flex; gap: 6px; flex-wrap: wrap; }
+.tm-choice { height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim); font: inherit; font-size: 12.5px; cursor: pointer; }
+.tm-choice:hover { border-color: var(--line-strong); color: var(--text); }
+.tm-choice[aria-pressed="true"] { border-color: var(--text-dim); color: var(--text); background: var(--wash); }
 .tm-leave-ask { font-size: 13.5px; color: var(--text-dim); margin-right: 6px; }
 
 /* A STATUS LINE YOU WRITE YOURSELF (w-0b54ee983f). Two homes, because the
@@ -283,7 +298,7 @@ img.tm-av { background: var(--bg-selected); }
    own padding and gap, and in the collapsed rail hides every `button > span`.
    These hand the sentence's word, the time menu's rows and Clear status back
    their own shapes; without them the sidebar wins on specificity. */
-.workspace-navigation .th-me-pop button { height: auto; gap: 0; padding: 0; border-radius: 0; }
+.workspace-navigation .th-me-pop button { height: auto; gap: 0; padding: 0; border-radius: var(--radius); }
 .workspace-navigation .th-me-pop .compose-word { display: inline; font: inherit; color: var(--text-dim); background: none; }
 .workspace-navigation .th-me-pop .when-row { display: flex; gap: 9px; width: 100%; padding: 6px 9px; font-size: 13px;
   color: var(--text-dim); border-radius: var(--radius); }
@@ -295,6 +310,8 @@ img.tm-av { background: var(--bg-selected); }
 .ps-anchor { position: relative; margin-left: auto; flex: none; }
 .ps-btn { display: inline-flex; align-items: center; gap: 9px; white-space: nowrap; }
 .ps-btn svg { color: var(--text-dim); flex: none; }
+/* Under the button and out of the row, so the button stays level with the project's name. */
+.ps-crosses { position: absolute; top: calc(100% + 6px); right: 0; width: 560px; font-size: 12px; line-height: 16px; color: var(--text-faint); text-align: right; }
 .ps-menu {
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 80; width: 360px; box-sizing: border-box; padding: 5px;
   background: var(--pop, var(--bg-selected)); border: 1px solid var(--line-strong); border-radius: var(--radius);
@@ -315,3 +332,6 @@ img.tm-av { background: var(--bg-selected); }
 .pp-who { flex: none; width: 150px; display: inline-flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 13.5px; white-space: nowrap; overflow: hidden; }
 .pp-who svg { color: var(--text-faint); flex: none; }
 .pp-head-who { flex: none; width: 150px; }
+
+/* The thread the task's agent works in, beside "With Bug fixer". */
+.tm-with-thread { margin-left: auto; padding-left: 16px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font-size: 13px; }

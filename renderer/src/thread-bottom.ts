@@ -228,6 +228,17 @@ const markOf = (el: HTMLElement): RestoreMark => {
   return fresh;
 };
 
+const ABOVE_THE_FIRST_LINE = 20;
+
+/** The first line of the last message near the top, or the end when all of it already fits. */
+export const landingTop = (top: number, bottom: number) => Math.max(0, Math.min(bottom, Math.round(top - ABOVE_THE_FIRST_LINE)));
+
+/** Where a person starts reading a thread: the last message, as either kind of page draws it. */
+export function lastMessageIn(box: HTMLElement): Element | null {
+  const all = box.querySelectorAll('.thread-block.is-msg, .thread-block.is-msg-same, .outcome, .appendix-foot');
+  return all[all.length - 1] ?? null;
+}
+
 /**
  * Keep a scrolling box at its bottom for as long as it is at its bottom.
  *
@@ -235,9 +246,13 @@ const markOf = (el: HTMLElement): RestoreMark => {
  * component's own cleanup does when she leaves the task. Her scrolling up stops
  * it too, until she scrolls back down.
  */
-export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number; keepPlace?: boolean } = {}): () => void {
+export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number; keepPlace?: boolean; readFrom?: () => Element | null } = {}): () => void {
   if (!el) return () => {};
   const now = opts.now ?? (() => Date.now());
+  // A message longer than the window lands on its first line, not its last, while
+  // the page settles and until she touches it. Then the ordinary rules hold.
+  const opened = now();
+  let landing = !!opts.readFrom;
   // KEEP HER PARAGRAPH WHERE IT IS WHEN ANYTHING ABOVE IT CHANGES HEIGHT, not
   // only on a re-wrap. The desktop's browser does this itself (scroll
   // anchoring); Safari on an iPhone does not, so there every picture or block
@@ -313,6 +328,18 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
       underRestore = false;
       stuck = gapToBottom(el) <= LEAVE_SLACK;
       mine = Math.round(el.scrollTop);
+      landing = false;
+    }
+    if (landing && (hand !== -Infinity || now() - opened > RESUME_WINDOW_MS)) landing = false;
+    const start = landing ? opts.readFrom!() : null;
+    if (start) {
+      const top = start.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+      const want = landingTop(top, bottomOf(el));
+      if (Math.round(el.scrollTop) !== want) el.scrollTop = want;
+      mine = want;
+      stuck = want >= bottomOf(el) - AT_BOTTOM_SLACK;
+      width = widthOf(el);
+      return;
     }
     // THE COLUMN CHANGED WIDTH, so whatever moved scrollTop just now was the
     // page re-wrapping and not her, even with her hand a moment behind it: the
@@ -415,6 +442,7 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
   if (placed !== null && Math.round(el.scrollTop) === placed) {
     stuck = gapToBottom(el) <= LEAVE_SLACK;
     mine = placed;
+    landing = false;
   }
 
   pin();

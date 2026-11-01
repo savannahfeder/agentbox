@@ -3,8 +3,6 @@
    round 22 answered a screen's contrast fault, not the design. */
 :root { --rm-line: var(--line); }
 
-.rm-pic { display: block; flex: none; object-fit: cover; border: 1px solid var(--line-strong); box-sizing: border-box; background: var(--bg-selected); }
-.rm-ini { text-align: center; font-family: var(--mono); letter-spacing: .04em; background: var(--film-strong); color: var(--text-dim); }
 .rm-quiet { margin-left: 9px; flex: none; font: 12px var(--mono); color: var(--text-faint); }
 .rm-label { font: 11px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 .rm-label b { font-weight: 400; color: var(--text-dim); margin-left: 6px; }
@@ -35,7 +33,7 @@
 .rm-rnm.muted { color: var(--text-dim); }
 .rm-rpp { display: flex; align-items: center; gap: 10px; }
 .rm-rpp .fs { display: flex; }
-.rm-rpp .fs .rm-pic + .rm-pic { margin-left: -3px; outline: 2px solid var(--skin-solid, var(--surface)); }
+.rm-rpp .fs .tm-av + .tm-av { margin-left: -3px; outline: 2px solid var(--skin-solid, var(--surface)); }
 .rm-rpp .n { font: 11.5px var(--mono); color: var(--text-dim); }
 .th-cell-title.rm-rlast { color: var(--text-dim); }
 .rm-rdots { padding: 0 6px; }
@@ -67,6 +65,9 @@
 .rm-notice { display: flex; align-items: center; gap: 10px; min-height: 36px; margin: 0 0 10px; padding: 0 6px 0 12px; border: 1px solid var(--rm-line); background: var(--wash); font-size: 13px; color: var(--text); }
 .rm-notice svg { color: var(--text-dim); flex: none; }
 .rm-notice .rm-btn { margin-left: auto; height: 24px; font-size: 12.5px; padding: 0 10px; }
+.gr-waits { display: flex; align-items: center; gap: 12px; flex: none; padding: 6px 16px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text-dim); }
+.gr-waits .rm-btn { margin-left: auto; height: 24px; font-size: 12.5px; padding: 0 10px; }
+.inv-join { height: 22px; font-size: 12.5px; padding: 0 10px; margin-left: 10px; flex: none; }
 .rm-empty { margin-top: 28px; max-width: 560px; display: flex; flex-direction: column; gap: 12px; }
 .rm-empty .t { font-size: 15px; color: var(--text); }
 .rm-empty .s { font-size: 13px; color: var(--text-faint); margin-top: -6px; }
@@ -148,7 +149,7 @@
 /* The body is `user-select: none`, so the name, time and words opt back in. The
    face does not, or its initials would ride along in every copy. */
 .rm-cm .h, .rm-cm .tx { user-select: text; -webkit-user-select: text; }
-.rm-cm .rm-pic { user-select: none; -webkit-user-select: none; }
+.rm-cm .tm-av { user-select: none; -webkit-user-select: none; }
 .rm-cm .tx p { margin: 0; white-space: pre-line; }
 .rm-cm .tx p + p { margin-top: 8px; }
 .rm-cm .tx a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
@@ -157,7 +158,29 @@
 .rm-cm .tx .rm-at.me { box-shadow: inset 0 -2px 0 var(--accent); }
 .rm-cm .tx .inline-image { display: block; max-width: min(100%, 360px); max-height: 240px; margin-top: 6px; }
 .rm-cm .tx .inline-image.arriving { width: min(100%, 360px); height: 160px; background: var(--wash); }
-.rm-cm .rm-file { display: inline-block; margin-top: 4px; padding: 3px 8px; border: 1px solid var(--line); font-size: 12.5px; color: var(--text-dim); }
+/* Pictures sent together share one paragraph, which is their row, as in a direct message (chat.css). */
+.rm-cm .tx p:has(> .inline-image-open),
+.rm-cm .tx p:has(> .inline-image) { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin-top: 6px; white-space: normal; }
+.rm-cm .tx p:has(> .inline-image-open) .inline-image { margin: 0; }
+:root:root:root:root .rm-cm .inline-image-open:has(> .inline-image[data-phone-img="loading"]) { width: min(100%, 360px); }
+:root:root:root:root .rm-cm .inline-image[data-phone-img="loading"] { max-height: 240px; }
+/* Two or more are smaller tiles, so two options sit side by side. */
+.rm-cm .tx p:has(> .inline-image-open ~ .inline-image-open) > .inline-image-open { max-width: calc(50% - 4px); }
+.rm-cm .tx p:has(> .inline-image-open ~ .inline-image-open) .inline-image { max-width: 100%; max-height: 180px; }
+/* A film is a tile the size of a picture's: its frame, a play mark, its length, its name. */
+.rm-cm .tx .rm-film { display: flex; flex-direction: column; width: min(100%, 320px); border: 1px solid var(--line); border-radius: var(--artifact-corner); overflow: hidden; background: var(--bg-raised); }
+.rm-cm .tx .rm-film:hover { border-color: var(--text-faint); }
+.rm-film-face { position: relative; display: block; aspect-ratio: 16 / 9; background: #16171a; }
+.rm-film-face .file-cover-film { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rm-film-face .file-cover-play { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; display: flex; align-items: center; justify-content: center; padding-left: 2px; box-sizing: border-box; background: rgba(0, 0, 0, .55); color: #fff; border: 1px solid rgba(255, 255, 255, .28); }
+.rm-film-length { position: absolute; right: 8px; bottom: 8px; padding: 2px 6px; border-radius: 6px; background: rgba(0, 0, 0, .55); color: #fff; font: 10.5px/14px var(--mono); font-variant-numeric: tabular-nums; }
+.rm-film-name { padding: 7px 10px; font-size: 12.5px; color: var(--text); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-cm .tx p:has(> .rm-film ~ .inline-image-open) > .rm-film,
+.rm-cm .tx p:has(> .inline-image-open ~ .rm-film) > .rm-film { width: calc(50% - 4px); }
+.rm-cm .rm-file { display: inline-block; margin-top: 4px; padding: 3px 8px; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); font-size: 12.5px; color: var(--text-dim); }
+/* Every chat page draws a file the same quiet way, never as the browser's own button. */
+.rm-file { display: inline-flex; align-items: center; gap: 8px; margin: 6px 0 2px; padding: 7px 12px; border: 1px solid var(--line-strong); border-radius: var(--artifact-corner-small); background: transparent; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; }
+.rm-file:hover { background: var(--wash); }
 .rm-cm .chat-chips { margin-top: 6px; }
 .rm-cm .rm-edited, .rm-cm .h .rm-edited { font: normal 10.5px var(--mono); color: var(--text-faint); }
 .rm-cm .rm-gone { color: var(--text-faint); font-style: italic; }
@@ -171,11 +194,11 @@
 .rm-chat-err::before { content: ''; flex: none; width: 6px; height: 6px; background: var(--accent); }
 .rm-full .rm-chat-err { margin: 0 28px 2px; max-width: 704px; }
 .rm-retry {
-  flex: none; height: 22px; padding: 0 8px; appearance: none; border: 1px solid var(--line-strong); border-radius: 0; cursor: pointer;
+  flex: none; height: 22px; padding: 0 8px; appearance: none; border: 1px solid var(--line-strong); border-radius: var(--radius); cursor: pointer;
   background: none; color: var(--text); font: inherit; font-size: 12px;
 }
 .rm-retry:hover { border-color: var(--text-faint); }
-.rm-picker { position: absolute; left: 20px; right: 20px; bottom: 112px; z-index: 30; padding: 4px; display: flex; flex-direction: column; gap: 1px; }
+.tm-avker { position: absolute; left: 20px; right: 20px; bottom: 112px; z-index: 30; padding: 4px; display: flex; flex-direction: column; gap: 1px; }
 
 /* menus */
 .rm-menu { position: fixed; z-index: 60; min-width: 250px; padding: 4px; display: flex; flex-direction: column; gap: 1px; }
@@ -280,7 +303,7 @@
 .rm-dlg .ttl svg { color: var(--text-faint); width: 20px; height: 20px; }
 .rm-dlg .who { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-dim); }
 .rm-faces { display: flex; }
-.rm-faces .rm-pic { margin-right: -5px; outline: 2px solid var(--bg-raised); }
+.rm-faces .tm-av { margin-right: -5px; outline: 2px solid var(--bg-raised); }
 .rm-field { display: flex; gap: 8px; }
 .rm-input { flex: 1; height: 36px; box-sizing: border-box; border: 1px solid var(--line-strong); background: var(--control-face); padding: 0 11px; display: flex; align-items: center; gap: 9px; font: inherit; font-size: 13.5px; color: var(--text); min-width: 0; outline: none; }
 .rm-input::placeholder { color: var(--text-faint); }
@@ -303,7 +326,7 @@
 .rm-big { display: inline-flex; align-items: center; gap: 6px; font-size: 26px; letter-spacing: -.03em; color: var(--text); }
 .rm-big svg { width: 24px; height: 24px; color: var(--text-faint); }
 .rm-joinfaces { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
-.rm-joinfaces .rm-pic { width: 100% !important; height: auto !important; aspect-ratio: 1; }
+.rm-joinfaces .tm-av { width: 100% !important; height: auto !important; aspect-ratio: 1; }
 .rm-live { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-dim); }
 .rm-live .live-mark { width: 13px; height: 13px; gap: 1.5px; color: var(--text); }
 .rm-note { font-size: 12.5px; line-height: 18px; color: var(--text-faint); }
@@ -335,7 +358,7 @@
 .rm-froom .rm-nm { font-size: 15px; display: flex; align-items: center; gap: 7px; }
 .rm-froom .rm-nm svg { color: var(--text-faint); width: 14px; height: 14px; }
 .rm-froom .here { display: flex; align-items: center; }
-.rm-froom .here .rm-pic { margin-right: -4px; outline: 2px solid var(--surface); }
+.rm-froom .here .tm-av { margin-right: -4px; outline: 2px solid var(--surface); }
 .rm-froom .here em { font: normal 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); margin-left: 14px; }
 .rm-froom .v { font: 12.5px var(--mono); color: var(--text-dim); text-align: right; }
 .rm-froom .j { display: flex; justify-content: flex-end; }
@@ -365,9 +388,9 @@
 .rm-conv:hover { background: var(--wash); }
 .rm-conv.on { background: var(--wash-strong); }
 .rm-conv .fc { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); position: relative; box-sizing: border-box; }
-.rm-conv .fc.two .rm-pic { position: absolute; }
-.rm-conv .fc.two .rm-pic:first-child { left: 0; top: 0; }
-.rm-conv .fc.two .rm-pic:last-child { right: 0; bottom: 0; outline: 2px solid var(--surface); }
+.rm-conv .fc.two .tm-av { position: absolute; }
+.rm-conv .fc.two .tm-av:first-child { left: 0; top: 0; }
+.rm-conv .fc.two .tm-av:last-child { right: 0; bottom: 0; outline: 2px solid var(--surface); }
 .rm-conv .fc.room { border: 1px solid var(--line-strong); }
 .rm-conv .t { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .rm-conv .t .nm { display: flex; align-items: center; gap: 7px; min-width: 0; height: 18px; }
@@ -385,7 +408,7 @@
 .rm-conv-wrap { position: relative; }
 .rm-conv-more {
   position: absolute; right: 16px; top: 9px; width: 24px; height: 20px; padding: 0; display: grid; place-items: center;
-  appearance: none; border: 1px solid var(--line-strong); border-radius: 0; cursor: pointer;
+  appearance: none; border: 1px solid var(--line-strong); border-radius: var(--radius); cursor: pointer;
   background: var(--skin-solid, var(--surface)); color: var(--text-dim); visibility: hidden;
 }
 .rm-conv-more svg { width: 13px; height: 13px; }
@@ -401,7 +424,7 @@
 .rm-full .rm-cm .h { font-size: 14px; }
 .rm-full .rm-cm .tx { font-size: 14.5px; line-height: 22px; }
 .rm-full .rm-compose { margin: 8px 28px 24px; max-width: 704px; }
-.rm-full .rm-picker { left: 28px; right: auto; width: 320px; }
+.rm-full .tm-avker { left: 28px; right: auto; width: 320px; }
 
 /* GROUPS: under the Groups tab, the row of every group, the chat filling the page, the people down the right. */
 .gr-page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -421,16 +444,16 @@
 .gr-notice .rm-btn { margin-left: 0; }
 .rm-full.hang .rm-cm { padding-left: 44px; }
 .rm-full.hang .rm-cm .h { gap: 8px; }
-.rm-full.hang .rm-cm .h > .rm-pic:first-child { position: absolute; left: 0; top: 9px; }
+.rm-full.hang .rm-cm .h > .tm-av:first-child { position: absolute; left: 0; top: 9px; }
 
 /* A named group wears a #; a chat, the faces in it (GroupMark). */
 .gr-faces { display: flex; flex: none; }
-.gr-faces > .rm-pic + .rm-pic { margin-left: -6px; outline: 2px solid var(--skin-solid, var(--surface)); }
+.gr-faces > .tm-av + .tm-av { margin-left: -6px; outline: 2px solid var(--skin-solid, var(--surface)); }
 .gr-tile { display: inline-flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box; border: 1px solid var(--line-strong); color: var(--text-dim); }
 .gr-two { position: relative; flex: none; display: inline-block; }
-.gr-two > .rm-pic { position: absolute; }
-.gr-two > .rm-pic:first-child { left: 0; top: 0; }
-.gr-two > .rm-pic:last-child { right: 0; bottom: 0; z-index: 1; outline: 2px solid var(--pop, var(--surface)); }
+.gr-two > .tm-av { position: absolute; }
+.gr-two > .tm-av:first-child { left: 0; top: 0; }
+.gr-two > .tm-av:last-child { right: 0; bottom: 0; z-index: 1; outline: 2px solid var(--pop, var(--surface)); }
 
 /* Who is in the group: face, name and level, what they are on, their agents. */
 .gr-side { width: clamp(240px, 36%, 368px); flex: none; min-height: 0; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; padding: 16px 24px 24px; border-left: 1px solid var(--rm-line); }
@@ -442,6 +465,30 @@
 .gr-pw { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .gr-l1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 13.5px; line-height: 18px; color: var(--text); }
 .gr-lv { flex: none; font: 11.5px var(--mono); color: var(--text-faint); }
+.gr-mate, .gr-tag { flex: none; font-size: 11.5px; font-style: normal; font-weight: 400; color: var(--text-faint); letter-spacing: 0; }
+.gc-1 .gr-tag { margin-left: 8px; }
+.gc-head-group .gr-tag { font-size: 12.5px; }
+
+/* The lists of decisions and of what shipped (TeamLists.tsx). */
+.modal.rm-dlg.tl-list { width: 560px; max-height: 70vh; display: flex; flex-direction: column; }
+.tl-head { flex: none; }
+.tl-body { overflow-y: auto; padding: 0 24px 16px; }
+.tl-sec h3 { margin: 14px 0 2px; font-size: 12px; font-weight: 500; color: var(--text-faint); }
+.tl-row { padding: 12px 0; border-top: 1px solid var(--rm-line); }
+.tl-sec h3 + .tl-row, .tl-sec:first-child > .tl-row:first-child { border-top: 0; }
+.tl-words { margin: 0; font-size: 14px; line-height: 20px; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.tl-foot { display: flex; align-items: center; gap: 12px; margin-top: 4px; min-height: 18px; font-size: 12px; color: var(--text-faint); }
+.tl-back { margin-left: auto; padding: 0; border: 0; background: none; font: inherit; color: var(--text-faint); visibility: hidden; cursor: pointer; }
+.tl-row:hover .tl-back, .tl-back:focus-visible { visibility: visible; }
+.tl-back:hover { color: var(--text); }
+.tl-none { margin: 4px 0 8px; font-size: 13.5px; line-height: 20px; color: var(--text-dim); }
+.tl-ship { display: flex; align-items: baseline; gap: 12px; width: 100%; padding: 10px 0; border: 0; border-top: 1px solid var(--rm-line); background: none; font: inherit; text-align: left; cursor: pointer; }
+.tl-ship:first-child { border-top: 0; }
+.tl-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 14px; color: var(--text); }
+.tl-who, .tl-when { flex: none; font-size: 12.5px; color: var(--text-faint); }
+.tl-when { width: 66px; text-align: right; }
+.tl-ship:hover .tl-title { text-decoration: underline; text-underline-offset: 3px; }
+.rm-cm .rm-decided { display: block; margin: 2px 0 0; padding: 0; font: normal 10.5px var(--mono); color: var(--text-faint); }
 .gr-l2 { font-size: 12.5px; line-height: 17px; color: var(--text-dim); }
 .gr-l2.idle { color: var(--text-faint); }
 .gr-ag { flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--text-dim); white-space: nowrap; }
@@ -463,7 +510,7 @@
 /* A group's chat a size up from a thread's list (w-dcaa2c122e, round 11). */
 .gr-page .rm-full .rm-cm .h { font-size: 15px; }
 .gr-page .rm-full .rm-cm .tx { font-size: 16px; line-height: 25px; }
-.gr-page .rm-full.hang .rm-cm .h > .rm-pic:first-child { top: 10px; }
+.gr-page .rm-full.hang .rm-cm .h > .tm-av:first-child { top: 10px; }
 .gr-page .rm-compose-input { font-size: 15px; line-height: 22px; }
 .gr-page .gr-pt, .gr-page .gr-l1 { font-size: 14.5px; line-height: 19px; }
 .gr-page .gr-l2 { font-size: 13.5px; line-height: 18px; }

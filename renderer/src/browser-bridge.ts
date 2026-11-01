@@ -22,6 +22,7 @@ import { setIconCount, startPhoneAlerts } from './phone-alerts';
 import { installPhoneFiles } from './phone-files';
 import { installPhoneScreen, pagePinched } from './phone-screen';
 import { atMostEvery, PHONE_PUSH_MS } from './phone-polls';
+import { callLane } from './tab-calls';
 
 type Push = (payload: unknown) => void;
 
@@ -159,8 +160,8 @@ export function installBrowserBridge(): boolean {
     .then((said) => { if (said?.key) installPhoneFiles(said.key); })
     .catch(() => { /* pictures stay blank; everything else still works */ });
 
-  const ask = async (channel: string, payload?: unknown) => {
-    const body = JSON.stringify(payload ?? null);
+  const ask = (channel: string, payload?: unknown) => lane(channel, JSON.stringify(payload ?? null));
+  const lane = callLane(async (channel: string, body: string) => {
     const res = await fetch(`/api/${encodeURIComponent(channel)}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', [TOKEN_HEADER]: token, 'x-agentbox-device': device },
@@ -178,7 +179,7 @@ export function installBrowserBridge(): boolean {
       throw new Error(said.error ?? `${Name} could not answer ${channel}.`);
     }
     return res.json();
-  };
+  });
 
   const bridge: Record<string, unknown> = {};
 

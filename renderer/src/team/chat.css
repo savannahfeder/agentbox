@@ -1,5 +1,5 @@
 /* A CONVERSATION WITH A TEAMMATE (w-2e8aa16f0f, drawing A of round two).
-   Slack's structure in the app's own materials: a square face in a column on
+   Slack's structure in the app's own materials: a round face in a column on
    the left, the full name and the time once per run, a quiet day line, and a
    rule that is a hairline. The run itself is ./chat-layout.ts. Nothing here
    reaches a thread with an agent: every rule hangs off .chat-msg, .chat-day or
@@ -18,6 +18,7 @@
    face's column (w-45cbac227a). */
 .chat-msg > .msg-head, .chat-msg > .msg-body, .chat-msg > .chat-more, .chat-msg > .chat-chips { grid-column: 2; min-width: 0; }
 .chat-msg .msg-head { align-items: baseline; }
+.chat-msg > .chat-seen { grid-column: 2; margin-top: 4px; font: 11px var(--mono); letter-spacing: .03em; color: var(--text-faint); cursor: default; }
 .chat-msg .msg-who { font-size: 14.5px; font-weight: 500; color: var(--text); }
 .chat-msg .msg-when { font: 11px var(--mono); letter-spacing: .03em; color: var(--text-faint); }
 
@@ -77,17 +78,19 @@
 .chat-msg .inline-image.arriving { width: min(100%, 360px); max-height: 240px; }
 :root:root:root:root .chat-msg .inline-image-open:has(> .inline-image[data-phone-img="loading"]) { width: min(100%, 360px); }
 :root:root:root:root .chat-msg .inline-image[data-phone-img="loading"] { max-height: 240px; }
+/* Two or more are smaller tiles, so two options sit side by side. */
+.chat-msg .msg-body p:has(> .inline-image-open ~ .inline-image-open) > .inline-image-open { max-width: calc(50% - 4px); }
+.chat-msg .msg-body p:has(> .inline-image-open ~ .inline-image-open) .inline-image { max-width: 100%; max-height: 180px; }
 
 /* ---------------------- reactions, and the bar on pointing ----------------
-   Drawing A, with round one's note on it: no colour and no rounded corners. So
-   every plate below is a 1px line over the pane's own wash at a square edge,
-   and the ONE distinction a chip makes — whether you are on it — is carried by
+   Drawing A, with round one's note on it: no colour. So every plate below is a
+   1px line over the pane's own wash at the small corner, and the ONE distinction a chip makes — whether you are on it — is carried by
    a brighter line and brighter text rather than by a tint. ./ChatActions.tsx. */
 
 .chat-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
 .chat-chip {
   display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 7px;
-  appearance: none; border: 1px solid var(--line); border-radius: 0; cursor: pointer;
+  appearance: none; border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer;
   background: var(--wash); color: var(--text-dim); font: inherit; font-size: 12px; line-height: 1;
 }
 .chat-chip:hover { border-color: var(--line-strong); color: var(--text); }
@@ -109,14 +112,14 @@
 .chat-acts {
   position: absolute; top: -13px; right: 0; z-index: 3;
   display: flex; align-items: stretch;
-  border: 1px solid var(--line-strong); border-radius: 0;
+  border: 1px solid var(--line-strong); border-radius: var(--radius);
   background: var(--skin-solid, var(--surface)); box-shadow: 0 2px 10px #0003;
   opacity: 0; pointer-events: none; transition: opacity 90ms ease;
 }
 .chat-msg:hover > .chat-acts, .chat-acts:focus-within, .chat-acts.open { opacity: 1; pointer-events: auto; }
 .chat-act {
   display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px;
-  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer;
+  appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer;
   color: var(--text-dim); font: inherit; font-size: 12px;
 }
 .chat-act + .chat-act { border-left: 1px solid var(--line); }
@@ -127,7 +130,7 @@
 /* Your three most recent emoji, one press each, before the bar's words. */
 .chat-quick {
   width: 28px; height: 26px; padding: 0;
-  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer;
+  appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer;
   font-size: 14px; line-height: 1;
 }
 .chat-quick:hover { background: var(--wash); }
@@ -137,13 +140,13 @@
 
 /* THE MORE MENU, placed against the window like the whole emoji list. */
 .chat-menu {
-  position: fixed; z-index: 85; box-sizing: border-box; padding: 4px 0;
-  border: 1px solid var(--line-strong); border-radius: 0;
+  position: fixed; z-index: 85; box-sizing: border-box; padding: 4px;
+  border: 1px solid var(--line-strong); border-radius: var(--artifact-corner);
   background: var(--skin-solid, var(--surface)); box-shadow: 0 8px 28px #0006;
 }
 .chat-menu-row {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; height: 30px; padding: 0 12px;
-  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer; text-align: left;
+  appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer; text-align: left;
   font: inherit; font-size: 13px; color: var(--text-dim);
 }
 .chat-menu-row.on { background: var(--wash); color: var(--text); }
@@ -151,18 +154,18 @@
 .chat-menu-row.danger.on { color: var(--text); }
 .chat-menu-rule { height: 1px; margin: 4px 0; background: var(--line); }
 
-/* Deleting asks once, in a small square card over the window. */
+/* Deleting asks once, in a small card over the window. */
 .chat-confirm-back { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: #0006; }
 .chat-confirm {
   width: 340px; padding: 18px 18px 14px; box-sizing: border-box;
-  border: 1px solid var(--line-strong); border-radius: 0;
+  border: 1px solid var(--line-strong); border-radius: var(--artifact-corner);
   background: var(--skin-solid, var(--surface)); box-shadow: 0 12px 40px #0008;
 }
 .chat-confirm-title { font-size: 15px; color: var(--text); }
 .chat-confirm-body { margin-top: 6px; font-size: 13px; color: var(--text-dim); line-height: 1.45; }
 .chat-confirm-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 .chat-confirm-no, .chat-confirm-yes {
-  height: 28px; padding: 0 14px; appearance: none; border-radius: 0; cursor: pointer; font: inherit; font-size: 13px;
+  height: 28px; padding: 0 14px; appearance: none; border-radius: var(--radius); cursor: pointer; font: inherit; font-size: 13px;
   border: 1px solid var(--line-strong); background: none; color: var(--text-dim);
 }
 .chat-confirm-yes { color: var(--text); background: var(--wash-strong); }
@@ -177,7 +180,7 @@
 .chat-edit-foot { display: flex; align-items: center; gap: 6px; padding: 0 8px 8px 12px; }
 .chat-edit-hint { flex: 1; font: 10.5px var(--mono); letter-spacing: .02em; color: var(--text-faint); }
 .chat-edit-cancel, .chat-edit-save {
-  height: 24px; padding: 0 10px; appearance: none; border: 1px solid var(--line-strong); border-radius: 0; cursor: pointer;
+  height: 24px; padding: 0 10px; appearance: none; border: 1px solid var(--line-strong); border-radius: var(--radius); cursor: pointer;
   background: none; color: var(--text-dim); font: inherit; font-size: 12px;
 }
 .chat-edit-save { color: var(--text); background: var(--wash-strong); }
@@ -193,11 +196,11 @@
 .chat-emoji {
   position: absolute; bottom: calc(100% + 5px); right: 0;
   display: flex; padding: 3px;
-  border: 1px solid var(--line-strong); border-radius: 0;
+  border: 1px solid var(--line-strong); border-radius: var(--artifact-corner);
   background: var(--skin-solid, var(--surface)); box-shadow: 0 4px 18px #0004;
 }
 .chat-emoji-one {
-  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer;
+  appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer;
   width: 26px; height: 26px; padding: 0; font-size: 15px; line-height: 1;
 }
 .chat-emoji-one:hover { background: var(--wash); }
@@ -217,13 +220,13 @@
    scroll cannot cut it off. Same plate as the short list, only larger. */
 .chat-emoji-all {
   position: fixed; z-index: 80; width: 320px; height: 360px; box-sizing: border-box;
-  display: flex; flex-direction: column;
-  border: 1px solid var(--line-strong); border-radius: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--line-strong); border-radius: var(--artifact-corner);
   background: var(--skin-solid, var(--surface)); box-shadow: 0 8px 28px #0006;
 }
 .chat-emoji-search {
   flex: none; margin: 8px 8px 0; height: 30px; padding: 0 10px; box-sizing: border-box;
-  border: 1px solid var(--line); border-radius: 0; outline: none; background: var(--wash);
+  border: 1px solid var(--line); border-radius: var(--radius); outline: none; background: var(--wash);
   font: inherit; font-size: 13px; color: var(--text);
 }
 .chat-emoji-search::placeholder { color: var(--text-faint); }
@@ -233,7 +236,7 @@
 .chat-emoji-tabs { flex: none; display: flex; padding: 6px 8px; border-bottom: 1px solid var(--line); }
 .chat-emoji-tab {
   flex: 1; height: 28px; padding: 0;
-  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer;
+  appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer;
   font-size: 15px; line-height: 1; filter: grayscale(1); opacity: .55;
 }
 .chat-emoji-tab:hover { filter: none; opacity: 1; background: var(--wash); }
@@ -247,7 +250,7 @@
 .chat-emoji-grid { display: grid; grid-template-columns: repeat(9, 1fr); }
 .chat-emoji-cell {
   height: 32px; padding: 0;
-  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer;
+  appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer;
   font-size: 19px; line-height: 1;
 }
 .chat-emoji-cell:hover { background: var(--wash-strong, var(--wash)); }
@@ -258,14 +261,14 @@
    ./FormatBar.tsx, drawn only on a chat. It rides the footer line the reply box
    already has, so it costs no height: it sits where the priority and model
    clauses sit on a thread with an agent, and the "Goes to …" line and Send keep
-   their own ends of that line. Square and monochrome, like everything else
-   drawing A asked for. */
+   their own ends of that line. Monochrome, like everything else drawing A asked
+   for. */
 
 .fmt-bar { display: flex; align-items: center; gap: 1px; flex: none; margin-right: 14px; }
 .fmt-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 24px; height: 24px; padding: 0;
-  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer;
+  appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer;
   color: var(--text-faint); font: inherit;
 }
 .fmt-btn:hover { background: var(--wash); color: var(--text); }
@@ -297,7 +300,7 @@
 .fmt-bar { position: relative; }
 .fmt-link-ask {
   position: absolute; bottom: calc(100% + 6px); left: 0; width: 280px; z-index: 60;
-  padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: 0; outline: none;
+  padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: var(--artifact-corner); outline: none;
   background: var(--pop); color: var(--text); font: inherit; font-size: 13px; box-shadow: var(--shadow-lg);
 }
 .fmt-link-ask::placeholder { color: var(--text-faint); }
@@ -377,7 +380,7 @@
 .mention-card-head { display: flex; align-items: center; gap: 9px; padding: 6px 14px 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text); }
 .mention-field {
   display: flex; align-items: center; width: 100%; padding: 7px 14px;
-  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer; text-align: left; font: inherit; font-size: 13px;
+  appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer; text-align: left; font: inherit; font-size: 13px;
 }
 .mention-field:hover, .mention-field.cursor { background: var(--bg-selected); }
 .mention-field .k { width: 72px; flex: none; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
@@ -387,8 +390,8 @@
 
 /* ------------------------------- threads ----------------------------------
    w-920461cbe6, the panel beside the chat, approved from the drawing
-   designs/w-920461cbe6/A-panel-beside-the-chat.png. Square and monochrome like
-   everything above. ./ThreadPanel.tsx and ./chat-threads.ts. */
+   designs/w-920461cbe6/A-panel-beside-the-chat.png. Monochrome like everything
+   above. ./ThreadPanel.tsx and ./chat-threads.ts. */
 
 /* The line under a message with replies. No box, no colour: faces, a count in
    the text colour, and when the last one came in, faint. It washes under the
@@ -396,7 +399,7 @@
 .chat-thread-line {
   grid-column: 2; justify-self: start; display: inline-flex; align-items: center; gap: 10px;
   margin: 8px 0 0 -6px; padding: 4px 10px 4px 6px;
-  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer;
+  appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer;
   font: inherit; font-size: 13px; line-height: 18px; color: var(--text-dim);
 }
 .chat-thread-line:hover { background: var(--wash); }
@@ -451,7 +454,7 @@ body.chat-thread-dragging * { cursor: col-resize !important; }
 .chat-thread-title { font-size: 14.5px; font-weight: 500; color: var(--text); }
 .chat-thread-close {
   display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
-  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer; color: var(--text-faint);
+  appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer; color: var(--text-faint);
 }
 .chat-thread-close:hover { background: var(--wash); color: var(--text); }
 .chat-thread-close:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
@@ -473,7 +476,7 @@ body.chat-thread-dragging * { cursor: col-resize !important; }
 /* Relative so the @ and # menus rise off it, as they do off the chat's box. */
 .chat-thread-box {
   position: relative; display: flex; flex-direction: column;
-  background: var(--wash); border: 1px solid var(--line); border-radius: 0;
+  background: var(--wash); border: 1px solid var(--line); border-radius: var(--radius);
   transition: border-color .18s, background .18s;
 }
 .chat-thread-box:focus-within { border-color: var(--line-strong); background: var(--surface); }
@@ -511,3 +514,28 @@ body.chat-thread-dragging * { cursor: col-resize !important; }
 @container thread-panel (max-width: 400px) {
   .chat-thread-panel .chat-act-word { display: none; }
 }
+
+/* The clip's two ways in, and Files searched from the reply box. */
+.fmt-attach-menu, .from-files {
+  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 60;
+  background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg);
+}
+.fmt-attach-menu { display: flex; flex-direction: column; padding: 4px; min-width: 168px; }
+.fmt-attach-menu button, .from-files-row {
+  appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer;
+  font: inherit; font-size: 13px; color: var(--text); text-align: left; padding: 6px 10px;
+}
+.fmt-attach-menu button:hover { background: var(--wash); }
+.from-files { width: 340px; padding: 6px; }
+.from-files-q {
+  width: 100%; box-sizing: border-box; padding: 7px 10px; margin-bottom: 4px; outline: none;
+  border: 1px solid var(--line); border-radius: var(--radius); background: transparent; color: var(--text); font: inherit; font-size: 13px;
+}
+.from-files-q::placeholder { color: var(--text-faint); }
+.from-files-list { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow-y: auto; }
+.from-files-row { display: flex; align-items: baseline; gap: 10px; width: 100%; }
+.from-files-row.is-on { background: var(--wash); }
+.from-files-row:disabled { cursor: default; color: var(--text-faint); }
+.from-files-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.from-files-where { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-dim); }
+.from-files-none { margin: 6px 10px 8px; font-size: 13px; color: var(--text-dim); }

@@ -100,7 +100,7 @@ describe('the toast after an answer carries the same way in', () => {
   it('a picked option hands it the row it picked on', () => {
     // The fourth argument is whether she stays on the thread, since 2026-10-13
     // (tests/a-reply-keeps-you-on-the-thread-unless-you-are-clearing-your-inbox).
-    expect(app).toContain('`Option ${option.n} sent → ${item.productName}`, takeBack, !movesOn(item), { product: item.product, id: item.id }');
+    expect(app).toMatch(/pickSentWords\([^\n]*takeBack, [^\n]*\{ product: item\.product, id: item\.id \}/);
   });
 
   // The fourth argument here is `stay`, for the same reason it is on the

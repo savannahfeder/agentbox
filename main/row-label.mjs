@@ -108,8 +108,8 @@ export function namePrompt(item) {
   const latest = cut(item?.result || item?.note, 700);
   return [
     'Here is a work thread: the message that opened it, and the latest thing',
-    'written on it. Write a short name for the thread AS IT STANDS NOW: 3 to 7',
-    'words, sentence case, no quotes, no trailing punctuation, naming the thing',
+    'written on it. Write a short name for the thread AS IT STANDS NOW: 3 to 6',
+    'words, never a sentence, sentence case, no quotes, no trailing punctuation, naming the thing',
     'being worked on rather than restating the sentence. If the opening line is',
     'already a short name, keep its words and only fix the case. Reply with the',
     'name and nothing else.',

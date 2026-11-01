@@ -1,0 +1,153 @@
+/* A DOCUMENT AS A PAGE TO READ: one look for a markdown file wherever it is
+   drawn (the side pane, the big view, read in place on a thread). The rules
+   are doubled (.doc-prose.doc-prose) so they win over `.markdown h2`, the
+   message look, which every thread body carries. */
+
+.doc-scroll { container-type: inline-size; }
+/* The side pane's card takes a corner, as a sheet of paper does. */
+.doc-pane.doc-md .doc-card, .workspace-layout .doc-pane.doc-md .doc-card { border-radius: 12px; }
+.doc-sheet {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 700px) minmax(0, 1fr);
+  column-gap: 40px;
+  padding: 44px 0 120px;
+}
+.doc-column { grid-column: 2; min-width: 0; }
+.doc-byline.doc-byline {
+  margin: 0 0 18px; font-size: 12.5px; line-height: 18px; color: var(--text-faint);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.doc-byline i { width: 3px; height: 3px; background: var(--text-faint); border-radius: 50%; opacity: .7; }
+
+.doc-prose.doc-prose { font-size: 16px; line-height: 1.72; color: var(--text); letter-spacing: -0.003em; overflow-wrap: break-word; }
+.doc-prose.doc-prose > :first-child { margin-top: 0; }
+.doc-prose.doc-prose h1, .doc-prose.doc-prose h2, .doc-prose.doc-prose h3, .doc-prose.doc-prose h4 {
+  color: var(--text); text-transform: none; font-weight: 620; text-wrap: balance;
+}
+.doc-prose.doc-prose h1 { font-size: clamp(26px, 5cqi, 34px); line-height: 1.18; letter-spacing: -0.026em; margin: 0 0 18px; }
+.doc-prose.doc-prose h2 { font-size: clamp(20px, 3.4cqi, 23px); line-height: 1.3; letter-spacing: -0.016em; margin: 2.1em 0 0.5em; }
+.doc-prose.doc-prose h3 { font-size: 18px; line-height: 1.4; letter-spacing: -0.008em; margin: 1.8em 0 0.35em; }
+.doc-prose.doc-prose h4 { font-size: 16px; line-height: 1.5; margin: 1.5em 0 0.3em; }
+.doc-prose.doc-prose p { margin: 0 0 1em; }
+.doc-prose.doc-prose strong { font-weight: 640; }
+.doc-prose.doc-prose a { color: var(--text); text-decoration: underline; text-decoration-color: var(--underline, var(--line-strong)); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.doc-prose.doc-prose a:hover { text-decoration-color: var(--text-dim); }
+
+.doc-prose.doc-prose ul, .doc-prose.doc-prose ol { margin: 0 0 1em; padding-left: 1.5em; }
+.doc-prose.doc-prose li { margin: 0.3em 0; padding-left: 0.2em; }
+.doc-prose.doc-prose li p { margin: 0; }
+.doc-prose.doc-prose li::marker { color: var(--text-faint); }
+.doc-prose.doc-prose ol > li::marker { font-variant-numeric: tabular-nums; font-size: 0.92em; }
+
+/* Tasks: the box is drawn, not the browser's. Done reads as done without
+   striking the words out. */
+.doc-prose.doc-prose ul[data-type="taskList"] { list-style: none; padding-left: 0; margin-left: 0; }
+.doc-prose.doc-prose ul[data-type="taskList"] li,
+.doc-prose.doc-prose li.task-list-item { list-style: none; display: flex; align-items: flex-start; gap: 11px; padding-left: 0; margin: 0.4em 0; }
+.doc-prose.doc-prose ul.contains-task-list { list-style: none; padding-left: 0; }
+.doc-prose.doc-prose ul[data-type="taskList"] li > label { margin: 0; flex: none; display: flex; padding-top: 0.4em; }
+.doc-prose.doc-prose ul[data-type="taskList"] li > div { flex: 1; min-width: 0; }
+.doc-prose.doc-prose input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none; flex: none;
+  width: 16px; height: 16px; margin: 0; border-radius: 4px;
+  border: 1.5px solid var(--line-strong); background: transparent; cursor: pointer;
+  display: inline-grid; place-content: center; position: relative; top: 0;
+}
+.doc-prose.doc-prose li.task-list-item > input[type="checkbox"] { margin-top: 0.4em; }
+.doc-prose.doc-prose input[type="checkbox"]:disabled { cursor: default; }
+.doc-prose.doc-prose input[type="checkbox"]::after {
+  content: ''; width: 8px; height: 4px; margin-top: -2px;
+  border: solid var(--on-solid, #1a1817); border-width: 0 0 1.6px 1.6px; transform: rotate(-45deg); opacity: 0;
+}
+.doc-prose.doc-prose input[type="checkbox"]:checked { background: var(--text-dim); border-color: var(--text-dim); }
+.doc-prose.doc-prose input[type="checkbox"]:checked::after { opacity: 1; }
+.doc-prose.doc-prose li[data-checked="true"] > div, .doc-prose.doc-prose li.task-list-item:has(> input:checked) { color: var(--text-faint); }
+
+.doc-prose.doc-prose blockquote {
+  margin: 1.4em 0; padding: 2px 0 2px 18px; border-left: 2px solid var(--line-strong);
+  color: var(--text-dim); font-size: 17px; line-height: 1.6;
+}
+.doc-prose.doc-prose blockquote p:last-child { margin-bottom: 0; }
+.doc-prose.doc-prose hr { border: 0; height: 1px; background: var(--line); margin: 2.4em 0; }
+
+.doc-prose.doc-prose :not(pre) > code {
+  font-family: var(--mono); font-size: 0.86em; padding: 0.12em 0.38em; border-radius: 5px;
+  background: var(--wash-strong, var(--bg-raised)); color: var(--text);
+}
+.doc-prose.doc-prose pre {
+  margin: 1.3em 0 1.5em; padding: 16px 18px; border-radius: 10px;
+  background: var(--code-ground, var(--bg-raised)); border: 1px solid var(--line);
+  overflow-x: auto; font-size: 13.5px; line-height: 1.65;
+}
+.doc-prose.doc-prose pre code { font-family: var(--mono); font-size: inherit; background: none; padding: 0; border-radius: 0; color: var(--text-dim); }
+
+/* A picture sits at the text's width, held like a page on the page. */
+.doc-prose.doc-prose img {
+  display: block; max-width: 100%; max-height: min(560px, 70vh); width: auto; height: auto; margin: 1.6em auto;
+  border-radius: var(--artifact-corner); border: 1px solid var(--line);
+}
+.doc-prose.doc-prose p:has(> img:only-child) { margin: 0; }
+
+/* A true grid, as messages have it, with the frame rounded and the header on a quiet band. */
+.doc-prose.doc-prose table {
+  display: table; width: 100%; margin: 1.4em 0 1.6em;
+  border-collapse: separate; border-spacing: 0;
+  border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+  font-size: 14.5px; line-height: 1.5; font-variant-numeric: tabular-nums;
+}
+.doc-prose.doc-prose tr > th, .doc-prose.doc-prose tr > td {
+  border: 0; border-top: 1px solid var(--line); border-left: 1px solid var(--line);
+  padding: 10px 14px; text-align: left; vertical-align: top; background: none; font-weight: 400;
+}
+.doc-prose.doc-prose tr > :first-child { border-left: 0; }
+.doc-prose.doc-prose tr:first-child > * { border-top: 0; }
+.doc-prose.doc-prose tr > th {
+  background: var(--wash); color: var(--text-dim); font-weight: 560; font-size: 13px;
+}
+.doc-prose.doc-prose tr > td:first-child { font-weight: 560; color: var(--text); }
+.doc-prose.doc-prose th p, .doc-prose.doc-prose td p { margin: 0; }
+.doc-prose.doc-prose .tableWrapper { overflow-x: auto; margin: 1.4em 0 1.6em; }
+.doc-prose.doc-prose .tableWrapper table { margin: 0; }
+
+/* THE OUTLINE, in the right margin when there is room for it and as a column
+   of short dashes there when there is not; the dashes open on a hover. The
+   section being read gets the one stronger line. */
+.doc-outline { grid-column: 3; grid-row: 1; justify-self: start; position: sticky; top: 44px; align-self: start; width: 100%; max-width: 220px; padding-right: 20px; box-sizing: border-box; z-index: 2; }
+/* Doubled to beat `.markdown ol`, which the side pane's editor carries. */
+.doc-outline .doc-outline-box ol { list-style: none; margin: 0; padding: 0; }
+.doc-outline .doc-outline-box li { margin: 0; }
+.doc-outline-head { display: block; margin: 0 0 10px; font: 10.5px/14px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--text-faint); }
+.doc-outline button {
+  display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 4px 0; border: 0; background: none;
+  font: inherit; font-size: 12.5px; line-height: 17px; text-align: left; color: var(--text-faint); cursor: pointer;
+}
+.doc-outline button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-outline button i { flex: none; width: 10px; height: 1px; background: var(--line-strong); transform: translateY(-4px); }
+.doc-outline .is-sub button { padding-left: 14px; }
+.doc-outline .is-sub button i { width: 6px; }
+.doc-outline button:hover { color: var(--text-dim); }
+.doc-outline .is-on button { color: var(--text); }
+.doc-outline .is-on button i { background: var(--accent); width: 14px; }
+.doc-outline .is-sub.is-on button i { width: 10px; }
+
+@container (max-width: 1060px) {
+  .doc-sheet { grid-template-columns: minmax(28px, 1fr) minmax(0, 700px) minmax(28px, 1fr); column-gap: 24px; }
+  .doc-outline { justify-self: end; width: 18px; margin-right: 14px; padding-right: 0; }
+  .doc-outline-box { position: relative; }
+  .doc-outline-head { display: none; }
+  .doc-outline button span { display: none; }
+  .doc-outline button { padding: 3px 0; justify-content: flex-end; }
+  .doc-outline .is-sub button { padding-left: 0; }
+  .doc-outline:hover .doc-outline-box {
+    position: absolute; top: -14px; right: -6px; width: 250px; padding: 12px 14px; border-radius: 12px;
+    background: var(--pop, var(--surface)); border: 1px solid var(--line); box-shadow: 0 18px 50px rgba(0, 0, 0, .35);
+  }
+  .doc-outline:hover .doc-outline-head { display: block; }
+  .doc-outline:hover button span { display: inline; }
+  .doc-outline:hover button { justify-content: flex-start; padding: 4px 0; }
+  .doc-outline:hover .is-sub button { padding-left: 14px; }
+}
+@container (max-width: 600px) {
+  .doc-sheet { grid-template-columns: 0 minmax(0, 1fr) 0; padding: 24px 18px 80px; column-gap: 0; }
+  .doc-outline { display: none; }
+}

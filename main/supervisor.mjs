@@ -11,6 +11,10 @@ import { MainTests } from './main-went-red.mjs';
 import { folderJob } from './task-folders-offthread.mjs';
 import { gitJob } from './git-change-offthread.mjs';
 import { queuedReplyText, submitReply, framedTeammate } from './live-replies.mjs';
+import { wakeForNotes } from './notes-wake.mjs';
+import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mjs';
+import { editedFilesLine } from '../shared/artifact-marks.mjs';
+import { readItemHistory } from './store/work-items.mjs';
 import { taskCommand } from './task-commands.mjs';
 import { providerCommand, reviewTarget, nativeCommandNames } from '../shared/provider-commands.mjs';
 import {agentInstructionsUnified, readSystemTemplate, writeInstruction} from './instruction-settings.mjs';
@@ -65,7 +69,8 @@ import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, placedScore, pr
 import { keysForAgents } from '../shared/shortcuts.mjs';
 import { isCleanRun, ruleIdOf, nextRunAt, periodKey, occurrenceId } from '../shared/repeats.mjs';
 import { occurrenceFields } from './repeats.mjs';
-import { teammateIdOf, mentionsIn, teammatesOn, primaryOf, OFFER_LABEL, CHAT_LABEL } from '../shared/teammates.mjs';
+import { teammateIdOf, mentionsIn, teammatesOn, primaryOf, OFFER_LABEL, CHAT_LABEL, howYourRunEnds } from '../shared/teammates.mjs';
+import { REACH_LABEL } from '../shared/teammate-reach.mjs';
 import { mayRunHere } from '../shared/team-rules.mjs';
 
 // WHO IS SIGNED IN, handed to the store server a worker talks through. An MCP
@@ -103,6 +108,7 @@ import { effectiveProfiles } from './account-discovery.mjs';
 import { referencedFiles, isImagePath } from '../shared/referenced-files.mjs';
 import { namedThreadsBlock } from '../shared/named-threads.mjs';
 import { changePath } from './code-change.mjs';
+import { noteAgentWrites } from './store/written-elsewhere.mjs';
 import { snapshotRepo } from './git-change.mjs';
 import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mjs';
 import { readTranscriptHead } from './agent-sessions.mjs';
@@ -145,6 +151,7 @@ import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mjs';
 import { cloudCodexMode } from './cloud-permission.mjs';
 import { createCodexApprovals } from './codex-approvals.mjs';
 import { approvalPublicKey, listPending } from './approvals.mjs';
+import { connectionLine, filesComeFirst } from '../shared/connections-catalog.mjs';
 import { codexDefaultModel, codexHome, codexKnownSlugs, codexModelLevels, codexModels } from './codex-models.mjs';
 import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.mjs';
 import { accountName } from '../shared/account-names.mjs';
@@ -166,9 +173,13 @@ import { runEndedProps } from './analytics.mjs';
 import { appendRun, runLedgerPath } from './run-ledger.mjs';
 import { toolServerLaunch } from './tool-server-launch.mjs';
 
+// The bold line and the 200 words in briefs/message-rules.md: a plain worker's
+// last message. A teammate's is a chat message (howYourRunEnds), and a brief
+// carrying both still wrote 1,000 characters.
+const WORKER_REPORT_RULES = /This is about the LAST message you send[\s\S]*?(?=A PICTURE YOU SHOW)/;
 const POLL_MS = 15_000;
 // The reasons a queued thread's line names (`status().cannotStart`).
-const SAID_WHY_NOT_STARTED = new Set(['setup', 'asleep', 'cloud-carried', 'engine', 'login', 'memory', 'slow-folder', 'error']);
+const SAID_WHY_NOT_STARTED = new Set(['setup', 'asleep', 'cloud-carried', 'engine', 'login', 'memory', 'slow-folder', 'error', 'brake']);
 // Making a thread's folder takes seconds; past this it is said to be slow.
 const SLOW_FOLDER_MS = 2 * 60_000;
 // A project's kit for a new thread from the phone: left again at most this
@@ -1065,7 +1076,7 @@ export class Supervisor {
   // the three-failure cap, the same way resumeStopped's does.
   resumeItems(ids = null) {
     const only = new Set(Array.isArray(ids) ? ids : []);
-    const out = { resumed: 0, queued: 0, working: 0, missing: 0 };
+    const out = { resumed: 0, queued: 0, working: 0, missing: 0, failed: 0 };
     if (!only.size) return out;
     this.liftBrakeForHer();
     // RESUMING IS STILL ASKING TO RUN ON THIS MAC, so it obeys the same team
@@ -1098,8 +1109,16 @@ export class Supervisor {
       this.forgetDeadStarts(item);
 
       if (this._roomFor(this._engineFor(item), item, { asked: true })) {
-        this._spawnResume(item);
-        out.resumed += 1;
+        // A start that throws is said on the press, not lost with the rest of the selection.
+        try {
+          this._spawnResume(item);
+          out.resumed += 1;
+        } catch (error) {
+          this._noteNotStarting(item, 'error', this._engineFor(item));
+          out.failed += 1;
+          out.why ??= String(error?.message ?? error);
+          console.warn(`${nameSlug}: could not start ${item.id} on request:`, out.why);
+        }
       } else {
         // Over capacity. The queue is what keeps this honest: without it the
         // row would sit open and nothing would ever pick it up, because tick's
@@ -1135,6 +1154,8 @@ export class Supervisor {
     for (const item of items) {
       if (item.status !== 'blocked' || !Array.isArray(item.blockedBy) || !item.blockedBy.length) continue;
       if (this.sessions.has(item.id) || stoppedByHer(item)) continue;
+      // A wait a person set comes back to them; it starts nothing (shared/thread-waits.mjs).
+      if (item.wrote?.blockedBy?.source === 'founder') continue;
       const blockers = item.blockedBy.map((id) => byId.get(`${item.product}:${id}`));
       if (blockers.some((b) => !b || b.status !== 'done')) continue;
       const cleared = Math.max(...blockers.map((b) => b.wrote?.status?.ts ?? 0));
@@ -1670,7 +1691,15 @@ export class Supervisor {
     if (this.paused) return { ok: false, reason: 'paused' };
     if (!this.store.isDue(item, Date.now())) return { ok: false, reason: 'scheduled' };
     if (this.claimHeldElsewhere(item)) return { ok: false, reason: 'held' };
+    const bySlug = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
+    if (!mayRunHere(item, bySlug.get(item.product), process.env.AGENTBOX_PERSON_ID || null)) return { ok: false, reason: 'held' };
     this._runNow.set(id, { product, at: Date.now(), started: false });
+    // A stopped run's reply is marked delivered and the fleet may be braked;
+    // left so, the queue walks past the row while it reads Up next.
+    this.liftBrakeForHer();
+    const prefix = `${product}:${id}:`;
+    for (const key of [...this._handledAnswers]) if (key.startsWith(prefix)) this._handledAnswers.delete(key);
+    for (const key of Object.keys(this._deliveryAttempts)) if (key.startsWith(prefix)) delete this._deliveryAttempts[key];
     // Asking for a row by name outranks a rest the fleet earned on it, the
     // same way `resumeItems` treats it.
     if (this._endRest(product, id)) this._saveState();
@@ -4694,8 +4723,17 @@ export class Supervisor {
       || (trouble.cause === 'at-limit' && limits.every((l) => !(l.percent >= 100)));
     if (!proven) return false;
     this._clearProfileTrouble(key);
+    // The fleet brake waits for the reset the limit printed, days off for a
+    // week's; an account proven free again ends it, or nothing starts till then.
+    if (this._healthyProfiles().length) {
+      this._fastExits = 0;
+      this._spawnCooldownUntil = 0;
+      this._fleetTroubleSince = 0;
+      this._lastFastExit = null;
+    }
     this._saveState();
     this.onChange?.();
+    this.wake?.();
     return true;
   }
 
@@ -7255,7 +7293,7 @@ export class Supervisor {
   _isContinuation(item) {
     if (!item.answer) return false;
     // The offer of a teammate is answered by the app (main/teammates.mjs), never by an agent.
-    if ((item.labels ?? []).includes(OFFER_LABEL)) return false;
+    if ((item.labels ?? []).includes(OFFER_LABEL) || (item.labels ?? []).includes(REACH_LABEL)) return false;
     // A withdrawn reply (Z after send in the inbox) is a cancel, not an
     // answer; spawning on it would brief a worker with "(withdrawn)".
     if (item.answer === '(withdrawn)') return false;
@@ -7371,6 +7409,7 @@ export class Supervisor {
     // Teammates next, for the same reason: a run a message or a schedule made
     // on this tick is picked up by the pass below.
     await this.serveTeammates(now);
+    await this.wakeForNotes(now);
     // And the folders of rows she has finished, put away. On a timer of its own
     // rather than every pass, because it is a walk of the disk and a tick is
     // fifteen seconds: she closes rows while nothing at all is running, which
@@ -7740,6 +7779,24 @@ export class Supervisor {
   // to Monday finds ONE period unserved, because four were never representable.
   // And nothing books the next run, so a run that dies costs one day rather
   // than costing the task.
+  // A teammate's note on a file an agent made is a turn for that agent
+  // (./notes-wake.mjs), live if a session is up, and never waited on for long.
+  async wakeForNotes(now = Date.now()) {
+    const team = this.store.teammates?.team;
+    if (!team) return;
+    const deadline = this.config.teammateReplyDeadlineMs ?? 30_000;
+    const tell = async (product, id, { text, from, fromNotes }) => {
+      let timer;
+      const late = new Promise((resolve) => { timer = setTimeout(() => resolve('late'), deadline); });
+      const sent = submitReply(this, { product, id, answer: text, from: from.name }, () => this.store.tellItem(product, id, { text, from, fromNotes }));
+      sent.catch((err) => console.warn(`zero: notes on a file did not reach ${id}: ${err.message}`));
+      await Promise.race([sent, late]).finally(() => clearTimeout(timer));
+    };
+    try {
+      if (await wakeForNotes({ store: this.store, team, tell, now })) this.wake?.();
+    } catch (err) { console.warn('zero: notes on a file could not reach its agent:', err.message); }
+  }
+
   // Your words to a teammate that is already on a run go into that run, the
   // way a reply typed in its thread does, live if a session is up.
   async serveTeammates(now = Date.now()) {
@@ -7790,6 +7847,12 @@ export class Supervisor {
       if (done.length) this.onChange?.();
     } catch (err) {
       teammates.noteTrouble?.(`Teammates could not wake: ${err.message}`, now);
+    }
+    // Sending goes over the network, so the tick does not wait on it.
+    if (teammates.team && !this._reaching) {
+      this._reaching = teammates.reach({ items, now, tell })
+        .catch((err) => teammates.noteTrouble?.(`A message to a person could not be sent: ${err.message}`, now))
+        .finally(() => { this._reaching = null; this.onChange?.(); });
     }
   }
 
@@ -8212,8 +8275,8 @@ export class Supervisor {
     // brief instead, which a personal task never gets; they are one document
     // now and this is the single point every kind of run passes through.
     const standing = this.standingInstructions();
-    const project = this.projectInstructions(item.product, product);
-    const messages = this.messageRules();
+    // The Team look line rides with the project, which is what it is about.
+    const project = [this.projectInstructions(item.product, product), this.teamLookLine(item.product, product), this.editedFilesLine(item), this.filesFoldersLine(item, product)].filter(Boolean).join('\n\n') || null;
     // ADHD MODE RIDES DIRECTLY UNDER THE MESSAGE RULES, and only while it is on
     // (w-5737fe67cf): its text is appended while the mode is on and removed
     // when it is turned off.
@@ -8225,7 +8288,11 @@ export class Supervisor {
     // team chat are current on a reply too.
     let teammate = null;
     try { teammate = this.store.teammates?.briefFor(item) ?? null; } catch { teammate = null; }
-    const system = fillName([standing, project, teammate, messages, adhd].filter(Boolean).join('\n\n'));
+    const messages = this.messageRules({ teammate: !!teammate });
+    // The connections say what this run can reach rather than how to behave,
+    // so they go above the ranked blocks and the message rules stay last.
+    const ranked = [standing, project, teammate, messages, adhd, teammate && howYourRunEnds()];
+    const system = fillName([this._connectionsBrief(), ...ranked].filter(Boolean).join('\n\n'));
     // `fork` IS THE FLAG THAT MAKES IT A FORK RATHER THAN A CONTINUATION: the
     // resumed conversation is written on under a NEW id, so the row it came
     // from keeps its own thread untouched (MP-08). The builder drops it when
@@ -8340,6 +8407,23 @@ export class Supervisor {
       harness.release(this, rec.profile ?? 'default');
     });
     return initial;
+  }
+
+  filesFoldersLine(item, product = null) {
+    try {
+      const name = product?.name ?? this.store.listProducts().find((p) => p.slug === item.product)?.name;
+      return this.store.teammates?.filesFoldersLine?.(name) ?? null;
+    } catch { return null; }
+  }
+
+  editedFilesLine(item) {
+    try { return editedFilesLine(readItemHistory(this.store.productDir(item.product), item.id)); } catch { return null; }
+  }
+
+  // Only a project holding the team's look hears about it (shared/team-look.mjs).
+  teamLookLine(slug, product = null) {
+    const dir = product?.dir ?? this.store.listProducts().find((p) => p.slug === slug)?.dir;
+    return dir && fs.existsSync(path.join(dir, TEAM_LOOK)) ? TEAM_LOOK_LINE : null;
   }
 
   /* ------------------------ project instructions -------------------------- */
@@ -8480,12 +8564,13 @@ export class Supervisor {
   // Read fresh at every spawn, never cached, like everything else she can edit
   // while the fleet is running. Emptying the box takes the user's words out,
   // never ours.
-  messageRules() {
+  messageRules({ teammate = false } = {}) {
     let theirs = '';
     if (!agentInstructionsUnified(this.userDir) && this.messageRulesFile() !== this.messageRulesDefaultFile()) {
       try { theirs = fs.readFileSync(this.messageRulesFile(), 'utf8').trim(); } catch {}
     }
-    const ours = this.shippedMessageRules().replace(/<!-- autonomy-rules:(start|end) -->\n?/g, '').trim();
+    const shipped = this.shippedMessageRules();
+    const ours = (teammate ? shipped.replace(WORKER_REPORT_RULES, '') : shipped).replace(/<!-- autonomy-rules:(start|end) -->\n?/g, '').trim();
     // ONE framing line each, for the same reason her project instructions carry
     // one: a session has no other way to know whose words these are, or which
     // wins where the two disagree.
@@ -9055,6 +9140,7 @@ export class Supervisor {
       // no store server, and never a name a worker chooses: see the argument in
       // main/codex-approvals.mjs.
       storeServer: storeServer?.name ?? null,
+      connectionServers: Object.keys(plan.connectionServers ?? {}),
       // Where a refusal Agentbox cannot draw a card for goes: the worker's own
       // stderr, which is what `troubleCause` reads and what the trace records.
       say: (line) => worker?.stderr?.emit?.('data', line),
@@ -9067,6 +9153,7 @@ export class Supervisor {
       // rather than once per app-server, and never caught: see `_codexIsolation`.
       ready: this._codexIsolation(client, handshake),
       threadParams: (mcpServers) => this.codexThreadParamsFor(plan, cwd, mcpServers, storeServer, home, { cloud }),
+      askedMcpServers: Object.keys(plan.connectionServers ?? {}),
       turnParams: this.codexTurnParamsFor(plan),
       resumeThreadId: plan.resumeId,
       // The card, which is the other half of what a worker needs to be able to
@@ -9241,6 +9328,7 @@ export class Supervisor {
       instructions: plan?.system ?? null,
       mcpServers,
       storeServer,
+      connectionServers: plan?.connectionServers ?? null,
       // WHAT SHE PICKED, AND IT IS ASKED FOR HERE FOR THE SAME REASON THE MODEL
       // IS: the one place that builds the params is the one place that decides,
       // so there is no precomputed field on the plan for a caller to forget.
@@ -9974,6 +10062,7 @@ export class Supervisor {
     // it never starts.
     const runId = crypto.randomUUID();
     const spawnFiles = [];
+    this._giveConnections(plan, item, runId, spawnFiles);
     this.prepareClaudePermissions(plan, product, runId, spawnFiles);
 
     // Workers bill to the founder's Claude subscription (the CLI's own OAuth
@@ -10251,6 +10340,7 @@ export class Supervisor {
         this._noteHeard(item, session.sessionId);
       }
       if (activity(session, ...frame)) this.onChange?.();
+      try { noteAgentWrites(product, item.id, frame[0]); } catch { /* a missed note only costs a click */ }
       if (session.remoteHeld && harness.capabilities.remoteControl) {
         try {
           const event = JSON.parse(frame[0]);
@@ -10826,7 +10916,8 @@ export class Supervisor {
       ? template.replace(/<!-- repeat-rules:(start|end) -->\n?/g, '')
       : template.replace(/<!-- repeat-rules:start -->[\s\S]*?<!-- repeat-rules:end -->\n?/g, '');
     // And a teammate's run: how it finishes, only where a teammate:<id> label says it is one.
-    template = teammateIdOf(item)
+    // A thread she sent to a teammate is her ask, so the rules for her rows hold.
+    template = teammateIdOf(item) && !item.routed
       ? template.replace(/<!-- teammate-rules:(start|end) -->\n?/g, '')
       : template.replace(/<!-- teammate-rules:start -->[\s\S]*?<!-- teammate-rules:end -->\n?/g, '');
     // And the fourth: her rule about when a piece of work gets its own row.
@@ -11655,12 +11746,48 @@ export class Supervisor {
   // landed on the approval card as a line it could not read. Approvals go on
   // the card and decisions go in the thread: a worker asks in its last message,
   // under Options, as its brief already says (w-ab1f2f1d82).
-  prepareClaudePermissions({ args }, product, runId, spawnFiles) {
+  /**
+   * This run's connections, on the plan for whichever engine starts it. The key
+   * ends with the run's files. Trouble here costs the run its tools, not the run.
+   */
+  _giveConnections(plan, item, runId, spawnFiles) {
+    if (!this.connections) return;
+    try {
+      const run = this.connections.openRun({ runId, item: { id: item.id, product: item.product } });
+      if (!Object.keys(run.servers).length) return;
+      plan.connectionServers = run.servers;
+      spawnFiles.push(run.close);
+    } catch (err) { console.warn('zero: could not hand this run its connections:', err?.message ?? err); }
+  }
+
+  _connectionsBrief() {
+    if (!this.connections) return null;
+    let tools = null;
+    try { tools = this.connections.statusNow?.() ?? null; } catch { /* told from workingNow */ }
+    if (!tools) {
+      let working = [];
+      try { working = this.connections.workingNow(); } catch { /* told as not connected */ }
+      const have = new Set(working.map((e) => e.id));
+      tools = this.connections.catalog.map((e) => ({ id: e.id, name: e.name, state: have.has(e.id) ? 'works' : 'not_connected', given: have.has(e.id) }));
+    }
+    const lines = ['## Connected tools', 'Each tool the owner can connect, as their Connections page shows it. Say it the same way, and never tell the owner to connect a tool that is connected.'];
+    for (const t of tools.filter((x) => x.state !== 'not_connected')) lines.push(connectionLine(t, Date.now()));
+    const missing = tools.filter((t) => t.state === 'not_connected');
+    if (missing.length) lines.push(`Not connected: ${missing.map((e) => e.name).join(', ')}. If the work needs one of them, or another tool, do not look for another way in. Say so in your message and give the owner the link: ${missing.map((e) => `[Connect ${e.name}](agentbox://connections/${e.id})`).join(' ')}, or [Connections](agentbox://connections) for anything else.`);
+    let copies = [];
+    try { copies = this.connections.copiesNow?.() ?? []; } catch { /* told as none */ }
+    if (copies.length || tools.some((t) => t.state !== 'not_connected')) lines.push('', filesComeFirst(copies, Date.now()));
+    return lines.join('\n');
+  }
+
+  prepareClaudePermissions({ args, connectionServers = null }, product, runId, spawnFiles) {
     args.push('--disallowedTools', 'AskUserQuestion');
-    const mcpConfig = this.writeMcpConfig(runId);
+    const mcpConfig = this.writeMcpConfig(runId, connectionServers);
     if (!mcpConfig) return;
     spawnFiles.push(mcpConfig);
     args.push('--mcp-config', mcpConfig, '--permission-prompt-tool', 'mcp__zero-approvals__approval_prompt');
+    // The app decides each of these calls itself, so the engine does not ask too.
+    for (const name of Object.keys(connectionServers ?? {})) args.push('--allowedTools', `mcp__${name}`);
     const rules = this.writeWorkerSettings(product, runId);
     if (rules) { spawnFiles.push(rules); args.push('--settings', rules); }
   }
@@ -11923,26 +12050,28 @@ export class Supervisor {
   // zero.config.json. The approvals channel is Agentbox's own and always rides;
   // the store server rides only when one is configured. Returns null when there
   // is nothing at all to offer, and the worker then runs with no MCP.
-  writeMcpConfig(runId = crypto.randomUUID()) {
-    const servers = this.mcpServers();
+  writeMcpConfig(runId = crypto.randomUUID(), connectionServers = null) {
+    const servers = this.mcpServers(connectionServers);
     if (!servers) return null;
     const file = path.join(os.tmpdir(), `zero-mcp-${runId}.json`);
     fs.writeFileSync(file, JSON.stringify({ mcpServers: servers }));
     return file;
   }
 
-  /** The two per-spawn files, gone once the run is. Removing twice is nothing. */
+  /** The two per-spawn files and the run's connection key, gone once the run is. Removing twice is nothing. */
   removeSpawnFiles(session) {
     for (const f of session?.spawnFiles ?? []) {
+      if (typeof f === 'function') { try { f(); } catch { /* the run has gone anyway */ } continue; }
       try { fs.unlinkSync(f); } catch (err) { if (err?.code !== 'ENOENT') console.warn('zero: could not remove a spawn file:', err?.message ?? err); }
     }
     if (session?.spawnFiles) session.spawnFiles = [];
   }
 
   /** The servers themselves, apart from the file. */
-  mcpServers(platform = process.platform) {
+  mcpServers(connectionServers = null, platform = process.platform) {
     const storeCmd = this.storeMcpCommand();
     const servers = {
+      ...connectionServers,
       // The approvals channel: gated actions pause here and ask the
       // founder live instead of dying or bouncing back as a paste.
       'zero-approvals': {
@@ -12031,7 +12160,8 @@ function accountRefusedTheRun(session) {
 // Those fields describe the thread; they never ask it anything.
 // Moving an answer out of the inbox is not asking the agent to answer again.
 // runAt also covers snoozes written before the inbox reminder had its own field.
-const NOT_A_WORD = new Set(['visibility', 'priority', 'problem', 'progress', 'solution', 'blockedBy', 'blocks', 'runAt', 'snoozedUntil']);
+// visibleTo is Add people, and label a rename.
+const NOT_A_WORD = new Set(['visibility', 'visibleTo', 'label', 'priority', 'problem', 'progress', 'solution', 'blockedBy', 'blocks', 'runAt', 'snoozedUntil', 'shippedAt']);
 function lastFounderWrite(item) {
   let latest = 0;
   for (const [field, w] of Object.entries(item?.wrote ?? {})) {

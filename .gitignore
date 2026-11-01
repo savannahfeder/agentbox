@@ -1,4 +1,6 @@
 node_modules/
+# A worktree's link to another checkout's packages is a file, which the line above misses.
+node_modules
 renderer/dist/
 *.log
 .DS_Store

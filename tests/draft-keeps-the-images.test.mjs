@@ -69,6 +69,14 @@ describe('her pasted images, through a close and a reopen', () => {
     ]);
   });
 
+  it('keep a file\'s size, so its chip and the 200 MB check still have it', () => {
+    const store = fakeStore();
+    saveDraftAttachments(ITEM, [{ ...dropped('cut.mp4'), size: 12 }, dropped('report.pdf')], store);
+    const [cut, report] = readDraftAttachments(ITEM, store);
+    expect(cut.size).toBe(12);
+    expect(report).not.toHaveProperty('size');
+  });
+
   it('keep their order, so the row she comes back to is the row she left', () => {
     const store = fakeStore();
     saveDraftAttachments(ITEM, [pasted('first.png'), pasted('second.png'), dropped('third.txt')], store);

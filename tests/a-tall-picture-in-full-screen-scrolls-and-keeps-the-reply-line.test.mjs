@@ -55,5 +55,5 @@ it('scrolls a tall picture at the width of the window in full screen', () => {
 // Beside the conversation it still fits whole: the pane is narrow there, and
 // a picture you have to scroll in a half-width pane is one you cannot see.
 it('still fits the whole picture when it sits beside the conversation', () => {
-  expect(read('styles.css')).toMatch(/\n\.doc-picture \{[^}]*object-fit: contain;[^}]*max-height: 100%;/);
+  expect(read('styles.css')).toMatch(/\n\.doc-picture \{[^}]*object-fit: contain;[^}]*max-height: calc\(100% - 16px\);/);
 });

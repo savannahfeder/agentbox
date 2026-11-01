@@ -5,6 +5,7 @@ import type { GroupChoice } from './GroupList';
 import { GroupMark } from './GroupList';
 import { I } from './icons';
 import { updatedWords } from '../../threads/page-rules';
+import { groupTag } from './room-rules';
 import { ChatsColumn, ChatsContext } from '../../teammates/ChatsColumn';
 
 /** Groups whose name matches, the name's start first, then a word's start, then anywhere in it.
@@ -31,7 +32,7 @@ export function GroupsColumn({ rows, current, now, onOpen }: { rows: GroupChoice
     return <button type="button" key={g.key} className={`gc-row${on ? ' on' : ''}${fresh ? ' unread' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => onOpen(g.key)}>
       <GroupMark g={g} size={20} />
       <span className="gc-w">
-        <span className="gc-1"><span className="rm-one">{g.name}</span><span className="gc-t">{g.at ? updatedWords(g.at, now) : ''}</span></span>
+        <span className="gc-1"><span className="rm-one">{g.name}{groupTag(g) && <em className="gr-tag">{groupTag(g)}</em>}</span><span className="gc-t">{g.at ? updatedWords(g.at, now) : ''}</span></span>
         <span className="gc-2"><span className="rm-one">{g.last}</span>{fresh && <i className="gc-dot" aria-label="New messages" />}</span>
       </span>
     </button>;
@@ -47,6 +48,7 @@ export function GroupsHead({ current, onFind }: { current: GroupChoice | undefin
     <h1 className="workspace-title gc-head-group">
       {current && (current.faces.length ? <GroupMark g={current} size={20} /> : <span className="gt-hh">{I.hash(15)}</span>)}
       <span className="rm-one">{current?.name ?? 'Groups'}</span>
+      {current?.open && <em className="gr-tag">{groupTag(current)}</em>}
     </h1>
   </div>;
 }

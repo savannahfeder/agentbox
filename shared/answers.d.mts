@@ -10,4 +10,5 @@ export interface AnsweredItem {
 export function agentSpokeSince(item: AnsweredItem | null | undefined, since: number): boolean;
 export function answerSettled(item: AnsweredItem | null | undefined): boolean;
 export function answerTs(item: AnsweredItem | null | undefined): number;
+export function wordWaits(item: (AnsweredItem & { runAt?: number }) | null | undefined): boolean;
 export function filedByThePerson(item: (AnsweredItem & { labels?: string[] }) | null | undefined): boolean;

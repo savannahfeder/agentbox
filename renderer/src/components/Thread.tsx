@@ -27,16 +27,19 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Face, TeamContext, firstName } from '../team/people';
 import { Name } from '../../../shared/product-name.mjs';
+import { LINE_MISSING } from '../reveal-line';
 import { activitySummary, keepActivityKeyLocal } from '../activity-summary';
 import { actWhen, actWords } from '../act-line';
 import { herTurnEnds, herTurnStarts, threadParts } from '../her-turns';
-import { holdAtBottom } from '../thread-bottom';
-import { NOT_ANSWERING, NOT_ANSWERING_MS } from '../not-answering';
+import { holdAtBottom, lastMessageIn } from '../thread-bottom';
+import { NOT_ANSWERING_MS, THREAD_NOT_ANSWERING_MS, threadWaitWords } from '../not-answering';
 import { onCloudPhone, onPhone } from '../phone-screen';
 import { threadPieces, typedParts } from '../typed-message';
 import { TicketLink } from './TicketReference';
+import { MessageKind, FileMarkOpener } from './FileMarkLine';
 import { clock, dayHeading } from '../thread-history';
 import { chatLayout, newestSaid } from '../team/chat-layout';
+import { DecideContext } from '../team/TeamLists';
 import { ChatFold } from '../team/ChatFold';
 import { MessageActions, Reactions } from '../team/ChatActions';
 import { DeleteMessage, MessageEditor } from '../team/MessageMore';
@@ -47,7 +50,8 @@ import { AgentAnswers } from '../team/ChatAgents';
 import {
   conversationGap, fileInChange, gapIndex, groupWork, outputCut, runFailures, runOverflow, runSummary,
 } from '../../../shared/agents.mjs';
-import type { AgentEvent, AgentTurn, AgentWork } from '../types';
+import type { AgentEvent, AgentTurn, AgentVoice, AgentWork } from '../types';
+import { voiceName } from '../../../shared/agent-voice.mjs';
 
 // How much of an output stands open before she asks for the rest. The chosen
 // drawings show five or six lines: enough to see what came back, short
@@ -104,7 +108,7 @@ export interface CodeInThread {
   open: (path: string) => void;
 }
 
-export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, nameOf, landOn, md, code, tail, chat = false, reactions, onReact, onQuote, onHandToAgent, replies, openThread = null, onOpenThread, freshThreads, onEdit, onMarkUnread, onCopied }: {
+export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, nameOf, landOn, md, code, tail, chat = false, reactions, onReact, onQuote, onHandToAgent, replies, openThread = null, onOpenThread, freshThreads, onEdit, onMarkUnread, onCopied, onMove, seenUnder = null }: {
   // CUT THE AGENT'S CURRENT STEP so a message of hers that is waiting on it is
   // answered now (w-f37a34def6). Absent where nothing can be cut.
   onSendNow?: () => unknown;
@@ -165,7 +169,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   onQuote?: (text: string) => void;
   // Turn this conversation into work. The line that used to say so sat under
   // the whole conversation; it is an action on a message now.
-  onHandToAgent?: () => void;
+  onHandToAgent?: (message: AgentTurn) => void;
   // THREADS (w-920461cbe6). The replies to each message, by its uid, which
   // `itemThread` lifted out of `events`; the uid of the one open in the panel
   // beside the chat; and the way to open one. With `onOpenThread`, Reply on a
@@ -182,6 +186,10 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   onMarkUnread?: (at: number) => void;
   /** A message's words were copied. */
   onCopied?: () => void;
+  /** It and its replies start a thread of their own, with a link left here. */
+  onMove?: (uid: string) => void;
+  /** "Seen by Dev, 1:55pm", under the message it is about (../team/seen-line.ts). */
+  seenUnder?: { uid: string; text: string; title?: string } | null;
 }) {
   // THE MESSAGE BEING EDITED, by uid, and the one asking to be deleted.
   const [editing, setEditing] = useState<string | null>(null);
@@ -204,17 +212,33 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   // are aggregated, and a run she opened stays open while she reads.
   const [runsOpen, setRunsOpen] = useState<Set<number>>(new Set());
   const foot = useRef<HTMLDivElement>(null);
+  const decide = useContext(DecideContext);
   // A TEAMMATE'S MESSAGE is theirs, not "You": drawn with their face and name.
   const team = useContext(TeamContext);
   const teammateOf = (e: AgentEvent) => {
     const by = (e as { by?: string }).by;
     return team && by && by !== team.me ? team.byId.get(by) ?? { id: by, email: '', name: 'A teammate', avatarUrl: null } : null;
   };
+  // AN AGENT'S MESSAGE IS ITS OWN, on its owner's screen as well as anyone's.
+  const voiceOf = (e: AgentEvent): string | null => {
+    const { voice } = e as { voice?: AgentVoice };
+    if (!voice) return null;
+    const owner = teammateOf(e);
+    return voiceName(voice, owner?.name ?? '', { mine: !owner });
+  };
 
   useEffect(() => {
     setOpen(new Map());
     setRunsOpen(new Set());
   }, [landOn]);
+
+  // A found line that is not drawn is in the middle this thread left out.
+  useEffect(() => {
+    if (!omitted) return;
+    const ask = () => onWhole();
+    window.addEventListener(LINE_MISSING, ask);
+    return () => window.removeEventListener(LINE_MISSING, ask);
+  }, [omitted, onWhole]);
 
   // Send now was pressed and the agent has not taken her words yet. One flag
   // for the thread: the cut answers every message waiting, not only one.
@@ -245,7 +269,8 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   useEffect(() => {
     const box = foot.current?.closest('.focus-scroll') as HTMLElement | null;
     // A phone's Safari does not keep her place when something above changes height.
-    return holdAtBottom(box, { keepPlace: onPhone() });
+    // A chat reads from its newest line up, so only a thread lands on a message's start.
+    return holdAtBottom(box, { keepPlace: onPhone(), ...(chat || !box ? {} : { readFrom: () => lastMessageIn(box) }) });
   }, [landOn]);
 
   // Where the missing middle is: after the opening, which is always kept. Drawn
@@ -368,7 +393,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
           : slot && !slot.head ? 'is-msg is-chat-cont'
           : e.same ? 'is-msg-same' : 'is-msg';
         return (
-        <div key={`${e.at}-${key}-${n}`} className={`thread-block ${holds} ${ends === gapAfter ? 'has-gap' : ''}${chat && e.kind !== 'work' && e.kind !== 'run' && e.uid && e.uid === openThread ? ' is-thread-open' : ''}`} data-exchange={exchanges[n]}>
+        <div key={`${e.at}-${key}-${n}`} className={`thread-block ${holds} ${ends === gapAfter ? 'has-gap' : ''}${chat && e.kind !== 'work' && e.kind !== 'run' && e.uid && e.uid === openThread ? ' is-thread-open' : ''}`} data-exchange={exchanges[n]} data-line={e.kind === 'work' || e.kind === 'run' ? undefined : e.uid ?? `at-${e.at}`}>
           {slot?.day && <div className="chat-day">{slot.day}</div>}
           {e.kind === 'work' && e.yours
             ? <ActLine act={e} />
@@ -400,12 +425,13 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                   type, because a turn means nothing between two people. */}
               <div className={`msg chat-msg${slot.head ? '' : ' cont'}${e.pending ? ' sending' : ''}`}>
                 <div className="chat-gutter">{slot.head
-                  ? <Face person={teammateOf(e) ?? (team?.me ? team.byId.get(team.me) : null)} me={!teammateOf(e) && e.who === 'you'} agent={e.who === 'it'} size="lg" />
+                  ? <Face person={teammateOf(e) ?? (team?.me ? team.byId.get(team.me) : null)} me={!voiceOf(e) && !teammateOf(e) && e.who === 'you'} agent={e.who === 'it' || !!voiceOf(e)} size="lg" />
                   : <span className="chat-gt">{clock(e.at)}</span>}</div>
                 {slot.head && (
                   <div className="msg-head">
-                    <span className="msg-who">{teammateOf(e)?.name ?? (e.who === 'you' ? 'You' : name)}</span>
+                    <span className="msg-who">{voiceOf(e) ?? teammateOf(e)?.name ?? (e.who === 'you' ? 'You' : name)}</span>
                     {headFacts(e, clock(e.at))}
+                    <MessageKind e={e} />
                     {e.edited && <span className="msg-edited" title="Edited">edited</span>}
                   </div>
                 )}
@@ -431,6 +457,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                     onReact={(emoji, off) => onReact?.(e.uid!, emoji, off)}
                   />
                 )}
+                {seenUnder && seenUnder.uid === e.uid && <div className="chat-seen" title={seenUnder.title}>{seenUnder.text}</div>}
                 {/* ITS THREAD, AS ONE LINE (w-920461cbe6): who replied, how
                     many, and when the last came in. Pressing it opens the
                     thread in the panel beside the chat. */}
@@ -443,7 +470,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                     {...(onOpenThread
                       ? { onQuote: () => onOpenThread(e.uid!), replyLabel: 'Reply in thread' }
                       : { onQuote: () => onQuote?.(e.text ?? '') })}
-                    onHandToAgent={onHandToAgent}
+                    onHandToAgent={onHandToAgent ? () => onHandToAgent(e) : undefined}
                     more={messageMore({
                       mine: !teammateOf(e) && e.who === 'you',
                       text: e.text ?? '',
@@ -451,6 +478,9 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                       onDelete: onEdit ? () => setDeleting(e.uid!) : undefined,
                       onMarkUnread: onMarkUnread ? () => onMarkUnread(e.at) : undefined,
                       onCopied,
+                      onMove: onMove ? () => onMove(e.uid!) : undefined,
+                      onDecide: decide ? () => decide.mark({ uid: e.uid!, text: e.text ?? '', by: (e as { by?: string }).by ?? team?.me ?? null }) : undefined,
+                      decideLabel: decide?.label,
                     })}
                   />
                 )}
@@ -470,13 +500,14 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
               // saying so, and here it gets its name back. The fold is
               // untouched, so the header still counts it as one message with
               // the half she cannot see.
-              <div className={`msg ${e.who === 'you' && !teammateOf(e) ? 'yours' : ''} ${turnStarts[n] ? 'turn' : ''} ${turnEnds[n] ? 'turn-end' : ''}${e.same && !e.resumed ? 'same' : ''} ${e.pending ? 'sending' : ''}`}>
+              <div className={`msg ${e.who === 'you' && !teammateOf(e) && !voiceOf(e) ? 'yours' : ''} ${turnStarts[n] ? 'turn' : ''} ${turnEnds[n] ? 'turn-end' : ''}${e.same && !e.resumed ? 'same' : ''} ${e.pending ? 'sending' : ''}`}>
                 {(!e.same || e.resumed) && (
                   <div className="msg-head">
-                    <span className="msg-who">{teammateOf(e)
+                    <span className="msg-who">{voiceOf(e) ? <><Face person={teammateOf(e)} agent />{voiceOf(e)}</> : teammateOf(e)
                       ? <><Face person={teammateOf(e)} />{firstName(teammateOf(e))}</>
                       : e.who === 'you' ? 'You' : ((e as { from?: string }).from ?? nameOf?.(e) ?? name)}</span>
                     {headFacts(e, when(e.at))}
+                    <MessageKind e={e} />
                   </div>
                 )}
                 {/* WHAT A PERSON TYPED IS NOT MARKDOWN (w-a33b339772).
@@ -545,14 +576,14 @@ const WAITING: Array<{ who: 'you' | 'them'; lines: number[] } | { work: number }
 // answering while the window keeps drawing. The wait is unchanged, and the
 // answer still lands if it comes; the head stops claiming to be reading.
 export function ThreadWaiting({ head }: { head: ReactNode }) {
-  const [late, setLate] = useState(false);
+  const [words, setWords] = useState<string | null>(null);
   useEffect(() => {
-    const t = setTimeout(() => setLate(true), NOT_ANSWERING_MS);
-    return () => clearTimeout(t);
+    const timers = [NOT_ANSWERING_MS, THREAD_NOT_ANSWERING_MS].map((ms) => setTimeout(() => setWords(threadWaitWords(ms)), ms));
+    return () => timers.forEach(clearTimeout);
   }, []);
   return (
     <div className="thread thread-waiting" aria-busy="true">
-      <div className="thread-head">{late ? NOT_ANSWERING : head}</div>
+      <div className="thread-head">{words ?? head}</div>
       {WAITING.map((row, i) => ('work' in row ? (
         <div key={i} className="sk-did" style={{ width: `${row.work}%` }} />
       ) : (
@@ -769,10 +800,13 @@ export function ActLine({ act }: { act: AgentWork }) {
   const team = useContext(TeamContext);
   const who = team && act.by && act.by !== team.me ? team.byId.get(act.by) ?? { id: act.by, email: '', name: 'A teammate', avatarUrl: null } : null;
   const words = actWords(act, who ? firstName(who) : null);
+  const openFile = useContext(FileMarkOpener);
   return (
     <div className={`act-line ${words.picked ? 'is-pick' : ''}`}>
       <span className="act-said">
-        {words.lead}
+        {act.fileMark && openFile
+          ? <button type="button" className="act-file-link" onClick={() => openFile(act.fileMark!)}>{words.lead}</button>
+          : words.lead}
         {words.choice && <span className="act-choice"> {words.choice}</span>}
       </span>
       <span className="act-when">{actWhen(act.at)}</span>

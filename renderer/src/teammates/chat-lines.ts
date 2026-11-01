@@ -154,6 +154,28 @@ export function workingLine(
   return { state: 'working', text: session.activity?.at(-1)?.label?.trim() || run, aside: elapsed < 60_000 ? 'just started' : `${spanLabel(elapsed)} in` };
 }
 
+// What stands between a waiting run and an agent. No estimate: nothing knows how
+// long a run takes, so it says how long the busy ones have been going.
+const NAMED_AT_MOST = 3;
+export function whyWaiting({ item, running, queued, titleOf, now }: {
+  item: string;
+  running: Pick<RunningSession, 'itemId' | 'startedAt'>[];
+  queued: string[];
+  titleOf: (id: string) => string | null;
+  now: number;
+}): string {
+  const busy = running.filter((s) => s.itemId !== item);
+  if (!busy.length) return 'It starts at the next free moment.';
+  const named = busy.slice(0, NAMED_AT_MOST).map((s) => {
+    const span = now - s.startedAt;
+    return `${titleOf(s.itemId) ?? 'another thread'} (${span < 60_000 ? 'just started' : `${Math.floor(span / 60_000)}m`})`;
+  });
+  if (busy.length > NAMED_AT_MOST) named.push(`and ${busy.length - NAMED_AT_MOST} more`);
+  const ahead = queued.indexOf(item);
+  const behind = ahead > 0 ? ` ${ahead} ${ahead === 1 ? 'thread is' : 'threads are'} ahead of this one.` : '';
+  return `${busy.length} ${busy.length === 1 ? 'agent is' : 'agents are'} busy: ${named.join(', ')}.${behind}`;
+}
+
 // A run's first line. Its teammate's queue letting it go is not an agent
 // having it: until a session exists it is waiting, as the live line says.
 export function startWord(r: Pick<TeamRunLine, 'teammate' | 'item'>, team: Pick<Teammate, 'id' | 'running'>[], sessions: ReadonlyMap<string, unknown>): string {
@@ -176,7 +198,12 @@ export function liveLine(
   session: Pick<RunningSession, 'startedAt' | 'activity'> | null | undefined,
   now = Date.now(),
   asked: string | null = null,
+  { answered = false, queued = true }: { answered?: boolean; queued?: boolean } = {},
 ): { state: 'working' | 'waiting'; lead: string; text: string; aside: string } | null {
+  // A claim left behind by a run that has ended is no wait: its answer is already there.
+  if (answered && !session) return null;
+  // Nor is a run nothing will start: the queue is the one promise of a free agent.
+  if (!queued && !session) return null;
   const line = workingLine(t, session, now, asked);
   return line && { state: line.state, ...teamWorkingLine(t.name, line), aside: line.aside };
 }

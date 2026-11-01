@@ -55,7 +55,7 @@ describe('R in an open thread', () => {
     expect(app).toContain("onReply={() => setModal('reply')}");
     // AND PUTS THE CARET BACK IN A BOX THAT IS ALREADY OPEN (w-326fb83c0e):
     // the dock focuses itself when it mounts, and Escape leaves it mounted.
-    expect(rInAThread).toBe("        else if (e.key === \'r\' || e.key === \'R\') { e.preventDefault(); setModal(\'reply\'); if (modal === \'reply\') focusTheReplyBox(); }");
+    expect(rInAThread).toContain("else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setModal('reply'); if (modal === 'reply') focusTheReplyBox();");
   });
 });
 
@@ -93,6 +93,6 @@ describe('what must not change', () => {
   });
 
   it('R on the list still opens the thread with its box', () => {
-    expect(onTheList).toContain("case 'r': case 'R': if (!multiSel.size && pointed && replyKeyWorksIn(view)) { e.preventDefault(); setFocused(pointed); markSeen(pointed); setModal('reply'); } break;");
+    expect(onTheList).toMatch(/case 'r': case 'R': if \(!multiSel\.size && pointed && replyKeyWorksIn\(view\)\) \{ e\.preventDefault\(\); showToast\(replyingTo\([^\n]*setFocused\(pointed\); markSeen\(pointed\); setModal\('reply'\); \} break;/);
   });
 });

@@ -143,7 +143,7 @@ const PEOPLE = [
   { id: ANA, name: 'Ana Ruiz', email: 'ana@northwind.test', avatarUrl: null },
 ];
 const team = { state: { signedIn: true, since: SINCE, people: PEOPLE, team: { id: 't1', name: 'Northwind' } }, me: ME, byId: new Map(PEOPLE.map((p) => [p.id, p])), products: new Map() };
-const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+const text = (html) => html.replace(/<small class="ps-crosses">.*?<\/small>/, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 describe('the Projects list says who sees each one', () => {
   // The column is handed in by the team build, the way App does it; with

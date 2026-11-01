@@ -116,3 +116,14 @@ export function heldForHer(item) {
   return item?.status === 'blocked' && status?.source === 'system' && !!toldBy(item)
     && answerTs(item) <= (status.ts ?? 0);
 }
+
+// A PERSON'S WORD WRITTEN AFTER THE MOMENT WAS SET, AND NOT YET ACTED ON, RUNS
+// NOW. The moment is for the run it was set for, not for everything said on
+// the thread, and it stays on the row for that run.
+export function wordWaits(item) {
+  const said = item?.wrote?.answer;
+  const set = item?.wrote?.runAt;
+  if (!said || !set || !item.answer || item.answer === '(withdrawn)') return false;
+  if (said.source !== 'founder' && !said.teammate) return false;
+  return said.ts > set.ts && (item.answeredThrough ?? 0) < said.ts;
+}

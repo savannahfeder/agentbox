@@ -46,7 +46,7 @@ describe('the columns of a chat message', () => {
 
 describe('the chips in the thread panel', () => {
   const ME = 'p-me', MAYA = 'p-maya';
-  const team = { me: ME, byId: new Map([[MAYA, { id: MAYA, name: 'Maya Chen' }], [ME, { id: ME, name: 'Sam Rivera' }]]) };
+  const team = { me: ME, state: { people: [] }, byId: new Map([[MAYA, { id: MAYA, name: 'Maya Chen' }], [ME, { id: ME, name: 'Sam Rivera' }]]) };
   const html = renderToStaticMarkup(React.createElement(TeamContext.Provider, { value: team },
     React.createElement(ThreadPanel, {
       parent: { at: 1, who: 'you', by: MAYA, uid: 'u-1', text: 'Long findings.' },

@@ -31,17 +31,22 @@ const html = renderToStaticMarkup(h(TeamStrip, { members, picked: 'me', onPick()
 
 describe('a card', () => {
   it('leaves out what they are on, and an AI teammate\'s job', () => {
-    for (const words of ['Fix mobile inbox crowding', 'Brand colours for the launch', 'Waiting on you', 'Posts and outreach', 'Pushed the new colours', 'the deck is in']) {
+    for (const words of ['Fix mobile inbox crowding', 'Brand colours for the launch', 'Posts and outreach', 'Pushed the new colours', 'the deck is in']) {
       expect(html).not.toContain(words);
     }
   });
 
+  // 2026-10-30: the one word under a name says how they are, in plain case, never in capitals.
   it('keeps the face, the name and how many agents are working', () => {
     expect(html).toContain('src="https://example.com/sam.png"');
     expect(html).toContain('Maya Costa');
-    expect(html).toContain('16 AGENTS');
-    expect(html).toContain('3 AGENTS');
-    expect(html).toContain('NOT RUNNING');
+    expect(html).toContain('16 agents working');
+    expect(html).toContain('3 agents working');
+    expect(html).not.toMatch(/AGENTS|NOT RUNNING/);
+  });
+
+  it('says an AI teammate stopped for you is waiting on you, which is about you rather than its work', () => {
+    expect(cardOf('mate:t-ada')).toContain('Waiting on you');
   });
 
   it('says whether a chat has something new', () => {
@@ -51,22 +56,23 @@ describe('a card', () => {
   });
 
   it('says on the Team how many agents its people run, and marks its chat when something is new', () => {
-    expect(cardOf('room:r-team')).toContain('6 AGENTS');
+    expect(cardOf('room:r-team')).toContain('6 agents working');
     expect(cardOf('room:r-team')).toContain('class="ev-new"');
     expect(cardOf('room:r-team')).not.toContain('>New messages');
   });
 
   it('says nothing under someone who keeps their agents to themselves', () => {
     expect(cardOf('person:p-jun')).toContain('Jun Park');
-    expect(cardOf('person:p-jun')).not.toMatch(/AGENT|RUNNING/);
+    expect(cardOf('person:p-jun')).not.toMatch(/agent|running|Free/i);
   });
 });
 
 describe('the row', () => {
+  // 2026-10-30: a face over a name with no box, so the row holds about eleven, most of a team.
   it('fits narrower cards, so more of the team is in one row', () => {
     const min = Number(css.match(/\.ev-strip \{[^}]*minmax\((\d+)px/)[1]);
-    expect(min).toBeLessThanOrEqual(150);
-    expect(min).toBeGreaterThanOrEqual(130);
+    expect(min).toBeLessThanOrEqual(130);
+    expect(min).toBeGreaterThanOrEqual(100);
   });
 
   it('stacks the face over the name', () => {

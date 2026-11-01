@@ -15,7 +15,7 @@
 //     silently disappears.
 //   - The link card's "Visit" hands the url to the app the way every other link
 //     in Agentbox is handed over, rather than to an in-app browser tab.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { buildExtensions } from '../editor/extensions';
@@ -24,6 +24,10 @@ import { patchOriginal } from '../editor/patch-md';
 import { theAppKeepsThisKey } from '../../../shared/artifact-keys.mjs';
 import { api } from '../api';
 import { asksForANewTab } from '../link-click';
+import { pictureUrl } from '../picture';
+import { agoWords } from '../threads/summary-rules';
+import { DocOutline } from './DocOutline';
+import './doc-reading.css';
 
 const SAVE_DEBOUNCE_MS = 900;
 
@@ -43,13 +47,30 @@ function prettyHref(h: string): string {
 
 type LinkPop = { href: string; left: number; top: number; pos: number; pinned: boolean };
 
-export function DocText({ product, src, text, mtime, onSaved, onNotice }: {
+/** How the big view edits: its saves make versions, so what is typed goes to it rather than onto the file. */
+export interface DocVersions {
+  onDraft: (out: string | null) => void;
+  saveNow: () => void;
+  /** Handed the way to read the file with her edit in it right now, null when there is no edit. */
+  flush: MutableRefObject<(() => string | null) | null>;
+  paint?: (root: HTMLElement) => void;
+  scrollTop?: number;
+  /** Words kept from a sitting that never got to save. */
+  draft?: string;
+  byline?: string | null;
+}
+
+export function DocText({ product, src, text, mtime, folder = null, onSaved, onNotice, readOnly = false, versions }: {
+  readOnly?: boolean;
+  versions?: DocVersions;
   product: string;
   src: string;
   text: string;
   // What was on disk when the pane loaded it. Handed back on every save so a
   // file an agent rewrote underneath her is not silently overwritten.
   mtime: number;
+  // The folder the file sits in, which its relative pictures are drawn from.
+  folder?: string | null;
   onSaved: (mtime: number) => void;
   onNotice: (text: string) => void;
 }) {
@@ -64,16 +85,22 @@ export function DocText({ product, src, text, mtime, onSaved, onNotice }: {
   // of them are how every session on a product stays in agreement.
   const baseMd = useRef(pmDocToMd(mdToPmDoc(text)));
   const lastMtime = useRef(mtime);
-  const dirty = useRef(false);
+  const dirty = useRef(!!versions?.draft);
   const saveTimer = useRef<number | null>(null);
+  const asVersions = useRef(versions);
+  asVersions.current = versions;
   useEffect(() => { lastMtime.current = mtime; }, [mtime]);
 
-  const extensions = useMemo(() => buildExtensions('Write anything…'), []);
+  // A picture the document names beside itself, on the window's picture scheme:
+  // the page's own address is no folder, so it drew as a broken picture.
+  const extensions = useMemo(() => buildExtensions('Write anything…', {
+    drawnFrom: folder ? (from) => (/^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(from) ? from : pictureUrl(new URL(from, `file://${folder}/`).pathname)) : null,
+  }), [folder]);
 
   const editor = useEditor({
     extensions,
-    content: mdToPmDoc(text),
-    editable: true,
+    content: mdToPmDoc(versions?.draft ?? text),
+    editable: !readOnly,
     onUpdate: () => {
       dirty.current = true;
       if (saveTimer.current != null) window.clearTimeout(saveTimer.current);
@@ -84,8 +111,9 @@ export function DocText({ product, src, text, mtime, onSaved, onNotice }: {
   const save = async () => {
     if (!editor || !dirty.current) return;
     const md = pmDocToMd(editor.getJSON());
-    if (md === baseMd.current) { dirty.current = false; return; }
+    if (md === baseMd.current) { dirty.current = false; asVersions.current?.onDraft(null); return; }
     dirty.current = false;
+    if (asVersions.current) { asVersions.current.onDraft(patchOriginal(onDisk.current, baseMd.current, md) ?? md); return; }
     // Her edit spliced back into the file, with every line she did not touch
     // left as the bytes it already was. Null means it could not be placed
     // exactly, and then the editor's own markdown is what gets written: her
@@ -128,6 +156,7 @@ export function DocText({ product, src, text, mtime, onSaved, onNotice }: {
       if (!(e.metaKey || e.ctrlKey) || (e.key !== 's' && e.key !== 'S')) return;
       e.preventDefault();
       if (saveTimer.current != null) { window.clearTimeout(saveTimer.current); saveTimer.current = null; }
+      if (asVersions.current) { asVersions.current.saveNow(); return; }
       const had = dirty.current;
       void Promise.resolve(save()).then(() => { if (had && !dirty.current) onNotice('Saved.'); });
     };
@@ -225,9 +254,36 @@ export function DocText({ product, src, text, mtime, onSaved, onNotice }: {
     return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey, true); };
   }, [linkPop?.pinned]);
 
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  const [column, setColumn] = useState<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const live = asVersions.current;
+    if (!live || !editor) return undefined;
+    live.flush.current = () => {
+      if (saveTimer.current != null) { window.clearTimeout(saveTimer.current); saveTimer.current = null; }
+      const md = pmDocToMd(editor.getJSON());
+      dirty.current = false;
+      return md === baseMd.current ? null : patchOriginal(onDisk.current, baseMd.current, md) ?? md;
+    };
+    // Up where she was reading, with the caret in the words rather than the page jumping to it.
+    if (scroller && live.scrollTop) scroller.scrollTop = live.scrollTop;
+    editor.view.dom.focus({ preventScroll: true });
+    const paint = () => asVersions.current?.paint?.(editor.view.dom);
+    let timer: number | null = null;
+    const later = () => { if (timer != null) window.clearTimeout(timer); timer = window.setTimeout(paint, 250); };
+    paint();
+    editor.on('update', later);
+    return () => { editor.off('update', later); if (timer != null) window.clearTimeout(timer); live.flush.current = null; };
+  }, [editor, scroller]);
+  // Moves the "Edited" words on with the minute.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = window.setInterval(() => setNow(Date.now()), 60_000); return () => window.clearInterval(t); }, []);
+
   return (
     <div
-      className="doc-rich markdown"
+      ref={setScroller}
+      className={`doc-rich doc-scroll markdown${versions ? ' av-doc-scroll' : ''}`}
       onKeyDown={(e) => {
         // ESCAPE HANDS THE KEYBOARD BACK, and that is the whole of its job in
         // here. One press steps out of the words, the app has its keys again,
@@ -270,7 +326,14 @@ export function DocText({ product, src, text, mtime, onSaved, onNotice }: {
         openFor(a, true);
       }}
     >
-      <EditorContent editor={editor} className="doc-rich-content" />
+      <div className="doc-sheet">
+        <div className="doc-column" ref={setColumn}>
+          {versions?.byline && <p className="doc-byline">{versions.byline}</p>}
+          {!versions && mtime > 0 && <p className="doc-byline">Edited {agoWords(mtime, now).replace(/^Y/, 'y')}</p>}
+          <EditorContent editor={editor} className="doc-rich-content doc-prose" />
+        </div>
+        <DocOutline scroller={scroller} page={column} />
+      </div>
       {linkPop && createPortal(
         <div
           className="link-pop"
