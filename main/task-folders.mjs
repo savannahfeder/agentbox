@@ -772,6 +772,9 @@ function clearUnfinished(root, staging, pid = process.pid) {
  * is not an option there at all.
  */
 function cloneCheckout(root, folder, branch, from, branchExists, pid = process.pid) {
+  // On NTFS the copy shares no blocks, so it writes everything the checkout
+  // would, plus the ignored files inside tracked directories.
+  if (process.platform === 'win32') return false;
   // TRACKED CONTENT ONLY, on both sides of this. Her checkout permanently
   // carries a couple of untracked files (a scratch `:memory:.ses`, a folder of
   // screenshots somebody left), and counting those as dirty turned the fast

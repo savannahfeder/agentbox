@@ -25,11 +25,28 @@ export const INCLUDE_FILE = '.worktreeinclude';
 /**
  * macOS `cp -c` asks APFS for a block-sharing clone. GNU `cp` has no `-c`;
  * `-a --reflink=auto` shares blocks where the filesystem can and copies where
- * it cannot. Lives here rather than in `main/task-folders.mjs`, the other
- * caller, because that file imports this one.
+ * it cannot. Windows has no `cp`, so there it is `fs.cpSync`, landing where
+ * `cp` would and keeping links as links. Lives here rather than in
+ * `main/task-folders.mjs`, the other caller, because that file imports this one.
  */
-export function copyTree(from, to) {
-  const args = process.platform === 'darwin'
+export function copyTree(from, to, platform = process.platform) {
+  if (platform === 'win32') {
+    const into = fs.statSync(to, { throwIfNoEntry: false })?.isDirectory();
+    fs.cpSync(from, into ? path.join(to, path.basename(from)) : to, {
+      recursive: true, preserveTimestamps: true, force: false, errorOnExist: true,
+      // cpSync copies a junction as the folder it points at. A link is made
+      // again as a link, an absolute one as a junction, which needs no
+      // Developer Mode, so the checks after the copy still see it.
+      filter: (src, dest) => {
+        if (!fs.lstatSync(src).isSymbolicLink()) return true;
+        const target = fs.readlinkSync(src);
+        fs.symlinkSync(target, dest, path.isAbsolute(target) ? 'junction' : undefined);
+        return false;
+      },
+    });
+    return;
+  }
+  const args = platform === 'darwin'
     ? ['-c', '-R', from, to]
     : ['-a', '--reflink=auto', from, to];
   execFileSync('cp', args, { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -197,6 +214,31 @@ function nearestReal(abs) {
 }
 
 /**
+ * Every link at or under `at`, never walking through one. Windows has no
+ * `find`, so there the walk is Node's own, and a junction counts as a link.
+ */
+export function linksUnder(at, platform = process.platform) {
+  if (platform !== 'win32') {
+    return execFileSync('find', [at, '-type', 'l', '-print0'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+      .split('\0').filter(Boolean);
+  }
+  const top = fs.lstatSync(at);
+  if (top.isSymbolicLink()) return [at];
+  if (!top.isDirectory()) return [];
+  const found = [];
+  const waiting = [at];
+  while (waiting.length) {
+    const here = waiting.pop();
+    for (const entry of fs.readdirSync(here, { withFileTypes: true })) {
+      const inside = path.join(here, entry.name);
+      if (entry.isSymbolicLink()) found.push(inside);
+      else if (entry.isDirectory()) waiting.push(inside);
+    }
+  }
+  return found;
+}
+
+/**
  * Links in a carried entry that would let the folder write somewhere else, such
  * as `node_modules -> ../other-checkout/node_modules`, where an install rewrites
  * another folder's dependencies.
@@ -213,8 +255,7 @@ function linksThatDoNotHold(root, folder, rel) {
   try {
     // `find <path>` on a path that is itself a link reports that link, so an
     // entry that is a link gets the same check as the links inside a directory.
-    found = execFileSync('find', [to, '-type', 'l', '-print0'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-      .split('\0').filter(Boolean);
+    found = linksUnder(to);
   } catch (error) {
     throw Error(`the links inside ${rel} could not be checked: ${String(error?.stderr ?? error?.message ?? '').trim()}`);
   }
