@@ -52,7 +52,7 @@ describe('the inbox after the first task is sent', () => {
   it('says the task is starting, not that nothing is running, until its row arrives', () => {
     // `justSent` since F-134: every other send gets the same line, not only
     // the walk's landing (tests/the-progress-tab-says-a-task-is-starting-until-its-row-arrives).
-    expect(app).toContain('<EmptyTab view={view} starting={justSent} waiting={needsYouCount.inbox} />');
+    expect(app).toContain('<EmptyTab view={view} starting={!!landOn || justSent} waiting={needsYouCount.inbox} />');
     const draw = (props) => renderToStaticMarkup(React.createElement(EmptyTab, props));
     expect(draw({ view: 'progress', starting: true })).toContain('Starting your task…');
     expect(draw({ view: 'progress', starting: false })).toContain('Nothing is running.');

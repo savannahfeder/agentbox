@@ -147,6 +147,9 @@ import { TutorialOffer } from './components/TutorialOffer';
 import { holdForStoppedAgent, neverWarned, rememberWarned } from './stopped-agent';
 import { comeBackTo, neverOffered, offerOnNewProject, rememberOffered } from './tutorial';
 import { FirstRunFlow } from './components/FirstRun';
+import { ClassicFirstRun, OpenLesson } from './components/FirstRunClassic';
+import { landing as firstRunLanding, lessonsLeft, setLessons, showsOpenLesson, type Lesson } from './first-run-classic';
+import { useLessonPlace } from './lesson-position';
 import { ideasFor, runOfRule } from './first-run';
 import { Tour } from './components/Tour';
 import { laterTabShown } from './later-tab';
@@ -198,6 +201,17 @@ import { SAYS_UNDO, opensTheToast, saysWhereItWent, toastOpens, toastParts, type
 import { SentLine } from './components/SentLine';
 
 const FIRST_IDEAS = ideasFor();
+
+/** Which first run this install shows, half each (shared/onboarding-arm.mjs). */
+type Arm = 'tour' | 'classic';
+const ARM_WAIT_MS = 3000;
+async function armNow(): Promise<Arm> {
+  try {
+    const asked = (window.zero as { onboardingArm?: () => Promise<unknown> } | undefined)?.onboardingArm?.();
+    const word = await Promise.race([asked, new Promise((r) => setTimeout(() => r(null), ARM_WAIT_MS))]);
+    return word === 'classic' ? 'classic' : 'tour';
+  } catch { return 'tour'; }
+}
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
 
@@ -1026,6 +1040,16 @@ export default function App() {
   const [home, setHome] = useState('');
   // The first run that starts on real work, while it is up.
   const [fresh, setFresh] = useState(false);
+  const [arm, setArm] = useState<Arm | null>(null);
+  const askingArm = useRef(false);
+  // The first run on main leaves two lessons in the inbox, once each: the key beside the first thread, and the lit 1 on its options.
+  const [lessons, setLessonList] = useState<Lesson[]>(() => lessonsLeft(localStorage));
+  const dropLesson = useCallback((l: Lesson) => setLessonList((had) => {
+    if (!had.includes(l)) return had;
+    const next = had.filter((x) => x !== l);
+    setLessons(localStorage, next);
+    return next;
+  }), []);
   // The tutorial on the inbox that follows it (components/Tour.tsx).
   const [tour, setTourState] = useState<TourState | null>(() => readTour(localStorage));
   const setTour = useCallback((t: TourState) => { saveTour(localStorage, t); setTourState(t); }, []);
@@ -1057,7 +1081,10 @@ export default function App() {
     // A new install gets the first run that starts on real work
     // (components/FirstRun.tsx); `?firstrun=` still walks the old one.
     if (forcedRun.current) setRun({ ...RUN_START, step: forcedRun.current });
-    else setFresh(true);
+    else if (!askingArm.current) {
+      askingArm.current = true;
+      void armNow().then((a) => { setArm(a); setFresh(true); });
+    }
     // AND THE LOOK IS WRITTEN DOWN HERE, on the one line that knows this Mac
     // has never been used. Before this, only the three setup screens and inbox
     // zero painted the lake and nothing was stored, so every other screen fell
@@ -6098,6 +6125,58 @@ export default function App() {
     setSelected(0);
   }, [setTour]);
 
+  // THE FIRST RUN ON MAIN ENDS IN THE INBOX, on the task just sent when there is one, with its two lessons left to give.
+  const [landOn, setLandOn] = useState<string | null>(null);
+  const finishClassic = useCallback((sent: string | null, runAt = 0, draft?: string) => {
+    const to = firstRunLanding(sent, runAt);
+    finishFirstRun(localStorage);
+    setLessons(localStorage, ['open', 'pick']);
+    setLessonList(['open', 'pick']);
+    setFresh(false);
+    setView(to.view);
+    setFocused(null);
+    setSelected(0);
+    setLandOn(to.select);
+    if (draft?.trim()) {
+      setComposeInitial({ body: draft });
+      setModal('compose');
+    }
+  }, []);
+  // Its row arrives with a snapshot or two after the send.
+  const landAt = landOn ? list.findIndex((i) => i.id === landOn) : -1;
+  useEffect(() => { if (landAt >= 0) { setSelected(landAt); setLandOn(null); } }, [landAt]);
+  // A task that could not start goes straight to Needs you, so follow it there.
+  useEffect(() => {
+    if (!landOn) return;
+    const tab = tabOfState(tabState.get(landOn) ?? null);
+    if (tab && tab !== view) setView(tab);
+  }, [landOn, tabState, view]);
+  // A row that never comes must not take the cursor later, while you are elsewhere.
+  useEffect(() => {
+    if (!landOn) return undefined;
+    const t = setTimeout(() => setLandOn(null), 15_000);
+    return () => clearTimeout(t);
+  }, [landOn]);
+  // ↵ beside the row you are on, until a thread is opened, and never while a card has the keyboard (`showsOpenLesson`).
+  const lessonAt = useLessonPlace(() => {
+    if (!showsOpenLesson({ lessons, focused: !!focused, fresh, view, modal })) return null;
+    const title = document.querySelector('.list-pane .row.selected .th-cell-title') ?? document.querySelector('.list-pane .th-cell-title');
+    if (!title) return null;
+    const range = document.createRange();
+    range.selectNodeContents(title);
+    const r = range.getBoundingClientRect();
+    return { left: r.right + 20, top: r.top + r.height / 2 - 17 };
+  }, [lessons, focused, fresh, view, modal, list, selected]);
+  useEffect(() => { if (focused) dropLesson('open'); }, [focused, dropLesson]);
+  // The first option's key lit, until a thread that offered options is left.
+  const pickSeen = useRef(false);
+  useEffect(() => {
+    const on = !!focused && lessons.includes('pick');
+    document.body.classList.toggle('teach-pick', on);
+    if (on && document.querySelector('.opt-row')) pickSeen.current = true;
+    if (!focused && pickSeen.current) dropLesson('pick');
+  });
+
   // EVERY SEND, while its row is on its way: the tab says it is starting rather than "Nothing is running."
   const [justSent, setJustSent] = useState(false);
   useEffect(() => {
@@ -6985,7 +7064,7 @@ export default function App() {
                       // same thing louder: "Nothing needs you" and "You finished
                       // the tutorial" were drawn one on top of the other.
                       ? run === null && !landing && <InboxClear slot={setClearSlot} first={firstTask(tour)} />
-                      : <EmptyTab view={view} starting={justSent} waiting={needsYouCount.inbox} />
+                      : <EmptyTab view={view} starting={!!landOn || justSent} waiting={needsYouCount.inbox} />
                 ) : <List
                   lead={view === 'inbox' && search === null && roomsUi.mentions.length
                     ? <MentionRows mentions={roomsUi.mentions} faces={roomsUi.faces} now={now} onOpen={roomsUi.openMention} /> : null}
@@ -7731,7 +7810,9 @@ export default function App() {
           its tether draws over whatever the app has open. w-82bb9e2c69.
           A ?modes= drawing stands INSTEAD of it, never over it: two full
           surfaces at once would photograph the welcome screen. */}
-      {fresh && !modeDraft && <FirstRunFlow snap={snap} home={home} onDone={finishFresh} />}
+      {fresh && !modeDraft && arm === 'classic' && <ClassicFirstRun snap={snap} home={home} onDone={finishClassic} />}
+      {fresh && !modeDraft && arm === 'tour' && <FirstRunFlow snap={snap} home={home} onDone={finishFresh} />}
+      <OpenLesson at={lessonAt} />
       {!fresh && <Tour tour={tour} view={view} thread={!!focused}
         covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}
         palette={modal === 'palette'}
