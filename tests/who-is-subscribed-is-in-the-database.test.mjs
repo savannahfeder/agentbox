@@ -165,6 +165,24 @@ describe('the database write itself', () => {
     expect(calls[1].method).toBe('POST');
     expect(calls[1].url).toContain('on_conflict=person');
   });
+
+  // The first write of a plan whose ledger record predates the database is
+  // revision 0, and a row asked for with `give` is waiting at -1, so the one
+  // takes the other. At the row's own default of 0 it never would.
+  it('fills in a row that asked for a plan and has heard nothing back', async () => {
+    const calls = [];
+    const db = supabaseRest({
+      url: 'https://db.test',
+      serviceKey: 'service',
+      fetchImpl: async (url, opts) => {
+        calls.push({ url, method: opts.method });
+        return { ok: true, status: 200, text: async () => JSON.stringify([{ person: P, plan: 'pro', rev: 0 }]) };
+      },
+    });
+    await db.writePlan(P, { plan: 'pro', source: 'given', rev: 0, at: 0 });
+    expect(calls.map((c) => c.method)).toEqual(['PATCH']);
+    expect(calls[0].url).toContain('rev=lt.0');
+  });
 });
 
 // The table itself, against every migration in PGlite, with a stand-in for
@@ -228,10 +246,12 @@ grant usage on schema public to anon, authenticated;
   });
 
   it('is where the owner asks for a plan, by address', async () => {
+    await server(`delete from public.cloud_plans`);
     await server(`insert into public.cloud_plans (person, give)
       select id, 'plus' from public.people where email = 'me@example.com'
       on conflict (person) do update set give = 'plus'`);
-    expect((await server(`select give from public.cloud_plans where person = '${ME}'`)).rows).toEqual([{ give: 'plus' }]);
+    // Under the server's first write, so the plan it answers with lands.
+    expect((await server(`select give, plan, rev from public.cloud_plans where person = '${ME}'`)).rows).toEqual([{ give: 'plus', plan: 'none', rev: -1 }]);
   });
 
   it('says who is subscribed, beside the address', async () => {
