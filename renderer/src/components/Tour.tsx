@@ -274,6 +274,14 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint }
     if (cardNow.current?.left !== left || cardNow.current?.top !== top) { cardNow.current = { left, top }; setCardAt(cardNow.current); }
   }, [box, step]);
 
+  // A close counts with or without a tip up: none shows over a chat still getting ready.
+  useEffect(() => {
+    if (!live || !tour) return undefined;
+    const closed = () => onChange(closeLessons(shown.current ?? 'close').reduce(finishLesson, tour));
+    window.addEventListener(THREAD_CLOSED, closed);
+    return () => window.removeEventListener(THREAD_CLOSED, closed);
+  }, [live, tour, onChange]);
+
   // A tip blocks nothing, so it has no way out of its own: the command bar has End the tutorial.
   useEffect(() => {
     if (!step || !tour) return undefined;
@@ -296,11 +304,9 @@ export function Tour({ tour, view, thread, covered, palette, onChange, onPoint }
       if (!typing && closesThread(e, thread)) return;
       if (!typing && keyLearns(step, e)) { later(finishLesson(tour, lessonOf(step))); return; }
     };
-    const closed = () => onChange(closeLessons(step).reduce(finishLesson, tour));
     window.addEventListener('pointerdown', down, true);
     window.addEventListener('keydown', key, true);
-    window.addEventListener(THREAD_CLOSED, closed);
-    return () => { window.removeEventListener('pointerdown', down, true); window.removeEventListener('keydown', key, true); window.removeEventListener(THREAD_CLOSED, closed); };
+    return () => { window.removeEventListener('pointerdown', down, true); window.removeEventListener('keydown', key, true); };
   }, [step, tour, thread, onChange]);
 
   if (!step || !box || !tour) return burst ? <ConfettiBurst key={burst} /> : null;

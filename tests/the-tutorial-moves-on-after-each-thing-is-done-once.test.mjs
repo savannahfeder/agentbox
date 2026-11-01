@@ -20,6 +20,12 @@ describe('closing a thread', () => {
     expect(tour).toContain('window.addEventListener(THREAD_CLOSED, closed);');
     expect(tour).not.toContain('}, 900);');
   });
+  it('is heard with no tip on screen, as on a chat still getting ready', () => {
+    const tour = read('renderer/src/components/Tour.tsx');
+    expect(tour).toContain("onChange(closeLessons(shown.current ?? 'close').reduce(finishLesson, tour))");
+    const at = tour.indexOf('window.addEventListener(THREAD_CLOSED, closed);');
+    expect(tour.slice(tour.lastIndexOf('useEffect(', at), at)).not.toContain('if (!step');
+  });
   it('is not told when the close was refused, so a held E teaches nothing', () => {
     const app = read('renderer/src/App.tsx');
     const at = app.indexOf('const markDone = useCallback(');

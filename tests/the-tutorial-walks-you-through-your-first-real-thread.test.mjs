@@ -555,6 +555,6 @@ describe('E on a thread that is waiting on you', () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
     // The app says so as it closes the thread; a held E never reaches that line.
-    expect(tour).toContain("const closed = () => onChange(closeLessons(step).reduce(finishLesson, tour));");
+    expect(tour).toContain("const closed = () => onChange(closeLessons(shown.current ?? 'close').reduce(finishLesson, tour));");
   });
 });
