@@ -36,6 +36,7 @@ import { isEffortWord } from '../shared/effort-levels.mjs';
 import { shippedNote } from '../shared/shipped-note.mjs';
 import { machineryPath, removeMachinery } from './store/home.mjs';
 import { Teammates } from './teammates.mts';
+import type { WorkItem } from './supervisor.mts';
 import { hopOf, HOP_LABEL_PREFIX } from '../shared/teammates.mjs';
 import {
   answerMode as readAnswerMode, answerModes, clearAnswerMode as clearAnswerModeFile, setAnswerMode,
@@ -75,17 +76,8 @@ export interface StoreProduct {
   team: ReturnType<typeof teamOf>;
 }
 
-export interface StoreItem {
-  id: string;
+export interface StoreItem extends Omit<WorkItem, 'product'> {
   product?: string;
-  productName?: string;
-  title?: string;
-  body?: string;
-  status?: string;
-  labels?: string[];
-  updatedAt?: number;
-  answerMode?: unknown;
-  wrote?: Record<string, { ts?: number } | undefined>;
   [field: string]: unknown;
 }
 
@@ -132,14 +124,14 @@ export interface RepeatInput {
   model?: string | null;
 }
 
-export interface FiledItem {
+export type FiledItem = {
   title: string;
   body?: string;
   problem?: string;
   kind?: string;
   priority?: number;
   labels?: string[];
-}
+};
 
 export interface ImportedChat extends CodexThreadLike {
   source?: string;
@@ -317,7 +309,7 @@ export class Store {
   // renderer can group, filter, and rail without a second lookup.
   listItems(now = Date.now()) {
     const { workItemsDisk } = this.modules;
-    const all: StoreItem[] = [];
+    const all: (StoreItem & { product: string })[] = [];
     // WHAT ONE REPLY MAY DO IS NOT ON THE LEDGER, so it is joined on here, once
     // for the whole fold rather than a file read per row (main/answer-modes.mts).
     const modes = answerModes({ now });
@@ -360,7 +352,7 @@ export class Store {
   // for the whole life of a session, so it cannot ask what the session did to
   // the row without reading it again; that question is the difference between a
   // delivery and a no-op (settleDelivery, main/supervisor.mts).
-  readItem(slug: string, id: string, now = Date.now()): StoreItem | null {
+  readItem(slug: string, id: string, now = Date.now()): (StoreItem & { product: string }) | null {
     const { workItemsDisk } = this.modules;
     const item = workItemsDisk.readWorkItem(this.productDir(slug), id, now);
     if (!item) return null;
@@ -462,7 +454,7 @@ export class Store {
   answerItem(slug: string, id: string, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo, fromPhone }: AnswerInput) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
-    let item: StoreItem | null = null;
+    let item: (StoreItem & { product: string }) | null = null;
     // THE MODEL GOES ON FIRST, BEFORE THE ANSWER. A reply on an idle row is
     // what starts a run, and the run reads the model off the item; written
     // after the answer it is a race the run can win, and she would pick a model

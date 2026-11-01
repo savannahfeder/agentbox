@@ -292,7 +292,7 @@ describe('what actually reaches the CLI', () => {
     // `input` — so one of the eight would arrive as her message with the brief
     // thrown away. The cases are in the file named at the top of this one.
     // 2026-10-07: the adapter capability owns this engine distinction.
-    expect(sup).toContain('const command = continuation && harnessFor(engine).capabilities.nativeCommands ? commandPrompt(item.answer, this._nativeCommands?.[item.id]) : review ? item.answer.trim() : null;');
+    expect(sup).toContain('const command = continuation && harnessFor(engine).capabilities.nativeCommands ? commandPrompt(item.answer, this._nativeCommands?.[item.id]) : review ? item.answer!.trim() : null;');
     expect(sup).toContain('if (command) prompt = command;');
   });
 

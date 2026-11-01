@@ -81,7 +81,7 @@ describe('what a run changed', () => {
 
   it('is handed to the git thread by the exit, which reads no repository itself', () => {
     const src = fs.readFileSync(path.join(ROOT, 'main', 'supervisor.mts'), 'utf8');
-    const exit = src.slice(src.indexOf('const settleExit = (code, signal, how) => {'));
+    const exit = src.slice(src.indexOf('const settleExit = (code'));
     const body = exit.slice(0, exit.indexOf('this.removeSpawnFiles(session);'));
     expect(body).toContain("gitJob('saveRunChange'");
     expect(body).not.toMatch(/changeFromRepo\(|writeChangeForRun\(/);

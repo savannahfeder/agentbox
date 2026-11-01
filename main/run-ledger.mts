@@ -34,8 +34,8 @@ export interface CloudUsageLine {
   at: string;
   wallSeconds?: unknown;
   runId?: string | number;
-  item?: string;
-  engine?: string;
+  item?: string | null;
+  engine?: string | null;
   exitCode?: unknown;
 }
 
@@ -86,7 +86,7 @@ export function runsFromCloudUsage(lines?: CloudUsageLine[] | null) {
   return out;
 }
 
-export function allRuns({ file = runLedgerPath(), cloudLines = [] } = {}) {
+export function allRuns({ file = runLedgerPath(), cloudLines = [] as CloudUsageLine[] } = {}) {
   return dedupeRuns([...readRuns({ file }), ...runsFromCloudUsage(cloudLines)]);
 }
 

@@ -698,8 +698,8 @@ interface WorkerSettingsFile {
 
 /** A ship the app made (main/ship-queue.mts `afterShip`). */
 export interface ShippedNote {
-  item: WorkItem;
-  product: Product;
+  item?: ShipItem | null;
+  product?: ShipProduct;
   sha?: string | null;
 }
 
@@ -1293,7 +1293,7 @@ export class Supervisor {
         const fresh = this.store.readItem?.(item.product, item.id) ?? item as WorkItem;
         this.spawnWorker(fresh, { continuation: true, shipFailure: reply });
       },
-      afterShip: (shipped: { item: ShipItem; product: ShipProduct; sha: string | null }) => { this.onShipped(); this.watchMainsTests(shipped as ShippedNote); this.reclaimShippedFolder(shipped as ShippedNote); },
+      afterShip: (shipped) => { this.onShipped(); this.watchMainsTests(shipped); this.reclaimShippedFolder(shipped); },
     });
     // AND THEN SOMEBODY WATCHES THE RUN THAT SHIP STARTED. The whole suite runs
     // on GitHub for every push and takes about five minutes, which is after the
@@ -3000,9 +3000,9 @@ export class Supervisor {
    * worktree sat there for days. The question asked is the same one as always
    * (`releaseTaskFolder`), so anything uncommitted keeps the folder.
    */
-  reclaimShippedFolder({ item, product }: Partial<ShippedNote> = {}) {
+  reclaimShippedFolder({ item, product }: ShippedNote = {}) {
     if (!item || !product) return Promise.resolve(null);
-    return Promise.resolve(this.releaseWorkFolder(item, product))
+    return Promise.resolve(this.releaseWorkFolder(item as WorkItem, product as Product))
       .catch((error) => { console.warn(`zero: could not hand back the folder of ${item.id}:`, error.message); return null; });
   }
 
@@ -7958,7 +7958,7 @@ export class Supervisor {
   _waitingOnLimit(rows: WorkItem[] | null | undefined) {
     const out: Record<string, { tool: string; until: number }> = {};
     const held = new Map<string, number | null>();
-    const heldUntil = (engine: string) => {
+    const heldUntil = (engine: string): number | null => {
       if (!held.has(engine)) {
         const profiles = this._profilesFor(engine);
         const keys = profiles.map((p) => this._accountKey(engine, p));
@@ -7968,13 +7968,13 @@ export class Supervisor {
         // when it tries again, which is not a time the limit promised.
         held.set(engine, allOut ? Math.min(...keys.map((k) => this._profileTrouble[k].resetsAt ?? 0)) : null);
       }
-      return held.get(engine);
+      return held.get(engine)!;
     };
     for (const i of rows ?? []) {
       if (i.status !== 'open' || this.sessions.has(i.id)) continue;
       const engine = engineOf(this._engineFor(i));
       const until = heldUntil(engine);
-      if (until !== null) out[i.id] = { tool: engineLabel(engine), until: until! };
+      if (until !== null) out[i.id] = { tool: engineLabel(engine), until };
     }
     return out;
   }
@@ -10286,7 +10286,7 @@ export class Supervisor {
         proc.once('error', () => resolveExit({ code: 1, signal: null }));
         return proc;
       },
-      onNotification: (method, params) => this._codexUsage().saw(method, params, home),
+      onNotification: (method: string, params: { rateLimits?: unknown } | null | undefined) => this._codexUsage().saw(method, params, home),
     });
     const handshake = client.initialize();
     handshake.catch(() => { /* the worker chains its own catch off this */ });
@@ -10322,7 +10322,7 @@ export class Supervisor {
       // is the whole reason the corner never starts a process to draw Codex's
       // meter. The home goes with it because there is one app-server per login
       // and a reading belongs to the one that gave it.
-      onNotification: (method, params) => this._codexUsage().saw(method, params, home),
+      onNotification: (method: string, params: { rateLimits?: unknown } | null | undefined) => this._codexUsage().saw(method, params, home),
       // A REQUEST CODEX INVENTED SINCE WE LAST READ ITS SCHEMA (w-36c51443df).
       //
       // The transport refuses it, which is the right answer and is not in
@@ -10334,7 +10334,7 @@ export class Supervisor {
       //
       // Once per method per app-server, for the reason `sayUnasked` gives: a
       // line repeated on every beat is a line nobody reads.
-      onUnknownRequest: (method) => {
+      onUnknownRequest: (method: string) => {
         this._unknownCodexRequests ??= new Set();
         if (this._unknownCodexRequests.has(method)) return;
         this._unknownCodexRequests.add(method);

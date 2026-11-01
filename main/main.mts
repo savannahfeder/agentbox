@@ -465,11 +465,11 @@ async function createWindow() {
     session: supabaseSession({
       cloudConfig,
       sessionFile: path.join(config.storeRoot, '.team-session'),
-      encrypt: (text) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : Buffer.from(text, 'utf8')),
-      decrypt: (buf) => (safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : buf.toString('utf8')),
+      encrypt: (text: string) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : Buffer.from(text, 'utf8')),
+      decrypt: (buf: Buffer) => (safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : buf.toString('utf8')),
       packaged: app.isPackaged,
-      openExternal: (url) => shell.openExternal(url),
-    }),
+      openExternal: (url: string) => shell.openExternal(url),
+    } as unknown as Parameters<typeof supabaseSession>[0]),
     store,
     disk: workItemsDisk,
     accountRoot: config.accountRoot,
@@ -484,7 +484,7 @@ async function createWindow() {
       // Her yes, with her id on it (shared/phone-snapshot.mjs phoneProjectsOf).
       projects: () => config.phoneProducts ?? null,
       ready: () => !!phoneApply,
-      apply: (cmd) => phoneApply(cmd),
+      apply: (cmd) => phoneApply!(cmd),
       // The Settings pages' model, read through the window's own handler.
       readSettings: () => phoneSettings?.() ?? null,
       pins: () => supervisor.threadPins,

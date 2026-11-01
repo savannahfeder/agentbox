@@ -56,7 +56,7 @@ export interface SettingsConfig {
   codexBinConfigured?: string | null;
   codexFrom?: string | null;
   codexMode?: string | null;
-  codexModel?: string;
+  codexModel?: string | null;
   outsideAgents?: unknown;
   sessionArgs?: string[] | null;
   projectSessionArgs?: Record<string, string[]>;
@@ -957,7 +957,7 @@ function engineSettings(supervisor: SettingsSupervisor, config: SettingsConfig, 
     // strip in the model drawer draws the picked model's list, so they travel
     // beside the name rather than as a list of their own that could disagree
     // with it.
-    codexModels: codexModelsAcross(offered).map((m: { id: string; label: string; levels: { id: string }[]; defaultLevel?: string }) => ({
+    codexModels: codexModelsAcross(offered).map((m) => ({
       id: m.id, label: m.label, levels: m.levels.map((l) => l.id), defaultLevel: m.defaultLevel,
     })),
     // Set when every login offered is on ChatGPT's free plan, so the menu can

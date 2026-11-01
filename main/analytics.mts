@@ -181,7 +181,7 @@ export function createAnalytics({ config, version, dir, client, env = process.en
   return {
     /** Draws this install's first run the first time one starts, and every count after carries it. */
     onboardingArm({ random }: { random?: () => number } = {}) {
-      armWord = armFor(dir, { env, ...(random ? { random } : {}) });
+      armWord = armFor(dir, { env, ...(random ? { random } : {}) }) as string;
       return armWord;
     },
     get enabled() { return on(); },

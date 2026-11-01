@@ -84,7 +84,7 @@ describe('a run saves what it changed', () => {
     const src = fs.readFileSync(path.join(ROOT, 'main', 'supervisor.mts'), 'utf8');
     // The exit handler's work is `settleExit` (a stop signal's death waits a
     // moment to be judged: tests/a-worker-stopped-with-the-app-is-not-a-failed-run).
-    const exitHandler = src.slice(src.indexOf('const settleExit = (code, signal, how) => {'));
+    const exitHandler = src.slice(src.indexOf('const settleExit = (code'));
     // On the git thread (main/run-change.mts), and the trace ends after it.
     expect(exitHandler).toContain("gitJob('saveRunChange'");
     expect(exitHandler.indexOf("gitJob('saveRunChange'")).toBeLessThan(exitHandler.indexOf('trace?.end()'));

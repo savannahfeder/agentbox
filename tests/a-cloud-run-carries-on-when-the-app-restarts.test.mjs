@@ -394,7 +394,7 @@ describe('the app', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
   it('hands the process that brings a run home its tool servers as they are now', () => {
-    const home = sup.slice(sup.indexOf('  _bringCloudHome(place) {'), sup.indexOf('  _bringCloudHome(place) {') + 2500);
+    const home = sup.slice(sup.indexOf('  _bringCloudHome(place'), sup.indexOf('  _bringCloudHome(place') + 2500);
     expect(home).toMatch(/this\.writeMcpConfig\(\)/);
     expect(home).toMatch(/AGENTBOX_MCP_CONFIG: mcp/);
   });

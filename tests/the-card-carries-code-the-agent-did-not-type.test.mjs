@@ -173,7 +173,7 @@ describe('the card carries code the agent did not type into a tool', () => {
     expect(src.indexOf('snapshotRepo(cwd)')).toBeGreaterThan(-1);
     // The exit handler's work is `settleExit` (a stop signal's death waits a
     // moment to be judged: tests/a-worker-stopped-with-the-app-is-not-a-failed-run).
-    const at = src.indexOf('const settleExit = (code, signal, how) => {');
+    const at = src.indexOf('const settleExit = (code');
     expect(src.indexOf('snapshotRepo(cwd)')).toBeLessThan(at);
     const exitHandler = src.slice(at);
     // Read back on the git thread (main/run-change.mts).

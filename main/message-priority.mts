@@ -26,7 +26,7 @@ export interface MessageItem {
 export interface MessageProduct { team?: { direct?: unknown } }
 export interface LatestMessage { text: string; by: string | null; ts: number }
 
-const LIVE = new Set(['open', 'claimed', 'blocked']);
+const LIVE = new Set<string | undefined>(['open', 'claimed', 'blocked']);
 
 /**
  * PURE. The newest message on a conversation: its words, who wrote it and
@@ -65,7 +65,7 @@ export function wantsPriority(item: MessageItem | null | undefined, product: Mes
   // what the sender said.
   // A row nobody chose a level for is composeItem's 0, so a number above it is
   // exactly "somebody picked one", and `by` says it was not this Mac.
-  if (set?.by && set.by !== me && Number.isFinite(item.priority) && item.priority > 0) return false;
+  if (set?.by && set.by !== me && Number.isFinite(item.priority) && item.priority! > 0) return false;
   return !(set && set.source !== 'system' && set.ts >= latest.ts);
 }
 

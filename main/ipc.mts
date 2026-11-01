@@ -105,10 +105,7 @@ export interface IpcOpenDialog {
 }
 
 export interface IpcHost {
-  ipcMain: {
-    handle(channel: 'zero:settings-set-workspace', listener: (event: IpcEvent, payload: { key: string; value?: unknown }) => unknown): unknown;
-    handle(channel: string, listener: IpcListener): unknown;
-  };
+  ipcMain: { handle(channel: string, listener: IpcListener): unknown };
   app: {
     isPackaged: boolean;
     getVersion(): string;
@@ -170,6 +167,7 @@ export interface TeammateArgs {
 type TerminalPayload = { product: unknown; id: unknown; action?: string; data?: string; cols: number; rows: number; offset: number; wait: number };
 type LookedAgain = Awaited<ReturnType<typeof lookAgainFor>>;
 type ElectronWindow = import('electron').BaseWindow;
+type WorkspaceSet = { key: string; value?: unknown };
 type RoomCalls = Record<string, (...args: unknown[]) => unknown>;
 type ImportableThreads = Awaited<ReturnType<typeof readImportableThreads>>;
 type SetProjectPayload = { product?: string; key: string; value?: unknown };
@@ -1999,7 +1997,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       return { code: null };
     }
   });
-  ipcMain.handle('zero:settings-set-workspace', (_e, payload) => {
+  ipcMain.handle('zero:settings-set-workspace', (_e, payload: WorkspaceSet) => {
     try {
       // Before the save: once the switch is off, nothing leaves, not even this.
       if (countsTurnedOff(payload)) { analytics.track('counts_turned_off'); analytics.flush(); }
