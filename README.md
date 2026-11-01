@@ -33,7 +33,7 @@
 
 ## Install
 
-There are two ways to run it: in the browser, or as a Mac app. Both need Node 22.13 or newer and Claude Code or Codex installed and signed in.
+There are two ways to run it: in the browser, or as a Mac app. Both need Node 22.18 or newer and Claude Code or Codex installed and signed in.
 
 **As a desktop app.** Build it from this repo. `npm start` is the desktop command on Omarchy and on a Mac:
 

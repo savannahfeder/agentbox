@@ -57,3 +57,50 @@ describe('the back end is TypeScript that runs as it is', () => {
     expect(() => stripTypeScriptTypes('enum Side { Left, Right }', { mode: 'strip' })).toThrow();
   });
 });
+
+// `npx agentbox-app` runs main/ on the user's own Node, which loads .mts
+// without a flag from 22.18. Below that it throws ERR_UNKNOWN_FILE_EXTENSION.
+describe('the Node it asks for can load it', () => {
+  it('is 22.18 or newer', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+    const [major, minor] = pkg.engines.node.match(/>=\s*(\d+)\.(\d+)/).slice(1).map(Number);
+    expect(major > 22 || (major === 22 && minor >= 18), pkg.engines.node).toBe(true);
+  });
+});
+
+// The push check, ship, the build, the store server and the cloud machines
+// run on whatever node is on PATH, and on 2026-11-01 that was 22.14 on the
+// Mac the agents share. Until that is known to be 22.18 or newer, nothing
+// they load may be .mts, or every push and every agent's store tools fail.
+describe('what plain Node on the Mac loads stays .mjs for now', () => {
+  const SPEC = /(?:\bfrom\s*|\bimport\s*\(?\s*|new URL\(\s*)['"](\.[^'"\n]*)['"]/g;
+  const imports = (file) => [...fs.readFileSync(path.join(root, file), 'utf8').matchAll(SPEC)]
+    .map((m) => path.normalize(path.join(path.dirname(file), m[1])))
+    .filter((p) => fs.existsSync(path.join(root, p)) && fs.statSync(path.join(root, p)).isFile());
+  const under = (dir) => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) => {
+    const rel = path.join(dir, e.name);
+    if (e.isDirectory()) return e.name === 'node_modules' ? [] : under(rel);
+    return /\.m?js$/.test(e.name) ? [rel] : [];
+  });
+  const named = ['scripts/hooks/pre-push', 'scripts/hooks/pre-commit', 'package.json', '.github/workflows/tests.yml']
+    .flatMap((f) => fs.readFileSync(path.join(root, f), 'utf8').match(/scripts\/[\w/.-]+\.mjs/g) ?? []);
+  const roots = [...new Set([...named, ...under('mcp'), ...under('cloud')])].filter((f) => fs.existsSync(path.join(root, f)));
+
+  function reached() {
+    const seen = new Set();
+    const stack = [...roots];
+    while (stack.length) {
+      for (const next of imports(stack.pop())) if (!seen.has(next)) { seen.add(next); stack.push(next); }
+    }
+    return [...seen];
+  }
+
+  it('starts from the scripts those run', () => {
+    expect(roots).toContain('scripts/ship.mjs');
+    expect(roots).toContain('mcp/stdio.mjs');
+  });
+
+  it('reaches no .mts', () => {
+    expect(reached().filter((f) => f.endsWith('.mts'))).toEqual([]);
+  });
+});
