@@ -71,6 +71,22 @@ export function standsAt(events: AgentEvent[], newest: { at: number } | null): n
   return answered ? events.findIndex((e) => said(e) && e.who !== 'you' && e.at === newest.at) : -1;
 }
 
+/**
+ * Where the page starts while an agent is working: at the answer your newest
+ * message or pick followed on from, or at the top when nothing came before it.
+ * The agent's sentences since are the steps you open it to watch, so none of
+ * them is lifted out as the answer.
+ */
+export function workingFrom(events: AgentEvent[]): number {
+  let yours = -1;
+  events.forEach((e, i) => { if (said(e) ? e.who === 'you' : e.yours) yours = i; });
+  for (let i = yours - 1; i >= 0; i--) {
+    const e = events[i];
+    if (said(e) && e.who !== 'you' && e.text?.trim()) return i;
+  }
+  return 0;
+}
+
 /** How many messages the fold holds above the one the page is drawn from. */
 export function earlierThan(events: AgentEvent[], from: number): number {
   return events.slice(0, from).filter(said).length;
