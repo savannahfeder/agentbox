@@ -12,12 +12,80 @@ import { asPulled } from '../../shared/team-rules.mjs';
 import { cleanStatus } from '../../shared/team-status.mjs';
 import { PHONE_COMMANDS } from '../../shared/phone-snapshot.mjs';
 import { roomsMemory } from './rooms-memory.mts';
+import type { MemoryRoomsFields } from './rooms-memory.mts';
+import type { LedgerLine } from './sync.mts';
 
 // The database's own checks on a message's file (20261013000000_message_files.sql).
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$/;
 const MAX_FILE_DATA = 14_000_000;
 
-export function createMemoryCloud() {
+export interface MemoryPerson {
+  id: string;
+  email: string;
+  name: string;
+  avatarUrl: string | null;
+  status: { text: string; until: number | null } | null;
+}
+export interface MemoryTeam { id: string; name: string; createdBy: string | null; made?: number }
+export interface MemoryMember { teamId: string; personId: string; role: string }
+export interface MemoryInvite { teamId: string; email: string; invitedBy: string }
+export interface MemoryProject { id: string; teamId: string; name: string; visibility: string; createdBy: string; direct: boolean }
+export interface MemoryLine { seq: number; projectId: string; uid: string; byPerson: string; body: LedgerLine; createdAt: number }
+export interface MemoryFile { projectId: string; name: string; byPerson: string; data: string }
+/** A thread card as the team sees it; the rest of it passes through. */
+export interface MemoryCard {
+  [key: string]: unknown;
+  threadId: string;
+  visible?: unknown;
+  people: string[] | null;
+  personId: string;
+  teamId: string;
+}
+export interface MemoryPhoneProject { owner: string; device: string; project: string; name: string; cloud: boolean; updatedAt: number }
+export interface MemoryPhoneThread { owner: string; device: string; project: string; item: string; snapshot: unknown; updatedAt: number }
+export interface MemoryPhoneSettings { owner: string; device: string; name: string; settings: unknown; updatedAt: number }
+export interface MemoryPushDevice { owner: string; token: string; platform: string; appVersion: string | null; updatedAt: number }
+export interface MemoryPhoneCommand {
+  id: string;
+  owner: string;
+  device: string;
+  project: string | null;
+  item: string | null;
+  kind: string;
+  payload: unknown;
+  createdAt: string;
+  claimedAt: string | null;
+  claimedBy: string | null;
+  takenAt: string | null;
+  outcome: unknown;
+}
+
+/** The whole cloud, as plain objects. Tests reach into it, so it is all in the open. */
+export interface MemoryCloud extends MemoryRoomsFields {
+  people: Map<string, MemoryPerson>;
+  teams: Map<string, MemoryTeam>;
+  members: MemoryMember[];
+  invites: MemoryInvite[];
+  projects: Map<string, MemoryProject>;
+  projectPeople: { projectId: string; personId: string }[];
+  lines: MemoryLine[];
+  cards: Map<string, MemoryCard>;
+  files: Map<string, MemoryFile>;
+  seq: number;
+  teamsMade: number;
+  now: () => number;
+  events: EventEmitter;
+  unconfirmed?: Set<string>;
+  refuseShares?: string;
+  phoneCommands?: MemoryPhoneCommand[];
+  phoneProjects?: Map<string, MemoryPhoneProject>;
+  phoneThreads?: Map<string, MemoryPhoneThread>;
+  phoneFiles?: Map<string, { data: Buffer; type: string | null }>;
+  phoneSettings?: Map<string, MemoryPhoneSettings>;
+  pushDevices?: Map<string, MemoryPushDevice>;
+}
+
+export function createMemoryCloud(): MemoryCloud {
   return {
     people: new Map(), // id -> { id, email, name, avatarUrl }
     teams: new Map(), // id -> { id, name, createdBy }
@@ -37,7 +105,7 @@ export function createMemoryCloud() {
 
 // A sign-in, the way Supabase's trigger turns one into a person. Google
 // confirms the email; `confirmed: false` is somebody who never proved theirs.
-export function signUpMemory(cloud, { id = crypto.randomUUID(), email, name, avatarUrl = null, confirmed = true }) {
+export function signUpMemory(cloud: MemoryCloud, { id = crypto.randomUUID(), email, name, avatarUrl = null, confirmed = true }: { id?: string; email: string; name?: string; avatarUrl?: string | null; confirmed?: boolean }) {
   cloud.people.set(id, { id, email, name: name || String(email).split('@')[0], avatarUrl, status: null });
   if (!confirmed) (cloud.unconfirmed ??= new Set()).add(id);
   return id;
@@ -46,7 +114,7 @@ export function signUpMemory(cloud, { id = crypto.randomUUID(), email, name, ava
 // WHAT THE CLOUD SERVER DOES WITH THE SERVICE ROLE (cloud/gateway/phone.mjs):
 // claims a command nobody has for the run it starts, as the database lets one
 // claim win. Here so a test can be the server.
-export function claimForTheCloud(cloud, id, runId) {
+export function claimForTheCloud(cloud: MemoryCloud, id: string, runId: string | number) {
   const c = (cloud.phoneCommands ?? []).find((x) => x.id === id);
   if (!c || c.takenAt || c.claimedAt) return false;
   c.claimedAt = new Date(cloud.now()).toISOString();
@@ -55,7 +123,7 @@ export function claimForTheCloud(cloud, id, runId) {
   return true;
 }
 
-export function memoryBackend(cloud, personId) {
+export function memoryBackend(cloud: MemoryCloud, personId: string) {
   const myTeams = () => cloud.members.filter((m) => m.personId === personId).map((m) => m.teamId)
     .sort((a, b) => (cloud.teams.get(a)?.made ?? 0) - (cloud.teams.get(b)?.made ?? 0));
   // The email the sign-in confirmed, never one a person could have typed.
@@ -63,19 +131,19 @@ export function memoryBackend(cloud, personId) {
     const me = cloud.people.get(personId);
     return me && !cloud.unconfirmed?.has(personId) ? String(me.email).toLowerCase() : null;
   };
-  const owns = (teamId) => cloud.members.some((m) => m.teamId === teamId && m.personId === personId && m.role === 'owner');
-  const canSee = (projectId) => {
+  const owns = (teamId: string) => cloud.members.some((m) => m.teamId === teamId && m.personId === personId && m.role === 'owner');
+  const canSee = (projectId: string) => {
     const p = cloud.projects.get(projectId);
     if (!p || !myTeams().includes(p.teamId)) return false;
     return p.visibility === 'team' || p.createdBy === personId
       || cloud.projectPeople.some((pp) => pp.projectId === projectId && pp.personId === personId);
   };
-  const projectOut = (p) => ({
+  const projectOut = (p: MemoryProject) => ({
     id: p.id, teamId: p.teamId, name: p.name, visibility: p.visibility, createdBy: p.createdBy, direct: !!p.direct,
     people: cloud.projectPeople.filter((pp) => pp.projectId === p.id).map((pp) => pp.personId),
   });
-  const refuse = (what) => { throw new Error(`not allowed: ${what}`); };
-  const personOut = (p) => p && ({ id: p.id, email: p.email, name: p.name, avatarUrl: p.avatarUrl ?? null, status: p.status ?? null });
+  const refuse: (what: string) => never = (what) => { throw new Error(`not allowed: ${what}`); };
+  const personOut = (p: MemoryPerson | undefined) => p && ({ id: p.id, email: p.email, name: p.name, avatarUrl: p.avatarUrl ?? null, status: p.status ?? null });
 
   return {
     kind: 'memory',
@@ -89,7 +157,7 @@ export function memoryBackend(cloud, personId) {
     // A line you wrote about yourself. Only ever your own: the database's
     // people_update_self says the same thing, and the personId argument is
     // here so a test can try to write somebody else's and be refused.
-    async setStatus({ text, until = null, personId: who = personId } = {}) {
+    async setStatus({ text, until = null, personId: who = personId }: { text?: unknown; until?: number | null; personId?: string } = {}) {
       if (who !== personId) refuse('write somebody else\'s status');
       const me = cloud.people.get(personId);
       if (!me) refuse('set a status before signing in');
@@ -108,7 +176,7 @@ export function memoryBackend(cloud, personId) {
     },
 
     // One team, on a yes, and the invite is used up.
-    async acceptInvite(teamId) {
+    async acceptInvite(teamId: string) {
       const email = confirmedEmail();
       if (!email) refuse('join a team without a confirmed email');
       const at = cloud.invites.findIndex((inv) => inv.teamId === teamId && inv.email.toLowerCase() === email);
@@ -120,14 +188,14 @@ export function memoryBackend(cloud, personId) {
     },
 
     async myTeams() {
-      return myTeams().map((id) => cloud.teams.get(id)).filter(Boolean).map((t) => ({ id: t.id, name: t.name }));
+      return myTeams().map((id) => cloud.teams.get(id) as MemoryTeam).filter(Boolean).map((t) => ({ id: t.id, name: t.name }));
     },
 
     async myTeam() {
       return (await this.myTeams())[0] ?? null;
     },
 
-    async createTeam(name) {
+    async createTeam(name: string) {
       const id = crypto.randomUUID();
       cloud.teamsMade += 1;
       cloud.teams.set(id, { id, name, createdBy: personId, made: cloud.teamsMade });
@@ -135,45 +203,32 @@ export function memoryBackend(cloud, personId) {
       return { id, name };
     },
 
-    async teamPeople(teamId) {
+    async teamPeople(teamId: string) {
       if (!myTeams().includes(teamId)) return [];
       const rows = cloud.members.filter((m) => m.teamId === teamId);
       return rows.map((m) => ({ ...personOut(cloud.people.get(m.personId)), role: m.role })).filter((p) => p.id);
     },
 
-    // A line you wrote about yourself. Only ever your own: the database's
-    // people_update_self says the same thing, and the personId argument is
-    // here so a test can try to write somebody else's and be refused.
-    async setStatus({ text, until = null, personId: who = personId } = {}) {
-      if (who !== personId) refuse('write somebody else\'s status');
-      const me = cloud.people.get(personId);
-      if (!me) refuse('set a status before signing in');
-      const clean = cleanStatus(text);
-      me.status = clean ? { text: clean, until: until ?? null } : null;
-      cloud.events.emit('people', {});
-      return me.status;
-    },
-
     // TEAM SETTINGS (2026-10-01), the same rules as 20261001000600_team_settings.sql.
-    async renameTeam(teamId, name) {
+    async renameTeam(teamId: string, name: unknown) {
       if (!owns(teamId)) refuse('rename a team you do not own');
-      const t = cloud.teams.get(teamId);
+      const t = cloud.teams.get(teamId)!;
       t.name = String(name).trim();
       return { id: t.id, name: t.name };
     },
 
-    async removeMember(teamId, who) {
+    async removeMember(teamId: string, who: string) {
       if (who !== personId && !owns(teamId)) refuse('remove somebody from a team you do not own');
       cloud.members = cloud.members.filter((m) => !(m.teamId === teamId && m.personId === who));
       cloud.events.emit('rooms', { kind: 'membership' });
     },
 
-    async listInvites(teamId) {
+    async listInvites(teamId: string) {
       if (!myTeams().includes(teamId)) return [];
       return cloud.invites.filter((i) => i.teamId === teamId).map((i) => ({ email: i.email, invitedBy: i.invitedBy ?? null }));
     },
 
-    async cancelInvite(teamId, email) {
+    async cancelInvite(teamId: string, email: unknown) {
       const clean = String(email).trim().toLowerCase();
       const inv = cloud.invites.find((i) => i.teamId === teamId && i.email.toLowerCase() === clean);
       if (!inv) return;
@@ -181,7 +236,7 @@ export function memoryBackend(cloud, personId) {
       cloud.invites = cloud.invites.filter((i) => i !== inv);
     },
 
-    async invite(teamId, email) {
+    async invite(teamId: string, email: unknown) {
       if (!myTeams().includes(teamId)) refuse('invite to a team you are not on');
       const clean = String(email).trim();
       if (!cloud.invites.some((i) => i.teamId === teamId && i.email.toLowerCase() === clean.toLowerCase())) {
@@ -193,7 +248,7 @@ export function memoryBackend(cloud, personId) {
       return [...cloud.projects.values()].filter((p) => canSee(p.id)).map(projectOut);
     },
 
-    async shareProject({ id, teamId, name, visibility = 'team', people = [], direct = false }) {
+    async shareProject({ id, teamId, name, visibility = 'team', people = [], direct = false }: { id: string; teamId: string; name: string; visibility?: string; people?: string[]; direct?: boolean }) {
       const existing = cloud.projects.get(id);
       if (existing && existing.createdBy !== personId) refuse('change a project somebody else shared');
       if (!myTeams().includes(teamId)) refuse('share into a team you are not on');
@@ -205,10 +260,10 @@ export function memoryBackend(cloud, personId) {
       cloud.projects.set(id, { id, teamId, name, visibility, createdBy: personId, direct: !!direct });
       cloud.projectPeople = cloud.projectPeople.filter((pp) => pp.projectId !== id);
       for (const person of new Set(people)) cloud.projectPeople.push({ projectId: id, personId: person });
-      return projectOut(cloud.projects.get(id));
+      return projectOut(cloud.projects.get(id)!);
     },
 
-    async pushLines(projectId, lines) {
+    async pushLines(projectId: string, lines: LedgerLine[]) {
       if (!canSee(projectId)) refuse('write to a project you cannot see');
       let added = 0;
       for (const line of lines) {
@@ -222,13 +277,13 @@ export function memoryBackend(cloud, personId) {
       return added;
     },
 
-    async pullLines(projectId, afterSeq = 0, limit = 500) {
+    async pullLines(projectId: string, afterSeq = 0, limit = 500) {
       if (!canSee(projectId)) return [];
       return cloud.lines.filter((l) => l.projectId === projectId && l.seq > afterSeq)
         .slice(0, limit).map((l) => ({ seq: l.seq, line: asPulled(structuredClone(l.body), { by: l.byPerson, at: l.createdAt, me: personId }) }));
     },
 
-    async putCards(teamId, cards) {
+    async putCards(teamId: string, cards: { threadId: string; visible?: unknown; people?: string[] | null; [key: string]: unknown }[]) {
       if (!myTeams().includes(teamId)) throw new Error('not on that team');
       for (const key of [...cloud.cards.keys()]) if (key.startsWith(`${personId}:`)) cloud.cards.delete(key);
       // A private card never goes up at all, whatever the Mac handed over, as
@@ -260,17 +315,17 @@ export function memoryBackend(cloud, personId) {
     // THE FILES A CONVERSATION'S MESSAGES LINK TO (w-140ac855b1). Read and
     // written by whoever may see the project, each name stored once and never
     // replaced: 20261013000000_message_files.sql.
-    async hasFiles(projectId, names) {
+    async hasFiles(projectId: string, names: string[]) {
       if (!canSee(projectId)) return [];
       return names.filter((n) => cloud.files.has(`${projectId}:${n}`));
     },
 
-    async getFile(projectId, name) {
+    async getFile(projectId: string, name: string) {
       if (!canSee(projectId)) return null;
       return cloud.files.get(`${projectId}:${name}`)?.data ?? null;
     },
 
-    async putFile(projectId, name, data) {
+    async putFile(projectId: string, name: string, data: string) {
       if (!canSee(projectId)) refuse('send a file to a project you cannot see');
       if (!FILE_NAME.test(name)) refuse('a file name that is not a plain name');
       if (data.length > MAX_FILE_DATA) refuse('a file that big');
@@ -287,18 +342,18 @@ export function memoryBackend(cloud, personId) {
     // Each write may name who it is for; a write for somebody other than
     // whoever this backend is signed in as is refused, as the database's
     // `owner = auth.uid()` refuses it.
-    async putPhoneProject({ owner, device, project, name, cloud: carriesOn }) {
+    async putPhoneProject({ owner, device, project, name, cloud: carriesOn }: { owner?: string; device: string; project: string; name: string; cloud?: boolean }) {
       if (owner && owner !== personId) refuse('write to somebody else\'s phone');
       const k = `${personId}:${device}:${project}`;
       const was = cloud.phoneProjects?.get(k);
       (cloud.phoneProjects ??= new Map()).set(k, { owner: personId, device, project, name, cloud: carriesOn === undefined ? was?.cloud ?? false : !!carriesOn, updatedAt: cloud.now() });
     },
-    async dropPhoneProject(device, project, owner) {
+    async dropPhoneProject(device: string, project: string, owner?: string) {
       if (owner && owner !== personId) return;
       cloud.phoneProjects?.delete(`${personId}:${device}:${project}`);
-      for (const k of [...(cloud.phoneThreads?.keys() ?? [])]) if (k.startsWith(`${personId}:${device}:${project}:`)) cloud.phoneThreads.delete(k);
+      for (const k of [...(cloud.phoneThreads?.keys() ?? [])]) if (k.startsWith(`${personId}:${device}:${project}:`)) cloud.phoneThreads?.delete(k);
     },
-    async putPhoneThreads(device, project, rows, owner) {
+    async putPhoneThreads(device: string, project: string, rows: { item: string; snapshot: unknown }[], owner?: string) {
       if (owner && owner !== personId) refuse('write to somebody else\'s phone');
       cloud.phoneThreads ??= new Map();
       if (!cloud.phoneProjects?.has(`${personId}:${device}:${project}`)) refuse('a thread of a project not on the phone');
@@ -312,23 +367,23 @@ export function memoryBackend(cloud, personId) {
     },
     // Her files for the phone (20261017000000_phone_files.sql): kept under her
     // own id, never replaced, at most the bucket's size.
-    async putPhoneFile({ owner, device, name, data, type }) {
+    async putPhoneFile({ owner, device, name, data, type }: { owner?: string; device: string; name: string; data: Buffer; type: string | null }) {
       if (owner && owner !== personId) refuse('write to somebody else\'s phone');
       if (!/^[0-9a-f]{64}\.[a-z0-9]{1,8}$/.test(name)) refuse('a file named that');
       if (data.length > 26_214_400) refuse('a file that big');
       const key = `${personId}/${device}/${name}`;
       if (!(cloud.phoneFiles ??= new Map()).has(key)) cloud.phoneFiles.set(key, { data: Buffer.from(data), type });
     },
-    async getPhoneFile({ owner, device, name }) {
+    async getPhoneFile({ owner, device, name }: { owner?: string; device: string; name: string }) {
       if (owner && owner !== personId) refuse('read somebody else\'s phone');
       const f = cloud.phoneFiles?.get(`${personId}/${device}/${name}`);
       return f ? Buffer.from(f.data) : null;
     },
-    async dropPhoneFiles({ owner, device, names }) {
+    async dropPhoneFiles({ owner, device, names }: { owner?: string; device: string; names: string[] }) {
       if (owner && owner !== personId) return;
       for (const n of names) cloud.phoneFiles?.delete(`${personId}/${device}/${n}`);
     },
-    async dropPhoneThreads(device, project, items, owner) {
+    async dropPhoneThreads(device: string, project: string, items: string[], owner?: string) {
       if (owner && owner !== personId) return;
       for (const item of items) cloud.phoneThreads?.delete(`${personId}:${device}:${project}:${item}`);
     },
@@ -339,7 +394,7 @@ export function memoryBackend(cloud, personId) {
       return [...(cloud.phoneProjects?.values() ?? [])].filter((p) => p.owner === personId);
     },
     // One row per computer (20261023000000_phone_settings.sql).
-    async putPhoneSettings({ owner, device, name, settings }) {
+    async putPhoneSettings({ owner, device, name, settings }: { owner?: string; device: string; name: string; settings: unknown }) {
       if (owner && owner !== personId) refuse('write to somebody else\'s phone');
       if (!/^[0-9a-f]{12}$/.test(String(device))) refuse('settings for no computer');
       if (new TextEncoder().encode(JSON.stringify(settings)).length > 200_000) refuse('settings that big');
@@ -349,44 +404,44 @@ export function memoryBackend(cloud, personId) {
       return [...(cloud.phoneSettings?.values() ?? [])].filter((s) => s.owner === personId).map((s) => ({ ...s }));
     },
     // The phones her alerts go to (20261025000000_push_devices.sql), hers alone.
-    async putPushDevice({ token, platform, appVersion = null }) {
+    async putPushDevice({ token, platform, appVersion = null }: { token: string; platform: string; appVersion?: string | null }) {
       if (!/^ExponentPushToken\[[A-Za-z0-9_-]{10,200}\]$/.test(String(token))) refuse('a phone address that is not Expo\'s');
       if (!['ios', 'android'].includes(platform)) refuse(`a ${platform} phone`);
       (cloud.pushDevices ??= new Map()).set(`${personId}:${token}`, { owner: personId, token, platform, appVersion, updatedAt: cloud.now() });
     },
-    async pushDevices(owner) {
+    async pushDevices(owner?: string) {
       if (owner && owner !== personId) return [];
       return [...(cloud.pushDevices?.values() ?? [])].filter((d) => d.owner === personId).map((d) => ({ ...d }));
     },
-    async dropPushDevice(token, owner) {
+    async dropPushDevice(token: string, owner?: string) {
       if (owner && owner !== personId) return;
       cloud.pushDevices?.delete(`${personId}:${token}`);
     },
     // What her phone does: a command, as herself, for one computer, not yet taken.
-    async addPhoneCommand({ id = null, device, project = null, item = null, kind, payload = {} }) {
+    async addPhoneCommand({ id = null, device, project = null, item = null, kind, payload = {} }: { id?: string | null; device: string; project?: string | null; item?: string | null; kind: string; payload?: unknown }) {
       if (!/^[0-9a-f]{12}$/.test(String(device))) refuse('a command for no computer');
       if (!PHONE_COMMANDS.includes(kind)) refuse(`a ${kind} command`);
       if ((kind === 'setting') !== (project == null) || (kind === 'setting' && item != null)) refuse(`a ${kind} command for ${project == null ? 'no project' : 'a project'}`);
       if (id && (cloud.phoneCommands ?? []).some((c) => c.id === id)) refuse('a command already sent');
-      const row = { id: id || crypto.randomUUID(), owner: personId, device, project, item, kind, payload, createdAt: new Date(cloud.now()).toISOString(), claimedAt: null, claimedBy: null, takenAt: null, outcome: null };
+      const row: MemoryPhoneCommand = { id: id || crypto.randomUUID(), owner: personId, device, project, item, kind, payload, createdAt: new Date(cloud.now()).toISOString(), claimedAt: null, claimedBy: null, takenAt: null, outcome: null };
       (cloud.phoneCommands ??= []).push(row);
       cloud.events.emit('phone', 1);
       return { ...row };
     },
-    async waitingPhoneCommands(device) {
+    async waitingPhoneCommands(device: string) {
       return (cloud.phoneCommands ?? []).filter((c) => c.owner === personId && c.device === device && !c.takenAt).map((c) => ({ ...c }));
     },
     async phoneCommands() {
       return (cloud.phoneCommands ?? []).filter((c) => c.owner === personId).map((c) => ({ ...c }));
     },
-    async cloudPhoneCommands(device, since) {
+    async cloudPhoneCommands(device: string, since: string) {
       return (cloud.phoneCommands ?? []).filter((c) => c.owner === personId && c.device === device && c.claimedBy && c.createdAt >= since).map((c) => ({ ...c }));
     },
     // THE COMPUTER CLAIMS ONE BEFORE IT DOES IT; the phone takes one back only
     // while nobody has. Exactly one of the two wins, as in the database.
     // 'claimed' is a claim made now, 'ours' one made before (this computer,
     // starting again), 'gone' a command taken back or already done.
-    async claimPhoneCommand(id, owner) {
+    async claimPhoneCommand(id: string, owner?: string) {
       if (owner && owner !== personId) return 'gone';
       const c = (cloud.phoneCommands ?? []).find((x) => x.id === id && x.owner === personId);
       if (!c || c.takenAt) return 'gone';
@@ -395,7 +450,7 @@ export function memoryBackend(cloud, personId) {
       c.claimedAt = new Date(cloud.now()).toISOString();
       return 'claimed';
     },
-    async takeBackPhoneCommand(id, outcome) {
+    async takeBackPhoneCommand(id: string, outcome: unknown) {
       const c = (cloud.phoneCommands ?? []).find((x) => x.id === id && x.owner === personId);
       if (!c || c.takenAt || c.claimedAt) return false;
       c.takenAt = new Date(cloud.now()).toISOString();
@@ -403,7 +458,7 @@ export function memoryBackend(cloud, personId) {
       cloud.events.emit('phone', 1);
       return true;
     },
-    async markPhoneCommand(id, outcome, owner) {
+    async markPhoneCommand(id: string, outcome: unknown, owner?: string) {
       if (owner && owner !== personId) return;
       // Somebody else's command is not there for you, as row level security
       // has it: the mark changes nothing rather than failing. Your own is
@@ -416,7 +471,7 @@ export function memoryBackend(cloud, personId) {
       cloud.events.emit('phone', 1);
     },
 
-    subscribe(onChange) {
+    subscribe(onChange: () => void) {
       const fire = () => onChange();
       cloud.events.on('lines', fire);
       cloud.events.on('cards', fire);

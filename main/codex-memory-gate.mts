@@ -63,6 +63,55 @@ export const HOOKS_FILE = 'hooks.json';
 /** The two events Codex has that we want. There is no PostToolUseFailure. */
 export const CODEX_EVENTS = ['PreToolUse', 'PostToolUse'];
 
+export interface CodexHook {
+  type: string;
+  command: string;
+  timeout: number;
+}
+
+export interface CodexHookGroup {
+  matcher: string;
+  hooks: CodexHook[];
+}
+
+export interface HooksFile {
+  hooks: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+interface HookGroupLike {
+  hooks?: { command?: unknown }[];
+}
+
+export interface HookEntry {
+  key?: string;
+  currentHash?: string;
+  command?: unknown;
+  trustStatus?: string;
+}
+
+export interface TrustEdit {
+  keyPath: string;
+  mergeStrategy: string;
+  value: string;
+}
+
+export interface CodexMemoryGateOptions {
+  home?: string | null;
+  scriptPath?: string;
+  on?: boolean;
+  request?: ((method: string, params: object) => Promise<{ data?: unknown } | null | undefined>) | null;
+  cwds?: string[];
+  fs?: Pick<typeof fsNode, 'readFileSync' | 'mkdirSync' | 'writeFileSync' | 'renameSync'>;
+  log?: (line: string) => void;
+}
+
+export interface CodexMemoryGateResult {
+  wrote: boolean;
+  trusted: number;
+  error: string | null;
+}
+
 /** How we know a hook in somebody's file is one of ours. */
 const OUR_SCRIPT = 'memory-gate-hook.sh';
 
@@ -71,13 +120,13 @@ const OUR_SCRIPT = 'memory-gate-hook.sh';
  * not a file whose name merely starts the same way, or turning the switch off
  * would delete `memory-gate-hook.sh.backup` out of somebody's config.
  */
-export function hookIsOurs(command) {
+export function hookIsOurs(command: unknown) {
   if (typeof command !== 'string') return false;
   return new RegExp(`${OUR_SCRIPT}'?\\s+(pre|post)\\s*$`).test(command.trim());
 }
 
 /** A path inside a single-quoted shell word, app bundles and apostrophes included. */
-function quoted(scriptPath) {
+function quoted(scriptPath: unknown) {
   return `'${String(scriptPath).replace(/'/g, `'\\''`)}'`;
 }
 
@@ -88,8 +137,8 @@ function quoted(scriptPath) {
  * for the reason the Claude side gives: a hook that times out lets its command
  * run, so the app's own refusal has to arrive first. Codex counts it in seconds.
  */
-export function ourHookGroups(scriptPath, { maxWaitSec = 20 * 60 } = {}) {
-  const group = (mode, timeout) => ([{
+export function ourHookGroups(scriptPath: unknown, { maxWaitSec = 20 * 60 }: { maxWaitSec?: number } = {}): Record<string, CodexHookGroup[]> {
+  const group = (mode: string, timeout: number) => ([{
     matcher: CODEX_MATCHER,
     hooks: [{ type: 'command', command: `${quoted(scriptPath)} ${mode}`, timeout }],
   }]);
@@ -100,16 +149,16 @@ export function ourHookGroups(scriptPath, { maxWaitSec = 20 * 60 } = {}) {
 }
 
 /** A hooks.json object, whatever shape the file on disk turned out to be. */
-function asFile(file) {
-  const base = file && typeof file === 'object' && !Array.isArray(file) ? { ...file } : {};
+function asFile(file: unknown): HooksFile {
+  const base: Record<string, unknown> = file && typeof file === 'object' && !Array.isArray(file) ? { ...file } : {};
   base.hooks = base.hooks && typeof base.hooks === 'object' && !Array.isArray(base.hooks) ? { ...base.hooks } : {};
-  return base;
+  return base as HooksFile;
 }
 
 /** Every group in `list` that is not one of ours, in the order it was written. */
-function withoutOurGroups(list) {
+function withoutOurGroups(list: unknown): unknown[] {
   if (!Array.isArray(list)) return [];
-  return list.filter((g) => !(g?.hooks ?? []).some?.((h) => hookIsOurs(h?.command)));
+  return list.filter((g: HookGroupLike | null | undefined) => !(g?.hooks ?? []).some?.((h) => hookIsOurs(h?.command)));
 }
 
 /**
@@ -121,7 +170,7 @@ function withoutOurGroups(list) {
  * not there. Running this twice gives the same file, so turning the switch on
  * again adds nothing.
  */
-export function withOurHooks(file, scriptPath, options) {
+export function withOurHooks(file: unknown, scriptPath: unknown, options?: { maxWaitSec?: number }) {
   const out = asFile(file);
   const ours = ourHookGroups(scriptPath, options);
   for (const event of CODEX_EVENTS) {
@@ -135,7 +184,7 @@ export function withOurHooks(file, scriptPath, options) {
  * event left with nothing in it loses its key entirely, so a file that was only
  * ever ours reads as a file with no hooks rather than as empty lists.
  */
-export function withoutOurHooks(file) {
+export function withoutOurHooks(file: unknown) {
   const out = asFile(file);
   for (const event of Object.keys(out.hooks)) {
     const kept = withoutOurGroups(out.hooks[event]);
@@ -146,7 +195,7 @@ export function withoutOurHooks(file) {
 }
 
 /** A TOML key as `config/batchWrite` wants it: one quoted segment, escaped. */
-function tomlKey(key) {
+function tomlKey(key: unknown) {
   return JSON.stringify(String(key));
 }
 
@@ -160,13 +209,13 @@ function tomlKey(key) {
  * changed with the app, and re-trusting it is the whole reason this runs at every
  * start rather than once at install.
  */
-export function ourTrustEdits(answer) {
-  const entries = [];
+export function ourTrustEdits(answer: unknown): TrustEdit[] {
+  const entries: HookEntry[] = [];
   for (const row of Array.isArray(answer) ? answer : []) {
     if (Array.isArray(row?.hooks)) entries.push(...row.hooks);
     else if (row?.key) entries.push(row);
   }
-  const edits = new Map();
+  const edits = new Map<string, TrustEdit>();
   for (const h of entries) {
     if (!h?.key || !h?.currentHash) continue;
     if (!hookIsOurs(h.command)) continue;
@@ -196,20 +245,18 @@ export function ourTrustEdits(answer) {
  * which is exactly where they were before this existed. It must never be a
  * reason the app fails to start.
  *
- * @param {object} how
- * @param {string} how.home The CODEX_HOME to write in.
- * @param {string} how.scriptPath scripts/memory-gate-hook.sh, unpacked.
- * @param {boolean} how.on Whether the memory check is on.
- * @param {(method: string, params: object) => Promise<any>} [how.request] The
+ * @param how.home The CODEX_HOME to write in.
+ * @param how.scriptPath scripts/memory-gate-hook.sh, unpacked.
+ * @param how.on Whether the memory check is on.
+ * @param how.request The
  *   app-server call. Omitted means "write the file, do not try to trust it".
- * @param {string[]} [how.cwds] Folders to ask `hooks/list` about. A hook in the
+ * @param how.cwds Folders to ask `hooks/list` about. A hook in the
  *   home is listed for any cwd, so one is enough; the app's own folder is used.
- * @param {object} [how.fs] Injected for tests.
- * @param {(line: string) => void} [how.log]
- * @returns {Promise<{wrote: boolean, trusted: number, error: string|null}>}
+ * @param how.fs Injected for tests.
+ * @param how.log
  */
-export async function syncCodexMemoryGate({ home, scriptPath, on, request = null, cwds = [], fs = fsNode, log = () => {} }) {
-  const out = { wrote: false, trusted: 0, error: null };
+export async function syncCodexMemoryGate({ home, scriptPath, on, request = null, cwds = [], fs = fsNode, log = () => {} }: CodexMemoryGateOptions): Promise<CodexMemoryGateResult> {
+  const out: CodexMemoryGateResult = { wrote: false, trusted: 0, error: null };
   if (!home || (on && !scriptPath)) { out.error = 'no codex home'; return out; }
   const file = path.join(home, HOOKS_FILE);
 
@@ -217,9 +264,9 @@ export async function syncCodexMemoryGate({ home, scriptPath, on, request = null
   // LEFT ALONE. A hooks.json that exists and is not JSON is somebody's own,
   // broken or newer than us; replacing it to install ours would throw their work
   // away. Codex workers then run ungated, which is where they already were.
-  let raw = null;
+  let raw: string | null = null;
   try { raw = fs.readFileSync(file, 'utf8'); } catch { raw = null; }
-  let before = null;
+  let before: unknown = null;
   if (raw !== null && raw.trim()) {
     try { before = JSON.parse(raw); } catch {
       out.error = `${file} is not readable JSON, so it was left alone`;
@@ -239,7 +286,7 @@ export async function syncCodexMemoryGate({ home, scriptPath, on, request = null
       fs.renameSync(tmp, file);
       out.wrote = true;
     } catch (err) {
-      out.error = `could not write ${file}: ${err.message}`;
+      out.error = `could not write ${file}: ${(err as Error).message}`;
       log(`memory gate: ${out.error}`);
       return out;
     }
@@ -255,6 +302,6 @@ export async function syncCodexMemoryGate({ home, scriptPath, on, request = null
     await request('config/batchWrite', { edits, reloadUserConfig: true });
     out.trusted = edits.length;
     log(`memory gate: trusted ${edits.length} Codex hook${edits.length === 1 ? '' : 's'} in ${home}`);
-  } catch (err) { out.error = `could not trust the Codex hook: ${err.message}`; log(`memory gate: ${out.error}`); }
+  } catch (err) { out.error = `could not trust the Codex hook: ${(err as Error).message}`; log(`memory gate: ${out.error}`); }
   return out;
 }

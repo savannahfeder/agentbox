@@ -6,9 +6,21 @@ import { readEnv } from '../../shared/product-name.mjs';
 import { readCloudUsage } from '../cloud/usage.mts';
 import { phoneDevice } from '../phone-inbox.mts';
 import { roomPrefsFile } from './rooms.mts';
+import type { PresenceFacts } from './rooms.mts';
 import { createRoomHours } from './room-hours.mts';
 
-export function roomsSetup({ config, store, supervisor, userDir, log = (line) => console.log(line) }) {
+export interface RoomsSetupOptions {
+  config: { alphaRooms?: boolean | null; storeRoot: string };
+  store: {
+    listProducts(opts?: { includeArchived?: boolean }): { dir?: string | null; slug?: string | null }[];
+    readItem(slug: string, id: string): { id: string; label?: string; title?: string } | null;
+  };
+  supervisor: { runsGoing(): { itemId: string; product: string; startedAt?: number }[] };
+  userDir: string;
+  log?: (line: string) => void;
+}
+
+export function roomsSetup({ config, store, supervisor, userDir, log = (line) => console.log(line) }: RoomsSetupOptions) {
   const hours = createRoomHours({
     home: appHome(),
     products: () => { try { return store.listProducts({ includeArchived: true }); } catch { return []; } },
@@ -20,10 +32,10 @@ export function roomsSetup({ config, store, supervisor, userDir, log = (line) =>
     enabled: () => config.alphaRooms === true,
     device: () => phoneDevice(userDir, config.storeRoot),
     prefsFile: roomPrefsFile(config.storeRoot),
-    presenceFacts: () => {
+    presenceFacts: (): PresenceFacts => {
       const running = supervisor.runsGoing().map((s) => ({ itemId: s.itemId, product: s.product, startedAt: s.startedAt }));
-      const items = running.map((r) => { try { return store.readItem(r.product, r.itemId); } catch { return null; } }).filter(Boolean);
-      let products = [];
+      const items = running.map((r) => { try { return store.readItem(r.product, r.itemId); } catch { return null; } }).filter(Boolean) as NonNullable<PresenceFacts['items']>;
+      let products: unknown[] = [];
       try { products = store.listProducts(); } catch { /* none to name */ }
       return { running, items, products, summary: hours.summary() };
     },

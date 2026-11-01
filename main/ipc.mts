@@ -74,6 +74,101 @@ import { handedOnByReply } from '../shared/team-rules.mjs';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mjs';
 import { saveAttachments } from './save-attachments.mts';
 import { stageAttachment } from './stage-attachment.mts';
+import type { BrowserWindow } from 'electron';
+import type { AnswerInput, ComposeInput, Store, StoreConfig } from './store.mts';
+import type { Supervisor, SupervisorConfig } from './supervisor.mts';
+import type { SettingsConfig } from './settings.mts';
+import type { createTeamService } from './team/index.mts';
+import type { UpdateTerminals } from './agent-updates.mts';
+import type { AttachmentFile } from './save-attachments.mts';
+
+export interface IpcEvent { sender?: unknown; senderFrame?: { parent?: unknown } | null }
+export type IpcListener = { bivarianceHack(event: IpcEvent, payload?: unknown): unknown }['bivarianceHack'];
+
+export interface IpcWindow {
+  isDestroyed(): boolean;
+  webContents: { send(channel: string, ...args: unknown[]): void };
+  isMinimized?(): boolean;
+  restore?(): void;
+  show?(): void;
+}
+
+export interface IpcShell { openExternal(url: string): unknown; openPath?(path: string): Promise<string> }
+
+export interface IpcOpenDialog {
+  title: string;
+  buttonLabel: string;
+  properties: string[];
+  defaultPath?: string;
+  filters?: { name: string; extensions: string[] }[];
+}
+
+export interface IpcHost {
+  ipcMain: { handle(channel: string, listener: IpcListener): unknown };
+  app: {
+    isPackaged: boolean;
+    getVersion(): string;
+    on(event: string, fn: (event: { preventDefault(): void }) => void): unknown;
+    quit(): void;
+    focus?(options?: { steal: boolean }): void;
+    accessibilitySupportEnabled?: boolean;
+  };
+  dialog: { showOpenDialog(window: IpcWindow, options: IpcOpenDialog): Promise<{ canceled: boolean; noDialog?: boolean; filePaths: string[] }> };
+  shell?: IpcShell;
+  micAccess?(): unknown;
+  readClipboardText?(): unknown;
+}
+
+export interface IpcAnalytics {
+  enabled: boolean;
+  installId?: unknown;
+  track(name: string, props?: Record<string, unknown>): unknown;
+  flush?(): unknown;
+  onboardingArm?(): string;
+}
+
+export interface IpcUpdater {
+  state(): unknown;
+  check(options: { manual: boolean }): Promise<unknown>;
+  install(): unknown;
+  move?(): unknown;
+}
+
+export type IpcTeam = ReturnType<typeof createTeamService>;
+export type IpcConfig = StoreConfig & SupervisorConfig & SettingsConfig & { accountRoot: string; storeRoot: string };
+
+export interface IpcDeps {
+  store: Store;
+  supervisor: Supervisor;
+  config: IpcConfig;
+  window: IpcWindow;
+  analytics?: IpcAnalytics;
+  docGrants?: { grant(file: string, roots: unknown[]): unknown } | null;
+  updater?: IpcUpdater;
+  host: IpcHost;
+  team?: IpcTeam | null;
+  onCount?: () => void;
+}
+
+export interface TeammateArgs {
+  id?: string;
+  engine?: unknown;
+  start?: boolean;
+  patch?: { engine?: unknown; [field: string]: unknown };
+  text?: string;
+  to?: unknown;
+  fresh?: boolean;
+  answers?: unknown;
+  ref?: unknown;
+  memory?: unknown;
+  [field: string]: unknown;
+}
+
+type RoomCalls = Record<string, (...args: unknown[]) => unknown>;
+type ImportableThreads = Awaited<ReturnType<typeof readImportableThreads>>;
+type SetProjectPayload = { product?: string; key: string; value?: unknown };
+type CloudAccountModule = typeof import('./cloud/account.mts');
+type CloudAccountHold = { config: string; value: NonNullable<ReturnType<CloudAccountModule['cloudAccountConfig']>>; session: ReturnType<CloudAccountModule['cloudAccountSession']> };
 
 // WHAT A WORKER IS TOLD WHEN HER DECISION COULD NOT BE RECORDED.
 const SPOOL_REFUSED = `${Name} could not record the founder's decision, so nothing was allowed. Finish what your grants cover and file the rest as a review.`;
@@ -88,12 +183,12 @@ const CARD_CHANGED = 'The approval request changed between being drawn and being
 // WHAT COUNTS AS SENT WHEN NOTHING IS. Analytics is optional here on purpose:
 // every test and every copy without a key gets an object that answers no to
 // everything, so no call site has to ask whether it exists.
-const NO_ANALYTICS = { enabled: false, track: () => false };
+const NO_ANALYTICS: IpcAnalytics = { enabled: false, track: () => false };
 
 // A copy with no updater wired in: the tests, and any host that constructs the
 // IPC surface by hand. It reports the state a build from source really is in
 // rather than a cheerful "up to date" nobody checked.
-const NO_UPDATER = {
+const NO_UPDATER: IpcUpdater = {
   state: () => ({
     phase: 'unsupported',
     currentVersion: null,
@@ -110,10 +205,10 @@ const NO_UPDATER = {
   move: () => ({ moved: false, error: null }),
 };
 
-const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget', 'method']);
-const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markUnread', 'react', 'edit', 'deleteMessage', 'putFile', 'file', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute']);
+const TEAMMATE_OPS: ReadonlySet<unknown> = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget', 'method']);
+const ROOM_OPS: ReadonlySet<unknown> = new Set(['refresh', 'send', 'markRead', 'markUnread', 'react', 'edit', 'deleteMessage', 'putFile', 'file', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute']);
 
-export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, onCount = () => {} }) {
+export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, onCount = () => {} }: IpcDeps) {
   // The three Electron things, or a plain Node stand-in for them. There is no
   // default: a caller that forgets says so here rather than throwing eighty
   // lines further down on `ipcMain.handle` of undefined.
@@ -128,7 +223,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // refetch the whole snapshot, so unthrottled pushes had the UI visibly
   // re-rendering (flashing images, shifting layout) the entire time any
   // worker was streaming. One push per window is plenty for a live tail.
-  let pushTimer = null;
+  let pushTimer: NodeJS.Timeout | null = null;
   const push = () => {
     if (pushTimer) return;
     pushTimer = setTimeout(() => {
@@ -204,7 +299,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // becomes a no, by the same rule and in the same place as a yes the spool
   // would not take: `allow` and `note` stop meaning what she pressed and start
   // meaning what was actually recorded.
-  const answerApproval = (id, allow, note) => {
+  const answerApproval = (id: string, allow: boolean, note?: string) => {
     const shown = approvals.cardShown(config.storeRoot, id);
     if (allow && supervisor.codexCardChanged?.(id, shown)) {
       console.warn(`zero: approval ${id} was drawn from a request that has since been rewritten; the founder's Allow was for a different card and nothing has been allowed`);
@@ -229,15 +324,15 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // Agentbox that text is task titles. A NUMBER MAY RIDE WITH THE NAME, and only
   // a number (2026-10-06): which setup step was reached.
   ipcMain.handle('zero:onboarding-arm', () => analytics.onboardingArm?.() ?? 'tour');
-  ipcMain.handle('zero:track', (_e, { name, count } = {}) => {
-    if (!EVENT_NAMES.includes(name)) return false;
+  ipcMain.handle('zero:track', (_e, { name, count }: { name?: string; count?: unknown } = {}) => {
+    if (!EVENT_NAMES.includes(name as string)) return false;
     onCount();
-    return analytics.track(name, Number.isFinite(count) ? { count } : undefined);
+    return analytics.track(name as string, Number.isFinite(count) ? { count } : undefined);
   });
 
   // WHETHER A COUNT CAME FROM SETUP'S PRACTICE PROJECT, read off the project's
   // own flag rather than its name, so the walkthrough and real use part.
-  const isPractice = (slug) => {
+  const isPractice = (slug: string) => {
     try { return store.listProducts().some((p) => p.slug === slug && p.practice === true); } catch { return false; }
   };
 
@@ -245,9 +340,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // shared/which-card-is-in-front.mjs, because the chord and the Agents menu
   // answer in THIS process, ahead of the page: reading a different order from
   // the one on screen means ⌘Y allows a command nobody was reading.
-  let looking = null;
+  let looking: { product: string | null; id: string } | null = null;
   const pendingApprovals = () => cardsInFront(approvals.listPending(config.storeRoot), looking);
-  ipcMain.handle('zero:looking', (event, { product = null, id = null } = {}) => {
+  ipcMain.handle('zero:looking', (event, { product = null, id = null }: { product?: string | null; id?: string | null } = {}) => {
     // The window's own top frame and nothing else, the guard
     // `zero:refresh-usage` carries: this moves which card ⌘Y answers. A page
     // the app shows in a pane gets no preload and cannot reach here at all, so
@@ -263,7 +358,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // From her phone the answer names the card it drew (main/phone-inbox.mts),
   // and a request rewritten since gets nothing.
-  ipcMain.handle('zero:approve', (_e, { id, allow, note, card }) => {
+  ipcMain.handle('zero:approve', (_e, { id, allow, note, card }: { id: string; allow: boolean; note?: string; card?: string }) => {
     if (card !== undefined && !approvals.cardStillShown(config.storeRoot, id, card)) return { ok: false, error: 'the card changed after your phone showed it, so nothing was allowed' };
     return { ok: answerApproval(id, allow, note) };
   });
@@ -275,7 +370,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // product's work-items.jsonl for an item that does not exist. The renderer
   // does not offer those actions; this is the second lock, here because the
   // first one is a UI and UIs get edited.
-  const isAgentRow = (id) => typeof id === 'string' && id.startsWith('agent:');
+  const isAgentRow = (id: unknown) => typeof id === 'string' && id.startsWith('agent:');
 
   // EVERY CLAUDE CODE AGENT ON THE MACHINE, minus the ones the app started itself.
   // It rides the snapshot because it is exactly the same kind of fact as the
@@ -315,7 +410,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     },
   });
 
-  ipcMain.handle('zero:refresh-usage', async (event, { engine = DEFAULT_ENGINE } = {}) => {
+  ipcMain.handle('zero:refresh-usage', async (event, { engine = DEFAULT_ENGINE }: { engine?: string } = {}) => {
     if (event.senderFrame?.parent || (event.sender && event.sender !== window.webContents)) throw Error('Usage refresh is only available in the main app window.');
     // Codex is asked of this computer and not of OpenAI; main/codex-usage.mts
     // says why there is no explicit read.
@@ -331,10 +426,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   const accountUsage = new AccountUsage({
     bin: () => config.claudeBin,
     env: () => supervisor._workerEnv(DEFAULT_ENGINE),
-    onReading: (profile, reading) => supervisor.noteUsageReading(profile, reading),
-    identity: (profile) => accountIdentity(profile === 'default' ? null : profile, { home: config.home }),
+    onReading: (profile: string, reading: unknown) => supervisor.noteUsageReading(profile, reading),
+    identity: (profile: string) => accountIdentity(profile === 'default' ? null : profile, { home: config.home }),
   });
-  ipcMain.handle('zero:account-usage', async (event, { refresh = false, engine = DEFAULT_ENGINE } = {}) => {
+  ipcMain.handle('zero:account-usage', async (event, { refresh = false, engine = DEFAULT_ENGINE }: { refresh?: boolean; engine?: string } = {}) => {
     if (event.senderFrame?.parent || (event.sender && event.sender !== window.webContents)) throw Error('Usage is only available in the main app window.');
     // Codex's are files on this computer, read on every ask.
     if (engine === 'codex') return { readings: supervisor.codexAccountUsage() };
@@ -347,7 +442,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // Agents this run has already counted. In memory on purpose: a fresh launch
   // seeing the same agent again is a fresh fact about the app being used.
-  const seenAgents = new Set();
+  const seenAgents = new Set<string>();
 
   const liveAgents = () => {
     try {
@@ -393,9 +488,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
      so there is only ever one sign in going on. Adding a Claude account after a
      Codex one replaces the folder, and the shell the old one was holding is
      closed in the same breath. */
-  let pendingLogin=null;
+  let pendingLogin: string | null=null;
 
-  const terminals=new TaskTerminals({resolve:key=>{
+  const terminals=new TaskTerminals({resolve:(key: string)=>{
     const {product,id}=JSON.parse(key);
     /*
      * THE SETTINGS TERMINAL, which belongs to no task. There is exactly one of
@@ -407,7 +502,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     }
     return taskPlace(product,id);
   }});
-  const taskPlace=(product,id)=>{
+  const taskPlace=(product: string,id: string)=>{
     const agent=id.startsWith('agent:')?liveAgents().find(a=>'agent:'+a.pid===id && (a.product??'')===product):null;
     return terminalPlace({store,supervisor,product,id,agent});
   };
@@ -415,17 +510,17 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
    * A TASK'S TERMINAL LIVES AS LONG AS THE TASK IS OPEN, in a process that
      outlives the app (main/terminal-host.mts). The sign-in terminal on
      Settings belongs to no task and stays in the app. */
-  const taskTerminals=new TerminalHosts({local:terminals,logFile:path.join(supervisor.userDir,'terminal-host.log'),log:line=>console.warn(`zero: ${line}`)});
+  const taskTerminals=new TerminalHosts({local:terminals,logFile:path.join(supervisor.userDir,'terminal-host.log'),log:(line: string)=>console.warn(`zero: ${line}`)});
   // A task's folder is not deleted while its terminal is open (supervisor.mts, `_folderInUse`).
-  supervisor.terminalOpen=itemId=>taskTerminals.hasTerminal(itemId);
-  const lookAtTerminals=()=>taskTerminals.endClosed(taskClosed(store)).catch(e=>console.warn('zero: terminals:',e.message));
+  supervisor.terminalOpen=(itemId: string)=>taskTerminals.hasTerminal(itemId);
+  const lookAtTerminals=()=>taskTerminals.endClosed(taskClosed(store)).catch((e: unknown)=>console.warn('zero: terminals:',(e as Error).message));
   void taskTerminals.ready().then(lookAtTerminals);
   setInterval(lookAtTerminals,60_000).unref?.();
   const agentUpdates=new AgentUpdates({
-    installation:async engine=>{await lookAgainFor(engine,config);return installedAgent(engine,config);},
-    refresh:async engine=>{await lookAgainFor(engine,config);await refreshAgentModels(engine,config,supervisor._codexOfferHomes());if(engine==='codex')for(const profile of supervisor._codexProfiles())supervisor._releaseIdleCodex(profile);},
+    installation:async (engine: string)=>{await lookAgainFor(engine,config);return installedAgent(engine,config);},
+    refresh:async (engine: string)=>{await lookAgainFor(engine,config);await refreshAgentModels(engine,config,supervisor._codexOfferHomes());if(engine==='codex')for(const profile of supervisor._codexProfiles())supervisor._releaseIdleCodex(profile);},
   });
-  ipcMain.handle('zero:agent-update',async(event,{engine,action}={})=>{
+  ipcMain.handle('zero:agent-update',async(event,{engine,action}: {engine?: string; action?: string}={})=>{
     if(event.senderFrame?.parent||(event.sender&&event.sender!==window.webContents))throw Error('Updates are only available in the main app window.');
     if(!['claude','codex'].includes(engine))throw Error('Unknown agent.');
     if(action==='check')return agentUpdates.check(engine);
@@ -437,11 +532,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
   let terminalQuitPending=false,terminalQuitReady=false;
   app.on('before-quit',event=>{
-    if(terminalQuitReady||(!terminalQuitPending&&!terminals.sessions.size&&!agentUpdates.terminals.sessions.size))return;
+    if(terminalQuitReady||(!terminalQuitPending&&!terminals.sessions.size&&!(agentUpdates.terminals as UpdateTerminals & {sessions: Map<unknown,unknown>}).sessions.size))return;
     event.preventDefault();
     if(!terminalQuitPending){terminalQuitPending=true;void Promise.all([terminals.shutdown(),agentUpdates.shutdown()]).finally(()=>{terminalQuitReady=true;app.quit();});}
   });
-  ipcMain.handle('zero:terminal',async(_event,payload={})=>{
+  ipcMain.handle('zero:terminal',async(_event,payload: {product?: unknown; id?: unknown; action?: string; data?: string; cols?: number; rows?: number; offset?: number; wait?: number}={})=>{
     if(_event.senderFrame?.parent || (_event.sender && _event.sender!==window.webContents)) throw Error('Terminal is only available in the main app window.');
     const {product,id,action,data,cols,rows,offset,wait}=payload;
     if(typeof product!=='string'||typeof id!=='string'||!id||id.length>300)throw Error('Invalid task.');
@@ -467,7 +562,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // The Done and All tabs' next page of finished threads the snapshot's 8 MB
   // read left out, asked for as she scrolls to their foot (main/store.mts).
-  ipcMain.handle('zero:older-items', (_e, { offset = 0, limit = 50 } = {}) =>
+  ipcMain.handle('zero:older-items', (_e, { offset = 0, limit = 50 }: { offset?: unknown; limit?: unknown } = {}) =>
     store.listOlderItems({ offset: Number(offset) || 0, limit: Math.min(Number(limit) || 50, 200) }));
 
   // IS ANYBODY ACTUALLY USING A SCREEN READER. Asked by the terminal pane
@@ -514,7 +609,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // Which alpha features are on (Settings, Alpha features).
       alpha,
       // TEAMMATES: who they are, what each is on, and the one team chat.
-      teammates: alpha.teammates ? (() => { try { return store.teammatesView(items, now); } catch (err) { return { list: [], chat: [], runs: [], error: err.message }; } })() : null,
+      teammates: alpha.teammates ? (() => { try { return store.teammatesView(items, now); } catch (err) { return { list: [], chat: [], runs: [], error: (err as Error).message }; } })() : null,
       agents: liveAgents(),
       // The open thread's own card first, which is the order the chord and the
       // Agents menu answer in too (shared/which-card-is-in-front.mjs).
@@ -604,7 +699,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // anywhere outside its own store, and it writes into a socket rather than to
   // disk. The reader refuses a send to an agent frozen on a permission box, and
   // reports back whether the agent actually moved rather than assuming it did.
-  ipcMain.handle('zero:agent-reply', async (_e, { pid, text }) => {
+  ipcMain.handle('zero:agent-reply', async (_e, { pid, text }: { pid: unknown; text: string }) => {
     try {
       const out = await agents.reply(Number(pid), text);
       // AND THE ROW REMEMBERS THAT THE USER SPOKE. Only on a delivered message: a
@@ -640,7 +735,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // somebody else's terminal — so this is honest about what it does: it takes
   // the row out of In progress and puts it back where it was. The session is
   // not touched, exactly as with deferring or closing one.
-  ipcMain.handle('zero:unreply-agent', (_e, { key }) => {
+  ipcMain.handle('zero:unreply-agent', (_e, { key }: { key?: unknown }) => {
     const mark = agentSchedule.replied(String(key ?? ''), 0);
     push();
     return { ok: true, repliedAt: mark };
@@ -648,7 +743,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // For the agent a reply cannot reach: bring the app it is running inside to
   // the front. Named honestly, because it is the app and not the pane.
-  ipcMain.handle('zero:agent-reveal', async (_e, { pid }) => {
+  ipcMain.handle('zero:agent-reveal', async (_e, { pid }: { pid: unknown }) => {
     try {
       return await agents.reveal(Number(pid));
     } catch {
@@ -660,7 +755,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // already has, only when she presses it. No model, nothing sent, nothing
   // written. It is streamed inside the reader because the biggest transcript on
   // this machine is 160MB.
-  ipcMain.handle('zero:agent-conversation', async (_e, payload) => {
+  ipcMain.handle('zero:agent-conversation', async (_e, payload?: { sessionId?: string; pid?: unknown; startedAt?: number; [field: string]: unknown }) => {
     try {
       // Her replies from Agentbox ride in beside the transcript for the same
       // reason the card needs them: they are not IN the transcript as hers.
@@ -674,7 +769,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     }
   });
 
-  ipcMain.handle('zero:dashboard', (_e, slug) => {
+  ipcMain.handle('zero:dashboard', (_e, slug: string) => {
     try {
       return store.readDashboard(slug);
     } catch {
@@ -682,17 +777,17 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     }
   });
 
-  ipcMain.handle('zero:command-catalog', (_e, { product, id }) => supervisor.commandCatalog(product, id));
-  ipcMain.handle('zero:remote-control', (_e, {product,id,action}) => supervisor.remoteControl(product,id,action));
-  ipcMain.handle('zero:command', (_e, { product, id, text }) => supervisor.commandItem(product, id, text));
-  ipcMain.handle('zero:compact', (_e, { product, id }) => supervisor.compactItem(product, id));
-  ipcMain.handle('zero:compaction-status', (_e, { product, id }) => supervisor.compactionStatus(product, id));
+  ipcMain.handle('zero:command-catalog', (_e, { product, id }: { product: string; id: string }) => supervisor.commandCatalog(product, id));
+  ipcMain.handle('zero:remote-control', (_e, {product,id,action}: { product: string; id: string; action: Parameters<Supervisor['remoteControl']>[2] }) => supervisor.remoteControl(product,id,action));
+  ipcMain.handle('zero:command', (_e, { product, id, text }: { product: string; id: string; text: Parameters<Supervisor['commandItem']>[2] }) => supervisor.commandItem(product, id, text));
+  ipcMain.handle('zero:compact', (_e, { product, id }: { product: string; id: string }) => supervisor.compactItem(product, id));
+  ipcMain.handle('zero:compaction-status', (_e, { product, id }: { product: string; id: string }) => supervisor.compactionStatus(product, id));
 
   // Send now: cut the running agent's current step so her waiting message is
   // answered at once (supervisor.sendNow).
-  ipcMain.handle('zero:send-now', (_e, { product, id }) => supervisor.sendNow(product, id));
+  ipcMain.handle('zero:send-now', (_e, { product, id }: { product: string; id: string }) => supervisor.sendNow(product, id));
 
-  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped }) => {
+  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped }: AnswerInput & { product: string; id: string; now?: unknown; inReplyTo?: unknown; closeUnshipped?: boolean }) => {
     if (isAgentRow(id)) return { ok: false };
     // WORK THAT NEVER REACHED MAIN IS NOT CLOSED UNASKED (shared/not-shipped.mjs).
     // The window asks first and says so with `closeUnshipped`; the phone and
@@ -773,35 +868,35 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // agents never set this. The renderer sends the WHOLE order rather than one
   // move, because a drag already knows the finished arrangement, and a move
   // would need both sides to agree about indices only one of them can see.
-  ipcMain.handle('zero:set-product-order', (_e, { order }) => {
+  ipcMain.handle('zero:set-product-order', (_e, { order }: { order: string[] }) => {
     supervisor.setProductOrder(order);
     return supervisor.status();
   });
 
   // A THREAD DRAGGED TO A PLACE OF ITS OWN in the list (w-6e5b532a95): the
   // places the drop worked out (`dropPlaces`, shared/rank.mjs), id to number.
-  ipcMain.handle('zero:set-thread-places', (_e, { places }) => {
+  ipcMain.handle('zero:set-thread-places', (_e, { places }: { places: Record<string, number | null> }) => {
     supervisor.setThreadPlaces(places);
     push();
     return { ok: true };
   });
 
   // THREADS KEPT ON THIS MAC whatever the cloud is set to: id to true, or null.
-  ipcMain.handle('zero:set-thread-on-mac', (_e, { onMac }) => {
+  ipcMain.handle('zero:set-thread-on-mac', (_e, { onMac }: { onMac: Record<string, boolean | null> }) => {
     supervisor.setThreadOnMac(onMac);
     push();
     return { ok: true };
   });
 
   // RUNS ON THIS MAC TO MOVE TO THE CLOUD, by id.
-  ipcMain.handle('zero:move-to-cloud', (_e, { ids }) => {
+  ipcMain.handle('zero:move-to-cloud', (_e, { ids }: { ids: string[] }) => {
     const out = supervisor.moveToCloud(ids);
     push();
     return out;
   });
 
   // PINNED THREADS (w-20323283e6): id to true, or null to unpin.
-  ipcMain.handle('zero:set-thread-pins', (_e, { pins }) => {
+  ipcMain.handle('zero:set-thread-pins', (_e, { pins }: { pins: Record<string, boolean | null> }) => {
     supervisor.setThreadPins(pins);
     push();
     return { ok: true };
@@ -809,101 +904,101 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // Hidden from the composer's picker and nothing else: a hidden product still
   // ranks, still spawns workers, and its work still reaches the inbox.
-  ipcMain.handle('zero:set-product-hidden', (_e, { product, hidden }) => {
+  ipcMain.handle('zero:set-product-hidden', (_e, { product, hidden }: { product: string; hidden: boolean }) => {
     supervisor.setProductHidden(product, hidden);
     return supervisor.status();
   });
 
   // WHO IS SIGNED IN, and the project a row is in, for the team's rules.
   const teamMe = () => team?.state()?.me?.id ?? null;
-  const productOf = (slug) => store.listProducts().find((p) => p.slug === slug) ?? null;
+  const productOf = (slug: string) => store.listProducts().find((p) => p.slug === slug) ?? null;
 
-  function handOnByReply(product, id) {
+  function handOnByReply(product: string, id: string) {
     try {
       const row = store.readItem(product, id);
       const next = row && handedOnByReply(row, productOf(product), teamMe());
       if (next) store.teamPatch(product, id, { assignee: next });
     } catch (err) {
-      console.warn(`team: could not hand ${id} on: ${err.message}`);
+      console.warn(`team: could not hand ${id} on: ${(err as Error).message}`);
     }
   }
 
   // FEEDBACK, from the card the sidebar's Feedback row opens (w-1b574413db).
   // main/feedback.mts decides where it goes and whether it may; the version
   // and the macOS release ride along so a report can be matched to a build.
-  ipcMain.handle('zero:send-feedback', async (_e, { text, files } = {}) => sendFeedback({
+  ipcMain.handle('zero:send-feedback', async (_e, { text, files }: { text?: string; files?: { name: string; type: string; data: string }[] } = {}) => sendFeedback({
     url: feedbackUrl(config),
-    payload: feedbackPayload({ text, files, app: { version: app.getVersion(), os: `${process.platform} ${os.release()}`, install: analytics.installId } }),
+    payload: feedbackPayload({ text, files, app: { version: app.getVersion(), os: `${process.platform} ${os.release()}`, install: analytics.installId } as { version?: string; os?: string } }),
   }));
 
   // THE TEAM'S DOORS. Each answers { ok, team } or { ok: false, error } with
   // the error in words, so the window can say what went wrong where it
   // happened instead of a row silently not appearing.
-  const teamNow = () => teamForWindow(team.state(), alphaFeatures(config).multiplayer);
-  const teamCall = (fn) => async (_e, arg) => {
+  const teamNow = () => teamForWindow(team!.state(), alphaFeatures(config).multiplayer);
+  const teamCall = <A,>(fn: (arg: A) => unknown) => async (_e: IpcEvent, arg?: unknown) => {
     if (!team) return { ok: false, error: 'This build has no team cloud set up.' };
     try {
-      const got = await fn(arg ?? {});
+      const got = await fn((arg ?? {}) as A) as { id?: unknown; product?: unknown } | undefined;
       push();
       // A call that wrote a row (a message, into its conversation) says which,
       // so the toast after it can open it with O (w-5513afd09a).
       const wrote = typeof got?.id === 'string' && typeof got?.product === 'string';
       return { ok: true, team: teamNow(), ...(wrote ? { made: { product: got.product, id: got.id } } : {}) };
     } catch (err) {
-      return { ok: false, error: String(err?.message ?? err), team: teamNow() };
+      return { ok: false, error: String((err as Error)?.message ?? err), team: teamNow() };
     }
   };
   // Signing in finishes in the browser, so the app comes back to the front
   // when it lands rather than leaving the person to find it.
   ipcMain.handle('zero:team-sign-in', teamCall(async () => {
-    await team.signIn();
+    await team!.signIn();
     try { if (window?.isMinimized?.()) window.restore(); window?.show?.(); app?.focus?.({ steal: true }); } catch { /* no window to raise */ }
   }));
-  ipcMain.handle('zero:team-sign-in-cancel', teamCall(() => team.cancelSignIn()));
-  ipcMain.handle('zero:team-sign-in-reopen', teamCall(() => team.reopenSignIn()));
-  ipcMain.handle('zero:team-sign-out', teamCall(() => team.signOut()));
-  ipcMain.handle('zero:team-sign-in-email', teamCall(({ email, password }) => team.signInWithEmail(email, password)));
+  ipcMain.handle('zero:team-sign-in-cancel', teamCall(() => team!.cancelSignIn()));
+  ipcMain.handle('zero:team-sign-in-reopen', teamCall(() => team!.reopenSignIn()));
+  ipcMain.handle('zero:team-sign-out', teamCall(() => team!.signOut()));
+  ipcMain.handle('zero:team-sign-in-email', teamCall(({ email, password }: { email: string; password: string }) => team!.signInWithEmail(email, password)));
   // Its own door, because it has one more thing to say: whether the account
   // waits on the link in its confirmation email.
-  ipcMain.handle('zero:team-sign-up', async (_e, { email, password, name } = {}) => {
+  ipcMain.handle('zero:team-sign-up', async (_e, { email, password, name }: { email?: string; password?: string; name?: string } = {}) => {
     if (!team) return { ok: false, error: 'This build has no team cloud set up.' };
     try {
       const out = await team.signUp(email, password, name);
       push();
       return { ok: true, team: teamNow(), confirm: !!out?.confirm };
     } catch (err) {
-      return { ok: false, error: String(err?.message ?? err), team: teamNow() };
+      return { ok: false, error: String((err as Error)?.message ?? err), team: teamNow() };
     }
   });
-  ipcMain.handle('zero:team-create', teamCall(({ name }) => team.createTeam(name)));
+  ipcMain.handle('zero:team-create', teamCall(({ name }: { name: string }) => team!.createTeam(name)));
   // An invite answered yes. Nothing else joins a team.
-  ipcMain.handle('zero:team-accept-invite', teamCall(({ teamId }) => team.acceptInvite(teamId)));
-  ipcMain.handle('zero:team-invite', teamCall(({ email }) => team.invite(email)));
-  ipcMain.handle('zero:team-rename', teamCall(({ name }) => team.renameTeam(name)));
-  ipcMain.handle('zero:team-remove-member', teamCall(({ personId }) => team.removeMember(personId)));
-  ipcMain.handle('zero:team-leave', teamCall(() => team.leaveTeam()));
-  ipcMain.handle('zero:team-cancel-invite', teamCall(({ email }) => team.cancelInvite(email)));
+  ipcMain.handle('zero:team-accept-invite', teamCall(({ teamId }: { teamId: string }) => team!.acceptInvite(teamId)));
+  ipcMain.handle('zero:team-invite', teamCall(({ email }: { email: string }) => team!.invite(email)));
+  ipcMain.handle('zero:team-rename', teamCall(({ name }: { name: string }) => team!.renameTeam(name)));
+  ipcMain.handle('zero:team-remove-member', teamCall(({ personId }: { personId: string }) => team!.removeMember(personId)));
+  ipcMain.handle('zero:team-leave', teamCall(() => team!.leaveTeam()));
+  ipcMain.handle('zero:team-cancel-invite', teamCall(({ email }: { email: string }) => team!.cancelInvite(email)));
   // A line you write about yourself, so a day in meetings is not read off
   // the Team page as idleness.
-  ipcMain.handle('zero:team-status', teamCall(({ text, hold, until }) => team.setStatus({ text, hold, until })));
-  ipcMain.handle('zero:team-share', teamCall(({ product, visibility, people }) => team.share(product, { visibility, people })));
-  ipcMain.handle('zero:team-sync', teamCall(() => team.syncNow()));
+  ipcMain.handle('zero:team-status', teamCall(({ text, hold, until }: { text: string; hold?: string; until?: number }) => team!.setStatus({ text, hold, until })));
+  ipcMain.handle('zero:team-share', teamCall(({ product, visibility, people }: { product: string; visibility?: string; people?: string[] }) => team!.share(product, { visibility, people })));
+  ipcMain.handle('zero:team-sync', teamCall(() => team!.syncNow()));
   // A MESSAGE TO A PERSON (approved 2026-10-01: people get messages, never
   // tasks). main/team/index.mts keeps it between the two of them.
-  ipcMain.handle('zero:team-message', teamCall(({ to, body, priority, files }) => team.message(to, body, priority, files)));
+  ipcMain.handle('zero:team-message', teamCall(({ to, body, priority, files }: { to: string; body: string; priority?: number; files?: unknown[] }) => team!.message(to, body, priority, files)));
   // ROOMS (alpha): one door, and only these calls through it (main/team/rooms.mts).
-  ipcMain.handle('zero:teammates', async (_e, { op, args = {} } = {}) => {
+  ipcMain.handle('zero:teammates', async (_e, { op, args = {} }: { op?: string; args?: TeammateArgs } = {}) => {
     const mates = store.teammates;
     if (!mates) return { ok: false, error: 'Teammates need a store.' };
     if (!TEAMMATE_OPS.has(op)) return { ok: false, error: `no teammates call named ${op}` };
     if (!alphaFeatures(config).teammates) return { ok: false, error: 'Teammates are an alpha feature. Turn them on in Settings, Alpha features.' };
     try {
-      const a = args && typeof args === 'object' ? args : {};
-      const kill = (id) => supervisor.stopSession(id);
-      let value;
+      const a: TeammateArgs = args && typeof args === 'object' ? args : {};
+      const kill = (id: string) => supervisor.stopSession(id);
+      let value: unknown;
       if (op === 'create') {
         value = mates.create({ ...a, engine: supervisor.engineOffered(a.engine) ?? null });
-        if (a.start !== false) value = mates.start(value.id);
+        if (a.start !== false) value = mates.start((value as { id: string }).id);
       } else if (op === 'describe') value = mates.describe({ ...a, engine: supervisor.engineOffered(a.engine) ?? null });
       else if (op === 'start') value = mates.start(a.id);
       else if (op === 'update') value = mates.update(a.id, { ...a.patch, ...(a.patch && 'engine' in a.patch ? { engine: supervisor.engineOffered(a.patch.engine) ?? null } : {}) });
@@ -918,25 +1013,25 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       push();
       return { ok: true, value: value ?? null };
     } catch (err) {
-      return { ok: false, error: String(err?.message ?? err) };
+      return { ok: false, error: String((err as Error)?.message ?? err) };
     }
   });
-  ipcMain.handle('zero:rooms', async (_e, { op, args = [] } = {}) => {
+  ipcMain.handle('zero:rooms', async (_e, { op, args = [] }: { op?: string; args?: unknown } = {}) => {
     const rooms = team?.rooms;
     if (!rooms) return { ok: false, error: 'This build has no team cloud set up.' };
     if (!ROOM_OPS.has(op)) return { ok: false, error: `no room call named ${op}` };
     try {
-      const value = await rooms[op](...(Array.isArray(args) ? args : [args]));
+      const value = await (rooms as unknown as RoomCalls)[op as string](...(Array.isArray(args) ? args : [args]));
       push();
       return { ok: true, value: value ?? null, rooms: rooms.state() };
     } catch (err) {
-      return { ok: false, error: String(err?.message ?? err), rooms: rooms.state() };
+      return { ok: false, error: String((err as Error)?.message ?? err), rooms: rooms.state() };
     }
   });
   // AN EDIT TO A THREAD, MADE IN PLACE from its summary: the summary's lines,
   // who sees it, its priority and what it is linked to. Works with or without a
   // team, since every thread has a summary.
-  ipcMain.handle('zero:thread-edit', (_e, { product, id, patch }) => {
+  ipcMain.handle('zero:thread-edit', (_e, { product, id, patch }: { product: string; id: string; patch?: { priority?: number | null; [field: string]: unknown } }) => {
     try {
       store.threadEdit(product, id, patch);
       // PICKING A LEVEL IS THE NEWER WORD on where a thread goes, so a place
@@ -945,14 +1040,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       push();
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: String(err?.message ?? err) };
+      return { ok: false, error: String((err as Error)?.message ?? err) };
     }
   });
   // MOVE A THREAD TO ANOTHER PROJECT (w-c9da359466). Only a thread nothing has
   // ever run on: shared/move-thread.mjs says why, and the store asks again.
   // The one fact only this side has is whether a worker is inside it right
   // now, which no field on the row can stand in for.
-  ipcMain.handle('zero:move-item', (_e, { product, id, to }) => {
+  ipcMain.handle('zero:move-item', (_e, { product, id, to }: { product: string; id: string; to: string }) => {
     try {
       const live = supervisor.status().running.some((r) => r.itemId === id);
       if (live) {
@@ -964,14 +1059,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       supervisor.wake();
       return { ok: true, ...out };
     } catch (err) {
-      return { ok: false, error: String(err?.message ?? err) };
+      return { ok: false, error: String((err as Error)?.message ?? err) };
     }
   });
 
   // A TASK A TEAMMATE GAVE YOU, ROUTED WITH ONE KEY. To an agent: it runs on
   // your Mac (you become its runner). Keep it: it stays yours and the routing
   // choices go away. Hand it back: it returns to whoever gave it to you.
-  ipcMain.handle('zero:team-route', teamCall(({ product, id, route }) => {
+  ipcMain.handle('zero:team-route', teamCall(({ product, id, route }: { product: string; id: string; route: string }) => {
     const me = teamMe();
     if (!me) throw new Error('sign in first');
     const row = store.readItem(product, id);
@@ -992,7 +1087,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // sync carries a reaction across in a message record and nowhere else
   // (shared/team-rules.mjs), so one written anywhere else would sit on this Mac
   // alone and look to its author like it had reached somebody.
-  ipcMain.handle('zero:team-react', teamCall(async ({ product, id, on, emoji, off }) => {
+  ipcMain.handle('zero:team-react', teamCall(async ({ product, id, on, emoji, off }: { product: string; id: string; on: string; emoji: string; off?: boolean }) => {
     const me = teamMe();
     if (!me) throw new Error('sign in first');
     const row = store.readItem(product, id);
@@ -1000,7 +1095,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const here = store.listProducts().find((p) => p.slug === product);
     if (!here?.team?.direct) throw new Error('reactions are for a conversation with a teammate');
     store.react(product, id, { on, emoji, off });
-    await team.syncNow();
+    await team!.syncNow();
   }));
 
   // 'granted', or 'settings' once macOS's Microphone page has been opened instead.
@@ -1010,17 +1105,17 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // EDIT OR DELETE A MESSAGE YOU SENT TO A TEAMMATE, in a conversation only,
   // for the same reason as a reaction above.
-  ipcMain.handle('zero:team-edit', teamCall(async ({ product, id, on, text, gone }) => {
+  ipcMain.handle('zero:team-edit', teamCall(async ({ product, id, on, text, gone }: { product: string; id: string; on: string; text?: string; gone?: boolean }) => {
     if (!teamMe()) throw new Error('sign in first');
     if (!store.readItem(product, id)) throw new Error('that conversation is gone');
     const here = store.listProducts().find((p) => p.slug === product);
     if (!here?.team?.direct) throw new Error('only a message to a teammate can be edited');
     if (!gone && !String(text ?? '').trim()) throw new Error('a message needs words; delete it instead');
     store.editMessage(product, id, { on, text, gone: gone === true });
-    await team.syncNow();
+    await team!.syncNow();
   }));
 
-  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo, fromPhone }) => {
+  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo, fromPhone }: ComposeInput & { product: string }) => {
     const out = store.composeItem(product, {
       // HOW HARD IT THINKS rides through unjudged: the store keeps any word
       // shaped like a level, and the spawn is the gate that knows each
@@ -1068,7 +1163,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // HER PICK OF WHO TAKES A THREAD: the answer when Auto asked, or giving one
   // to someone else after (shared/auto-route.mjs). `to` is 'agent' or one of
   // her teammates as 'mate:<id>'; anyone else is refused rather than written.
-  ipcMain.handle('zero:route-thread', (_e, { product, id, to }) => {
+  ipcMain.handle('zero:route-thread', (_e, { product, id, to }: { product: string; id: string; to: string }) => {
     const item = store.readItem(product, id);
     if (!item) throw new Error('that thread is gone');
     const mate = typeof to === 'string' && to.startsWith('mate:') ? to.slice('mate:'.length) : null;
@@ -1084,7 +1179,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // The whole of the work is reading the readme in the folder chosen two
   // screens earlier, so this returns in milliseconds. The two second pause
   // before it is called is in the renderer, where the row is being watched.
-  ipcMain.handle('zero:first-run-answer', (_e, { product, id, round = 0 }) => {
+  ipcMain.handle('zero:first-run-answer', (_e, { product, id, round = 0 }: { product: string; id: string; round?: number }) => {
     return store.finishFirstRunTask(product, id, round);
   });
 
@@ -1115,14 +1210,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // BEAT EIGHT'S THREE EXAMPLE ROWS, written into the project she just
   // made. They are real rows, because the beat teaches clearing an inbox and
   // there is no way to teach that with a picture of one.
-  ipcMain.handle('zero:first-run-examples', (_e, { product }) => {
+  ipcMain.handle('zero:first-run-examples', (_e, { product }: { product: string }) => {
     return store.stageFirstRunExamples(product);
   });
 
   // AND NOTHING ELSE STARTS WHILE SHE IS BEING SHOWN AROUND.The hold is in
   // memory and it expires; supervisor.firstRunWalking says why both of those
   // matter.
-  ipcMain.handle('zero:first-run-walking', (_e, { walking }) => {
+  ipcMain.handle('zero:first-run-walking', (_e, { walking }: { walking?: unknown }) => {
     supervisor.firstRunWalking(!!walking);
     return supervisor.status();
   });
@@ -1135,7 +1230,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // NOTHING OF HERS IS DELETED HERE, and there is no version of this handler
   // that may delete anything. main/fresh-user.mts says how it works and why
   // her own window and every agent in it keep running.
-  ipcMain.handle('zero:open-fresh-user', (_e, payload) => {
+  ipcMain.handle('zero:open-fresh-user', (_e, payload?: { withAgents?: boolean; withTools?: boolean }) => {
     return openFreshUser({
       withAgents: payload?.withAgents !== false,
       withTools: payload?.withTools !== false,
@@ -1154,14 +1249,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // "Run this later", the durable half of what snooze used to pretend to be.
   // A worker already running on the item is stopped: deferring work that is
   // happening right now and leaving it running is not deferring it.
-  ipcMain.handle('zero:schedule', (_e, { product, id, runAt }) => {
+  ipcMain.handle('zero:schedule', (_e, { product, id, runAt }: { product: string; id: string; runAt: number }) => {
     if (isAgentRow(id)) return { ok: false };
     if (runAt > Date.now()) supervisor.stopSession(id);
     return store.scheduleItem(product, id, runAt);
   });
 
   // Snooze changes when a person sees the thread, never what an agent does.
-  ipcMain.handle('zero:snooze', (_e, { product, id, snoozedUntil }) => {
+  ipcMain.handle('zero:snooze', (_e, { product, id, snoozedUntil }: { product: string; id: string; snoozedUntil: number }) => {
     if (isAgentRow(id)) return { ok: false };
     const item = store.snoozeItem(product, id, snoozedUntil);
     push();
@@ -1176,7 +1271,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   //
   // The KEY comes from the agent, never from the row id: `agent:<pid>` is what
   // the list draws with and a pid is not an identity (shared/agents.mjs).
-  ipcMain.handle('zero:schedule-agent', (_e, { key, runAt }) => {
+  ipcMain.handle('zero:schedule-agent', (_e, { key, runAt }: { key?: unknown; runAt: number }) => {
     const set = agentSchedule.set(String(key ?? ''), runAt);
     push();
     return { ok: true, runAt: set };
@@ -1185,7 +1280,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // `through` is the agent's own last activity when she closed it, so a session
   // that then does something newer is news again rather than the thing she
   // dismissed; 0 puts the row straight back.
-  ipcMain.handle('zero:close-agent', (_e, { key, through }) => {
+  ipcMain.handle('zero:close-agent', (_e, { key, through }: { key?: unknown; through: number }) => {
     const mark = agentSchedule.close(String(key ?? ''), through);
     push();
     return { ok: true, doneThrough: mark };
@@ -1206,7 +1301,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // engine that was just refused. Both were absent here because neither field
   // reached this handler at all: the whole pair was dropped four times over on
   // the way from her card (main/repeats.mjs says where).
-  ipcMain.handle('zero:compose-repeat', (_e, { product, title, body, priority, rule, engine, model }) => {
+  ipcMain.handle('zero:compose-repeat', (_e, { product, title, body, priority, rule, engine, model }: { product: string; title: string; body?: string; priority?: number; rule: { every: string; at: string; on?: number }; engine?: unknown; model?: string }) => {
     const made = store.composeRepeat(product, {
       title,
       body,
@@ -1226,7 +1321,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // without this the renderer could mark a rule for Codex without ever passing
   // `engineOffered` -- the capability gate, bypassed by the edit screen. A patch
   // that names neither is forwarded exactly as it arrived.
-  ipcMain.handle('zero:set-repeat', (_e, { product, id, rule }) => {
+  ipcMain.handle('zero:set-repeat', (_e, { product, id, rule }: { product: string; id: string; rule?: { engine?: unknown; model?: string; [field: string]: unknown } }) => {
     const { engine, model, ...rest } = rule ?? {};
     return store.setRepeat(product, id, {
       ...rest,
@@ -1237,9 +1332,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // Ending one is how she stops it, and it is a small durable fact rather than
   // an archive, so it does not collide with what done means on a work item.
-  ipcMain.handle('zero:end-repeat', (_e, { product, id }) => store.endRepeat(product, id));
+  ipcMain.handle('zero:end-repeat', (_e, { product, id }: { product: string; id: string }) => store.endRepeat(product, id));
 
-  ipcMain.handle('zero:create-product', (_e, { name, repoPath, ofMany }) => {
+  ipcMain.handle('zero:create-product', (_e, { name, repoPath, ofMany }: { name: string; repoPath?: string; ofMany?: unknown }) => {
     const out = store.createProduct({ name, repoPath });
     // (privacy page 5.1). The count is the whole payload; the path it was
     // connected to never leaves.
@@ -1272,9 +1367,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // one folder the check above refuses: a tester saw a single folder listed and
   // had to press Ctrl+L to type a path. shared/project-folder-check.mjs orders
   // the candidates; the first that exists on this disk is the one.
-  ipcMain.handle('zero:choose-folder', async (_e, { startIn } = {}) => {
+  ipcMain.handle('zero:choose-folder', async (_e, { startIn }: { startIn?: string } = {}) => {
     const connected = store.listProducts().map((p) => p.repoPath).filter(Boolean);
-    const isDir = (p) => { try { return fsWatch.statSync(p).isDirectory(); } catch { return false; } };
+    const isDir = (p: string) => { try { return fsWatch.statSync(p).isDirectory(); } catch { return false; } };
     const openAt = chooserStartsIn(startIn, { known: connected, home: os.homedir() }).find(isDir) ?? null;
     const r = await dialog.showOpenDialog(window, {
       // The title is what the screen behind it asks. On Linux the chooser
@@ -1310,7 +1405,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // standing in, whether choosing it would be turned down. The Mac's dialog
   // cannot do that and this can, which makes the browser's picker the better
   // of the two on the one thing that actually costs somebody an afternoon.
-  ipcMain.handle('zero:list-folders', (_e, { at = null, showHidden = false } = {}) => {
+  ipcMain.handle('zero:list-folders', (_e, { at = null, showHidden = false }: { at?: string | null; showHidden?: boolean } = {}) => {
     const home = os.homedir();
     const listed = listFolders({ at, home, showHidden });
     const verdict = checkProjectFolder(listed.at, { home });
@@ -1321,7 +1416,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // ~/Desktop/dev/<name> from the name typed, and that folder sometimes already
   // exists with somebody's code in it; calling that one new would be a lie in
   // the one sentence on the card.
-  ipcMain.handle('zero:folder-exists', (_e, { path: p } = {}) => {
+  ipcMain.handle('zero:folder-exists', (_e, { path: p }: { path?: unknown } = {}) => {
     if (typeof p !== 'string' || !p.trim()) return { exists: false };
     const full = p.trim().startsWith('~')
       ? path.join(os.homedir(), p.trim().slice(1))
@@ -1337,7 +1432,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // `chosen` comes back with them so the screen can open on what she already
   // took rather than on nothing, which is what makes walking it a second time
   // show her the truth instead of an empty page.
-  ipcMain.handle('zero:agent-files', (_e, { folder = null, product = null } = {}) => {
+  ipcMain.handle('zero:agent-files', (_e, { folder = null, product = null }: { folder?: unknown; product?: string | null } = {}) => {
     const found = readAgentFiles({ folder: typeof folder === 'string' && folder.trim() ? folder.trim() : null });
     const map = config.projectAgents ?? {};
     const chosen = product && Array.isArray(map[product]) ? map[product] : null;
@@ -1359,15 +1454,15 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // its own project list.
   ipcMain.handle('zero:agent-folders', () => {
     const products = store.listProducts();
-    const owned = new Set();
-    const roots = new Set();
+    const owned = new Set<string>();
+    const roots = new Set<string>();
     for (const p of products) {
       const repo = typeof p.repoPath === 'string' && p.repoPath.trim() ? path.resolve(p.repoPath.trim()) : null;
       if (!repo) continue;
       owned.add(repo);
       roots.add(path.dirname(repo));
     }
-    let folders = [];
+    let folders: ReturnType<typeof findAgentFolders> = [];
     try { folders = findAgentFolders({ roots: [...roots] }); } catch { folders = []; }
     // AND THE AGENTS THEMSELVES, not only how many.A count can only be a clause
     // in a sentence; the card now draws each folder as a heading with its own
@@ -1377,7 +1472,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const out = [];
     for (const f of folders) {
       if (owned.has(f.folder)) continue;
-      let agents = [];
+      let agents: ReturnType<typeof readFolderAgents> = [];
       try { agents = readFolderAgents(f.folder); } catch { agents = []; }
       out.push({ ...f, agents });
     }
@@ -1398,7 +1493,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // several projects, so re-walking would cost seconds of a button that should
   // feel instant. The card read them a moment before pressing, so the last read
   // is the right answer and it is ours rather than the renderer's.
-  let lastThreads = [];
+  let lastThreads: ImportableThreads = [];
   // THE USER'S CODEX CONVERSATIONS ARE ON THE SAME CARD. They carry `source:
   // 'codex'`, land under the project whose folder they ran in exactly as the
   // Claude Code ones do, and the ones the user said not now to are here too, so
@@ -1437,11 +1532,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
    *  list holds keeps the list's copy: the search reads no title, answer or
    *  ending, and its copy would bring the chat in without them.
    */
-  let searchable = null;
-  ipcMain.handle('zero:search-agent-threads', async (_e, { again = false } = {}) => {
+  let searchable: { threads: ImportableThreads; reached: number } | null = null;
+  ipcMain.handle('zero:search-agent-threads', async (_e, { again = false }: { again?: boolean } = {}) => {
     if (again) searchable = null;
     if (!searchable) {
-      let got = { threads: [], reached: 0 };
+      let got: { threads: ImportableThreads; reached: number } = { threads: [], reached: 0 };
       try { got = await readSearchableThreads({ config, supervisor, readCodex: readCodexThreadsOffThread }); } catch { got = { threads: [], reached: 0 }; }
       searchable = got;
     }
@@ -1458,7 +1553,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // is a row, and a row is what stops it being imported twice
   // (`threadsNeedingRows`). The row's first reply resumes the conversation as a
   // copy (`Supervisor#importedThreadFor`, GitHub #44).
-  ipcMain.handle('zero:import-threads', async (_e, { product, threads, land } = {}) => {
+  ipcMain.handle('zero:import-threads', async (_e, { product, threads, land }: { product?: string; threads?: unknown; land?: string } = {}) => {
     if (!product) return { ok: false, added: 0, already: 0, ids: [] };
     const want = new Set(
       (Array.isArray(threads) ? threads : [])
@@ -1471,7 +1566,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     if (!lastThreads.length) lastThreads = await readAllThreads();
     // Two kinds, two rows.
     const chosen = readChatEnds(lastThreads.filter((t) => want.has(String(t?.id ?? ''))));
-    let out = { ids: [], added: 0, already: 0, done: 0 };
+    let out: { ids: string[]; added: number; already: number; done: number } = { ids: [], added: 0, already: 0, done: 0 };
     try {
       // Each store method takes its own kind off the list and leaves the other.
       // Setup's last screen sorts what it brings in: finished chats go to Done.
@@ -1481,7 +1576,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       out = { ids: [...claude.ids, ...codex.ids], added: claude.added + codex.added, already: claude.already + codex.already, done: claude.done + codex.done };
     } catch (err) {
       push();
-      return { ok: false, error: String(err.message), added: 0, already: 0, ids: [] };
+      return { ok: false, error: String((err as Error).message), added: 0, already: 0, ids: [] };
     }
     push();
     return { ok: true, ...out };
@@ -1504,25 +1599,25 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // whole list already, so it could hand the paths over, but a row that names a
   // file on somebody's disk should name a file that was on the disk a moment
   // ago and not one a screen was holding from earlier in the walk.
-  ipcMain.handle('zero:import-agents', (_e, { product, agents } = {}) => {
+  ipcMain.handle('zero:import-agents', (_e, { product, agents }: { product?: string; agents?: unknown } = {}) => {
     if (!product) return { ok: false, added: 0, ids: [] };
     const names = (Array.isArray(agents) ? agents : [])
       .filter((n) => typeof n === 'string' && n.trim())
       .map((n) => n.trim());
     try {
-      setProjectSetting({ config, supervisor }, { product, key: 'agents', value: names });
+      setProjectSetting({ config, supervisor, store }, { product, key: 'agents', value: names });
     } catch { /* the ticks are a convenience; the rows are the point */ }
     if (!names.length) { push(); return { ok: true, added: 0, ids: [] }; }
     const keep = new Set(names);
     const repo = store.listProducts().find((p) => p.slug === product)?.repoPath ?? null;
     const found = readAgentFiles({ folder: repo });
     const chosen = [...found.user, ...found.project].filter((a) => keep.has(a.name));
-    let out = { ids: [], added: 0, already: 0 };
+    let out: { ids: string[]; added: number; already: number } = { ids: [], added: 0, already: 0 };
     try {
       out = store.importAgentRows(product, chosen);
     } catch (err) {
       push();
-      return { ok: false, error: String(err.message), added: 0, ids: [] };
+      return { ok: false, error: String((err as Error).message), added: 0, ids: [] };
     }
     push();
     return { ok: true, ...out };
@@ -1539,21 +1634,21 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // Stop a running agent: kill its session and set the item blocked, so it
   // is not instantly re-pulled and sits in the inbox awaiting redirection.
-  ipcMain.handle('zero:stop-session', (_e, { product, id }) => {
+  ipcMain.handle('zero:stop-session', (_e, { product, id }: { product: string; id: string }) => {
     if (isAgentRow(id)) return { ok: false };
     supervisor.stopSession(id);
     return store.answerItem(product, id, { status: 'blocked' });
   });
 
   // Run now, from the three-dot menu on a waiting task (supervisor.runNow).
-  ipcMain.handle('zero:run-now', (_e, { product, id }) => {
+  ipcMain.handle('zero:run-now', (_e, { product, id }: { product: string; id: string }) => {
     if (isAgentRow(id)) return { ok: false, reason: 'missing' };
     return supervisor.runNow(product, id);
   });
 
   // Send a stopped/blocked item back to the queue; the fresh worker's brief
   // carries whatever the founder wrote on the item meanwhile.
-  ipcMain.handle('zero:reopen', (_e, { product, id }) => {
+  ipcMain.handle('zero:reopen', (_e, { product, id }: { product: string; id: string }) => {
     if (isAgentRow(id)) return { ok: false };
     const out = store.answerItem(product, id, { status: 'open' });
     supervisor.liftBrakeForHer?.();
@@ -1572,39 +1667,39 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // checkout the fleet works in, so a save could be undone by the next
   // worker's `git checkout` with nothing to show it had happened. The shipped
   // defaults still come from appDir; only her own copy moved.
-  ipcMain.handle('zero:instruction-read', (_e, id) => {
+  ipcMain.handle('zero:instruction-read', (_e, id: string) => {
     try { return readInstruction(supervisor.userDir, id, supervisor.appDir); }
-    catch (e) { return {text:'',defaultText:'',error:e.message}; }
+    catch (e) { return {text:'',defaultText:'',error:(e as Error).message}; }
   });
-  ipcMain.handle('zero:instruction-write', (_e, {id,text}) => {
+  ipcMain.handle('zero:instruction-write', (_e, {id,text}: { id: string; text: string }) => {
     try { return writeInstruction(supervisor.userDir, id, text); }
-    catch (e) { return {ok:false,error:e.message}; }
+    catch (e) { return {ok:false,error:(e as Error).message}; }
   });
   // The restore points behind the Restore link: her own earlier versions of one
   // box. The list carries times and sizes only, because the whole of twenty
   // versions is most of a megabyte and the page needs one of them at a time.
-  ipcMain.handle('zero:instruction-history', (_e, id) => {
+  ipcMain.handle('zero:instruction-history', (_e, id: string) => {
     try { return {versions: listVersions(supervisor.userDir, id)}; }
-    catch (e) { return {versions:[], error:e.message}; }
+    catch (e) { return {versions:[], error:(e as Error).message}; }
   });
-  ipcMain.handle('zero:instruction-version', (_e, {id,at}) => {
+  ipcMain.handle('zero:instruction-version', (_e, {id,at}: { id: string; at: number }) => {
     try { return readVersion(supervisor.userDir, id, at); }
-    catch (e) { return {text:'', error:e.message}; }
+    catch (e) { return {text:'', error:(e as Error).message}; }
   });
   ipcMain.handle('zero:standing-read', () => {
     try {
       return { text: supervisor.readStanding() };
     } catch (err) {
-      return { text: '', error: err.message };
+      return { text: '', error: (err as Error).message };
     }
   });
 
-  ipcMain.handle('zero:standing-write', (_e, { text }) => {
+  ipcMain.handle('zero:standing-write', (_e, { text }: { text: unknown }) => {
     try {
       supervisor.writeStanding(text);
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: err.message };
+      return { ok: false, error: (err as Error).message };
     }
   });
 
@@ -1618,16 +1713,16 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     try {
       return { text: supervisor.readMessageRules() };
     } catch (err) {
-      return { text: '', error: err.message };
+      return { text: '', error: (err as Error).message };
     }
   });
 
-  ipcMain.handle('zero:message-rules-write', (_e, { text }) => {
+  ipcMain.handle('zero:message-rules-write', (_e, { text }: { text: unknown }) => {
     try {
       supervisor.writeMessageRules(text);
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: err.message };
+      return { ok: false, error: (err as Error).message };
     }
   });
 
@@ -1638,11 +1733,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // it. Every handler answers `{ ok, error }` rather than throwing across the
   // bridge, because the one thing this screen must never do is leave her
   // believing a setting took when it did not.
-  ipcMain.handle('zero:settings-read', (_e, how) => {
+  ipcMain.handle('zero:settings-read', (_e, how?: { search?: boolean }) => {
     try {
       return { ok: true, ...readSettings({ config, supervisor, store }, { search: how?.search !== false }) };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
@@ -1655,7 +1750,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     try {
       return { ok: true, workspace: await lookAgainFor('claude', config) };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
@@ -1668,7 +1763,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     try {
       return { ok: true, workspace: await lookAgainFor('codex', config) };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
@@ -1692,7 +1787,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
    * that cannot be run, is an ordinary mistake at a file panel; it comes back
    * as words the row prints, the way `zero:choose-folder` already does.
    */
-  ipcMain.handle('zero:engine-bin', async (_e, { engine, action } = {}) => {
+  ipcMain.handle('zero:engine-bin', async (_e, { engine, action }: { engine?: string; action?: string } = {}) => {
     if (engine !== 'claude' && engine !== 'codex') return { ok: false, error: 'Unknown coding agent.' };
     try {
       // Handing the choice back needs no panel: it is the row saying "look for
@@ -1703,7 +1798,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
         return { ok: true, ...readSettings({ config, supervisor, store }) };
       }
       const { dialog } = await import('electron');
-      const r = await dialog.showOpenDialog(window, {
+      const r = await dialog.showOpenDialog(window as unknown as BrowserWindow, {
         title: engine === 'codex' ? 'Where is Codex?' : 'Where is Claude Code?',
         buttonLabel: 'Use this one',
         properties: ['openFile', 'showHiddenFiles', 'treatPackageAsDirectory'],
@@ -1715,7 +1810,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       if (!took.ok) return { ok: false, refused: took.say };
       return { ok: true, ...readSettings({ config, supervisor, store }) };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
@@ -1724,7 +1819,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // finder is the recheck, so what gets installed lands on the config and the
   // rest of the app runs on it without a restart.
   const engineSetup = createEngineSetup({
-    find: (engine) => {
+    find: (engine: string) => {
       const finders = {
         // `certain` travels with the answer, so a search that established
         // nothing does not read as a computer with nothing on it.
@@ -1735,7 +1830,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     },
     // WHICH ONE IS SIGNED IN, kept on the config for the run that reads it
     // (`Supervisor#_enginesFound`) and never saved: it changes outside the app.
-    onSignIn: (engine, signedIn) => {
+    onSignIn: (engine: string, signedIn: boolean) => {
       config[`${engine}SignedIn`] = signedIn;
     },
   });
@@ -1749,7 +1844,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   }
   // A sign-in left waiting on the browser is not left running after the app.
   app.on('will-quit', () => { engineSetup.cancel('claude'); engineSetup.cancel('codex'); });
-  ipcMain.handle('zero:engine-setup', async (_e, { action, engine } = {}) => {
+  ipcMain.handle('zero:engine-setup', async (_e, { action, engine }: { action?: string; engine?: string } = {}) => {
     if (!isEngine(engine)) return { ok: false, error: 'Unknown coding agent.' };
     try {
       if (action === 'ready') return { ok: true, ...(await engineSetup.readiness(engine)) };
@@ -1758,7 +1853,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       if (action === 'cancel') return { ok: true, ...engineSetup.cancel(engine) };
       return { ok: true, ...engineSetup.status(engine) };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
@@ -1775,7 +1870,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       try { terminals.close(JSON.stringify(SETTINGS_TERMINAL)); } catch { /* none open */ }
       return { ok: true, ...made, workspace: readSettings({ config, supervisor, store }).workspace };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
@@ -1791,24 +1886,24 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       try { terminals.close(JSON.stringify(SETTINGS_TERMINAL)); } catch { /* none open */ }
       return { ok: true, ...made, workspace: readSettings({ config, supervisor, store }).workspace };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
-  ipcMain.handle('zero:settings-set-project', (_e, payload) => {
+  ipcMain.handle('zero:settings-set-project', (_e, payload?: SetProjectPayload) => {
     try {
-      setProjectSetting({ config, supervisor, store }, payload ?? {});
+      setProjectSetting({ config, supervisor, store }, (payload ?? {}) as SetProjectPayload);
       push();
       return { ok: true, ...readSettings({ config, supervisor, store }) };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
   // SIGNING IN TO AGENTBOX CLOUD ITSELF, on the app's own sign-in page
   // (main/cloud/account.mts): Google, or an email and a password, traded for
   // this Mac's cloud key. One session per page, made when the page first asks.
-  let cloudAccount = null;
+  let cloudAccount: CloudAccountHold | null = null;
   const cloudAccountSessionNow = async () => {
     const home = supervisor.config.home || os.homedir();
     const { cloudAccountConfig, cloudAccountSession } = await import('./cloud/account.mts');
@@ -1823,8 +1918,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // A new account's link comes back to this Mac's own listener while the page
   // says to check the inbox, and the sign-in finishes here, so the page moves
   // on by itself. Behind the handler, which it would hold for a quarter hour.
-  let confirming = null;
-  const waitForTheLink = async (acct) => {
+  let confirming: Promise<void> | null = null;
+  const waitForTheLink = async (acct: CloudAccountHold) => {
     if (confirming) return;
     const { waitForEmailConfirmation } = await import('./cloud/account.mts');
     confirming = waitForEmailConfirmation({ config: acct.value, session: acct.session, home: supervisor.config.home || os.homedir() })
@@ -1835,7 +1930,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       })
       .finally(() => { confirming = null; });
   };
-  ipcMain.handle('zero:cloud-account-sign-in', async (_e, { method, email, password, name, acceptTerms } = {}) => {
+  ipcMain.handle('zero:cloud-account-sign-in', async (_e, { method, email, password, name, acceptTerms }: { method?: string; email?: string; password?: string; name?: string; acceptTerms?: unknown } = {}) => {
     const acct = await cloudAccountSessionNow();
     if (!acct) return { ok: false, error: 'This copy of the app has no cloud to sign in to.' };
     const { cloudSignIn } = await import('./cloud/account.mts');
@@ -1855,13 +1950,13 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
   // PAYING FOR A CLOUD PLAN: Stripe's own pages, in the browser, as other
   // desktop apps do. An app window drew them badly and never offers Apple Pay.
-  const cloudCall = async (name, args = {}) => {
+  const cloudCall = async (name: 'cloudPlan' | 'payForCloud' | 'openCloudBilling', args: Record<string, unknown> = {}) => {
     try {
       const account = await import('./cloud/account.mts');
       const shell = await shellNow();
-      return await account[name]({ ...args, openExternal: (u) => shell.openExternal(u), home: supervisor.config.home || os.homedir() });
+      return await account[name]({ ...args, openExternal: (u: string) => shell.openExternal(u), home: supervisor.config.home || os.homedir() });
     } catch (err) {
-      return { ok: false, error: 'unreachable', message: `The cloud did not answer: ${err?.message || err}` };
+      return { ok: false, error: 'unreachable', message: `The cloud did not answer: ${(err as Error)?.message || err}` };
     }
   };
   ipcMain.handle('zero:cloud-account-plan', async () => {
@@ -1869,18 +1964,18 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     supervisor.cloudPlanSeen?.(plan);
     return plan;
   });
-  ipcMain.handle('zero:cloud-account-pay', (_e, { plan } = {}) => cloudCall('payForCloud', { plan }));
+  ipcMain.handle('zero:cloud-account-pay', (_e, { plan }: { plan?: string } = {}) => cloudCall('payForCloud', { plan }));
   ipcMain.handle('zero:cloud-account-billing', () => cloudCall('openCloudBilling'));
 
   // THE CLOUD SETUP'S SIGN-IN for one account, made in the cloud
   // (main/cloud/logins.mts). The Mac relays the link and the code only.
-  ipcMain.handle('zero:cloud-signin', async (_e, { action, engine, key, code } = {}) => {
+  ipcMain.handle('zero:cloud-signin', async (_e, { action, engine, key, code }: { action?: string; engine?: string; key?: string | null; code?: string } = {}) => {
     try {
       const out = await supervisor.cloudSignIn(action, engine, key ?? null, code);
       push();
       return { ok: true, key: out?.key ?? null };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
   // CLAUDE'S CODE, FROM THE CLIPBOARD, WHEN SHE COMES BACK (2026-10-14: she
@@ -1898,17 +1993,17 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       return { code: null };
     }
   });
-  ipcMain.handle('zero:settings-set-workspace', (_e, payload) => {
+  ipcMain.handle('zero:settings-set-workspace', (_e, payload?: { key?: string; value?: unknown }) => {
     try {
       // Before the save: once the switch is off, nothing leaves, not even this.
       if (countsTurnedOff(payload)) { analytics.track('counts_turned_off'); analytics.flush(); }
-      setWorkspaceSetting({ config, supervisor, store }, payload ?? {});
+      setWorkspaceSetting({ config, supervisor, store }, (payload ?? {}) as { key: string; value?: unknown });
       if (payload?.key === 'alphaRooms') team?.rooms?.tick().catch(() => {});
       if (cornerTagTurnedOff(payload)) analytics.track('tag_turned_off');
       push();
       return { ok: true, ...readSettings({ config, supervisor, store }) };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
@@ -1922,9 +2017,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // THE FOLDER IS LOOKED UP HERE AND NOWHERE ELSE. A slug naming no product is
   // refused before anything touches the disk, so a stale sidebar row cannot aim
   // a write at a folder that has been deleted underneath it.
-  const productDirOf = (slug) => store.listProducts().find((p) => p.slug === slug)?.dir ?? null;
+  const productDirOf = (slug: string | undefined) => store.listProducts().find((p) => p.slug === slug)?.dir ?? null;
 
-  ipcMain.handle('zero:project-rename', (_e, { product, name } = {}) => {
+  ipcMain.handle('zero:project-rename', (_e, { product, name }: { product?: string; name?: string } = {}) => {
     try {
       const dir = productDirOf(product);
       if (!dir) return { ok: false, error: 'That project could not be found.' };
@@ -1936,33 +2031,33 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       push();
       return { ok: true, name: saved, ...readSettings({ config, supervisor, store }) };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
   // ARCHIVE A PROJECT, OR BRING ONE BACK (main/store.mts setProductArchived).
   // Its files stay on disk; it leaves every list the app draws. Pushed for the
   // same reason a rename is: the rail, the inbox and the picker all list it.
-  ipcMain.handle('zero:project-archive', (_e, { product, archived } = {}) => {
+  ipcMain.handle('zero:project-archive', (_e, { product, archived }: { product?: string; archived?: boolean } = {}) => {
     try {
       store.setProductArchived(product, archived === true);
       push();
       return { ok: true, ...readSettings({ config, supervisor, store }) };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
   // WHO SEES A PROJECT'S THREADS (main/store.mts setProductSeenBy,
   // w-b989839656). Pushed, because the inbox's locks and the New thread
   // card's starting chip both read it off the snapshot's projects.
-  ipcMain.handle('zero:project-seen-by', (_e, { product, who, people } = {}) => {
+  ipcMain.handle('zero:project-seen-by', (_e, { product, who, people }: { product?: string; who?: string; people?: string[] } = {}) => {
     try {
       store.setProductSeenBy(product, { who, people });
       push();
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
@@ -1970,12 +2065,12 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // mean the renderer briefly holds a path into her Downloads folder and hands
   // it back to be trusted; this way the only path that crosses the bridge is one
   // the open panel itself produced inside this same call.
-  ipcMain.handle('zero:project-icon', async (_e, { product } = {}) => {
+  ipcMain.handle('zero:project-icon', async (_e, { product }: { product?: string } = {}) => {
     try {
       const dir = productDirOf(product);
       if (!dir) return { ok: false, error: 'That project could not be found.' };
       const { dialog } = await import('electron');
-      const r = await dialog.showOpenDialog(window, {
+      const r = await dialog.showOpenDialog(window as unknown as BrowserWindow, {
         title: 'Pick a picture for this project',
         buttonLabel: 'Use this picture',
         properties: ['openFile'],
@@ -1988,11 +2083,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       push();
       return { ok: true, ...readSettings({ config, supervisor, store }) };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
-  ipcMain.handle('zero:project-icon-clear', (_e, { product } = {}) => {
+  ipcMain.handle('zero:project-icon-clear', (_e, { product }: { product?: string } = {}) => {
     try {
       const dir = productDirOf(product);
       if (!dir) return { ok: false, error: 'That project could not be found.' };
@@ -2000,27 +2095,27 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       push();
       return { ok: true, ...readSettings({ config, supervisor, store }) };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
   // Her rules for ONE project, the layer that did not exist. The supervisor
   // owns the file and the injection (projectInstructionsFile, spawnPlan); this
   // is only the window onto it, exactly as standing-read/write is.
-  ipcMain.handle('zero:project-instructions-read', (_e, { product }) => {
+  ipcMain.handle('zero:project-instructions-read', (_e, { product }: { product: string }) => {
     try {
       return { ok: true, text: supervisor.readProjectInstructions(product) };
     } catch (err) {
-      return { ok: false, text: '', error: String(err.message) };
+      return { ok: false, text: '', error: String((err as Error).message) };
     }
   });
 
-  ipcMain.handle('zero:project-instructions-write', (_e, { product, text }) => {
+  ipcMain.handle('zero:project-instructions-write', (_e, { product, text }: { product: string; text: unknown }) => {
     try {
       supervisor.writeProjectInstructions(product, text);
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: String(err.message) };
+      return { ok: false, error: String((err as Error).message) };
     }
   });
 
@@ -2030,7 +2125,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // by workers through the MCP and renderable in the message view.
   // The saving itself is main/save-attachments.mts, shared with a message to a
   // person, which saves its own once it knows which conversation it is in.
-  ipcMain.handle('zero:save-attachments', async (_e, { product, files }) => saveAttachments(store.productDir(product), files));
+  ipcMain.handle('zero:save-attachments', async (_e, { product, files }: { product: string; files: AttachmentFile[] }) => saveAttachments(store.productDir(product), files));
 
   // A PASTED SCREENSHOT GOES TO DISK THE MOMENT IT IS PASTED.
   //
@@ -2071,11 +2166,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // costs nothing at send time because `zero:save-attachments` above already
   // copies from `srcPath`. Bytes are copied on disk rather than carried through
   // this bridge as base64, which a file picked off disk should never need.
-  ipcMain.handle('zero:stage-attachment', async (_e, file) => stageAttachment(path.join(config.accountRoot, '.staging'), file));
+  ipcMain.handle('zero:stage-attachment', async (_e, file?: AttachmentFile) => stageAttachment(path.join(config.accountRoot, '.staging'), file));
 
   // Unstick ONE stalled item: forget its answer's delivery mark and tick, so
   // a fresh worker picks the answer up now.
-  ipcMain.handle('zero:redeliver', (_e, { product, id }) => {
+  ipcMain.handle('zero:redeliver', (_e, { product, id }: { product: string; id: string }) => {
     if (isAgentRow(id)) return { ok: false };
     const item = store.listItems().find((i) => i.product === product && i.id === id);
     if (!item?.answer || item.answer === '(withdrawn)') return { ok: false, error: 'no live answer to redeliver' };
@@ -2089,7 +2184,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // Respawn what a mass die-off (usage limit, crash) left stranded. With `ids`,
   // only those: a selection in the list is her saying which of the stopped rows
   // are still worth her plan.
-  ipcMain.handle('zero:resume-agents', (_e, arg) => {
+  ipcMain.handle('zero:resume-agents', (_e, arg?: { ids?: unknown }) => {
     const ids = Array.isArray(arg?.ids) ? arg.ids : null;
     const cleared = supervisor.resumeStopped(ids);
     return { ok: true, cleared, ...supervisor.status() };
@@ -2097,7 +2192,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // Put a worker back on named rows whatever state they are in, including the
   // finished ones no other path can reach. Ids only: this is her pointing.
-  ipcMain.handle('zero:resume-items', (_e, arg) => {
+  ipcMain.handle('zero:resume-items', (_e, arg?: { ids?: unknown }) => {
     const ids = Array.isArray(arg?.ids) ? arg.ids : [];
     return { ok: true, ...supervisor.resumeItems(ids), ...supervisor.status() };
   });
@@ -2118,7 +2213,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // of eleven chips on one card opened two other products' files (her answer,
   // 2026-08-19). When it finds nothing it now hands back a sentence she can
   // read, and the renderer shows it.
-  ipcMain.handle('zero:open-artifact', async (_e, { product, src, mode }) => {
+  ipcMain.handle('zero:open-artifact', async (_e, { product, src, mode }: { product: string; src?: unknown; mode?: string }) => {
     const shell = await shellNow();
     if (typeof src !== 'string' || !src) return { ok: false, error: 'no path' };
     if (/^https?:/.test(src)) { if (mode !== 'resolve') shell.openExternal(src); return { ok: true, opened: src } }
@@ -2146,15 +2241,15 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     }
     if (mode === 'source') {
       try { await openSourceFile(found.path); return { ok: true, opened: found.path }; }
-      catch (error) { return { ok: false, error: error.message || 'The text editor could not be opened.' }; }
+      catch (error) { return { ok: false, error: (error as Error).message || 'The text editor could not be opened.' }; }
     }
-    const err = await shell.openPath(found.path);
+    const err = await shell.openPath!(found.path);
     return err ? { ok: false, error: err } : { ok: true, opened: found.path };
   });
 
   // THE PICTURES IN A FOLDER A MESSAGE NAMES, so the folder line draws them
   // (FolderPreview in Focus.tsx). Only pictures, only inside this product.
-  ipcMain.handle('zero:folder-pictures', (_e, { product, src } = {}) => folderPictures({
+  ipcMain.handle('zero:folder-pictures', (_e, { product, src }: { product?: string; src?: unknown } = {}) => folderPictures({
     src,
     product,
     products: store.listProducts(),
@@ -2167,7 +2262,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // exactly the file a click would have opened, and then main hands back the
   // text rather than the path. What may be written is decided in
   // main/doc-file.mts: markdown only, inside this product's own folders only.
-  ipcMain.handle('zero:read-doc', async (_e, { product, src }) => {
+  ipcMain.handle('zero:read-doc', async (_e, { product, src }: { product: string; src?: unknown }) => {
     const found = await resolveArtifact({
       src,
       product,
@@ -2181,7 +2276,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // THE CHANGE A RUN MADE. Same finder as every other artifact, so a click on
   // the chip and a click on a path in her message open the same file.
-  ipcMain.handle('zero:code-change', async (_e, { product, src }) => {
+  ipcMain.handle('zero:code-change', async (_e, { product, src }: { product: string; src?: unknown }) => {
     const found = await resolveArtifact({
       src,
       product,
@@ -2193,7 +2288,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     try {
       return { ok: true, change: readChange(found.path) };
     } catch (e) {
-      return { ok: false, error: `that change could not be read (${e.message})` };
+      return { ok: false, error: `that change could not be read (${(e as Error).message})` };
     }
   });
 
@@ -2203,7 +2298,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // same pair the pane already has on screen. The change is re-read here rather
   // than trusted from the renderer, because it is what says which folders a
   // write may land in and that decision may not come from the window.
-  const openChange = async (product, src) => {
+  const openChange = async (product: string, src: unknown) => {
     const found = await resolveArtifact({
       src,
       product,
@@ -2215,11 +2310,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     try {
       return { ok: true, change: readChange(found.path), prod: store.listProducts().find((p) => p.slug === product) ?? null };
     } catch (e) {
-      return { ok: false, error: `that change could not be read (${e.message})` };
+      return { ok: false, error: `that change could not be read (${(e as Error).message})` };
     }
   };
 
-  ipcMain.handle('zero:code-file', async (_e, { product, src, path: filePath }) => {
+  ipcMain.handle('zero:code-file', async (_e, { product, src, path: filePath }: { product: string; src?: unknown; path?: string }) => {
     const opened = await openChange(product, src);
     if (!opened.ok) return opened;
     const found = findFile({ change: opened.change, product: opened.prod, filePath });
@@ -2227,7 +2322,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return readCodeFile({ file: found.path });
   });
 
-  ipcMain.handle('zero:save-code-file', async (_e, { product, src, path: filePath, text, mtime }) => {
+  ipcMain.handle('zero:save-code-file', async (_e, { product, src, path: filePath, text, mtime }: { product: string; src?: unknown; path?: string; text: unknown; mtime?: number }) => {
     const opened = await openChange(product, src);
     if (!opened.ok) return opened;
     const found = findFile({ change: opened.change, product: opened.prod, filePath });
@@ -2235,7 +2330,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return writeCodeFile({ file: found.path, change: opened.change, product: opened.prod, text, mtime });
   });
 
-  ipcMain.handle('zero:write-doc', async (_e, { product, src, text, mtime }) => {
+  ipcMain.handle('zero:write-doc', async (_e, { product, src, text, mtime }: { product: string; src?: unknown; text: unknown; mtime?: number }) => {
     const prod = store.listProducts().find((p) => p.slug === product) ?? null;
     const found = await resolveArtifact({
       src,
@@ -2254,13 +2349,13 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // document pane there is no path to resolve and no path to check: the slug
   // picks the product, the product owns the path. See main/rail-note.mts for
   // why it is a file at all.
-  ipcMain.handle('zero:rail-note', (_e, { product }) => {
+  ipcMain.handle('zero:rail-note', (_e, { product }: { product: string }) => {
     const prod = store.listProducts().find((p) => p.slug === product) ?? null;
     if (!prod) return { ok: false, error: 'That project could not be found.' };
     return readNote({ product: prod });
   });
 
-  ipcMain.handle('zero:save-rail-note', (_e, { product, text }) => {
+  ipcMain.handle('zero:save-rail-note', (_e, { product, text }: { product: string; text: unknown }) => {
     const prod = store.listProducts().find((p) => p.slug === product) ?? null;
     if (!prod) return { ok: false, error: 'That project could not be found.' };
     return writeNote({ product: prod, text });
@@ -2268,13 +2363,13 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // The trace: what each session on this item actually did, from the logs the
   // supervisor persists under <product>/sessions/<item-id>/. Read-only.
-  ipcMain.handle('zero:session-trace', async (_e, { product, id }) => {
+  ipcMain.handle('zero:session-trace', async (_e, { product, id }: { product: string; id: string }) => {
     const fs = await import('node:fs');
     const path = await import('node:path');
     const dir = store.listProducts().find((p) => p.slug === product)?.dir;
     if (!dir || !/^[\w-]+$/.test(String(id ?? ''))) return { ok: false, sessions: [] };
     const traceDir = machineryPath(dir, path.join('sessions', id));
-    let files = [];
+    let files: string[] = [];
     try {
       files = fs.readdirSync(traceDir).filter((f) => f.endsWith('.log')).sort();
     } catch { return { ok: true, sessions: [] }; }
@@ -2289,11 +2384,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // The thread history behind the time under a task's title. Raw ledger lines,
   // read fresh: the renderer owns what they mean, this owns getting them across.
-  ipcMain.handle('zero:item-history', async (_e, { product, id, before }) => {
+  ipcMain.handle('zero:item-history', async (_e, { product, id, before }: { product: string; id: string; before?: number }) => {
     try {
       return { ok: true, lines: store.readHistory(product, id, { before, max: Number.MAX_SAFE_INTEGER }) };
     } catch (err) {
-      return { ok: false, error: err.message, lines: [] };
+      return { ok: false, error: (err as Error).message, lines: [] };
     }
   });
 

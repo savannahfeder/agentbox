@@ -16,14 +16,229 @@ import {
 } from './store/teammates-files.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { RepeatShape } from '../shared/repeats.mjs';
+
+export type Works = RepeatShape;
+
+export interface Duty { id: string; what: string; tell?: string | null }
+
+export interface Memory { id: string; text: string; from: string | null; at: number; by: string | null }
+
+export interface Teammate {
+  id: string;
+  name: string;
+  letter?: string | null;
+  role?: string | null;
+  job?: string | null;
+  goal?: string | null;
+  counted?: string | null;
+  asksFirst?: string | null;
+  works?: Works | null;
+  product?: string | null;
+  engine?: string | null;
+  model?: string | null;
+  effort?: string | null;
+  limit?: number;
+  status: 'draft' | 'active';
+  starter?: string | null;
+  primary?: boolean;
+  paused: boolean;
+  pausedUntil?: string | null;
+  handoffsNeedYes?: boolean;
+  createdAt: number;
+  updatedAt: number;
+  endedAt?: number | null;
+  served: string;
+  memory: Memory[];
+  duties: Duty[];
+  dutyServed: Record<string, string>;
+}
+
+export type TeammatePatch = Partial<Teammate> & { remember?: Memory; forget?: string };
+
+export interface ThreadRef { product: string; id: string; title?: string }
+
+export interface ItemRef { id: string; product: string; title?: string }
+
+export interface Turn { source?: string; field?: string; text?: string }
+
+interface Written { source?: string; ts?: number }
+
+export interface TeamItem {
+  id: string;
+  product: string;
+  status?: string;
+  labels?: string[];
+  title?: string;
+  label?: string;
+  body?: string;
+  answer?: string;
+  result?: string;
+  note?: string;
+  start?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  wrote?: Partial<Record<'note' | 'result' | 'answer' | 'status', Written>>;
+}
+
+export interface ChatMessage {
+  id: string;
+  kind: 'msg' | 'pass' | 'act';
+  from: string;
+  to?: string[];
+  text?: string;
+  ts: number;
+  title?: string;
+  details?: string;
+  product?: string;
+  setup?: boolean;
+  threads?: ThreadRef[];
+  verb?: string;
+  ref?: string;
+}
+
+export interface Chat {
+  messages: ChatMessage[];
+  seen: Set<string>;
+  into: Map<string, { ref: string; for: string; ts: number }[]>;
+}
+
+export interface Playbook {
+  id: string;
+  title: string;
+  readers: string[];
+  lessons: { id: string; text: string; ts: number; by: string | null; from: ThreadRef | null }[];
+  updatedAt: number;
+}
+
+export interface TeammateStatus {
+  waiting: ItemRef[];
+  now: string | null;
+  running: { id: string; product: string } | null;
+  queued: number;
+  next: ItemRef[];
+  done: ItemRef[];
+  runsThisWeek: number;
+}
+
+export interface Offer {
+  key: string;
+  product: string;
+  count: number;
+  titles: string[];
+  asked: { title: string; n: number }[];
+  threads: ThreadRef[];
+  title: string;
+  said: string;
+}
+
+interface TriggerBase {
+  from?: string;
+  msg?: string;
+  hop?: number;
+  product?: string;
+  via?: string;
+  viaProduct?: string | null;
+  work?: string;
+  hold?: boolean;
+  key?: string;
+}
+
+export type WakeTrigger =
+  | (TriggerBase & { kind: 'schedule'; key: string; label: string })
+  | (TriggerBase & { kind: 'duty'; duty: string; what: string; tell?: string; key: string })
+  | (TriggerBase & { kind: 'pass'; title?: string; details?: string })
+  | (TriggerBase & { kind: 'message'; text?: string; opening?: 'start' | 'setup' });
+
+interface ActionBase { teammate: string; msg?: string; trigger?: WakeTrigger }
+
+export type WakeAction =
+  | (ActionBase & { type: 'run'; id: string; trigger: WakeTrigger; title: string; start: 'now' | 'later' })
+  | (ActionBase & { type: 'seen'; msg: string; run?: string })
+  | (ActionBase & { type: 'served'; key: string })
+  | (ActionBase & { type: 'dutyServed'; duty: string; key: string })
+  | (ActionBase & { type: 'answer'; item: string; product: string; text: string; msg: string })
+  | (ActionBase & { type: 'tell'; item: string; product: string | null; text: string; from: { teammate: string; name: string }; hop: number; hold: boolean; msg: string })
+  | (ActionBase & { type: 'release'; item: string; product: string })
+  | (ActionBase & { type: 'limit' })
+  | (ActionBase & { type: 'unread'; duty: string; what: string })
+  | (ActionBase & { type: 'hops'; msg: string; from: string });
+
+export interface TeammateStore {
+  config: { storeRoot: string; accountId: string };
+  listProducts(): { slug: string; name?: string; dir?: string | null; repoPath?: string | null; practice?: boolean | null; personal?: boolean | null }[];
+  listItems(now?: number): TeamItem[];
+  productDir(slug: string | null | undefined): string;
+  readHistory?(slug: string, id: string, opts?: { max?: number }): unknown[];
+  modules: {
+    workItemsDisk: {
+      updateWorkItem(dir: string, id: string, patch: Record<string, unknown>, opts: { source: string; now: number }): unknown;
+      createWorkItem(dir: string, fields: Record<string, unknown>, opts: { source: string; now: number }): { id: string };
+      createWorkItemIfAbsent(dir: string, id: string, fields: Record<string, unknown>, opts: { source: string; now: number }): { created?: boolean } | null | undefined;
+    };
+    lock: { withProjectLock(dir: string, fn: () => Promise<unknown>): Promise<unknown> };
+    workItemsCore: { threadOf(lines: unknown[], id: string): Turn[] };
+  };
+}
+
+export interface TeammateFields {
+  name?: string;
+  letter?: string | null;
+  role?: string | null;
+  job?: string | null;
+  goal?: string | null;
+  counted?: string | null;
+  asksFirst?: string | null;
+  works?: Works | null;
+  product?: string | null;
+  engine?: string | null;
+  model?: string | null;
+  effort?: string | null;
+  limit?: number;
+  status?: 'draft' | 'active';
+  starter?: string;
+  primary?: boolean;
+}
+
+export interface DescribeInput {
+  text?: string;
+  starter?: string;
+  product?: string | null;
+  engine?: string | null;
+  threads?: ThreadRef[];
+  greeted?: boolean;
+}
+
+export interface PostInput {
+  text?: unknown;
+  to?: string | string[];
+  options?: string[];
+  fresh?: boolean;
+  answers?: unknown;
+}
+
+export interface TickInput {
+  items?: TeamItem[];
+  now?: number;
+  deliver?: (product: string, item: string, text: string) => unknown;
+  tell?: (product: string | null, item: string, hand: { text: string; from: { teammate: string; name: string }; hold: boolean; hop: number }) => unknown;
+}
+
+export interface OfferInput { items?: TeamItem[]; chat?: Chat; now?: number }
+
+interface SourceFile { file: string; title?: string; chars: number }
+
+type TurnsOf = (product: string, id: string) => Turn[];
+
+interface Opening { body: string; yours: boolean }
 
 const CHAT_FOR_SCREEN = 400;
 
-const TROUBLE_VERB = { run: 'start a run', answer: 'get your message', tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done' };
+const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done' };
 
 // When each project last shipped, from the note the ship queue leaves.
-function shippedByProduct(items) {
-  const out = {};
+function shippedByProduct(items?: TeamItem[] | null) {
+  const out: Record<string, number> = {};
   for (const i of items ?? []) {
     if (!isShippedNote(i.note)) continue;
     const at = i.wrote?.note?.ts ?? i.updatedAt ?? 0;
@@ -32,17 +247,20 @@ function shippedByProduct(items) {
   return out;
 }
 
-const capital = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+const capital = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
-function lastRanOf(teammateId, dutyId, items) {
-  let at = null;
-  for (const i of items) if (teammateIdOf(i) === teammateId && dutyOf(i) === dutyId && (i.createdAt ?? 0) > (at ?? 0)) at = i.createdAt;
+function lastRanOf(teammateId: string, dutyId: string, items: TeamItem[]) {
+  let at: number | null = null;
+  for (const i of items) if (teammateIdOf(i) === teammateId && dutyOf(i) === dutyId && (i.createdAt ?? 0) > (at ?? 0)) at = i.createdAt!;
   return at;
 }
 const TROUBLE_SHOWN_MS = 30 * 60_000;
 
 export class Teammates {
-  constructor(store) {
+  declare store: TeammateStore;
+  declare trouble: { text: string; at: number } | null | undefined;
+
+  constructor(store: TeammateStore) {
     this.store = store;
   }
 
@@ -50,32 +268,32 @@ export class Teammates {
     return teamDir(this.store.config.storeRoot, this.store.config.accountId);
   }
 
-  list(now = Date.now()) {
+  list(now = Date.now()): Teammate[] {
     return readTeammates(this.dir(), now);
   }
 
-  get(id, now = Date.now()) {
+  get(id: string, now = Date.now()): Teammate | null {
     return this.list(now).find((t) => t.id === id) ?? null;
   }
 
-  chat() {
+  chat(): Chat {
     return readChat(this.dir());
   }
 
   // A project a teammate can work in: the one asked for when it exists, else
   // the first with code in it, since most of what a teammate does is code.
-  _product(slug) {
+  _product(slug: unknown) {
     const products = this.store.listProducts().filter((p) => !p.practice && !p.personal);
     return products.find((p) => p.slug === slug)?.slug ?? products.find((p) => p.repoPath)?.slug ?? products[0]?.slug ?? null;
   }
 
   // A project named on a pass, if it is one a teammate can work in.
-  _productIf(slug) {
+  _productIf(slug: string | null | undefined) {
     if (!slug) return null;
     return this.store.listProducts().some((p) => p.slug === slug && !p.practice && !p.personal) ? slug : null;
   }
 
-  create(fields = {}, now = Date.now()) {
+  create(fields: TeammateFields = {}, now = Date.now()): Teammate {
     const starter = fields.starter ? STARTERS.find((s) => s.starter === fields.starter) : null;
     const base = { ...(starter ?? {}), ...fields };
     const product = this._product(base.product);
@@ -83,7 +301,7 @@ export class Teammates {
     const team = this.list(now);
     const name = String(base.name ?? '').trim() || 'New teammate';
     const id = newTeammateId();
-    const patch = {
+    const patch: TeammatePatch = {
       name,
       letter: base.letter || letterFor(name, team),
       role: base.role ?? null,
@@ -106,14 +324,14 @@ export class Teammates {
     // Its first round is the next one, not one already past today.
     if (patch.works) patch.served = periodKey(patch.works, now) ?? '';
     writeTeammate(this.dir(), id, patch, now);
-    return this.get(id, now);
+    return this.get(id, now)!;
   }
 
   // Someone new, from words: a draft that sets itself up by asking you in the
   // team chat. Its first run is the setup.
   // `greeted` is the New teammate page: the greeting it drew goes in the chat
   // first, from the teammate, so your answer reads as one.
-  describe({ text, starter, product, engine, threads, greeted = false } = {}, now = Date.now()) {
+  describe({ text, starter, product, engine, threads, greeted = false }: DescribeInput = {}, now = Date.now()) {
     const s = starter ? STARTERS.find((x) => x.starter === starter) : null;
     if (starter && !s) throw new Error('No such starter.');
     const words = String(s?.ask ?? text ?? '').trim();
@@ -128,7 +346,7 @@ export class Teammates {
     return { teammate: this.get(t.id, now), message: m.id };
   }
 
-  start(id, now = Date.now()) {
+  start(id: string, now = Date.now()) {
     const t = this.get(id, now);
     if (!t) throw new Error('No such teammate.');
     if (t.status !== 'active') writeTeammate(this.dir(), id, { status: 'active' }, now);
@@ -137,14 +355,14 @@ export class Teammates {
     return this.get(id, now);
   }
 
-  update(id, patch = {}, now = Date.now()) {
+  update(id: string, patch: Record<string, unknown> = {}, now = Date.now()) {
     const t = this.get(id, now);
     if (!t) throw new Error('No such teammate.');
     const allowed = ['name', 'role', 'job', 'goal', 'counted', 'asksFirst', 'works', 'product', 'engine', 'model', 'effort', 'limit', 'paused', 'letter', 'handoffsNeedYes', 'primary'];
-    const clean = {};
+    const clean: Record<string, unknown> = {};
     for (const k of allowed) if (k in patch) clean[k] = patch[k];
     if ('product' in clean) clean.product = this._product(clean.product);
-    if (clean.works && isWorks(clean.works)) clean.served = periodKey(clean.works, now) ?? '';
+    if (clean.works && isWorks(clean.works)) clean.served = periodKey(clean.works as Works, now) ?? '';
     if ('paused' in clean && !!clean.paused !== !!t.paused) {
       writeChat(this.dir(), { kind: 'act', from: id, verb: clean.paused ? 'paused' : 'resumed' }, now);
     }
@@ -164,7 +382,7 @@ export class Teammates {
     return this.get(id, now);
   }
 
-  _moveOpenRuns(id, patch, now) {
+  _moveOpenRuns(id: string, patch: Record<string, unknown>, now: number) {
     const { workItemsDisk } = this.store.modules;
     let items = [];
     try { items = this.store.listItems(now); } catch { return; }
@@ -174,21 +392,21 @@ export class Teammates {
       try {
         workItemsDisk.updateWorkItem(dir, run.id, patch, { source: 'system', now });
       } catch (err) {
-        this.noteTrouble(`A run of this teammate stayed on its old agent: ${err.message}`, now);
+        this.noteTrouble(`A run of this teammate stayed on its old agent: ${(err as Error).message}`, now);
       }
     }
   }
 
   // Stop: the run it is on and anything queued behind it end now, and it waits
   // for your next word. `kill` stops a run's agent (the supervisor's stopSession).
-  stop(id, { kill } = {}, now = Date.now()) {
+  stop(id: string, { kill }: { kill?: (id: string) => void } = {}, now = Date.now()) {
     if (!this.get(id, now)) throw new Error('No such teammate.');
     return { stopped: this._endRuns(id, (i) => isActiveRun(i) || isQueued(i), { kill, note: STOPPED_NOTE }, now) };
   }
 
   // Delete ends every run it has open, its questions to you too, so nothing
   // it started is left running or waiting for a teammate that is gone.
-  remove(id, { kill } = {}, now = Date.now()) {
+  remove(id: string, { kill }: { kill?: (id: string) => void } = {}, now = Date.now()) {
     if (!this.get(id, now)) throw new Error('No such teammate.');
     this._endRuns(id, () => true, { kill, note: 'Its teammate was deleted.' }, now);
     writeTeammate(this.dir(), id, { endedAt: now }, now);
@@ -197,7 +415,7 @@ export class Teammates {
 
   // Closed as you, not as the app: an app's close of a thread you wrote is
   // news in Needs you, and yours is filed.
-  _endRuns(id, which, { kill, note }, now) {
+  _endRuns(id: string, which: (i: TeamItem) => boolean, { kill, note }: { kill?: (id: string) => void; note: string }, now: number) {
     const { workItemsDisk } = this.store.modules;
     const runs = this.store.listItems(now).filter((i) => teammateIdOf(i) === id && i.status !== 'done' && which(i));
     for (const run of runs) {
@@ -210,30 +428,30 @@ export class Teammates {
     return runs.length;
   }
 
-  remember(id, text, { from = null, by = null } = {}, now = Date.now()) {
+  remember(id: string, text: unknown, { from = null, by = null }: { from?: string | null; by?: string | null } = {}, now = Date.now()) {
     const words = String(text ?? '').trim();
     if (!words) throw new Error('Nothing to remember.');
-    const mem = { id: newMemoryId(), text: words.slice(0, 300), from, at: now, by };
+    const mem: Memory = { id: newMemoryId(), text: words.slice(0, 300), from, at: now, by };
     writeTeammate(this.dir(), id, { remember: mem }, now);
     writeChat(this.dir(), { kind: 'act', from: id, verb: 'learned', text: mem.text, ref: mem.id }, now);
     return mem;
   }
 
   // Its method, for the About page: the text and when it last changed.
-  method(id) {
+  method(id: string) {
     if (!this.get(id)) throw new Error('No such teammate.');
     const m = readMethod(this.dir(), id);
     return m ? { text: m.text, changedAt: m.changedAt } : null;
   }
 
-  forget(id, memoryId, now = Date.now()) {
+  forget(id: string, memoryId: string, now = Date.now()) {
     writeTeammate(this.dir(), id, { forget: memoryId }, now);
     return { ok: true };
   }
 
   // Your words in the team chat. On a teammate's page they go to that
   // teammate; in the team chat to whoever they name with @.
-  post({ text, to = [], options, fresh = false, answers } = {}, now = Date.now()) {
+  post({ text, to = [], options, fresh = false, answers }: PostInput = {}, now = Date.now()) {
     const words = String(text ?? '').trim();
     if (!words) throw new Error('Nothing to send.');
     const team = this.list(now);
@@ -248,7 +466,7 @@ export class Teammates {
 
   // Your go-ahead for work held after too many hand-offs: the same work again,
   // from you, so it wakes the teammate with everything it carried.
-  goAhead(id, ref, now = Date.now()) {
+  goAhead(id: string, ref: string, now = Date.now()) {
     const held = this.chat().messages.find((m) => m.id === ref);
     if (!held) throw new Error('That work is no longer in the chat.');
     if (held.kind === 'pass') {
@@ -260,17 +478,17 @@ export class Teammates {
 
   // What the screen draws: every teammate with what it is doing, and the chat
   // with the lines its runs leave, newest last.
-  view(items, now = Date.now()) {
-    let team = [];
-    let chat = { messages: [] };
+  view(items?: TeamItem[] | null, now = Date.now()) {
+    let team: Teammate[] = [];
+    let chat: Pick<Chat, 'messages'> = { messages: [] };
     try {
       team = this.list(now);
       chat = this.chat();
     } catch (err) {
-      return { list: [], chat: [], runs: [], error: err.message };
+      return { list: [], chat: [], runs: [], error: (err as Error).message };
     }
     const mine = (items ?? []).filter((i) => teammateIdOf(i));
-    let books = [];
+    let books: Playbook[] = [];
     try { books = readPlaybooks(this.dir()); } catch { /* the playbooks file is read again next time */ }
     return {
       ...(this.trouble && now - this.trouble.at < TROUBLE_SHOWN_MS ? { trouble: this.trouble.text } : {}),
@@ -292,33 +510,33 @@ export class Teammates {
   // Carries out what `planWakes` decided. Each action is written so a crash
   // between two of them redoes nothing twice: runs are created if absent under
   // the project lock, and the seen marker comes after the run it records.
-  async tick({ items, now = Date.now(), deliver, tell } = {}) {
-    let team;
-    let chat;
+  async tick({ items, now = Date.now(), deliver, tell }: TickInput = {}) {
+    let team: Teammate[];
+    let chat: Chat;
     try {
       team = this.list(now);
       chat = this.chat();
     } catch (err) {
-      this.noteTrouble(`Teammates could not be read: ${err.message}`, now);
+      this.noteTrouble(`Teammates could not be read: ${(err as Error).message}`, now);
       return [];
     }
     try {
       await this.offer({ items, chat, now });
     } catch (err) {
-      this.noteTrouble(`The offer of a teammate failed: ${err.message}`, now);
+      this.noteTrouble(`The offer of a teammate failed: ${(err as Error).message}`, now);
     }
     if (!team.length) return [];
     team = this._namedByRole(team, now);
     const mine = (items ?? []).filter((i) => teammateIdOf(i));
-    const actions = planWakes({ teammates: team, chat, items: mine, now, shipped: shippedByProduct(items) });
+    const actions: WakeAction[] = planWakes({ teammates: team, chat, items: mine, now, shipped: shippedByProduct(items) });
     const byId = new Map(team.map((t) => [t.id, t]));
-    const done = [];
+    const done: WakeAction[] = [];
     const { workItemsDisk, lock } = this.store.modules;
     // What did not go through is not marked seen or served, so the next tick
     // tries it again.
     const failed = new Set();
     for (const a of actions) {
-      const t = byId.get(a.teammate);
+      const t = byId.get(a.teammate)!;
       if (a.type === 'seen' && failed.has(a.msg)) continue;
       if (a.type === 'served' && failed.has(`${a.teammate}@${a.key}`)) continue;
       if (a.type === 'dutyServed' && failed.has(`${a.teammate}#${a.duty}@${a.key}`)) continue;
@@ -328,7 +546,7 @@ export class Teammates {
           if (!product) continue;
           const dir = this.store.productDir(product);
           const hop = a.trigger.hop ?? 0;
-          const labels = ['founder', teammateLabel(t.id), `${HOP_LABEL_PREFIX}${hop}`, `${WORK_LABEL_PREFIX}${a.trigger.work ?? a.id}`];
+          const labels: string[] = ['founder', teammateLabel(t.id), `${HOP_LABEL_PREFIX}${hop}`, `${WORK_LABEL_PREFIX}${a.trigger.work ?? a.id}`];
           if (a.trigger.kind === 'pass' && a.trigger.from && a.trigger.from !== YOU) labels.push(`${FROM_LABEL_PREFIX}${a.trigger.from}`);
           if (a.trigger.kind === 'duty') labels.push(`${DUTY_LABEL_PREFIX}${a.trigger.duty}`);
           if (a.trigger.kind === 'message' && a.trigger.from === YOU && !a.trigger.via) labels.push(CHAT_LABEL);
@@ -377,7 +595,7 @@ export class Teammates {
         if (a.msg) failed.add(a.msg);
         if (a.trigger?.msg) failed.add(a.trigger.msg);
         if (a.trigger?.key) failed.add(a.trigger.kind === 'duty' ? `${a.teammate}#${a.trigger.duty}@${a.trigger.key}` : `${a.teammate}@${a.trigger.key}`);
-        this.noteTrouble(`${t?.name ?? 'A teammate'} could not ${TROUBLE_VERB[a.type] ?? 'carry on'}: ${err.message}`, now);
+        this.noteTrouble(`${t?.name ?? 'A teammate'} could not ${TROUBLE_VERB[a.type] ?? 'carry on'}: ${(err as Error).message}`, now);
       }
     }
     if (done.length && done.length === actions.length) this.trouble = null;
@@ -386,10 +604,10 @@ export class Teammates {
 
   // The offer of a teammate for asks you keep making: acts on a tap on an
   // open one, then makes a new one if your threads call for it.
-  async offer({ items = [], chat = this.chat(), now = Date.now() } = {}) {
+  async offer({ items = [], chat = this.chat(), now = Date.now() }: OfferInput = {}) {
     const { workItemsDisk, lock } = this.store.modules;
     for (const row of items.filter((i) => (i.labels ?? []).includes(OFFER_LABEL) && i.status !== 'done')) {
-      const tap = offerAnswer(row.answer);
+      const tap: { kind: 'make' | 'dismiss'; words?: string } | null = offerAnswer(row.answer);
       if (!tap) continue;
       const dir = this.store.productDir(row.product);
       if (tap.kind === 'make') {
@@ -413,7 +631,7 @@ export class Teammates {
       }, { source: 'system', now });
     }
     const offered = new Set(chat.messages.filter((m) => m.kind === 'act' && m.verb === 'offered').map((m) => m.ref));
-    const offer = offerFrom({ items, offered, now });
+    const offer: Offer | null = offerFrom({ items, offered, now });
     if (!offer) return null;
     const dir = this.store.productDir(offer.product);
     if (!dir) return null;
@@ -437,21 +655,21 @@ export class Teammates {
 
   // The threads an answered offer came from. An offer made before it kept
   // them is matched back to your asks by the titles it listed.
-  _threadsBehind(row, listed, items, chat) {
+  _threadsBehind(row: TeamItem, listed: string[], items: TeamItem[], chat: Chat): ThreadRef[] {
     const kept = chat.messages.find((m) => m.kind === 'act' && m.verb === 'offered' && m.text === row.title && m.threads?.length);
-    if (kept) return kept.threads;
+    if (kept) return kept.threads!;
     const titles = new Set(listed.map((l) => l.slice(2).replace(/ \(\d+ times\)$/, '').trim().toLowerCase()));
     return items.filter((i) => (i.labels ?? []).includes('founder') && !teammateIdOf(i) && titles.has(String(i.label || i.title).trim().toLowerCase()))
       .slice(0, 12).map((i) => ({ product: i.product, id: i.id, title: String(i.label || i.title).trim() }));
   }
 
   // Said on the teammates page and in the log, never only in the log.
-  noteTrouble(text, now = Date.now()) {
+  noteTrouble(text: string, now = Date.now()) {
     console.warn(`teammates: ${text}`);
     this.trouble = { text, at: now };
   }
 
-  _sayOnce(teammateId, verb, text, now) {
+  _sayOnce(teammateId: string, verb: string, text: string, now: number) {
     const day = new Date(now).toDateString();
     const already = this.chat().messages.some((m) => m.kind === 'act' && m.from === teammateId && m.verb === verb && new Date(m.ts).toDateString() === day);
     if (!already) writeChat(this.dir(), { kind: 'act', from: teammateId, verb, text }, now);
@@ -459,10 +677,10 @@ export class Teammates {
 
   // Teammates go by their role. Ones made with a person's name are renamed
   // once; a name you give one afterwards is yours and stays.
-  _namedByRole(team, now) {
+  _namedByRole(team: Teammate[], now: number): Teammate[] {
     const marker = path.join(this.dir(), 'named-by-role');
     if (fs.existsSync(marker)) return team;
-    const renamed = new Map();
+    const renamed = new Map<string, string>();
     const taken = new Set(team.filter((t) => !t.role || t.name.toLowerCase() === t.role.toLowerCase()).map((t) => t.name.toLowerCase()));
     for (const t of team) {
       if (!t.role || t.name.toLowerCase() === t.role.toLowerCase()) continue;
@@ -472,7 +690,7 @@ export class Teammates {
       taken.add(name.toLowerCase());
       renamed.set(t.id, name);
     }
-    const out = [];
+    const out: Teammate[] = [];
     for (const t of team) {
       const name = renamed.get(t.id);
       if (!name) { out.push(t); continue; }
@@ -485,7 +703,7 @@ export class Teammates {
   }
 
   /* ---------------------------------------------------------------- brief */
-  nameOf(id, team) {
+  nameOf(id: string | undefined, team: Teammate[]) {
     if (id === YOU) return 'The person';
     return team.find((t) => t.id === id)?.name ?? 'A teammate';
   }
@@ -493,7 +711,7 @@ export class Teammates {
   // Why this run exists, written into the run's own body.
   // What opens the run's thread: your own words when you wrote, and otherwise
   // a plain line saying what woke it. How to answer is in its brief.
-  openingFor(t, trigger, team) {
+  openingFor(t: Teammate, trigger: WakeTrigger, team: Teammate[]): Opening {
     const who = this.nameOf(trigger.from, team);
     if (trigger.kind === 'schedule') {
       return { body: `Time for your ${isWorks(t.works) ? ruleLabel(t.works) : 'regular'} round.`, yours: false };
@@ -525,7 +743,7 @@ export class Teammates {
 
   // Teammates naming this one in the chat since this run last spoke. Talk wakes
   // nobody (`planWakes`), so a turn is where it is read.
-  _toldInTheChat(item, t, chat) {
+  _toldInTheChat(item: TeamItem, t: Teammate, chat: Chat) {
     const r = item.wrote?.result;
     const since = r?.source === 'agent' ? r.ts ?? 0 : item.createdAt ?? 0;
     return chat.messages.filter((m) => m.kind === 'msg' && m.from !== YOU && m.from !== t.id
@@ -535,8 +753,8 @@ export class Teammates {
   // Where the person's work lives. A teammate works in one project, but a job
   // like fundraising draws on all of them: the power test's investor update
   // read one repository and missed what had shipped in the others.
-  _projectsFor(t) {
-    let products = [];
+  _projectsFor(t: Teammate) {
+    let products: ReturnType<TeammateStore['listProducts']> = [];
     try { products = this.store.listProducts().filter((p) => !p.practice); } catch { return []; }
     if (products.length < 2) return [];
     return [
@@ -549,11 +767,11 @@ export class Teammates {
 
   // The standing part of a teammate's brief, read fresh at every spawn so its
   // memory and the chat are current even on a reply.
-  briefFor(item, now = Date.now()) {
+  briefFor(item: TeamItem, now = Date.now()) {
     const id = teammateIdOf(item);
     if (!id) return null;
-    let team;
-    let chat;
+    let team: Teammate[];
+    let chat: Chat;
     try {
       team = this.list(now);
       chat = this.chat();
@@ -565,12 +783,12 @@ export class Teammates {
     const everything = (() => { try { return this.store.listItems(now); } catch { return []; } })();
     const items = everything.filter((i) => teammateIdOf(i));
     const others = team.filter((x) => x.id !== id);
-    const when = (ts) => new Date(ts).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    const when = (ts: number) => new Date(ts).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
     const hop = hopOf(item);
-    const cut = (text, n) => (text.length > n ? `${text.slice(0, n - 1)}…` : text);
+    const cut = (text: string, n: number) => (text.length > n ? `${text.slice(0, n - 1)}…` : text);
     // From the history kept per ledger change, not readThread: that reads the
     // whole ledger once per thread, many times in one brief.
-    const said = (product, thread) => this.store.modules.workItemsCore.threadOf(this.store.readHistory?.(product, thread, { max: 2000 }) ?? [], thread);
+    const said = (product: string, thread: string) => this.store.modules.workItemsCore.threadOf(this.store.readHistory?.(product, thread, { max: 2000 }) ?? [], thread);
     const earlier = items.filter((i) => teammateIdOf(i) === id && i.id !== item.id);
     const origin = chat.messages.find((m) => m.kind === 'msg' && m.setup && (m.to ?? []).includes(id) && m.threads?.length)?.threads ?? [];
     const method = readMethod(this.dir(), id);
@@ -582,14 +800,14 @@ export class Teammates {
       .filter((x) => x.id !== item.id).slice(0, 6);
     const named = asked.length ? this._writeThreads(sourcesDir(this.dir(), id), asked, said) : [];
     const record = recordOf(earlier, said, { now });
-    let books = [];
+    let books: Playbook[] = [];
     try { books = readPlaybooks(this.dir()); } catch { books = []; }
     const reads = books.filter((b) => b.readers.includes(t.id));
     const notRead = books.filter((b) => !b.readers.includes(t.id));
     const told = this._toldInTheChat(item, t, chat);
     // What you said in the chat lately, to anyone: a stop, a change of plan.
     const yours = chat.messages.filter((m) => m.kind === 'msg' && m.from === YOU && now - m.ts < WEEK_MS).slice(-YOUR_CHAT_LINES)
-      .map((m) => `- [${when(m.ts)}]${(m.to ?? []).length ? ` to ${m.to.map((x) => this.nameOf(x, team)).join(', ')}` : ''}: ${cut(String(m.text ?? '').replace(/\s+/g, ' ').trim(), 400)}`);
+      .map((m) => `- [${when(m.ts)}]${(m.to ?? []).length ? ` to ${m.to!.map((x) => this.nameOf(x, team)).join(', ')}` : ''}: ${cut(String(m.text ?? '').replace(/\s+/g, ' ').trim(), 400)}`);
     const lastSeen = Math.max(0, ...earlier.map((i) => (i.wrote?.answer?.source === 'founder' ? i.wrote.answer.ts ?? 0 : 0)));
     const untried = method && laterThan(method.changedAt, lastSeen);
     const toldLines = told.slice(-CHAT_TAIL).map((m) => {
@@ -636,7 +854,7 @@ export class Teammates {
       ...(t.primary ? this._asPrimary(others, items, now) : []),
       '## The team',
       ...(others.length ? others.map((o) => {
-        const s = t.primary ? statusOf(o, items, now) : null;
+        const s: TeammateStatus | null = t.primary ? statusOf(o, items, now) : null;
         const doing = s ? [s.now ? ` Now: ${s.now}.` : '', s.queued ? ` ${s.queued} queued.` : '', s.done.length ? ` Finished today: ${s.done.map((d) => d.title).join('; ')}.` : ''].join('') : '';
         return `- ${o.name}${o.role && o.role.toLowerCase() !== o.name.toLowerCase() ? `, ${o.role}` : ''}${o.paused ? ' (paused)' : ''}: ${o.job ? cut(o.job, t.primary ? 240 : 140) : 'no job yet'}${doing}`;
       }) : ['- You are the only teammate so far.']),
@@ -679,8 +897,8 @@ export class Teammates {
   }
 
   // What the primary is for, and what is waiting on the person across the team.
-  _asPrimary(others, items, now) {
-    const waiting = others.flatMap((o) => statusOf(o, items, now).waiting.map((w) => `- ${o.name}: "${w.title}" (${w.product}/${w.id})`));
+  _asPrimary(others: Teammate[], items: TeamItem[], now: number) {
+    const waiting = others.flatMap((o) => statusOf(o, items, now).waiting.map((w: ItemRef) => `- ${o.name}: "${w.title}" (${w.product}/${w.id})`));
     return [
       '## You are the primary employee',
       "You are the person's main point of contact: the one teammate they talk to. Work reaches you three ways: they write to you, Auto gives you a thread it could not place (two teammates fit, or it spans several jobs), or it is your check-in.",
@@ -699,7 +917,7 @@ export class Teammates {
 
   // A teammate with no method yet: the threads it learns from, written out
   // whole, and how to write the method from them before anything else.
-  _buildMethodFirst(t, file, sources, fromThreads) {
+  _buildMethodFirst(t: Teammate, file: string, sources: SourceFile[], fromThreads: boolean) {
     return [
       fromThreads && t.status === 'draft' ? '## The threads you come from' : '## First, build your method',
       `You have no method yet. ${t.status === 'draft' ? 'Before anything else' : 'Before you do what woke you'}, write it at ${file} (or with team_method when you cannot write there): one file, in plain markdown, that every later run of yours reads whole. Read every file below in full first; they are the person's threads with every word said, uncut.`,
@@ -715,22 +933,22 @@ export class Teammates {
   // Each thread a teammate learns from, written whole into its sources folder:
   // the threads it was made from, your own threads its runs name (the work it
   // was handed, a thread id in what was said), and its own past runs.
-  _writeSources(t, origin, earlier, said, everything = []) {
+  _writeSources(t: Teammate, origin: ThreadRef[], earlier: TeamItem[], said: TurnsOf, everything: TeamItem[] = []): SourceFile[] {
     const dir = sourcesDir(this.dir(), t.id);
-    const read = new Map();
-    const turnsOf = (product, id) => {
+    const read = new Map<string, Turn[]>();
+    const turnsOf = (product: string, id: string): Turn[] => {
       if (!read.has(id)) {
         try { read.set(id, said(product, id) ?? []); } catch { read.set(id, []); }
       }
-      return read.get(id);
+      return read.get(id)!;
     };
     const recent = [...earlier].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)).slice(0, 25);
-    const named = new Set();
+    const named = new Set<string>();
     for (const i of recent) {
       if (workOf(i) !== i.id) named.add(workOf(i));
       for (const x of turnsOf(i.product, i.id)) for (const id of threadIdsIn(x.text)) named.add(id);
     }
-    const threads = [
+    const threads: ThreadRef[] = [
       ...origin.slice(0, 12).map((x) => ({ product: x.product, id: x.id, title: x.title })),
       ...yoursAmong([...named], everything).slice(0, 12),
       ...recent.map((i) => ({ product: i.product, id: i.id, title: i.label || i.title })),
@@ -738,9 +956,9 @@ export class Teammates {
     return this._writeThreads(dir, threads, turnsOf);
   }
 
-  _writeThreads(dir, threads, turnsOf) {
-    const out = [];
-    const seen = new Set();
+  _writeThreads(dir: string, threads: ThreadRef[], turnsOf: TurnsOf): SourceFile[] {
+    const out: SourceFile[] = [];
+    const seen = new Set<string>();
     for (const thread of threads) {
       if (seen.has(thread.id)) continue;
       seen.add(thread.id);
@@ -764,15 +982,15 @@ const YOUR_CHAT_LINES = 10;
 // Date.now(); Linux stamps a file up to 16ms behind, so the one written second
 // can read first. A second is past that and under any gap a person makes.
 const CLOCKS_APART_MS = 1_000;
-const laterThan = (a, b) => a > b + CLOCKS_APART_MS;
+const laterThan = (a: number, b: number) => a > b + CLOCKS_APART_MS;
 
-const threadIdsIn = (text) => [...String(text ?? '').matchAll(/\bw-[0-9a-f]{10,12}\b/g)].map((m) => m[0]);
+const threadIdsIn = (text: unknown) => [...String(text ?? '').matchAll(/\bw-[0-9a-f]{10,12}\b/g)].map((m) => m[0]);
 
 // Of these thread ids, the ones that are your own threads, not a teammate's runs.
-const yoursAmong = (ids, everything) => [...new Set(ids)]
+const yoursAmong = (ids: string[], everything: TeamItem[]): ThreadRef[] => [...new Set(ids)]
   .map((id) => everything.find((i) => i.id === id && !teammateIdOf(i)))
   .filter(Boolean)
-  .map((i) => ({ product: i.product, id: i.id, title: i.label || i.title }));
+  .map((i) => ({ product: i!.product, id: i!.id, title: i!.label || i!.title }));
 
 const METHOD_SECTIONS = [
   '- What the job is, and what it is not',

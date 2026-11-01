@@ -28,6 +28,80 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { whatATeammateMaySet, whatYourOtherCopyMaySet } from '../../shared/team-rules.mjs';
+import type { CloudProject, SharedProjectRef } from './projects.mts';
+
+/** A ledger line as it is written and pushed; other keys pass through. */
+export interface LedgerLine {
+  [key: string]: unknown;
+  by?: string;
+  uid?: string;
+  patch?: unknown;
+}
+
+/** A file a message names that the cloud did not have yet. */
+export interface WantedFile { name: string; since: number; checked: number }
+
+/** Where one shared project's push, pull and file cursors stand. */
+export interface SyncCursor {
+  pushedTo: number;
+  pulledSeq: number;
+  filesFrom?: number;
+  wanted?: WantedFile[];
+}
+
+export interface SyncState {
+  get(projectId: string): SyncCursor;
+  set(projectId: string, value: SyncCursor): void;
+  getCardsHash(): string | null;
+  setCardsHash(hash: string): void;
+  getTeam(personId: string): string | null;
+  setTeam(personId: string, teamId: string | null): void;
+  getSince(personId: string): number | null;
+  setSince(personId: string, at: number): void;
+}
+
+type FsForState = Pick<typeof fs, 'readFileSync' | 'writeFileSync' | 'renameSync'>;
+
+/** What the cloud holds of a thread, as it is published for the team. */
+export interface SyncCard { threadId: string; [key: string]: unknown }
+
+export interface SyncFiles {
+  size(dir: string, name: string): number | null;
+  read(dir: string, name: string): Buffer;
+  write(dir: string, name: string, bytes: Buffer): void;
+}
+
+export interface SyncDisk {
+  readLinesFrom(dir: string, offset: number): { lines: LedgerLine[]; end: number };
+  appendForeignLines(dir: string, lines: LedgerLine[]): number;
+}
+
+export interface SyncBackend {
+  personId?: string | null;
+  me(): Promise<{ id: string } | null | undefined>;
+  listProjects(): Promise<CloudProject[]>;
+  pushLines(projectId: string, lines: LedgerLine[]): Promise<number>;
+  pullLines(projectId: string, afterSeq: number, limit: number): Promise<{ seq: number; line: LedgerLine | null }[]>;
+  putCards(teamId: string, cards: SyncCard[]): Promise<void>;
+  hasFiles?(projectId: string, names: string[]): Promise<string[]>;
+  getFile?(projectId: string, name: string): Promise<unknown>;
+  putFile?(projectId: string, name: string, data: string): Promise<boolean>;
+}
+
+export interface TeamSyncOptions {
+  backend: SyncBackend;
+  disk: SyncDisk;
+  state: SyncState;
+  listShared: () => SharedProjectRef[];
+  joinProject: (project: CloudProject) => SharedProjectRef | null | undefined | Promise<SharedProjectRef | null | undefined>;
+  listCards?: () => SyncCard[] | null | undefined;
+  teamIdOf?: () => string | null | undefined;
+  files?: SyncFiles;
+  now?: () => number;
+  log?: (line: string) => void;
+}
+
+export interface SyncReport { joined: string[]; notJoined: number; pushed: number; pulled: number; cards: boolean }
 
 const PAGE = 500;
 // HOW MANY SHARED PROJECTS A MAC TAKES ON BY ITSELF. Anyone on the team can
@@ -60,13 +134,13 @@ const WANTED_FOR_MS = 14 * 24 * 60 * 60 * 1000;
 const NAMED = /\]\(attachments\/([A-Za-z0-9][\w.-]{0,159})\)/g;
 
 /** The files a ledger line's message links to, by name, each once. */
-export function filesNamedIn(line) {
+export function filesNamedIn(line: LedgerLine | null | undefined): string[] {
   if (!line || typeof line !== 'object' || !line.patch) return [];
   return [...new Set([...JSON.stringify(line.patch).matchAll(NAMED)].map((m) => m[1]))];
 }
 
 // The attachments folder of a project on this Mac.
-export const diskFiles = {
+export const diskFiles: SyncFiles = {
   size(dir, name) {
     try { const st = fs.statSync(path.join(dir, 'attachments', name)); return st.isFile() ? st.size : null; } catch { return null; }
   },
@@ -74,27 +148,32 @@ export const diskFiles = {
   // `wx`: a file already here under that name is never replaced.
   write(dir, name, bytes) {
     fs.mkdirSync(path.join(dir, 'attachments'), { recursive: true });
-    try { fs.writeFileSync(path.join(dir, 'attachments', name), bytes, { flag: 'wx' }); } catch (err) { if (err.code !== 'EEXIST') throw err; }
+    try { fs.writeFileSync(path.join(dir, 'attachments', name), bytes, { flag: 'wx' }); } catch (err) { if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err; }
   },
 };
 
 // Where each shared project's cursors stand, kept between runs.
-export function memorySyncState() {
-  const map = new Map();
+export function memorySyncState(): SyncState {
+  const map = new Map<string, Partial<SyncCursor> & { hash?: string | null; [personId: string]: unknown }>();
   return {
     get: (projectId) => ({ pushedTo: 0, pulledSeq: 0, ...(map.get(projectId) || {}) }),
     set: (projectId, value) => { map.set(projectId, { ...value }); },
     getCardsHash: () => map.get('__cards__')?.hash ?? null,
     setCardsHash: (hash) => { map.set('__cards__', { hash }); },
-    getTeam: (personId) => map.get('__teams__')?.[personId] ?? null,
+    getTeam: (personId) => map.get('__teams__')?.[personId] as string | null | undefined ?? null,
     setTeam: (personId, teamId) => { map.set('__teams__', { ...(map.get('__teams__') || {}), [personId]: teamId }); },
-    getSince: (personId) => map.get('__since__')?.[personId] ?? null,
+    getSince: (personId) => map.get('__since__')?.[personId] as number | null | undefined ?? null,
     setSince: (personId, at) => { map.set('__since__', { ...(map.get('__since__') || {}), [personId]: at }); },
   };
 }
 
-export function fileSyncState(file, fs) {
-  let data = {};
+export function fileSyncState(file: string, fs: FsForState): SyncState {
+  let data: {
+    projects?: Record<string, SyncCursor>;
+    cardsHash?: string | null;
+    teams?: Record<string, string | null>;
+    since?: Record<string, number | null>;
+  } = {};
   try { data = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { data = {}; }
   const save = () => {
     const tmp = `${file}.${process.pid}.tmp`;
@@ -119,27 +198,27 @@ export function fileSyncState(file, fs) {
 
 // A line from before anyone signed in has no writer and no id. It is pushed as
 // the sharer's, with an id made from its bytes, so a second push is the same id.
-function adopt(line, me) {
+function adopt(line: LedgerLine, me: string): LedgerLine {
   if (line.by && line.uid) return line;
   const uid = line.uid || `h-${crypto.createHash('sha256').update(JSON.stringify(line)).digest('hex').slice(0, 24)}`;
   return { ...line, by: line.by || me, uid };
 }
 
-export function createTeamSync({ backend, disk, state, listShared, joinProject, listCards = () => [], teamIdOf = () => null, files = diskFiles, now = Date.now, log = () => {} }) {
-  let running = null;
-  const quietly = async (what, fn, fallback) => {
-    try { return await fn(); } catch (err) { log(`team files: ${what}: ${err?.message ?? err}`); return fallback; }
+export function createTeamSync({ backend, disk, state, listShared, joinProject, listCards = () => [], teamIdOf = () => null, files = diskFiles, now = Date.now, log = () => {} }: TeamSyncOptions) {
+  let running: Promise<SyncReport> | null = null;
+  const quietly = async <T, F = undefined>(what: string, fn: () => T | Promise<T>, fallback?: F): Promise<Awaited<T> | F> => {
+    try { return await fn(); } catch (err) { log(`team files: ${what}: ${(err as Error | undefined)?.message ?? err}`); return fallback as F; }
   };
 
   // Takes down whichever of `names` the cloud has and this Mac does not.
   // Answers the names still missing.
-  async function takeFiles(project, names) {
+  async function takeFiles(project: SharedProjectRef, names: string[]): Promise<string[]> {
     const missing = [...new Set(names)].filter((n) => files.size(project.dir, n) == null);
     if (!missing.length || !backend.hasFiles) return missing;
-    const there = new Set(await quietly('asking', () => backend.hasFiles(project.projectId, missing), []));
+    const there = new Set(await quietly('asking', () => backend.hasFiles!(project.projectId, missing), []));
     for (const name of missing.filter((n) => there.has(n))) {
       // One at a time: each can be ten megabytes.
-      const data = await quietly(`taking ${name}`, () => backend.getFile(project.projectId, name), null);
+      const data = await quietly(`taking ${name}`, () => backend.getFile!(project.projectId, name), null);
       const bytes = typeof data === 'string' ? Buffer.from(data, 'base64') : null;
       if (bytes && bytes.length <= MAX_MESSAGE_FILE_BYTES) await quietly(`saving ${name}`, () => files.write(project.dir, name, bytes));
     }
@@ -150,11 +229,11 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
   // go up, and the files anyone's name that are not here are wanted. The first
   // look after updating starts at the top of the ledger, which is what sends a
   // picture from before this existed.
-  async function sendFiles(project, me) {
+  async function sendFiles(project: SharedProjectRef, me: string) {
     if (!backend.putFile) return;
     const cursor = state.get(project.projectId);
     const { lines, end } = disk.readLinesFrom(project.dir, cursor.filesFrom ?? 0);
-    const mine = new Set();
+    const mine = new Set<string>();
     const wanted = new Map((cursor.wanted ?? []).map((w) => [w.name, w]));
     for (const line of lines) {
       for (const name of filesNamedIn(line)) {
@@ -164,17 +243,17 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
       }
     }
     if (mine.size) {
-      const there = await quietly('asking', () => backend.hasFiles(project.projectId, [...mine]), null);
+      const there = await quietly('asking', () => backend.hasFiles!(project.projectId, [...mine]), null);
       if (!there) return; // Not now; this stretch of the ledger is looked at again next pass.
       for (const name of [...mine].filter((n) => !there.includes(n))) {
-        const sent = await quietly(`sending ${name}`, async () => { await backend.putFile(project.projectId, name, files.read(project.dir, name).toString('base64')); return true; }, false);
+        const sent = await quietly(`sending ${name}`, async () => { await backend.putFile!(project.projectId, name, files.read(project.dir, name).toString('base64')); return true; }, false);
         if (!sent) return;
       }
     }
     state.set(project.projectId, { ...state.get(project.projectId), filesFrom: end, wanted: [...wanted.values()].slice(-WANTED_MAX) });
   }
 
-  async function takeWanted(project) {
+  async function takeWanted(project: SharedProjectRef) {
     const cursor = state.get(project.projectId);
     const at = now();
     const wanted = (cursor.wanted ?? []).filter((w) => at - w.since < WANTED_FOR_MS && files.size(project.dir, w.name) == null);
@@ -185,7 +264,7 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
     if (kept.length !== (cursor.wanted ?? []).length || due.length) state.set(project.projectId, { ...state.get(project.projectId), wanted: kept });
   }
 
-  async function pushProject(project, me) {
+  async function pushProject(project: SharedProjectRef, me: string) {
     const cursor = state.get(project.projectId);
     const { lines, end } = disk.readLinesFrom(project.dir, cursor.pushedTo);
     const mine = lines.filter((l) => l && (!l.by || l.by === me)).map((l) => adopt(l, me));
@@ -195,14 +274,14 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
     return pushed;
   }
 
-  async function pullProject(project, me) {
+  async function pullProject(project: SharedProjectRef, me: string) {
     let pulled = 0;
     for (;;) {
       const cursor = state.get(project.projectId);
       const rows = await backend.pullLines(project.projectId, cursor.pulledSeq, PAGE);
       if (!rows.length) break;
       const direct = project.direct === true;
-      const bring = rows.map((r) => r.line).filter(Boolean)
+      const bring = rows.map((r) => r.line as LedgerLine).filter(Boolean)
         // A line of your own comes back only in a conversation, and a line of a
         // teammate's keeps only what they may set here (shared/team-rules.mjs).
         .map((l) => (l.by === me ? whatYourOtherCopyMaySet(l, { direct }) : whatATeammateMaySet(l, { direct })))
@@ -235,7 +314,7 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
   async function run() {
     const me = backend.personId ?? (await backend.me())?.id;
     if (!me) throw new Error('nobody is signed in');
-    const report = { joined: [], notJoined: 0, pushed: 0, pulled: 0, cards: false };
+    const report: SyncReport = { joined: [], notJoined: 0, pushed: 0, pulled: 0, cards: false };
 
     const cloudProjects = await backend.listProjects();
     const local = new Map(listShared().map((p) => [p.projectId, p]));

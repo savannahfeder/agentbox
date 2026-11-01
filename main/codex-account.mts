@@ -31,9 +31,28 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 
-const liveAccounts = new Map();
-const authFingerprint = text => createHash('sha256').update(text).digest('hex');
-export function rememberCodexAccount(home, account) {
+/** What is read off auth.json and its id_token; every field is whatever the file held. */
+interface ChatgptClaim { chatgpt_plan_type?: string; chatgpt_account_id?: string; chatgpt_subscription_active_until?: string }
+interface IdClaims { email?: string; name?: string; 'https://api.openai.com/auth'?: ChatgptClaim | null }
+interface AuthFile {
+  tokens?: { id_token?: string; account_id?: string } | null;
+  auth_mode?: string;
+  OPENAI_API_KEY?: string;
+}
+export interface CodexAccount {
+  email: string | null;
+  name: string | null;
+  plan: string | null;
+  planNamed: boolean;
+  mode: string | null;
+  accountId: string | null;
+}
+/** The login a running Codex reports for a home, as far as this file reads it. */
+interface LiveAccount { type?: string; planType?: string; email?: string }
+
+const liveAccounts = new Map<string, { fingerprint: string; account: LiveAccount | null | undefined }>();
+const authFingerprint = (text: string) => createHash('sha256').update(text).digest('hex');
+export function rememberCodexAccount(home: string | null | undefined, account: LiveAccount | null | undefined) {
   const file = codexAuthFile(home);
   try {
     const fingerprint = authFingerprint(fs.readFileSync(file, 'utf8'));
@@ -50,9 +69,9 @@ const AUTH_CLAIM = 'https://api.openai.com/auth';
  *  which title-cases into "Prolite", a product name nobody at OpenAI has ever
  *  used. Inventing a label is how a screen tells a confident lie about what
  *  somebody is paying for, so an id we do not know is shown as the id. */
-const PLANS = { free: 'Free', plus: 'Plus', pro: 'Pro', business: 'Business', team: 'Team', enterprise: 'Enterprise', edu: 'Edu' };
+const PLANS: Record<string, string> = { free: 'Free', plus: 'Plus', pro: 'Pro', business: 'Business', team: 'Team', enterprise: 'Enterprise', edu: 'Edu' };
 
-function planLabel(raw) {
+function planLabel(raw: unknown): string | null {
   const s = String(raw ?? '').trim().toLowerCase();
   if (!s) return null;
   return PLANS[s] ?? s;
@@ -63,7 +82,7 @@ function planLabel(raw) {
  *  "On the Pro plan" for one and "Codex reports the plan as prolite" for the
  *  other, because "On the prolite plan" reads like our typo rather than like
  *  Codex's word. */
-function planIsNamed(raw) {
+function planIsNamed(raw: unknown): boolean {
   const s = String(raw ?? '').trim().toLowerCase();
   return !!s && !!PLANS[s];
 }
@@ -71,14 +90,14 @@ function planIsNamed(raw) {
 /**
  * The middle of a JWT, which is plain base64url JSON. No verification: see the
  *  header of this file for why there is nothing here to verify. */
-function claims(token) {
+function claims(token: unknown): IdClaims | null {
   if (typeof token !== 'string') return null;
   const part = token.split('.')[1];
   if (!part) return null;
   try {
     const padded = part + '='.repeat((4 - (part.length % 4)) % 4);
     const json = JSON.parse(Buffer.from(padded, 'base64url').toString('utf8'));
-    return json && typeof json === 'object' ? json : null;
+    return json && typeof json === 'object' ? json as IdClaims : null;
   } catch {
     return null;
   }
@@ -87,7 +106,7 @@ function claims(token) {
 /**
  * Where this login lives. `configured` is the workspace's CODEX_HOME when it has
  *  one, which is the same rule main/supervisor.mts `_codexHome` follows. */
-export function codexAuthFile(home = null) {
+export function codexAuthFile(home: string | null = null): string {
   return path.join(home || path.join(os.homedir(), '.codex'), 'auth.json');
 }
 
@@ -98,17 +117,14 @@ export function codexAuthFile(home = null) {
  * connected, exactly as it did before this existed. Every field is independently
  * nullable: an account signed in with an API key has no email and no plan, and
  * the card then says the one true thing it can.
- *
- * @returns {{ email: string|null, name: string|null, plan: string|null,
- *   mode: string|null, accountId: string|null }|null}
  */
-export function codexAccount(home = null, { file = null } = {}) {
+export function codexAccount(home: string | null = null, { file = null }: { file?: string | null } = {}): CodexAccount | null {
   const at = file ?? codexAuthFile(home);
-  let auth = null;
-  let fingerprint;
+  let auth: AuthFile | null = null;
+  let fingerprint: string;
   try {
     const text = fs.readFileSync(at, 'utf8');
-    auth = JSON.parse(text);
+    auth = JSON.parse(text) as AuthFile | null;
     fingerprint = authFingerprint(text);
   } catch { return null; }
   if (!auth || typeof auth !== 'object') return null;
@@ -142,9 +158,9 @@ export function codexAccount(home = null, { file = null } = {}) {
  * an ending: a paid type with a past date is a token minted before a renewal,
  * and a free login that never paid has no date.
  */
-export function codexPlanEnded(home = null, { file = null, now = Date.now() } = {}) {
-  let auth = null;
-  try { auth = JSON.parse(fs.readFileSync(file ?? codexAuthFile(home), 'utf8')); } catch { return null; }
+export function codexPlanEnded(home: string | null = null, { file = null, now = Date.now() }: { file?: string | null; now?: number } = {}): number | null {
+  let auth: AuthFile | null = null;
+  try { auth = JSON.parse(fs.readFileSync(file ?? codexAuthFile(home), 'utf8')) as AuthFile | null; } catch { return null; }
   const chatgpt = claims(auth?.tokens?.id_token)?.[AUTH_CLAIM];
   if (String(chatgpt?.chatgpt_plan_type ?? '').trim().toLowerCase() !== 'free') return null;
   const until = Date.parse(chatgpt?.chatgpt_subscription_active_until ?? '');
@@ -156,9 +172,9 @@ export function codexPlanEnded(home = null, { file = null, now = Date.now() } = 
  * one of these logins reads Free, with the latest paid plan's end or null, and
  * null when any login is paid or cannot say.
  */
-export function codexFreePlan(homes, { now = Date.now() } = {}) {
+export function codexFreePlan(homes: (string | null)[], { now = Date.now() }: { now?: number } = {}): { endedAt: number | null } | null {
   if (!homes.length || !homes.every((h) => codexAccount(h)?.plan === PLANS.free)) return null;
-  const ended = homes.map((h) => codexPlanEnded(h, { now })).filter((t) => t != null);
+  const ended = homes.map((h) => codexPlanEnded(h, { now })).filter((t): t is number => t != null);
   return { endedAt: ended.length ? Math.max(...ended) : null };
 }
 
@@ -170,9 +186,9 @@ export function codexFreePlan(homes, { now = Date.now() } = {}) {
  * with no mode is a key when it carries a key and no tokens. A ChatGPT login
  * with a key left beside its tokens is still a ChatGPT login; the mode decides.
  */
-export function codexLoginMode(home = null, { file = null } = {}) {
-  let auth = null;
-  try { auth = JSON.parse(fs.readFileSync(file ?? codexAuthFile(home), 'utf8')); } catch { return null; }
+export function codexLoginMode(home: string | null = null, { file = null }: { file?: string | null } = {}): string | null {
+  let auth: AuthFile | null = null;
+  try { auth = JSON.parse(fs.readFileSync(file ?? codexAuthFile(home), 'utf8')) as AuthFile | null; } catch { return null; }
   if (!auth || typeof auth !== 'object') return null;
   const mode = typeof auth.auth_mode === 'string' ? auth.auth_mode.trim().toLowerCase().replace(/[^a-z]/g, '') : '';
   if (mode) return mode === 'apikey' ? 'apikey' : mode.startsWith('chatgpt') ? 'chatgpt' : mode;
@@ -193,7 +209,7 @@ export function codexLoginMode(home = null, { file = null } = {}) {
  * run is refused, in words shared/spawn-trouble.mjs files as 'api-key'. The
  * key is never in the sentence.
  */
-export function codexKeyRefusal(home = null, opts = {}) {
+export function codexKeyRefusal(home: string | null = null, opts: { file?: string | null } = {}): string | null {
   return codexLoginMode(home, opts) === 'apikey'
     ? 'Codex is signed in with an API key, which bills every call to that key. Workers only run on a ChatGPT plan: run codex login in a terminal to sign in with ChatGPT.'
     : null;
@@ -210,10 +226,10 @@ export function codexKeyRefusal(home = null, opts = {}) {
  * that exists, so pressing Add twice cannot hand the second login the first
  * one's folder and overwrite a working account.
  *
- * @returns {{ home: string, profile: string }} `profile` is the word the fleet
- *   spawns on, which for every home but her primary one IS the path.
+ * @returns `profile` is the word the fleet spawns on, which for every home but
+ *   her primary one IS the path.
  */
-export function makeCodexHome({ home = os.homedir(), mkdir = fs.mkdirSync, exists = fs.existsSync } = {}) {
+export function makeCodexHome({ home = os.homedir(), mkdir = fs.mkdirSync, exists = fs.existsSync }: { home?: string; mkdir?: (dir: string, options: { recursive: true }) => unknown; exists?: (dir: string) => boolean } = {}): { home: string; profile: string } {
   for (let n = 2; n < 100; n += 1) {
     const dir = path.join(home, `.codex-${n}`);
     if (exists(dir)) continue;
@@ -231,7 +247,7 @@ export function makeCodexHome({ home = os.homedir(), mkdir = fs.mkdirSync, exist
  *
  * @returns the home it was given, so it can be used inline at a spawn.
  */
-export function ensureCodexHome(home, { mkdir = fs.mkdirSync } = {}) {
+export function ensureCodexHome<T extends string | null | undefined>(home: T, { mkdir = fs.mkdirSync }: { mkdir?: (dir: string, options: { recursive: true }) => unknown } = {}): T {
   if (home) { try { mkdir(home, { recursive: true }); } catch { /* codex's own message about the folder is the better one */ } }
   return home;
 }
@@ -240,6 +256,6 @@ export function ensureCodexHome(home, { mkdir = fs.mkdirSync } = {}) {
  * The one line that signs a new account in, for the terminal to run. The home
  *  is spelled out rather than left to the shell, because `~` inside a variable
  *  assignment is not expanded by every shell the same way. */
-export function codexLoginCommand(home) {
+export function codexLoginCommand(home: string): string {
   return `CODEX_HOME=${home} codex login`;
 }

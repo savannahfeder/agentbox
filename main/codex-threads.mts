@@ -33,10 +33,132 @@ import { WAS_SLUGS, nameSlug } from '../shared/product-name.mjs';
 import { howTheChatEnded } from '../shared/agent-import.mjs';
 
 export const CODEX_RECENT_DAYS = RECENT_DAYS;
+
+export interface CodexIndexEntry {
+  name: string;
+  updatedAt: number;
+}
+
+interface CodexIndexLine {
+  id?: unknown;
+  thread_name?: unknown;
+  updated_at?: string;
+}
+
+interface RolloutPart {
+  type?: string;
+  text?: string;
+}
+
+interface RolloutPayload {
+  session_id?: string;
+  id?: string;
+  cwd?: string;
+  timestamp?: string;
+  originator?: string;
+  source?: string;
+  thread_source?: string;
+  type?: string;
+  message?: string;
+  role?: string;
+  content?: RolloutPart[];
+}
+
+interface RolloutLine {
+  type?: string;
+  timestamp?: string;
+  payload?: RolloutPayload;
+}
+
+interface RolloutMeta {
+  id: string;
+  cwd: string;
+  threadSource: string;
+  startedAt: number;
+}
+
+export interface Rollout extends RolloutMeta {
+  prompt: string;
+  last: string;
+  herTurnLast: boolean;
+  turns: number;
+  images: number;
+  lastActive: number;
+  path: string;
+  mtime: number;
+}
+
+export interface CodexSkipped {
+  notHers: number;
+  scratch: number;
+  ours: number;
+  old: number;
+  empty: number;
+  unreadable: number;
+  copy: number;
+}
+
+export interface CodexThread {
+  id: string;
+  source: 'codex';
+  folder: string;
+  folderName: string;
+  short: string;
+  title: string;
+  when: number;
+  startedAt: number;
+  lastActive: number;
+  turns: number;
+  images: number;
+  path: string;
+  prompt: string;
+  last: string;
+  live: boolean;
+  waiting?: boolean;
+  ask?: string;
+  lastSaid: string;
+  firstSaid: string;
+}
+
+export interface CodexThreadsOptions {
+  home?: string;
+  codexDir?: string | null;
+  codexDirs?: string[] | null;
+  days?: number;
+  now?: number;
+}
+
+export interface CodexThreadsRead {
+  threads: CodexThread[];
+  skipped: CodexSkipped;
+}
+
+interface CodexHomeRead {
+  home: string;
+  days: number;
+  now: number;
+  cutoff: number;
+  index: Map<string, CodexIndexEntry>;
+  byId: Map<string, CodexThread & { fileTime: number }>;
+  skipped: CodexSkipped;
+}
+
+interface OffThreadReply {
+  id: number;
+  ok: boolean;
+  value: CodexThreadsRead;
+  error?: string;
+}
+
+interface OffThreadWait {
+  resolve: (value: CodexThreadsRead) => void;
+  reject: (err: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
 /** The originator Codex records for a run this app started (CLIENT_INFO.name), now and before. */
 const OUR_ORIGINATORS = new Set([nameSlug, ...WAS_SLUGS]);
 /** `codex exec` and Codex as an MCP server: one-shot runs a program starts. */
-const SOURCES_NOT_TYPED = new Set(['exec', 'mcp']);
+const SOURCES_NOT_TYPED = new Set<string | undefined>(['exec', 'mcp']);
 /** How many day folders the walk opens at most, whatever `days` says. */
 const MAX_DAY_FOLDERS = 40;
 /**
@@ -48,13 +170,13 @@ export const codexHome = (home = os.homedir()) => path.join(home, '.codex');
 
 /** The names Codex gave her threads, by id. Missing file is an empty map. */
 export function readCodexIndex(codexDir = codexHome()) {
-  const out = new Map();
+  const out = new Map<string, CodexIndexEntry>();
   let text = '';
   try { text = fs.readFileSync(path.join(codexDir, 'session_index.jsonl'), 'utf8'); } catch { return out; }
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
     try {
-      const j = JSON.parse(line);
+      const j: CodexIndexLine | null = JSON.parse(line);
       const id = String(j?.id ?? '').trim();
       if (!id) continue;
       const at = Date.parse(j?.updated_at ?? '');
@@ -64,8 +186,8 @@ export function readCodexIndex(codexDir = codexHome()) {
   return out;
 }
 
-const numericDesc = (dir) => {
-  let names = [];
+const numericDesc = (dir: string) => {
+  let names: string[] = [];
   try { names = fs.readdirSync(dir); } catch { return []; }
   return names.filter((n) => /^\d+$/.test(n)).sort((a, b) => Number(b) - Number(a));
 };
@@ -78,9 +200,9 @@ const numericDesc = (dir) => {
  *  worked in yesterday sits in a folder the newest-`days` walk never opens
  *  (w-db6f5e331e). Past those folders only a stat is paid per file, and the
  *  walk still stops at MAX_DAY_FOLDERS. */
-export function listRolloutFiles(codexDir = codexHome(), { days = CODEX_RECENT_DAYS, since = null } = {}) {
+export function listRolloutFiles(codexDir = codexHome(), { days = CODEX_RECENT_DAYS, since = null }: { days?: number; since?: number | null } = {}) {
   const root = path.join(codexDir, 'sessions');
-  const out = [];
+  const out: string[] = [];
   let looked = 0;
   const limit = Math.min(Math.max(1, Number(days) || 1), MAX_DAY_FOLDERS);
   const reach = since == null ? limit : MAX_DAY_FOLDERS;
@@ -91,7 +213,7 @@ export function listRolloutFiles(codexDir = codexHome(), { days = CODEX_RECENT_D
         const older = looked >= limit;
         looked += 1;
         const dir = path.join(root, year, month, day);
-        let names = [];
+        let names: string[] = [];
         try { names = fs.readdirSync(dir); } catch { names = []; }
         for (const name of names) {
           if (!/^rollout-.*\.jsonl$/.test(name)) continue;
@@ -99,7 +221,7 @@ export function listRolloutFiles(codexDir = codexHome(), { days = CODEX_RECENT_D
           if (older) {
             let mtime = 0;
             try { mtime = fs.statSync(file).mtimeMs; } catch { continue; }
-            if (mtime < since) continue;
+            if (mtime < since!) continue;
           }
           out.push(file);
         }
@@ -112,7 +234,7 @@ export function listRolloutFiles(codexDir = codexHome(), { days = CODEX_RECENT_D
 /* * * Codex Desktop prefixes a prompt with the files she attached. Everything else is kept as
  is.
 */
-export function cleanPrompt(text) {
+export function cleanPrompt(text: unknown) {
   let t = String(text ?? '');
   const at = t.indexOf('## My request:');
   if (at >= 0) t = t.slice(at + '## My request:'.length);
@@ -130,7 +252,7 @@ export function cleanPrompt(text) {
  * with an angle-bracket tag on its first line, and nothing a person types does.
  * Measured on a real thread: three parts, the
  * first two injected. */
-export function isInjected(text) {
+export function isInjected(text: unknown) {
   const t = String(text ?? '').trimStart();
   const first = t.split('\n')[0] ?? '';
   if (/^<[a-z_]+[^>]*>/i.test(first)) return true;
@@ -147,7 +269,7 @@ export function isInjected(text) {
  *  drawing call as private-use characters around a JSON blob, e.g.
  *  U+E200 "visualize" U+E202 {…} U+E201, which the row would otherwise print
  *  as a box and a path. The text on either side is the message. */
-export function cleanAnswer(text) {
+export function cleanAnswer(text: unknown) {
   return String(text ?? '')
     .replace(/[-][a-z_]*[-]\{[^\n]*?\}[-]?/g, '')
     .replace(/[-]/g, '')
@@ -155,7 +277,7 @@ export function cleanAnswer(text) {
     .trim();
 }
 
-const partsOf = (payload) => (Array.isArray(payload?.content) ? payload.content : []).filter((c) => c && typeof c === 'object');
+const partsOf = (payload: RolloutPayload) => (Array.isArray(payload?.content) ? payload.content : []).filter((c) => c && typeof c === 'object');
 
 /**
  * One transcript, read once: who started it, where, what she asked first and
@@ -172,21 +294,21 @@ const partsOf = (payload) => (Array.isArray(payload?.content) ? payload.content 
 // her Codex folder can hold thousands of them, and reading every one again
 // each minute held the app for seconds.
 const ROLLOUTS_KEPT = 5000;
-const rollouts = new Map();
+const rollouts = new Map<string, { size: number; mtimeMs: number; value: Rollout | null }>();
 
-export function readRollout(file) {
-  let st = null;
+export function readRollout(file: string): Rollout | null {
+  let st: fs.Stats | null = null;
   try { st = fs.statSync(file); } catch { return null; }
   const kept = rollouts.get(file);
   if (kept && kept.size === st.size && kept.mtimeMs === st.mtimeMs) return kept.value;
   const value = readRolloutAfresh(file);
   rollouts.delete(file);
   rollouts.set(file, { size: st.size, mtimeMs: st.mtimeMs, value });
-  if (rollouts.size > ROLLOUTS_KEPT) rollouts.delete(rollouts.keys().next().value);
+  if (rollouts.size > ROLLOUTS_KEPT) rollouts.delete(rollouts.keys().next().value!);
   return value;
 }
 
-function readRolloutAfresh(file) {
+function readRolloutAfresh(file: string): Rollout | null {
   let text = '';
   try {
     const fd = fs.openSync(file, 'r');
@@ -198,7 +320,7 @@ function readRolloutAfresh(file) {
     } finally { fs.closeSync(fd); }
   } catch { return null; }
   const lines = text.split('\n');
-  let meta = null;
+  let meta: RolloutMeta | null = null;
   let prompt = '';
   let last = '';
   // Whether the person wrote after Codex's last answer, so it is not waiting.
@@ -211,7 +333,7 @@ function readRolloutAfresh(file) {
   let sawEventTurns = false;
   for (const line of lines) {
     if (!line.trim()) continue;
-    let j;
+    let j: RolloutLine;
     try { j = JSON.parse(line); } catch { continue; }
     if (!meta) {
       if (j?.type !== 'session_meta') return null;
@@ -277,7 +399,7 @@ function readRolloutAfresh(file) {
  *  still in. Two minutes because Codex writes a token count line every turn and
  *  a turn on her Mac was never longer than that between writes. */
 export const LIVE_MS = 2 * 60_000;
-export const isLive = (mtime, now = Date.now()) => Number(mtime) > 0 && now - Number(mtime) < LIVE_MS;
+export const isLive = (mtime: unknown, now = Date.now()) => Number(mtime) > 0 && now - Number(mtime) < LIVE_MS;
 
 /**
  * THE USER'S CONVERSATIONS, newest first, in the shape the import card and the
@@ -297,25 +419,25 @@ export const isLive = (mtime, now = Date.now()) => Number(mtime) > 0 && now - Nu
  *  being written. And the name Codex gave a conversation is read from every
  *  folder's index, newest entry winning, so the copy kept still carries a name
  *  that only another folder's index knew. */
-export function readCodexThreads({ home = os.homedir(), codexDir = null, codexDirs = null, days = CODEX_RECENT_DAYS, now = Date.now() } = {}) {
+export function readCodexThreads({ home = os.homedir(), codexDir = null, codexDirs = null, days = CODEX_RECENT_DAYS, now = Date.now() }: CodexThreadsOptions = {}): CodexThreadsRead {
   const dirs = codexDirs ?? (codexDir ? [codexDir] : codexDataDirs({ home }));
   const cutoff = now - Math.max(0, Number(days) || 0) * 86400 * 1000;
-  const index = new Map();
+  const index = new Map<string, CodexIndexEntry>();
   for (const dir of dirs) {
     for (const [id, entry] of readCodexIndex(dir)) {
       const had = index.get(id);
       if (!had || (entry.name && (!had.name || entry.updatedAt > had.updatedAt))) index.set(id, entry);
     }
   }
-  const byId = new Map();
-  const skipped = { notHers: 0, scratch: 0, ours: 0, old: 0, empty: 0, unreadable: 0, copy: 0 };
+  const byId = new Map<string, CodexThread & { fileTime: number }>();
+  const skipped: CodexSkipped = { notHers: 0, scratch: 0, ours: 0, old: 0, empty: 0, unreadable: 0, copy: 0 };
   for (const dir of dirs) readOneCodexHome(dir, { home, days, now, cutoff, index, byId, skipped });
   const out = [...byId.values()].map(({ fileTime, ...t }) => t);
   out.sort((a, b) => b.when - a.when);
   return { threads: out, skipped };
 }
 
-function readOneCodexHome(codexDir, { home, days, now, cutoff, index, byId, skipped }) {
+function readOneCodexHome(codexDir: string, { home, days, now, cutoff, index, byId, skipped }: CodexHomeRead) {
   for (const file of listRolloutFiles(codexDir, { days, since: cutoff })) {
     const r = readRollout(file);
     if (!r) { skipped.unreadable += 1; continue; }
@@ -362,22 +484,22 @@ function readOneCodexHome(codexDir, { home, days, now, cutoff, index, byId, skip
 // the app, so its transcripts stay remembered between reads. Where a worker
 // cannot start, the read runs here as before.
 const OFF_THREAD_DEADLINE_MS = 5 * 60_000;
-let worker = null;
+let worker: Worker | null = null;
 let asked = 0;
-const waiting = new Map();
-export function readCodexThreadsOffThread(opts = {}) {
+const waiting = new Map<number, OffThreadWait>();
+export function readCodexThreadsOffThread(opts: CodexThreadsOptions = {}): Promise<CodexThreadsRead> {
   try {
     if (!worker) {
       worker = new Worker(new URL('./codex-threads-worker.mts', import.meta.url));
       worker.unref();
-      worker.on('message', ({ id, ok, value, error }) => {
+      worker.on('message', ({ id, ok, value, error }: OffThreadReply) => {
         const w = waiting.get(id);
         if (!w) return;
         waiting.delete(id);
         clearTimeout(w.timer);
         if (ok) w.resolve(value); else w.reject(new Error(error));
       });
-      const fail = (err) => {
+      const fail = (err: Error) => {
         for (const w of waiting.values()) { clearTimeout(w.timer); w.reject(err); }
         waiting.clear();
         worker = null;
@@ -389,10 +511,10 @@ export function readCodexThreadsOffThread(opts = {}) {
     return Promise.resolve().then(() => readCodexThreads(opts));
   }
   const id = (asked += 1);
-  return new Promise((resolve, reject) => {
+  return new Promise<CodexThreadsRead>((resolve, reject) => {
     const timer = setTimeout(() => { waiting.delete(id); reject(new Error('the Codex reader did not answer in time')); }, OFF_THREAD_DEADLINE_MS);
     timer.unref?.();
     waiting.set(id, { resolve, reject, timer });
-    worker.postMessage({ id, opts });
+    worker!.postMessage({ id, opts });
   });
 }

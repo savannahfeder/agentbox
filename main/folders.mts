@@ -34,7 +34,7 @@ export const startingPoint = (home = os.homedir()) => home;
  *  `~` is how our own screens write the home folder, and somebody typing a path
  *  by hand writes it that way too.
  */
-export function absolute(at, home = os.homedir()) {
+export function absolute(at: unknown, home: string = os.homedir()): string {
   const s = String(at ?? '').trim();
   if (!s) return startingPoint(home);
   if (s === '~') return home;
@@ -50,20 +50,29 @@ export function absolute(at, home = os.homedir()) {
  *  answer rather than a throw: somebody navigating a disk lands on a folder
  *  they cannot open fairly often, and the screen should say so and stay put.
  */
-export function listFolders({ at, home = os.homedir(), showHidden = false } = {}) {
+export interface FolderListing {
+  at: string;
+  parent: string | null;
+  home: string;
+  folders: { name: string; path: string }[];
+  unreadable?: string;
+}
+
+export function listFolders({ at, home = os.homedir(), showHidden = false }: { at?: unknown; home?: string; showHidden?: boolean } = {}): FolderListing {
   const here = absolute(at, home);
   const parent = path.dirname(here);
 
-  let entries;
+  let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(here, { withFileTypes: true });
   } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
     return {
       at: here,
       parent: parent === here ? null : parent,
       home,
       folders: [],
-      unreadable: err.code === 'EACCES' || err.code === 'EPERM'
+      unreadable: code === 'EACCES' || code === 'EPERM'
         ? 'The system will not let this be opened.'
         : 'That folder is not there any more.',
     };

@@ -31,8 +31,8 @@ function bakedUrl() {
 }
 
 const BAKED = bakedUrl();
-const clean = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+const clean = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
-export function feedbackUrl(config, baked = BAKED, env = process.env) {
+export function feedbackUrl(config: { feedbackUrl?: unknown } | null | undefined, baked: unknown = BAKED, env: NodeJS.ProcessEnv = process.env): string | null {
   return clean(config?.feedbackUrl) ?? clean(readEnv('FEEDBACK_URL', env)) ?? clean(baked);
 }

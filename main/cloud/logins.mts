@@ -27,6 +27,117 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { wayBack, listenForWayBack } from './browser-return.mts';
+import type { CloudPayload, CloudReply, CloudStorage, CloudTransport } from './managed.mts';
+
+export interface CloudLoginRenewing {
+  at: number;
+  id: string | null;
+}
+
+export interface CloudLoginRecord {
+  engine: string;
+  key?: string;
+  dir?: string;
+  id: string;
+  savedAt?: number;
+  expiresAt?: number | null;
+  email?: string | null;
+  org?: string | null;
+  limits?: readonly unknown[] | null;
+  readAt?: number;
+  broken?: string | null;
+  renewing?: number | CloudLoginRenewing | null;
+  lastUsedAt?: number | null;
+  retired?: { id: string; at: number }[];
+  duplicateOf?: string;
+  limitedUntil?: number;
+  lookFailedAt?: number;
+  lookError?: string | null;
+}
+
+export type CloudLogins = Record<string, CloudLoginRecord>;
+
+export interface RecordedLogin {
+  id: string;
+  savedAt?: number;
+  expiresAt?: number | null;
+  email?: string | null;
+  org?: string | null;
+  limits?: readonly unknown[] | null;
+}
+
+export interface CloudLoginPick {
+  home?: string;
+  now?: number;
+  only?: string[] | null;
+  prefer?: string | null;
+  follow?: boolean;
+}
+
+export interface SigninEvent {
+  seq?: number;
+  kind?: string;
+  state?: string;
+  url?: string;
+  code?: string;
+  message?: string | null;
+  email?: string;
+  expiresAt?: number;
+  org?: string;
+  limits?: unknown[];
+  signedOut?: boolean;
+}
+
+export interface CloudSignInStatus {
+  state: string;
+  url: string | null;
+  code: string | null;
+  message: string | null;
+  attempt: string;
+}
+
+export interface CloudSignInOptions {
+  transport: CloudTransport;
+  storage: CloudStorage;
+  engine: string;
+  dir: string;
+  home?: string;
+  expectEmail?: string | null;
+  onChange?: (status: CloudSignInStatus) => void;
+  onSaved?: () => void;
+  pollWaitMs?: number;
+  checkMs?: number;
+}
+
+export interface CloudSignIn {
+  status(): CloudSignInStatus;
+  done: Promise<CloudSignInStatus>;
+  code(text: unknown): Promise<boolean>;
+  cancel(): Promise<void>;
+}
+
+export interface CloudSessionOptions {
+  transport: CloudTransport;
+  pollWaitMs?: number;
+}
+
+export interface CloudLimitReading {
+  percent: number;
+  span?: string;
+  resetsAt?: number | null;
+}
+
+interface SessionStart extends CloudPayload {
+  action: string;
+  runId: string;
+  engine: string;
+}
+
+interface SessionOptions extends CloudSessionOptions {
+  start: SessionStart;
+  onEvent?: (e: SigninEvent) => void;
+  isCancelled?: () => boolean;
+}
 
 // A Codex access token lasts 240 hours. One with under 3 days left is
 // renewed; one with under 9 hours (an 8-hour run and its homecoming) does not
@@ -40,23 +151,23 @@ const RENEWAL_FENCE_MS = 10 * 60_000;
 const OLD_LOGIN_GRACE_MS = 60 * 60_000;
 const LINK_SECONDS = 30 * 60;
 
-export const loginObjectKey = (engine, id) => `logins/${engine}/${id}.json`;
+export const loginObjectKey = (engine: string, id: string) => `logins/${engine}/${id}.json`;
 export const cloudLoginsPath = (home = os.homedir()) => path.join(home, '.agentbox', 'cloud-logins.json');
 // The key is the account's own (`acct-…`), or, in older notes and tests, a
 // folder; either way it is used exactly as given.
-const accountOf = (engine, key) => `${engine}:${key}`;
+const accountOf = (engine: string, key: string | undefined) => `${engine}:${key}`;
 export const newCloudAccountKey = () => `acct-${crypto.randomUUID().slice(0, 8)}`;
 
-export function readCloudLogins({ home = os.homedir() } = {}) {
+export function readCloudLogins({ home = os.homedir() }: { home?: string } = {}): CloudLogins {
   try {
-    const all = JSON.parse(fs.readFileSync(cloudLoginsPath(home), 'utf8'));
-    return all && typeof all === 'object' ? all : {};
+    const all: unknown = JSON.parse(fs.readFileSync(cloudLoginsPath(home), 'utf8'));
+    return all && typeof all === 'object' ? all as CloudLogins : {};
   } catch {
     return {};
   }
 }
 
-function writeCloudLogins(all, { home = os.homedir() } = {}) {
+function writeCloudLogins(all: CloudLogins, { home = os.homedir() }: { home?: string } = {}) {
   const file = cloudLoginsPath(home);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.${crypto.randomUUID()}.tmp`;
@@ -69,7 +180,7 @@ function writeCloudLogins(all, { home = os.homedir() } = {}) {
 // be one step, or an old run's report lands over a new sign-in (Codex's
 // review, finding 2). A lock file, taken exclusively; one left by a process
 // that died is stale after ten seconds.
-function withLock(home, fn) {
+function withLock<T>(home: string, fn: () => T): T {
   const lock = `${cloudLoginsPath(home)}.lock`;
   fs.mkdirSync(path.dirname(lock), { recursive: true });
   const until = Date.now() + 5000;
@@ -79,7 +190,7 @@ function withLock(home, fn) {
       fs.closeSync(fs.openSync(lock, 'wx'));
       break;
     } catch (err) {
-      if (err.code !== 'EEXIST') throw err;
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
       try { if (Date.now() - fs.statSync(lock).mtimeMs > 10_000) { fs.rmSync(lock, { force: true }); continue; } } catch { continue; }
       if (Date.now() > until) throw new Error('the cloud sign-in note is busy');
       Atomics.wait(pause, 0, 0, 15);
@@ -88,13 +199,13 @@ function withLock(home, fn) {
   try { return fn(); } finally { fs.rmSync(lock, { force: true }); }
 }
 
-export function cloudLoginFor(engine, dir, { home = os.homedir() } = {}) {
+export function cloudLoginFor(engine: string, dir: string | undefined, { home = os.homedir() }: { home?: string } = {}) {
   return readCloudLogins({ home })[accountOf(engine, dir)] ?? null;
 }
 
 // A new sign-in becomes the account's current one. What it replaced is kept
 // on a list to delete once no run can still be about to fetch it.
-export function recordCloudLogin(engine, dir, { id, savedAt = Date.now(), expiresAt = null, email = null, org = null, limits = null }, { home = os.homedir(), now = Date.now() } = {}) {
+export function recordCloudLogin(engine: string, dir: string, { id, savedAt = Date.now(), expiresAt = null, email = null, org = null, limits = null }: RecordedLogin, { home = os.homedir(), now = Date.now() }: { home?: string; now?: number } = {}): CloudLoginRecord {
   return withLock(home, () => {
   const all = readCloudLogins({ home });
   const key = accountOf(engine, dir);
@@ -111,7 +222,7 @@ export function recordCloudLogin(engine, dir, { id, savedAt = Date.now(), expire
 
 // A change to the account's note that applies only while `id` is still its
 // current login: an old run that reports trouble cannot undo a new sign-in.
-export function markCloudLogin(engine, dir, id, patch, { home = os.homedir() } = {}) {
+export function markCloudLogin(engine: string, dir: string, id: string | null | undefined, patch: Partial<CloudLoginRecord>, { home = os.homedir() }: { home?: string } = {}) {
   return withLock(home, () => {
     const all = readCloudLogins({ home });
     const key = accountOf(engine, dir);
@@ -126,9 +237,9 @@ export function markCloudLogin(engine, dir, id, patch, { home = os.homedir() } =
 // (`org`, main/cloud/org.mts) matches an earlier record's, by when they were
 // saved. Key -> the earlier record's key. A record with no org yet is no one's
 // duplicate.
-function duplicatesIn(records) {
-  const first = new Map();
-  const dup = new Map();
+function duplicatesIn(records: Partial<CloudLoginRecord>[]) {
+  const first = new Map<string, string | undefined>();
+  const dup = new Map<string | undefined, string | undefined>();
   for (const r of [...records].sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0) || String(a.key).localeCompare(String(b.key)))) {
     if (!r?.org) continue;
     const id = `${r.engine}:${r.org}`;
@@ -142,7 +253,7 @@ function duplicatesIn(records) {
 // account as an earlier one), 'limited' (at its usage limit until
 // `limitedUntil`), 'renew' (Codex: must be renewed before a run), 'stale'
 // (Codex: may run, renewal due), 'ready'.
-export function cloudLoginState(rec, { now = Date.now() } = {}) {
+export function cloudLoginState(rec: Partial<CloudLoginRecord> | null | undefined, { now = Date.now() }: { now?: number } = {}) {
   if (!rec?.id) return 'none';
   if (rec.broken) return 'broken';
   if (rec.duplicateOf) return 'duplicate';
@@ -154,10 +265,10 @@ export function cloudLoginState(rec, { now = Date.now() } = {}) {
   return 'ready';
 }
 
-export const mayRunOn = (state) => state === 'ready' || state === 'stale';
+export const mayRunOn = (state: string) => state === 'ready' || state === 'stale';
 
 // Every cloud account of an engine, oldest first.
-export function listCloudLogins(engine, { home = os.homedir() } = {}) {
+export function listCloudLogins(engine: string, { home = os.homedir() }: { home?: string } = {}): CloudLoginRecord[] {
   const mine = Object.values(readCloudLogins({ home })).filter((r) => r && r.engine === engine && r.id);
   const dup = duplicatesIn(mine);
   return mine
@@ -165,15 +276,15 @@ export function listCloudLogins(engine, { home = os.homedir() } = {}) {
     .sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0));
 }
 
-export function cloudAccountsFrom(env = process.env) {
+export function cloudAccountsFrom(env: NodeJS.ProcessEnv = process.env) {
   const list = String(env.AGENTBOX_CLOUD_ACCOUNTS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
   return list.length ? list : null;
 }
 
 // The cloud account that is this Mac's own account, which the app hands each
 // cloud run it starts (Supervisor#_cloudAccountEnv).
-export const CLOUD_ACCOUNT_ENV = { claude: 'AGENTBOX_CLOUD_CLAUDE_ACCOUNT', codex: 'AGENTBOX_CLOUD_CODEX_ACCOUNT' };
-export function cloudAccountFrom(env = process.env, engine = 'claude') {
+export const CLOUD_ACCOUNT_ENV: Record<string, string> = { claude: 'AGENTBOX_CLOUD_CLAUDE_ACCOUNT', codex: 'AGENTBOX_CLOUD_CODEX_ACCOUNT' };
+export function cloudAccountFrom(env: NodeJS.ProcessEnv = process.env, engine = 'claude') {
   return String(env?.[CLOUD_ACCOUNT_ENV[engine]] ?? '').trim() || null;
 }
 
@@ -197,9 +308,9 @@ export function cloudAccountFrom(env = process.env, engine = 'claude') {
 //
 // `only` (emails or keys) narrows it for a copy of the app under test, which
 // shares this list with the person's own app.
-function accountInUse(all, engine, { now, only, prefer, follow = false }) {
+function accountInUse(all: CloudLogins, engine: string, { now, only, prefer, follow = false }: { now: number; only: string[] | null; prefer: string | null; follow?: boolean }): [string, CloudLoginRecord] | null {
   const dup = duplicatesIn(Object.values(all).filter((r) => r?.engine === engine));
-  const named = (r) => !only || [r.email, r.key ?? r.dir].some((n) => n && only.includes(String(n).toLowerCase()));
+  const named = (r: Partial<CloudLoginRecord>) => !only || [r.email, r.key ?? r.dir].some((n) => n && only.includes(String(n).toLowerCase()));
   // A login that was never finished or has stopped working is not an account
   // at all. A Codex login due a renewal is the account and simply cannot run
   // yet; `Supervisor#_renewCloudLogins` mends that on its own clock.
@@ -213,12 +324,12 @@ function accountInUse(all, engine, { now, only, prefer, follow = false }) {
 }
 
 /** The account a run would take now, whether or not it can run. Null with none. */
-export function cloudLoginInUse(engine, { home = os.homedir(), now = Date.now(), only = null, prefer = null, follow = false } = {}) {
+export function cloudLoginInUse(engine: string, { home = os.homedir(), now = Date.now(), only = null, prefer = null, follow = false }: CloudLoginPick = {}) {
   const hit = accountInUse(readCloudLogins({ home }), engine, { now, only, prefer, follow });
   return hit ? { ...hit[1], key: hit[1].key ?? hit[1].dir } : null;
 }
 
-export function pickCloudLogin(engine, { home = os.homedir(), now = Date.now(), only = null, prefer = null, follow = false } = {}) {
+export function pickCloudLogin(engine: string, { home = os.homedir(), now = Date.now(), only = null, prefer = null, follow = false }: CloudLoginPick = {}) {
   return withLock(home, () => {
     const all = readCloudLogins({ home });
     const hit = accountInUse(all, engine, { now, only, prefer, follow });
@@ -230,20 +341,20 @@ export function pickCloudLogin(engine, { home = os.homedir(), now = Date.now(), 
   });
 }
 
-const clock = (t) => new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase();
+const clock = (t: number) => new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase();
 
 /** Why a run found no account to take, as its thread will quote it. */
-export function noCloudAccountSentence(engine, inUse, { now = Date.now() } = {}) {
+export function noCloudAccountSentence(engine: string, inUse: CloudLoginRecord | null | undefined, { now = Date.now() }: { now?: number } = {}) {
   const name = engine === 'codex' ? 'Codex' : 'Claude';
   const state = inUse ? cloudLoginState(inUse, { now }) : 'none';
-  if (state === 'limited') return `the ${name} account the cloud runs on is at its usage limit until ${clock(inUse.limitedUntil)}`;
+  if (state === 'limited') return `the ${name} account the cloud runs on is at its usage limit until ${clock(inUse!.limitedUntil!)}`;
   if (state === 'renew') return `the ${name} account the cloud runs on is renewing its sign-in`;
   return `no ${name} account is signed in for the cloud yet (the cloud button)`;
 }
 
 // An account she took out of the cloud. Its object goes too, and every older
 // one it replaced (main/cloud/logins.mts keeps them only for runs under way).
-export async function removeCloudLogin(engine, key, { storage, home = os.homedir() } = {}) {
+export async function removeCloudLogin(engine: string, key: string, { storage, home = os.homedir() }: { storage?: CloudStorage; home?: string } = {}) {
   const rec = cloudLoginFor(engine, key, { home });
   if (!rec) return false;
   withLock(home, () => {
@@ -259,10 +370,10 @@ export async function removeCloudLogin(engine, key, { storage, home = os.homedir
 
 // Delete what newer sign-ins replaced, once their grace is over. Never the
 // current one.
-export async function sweepRetiredLogins(engine, dir, { storage, home = os.homedir(), now = Date.now() } = {}) {
+export async function sweepRetiredLogins(engine: string, dir: string, { storage, home = os.homedir(), now = Date.now() }: { storage?: CloudStorage; home?: string; now?: number } = {}) {
   const rec = cloudLoginFor(engine, dir, { home });
   if (!rec?.retired?.length || !storage?.del) return;
-  const keep = [];
+  const keep: { id: string; at: number }[] = [];
   for (const r of rec.retired) {
     if (now - r.at < OLD_LOGIN_GRACE_MS || r.id === rec.id) { keep.push(r); continue; }
     try { await storage.del(loginObjectKey(engine, r.id)); } catch { keep.push(r); }
@@ -274,10 +385,10 @@ export async function sweepRetiredLogins(engine, dir, { storage, home = os.homed
 // One sandbox session that is not a run: a sign-in or a renewal. Starts it,
 // reads its `signin` events until it says how it ended, and lets the session
 // go. `onEvent` hears each event; the session's end is the promise's value.
-async function session({ transport, start, onEvent = () => {}, pollWaitMs = 20_000, isCancelled = () => false }) {
+async function session({ transport, start, onEvent = () => {}, pollWaitMs = 20_000, isCancelled = () => false }: SessionOptions): Promise<SigninEvent> {
   const sessionId = `agentbox-${start.action}-${start.engine}-${start.runId}`;
-  const say = (state, extra = {}) => ({ state, ...extra });
-  const invoke = async (payload) => {
+  const say = (state: string, extra: Partial<SigninEvent> = {}): SigninEvent => ({ state, ...extra });
+  const invoke = async (payload: CloudPayload): Promise<CloudReply> => {
     for (let failures = 0; ;) {
       try { return await transport.invoke(sessionId, payload); } catch (err) {
         failures += 1;
@@ -302,8 +413,8 @@ async function session({ transport, start, onEvent = () => {}, pollWaitMs = 20_0
       for (const e of page.events || []) {
         since = Math.max(since, e.seq);
         if (e.kind !== 'signin') continue;
-        onEvent(e);
-        if (e.state === 'saved' || e.state === 'failed') return e;
+        onEvent(e as unknown as SigninEvent);
+        if (e.state === 'saved' || e.state === 'failed') return e as unknown as SigninEvent;
       }
     }
   } catch {
@@ -332,24 +443,24 @@ export const CHECK_MS = 150_000;
 // each with its own deadline (90 and 30 seconds); past both, it is not coming.
 const RETURN_MS = 125_000;
 
-function within(ms, promise) {
-  let timer;
-  const late = new Promise((_, no) => { timer = setTimeout(() => no(new Error('no answer')), ms); });
+function within<T>(ms: number, promise: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, no) => { timer = setTimeout(() => no(new Error('no answer')), ms); });
   return Promise.race([promise, late]).finally(() => clearTimeout(timer));
 }
 
-export function startCloudSignIn({ transport, storage, engine, dir, home = os.homedir(), expectEmail = null, onChange = () => {}, onSaved = () => {}, pollWaitMs, checkMs = CHECK_MS }) {
+export function startCloudSignIn({ transport, storage, engine, dir, home = os.homedir(), expectEmail = null, onChange = () => {}, onSaved = () => {}, pollWaitMs, checkMs = CHECK_MS }: CloudSignInOptions): CloudSignIn {
   const id = crypto.randomUUID();
   const runId = `signin-${id}`;
   const sessionId = `agentbox-signin-${engine}-${runId}`;
   // `attempt` tells one sign-in from the next, which can show the same link.
-  let status = { state: 'starting', url: null, code: null, message: null, attempt: runId };
+  let status: CloudSignInStatus = { state: 'starting', url: null, code: null, message: null, attempt: runId };
   let cancelled = false;
   let gaveUp = false;
-  let checkTimer = null;
-  let back = null;
+  let checkTimer: ReturnType<typeof setTimeout> | null = null;
+  let back: { close(): void } | null = null;
   const letBackGo = () => { back?.close(); back = null; };
-  const giveUp = (message) => {
+  const giveUp = (message: string | null) => {
     if (gaveUp || status.state === 'saved' || status.state === 'failed') return;
     gaveUp = true;
     cancelled = true;
@@ -358,7 +469,7 @@ export function startCloudSignIn({ transport, storage, engine, dir, home = os.ho
     onChange(status);
     transport.invoke(sessionId, { action: 'signal', runId, signal: 'SIGTERM' }).catch(() => {});
   };
-  const set = (patch) => {
+  const set = (patch: Partial<CloudSignInStatus>) => {
     status = { ...status, ...patch };
     // The check's clock starts when her part ends, and stops when it ends.
     if (status.state === 'checking' && !checkTimer) {
@@ -376,17 +487,17 @@ export function startCloudSignIn({ transport, storage, engine, dir, home = os.ho
   // The browser's return, passed to the cloud. Once taken the port goes, so
   // another Codex account can be added while this one is checked; one not
   // taken, short of OpenAI refusing it, leaves the sign-in waiting.
-  const handOn = async (query) => {
+  const handOn = async (query: string) => {
     if (status.state !== 'waiting') return false;
     set({ state: 'checking', message: null });
-    let out = null;
+    let out: CloudReply | null = null;
     try { out = await within(RETURN_MS, transport.invoke(sessionId, { action: 'signin-callback', runId, query })); } catch { /* not delivered */ }
     if (out?.ok) letBackGo();
-    else if (out?.error !== 'refused' && status.state === 'checking') set({ state: 'waiting' });
+    else if (out?.error !== 'refused' && status.state as string === 'checking') set({ state: 'waiting' });
     return !!out?.ok;
   };
   // The way back is open before the page is shown, so it is there first.
-  const openWayBack = async (url) => {
+  const openWayBack = async (url: string) => {
     const at = wayBack(url);
     if (!at) return giveUp('Codex’s sign-in link had no way back. Try again.');
     try {
@@ -407,7 +518,7 @@ export function startCloudSignIn({ transport, storage, engine, dir, home = os.ho
       start: { action: 'signin', runId, engine, saveUrl, ...(engine === 'codex' ? { flow: 'browser' } : {}) },
       onEvent: (e) => {
         if (e.state === 'needs-code') set({ state: 'needs-code', url: e.url });
-        else if (e.state === 'waiting' && engine === 'codex' && !e.code) void openWayBack(e.url);
+        else if (e.state === 'waiting' && engine === 'codex' && !e.code) void openWayBack(e.url!);
         else if (e.state === 'waiting') set({ state: 'waiting', url: e.url, code: e.code });
         else if (e.state === 'checking') set({ state: 'checking' });
       },
@@ -436,7 +547,7 @@ export function startCloudSignIn({ transport, storage, engine, dir, home = os.ho
   return {
     status: () => status,
     done,
-    async code(text) {
+    async code(text: unknown) {
       const c = String(text || '').trim();
       if (!c || status.state !== 'needs-code') return false;
       set({ state: 'checking', message: null });
@@ -446,7 +557,7 @@ export function startCloudSignIn({ transport, storage, engine, dir, home = os.ho
         ok = !!out?.ok;
       } catch { /* not delivered */ }
       // A code that did not reach the sign-in can be pasted again (finding 7).
-      if (!ok && status.state === 'checking') set({ state: 'needs-code', message: 'That code did not reach the sign-in. Paste it again.' });
+      if (!ok && status.state as string === 'checking') set({ state: 'needs-code', message: 'That code did not reach the sign-in. Paste it again.' });
       return ok;
     },
     async cancel() {
@@ -462,7 +573,7 @@ export function startCloudSignIn({ transport, storage, engine, dir, home = os.ho
 // login and keeps the renewed one as a new object. Fenced by a `renewing`
 // mark, so an app restarted mid-renewal does not start a second one on the
 // same refresh token. Returns 'renewed', 'busy', 'signed-out' or 'failed'.
-export async function renewCloudCodexLogin({ transport, storage, dir, home = os.homedir(), now = Date.now(), pollWaitMs }) {
+export async function renewCloudCodexLogin({ transport, storage, dir, home = os.homedir(), now = Date.now(), pollWaitMs }: CloudSessionOptions & { storage: CloudStorage; dir: string; home?: string; now?: number }) {
   const rec = cloudLoginFor('codex', dir, { home });
   if (!rec?.id || rec.broken) return 'failed';
   const was = typeof rec.renewing === 'number' ? { at: rec.renewing, id: null } : rec.renewing;
@@ -502,7 +613,7 @@ export async function renewCloudCodexLogin({ transport, storage, dir, home = os.
 
 /* ------------------------------- looking --------------------------------- */
 // A look's session and week, in the shape the usage meters draw. Null with none.
-export function cloudLimits(read) {
+export function cloudLimits(read: CloudLimitReading[] | null | undefined) {
   if (!Array.isArray(read) || !read.length) return null;
   return read.filter((l) => Number.isFinite(l?.percent)).map((l) => ({
     span: l.span === 'week' ? 'week' : 'session',
@@ -517,7 +628,7 @@ export function cloudLimits(read) {
 // that makes one tiny reply on it and reads the reply's headers. Kept on the
 // login's note only while that login is still the current one. A failed look
 // keeps the last reading and notes why beside it. Returns 'read' or 'failed'.
-export async function lookAtCloudLogin({ transport, storage, key, home = os.homedir(), now = Date.now(), pollWaitMs }) {
+export async function lookAtCloudLogin({ transport, storage, key, home = os.homedir(), now = Date.now(), pollWaitMs }: CloudSessionOptions & { storage: CloudStorage; key: string; home?: string; now?: number }) {
   const rec = cloudLoginFor('claude', key, { home });
   if (!rec?.id || rec.broken) return 'failed';
   const end = await session({
@@ -539,7 +650,7 @@ export async function lookAtCloudLogin({ transport, storage, key, home = os.home
 // the app's own copies for the cloud, never Claude Code's own login, and
 // nothing reads them now. Deleted once, on start.
 export const OLD_KEYCHAIN_SERVICE_SUFFIX = 'cloud: Claude sign-in';
-export function forgetOldCloudTokens({ home = os.homedir(), platform = process.platform, service, exec } = {}) {
+export function forgetOldCloudTokens({ home = os.homedir(), platform = process.platform, service, exec }: { home?: string; platform?: NodeJS.Platform; service?: string; exec?: (cmd: string, args: string[]) => unknown } = {}) {
   try { fs.rmSync(path.join(home, '.agentbox', 'cloud-tokens.json'), { force: true }); } catch { /* none */ }
   if (platform !== 'darwin' || !service || !exec) return;
   // One entry per account; delete until there are none (at most 20).

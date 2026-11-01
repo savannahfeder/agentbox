@@ -6,16 +6,22 @@ import os from 'node:os';
 import path from 'node:path';
 import { candidatePaths, versionedPaths } from './codex-bin.mjs';
 
-function executable(file) {
+function executable(file: string): boolean {
   try {
     fs.accessSync(file, fs.constants.X_OK);
     return fs.statSync(file).isFile();
   } catch { return false; }
 }
 
-export function codexLaunchEnv(bin, source = process.env, {
+export interface CodexLaunchEnvOptions {
+  home?: string;
+  exists?: (file: string) => boolean;
+  readdir?: (dir: string) => string[];
+}
+
+export function codexLaunchEnv(bin: string | null | undefined, source: NodeJS.ProcessEnv = process.env, {
   home = source.HOME || os.homedir(), exists = executable, readdir,
-} = {}) {
+}: CodexLaunchEnvOptions = {}): NodeJS.ProcessEnv {
   if (!bin) return { ...source };
   const binDir = path.dirname(bin);
   const inherited = (source.PATH || '').split(path.delimiter).filter(Boolean);
@@ -24,7 +30,7 @@ export function codexLaunchEnv(bin, source = process.env, {
   const directories = [...new Set([
     binDir, ...inherited,
     ...candidatePaths(home).map(path.dirname),
-    ...versionedPaths(home, readdir).map(path.dirname),
+    ...versionedPaths(home, readdir as never).map(path.dirname),
   ])];
   const nodeDir = directories.find(dir => exists(path.join(dir, 'node')));
   return { ...source, PATH: [...new Set([binDir, ...(nodeDir ? [nodeDir] : []), ...inherited])].join(path.delimiter) };
