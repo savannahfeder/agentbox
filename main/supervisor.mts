@@ -54,6 +54,7 @@ import { readCloudConfig, cloudAccountConfig, OLD_TOKEN_SERVICE, imageCapsToTry 
 import { cloudVersionGaps } from '../shared/cloud-versions.mts';
 import { cloudLoginState, mayRunOn, startCloudSignIn, renewCloudCodexLogin, sweepRetiredLogins, forgetOldCloudTokens, listCloudLogins, removeCloudLogin, newCloudAccountKey, lookAtCloudLogin, cloudLimits, markCloudLogin, cloudLoginInUse, cloudAccountsFrom, CLOUD_ACCOUNT_ENV } from './cloud/logins.mts';
 import type { CloudLimitReading } from './cloud/logins.mts';
+import type { TickInput } from './teammates.mts';
 import { execFileSync } from 'node:child_process';
 import { holdUntilHome } from './cloud/codex-cloud.mts';
 import { hostSocketPath, perlRunsTheShim, HOST_ALREADY_THERE } from './cloud/host.mts';
@@ -615,7 +616,7 @@ export interface SupervisorStore {
     briefFor(item: WorkItem): string | null;
     list?(now?: number): RouteMate[];
     noteTrouble(text: string, now?: number): void;
-    tick(opts: { items: WorkItem[]; now: number; deliver: unknown; tell: unknown }): Promise<unknown[]>;
+    tick(opts: TickInput): Promise<unknown[]>;
   } | null;
 }
 

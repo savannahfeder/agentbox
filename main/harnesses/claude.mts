@@ -48,7 +48,7 @@ export const claudeHarness = {
   tooling: (profile: string) => linkAccountTooling(profile),
   // A cloud run's command line and environment. A kit for the phone is made
   // from the same two (Supervisor#_writeKit), so the cloud's turn is this one.
-  cloudLaunch(sup: HarnessSupervisor, plan: HarnessPlan, { item, profile, env }: { item: HarnessItem; profile: string; env: Env }): { args: string[]; env: Env } {
+  cloudLaunch(sup: HarnessSupervisor, plan: HarnessPlan, { item, profile, env }: { item: HarnessItem; profile: string | null | undefined; env: Env }): { args: string[]; env: Env } {
     return {
       args: streamInputArgs(definition.run, cloudPermissionArgs(plan.args, cloudClaudeMode(sup.config.cloudPermission, plan.answerMode))),
       env: { ...env, STORE_ACCOUNT_ID: sup.config.accountId, ...storeRootEnv(sup.config.storeRoot),

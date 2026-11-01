@@ -63,7 +63,7 @@ export interface SyncState {
 type FsForState = Pick<typeof fs, 'readFileSync' | 'writeFileSync' | 'renameSync'>;
 
 /** What the cloud holds of a thread, as it is published for the team. */
-export interface SyncCard { threadId: string; [key: string]: unknown }
+export interface SyncCard { threadId: string; personId?: string; state?: string; visible?: boolean; title?: unknown; updatedAt?: unknown; [key: string]: unknown }
 
 export interface SyncFiles {
   size(dir: string, name: string): number | null;

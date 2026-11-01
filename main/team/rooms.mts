@@ -5,6 +5,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { wallCards, myPresence, displayNameOf, withoutHidden } from '../../shared/room-cards.mts';
+import type { WallCard, TeamCardLike } from '../../shared/room-cards.mts';
+import type { AgentHoursSummary } from '../../shared/agent-hours.mts';
 import { GENERAL_ROOM } from './rooms-memory.mts';
 import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mjs';
 
@@ -162,10 +164,7 @@ export interface RoomView extends RoomRow {
   people: { id: string; name: string; avatarUrl: string | null }[] | null;
 }
 
-export interface WallCard {
-  agents?: number;
-  [key: string]: unknown;
-}
+export type { WallCard };
 
 export interface RoomMention {
   id: string;
@@ -195,14 +194,14 @@ export interface RoomsState {
 export interface PresenceFacts {
   running?: { itemId: string; product: string; startedAt?: number }[];
   items?: { id: string; label?: string; title?: string }[];
-  products?: unknown[];
-  summary?: unknown;
+  products?: { slug?: string; personal?: boolean; seenBy?: string; seenByPeople?: string[] }[];
+  summary?: AgentHoursSummary | null;
 }
 
 export interface RoomsOptions {
   backend: () => RoomsBackend | null;
   me: () => { id: string; name?: string; avatarUrl?: string | null; status?: { text?: string | null; until?: number | string | null } | null } | null | undefined;
-  team: () => { people?: { id: string }[]; cards?: unknown[]; team?: unknown } | null | undefined;
+  team: () => { people?: { id: string }[]; cards?: TeamCardLike[]; team?: unknown } | null | undefined;
   enabled: () => boolean;
   device: () => string;
   presenceFacts: () => PresenceFacts | null | undefined;

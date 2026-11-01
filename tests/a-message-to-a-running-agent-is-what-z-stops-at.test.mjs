@@ -166,6 +166,6 @@ describe('why the window has to close at all', () => {
     expect(steer).toMatch(/child\.stdin\.write\(JSON\.stringify\(\{ type: 'user'/);
     // What is steered is their words inside `liveReplyBrief` (w-ac7f0c0cbb);
     // what matters here is only that the hand-over happens in this tick.
-    expect(read('main', 'live-replies.mts')).toMatch(/session\.child\.steer\(/);
+    expect(read('main', 'live-replies.mts')).toMatch(/session\.child!?\.steer!?\(/);
   });
 });

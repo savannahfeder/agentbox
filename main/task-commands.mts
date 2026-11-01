@@ -29,7 +29,7 @@ export interface CommandItem {
 
 export interface CommandProduct {
   slug: string;
-  repoPath?: string;
+  repoPath?: string | null;
   dir: string;
 }
 
@@ -38,8 +38,8 @@ export interface CommandSession {
 }
 
 export interface CompactionJob {
-  threadId?: string;
-  profile?: string;
+  threadId?: string | null;
+  profile?: string | null;
 }
 
 export interface CodexUsageReport {
@@ -55,12 +55,12 @@ export interface TaskCommandSupervisor extends HarnessSupervisor {
   _compactionJobs?: Map<string, CompactionJob>;
   _nativeCommands?: Record<string, string[] | undefined>;
   _saveState(): void;
-  _engineFor(item: CommandItem): string;
+  _engineFor(item: CommandItem | null | undefined): string;
   _codexUsageHome(): string;
   codexUsage(): CodexUsageReport | null;
-  rowSessionFor(item: CommandItem, product: CommandProduct | undefined): { sessionId?: string; profile?: string } | null | undefined;
+  rowSessionFor(item: CommandItem, product: CommandProduct | null | undefined): { sessionId?: string; profile?: string | null } | null | undefined;
   remoteControl(product: string, id: string, action: string): Promise<unknown>;
-  compactItem(product: string, id: string): Promise<CommandResult>;
+  compactItem(product: string, id: string): { state: string; at?: number } | null;
   store: {
     readItem(product: string, id: string): CommandItem | null | undefined;
     listProducts(): CommandProduct[];
@@ -136,7 +136,7 @@ function forkTask(sup: TaskCommandSupervisor, productSlug: string, id: string, i
   return publish('done', `Forked into a new task, starting from everything this conversation knows: ${made.title}`, op.name);
 }
 
-export async function taskCommand(sup: TaskCommandSupervisor, productSlug: string, id: string, text: string): Promise<CommandResult> {
+export async function taskCommand(sup: TaskCommandSupervisor, productSlug: string, id: string, text: string): Promise<CommandResult | { state: string; at?: number } | null> {
  const key=JSON.stringify([productSlug,id]);
  const publish=(state: string,message?: string,name?: string)=>{
   const value={state,text:message,name,at:Date.now()};

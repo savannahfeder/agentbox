@@ -12,7 +12,7 @@ import { createRoomHours } from './room-hours.mts';
 export interface RoomsSetupOptions {
   config: { alphaRooms?: boolean | null; storeRoot: string };
   store: {
-    listProducts(opts?: { includeArchived?: boolean }): { dir?: string | null; slug?: string | null }[];
+    listProducts(opts?: { includeArchived?: boolean }): { dir?: string | null; slug?: string; personal?: boolean; seenBy?: string; seenByPeople?: string[] }[];
     readItem(slug: string, id: string): { id: string; label?: string; title?: string } | null;
   };
   supervisor: { runsGoing(): { itemId: string; product: string; startedAt?: number }[] };
@@ -35,7 +35,7 @@ export function roomsSetup({ config, store, supervisor, userDir, log = (line) =>
     presenceFacts: (): PresenceFacts => {
       const running = supervisor.runsGoing().map((s) => ({ itemId: s.itemId, product: s.product, startedAt: s.startedAt }));
       const items = running.map((r) => { try { return store.readItem(r.product, r.itemId); } catch { return null; } }).filter(Boolean) as NonNullable<PresenceFacts['items']>;
-      let products: unknown[] = [];
+      let products: NonNullable<PresenceFacts['products']> = [];
       try { products = store.listProducts(); } catch { /* none to name */ }
       return { running, items, products, summary: hours.summary() };
     },

@@ -17,8 +17,7 @@
 // renderer/src as TypeScript until an agent told the user to "Press S on this
 // task" three days after S stopped scheduling: nothing a session is handed
 // said what the keys are, so it went by an old memory. The supervisor now
-// hands every run `keysForAgents()`, read off this same list, and main cannot
-// import TypeScript. Types are in shortcuts.d.mts beside it.
+// hands every run `keysForAgents()`, read off this same list.
 //
 // ONE SENTENCE A ROW, AND IT IS SHORT (w-1bc916a880). Every
 // sentence here is now under seventy characters and the test enforces it. A row

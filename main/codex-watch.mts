@@ -20,9 +20,9 @@ import { readCodexThreads } from './codex-threads.mts';
 export const CODEX_POLL_MS = 60_000;
 
 export interface CodexThread {
-  id?: unknown;
-  lastActive?: unknown;
-  live?: unknown;
+  id?: string;
+  lastActive?: number;
+  live?: boolean;
 }
 
 type Count = (event: string, props: { engine: string }) => void;

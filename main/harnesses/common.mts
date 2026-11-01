@@ -118,12 +118,11 @@ export interface HarnessSpawnContext {
 }
 
 export interface HarnessRecord {
-  sessionId?: string;
-  profile?: string;
-  cwd?: string;
+  sessionId?: string | null;
+  profile?: string | null;
+  cwd?: string | null;
   cloud?: boolean;
   model?: string | null;
-  [key: string]: unknown;
 }
 
 export interface HarnessSession {
@@ -135,7 +134,7 @@ export interface HarnessSession {
 export interface HarnessSupervisor {
   config: HarnessConfig;
   _profiles(): string[];
-  _claudeConfigDir(profile: string): string;
+  _claudeConfigDir(profile: string | null | undefined): string;
   _cloudDocsEnv(item: HarnessItem): Env;
   _spawnCloudRelay(args: string[], options: { cwd: string; env: Env }): ChildProcess;
   memoryGateEnv(item: HarnessItem): Env;
@@ -205,7 +204,7 @@ export interface Harness extends Omit<HarnessDefinition, 'instructions'> {
   updateSettings(options: { home: string }): UpdateSettings;
   runCommand(sup: HarnessSupervisor, options: Record<string, unknown>): Promise<unknown>;
   instructions(context: InstructionsContext): InstructionsAnswer;
-  cloudLaunch(sup: HarnessSupervisor, plan: HarnessPlan, context: { item: HarnessItem; profile: string; env: Env }): { args: string[]; env: Env };
+  cloudLaunch(sup: HarnessSupervisor, plan: HarnessPlan, context: { item: HarnessItem; profile: string | null | undefined; env: Env }): { args: string[]; env: Env };
 }
 
 export interface HarnessBinaryFound {

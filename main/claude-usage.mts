@@ -8,7 +8,7 @@ import { readUsageReport } from '../shared/claude-usage.mts';
 import { localZone, USAGE_UNREADABLE } from '../shared/usage.mts';
 import { runClaudeUsage } from './claude-usage-process.mts';
 import type { UsageRunner } from './claude-usage-process.mts';
-import type { UsageLimit } from '../shared/usage.d.mts';
+import type { UsageLimit } from '../shared/usage.mts';
 import { NO_METERED_KEY } from './harnesses/claude.mts';
 import { CERTIFICATES, LOCALE, PROXIES } from './shell-path.mjs';
 
