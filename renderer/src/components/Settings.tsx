@@ -1605,6 +1605,9 @@ function ShippingPage({ projects, every, everyNote, scope, codexReady, onScope, 
       )}
       <ShipWords key={scope}
         label={project ? `In your own words, for ${project.name}` : 'In your own words, for every project'}
+        description={project
+          ? (everyNote.trim() ? `Added to every project’s words, which apply here too: “${clip(everyNote.trim(), 120)}”` : 'Anything agents should follow before something in this project ships.')
+          : 'Anything agents should follow before something ships, like “never ship a database migration on its own”. Each project can add its own.'}
         text={project ? project.shipNote ?? '' : everyNote}
         onSave={(t) => (project ? onProjectNote(project.slug, t) : onEveryNote(t))} />
     </div>
@@ -1612,7 +1615,9 @@ function ShippingPage({ projects, every, everyNote, scope, codexReady, onScope, 
 }
 
 // Her own words about shipping, saved as she types, the way Instructions saves.
-function ShipWords({ label, text, onSave }: { label: string; text: string; onSave: (t: string) => void }) {
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+
+function ShipWords({ label, description, text, onSave }: { label: string; description: string; text: string; onSave: (t: string) => void }) {
   const [value, setValue] = useState(text);
   const [status, setStatus] = useState('');
   const timer = useRef<number | null>(null);
@@ -1627,7 +1632,7 @@ function ShipWords({ label, text, onSave }: { label: string; text: string; onSav
   return (
     <div className="set-group">
       <div className="instr-card">
-        <Part id="ship-words" label={label} description="Anything agents should follow before something ships, like \u201cnever ship a database migration on its own\u201d." writing={{ text: value, status, edit }} />
+        <Part id="ship-words" label={label} description={description} writing={{ text: value, status, edit }} />
       </div>
     </div>
   );

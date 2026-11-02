@@ -65,8 +65,17 @@ describe('the answers', () => {
     expect(rulesChip(ASK_FIRST)).toBeNull();
     expect(rulesChip(FIXES_SHIP)).toBe('Fixes ship on their own');
     expect(rulesChip({ ...ASK_FIRST, seen: 'test' })).toBe('Tested changes ship on their own');
-    expect(rulesChip({ small: 'ship', wide: 'ask', seen: 'test', big: 'ask' })).toBe('Fixes and tested changes ship on their own');
+    expect(rulesChip({ small: 'ship', wide: 'ask', seen: 'test', big: 'ask' })).toBe('Small fixes and tested changes ship on their own');
     expect(rulesChip({ ...ASK_FIRST, big: 'test-ask' })).toBe('AI testers try big changes first');
+  });
+
+  // Second round: "Fixes ship on their own" on a payments API where fixes
+  // touching money still ask, and the same words on two projects whose fixes
+  // were set apart.
+  it('name which fixes, when only one kind of fix ships', () => {
+    expect(rulesChip({ ...ASK_FIRST, small: 'ship' })).toBe('Small fixes ship on their own');
+    expect(rulesChip({ ...ASK_FIRST, wide: 'review' })).toBe('Reviewed fixes ship on their own');
+    expect(rulesChip({ ...ASK_FIRST, small: 'ship' })).not.toBe(rulesChip({ ...ASK_FIRST, wide: 'review' }));
   });
 
   it('say asking the same way on every kind', () => {

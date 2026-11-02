@@ -64,11 +64,12 @@ export const shipsAlone = (rules) => KINDS.some((k) => rules?.[k] && rules[k] !=
 
 /** A few words for the new-thread box, or null when everything asks. */
 export function rulesChip(rules) {
-  const fixes = rules.small === 'ship' || rules.wide === 'review';
-  const tested = rules.seen === 'test' || rules.big === 'test';
-  if (fixes && tested) return 'Fixes and tested changes ship on their own';
-  if (fixes) return 'Fixes ship on their own';
-  if (tested) return 'Tested changes ship on their own';
+  const small = rules.small === 'ship';
+  const wide = rules.wide === 'review';
+  const fixes = small && wide ? 'fixes' : small ? 'small fixes' : wide ? 'reviewed fixes' : '';
+  const tested = rules.seen === 'test' || rules.big === 'test' ? 'tested changes' : '';
+  const ship = [fixes, tested].filter(Boolean).join(' and ');
+  if (ship) return `${ship[0].toUpperCase()}${ship.slice(1)} ship on their own`;
   if (rules.big === 'test-ask') return 'AI testers try big changes first';
   return null;
 }
