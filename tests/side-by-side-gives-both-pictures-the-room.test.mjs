@@ -25,7 +25,7 @@ it('never gives a negative room', () => {
 it('side by side takes the comment list away and the stage reads its own padding', () => {
   const view = fs.readFileSync(new URL('../renderer/src/components/ArtifactView.tsx', import.meta.url), 'utf8');
   const stage = fs.readFileSync(new URL('../renderer/src/components/ArtifactStage.tsx', import.meta.url), 'utf8');
-  expect(view).toMatch(/\{!compare && \(found === 'looking'/);
+  expect(view).toMatch(/\{!compare && \(foundNow === 'looking'/);
   expect(stage).toMatch(/roomInside\(/);
   expect(stage).not.toMatch(/PICTURE_AIR/);
 });

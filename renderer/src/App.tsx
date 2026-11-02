@@ -187,7 +187,8 @@ import { waitingCounts } from './threads-made';
 import { closeAsk, closeAskOwnsKey, KEEP_OPEN, unshippedAsk } from './close-asks-first';
 import { notShipped, shipItAsk } from '../../shared/not-shipped.mjs';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
-import { agentLinks, chatProjects, chatTaskSharing, chatTranscript, taskBrief, taskTitle, withTask } from './team/agent-mentions';
+import { agentLinks, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
+import type { LedgerLine } from './thread-history';
 import { ruleIdOf, ruleLabel, runToOpen } from '../../shared/repeats.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { NOT_ANSWERING, NOT_ANSWERING_MS, RESTART_IT, RESTART_IT_MS, SEND_NOT_TAKEN } from './not-answering';
@@ -3614,7 +3615,12 @@ export default function App() {
     const nameOf = (by: string | undefined) => (by && team?.byId.get(by)?.name) || (by && by === team?.me ? 'You' : 'A teammate');
     const others = people.filter((p) => p !== team?.me).map((p) => nameOf(p));
     let transcript: Array<{ who: string; text: string }> = [];
-    try { transcript = chatTranscript((await api.itemHistory({ product: item.product, id: item.id }))?.lines ?? [], nameOf); } catch { /* the ask alone still briefs it */ }
+    let lines: LedgerLine[] = [];
+    try {
+      lines = (await api.itemHistory({ product: item.product, id: item.id }))?.lines ?? [];
+      transcript = chatTranscript(lines, nameOf);
+    } catch { /* the ask alone still briefs it */ }
+    const find = (product: string, id: string) => items.find((i) => i.id === id && i.product === product);
     const brief = taskBrief({ sent: text, asker: nameOf(team?.me ?? undefined), others, transcript });
     let out = text;
     for (const link of links) {
@@ -3626,11 +3632,12 @@ export default function App() {
         // Seen by the people in the conversation and nobody else, whoever
         // the project is shared with; a Just you project stays Just you.
         ...chatTaskSharing(project, people),
+        ...(lastAskKeptOnMac(lines, project.slug, find) ? { onMac: true } : {}),
       });
       if (made?.id) out = withTask(out, link, made.id);
     }
     return out;
-  }, [snap?.products, team]);
+  }, [snap?.products, team, items]);
 
   // WHAT A CONVERSATION NEEDS TO BRING AN AGENT IN AND TO DRAW ITS ANSWER
   // (w-7b9cb8636a, team/ChatAgents.tsx): the projects it can be sent to, the
