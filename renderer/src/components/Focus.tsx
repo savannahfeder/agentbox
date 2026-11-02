@@ -135,6 +135,8 @@ import {
 import { SummaryPanel, SummaryRail, ThreadCrumb, ThreadStateMark, useSummaryOpen, useSummaryShortcut, type RepeatHandle } from '../threads/Summary';
 import { summaryFits, summaryPlace } from '../room';
 import { ThreadMenu, type PlaceAct, type ThreadPlace } from '../threads/ThreadMenu';
+import { ThreadFilesButton } from '../threads/ThreadFiles';
+import { filesMadeHere } from '../threads/thread-files';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { ChatAgentsContext, useChatMentions } from '../team/ChatAgents';
 import { useThreadMentions } from './ThreadMentions';
@@ -1308,6 +1310,15 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const opensBig = (path?: string | null) => !onPhone() && !item.agent && !previewSample && !!viewKind(path) && viewKind(path) !== 'code';
   const openBig = (path: string) => setArtifact({ path, at: Date.now() });
   const openFileMark = useCallback((link: FileMarkLink) => setArtifact({ file: link.file, note: link.id, at: Date.now() }), []);
+  const [historyLines, setHistoryLines] = useState<unknown[]>([]);
+  useEffect(() => {
+    let live = true;
+    const read = () => { void api.itemHistory({ product: item.product, id: item.id }).then((r) => { if (live) setHistoryLines(r?.lines ?? []); }); };
+    read();
+    const off = api.onChanged(read);
+    return () => { live = false; off?.(); };
+  }, [item.product, item.id]);
+  const madeHere = useMemo(() => filesMadeHere(historyLines, item.artifacts?.notes ?? []), [historyLines, item.artifacts?.notes]);
   const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig });
   useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig }; });
   // A row in Needs you for a comment or an approval opens the file at it.
@@ -1697,6 +1708,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const threadMenu = (
     <ThreadMenu
       key={`${item.product}:${item.id}`}
+      files={<ThreadFilesButton files={madeHere} onOpen={(f) => (opensBig(f.src) ? openBig(f.src) : onOpenDoc?.(f.src))} />}
       change={changeFigures}
       onViewChange={() => onOpenDoc?.(changePathFor(item.id))}
       /* A PHONE HAS NO TERMINAL AND NO ⌘J (QA batch 005, F-118), and it is the
