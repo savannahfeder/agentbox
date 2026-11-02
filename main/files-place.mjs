@@ -372,10 +372,39 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   };
   const find = (key) => allFiles().find((f) => f.key === key) ?? null;
 
-  const onDisk = async (src, product, thread = null) => {
-    const found = await resolveArtifact({ src, product, products: readable(), accountRoot, storeRoot, thread });
+  const onDisk = async (src, product, thread = null, products = readable()) => {
+    const found = await resolveArtifact({ src, product, products, accountRoot, storeRoot, thread });
     return found.ok ? found.path : null;
   };
+
+  // An open file asks for every copy it names on each change in the app, so a
+  // project's copies are found and hashed once per state of the threads.
+  let copiesFor = { files: null, products: null, byProject: new Map() };
+  const copiesNow = (files) => {
+    if (copiesFor.files !== files) copiesFor = { files, products: readable(), byProject: new Map() };
+    return copiesFor;
+  };
+  function copiesIn(files, project) {
+    const { products, byProject } = copiesNow(files);
+    const key = projectKey(project);
+    if (!byProject.has(key)) {
+      byProject.set(key, (async () => {
+        const out = [];
+        for (const f of files) {
+          if (projectKey(f.project) !== key) continue;
+          for (const v of f.chain) {
+            for (const c of v.copies) {
+              const there = await onDisk(c.path, c.thread.ref.product, null, products);
+              const bytes = there && await bytesOf(there).catch(() => null);
+              if (bytes) out.push({ f, v, c, bytes });
+            }
+          }
+        }
+        return out;
+      })());
+    }
+    return byProject.get(key);
+  }
   const nameInRoom = (src) => String(src).replace(/^\.?\/?attachments\//, '');
   // A group's file may still be in the cloud, and drawing the list fetches nothing.
   async function openedOf(file, v, { fetch = false } = {}) {
@@ -698,38 +727,35 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
      * `path`: copies in the same project with the same bytes, under whatever
      * name. `file` is the version's name in this thread; theirs are given it.
      */
-    async sameFile({ product, id, path: src, file: here }) {
+    async sameFile({ product, id, path: src, file: here }, files = allFiles()) {
       const none = { key: null, notes: [], approvals: [] };
-      const files = allFiles();
       const isHere = (t) => t.ref.kind !== 'shared' && t.ref.product === product && t.ref.id === id;
       const home = files.find((f) => f.chain.some((v) => v.copies.some((c) => isHere(c.thread) && c.path === src)));
-      const mine = await onDisk(src, product);
+      const mine = await onDisk(src, product, null, copiesNow(files).products);
       const me = mine && await bytesOf(mine);
       if (!home || !me) return none;
       const notes = [];
       const approvals = [];
-      for (const f of files) {
-        if (projectKey(f.project) !== projectKey(home.project)) continue;
-        for (const v of f.chain) {
-          for (const c of v.copies) {
-            if (isHere(c.thread)) continue;
-            const there = await onDisk(c.path, c.thread.ref.product);
-            const it = there && await bytesOf(there);
-            if (!it || it.size !== me.size || it.hash !== me.hash) continue;
-            for (const n of f.notes) {
-              if (n.thread !== c.thread || n.file !== v.id || notes.some((x) => x.id === n.id)) continue;
-              const { thread, ...rest } = n;
-              notes.push({ ...rest, file: here, in: thread.title, key: f.key });
-            }
-            for (const a of f.approvals) {
-              if (a.thread !== c.thread || a.file !== v.id) continue;
-              const { thread: _t, ...rest } = a;
-              approvals.push({ ...rest, file: here, key: f.key });
-            }
-          }
+      for (const { f, v, c, bytes: it } of await copiesIn(files, home.project)) {
+        if (isHere(c.thread) || it.size !== me.size || it.hash !== me.hash) continue;
+        for (const n of f.notes) {
+          if (n.thread !== c.thread || n.file !== v.id || notes.some((x) => x.id === n.id)) continue;
+          const { thread, ...rest } = n;
+          notes.push({ ...rest, file: here, in: thread.title, key: f.key });
+        }
+        for (const a of f.approvals) {
+          if (a.thread !== c.thread || a.file !== v.id) continue;
+          const { thread: _t, ...rest } = a;
+          approvals.push({ ...rest, file: here, key: f.key });
         }
       }
       return { key: home.key, notes, approvals };
+    },
+
+    /** sameFile for every file a thread names, from one reading of the threads. */
+    async sameFiles({ product, id, copies }) {
+      const files = allFiles();
+      return Promise.all((copies ?? []).map((c) => this.sameFile({ product, id, path: String(c?.path ?? ''), file: String(c?.file ?? '') }, files)));
     },
 
     /** A comment, approval or "seen" from the big view, written where it belongs. */

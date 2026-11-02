@@ -2244,8 +2244,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     if (out.ok) { push(); void team?.syncNow?.()?.catch?.(() => {}); }
     return out;
   });
-  ipcMain.handle('zero:file-elsewhere', async (_e, { product, id, path: src, file } = {}) => {
-    try { return await filesPlaceNow().sameFile({ product: String(product ?? ''), id: String(id ?? ''), path: String(src ?? ''), file: String(file ?? '') }); } catch { return { key: null, notes: [], approvals: [] }; }
+  ipcMain.handle('zero:file-elsewhere', async (_e, { product, id, copies } = {}) => {
+    const asked = Array.isArray(copies) ? copies : [];
+    try { return await filesPlaceNow().sameFiles({ product: String(product ?? ''), id: String(id ?? ''), copies: asked }); } catch { return asked.map(() => ({ key: null, notes: [], approvals: [] })); }
   });
   ipcMain.handle('zero:file-line', async (_e, { product, id } = {}) => {
     try { return await filesPlaceNow().lineFor({ product: String(product ?? ''), id: String(id ?? '') }); } catch { return []; }

@@ -939,8 +939,10 @@ export const api = {
   async fileLine(p: { product: string; id: string }): Promise<FileLine[]> {
     return (await window.zero?.fileLine?.(p).catch(() => null)) ?? [];
   },
-  async fileElsewhere(p: { product: string; id: string; path: string; file: string }): Promise<FileElsewhere> {
-    return (await window.zero?.fileElsewhere?.(p).catch(() => null)) ?? { key: null, notes: [], approvals: [] };
+  /** One answer per copy, in the order asked. */
+  async fileElsewhere(p: { product: string; id: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]> {
+    const got = await window.zero?.fileElsewhere?.(p).catch(() => null);
+    return Array.isArray(got) ? got : p.copies.map(() => ({ key: null, notes: [], approvals: [] }));
   },
   async filesPlaceEdit(p: { key: string; text: string }): Promise<{ ok: boolean; error?: string; goes?: 'sent'; to?: string }> {
     if (!window.zero?.filesPlaceEdit) return { ok: false, error: `Quit and reopen ${NAME} to save this. Your words are still here.` };
