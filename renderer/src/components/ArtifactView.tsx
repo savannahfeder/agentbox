@@ -644,7 +644,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
           {editing && !compare && (
             <div className="av-pane" key={`editing-${editing.base.id}`} ref={editPane} onClick={pickInEditor}>
               <DocText product={product} src={editing.base.path} text={editing.text} mtime={0} folder={editing.folder} onSaved={() => {}} onNotice={setTold}
-                versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, draft: editing.draft, byline: bylineOf(editing.base) }} />
+                versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, draft: editing.draft, byline: bylineOf(version ?? editing.base) }} />
               {offers.comment && <SelectionBar page={editPane} onComment={(quote) => { setWholeAsked(false); setDraftPlace({ kind: 'quote', text: quote }); box.current?.focus(); }} />}
             </div>
           )}

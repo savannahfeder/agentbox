@@ -48,6 +48,21 @@ describe('the saved version reaching the view', () => {
   });
 });
 
+describe('opening a document from its thread', () => {
+  const focus = fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/components/Focus.tsx'), 'utf8');
+  const tile = focus.slice(focus.indexOf('<QueueFile key={path}'), focus.indexOf('/>', focus.indexOf('<QueueFile key={path}')));
+  it('opens the version its preview draws, which is the newest edit', () => {
+    expect(tile).toMatch(/path=\{newestOfFamily\(path, item\.artifacts\?\.edits\)\}/);
+    expect(tile).toMatch(/openBig\(newestOfFamily\(path, item\.artifacts\?\.edits\)\)/);
+  });
+  it('a press on a file with no edits opens the file it names', async () => {
+    const { newestOfFamily } = await import('../shared/artifact-marks.mjs');
+    expect(newestOfFamily('docs/plan.md', [])).toBe('docs/plan.md');
+    expect(newestOfFamily('docs/plan.md', [{ path: 'designs/w-1/plan-v2.md' }])).toBe('designs/w-1/plan-v2.md');
+    expect(newestOfFamily('docs/other.md', [{ path: 'designs/w-1/plan-v2.md' }])).toBe('docs/other.md');
+  });
+});
+
 describe('what a save posts', () => {
   it('the typed words', () => {
     expect(wordsToSave({ typed: 'new', posted: null, original: 'old' })).toBe('new');
@@ -97,6 +112,11 @@ describe('the view', () => {
   });
   it('saves when the window loses focus', () => {
     expect(view).toMatch(/addEventListener\('blur', saveNow\)/);
+  });
+  it('"Show v4" on an older version can be pressed, though the line it sits on lets presses through', () => {
+    const css = fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/components/artifact-view.css'), 'utf8');
+    expect(css).toMatch(/\.av-told \{[^}]*pointer-events: none/);
+    expect(css).toMatch(/\.av-told \.av-btn \{[^}]*pointer-events: auto/);
   });
   it('words typed into the document can still be commented on', () => {
     expect(between('{editing && !compare && (', '{version && !compare && !editing')).toContain('<SelectionBar');

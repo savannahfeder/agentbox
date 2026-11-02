@@ -2211,7 +2211,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       {/* One thing at a time reads a page or a note in place rather than as a
           tile, and not a second time while it is open on the side. */}
       {inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && <QueueFile key={path} product={product} path={newestOfFamily(path, item.artifacts?.edits)} md={md}
-        onOpen={() => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'focus'))} onSide={() => onOpenArtifact?.(path, 'beside')} />)}
+        onOpen={() => (opensBig(path) ? openBig(newestOfFamily(path, item.artifacts?.edits)) : onOpenArtifact?.(path, 'focus'))} onSide={() => onOpenArtifact?.(path, 'beside')} />)}
       {/* What the page cannot read in place, a deck or a PDF, is a tile under it. */}
       {page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths.filter((path) => !readsInPlace(path))} revision={item.updatedAt} openDoc={openDoc} onOpen={path => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'beside'))} />}
       {!page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths} revision={item.updatedAt} openDoc={openDoc} onOpen={path => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'beside'))} />}
