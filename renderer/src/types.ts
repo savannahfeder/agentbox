@@ -675,6 +675,8 @@ export interface TeamChatLine {
   doc?: { product: string; src: string; name: string };
   /** The words that set a new teammate up; from a suggestion, with the threads it was made from. */
   setup?: boolean; threads?: { product: string; id: string; title: string }[];
+  /** The teammate's thread it was written in. */
+  run?: string;
   /** On an `act`: `learned` (kept something about you), `updated` (changed its own instructions),
    *  `lesson` (added to the playbook `ref`), and the older run and pause verbs. */
 }

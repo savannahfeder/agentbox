@@ -116,6 +116,7 @@ import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, lookMeans, lookOf,
 import { WorkspaceNavigation } from './components/WorkspaceNavigation';
 import { useRooms } from './team/rooms/useRooms';
 import { useTeammates } from './teammates/useTeammates';
+import { ThreadQuestions } from './teammates/TeammatesPage';
 import { FilesPlace, useFilesList } from './files/FilesPlace';
 import { ConnectionsPlace } from './connections/ConnectionsPlace';
 import { TeammatesContext } from './teammates/row-lead';
@@ -7687,6 +7688,7 @@ export default function App() {
                   onAsked={() => setThreadAsk(null)}
                   onShown={setOpenShows}
                   aboveDock={<><PhoneStatus message={snap.phoneStatus} />{whereItWent}</>}
+                  questions={teammateIdOf(focused) ? <ThreadQuestions view={snap.teammates} item={focused} onChanged={() => { void refresh(); }} /> : null}
                   onReveal={() => revealAgent(focused)}
                   // Remind me later and stop this task are neither of the two
                   // ways a task ends, and the card beside the bar names exactly
