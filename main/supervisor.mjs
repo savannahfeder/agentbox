@@ -273,6 +273,7 @@ const HUNG_QUIET_MS = 10 * 60_000;
 // A pass this late was not late, the Mac was asleep (forgiveSleep). Eight
 // missed passes: past any slow pass, well under the ten minutes above.
 const SLEPT_GAP_MS = 2 * 60_000;
+const PROFILES_KEPT_MS = 1000;
 // Awake this long and not joined or taken back, a row handed to the cloud runs here (`_carriedHolds`).
 const PHONE_QUIET_MS = 10 * 60_000;
 // Two hangs on one row inside this window and the app stops restarting it and
@@ -4313,8 +4314,14 @@ export class Supervisor {
   // THE CONFIGURED ONES FIRST, THEN WHATEVER IS SIGNED IN ON THE DISK. One
   // copy of that rule, in main/account-discovery.mjs, so the fleet and the
   // Agents page can never disagree about which accounts exist.
+  // A tick asks once per waiting thread, so within one it is read at most once a second.
   _profiles() {
-    return effectiveProfiles(this.config.authProfiles, { home: this.config.home });
+    const now = Date.now();
+    const kept = this._profilesKept;
+    if (this._ticking && kept && now - kept.at < PROFILES_KEPT_MS) return [...kept.list];
+    const list = effectiveProfiles(this.config.authProfiles, { home: this.config.home });
+    this._profilesKept = { at: now, list };
+    return [...list];
   }
 
   // THE CODEX LOGIN, WHICH IS NOT ONE OF THE CLAUDE ONES.
