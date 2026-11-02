@@ -31,9 +31,9 @@ export interface TryAgainOutcome { resumed?: number; queued?: number; working?: 
 
 /** What a press of Try again says, whatever came back, so a press is never silent. */
 export function tryAgainWords(r: TryAgainOutcome | null | undefined): string {
-  if (!r) return 'Try again did not reach the app. Quit and reopen it, then try again.';
+  if (!r) return 'Try again did not reach the app.';
   if (r.resumed) return 'Trying again now.';
-  if (r.queued) return 'Queued. It starts as soon as an agent is free.';
+  if (r.queued) return 'Queued.';
   if (r.working) return 'Already running.';
   if (r.failed) return `It could not start: ${String(r.why ?? 'the app did not say why').replace(/\.$/, '')}.`;
   if (r.missing) return 'This thread is gone from this computer.';

@@ -570,8 +570,8 @@ function VoicePick({ voice, words, onPick, none = null }: { voice: { id: string;
   </span>;
 }
 
-const READS = [{ id: 'threads', label: 'Shared threads only' }, { id: 'all', label: 'Everything you can read, your direct messages too' }];
-const TEAM_CAN = [{ id: 'ask', label: 'See what it does. What they write to it comes to you' }, { id: 'open', label: 'See what it does and give it work' }];
+const READS = [{ id: 'threads', label: 'Shared threads only' }, { id: 'all', label: 'Everything you can read' }];
+const TEAM_CAN = [{ id: 'ask', label: 'See what it does' }, { id: 'open', label: 'See what it does and give it work' }];
 const EVERY_WORDS = [{ id: 'day', label: 'Every day' }, { id: 'weekday', label: 'Weekdays' }, { id: 'week', label: 'Every week' }];
 const NO_ROUND = { id: 'none', label: 'Only when someone writes to it' };
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((label, i) => ({ id: String(i), label }));

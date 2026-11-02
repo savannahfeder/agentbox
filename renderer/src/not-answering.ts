@@ -25,7 +25,7 @@ export const RESTART_IT_MS = 45_000;
 export const NOT_ANSWERING = `${Name} is not answering.`;
 
 /** A conversation that is slow to read: the app is busy, not gone. */
-export const STILL_READING = 'Still reading this conversation. The app is busy.';
+export const STILL_READING = 'Still reading this conversation.';
 export const THREAD_NOT_ANSWERING_MS = 30_000;
 
 /** What a conversation being read says once it has waited this long; null for its own head. */

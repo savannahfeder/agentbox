@@ -1,5 +1,5 @@
 import { RemoteControl } from './RemoteControl';
-import { dropHalfMention, heldKeyThatOpenedTheBox, keyInTheReplyBox, replyName, replyTarget, sendKeyFor, unsentWords } from '../reply-keys';
+import { dropHalfMention, heldKeyThatOpenedTheBox, keyInTheReplyBox, replyName, replyTarget, sendKeyFor } from '../reply-keys';
 import { onPhone } from '../phone-screen';
 import { FilmBar, useFilm } from './FilmPlayer';
 import { useFilmPoster } from '../film-poster';
@@ -2914,7 +2914,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
       }
     } else if (finishing.current) return;
     if (saving || (!(spoken ?? text).trim() && !attachments.length)) return;
-    if (attaching.length) { onNotice(`${attaching[0].name} is still being attached. Send once it is in.`); return; }
+    if (attaching.length) { onNotice(`${attaching[0].name} is still being attached.`); return; }
     // AN AGENT WITH NO PROJECT DOES NOT GO OUT. The footer already says why;
     // ⌘↵ says it again rather than doing nothing.
     if (chat.block) { onNotice(chat.block); return; }
@@ -2983,7 +2983,6 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   };
   // A note being recorded is a draft: the box stays open round it.
   const hasDraft = !!text.trim() || attachments.length > 0 || recording;
-  const unsent = unsentWords({ words: text, files: attachments.length, sending: !!saving });
   // THE SLASH MENU, AND THE MODE THAT IS ALWAYS ON THE SCREEN.
   //
   // It does. Claude Code has no backslash TRIGGER: `/` opens its commands and
@@ -3601,7 +3600,6 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             things to choose between; a stop INSTEAD of a dead Send is one
             thing that is always the thing she can do. */}
         {stop && !hasDraft ? stop : (<>
-        {unsent && <span className="dock-unsent">{unsent}</span>}
         <button
           className="dock-send"
           onClick={() => send()}

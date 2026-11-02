@@ -34,7 +34,7 @@ import { AttachRow } from '../components/AttachRow';
 import { persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { draftKey, readDraft, readDraftAttachments, restoreFailedDraft, saveDraft, saveDraftAttachments } from '../drafts';
 import type { AgentTurn } from '../types';
-import { sendKeyFor, unsentWords } from '../reply-keys';
+import { sendKeyFor } from '../reply-keys';
 import './chat.css';
 
 // Before the frame is drawn in the app; a plain effect where there is no window.
@@ -119,7 +119,6 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
   const finishing = useRef(false);
   const [recording, setRecording] = useState(false);
   useEffect(() => { setNotice(null); }, [draft]);
-  const unsent = unsentWords({ words: draft, files: attachments.length, sending: false });
   // WHAT YOU SENT AND THE LEDGER DOES NOT HAVE YET, drawn at once and dropped
   // when your own committed copy arrives, so a reply never appears to vanish
   // between Enter and the next read of the row.
@@ -179,7 +178,7 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
     }
     const words = draft.trim();
     if (!words && !files.length) return;
-    if (attaching.length) { setNotice(`${attaching[0].name} is still being attached. Send once it is in.`); return; }
+    if (attaching.length) { setNotice(`${attaching[0].name} is still being attached.`); return; }
     // An agent with no project does not go out; the line under the box says why.
     if (chat.block) { setNotice(chat.block); return; }
     const putBack = (why: string) => {
@@ -405,7 +404,6 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
               onVoice={(note) => setAttachments((a) => (a.some((x) => x.draftId === note.draftId)
                 ? a : [...a, { name: note.name, dataBase64: note.dataBase64, image: false, draftId: note.draftId }]))}
               onNotice={setNotice} voiceKey={voiceKey} voice={voiceCtl} onRecording={setRecording} />
-            {unsent && <span className="dock-unsent">{unsent}</span>}
             <button type="button" className="dock-send" disabled={!ready} onClick={() => void send()} title={`Send · ${sendKeyFor(true)}`}>Send <kbd>{sendKeyFor(true)}</kbd></button>
           </div>
         </div>

@@ -50,7 +50,6 @@ img.tm-av { background: var(--bg-selected); }
 .tm-add-wrap { position: relative; display: inline-flex; flex: none; margin-left: auto; }
 .tm-people + .tm-add-wrap { margin-left: 2px; }
 .tm-add-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; min-width: 220px; padding: 6px; background: var(--surface); border: 1px solid var(--line-strong); box-shadow: var(--shadow-lg); -webkit-app-region: no-drag; }
-.tm-add-menu p { margin: 2px 6px 6px; font-size: 12px; line-height: 17px; color: var(--text-faint); white-space: normal; text-transform: none; letter-spacing: 0; }
 .tm-add-menu button { display: flex; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 6px; border: 0; background: none; font-size: 13px; color: var(--text); text-align: left; cursor: pointer; }
 .tm-add-menu button:hover, .tm-add-menu button:focus-visible { background: var(--wash); outline: none; }
 .tm-add-people svg { width: 15px; height: 15px; flex: 0 0 auto; }
@@ -307,8 +306,6 @@ img.tm-av { background: var(--bg-selected); }
 .ps-anchor { position: relative; margin-left: auto; flex: none; }
 .ps-btn { display: inline-flex; align-items: center; gap: 9px; white-space: nowrap; }
 .ps-btn svg { color: var(--text-dim); flex: none; }
-/* Under the button and out of the row, so the button stays level with the project's name. */
-.ps-crosses { position: absolute; top: calc(100% + 6px); right: 0; width: 560px; font-size: 12px; line-height: 16px; color: var(--text-faint); text-align: right; }
 .ps-menu {
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 80; width: 360px; box-sizing: border-box; padding: 5px;
   background: var(--pop, var(--bg-selected)); border: 1px solid var(--line-strong); border-radius: var(--radius);

@@ -18,7 +18,3 @@ export function messageKind(e: Pick<AgentTurn, 'says' | 'fileMark'> | null | und
   return null;
 }
 
-/** Under the comment box on a teammate's thread: where the words go. */
-export function commentWhere(owner: string): string {
-  return `Goes to ${owner}'s Needs you. It does not start an agent.`;
-}

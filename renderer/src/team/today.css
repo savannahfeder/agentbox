@@ -32,5 +32,4 @@
 .td-more:hover { color: var(--text); }
 .td-extra { padding: 4px 0; font-size: 13px; line-height: 20px; color: var(--text-faint); }
 
-.td-empty, .td-quiet { margin: 0; font-size: 13.5px; line-height: 20px; color: var(--text-faint); }
-.td-quiet { padding-top: 4px; }
+.td-empty { margin: 0; font-size: 13.5px; line-height: 20px; color: var(--text-faint); }

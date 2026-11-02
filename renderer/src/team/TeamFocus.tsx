@@ -107,7 +107,6 @@ export function AddPeople({ item, product, onAdd }: {
       {mark}
     </button>
     {open && <div className="tm-add-menu" role="menu" aria-label="Add to this thread">
-      <p>They will see this thread.</p>
       {offered.map((p) => (
         <button key={p.id} type="button" role="menuitem" onClick={() => { setOpen(false); onAdd(item, p.id); }}>
           <Face person={p} /><span>{p.name}</span>
