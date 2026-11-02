@@ -32,7 +32,6 @@ import { ProductMark } from './ProductMark';
 import { shortPath } from './Settings';
 import { archiveLabel, archivedLine, keepShown, selectionLine, togglePick } from '../project-archive';
 import type { Product, ProjectSettings } from '../types';
-import { SHIP_MODE_WORDS, type ShipMode } from '../../../shared/ship-mode.mjs';
 import './projects-page.css';
 
 const DRAG_THRESHOLD_PX = 4;
@@ -47,7 +46,8 @@ interface Row {
   dir: string;
   /** Where its code is, when it has a folder of its own. */
   repo: string | null;
-  ship: ShipMode;
+  /** Whether it has ship rules of its own. */
+  shipOwn: boolean;
 }
 
 export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archived = [], onUnarchive, onArchive, who, home = null }: {
@@ -134,13 +134,13 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
     for (const p of ordered) {
       const d = info.get(p.slug);
       seen.add(p.slug);
-      out.push({ slug: p.slug, name: d?.name ?? p.name, logo: d?.logo ?? p.logo, dir: d?.dir ?? p.dir, repo: d?.repoPath ?? p.repoPath ?? null, ship: d?.shipMode ?? 'ask' });
+      out.push({ slug: p.slug, name: d?.name ?? p.name, logo: d?.logo ?? p.logo, dir: d?.dir ?? p.dir, repo: d?.repoPath ?? p.repoPath ?? null, shipOwn: !!d?.shipOwn });
     }
     for (const d of details) {
       // In the order but left off on purpose (a conversation, the practice
       // project) stays off; only one the order has never heard of is added.
       if (seen.has(d.slug) || bySlug.has(d.slug)) continue;
-      out.push({ slug: d.slug, name: d.name, logo: d.logo, dir: d.dir ?? '', repo: d.repoPath ?? null, ship: d.shipMode ?? 'ask' });
+      out.push({ slug: d.slug, name: d.name, logo: d.logo, dir: d.dir ?? '', repo: d.repoPath ?? null, shipOwn: !!d.shipOwn });
     }
     return out;
   }, [full.join('\n'), ranked, details, archived]);
@@ -286,7 +286,7 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
               <span className="pp-rank">#</span>
               <span className="pp-head-name">Project</span>
               {who && <span className="pp-head-who">Who sees it</span>}
-              <span className="pp-head-ship">When ready</span>
+              <span className="pp-head-ship">Shipping</span>
               {onSetOrder && <span className="pp-head-move">Move</span>}
             </div>
           )}
@@ -339,7 +339,7 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
                   {/* WHO SEES ITS THREADS (design 1B, w-b989839656), only on a
                       team, where the question exists. */}
                   {who && <span className="pp-who">{who(project.get(p.slug) ?? (p as unknown as Product))}</span>}
-                  <span className="pp-ship">{SHIP_MODE_WORDS[p.ship]}</span>
+                  <span className="pp-ship">{p.shipOwn ? 'Its own rules' : 'Every project'}</span>
                   {onSetOrder && !selecting && (
                     <span className="pp-acts">
                       <button type="button" className="pp-top" disabled={rank === 0}

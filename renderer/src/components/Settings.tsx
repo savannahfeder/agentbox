@@ -36,7 +36,7 @@ import { whatTakesEscape } from '../settings-escape';
 import { WebAlertsGroup } from './WebAlerts';
 import { api, RESTART_NOTE } from '../api';
 import { updateLook } from '../update-row';
-import { InstructionSettings, sizeLabel } from './InstructionSettings';
+import { InstructionSettings, ScopeSwitch, sizeLabel } from './InstructionSettings';
 import { EVERY } from '../instruction-scope';
 import type {AccountUsageReading, Usage, UsageLimit, WorkspaceSettings} from '../types';
 import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
@@ -56,7 +56,8 @@ import { chord, chords, sayKeys } from '../this-keyboard';
 import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mjs';
-import { SHIP_MODES, SHIP_MODE_SENTENCE, SHIP_MODE_WORDS, type ShipMode } from '../../../shared/ship-mode.mjs';
+import { ASK_FIRST, CHOICES, CHOICE_WORDS, KINDS, KIND_WORDS, rulesSummary, type ShipKind, type ShipRules } from '../../../shared/ship-mode.mjs';
+import { resolveScope } from '../instruction-scope';
 import { TaskTerminal } from './TaskTerminal';
 import { ProjectsPage } from './ProjectsPage';
 import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId } from '../settings-search';
@@ -1544,6 +1545,59 @@ function ProjectTitle({ project, onRename }: {
 
 // ONE MARK PER PAGE, at the weight of the app's own sidebar icons: 1.4 hairline
 // on a 24 grid, round caps, no fill except where the shape needs one.
+/* SHIPPING (w-e4d49a1539): what agents ship without asking, for every project
+   and for any one. The heading switches scope the way Instructions does. */
+function ShippingPage({ projects, every, scope, onScope, onEvery, onProject, onInstructions }: {
+  projects: ProjectSettings[];
+  every: ShipRules;
+  scope: string;
+  onScope: (s: string) => void;
+  onEvery: (rules: ShipRules) => void;
+  onProject: (slug: string, rules: ShipRules | null) => void;
+  onInstructions: (scope: string) => void;
+}) {
+  const project = scope === EVERY ? null : projects.find((p) => p.slug === scope) ?? null;
+  const own = project?.shipOwn ?? null;
+  const rows = (rules: ShipRules, set: (r: ShipRules) => void) => KINDS.map((k: ShipKind) => (
+    <Row key={k} label={KIND_WORDS[k].label} desc={KIND_WORDS[k].desc}>
+      <Picker bare label={KIND_WORDS[k].label} value={rules[k] as string}
+        options={CHOICES[k].map((c) => ({ value: c, label: CHOICE_WORDS[k][c] }))}
+        onChange={(v) => set({ ...rules, [k]: v } as ShipRules)} />
+    </Row>
+  ));
+  const differ = projects.filter((p) => p.shipOwn);
+  return (
+    <div className="set-inner instructions-page">
+      <ScopeSwitch lead="Shipping for" scope={scope} projects={projects} onScope={onScope} />
+      <div className="set-lede">What agents ship without asking you. Shipping means merging into main.</div>
+      {project ? (
+        <Group>
+          <Row label="Same as every project" desc={own ? 'This project has its own rules below.' : rulesSummary(every)}>
+            <Switch label="Same as every project" on={!own} onChange={(v) => onProject(project.slug, v ? null : every)} />
+          </Row>
+          {own && rows(own, (r) => onProject(project.slug, r))}
+        </Group>
+      ) : (
+        <>
+          <Group>{rows(every, onEvery)}</Group>
+          <Group label="Projects with their own rules">
+            {differ.length ? differ.map((p) => (
+              <Row key={p.slug} label={p.name} desc={rulesSummary(p.shipOwn as ShipRules)}>
+                <button type="button" className="set-ghost" onClick={() => onScope(p.slug)}>Open</button>
+              </Row>
+            )) : <Row label="None yet" desc="Every project follows the rules above. Pick a project at the top to give it its own." />}
+          </Group>
+        </>
+      )}
+      <Group label="In your own words">
+        <Row label="Anything else before something ships" desc="Like “never ship a database migration on its own”. These go in your instructions.">
+          <button type="button" className="set-ghost" onClick={() => onInstructions(scope)}>Open Instructions</button>
+        </Row>
+      </Group>
+    </div>
+  );
+}
+
 function NavIcon({ id }: { id: SettingsPageId }) {
   const paths: Record<SettingsPageId, ReactNode> = {
     general: <><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1" /><circle cx="15" cy="7" r="2" /><circle cx="9" cy="12" r="2" /><circle cx="17" cy="17" r="2" /></>,
@@ -1555,6 +1609,7 @@ function NavIcon({ id }: { id: SettingsPageId }) {
     running: <><circle cx="12" cy="12" r="8" /><path d="M10.5 9.2v5.6l4.5-2.8z" /></>,
     cloud: <path d="M4 18V9M9.5 18V5M15 18v-6M20.5 18v-9" />,
     instructions: <path d="M6.5 3.5h7.5l4 4V20.5h-11.5zM14 3.5V8h4M9.5 12h5M9.5 16h5" />,
+    shipping: <path d="M4 7.5 12 3.5l8 4v9l-8 4-8-4zM4 7.5l8 4 8-4M12 11.5v9" />,
     projects: <path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" />,
     team: <><circle cx="9" cy="9" r="3" /><path d="M3.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5" /><circle cx="16.5" cy="9.5" r="2.5" /><path d="M16 14.6c2.3-.2 4 1.2 4.5 4" /></>,
     alpha: <><path d="M9.5 3.5h5M10.5 3.5v5.2L5.6 17.6a2 2 0 0 0 1.8 2.9h9.2a2 2 0 0 0 1.8-2.9l-4.9-8.9V3.5" /><path d="M7.6 14.5h8.8" /></>,
@@ -1777,6 +1832,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   // open it already pointed at that project.
   const [instrScope, setInstrScope] = useState<string>(EVERY);
   const openInstructions = (slug: string) => { setInstrScope(slug); setPane('instructions'); };
+  const [shipScope, setShipScope] = useState<string>(EVERY);
+  const openShipping = (slug: string) => { setShipScope(slug); setPane('shipping'); };
   const current = useMemo(
     () => (typeof pane === 'string' ? null : projects.find((p) => p.slug === pane.project) ?? null),
     [pane, projects],
@@ -2105,6 +2162,17 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
 
       <div className="set-pane" ref={paneEl}>
         {pane === 'instructions' && <InstructionSettings projects={projects} scope={instrScope} onScope={setInstrScope} onSaved={load} />}
+        {model && w && pane === 'shipping' && (
+          <ShippingPage
+            projects={projects}
+            every={w.shipRules ?? ASK_FIRST}
+            scope={resolveScope(shipScope, projects)}
+            onScope={setShipScope}
+            onEvery={(rules) => setWorkspace('shipRules', rules)}
+            onProject={(slug, rules) => setProject(slug, 'shipRules', rules)}
+            onInstructions={openInstructions}
+          />
+        )}
         {/* The settings error is left off the pages that read nothing from the
             settings file. The stale-build note is shown nowhere
             (w-b3e123a0af): a released app replaces its window and its process
@@ -2527,14 +2595,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               >
                 <Switch label="Let agents start the tasks they file here" on={current.autonomous} onChange={(v) => setProject(current.slug, 'autonomous', v)} />
               </Row>
-              <Row label="When a change is ready" desc={SHIP_MODE_SENTENCE[current.shipMode ?? 'ask']}>
-                <Picker
-                  bare
-                  label="When a change is ready"
-                  value={current.shipMode ?? 'ask'}
-                  options={SHIP_MODES.map((m) => ({ value: m, label: SHIP_MODE_WORDS[m] }))}
-                  onChange={(v: ShipMode) => setProject(current.slug, 'shipMode', v)}
-                />
+              <Row
+                label="What ships without asking you"
+                desc={current.shipOwn ? `Its own rules. ${rulesSummary(current.shipOwn)}` : `Same as every project. ${rulesSummary(w?.shipRules ?? ASK_FIRST)}`}
+              >
+                <button type="button" className="set-ghost" onClick={() => openShipping(current.slug)}>Open</button>
               </Row>
               {/* ONE LOGIN, NO ROW. The choice is only a choice with a second
                   account signed in, and on the one-account Mac -- which is

@@ -1087,8 +1087,8 @@ export interface ProjectSettings {
   /** Her mark for this project as a drawable url, or null for the burst. */
   logo: string | null;
   autonomous: boolean;
-  /** What may ship without asking her (shared/ship-mode.mjs). */
-  shipMode?: 'ask' | 'unseen' | 'tested';
+  /** This project's own ship rules, or null when it follows every project's (shared/ship-mode.mjs). */
+  shipOwn?: import('../../shared/ship-mode.mjs').ShipRules | null;
   /** Its threads go to her account online for her phone with the Mac shut. */
   onPhone?: boolean;
   permission: PermissionMode | 'workspace';
@@ -1241,6 +1241,8 @@ export interface WorkspaceSettings {
   cloudCodexMode?: CodexModeId | 'same';
   /** What a Codex worker may do across the workspace. Never 'workspace' here. */
   codexMode: CodexModeId;
+  /** What ships without asking on every project (shared/ship-mode.mjs). */
+  shipRules?: import('../../shared/ship-mode.mjs').ShipRules;
   // One switch over everything that leaves the machine, on at install
   // (legal/privacy.html section 10). `diagnosticsDestination` is whether this
   // copy has anywhere to send to at all: a build from source does not.

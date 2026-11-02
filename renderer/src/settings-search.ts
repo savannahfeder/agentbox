@@ -12,7 +12,7 @@
 
 export type SettingsPageId =
   | 'general' | 'appearance' | 'shortcuts' | 'phone' | 'alpha' | 'rooms'
-  | 'claude' | 'codex' | 'running' | 'cloud' | 'instructions'
+  | 'claude' | 'codex' | 'running' | 'cloud' | 'instructions' | 'shipping'
   | 'projects' | 'team';
 
 /** The menu, in the order it is drawn, under the headings it is drawn
@@ -27,6 +27,7 @@ export const SETTINGS_PAGES: Array<{ id: SettingsPageId; label: string; group: '
   { id: 'codex', label: 'Codex', group: 'Agents' },
   { id: 'running', label: 'Running', group: 'Agents' },
   { id: 'instructions', label: 'Instructions', group: 'Agents' },
+  { id: 'shipping', label: 'Shipping', group: 'Agents' },
   { id: 'projects', label: 'Projects', group: 'Workspace' },
   { id: 'team', label: 'Team', group: 'Workspace' },
   { id: 'rooms', label: 'Rooms', group: 'Workspace' },
@@ -85,7 +86,8 @@ const ENTRIES: Entry[] = [
   { page: 'running', label: 'Agents you started yourself', anchor: 'outside', words: 'terminal outside sessions inbox your own' },
   { page: 'running', label: 'Bring in new chats', anchor: 'outside', words: 'import chats conversations automatic' },
   { page: 'instructions', label: 'Instructions for every agent', words: 'rules prompt claude.md how agents write to you' },
-  { page: 'projects', label: 'Projects', words: 'order priority archive new project ship shipping deploy release merge approval approve review ask autonomous' },
+  { page: 'shipping', label: 'What ships without asking you', words: 'ship shipping deploy release merge main approve approval review ask autonomous automatic auto factory rules test testers synthetic users per project every project fixes bugs' },
+  { page: 'projects', label: 'Projects', words: 'order priority archive new project' },
   { page: 'team', label: 'Team', words: 'invite people members teammates' },
 ];
 

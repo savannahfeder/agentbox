@@ -217,9 +217,9 @@ function ProjectPart({project,onSaved}:{project:ProjectSettings;onSaved:()=>void
    and the words after "for" open the list of who else it can be for. A dotted
    underline did not read as clickable, so the words carry a solid underline
    and an arrow, which is the one that was approved. */
-function ScopeSwitch({scope,projects,onScope}:{scope:Scope;projects:ProjectSettings[];onScope:(s:Scope)=>void}) {
+export function ScopeSwitch({scope,projects,onScope,lead='Instructions for'}:{scope:Scope;projects:ProjectSettings[];onScope:(s:Scope)=>void;lead?:string}) {
  const {open,setOpen,wrap}=useMenu();
- return <h1 className="instr-lead">Instructions for <span className="instr-scope" ref={wrap as React.RefObject<HTMLSpanElement>}>
+ return <h1 className="instr-lead">{lead} <span className="instr-scope" ref={wrap as React.RefObject<HTMLSpanElement>}>
   <button type="button" className="instr-scope-word" aria-haspopup="menu" aria-expanded={open} onClick={()=>setOpen(v=>!v)}>
    {scopeWords(scope,projects)}
    <svg className="instr-scope-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
