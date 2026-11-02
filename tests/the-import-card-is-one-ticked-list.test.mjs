@@ -17,7 +17,10 @@ import fs from 'node:fs';
 import { LIST, importLines } from '../renderer/src/agent-import-card';
 
 const DAY = 86400e3;
-const NOW = Date.now();
+// A FIXED NOON, not Date.now(): the words are calendar days, and a day is not
+// always 86,400,000 ms long. See
+// tests/a-day-with-an-extra-hour-still-knows-what-today-is.test.mjs.
+const NOW = new Date('2026-06-15T12:00:00-07:00').getTime();
 const thread = (id, source, daysAgo, title) => ({
   id, source, folder: `/w/${id}`, folderName: id, short: `~/w/${id}`, title, when: NOW - daysAgo * DAY, path: `/t/${id}`,
 });
@@ -31,7 +34,7 @@ const dests = [
 ];
 
 describe('the lines', () => {
-  const lines = importLines(dests);
+  const lines = importLines(dests, NOW);
 
   it('is one line per conversation or agent, with no folder or project block', () => {
     expect(lines.map((l) => l.title)).toEqual([
@@ -42,7 +45,7 @@ describe('the lines', () => {
   it('says where each came from and when, newest first', () => {
     expect(lines[0].meta).toBe('Codex · Landing Page · today');
     expect(lines[1].meta).toBe('Claude Code · Landing Page · yesterday');
-    expect(lines[2].meta).toMatch(/^Claude Code · Orders Api · [A-Z][a-z]+ \d+$/);
+    expect(lines[2].meta).toBe('Claude Code · Orders Api · Jun 7');
   });
 
   it('names an agent file as a Claude Code agent, with no day', () => {
