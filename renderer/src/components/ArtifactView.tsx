@@ -634,9 +634,6 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
         </div>
         {!compare && (found === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0) && <aside className="av-side" aria-label="Comments">
           <div className="av-list">
-            {offers.comment && hint && !openNotes.length && !settled.length && (
-              <div className="av-empty"><NoteGlyph name="pin" /><span>{hint}</span></div>
-            )}
             {openNotes.map(card)}
             {settled.length > 0 && (
               <button type="button" className="av-note-act av-settled" aria-expanded={showSettled} onClick={() => setShowSettled(!showSettled)}>
@@ -644,6 +641,9 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
               </button>
             )}
             {showSettled && settled.map(card)}
+            {offers.comment && hint && !openNotes.length && !(showSettled && settled.length) && (
+              <div className="av-empty"><NoteGlyph name="pin" /><span>{hint}</span></div>
+            )}
           </div>
           {(offers.comment || trouble) && <div className="av-foot">
             {offers.comment && sendNotes.length > 0 && (
