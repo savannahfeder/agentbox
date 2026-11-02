@@ -148,8 +148,9 @@ describe('the screen', () => {
     expect(view).not.toContain('<textarea className="av-edit"');
     expect(view).toContain('<DocText');
   });
-  it('offers Edit only on a file that opened, on its newest version', () => {
-    expect(view).toMatch(/onNewVersion && kind === 'markdown' && version && isNewest && found === 'open'/);
+  it('opens for typing only on its newest version, and not one the editor could not read', () => {
+    expect(view).toMatch(/onNewVersion && kind === 'markdown' && version && isNewest && !version\.newer/);
+    expect(view).toMatch(/if \(text === null\) \{ setUnreadable\(v\.id\); return; \}/);
   });
   it('a thread and a teammate\'s thread both pass a way to save', () => {
     expect(read('renderer/src/components/ThreadArtifacts.tsx')).toContain('onNewVersion=');
