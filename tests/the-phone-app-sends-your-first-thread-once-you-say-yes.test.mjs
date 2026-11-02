@@ -45,3 +45,15 @@ describe('a send that needs the notice', () => {
     expect(cloud.match(/await askNotice\(\)/g)).toHaveLength(2);
   });
 });
+
+// Logged three times in the same workday: the toast read "Started in" and
+// stopped, because the form never said which project the thread went to.
+describe('the toast after a new thread', async () => {
+  const { planFor } = await import('../mobile/src/lib/actions');
+  it('names the project it started in', () => {
+    expect(planFor({ kind: 'new', product: 'dev/agentbox', text: 'Fix it', to: 'Agentbox' }, null, Date.now()).toast).toMatch(/^Started in Agentbox/);
+  });
+  it('is told the project by the form', () => {
+    expect(read('ui/NewThreadForm.tsx')).toMatch(/c\.send\(\{ kind: 'new', product, to: projectName,/);
+  });
+});
