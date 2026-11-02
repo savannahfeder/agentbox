@@ -6,7 +6,7 @@
 import { useState, type ReactNode } from 'react';
 import { I } from './icons';
 import { Face } from '../people';
-import { clockOf } from './room-rules';
+import { clockOf } from '../../teammates/chat-lines';
 import { MoreMenu, type MoreItem } from '../MessageMore';
 
 export type Conversation = {

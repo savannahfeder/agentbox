@@ -90,9 +90,10 @@ describe('said once', () => {
     expect(of(day, 'person:p-dev').waitingOnYou.map((l) => l.title)).toEqual(['Read the pricing page']);
   });
 
-  it('J and K walk the tasks, right after what waits on you', () => {
+  it('J and K walk the tasks, a free one under Working on and a blocked one under Blocked', () => {
     const ids = linesToStep(teamToday(base).people).map((s) => s.id);
-    expect(ids).toContain('person:p-sofia/tasks/card/p-sofia/dev-to-sofia');
+    expect(ids).toContain('person:p-dev/working/direct-dev/to-dev');
+    expect(ids).toContain('person:p-sofia/blocked/card/p-sofia/dev-to-sofia');
   });
 
   it('the count of what is blocked on others takes blocked tasks', () => {

@@ -1,6 +1,6 @@
 // A THREAD THAT WAITS ON SOMEONE ELSE IS NOT IN NEEDS YOU.
 //
-// Team round 4, Dev: threads blocked until Jordan's code or waiting for Sofia's
+// On a team, an engineer's threads blocked until Jordan's code or waiting for Sofia's
 // pins sat in Needs you with one choice, "Wait for Jordan's code, then work
 // through the checklist (recommended)"; he pressed it to clear them and they
 // came back. Measured here: only a wait a person set (`setByPerson`) took a

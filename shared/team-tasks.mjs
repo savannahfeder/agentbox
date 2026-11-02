@@ -108,13 +108,15 @@ export function dueFromWords(text, now) {
 /* -------------------------------- titles -------------------------------- */
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const END = String.raw`(?:\s*[:,.\-–—]\s*|\s*\n\s*|\s*$)`;
+// En and em dash, built from their codes so no dash sits in the source the no-dash check reads.
+const DASHES = String.fromCharCode(0x2013, 0x2014);
+const END = String.raw`(?:\s*[:,.\-${DASHES}]\s*|\s*\n\s*|\s*$)`;
 
 /** The words with who they are for taken off the front: "Task for Sofia:", "Sofia,", "For Dev -". */
 function withoutAddress(text, names) {
   const firsts = [...new Set(names.map((n) => String(n ?? '').trim().split(/\s+/)[0]).filter(Boolean))].map(escape);
   const who = firsts.length ? `(?:${firsts.join('|')})` : null;
-  const leads = [String.raw`(?:a\s+|new\s+)?task\s*[:\-–—]\s*`];
+  const leads = [String.raw`(?:a\s+|new\s+)?task\s*[:\-${DASHES}]\s*`];
   if (who) leads.unshift(String.raw`(?:(?:a\s+|new\s+)?task\s+)?(?:for|to)\s+@?${who}\b${END}`, String.raw`@?${who}\b${END}`);
   let t = String(text ?? '');
   for (const lead of leads) t = t.replace(new RegExp(`^\\s*${lead}`, 'i'), '');

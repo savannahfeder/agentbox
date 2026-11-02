@@ -671,6 +671,23 @@ export function messagePriority(item: WorkItem): number | null {
   return set && set.source !== 'system' ? item.priority ?? null : null;
 }
 
+// The words a row's Status cell would only repeat from the tab it is under.
+const TAB_SAYS: Partial<Record<string, readonly string[]>> = {
+  inbox: ['Waiting on you', 'Waiting'],
+  progress: ['In progress'],
+};
+export const repeatsTheTab = (word: string, tab?: string): boolean => !!tab && !!TAB_SAYS[tab]?.includes(word);
+
+/** The level a row names: none at Medium, which is what an unset thread runs at. */
+export function rowPriorityId(priority: number | null): PriorityId | null {
+  if (priority === null) return null;
+  const id = priorityIdOf(priority);
+  return id === 'medium' ? null : id;
+}
+
+/** What a teammate's card puts where a project goes: nothing for a task, whose card names its kind there. */
+export const cardPlace = (card: Pick<ThreadCard, 'project' | 'task'>): string => (card.task || card.project === 'Task' ? '' : card.project ?? '');
+
 // ------------------------------------------------------------------ the board
 
 export interface BoardEntry {
@@ -727,7 +744,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
         const state = stateOf?.(item);
         if (!state || (state === 'done' && !(item.updatedAt >= today))) continue;
         out.push({
-          key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: shownTitle(item), project: 'Task',
+          key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: shownTitle(item), project: null,
           projectSlug: product.slug, priority: shownPriority(item), updatedAt: item.updatedAt, item, card: null, task,
         });
         continue;
@@ -737,7 +754,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
       // A closed conversation is not finished work: replying is what closes it.
       if (!said || !state || state === 'done') continue;
       out.push({
-        key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: said.text, project: 'Message',
+        key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: said.text, project: null,
         projectSlug: product.slug, priority: messagePriority(item), updatedAt: item.updatedAt, item, card: null,
         message: { people: said.people, fromMe: said.fromMe },
       });
@@ -774,7 +791,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
     if (card.state === 'done' && !(card.updatedAt >= today)) continue;
     out.push({
       key: `card/${card.personId}/${card.threadId}`, ownerId: card.personId, state: card.state, title: card.visible ? card.title : null,
-      project: card.visible ? card.project : null, projectSlug: (card.visible && slugOfName.get(card.project ?? '')) || null, priority: card.priority, updatedAt: card.updatedAt, item: null, card,
+      project: card.visible ? cardPlace(card) || null : null, projectSlug: (card.visible && slugOfName.get(card.project ?? '')) || null, priority: card.priority, updatedAt: card.updatedAt, item: null, card,
     });
   }
   return out.sort((a, b) => b.updatedAt - a.updatedAt);

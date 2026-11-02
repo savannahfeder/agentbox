@@ -68,7 +68,7 @@ describe('J and K move through the lines the page draws', () => {
   const ids = lines.map((l) => l.line.key);
 
   it('go in the order they read, person by person, and stop at what the section draws', () => {
-    expect(ids).toEqual(['w1', 'f1', 'b1', 's1', 's2', 's3', 's4']);
+    expect(ids).toEqual(['f1', 's1', 's2', 's3', 's4', 'b1']);
   });
   it('J from nothing takes the first, K from nothing too', () => {
     expect(stepLine(lines, null, 1)).toBe(lines[0].id);
@@ -78,7 +78,7 @@ describe('J and K move through the lines the page draws', () => {
     expect(stepLine(lines, lines[1].id, 1)).toBe(lines[2].id);
     expect(stepLine(lines, lines[1].id, -1)).toBe(lines[0].id);
     expect(stepLine(lines, lines[0].id, -1)).toBe(lines[0].id);
-    expect(stepLine(lines, lines[6].id, 1)).toBe(lines[6].id);
+    expect(stepLine(lines, lines[5].id, 1)).toBe(lines[5].id);
   });
   it('a picked line that has gone starts again from the first', () => {
     expect(stepLine(lines, 'gone', 1)).toBe(lines[0].id);
@@ -86,9 +86,8 @@ describe('J and K move through the lines the page draws', () => {
   it('an empty page has nothing to pick', () => {
     expect(stepLine([], null, 1)).toBeNull();
   });
-  it('one thread on two lists is two stops', () => {
-    const twice = linesToStep([person('a', { finished: [line('x')], waitingOnYou: [line('x')] })]);
-    expect(new Set(twice.map((l) => l.id)).size).toBe(2);
+  it('what waits on you is not a stop: Needs you holds it', () => {
+    expect(linesToStep([person('a', { waitingOnYou: [line('x')] })])).toEqual([]);
   });
 });
 

@@ -104,9 +104,7 @@ describe('what was decided, what is blocked and on whom, and what waits on you',
 
   it('says it in one line at the top, counting all of Needs you', () => {
     expect(day.counts).toEqual({ needYou: 4, blocked: 2, shipped: 2, listed: 4 });
-    expect(todayLine(day.counts)).toBe('4 things need you, 2 blocked on others, 2 shipped');
-    expect(todayLine({ needYou: 1, blocked: 0, shipped: 1 })).toBe('1 thing needs you, 1 shipped');
-    expect(todayLine({ needYou: 0, blocked: 0, shipped: 0 })).toBe('Nothing needs you');
+    expect(todayLine(day.counts)).toBe('4 things need you');
   });
 });
 

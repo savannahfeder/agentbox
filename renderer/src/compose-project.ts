@@ -35,7 +35,7 @@ const ABOUT_CODE = /\b(?:code|page|screen|button|bug|fix|build|restyle|repo|bran
 /**
  * The one other project with code, when these words are about code and the card
  * points at a project with none. Two with code is a guess, so it stays. Agents told
- * "no page code in repo" from a project holding one README (round 5).
+ * "no page code in repo" from a project holding one README.
  */
 export function codeProjectFor<T extends ProjectLike & { code?: boolean; team?: { direct?: boolean } | null }>(
   text: string,

@@ -5,6 +5,10 @@
 // received a raw first sentence.
 
 export const TITLE_WORDS = 6;
+// A first clause this short is the name, whole.
+const CLAUSE_WORDS = 7;
+// A cut never keeps more than this.
+const MOST_WORDS = 8;
 
 // Opening words that are manners or a request, not the work.
 const GREETING = /^(?:(?:hey|hi|hello|ok|okay|so|right)\b[^,.!?]{0,24}[,!]\s*)+/i;
@@ -20,6 +24,10 @@ const TAIL = new Set(`a an the of to for at on in into with by from and or but n
 // Where a whole clause ends: the name ends there. Otherwise it keeps its six words.
 const BREAK = new Set(`and but because since which that when while if so`.split(/\s+/));
 const bare = (w) => w.toLowerCase().replace(/[^a-z']/g, '');
+
+// A phrase starts at these, so a cut just before one leaves the phrase before it whole.
+const CUT_BEFORE = new Set(`at on in into onto for with without by from about after before until during over under
+  off across between per via as to and or but so because since which that when while if where whether unless though although`.split(/\s+/));
 
 // Only for a title the six words cut short: a clause these open cannot be
 // finished, and a last word of these only leads to the words that were cut.
@@ -81,15 +89,22 @@ function alreadyShort(raw) {
   return (n <= TITLE_WORDS && firstSentenceOf(t) === t) || (n <= 8 && !/[,;:.!?…]/.test(t));
 }
 
+/** Where a clause too long to keep whole is cut: the longest that fits six words, else the shortest up to eight. */
+function naturalCut(w) {
+  const at = w.map((x, k) => (k >= 3 && k <= MOST_WORDS && CUT_BEFORE.has(bare(x)) ? k : -1)).filter((k) => k > 0);
+  const short = at.filter((k) => k <= TITLE_WORDS);
+  return short.length ? short[short.length - 1] : at[0] ?? -1;
+}
+
 /**
- * PURE. A title of at most six words from whatever a thread was opened with.
- * A short line comes back untouched; a sentence comes back as the start of its
- * first clause, with no greeting, no "can you", no quote mark and no trailing
- * punctuation.
+ * PURE. A title of a few words from whatever a thread was opened with. A
+ * short line comes back as typed, less a closing full stop; a sentence comes
+ * back as its first clause if that is short, or else cut where a phrase ends,
+ * with no greeting, no "can you", no quote mark and no trailing punctuation.
  */
 export function shortTitle(opening) {
   const text = withoutFiles(opening).trim() || PICTURE_LINK.exec(String(opening ?? ''))?.[1] || opening;
-  if (alreadyShort(text)) return String(text).trim();
+  if (alreadyShort(text)) return String(text).trim().replace(/(?<!\.)\.$/, '');
   let t = plain(text);
   if (!t) return '';
   t = t.replace(GREETING, '').replace(ASK, '').replace(LOOK, '').replace(CANNOT, 'Cannot ');
@@ -100,7 +115,8 @@ export function shortTitle(opening) {
   let w = words(t);
   const cut = w.findIndex((x, k) => k >= 3 && BREAK.has(bare(x)));
   const clause = cut < 0 ? w.length : cut;
-  w = w.slice(0, Math.min(TITLE_WORDS, clause));
+  const keep = clause <= CLAUSE_WORDS ? clause : naturalCut(w.slice(0, clause));
+  w = w.slice(0, keep > 0 ? keep : Math.min(TITLE_WORDS, clause));
   if (w.length < clause) {
     const opens = w.findIndex((x, k) => k >= 2 && OPENS.has(bare(x)));
     if (opens > 0) w = w.slice(0, opens);

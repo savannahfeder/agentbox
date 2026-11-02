@@ -55,12 +55,16 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onNotice }: {
     let live = true;
     const read = () => { void Promise.all(copies.map((c) => api.fileElsewhere({ product: item.product, id: item.id, ...c }))).then((all) => { if (live) setElsewhere(all); }); };
     read();
-    const off = api.onChanged(read);
+    // A burst of changes asks once.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const offChanged = copies.length ? api.onChanged(() => { if (timer) clearTimeout(timer); timer = setTimeout(read, 1000); }) : null;
+    const off = () => { if (timer) clearTimeout(timer); offChanged?.(); };
     return () => { live = false; off?.(); };
   }, [item.product, item.id, copiesKey]);
   const marks = useMemo(() => withElsewhere(item.artifacts ?? NO_MARKS, elsewhere), [item.artifacts, elsewhere]);
   // Every version the files' lines hold, made here or anywhere else, numbered as Files numbers them.
-  const numbered = useFileLine(item.product, item.id, lines.length);
+  // Only when this thread says more: asking on every change in the app rebuilt Files each time.
+  const numbered = useFileLine(item.product, item.id, lines.length, false);
   const allLines = useMemo(() => (numbered.lines.length ? [...lines, ...numbered.lines as LedgerLine[]] : lines), [lines, numbered]);
   const people: Person[] = team ? [...team.byId.values()].filter((p) => !item.people?.length || item.people.includes(p.id)) : [];
   return <ArtifactView

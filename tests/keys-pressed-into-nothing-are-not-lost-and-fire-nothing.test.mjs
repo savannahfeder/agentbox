@@ -60,15 +60,15 @@ describe('when the screen has just changed', () => {
 
 describe('R says who', () => {
   it('a person or a group by name', () => {
-    expect(replyingTo({ people: ['Sofia'], title: 'x' })).toBe('Replying to Sofia');
-    expect(replyingTo({ people: ['Sofia', 'Maya'], title: 'x' })).toBe('Replying to Sofia and Maya');
+    expect(replyingTo({ people: ['Sofia'] })).toBe('Replying to Sofia');
+    expect(replyingTo({ people: ['Sofia', 'Maya'] })).toBe('Replying to Sofia and Maya');
   });
-  it('an agent by its thread', () => {
-    expect(replyingTo({ people: null, title: 'Fix the race' })).toBe('Replying to the agent on Fix the race');
-    expect(replyingTo({ people: [], title: 'Fix the race' })).toBe('Replying to the agent on Fix the race');
+  it('nothing for an agent, whose thread is already on the screen', () => {
+    expect(replyingTo({ people: null })).toBeNull();
+    expect(replyingTo({ people: [] })).toBeNull();
   });
   it('the box and R on the list both use it', () => {
-    expect(read('renderer/src/components/Focus.tsx')).toContain('replyingTo(');
+    expect(read('renderer/src/components/Focus.tsx')).toContain('replyTarget(');
     expect(read('renderer/src/App.tsx')).toContain('replyingTo(');
   });
 });

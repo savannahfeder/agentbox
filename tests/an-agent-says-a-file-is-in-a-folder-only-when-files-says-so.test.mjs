@@ -1,6 +1,6 @@
 // AN AGENT SAYS A FILE IS IN A FOLDER ONLY WHEN FILES SAYS SO.
 //
-// Round 5: an agent told Maya "pricing-decision-rule.md is now in your Product specs
+// An agent told Maya "pricing-decision-rule.md is now in your Product specs
 // folder", and it sat loose in Company. It told her the folder held 1 file when she
 // saw 4. Dev's agents' dev-afternoon and group-bookings-plan never appeared.
 // Measured from the session logs of all three copies: team_file was called 0 times.

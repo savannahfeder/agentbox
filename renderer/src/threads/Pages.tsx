@@ -29,7 +29,7 @@ import {
   backWords, timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type Privacy, type UpdatedWindow,
 } from './page-rules';
-import { messageLine, messagePriority, rowSharing, waitingWord } from './page-rules';
+import { messageLine, messagePriority, repeatsTheTab, rowPriorityId, rowSharing, waitingWord } from './page-rules';
 import { STATE_WORD, linkWords } from './summary-rules';
 import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
 import { stopKey } from './walk-rules';
@@ -614,7 +614,7 @@ export function EmptyTab({ view, starting = false, waiting = 0 }: { view: TabVie
 /* ------------------------------------------------------------ one thread's cells */
 export function TableHead({ person = false, tab }: { person?: boolean; tab?: string }) {
   return <div className="row th-head"><span className="mark" aria-hidden="true" /><div className={`row-main th-grid${person ? ' with-person' : ''}`}>
-    <div>Thread</div><div>Status</div><div className="th-col-proj">Project</div>{person && <div>Person</div>}<div className="th-col-prio">Priority</div><div className="num">{timeHeading(tab)}</div>
+    <div>Thread</div><div className="th-col-state">Status</div><div className="th-col-proj">Project</div>{person && <div>Person</div>}<div className="th-col-prio">Priority</div><div className="num">{timeHeading(tab)}</div>
   </div></div>;
 }
 
@@ -624,7 +624,7 @@ export function SectionHead({ label, count, tab, folded, onFold }: { label: stri
     <div><button type="button" className="th-fold" aria-expanded={!folded} onClick={onFold}>
       <svg className="th-fold-mark" width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.4" /></svg>
       {label}<b>{count}</b>
-    </button></div><div /><div className="th-col-proj" /><div className="th-col-prio" /><div className="num">{timeHeading(tab)}</div>
+    </button></div><div className="th-col-state" /><div className="th-col-proj" /><div className="th-col-prio" /><div className="num">{timeHeading(tab)}</div>
   </div></div>;
 }
 
@@ -670,7 +670,7 @@ export function RowCells({ status, retry, lead, title, hidden = false, lock = fa
   /** Words for the time cell instead of how long ago: a repeating task's next run. */
   when?: string;
 }) {
-  const id = priority === null ? null : priorityIdOf(priority);
+  const id = rowPriorityId(priority);
   return <div className={`row-main th-grid${person !== undefined ? ' with-person' : ''}`}>
     {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
         people with a small count beside them for a thread only a few people
@@ -737,9 +737,10 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const inNeedsYou = tab === 'inbox';
   // A teammate's words hold it in Needs you whatever the thread itself says.
   const peopleWaitOnYou = !!team && inNeedsYou && !cell.live && (!!item.waitingComments?.length || fileNewsFor(item, team.me, { myName: team.byId.get(team.me ?? '')?.name ?? null }).length > 0 || closedOverWords(item, product, team.me));
-  const status = waits && !cell.live ? { ...cell, word: waits.word, title: waits.title }
+  const worded = waits && !cell.live ? { ...cell, word: waits.word, title: waits.title }
     : peopleWaitOnYou ? { ...cell, word: 'Waiting on you', mark: 'need' as const }
       : team && (cell.word === STATE_WORD.waiting || iSpokeLast(item, product, team.me)) ? { ...cell, word: waitingWord(item, product, team.me, nameFirst, { inNeedsYou: tab === 'inbox' }) } : cell;
+  const status = repeatsTheTab(worded.word, tab) ? undefined : worded;
   // WHO SEES IT, AT A GLANCE (2026-10-01). One mark after the title, always: the
   // people on a thread the team or chosen people can see, the lock on one only
   // you can see. A thread shared with chosen people (w-41ff964775) carries the
@@ -769,12 +770,12 @@ export function ThreadCells({ item, product, now, person, tab }: {
     const cell = task.held ? { ...taskCell(task.word), mark: 'held' as const, title: task.title } : taskCell(task.word);
     const unblocked = waitCameBack(item) ? item.waitEnded?.said : null;
     return <RowCells status={cell} title={<><span className="tq-from"><Face person={other} agent={!!taskVoice} /><b>{taskVoice ? voiceName(taskVoice, firstName(team?.byId.get(item.wrote?.body?.by ?? '') ?? null), { mine: item.wrote?.body?.by === team?.me }) : firstName(other)}</b></span>{rowTitle(item)}</>}
-      aside={unblocked ?? due?.word ?? undefined} late={!unblocked && !!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="Task" person={person}
+      aside={unblocked ?? due?.word ?? undefined} late={!unblocked && !!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="" person={person}
       priority={shownPriority(item)} updatedAt={task.at} when={back} now={now} />;
   }
   if (said) {
     const fileNews = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string) => (said.people.length > 1 ? firstName(team?.byId.get(id) ?? null) : ''))?.trim();
-    return <RowCells status={status} title={<MessageTitle people={said.people} fromMe={!fileNews && said.fromMe} text={fileNews ?? said.text} name={item.label || (isWorkThread(item) ? item.title : null)} />} aside={due?.word} late={!!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="Message" person={person}
+    return <RowCells status={status} title={<MessageTitle people={said.people} fromMe={!fileNews && said.fromMe} text={fileNews ?? said.text} name={item.label || (isWorkThread(item) ? item.title : null)} />} aside={due?.word} late={!!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="" person={person}
       priority={messagePriority(item)} updatedAt={when} when={back} now={now} action={action} />;
   }
   // ONLY THE UNUSUAL CASE WEARS A MARK (2026-10-02). Shared with the team is
@@ -1084,6 +1085,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
           // A teammate's card carries their summary and never our agents.
           const status = e.item ? statusCell(e.item, { ...factsFor(fleet, e.item.id), state: e.state, inProgress: e.state === 'running', now, practice: !!products.find((p) => p.slug === e.item!.product)?.practice }) : null;
           const doing = e.item && status?.live ? doingWords(factsFor(fleet, e.item.id).session, now) : null;
+          const prio = rowPriorityId(e.priority);
           const seen = e.item ? sharing(e.item) : null;
           const who = seen === 'people' ? <SharedMark label="Visible to the people on it" /> : seen === 'private' ? <LockMark /> : null;
           const pin = e.item?.pinned && e.item.status !== 'done' ? <PinMark size={13} className="th-pin" /> : null;
@@ -1126,7 +1128,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
             : e.card?.shippedAt ? <span className="s">Shipped</span>
             : status && saysOnCard(status, e.item!, e.state)
             ? <span className="s"><StatusMark status={status} />{status.word}</span>
-            : e.live && <RunningMark cloud={!!e.item && cloudIds.has(e.item.id)} />}{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project}</span>
+            : e.live && <RunningMark cloud={!!e.item && cloudIds.has(e.item.id)} />}{prio && <PriorityMark id={prio} />}{e.project && <span className="p">{e.project}</span>}
             {withOthers && <Face person={personOf(team, e.ownerId)} me={e.ownerId === me} />}</div>
           {doing && <div className="th-card-doing">{doing}</div>}
         </button>;

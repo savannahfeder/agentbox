@@ -24,6 +24,7 @@ import { commentLine } from '../threads/teammate-thread';
 import { fileNewsFor, fileNewsLine } from '../../../shared/artifact-marks.mjs';
 import { CloudOfferRow, RepeatMark, RowCells, SectionHead, TableHead, ThreadCells, WaitingContext } from '../threads/Pages';
 import type { StackKey, StackSection } from '../threads/stack-rules';
+import { cardPlace } from '../threads/page-rules';
 import { FleetContext } from '../fleet';
 import { cardStatus, factsFor, statusCell } from '../status-word';
 import { toApproveWords } from '../threads-made';
@@ -360,7 +361,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
 
   return (
     <div className={`list${table ? ' th-table' : ''}`} ref={drag.listRef} {...pointer}>
-      {table && !stack && <TableHead person={withPerson} tab={view} />}
+      {table && (!stack || stack.sections.every((x) => x.bare)) && <TableHead person={withPerson} tab={view} />}
       {!leadIn && lead}
       {/* Repeating tasks sit above the deferred rows, in the tab that already
           holds work with a moment attached. They are RULES, not items, so they
@@ -404,7 +405,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
       )}
       {shown.map((group) => (
         <div key={group.key}>
-          {group.section && <SectionHead label={group.section.label} count={group.section.count} tab={group.section.tab} folded={group.section.folded} onFold={() => stack?.onFold(group.section!.key)} />}
+          {group.section && !group.section.bare && <SectionHead label={group.section.label} count={group.section.count} tab={group.section.tab} folded={group.section.folded} onFold={() => stack?.onFold(group.section!.key)} />}
           {group.section?.key === 'later' && !group.section.folded && ruleRows(laterRules)}
           {leadIn && group.section?.key === leadIn && !group.section.folded && lead}
           {/* An empty label is a ranked list or the row that says nothing is
@@ -422,7 +423,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
               return (
                 <div key={key} className={`row th-their-row${selectedCard === key ? ' selected' : ''}`} onClick={() => onOpenCard?.(c)}>
                   <span className="mark" aria-hidden="true" />
-                  <RowCells status={cardStatus(c.state, team?.byId.get(c.personId)?.name?.split(/\s+/)[0])} title={c.title ?? 'Private thread'} where={c.project ?? ''} person={personCell?.(c.personId)}
+                  <RowCells status={cardStatus(c.state, team?.byId.get(c.personId)?.name?.split(/\s+/)[0])} title={c.title ?? 'Private thread'} where={cardPlace(c)} person={personCell?.(c.personId)}
                     priority={c.priority} updatedAt={c.updatedAt} now={Date.now()} />
                 </div>
               );

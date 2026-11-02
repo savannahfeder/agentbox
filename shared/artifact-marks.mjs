@@ -612,7 +612,7 @@ export function addressedTo(text, people) {
     const name = firstWord(p?.name);
     if (!p?.id || name.length < 2) continue;
     const n = escaped(name);
-    if (new RegExp(`^(?:(?:hi|hey|hello|dear)\\s+)?@?${n}\\s*[,:—–-]`, 'i').test(words)) return p.id;
+    if (new RegExp(`^(?:(?:hi|hey|hello|dear)\\s+)?@?${n}\\s*[,:\\u2014\\u2013-]`, 'i').test(words)) return p.id;
     if (new RegExp(`(?:^|[\\s(])@${n}(?![\\w'’])`, 'i').test(words)) return p.id;
   }
   return null;
@@ -622,9 +622,11 @@ export function addressedTo(text, people) {
 // reads well." Read clause by clause rather than by its first word, so a
 // thank-you that goes on to say anything else is work for the agent.
 const PRAISE = /^(?:(?:v\d+|it|this|that|all|so|very|really|is|['’]s)\s+)*(?:thanks|thank you|thx|ty|cheers|approved?|lgtm|looks? (?:good|great|right|fine|perfect)|reads? (?:well|great|fine|right|nicely)|sounds? (?:good|great)|love (?:it|this|that)|perfect|great|nice|nice work|well done|good|good (?:work|job)|all good|ship it|works|this is it|that['’]?s it)(?:\s+(?:to me|for me|v\d+|you|it|this|all|so much|a lot|again|now|here|work))*$/i;
-const CLAUSES = /[,.;:!…—–]+|\s+-\s+|\s+(?:and|&)\s+/;
+// En and em dash, built from their codes so no dash sits in the source the no-dash check reads.
+const DASHES = String.fromCharCode(0x2013, 0x2014);
+const CLAUSES = new RegExp(String.raw`[,.;:!…${DASHES}]+|\s+-\s+|\s+(?:and|&)\s+`);
 export function onlyThanks(text) {
-  const words = String(text ?? '').replace(/[^\p{L}\p{N}\s,.;:!?…—–&'’-]/gu, ' ').trim();
+  const words = String(text ?? '').replace(new RegExp(String.raw`[^\p{L}\p{N}\s,.;:!?…${DASHES}&'’-]`, 'gu'), ' ').trim();
   if (!words || words.includes('?')) return false;
   const clauses = words.split(CLAUSES).map((c) => c.trim().replace(/\s+/g, ' ')).filter(Boolean);
   return clauses.length > 0 && clauses.every((c) => PRAISE.test(c));

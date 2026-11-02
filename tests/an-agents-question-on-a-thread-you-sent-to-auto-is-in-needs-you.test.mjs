@@ -1,6 +1,6 @@
 // AN AGENT'S QUESTION ON A THREAD YOU SENT TO AUTO IS IN NEEDS YOU.
 //
-// Team round 4: Maya sent "Draft our October investor update" to Auto. Its
+// On a team, Maya sent "Draft our October investor update" to Auto. Its
 // agent ended on "Is the draft ready to share...? 1 Share it now
 // (recommended) 2 Send me the revenue...", yet the thread read Done and sat in
 // no list. Measured here: Auto gave it to a teammate, which adds a

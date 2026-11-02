@@ -274,11 +274,6 @@ export function firstSentence(text: string): string {
   return one.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? one;
 }
 
-/** The inbox tab every one of these threads sits in, or null when they differ or one is in none. */
-export function sentTab<T extends string>(tabs: (T | null)[]): T | null {
-  const first = tabs[0] ?? null;
-  return first !== null && tabs.every((x) => x === first) ? first : null;
-}
 
 // What it saved, shown in your chat with it as one quiet line.
 export const SAVED_VERBS = new Set(['learned', 'updated', 'lesson']);

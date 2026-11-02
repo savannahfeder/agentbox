@@ -15,26 +15,25 @@ const sizeOf = (stamp) => Number(String(stamp).split(':')[0]);
 const timeOf = (stamp) => Number(String(stamp).split(':')[1]);
 const drawn = (raw, size, cut) => (cut ? `… truncated (${size} bytes total)\n\n${raw}` : raw);
 
-// The bytes up to the end of the last whole UTF-8 character: a log can be read
-// while a character is half written, and a piece decoded alone garbles it.
-function wholeChars(buf, n) {
-  for (let i = n - 1; i >= Math.max(0, n - 4); i--) {
+// How many of the first n bytes end on a whole character. A character the
+// writer has not finished waits for the next read, since each piece of it
+// decoded alone comes out as "�".
+function wholeUpTo(buf, n) {
+  for (let i = n - 1; i >= Math.max(0, n - 3); i--) {
     const b = buf[i];
     if ((b & 0xc0) === 0x80) continue;
-    const len = b >= 0xf0 ? 4 : b >= 0xe0 ? 3 : b >= 0xc0 ? 2 : 1;
-    return i + len <= n ? n : i;
+    const len = b >= 0xc2 && b <= 0xdf ? 2 : b >= 0xe0 && b <= 0xef ? 3 : b >= 0xf0 && b <= 0xf4 ? 4 : 1;
+    return i + len > n ? i : n;
   }
   return n;
 }
 
-/** The text from `from` to `to`, stopping before a half-written character, and where it stopped. */
 function readBytes(fs, file, from, to) {
   const buf = Buffer.allocUnsafe(Math.max(0, to - from));
   const fd = fs.openSync(file, 'r');
-  try {
-    const end = wholeChars(buf, fs.readSync(fd, buf, 0, buf.length, from));
-    return { text: buf.toString('utf8', 0, end), to: from + end };
-  } finally { fs.closeSync(fd); }
+  let n;
+  try { n = wholeUpTo(buf, fs.readSync(fd, buf, 0, buf.length, from)); } finally { fs.closeSync(fd); }
+  return { text: buf.toString('utf8', 0, n), end: from + n };
 }
 
 /** One log for a screen that holds the stamp `had`, or none. */
@@ -45,16 +44,17 @@ export function traceAnswer({ fs, file, startedAt, had }) {
   if (had === stamp) return { startedAt, stamp, same: true };
   const from = had ? sizeOf(had) : NaN;
   try {
-    // The stamp names where the read stopped, so a held-back character is read next time.
+    // The stamp says how far the read got, which is short of the file's size
+    // while a character is unfinished, so the next read starts there.
+    const upTo = (end) => `${end}:${st.mtimeMs}`;
     if (from > 0 && st.size > from && st.size - from <= GROWTH_AT_MOST) {
-      const read = readBytes(fs, file, from, st.size);
-      return { startedAt, stamp: `${read.to}:${st.mtimeMs}`, from, more: read.text };
+      const { text, end } = readBytes(fs, file, from, st.size);
+      return { startedAt, stamp: upTo(end), from, more: text };
     }
     const start = Math.max(0, st.size - READ_AT_MOST);
-    const read = readBytes(fs, file, start, st.size);
-    const raw = read.text;
+    const { text: raw, end } = readBytes(fs, file, start, st.size);
     const cut = start > 0 || raw.length > CAP;
-    return { startedAt, stamp: `${read.to}:${st.mtimeMs}`, text: drawn(cut ? raw.slice(-CAP) : raw, st.size, cut), ...(cut ? { cut } : {}) };
+    return { startedAt, stamp: upTo(end), text: drawn(cut ? raw.slice(-CAP) : raw, end, cut), ...(cut ? { cut } : {}) };
   } catch {
     return { startedAt, stamp, text: '' };
   }

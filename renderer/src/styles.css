@@ -88,6 +88,10 @@
   */
   --row-line: .375;
   --line-strong: rgba(17, 25, 48, 0.14);
+  /* A board card's fill is invisible on a white page, so in Light its edge is
+     all that marks it, and --line alone was too faint to read. */
+  --card-line: var(--line-strong);
+  --card-line-hover: rgba(17, 25, 48, 0.24);
   /* THE GLOW IS ONE LIGHT, NOT A HIGHLIGHTER. The walk has no colour of its own
      anywhere and this is the app's own light. On a light window a cool white
      bloom is invisible, so the ring's glow there is the page's own ink at low
@@ -423,6 +427,8 @@
      eighths of its own --line too. See the light block for the reasoning. */
   --row-line: .375;
   --line-strong: rgba(255, 255, 255, 0.19);
+  --card-line: var(--line);
+  --card-line-hover: var(--line-strong);
   /* THE WALK'S RING AND ITS CARD. See the light block for the reasoning. These four
      are what every shot on the round four page was taken with: the glow is the
      cool light on both the ring and the card, the edge is what holds the card
@@ -2210,13 +2216,10 @@ body {
 /* Sections appended below the body: your answer, the result. Same typographic
    system as the body, no cards, no border stripes. */
 .appendix { margin-top: 26px; }
-.appendix-label {
-  font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em;
-  color: var(--text-faint); margin-bottom: 7px; font-weight: 600;
-}
+.appendix-label { font-size: 12.5px; color: var(--text-faint); margin-bottom: 7px; }
 /* What wrote it, after the label's own word: quieter than the label, because
    the label says what this block IS and this says where it came from. */
-.appendix-ran { font-weight: 400; opacity: 0.72; }
+.appendix-ran { opacity: 0.72; }
 .appendix-unshipped::before {
   content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent); margin-right: 7px; vertical-align: 1px;
@@ -2388,6 +2391,9 @@ body {
 */
 .focus-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; height: 100%; position: relative; }
 .focus-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+/* A long thread needs a bar to grab. A set `scrollbar-color` overrides the
+   `::-webkit-scrollbar-thumb` hover rule, so the colour has to be set here. */
+.focus-scroll:hover { scrollbar-color: color-mix(in srgb, var(--text-faint) 60%, transparent) transparent; }
 /* THE DOCK FADES TO WHATEVER IT SITS ON, and one edge across the middle of an
    opened task is the bug both halves of this rule exist to prevent: a
    different white in the lower half of every opened task. It has named --bg and --surface by turns as the ground
@@ -2615,7 +2621,6 @@ body {
 /* A person is the one to notice before a send: their face, their name in the text's own colour. */
 .dock-to-person { font-size: 12.5px; color: var(--text); }
 .dock-to-person > * { flex: none; }
-.dock-to-mark { flex: none; width: 8px; height: 8px; border: 1.5px solid var(--text-faint); }
 /* Words in a box have not gone: the difference from a posted message has to be read, not inferred. */
 .dock-unsent { margin-left: auto; margin-right: 10px; font-size: 12px; color: var(--accent); white-space: nowrap; }
 .dock-unsent + .dock-send { margin-left: 0; }
@@ -9339,8 +9344,10 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .pv-idle { cursor: none; }
 .pv-idle .pv-chrome { opacity: 0; pointer-events: none; }
 
-.pv-top { position: absolute; top: 16px; left: 16px; right: 16px; height: 46px; display: flex; align-items: center; justify-content: space-between;
+/* `left` clears the Mac window's buttons, which sit over this corner. */
+.pv-top { position: absolute; top: 16px; left: 84px; right: 16px; height: 46px; display: flex; align-items: center; justify-content: space-between;
   gap: 16px; }
+:root[data-window="flat"] .pv-top { left: 16px; }
 .pv-title { display: flex; align-items: center; gap: 12px; min-width: 0; height: 46px; padding: 0 18px; }
 .pv-name { font-size: 13px; letter-spacing: .01em; color: color-mix(in srgb, var(--read-paper) 86%, transparent);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
