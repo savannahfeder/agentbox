@@ -48,6 +48,8 @@ your change and you fix only what is likely and bad) run when someone asks.
 
 Do not design for rare or future cases nobody asked about.
 
+Never add explanatory or filler text on screen to get around a design problem; fix the design.
+
 ## NOTHING RETRIES FOR EVER, NOTHING WAITS FOR EVER, NOTHING FAILS IN SILENCE (2026-10-19)
 
 One cloud thread's start died in under a second, every 15 seconds, 16,135
