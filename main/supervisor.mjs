@@ -11892,6 +11892,7 @@ export class Supervisor {
 
   _connectionsBrief() {
     if (!this.connections) return null;
+    const now = this.connections._now?.() ?? Date.now();
     let tools = null;
     try { tools = this.connections.statusNow?.() ?? null; } catch { /* told from workingNow */ }
     if (!tools) {
@@ -11901,12 +11902,12 @@ export class Supervisor {
       tools = this.connections.catalog.map((e) => ({ id: e.id, name: e.name, state: have.has(e.id) ? 'works' : 'not_connected', given: have.has(e.id) }));
     }
     const lines = ['## Connected tools', 'Each tool the owner can connect, as their Connections page shows it. Say it the same way, and never tell the owner to connect a tool that is connected.'];
-    for (const t of tools.filter((x) => x.state !== 'not_connected')) lines.push(connectionLine(t, Date.now()));
+    for (const t of tools.filter((x) => x.state !== 'not_connected')) lines.push(connectionLine(t, now));
     const missing = tools.filter((t) => t.state === 'not_connected');
     if (missing.length) lines.push(`Not connected: ${missing.map((e) => e.name).join(', ')}. If the work needs one of them, or another tool, do not look for another way in. Say so in your message and give the owner the link: ${missing.map((e) => `[Connect ${e.name}](agentbox://connections/${e.id})`).join(' ')}, or [Connections](agentbox://connections) for anything else.`);
     let copies = [];
     try { copies = this.connections.copiesNow?.() ?? []; } catch { /* told as none */ }
-    if (copies.length || tools.some((t) => t.state !== 'not_connected')) lines.push('', filesComeFirst(copies, Date.now()));
+    if (copies.length || tools.some((t) => t.state !== 'not_connected')) lines.push('', filesComeFirst(copies, now));
     return lines.join('\n');
   }
 
