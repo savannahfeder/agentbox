@@ -170,3 +170,8 @@
   .pl-head { flex-wrap: wrap; }
 }
 
+.pl-empty-chat { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.pl-bubbles { display: flex; flex-direction: column; gap: 8px; width: 180px; }
+.pl-bubble { display: block; height: 30px; border-radius: 14px; background: var(--wash-strong); }
+.pl-bubble.them { width: 70%; border-bottom-left-radius: 4px; }
+.pl-bubble.you { width: 55%; align-self: flex-end; border-bottom-right-radius: 4px; background: var(--wash); border: 1px dashed var(--line-strong); }

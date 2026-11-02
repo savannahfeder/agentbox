@@ -95,13 +95,13 @@ export function faceRow(members: readonly Member[]): Member[] {
 }
 
 /** The home: one list with the team's faces on its line, or the two tabs with cards. */
-export type HomeLayout = 'list' | 'tabs' | 'states';
+export type HomeLayout = 'list' | 'tabs' | 'states' | 'chats';
 const HOME_KEY = 'agentbox.home.layout';
 type Store = Pick<Storage, 'getItem' | 'setItem'> | null;
 const local = (): Store => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 
 export function readHomeLayout(store: Store = local()): HomeLayout {
-  try { const v = store?.getItem(HOME_KEY); return v === 'tabs' || v === 'states' ? v : 'list'; } catch { return 'list'; }
+  try { const v = store?.getItem(HOME_KEY); return v === 'tabs' || v === 'states' || v === 'chats' ? v : 'list'; } catch { return 'list'; }
 }
 
 export function writeHomeLayout(layout: HomeLayout, store: Store = local()) {

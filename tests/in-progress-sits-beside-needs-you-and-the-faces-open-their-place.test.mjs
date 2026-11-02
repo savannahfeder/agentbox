@@ -135,6 +135,7 @@ describe('In progress beside Needs you', () => {
   });
 
   it('opens as a list on the one-list home until someone picks the board', () => {
-    expect(app).toMatch(/evChosen \?\? \(homeLayout === 'tabs' \? 'board' : 'list'\)/);
+    // The layouts with only two tabs open it as the board, where Later and Done are (2026-11-02).
+    expect(app).toMatch(/evChosen \?\? \(homeLayout === 'list' \? 'list' : 'board'\)/);
   });
 });

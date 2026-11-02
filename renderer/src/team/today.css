@@ -40,3 +40,6 @@
 .team-page > .tk { padding-top: 8px; }
 .td-title { margin: 0; font-size: 15px; font-weight: 500; line-height: 24px; color: var(--text); }
 .team-page > .tk .td-title { margin-bottom: 10px; }
+/* In Chats the team's day is one person under another. */
+.cx-frame-main .td-people { columns: 1; }
+.cx-frame-main .team-page { height: 100%; }

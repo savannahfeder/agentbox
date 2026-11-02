@@ -367,7 +367,7 @@ function CloudButton({ cloud, onMode, onWhenOn, onSetUp, onMove }: { cloud: Clou
   </span>;
 }
 
-export type HomeChoice = { layout: 'list' | 'tabs' | 'states'; onLayout: (layout: 'list' | 'tabs' | 'states') => void; group: 'none' | 'who'; onGroup: (group: 'none' | 'who') => void };
+export type HomeChoice = { layout: 'list' | 'tabs' | 'states' | 'chats'; onLayout: (layout: 'list' | 'tabs' | 'states' | 'chats') => void; group: 'none' | 'who'; onGroup: (group: 'none' | 'who') => void };
 
 export function DisplayMenu({ page, display, onDisplay, products, items = [], shown, total, tab, people, home = null }: {
   home?: HomeChoice | null;
@@ -396,6 +396,7 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
       <button type="button" className={home.layout === 'list' ? 'on' : ''} onClick={() => home.onLayout('list')}>One list</button>
       <button type="button" className={home.layout === 'tabs' ? 'on' : ''} onClick={() => home.onLayout('tabs')}>Two tabs</button>
       <button type="button" className={home.layout === 'states' ? 'on' : ''} onClick={() => home.onLayout('states')}>Needs you, In progress + a Team page</button>
+      <button type="button" className={home.layout === 'chats' ? 'on' : ''} onClick={() => home.onLayout('chats')}>Needs you, In progress + the team in Chats</button>
     </span></div>}
     {people && <PeopleLine {...people} />}
     <div className="line"><span className="lab">View</span><span className="opts">
