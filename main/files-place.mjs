@@ -31,7 +31,7 @@ const FILES_FOR_AGENTS = 40;
  * same name, as the agent's tools match it (mcp/core/reach.mjs).
  */
 /** Counts for tests: how many threads were parsed for their files. */
-export const filesOfInternals = { parses: 0 };
+export const filesOfInternals = { parses: 0, entries: 0 };
 
 // Every list of Files reads every thread, so a thread is parsed again only when
 // its lines did: one agent writing must not re-read thousands of threads.
@@ -319,26 +319,49 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   };
   const readable = () => [...store.listProducts(), ...(team?.sharedThreadProducts?.() ?? [])];
 
+  // A thread's entry and its part of allFiles' signature, kept while its lines
+  // and its project are the same objects and names they were.
+  const entries = new Map();
+  const sigs = new WeakMap();
+  const sigOf = (t) => sigs.get(t) ?? `${refKey(t.ref)}@${linesKey(t.lines)}|${t.title}|${t.project}|${(t.dirs ?? []).join(',')}`;
+
   function threads() {
     const state = team?.state?.() ?? {};
     const me = state.me?.id ?? null;
     const firstOf = (id) => (state.people ?? []).find((p) => p.id === id)?.name?.split(/\s+/)[0] ?? 'someone';
     const out = [];
     const bySlug = new Map(store.listProducts().map((p) => [p.slug, p]));
+    const readers = new Map();
+    const readerOf = (slug) => {
+      if (!readers.has(slug)) readers.set(slug, store.historyReader?.(slug) ?? ((id, o) => store.readHistory(slug, id, o)));
+      return readers.get(slug);
+    };
     for (const item of store.listAllWorkItems()) {
       const product = bySlug.get(item.product);
       if (!product) continue;
       const chat = !!product.team?.direct;
-      const lines = historyOf(`${product.slug}/${item.id}`, item.updatedAt, () => store.readHistory(product.slug, item.id, { max: Number.MAX_SAFE_INTEGER }));
+      const key = `${product.slug}/${item.id}`;
+      const lines = historyOf(key, item.updatedAt, () => readerOf(product.slug)(item.id, { max: Number.MAX_SAFE_INTEGER }));
+      const was = chat ? null : entries.get(key);
+      if (was && was.lines === lines && was.name === product.name && was.dir === product.dir && was.repo === product.repoPath) {
+        out.push(was.entry);
+        continue;
+      }
+      filesOfInternals.entries += 1;
       // The receiving copy lists everyone but the one who started the chat.
       const others = [...new Set([...(product.team?.people ?? []), product.team?.sharedBy, ...(item.people ?? [])])].filter((p) => p && p !== me);
-      out.push({
+      const entry = {
         ref: { kind: chat ? 'chat' : 'thread', product: product.slug, id: item.id },
         title: chat ? `Chat with ${others.map(firstOf).join(', ') || 'yourself'}` : shownTitle(item),
         project: chat ? null : product.name,
         dirs: chat ? [] : [product.dir, product.repoPath, product.repoPath ? path.join(product.repoPath, '.claude', 'worktrees', item.id) : null].filter(Boolean),
         lines,
-      });
+      };
+      if (!chat) {
+        sigs.set(entry, sigOf(entry));
+        entries.set(key, { entry, lines, name: product.name, dir: product.dir, repo: product.repoPath });
+      }
+      out.push(entry);
     }
     const cards = new Map((state.cards ?? []).map((c) => [`${c.personId}/${c.threadId}`, c]));
     for (const s of team?.sharedThreads?.() ?? []) {
@@ -366,7 +389,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   let last = { sig: null, files: [] };
   const allFiles = () => {
     const ts = threads();
-    const sig = ts.map((t) => `${refKey(t.ref)}@${linesKey(t.lines)}|${t.title}|${t.project}|${(t.dirs ?? []).join(',')}`).join('\n');
+    const sig = ts.map(sigOf).join('\n');
     if (sig !== last.sig) last = { sig, files: filesOf(ts) };
     return last.files;
   };

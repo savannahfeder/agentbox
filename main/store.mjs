@@ -271,6 +271,12 @@ export class Store {
     return this.modules.workItemsDisk.readItemHistory(this.productDir(slug), id, { max, before });
   }
 
+  /** readHistory for many threads of one project: its ledger is found and read once, not per thread. */
+  historyReader(slug) {
+    const read = this.modules.workItemsDisk.readItemHistories(this.productDir(slug));
+    return (id, opts) => (ROW_ID.test(String(id ?? '')) ? read(id, opts) : []);
+  }
+
   // THE CONVERSATION ON ONE ROW, oldest first, for the brief a spawning worker
   // is handed (main/supervisor.mjs, buildBrief). readHistory above is the same
   // ledger read for her thread view and stops at the lines; this one asks

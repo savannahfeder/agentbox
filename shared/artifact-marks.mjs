@@ -354,6 +354,10 @@ const NAMED = new RegExp(
   + String.raw`|(?<![\w./:@~(\[-])(${PATHISH})(?![\w/-])`,
   'gi',
 );
+// Every alternative of NAMED needs one of these, and NAMED is slow to fail on long text.
+const ANY_EXT = new RegExp(String.raw`\.(?:${EXT})`, 'i');
+/** Counts for tests: how many messages NAMED was run over. */
+export const filesInLinesInternals = { searched: 0 };
 const FENCE = /```[\s\S]*?(?:```|$)/g;
 const EDITED_WORDS = /^Updated [^\n]+\.\s*\n\n\[/;
 
@@ -380,7 +384,8 @@ export function otherFilesInLines(lines) {
     const p = l?.patch;
     if (!p) continue;
     for (const field of ['result', 'note', 'body', 'answer']) {
-      if (typeof p[field] !== 'string') continue;
+      // OTHER_NAMED is a link or a code span, so it needs one of these.
+      if (typeof p[field] !== 'string' || !(p[field].includes('](') || p[field].includes('`'))) continue;
       for (const m of p[field].replace(FENCE, '').matchAll(OTHER_NAMED)) {
         if (l.source === 'founder' && !m[1]) continue;
         const path = (m[1] ?? m[2]).replace(/^\.\//, '');
@@ -412,7 +417,8 @@ export function filesInLines(lines) {
       out.push({ path: p.artifact.path, by: l.by ?? null, at: l.ts, edited: true });
     }
     for (const field of ['body', 'answer', 'result', 'note']) {
-      if (typeof p[field] !== 'string') continue;
+      if (typeof p[field] !== 'string' || !ANY_EXT.test(p[field])) continue;
+      filesInLinesInternals.searched += 1;
       // A person's own words only count a file they attached. The notes sent to an
       // agent name the file it should make, which does not exist yet.
       const linksOnly = l.source === 'founder' && (field === 'answer' || field === 'body');
