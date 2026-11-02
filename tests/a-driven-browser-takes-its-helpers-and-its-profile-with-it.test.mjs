@@ -28,39 +28,48 @@ afterEach(() => {
   }
 });
 
-// A copy of the shell under the browser's own name, so `ps` shows a command
-// line that reads like Chrome's: this binary, this profile, and helper
-// processes of its own that outlive their parent, as Chrome's dozen do.
+// The stand-in browser is the shell itself, started from /bin/sh, so `ps`
+// shows a command line shaped like Chrome's: this binary, this profile, and
+// helper processes of its own that outlive their parent, as Chrome's dozen do.
 //
-// Each fills its own corner of the profile in bursts rather than in a spin:
-// four of these flat out starve the two-core machine this runs on, and a test
-// that takes the box down with it measures nothing.
+// It used to be a copy of /bin/sh under the name `chrome`, and a copy of an
+// Apple-signed binary does not run on an Apple-silicon Mac: all four cases
+// here timed out on one with no process on the profile and nothing written,
+// so no stand-in had started at all.
+//
+// Each helper fills its own corner of the profile in bursts rather than in a
+// spin: four of these flat out starve the two-core machine this runs on, and a
+// test that takes the box down with it measures nothing.
 const HELPER = 'mkdir -p "$1/Default/Cache/$4"; while :; do i=0; while [ $i -lt 20 ]; do i=$((i+1)); echo x > "$1/Default/Cache/$4/page-$i"; done; sleep 0.1; done';
 const PARENT = `for t in gpu renderer utility network; do "$0" -c '${HELPER}' "$0" "$1" --type=$t "$2" "$t" & done\nwait`;
 const HELPERS = 4;
 
+const bin = '/bin/sh';
+
 function start() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'helper-chrome-'));
-  const bin = path.join(dir, 'chrome');
   const profile = path.join(dir, 'profile');
   fs.mkdirSync(profile);
-  fs.copyFileSync('/bin/sh', bin);
-  fs.chmodSync(bin, 0o755);
-  const chrome = spawn(bin, ['-c', PARENT, bin, profile, `--user-data-dir=${profile}`], { stdio: 'ignore' });
+  const chrome = spawn(bin, ['-c', PARENT, bin, profile, `--user-data-dir=${profile}`], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const said = { out: '' };
+  chrome.stderr.on('data', (d) => { said.out += d; });
+  chrome.once('exit', (code, signal) => { said.end = `exited with code ${code}, signal ${signal}`; });
   started.push({ bin, profile, dir });
-  return { bin, profile, chrome, dir };
+  return { bin, profile, chrome, dir, said };
 }
 
 /** Up and writing: waited for rather than slept through, so a loaded box is no trouble. */
-async function settled({ profile, bin }) {
+async function settled({ profile, bin, said }) {
   const deadline = Date.now() + 15_000;
   for (;;) {
     const pids = holdersOf(profile, undefined, bin);
     const writing = fs.existsSync(path.join(profile, 'Default', 'Cache')) ? fs.readdirSync(path.join(profile, 'Default', 'Cache')).length : 0;
     if (pids.length > HELPERS && writing === HELPERS) return;
-    // Which half is missing: one message for a blind `ps` and for a stand-in
-    // that never started cost a round on the Mac.
-    if (Date.now() > deadline) throw new Error(`the stand-in browser never got all ${HELPERS} helpers writing: ${pids.length} processes on the profile, ${writing} of them writing`);
+    // Which half is missing, and what the stand-in said on its way out: a blind
+    // `ps`, and then a stand-in that never ran, each cost a round on the Mac.
+    if (Date.now() > deadline) {
+      throw new Error(`the stand-in browser never got all ${HELPERS} helpers writing: ${pids.length} processes on the profile, ${writing} of them writing; it ${said.end ?? 'is still running'}${said.out ? `, and said: ${said.out.trim()}` : ''}`);
+    }
     await new Promise((r) => setTimeout(r, 100));
   }
 }
