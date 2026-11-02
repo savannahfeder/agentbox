@@ -65,7 +65,7 @@ describe('without Groups it holds Threads, Feedback and Settings', () => {
   });
 
   it('puts no Groups row under Threads unless Groups is on, and Chats only for teammates', () => {
-    expect(app).toContain('groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown, teammatesUi.live ? openChats : undefined) : teammatesUi.rail(teammatesShown)} />');
+    expect(app).toContain(`groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />`);
   });
 
   it('names the first row and the page Threads without Groups, and Inbox with them', () => {

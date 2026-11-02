@@ -73,7 +73,7 @@ describe('in the app', () => {
   });
 
   it('keeps the sidebar\'s Chats row the one it is without a team', () => {
-    expect(app).toContain('groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown, teammatesUi.live ? openChats : undefined) : teammatesUi.rail(teammatesShown)} />');
+    expect(app).toContain(`groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />`);
     expect(app).toContain('onGroupsPage={roomShown || directOpen}');
     expect(app).toContain('onTeammatesPage={teammatesShown}');
   });

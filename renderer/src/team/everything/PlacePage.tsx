@@ -12,12 +12,13 @@ export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, side
   m: Member; waits?: number;
   /** Under the name: their role, or whose AI teammate it is. */
   about?: string | null;
-  onBack: () => void; backTo: string;
+  /** Absent inside Chats, where the list beside it is the way back. */
+  onBack?: () => void; backTo?: string;
   actions?: ReactNode; chat: ReactNode; side: ReactNode;
 }) {
   return <section className="pl" aria-label={m.name}>
     <header className="pl-head">
-      <button type="button" className="pl-back" onClick={onBack} title={`Back to ${backTo} (Esc)`} aria-label={`Back to ${backTo}`}>{BACK}<span>{backTo}</span></button>
+      {onBack && <button type="button" className="pl-back" onClick={onBack} title={`Back to ${backTo} (Esc)`} aria-label={`Back to ${backTo}`}>{BACK}<span>{backTo}</span></button>}
       <div className="pl-who">
         <MemberFace m={m} size={40} />
         <div className="pl-name">
@@ -44,8 +45,8 @@ export function PlaceList({ title, rows, now, empty, more }: { title: string; ro
     {rows.length ? <ul className="pl-rows">{rows.map((r) => <li key={r.key}>
       <button type="button" className={`pl-row ${r.tone ?? 'work'}`} onClick={r.onOpen} disabled={!r.onOpen} title={r.title}>
         <i aria-hidden="true" /><span className="pl-t">{r.title}</span>
-        {r.word ? <span className="pl-w">{r.word}</span> : <span />}
         <span className="pl-at">{agoQuiet(r.at, now)}</span>
+        {r.word && <span className="pl-w">{r.word}</span>}
       </button>
     </li>)}</ul> : <p className="pl-none">{empty}</p>}
     {more}
@@ -88,6 +89,14 @@ export function JobBlock({ job, onSave }: { job: string | null; onSave?: (job: s
 }
 
 /** A box that sends one message, for a conversation that has no chat of its own yet. */
+/** A chat with nothing in it yet: two faint bubbles, and what to do. */
+export function EmptyChat({ name }: { name: string }) {
+  return <div className="pl-empty-chat">
+    <div className="pl-bubbles" aria-hidden="true"><i className="pl-bubble them" /><i className="pl-bubble you" /></div>
+    <p className="pl-hello">Send {name} your first message</p>
+  </div>;
+}
+
 export function SendBox({ placeholder, note, onSend, empty }: {
   placeholder: string; note?: string | null; empty?: ReactNode;
   /** Null once it went, or the reason it did not. */

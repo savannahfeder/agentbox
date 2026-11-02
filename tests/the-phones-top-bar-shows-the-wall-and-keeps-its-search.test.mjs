@@ -52,7 +52,7 @@ describe('the top bar of the web app on a phone', () => {
   it('leaves the teammates\' faces off the tabs row on a phone; they are under Everything else', () => {
     // "you shouldn't put teammates in the top bar" (2026-10-29).
     expect(app).toMatch(/corner: onPhone\(\) \? null\s/);
-    expect(app).toMatch(/progress: homeLayout === 'list' && !onPhone\(\)/);
+    expect(app).toMatch(/progress: !onPhone\(\)/);
   });
 
   it('puts search after View and filters and before the gear, and hides it while searching', () => {
