@@ -31,6 +31,7 @@ import { appSessionFolders } from './agent-homes.mjs';
 import { registerIpc } from './ipc.mjs';
 import { stallWatch } from './stall-watch.mts';
 import { startFreezeRecorder } from './freeze-recorder.mjs';
+import { FreezeWatch } from './freeze-watch.mjs';
 import { applyThrough, phoneDevice } from './phone-inbox.mjs';
 import { answerWhatOnlyTheWindowAnswered } from './serve.mjs';
 import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mjs';
@@ -442,6 +443,13 @@ async function createWindow() {
     onFreeze: (f) => { stalls.noteFreeze(f); console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`); },
   });
   quitStep(app, 'before-quit', 'freezes.stop', () => freezes.stop());
+  const freezeWatch = new FreezeWatch({ store, userDir, appDir });
+  const checkFreezes = () => { try { freezeWatch.check(); } catch (err) { console.warn(`zero: could not read yesterday's freezes: ${err.message}`); } };
+  const freezeFirst = setTimeout(checkFreezes, 60_000);
+  const freezeHourly = setInterval(checkFreezes, 60 * 60_000);
+  freezeFirst.unref?.();
+  freezeHourly.unref?.();
+  quitStep(app, 'before-quit', 'freezeWatch.stop', () => { clearTimeout(freezeFirst); clearInterval(freezeHourly); });
   quitStep(app, 'before-quit', 'supervisor.killAll', () => supervisor.killAll());
   // THE TEAM. Off entirely on a build with no team cloud (the single-person
   // app). Otherwise it restores whoever was signed in, and from then on every

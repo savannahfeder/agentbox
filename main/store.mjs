@@ -802,7 +802,13 @@ export class Store {
   // it with the 'founder' label the way a repeating task's run is filed
   // (main/repeats.mjs), because the person agreed that these start and ship on
   // their own (main/main-went-red.mjs).
-  fileMainFix(slug, { title, body, problem, kind = 'task', priority = 5, labels = [] }) {
+  fileMainFix(slug, row) {
+    return this.fileOnItsOwn(slug, row);
+  }
+
+  // A thread the app files that starts without waiting for anyone, as above.
+  // Whether its work then ships without review is the caller's to say.
+  fileOnItsOwn(slug, { title, body, problem, kind = 'task', priority = 5, labels = [] }) {
     const { workItemsDisk } = this.modules;
     return workItemsDisk.createWorkItem(
       this.productDir(slug),
