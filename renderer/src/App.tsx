@@ -6458,6 +6458,7 @@ export default function App() {
   const [taskHeader, setTaskHeader] = useState<HTMLDivElement | null>(null);
   // The socket look B of w-581dbc6cc4's round teleports the code mark into.
   const [cornerHeaderTarget, setCornerHeaderTarget] = useState<HTMLSpanElement | null>(null);
+  const [connectionsCorner, setConnectionsCorner] = useState<HTMLSpanElement | null>(null);
 
   // A schedule set on a thread. On one RUN of a repeating task it moves that
   // task's rule rather than making a second one; on ordinary work it makes that
@@ -7329,6 +7330,7 @@ export default function App() {
           {/* Not while Settings or the Team page covers the thread: the thread's
               state and Summary button were left standing in their header. */}
           {focused && !settingsOpen && !teamShown && <span style={{display:'contents'}} ref={setCornerHeaderTarget}/>}
+          {connectionsShown && <span style={{display:'contents'}} ref={setConnectionsCorner}/>}
           {/* SEARCH, NEW THREAD AND DISPLAY (approved 2026-10-01): the whole of
               the right end on the Inbox, which is the one page of threads now
               (w-05ff3d1438). Display holds the view, the sort and the filters.
@@ -7455,7 +7457,7 @@ export default function App() {
                   points here. */}
               {planWords && !snap.supervisor.running?.length && !run && !focused && !focusedRepeat && !teammatesShown && <PlanBar words={planWords} onSetup={setSetupPlan} />}
               {connectionsShown ? (
-                <ConnectionsPlace now={now} focus={connectionsPage!.focus} onNotice={showToast} />
+                <ConnectionsPlace now={now} focus={connectionsPage!.focus} onNotice={showToast} corner={connectionsCorner} />
               ) : filesShown ? (
                 <FilesPlace project={filesPage!.project} onProject={(project) => setFilesPage({ project })} now={now} onNotice={showToast}
                   onPlace={(p) => {

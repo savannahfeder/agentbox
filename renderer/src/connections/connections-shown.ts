@@ -66,12 +66,33 @@ export function checkResultLine(tile: ConnectionTile, after: 'connect' | 'check'
 
 const article = (noun: string) => (/^[aeio]/.test(noun) ? `an ${noun}` : `a ${noun}`);
 
-/** A word on a tile that nobody has connected: what it will take, in as few words as true. */
-export function offerLine(tile: Pick<ConnectionTile, 'access' | 'name'>): string {
-  if (tile.access === 'vendor_approval') return `Needs ${tile.name}'s approval`;
-  if (tile.access === 'own_client') return 'Needs an app made in it';
-  if (tile.access === 'key') return 'Takes a personal token';
-  return 'Not connected';
+type Carded = Pick<ConnectionTile, 'state' | 'connected' | 'access' | 'at'> & Partial<Pick<ConnectionTile, 'nextTryAt' | 'failures' | 'changed'>>;
+export interface CardState { tone: 'good' | 'hurt' | 'quiet' | null; words: string | null; todo: string | null }
+
+const HURT: Record<string, string> = { not_signed_in: 'Sign in', not_allowed: 'Needs access', unreachable: 'Reconnect' };
+
+/** What a card says: Connected, Not working and what to do, or nothing at all. */
+export function cardState(tile: Carded, now: number): CardState {
+  const say = (tone: CardState['tone'], words: string | null, todo: string | null = null): CardState => ({ tone, words, todo });
+  if (!tile.connected) return tile.access === 'vendor_approval' ? say(null, 'Not available yet') : say(null, null);
+  if (failedSinceCheck({ ...tile, word: '' })) return say('hurt', 'Not working', 'Check it');
+  if (HURT[tile.state]) return say('hurt', 'Not working', HURT[tile.state]);
+  if (tile.state === 'down') return say('hurt', 'Not working', tile.nextTryAt && tile.nextTryAt > now ? 'Trying again' : 'Check it');
+  if (tile.state === 'choose_reads') return say('quiet', 'Choose its tools');
+  if (tile.state === 'nothing_to_read') return say('quiet', 'Nothing to read');
+  if (tile.changed?.length) return say('quiet', 'Its tools changed');
+  return say('good', 'Connected');
+}
+
+/** The page's groups in order: what is connected, each catalogue group, then tools added by address. */
+export function pageGroups<T extends { name: string; group: string; connected: boolean }>(tiles: T[], groups: { id: string; name: string }[], query: string): { id: string; name: string; tiles: T[] }[] {
+  const found = tilesFound(tiles, query, groups);
+  const rest = found.filter((t) => !t.connected);
+  return [
+    { id: 'connected', name: 'Connected', tiles: found.filter((t) => t.connected) },
+    ...groups.map((g) => ({ ...g, tiles: rest.filter((t) => t.group === g.id) })),
+    { id: 'added', name: 'Added by address', tiles: rest.filter((t) => !groups.some((g) => g.id === t.group)) },
+  ].filter((g) => g.tiles.length > 0);
 }
 
 /** The one line a working tile shows about its copy. */
