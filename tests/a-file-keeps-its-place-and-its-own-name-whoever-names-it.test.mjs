@@ -129,9 +129,9 @@ describe('the Move menu\'s search', () => {
 
 describe('a file that has not reached this computer', () => {
   it('says whose computer has it', () => {
-    expect(missingWords('Dev')).toBe('On Dev\'s computer. It opens here once it comes across.');
+    expect(missingWords('Dev')).toBe('On Dev\'s computer.');
   });
   it('says so plainly when nobody is known', () => {
-    expect(missingWords(null)).toBe('Not on this computer yet. It opens here once it comes across.');
+    expect(missingWords(null)).toBe('Not on this computer yet.');
   });
 });

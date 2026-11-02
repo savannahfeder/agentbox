@@ -331,8 +331,8 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
   const tile = (f: PlacedFile) => <Tile key={f.key} file={f} list={asList} now={now} me={team?.me ?? null} nameOf={nameOf} onOpen={() => setOpenKey(f.key)} folders={folders} act={(p) => { void act(p); }}
     onNewFolder={(file, name) => { void act({ do: 'make', project: file.project ?? '', name }).then((r) => { if (r.ok && r.folder) move(file.key, r.folder); }); }} />;
   const empty = looking ? 'No file matches.'
-    : folder ? 'Nothing in this folder yet. Drag a file here, or move one from its menu.'
-      : project ? `No files in ${project} yet.` : 'Files your team shares and your agents make will be here.';
+    : folder ? 'Nothing in this folder yet.'
+      : project ? `No files in ${project} yet.` : 'Nothing in Files yet.';
 
   return <div className="fp-page">
     <div className="fp-bar">

@@ -4,8 +4,6 @@
 // Jordan, Maya, Sofia as people" and "only found [Lumen] at 02:33 by opening
 // Chats". Both groups were pinned, so they sorted by name and Coworking led.
 // The people list read the same in both, so teammates looked like strangers.
-// And Settings > Projects said "Team" with nothing about what crosses: "Documents
-// are per-copy... its folder is on my machine."
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
@@ -17,7 +15,6 @@ import { buildMembers } from '../renderer/src/team/everything/members.ts';
 import { MemberWord } from '../renderer/src/team/everything/TeamStrip.tsx';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { PROJECT_CROSSES } from '../renderer/src/team/project-crosses.ts';
 
 const convo = (name, o = {}) => ({ key: `room:${name}`, kind: 'room', id: name, name, faces: [], last: '', at: 1, unread: false, ...o });
 
@@ -100,14 +97,8 @@ describe('a team invite', () => {
 });
 
 describe('what a project shares', () => {
-  it('says plainly what crosses and what stays', () => {
-    expect(PROJECT_CROSSES.team).toMatch(/threads/i);
-    expect(PROJECT_CROSSES.team).toMatch(/folder/i);
-    expect(PROJECT_CROSSES.team).toMatch(/stay/i);
-    expect(PROJECT_CROSSES.private).toMatch(/nothing/i);
-  });
-  it('the project’s button shows it', () => {
+  it('the project’s button carries no line explaining it', () => {
     const share = readFileSync(new URL('../renderer/src/team/ProjectShare.tsx', import.meta.url), 'utf8');
-    expect(share).toContain('PROJECT_CROSSES');
+    expect(share).not.toContain('ps-crosses');
   });
 });

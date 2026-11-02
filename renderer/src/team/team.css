@@ -306,8 +306,6 @@ img.tm-av { background: var(--bg-selected); }
 .ps-anchor { position: relative; margin-left: auto; flex: none; }
 .ps-btn { display: inline-flex; align-items: center; gap: 9px; white-space: nowrap; }
 .ps-btn svg { color: var(--text-dim); flex: none; }
-/* Under the button and out of the row, so the button stays level with the project's name. */
-.ps-crosses { position: absolute; top: calc(100% + 6px); right: 0; width: 560px; font-size: 12px; line-height: 16px; color: var(--text-faint); text-align: right; }
 .ps-menu {
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 80; width: 360px; box-sizing: border-box; padding: 5px;
   background: var(--pop, var(--bg-selected)); border: 1px solid var(--line-strong); border-radius: var(--radius);

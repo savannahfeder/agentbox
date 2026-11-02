@@ -84,7 +84,7 @@ export function foldersMatching<T extends { name: string }>(folders: T[], query:
 }
 
 /** What a tile or the big view says of a file with no bytes here. */
-export const missingWords = (who: string | null) => (who ? `On ${who}'s computer. It opens here once it comes across.` : 'Not on this computer yet. It opens here once it comes across.');
+export const missingWords = (who: string | null) => (who ? `On ${who}'s computer.` : 'Not on this computer yet.');
 
 // A name no person chose: a page shot's timestamp, a Mac screenshot's, a hash.
 const MACHINE_NAME = /^page-\d{4}-\d{2}-\d{2}T[\d-]+Z?(?:[-_ ]v\d+)?\.\w+$|^screen ?shot[ -]\d{4}-\d{2}-\d{2}\b.*\.\w+$|^(?:[0-9a-f]{12,}|\d{10,})\.\w+$/i;
