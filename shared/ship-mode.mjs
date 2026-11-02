@@ -67,7 +67,7 @@ export function rulesChip(rules) {
   const small = rules.small === 'ship';
   const wide = rules.wide === 'review';
   const fixes = small && wide ? 'fixes' : small ? 'small fixes' : wide ? 'reviewed fixes' : '';
-  const tested = rules.seen === 'test' || rules.big === 'test' ? 'tested changes' : '';
+  const tested = rules.seen === 'test' || rules.big === 'test' ? 'AI-tested changes' : '';
   const ship = [fixes, tested].filter(Boolean).join(' and ');
   if (ship) return `${ship[0].toUpperCase()}${ship.slice(1)} ship on their own`;
   if (rules.big === 'test-ask') return 'AI testers try big changes first';

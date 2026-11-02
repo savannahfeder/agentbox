@@ -1577,7 +1577,7 @@ function ShippingPage({ projects, every, everyNote, scope, codexReady, onScope, 
   ));
   const differ = projects.filter((p) => p.shipOwn);
   const sameLine = !own ? rulesSummary(every)
-    : same(own, every) ? 'Its own rules match every project\u2019s today, and will not follow changes to them.'
+    : same(own, every) ? 'Off: this project has its own rules below, a copy of every project\u2019s for now. Change any row, or turn this on to follow every project again.'
       : 'This project has its own rules below.';
   return (
     <div className="set-inner instructions-page">

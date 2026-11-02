@@ -64,8 +64,9 @@ describe('the answers', () => {
   it('give the new-thread box a few words when something ships alone, and none when all ask', () => {
     expect(rulesChip(ASK_FIRST)).toBeNull();
     expect(rulesChip(FIXES_SHIP)).toBe('Fixes ship on their own');
-    expect(rulesChip({ ...ASK_FIRST, seen: 'test' })).toBe('Tested changes ship on their own');
-    expect(rulesChip({ small: 'ship', wide: 'ask', seen: 'test', big: 'ask' })).toBe('Small fixes and tested changes ship on their own');
+    expect(rulesChip({ ...ASK_FIRST, seen: 'test' })).toBe('AI-tested changes ship on their own');
+    expect(rulesChip({ small: 'ship', wide: 'ask', seen: 'test', big: 'ask' })).toBe('Small fixes and AI-tested changes ship on their own');
+    // Third round: "tested changes" read as changes that pass my own tests.
     expect(rulesChip({ ...ASK_FIRST, big: 'test-ask' })).toBe('AI testers try big changes first');
   });
 
