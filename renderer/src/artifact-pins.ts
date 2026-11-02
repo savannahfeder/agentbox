@@ -1,8 +1,9 @@
 // PURE. How the big file view (components/ArtifactView.tsx) draws its pins,
 // zooms a picture, and what it offers for the file it found.
-import { placeWords } from '../../shared/artifact-marks.mjs';
+import { noteGoesTo, notesForTheAgent, placeWords } from '../../shared/artifact-marks.mjs';
+import type { FileVersion } from '../../shared/artifact-marks.mjs';
 import { MAX_ZOOM } from './picture-view';
-import type { FileNote, NotePlace } from './types';
+import type { FileMarks, FileNote, NotePlace } from './types';
 
 export type Lean = 'ne' | 'nw' | 'se' | 'sw';
 
@@ -196,4 +197,14 @@ export type Found = 'looking' | 'open' | 'coming' | 'gone' | 'unplayable';
 export function viewOffers(found: Found, signedIn: boolean): { approve: boolean; comment: boolean } {
   const open = found === 'open';
   return { approve: open && signedIn, comment: open };
+}
+
+/** The open notes on this version that "Send this note to the agent" would send. */
+export function notesToSendTheAgent(marks: FileMarks, version: FileVersion, count: number, people: ReadonlyArray<{ id: string; name?: string | null }>): string[] {
+  return notesForTheAgent(marks, version, count).ids.filter((id) => noteGoesTo(marks.notes.find((n) => n.id === id), people).to === 'agent');
+}
+
+/** What the comment box's button says. */
+export function noteSendWords(_: { text: string; people: ReadonlyArray<{ id: string; name?: string | null }>; me: string | null; nameOf: (id: string | null) => string; agentMade: boolean; toAgent: boolean; owner: string | null }): string {
+  return 'Comment';
 }
