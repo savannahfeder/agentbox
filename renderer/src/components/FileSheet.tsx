@@ -42,7 +42,7 @@ export function FileSheet({ name, shown, load, onClose }: { name: string; shown?
   const title = shown || name;
   let body;
   if (blob === undefined) body = <PreviewLoading />;
-  else if (!blob || !url) body = <div className="doc-missing">{title} is on its way. Close this and open it again in a moment.</div>;
+  else if (!blob || !url) body = <div className="doc-missing">{title} is on its way.</div>;
   else if (kind === 'pdf') body = <PdfPages load={bytes} name={title} />;
   else if (kind === 'film') body = <FilmPlayer url={url} name={title} wide />;
   else if (kind === 'image') body = <img src={url} alt={title} />;

@@ -287,7 +287,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
     const out = await write({ do: 'note', id, file: version.id, place, text, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}) })
       .catch((err: Error) => ({ ok: false, error: err.message }));
     setSending(false);
-    if (failed(out, 'That comment did not save. Your words are still in the box.')) {
+    if (failed(out, 'That comment did not save.')) {
       setSavingNotes((was) => was.filter((n) => n.id !== id));
       setWords(text);
       return;
@@ -310,7 +310,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
 
   const reply = async (note: FileNote, text: string) => {
     const out = await write({ do: 'reply', id: newId(), on: note.id, file: note.file, text });
-    return !failed(out, 'That reply did not save. Your words are still in the box.');
+    return !failed(out, 'That reply did not save.');
   };
 
   // An older version, or one with comments open, is approved only once that is said.
@@ -337,7 +337,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   // Main sends the notes, so the thread draws them once and not again as an instruction.
   const toAgent = async (on: string[]) => {
     if (!on.length) return;
-    failed(await write({ do: 'toagent', on }), 'Those notes did not reach the agent. Try again.');
+    failed(await write({ do: 'toagent', on }), 'Those notes did not reach the agent.');
   };
   const sendNotes = withAgent && version
     ? notesForTheAgent(marks, version, family!.versions.length).ids.filter((id) => noteGoesTo(marks.notes.find((n) => n.id === id), people).to === 'agent')

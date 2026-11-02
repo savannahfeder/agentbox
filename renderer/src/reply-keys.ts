@@ -81,8 +81,8 @@ export function keyOnTheList({ key, justChanged }: { key: string; justChanged: b
   return 'nowhere';
 }
 
-export const NOWHERE_TO_TYPE = 'Nothing is open to type into. Press R to reply or N for a new thread.';
-export const HELD_AFTER_A_CHANGE = 'That key did nothing, because the screen had just changed. Press it again if you meant it.';
+export const NOWHERE_TO_TYPE = 'Nothing is open to type into.';
+export const HELD_AFTER_A_CHANGE = 'That key did nothing, because the screen had just changed.';
 
 /** A held key repeats, and the repeat of the one that opened a box would type into it. */
 export function heldKeyThatOpenedTheBox({ key, repeat, empty, opener }: { key: string; repeat: boolean; empty: boolean; opener: string }): boolean {

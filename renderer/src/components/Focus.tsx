@@ -2914,7 +2914,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
       }
     } else if (finishing.current) return;
     if (saving || (!(spoken ?? text).trim() && !attachments.length)) return;
-    if (attaching.length) { onNotice(`${attaching[0].name} is still being attached. Send once it is in.`); return; }
+    if (attaching.length) { onNotice(`${attaching[0].name} is still being attached.`); return; }
     // AN AGENT WITH NO PROJECT DOES NOT GO OUT. The footer already says why;
     // ⌘↵ says it again rather than doing nothing.
     if (chat.block) { onNotice(chat.block); return; }

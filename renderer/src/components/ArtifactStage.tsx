@@ -423,7 +423,7 @@ function PageStage({ url, path, name, product, readText, onFound, notes, carried
     {onPlace && (
       <div className="av-zoom file-pager" role="group" aria-label="Pins">
         <button type="button" className={`av-pin-mode${pinning ? ' is-on' : ''}`} aria-pressed={pinning} onClick={() => setPinning(!pinning)}
-          title={pinning ? 'Click the page to pin a spot. Press again to use the page.' : 'Pin a spot on the page'}>
+          title="Pin a spot on the page">
           <PinGlyph />{pinning ? 'Click a spot' : 'Pin a spot'}
         </button>
       </div>
@@ -498,7 +498,7 @@ function OpenedFile({ product, path, name, byline, notes, carried = [], draft, a
 
   if (!found) return <OpeningWait name={name} kind={kind} onAgain={onAgain} />;
   if (!opened) {
-    return <div className="doc-missing">{found.coming ? `${name} is on its way. It opens here once it lands.` : missingSays ? `${name}: ${missingSays}` : `${name} could not be found.`}</div>;
+    return <div className="doc-missing">{found.coming ? `${name} is on its way.` : missingSays ? `${name}: ${missingSays}` : `${name} could not be found.`}</div>;
   }
   if (kind === 'image') return <PictureStage url={url as string} name={name} notes={notes} carried={carried} draft={draft} activeId={activeId} go={go} showResolved={showResolved} keep={keep} onPlace={onPlace} onPick={onPick} onFound={onFound} onAgain={onAgain} />;
   if (kind === 'film') {

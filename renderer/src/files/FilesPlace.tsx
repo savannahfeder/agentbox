@@ -265,14 +265,14 @@ function OpenFile({ fileKey, onClose, onPlace, onNotice }: {
     write={(mark) => api.filesPlaceMark({ key: fileKey, mark })}
     onNewVersion={editsTo ? async (_name, text) => {
       const out = await api.filesPlaceEdit({ key: fileKey, text });
-      if (!out.ok) return out.error ?? 'That did not save. Your words are still here.';
+      if (!out.ok) return out.error ?? 'That did not save.';
       // The page shows the new words as Done returns, not a moment after.
       const fresh = await api.filesPlaceOpen({ key: fileKey });
       if (fresh) setView(fresh);
       return null;
     } : undefined}
     missingSays={(by) => missingWords(by && by !== team?.me && team?.byId.get(by) ? firstName(team.byId.get(by)!) : null)}
-    editGoes={editsTo?.kind === 'shared' ? `Sent to ${team?.byId.get(editsTo.ownerId ?? '') ? firstName(team.byId.get(editsTo.ownerId!)!) : 'whoever made it'}. It shows as the next version once their computer has it.` : undefined}
+    editGoes={editsTo?.kind === 'shared' ? `Sent to ${team?.byId.get(editsTo.ownerId ?? '') ? firstName(team.byId.get(editsTo.ownerId!)!) : 'whoever made it'}.` : undefined}
     onOutside={(src) => { void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) onNotice(r.error || 'That file could not be opened.'); }); }}
     onClose={onClose}
     below={below}

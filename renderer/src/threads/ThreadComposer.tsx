@@ -1324,7 +1324,7 @@ export function ThreadComposer({
             e.preventDefault();
             ideaList.current?.querySelector<HTMLButtonElement>('button')?.focus();
           }}
-          placeholder={mate === 'new' ? 'What should they do? They set themselves up from it and ask what they need' : mateRow ? `What should ${mateRow.name} do?` : person ? (sendAs === 'task' && !extra.length ? `What should ${person.name.split(/\s+/)[0]} do?` : `Message ${names}`) : placeholderFor(null)}
+          placeholder={mate === 'new' ? 'What should they do?' : mateRow ? `What should ${mateRow.name} do?` : person ? (sendAs === 'task' && !extra.length ? `What should ${person.name.split(/\s+/)[0]} do?` : `Message ${names}`) : placeholderFor(null)}
           onPaste={async (e) => {
             const pasted = await fromPaste(e);
             if (pasted.length) { e.preventDefault(); setAttachments((a) => [...a, ...pasted]); }
@@ -1378,7 +1378,7 @@ export function ThreadComposer({
         {person ? (
           <div className="tc-bar">
             {headChips}
-            {taskToMany && <span className="tc-why">A task goes to one person. Send it as a message, or keep one name in To.</span>}
+            {taskToMany && <span className="tc-why">A task goes to one person.</span>}
             {team && sendAs === 'task' && (
               <span className="tc-anchor" ref={anchor('visibility')}>
                 <button type="button" data-trigger className={`tc-chip ${open === 'visibility' ? 'open' : ''}`} title="Who sees it"

@@ -18,7 +18,7 @@ const FILM_TAG_REACH = 84;
 
 export function FilmCannotPlay({ name, onOutside }: { name: string; onOutside?: () => void }) {
   return <div className="doc-missing film-cannot">
-    <span>{name} cannot be played here. The file may be damaged or in a format this app cannot play.</span>
+    <span>{name} cannot be played here.</span>
     {onOutside && <button type="button" className="av-btn" onClick={onOutside}>Open outside</button>}
   </div>;
 }

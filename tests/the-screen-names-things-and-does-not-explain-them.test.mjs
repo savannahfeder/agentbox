@@ -51,6 +51,13 @@ describe('nothing on screen explains how to use itself', () => {
     'It was not sent.',
     'Quit and reopen it, then try again',
     'Those notes did not reach the agent. Try again',
+    'The rest of its folder stays on this computer',
+    'It does not start an agent',
+    'They will see this thread',
+    'start a thread you both see',
+    'It shows as the next version once their computer has it',
+    'They set themselves up from it',
+    'Remove it to send the rest',
   ]) {
     it(`"${words}" is not drawn`, () => expect(drawing(words)).toEqual([]));
   }

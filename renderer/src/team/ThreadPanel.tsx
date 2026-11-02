@@ -178,7 +178,7 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
     }
     const words = draft.trim();
     if (!words && !files.length) return;
-    if (attaching.length) { setNotice(`${attaching[0].name} is still being attached. Send once it is in.`); return; }
+    if (attaching.length) { setNotice(`${attaching[0].name} is still being attached.`); return; }
     // An agent with no project does not go out; the line under the box says why.
     if (chat.block) { setNotice(chat.block); return; }
     const putBack = (why: string) => {

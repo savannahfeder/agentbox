@@ -921,7 +921,6 @@ export function TeammateCard({ card, person, files = [] }: {
         {card.project && <><dt>Project</dt><dd>{card.project}</dd></>}
         <dt>Who sees it</dt><dd>{card.people?.length && team ? chosenNames(card.people, team.byId) : 'The team'}</dd>
       </dl>
-      <p className="ts-tk-foot">The agent keeps this summary up to date.</p>
     </article>
   );
 }

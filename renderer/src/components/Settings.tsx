@@ -2181,7 +2181,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               </Row>
             </Group>
             <Group id="sidebar" label="Sidebar">
-              <Row label="Shrink the sidebar to icons" desc="It opens when you point at it and shrinks when you leave.">
+              <Row label="Shrink the sidebar to icons">
                 <Switch label="Shrink the sidebar to icons" on={sidebarShrinks} onChange={setSidebarShrinks} />
               </Row>
             </Group>

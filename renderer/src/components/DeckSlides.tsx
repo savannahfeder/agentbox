@@ -88,7 +88,7 @@ export function DeckSlides({ load, name, onPage, goTo, commented, onSpot, pins }
   };
   useEffect(() => { if (goTo && deck) go(goTo.n); }, [goTo?.at, !!deck]);
   useEffect(() => { strip.current?.querySelector('.is-on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [at]);
-  if (failed) return <div className="doc-missing">{name} could not be read. Open it outside to see it.</div>;
+  if (failed) return <div className="doc-missing">{name} could not be read.</div>;
   const count = deck?.slides.length ?? 0;
   const ratio = deck ? deck.size.w / deck.size.h : 16 / 9;
   const width = Math.max(0, Math.min(fit.w, fit.h * ratio));

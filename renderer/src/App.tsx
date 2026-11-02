@@ -6799,7 +6799,7 @@ export default function App() {
     const out = await api.threadEdit(item.product, item.id, { blockedBy: on ? [on] : [] });
     const task = isTaskRow(item);
     showToast(!out.ok ? 'That change did not save.'
-      : on ? (task ? 'Blocked. Its holder hears when that finishes.' : 'It waits in Later and comes back when that ends.')
+      : on ? (task ? 'Blocked.' : 'It waits in Later and comes back when that ends.')
         : task ? 'Not blocked any more.' : 'It is not waiting any more.');
     void refresh();
   };
@@ -7053,7 +7053,7 @@ export default function App() {
         chat={room ? roomsUi.chatIn(room) : roomsUi.live
           ? <SendBox placeholder={`Message ${first}`} empty={<p className="pl-hello">No messages with {first} yet.</p>}
             onSend={(text) => roomsUi.startChat(id, placeMember.name, text)} />
-          : <SendBox placeholder={`Message ${first}`} empty={<p className="pl-hello">Messages with {first} start a thread you both see.</p>}
+          : <SendBox placeholder={`Message ${first}`} empty={<p className="pl-hello">No messages with {first} yet.</p>}
             onSend={async (text) => { setComposeInitial({ to: id, body: text }); setModal('compose'); return null; }} />}
         side={<>
           <PlaceList title="Waiting on you" now={now} rows={[
@@ -7082,7 +7082,7 @@ export default function App() {
         side={<>
           <JobBlock job={t?.job ?? null} onSave={(job) => teammatesUi.setJob(id, job)} />
           <PlaceList title="Waiting on you" now={now} rows={asks.map((i) => itemRow(i, '', 'ask'))} />
-          <PlaceList title="In progress" now={now} rows={split.now.map((i) => itemRow(i, word(i)[0], word(i)[1]))} empty="Nothing in progress. Message it or give it a task." />
+          <PlaceList title="In progress" now={now} rows={split.now.map((i) => itemRow(i, word(i)[0], word(i)[1]))} />
           <PlaceList title="Finished this week" now={now} rows={split.finished.map((i) => itemRow(i, 'Done', 'done'))} />
         </>} />;
     } else {
@@ -7092,7 +7092,7 @@ export default function App() {
       const ownerMember = members.find((m) => m.key === `person:${tm?.owner}`);
       placeEl = tm && <MemberPlace m={{ ...placeMember, name: tm.name }} about={`${first}'s AI teammate`} onBack={back} backTo={backTo}
         chat={<SendBox placeholder={`Write to ${tm.name}`}
-          empty={<p className="pl-hello">{tm.name} works for {first}. {tm.open ? `${first} lets anyone on the team give it work, so it starts on what you write.` : `What you write goes to ${first} as a request.`}</p>}
+          empty={<p className="pl-hello">No messages with {tm.name} yet.</p>}
           onSend={async (text) => { const r = await api.teamMessageMate({ owner: tm.owner, mate: tm.id, text }); if (r.ok) { showToast(tm.open ? `Sent to ${tm.name}` : `Sent to ${first} to pass on`); void refresh(); } return r.ok ? null : r.error ?? 'That did not send.'; }} />}
         side={<>
           <JobBlock job={tm.job} />
@@ -9001,7 +9001,7 @@ export default function App() {
       })()}
       {!!snap?.teammates?.sending?.length && (
         <AgentSending held={snap.teammates.sending} raised={!!toast && !sentLineShown}
-          onUndo={async (id) => { const r = await api.teammates<boolean>('unsend', { id }); showToast(r.ok && r.value ? 'Taken back. It was not sent.' : 'It had already gone.'); void refresh(); }} />
+          onUndo={async (id) => { const r = await api.teammates<boolean>('unsend', { id }); showToast(r.ok && r.value ? 'Taken back.' : 'It had already gone.'); void refresh(); }} />
       )}
       {/* AND NO TOAST FOR A NEW VERSION. It was the third of the four drawn for
           w-86452550e5 and the argument against it is the one she agreed with: a

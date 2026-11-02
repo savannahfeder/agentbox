@@ -53,9 +53,9 @@ async function stageInPieces(file: File, name: string, onDone: (bytes: number) =
 /** What stops the box sending, said for the person: a file that could not be attached, or one too big to go. */
 export function attachProblem(list: PendingAttachment[]): string | null {
   const failed = list.find((a) => a.failed);
-  if (failed) return `${failed.failed} Remove it to send the rest.`;
+  if (failed) return failed.failed ?? null;
   const big = list.find((a) => tooBigToSend(a.size ?? 0));
-  if (big) return `${big.name} is ${sizeWords(big.size ?? 0)}, over the ${MAX_SENT_MB} MB a message can send. Remove it to send the rest.`;
+  if (big) return `${big.name} is ${sizeWords(big.size ?? 0)}, over the ${MAX_SENT_MB} MB a message can send.`;
   return null;
 }
 

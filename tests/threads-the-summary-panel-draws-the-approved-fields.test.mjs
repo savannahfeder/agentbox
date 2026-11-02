@@ -113,7 +113,7 @@ describe('a teammate’s card', () => {
   // state ("Waiting on Maya") heads the page (TeammateStanding) instead.
   it('is exactly the summary’s fields: context first, then done, the links, then the properties', () => {
     const words = text(draw(React.createElement(TeammateCard, { card, person: maya })));
-    expect(words).toBe('About Acme’s contract ends on the 14th. Done Terms are drafted at 8% over last year. Blocked by Sign in with Google Blocks A thread you cannot see Owner Ma Maya Chen Priority High Project Northwind Who sees it The team The agent keeps this summary up to date.');
+    expect(words).toBe('About Acme’s contract ends on the 14th. Done Terms are drafted at 8% over last year. Blocked by Sign in with Google Blocks A thread you cannot see Owner Ma Maya Chen Priority High Project Northwind Who sees it The team');
   });
   it('shows nothing of a private thread but that it is private, whose it is and its state', () => {
     const words = text(draw(React.createElement(TeammateCard, { card: { ...card, visible: false, title: null, project: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [] }, person: maya })));

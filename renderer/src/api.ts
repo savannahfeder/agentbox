@@ -943,7 +943,7 @@ export const api = {
     return (await window.zero?.fileElsewhere?.(p).catch(() => null)) ?? { key: null, notes: [], approvals: [] };
   },
   async filesPlaceEdit(p: { key: string; text: string }): Promise<{ ok: boolean; error?: string; goes?: 'sent'; to?: string }> {
-    if (!window.zero?.filesPlaceEdit) return { ok: false, error: `Quit and reopen ${NAME} to save this. Your words are still here.` };
+    if (!window.zero?.filesPlaceEdit) return { ok: false, error: `Quit and reopen ${NAME} to save this.` };
     return window.zero.filesPlaceEdit(p);
   },
   async filesPlaceMark(p: { key: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }> {
