@@ -65,7 +65,9 @@ export function cleanMark(value) {
     }
     case 'resolve': case 'reopen': {
       const on = shortId(value.on);
-      return on ? { do: value.do, on } : undefined;
+      // `in`: the version that answered it, when the app resolved it rather than a press.
+      const answeredIn = value.do === 'resolve' ? fileId(value.in) : null;
+      return on ? { do: value.do, on, ...(answeredIn ? { in: answeredIn } : {}) } : undefined;
     }
     case 'approve': case 'unapprove': {
       const file = fileId(value.file);
@@ -88,12 +90,21 @@ export function cleanMark(value) {
       const text = typeof value.text === 'string' && value.text.trim() && byteLength(value.text) <= MAX_EDIT_BYTES ? value.text : null;
       return text ? { do: 'edit', file, text } : undefined;
     }
+    // What was decided about an agent's version that skipped someone's edit (main/version-reconcile.mjs).
+    case 'reconcile': {
+      const file = fileId(value.file);
+      if (!file) return undefined;
+      const path = value.path !== undefined ? documentPath(value.path) : null;
+      const missed = value.missed !== undefined ? documentPath(value.missed) : null;
+      const from = fileId(value.from);
+      return { do: 'reconcile', file, ...(path ? { path } : {}), ...(missed ? { missed } : {}), ...(from ? { from } : {}), ...(Number.isInteger(value.clash) && value.clash > 0 ? { clash: value.clash } : {}), ...(value.replace === true ? { replace: true } : {}) };
+    }
     default: return undefined;
   }
 }
 
 /** Only that this person has looked at something, which is nothing anyone else needs to read. */
-export const isBookkeepingMark = (mark) => mark?.do === 'seen' || mark?.do === 'sent';
+export const isBookkeepingMark = (mark) => mark?.do === 'seen' || mark?.do === 'sent' || mark?.do === 'reconcile';
 
 /**
  * Every mark on a thread, oldest first, as what it now says. Each entry is the
@@ -125,7 +136,7 @@ export function marksOf(entries) {
       replies.set(e.id, { id: e.id, on: e.on, text: e.text, by: e.by ?? null, ts: e.ts });
     } else if (e.do === 'resolve' || e.do === 'reopen') {
       const was = settled.get(e.on);
-      if (!was || e.ts >= was.ts) settled.set(e.on, { ts: e.ts, by: e.by ?? null, resolved: e.do === 'resolve' });
+      if (!was || e.ts >= was.ts) settled.set(e.on, { ts: e.ts, by: e.by ?? null, resolved: e.do === 'resolve', in: e.in ?? null });
     } else if (e.do === 'approve' || e.do === 'unapprove') {
       const key = `${e.file}\0${e.by ?? ''}`;
       const was = given.get(key);
@@ -148,7 +159,7 @@ export function marksOf(entries) {
   const list = [...notes.values()].map((n) => {
     const s = settled.get(n.id);
     const out = { ...n, ...(sent.has(n.id) ? { sent: true } : {}), ...(toAgent.has(n.id) ? { toAgent: true } : {}), ...(answers.has(n.id) ? { replies: answers.get(n.id) } : {}) };
-    return s?.resolved ? { ...out, resolved: true, resolvedBy: s.by } : out;
+    return s?.resolved ? { ...out, resolved: true, resolvedBy: s.by, ...(s.in ? { resolvedIn: s.in } : {}) } : out;
   });
   return {
     notes: list,
@@ -358,6 +369,10 @@ const NAMED = new RegExp(
   + String.raw`|(?<![\w./:@~(\[-])(${PATHISH})(?![\w/-])`,
   'gi',
 );
+// Every alternative of NAMED needs one of these, and NAMED is slow to fail on long text.
+const ANY_EXT = new RegExp(String.raw`\.(?:${EXT})`, 'i');
+/** Counts for tests: how many messages NAMED was run over. */
+export const filesInLinesInternals = { searched: 0 };
 const FENCE = /```[\s\S]*?(?:```|$)/g;
 const EDITED_WORDS = /^Updated [^\n]+\.\s*\n\n\[/;
 
@@ -384,7 +399,8 @@ export function otherFilesInLines(lines) {
     const p = l?.patch;
     if (!p) continue;
     for (const field of ['result', 'note', 'body', 'answer']) {
-      if (typeof p[field] !== 'string') continue;
+      // OTHER_NAMED is a link or a code span, so it needs one of these.
+      if (typeof p[field] !== 'string' || !(p[field].includes('](') || p[field].includes('`'))) continue;
       for (const m of p[field].replace(FENCE, '').matchAll(OTHER_NAMED)) {
         if (l.source === 'founder' && !m[1]) continue;
         const path = (m[1] ?? m[2]).replace(/^\.\//, '');
@@ -416,7 +432,8 @@ export function filesInLines(lines) {
       out.push({ path: p.artifact.path, by: l.by ?? null, at: l.ts, edited: true });
     }
     for (const field of ['body', 'answer', 'result', 'note']) {
-      if (typeof p[field] !== 'string') continue;
+      if (typeof p[field] !== 'string' || !ANY_EXT.test(p[field])) continue;
+      filesInLinesInternals.searched += 1;
       // A person's own words only count a file they attached. The notes sent to an
       // agent name the file it should make, which does not exist yet.
       const linksOnly = l.source === 'founder' && (field === 'answer' || field === 'body');
@@ -444,6 +461,16 @@ export function sharedByWords(v, { me, nameOf }) {
   return whose ? `Shared by ${whose}'s agent` : 'Shared by your agent';
 }
 
+/** "Resolved by your agent in v15": a comment the version `v` answered. */
+export function resolvedInWords(v, { me, nameOf }) {
+  const whose = !v?.by || v.by === me ? null : nameOf(v.by);
+  let who;
+  if (typeof v?.agent !== 'string') who = whose ?? 'you';
+  else if (v.agent && v.agent !== PLAIN_AGENT) who = v.agent;
+  else who = whose ? `${whose}'s agent` : 'your agent';
+  return `Resolved by ${who} in v${v.n}`;
+}
+
 /**
  * The open comments on the versions before this one, as this version shows them:
  * the same comment, not a copy, so resolving it here resolves it everywhere.
@@ -459,7 +486,7 @@ export function editClash(family, baseN, me, nameOf) {
   const versions = family?.versions ?? [];
   const other = versions.slice(baseN).filter((v) => v.by !== me).at(-1);
   if (!other) return null;
-  return `${nameOf(other.by)} saved v${versions.indexOf(other) + 1} while you were editing. Yours saves as v${versions.length + 1}, and both are kept.`;
+  return `${nameOf(other.by)} saved v${versions.indexOf(other) + 1} while you were editing. Yours saves as v${versions.length + 1}, with their changes merged in.`;
 }
 
 /** What a person calls a file at any version: one name, whatever each version is named on disk. */
@@ -503,10 +530,20 @@ export function newestOfFamily(path, edits) {
 
 /** The line that tells an agent which files people have edited, or null. Its own later version ends it. */
 export function editedFilesLine(lines) {
-  const moved = threadFiles(filesInLines(lines)).filter((f) => f.versions.at(-1)?.edited && f.versions.length > 1);
-  if (!moved.length) return null;
-  const said = moved.map((f) => `${f.versions[0].name} is now ${f.versions.at(-1).path}`).join('; ');
-  return `People edited files on this thread. Read the newest version, not the copy you remember: ${said}.`;
+  const families = threadFiles(filesInLines(lines));
+  const moved = families.filter((f) => f.versions.at(-1)?.edited && f.versions.length > 1);
+  const missedOn = new Map((lines ?? []).flatMap((l) => (l?.patch?.artifact?.do === 'reconcile' && l.patch.artifact.missed ? [[l.patch.artifact.file, l.patch.artifact.missed]] : [])));
+  const missed = families.flatMap((f) => {
+    const newest = f.versions.at(-1);
+    return missedOn.has(newest?.id) ? [`${newest.path} was written without the edit in ${missedOn.get(newest.id)}`] : [];
+  });
+  const clashed = new Map((lines ?? []).flatMap((l) => (l?.patch?.artifact?.do === 'reconcile' && l.patch.artifact.clash && l.patch.artifact.path ? [[l.patch.artifact.path, l.patch.artifact.file]] : [])));
+  const kept = moved.flatMap((f) => (clashed.has(f.versions.at(-1).path) ? [`${f.versions.at(-1).path} kept a person's words where your ${clashed.get(f.versions.at(-1).path)} changed the same ones`] : []));
+  const said = [];
+  if (moved.length) said.push(`People edited files on this thread. Read the newest version, not the copy you remember: ${moved.map((f) => `${f.versions[0].name} is now ${f.versions.at(-1).path}`).join('; ')}. An edit your next version leaves out is merged back in, so to undo one because they asked, pass replacesEdits to write_document.`);
+  if (kept.length) said.push(`${kept.join('; ')}.`);
+  if (missed.length) said.push(`${missed.join('; ')}. Read that edit and carry it across unless you were told otherwise.`);
+  return said.join(' ') || null;
 }
 
 /** Who said the file first, which is who an approval or a note reaches in a conversation. */
@@ -672,6 +709,42 @@ export function notesForItsAgent(lines, marks, { me, nameOf = () => 'Someone', p
       const { text, ids } = notesForTheAgent({ notes: open }, version, family.versions.length, { nameOf: first });
       out.push({ by: open[0].by, ids, text: `${nameOf(open[0].by)} left notes on ${version.name}, a file you made on this thread.\n\n${text}` });
     }
+  }
+  return out;
+}
+
+/**
+ * The open comments a later version of their file answered: one sent to the
+ * agent, by the agent's next version; one written to a teammate, by that
+ * teammate's next version. A reopen after that version keeps it open.
+ * Returns `[{ on, in }]`, the comment and the version.
+ */
+export function answeredNotes(lines, { people = [] } = {}) {
+  const entries = [];
+  const sentAt = new Map();
+  const settledAt = new Map();
+  for (const l of lines ?? []) {
+    const a = l?.patch?.artifact;
+    if (!a) continue;
+    entries.push({ ...a, by: l.by ?? null, ts: l.ts });
+    if (a.do === 'sent') for (const id of a.on ?? []) if (!sentAt.has(id)) sentAt.set(id, l.ts);
+    if (a.do === 'resolve' || a.do === 'reopen') settledAt.set(a.on, Math.max(settledAt.get(a.on) ?? -Infinity, l.ts));
+  }
+  // Notes told to an agent name the file it should make, which is no version until it does.
+  const families = threadFiles(notedFilesInLines((lines ?? []).filter((l) => !l?.patch?.fromNotes)));
+  const out = [];
+  for (const n of marksOf(entries).notes) {
+    if (n.resolved) continue;
+    const family = families.find((f) => f.versions.some((v) => v.id === n.file));
+    if (!family) continue;
+    const later = family.versions.slice(family.versions.findIndex((v) => v.id === n.file) + 1);
+    let answer = sentAt.has(n.id) ? later.find((v) => typeof v.agent === 'string' && v.at > sentAt.get(n.id)) : undefined;
+    if (!answer) {
+      const goes = noteGoesTo(n, people);
+      if (goes.to === 'person') answer = later.find((v) => v.by === goes.person && v.at > n.ts);
+    }
+    if (!answer || (settledAt.get(n.id) ?? -Infinity) >= answer.at) continue;
+    out.push({ on: n.id, in: answer.id });
   }
   return out;
 }

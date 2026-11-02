@@ -271,6 +271,12 @@ export class Store {
     return this.modules.workItemsDisk.readItemHistory(this.productDir(slug), id, { max, before });
   }
 
+  /** readHistory for many threads of one project: its ledger is found and read once, not per thread. */
+  historyReader(slug) {
+    const read = this.modules.workItemsDisk.readItemHistories(this.productDir(slug));
+    return (id, opts) => (ROW_ID.test(String(id ?? '')) ? read(id, opts) : []);
+  }
+
   // THE CONVERSATION ON ONE ROW, oldest first, for the brief a spawning worker
   // is handed (main/supervisor.mjs, buildBrief). readHistory above is the same
   // ledger read for her thread view and stops at the lines; this one asks
@@ -796,7 +802,13 @@ export class Store {
   // it with the 'founder' label the way a repeating task's run is filed
   // (main/repeats.mjs), because the person agreed that these start and ship on
   // their own (main/main-went-red.mjs).
-  fileMainFix(slug, { title, body, problem, kind = 'task', priority = 5, labels = [] }) {
+  fileMainFix(slug, row) {
+    return this.fileOnItsOwn(slug, row);
+  }
+
+  // A thread the app files that starts without waiting for anyone, as above.
+  // Whether its work then ships without review is the caller's to say.
+  fileOnItsOwn(slug, { title, body, problem, kind = 'task', priority = 5, labels = [] }) {
     const { workItemsDisk } = this.modules;
     return workItemsDisk.createWorkItem(
       this.productDir(slug),

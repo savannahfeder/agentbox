@@ -1,6 +1,7 @@
 // The file itself, whichever kind it is, with the comments drawn on it. One
 // stage to a pane, so two versions side by side are two of these.
-import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { whereAFileLinkGoes } from '../file-links';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { findQuote, viewKind } from '../../../shared/artifact-marks.mjs';
@@ -26,8 +27,30 @@ import { DocOutline } from './DocOutline';
 import './doc-reading.css';
 
 const MD_PLUGINS = [remarkGfm];
+
+/** Opens a web link over the file. Set by the view the file is open in. */
+export const StageLink = createContext<((url: string) => void) | null>(null);
+
+// A bare <a> would walk the whole window off to that page.
+function FileLink({ href = '', folder, children }: { href?: string; folder: string | null; children?: ReactNode }) {
+  const openWeb = useContext(StageLink);
+  return <a href={href} onClick={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const goes = whereAFileLinkGoes(href);
+    if (goes === 'browser') {
+      if (openWeb) openWeb(href);
+      else void api.openArtifactExternally({ product: '', src: href });
+    } else if (goes === 'outside' && folder) {
+      const src = href.startsWith('/') ? href : decodeURIComponent(new URL(href, `file://${folder}/`).pathname);
+      void api.openArtifactExternally({ product: '', src });
+    }
+  }}>{children}</a>;
+}
+
 /** A picture the document names beside itself is drawn from the document's own folder. */
 const partsFor = (folder: string | null) => ({
+  a: ({ href, children }: { href?: string; children?: ReactNode }) => <FileLink href={href} folder={folder}>{children}</FileLink>,
   img: ({ src, alt }: { src?: string; alt?: string }) => {
     const from = src ?? '';
     if (/^https?:/.test(from)) return <img src={from} alt={alt ?? ''} />;

@@ -355,7 +355,8 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
         type="button"
         className="ts-more"
         aria-label="More actions"
-        title="More"
+        data-hint="more"
+        data-hint-align="right"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -365,6 +366,7 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
       </button>}
       {open && waiting && (
         <div className="th-menu ts-more-menu ts-wait-menu" role="menu" aria-label={blocks ? 'Blocked by' : 'Waits on'}>
+          <p className="ts-menu-say">{blocks ? 'Blocked until that is done.' : 'It moves to Later and comes back when that is done.'}</p>
           {waitsNow && <button type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { close(false); onWait?.(null); }}>
             <span className="ico"><WaitMark /></span><span className="ts-more-label">{blocks ? 'Not blocked' : 'Stop waiting'}</span>
           </button>}
@@ -377,6 +379,7 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
       )}
       {open && !waiting && (giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Give it to">
+          <p className="ts-menu-say">A person gets it as a task in their Needs you. An AI teammate starts on it.</p>
           {giveTo.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { close(false); onGive?.(p); }}>
             <span className="ico"><GiveMark /></span>
             <span className="ts-more-label">{p.name}</span>

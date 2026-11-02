@@ -11,10 +11,11 @@ import { MainTests } from './main-went-red.mjs';
 import { folderJob } from './task-folders-offthread.mjs';
 import { gitJob } from './git-change-offthread.mjs';
 import { queuedReplyText, submitReply, framedTeammate } from './live-replies.mjs';
-import { wakeForNotes } from './notes-wake.mjs';
+import { resolveAnsweredNotes, wakeForNotes } from './notes-wake.mjs';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mjs';
 import { editedFilesLine } from '../shared/artifact-marks.mjs';
-import { readItemHistory } from './store/work-items.mjs';
+import { readItemHistory, updateWorkItem } from './store/work-items.mjs';
+import { reconcileRows } from './version-reconcile.mjs';
 import { taskCommand } from './task-commands.mjs';
 import { providerCommand, reviewTarget, nativeCommandNames } from '../shared/provider-commands.mjs';
 import {agentInstructionsUnified, readSystemTemplate, writeInstruction} from './instruction-settings.mjs';
@@ -273,6 +274,7 @@ const HUNG_QUIET_MS = 10 * 60_000;
 // A pass this late was not late, the Mac was asleep (forgiveSleep). Eight
 // missed passes: past any slow pass, well under the ten minutes above.
 const SLEPT_GAP_MS = 2 * 60_000;
+const PROFILES_KEPT_MS = 1000;
 // Awake this long and not joined or taken back, a row handed to the cloud runs here (`_carriedHolds`).
 const PHONE_QUIET_MS = 10 * 60_000;
 // Two hangs on one row inside this window and the app stops restarting it and
@@ -1750,6 +1752,18 @@ export class Supervisor {
   // A push lasts while its task runs, so a second push cannot pause the first,
   // and ends with that run. One that never starts ends when the row stops being
   // open work: finished, archived, or gone.
+  _reconcileVersions(items) {
+    reconcileRows({
+      items,
+      isLive: (item) => this.sessions.has(item.id) || this._cloudWorkOutstanding(item),
+      dirOf: (item) => this.store.productDir(item.product),
+      historyOf: (item) => readItemHistory(this.store.productDir(item.product), item.id, { max: Number.MAX_SAFE_INTEGER }),
+      writeTo: (item, patch) => updateWorkItem(this.store.productDir(item.product), item.id, patch, { source: 'system' }),
+      looked: (this._versionsLooked ??= new Map()),
+      warn: (words) => console.warn(`zero: ${words}`),
+    });
+  }
+
   _settleRunNow(items) {
     for (const [id, rec] of [...this._runNow]) {
       const item = items.find((i) => i.id === id && i.product === rec.product);
@@ -4313,8 +4327,14 @@ export class Supervisor {
   // THE CONFIGURED ONES FIRST, THEN WHATEVER IS SIGNED IN ON THE DISK. One
   // copy of that rule, in main/account-discovery.mjs, so the fleet and the
   // Agents page can never disagree about which accounts exist.
+  // A tick asks once per waiting thread, so within one it is read at most once a second.
   _profiles() {
-    return effectiveProfiles(this.config.authProfiles, { home: this.config.home });
+    const now = Date.now();
+    const kept = this._profilesKept;
+    if (this._ticking && kept && now - kept.at < PROFILES_KEPT_MS) return [...kept.list];
+    const list = effectiveProfiles(this.config.authProfiles, { home: this.config.home });
+    this._profilesKept = { at: now, list };
+    return [...list];
   }
 
   // THE CODEX LOGIN, WHICH IS NOT ONE OF THE CLAUDE ONES.
@@ -7517,6 +7537,7 @@ export class Supervisor {
     // on this tick is picked up by the pass below.
     await this.serveTeammates(now);
     await this.wakeForNotes(now);
+    this.resolveAnsweredNotes(now);
     // And the folders of rows she has finished, put away. On a timer of its own
     // rather than every pass, because it is a walk of the disk and a tick is
     // fifteen seconds: she closes rows while nothing at all is running, which
@@ -7554,6 +7575,7 @@ export class Supervisor {
     // whose run has ended is settled first, since it no longer holds anything.
     this._settleRunNow(items);
     this._settlePreemptions(items, now);
+    this._reconcileVersions(items);
 
     // Interrupted sessions the last sweep could not fit in a slot. Ahead of
     // everything, because a row whose own session is waiting must not have a
@@ -7902,6 +7924,12 @@ export class Supervisor {
     try {
       if (await wakeForNotes({ store: this.store, team, tell, now })) this.wake?.();
     } catch (err) { console.warn('zero: notes on a file could not reach its agent:', err.message); }
+  }
+
+  resolveAnsweredNotes(now = Date.now()) {
+    try {
+      resolveAnsweredNotes({ store: this.store, people: this.store.teammates?.team?.state?.()?.people ?? [], now });
+    } catch (err) { console.warn('zero: comments a new version answered could not be resolved:', err.message); }
   }
 
   // Your words to a teammate that is already on a run go into that run, the

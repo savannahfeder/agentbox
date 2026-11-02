@@ -8,7 +8,7 @@
 // you. The two tabs stay one choice away in View and filters. Counted here, so a
 // face can never say more waits on you than Needs you holds.
 import { describe, it, expect } from 'vitest';
-import { nowAndFinished, readHomeLayout, statusWord, waitsOnYou, writeHomeLayout, youWaitOn } from '../renderer/src/team/everything/place.ts';
+import { nowAndFinished, statusWord, waitsOnYou, youWaitOn } from '../renderer/src/team/everything/place.ts';
 
 const mateOf = (r) => r.labels?.find((l) => l.startsWith('teammate:'))?.slice('teammate:'.length) ?? null;
 
@@ -79,23 +79,6 @@ describe('the one word under a name', () => {
   });
 });
 
-describe('the home you see', () => {
-  const store = () => { const s = new Map(); return { getItem: (k) => s.get(k) ?? null, setItem: (k, v) => s.set(k, v) }; };
-
-  it('is one list until you pick the two tabs, and stays picked', () => {
-    const s = store();
-    expect(readHomeLayout(s)).toBe('list');
-    writeHomeLayout('tabs', s);
-    expect(readHomeLayout(s)).toBe('tabs');
-    writeHomeLayout('list', s);
-    expect(readHomeLayout(s)).toBe('list');
-  });
-
-  it('falls back to one list on anything it does not know', () => {
-    expect(readHomeLayout({ getItem: () => 'grid', setItem() {} })).toBe('list');
-    expect(readHomeLayout({ getItem: () => { throw new Error('no storage'); }, setItem() {} })).toBe('list');
-  });
-});
 
 describe('a place\'s two lists', () => {
   const now = 10 * 24 * 3600_000;

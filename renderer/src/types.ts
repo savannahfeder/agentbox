@@ -230,6 +230,8 @@ export interface FileNote {
   pin?: number;
   resolved?: boolean;
   resolvedBy?: string | null;
+  /** The version that answered it, when the app resolved it rather than a press. */
+  resolvedIn?: string;
   sent?: boolean;
   /** Someone pressed "Send to the agent" on a note the agent was not sent. */
   toAgent?: boolean;
@@ -1695,7 +1697,7 @@ declare global {
       findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number } }): Promise<FoundInThreads>;
       warmFindInThreads(): Promise<boolean>;
       fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
-      fileNewVersion?(p: { product: string; id: string; path: string; text: string }): Promise<{ ok: boolean; path?: string; error?: string }>;
+      fileNewVersion?(p: { product: string; id: string; path: string; text: string; since?: string | null }): Promise<{ ok: boolean; path?: string; error?: string }>;
       teamMarkFile(p: { personId: string; threadId: string; mark: ArtifactMark }): Promise<TeamCallResult>;
       connections?(): Promise<ConnectionsList>;
       connectionsConnect?(p: ConnectAsk): Promise<ConnectAnswer>;
