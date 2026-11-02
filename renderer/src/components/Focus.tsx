@@ -1799,7 +1799,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     ? <><h1 className="workspace-title gc-head-group cx-person"><span className="rm-one">{threadName}</span>{audience && <span className="thread-crumb-with">{audience}</span>}</h1>{(direct || summarised) && <ConversationAside item={item} onAddPeople={onAddPeople} />}</>
     : crumbFrom
     ? <><ThreadCrumb from={crumbFrom} name={threadName} audience={audience} onBack={onClose} onRename={rename} threadKey={`${item.product}/${item.id}`} renameAsk={Math.max(pageAsk?.what === 'rename' ? pageAsk.at : 0, renameAt)} onAsked={onAsked} />
-      {(direct || summarised) && <ConversationAside item={item} onAddPeople={onAddPeople} />}</>
+      {(direct || summarised) && !cornerHeaderTarget && <ConversationAside item={item} onAddPeople={onAddPeople} />}</>
     : <>{backButton}{bandLine}</>;
 
   // ANYTHING ADDED TO THIS ELEMENT RIDES BESIDE THE LITERAL, NEVER INSIDE IT.
@@ -1855,7 +1855,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     {/* THE CORNER: THE THREAD'S MENU, and nothing else. The Summary button
         that stood beside it (w-e731ca9376) moved onto the summary itself on
         w-a3482b8c2c: the rail opens it, the icon beside its title closes it. */}
-    {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{threadMenu}</span>, cornerHeaderTarget)}
+    {cornerHeaderTarget && createPortal(<span className="ts-top">{crumbFrom && !inChats && (direct || summarised) && <ConversationAside item={item} onAddPeople={onAddPeople} />}{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{threadMenu}</span>, cornerHeaderTarget)}
     {artifact && (
       <ThreadArtifacts item={item} open={artifact} withAgent={!direct && !heldByPerson && !item.agent}
         onClose={() => setArtifact(null)} onNotice={onNotice} />

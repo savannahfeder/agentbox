@@ -128,9 +128,8 @@ export function PlaceButton({ onPlace, startOpen = false, ...facts }: PlaceFacts
   return (
     <span className="ts-place-wrap" ref={wrap}>
       <button type="button" className={`ts-done ts-place${open ? ' open' : ''}`} aria-haspopup="dialog" aria-expanded={open}
-        aria-label={`Runs on: ${v.word}`} onClick={() => setOpen((o) => !o)}>
+        aria-label={`Runs on: ${v.word}`} title={`Runs on ${v.word}`} onClick={() => setOpen((o) => !o)}>
         {v.on === 'cloud' ? <CloudMark /> : <MacMark />}
-        <span>{v.word}</span>
         {v.dot && <i className="ts-place-dot" aria-hidden="true" />}
       </button>
       {open && (

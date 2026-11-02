@@ -94,7 +94,7 @@ describe('on the Mac', () => {
   // bar's place button carries the move (the-cloud-button-on-a-thread-...).
   it('the top bar says the run is on this Mac, and picking Cloud moves it', () => {
     const html = renderToStaticMarkup(React.createElement(ThreadMenu, { onFinish: () => {}, place: 'move', onPlace: () => {} }));
-    expect(html).toMatch(/class="ts-done ts-place[^"]*"[^>]*>.*This Mac/);
+    expect(html).toMatch(/class="ts-done ts-place[^"]*"[^>]*aria-label="Runs on: This Mac"/);
     expect(placeView({ place: 'move' }).pickCloud).toBe('move');
   });
 

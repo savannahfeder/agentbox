@@ -66,6 +66,8 @@
 /* WHERE IT RUNS, Done's box with its own words (threads/PlaceButton.tsx). The
    dot is the one accent: a thread the cloud handed back. */
 .ts-place-wrap { position: relative; display: inline-flex; }
+.ts-done.ts-place { width: 30px; padding: 0; justify-content: center; position: relative; }
+.ts-done.ts-place .ts-place-dot { position: absolute; top: 4px; right: 4px; margin: 0; }
 .ts-place.open { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .ts-place-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-left: -2px; }
 .th-pop.ts-place-pop { top: calc(100% + 8px); right: 0; width: 440px; font-size: 13px; }
