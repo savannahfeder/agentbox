@@ -29,7 +29,7 @@ import {
   backWords, timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type Privacy, type UpdatedWindow,
 } from './page-rules';
-import { messageLine, messagePriority, repeatsTheTab, rowPriorityId, rowSharing, waitingWord } from './page-rules';
+import { cellUnderTab, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
 import { STATE_WORD, linkWords } from './summary-rules';
 import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
 import { stopKey } from './walk-rules';
@@ -744,7 +744,8 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const worded = waits && !cell.live ? { ...cell, word: waits.word, title: waits.title }
     : peopleWaitOnYou ? { ...cell, word: 'Waiting on you', mark: 'need' as const }
       : team && (cell.word === STATE_WORD.waiting || iSpokeLast(item, product, team.me)) ? { ...cell, word: waitingWord(item, product, team.me, nameFirst, { inNeedsYou: tab === 'inbox' }) } : cell;
-  const status = repeatsTheTab(worded.word, tab) ? undefined : worded;
+  const shownWord = cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou });
+  const status = shownWord === null ? undefined : { ...worded, word: shownWord };
   // WHO SEES IT, AT A GLANCE (2026-10-01). One mark after the title, always: the
   // people on a thread the team or chosen people can see, the lock on one only
   // you can see. A thread shared with chosen people (w-41ff964775) carries the
