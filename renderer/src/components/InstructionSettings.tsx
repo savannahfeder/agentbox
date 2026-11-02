@@ -181,7 +181,7 @@ export function Part({id,label,writing,description,head,hidden,find}:{id:string;
  useEffect(()=>{if(text!==null&&!decided.current){decided.current=true;setWriting(startsWriting(text));}},[text]);
  const box=useRef<HTMLTextAreaElement>(null);
  // The caret at the end, so words added after Edit go after what is there.
- useEffect(()=>{if(writingNow&&text!==null&&box.current){box.current.focus({preventScroll:true});const end=box.current.value.length;box.current.setSelectionRange(end,end);}},[writingNow]);
+ useEffect(()=>{if(writingNow&&text!==null){box.current?.focus({preventScroll:true});const end=box.current?.value.length??0;box.current?.setSelectionRange(end,end);}},[writingNow]);
  return <section className="instr-part" id={`instr-${id}`} data-find={find}>
   <div className="instr-part-head">
    {label && <h2>{label}</h2>}
