@@ -153,11 +153,15 @@ if (verb === 'open') {
       : [...document.querySelectorAll('[data-breaker-ref]')].find((e) => (e.getAttribute('aria-label') || e.innerText || e.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase().startsWith(w.toLowerCase()));
     if (!el) return null;
     el.scrollIntoView({ block: 'center' });
-    el.click();
-    if (el.matches('input, textarea, select, [contenteditable]')) el.focus();
-    return (el.getAttribute('aria-label') || el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 60);
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2, field: el.matches('input, textarea, select, [contenteditable]'),
+      words: (el.getAttribute('aria-label') || el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 60) };
   })()`);
-  await report(t, hit === null ? `Nothing numbered or named "${which}" on screen. Run look again.` : `Pressed "${hit}".`);
+  // A real press, so whatever listens for the pointer hears it, and whatever covers the thing gets the press instead.
+  if (hit) {
+    for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await t.call('Input.dispatchMouseEvent', { type, x: hit.x, y: hit.y, button: 'left', clickCount: type === 'mouseMoved' ? 0 : 1 });
+  }
+  await report(t, hit === null ? `Nothing numbered or named "${which}" on screen. Run look again.` : `Pressed "${hit.words}".`);
   t.detach();
 } else if (verb === 'type') {
   const t = await tab();
