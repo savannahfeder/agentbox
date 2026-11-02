@@ -1,5 +1,5 @@
 import { RemoteControl } from './RemoteControl';
-import { dropHalfMention, heldKeyThatOpenedTheBox, keyInTheReplyBox, replyName, replyTarget, sendKeyFor, unsentWords } from '../reply-keys';
+import { dropHalfMention, heldKeyThatOpenedTheBox, keyInTheReplyBox, replyName, replyTarget, sendKeyFor } from '../reply-keys';
 import { onPhone } from '../phone-screen';
 import { FilmBar, useFilm } from './FilmPlayer';
 import { useFilmPoster } from '../film-poster';
@@ -2983,7 +2983,6 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   };
   // A note being recorded is a draft: the box stays open round it.
   const hasDraft = !!text.trim() || attachments.length > 0 || recording;
-  const unsent = unsentWords({ words: text, files: attachments.length, sending: !!saving });
   // THE SLASH MENU, AND THE MODE THAT IS ALWAYS ON THE SCREEN.
   //
   // It does. Claude Code has no backslash TRIGGER: `/` opens its commands and
@@ -3601,7 +3600,6 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             things to choose between; a stop INSTEAD of a dead Send is one
             thing that is always the thing she can do. */}
         {stop && !hasDraft ? stop : (<>
-        {unsent && <span className="dock-unsent">{unsent}</span>}
         <button
           className="dock-send"
           onClick={() => send()}

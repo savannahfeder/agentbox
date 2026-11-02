@@ -8,10 +8,6 @@ import './today.css';
 
 const RANGES: { id: TodayRange; label: string }[] = [{ id: 'today', label: 'Today' }, { id: 'yesterday', label: 'Yesterday' }, { id: 'week', label: 'This week' }];
 const EMPTY: Record<TodayRange, string> = { today: 'Nothing moved yet today.', yesterday: 'Nothing moved yesterday.', week: 'Nothing moved this week.' };
-const QUIET: Record<TodayRange, string> = { today: 'Nothing yet today from', yesterday: 'Nothing yesterday from', week: 'Nothing this week from' };
-
-const joinNames = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
-
 
 function Section({ id, picked, label, lines, extra, range, titleOf, onOpen }: {
   id: string; picked: string | null; label: string; lines: GroupLine[]; extra?: ReactNode; range: TodayRange;
@@ -111,7 +107,6 @@ export function TodayPage({ range, onRange, day, faces, picked, onPicked, keys, 
       <div className="td-people">
         {shown.people.map((p) => <Person key={p.key} p={p} face={faces.get(p.key)} picked={picked} range={range} onOpen={onOpen} />)}
       </div>
-      {shown.quiet.length > 0 && <p className="td-quiet">{QUIET[range]} {joinNames(shown.quiet)}.</p>}
     </div>
   </div>;
 }

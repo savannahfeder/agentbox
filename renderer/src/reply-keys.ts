@@ -18,11 +18,6 @@ export function keyInTheReplyBox({ toPeople, key, shift, meta, ctrl, composing }
 
 export const sendKeyFor = (toPeople: boolean): string => chord(toPeople ? '↵' : '⌘↵');
 
-/** What a box says about words still in it. Null when it has none, or they are on their way. */
-export function unsentWords({ words, files, sending }: { words: string; files: number; sending: boolean }): string | null {
-  return !sending && (words.trim() || files > 0) ? 'Not sent yet' : null;
-}
-
 /**
  * The line over a reply box and the toast from R on the list: the people who
  * will read it. Null for an agent's thread, whose title the screen already shows.
