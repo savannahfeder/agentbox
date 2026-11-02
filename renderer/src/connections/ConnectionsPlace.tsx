@@ -81,6 +81,7 @@ function ClientBoxes({ tile, onGo, busy }: { tile: ConnectionTile; onGo: (p: { c
       <code className="cn-address" data-selectable>{tile.redirect}</code>
       {tile.redirect && <CopyButton text={tile.redirect} />}
     </div>
+    {tile.hint && <p className="cn-hint cn-hint-near">{tile.hint}</p>}
     <input className="cn-input" aria-label="Client ID" placeholder="Client ID" autoComplete="off" spellCheck={false} value={clientId} onChange={(e) => setClientId(e.target.value)} />
     <input className="cn-input" aria-label="Client secret" placeholder="Client secret" type="password" autoComplete="off" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} />
     <div className="cn-actions"><button type="submit" className="cn-button cn-button-main" disabled={busy || !clientId.trim() || !clientSecret.trim()}>Connect</button></div>
@@ -229,7 +230,7 @@ function Sheet({ tile, now, list, onClose, onNotice }: { tile: ConnectionTile; n
     {found && <p className="cn-found" role="status">{found}</p>}
     {tile.state === 'works' && tile.read && <p className="cn-read"><span className="cn-read-label">{tile.toolCount} tools. Last read</span> {tile.read}</p>}
     {tile.todo && <p className="cn-todo">{tile.todo}</p>}
-    {wanting && tile.hint && <p className="cn-hint">{tile.hint}</p>}
+    {wanting && tile.hint && !asksClient && <p className="cn-hint">{tile.hint}</p>}
     {whenLine(tile, now) && <p className="cn-when">{whenLine(tile, now)}</p>}
     {tile.endsAt && <p className="cn-when">Its sign-in ends at {new Date(tile.endsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} and {tile.name} gives no way to renew it.</p>}
     {tile.changed.length > 0 && <p className="cn-todo">
