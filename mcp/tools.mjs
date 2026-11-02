@@ -141,16 +141,18 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
         content: z.string().optional(),
         status: z.enum(['current', 'history', 'exploration']).optional(),
         folder: z.string().optional().describe('a folder in Files to put it in, by name, such as Product specs. Made if there is none. The answer\'s filedIn says it happened; a directory in path is not a folder in Files'),
-        versionOf: z.string().optional().describe('the name of a file someone already has, on this thread or in Files, that this content revises. It is saved as that file\'s next version (-v2, -v3) in this thread\'s folder and opens as the same file, with its comments; no path is needed and nobody has to be sent it. A copy of such a file written under its own name elsewhere is saved this way too'),
+        versionOf: z.string().optional().describe('the name of a file someone already has, on this thread or in Files, that this content revises. It is saved as that file\'s next version (-v2, -v3) in this thread\'s folder and opens as the same file, with its comments; no path is needed and nobody has to be sent it. A copy of such a file written under its own name elsewhere is saved this way too. The newest version is nobody\'s to overwrite: if somebody edited the file since the copy you wrote from, your changes are merged into theirs, and when the same lines changed both ways nothing is saved and the answer names the version to read'),
       },
       run: async ({ product, folder, versionOf, ...doc }) => {
-        const version = doc.content == null ? null : documentVersion({ product, versionOf, path: doc.path ?? null, ownItem });
+        const version = doc.content == null ? null : documentVersion({ product, versionOf, path: doc.path ?? null, content: doc.content, ownItem });
         const into = version ? version.product : product;
-        const written = await writeDocument(into, version ? { ...doc, id: undefined, path: version.path, title: doc.title ?? version.title } : doc);
+        // A merge keeps what somebody else saved while this run was writing, so
+        // what lands is the merge, not the words this run arrived with.
+        const written = await writeDocument(into, version ? { ...doc, id: undefined, path: version.path, title: doc.title ?? version.title, ...(version.content != null ? { content: version.content } : {}) } : doc);
         if (doc.content == null) return json(written);
         noteWrittenForRun(into, written.path);
         const named = await nameOnThread(written, { ownItem, update: (id, patch) => claims.update(id, patch), note: version?.note });
-        return json({ ...written, ...named, ...(version ? { versionOf: version.of } : {}), ...fileWrittenDocument({ path: written.path, folder }) });
+        return json({ ...written, ...named, ...(version ? { versionOf: version.of } : {}), ...(version?.merged ? { merged: version.merged, note: version.note } : {}), ...fileWrittenDocument({ path: written.path, folder }) });
       },
     },
 
