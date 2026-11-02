@@ -95,6 +95,20 @@ export function tarDocs(dir, files) {
 const stampOf = (st) => `${st.size}:${Math.round(st.mtimeMs)}`;
 const hashOf = (body) => crypto.createHash('sha256').update(body).digest('hex');
 
+/**
+ * The copy this run already laid beside a file, when it is still exactly as the
+ * run left it, or null. One run's later work belongs in its own copy: five
+ * copies of a document and nobody can say which is current (w-27a7ae314a). A
+ * copy somebody has edited here is theirs, and gets the next name instead.
+ */
+function besideStillOurs(was) {
+  if (!was?.path) return null;
+  try {
+    const st = fs.lstatSync(was.path);
+    return st.isFile() && stampOf(st) === was.stamp ? was.path : null;
+  } catch { return null; }
+}
+
 // `notes.md` -> `notes (cloud).md`, then `notes (cloud 2).md`, and so on.
 function besideName(file) {
   const ext = path.extname(file);
@@ -189,7 +203,7 @@ export async function layDocs({ tgz, dir, sentAt = 0, laid = {}, sent = null }) 
         // nobody had touched.
         const untouched = mine || (Math.floor(here.mtimeMs) <= sentAt && (!took || took.has(rel)));
         if (!untouched) {
-          target = besideName(target);
+          target = besideStillOurs(laid[rel]?.beside) ?? besideName(target);
           out.beside.push(path.relative(root, target));
         }
       }
@@ -199,7 +213,11 @@ export async function layDocs({ tgz, dir, sentAt = 0, laid = {}, sent = null }) 
       fs.writeFileSync(part, body, { flag: 'wx' });
       fs.renameSync(part, target);
       if (target === asIs) out.written.push(rel);
-      laid[rel] = { stamp: target === asIs ? stampOf(fs.statSync(target)) : laid[rel]?.stamp ?? null, hash };
+      laid[rel] = {
+        stamp: target === asIs ? stampOf(fs.statSync(target)) : laid[rel]?.stamp ?? null,
+        hash,
+        beside: target === asIs ? laid[rel]?.beside ?? null : { path: target, stamp: stampOf(fs.statSync(target)) },
+      };
     }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });

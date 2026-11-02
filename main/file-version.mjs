@@ -61,3 +61,4 @@ export function saveNextVersion({ dir, threadId, lines, basePath, baseId, text, 
   }
   return { ok: false, error: 'Too many versions of that file are in the way, so nothing was saved.' };
 }
+

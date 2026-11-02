@@ -306,3 +306,6 @@ textarea.tq-field { resize: vertical; border-color: var(--line); margin-left: 0;
 .tq-details .compose-word { text-decoration: none; color: var(--text); text-align: left; }
 .tq-details .compose-word::after { content: ''; display: inline-block; width: 5px; height: 5px; margin: 0 2px 3px 9px; border-right: 1.25px solid currentColor; border-bottom: 1.25px solid currentColor; transform: rotate(45deg); color: var(--text-faint); vertical-align: middle; }
 .tq-details .compose-word:hover::after, .tq-details .compose-word.open::after { color: var(--text-dim); }
+.cx-row.cx-team { margin-bottom: 6px; }
+.cx-row .cx-mark { display: inline-flex; width: 20px; justify-content: center; color: var(--text-dim); }
+.cx-row .cx-mark svg { width: 18px; height: 18px; }
