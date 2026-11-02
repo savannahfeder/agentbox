@@ -11,7 +11,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { cleanMark, editedFilesLine, filesInLines } from '../shared/artifact-marks.mjs';
+import { cleanMark, editedFilesLine, filesInLines, newestOfFamily } from '../shared/artifact-marks.mjs';
 import { planReconcile, reconcileRows, reconcileThread } from '../main/version-reconcile.mjs';
 import * as disk from '../main/store/work-items.mjs';
 import { Store } from '../main/store.mjs';
@@ -175,6 +175,23 @@ describe('writing it down', () => {
     expect(cleanMark({ do: 'reconcile', file: 'o-v3.md', replace: true })).toEqual({ do: 'reconcile', file: 'o-v3.md', replace: true });
     expect(cleanMark({ do: 'reconcile', file: 'o-v3.md', path: '../../x.md' })).toEqual({ do: 'reconcile', file: 'o-v3.md' });
     expect(cleanMark({ do: 'reconcile' })).toBeUndefined();
+  });
+});
+
+describe('what opens beside the message', () => {
+  // Measured in a running copy: the agent's message names v3, the pane opened v3,
+  // and the person saw their line gone though v4 had it.
+  const edits = [{ file: 'o.md', path: 'designs/w-1/o-v2.md' }, { file: 'o-v3.md', path: 'designs/w-1/o-v4.md' }];
+  it('is the merged version, not the one the message names', () => {
+    expect(newestOfFamily('designs/w-1/o-v3.md', edits)).toBe('designs/w-1/o-v4.md');
+    const app = fs.readFileSync(path.join(import.meta.dirname, '../renderer/src/App.tsx'), 'utf8');
+    expect(app).toMatch(/besideSrc = namedBeside && newestOfFamily\(namedBeside, focused\?\.artifacts\?\.edits\)/);
+  });
+  it('is the named file when nobody edited it', () => {
+    expect(newestOfFamily('designs/w-1/o-v3.md', undefined)).toBe('designs/w-1/o-v3.md');
+  });
+  it('is the named file when the edits were to another document', () => {
+    expect(newestOfFamily('designs/w-1/other.md', edits)).toBe('designs/w-1/other.md');
   });
 });
 
