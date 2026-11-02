@@ -17,6 +17,7 @@ import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note
 import { opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
 import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
+import { pressedInTheFindBox } from '../find-in-page';
 import { ArtifactStage, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
 import { OpeningWait } from './OpeningWait';
 import { CrossIcon } from './CrossIcon';
@@ -470,7 +471,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   // on its way up, so the thread behind stays still.
   useEffect(() => {
     const escape = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' || pressedInTheFindBox(e.target)) return;
       e.stopImmediatePropagation();
       e.preventDefault();
       if (asking) setAsking(null);
@@ -484,7 +485,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
       e.stopPropagation();
       const at = e.target as HTMLElement | null;
       const typing = at?.tagName === 'TEXTAREA' || !!at?.isContentEditable;
-      if (typing || followsTheFile) return;
+      if (typing || followsTheFile || pressedInTheFindBox(e.target)) return;
       if (e.key === 'ArrowRight') { e.preventDefault(); stepFile(1); }
       if (e.key === 'ArrowLeft') { e.preventDefault(); stepFile(-1); }
     };
@@ -599,7 +600,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
 
   return createPortal(
     <StageThread.Provider value={thread}>
-    <div className="artifact-view" role="dialog" aria-label={version?.name ?? 'File'}>
+    <div className="artifact-view" data-find-layer role="dialog" aria-label={version?.name ?? 'File'}>
       <header className="av-top">
         <button type="button" className="av-back" onClick={leave} title="Back (esc)"><span aria-hidden="true">←</span><span className="av-thread">{threadName}</span></button>
         <span className="av-name">{familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? '')}</span>
