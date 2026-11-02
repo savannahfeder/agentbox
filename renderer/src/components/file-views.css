@@ -112,7 +112,7 @@
 .av-page-pins .av-pin-tag { pointer-events: auto; }
 .av-pin-mode {
   height: 28px; display: inline-flex; align-items: center; gap: 7px; padding: 0 10px;
-  border: 0; border-radius: var(--radius); background: none; color: var(--text-dim); font: 12px/1 var(--mono); cursor: pointer; white-space: nowrap;
+  border: 0; border-radius: var(--radius); background: none; color: var(--text-dim); font: inherit; font-size: 12.5px; line-height: 1; cursor: pointer; white-space: nowrap;
 }
 .av-pin-mode:hover { background: var(--wash-strong, var(--wash)); color: var(--text); }
 .av-pin-mode.is-on { background: var(--wash-strong, var(--wash)); color: var(--text); }

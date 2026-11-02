@@ -111,7 +111,7 @@ export function createConnections({
     return {
       id: entry.id, name: entry.name, state, word,
       todo: stuck ? 'Tick at least one that runs with nothing else asked of it, so a real read can prove it works.' : todo,
-      connected: !!c, group: entry.group ?? 'added', access: entry.access, needs: entry.needs ?? null, custom: !!entry.custom,
+      connected: !!c, group: entry.group ?? 'added', access: entry.access, needs: entry.needs ?? null, hint: entry.hint ?? null, said: entry.said ?? null, custom: !!entry.custom,
       address: entry.address, ...signInFacts(c, entry),
       at: s.at ?? null, workedAt: s.workedAt ?? null, toolCount: s.toolCount ?? null, read: s.read ?? null,
       since: c ? (s.since ?? s.at ?? null) : null, nextTryAt: c ? nextTry(s) : null,
@@ -528,6 +528,9 @@ export function createConnections({
       if (JSON.stringify(changed) !== JSON.stringify(c.status.changed ?? [])) await saveStatus(id, { tools, changed, toolCount: tools.length });
     },
     _read: () => vault.read(),
+    // The clock that stamped every `at` here, so whoever puts one into words
+    // reads it against the same one.
+    _now: now,
     callMs,
   };
   return service;

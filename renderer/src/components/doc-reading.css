@@ -131,7 +131,9 @@
 .doc-outline .is-sub.is-on button i { width: 10px; }
 
 @container (max-width: 1060px) {
-  .doc-sheet { grid-template-columns: minmax(28px, 1fr) minmax(0, 700px) minmax(28px, 1fr); column-gap: 24px; }
+  /* Beside a thread the margins hold only the outline's dashes, so the column
+     takes the room instead. */
+  .doc-sheet { grid-template-columns: minmax(48px, 1fr) minmax(0, 820px) minmax(48px, 1fr); column-gap: 0; }
   .doc-outline { justify-self: end; width: 18px; margin-right: 14px; padding-right: 0; }
   .doc-outline-box { position: relative; }
   .doc-outline-head { display: none; }

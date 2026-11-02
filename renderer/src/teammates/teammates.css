@@ -156,14 +156,14 @@ span.tq-link:focus-visible { outline: 1px solid var(--text-faint); outline-offse
 
 /* CHATS: your AI teammates, people and groups in one list. Softer than the
    inbox, as the chat is, with the sections folding. */
-.cx-list { padding: 10px 10px 16px; display: flex; flex-direction: column; gap: 1px; background: var(--bg); }
+.cx-list, .gc-list.cx-list { padding: 10px 10px 16px; display: flex; flex-direction: column; gap: 1px; background: var(--bg); }
 .cx-search { display: flex; align-items: center; gap: 8px; height: 32px; margin: 0 2px 6px; padding: 0 10px; border-radius: 6px; background: var(--wash); color: var(--text-faint); }
 .cx-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: inherit; font-size: 13.5px; color: var(--text); }
 .cx-search input::placeholder { color: var(--text-faint); }
 .cx-search kbd { font: 11px var(--mono); color: var(--text-faint); }
 .cx-search:focus-within kbd { display: none; }
 .cx-sec { display: flex; flex-direction: column; gap: 1px; margin-top: 8px; }
-.cx-head { display: flex; align-items: center; height: 30px; padding: 0 4px 0 2px; }
+.cx-head { display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 4px 0 2px; margin-bottom: 2px; }
 .cx-fold { flex: 1; display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 6px; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 500; color: var(--text-dim); text-align: left; cursor: default; }
 .cx-fold svg { color: var(--text-faint); flex: none; }
 .cx-fold em { font-style: normal; font-weight: 400; color: var(--text-faint); }

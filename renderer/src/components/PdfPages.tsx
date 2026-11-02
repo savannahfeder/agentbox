@@ -154,7 +154,7 @@ export function PdfPages({ load, name, onPage, onShape, goTo, fit = false, word 
 
   useEffect(() => { strip.current?.querySelector('.is-on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [at]);
 
-  if (failed) return <div className="doc-missing">{name} could not be drawn. The file may be damaged.</div>;
+  if (failed) return <div className="doc-missing">{name} could not be drawn.</div>;
   const strips = !!pdf && aspect > 0 && stripFor({ fit, landscape: aspect > 1, count: pdf.numPages });
   // A standing page is held to the height a slide's thumbnail has.
   const thumb = aspect > 1 ? THUMB : Math.round((THUMB / (16 / 9)) * aspect);

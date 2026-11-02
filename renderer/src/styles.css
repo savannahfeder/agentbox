@@ -752,7 +752,6 @@
   /* Darker than dark's 0.45: over rows this near black, a lighter scrim left
      the new-task card reading as one more row rather than a card on top. */
   --scrim: rgba(0, 0, 0, 0.72);
-  --radius: 0px;
   --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, 'DejaVu Sans Mono', monospace;
 }
 :root[data-skin="ember-grid"] body { font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, 'DejaVu Sans', sans-serif; }
@@ -2414,11 +2413,6 @@ body {
      Measured by ../scroll-gutter.ts; 0 when the scrollbar overlays. */
   padding-right: calc(32px + var(--scroll-gutter, 0px));
 }
-.focus-dock::before {
-  /* the task fades out above the dock instead of hitting a hard edge */
-  content: ""; position: absolute; left: 0; right: 0; top: -34px; height: 34px;
-  background: linear-gradient(to bottom, transparent, var(--surface)); pointer-events: none;
-}
 /* THE REPLY BOX BEGINS WHERE THE WORDS BEGIN. --read-w is the width of the
    SHEET, and .focus spends 32px of it on each side as padding, so a dock card
    set to the full sheet started 32px left of every word above it (410 against
@@ -2449,7 +2443,7 @@ body {
 .focus-dock kbd {
   font-family: var(--mono); font-size: 10.5px; color: var(--text-dim);
   background: var(--wash); border: 1px solid var(--line-strong);
-  border-radius: 0; padding: 1.5px 5.5px;
+  border-radius: var(--radius); padding: 1.5px 5.5px;
 }
 .dock-pill { display: flex; align-items: center; width: 100%; background: transparent; border: none; font: inherit; cursor: text; }
 .dock-pill-text { padding: 11px 16px; color: var(--text-faint); font-size: 14.5px; flex: 1; text-align: left; }
@@ -2621,9 +2615,6 @@ body {
 /* A person is the one to notice before a send: their face, their name in the text's own colour. */
 .dock-to-person { font-size: 12.5px; color: var(--text); }
 .dock-to-person > * { flex: none; }
-/* Words in a box have not gone: the difference from a posted message has to be read, not inferred. */
-.dock-unsent { margin-left: auto; margin-right: 10px; font-size: 12px; color: var(--accent); white-space: nowrap; }
-.dock-unsent + .dock-send { margin-left: 0; }
 
 /* Approval cards: a worker is frozen mid-action until the user answers,
    so these sit above everything, bottom-right, and say exactly what runs. */
@@ -4537,8 +4528,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 }
 .zoom-readout.up { opacity: 1; }
 
-/* ⌘F. A small panel over whatever is on screen, in the toast's shape. Above
-   the zoom readout and below the toasts. The field is a tint of the theme,
+/* ⌘F. A small panel over whatever is on screen, in the toast's shape. The field is a tint of the theme,
    never white (the light-component rule, 2026-09-23).
 
    98 POINTS DOWN, AND NEVER HIGHER THAN 44. It sat at 10 and not one of its
@@ -4550,7 +4540,10 @@ img.product-mark { object-fit: cover; opacity: 1; }
    changes it; turning every drag strip off while the box was up (the first
    fix) left the buttons exactly as dead. 98 also clears the terminal, New task
    and Commands buttons, which sit 54 to 89 points down at the right edge in
-   every task layout, so the box never covers a control. */
+   every task layout, so the box never covers a control.
+
+   Its z-index is over the full-screen file views (.artifact-view at 9400 and
+   its selection bar at 9450) and under the 10000 screens that lock the app. */
 .find-bar {
   position: fixed;
   top: 98px;
@@ -4566,7 +4559,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
   border-radius: var(--radius);
   font-size: 13.5px;
   box-shadow: var(--shadow-md);
-  z-index: 95;
+  z-index: 9500;
   user-select: none;
 }
 .find-input {
@@ -5737,12 +5730,6 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 }
 :root[data-skin] .app.flat .focus-dock { background: transparent; }
 :root[data-skin] .app.flat .focus-dock::before { background: none; }
-:root[data-skin] .app.flat .focus-scroll {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), transparent);
-}
-:root[data-skin] .app.flat .dock-card { background: transparent; }
-:root[data-skin] .app.flat .dock-card:focus-within { background: var(--skin-pane); }
 
 /* That round's reasoning is kept in decisions.md rather than here, because the
    question it was answering is closed. IT WAS THE LAST SLAB ON THE SCREEN.

@@ -130,7 +130,7 @@ import { MARK_UNREAD, SAY } from './team/chat-events';
 import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
 import { aBoxIsListening } from './dictation';
 import { MentionRows } from './team/rooms/MentionRows';
-import { AgentsLine, CornerFaces, MateThreads, NeedsFaces, PersonThreads, SpaceBar, TeamStrip, TeamThreads } from './team/everything/TeamStrip';
+import { AgentsLine, CornerFaces, MateThreads, NeedsFaces, NeedsRail, PersonThreads, SpaceBar, TeamStrip, TeamThreads } from './team/everything/TeamStrip';
 import { JobBlock, Place as MemberPlace, PlaceAction, PlaceList, PlaceMates, SendBox, type PlaceRow } from './team/everything/PlacePage';
 import { nowAndFinished, pressOpensIn, readHomeLayout, waitsOnYou, writeHomeLayout, youWaitOn, type HomeLayout } from './team/everything/place';
 import { buildMembers, hideMember, mateRunsOf, orderMembers, personCardsOf, readCardRows, readHidden, readOrder, splitHidden, teamRunsOf, unhideMember, writeCardRows, writeHidden, writeOrder, type CardRows, type Hidden, type Member } from './team/everything/members';
@@ -187,7 +187,8 @@ import { waitingCounts } from './threads-made';
 import { closeAsk, closeAskOwnsKey, KEEP_OPEN, unshippedAsk } from './close-asks-first';
 import { notShipped, shipItAsk } from '../../shared/not-shipped.mjs';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
-import { agentLinks, chatProjects, chatTaskSharing, chatTranscript, taskBrief, taskTitle, withTask } from './team/agent-mentions';
+import { agentLinks, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
+import type { LedgerLine } from './thread-history';
 import { ruleIdOf, ruleLabel, runToOpen } from '../../shared/repeats.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { NOT_ANSWERING, NOT_ANSWERING_MS, RESTART_IT, RESTART_IT_MS, SEND_NOT_TAKEN } from './not-answering';
@@ -3614,7 +3615,12 @@ export default function App() {
     const nameOf = (by: string | undefined) => (by && team?.byId.get(by)?.name) || (by && by === team?.me ? 'You' : 'A teammate');
     const others = people.filter((p) => p !== team?.me).map((p) => nameOf(p));
     let transcript: Array<{ who: string; text: string }> = [];
-    try { transcript = chatTranscript((await api.itemHistory({ product: item.product, id: item.id }))?.lines ?? [], nameOf); } catch { /* the ask alone still briefs it */ }
+    let lines: LedgerLine[] = [];
+    try {
+      lines = (await api.itemHistory({ product: item.product, id: item.id }))?.lines ?? [];
+      transcript = chatTranscript(lines, nameOf);
+    } catch { /* the ask alone still briefs it */ }
+    const find = (product: string, id: string) => items.find((i) => i.id === id && i.product === product);
     const brief = taskBrief({ sent: text, asker: nameOf(team?.me ?? undefined), others, transcript });
     let out = text;
     for (const link of links) {
@@ -3626,11 +3632,12 @@ export default function App() {
         // Seen by the people in the conversation and nobody else, whoever
         // the project is shared with; a Just you project stays Just you.
         ...chatTaskSharing(project, people),
+        ...(lastAskKeptOnMac(lines, project.slug, find) ? { onMac: true } : {}),
       });
       if (made?.id) out = withTask(out, link, made.id);
     }
     return out;
-  }, [snap?.products, team]);
+  }, [snap?.products, team, items]);
 
   // WHAT A CONVERSATION NEEDS TO BRING AN AGENT IN AND TO DRAW ITS ANSWER
   // (w-7b9cb8636a, team/ChatAgents.tsx): the projects it can be sent to, the
@@ -6471,6 +6478,7 @@ export default function App() {
   const [taskHeader, setTaskHeader] = useState<HTMLDivElement | null>(null);
   // The socket look B of w-581dbc6cc4's round teleports the code mark into.
   const [cornerHeaderTarget, setCornerHeaderTarget] = useState<HTMLSpanElement | null>(null);
+  const [connectionsCorner, setConnectionsCorner] = useState<HTMLSpanElement | null>(null);
 
   // A schedule set on a thread. On one RUN of a repeating task it moves that
   // task's rule rather than making a second one; on ordinary work it makes that
@@ -6812,7 +6820,7 @@ export default function App() {
     const out = await api.threadEdit(item.product, item.id, { blockedBy: on ? [on] : [] });
     const task = isTaskRow(item);
     showToast(!out.ok ? 'That change did not save.'
-      : on ? (task ? 'Blocked. Its holder hears when that finishes.' : 'It waits in Later and comes back when that ends.')
+      : on ? (task ? 'Blocked.' : 'It waits in Later and comes back when that ends.')
         : task ? 'Not blocked any more.' : 'It is not waiting any more.');
     void refresh();
   };
@@ -6941,6 +6949,9 @@ export default function App() {
   const evKey = teamMode ? evPick ?? 'me' : null;
   const evOn = teamMode && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown
     && (view !== 'inbox' || !!evPick);
+  // The team panel beside the Needs you list; the faces row stands in for it when the window is narrow.
+  const railShown = teamMode && homeLayout === 'list' && !onPhone() && view === 'inbox' && search === null && !evOn && !todayOn && !tasksOn
+    && !settingsOpen && !teamShown && !focused && !focusedRepeat && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
   const evMember = evOn ? members.find((m) => m.key === evKey) ?? null : null;
   // Hiding the card that is open goes back to your threads.
   const hideCard = (m: Member) => {
@@ -6958,7 +6969,7 @@ export default function App() {
     // under Everything else ("you shouldn't put teammates in the top bar",
     // w-33511040d7).
     corner: onPhone() ? null
-      : homeLayout === 'list' ? <NeedsFaces members={evSplit.shown} picked={evOn ? evKey : null} waits={waits} onPick={(key) => pickMember(key)} onAdd={teammatesUi.live ? teammatesUi.onNew : undefined} />
+      : homeLayout === 'list' ? <NeedsFaces members={evSplit.shown} picked={evOn ? evKey : null} waits={waits} onPick={(key) => pickMember(key)} onAdd={teammatesUi.live ? teammatesUi.onNew : undefined} narrowOnly={railShown} />
       : evOn ? null : <CornerFaces members={evSplit.shown} onPick={(key) => pickMember(key)} />,
     progress: homeLayout === 'list' && !onPhone() ? { count: mineShown ? shownCount(yoursOnly(progressTab, teammateIdOf)) : 0, on: evOn && evKey === 'me' } : undefined,
     today: homeLayout === 'list' && !onPhone() ? { on: todayOn, onToday: () => { goNeedsYou(); setTodayOn(true); } } : undefined,
@@ -7066,7 +7077,7 @@ export default function App() {
         chat={room ? roomsUi.chatIn(room) : roomsUi.live
           ? <SendBox placeholder={`Message ${first}`} empty={<p className="pl-hello">No messages with {first} yet.</p>}
             onSend={(text) => roomsUi.startChat(id, placeMember.name, text)} />
-          : <SendBox placeholder={`Message ${first}`} empty={<p className="pl-hello">Messages with {first} start a thread you both see.</p>}
+          : <SendBox placeholder={`Message ${first}`} empty={<p className="pl-hello">No messages with {first} yet.</p>}
             onSend={async (text) => { setComposeInitial({ to: id, body: text }); setModal('compose'); return null; }} />}
         side={<>
           <PlaceList title="Waiting on you" now={now} rows={[
@@ -7074,7 +7085,7 @@ export default function App() {
             ...mentionsBy.map((m) => ({ key: m.id, title: m.body || `In ${m.roomName}`, word: m.roomName, at: m.at, tone: 'ask' as const, onOpen: () => roomsUi.openMention(m) })),
           ]} />
           <PlaceList title={`You are waiting on ${first}`} now={now} rows={given.map((i) => itemRow(i, dueSaid(dayDeadline(i.due), now, { ahead: true })?.word ?? '', 'later'))} />
-          <PlaceList title="In progress" now={now} rows={theirs.now.map(cardRow)} empty={sharesThreads(id) ? `${first} has nothing in progress.` : `${first} shares no threads with the team.`} />
+          <PlaceList title="In progress" now={now} rows={theirs.now.map(cardRow)} />
           <PlaceList title="Finished this week" now={now} rows={theirs.finished.map(cardRow)} />
           <PlaceMates title={`${first}'s AI teammates`} mates={theirMates} waits={waits} onPick={(key) => pickMember(key)} />
         </>} />;
@@ -7095,7 +7106,7 @@ export default function App() {
         side={<>
           <JobBlock job={t?.job ?? null} onSave={(job) => teammatesUi.setJob(id, job)} />
           <PlaceList title="Waiting on you" now={now} rows={asks.map((i) => itemRow(i, '', 'ask'))} />
-          <PlaceList title="In progress" now={now} rows={split.now.map((i) => itemRow(i, word(i)[0], word(i)[1]))} empty="Nothing in progress. Message it or give it a task." />
+          <PlaceList title="In progress" now={now} rows={split.now.map((i) => itemRow(i, word(i)[0], word(i)[1]))} />
           <PlaceList title="Finished this week" now={now} rows={split.finished.map((i) => itemRow(i, 'Done', 'done'))} />
         </>} />;
     } else {
@@ -7105,7 +7116,7 @@ export default function App() {
       const ownerMember = members.find((m) => m.key === `person:${tm?.owner}`);
       placeEl = tm && <MemberPlace m={{ ...placeMember, name: tm.name }} about={`${first}'s AI teammate`} onBack={back} backTo={backTo}
         chat={<SendBox placeholder={`Write to ${tm.name}`}
-          empty={<p className="pl-hello">{tm.name} works for {first}. {tm.open ? `${first} lets anyone on the team give it work, so it starts on what you write.` : `What you write goes to ${first} as a request.`}</p>}
+          empty={<p className="pl-hello">No messages with {tm.name} yet.</p>}
           onSend={async (text) => { const r = await api.teamMessageMate({ owner: tm.owner, mate: tm.id, text }); if (r.ok) { showToast(tm.open ? `Sent to ${tm.name}` : `Sent to ${first} to pass on`); void refresh(); } return r.ok ? null : r.error ?? 'That did not send.'; }} />}
         side={<>
           <JobBlock job={tm.job} />
@@ -7342,6 +7353,7 @@ export default function App() {
           {/* Not while Settings or the Team page covers the thread: the thread's
               state and Summary button were left standing in their header. */}
           {focused && !settingsOpen && !teamShown && <span style={{display:'contents'}} ref={setCornerHeaderTarget}/>}
+          {connectionsShown && <span style={{display:'contents'}} ref={setConnectionsCorner}/>}
           {/* SEARCH, NEW THREAD AND DISPLAY (approved 2026-10-01): the whole of
               the right end on the Inbox, which is the one page of threads now
               (w-05ff3d1438). Display holds the view, the sort and the filters.
@@ -7468,7 +7480,7 @@ export default function App() {
                   points here. */}
               {planWords && !snap.supervisor.running?.length && !run && !focused && !focusedRepeat && !teammatesShown && <PlanBar words={planWords} onSetup={setSetupPlan} />}
               {connectionsShown ? (
-                <ConnectionsPlace now={now} focus={connectionsPage!.focus} onNotice={showToast} />
+                <ConnectionsPlace now={now} focus={connectionsPage!.focus} onNotice={showToast} corner={connectionsCorner} />
               ) : filesShown ? (
                 <FilesPlace project={filesPage!.project} onProject={(project) => setFilesPage({ project })} now={now} onNotice={showToast}
                   onPlace={(p) => {
@@ -7739,7 +7751,7 @@ export default function App() {
                   />
                 )}
                 {evTop}
-                {roomShown ? roomsUi.page : todayEl ? todayEl : tasksEl ? tasksEl : placeEl ? placeEl : evSpace ? evSpace : <>
+                {roomShown ? roomsUi.page : todayEl ? todayEl : tasksEl ? tasksEl : placeEl ? placeEl : evSpace ? evSpace : <div className={railShown ? 'nr-home' : undefined}><div className={railShown ? 'nr-list' : undefined}>
                 <PhoneStatus message={snap.phoneStatus} />
                 {snap.phoneConnect ? <ConnectComputer email={snap.phoneConnect.email} onSignOut={() => { void api.teamSignOut().then(() => refresh()); }} />
                 : clearMoves || (emptyView && !theirRows.length && !(view === 'inbox' && search === null && (leadCount || sharedFileNews.length || followingNews.length))) ? (
@@ -7851,7 +7863,7 @@ export default function App() {
                     setSelected(i);
                   }}
                 />}
-                </>}
+                </div>{railShown && <NeedsRail members={evSplit.shown} picked={null} waits={waits} onPick={(key) => pickMember(key)} onAdd={teammatesUi.live ? teammatesUi.onNew : undefined} />}</div>}
                 </>}
                 </>
               )}
@@ -9014,7 +9026,7 @@ export default function App() {
       })()}
       {!!snap?.teammates?.sending?.length && (
         <AgentSending held={snap.teammates.sending} raised={!!toast && !sentLineShown}
-          onUndo={async (id) => { const r = await api.teammates<boolean>('unsend', { id }); showToast(r.ok && r.value ? 'Taken back. It was not sent.' : 'It had already gone.'); void refresh(); }} />
+          onUndo={async (id) => { const r = await api.teammates<boolean>('unsend', { id }); showToast(r.ok && r.value ? 'Taken back.' : 'It had already gone.'); void refresh(); }} />
       )}
       {/* AND NO TOAST FOR A NEW VERSION. It was the third of the four drawn for
           w-86452550e5 and the argument against it is the one she agreed with: a

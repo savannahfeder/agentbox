@@ -207,7 +207,7 @@ function BlockWords({ onPick }: { onPick: (id: string) => void }) {
 
 /* ----------------------------------------------------------------- button */
 
-export function ThreadMenu({ change = null, onViewChange, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onReopen = null, onRunNow = null, onLater = null, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false }: {
+export function ThreadMenu({ change = null, onViewChange, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onReopen = null, onRunNow = null, onLater = null, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
   /** Whether a person has said it shipped, or null where the team would not see that. */
   shipped?: boolean | null;
   onShipped?: (on: boolean) => void;
@@ -243,6 +243,8 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
   onPin?: (pin: boolean) => void;
   /** Where it runs, or null where the cloud could never run it; drawn as PlaceButton. */
   place?: ThreadPlace | null;
+  /** The Files button, first in the row. */
+  files?: ReactNode;
   placeFacts?: Omit<PlaceFacts, 'place'>;
   /** True keeps it on this Mac (moving it here if it is in the cloud). */
   onPlace?: (keep: PlaceAct) => void;
@@ -328,9 +330,10 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
     else onFinish?.();
   };
 
-  if (!rows.length && !done && !place && !onReopen) return null;
+  if (!rows.length && !done && !place && !onReopen && !files) return null;
   return (
     <span className="ts-more-wrap" ref={wrap}>
+      {files}
       {place && <PlaceButton place={place} {...placeFacts} onPlace={onPlace} />}
       {onReopen && !done && <button type="button" className="ts-done ts-reopen" onClick={onReopen}><span>Reopen</span></button>}
       {onCloseTask && <button type="button" className="ts-done ts-close-task" onClick={onCloseTask}><span>Close task</span></button>}

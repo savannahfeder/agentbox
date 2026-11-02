@@ -1,5 +1,5 @@
 import { RemoteControl } from './RemoteControl';
-import { dropHalfMention, heldKeyThatOpenedTheBox, keyInTheReplyBox, replyName, replyTarget, sendKeyFor, unsentWords } from '../reply-keys';
+import { dropHalfMention, heldKeyThatOpenedTheBox, keyInTheReplyBox, replyName, replyTarget, sendKeyFor } from '../reply-keys';
 import { onPhone } from '../phone-screen';
 import { FilmBar, useFilm } from './FilmPlayer';
 import { useFilmPoster } from '../film-poster';
@@ -135,6 +135,8 @@ import {
 import { SummaryPanel, SummaryRail, ThreadCrumb, ThreadStateMark, useSummaryOpen, useSummaryShortcut, type RepeatHandle } from '../threads/Summary';
 import { summaryFits, summaryPlace } from '../room';
 import { ThreadMenu, type PlaceAct, type ThreadPlace } from '../threads/ThreadMenu';
+import { ThreadFilesButton } from '../threads/ThreadFiles';
+import { filesMadeHere } from '../threads/thread-files';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { ChatAgentsContext, useChatMentions } from '../team/ChatAgents';
 import { useThreadMentions } from './ThreadMentions';
@@ -1308,6 +1310,15 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const opensBig = (path?: string | null) => !onPhone() && !item.agent && !previewSample && !!viewKind(path) && viewKind(path) !== 'code';
   const openBig = (path: string) => setArtifact({ path, at: Date.now() });
   const openFileMark = useCallback((link: FileMarkLink) => setArtifact({ file: link.file, note: link.id, at: Date.now() }), []);
+  const [historyLines, setHistoryLines] = useState<unknown[]>([]);
+  useEffect(() => {
+    let live = true;
+    const read = () => { void api.itemHistory({ product: item.product, id: item.id }).then((r) => { if (live) setHistoryLines(r?.lines ?? []); }); };
+    read();
+    const off = api.onChanged(read);
+    return () => { live = false; off?.(); };
+  }, [item.product, item.id]);
+  const madeHere = useMemo(() => filesMadeHere(historyLines, item.artifacts?.notes ?? []), [historyLines, item.artifacts?.notes]);
   const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig });
   useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig }; });
   // A row in Needs you for a comment or an approval opens the file at it.
@@ -1697,6 +1708,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const threadMenu = (
     <ThreadMenu
       key={`${item.product}:${item.id}`}
+      files={<ThreadFilesButton files={madeHere} onOpen={(f) => (opensBig(f.src) ? openBig(f.src) : onOpenDoc?.(f.src))} />}
       change={changeFigures}
       onViewChange={() => onOpenDoc?.(changePathFor(item.id))}
       /* A PHONE HAS NO TERMINAL AND NO ⌘J (QA batch 005, F-118), and it is the
@@ -1799,7 +1811,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     ? <><h1 className="workspace-title gc-head-group cx-person"><span className="rm-one">{threadName}</span>{audience && <span className="thread-crumb-with">{audience}</span>}</h1>{(direct || summarised) && <ConversationAside item={item} onAddPeople={onAddPeople} />}</>
     : crumbFrom
     ? <><ThreadCrumb from={crumbFrom} name={threadName} audience={audience} onBack={onClose} onRename={rename} threadKey={`${item.product}/${item.id}`} renameAsk={Math.max(pageAsk?.what === 'rename' ? pageAsk.at : 0, renameAt)} onAsked={onAsked} />
-      {(direct || summarised) && <ConversationAside item={item} onAddPeople={onAddPeople} />}</>
+      {(direct || summarised) && !cornerHeaderTarget && <ConversationAside item={item} onAddPeople={onAddPeople} />}</>
     : <>{backButton}{bandLine}</>;
 
   // ANYTHING ADDED TO THIS ELEMENT RIDES BESIDE THE LITERAL, NEVER INSIDE IT.
@@ -1855,7 +1867,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     {/* THE CORNER: THE THREAD'S MENU, and nothing else. The Summary button
         that stood beside it (w-e731ca9376) moved onto the summary itself on
         w-a3482b8c2c: the rail opens it, the icon beside its title closes it. */}
-    {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{threadMenu}</span>, cornerHeaderTarget)}
+    {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && (direct || summarised) && <ConversationAside item={item} onAddPeople={onAddPeople} />}{threadMenu}</span>, cornerHeaderTarget)}
     {artifact && (
       <ThreadArtifacts item={item} open={artifact} withAgent={!direct && !heldByPerson && !item.agent}
         onClose={() => setArtifact(null)} onNotice={onNotice} />
@@ -2199,7 +2211,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       {/* One thing at a time reads a page or a note in place rather than as a
           tile, and not a second time while it is open on the side. */}
       {inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && <QueueFile key={path} product={product} path={newestOfFamily(path, item.artifacts?.edits)} md={md}
-        onOpen={() => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'focus'))} onSide={() => onOpenArtifact?.(path, 'beside')} />)}
+        onOpen={() => (opensBig(path) ? openBig(newestOfFamily(path, item.artifacts?.edits)) : onOpenArtifact?.(path, 'focus'))} onSide={() => onOpenArtifact?.(path, 'beside')} />)}
       {/* What the page cannot read in place, a deck or a PDF, is a tile under it. */}
       {page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths.filter((path) => !readsInPlace(path))} revision={item.updatedAt} openDoc={openDoc} onOpen={path => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'beside'))} />}
       {!page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths} revision={item.updatedAt} openDoc={openDoc} onOpen={path => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'beside'))} />}
@@ -2914,7 +2926,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
       }
     } else if (finishing.current) return;
     if (saving || (!(spoken ?? text).trim() && !attachments.length)) return;
-    if (attaching.length) { onNotice(`${attaching[0].name} is still being attached. Send once it is in.`); return; }
+    if (attaching.length) { onNotice(`${attaching[0].name} is still being attached.`); return; }
     // AN AGENT WITH NO PROJECT DOES NOT GO OUT. The footer already says why;
     // ⌘↵ says it again rather than doing nothing.
     if (chat.block) { onNotice(chat.block); return; }
@@ -2983,7 +2995,6 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   };
   // A note being recorded is a draft: the box stays open round it.
   const hasDraft = !!text.trim() || attachments.length > 0 || recording;
-  const unsent = unsentWords({ words: text, files: attachments.length, sending: !!saving });
   // THE SLASH MENU, AND THE MODE THAT IS ALWAYS ON THE SCREEN.
   //
   // It does. Claude Code has no backslash TRIGGER: `/` opens its commands and
@@ -3601,7 +3612,6 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             things to choose between; a stop INSTEAD of a dead Send is one
             thing that is always the thing she can do. */}
         {stop && !hasDraft ? stop : (<>
-        {unsent && <span className="dock-unsent">{unsent}</span>}
         <button
           className="dock-send"
           onClick={() => send()}

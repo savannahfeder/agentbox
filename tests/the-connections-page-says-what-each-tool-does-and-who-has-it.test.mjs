@@ -153,10 +153,11 @@ describe('what crosses to the team', () => {
 });
 
 describe('where the page is', () => {
-  it('in the sidebar, right below Files', () => {
+  // Above Files since 2026-11-02 (the-sidebar-reads-inbox-chats-connections-files).
+  it('in the sidebar, right above Files', () => {
     const nav = read('renderer/src/components/WorkspaceNavigation.tsx');
-    expect(nav.indexOf('data-tab="connections"')).toBeGreaterThan(nav.indexOf('data-tab="files"'));
-    expect(nav.indexOf('data-tab="connections"') - nav.indexOf('data-tab="files"')).toBeLessThan(1200);
+    expect(nav.indexOf('data-tab="files"')).toBeGreaterThan(nav.indexOf('data-tab="connections"'));
+    expect(nav.indexOf('data-tab="files"') - nav.indexOf('data-tab="connections"')).toBeLessThan(1200);
   });
 
   it('in Command K', () => {

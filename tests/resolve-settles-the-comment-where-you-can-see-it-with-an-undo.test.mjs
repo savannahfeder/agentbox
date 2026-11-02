@@ -73,7 +73,8 @@ describe('its pin', () => {
 });
 
 describe('the wiring', () => {
-  const view = fs.readFileSync(new URL('../renderer/src/components/ArtifactView.tsx', import.meta.url), 'utf8');
+  const view = fs.readFileSync(new URL('../renderer/src/components/ArtifactView.tsx', import.meta.url), 'utf8')
+    + fs.readFileSync(new URL('../renderer/src/components/FileNoteCard.tsx', import.meta.url), 'utf8');
   const css = fs.readFileSync(new URL('../renderer/src/components/artifact-view.css', import.meta.url), 'utf8');
   it('the card says Resolved and offers Undo while it settles', () => {
     expect(view).toMatch(/is-just-settled/);

@@ -939,11 +939,13 @@ export const api = {
   async fileLine(p: { product: string; id: string }): Promise<FileLine[]> {
     return (await window.zero?.fileLine?.(p).catch(() => null)) ?? [];
   },
-  async fileElsewhere(p: { product: string; id: string; path: string; file: string }): Promise<FileElsewhere> {
-    return (await window.zero?.fileElsewhere?.(p).catch(() => null)) ?? { key: null, notes: [], approvals: [] };
+  /** One answer per copy, in the order asked. */
+  async fileElsewhere(p: { product: string; id: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]> {
+    const got = await window.zero?.fileElsewhere?.(p).catch(() => null);
+    return Array.isArray(got) ? got : p.copies.map(() => ({ key: null, notes: [], approvals: [] }));
   },
   async filesPlaceEdit(p: { key: string; text: string }): Promise<{ ok: boolean; error?: string; goes?: 'sent'; to?: string }> {
-    if (!window.zero?.filesPlaceEdit) return { ok: false, error: `Quit and reopen ${NAME} to save this. Your words are still here.` };
+    if (!window.zero?.filesPlaceEdit) return { ok: false, error: `Quit and reopen ${NAME} to save this.` };
     return window.zero.filesPlaceEdit(p);
   },
   async filesPlaceMark(p: { key: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }> {
@@ -1015,7 +1017,7 @@ export const api = {
     return out?.moving ?? (out?.ok ? ids.length : 0);
   },
 
-  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem | null> {
+  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem | null> {
     // FIXTURES ANSWER WITH THE TASK, the way the real store does. Returning
     // null here meant the send had nothing to point at, and the caller reads
     // that as "no task was made" and puts no way back on the undo pile — so the

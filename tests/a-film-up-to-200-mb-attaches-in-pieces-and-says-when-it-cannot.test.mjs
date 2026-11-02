@@ -98,14 +98,14 @@ describe('a box in a tab, where a file has no path', () => {
     const [got] = await collectFiles([huge]);
     expect(calls.parts).toEqual([]);
     expect(got.srcPath).toBeUndefined();
-    expect(attachProblem([got])).toBe('launch-cut-225mb.mp4 is 225 MB, over the 200 MB a message can send. Remove it to send the rest.');
+    expect(attachProblem([got])).toBe('launch-cut-225mb.mp4 is 225 MB, over the 200 MB a message can send.');
   });
 
   it('a piece the computer refuses leaves the film out and says so', async () => {
     zero({ stageAttachmentPart: async () => { throw new Error('The disk is full.'); } });
     const [got] = await collectFiles([film(5)]);
     expect(got.srcPath).toBeUndefined();
-    expect(attachProblem([got])).toBe('film-60mb.mp4 could not be attached: The disk is full. Remove it to send the rest.');
+    expect(attachProblem([got])).toBe('film-60mb.mp4 could not be attached: The disk is full.');
   });
 
   it('never saves a message without a file it could not attach', async () => {

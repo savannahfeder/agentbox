@@ -66,6 +66,17 @@
 /* WHERE IT RUNS, Done's box with its own words (threads/PlaceButton.tsx). The
    dot is the one accent: a thread the cloud handed back. */
 .ts-place-wrap { position: relative; display: inline-flex; }
+.ts-files-wrap { position: relative; display: inline-flex; }
+.ts-done.ts-files { height: 30px; min-width: 30px; padding: 0 9px; gap: 6px; justify-content: center; }
+.ts-files-n { font-weight: 400; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--text-dim); }
+.ts-files-pop { width: 360px; max-height: min(440px, 70vh); overflow-y: auto; padding: 6px; }
+.ts-files-pop ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.ts-files-pop button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 6px 10px; border: 0; border-radius: var(--artifact-corner-small); background: none; font: inherit; font-size: 13.5px; color: var(--text); text-align: left; cursor: pointer; }
+.ts-files-pop button:hover { background: var(--wash); }
+.ts-files-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ts-files-notes { flex: none; font-size: 12px; color: var(--text-faint); }
+.ts-done.ts-place { width: 30px; padding: 0; justify-content: center; position: relative; }
+.ts-done.ts-place .ts-place-dot { position: absolute; top: 4px; right: 4px; margin: 0; }
 .ts-place.open { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .ts-place-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-left: -2px; }
 .th-pop.ts-place-pop { top: calc(100% + 8px); right: 0; width: 440px; font-size: 13px; }

@@ -1,6 +1,6 @@
 // The file itself, whichever kind it is, with the comments drawn on it. One
 // stage to a pane, so two versions side by side are two of these.
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { findQuote, viewKind } from '../../../shared/artifact-marks.mjs';
@@ -13,7 +13,9 @@ import { filmMarks, filmPins, hasSpot, keepUnder, marksOnPages, nextZoom, pagePi
 
 const pick = ({ paddingLeft, paddingRight, paddingTop, paddingBottom }: CSSStyleDeclaration) => ({ paddingLeft, paddingRight, paddingTop, paddingBottom });
 import type { FileNote, NotePlace } from '../types';
+import { quotesKey } from '../selection-bar';
 import { CodeFile } from './CodeFile';
+import { SelectionBar } from './SelectionBar';
 import { DeckSlides } from './DeckSlides';
 import { PinMarks, spotIn } from './PinMarks';
 import { FilmPlayer } from './FilmPlayer';
@@ -270,6 +272,11 @@ function PictureStage({ url, name, notes, carried, draft, activeId, go, showReso
   </div>;
 }
 
+// Parsing a long document takes tens of milliseconds, and the view around it redraws on every keystroke and update.
+const MarkdownBody = memo(({ text, parts }: { text: string; parts: ReturnType<typeof partsFor> }) => (
+  <ReactMarkdown remarkPlugins={MD_PLUGINS} components={parts}>{text}</ReactMarkdown>
+));
+
 function DocStage({ product, path, name, folder, byline, notes, draft, activeId, go, onPlace, onPick, onFound, onQuotesGone, readText, onAgain }: {
   onAgain: () => void;
   product: string; path: string; name: string; folder: string | null; byline?: string | null; notes: FileNote[]; draft: NotePlace | null; activeId: string | null; go: StageGo;
@@ -300,6 +307,8 @@ function DocStage({ product, path, name, folder, byline, notes, draft, activeId,
   useEffect(() => { if (failed) onFound?.('gone'); }, [failed]);
   const quotes = useMemo(() => notes.flatMap((n) => (n.place.kind === 'quote' && !n.resolved ? [{ id: n.id, text: n.place.text }] : [])), [notes]);
   const draftQuote = draft?.kind === 'quote' ? draft.text : null;
+  // `notes` is a new list on every redraw; painting walks every word of the page.
+  const quotesNow = quotesKey(quotes);
   useEffect(() => {
     ranges.current = paintQuotes(page.current, quotes, activeId, draftQuote);
     if (text !== null && canPaintQuotes()) onQuotesGone?.(quotes.filter((q) => !ranges.current.has(q.id)).map((q) => q.id));
@@ -307,7 +316,7 @@ function DocStage({ product, path, name, folder, byline, notes, draft, activeId,
       const highlights = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
       highlights?.delete('av-quote'); highlights?.delete('av-quote-on');
     };
-  }, [text, quotes, activeId, draftQuote]);
+  }, [text, quotesNow, activeId, draftQuote]);
   useEffect(() => {
     if (!go || go.place.kind !== 'quote') return;
     const hit = findQuote(page.current?.innerText ?? '', go.place.text);
@@ -324,23 +333,18 @@ function DocStage({ product, path, name, folder, byline, notes, draft, activeId,
    <div className="doc-column" ref={setColumn}>
     {byline && <p className="doc-byline">{byline}</p>}
     <div ref={page} className="av-doc doc-prose"
-      onMouseUp={() => {
-        const picked = window.getSelection();
-        const words = picked?.toString().trim();
-        if (words && onPlace && picked?.anchorNode && page.current?.contains(picked.anchorNode)) {
-          onPlace({ kind: 'quote', text: words.replace(/\s+/g, ' ').slice(0, 400) });
-          picked.removeAllRanges();
-        }
-      }}
       onClick={(e) => {
+        // The end of a drag over a comment's words is not a press on that comment.
+        if (window.getSelection()?.isCollapsed === false) return;
         const caret = document.caretRangeFromPoint?.(e.clientX, e.clientY);
         if (!caret) return;
         for (const [id, range] of ranges.current) {
           if (range.isPointInRange(caret.startContainer, caret.startOffset)) { onPick?.(id); return; }
         }
       }}>
-      <ReactMarkdown remarkPlugins={MD_PLUGINS} components={parts}>{text}</ReactMarkdown>
+      <MarkdownBody text={text} parts={parts} />
     </div>
+    {onPlace && <SelectionBar page={page} onComment={(quote) => onPlace({ kind: 'quote', text: quote })} />}
    </div>
    <DocOutline scroller={scroller} page={column} />
    </div>
@@ -423,7 +427,7 @@ function PageStage({ url, path, name, product, readText, onFound, notes, carried
     {onPlace && (
       <div className="av-zoom file-pager" role="group" aria-label="Pins">
         <button type="button" className={`av-pin-mode${pinning ? ' is-on' : ''}`} aria-pressed={pinning} onClick={() => setPinning(!pinning)}
-          title={pinning ? 'Click the page to pin a spot. Press again to use the page.' : 'Pin a spot on the page'}>
+          title="Pin a spot on the page">
           <PinGlyph />{pinning ? 'Click a spot' : 'Pin a spot'}
         </button>
       </div>
@@ -448,24 +452,19 @@ function CodeStage({ product, path, name, notes, draft, activeId, onPlace, onFou
   }, [product, path]);
   const quotes = useMemo(() => notes.flatMap((n) => (n.place.kind === 'quote' && !n.resolved ? [{ id: n.id, text: n.place.text }] : [])), [notes]);
   const draftQuote = draft?.kind === 'quote' ? draft.text : null;
+  const quotesNow = quotesKey(quotes);
   useEffect(() => {
     paintQuotes(page.current, quotes, activeId, draftQuote);
     return () => {
       const highlights = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
       highlights?.delete('av-quote'); highlights?.delete('av-quote-on');
     };
-  }, [text, quotes, activeId, draftQuote]);
+  }, [text, quotesNow, activeId, draftQuote]);
   if (text === null) return <div className="doc-missing">{name} could not be opened.</div>;
   if (text === undefined) return <OpeningWait name={name} kind={null} onAgain={onAgain} />;
   return <div className="av-code-scroll"><div className="av-code-sheet">
-    <CodeFile ref={page} text={text} onMouseUp={() => {
-      const picked = window.getSelection();
-      const words = picked?.toString().trim();
-      if (words && onPlace && picked?.anchorNode && page.current?.contains(picked.anchorNode)) {
-        onPlace({ kind: 'quote', text: words.replace(/\s+/g, ' ').slice(0, 400) });
-        picked.removeAllRanges();
-      }
-    }} />
+    <CodeFile ref={page} text={text} />
+    {onPlace && <SelectionBar page={page} onComment={(quote) => onPlace({ kind: 'quote', text: quote })} />}
   </div></div>;
 }
 
@@ -498,7 +497,7 @@ function OpenedFile({ product, path, name, byline, notes, carried = [], draft, a
 
   if (!found) return <OpeningWait name={name} kind={kind} onAgain={onAgain} />;
   if (!opened) {
-    return <div className="doc-missing">{found.coming ? `${name} is on its way. It opens here once it lands.` : missingSays ? `${name}: ${missingSays}` : `${name} could not be found.`}</div>;
+    return <div className="doc-missing">{found.coming ? `${name} is on its way.` : missingSays ? `${name}: ${missingSays}` : `${name} could not be found.`}</div>;
   }
   if (kind === 'image') return <PictureStage url={url as string} name={name} notes={notes} carried={carried} draft={draft} activeId={activeId} go={go} showResolved={showResolved} keep={keep} onPlace={onPlace} onPick={onPick} onFound={onFound} onAgain={onAgain} />;
   if (kind === 'film') {

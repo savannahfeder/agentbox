@@ -94,6 +94,19 @@ export function faceRow(members: readonly Member[]): Member[] {
   return row.some((m) => m.kind !== 'me') ? row : [];
 }
 
+export interface RailSection { label: 'People' | 'AI teammates' | 'Groups' | null; rows: Member[] }
+
+/** The panel beside Needs you: you and the team, then people, AI teammates and the other chats. Empty for someone alone. */
+export function railSections(members: readonly Member[]): RailSection[] {
+  const sections: RailSection[] = [
+    { label: null, rows: [...members.filter((m) => m.kind === 'me'), ...members.filter((m) => m.kind === 'chat' && m.team)] },
+    { label: 'People', rows: members.filter((m) => m.kind === 'person') },
+    { label: 'AI teammates', rows: [...members.filter((m) => m.key.startsWith('mate:')), ...members.filter((m) => m.key.startsWith('theirmate:'))] },
+    { label: 'Groups', rows: members.filter((m) => m.kind === 'chat' && !m.team) },
+  ];
+  return members.some((m) => m.kind !== 'me') ? sections.filter((x) => x.rows.length) : [];
+}
+
 /** The home: one list with the team's faces on its line, or the two tabs with cards. */
 export type HomeLayout = 'list' | 'tabs';
 const HOME_KEY = 'agentbox.home.layout';

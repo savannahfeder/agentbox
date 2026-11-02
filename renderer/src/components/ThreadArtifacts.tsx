@@ -53,7 +53,10 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onNotice }: {
   const copiesKey = JSON.stringify(copies);
   useEffect(() => {
     let live = true;
-    const read = () => { void Promise.all(copies.map((c) => api.fileElsewhere({ product: item.product, id: item.id, ...c }))).then((all) => { if (live) setElsewhere(all); }); };
+    const read = () => {
+      if (!copies.length) { setElsewhere([]); return; }
+      void api.fileElsewhere({ product: item.product, id: item.id, copies }).then((all) => { if (live) setElsewhere(all); });
+    };
     read();
     // A burst of changes asks once.
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -85,7 +88,7 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onNotice }: {
     withAgent={withAgent}
     onNewVersion={async (_name, text, path) => {
       const out = await api.fileNewVersion({ product: item.product, id: item.id, path, text });
-      return out.ok ? null : out.error ?? 'That did not save. Your words are still here.';
+      return out.ok ? null : out.error ?? 'That did not save.';
     }}
     onOutside={(src) => { void api.openArtifactExternally({ product: item.product, src }).then((r) => { if (!r.ok) onNotice(r.error || `${src} could not be opened.`); }); }}
     onClose={onClose}

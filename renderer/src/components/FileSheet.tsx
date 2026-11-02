@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { docKind, isPlainText } from '../doc-pane';
+import { pressedInTheFindBox } from '../find-in-page';
 import { CodeFile } from './CodeFile';
 import { FilmPlayer } from './FilmPlayer';
 import { PdfPages } from './PdfPages';
@@ -34,7 +35,7 @@ export function FileSheet({ name, shown, load, onClose }: { name: string; shown?
   const url = useMemo(() => (blob ? URL.createObjectURL(blob) : null), [blob]);
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !pressedInTheFindBox(e.target)) { e.stopPropagation(); onClose(); } };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
@@ -42,7 +43,7 @@ export function FileSheet({ name, shown, load, onClose }: { name: string; shown?
   const title = shown || name;
   let body;
   if (blob === undefined) body = <PreviewLoading />;
-  else if (!blob || !url) body = <div className="doc-missing">{title} is on its way. Close this and open it again in a moment.</div>;
+  else if (!blob || !url) body = <div className="doc-missing">{title} is on its way.</div>;
   else if (kind === 'pdf') body = <PdfPages load={bytes} name={title} />;
   else if (kind === 'film') body = <FilmPlayer url={url} name={title} wide />;
   else if (kind === 'image') body = <img src={url} alt={title} />;
@@ -50,7 +51,7 @@ export function FileSheet({ name, shown, load, onClose }: { name: string; shown?
   else if (kind === 'html') body = text === null ? <PreviewLoading /> : <iframe title={title} sandbox="allow-scripts" srcDoc={text} />;
   else if (isPlainText(name)) body = text === null ? <PreviewLoading /> : <div className="code-scroll"><CodeFile text={text} /></div>;
   else body = <div className="doc-missing">{title} cannot be shown here. <a href={url} download={name}>Save a copy</a>.</div>;
-  return <div className="file-sheet" role="dialog" aria-label={title}>
+  return <div className="file-sheet" data-find-layer role="dialog" aria-label={title}>
     <div className="file-sheet-card">
       <div className="file-sheet-head"><span>{title}</span><button type="button" className="pdf-step" onClick={onClose}>Close</button></div>
       <div className="file-sheet-body">{body}</div>

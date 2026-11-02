@@ -24,7 +24,6 @@ import type { LedgerLine } from '../thread-history';
 import type { AgentEvent, FileMarkLink, FileMarks, Person, ThreadCard } from '../types';
 import { MessagePerson, TeammateCard, TeammateStanding } from './Summary';
 import { earlierWords, filesOnThread, notSharedWords } from './teammate-thread';
-import { commentWhere } from './message-kind';
 import { canContinue } from './continue-thread';
 
 const PICTURE = /\.(png|jpe?g|gif|webp|svg)$/i;
@@ -134,12 +133,12 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             return { ok: !!out?.ok, error: out?.error };
           }}
           onNewVersion={async (_name, text, _path, id) => {
-            if (new TextEncoder().encode(text).length > MAX_EDIT_BYTES) return `This document is too long to edit from here. ${owner} can edit it on their own thread.`;
+            if (new TextEncoder().encode(text).length > MAX_EDIT_BYTES) return 'This document is too long to edit from here.';
             const out = await api.teamMarkFile({ personId, threadId, mark: { do: 'edit', file: id, text } });
             setReread((n) => n + 1);
-            return out?.ok ? null : out?.error ?? 'That did not save. Your words are still here.';
+            return out?.ok ? null : out?.error ?? 'That did not save.';
           }}
-          editGoes={`Sent to ${owner}. It shows as the next version once their computer has it.`}
+          editGoes={`Sent to ${owner}.`}
           onClose={() => setBig(null)} />
       )}
       <div className="tp-bar">
@@ -151,7 +150,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
           </button>}
           {onContinue && canContinue(work, card, team?.me ?? null) && (
             <button type="button" className="th-follow" onClick={onContinue}
-              title={`Start a thread of your own with ${owner}'s conversation and files. Your agent runs it on your account.`}>
+              title={`Start a thread of your own with ${owner}'s conversation and files.`}>
               Continue it yourself
             </button>
           )}
@@ -183,7 +182,6 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
                 onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
               <button type="submit" disabled={!draft.trim() || sending}>Comment</button>
             </div>
-            <p className="tp-comment-where">{commentWhere(owner)}</p>
           </form>
         </section>
         <aside className="tp-side" aria-label="About this thread">

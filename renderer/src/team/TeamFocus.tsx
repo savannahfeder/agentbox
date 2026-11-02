@@ -96,20 +96,17 @@ export function AddPeople({ item, product, onAdd }: {
   </svg>;
   if (isDirect(product)) {
     if (!peopleInConversation(product, team?.me ?? null, team?.state.people ?? [])) return null;
-    return <button type="button" className="tm-add-people" title="Add people to a new conversation" onClick={() => onAdd(item)}>
+    return <button type="button" className="tm-add-people" aria-label="Add people" title="Add people to a new conversation" onClick={() => onAdd(item)}>
       {mark}
-      Add people
     </button>;
   }
   const offered = peopleToAdd({ item, me: team?.me ?? null, company: team?.state.people ?? [] });
   if (!offered.length) return null;
   return <span className="tm-add-wrap" ref={here}>
-    <button type="button" className="tm-add-people" title="Add someone to this thread" aria-expanded={open} onClick={() => setOpen((was) => !was)}>
+    <button type="button" className="tm-add-people" aria-label="Add people" title="Add someone to this thread" aria-expanded={open} onClick={() => setOpen((was) => !was)}>
       {mark}
-      Add people
     </button>
     {open && <div className="tm-add-menu" role="menu" aria-label="Add to this thread">
-      <p>They will see this thread.</p>
       {offered.map((p) => (
         <button key={p.id} type="button" role="menuitem" onClick={() => { setOpen(false); onAdd(item, p.id); }}>
           <Face person={p} /><span>{p.name}</span>

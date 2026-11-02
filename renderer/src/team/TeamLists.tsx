@@ -40,7 +40,7 @@ export function DecisionsList({ title, project, rows, nameOf, onTakeBack, onClos
   return <List title={title} label={title} onClose={onClose}>
     {priority && <section className="tl-sec"><h3>This week’s priorities</h3>{row(priority)}</section>}
     {decisions.length > 0 && <section className="tl-sec">{priority && <h3>Decisions</h3>}{decisions.map(row)}</section>}
-    {!priority && !decisions.length && <p className="tl-none">Nothing is marked yet. A message’s More menu marks it a decision.</p>}
+    {!priority && !decisions.length && <p className="tl-none">Nothing is marked yet.</p>}
   </List>;
 }
 
@@ -52,6 +52,6 @@ export function ShippedList({ rows, now, nameOf, onOpen, onClose }: {
     {rows.map((r) => <button type="button" key={r.key} className="tl-ship" onClick={() => onOpen(r)}>
       <span className="tl-title">{r.title}</span><span className="tl-who">{nameOf(r.ownerId)}</span><span className="tl-when">{shippedWords(r.at, now)}</span>
     </button>)}
-    {!rows.length && <p className="tl-none">Nothing has shipped this week. A thread’s menu marks it shipped, and a merge says so by itself.</p>}
+    {!rows.length && <p className="tl-none">Nothing has shipped this week.</p>}
   </List>;
 }

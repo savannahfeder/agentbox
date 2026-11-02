@@ -265,14 +265,14 @@ function OpenFile({ fileKey, onClose, onPlace, onNotice }: {
     write={(mark) => api.filesPlaceMark({ key: fileKey, mark })}
     onNewVersion={editsTo ? async (_name, text) => {
       const out = await api.filesPlaceEdit({ key: fileKey, text });
-      if (!out.ok) return out.error ?? 'That did not save. Your words are still here.';
+      if (!out.ok) return out.error ?? 'That did not save.';
       // The page shows the new words as Done returns, not a moment after.
       const fresh = await api.filesPlaceOpen({ key: fileKey });
       if (fresh) setView(fresh);
       return null;
     } : undefined}
     missingSays={(by) => missingWords(by && by !== team?.me && team?.byId.get(by) ? firstName(team.byId.get(by)!) : null)}
-    editGoes={editsTo?.kind === 'shared' ? `Sent to ${team?.byId.get(editsTo.ownerId ?? '') ? firstName(team.byId.get(editsTo.ownerId!)!) : 'whoever made it'}. It shows as the next version once their computer has it.` : undefined}
+    editGoes={editsTo?.kind === 'shared' ? `Sent to ${team?.byId.get(editsTo.ownerId ?? '') ? firstName(team.byId.get(editsTo.ownerId!)!) : 'whoever made it'}.` : undefined}
     onOutside={(src) => { void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) onNotice(r.error || 'That file could not be opened.'); }); }}
     onClose={onClose}
     below={below}
@@ -331,8 +331,8 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
   const tile = (f: PlacedFile) => <Tile key={f.key} file={f} list={asList} now={now} me={team?.me ?? null} nameOf={nameOf} onOpen={() => setOpenKey(f.key)} folders={folders} act={(p) => { void act(p); }}
     onNewFolder={(file, name) => { void act({ do: 'make', project: file.project ?? '', name }).then((r) => { if (r.ok && r.folder) move(file.key, r.folder); }); }} />;
   const empty = looking ? 'No file matches.'
-    : folder ? 'Nothing in this folder yet. Drag a file here, or move one from its menu.'
-      : project ? `No files in ${project} yet.` : 'Files your team shares and your agents make will be here.';
+    : folder ? 'Nothing in this folder yet.'
+      : project ? `No files in ${project} yet.` : 'Nothing in Files yet.';
 
   return <div className="fp-page">
     <div className="fp-bar">

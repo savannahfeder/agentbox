@@ -17,8 +17,8 @@ describe('how long an opened file may take', () => {
     expect(OPEN_WITHIN_MS).toBe(20_000);
   });
 
-  it('says which file, and what to do', () => {
-    expect(didNotOpen('launch-timeline.png')).toBe('launch-timeline.png did not open. The app took too long to answer.');
+  it('says which file', () => {
+    expect(didNotOpen('launch-timeline.png')).toBe('launch-timeline.png did not open.');
   });
 
   it('shows a skeleton of words only for a document', () => {

@@ -115,6 +115,7 @@
 .pl-name h2 { margin: 0; font-size: 17px; font-weight: 500; line-height: 22px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pl-name h2 em { font-style: normal; font-weight: 400; font-size: 13.5px; color: var(--text-faint); margin-left: 10px; }
 .pl-name .ev-s { justify-content: flex-start; }
+.pl-name .ev-s-blank { display: none; }
 .pl-acts { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .pl-btn { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: 8px; background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
 .pl-btn:hover { color: var(--text); border-color: var(--text-faint); background: var(--wash); }
@@ -169,3 +170,19 @@
   .pl-head { flex-wrap: wrap; }
 }
 
+
+/* The team beside Needs you. Under 1100px the faces row on the tab line stands in for it. */
+.nr-home { display: flex; align-items: flex-start; gap: 24px; padding-right: var(--row-r, 24px); }
+.nr-list { flex: 1; min-width: 0; }
+.nr-rail { position: sticky; top: 16px; flex: none; width: 248px; margin-top: 8px; padding: 12px 8px; display: flex; flex-direction: column; gap: 14px; background: var(--wash); border-radius: var(--artifact-corner); }
+.nr-sec { display: flex; flex-direction: column; gap: 2px; }
+.nr-sec h3 { margin: 0 0 4px; padding: 0 8px; font: 400 11px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.nr-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 8px; border: 0; border-radius: var(--artifact-corner-small); background: none; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.nr-row:hover, .nr-row.on { background: var(--wash-strong); }
+.nr-t { display: flex; flex-direction: column; min-width: 0; }
+.nr-n { font-size: 13.5px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nr-t .ev-s { justify-content: flex-start; margin-top: 0; }
+.nr-t .ev-s-blank { display: none; }
+.nr-add .nr-n { color: var(--text-dim); }
+@media (max-width: 1099px) { .nr-rail { display: none; } }
+@media (min-width: 1100px) { .ev-faces.nr-narrow-only { display: none; } }

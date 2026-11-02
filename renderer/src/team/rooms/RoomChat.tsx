@@ -31,7 +31,7 @@ import { AttachRow } from '../../components/AttachRow';
 import { collectFiles, isImageName, type PendingAttachment } from '../../attachments';
 import { pictureUrl } from '../../picture';
 import { holdAtBottom } from '../../thread-bottom';
-import { sendKeyFor, unsentWords } from '../../reply-keys';
+import { sendKeyFor } from '../../reply-keys';
 import { I } from './icons';
 import type { MessageMarks } from '../decisions';
 import { LINE_MISSING } from '../../reveal-line';
@@ -239,7 +239,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
                 : <div className="tx">{body(m)}</div>}
             {!headed && m.editedAt && !m.deleted && editing !== m.id && <em className="rm-edited">edited</em>}
             {!m.deleted && marks?.get(m.id) && <em className="rm-decided">{marks.get(m.id)?.priority ? 'This week’s priorities' : 'Decision'}</em>}
-            {!m.deleted && onReact && <Reactions on={m.reactions} me={meId} onReact={(emoji, off) => onReact(m.id, emoji, !off)} />}
+            {!m.deleted && onReact && <Reactions on={m.reactions} me={meId} nameOf={(id) => who(id)?.name} onReact={(emoji, off) => onReact(m.id, emoji, !off)} />}
             {reps.length > 0 && <button type="button" className="rep" onClick={() => setThread(m.id)}>
               {[...new Set(reps.map((r) => r.by))].slice(0, 3).map((id) => <Face key={id ?? 'x'} name={who(id)?.name ?? '?'} url={who(id)?.avatarUrl} size={13} />)}
               <span style={{ marginLeft: 5 }}>{reps.length} {reps.length === 1 ? 'reply' : 'replies'}</span>
@@ -448,7 +448,6 @@ function Composer({ roomId, threadId, placeholder, people, onSend, onPutFile, on
   // A send that failed, so it can be tried again, and is when the connection comes back.
   const [failed, setFailed] = useState(false);
   const ready = !!text.trim() || attachments.length > 0 || recording;
-  const unsent = unsentWords({ words: text, files: attachments.length, sending: busy });
   // EVERYTHING STAYS IN THE BOX UNTIL THE ROOM HAS IT. Each file keeps the
   // name it was given when it went into the box, so a second try puts the
   // same file rather than another copy, and a file the room already has
@@ -563,7 +562,6 @@ function Composer({ roomId, threadId, placeholder, people, onSend, onPutFile, on
           onFromFiles={onPutFile ? (f) => add([f]) : undefined}
           onVoice={onPutFile ? (note) => add([{ name: note.name, dataBase64: note.dataBase64, image: isImageName(note.name), draftId: note.draftId }]) : undefined}
           onNotice={setError} voiceKey={voiceKey} voice={voiceCtl} onRecording={setRecording} />
-        {unsent && <span className="dock-unsent">{unsent}</span>}
         <button type="button" className="dock-send" disabled={!ready || busy} onClick={() => void send()} title={`Send · ${sendKeyFor(true)}`}>
           {busy ? sendingWords(sending, roomId, attachments) : <>Send <kbd>{sendKeyFor(true)}</kbd></>}
         </button>

@@ -1,8 +1,9 @@
 // PURE. How the big file view (components/ArtifactView.tsx) draws its pins,
 // zooms a picture, and what it offers for the file it found.
-import { placeWords } from '../../shared/artifact-marks.mjs';
+import { noteGoesTo, notesForTheAgent, placeWords } from '../../shared/artifact-marks.mjs';
+import type { FileVersion } from '../../shared/artifact-marks.mjs';
 import { MAX_ZOOM } from './picture-view';
-import type { FileNote, NotePlace } from './types';
+import type { FileMarks, FileNote, NotePlace } from './types';
 
 export type Lean = 'ne' | 'nw' | 'se' | 'sw';
 
@@ -196,4 +197,26 @@ export type Found = 'looking' | 'open' | 'coming' | 'gone' | 'unplayable';
 export function viewOffers(found: Found, signedIn: boolean): { approve: boolean; comment: boolean } {
   const open = found === 'open';
   return { approve: open && signedIn, comment: open };
+}
+
+type Named = ReadonlyArray<{ id: string; name?: string | null }>;
+
+/** The open notes on this version that "Send this note to the agent" would send. Main sends none on a file the agent did not make. */
+export function notesToSendTheAgent(marks: FileMarks, version: FileVersion, count: number, people: Named): string[] {
+  if (typeof version.agent !== 'string') return [];
+  return notesForTheAgent(marks, version, count).ids.filter((id) => noteGoesTo(marks.notes.find((n) => n.id === id), people).to === 'agent');
+}
+
+/**
+ * What the comment box's button says: who the note will reach, by the rule
+ * main sends it by (noteGoesTo). `toAgent` is whether anything here sends a
+ * note to an agent at all; `owner` is who shared the file.
+ */
+export function noteSendWords({ text, people, me, nameOf, agentMade, toAgent, owner }: {
+  text: string; people: Named; me: string | null; nameOf: (id: string | null) => string; agentMade: boolean; toAgent: boolean; owner: string | null;
+}): string {
+  const goes = noteGoesTo({ text }, people);
+  if (goes.to === 'person') return goes.person === me ? 'Add note' : `Send to ${nameOf(goes.person)}`;
+  if (agentMade && toAgent) return goes.to === 'agent' ? 'Send to the agent' : 'Add note';
+  return owner && owner !== me ? `Send to ${nameOf(owner)}` : 'Add note';
 }

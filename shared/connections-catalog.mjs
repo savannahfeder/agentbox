@@ -67,7 +67,9 @@ export const GROUPS = Object.freeze([
   { id: 'design', name: 'Design' },
 ]);
 
-const tool = (fields) => Object.freeze({ auth: 'oauth', redirect: 'loopback', scope: null, needs: null, copy: null, ...fields });
+// `needs` is the whole story, said when a connect is refused; `hint` is the one
+// line a sheet shows; `said` sums up `reads` and `writes` for a person.
+const tool = (fields) => Object.freeze({ auth: 'oauth', redirect: 'loopback', scope: null, needs: null, hint: null, said: null, copy: null, ...fields });
 // The vendor lets any app register itself, so Connect is the whole job.
 const signIn = (fields) => tool({ access: ACCESS.SIGN_IN, registration: 'dynamic', ...fields });
 const ownClient = (fields) => tool({ access: ACCESS.OWN_CLIENT, registration: 'own', redirect: 'fixed', ...fields });
@@ -75,6 +77,7 @@ const ownClient = (fields) => tool({ access: ACCESS.OWN_CLIENT, registration: 'o
 const youChoose = { reads: null, writes: [], check: null };
 
 const GOOGLE_NEEDS = 'Google offers this in its Workspace Developer Preview. Your team joins the preview, turns the server on in a Google Cloud project and makes an OAuth client there.';
+const GOOGLE_HINT = 'Your Google Workspace admin gives you these.';
 
 // Checked 2026-10-31 against each vendor's docs and each address's public sign-in
 // details. A check is a read that needs no argument, because a wrong argument
@@ -85,6 +88,7 @@ export const LINEAR = signIn({
   group: 'work',
   address: 'https://mcp.linear.app/mcp',
   scope: 'read write',
+  said: { reads: 'Issues, projects, cycles, comments and docs', writes: 'New issues, issue edits and comments' },
   reads: ['list_issues', 'get_issue', 'list_my_issues', 'list_comments', 'list_teams', 'get_team', 'list_projects', 'get_project', 'list_cycles', 'list_users', 'get_user', 'list_documents', 'get_document', 'list_issue_statuses', 'get_issue_status', 'list_issue_labels', 'list_project_labels', 'search_documentation'],
   writes: ['create_issue', 'update_issue', 'create_comment'],
   check: { tool: 'list_issues', args: { limit: CHECK_LIMIT }, things: 'issues' },
@@ -96,6 +100,7 @@ const NOTION = signIn({
   name: 'Notion',
   group: 'docs',
   address: 'https://mcp.notion.com/mcp',
+  said: { reads: 'Pages, databases, comments and people', writes: 'New pages, edits, comments and moves' },
   reads: ['notion-search', 'notion-fetch', 'notion-get-self', 'notion-get-users', 'notion-get-teams', 'notion-get-comments', 'notion-list-recent-pages', 'notion-list-shared-pages', 'notion-list-favorite-pages', 'notion-query-data-sources'],
   writes: ['notion-create-pages', 'notion-update-page', 'notion-create-comment', 'notion-move-pages', 'notion-duplicate-page'],
   check: { tool: 'notion-list-recent-pages', args: {}, things: 'pages' },
@@ -108,6 +113,8 @@ const SLACK = ownClient({
   group: 'talk',
   address: 'https://mcp.slack.com/mcp',
   needs: 'Slack lets only a registered Slack app connect. A workspace admin makes an internal Slack app, or approves one, and gives you its client ID and secret.',
+  hint: 'Your Slack workspace admin gives you these.',
+  said: { reads: 'Channels, threads, canvases and people', writes: 'Sending messages and writing canvases' },
   scope: 'search:read.public channels:history channels:read users:read',
   reads: ['slack_search_public', 'slack_search_channels', 'slack_search_users', 'slack_read_channel', 'slack_read_thread', 'slack_read_canvas', 'slack_read_user_profile'],
   writes: ['slack_send_message', 'slack_schedule_message', 'slack_create_canvas', 'slack_update_canvas'],
@@ -121,6 +128,8 @@ const HUBSPOT = ownClient({
   group: 'sales',
   address: 'https://mcp.hubspot.com/',
   needs: 'HubSpot asks for an MCP Connector made in your own account, under Development. Give it the address below, then paste its client ID and secret here.',
+  hint: 'Your HubSpot admin makes these under Development.',
+  said: { reads: 'Contacts, companies, deals and conversations', writes: 'Changes to CRM records' },
   reads: ['get_user_details', 'get_organization_details', 'search_crm_objects', 'get_crm_objects', 'query_crm_data', 'search_properties', 'get_properties', 'search_owners', 'search_conversations'],
   writes: ['manage_crm_objects'],
   check: { tool: 'get_user_details', args: {}, things: null },
@@ -130,7 +139,8 @@ const HUBSPOT = ownClient({
 const REAL_TOOLS = [
   NOTION,
   ownClient({
-    id: 'google-drive', name: 'Google Drive', group: 'docs', address: 'https://drivemcp.googleapis.com/mcp/v1', needs: GOOGLE_NEEDS,
+    id: 'google-drive', name: 'Google Drive', group: 'docs', address: 'https://drivemcp.googleapis.com/mcp/v1', needs: GOOGLE_NEEDS, hint: GOOGLE_HINT,
+    said: { reads: 'Files, their contents and who can see them', writes: 'New files and copies' },
     scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file',
     reads: ['list_recent_files', 'search_files', 'read_file_content', 'download_file_content', 'get_file_metadata', 'get_file_permissions'],
     writes: ['create_file', 'copy_file'],
@@ -142,6 +152,7 @@ const REAL_TOOLS = [
   LINEAR,
   signIn({
     id: 'atlassian', name: 'Jira and Confluence', group: 'work', address: 'https://mcp.atlassian.com/v2/mcp',
+    said: { reads: 'Jira issues and projects, Confluence pages', writes: 'New or edited issues, pages and comments' },
     reads: ['getJiraIssue', 'searchJiraIssuesUsingJql', 'listJiraProjects', 'listJiraIssueComments', 'getConfluenceContent', 'listConfluenceContent', 'listConfluenceSpaces', 'listConfluenceComments', 'searchConfluence'],
     writes: ['createJiraIssue', 'editJiraIssue', 'transitionJiraIssue', 'addOrEditJiraIssueComment', 'createConfluenceContent', 'updateConfluenceContent', 'createConfluenceComment'],
     check: { tool: 'listJiraProjects', args: {}, things: 'projects' },
@@ -149,6 +160,8 @@ const REAL_TOOLS = [
   tool({
     id: 'github', name: 'GitHub', group: 'work', address: 'https://api.githubcopilot.com/mcp/', access: ACCESS.KEY, registration: 'none',
     needs: 'GitHub asks each app to be registered before it can offer a sign-in, so this takes a personal access token from your GitHub settings.',
+    hint: 'Make a token in GitHub under Settings, Developer settings.',
+    said: { reads: 'Issues and pull requests', writes: 'Comments, issues and pull requests' },
     reads: ['get_me', 'list_issues', 'search_issues', 'issue_read', 'list_pull_requests', 'search_pull_requests', 'pull_request_read', 'list_issue_types'],
     writes: ['add_issue_comment', 'issue_write', 'create_pull_request'],
     check: { tool: 'get_me', args: {}, things: null },
@@ -157,20 +170,23 @@ const REAL_TOOLS = [
   ownClient({
     id: 'asana', name: 'Asana', group: 'work', address: 'https://mcp.asana.com/v2/mcp', ...youChoose,
     needs: 'Asana does not let apps register themselves. Make an app in the Asana developer console, then paste its client ID and secret here.',
+    hint: 'From an app you make in the Asana developer console.',
   }),
   signIn({ id: 'monday', name: 'monday.com', group: 'work', address: 'https://mcp.monday.com/mcp', ...youChoose }),
   signIn({ id: 'clickup', name: 'ClickUp', group: 'work', address: 'https://mcp.clickup.com/mcp', ...youChoose }),
   signIn({ id: 'vercel', name: 'Vercel', group: 'work', address: 'https://mcp.vercel.com/', ...youChoose }),
   SLACK,
   ownClient({
-    id: 'gmail', name: 'Gmail', group: 'talk', address: 'https://gmailmcp.googleapis.com/mcp/v1', needs: GOOGLE_NEEDS,
+    id: 'gmail', name: 'Gmail', group: 'talk', address: 'https://gmailmcp.googleapis.com/mcp/v1', needs: GOOGLE_NEEDS, hint: GOOGLE_HINT,
+    said: { reads: 'Threads, messages, labels and drafts', writes: 'Drafts and labels' },
     scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose',
     reads: ['list_labels', 'search_threads', 'get_thread', 'get_message', 'list_drafts'],
     writes: ['create_draft', 'label_message', 'label_thread', 'unlabel_message', 'unlabel_thread'],
     check: { tool: 'list_labels', args: {}, things: 'labels' },
   }),
   ownClient({
-    id: 'google-calendar', name: 'Google Calendar', group: 'talk', address: 'https://calendarmcp.googleapis.com/mcp/v1', needs: GOOGLE_NEEDS,
+    id: 'google-calendar', name: 'Google Calendar', group: 'talk', address: 'https://calendarmcp.googleapis.com/mcp/v1', needs: GOOGLE_NEEDS, hint: GOOGLE_HINT,
+    said: { reads: 'Calendars, events and free times', writes: 'New, edited or deleted events and replies' },
     scope: 'https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/calendar.events.freebusy',
     reads: ['list_calendars', 'list_events', 'get_event', 'search_events', 'suggest_time'],
     writes: ['create_event', 'update_event', 'delete_event', 'respond_to_event'],
@@ -179,6 +195,8 @@ const REAL_TOOLS = [
   signIn({
     id: 'intercom', name: 'Intercom', group: 'talk', address: 'https://mcp.intercom.com/mcp',
     needs: 'This is the address for US workspaces. A workspace hosted in the EU uses https://mcp.eu.intercom.com/mcp, which you can add by its address. Australia has none.',
+    hint: 'For US workspaces. An EU one is added by its address.',
+    said: { reads: 'Conversations, contacts, companies and articles', writes: 'Internal notes and articles' },
     reads: ['search', 'fetch', 'search_conversations', 'get_conversation', 'search_contacts', 'get_contact', 'list_companies', 'get_company', 'list_articles', 'search_articles', 'get_article'],
     writes: ['add_internal_note', 'create_article', 'update_article'],
     check: { tool: 'list_articles', args: {}, things: 'articles' },
@@ -188,9 +206,11 @@ const REAL_TOOLS = [
     id: 'salesforce', name: 'Salesforce', group: 'sales', address: 'https://api.salesforce.com/platform/mcp/v1/platform/sobject-reads', ...youChoose,
     scope: 'mcp_api refresh_token',
     needs: 'A Salesforce admin turns this server on under API Catalog, MCP Servers, and makes an External Client App. Paste its client ID and secret here. Salesforce may bill for its use.',
+    hint: 'Your Salesforce admin gives you these.',
   }),
   signIn({
     id: 'stripe', name: 'Stripe', group: 'sales', address: 'https://mcp.stripe.com/',
+    said: { reads: 'Your account, its records and the docs', writes: 'Any change to your account' },
     reads: ['get_stripe_account_info', 'stripe_api_search', 'stripe_api_details', 'stripe_api_read', 'search_stripe_documentation'],
     writes: ['stripe_api_write'],
     check: { tool: 'get_stripe_account_info', args: {}, things: null },
@@ -198,6 +218,8 @@ const REAL_TOOLS = [
   tool({
     id: 'figma', name: 'Figma', group: 'design', address: 'https://mcp.figma.com/mcp', access: ACCESS.VENDOR_APPROVAL, registration: 'dynamic',
     needs: `Figma lets only clients on its own list connect, and ${Name} is not on that list yet. New clients join Figma's waitlist.`,
+    hint: `Figma has not opened this to ${Name} yet.`,
+    said: { reads: 'Designs, FigJam boards and libraries', writes: 'New files, diagrams and edits' },
     reads: ['whoami', 'get_design_context', 'get_metadata', 'get_screenshot', 'get_figjam', 'get_variable_defs', 'get_libraries', 'search_design_system'],
     writes: ['generate_diagram', 'create_new_file', 'use_figma'],
     check: { tool: 'whoami', args: {}, things: null },

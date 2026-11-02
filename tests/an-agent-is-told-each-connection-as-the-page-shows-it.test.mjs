@@ -7,6 +7,12 @@
 // tool, so it fell in the second. Measured here on the words a worker is given,
 // built from a real connections service on the fixture, and on what a run's
 // tool answers while the tracker is down.
+//
+// Then main went red here on 2026-11-02 at 11:53pm: the test moved the
+// service's clock forward 20 minutes, past midnight, and the words came back
+// "last tried Nov 2 12:13am" because the broker read the wall clock instead of
+// the clock that had stamped the time. The clock below is pinned so the hour
+// the suite runs at cannot decide the answer.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -29,18 +35,19 @@ const browser = async (url) => {
   await fetch(allowed.headers.get('location'), { signal: AbortSignal.timeout(5000) });
 };
 const MIN = 60_000;
+const NOON = new Date('2026-06-15T12:00:00-07:00').getTime();
 
 let fx; let dir; let conn; let clock;
 beforeEach(async () => {
   fx = await startToolsFixture();
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'conn-told-'));
-  clock = Date.now();
+  clock = NOON;
   conn = createConnections({ vaultFile: path.join(dir, 'c.enc'), cipher, catalog: catalogFor({ env: { AGENTBOX_TOOLS_FIXTURE: fx.mcpUrl }, packaged: false }), openExternal: browser, now: () => clock });
 });
 afterEach(async () => { await conn.stop(); await fx.stop(); fs.rmSync(dir, { recursive: true, force: true }); });
 
 const supervisorWith = (connections) => Object.assign(Object.create(Supervisor.prototype), { connections });
-const brief = () => supervisorWith({ catalog: conn.catalog, workingNow: conn.workingNow, statusNow: conn.statusNow })._connectionsBrief();
+const brief = () => supervisorWith({ catalog: conn.catalog, workingNow: conn.workingNow, statusNow: conn.statusNow, _now: conn._now })._connectionsBrief();
 const lineFor = (b, name) => b.split('\n').find((l) => l.startsWith(name)) ?? '';
 
 describe('a tracker that is down', () => {
@@ -52,8 +59,7 @@ describe('a tracker that is down', () => {
     clock += 3 * 60 * MIN;
     await conn.check('test-tracker');
     const line = lineFor(brief(), 'Test tracker');
-    // The brief words its times against the real clock, so an evening run crosses midnight.
-    expect(line).toContain(`Test tracker is connected but down since ${clockAt(wentDown)}, last tried ${clockAt(clock)}.`);
+    expect(line).toContain(`Test tracker is connected but down since ${clockAt(wentDown, clock)}, last tried ${clockAt(clock, clock)}.`);
     expect(line).toContain('mcp__connection-test-tracker');
     expect(brief()).not.toContain('[Connect Test tracker]');
     expect(brief()).not.toMatch(/Not connected: .*Test tracker/);
@@ -128,6 +134,20 @@ describe('what the run\'s tool answers while it is down', () => {
     expect(out.result.isError).toBe(true);
     expect(out.result.content[0].text).toContain(`Test tracker is connected but down since ${clockAt(wentDown, clock)}, last tried ${clockAt(clock, clock)}`);
     expect(out.result.content[0].text).toMatch(/tries it again by itself/i);
+    run.close();
+    await broker.stop();
+  });
+
+  it('a run that crosses midnight says yesterday, not a date in the future', async () => {
+    clock = new Date('2026-11-02T23:53:00-08:00').getTime();
+    await conn.connect('test-tracker');
+    const broker = createBroker({ connections: conn, storeRoot: dir, socketPath: path.join(dir, 'b.sock'), proxyFile: '/nowhere' });
+    const run = broker.openRun({ runId: 'r', item: { id: 'w', product: 'p' } });
+    fx.switches.errors = true;
+    await conn.check('test-tracker');
+    clock += 20 * MIN;
+    const out = await broker._answer({ run: run.servers['connection-test-tracker'].env.AGENTBOX_CONNECTION_RUN, connection: 'test-tracker', method: 'tools/call', params: { name: 'list_issues', arguments: {} } }, new AbortController().signal);
+    expect(out.result.content[0].text).toContain('down since yesterday 11:53pm, last tried 12:13am');
     run.close();
     await broker.stop();
   });

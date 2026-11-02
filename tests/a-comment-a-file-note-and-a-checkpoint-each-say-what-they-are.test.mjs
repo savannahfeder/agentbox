@@ -60,9 +60,9 @@ describe('the thread draws the tag in the message head', () => {
   });
 });
 
-describe('the comment box says where a comment goes', () => {
+describe('the comment box carries no line explaining it', () => {
   const src = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
-  it('names the owner, their Needs you, and that it starts no agent', () => {
-    expect(src).toMatch(/commentWhere\(owner\)/);
+  it('draws no sentence under the box', () => {
+    expect(src).not.toContain('tp-comment-where');
   });
 });

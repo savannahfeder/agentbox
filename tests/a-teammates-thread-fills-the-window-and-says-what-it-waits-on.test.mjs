@@ -14,7 +14,6 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { standingLine, filesOnThread } from '../renderer/src/threads/teammate-thread';
 import { TeammateCard, TeammateStanding } from '../renderer/src/threads/Summary.tsx';
-import { commentWhere } from '../renderer/src/threads/message-kind';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const rule = (css, sel) => css.match(new RegExp(`^${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`, 'm'))?.[1] ?? '';
@@ -64,11 +63,10 @@ describe('the files it made are listed beside it', () => {
   });
 });
 
-describe('the comment box says where the words go, and keeps saying it', () => {
-  it('as a line under the box, not a placeholder', () => {
-    expect(commentWhere('Dev')).toBe("Goes to Dev's Needs you. It does not start an agent.");
+describe('the comment box explains nothing', () => {
+  it('no line under the box, and no explaining placeholder', () => {
     const src = read('renderer/src/threads/TeammateThread.tsx');
-    expect(src).toContain('<p className="tp-comment-where">{commentWhere(owner)}</p>');
+    expect(src).not.toContain('tp-comment-where');
     expect(src).not.toMatch(/placeholder=\{`Comment to \$\{owner\}\. This starts no agent\.`\}/);
   });
 });

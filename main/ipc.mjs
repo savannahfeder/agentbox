@@ -1102,7 +1102,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     await team.syncNow();
   }));
 
-  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo, fromPhone }) => {
+  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo, fromPhone, onMac }) => {
     const out = store.composeItem(product, {
       // HOW HARD IT THINKS rides through unjudged: the store keeps any word
       // shaped like a level, and the spawn is the gate that knows each
@@ -1133,6 +1133,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // fields cannot be corrected separately.
       model: supervisor.modelOffered(engine, model),
     });
+    // Before the wake below, so its first run cannot start in the cloud.
+    if (onMac === true && out?.id) supervisor.setThreadOnMac({ [out.id]: true });
     // A real thread ends the walk's hold on agents (`Supervisor#sentByThem`).
     supervisor.sentByThem(labels);
     // THAT a task was written, and whether in practice. Never its words.
@@ -2244,8 +2246,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     if (out.ok) { push(); void team?.syncNow?.()?.catch?.(() => {}); }
     return out;
   });
-  ipcMain.handle('zero:file-elsewhere', async (_e, { product, id, path: src, file } = {}) => {
-    try { return await filesPlaceNow().sameFile({ product: String(product ?? ''), id: String(id ?? ''), path: String(src ?? ''), file: String(file ?? '') }); } catch { return { key: null, notes: [], approvals: [] }; }
+  ipcMain.handle('zero:file-elsewhere', async (_e, { product, id, copies } = {}) => {
+    const asked = Array.isArray(copies) ? copies : [];
+    try { return await filesPlaceNow().sameFiles({ product: String(product ?? ''), id: String(id ?? ''), copies: asked }); } catch { return asked.map(() => ({ key: null, notes: [], approvals: [] })); }
   });
   ipcMain.handle('zero:file-line', async (_e, { product, id } = {}) => {
     try { return await filesPlaceNow().lineFor({ product: String(product ?? ''), id: String(id ?? '') }); } catch { return []; }

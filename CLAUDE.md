@@ -48,6 +48,8 @@ your change and you fix only what is likely and bad) run when someone asks.
 
 Do not design for rare or future cases nobody asked about.
 
+Never add explanatory or filler text on screen to get around a design problem; fix the design.
+
 ## THE TRAY'S LOOK IS APPROVED. DO NOT CHANGE IT ON YOUR OWN (2026-11-02)
 
 After it was approved, the corner tray (its glass, tint, ink, list, and when it

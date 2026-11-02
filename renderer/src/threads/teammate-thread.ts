@@ -6,7 +6,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export const earlierWords = (n: number, owner: string) => `${plural(n, 'earlier message')} ${n === 1 ? 'stays' : 'stay'} on ${owner}'s computer.`;
 
-export const notSharedWords = (owner: string) => `${owner}'s app has not shared these messages yet. They show here the next time it syncs.`;
+export const notSharedWords = (owner: string) => `${owner}'s app has not shared these messages yet.`;
 
 /** The people's words for a waiting comment on a row: "Maya commented: …". */
 export function commentLine(comments: { by: string; text: string }[] | undefined, nameOf: (id: string) => string): string | null {
