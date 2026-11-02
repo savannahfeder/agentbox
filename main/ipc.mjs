@@ -74,6 +74,7 @@ import { handedOnByReply } from '../shared/team-rules.mjs';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mjs';
 import { saveAttachments } from './save-attachments.mjs';
 import { stageAttachment } from './stage-attachment.mjs';
+import { rulesChip, rulesFor, rulesSummary } from '../shared/ship-mode.mjs';
 
 // WHAT A WORKER IS TOLD WHEN HER DECISION COULD NOT BE RECORDED.
 const SPOOL_REFUSED = `${Name} could not record the founder's decision, so nothing was allowed. Finish what your grants cover and file the rest as a review.`;
@@ -502,8 +503,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // now. The Codex side never starts anything at all (main/codex-usage.mjs).
     const reading = usageFor === DEFAULT_ENGINE ? usage.read() : supervisor.codexUsage();
     const alpha = alphaFeatures(config);
+    const products = store.listProducts();
     return {
-      products: store.listProducts(),
+      products,
       // Each with the place she dragged it to, if she did (w-6e5b532a95).
       items: supervisor.withPlaces(items),
       // THE TEAM: who is signed in, their team and its people, and the
@@ -512,6 +514,13 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       team: team ? teamForWindow(team.state(), alpha.multiplayer) : null,
       // Which alpha features are on (Settings, Alpha features).
       alpha,
+      // WHAT EACH PROJECT SHIPS WITHOUT ASKING, for the new-thread box, only
+      // where something does (Settings › Shipping, shared/ship-mode.mjs).
+      shipping: Object.fromEntries(products.map((p) => {
+        const rules = rulesFor(config, p.slug);
+        const chip = rulesChip(rules);
+        return chip ? [[p.slug, { chip, summary: rulesSummary(rules) }]] : [];
+      }).flat()),
       // TEAMMATES: who they are, what each is on, and the one team chat.
       teammates: alpha.teammates ? (() => { try { return store.teammatesView(items, now); } catch (err) { return { list: [], chat: [], runs: [], error: err.message }; } })() : null,
       agents: liveAgents(),

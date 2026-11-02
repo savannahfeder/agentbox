@@ -54,8 +54,24 @@ export const projectKept = (config, slug) => cleanRules(config?.shipRules?.proje
 /** The answers a project's agents follow. */
 export const rulesFor = (config, slug) => projectOwn(config, slug) ?? everyProject(config);
 
+const words = (v) => (typeof v === 'string' ? v.trim() : '');
+
+/** Her own words about shipping: every project's, then the project's. */
+export const notesFor = (config, slug) => [words(config?.shipNotes?.every), words(config?.shipNotes?.projects?.[slug])].filter(Boolean);
+
 /** Whether anything ships without asking under these answers. */
 export const shipsAlone = (rules) => KINDS.some((k) => rules?.[k] && rules[k] !== 'ask' && rules[k] !== 'test-ask');
+
+/** A few words for the new-thread box, or null when everything asks. */
+export function rulesChip(rules) {
+  const fixes = rules.small === 'ship' || rules.wide === 'review';
+  const tested = rules.seen === 'test' || rules.big === 'test';
+  if (fixes && tested) return 'Fixes and tested changes ship on their own';
+  if (fixes) return 'Fixes ship on their own';
+  if (tested) return 'Tested changes ship on their own';
+  if (rules.big === 'test-ask') return 'AI testers try big changes first';
+  return null;
+}
 
 /** What happens to each kind, in a few sentences, for a project row. */
 export function rulesSummary(rules) {
@@ -79,9 +95,13 @@ export function rulesSummary(rules) {
 
 const ASK = ['   Do not ship it. Bring it to them, and ask.'];
 
-/** The section a worker's brief carries for these answers, or '' when everything asks. */
-export function shipRulesBrief(rules) {
-  if (!rules || !shipsAlone(rules)) return '';
+/** The section a worker's brief carries, or '' when everything asks and she wrote nothing. */
+export function shipRulesBrief(rules, notes = []) {
+  const own = notes.map(words).filter(Boolean);
+  const said = own.length ? ['', 'In their own words:', '', ...own.map((n) => n.split('\n').map((l) => `> ${l}`).join('\n'))] : [];
+  if (!rules || !shipsAlone(rules)) {
+    return own.length ? ['', '# Before this change ships', '', 'The person wrote this in Settings, under Shipping. It outranks the rest of this brief.', ...said].join('\n') : '';
+  }
   const lines = {
     small: rules.small === 'ship' ? ['   When its tests pass, ship it without asking.'] : ASK,
     wide: rules.wide === 'review' ? [
@@ -137,5 +157,6 @@ export function shipRulesBrief(rules) {
     '',
     'Your answer says which of the four your change was and why, in one sentence, and',
     'what reviewed or tested it.',
+    ...(said.length ? [...said, '', 'Where their words and the four above disagree, their words win.'] : []),
   ].join('\n');
 }

@@ -7145,6 +7145,8 @@ export default function App() {
           // Projects page, which is where the order is set. The draft is
           // already saved, so closing loses nothing.
           onReorderProjects={() => { setModal(null); setComposeInitial(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
+          shipping={snap.shipping}
+          onOpenShipping={(slug) => { setModal(null); setTeamOpen(false); setSettingsPane(`shipping:${slug}`); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
           /* "New project", last in the project menu. The card draws OVER the
              composer rather than replacing it (it is last in this file for
              exactly that), so the draft is still here afterwards and the

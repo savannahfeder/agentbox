@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ASK_FIRST, CHOICE_WORDS, KINDS, cleanRules, everyProject, projectKept, projectOwn, rulesFor, rulesSummary, shipRulesBrief, shipsAlone } from '../shared/ship-mode.mjs';
+import { ASK_FIRST, CHOICE_WORDS, KINDS, cleanRules, everyProject, notesFor, projectKept, projectOwn, rulesChip, rulesFor, rulesSummary, shipRulesBrief, shipsAlone } from '../shared/ship-mode.mjs';
 
 const FIXES_SHIP = { small: 'ship', wide: 'review', seen: 'ask', big: 'test-ask' };
 
@@ -57,6 +57,16 @@ describe('the answers', () => {
     expect(rulesSummary(FIXES_SHIP)).toBe('Small fixes ship on their own. Fixes that reach a lot ship after a Codex review. Big changes go to AI testers, then to you. The rest asks you first.');
     expect(rulesSummary({ ...ASK_FIRST, big: 'test-ask' })).not.toBe(rulesSummary(ASK_FIRST));
     expect(rulesSummary({ small: 'ship', wide: 'review', seen: 'test', big: 'test' })).toBe('Small fixes ship on their own. Fixes that reach a lot ship after a Codex review. Changes you can see and big changes ship after AI testers try them.');
+  });
+
+  // All three testers looked for what a project would ship where they were
+  // writing the task, and found nothing outside Settings.
+  it('give the new-thread box a few words when something ships alone, and none when all ask', () => {
+    expect(rulesChip(ASK_FIRST)).toBeNull();
+    expect(rulesChip(FIXES_SHIP)).toBe('Fixes ship on their own');
+    expect(rulesChip({ ...ASK_FIRST, seen: 'test' })).toBe('Tested changes ship on their own');
+    expect(rulesChip({ small: 'ship', wide: 'ask', seen: 'test', big: 'ask' })).toBe('Fixes and tested changes ship on their own');
+    expect(rulesChip({ ...ASK_FIRST, big: 'test-ask' })).toBe('AI testers try big changes first');
   });
 
   it('say asking the same way on every kind', () => {
@@ -110,6 +120,20 @@ describe('what the agent is told', () => {
   it('asks for a kind left on asking, even when another kind ships', () => {
     const b = shipRulesBrief({ small: 'ship', wide: 'ask', seen: 'ask', big: 'ask' });
     expect(b).toMatch(/2\. A fix that reaches a lot[\s\S]*Do not ship it\. Bring it to them, and ask/);
+  });
+
+  // Two testers wrote a rule in their own words and went looking for it on
+  // the Shipping page; it lived in Instructions, behind a long template.
+  it('carries the person\'s own words, every project\'s and the project\'s', () => {
+    const b = shipRulesBrief(FIXES_SHIP, ['Never ship a database migration on its own.', 'Payments always asks.']);
+    expect(b).toMatch(/In their own words:\n\n> Never ship a database migration on its own\.\n> Payments always asks\./);
+  });
+
+  it('carries the words alone when nothing ships without asking', () => {
+    const b = shipRulesBrief(ASK_FIRST, ['Always show me screenshots.']);
+    expect(b).toMatch(/In their own words/);
+    expect(b).not.toMatch(/1\. A small fix nobody sees/);
+    expect(shipRulesBrief(ASK_FIRST, ['  '])).toBe('');
   });
 
   it('settles a doubt by asking more, and has the agent name its kind', () => {
@@ -217,6 +241,17 @@ describe('Settings', async () => {
     setWorkspaceSetting(ctx(), { key: 'shipRules', value: FIXES_SHIP });
     setWorkspaceSetting(ctx(), { key: 'shipRules', value: ASK_FIRST });
     expect(loadConfig(tmp).shipRules).toBeUndefined();
+  });
+
+  it('keeps words for every project and for one, and reads them back', () => {
+    setWorkspaceSetting(ctx(), { key: 'shipNote', value: 'Never ship a migration on its own.' });
+    setProjectSetting(ctx(), { product: 'acme', key: 'shipNote', value: 'Payments always asks.' });
+    const m = model();
+    expect(m.workspace.shipNote).toBe('Never ship a migration on its own.');
+    expect(m.projects[0].shipNote).toBe('Payments always asks.');
+    expect(notesFor(loadConfig(tmp), 'acme')).toEqual(['Never ship a migration on its own.', 'Payments always asks.']);
+    setProjectSetting(ctx(), { product: 'acme', key: 'shipNote', value: '' });
+    expect(model().projects[0].shipNote).toBe('');
   });
 
   it('refuses answers it does not know', () => {

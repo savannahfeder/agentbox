@@ -7,7 +7,7 @@ export { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/c
 import { taskRemoteControl } from './task-remote-control.mjs';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mjs';
 import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor } from './ship-queue.mjs';
-import { rulesFor, shipRulesBrief, shipsAlone } from '../shared/ship-mode.mjs';
+import { notesFor, rulesFor, shipRulesBrief, shipsAlone } from '../shared/ship-mode.mjs';
 import { MainTests } from './main-went-red.mjs';
 import { folderJob } from './task-folders-offthread.mjs';
 import { gitJob } from './git-change-offthread.mjs';
@@ -2724,7 +2724,7 @@ export class Supervisor {
 
   /** How this project's tasks ship and when they ask first, or '' for neither. */
   shipSection(product) {
-    const rules = shipRulesBrief(rulesFor(this.config, product.slug));
+    const rules = shipRulesBrief(rulesFor(this.config, product.slug), notesFor(this.config, product.slug));
     const how = this.shipsThroughTheApp(product) ? this.shipBrief({ ruled: !!rules }) : '';
     return [how, rules].filter(Boolean).join('\n');
   }

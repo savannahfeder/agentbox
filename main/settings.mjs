@@ -618,6 +618,7 @@ export function readSettings({ config, supervisor, store }, { search = true } = 
       autonomous: (config.autonomousProducts ?? []).includes(product.slug),
       shipOwn: projectOwn(config, product.slug),
       shipKept: projectKept(config, product.slug),
+      shipNote: typeof config.shipNotes?.projects?.[product.slug] === 'string' ? config.shipNotes.projects[product.slug] : '',
       // ON HER PHONE WITH THE MAC SHUT (docs/cloud/PHONE-PLAN.md): its threads
       // go up to her own rows online on every sync (main/phone-inbox.mjs).
       onPhone: phoneSlugs.has(product.slug),
@@ -864,6 +865,7 @@ function engineSettings(supervisor, config, { search = true } = {}) {
     codexMode: isCodexMode(config.codexMode) ? config.codexMode : CODEX_DEFAULT_MODE,
     // What ships without asking on every project (shared/ship-mode.mjs).
     shipRules: everyProject(config),
+    shipNote: typeof config.shipNotes?.every === 'string' ? config.shipNotes.every : '',
   };
 }
 
@@ -875,6 +877,14 @@ function saveShipRules(config, { every, projects }) {
     ...(projects && Object.keys(projects).length ? { projects } : {}),
   };
   saveConfig(config, { shipRules: Object.keys(next).length ? next : undefined });
+}
+
+function saveShipNotes(config, { every, projects }) {
+  const next = {
+    ...(typeof every === 'string' && every.trim() ? { every } : {}),
+    ...(projects && Object.keys(projects).length ? { projects } : {}),
+  };
+  saveConfig(config, { shipNotes: Object.keys(next).length ? next : undefined });
 }
 
 /* -------------------------------- writing -------------------------------- */
@@ -905,6 +915,12 @@ export function setProjectSetting({ config, supervisor, store }, { product, key,
       if (rules) projects[product] = rules;
       else if (projects[product]) projects[product] = { ...projects[product], off: true };
       saveShipRules(config, { ...config.shipRules, projects });
+      break;
+    }
+    case 'shipNote': {
+      const projects = { ...(config.shipNotes?.projects ?? {}) };
+      if (typeof value === 'string' && value.trim()) projects[product] = value; else delete projects[product];
+      saveShipNotes(config, { ...config.shipNotes, projects });
       break;
     }
     case 'phone':
@@ -1218,6 +1234,9 @@ export function setWorkspaceSetting({ config, supervisor, store }, { key, value 
       saveShipRules(config, { ...config.shipRules, every: rules });
       break;
     }
+    case 'shipNote':
+      saveShipNotes(config, { ...config.shipNotes, every: typeof value === 'string' ? value : '' });
+      break;
     case 'phoneAll':
       saveConfig(config, { phoneProducts: withPhoneAll(config.phoneProducts, process.env.AGENTBOX_PERSON_ID, !!value, phoneEligible(store?.listProducts?.() ?? [])) });
       break;

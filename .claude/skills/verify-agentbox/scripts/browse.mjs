@@ -160,6 +160,8 @@ if (verb === 'open') {
   // A real press, so whatever listens for the pointer hears it, and whatever covers the thing gets the press instead.
   if (hit) {
     for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await t.call('Input.dispatchMouseEvent', { type, x: hit.x, y: hit.y, button: 'left', clickCount: type === 'mouseMoved' ? 0 : 1 });
+    // A text field pressed has the cursor in it, as after a person's click.
+    if (hit.field) await t.evaluate(`(() => { const a = document.activeElement; if (!a || !a.matches('input, textarea, select, [contenteditable]')) document.elementFromPoint(${hit.x}, ${hit.y})?.focus(); })()`);
   }
   await report(t, hit === null ? `Nothing numbered or named "${which}" on screen. Run look again.` : `Pressed "${hit.words}".`);
   t.detach();

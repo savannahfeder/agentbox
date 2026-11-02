@@ -12,4 +12,6 @@ export declare function projectKept(config: unknown, slug: string): ShipRules | 
 export declare function rulesFor(config: unknown, slug: string): ShipRules;
 export declare function shipsAlone(rules: ShipRules | null | undefined): boolean;
 export declare function rulesSummary(rules: ShipRules): string;
-export declare function shipRulesBrief(rules: ShipRules | null | undefined): string;
+export declare function rulesChip(rules: ShipRules): string | null;
+export declare function notesFor(config: unknown, slug: string): string[];
+export declare function shipRulesBrief(rules: ShipRules | null | undefined, notes?: string[]): string;

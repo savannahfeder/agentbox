@@ -36,7 +36,7 @@ import { whatTakesEscape } from '../settings-escape';
 import { WebAlertsGroup } from './WebAlerts';
 import { api, RESTART_NOTE } from '../api';
 import { updateLook } from '../update-row';
-import { InstructionSettings, ScopeSwitch, sizeLabel } from './InstructionSettings';
+import { InstructionSettings, Part, ScopeSwitch, sizeLabel } from './InstructionSettings';
 import { EVERY } from '../instruction-scope';
 import type {AccountUsageReading, Usage, UsageLimit, WorkspaceSettings} from '../types';
 import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
@@ -1547,32 +1547,46 @@ function ProjectTitle({ project, onRename }: {
 // on a 24 grid, round caps, no fill except where the shape needs one.
 /* SHIPPING (w-e4d49a1539): what agents ship without asking, for every project
    and for any one. The heading switches scope the way Instructions does. */
-function ShippingPage({ projects, every, scope, onScope, onEvery, onProject, onInstructions }: {
+function ShippingPage({ projects, every, everyNote, scope, codexReady, onScope, onEvery, onProject, onEveryNote, onProjectNote }: {
   projects: ProjectSettings[];
   every: ShipRules;
+  everyNote: string;
   scope: string;
+  codexReady: boolean;
   onScope: (s: string) => void;
   onEvery: (rules: ShipRules) => void;
   onProject: (slug: string, rules: ShipRules | null) => void;
-  onInstructions: (scope: string) => void;
+  onEveryNote: (text: string) => void;
+  onProjectNote: (slug: string, text: string) => void;
 }) {
   const project = scope === EVERY ? null : projects.find((p) => p.slug === scope) ?? null;
   const own = project?.shipOwn ?? null;
+  const same = (a: ShipRules, b: ShipRules) => KINDS.every((k) => a[k] === b[k]);
+  // What the row says under its name: the kind, then anything about this answer worth knowing.
+  const desc = (k: ShipKind, rules: ShipRules) => [
+    KIND_WORDS[k].desc,
+    project && own && rules[k] !== every[k] ? `Every project: ${CHOICE_WORDS[k][every[k]]}.` : '',
+    k === 'wide' && rules.wide === 'review' && !codexReady ? 'Codex is not set up on this computer, so these will ask you.' : '',
+  ].filter(Boolean).join(' ');
   const rows = (rules: ShipRules, set: (r: ShipRules) => void) => KINDS.map((k: ShipKind) => (
-    <Row key={k} label={KIND_WORDS[k].label} desc={KIND_WORDS[k].desc}>
+    <Row key={k} label={KIND_WORDS[k].label} desc={desc(k, rules)}>
       <Picker bare label={KIND_WORDS[k].label} value={rules[k] as string}
         options={CHOICES[k].map((c) => ({ value: c, label: CHOICE_WORDS[k][c] }))}
         onChange={(v) => set({ ...rules, [k]: v } as ShipRules)} />
     </Row>
   ));
   const differ = projects.filter((p) => p.shipOwn);
+  const sameLine = !own ? rulesSummary(every)
+    : same(own, every) ? 'Its own rules match every project\u2019s today, and will not follow changes to them.'
+      : 'This project has its own rules below.';
   return (
     <div className="set-inner instructions-page">
       <ScopeSwitch lead="Shipping for" scope={scope} projects={projects} onScope={onScope} />
       <div className="set-lede">What agents ship without asking you. Shipping means merging into main. AI testers are agents that each play someone your product is for and use the change before you see it.</div>
       {project ? (
         <Group>
-          <Row label="Same as every project" desc={own ? 'This project has its own rules below.' : rulesSummary(every)}>
+          {!project.repoPath && <Row label="No code here" desc="This project has no repository, so nothing in it ships. Its rules apply once it has one." />}
+          <Row label="Same as every project" desc={sameLine}>
             <Switch label="Same as every project" on={!own} onChange={(v) => onProject(project.slug, v ? null : project.shipKept ?? every)} />
           </Row>
           {own && rows(own, (r) => onProject(project.slug, r))}
@@ -1589,11 +1603,32 @@ function ShippingPage({ projects, every, scope, onScope, onEvery, onProject, onI
           </Group>
         </>
       )}
-      <Group label="In your own words">
-        <Row label="Anything else before something ships" desc="Like “never ship a database migration on its own”. These go in your instructions.">
-          <button type="button" className="set-ghost" onClick={() => onInstructions(scope)}>Open Instructions</button>
-        </Row>
-      </Group>
+      <ShipWords key={scope}
+        label={project ? `In your own words, for ${project.name}` : 'In your own words, for every project'}
+        text={project ? project.shipNote ?? '' : everyNote}
+        onSave={(t) => (project ? onProjectNote(project.slug, t) : onEveryNote(t))} />
+    </div>
+  );
+}
+
+// Her own words about shipping, saved as she types, the way Instructions saves.
+function ShipWords({ label, text, onSave }: { label: string; text: string; onSave: (t: string) => void }) {
+  const [value, setValue] = useState(text);
+  const [status, setStatus] = useState('');
+  const timer = useRef<number | null>(null);
+  const pending = useRef<string | null>(null);
+  const flush = () => { if (pending.current !== null) { onSave(pending.current); pending.current = null; setStatus('Saved'); } };
+  useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); flush(); }, []);
+  const edit = (v: string) => {
+    setValue(v); pending.current = v; setStatus('Saving\u2026');
+    if (timer.current) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(flush, 500);
+  };
+  return (
+    <div className="set-group">
+      <div className="instr-card">
+        <Part id="ship-words" label={label} description="Anything agents should follow before something ships, like \u201cnever ship a database migration on its own\u201d." writing={{ text: value, status, edit }} />
+      </div>
     </div>
   );
 }
@@ -1626,6 +1661,7 @@ function NavIcon({ id }: { id: SettingsPageId }) {
  *  name the screen has ever used still opens the page its content went to. */
 function paneFrom(want: string, has: { team: boolean }): Pane {
   if (want.startsWith('project:')) return { project: want.slice('project:'.length) };
+  if (want.startsWith('shipping:')) return 'shipping';
   if (want === 'themes') return 'appearance';
   if (want === 'priority') return 'projects';
   // The accounts were a page, then a group on Agents, then on General; they
@@ -1832,7 +1868,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   // open it already pointed at that project.
   const [instrScope, setInstrScope] = useState<string>(EVERY);
   const openInstructions = (slug: string) => { setInstrScope(slug); setPane('instructions'); };
-  const [shipScope, setShipScope] = useState<string>(EVERY);
+  // `shipping:<slug>` opens Shipping on that project (the new-thread box's chip).
+  const [shipScope, setShipScope] = useState<string>(() => (startPane?.startsWith('shipping:') ? startPane.slice('shipping:'.length) : EVERY));
   const openShipping = (slug: string) => { setShipScope(slug); setPane('shipping'); };
   const current = useMemo(
     () => (typeof pane === 'string' ? null : projects.find((p) => p.slug === pane.project) ?? null),
@@ -2166,11 +2203,14 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
           <ShippingPage
             projects={projects}
             every={w.shipRules ?? ASK_FIRST}
+            everyNote={w.shipNote ?? ''}
             scope={resolveScope(shipScope, projects)}
+            codexReady={(w.engineChoices ?? []).some((e) => e.id === 'codex')}
             onScope={setShipScope}
             onEvery={(rules) => setWorkspace('shipRules', rules)}
             onProject={(slug, rules) => setProject(slug, 'shipRules', rules)}
-            onInstructions={openInstructions}
+            onEveryNote={(text) => setWorkspace('shipNote', text)}
+            onProjectNote={(slug, text) => setProject(slug, 'shipNote', text)}
           />
         )}
         {/* The settings error is left off the pages that read nothing from the

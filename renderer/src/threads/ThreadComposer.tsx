@@ -110,7 +110,7 @@ export interface ComposeStart {
 }
 
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine,
+  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, shipping, onOpenShipping,
 }: {
   statusLine?: string | null;
   /** On the page: whether the keyboard is in the box or words are left in it. */
@@ -158,6 +158,9 @@ export function ThreadComposer({
   onOpenConversation?: (item: WorkItem, draft: string) => void;
   /** Opens Settings > Priority, from the "Reorder" beside the project menu's heading. */
   onReorderProjects?: () => void;
+  /** What each project ships without asking, where something does (Settings › Shipping). */
+  shipping?: Record<string, { chip: string; summary: string }>;
+  onOpenShipping?: (slug: string) => void;
   /** Opens the New project card, from the last row of the project menu. Asked
    *  for on 2026-10-05: making a project is a thing you should be able to do
    *  from the menu you are already in, whether you have none or ten. */
@@ -1201,6 +1204,13 @@ export function ThreadComposer({
               {open === 'project' && projectMenu}
             </span>
             {priorityChip}
+            {product && shipping?.[product.slug] && (
+              <span className="tc-anchor">
+                <button type="button" className="tc-chip" title={`${shipping[product.slug].summary} Open Shipping in Settings to change it.`} onClick={() => onOpenShipping?.(product.slug)}>
+                  {shipping[product.slug].chip}
+                </button>
+              </span>
+            )}
             {team && (
               <span className="tc-anchor" ref={anchor('visibility')}>
                 <button type="button" data-trigger className={`tc-chip ${open === 'visibility' ? 'open' : ''}`} title="Who sees it"

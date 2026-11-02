@@ -8,6 +8,10 @@
 // (a thread's reply) worked; the room's chat box, which waits for a click,
 // never did. A click on a text field now also focuses it, as a person's does.
 // Asserted on the source, as the click is a script the page runs.
+//
+// Since w-e4d49a1539 the click is a real press at the thing's middle, because
+// el.click() skipped the pointer events the Projects list and every menu
+// listen for. A field pressed is still made to hold the cursor.
 import { it, expect } from 'vitest';
 import fs from 'node:fs';
 
@@ -15,5 +19,7 @@ const browse = fs.readFileSync(new URL('../.claude/skills/verify-agentbox/script
 
 it('a click on a text field puts the cursor in it', () => {
   const click = browse.slice(browse.indexOf("} else if (verb === 'click') {"), browse.indexOf("} else if (verb === 'type') {"));
-  expect(click).toMatch(/el\.click\(\);\s*if \(el\.matches\('input, textarea, select, \[contenteditable\]'\)\) el\.focus\(\);/);
+  expect(click).toMatch(/Input\.dispatchMouseEvent/);
+  expect(click).toMatch(/'mousePressed', 'mouseReleased'/);
+  expect(click).toMatch(/if \(hit\.field\)[\s\S]*elementFromPoint[\s\S]*\.focus\(\)/);
 });

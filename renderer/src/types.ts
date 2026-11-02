@@ -912,6 +912,8 @@ export interface UpdateState {
 
 export interface Snapshot {
   products: Product[];
+  /** What each project ships without asking, only where something does (shared/ship-mode.mjs). */
+  shipping?: Record<string, { chip: string; summary: string }>;
   items: WorkItem[];
   // ON THE PHONE WITH THE MAC SHUT ONLY (renderer/src/cloud-bridge.ts): her
   // replies from the phone her Mac has not taken yet, or turned down.
@@ -1091,6 +1093,8 @@ export interface ProjectSettings {
   shipOwn?: import('../../shared/ship-mode.mjs').ShipRules | null;
   /** Its own rules kept while it follows every project's, to put back. */
   shipKept?: import('../../shared/ship-mode.mjs').ShipRules | null;
+  /** Her own words about shipping on this project. */
+  shipNote?: string;
   /** Its threads go to her account online for her phone with the Mac shut. */
   onPhone?: boolean;
   permission: PermissionMode | 'workspace';
@@ -1245,6 +1249,8 @@ export interface WorkspaceSettings {
   codexMode: CodexModeId;
   /** What ships without asking on every project (shared/ship-mode.mjs). */
   shipRules?: import('../../shared/ship-mode.mjs').ShipRules;
+  /** Her own words about shipping on every project. */
+  shipNote?: string;
   // One switch over everything that leaves the machine, on at install
   // (legal/privacy.html section 10). `diagnosticsDestination` is whether this
   // copy has anywhere to send to at all: a build from source does not.
