@@ -37,6 +37,15 @@ export function FileNoteCard({ note, wordsGone, active, settling, person, me, on
   };
   const { tag, rest } = placeParts(place);
   const quote = note.place.kind === 'quote';
+  // What became of the note itself: above its replies when it has some, so it is not read as theirs.
+  const answered = !!note.replies?.length;
+  const facts = [
+    wordsGone && <span key="gone" className="av-note-sent">Those words were edited</span>,
+    note.in && <span key="in" className="av-note-sent">In {note.in}</span>,
+    note.from && <span key="from" className="av-note-sent">From {note.from}, still open</span>,
+    note.sent && <span key="sent" className="av-note-sent"><NoteGlyph name="send" />Sent to the agent</span>,
+    !note.sent && held && !note.resolved && <span key="held" className="av-note-sent">{held.went && <NoteGlyph name="send" />}{held.words}</span>,
+  ].filter(Boolean);
   return <article className={`av-note${active ? ' is-on' : ''}${note.resolved ? ' is-settled' : ''}${settling ? ' is-just-settled' : ''}${note.saving ? ' is-saving' : ''}`} id={`av-note-${note.id}`}>
     <button type="button" className="av-note-go" onClick={onGo} aria-label={`Go to ${place}`}>
       <span className="av-note-head">
@@ -49,6 +58,7 @@ export function FileNoteCard({ note, wordsGone, active, settling, person, me, on
       {quote && <span className="av-note-place">{place}</span>}
       <span className="av-note-text">{note.text}</span>
     </button>
+    {answered && facts.length > 0 && <span className="av-note-acts av-note-facts">{facts}</span>}
     {(note.replies ?? []).map((r) => (
       <div className="av-reply" key={r.id}>
         <span className="av-note-head">
@@ -74,14 +84,8 @@ export function FileNoteCard({ note, wordsGone, active, settling, person, me, on
       <span className="av-note-done"><NoteGlyph name="check" />Resolved</span>
       <button type="button" className="av-note-act" onClick={() => onSettle(false)}><NoteGlyph name="undo" />Undo</button>
     </span> : <span className="av-note-acts">
-      {wordsGone && <span className="av-note-sent">Those words were edited</span>}
-      {note.in && <span className="av-note-sent">In {note.in}</span>}
-      {note.from && <span className="av-note-sent">From {note.from}, still open</span>}
-      {note.sent && <span className="av-note-sent is-gone"><NoteGlyph name="send" />Sent to the agent</span>}
-      {!note.sent && held && !note.resolved && <>
-        <span className={`av-note-sent${held.went ? ' is-gone' : ''}`}>{held.went && <NoteGlyph name="send" />}{held.words}</span>
-        <button type="button" className="av-note-act av-note-toagent" onClick={onToAgent}><NoteGlyph name="send" />Send to the agent</button>
-      </>}
+      {!answered && facts}
+      {!note.sent && held && !note.resolved && <button type="button" className="av-note-act av-note-toagent" onClick={onToAgent}><NoteGlyph name="send" />Send to the agent</button>}
       {!replying && <span className="av-note-btns">
         {canReply && !note.resolved && <button type="button" className="av-note-act" onClick={() => onReplying(true)}><NoteGlyph name="reply" />Reply</button>}
         <button type="button" className="av-note-act" onClick={() => onSettle(!note.resolved)}><NoteGlyph name={note.resolved ? 'undo' : 'check'} />{note.resolved ? 'Reopen' : 'Resolve'}</button>
