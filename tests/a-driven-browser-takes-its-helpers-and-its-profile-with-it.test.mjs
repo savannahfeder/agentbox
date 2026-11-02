@@ -55,9 +55,12 @@ function start() {
 async function settled({ profile, bin }) {
   const deadline = Date.now() + 15_000;
   for (;;) {
-    const up = holdersOf(profile, undefined, bin).length > HELPERS;
-    if (up && fs.readdirSync(path.join(profile, 'Default', 'Cache')).length === HELPERS) return;
-    if (Date.now() > deadline) throw new Error(`the stand-in browser never got all ${HELPERS} helpers writing`);
+    const pids = holdersOf(profile, undefined, bin);
+    const writing = fs.existsSync(path.join(profile, 'Default', 'Cache')) ? fs.readdirSync(path.join(profile, 'Default', 'Cache')).length : 0;
+    if (pids.length > HELPERS && writing === HELPERS) return;
+    // Which half is missing: one message for a blind `ps` and for a stand-in
+    // that never started cost a round on the Mac.
+    if (Date.now() > deadline) throw new Error(`the stand-in browser never got all ${HELPERS} helpers writing: ${pids.length} processes on the profile, ${writing} of them writing`);
     await new Promise((r) => setTimeout(r, 100));
   }
 }
