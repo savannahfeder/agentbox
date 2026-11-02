@@ -283,7 +283,7 @@ describe('where the rules show outside Settings', () => {
 
   it('the new-thread box and the thread\'s reply box show it and open Shipping for the project', () => {
     expect(read('renderer/src/threads/ThreadComposer.tsx')).toMatch(/shipping\?\.\[product\.slug\][\s\S]*?onOpenShipping\?\.\(product\.slug\)/);
-    expect(read('renderer/src/components/Focus.tsx')).toMatch(/shipping && \([\s\S]*?onOpenShipping\?\.\(item\.product\)/);
+    expect(read('renderer/src/components/Focus.tsx')).toMatch(/shipping && \(\s*<>\s*<ShipWord shipping=\{shipping\} onOpen=\{\(\) => onOpenShipping\?\.\(item\.product\)\}/);
   });
 
   it('the command bar has Shipping, and Shipping for each project', () => {

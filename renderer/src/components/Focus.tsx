@@ -2205,7 +2205,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} items={items} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} talkWord={inChats ? 'Message' : undefined} stop={stopButton} shipping={inChats ? null : shipping} onOpenShipping={onOpenShipping} />
+            <DockComposer item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} items={items} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} talkWord={inChats ? 'Message' : undefined} shipping={inChats ? null : shipping} onOpenShipping={onOpenShipping} stop={stopButton} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
@@ -2386,6 +2386,16 @@ function ModePicker({ value, options, label, onChange }: {
             Settled on w-86dd93ab0d. */}
         {(now?.label ?? value).replace(/(^|\s)\S/g, (c) => c.toUpperCase())}
       </button>
+    </span>
+  );
+}
+
+// What a thread's project ships without asking, as one word of the reply
+// box's sentence: it wraps with the sentence, the way the priority word does.
+function ShipWord({ shipping, onOpen }: { shipping: { chip: string; summary: string }; onOpen: () => void }) {
+  return (
+    <span className="compose-word-wrap">
+      <button type="button" className="compose-word set" title={`${shipping.summary} Open Shipping in Settings to change it.`} onClick={onOpen}>{shipping.chip}</button>
     </span>
   );
 }
@@ -3233,9 +3243,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           {/* What this thread's project ships without asking (Settings › Shipping). */}
           {shipping && (
             <>
-              <span className="compose-word-wrap">
-                <button type="button" className="compose-word set" title={`${shipping.summary} Open Shipping in Settings to change it.`} onClick={() => onOpenShipping?.(item.product)}>{shipping.chip}</button>
-              </span>
+              <ShipWord shipping={shipping} onOpen={() => onOpenShipping?.(item.product)} />
               {'. '}
             </>
           )}
