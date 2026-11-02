@@ -641,7 +641,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
               </button>
             )}
             {showSettled && settled.map(card)}
-            {offers.comment && hint && !openNotes.length && !(showSettled && settled.length) && (
+            {offers.comment && hint && !draftPlace && !openNotes.length && !(showSettled && settled.length) && (
               <div className="av-empty"><NoteGlyph name="pin" /><span>{hint}</span></div>
             )}
           </div>
