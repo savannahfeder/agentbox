@@ -41,7 +41,6 @@ import { FleetContext } from '../fleet';
 import { TeammateLead } from '../teammates/row-lead';
 import { factsFor, saysOnCard, statusCell, type StatusCell } from '../status-word';
 import { offersTryAgain } from '../try-again';
-import { doingWords } from '../live-line';
 import { voiceName } from '../../../shared/agent-voice.mjs';
 import { shownPriority } from '../../../shared/rank.mjs';
 import { api } from '../api';
@@ -795,8 +794,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
     ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null))
     ?? (waitCameBack(item) ? item.waitEnded?.said : null)
     ?? item.handedOver?.said;
-  const doing = cell.live ? doingWords(factsFor(fleet, item.id).session, now) : null;
-  return <RowCells status={status} retry={retry} lead={<TeammateLead item={item} />} title={rowTitle(item)} aside={asideBesides(rowTitle(item), commented ?? (toApproveWords(waiting.get(`${item.product}/${item.id}`)) || doing)) ?? undefined} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} pinned={!!item.pinned && item.status !== 'done'} where={product?.name ?? ''} person={person}
+  return <RowCells status={status} retry={retry} lead={<TeammateLead item={item} />} title={rowTitle(item)} aside={asideBesides(rowTitle(item), commented ?? (toApproveWords(waiting.get(`${item.product}/${item.id}`)) || null)) ?? undefined} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} pinned={!!item.pinned && item.status !== 'done'} where={product?.name ?? ''} person={person}
     priority={shownPriority(item)} updatedAt={when} when={back} now={now} action={action} />;
 }
 
@@ -1084,7 +1082,6 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
           const edge = isSelected(e) && !marked?.size;
           // A teammate's card carries their summary and never our agents.
           const status = e.item ? statusCell(e.item, { ...factsFor(fleet, e.item.id), state: e.state, inProgress: e.state === 'running', now, practice: !!products.find((p) => p.slug === e.item!.product)?.practice }) : null;
-          const doing = e.item && status?.live ? doingWords(factsFor(fleet, e.item.id).session, now) : null;
           const prio = rowPriorityId(e.priority);
           const seen = e.item ? sharing(e.item) : null;
           const who = seen === 'people' ? <SharedMark label="Visible to the people on it" /> : seen === 'private' ? <LockMark /> : null;
@@ -1130,7 +1127,6 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
             ? <span className="s"><StatusMark status={status} />{status.word}</span>
             : e.live && <RunningMark cloud={!!e.item && cloudIds.has(e.item.id)} />}{prio && <PriorityMark id={prio} />}{e.project && <span className="p">{e.project}</span>}
             {withOthers && <Face person={personOf(team, e.ownerId)} me={e.ownerId === me} />}</div>
-          {doing && <div className="th-card-doing">{doing}</div>}
         </button>;
         })}
         {col.state === 'running' && <CloudOfferCard />}
