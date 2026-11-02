@@ -6,6 +6,7 @@ export type FileVersion = { id: string; name: string; path: string; n: number; b
 export type FileFamily = { key: string; versions: FileVersion[] };
 export type FileNews = { kind: 'note' | 'named' | 'approved'; id: string; by: string; ts: number; file: string; text?: string };
 
+export const MAX_QUOTE_CHARS: number;
 export function cleanMark(value: unknown): ArtifactMark | undefined;
 export function isBookkeepingMark(mark: unknown): boolean;
 export function marksOf(entries: unknown[] | null | undefined): FileMarks;
