@@ -5719,8 +5719,6 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 }
 :root[data-skin] .app.flat .focus-dock { background: transparent; }
 :root[data-skin] .app.flat .focus-dock::before { background: none; }
-:root[data-skin] .app.flat .dock-card { background: transparent; }
-:root[data-skin] .app.flat .dock-card:focus-within { background: var(--skin-pane); }
 
 /* That round's reasoning is kept in decisions.md rather than here, because the
    question it was answering is closed. IT WAS THE LAST SLAB ON THE SCREEN.
