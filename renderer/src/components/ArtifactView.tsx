@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, noteGoesTo, notesForTheAgent, otherFilesInLines, placeWords, reviewKind, sharedByWords, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
+  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, noteGoesTo, otherFilesInLines, placeWords, reviewKind, sharedByWords, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
 } from '../../../shared/artifact-marks.mjs';
 import type { FileVersion } from '../../../shared/artifact-marks.mjs';
 import { api } from '../api';
@@ -12,13 +12,14 @@ import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { firstName, Face } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
-import { hasSpot, notePlaceWords, otherFilesOpen, pageSpot, PIN_FRAME_S, pinned, viewOffers, type Found } from '../artifact-pins';
+import { hasSpot, noteSendWords, notesToSendTheAgent, otherFilesOpen, pageSpot, PIN_FRAME_S, pinned, viewOffers, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
 import { ArtifactStage, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
 import { OpeningWait } from './OpeningWait';
 import { CrossIcon } from './CrossIcon';
 import { DocText } from './DocText';
 import { FileNoteCard } from './FileNoteCard';
+import { NoteGlyph } from './NoteGlyphs';
 import './artifact-view.css';
 
 export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number }
@@ -274,9 +275,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
     if (!on.length) return;
     failed(await write({ do: 'toagent', on }), 'Those notes did not reach the agent.');
   };
-  const sendNotes = withAgent && version
-    ? notesForTheAgent(marks, version, family!.versions.length).ids.filter((id) => noteGoesTo(marks.notes.find((n) => n.id === id), people).to === 'agent')
-    : [];
+  const sendNotes = withAgent && version ? notesToSendTheAgent(marks, version, family!.versions.length, people) : [];
   const pressSend = () => toAgent(sendNotes);
 
   const isNewest = !!family && !!at && at.vi === family.versions.length - 1;
@@ -471,17 +470,24 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); }
   };
 
-  const hint = kind === 'image' ? 'Click the picture, or write a comment'
-    : kind === 'markdown' || kind === 'code' ? 'Select words, or write a comment'
-      : kind === 'deck' || kind === 'pdf' ? 'Click a spot, or write a comment'
-        : kind === 'page' ? 'Pin a spot, or write a comment'
-          : 'Write a comment';
+  const hint = kind === 'image' ? 'Click the picture to pin a note'
+    : kind === 'markdown' || kind === 'code' ? 'Select words to note them'
+      : kind === 'deck' || kind === 'pdf' ? 'Click a spot to pin a note'
+        : kind === 'page' ? 'Press Pin a spot, then click the page'
+          : kind === 'film' ? 'Pause the film and click it to pin a note'
+            : null;
+  const agentMade = typeof version?.agent === 'string';
+  const sendWords = noteSendWords({
+    text: words, people, me, nameOf, agentMade,
+    toAgent: withAgent || (!!me && !!ownerOfRow && ownerOfRow !== me),
+    owner: version ? whoseIsTheFile(files, version.id) : null,
+  });
 
-  const heldFor = (n: FileNote): string | null => {
+  const heldFor = (n: FileNote): { words: string; went: boolean } | null => {
     if (n.sent || !offers.comment || typeof flat.find((x) => x.v.id === n.file)?.v.agent !== 'string') return null;
     const goes = noteGoesTo(n, people);
-    if (goes.to === 'person') return `Sent to ${goes.person === me ? 'you' : nameOf(goes.person)}`;
-    return goes.to === 'nobody' ? 'Not sent to the agent' : null;
+    if (goes.to === 'person') return { words: `Sent to ${goes.person === me ? 'you' : nameOf(goes.person)}`, went: true };
+    return goes.to === 'nobody' ? { words: 'Not sent to the agent', went: false } : null;
   };
   const card = (n: FileNote) => (
     <FileNoteCard key={n.id} note={n} wordsGone={goneQuotes.includes(n.id)} active={n.id === activeId} settling={n.id === undo} person={person} me={me} onGo={() => pickNote(n)} onSettle={(r) => void settle(n, r)} nameOf={nameOf}
@@ -555,7 +561,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
             <button type="button" className="av-chev" disabled={at!.vi === 0} onClick={() => stepVersion(-1)} aria-label="Older version">‹</button>
             <span className="av-of">v{version!.n} of {family.versions.length}</span>
             <button type="button" className="av-chev" disabled={at!.vi === family.versions.length - 1} onClick={() => stepVersion(1)} aria-label="Newer version">›</button>
-            <button type="button" className={`av-btn av-compare${compare ? ' is-on' : ''}`} aria-pressed={compare} onClick={() => setCompare(!compare)}>Side by side</button>
+            <button type="button" className={`av-btn av-compare${compare ? ' is-on' : ''}`} aria-pressed={compare} onClick={() => setCompare(!compare)}><NoteGlyph name="sides" />Side by side</button>
           </span>
         )}
         <span className="av-spring" />
@@ -564,11 +570,11 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
         )}
         {earlier && <span className="av-approved is-old" title={approvalSince(family, at!.vi, marks.approvals, nameOf) ?? undefined}>{version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`}</span>}
         {editing && editWord && <span className="av-saved" role="status">{editWord}</span>}
-        {offers.approve && !editing && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}>{mineApproved ? 'Approved' : 'Approve'}</button>}
-        {canEdit && !compare && !editing && <button type="button" className="av-btn" onClick={() => void startEdit()}>Edit</button>}
-        {canRestore && !compare && !editing && <button type="button" className="av-btn" disabled={restoring} onClick={() => void restore()}>Restore this version</button>}
+        {offers.approve && !editing && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
+        {canEdit && !compare && !editing && <button type="button" className="av-btn" onClick={() => void startEdit()}><NoteGlyph name="edit" />Edit</button>}
+        {canRestore && !compare && !editing && <button type="button" className="av-btn" disabled={restoring} onClick={() => void restore()}><NoteGlyph name="undo" />Restore this version</button>}
         {editing && <button type="button" className="av-btn is-on" onClick={() => void finishEdit()}>Done</button>}
-        {onOutside && version && found === 'open' && !editing && <button type="button" className="av-btn" onClick={() => onOutside(version.path)}>Open outside</button>}
+        {onOutside && version && found === 'open' && !editing && <button type="button" className="av-btn" onClick={() => onOutside(version.path)}><NoteGlyph name="outside" />Open outside</button>}
         <button type="button" className="av-close" onClick={leave} title="Close (esc)" aria-label="Close"><CrossIcon /></button>
       </header>
       <div className="av-body">
@@ -628,38 +634,53 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
         </div>
         {!compare && (found === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0) && <aside className="av-side" aria-label="Comments">
           <div className="av-list">
+            {offers.comment && hint && !openNotes.length && !settled.length && (
+              <div className="av-empty"><NoteGlyph name="pin" /><span>{hint}</span></div>
+            )}
             {openNotes.map(card)}
             {settled.length > 0 && (
-              <button type="button" className="av-settled" aria-expanded={showSettled} onClick={() => setShowSettled(!showSettled)}>{showSettled ? 'Hide resolved' : `Show resolved (${settled.length})`}</button>
+              <button type="button" className="av-note-act av-settled" aria-expanded={showSettled} onClick={() => setShowSettled(!showSettled)}>
+                <NoteGlyph name={showSettled ? 'up' : 'down'} />{showSettled ? 'Hide resolved' : `Show resolved (${settled.length})`}
+              </button>
             )}
             {showSettled && settled.map(card)}
           </div>
-          {offers.comment && sendNotes.length > 0 && (
-            <button type="button" className="av-btn av-send" onClick={() => void pressSend()}>Send {sendNotes.length === 1 ? 'this note' : 'these notes'} to the agent</button>
-          )}
-          {trouble && <p className="av-trouble" role="alert">{trouble}</p>}
-          {offers.comment && <form className="av-write" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-            {asking && askingFor.length > 0 && (
-              <div className="av-names" role="listbox">
-                {askingFor.map((p, i) => (
-                  <button type="button" role="option" aria-selected={i === asking.sel} key={p.id} className={`av-name-row${i === asking.sel ? ' is-on' : ''}`} onMouseDown={(e) => { e.preventDefault(); nameInto(p); }}>
-                    <Face person={p} />{p.name}
+          {(offers.comment || trouble) && <div className="av-foot">
+            {offers.comment && sendNotes.length > 0 && (
+              <button type="button" className="av-btn av-send" onClick={() => void pressSend()}><NoteGlyph name="send" />Send {sendNotes.length === 1 ? 'this note' : 'these notes'} to the agent</button>
+            )}
+            {trouble && <p className="av-trouble" role="alert">{trouble}</p>}
+            {offers.comment && <form className="av-write" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+              {asking && askingFor.length > 0 && (
+                <div className="av-names" role="listbox">
+                  {askingFor.map((p, i) => (
+                    <button type="button" role="option" aria-selected={i === asking.sel} key={p.id} className={`av-name-row${i === asking.sel ? ' is-on' : ''}`} onMouseDown={(e) => { e.preventDefault(); nameInto(p); }}>
+                      <Face person={p} />{p.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="av-write-box" onClick={(e) => { if (e.target === e.currentTarget) box.current?.focus(); }}>
+                <textarea ref={box} rows={2} value={words} placeholder="Write a note" aria-label="Note"
+                  onChange={(e) => onWords(e.target.value, e.target.selectionStart)}
+                  onFocus={() => setHold((n) => n + 1)}
+                  onKeyDown={onBoxKey} />
+                <div className="av-write-foot">
+                  {chip && (
+                    <span className="av-chip">
+                      {pinned(placeNow) && <NoteGlyph name="pin" />}
+                      <span className="av-chip-words">{chip}</span>
+                      <button type="button" className="av-chip-off" aria-label="Note on the whole file instead" title="Note on the whole file instead"
+                        onClick={() => { setDraftPlace(null); setWholeAsked(followsTheFile); }}><CrossIcon /></button>
+                    </span>
+                  )}
+                  <button type="submit" className="av-btn av-write-send" disabled={!words.trim() || sending}>
+                    <NoteGlyph name="send" />{sendWords}
                   </button>
-                ))}
+                </div>
               </div>
-            )}
-            {chip && (
-              <div className="av-chip">
-                <span className="av-chip-words">{chip}</span>
-                <button type="button" className="av-chip-off" aria-label="Comment on the whole file instead" title="Comment on the whole file instead"
-                  onClick={() => { setDraftPlace(null); setWholeAsked(followsTheFile); }}><CrossIcon /></button>
-              </div>
-            )}
-            <textarea ref={box} rows={2} value={words} placeholder={chip ? 'Comment' : hint} aria-label="Comment"
-              onChange={(e) => onWords(e.target.value, e.target.selectionStart)}
-              onFocus={() => setHold((n) => n + 1)}
-              onKeyDown={onBoxKey} />
-          </form>}
+            </form>}
+          </div>}
         </aside>}
       </div>
       {below}

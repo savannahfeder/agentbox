@@ -157,8 +157,8 @@ describe('the screen', () => {
   });
   it('a comment saying more than one thing grows, rather than printing over its own words', () => {
     const css = read('renderer/src/components/artifact-view.css');
-    expect(css).toMatch(/\.av-note-acts \{[^}]*flex-wrap: wrap[^}]*min-height: 18px/);
-    expect(css).not.toMatch(/\.av-note-acts \{[^}]*[^-]height: 18px/);
+    expect(css).toMatch(/\.av-note-acts \{[^}]*flex-wrap: wrap[^}]*min-height: 28px/);
+    expect(css).not.toMatch(/\.av-note-acts \{[^}]*[^-]height: 28px/);
   });
   it('a version arriving does not pull the view off the page in hand', () => {
     expect(view).toContain('inHand.current');

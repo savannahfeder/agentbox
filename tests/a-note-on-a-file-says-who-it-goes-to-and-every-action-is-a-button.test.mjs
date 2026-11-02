@@ -72,10 +72,10 @@ describe('the card', () => {
   });
   it('draws its pin as the tag on the picture, not the words "Pin 1"', () => {
     expect(html()).toMatch(/class="av-pin-tag[^"]*"[^>]*>1</);
-    expect(html()).not.toContain('Pin 1');
+    expect(html().replace(/<[^>]*>/g, ' ')).not.toContain('Pin 1');
   });
   it('a note held back offers Send to the agent as a button with an icon', () => {
-    const h = html({ note: { ...base.note, sent: false, text: 'Thanks' }, held: 'Not sent to the agent' });
+    const h = html({ note: { ...base.note, sent: false, text: 'Thanks' }, held: { words: 'Not sent to the agent', went: false } });
     expect(button(h, 'Send to the agent')).toMatch(/<svg/);
   });
   it('a resolved note offers Reopen, and one just resolved offers Undo, both as buttons with icons', () => {

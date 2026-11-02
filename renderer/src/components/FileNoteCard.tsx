@@ -4,15 +4,22 @@ import { Face } from '../team/people';
 import { clock } from '../thread-history';
 import type { FileNote, Person } from '../types';
 import { notePlaceWords } from '../artifact-pins';
+import { NoteGlyph } from './NoteGlyphs';
 
 const clockAt = clock;
+
+/** "Pin 2 at 0:12" as the tag on the file ("2") and the words after it ("at 0:12"). */
+function placeParts(words: string): { tag: string | null; rest: string } {
+  const m = /^Pin (\S+)(?: (.*))?$/.exec(words);
+  return m ? { tag: m[1], rest: m[2] ?? '' } : { tag: null, rest: words };
+}
 
 export function FileNoteCard({ note, wordsGone, active, settling, person, me, onGo, onSettle, nameOf, replying, onReplying, onReply, canReply, held, onToAgent }: {
   note: FileNote; wordsGone: boolean; active: boolean; person: (id: string | null) => Person | null; me: string | null;
   /** Just resolved: it stays in place, struck, with its Undo, before it folds away. */
   settling: boolean;
   /** On an agent's file, where a note the agent was not sent went instead. */
-  held: string | null; onToAgent: () => void;
+  held: { words: string; went: boolean } | null; onToAgent: () => void;
   onGo: () => void; onSettle: (resolved: boolean) => void; nameOf: (id: string | null) => string;
   replying: boolean; onReplying: (on: boolean) => void; onReply: (text: string) => Promise<boolean>; canReply: boolean;
 }) {
@@ -28,14 +35,18 @@ export function FileNoteCard({ note, wordsGone, active, settling, person, me, on
     setSending(false);
     if (ok) { setWords(''); onReplying(false); }
   };
+  const { tag, rest } = placeParts(place);
+  const quote = note.place.kind === 'quote';
   return <article className={`av-note${active ? ' is-on' : ''}${note.resolved ? ' is-settled' : ''}${settling ? ' is-just-settled' : ''}${note.saving ? ' is-saving' : ''}`} id={`av-note-${note.id}`}>
     <button type="button" className="av-note-go" onClick={onGo} aria-label={`Go to ${place}`}>
       <span className="av-note-head">
         <Face person={person(note.by)} name={person(note.by) ? undefined : whoSaid(note.by)} me={!!me && note.by === me} />
         <span className="av-note-who">{whoSaid(note.by)}</span>
+        {tag && <span className="av-pin-tag av-note-tag">{tag}</span>}
+        {!quote && note.place.kind !== 'whole' && rest && <span className="av-note-at">{rest}</span>}
         <span className="av-note-when">{clockAt(note.ts)}</span>
       </span>
-      <span className="av-note-place">{place}</span>
+      {quote && <span className="av-note-place">{place}</span>}
       <span className="av-note-text">{note.text}</span>
     </button>
     {(note.replies ?? []).map((r) => (
@@ -53,22 +64,28 @@ export function FileNoteCard({ note, wordsGone, active, settling, person, me, on
         <textarea rows={1} autoFocus value={words} placeholder="Reply" aria-label="Reply"
           onChange={(e) => setWords(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
+        <span className="av-note-acts">
+          <button type="button" className="av-note-act" onClick={() => { setWords(''); onReplying(false); }}>Cancel</button>
+          <button type="submit" className="av-note-act is-strong" disabled={!words.trim() || sending}><NoteGlyph name="send" />Reply</button>
+        </span>
       </form>
     )}
     {settling ? <span className="av-note-acts" role="status">
-      <span className="av-note-done">Resolved</span>
-      <button type="button" className="av-note-act av-note-undo" onClick={() => onSettle(false)}>Undo</button>
+      <span className="av-note-done"><NoteGlyph name="check" />Resolved</span>
+      <button type="button" className="av-note-act" onClick={() => onSettle(false)}><NoteGlyph name="undo" />Undo</button>
     </span> : <span className="av-note-acts">
       {wordsGone && <span className="av-note-sent">Those words were edited</span>}
       {note.in && <span className="av-note-sent">In {note.in}</span>}
       {note.from && <span className="av-note-sent">From {note.from}, still open</span>}
-      {note.sent && <span className="av-note-sent">Sent to the agent</span>}
+      {note.sent && <span className="av-note-sent is-gone"><NoteGlyph name="send" />Sent to the agent</span>}
       {!note.sent && held && !note.resolved && <>
-        <span className="av-note-sent">{held}</span>
-        <button type="button" className="av-note-act" onClick={onToAgent}>Send to the agent</button>
+        <span className={`av-note-sent${held.went ? ' is-gone' : ''}`}>{held.went && <NoteGlyph name="send" />}{held.words}</span>
+        <button type="button" className="av-note-act" onClick={onToAgent}><NoteGlyph name="send" />Send to the agent</button>
       </>}
-      {canReply && !replying && !note.resolved && <button type="button" className="av-note-act" onClick={() => onReplying(true)}>Reply</button>}
-      <button type="button" className="av-note-act" onClick={() => onSettle(!note.resolved)}>{note.resolved ? 'Reopen' : 'Resolve'}</button>
+      {!replying && <span className="av-note-btns">
+        {canReply && !note.resolved && <button type="button" className="av-note-act" onClick={() => onReplying(true)}><NoteGlyph name="reply" />Reply</button>}
+        <button type="button" className="av-note-act" onClick={() => onSettle(!note.resolved)}><NoteGlyph name={note.resolved ? 'undo' : 'check'} />{note.resolved ? 'Reopen' : 'Resolve'}</button>
+      </span>}
     </span>}
   </article>;
 }

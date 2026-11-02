@@ -74,7 +74,7 @@ describe('cards, sheets and menus take the artifact corner', () => {
   it.each([
     ['.tq-doc-card', 'the file a teammate sends in its chat'],
     ['.approval-card', 'the permission card'], ['.modal', 'a sheet or dialog'], ['.cn-tile', 'a Connections card'], ['.cn-sheet', 'a Connections sheet'],
-    ['.av-note', 'a comment card in the viewer'], ['.av-write textarea', 'the comment box, like the reply box'],
+    ['.av-note', 'a comment card in the viewer'], ['.av-write-box', 'the note box, like the reply box'],
     ['.th-menu', 'a thread menu'], ['.th-pop', 'the view and filters menu'], ['.tc-menu', 'the composer\'s menus'],
     ['.chat-menu', 'a message\'s menu'], ['.chat-confirm', 'a delete question'], ['.chat-emoji', 'the emoji picker'],
     ['.prio-menu', 'priority'], ['.when-menu', 'when'], ['.slash-menu', 'slash commands'], ['.mention-menu', 'mentions'],

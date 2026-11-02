@@ -199,12 +199,24 @@ export function viewOffers(found: Found, signedIn: boolean): { approve: boolean;
   return { approve: open && signedIn, comment: open };
 }
 
-/** The open notes on this version that "Send this note to the agent" would send. */
-export function notesToSendTheAgent(marks: FileMarks, version: FileVersion, count: number, people: ReadonlyArray<{ id: string; name?: string | null }>): string[] {
+type Named = ReadonlyArray<{ id: string; name?: string | null }>;
+
+/** The open notes on this version that "Send this note to the agent" would send. Main sends none on a file the agent did not make. */
+export function notesToSendTheAgent(marks: FileMarks, version: FileVersion, count: number, people: Named): string[] {
+  if (typeof version.agent !== 'string') return [];
   return notesForTheAgent(marks, version, count).ids.filter((id) => noteGoesTo(marks.notes.find((n) => n.id === id), people).to === 'agent');
 }
 
-/** What the comment box's button says. */
-export function noteSendWords(_: { text: string; people: ReadonlyArray<{ id: string; name?: string | null }>; me: string | null; nameOf: (id: string | null) => string; agentMade: boolean; toAgent: boolean; owner: string | null }): string {
-  return 'Comment';
+/**
+ * What the comment box's button says: who the note will reach, by the rule
+ * main sends it by (noteGoesTo). `toAgent` is whether anything here sends a
+ * note to an agent at all; `owner` is who shared the file.
+ */
+export function noteSendWords({ text, people, me, nameOf, agentMade, toAgent, owner }: {
+  text: string; people: Named; me: string | null; nameOf: (id: string | null) => string; agentMade: boolean; toAgent: boolean; owner: string | null;
+}): string {
+  const goes = noteGoesTo({ text }, people);
+  if (goes.to === 'person') return goes.person === me ? 'Add note' : `Send to ${nameOf(goes.person)}`;
+  if (agentMade && toAgent) return goes.to === 'agent' ? 'Send to the agent' : 'Add note';
+  return owner && owner !== me ? `Send to ${nameOf(owner)}` : 'Add note';
 }
