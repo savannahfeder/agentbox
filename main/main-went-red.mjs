@@ -416,7 +416,11 @@ export class MainTests {
       return ids.some((id) => (asked.jobs ?? []).includes(id)) ? 'waiting' : 'filed';
     }
     this.write({ ...state, askedAgain: { runId: run.databaseId, jobs: ids } });
-    const { code, out } = await this.gh(['run', 'rerun', String(run.databaseId), '--failed'], { cwd });
+    // The WHOLE run, not `--failed`: GitHub's re-run-failed-jobs is about jobs
+    // concluded `failure`, and a starved job is concluded `cancelled`, so the
+    // cheaper ask is the one that might leave it unstaffed again. The job that
+    // already passed runs a second time for nothing, which is minutes.
+    const { code, out } = await this.gh(['run', 'rerun', String(run.databaseId)], { cwd });
     if (code !== 0) {
       this.log.warn?.(`main-tests: could not ask GitHub to run ${shortSha(run.headSha)} again: ${String(out).trim().slice(0, 200)}`);
       return 'refused';

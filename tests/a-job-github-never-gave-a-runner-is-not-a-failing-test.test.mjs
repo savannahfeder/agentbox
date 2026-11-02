@@ -137,7 +137,9 @@ describe('the run GitHub had no macOS runner for', () => {
       { run: { ...RED, status: 'completed', conclusion: 'success' }, jobs: [] },
     ], { asked }).watch({ product: { slug: 'myproduct', repoPath: root }, sha: '23ed9d4' });
     expect(asked.join(' ')).toContain('41513011133');
-    expect(asked.join(' ')).toContain('--failed');
+    // The whole run, because a starved job is `cancelled` and GitHub's
+    // re-run-failed-jobs is about jobs concluded `failure`.
+    expect(asked.join(' ')).not.toContain('--failed');
     expect(itemsOf(store)).toHaveLength(0);
   });
 
