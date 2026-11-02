@@ -2691,6 +2691,8 @@ export default function App() {
   const [homeLayout, setHomeLayoutRaw] = useState<HomeLayout>(() => readHomeLayout());
   const setHomeLayout = (layout: HomeLayout) => { setHomeLayoutRaw(layout); writeHomeLayout(layout); };
   const [evTab, setEvTab] = useState<EvTab>('agents');
+  // The Team card's view on the two-tab layout: the team's day, its board, or its tasks.
+  const [teamCardView, setTeamCardView] = useState<'today' | 'board' | 'tasks'>('today');
   const [needsGroup, setNeedsGroupRaw] = useState<NeedsGroup>(() => readNeedsGroup());
   const setNeedsGroup = (group: NeedsGroup) => { setNeedsGroupRaw(group); writeNeedsGroup(group); };
   // "In progress" on the one-list home is a list until someone picks the board.
@@ -2973,7 +2975,7 @@ export default function App() {
   const [needsFolded, setNeedsFolded] = useState<ReadonlySet<string>>(() => new Set());
   const fromPeopleAbove = leadCount + sharedFileNews.length + followingNews.length;
   const needsStacked = useMemo(() => {
-    if (needsGroup !== 'who' || !(teamMode && homeLayout === 'list' && view === 'inbox' && search === null && !withOthers && !onPhone())) return null;
+    if (needsGroup !== 'who' || !(teamMode && homeLayout !== 'tabs' && view === 'inbox' && search === null && !withOthers && !onPhone())) return null;
     const who = { me: team?.me ?? null, isMate: (i: WorkItem) => !!teammateIdOf(i), isDirect: (i: WorkItem) => directSlugs.has(i.product) };
     return needsByWho(heldBox.rows, (i) => whoIsWaiting(i, who), needsFolded, fromPeopleAbove);
   }, [needsGroup, teamMode, homeLayout, view, search, withOthers, team?.me, heldBox.rows, directSlugs, needsFolded, fromPeopleAbove]);
@@ -6954,16 +6956,17 @@ export default function App() {
   const mineInNeeds = mineShown ? inbox : [];
   const waits = teamMode ? waitsOnYou({ needs: mineInNeeds, mentions: roomsUi.live ? roomsUi.mentions : [], me: team?.me ?? null, mateOf: (r) => teammateIdOf(r as WorkItem), directWith: (p) => directPerson.get(p) ?? null }) : new Map<string, number>();
   const teamTabs = teamMode ? {
-    on: evOn, onNeeds: goNeedsYou, onEverything: () => pickMember('me'),
+    on: evOn || (homeLayout === 'states' && tasksOn && view === 'inbox'), onNeeds: goNeedsYou, onEverything: () => pickMember('me'),
     // Not on a phone: there Needs you is just the inbox, and the team is
     // under Everything else ("you shouldn't put teammates in the top bar",
     // w-33511040d7).
     corner: onPhone() ? null
-      : homeLayout === 'list' ? <NeedsFaces members={evSplit.shown} picked={evOn ? evKey : null} waits={waits} onPick={(key) => pickMember(key)} onAdd={teammatesUi.live ? teammatesUi.onNew : undefined} />
+      : homeLayout !== 'tabs' ? <NeedsFaces members={evSplit.shown} picked={evOn ? evKey : null} waits={waits} onPick={(key) => pickMember(key)} onAdd={teammatesUi.live ? teammatesUi.onNew : undefined} />
       : evOn ? null : <CornerFaces members={evSplit.shown} onPick={(key) => pickMember(key)} />,
-    progress: homeLayout === 'list' && !onPhone() ? { count: mineShown ? shownCount(yoursOnly(progressTab, teammateIdOf)) : 0, on: evOn && evKey === 'me' } : undefined,
+    progress: homeLayout !== 'tabs' && !onPhone() ? { count: mineShown ? shownCount(yoursOnly(progressTab, teammateIdOf)) : 0, on: view !== 'done' && evOn && evKey === 'me' } : undefined,
     today: homeLayout === 'list' && !onPhone() ? { on: todayOn, onToday: () => { goNeedsYou(); setTodayOn(true); } } : undefined,
     tasks: homeLayout === 'list' && !onPhone() ? { on: tasksOn, onTasks: () => { goNeedsYou(); setTasksOn(true); } } : undefined,
+    done: homeLayout === 'states' && !onPhone() ? { on: view === 'done' && !evPick, onDone: () => { goNeedsYou(); setView('done'); } } : undefined,
   } : null;
   const dayStart = new Date(now).setHours(0, 0, 0, 0);
   const evItems = evMember?.kind === 'mate' ? (mateRunsOf(items, evMember.key.slice('mate:'.length), dayStart)) : [];
@@ -6987,13 +6990,14 @@ export default function App() {
       onOpenItem={(item) => { const i = list.indexOf(item); setCardSel(null); if (i >= 0) setSelected(i); setFocused(item); markSeen(item); }} />
   </div> : null;
   const evBar = !evMember ? null
-    : evMember.kind === 'me' ? (homeLayout === 'list' ? null : <SpaceBar m={evMember} tabs={[]} />)
-    : <SpaceBar m={evMember} tabs={[]} onMessage={() => pickMember(evMember.key, 'messages')} onShipped={evMember.team ? () => setShippedOpen(true) : undefined}
+    : evMember.kind === 'me' ? (homeLayout !== 'tabs' ? null : <SpaceBar m={evMember} tabs={[]} />)
+    : <SpaceBar m={evMember} tabs={homeLayout === 'tabs' && evMember.team ? ([['today', 'Today'], ['board', 'Board'], ['tasks', 'Tasks']] as const).map(([id, label]) => ({ id, label, on: teamCardView === id })) : []}
+      onTab={(id) => setTeamCardView(id as 'today' | 'board' | 'tasks')} onMessage={() => pickMember(evMember.key, 'messages')} onShipped={evMember.team ? () => setShippedOpen(true) : undefined}
       right={<AgentsLine n={evMember.agents} starting={evMember.starting}
         still={evMember.kind === 'person' ? `${evMember.inProgress ?? 0} in progress` : undefined} />} />;
   const needsYouCount = { inbox: (mineShown ? shownCount(inbox) : 0) + theirCount('inbox') + leadCount + sharedFileNews.length + followingNews.length };
   const todayShown = teamMode && todayOn && !!snap && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
-  const todayEl = todayShown ? <TodayPage range={todayRange} onRange={setTodayRange} onNeeds={goNeedsYou} picked={todayPick} onPicked={setTodayPick} keys={!modal}
+  const todayPage = () => snap ? <TodayPage range={todayRange} onRange={setTodayRange} onNeeds={goNeedsYou} picked={todayPick} onPicked={setTodayPick} keys={!modal}
     faces={new Map(members.map((m) => [m.key, m]))}
     day={teamToday({
       range: todayRange, now, me: team?.me ?? null, items, products: snap.products, cards: weekCards,
@@ -7005,18 +7009,20 @@ export default function App() {
       mateOf: (r) => teammateIdOf(r as WorkItem), directWith: (p) => directPerson.get(p) ?? null,
     })}
     onOpen={(l) => { if (l.item) { setFocused(l.item); markSeen(l.item); } else if (l.card) openTeammateCard(l.card); else if (l.mention) roomsUi.openMention(l.mention); else if (l.roomId) roomsUi.open(l.roomId); else if (l.file) openFiles(filesForToday?.files.find((f) => f.key === l.file)?.project ?? null); }} /> : null;
+  const todayEl = todayShown ? todayPage() : null;
   const tasksShown = teamMode && tasksOn && !!snap && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
   const firstNameOf = (id: string) => team?.byId.get(id)?.name?.split(/\s+/)[0] ?? 'Someone';
-  const tasksEl = tasksShown ? <TasksPage keys={!modal} me={team?.me ?? null} nameOf={firstNameOf} picked={tasksPick} onPicked={setTasksPick}
+  const tasksPage = () => snap ? <TasksPage keys={!modal} me={team?.me ?? null} nameOf={firstNameOf} picked={tasksPick} onPicked={setTasksPick}
     faces={new Map(members.map((m) => [m.key, m]))}
     groups={teamTasks({ items, products: snap.products, cards: weekCards, me: team?.me ?? null, now, nameOf: firstNameOf, mates: teammatesUi.list })}
     onOpenAgent={(r) => { if (r.agent) { setFocused(r.agent.item); markSeen(r.agent.item); } }}
     onOpen={(r) => { setTasksPick(r.key); if (r.item) { setFocused(r.item); markSeen(r.item); } else if (r.card) openTeammateCard(r.card); }}
     onOpenBlock={(r) => { const o = r.block?.opens; if (o?.item) { setFocused(o.item); markSeen(o.item); } else if (o?.card) openTeammateCard(o.card); }}
     onDone={(r) => { if (r.item) void markDone(r.item, { stay: true }); }} /> : null;
+  const tasksEl = tasksShown ? tasksPage() : null;
   // A place is the whole page under the tabs; on the one-list home there are no cards.
   const evTop = evOn && !evPlace ? <>
-    {homeLayout !== 'list' && <>
+    {homeLayout === 'tabs' && <>
       <div className="ev-head">Team<b>{evSplit.shown.length}</b></div>
       <CardsArea rows={evRows} onRows={setEvRows} picked={evKey} hidden={evSplit.hidden} onShow={showCard}>
         <TeamStrip members={evSplit.shown} picked={evKey} onPick={(key) => pickMember(key)} onMove={reorderMembers} waits={waits}
@@ -7027,7 +7033,8 @@ export default function App() {
     {evBar}
   </> : null;
   // A picked card with no board: its threads as a list, or for a person who shares nothing, the line that says so.
-  const evSpace = evBoardEl ?? (!evMember || evMember.kind === 'me' ? null
+  const teamSpace = homeLayout === 'tabs' && evMember?.team ? teamCardView : null;
+  const evSpace = teamSpace === 'today' ? todayPage() : teamSpace === 'tasks' ? tasksPage() : evBoardEl ?? (!evMember || evMember.kind === 'me' ? null
     : evMember.kind === 'mate'
       ? <MateThreads items={evItems} products={snap?.products ?? []} now={now} onOpen={(item) => { setFocused(item); markSeen(item); }} />
       : evMember.kind === 'chat'
@@ -7041,7 +7048,7 @@ export default function App() {
   // A teammate's waiting thread waits on them, not on you, so it never wears the accent.
   const CARD_WORD: Record<string, [string, PlaceRow['tone']]> = { running: ['Working', 'work'], waiting: ['Waiting', 'hold'], scheduled: ['Later', 'later'], done: ['Done', 'done'] };
   const placeMember = evOn && evPlace ? members.find((m) => m.key === evPlace) ?? null : null;
-  const backTo = homeLayout === 'list' || view === 'inbox' ? 'Needs you' : 'Team';
+  const backTo = homeLayout !== 'tabs' || view === 'inbox' ? 'Needs you' : 'Team';
   let placeEl: ReactNode = null;
   if (placeMember && snap) {
     const back = () => { setEvPick(null); };
@@ -7222,7 +7229,7 @@ export default function App() {
         onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onSignOut={() => { void api.teamSignOut().then(() => refresh()); }}
         onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inbox.length + leadCount} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
-        onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomShown || directOpen}
+        onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} onTasks={teamMode && homeLayout === 'states' ? () => { goNeedsYou(); setTasksOn(true); } : undefined} tasksPage={tasksShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomShown || directOpen}
         /* Without Groups the one row under Threads is Chats, and only while there are teammates. */
         groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown, teammatesUi.live ? openChats : undefined) : teammatesUi.rail(teammatesShown)} />
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the

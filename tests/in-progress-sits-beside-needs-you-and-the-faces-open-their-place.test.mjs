@@ -127,7 +127,7 @@ describe('In progress beside Needs you', () => {
 
   it('is the second word on the line, and is the same number the list draws', () => {
     expect(pages).toMatch(/team\?\.progress && <button.*onClick=\{team\.onEverything\}>In progress/);
-    expect(app).toMatch(/progress: homeLayout === 'list' && !onPhone\(\) \? \{ count: mineShown \? shownCount\(yoursOnly\(progressTab, teammateIdOf\)\) : 0/);
+    expect(app).toMatch(/progress: homeLayout !== 'tabs' && !onPhone\(\) \? \{ count: mineShown \? shownCount\(yoursOnly\(progressTab, teammateIdOf\)\) : 0/);
   });
 
   it('is what Tab goes to from Needs you, and Tab comes back', () => {

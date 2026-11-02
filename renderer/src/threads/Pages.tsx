@@ -367,7 +367,7 @@ function CloudButton({ cloud, onMode, onWhenOn, onSetUp, onMove }: { cloud: Clou
   </span>;
 }
 
-export type HomeChoice = { layout: 'list' | 'tabs'; onLayout: (layout: 'list' | 'tabs') => void; group: 'none' | 'who'; onGroup: (group: 'none' | 'who') => void };
+export type HomeChoice = { layout: 'list' | 'tabs' | 'states'; onLayout: (layout: 'list' | 'tabs' | 'states') => void; group: 'none' | 'who'; onGroup: (group: 'none' | 'who') => void };
 
 export function DisplayMenu({ page, display, onDisplay, products, items = [], shown, total, tab, people, home = null }: {
   home?: HomeChoice | null;
@@ -395,6 +395,7 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
     {home && <div className="line"><span className="lab">Home</span><span className="opts">
       <button type="button" className={home.layout === 'list' ? 'on' : ''} onClick={() => home.onLayout('list')}>One list</button>
       <button type="button" className={home.layout === 'tabs' ? 'on' : ''} onClick={() => home.onLayout('tabs')}>Two tabs</button>
+      <button type="button" className={home.layout === 'states' ? 'on' : ''} onClick={() => home.onLayout('states')}>Needs you, In progress, Done</button>
     </span></div>}
     {people && <PeopleLine {...people} />}
     <div className="line"><span className="lab">View</span><span className="opts">
@@ -476,7 +477,9 @@ export type TeamTabs = { on: boolean; onNeeds: () => void; onEverything: () => v
   /** The team's day (team/TodayPage.tsx). */
   today?: { on: boolean; onToday: () => void };
   /** Every task on the team (team/TasksPage.tsx). */
-  tasks?: { on: boolean; onTasks: () => void } };
+  tasks?: { on: boolean; onTasks: () => void };
+  /** Your finished threads, on the layout whose tabs are only states. */
+  done?: { on: boolean; onDone: () => void } };
 export const EVERYTHING_ELSE = 'Everything else';
 
 /** `needs` renames the first tab (Waiting, once a teammate is on the page). */
@@ -505,7 +508,7 @@ function StateTabsRow({ view, counts, onView, needs, onSearch, lit = false, afte
   // In progress, Later and Done are your own card's tabs on Everything else.
   const tabs = team ? INBOX_TABS.filter((t) => t.view === 'inbox')
     : INBOX_TABS.filter((t) => t.view !== 'snoozed' || laterTabShown({ count: counts.snoozed ?? 0, view, walking: keepLater }));
-  const on = (t: TabView) => (team ? t === 'inbox' && !team.on && !team.today?.on && !team.tasks?.on : view === t && !dim);
+  const on = (t: TabView) => (team ? t === 'inbox' && !team.on && !team.today?.on && !team.tasks?.on && !team.done?.on : view === t && !dim);
   return <div className="th-bar"><div className="tm-tabs">
     {/* Every tab wears the Tab plate (hint-plate.ts, 'state-tab'). */}
     {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} onClick={() => (team ? team.onNeeds() : onView(t.view))}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
@@ -513,6 +516,7 @@ function StateTabsRow({ view, counts, onView, needs, onSearch, lit = false, afte
     {team?.progress && <button type="button" data-hint="state-tab" className={`tm-tab${team.progress.on ? ' on' : ''}`} onClick={team.onEverything}>In progress{team.progress.count > 0 && <b>{team.progress.count}</b>}</button>}
     {team?.today && <button type="button" data-hint="state-tab" className={`tm-tab${team.today.on ? ' on' : ''}`} onClick={team.today.onToday}>Today</button>}
     {team?.tasks && <button type="button" data-hint="state-tab" className={`tm-tab${team.tasks.on ? ' on' : ''}`} onClick={team.tasks.onTasks}>Tasks</button>}
+    {team?.done && <button type="button" data-hint="state-tab" className={`tm-tab${team.done.on ? ' on' : ''}`} onClick={team.done.onDone}>{DONE.short}</button>}
     {after}
   </div>{team?.corner}{onSearch && <SearchButton onSearch={onSearch} />}</div>;
 }
