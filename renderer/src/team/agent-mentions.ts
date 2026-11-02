@@ -166,6 +166,26 @@ export function chatTranscript(
   return out;
 }
 
+/**
+ * WHETHER A NEW ASK STARTS ON THIS MAC: when the conversation's last ask to an
+ * agent in the same project went to a thread kept on this Mac. Every mention
+ * makes a new thread, so "I moved it to the Mac, do it there" would otherwise
+ * start in the cloud again.
+ */
+export function lastAskKeptOnMac(
+  lines: ReadonlyArray<{ ts: number; patch?: Record<string, unknown> | null }>,
+  project: string,
+  find: (product: string, id: string) => { onMac?: boolean } | undefined,
+): boolean {
+  for (const l of lines.slice().sort((a, b) => b.ts - a.ts)) {
+    const said = l.patch?.answer ?? l.patch?.body;
+    if (typeof said !== 'string') continue;
+    const task = agentLinks(said).filter((a) => a.task && a.project === project).at(-1)?.task;
+    if (task) return find(project, task)?.onMac === true;
+  }
+  return false;
+}
+
 // How much of the conversation goes into the task. Enough to know what "findings
 // 1 to 3" refers to; never the whole history of a long chat.
 const BRIEF_MESSAGES = 12;

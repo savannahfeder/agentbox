@@ -57,9 +57,9 @@ describe("a thread's file, numbered by its line", () => {
 
 describe('the big view', () => {
   const view = fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/components/ArtifactView.tsx'), 'utf8');
-  it('lands through the one rule, and says which version is the newest', () => {
+  it('lands through the one rule, and offers the newest version by name', () => {
     expect(view).toContain('whereAPressLands(families,');
-    expect(view).toMatch(/is the newest/);
+    expect(view).toMatch(/className="av-newest"[^\n]*>Show v\{/);
   });
   const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
   it("a thread's view reads the file's line, not only its own lines", () => {

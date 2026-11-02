@@ -239,7 +239,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
                 : <div className="tx">{body(m)}</div>}
             {!headed && m.editedAt && !m.deleted && editing !== m.id && <em className="rm-edited">edited</em>}
             {!m.deleted && marks?.get(m.id) && <em className="rm-decided">{marks.get(m.id)?.priority ? 'This week’s priorities' : 'Decision'}</em>}
-            {!m.deleted && onReact && <Reactions on={m.reactions} me={meId} onReact={(emoji, off) => onReact(m.id, emoji, !off)} />}
+            {!m.deleted && onReact && <Reactions on={m.reactions} me={meId} nameOf={(id) => who(id)?.name} onReact={(emoji, off) => onReact(m.id, emoji, !off)} />}
             {reps.length > 0 && <button type="button" className="rep" onClick={() => setThread(m.id)}>
               {[...new Set(reps.map((r) => r.by))].slice(0, 3).map((id) => <Face key={id ?? 'x'} name={who(id)?.name ?? '?'} url={who(id)?.avatarUrl} size={13} />)}
               <span style={{ marginLeft: 5 }}>{reps.length} {reps.length === 1 ? 'reply' : 'replies'}</span>

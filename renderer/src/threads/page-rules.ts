@@ -678,6 +678,17 @@ const TAB_SAYS: Partial<Record<string, readonly string[]>> = {
 };
 export const repeatsTheTab = (word: string, tab?: string): boolean => !!tab && !!TAB_SAYS[tab]?.includes(word);
 
+/**
+ * The Status word a row draws under a tab, or null for none. In Needs you an
+ * agent thread waiting on you says Answered rather than nothing, so the row says
+ * why it is there; a teammate waiting on you keeps their words.
+ */
+export function cellUnderTab(word: string, tab: string | undefined, { fromPeople }: { fromPeople: boolean }): string | null {
+  if (tab === 'inbox' && fromPeople) return word;
+  if (!repeatsTheTab(word, tab)) return word;
+  return tab === 'inbox' ? 'Answered' : null;
+}
+
 /** The level a row names: none at Medium, which is what an unset thread runs at. */
 export function rowPriorityId(priority: number | null): PriorityId | null {
   if (priority === null) return null;

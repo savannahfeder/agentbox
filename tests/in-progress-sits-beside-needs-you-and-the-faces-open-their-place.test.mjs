@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NeedsFaces } from '../renderer/src/team/everything/TeamStrip.tsx';
-import { faceRow, pressOpensIn, readHomeLayout, writeHomeLayout } from '../renderer/src/team/everything/place.ts';
+import { faceRow, pressOpensIn } from '../renderer/src/team/everything/place.ts';
 import { stackRows, yoursOnly } from '../renderer/src/threads/stack-rules.ts';
 
 const read = (p) => fs.readFileSync(new URL(`../renderer/src/${p}`, import.meta.url), 'utf8');
@@ -86,20 +86,10 @@ describe('the home has no panel', () => {
     expect(fs.existsSync(new URL('../renderer/src/team/everything/TeamRail.tsx', import.meta.url))).toBe(false);
   });
 
-  it('offers One list and Two tabs, and nothing about a team beside it', () => {
-    expect(pages).toContain('>One list<');
-    expect(pages).toContain('>Two tabs<');
+  it('offers no choice of layout', () => {
+    expect(pages).not.toContain('>One list<');
+    expect(pages).not.toContain('>Two tabs<');
     expect(pages).not.toContain('Team beside Needs you');
-  });
-
-  it('one list is the home unless someone picked two tabs', () => {
-    const s = (v) => ({ getItem: () => v, setItem() {} });
-    expect(readHomeLayout(s(null))).toBe('list');
-    expect(readHomeLayout(s('rail'))).toBe('list');
-    expect(readHomeLayout(s('tabs'))).toBe('tabs');
-    let kept = null;
-    writeHomeLayout('tabs', { getItem: () => null, setItem: (_, v) => { kept = v; } });
-    expect(kept).toBe('tabs');
   });
 });
 
@@ -127,14 +117,14 @@ describe('In progress beside Needs you', () => {
 
   it('is the second word on the line, and is the same number the list draws', () => {
     expect(pages).toMatch(/team\?\.progress && <button.*onClick=\{team\.onEverything\}>In progress/);
-    expect(app).toMatch(/progress: homeLayout === 'list' && !onPhone\(\) \? \{ count: mineShown \? shownCount\(yoursOnly\(progressTab, teammateIdOf\)\) : 0/);
+    expect(app).toMatch(/progress: !onPhone\(\) \? \{ count: mineShown \? shownCount\(yoursOnly\(progressTab, teammateIdOf\)\) : 0/);
   });
 
   it('is what Tab goes to from Needs you, and Tab comes back', () => {
     expect(app).toMatch(/if \(teamMode\) \{ if \(view === 'inbox' && !evPick\) pickMember\('me'\); else goNeedsYou\(\); return; \}/);
   });
 
-  it('opens as a list on the one-list home until someone picks the board', () => {
-    expect(app).toMatch(/evChosen \?\? \(homeLayout === 'tabs' \? 'board' : 'list'\)/);
+  it('opens as a list without a team, and as the board, with Later and Done, with one', () => {
+    expect(app).toMatch(/evChosen \?\? \(homeLayout === 'list' \? 'list' : 'board'\)/);
   });
 });

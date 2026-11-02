@@ -48,7 +48,7 @@ describe('the wiring', () => {
   it('the one Open outside sits in the words, and the header offers it only for a film that plays', () => {
     const view = read('renderer/src/components/ArtifactView.tsx');
     expect(view).toMatch(/onOutside=\{onOutside \? \(\) => onOutside\(path\) : undefined\}/);
-    expect(view).toMatch(/onOutside && version && found === 'open'/);
+    expect(view).toMatch(/onOutside && version && foundNow === 'open'/);
   });
   it('the stage leaves a film to say for itself whether it opened', () => {
     const stage = read('renderer/src/components/ArtifactStage.tsx');

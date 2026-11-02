@@ -34,7 +34,7 @@ it('a picture, a film, a pdf and a deck still do', () => {
 });
 
 it('a click on a note read in place, or its button, opens it beside', () => {
-  expect(focus).toContain("onOpen={() => onOpenArtifact?.(path, 'beside')} onFullScreen={() => onOpenArtifact?.(path, 'focus')}");
+  expect(focus).toContain("onOpen={() => onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'beside')} onFullScreen={() => onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'focus')}");
   expect(one).toMatch(/<DocumentPreview[^>]*onOpen=\{onOpen\}/);
   expect(preview).toContain('Open on the side');
   expect(preview).not.toContain('Open full size');
@@ -43,7 +43,7 @@ it('a click on a note read in place, or its button, opens it beside', () => {
 it('full screen is still there, only behind its own corner mark', () => {
   expect(one).toContain('onOpen={onFullScreen ?? onOpen}');
   expect(one).toContain('aria-label="Open full screen"');
-  const opens = [...focus.matchAll(/onOpenArtifact\?\.\(path, '(beside|focus)'\)/g)].map((m) => m[1]);
+  const opens = [...focus.matchAll(/onOpenArtifact\?\.\((?:path|newestOfFamily\(path, item\.artifacts\?\.edits\)), '(beside|focus)'\)/g)].map((m) => m[1]);
   expect(opens.filter((m) => m === 'focus')).toHaveLength(1);
 });
 
