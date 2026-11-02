@@ -39,9 +39,9 @@ describe('a close inside the grace window of the last one', () => {
     const b = defer().slice(defer().indexOf(') => {'));
     const firstAwait = b.indexOf('await ');
     expect(b.indexOf('leaveResolved(item)')).toBeGreaterThan(-1);
-    expect(b.indexOf('holdRow(item.id)')).toBeGreaterThan(-1);
+    expect(b.indexOf('holdRow(item.id,')).toBeGreaterThan(-1);
     expect(b.indexOf('leaveResolved(item)')).toBeLessThan(firstAwait);
-    expect(b.indexOf('holdRow(item.id)')).toBeLessThan(firstAwait);
+    expect(b.indexOf('holdRow(item.id,')).toBeLessThan(firstAwait);
     expect(b).not.toContain('await flushPending()');
   });
 
