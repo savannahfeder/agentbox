@@ -628,7 +628,7 @@ export function SectionHead({ label, count, tab, folded, onFold }: { label: stri
   return <div className={`row th-head th-section${folded ? ' folded' : ''}`}><span className="mark" aria-hidden="true" /><div className="row-main th-grid">
     <div><button type="button" className="th-fold" aria-expanded={!folded} onClick={onFold}>
       <svg className="th-fold-mark" width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.4" /></svg>
-      {label}<b>{count}</b>
+      {label}{count > 0 && <b>{count}</b>}
     </button></div><div className="th-col-state" /><div className="th-col-proj" /><div className="th-col-prio" /><div className="num">{timeHeading(tab)}</div>
   </div></div>;
 }
@@ -1070,7 +1070,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
             window.addEventListener('pointermove', move);
             window.addEventListener('pointerup', up);
             window.addEventListener('pointercancel', cancel);
-          }}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b>
+          }}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}{rows.length > 0 && <b>{rows.length}</b>}
           {/* THE HANDLE COMES UP WHEN YOU ARE OVER THE COLUMN: "a little drag
               icon comes up subtly". Only where a drag does something. */}
           {onReorderColumns && <GripIcon />}</div>

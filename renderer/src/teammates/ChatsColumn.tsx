@@ -62,7 +62,7 @@ export function ChatsColumn({ current }: { current: string | null }) {
     const open = !folded.has(id);
     return <div className="cx-sec" key={id}>
       <div className="cx-head">
-        <button type="button" className="cx-fold" aria-expanded={open} onClick={() => fold(id)}>{CHEVRON(open)}<span>{title}</span><em>{count}</em></button>
+        <button type="button" className="cx-fold" aria-expanded={open} onClick={() => fold(id)}>{CHEVRON(open)}<span>{title}</span>{count > 0 && <em>{count}</em>}</button>
         {plus}
       </div>
       {open && rows}

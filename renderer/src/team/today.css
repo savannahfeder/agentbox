@@ -49,7 +49,7 @@
 /* THE TEAM'S DAY AS CARDS (the Team page, and Everyone in Chats): one card a person,
    each line marked by what it is, a ring for working, a filled dot for done. */
 .team-page .td { padding: 28px 40px 48px; }
-.team-page .td-col { max-width: 880px; }
+.team-page .td-col { max-width: 1000px; }
 .team-page .td-top { border-bottom: 0; padding-bottom: 0; margin-bottom: 18px; }
 .team-page .td-title { font-size: 19px; font-weight: 500; line-height: 26px; }
 .team-page .td-people { columns: 1; }

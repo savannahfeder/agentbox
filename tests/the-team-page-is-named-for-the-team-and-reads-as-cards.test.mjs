@@ -8,7 +8,8 @@
 // said Chats; the day was a flat grid of 13px rows under a label column; the
 // side panel took 330 of the 960 points beside the chat. Narrowed to 264, its
 // titles cut off mid-word ("Add the seat count to the book…"), and its dots
-// meant the opposite of the Everyone cards' dots.
+// meant the opposite of the Everyone cards' dots. Then: the list of people on
+// the left was "a bit wide" at 300, and a section with nothing in it said 0.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -47,5 +48,21 @@ describe('a person\'s page', () => {
     const css = read('renderer/src/team/everything/everything.css');
     expect(css).toMatch(/\.pl-row i \{[^}]*border: 1\.5px solid var\(--accent\)/);
     expect(css).toMatch(/\.pl-row\.done i \{ border: 0; background: var\(--text-faint\); \}/);
+  });
+});
+
+describe('the list beside it', () => {
+  it('is 240 wide, leaving the rest to the page', () => {
+    expect(read('renderer/src/team/rooms/rooms.css')).toMatch(/^\.gc-list \{ width: 240px;/m);
+  });
+  it('says no 0 on a section with nothing in it', () => {
+    const col = read('renderer/src/teammates/ChatsColumn.tsx');
+    expect(col).toContain('{count > 0 && <em>{count}</em>}');
+    expect(col).not.toContain('<span>{title}</span><em>{count}</em>');
+  });
+  it('nor does a board column or a section of threads', () => {
+    const pages = read('renderer/src/threads/Pages.tsx');
+    expect(pages).toContain('{rows.length > 0 && <b>{rows.length}</b>}');
+    expect(pages).toContain('{label}{count > 0 && <b>{count}</b>}');
   });
 });
