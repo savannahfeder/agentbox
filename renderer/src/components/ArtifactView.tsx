@@ -14,7 +14,11 @@ import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
 import { hasSpot, noteSendWords, notesToSendTheAgent, otherFilesOpen, pageSpot, PIN_FRAME_S, pinned, viewOffers, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
-import { ArtifactStage, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
+import { ArtifactStage, StageLink, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
+import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
+import { noteWithPictures } from '../note-pictures';
+import { AttachRow } from './AttachRow';
+import { FileLinkBrowser } from './FileLinkBrowser';
 import { OpeningWait } from './OpeningWait';
 import { CrossIcon } from './CrossIcon';
 import { DocText } from './DocText';
@@ -95,6 +99,11 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   const [sending, setSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [found, setFound] = useState<Found>('looking');
+  const [pictures, setPictures] = useState<PendingAttachment[]>([]);
+  const { attaching, collect } = useAttaching();
+  const [link, setLink] = useState<string | null>(null);
+  const closeLink = useCallback(() => setLink(null), []);
+  const pictureInput = useRef<HTMLInputElement | null>(null);
   const box = useRef<HTMLTextAreaElement | null>(null);
   const placedFor = useRef<string | null>(null);
   const inHand = useRef<string | null>(null);
@@ -122,7 +131,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
 
   const family = at ? families[at.fi] : undefined;
   const version = family?.versions[at!.vi];
-  useEffect(() => { inHand.current = version?.id ?? null; }, [version?.id]);
+  useEffect(() => { inHand.current = version?.id ?? null; setLink(null); }, [version?.id]);
   const kind = version ? viewKind(version.path) : null;
   const [savingNotes, setSavingNotes] = useState<FileNote[]>([]);
   const [settling, setSettling] = useState<Record<string, boolean>>({});
@@ -207,12 +216,21 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   };
 
   const send = async () => {
-    const text = words.trim();
-    if (!text || !version || sending) return;
+    const typed = words.trim();
+    if ((!typed && !pictures.length) || !version || sending || attaching.length) return;
     // "Sofia, approved v4" names Sofia as surely as @Sofia does: it reaches her, not the agent.
-    const to = addressedTo(text, people);
-    const mentions = [...new Set([...(to ? [to] : []), ...named.filter((p) => text.includes(`@${firstName(p)}`)).map((p) => p.id)])];
+    const to = addressedTo(typed, people);
+    const mentions = [...new Set([...(to ? [to] : []), ...named.filter((p) => typed.includes(`@${firstName(p)}`)).map((p) => p.id)])];
     setSending(true);
+    let links = '';
+    try { links = await persistAttachments(product, pictures); } catch (err) {
+      setSending(false);
+      failed({ ok: false, error: (err as Error).message }, 'That picture did not save.');
+      return;
+    }
+    const text = noteWithPictures(typed, links);
+    const sentPictures = pictures;
+    setPictures([]);
     const owner = whoseIsTheFile(files, version.id);
     const id = newId();
     const place = placeNow;
@@ -225,7 +243,8 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
     setSending(false);
     if (failed(out, 'That comment did not save.')) {
       setSavingNotes((was) => was.filter((n) => n.id !== id));
-      setWords(text);
+      setWords(typed);
+      setPictures(sentPictures);
       return;
     }
     setNamed([]);
@@ -422,7 +441,8 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
       if (e.key !== 'Escape') return;
       e.stopImmediatePropagation();
       e.preventDefault();
-      if (asking) setAsking(null);
+      if (link) setLink(null);
+      else if (asking) setAsking(null);
       else if (leaveAsked) setLeaveAsked(false);
       else if (replyingTo) setReplyingTo(null);
       else if (draftPlace) setDraftPlace(null);
@@ -461,6 +481,15 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
     const m = people.length ? /(^|\s)@(\w*)$/.exec(value.slice(0, caret)) : null;
     setAsking(m ? { start: caret - m[2].length - 1, query: m[2], sel: 0 } : null);
   };
+  // Rooms keep their files outside any project, so there is nowhere to save a picture.
+  const canAddPictures = !!product && !!window.zero?.saveAttachments;
+  const addPictures = async (list: FileList | File[] | null) => {
+    if (!list?.length) return;
+    const all = await collect(list);
+    const got = all.filter((a) => a.image || a.failed);
+    setTrouble(got.length < all.length ? 'Only pictures can go on a note.' : null);
+    if (got.length) setPictures((was) => [...was, ...got]);
+  };
   const onBoxKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     if (asking && askingFor.length) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setAsking({ ...asking, sel: (asking.sel + 1) % askingFor.length }); return; }
@@ -490,7 +519,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
     return goes.to === 'nobody' ? { words: 'Not sent to the agent', went: false } : null;
   };
   const card = (n: FileNote) => (
-    <FileNoteCard key={n.id} note={n} wordsGone={goneQuotes.includes(n.id)} active={n.id === activeId} settling={n.id === undo} person={person} me={me} onGo={() => pickNote(n)} onSettle={(r) => void settle(n, r)} nameOf={nameOf}
+    <FileNoteCard key={n.id} note={n} product={product} wordsGone={goneQuotes.includes(n.id)} active={n.id === activeId} settling={n.id === undo} person={person} me={me} onGo={() => pickNote(n)} onSettle={(r) => void settle(n, r)} nameOf={nameOf}
       canReply={offers.comment} replying={replyingTo === n.id} onReplying={(on) => setReplyingTo(on ? n.id : null)} onReply={(text) => reply(n, text)}
       held={heldFor(n)} onToAgent={() => void toAgent([n.id])} />
   );
@@ -551,6 +580,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
 
   return createPortal(
     <StageThread.Provider value={thread}>
+    <StageLink.Provider value={setLink}>
     <div className="artifact-view" role="dialog" aria-label={version?.name ?? 'File'}>
       <header className="av-top">
         <button type="button" className="av-back" onClick={leave} title="Back (esc)"><span aria-hidden="true">←</span><span className="av-thread">{threadName}</span></button>
@@ -631,6 +661,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
             <button type="button" className="av-step av-prev" disabled={at.fi === 0} onClick={() => stepFile(-1)} aria-label="Previous file">‹</button>
             <button type="button" className="av-step av-next" disabled={at.fi === families.length - 1} onClick={() => stepFile(1)} aria-label="Next file">›</button>
           </>}
+          {link && <FileLinkBrowser key={link} url={link} product={product} backTo={kind ? `the ${KIND_WORD[kind].toLowerCase()}` : 'the file'} onClose={closeLink} />}
         </div>
         {!compare && (found === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0) && <aside className="av-side" aria-label="Comments">
           <div className="av-list">
@@ -660,12 +691,25 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
                   ))}
                 </div>
               )}
-              <div className="av-write-box" onClick={(e) => { if (e.target === e.currentTarget) box.current?.focus(); }}>
+              <div className="av-write-box" onClick={(e) => { if (e.target === e.currentTarget) box.current?.focus(); }}
+                onDragOver={canAddPictures ? (e) => e.preventDefault() : undefined}
+                onDrop={canAddPictures ? (e) => { e.preventDefault(); void addPictures(e.dataTransfer.files); } : undefined}>
                 <textarea ref={box} rows={2} value={words} placeholder="Write a note" aria-label="Note"
                   onChange={(e) => onWords(e.target.value, e.target.selectionStart)}
                   onFocus={() => setHold((n) => n + 1)}
+                  onPaste={canAddPictures ? async (e) => {
+                    if (![...e.clipboardData.items].some((i) => i.kind === 'file')) return;
+                    e.preventDefault();
+                    const got = await fromPaste(e);
+                    if (got.length) setPictures((was) => [...was, ...got]);
+                  } : undefined}
                   onKeyDown={onBoxKey} />
+                <AttachRow attachments={pictures} attaching={attaching} onRemove={(i) => setPictures((was) => was.filter((_, j) => j !== i))} />
                 <div className="av-write-foot">
+                  {canAddPictures && <>
+                    <button type="button" className="av-write-picture" title="Add a picture" aria-label="Add a picture" onClick={() => pictureInput.current?.click()}><NoteGlyph name="picture" /></button>
+                    <input ref={pictureInput} type="file" accept="image/*" multiple hidden onChange={async (e) => { await addPictures(e.target.files); e.target.value = ''; }} />
+                  </>}
                   {chip && (
                     <span className="av-chip">
                       {pinned(placeNow) && <NoteGlyph name="pin" />}
@@ -674,7 +718,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
                         onClick={() => { setDraftPlace(null); setWholeAsked(followsTheFile); }}><CrossIcon /></button>
                     </span>
                   )}
-                  <button type="submit" className="av-btn av-write-send" disabled={!words.trim() || sending}>
+                  <button type="submit" className="av-btn av-write-send" disabled={(!words.trim() && !pictures.length) || sending || attaching.length > 0 || !!attachProblem(pictures)}>
                     <NoteGlyph name={sendWords === 'Add note' ? 'add' : 'send'} />{sendWords}
                   </button>
                 </div>
@@ -685,6 +729,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
       </div>
       {below}
     </div>
+    </StageLink.Provider>
     </StageThread.Provider>,
     document.body,
   );

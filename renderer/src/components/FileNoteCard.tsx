@@ -1,5 +1,8 @@
 // One note on a file in the big view: who said it, where, what, its replies, and what can be done with it.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { api } from '../api';
+import { notePictures, type NotePicture } from '../note-pictures';
+import { pictureUrl } from '../picture';
 import { Face } from '../team/people';
 import { clock } from '../thread-history';
 import type { FileNote, Person } from '../types';
@@ -14,8 +17,22 @@ function placeParts(words: string): { tag: string | null; rest: string } {
   return m ? { tag: m[1], rest: m[2] ?? '' } : { tag: null, rest: words };
 }
 
-export function FileNoteCard({ note, wordsGone, active, settling, person, me, onGo, onSettle, nameOf, replying, onReplying, onReply, canReply, held, onToAgent }: {
-  note: FileNote; wordsGone: boolean; active: boolean; person: (id: string | null) => Person | null; me: string | null;
+// A picture saved on a teammate's computer is not on this one: its name stands in.
+function NotePictureShown({ product, picture }: { product: string; picture: NotePicture }) {
+  const [src, setSrc] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    api.resolveDoc({ product, src: picture.src })
+      .then((r) => { if (live) setSrc(r.ok && r.opened ? pictureUrl(r.opened) : null); })
+      .catch(() => { if (live) setSrc(null); });
+    return () => { live = false; };
+  }, [product, picture.src]);
+  if (src === null) return <span className="av-note-picture-gone">{picture.name}</span>;
+  return src ? <img className="av-note-picture" src={src} alt={picture.name} onError={() => setSrc(null)} /> : null;
+}
+
+export function FileNoteCard({ note, wordsGone, product, active, settling, person, me, onGo, onSettle, nameOf, replying, onReplying, onReply, canReply, held, onToAgent }: {
+  note: FileNote; wordsGone: boolean; active: boolean; product: string; person: (id: string | null) => Person | null; me: string | null;
   /** Just resolved: it stays in place, struck, with its Undo, before it folds away. */
   settling: boolean;
   /** On an agent's file, where a note the agent was not sent went instead. */
@@ -36,6 +53,7 @@ export function FileNoteCard({ note, wordsGone, active, settling, person, me, on
     if (ok) { setWords(''); onReplying(false); }
   };
   const { tag, rest } = placeParts(place);
+  const said = notePictures(note.text);
   const quote = note.place.kind === 'quote';
   // What became of the note itself: above its replies when it has some, so it is not read as theirs.
   const answered = !!note.replies?.length;
@@ -56,7 +74,10 @@ export function FileNoteCard({ note, wordsGone, active, settling, person, me, on
         <span className="av-note-when">{clockAt(note.ts)}</span>
       </span>
       {quote && <span className="av-note-place">{place}</span>}
-      <span className="av-note-text">{note.text}</span>
+      {said.words && <span className="av-note-text">{said.words}</span>}
+      {said.pictures.length > 0 && <span className="av-note-pictures">
+        {said.pictures.map((p) => <NotePictureShown key={p.src} product={product} picture={p} />)}
+      </span>}
     </button>
     {answered && facts.length > 0 && <span className="av-note-acts av-note-facts">{facts}</span>}
     {(note.replies ?? []).map((r) => (

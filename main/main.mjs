@@ -57,6 +57,7 @@ import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mjs';
 import { quietTheFramesScrollbars } from './frame-scrollbars.mts';
 import { letLocalAppsShowInThePane } from './local-app-frames.mts';
 import { hardenAttachedWebview } from './webview-guard.mts';
+import { leavesTheApp } from './app-window-stays.mjs';
 import { IMG_SCHEMES, imgPath, mediaResponse, mediaType, servable } from './img-scheme.mjs';
 import { hotWindowVerdict, storeHasWork } from './dev-window.mjs';
 import { writeHeldThenReload } from './write-before-reload.mts';
@@ -1130,6 +1131,13 @@ async function createWindow() {
     if (/^https?:/.test(url)) shell.openExternal(url);
     else if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
     return { action: 'deny' };
+  });
+  // A plain link the renderer did not catch would turn the whole window into
+  // that page, with no Back and no Close. It goes to your own browser instead.
+  window.webContents.on('will-navigate', (e, url) => {
+    if (!leavesTheApp(window.webContents.getURL(), url)) return;
+    e.preventDefault();
+    if (/^https?:/.test(url)) shell.openExternal(url);
   });
 
   // WHAT AN EMBEDDED PAGE MAY DO IS DECIDED HERE, NOT ON THE TAG THAT ASKED.
