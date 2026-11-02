@@ -220,7 +220,7 @@ import { shippedAtOf, shownToTeam } from '../../shared/thread-cards.mjs';
 import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shared/thread-waits.mjs';
 import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mjs';
 import type { ArtifactOpen } from './components/ArtifactView';
-import { fileNewsFor } from '../../shared/artifact-marks.mjs';
+import { fileNewsFor, newestOfFamily } from '../../shared/artifact-marks.mjs';
 import { teammateThreadsFound } from './threads/teammate-thread';
 import { chatsFound } from './team/chats-found';
 import { insideGroups, type InsideGroup, type InsideGroupKey, type InsideRow } from './found-inside';
@@ -3326,9 +3326,11 @@ export default function App() {
   // THE NOTE OR PAGE THE NEWEST ANSWER SETS ON ITS OWN LINE OPENS BESIDE IT
   // (besideDocument, message-artifacts.ts). Never over a file opened by hand, never
   // over full screen, and never on a window too narrow to have a side.
-  const besideSrc = focused
+  const namedBeside = focused
     ? besideDocument(focused.result, snap?.products.find((p) => p.slug === focused.product)?.dir ?? null)
     : null;
+  // Someone may have edited it since the message named it.
+  const besideSrc = namedBeside && newestOfFamily(namedBeside, focused?.artifacts?.edits);
   const roomBeside = artifactPlacement('beside', artifactWidth) === 'beside';
   useEffect(() => {
     const card = focused;
