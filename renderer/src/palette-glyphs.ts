@@ -77,6 +77,7 @@ const BY_PREFIX: [string, string][] = [
   ['priority-high', '↑'],
   ['priority-', '↓'],
   ['rank-', '↑'],
+  ['ship-', '⇪'],
   ['move-', '→'],
   ['model-', '◇'],
   ['group-', '#'],

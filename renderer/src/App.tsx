@@ -6758,6 +6758,8 @@ export default function App() {
                 <TicketItems.Provider value={items}>
                 <ChatsFrame current={inChats ? `direct:${focused.id}` : null}>
                 <Focus
+                  shipping={snap.shipping?.[focused.product] ?? null}
+                  onOpenShipping={(slug) => { setTeamOpen(false); setSettingsPane(`shipping:${slug}`); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
                   // A run of a repeating task carries its rule into the
                   // summary: what every run is told, and Stop repeating.
                   repeat={focusedRule ? {
@@ -7558,7 +7560,7 @@ export default function App() {
         onPauseTeammate={(id, paused) => { setModal(null); void api.teammates('update', { id, patch: { paused } }).then(() => refresh()); }}
         onShortcuts={() => { setModal(null); setSettingsPane('shortcuts'); setSettingsOpen(true); }}
         onOpenProjects={() => { setModal(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
-        onOpenShipping={() => { setModal(null); setTeamOpen(false); setSettingsPane('shipping'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
+        onOpenShipping={(slug) => { setModal(null); setTeamOpen(false); setSettingsPane(slug ? `shipping:${slug}` : 'shipping'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onClose={() => setModal(null)}
       />
       {/* SETTINGS, as a screen over everything. Not inside the modal stack:

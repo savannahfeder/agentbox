@@ -269,3 +269,26 @@ describe('Settings', async () => {
     expect(model().workspace.shipRules).toEqual(ASK_FIRST);
   });
 });
+
+// Ways in, so the rules are found where people look: the thread being
+// written, the thread being read, and the command bar by project name. Each
+// was asked for by the synthetic users; read off the sources, as these are
+// screens the tests do not draw.
+describe('where the rules show outside Settings', () => {
+  const read = (p) => fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), '..', p), 'utf8');
+
+  it('the snapshot carries each project\'s chip, only where something ships alone', () => {
+    expect(read('main/ipc.mjs')).toMatch(/shipping: Object\.fromEntries\(products\.map\(\(p\) => \{[\s\S]*?rulesChip\(rules\)[\s\S]*?chip \? \[\[p\.slug/);
+  });
+
+  it('the new-thread box and the thread\'s reply box show it and open Shipping for the project', () => {
+    expect(read('renderer/src/threads/ThreadComposer.tsx')).toMatch(/shipping\?\.\[product\.slug\][\s\S]*?onOpenShipping\?\.\(product\.slug\)/);
+    expect(read('renderer/src/components/Focus.tsx')).toMatch(/shipping && \([\s\S]*?onOpenShipping\?\.\(item\.product\)/);
+  });
+
+  it('the command bar has Shipping, and Shipping for each project', () => {
+    const palette = read('renderer/src/components/Palette.tsx');
+    expect(palette).toMatch(/label: 'Shipping…'/);
+    expect(palette).toMatch(/label: `Shipping for \$\{p\.name\}…`/);
+  });
+});

@@ -61,7 +61,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   onRankFirst: (slug: string) => void;
   /** Settings, opened on the Projects page, where the running order is set. */
   onOpenProjects?: () => void;
-  onOpenShipping?: () => void;
+  onOpenShipping?: (slug?: string) => void;
   // Opens the new project card, which does the naming.
   onNewProject: () => void;
   // Opens the new thread card, the same thing N does.
@@ -138,8 +138,14 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       label: 'Shipping…',
       hint: 'what agents ship without asking you',
       keywords: 'ship shipping deploy release merge approve approval review ask autonomous automatic rules testers factory',
-      run: onOpenShipping,
-    }] : []),
+      run: () => onOpenShipping(),
+    }, ...products.map((p) => ({
+      id: `ship-${p.slug}`,
+      label: `Shipping for ${p.name}…`,
+      hint: 'what ships without asking you here',
+      keywords: 'ship shipping deploy release merge approve review ask rules',
+      run: () => onOpenShipping(p.slug),
+    }))] : []),
     // MY WORKSPACE SAYS WHAT IT IS (w-04e8d6d6e6). The app makes it at launch
     // so that a thread always has somewhere to go (main/main.mjs), and a new
     // user meets it here as a project they never made, with nothing on the row
