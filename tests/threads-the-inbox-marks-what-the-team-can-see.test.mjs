@@ -22,7 +22,10 @@ import { TeamContext } from '../renderer/src/team/people.tsx';
 import { rowSharing } from '../renderer/src/threads/page-rules.ts';
 globalThis.React = React;
 
-const NOW = Date.now();
+// A FIXED NOON, not Date.now(): the updated words are calendar days, and a day
+// is not always 86,400,000 ms long. See
+// tests/a-day-with-an-extra-hour-still-knows-what-today-is.test.mjs.
+const NOW = new Date('2026-06-15T12:00:00-07:00').getTime();
 const DAY = 86_400_000;
 const SINCE = NOW - 7 * DAY;
 const ME = 'p-me';
@@ -92,7 +95,7 @@ describe('the row', () => {
     expect(html).not.toContain('th-row-act');
   });
   it('still says when it was updated, in the same cell the button covers on hover', () => {
-    expect(draw(row())).toMatch(/th-cell-when num[^>]*><span class="th-when">1 day ago|th-cell-when num[^>]*><span class="th-when">Yesterday/);
+    expect(draw(row())).toMatch(/th-cell-when num[^>]*><span class="th-when">Yesterday</);
   });
   // Status joined the four on 2026-10-20 (w-ec2b04d449), picked out of five
   // drawn options: "I actually quite like them all having separate status line

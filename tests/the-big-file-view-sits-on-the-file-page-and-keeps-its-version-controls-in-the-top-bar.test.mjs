@@ -34,8 +34,8 @@ describe('the big file view', () => {
     expect(view).not.toMatch(/is the newest\./);
   });
 
-  it('names the version in the byline only while editing, when the top bar hides it', () => {
-    expect(view).toMatch(/editing \? `Version \$\{v\.n\}`/);
+  it('leaves the version number to the top bar, not the byline', () => {
+    expect(view).not.toMatch(/`Version \$\{v\.n\}`/);
   });
 
   it('draws only the counter in the tag font, so Side by side is in the button font', () => {
