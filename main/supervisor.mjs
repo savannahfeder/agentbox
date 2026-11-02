@@ -919,6 +919,12 @@ export class Supervisor {
       trouble.stamp = stamp;
       if (this._profileCooldown) this._profileCooldown[key] = 0;
       if (!key.startsWith('codex:')) this._spawnCooldownUntil = 0;
+      // A thread held for dying on this login gets its next try now. Only one
+      // with a try left, so a sign-in never adds to the 30m/2h/8h ladder.
+      const now = Date.now();
+      for (const held of Object.values(this._heldStarts ?? {})) {
+        if (held?.account === key && !held.trying && held.next > now) held.next = now;
+      }
       lifted = true;
     }
     if (lifted) this._saveState();
@@ -5662,11 +5668,13 @@ export class Supervisor {
     }
     const said = (session.tail ?? []).filter((l) => typeof l === 'string' && l.startsWith('stderr:'))
       .flatMap((l) => l.slice('stderr:'.length).split('\n')).map((l) => l.trim()).filter((l) => l && !l.startsWith(CLOUD_SENT)).at(-1) ?? null;
+    // The login that refused it, so a sign-in on it can bring the next try forward (`_noticeSignIns`).
+    const account = refused && !session.cloud ? this._accountKey(session.engine, session.profile || 'default') : null;
     // A try of its own that died at once is held again straight away.
     if (held?.trying) {
       const tries = (held.tries ?? 0) + 1;
       const next = tries < HELD_RETRY_MS.length ? Math.max(held.trying + HELD_RETRY_MS[tries], now + HELD_RETRY_MS[0]) : null;
-      this._heldStarts[key] = { since: now, said: said ?? held.said ?? null, tries, next };
+      this._heldStarts[key] = { since: now, said: said ?? held.said ?? null, tries, next, account };
       delete this._deadStarts[key];
       this._saveState();
       this._sayItStoppedStarting(item, stoppedStartingSentence({ tries, triedAt: held.trying, said: said ?? held.said, next }));
@@ -5678,7 +5686,7 @@ export class Supervisor {
     // Saved every time, so the six are still six across a restart of the app.
     if (starts.length < STORM_STARTS || held) { this._saveState(); return; }
     const next = now + HELD_RETRY_MS[0];
-    this._heldStarts[key] = { since: now, said, tries: 0, next };
+    this._heldStarts[key] = { since: now, said, tries: 0, next, account };
     this._saveState();
     this._sayItStoppedStarting(item, stoppedStartingSentence({ starts: starts.length, minutes: Math.round(STORM_WINDOW_MS / 60_000), said, next }));
   }
