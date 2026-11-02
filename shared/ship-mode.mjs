@@ -26,9 +26,9 @@ export const KIND_WORDS = {
 
 export const CHOICE_WORDS = {
   small: { ask: 'Ask me first', ship: 'Ship it' },
-  wide: { ask: 'Ask me first', review: 'Codex reviews, then it ships' },
-  seen: { ask: 'Show me first', test: 'Test users try it, then it ships' },
-  big: { ask: 'Show me first', 'test-ask': 'Test users try it, then show me', test: 'Test users try it, then it ships' },
+  wide: { ask: 'Ask me first', review: 'Codex reviews it, then it ships' },
+  seen: { ask: 'Ask me first', test: 'AI testers try it, then it ships' },
+  big: { ask: 'Ask me first', 'test-ask': 'AI testers try it, then ask me', test: 'AI testers try it, then it ships' },
 };
 
 /** A whole set of answers, or null when `value` is not one. */
@@ -46,7 +46,10 @@ export function cleanRules(value) {
 export const everyProject = (config) => cleanRules(config?.shipRules?.every) ?? { ...ASK_FIRST };
 
 /** A project's own answers, or null when it follows every project. */
-export const projectOwn = (config, slug) => cleanRules(config?.shipRules?.projects?.[slug]);
+export const projectOwn = (config, slug) => (config?.shipRules?.projects?.[slug]?.off ? null : cleanRules(config?.shipRules?.projects?.[slug]));
+
+/** A project's own answers kept while it follows every project, to put back. */
+export const projectKept = (config, slug) => cleanRules(config?.shipRules?.projects?.[slug]);
 
 /** The answers a project's agents follow. */
 export const rulesFor = (config, slug) => projectOwn(config, slug) ?? everyProject(config);
@@ -54,12 +57,24 @@ export const rulesFor = (config, slug) => projectOwn(config, slug) ?? everyProje
 /** Whether anything ships without asking under these answers. */
 export const shipsAlone = (rules) => KINDS.some((k) => rules?.[k] && rules[k] !== 'ask' && rules[k] !== 'test-ask');
 
-/** One line for a project row: what ships on its own. */
+/** What happens to each kind, in a few sentences, for a project row. */
 export function rulesSummary(rules) {
-  const alone = [rules.small === 'ship' && 'small fixes', rules.wide === 'review' && 'reviewed fixes', rules.seen === 'test' && 'tested changes', rules.big === 'test' && 'tested big changes'].filter(Boolean);
-  if (!alone.length) return 'Everything asks you first.';
-  const list = alone.length === 1 ? alone[0] : `${alone.slice(0, -1).join(', ')} and ${alone.at(-1)}`;
-  return `${list[0].toUpperCase()}${list.slice(1)} ship on their own. The rest asks you first.`;
+  const names = { small: 'small fixes', wide: 'fixes that reach a lot', seen: 'changes you can see', big: 'big changes' };
+  const which = (pick) => KINDS.filter((k) => pick(rules[k], k)).map((k) => names[k]);
+  const and = (list) => (list.length === 1 ? list[0] : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`);
+  const cap = (s) => `${s[0].toUpperCase()}${s.slice(1)}`;
+  const said = [];
+  const alone = which((c, k) => k === 'small' && c === 'ship');
+  const reviewed = which((c) => c === 'review');
+  const tested = which((c) => c === 'test');
+  const triedFirst = which((c) => c === 'test-ask');
+  if (alone.length) said.push(`${cap(and(alone))} ship on their own.`);
+  if (reviewed.length) said.push(`${cap(and(reviewed))} ship after a Codex review.`);
+  if (tested.length) said.push(`${cap(and(tested))} ship after AI testers try them.`);
+  if (triedFirst.length) said.push(`${cap(and(triedFirst))} go to AI testers, then to you.`);
+  if (!said.length) return 'Everything asks you first.';
+  if (KINDS.some((k) => rules[k] === 'ask')) said.push('The rest asks you first.');
+  return said.join(' ');
 }
 
 const ASK = ['   Do not ship it. Bring it to them, and ask.'];

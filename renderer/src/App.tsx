@@ -7556,6 +7556,7 @@ export default function App() {
         onPauseTeammate={(id, paused) => { setModal(null); void api.teammates('update', { id, patch: { paused } }).then(() => refresh()); }}
         onShortcuts={() => { setModal(null); setSettingsPane('shortcuts'); setSettingsOpen(true); }}
         onOpenProjects={() => { setModal(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
+        onOpenShipping={() => { setModal(null); setTeamOpen(false); setSettingsPane('shipping'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onClose={() => setModal(null)}
       />
       {/* SETTINGS, as a screen over everything. Not inside the modal stack:

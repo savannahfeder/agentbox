@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ASK_FIRST, KINDS, cleanRules, everyProject, projectOwn, rulesFor, rulesSummary, shipRulesBrief, shipsAlone } from '../shared/ship-mode.mjs';
+import { ASK_FIRST, CHOICE_WORDS, KINDS, cleanRules, everyProject, projectKept, projectOwn, rulesFor, rulesSummary, shipRulesBrief, shipsAlone } from '../shared/ship-mode.mjs';
 
 const FIXES_SHIP = { small: 'ship', wide: 'review', seen: 'ask', big: 'test-ask' };
 
@@ -50,9 +50,24 @@ describe('the answers', () => {
     expect(shipsAlone({ ...ASK_FIRST, seen: 'test' })).toBe(true);
   });
 
-  it('read back as one line for a project row', () => {
+  // Three synthetic users read two projects with different rules as the same,
+  // because the line named only what ships alone and left out the testers.
+  it('read back naming what happens to each kind, testers included', () => {
     expect(rulesSummary(ASK_FIRST)).toBe('Everything asks you first.');
-    expect(rulesSummary(FIXES_SHIP)).toBe('Small fixes and reviewed fixes ship on their own. The rest asks you first.');
+    expect(rulesSummary(FIXES_SHIP)).toBe('Small fixes ship on their own. Fixes that reach a lot ship after a Codex review. Big changes go to AI testers, then to you. The rest asks you first.');
+    expect(rulesSummary({ ...ASK_FIRST, big: 'test-ask' })).not.toBe(rulesSummary(ASK_FIRST));
+    expect(rulesSummary({ small: 'ship', wide: 'review', seen: 'test', big: 'test' })).toBe('Small fixes ship on their own. Fixes that reach a lot ship after a Codex review. Changes you can see and big changes ship after AI testers try them.');
+  });
+
+  it('say asking the same way on every kind', () => {
+    for (const k of KINDS) expect(CHOICE_WORDS[k].ask).toBe('Ask me first');
+  });
+
+  it('keep a project\'s own rules while it follows every project\'s, to put back', () => {
+    const config = { shipRules: { every: FIXES_SHIP, projects: { web: { ...ASK_FIRST, off: true } } } };
+    expect(projectOwn(config, 'web')).toBeNull();
+    expect(rulesFor(config, 'web')).toEqual(FIXES_SHIP);
+    expect(projectKept(config, 'web')).toEqual(ASK_FIRST);
   });
 });
 
@@ -184,12 +199,18 @@ describe('Settings', async () => {
     expect(loadConfig(tmp).shipRules).toEqual({ every: FIXES_SHIP });
   });
 
-  it('keeps a project\'s own answers, and lets it go back to every project\'s', () => {
-    setProjectSetting(ctx(), { product: 'acme', key: 'shipRules', value: ASK_FIRST });
-    expect(model().projects[0].shipOwn).toEqual(ASK_FIRST);
+  it('keeps a project\'s own answers, and lets it go back to every project\'s without losing them', () => {
+    setProjectSetting(ctx(), { product: 'acme', key: 'shipRules', value: FIXES_SHIP });
+    expect(model().projects[0].shipOwn).toEqual(FIXES_SHIP);
     setProjectSetting(ctx(), { product: 'acme', key: 'shipRules', value: null });
     expect(model().projects[0].shipOwn).toBeNull();
+    expect(model().projects[0].shipKept).toEqual(FIXES_SHIP);
+  });
+
+  it('forgets nothing it was never given', () => {
+    setProjectSetting(ctx(), { product: 'acme', key: 'shipRules', value: null });
     expect(loadConfig(tmp).shipRules).toBeUndefined();
+    expect(model().projects[0].shipKept).toBeNull();
   });
 
   it('leaves nothing in the config once everything asks again', () => {

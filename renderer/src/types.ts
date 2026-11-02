@@ -1089,6 +1089,8 @@ export interface ProjectSettings {
   autonomous: boolean;
   /** This project's own ship rules, or null when it follows every project's (shared/ship-mode.mjs). */
   shipOwn?: import('../../shared/ship-mode.mjs').ShipRules | null;
+  /** Its own rules kept while it follows every project's, to put back. */
+  shipKept?: import('../../shared/ship-mode.mjs').ShipRules | null;
   /** Its threads go to her account online for her phone with the Mac shut. */
   onPhone?: boolean;
   permission: PermissionMode | 'workspace';

@@ -14,6 +14,7 @@ const BY_ID: Record<string, string> = {
   filter: '≡',
   'clear-filter': '×',
   'projects-page': '▤',
+  'shipping-page': '⇪',
   search: '/',
   'all-threads': '/',
   'view-inbox': '→',

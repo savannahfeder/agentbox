@@ -130,7 +130,8 @@ export function Approvals() {
 
   const { card, verdict, waiting } = cardOnStage(pending, answered, leaving.current);
   // The notice's own buttons sit where the card would cover them.
-  if (!card || c.minimizedApproval === card.id || pathname === '/ai-notice') return null;
+  if (pathname === '/ai-notice') return null;
+  if (!card || c.minimizedApproval === card.id) return null;
   const answer = async (allow: boolean) => {
     setAnswered({ id: card.id, allow });
     try { await c.send({ kind: 'approve', approval: card.id, allow }, null); } catch (err) {

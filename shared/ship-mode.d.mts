@@ -8,6 +8,7 @@ export declare const CHOICE_WORDS: Record<ShipKind, Record<string, string>>;
 export declare function cleanRules(value: unknown): ShipRules | null;
 export declare function everyProject(config: unknown): ShipRules;
 export declare function projectOwn(config: unknown, slug: string): ShipRules | null;
+export declare function projectKept(config: unknown, slug: string): ShipRules | null;
 export declare function rulesFor(config: unknown, slug: string): ShipRules;
 export declare function shipsAlone(rules: ShipRules | null | undefined): boolean;
 export declare function rulesSummary(rules: ShipRules): string;

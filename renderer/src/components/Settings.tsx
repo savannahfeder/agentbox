@@ -1569,11 +1569,11 @@ function ShippingPage({ projects, every, scope, onScope, onEvery, onProject, onI
   return (
     <div className="set-inner instructions-page">
       <ScopeSwitch lead="Shipping for" scope={scope} projects={projects} onScope={onScope} />
-      <div className="set-lede">What agents ship without asking you. Shipping means merging into main.</div>
+      <div className="set-lede">What agents ship without asking you. Shipping means merging into main. AI testers are agents that each play someone your product is for and use the change before you see it.</div>
       {project ? (
         <Group>
           <Row label="Same as every project" desc={own ? 'This project has its own rules below.' : rulesSummary(every)}>
-            <Switch label="Same as every project" on={!own} onChange={(v) => onProject(project.slug, v ? null : every)} />
+            <Switch label="Same as every project" on={!own} onChange={(v) => onProject(project.slug, v ? null : project.shipKept ?? every)} />
           </Row>
           {own && rows(own, (r) => onProject(project.slug, r))}
         </Group>
