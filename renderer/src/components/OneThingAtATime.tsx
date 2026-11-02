@@ -109,7 +109,7 @@ export function QueueAnswer({ text, md, name = '', by = null }: {
  * none) keeps its name and the way to open it; a note that cannot be read
  * draws nothing, and the answer still names it.
  */
-export function QueueFile({ product, path, md, onOpen, onSide }: { product: string; path: string; md: (text: string) => ReactNode; onOpen: () => void; onSide?: () => void }) {
+export function QueueFile({ product, path, md, onOpen, onFullScreen }: { product: string; path: string; md: (text: string) => ReactNode; onOpen: () => void; onFullScreen?: () => void }) {
   const page = /\.html?$/i.test(path);
   const [url, setUrl] = useState<string | null | undefined>(undefined);
   const [text, setText] = useState<string | null | undefined>(undefined);
@@ -135,7 +135,7 @@ export function QueueFile({ product, path, md, onOpen, onSide }: { product: stri
     <section className={`${page ? 'one-file one-page' : 'one-file one-note'}${folded ? ' one-folded' : expanded ? ' one-expanded' : ''}`}>
       <FilePreviewHeader path={path} folded={folded} expanded={expanded}
         onFold={() => { setExpanded(false); setFolded((f) => !f); }}
-        onCondense={() => setExpanded(false)} onOpen={onOpen} onSide={onSide} />
+        onCondense={() => setExpanded(false)} onOpen={onFullScreen ?? onOpen} onSide={onFullScreen && onOpen} />
       {!folded && page && url && <HtmlPreview key={`${product}:${path}`} url={url} path={path} expanded={expanded} onExpandedChange={setExpanded} />}
       {!folded && !page && text != null && <DocumentPreview key={`${product}:${path}`} expanded={expanded} onExpandedChange={setExpanded} onOpen={onOpen}><div className="markdown one-notebody doc-prose">{md(text)}</div></DocumentPreview>}
     </section>
