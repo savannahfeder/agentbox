@@ -61,7 +61,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   /** Only on a thread with an agent, on the owner's own computer. */
   withAgent?: boolean;
   /** Posts edited words as the next version of a document. Null when it went, else why not. */
-  onNewVersion?: (name: string, text: string, path: string, id: string) => Promise<string | null>;
+  onNewVersion?: (name: string, text: string, path: string, id: string, since?: string | null) => Promise<string | null>;
   /** Said after a save that only becomes a version on someone else's computer. */
   editGoes?: string;
   onClose: () => void;
@@ -327,7 +327,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
     const run = (async () => {
       setEditWord('Saving…');
       const clash = editClash(family, sitting.base.n, me, nameOf);
-      const why = await onNewVersion(sitting.base.name, out, sitting.base.path, sitting.base.id).catch((err: Error) => err.message);
+      const why = await onNewVersion(sitting.base.name, out, sitting.base.path, sitting.base.id, posted.current).catch((err: Error) => err.message);
       if (why) { setTold(`${why} Press back again to leave: your words come back when you open it again.`); setEditWord('Not saved'); return false; }
       posted.current = out;
       try { if (localStorage.getItem(draftKey(sitting.base.path)) === out) localStorage.removeItem(draftKey(sitting.base.path)); } catch { /* nothing kept */ }

@@ -1695,7 +1695,7 @@ declare global {
       findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number } }): Promise<FoundInThreads>;
       warmFindInThreads(): Promise<boolean>;
       fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
-      fileNewVersion?(p: { product: string; id: string; path: string; text: string }): Promise<{ ok: boolean; path?: string; error?: string }>;
+      fileNewVersion?(p: { product: string; id: string; path: string; text: string; since?: string | null }): Promise<{ ok: boolean; path?: string; error?: string }>;
       teamMarkFile(p: { personId: string; threadId: string; mark: ArtifactMark }): Promise<TeamCallResult>;
       connections?(): Promise<ConnectionsList>;
       connectionsConnect?(p: ConnectAsk): Promise<ConnectAnswer>;

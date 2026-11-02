@@ -11,6 +11,7 @@
 // is there because the file format depends on it, not because a model cannot be
 // trusted to think.
 
+import path from 'node:path';
 import { z } from 'zod';
 import { resolveAccount } from './core/account.mjs';
 import { listProducts, getProduct, createProduct, updateProduct } from './core/products.mjs';
@@ -142,14 +143,16 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
         status: z.enum(['current', 'history', 'exploration']).optional(),
         folder: z.string().optional().describe('a folder in Files to put it in, by name, such as Product specs. Made if there is none. The answer\'s filedIn says it happened; a directory in path is not a folder in Files'),
         versionOf: z.string().optional().describe('the name of a file someone already has, on this thread or in Files, that this content revises. It is saved as that file\'s next version (-v2, -v3) in this thread\'s folder and opens as the same file, with its comments; no path is needed and nobody has to be sent it. A copy of such a file written under its own name elsewhere is saved this way too'),
+        replacesEdits: z.boolean().optional().describe('with versionOf: you mean to undo what someone typed in an earlier version, because they asked. Without it, an edit your version leaves out is merged back in on top of it'),
       },
-      run: async ({ product, folder, versionOf, ...doc }) => {
+      run: async ({ product, folder, versionOf, replacesEdits, ...doc }) => {
         const version = doc.content == null ? null : documentVersion({ product, versionOf, path: doc.path ?? null, ownItem });
         const into = version ? version.product : product;
         const written = await writeDocument(into, version ? { ...doc, id: undefined, path: version.path, title: doc.title ?? version.title } : doc);
         if (doc.content == null) return json(written);
         noteWrittenForRun(into, written.path);
         const named = await nameOnThread(written, { ownItem, update: (id, patch) => claims.update(id, patch), note: version?.note });
+        if (replacesEdits && version && named.onThread) await claims.update(ownItem, { artifact: { do: 'reconcile', file: path.basename(written.path), replace: true } });
         return json({ ...written, ...named, ...(version ? { versionOf: version.of } : {}), ...fileWrittenDocument({ path: written.path, folder }) });
       },
     },

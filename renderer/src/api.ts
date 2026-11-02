@@ -900,7 +900,7 @@ export const api = {
     if (!window.zero?.fileMark) return { ok: false, error: `quit and reopen ${NAME} to comment here` };
     return window.zero.fileMark(p);
   },
-  async fileNewVersion(p: { product: string; id: string; path: string; text: string }): Promise<{ ok: boolean; path?: string; error?: string }> {
+  async fileNewVersion(p: { product: string; id: string; path: string; text: string; since?: string | null }): Promise<{ ok: boolean; path?: string; error?: string }> {
     if (!window.zero?.fileNewVersion) return { ok: false, error: `quit and reopen ${NAME} to edit here` };
     return window.zero.fileNewVersion(p);
   },

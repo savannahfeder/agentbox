@@ -658,13 +658,13 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     },
 
     /** A version written on one of this person's own threads. A chat carries it as a message, which is what reaches the other person. */
-    editOnThread({ product, id, path: basePath, baseId, text, taken }) {
+    editOnThread({ product, id, path: basePath, baseId, text, taken, since }) {
       const here = store.listProducts().find((p) => p.slug === product);
       if (!here || !store.readItem(product, id)) return { ok: false, error: 'that thread is gone' };
       const lines = store.readHistory(product, id, { max: Number.MAX_SAFE_INTEGER });
       const clean = String(basePath ?? '').replace(/^\.\//, '');
       const names = taken ?? allFiles().find((f) => f.chain.some((v) => v.copies.some((c) => c.thread.ref.id === id && c.path === clean)))?.chain.map((v) => v.name) ?? [];
-      const saved = saveNextVersion({ dir: here.dir, threadId: id, lines, basePath, baseId, text, taken: names });
+      const saved = saveNextVersion({ dir: here.dir, threadId: id, lines, basePath, baseId, text, since, taken: names });
       if (!saved.ok) return saved;
       if (here.team?.direct) store.answerItem(product, id, { answer: editedWords(saved.shown, saved.path) });
       else store.fileMark(product, id, { do: 'edit', file: saved.file, path: saved.path, ...(saved.over ? { over: saved.over } : {}) });

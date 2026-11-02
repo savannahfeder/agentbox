@@ -14,7 +14,8 @@ import { queuedReplyText, submitReply, framedTeammate } from './live-replies.mjs
 import { wakeForNotes } from './notes-wake.mjs';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mjs';
 import { editedFilesLine } from '../shared/artifact-marks.mjs';
-import { readItemHistory } from './store/work-items.mjs';
+import { readItemHistory, updateWorkItem } from './store/work-items.mjs';
+import { reconcileRows } from './version-reconcile.mjs';
 import { taskCommand } from './task-commands.mjs';
 import { providerCommand, reviewTarget, nativeCommandNames } from '../shared/provider-commands.mjs';
 import {agentInstructionsUnified, readSystemTemplate, writeInstruction} from './instruction-settings.mjs';
@@ -1750,6 +1751,18 @@ export class Supervisor {
   // A push lasts while its task runs, so a second push cannot pause the first,
   // and ends with that run. One that never starts ends when the row stops being
   // open work: finished, archived, or gone.
+  _reconcileVersions(items) {
+    reconcileRows({
+      items,
+      isLive: (item) => this.sessions.has(item.id) || this._cloudWorkOutstanding(item),
+      dirOf: (item) => this.store.productDir(item.product),
+      historyOf: (item) => readItemHistory(this.store.productDir(item.product), item.id, { max: Number.MAX_SAFE_INTEGER }),
+      writeTo: (item, patch) => updateWorkItem(this.store.productDir(item.product), item.id, patch, { source: 'system' }),
+      looked: (this._versionsLooked ??= new Map()),
+      warn: (words) => console.warn(`zero: ${words}`),
+    });
+  }
+
   _settleRunNow(items) {
     for (const [id, rec] of [...this._runNow]) {
       const item = items.find((i) => i.id === id && i.product === rec.product);
@@ -7554,6 +7567,7 @@ export class Supervisor {
     // whose run has ended is settled first, since it no longer holds anything.
     this._settleRunNow(items);
     this._settlePreemptions(items, now);
+    this._reconcileVersions(items);
 
     // Interrupted sessions the last sweep could not fit in a slot. Ahead of
     // everything, because a row whose own session is waiting must not have a
