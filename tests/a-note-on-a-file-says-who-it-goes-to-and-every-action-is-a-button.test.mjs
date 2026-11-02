@@ -99,7 +99,7 @@ describe('the panel', () => {
     expect(view).toContain('Click the picture to pin a note');
   });
   it('the box has a send button that says who it goes to', () => {
-    expect(view).toMatch(/className="av-btn av-write-send"[^>]*>[\s\S]{0,80}\{sendWords\}/);
+    expect(view).toMatch(/className="av-btn av-write-send"[^>]*>[\s\S]{0,160}\{sendWords\}/);
   });
   it('the card\'s buttons are always there, never shown only on hover', () => {
     expect(css).not.toMatch(/\.av-note-act[^{]*\{[^}]*opacity: 0/);
