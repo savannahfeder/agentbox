@@ -1565,7 +1565,7 @@ function ShippingPage({ projects, every, everyNote, scope, codexReady, onScope, 
   // What the row says under its name: the kind, then anything about this answer worth knowing.
   const desc = (k: ShipKind, rules: ShipRules) => [
     KIND_WORDS[k].desc,
-    project && own && rules[k] !== every[k] ? `Every project: ${CHOICE_WORDS[k][every[k]]}.` : '',
+    project && own && rules[k] !== every[k] ? `Every project says “${CHOICE_WORDS[k][every[k]]}”.` : '',
     k === 'wide' && rules.wide === 'review' && !codexReady ? 'Codex is not set up on this computer, so these will ask you.' : '',
   ].filter(Boolean).join(' ');
   const rows = (rules: ShipRules, set: (r: ShipRules) => void) => KINDS.map((k: ShipKind) => (
@@ -1577,7 +1577,7 @@ function ShippingPage({ projects, every, everyNote, scope, codexReady, onScope, 
   ));
   const differ = projects.filter((p) => p.shipOwn);
   const sameLine = !own ? rulesSummary(every)
-    : same(own, every) ? 'Off: this project has its own rules below, a copy of every project\u2019s for now. Change any row, or turn this on to follow every project again.'
+    : same(own, every) ? 'This project has its own rules below, copied from every project\u2019s for now. Change any row, or turn this on to follow every project again.'
       : 'This project has its own rules below.';
   return (
     <div className="set-inner instructions-page">
@@ -1606,7 +1606,7 @@ function ShippingPage({ projects, every, everyNote, scope, codexReady, onScope, 
       <ShipWords key={scope}
         label={project ? `In your own words, for ${project.name}` : 'In your own words, for every project'}
         description={project
-          ? (everyNote.trim() ? `Added to every project’s words, which apply here too: “${clip(everyNote.trim(), 120)}”` : 'Anything agents should follow before something in this project ships.')
+          ? (everyNote.trim() ? `These add to every project’s words, which apply here too (“${clip(everyNote.trim(), 120)}”).` : 'Anything agents should follow before something in this project ships.')
           : 'Anything agents should follow before something ships, like “never ship a database migration on its own”. Each project can add its own.'}
         text={project ? project.shipNote ?? '' : everyNote}
         onSave={(t) => (project ? onProjectNote(project.slug, t) : onEveryNote(t))} />
