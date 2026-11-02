@@ -4,6 +4,7 @@
 import fsDefault from 'node:fs';
 import path from 'node:path';
 import { familyName, familyOfName, filesInLines, nextVersionName, reviewKind, threadFiles } from '../shared/artifact-marks.mjs';
+import { mergeThree } from '../shared/doc-merge.mjs';
 import { MAX_DOC_BYTES } from './doc-file.mjs';
 
 const THREAD_ID = /^[\w-]{1,64}$/;
@@ -28,6 +29,7 @@ export function saveNextVersion({ dir, threadId, lines, basePath, baseId, text, 
   if (reviewKind(base.path) !== 'markdown') return { ok: false, error: 'Only documents can be edited here.' };
 
   const newest = family.versions[family.versions.length - 1];
+  const words = newest.id === base.id ? text : withTheNewest({ dir, base, newest, text, fs });
   const folder = path.join(dir, 'designs', threadId);
   fs.mkdirSync(folder, { recursive: true });
   const held = new Set(taken);
@@ -35,7 +37,7 @@ export function saveNextVersion({ dir, threadId, lines, basePath, baseId, text, 
     const name = nextVersionName(newest.name, n);
     if (held.has(name)) continue;
     try {
-      fs.writeFileSync(path.join(folder, name), text, { flag: 'wx' });
+      fs.writeFileSync(path.join(folder, name), words, { flag: 'wx' });
     } catch (err) {
       if (err?.code === 'EEXIST') continue;
       return { ok: false, error: String(err?.message ?? err).slice(0, 200) };
@@ -43,4 +45,21 @@ export function saveNextVersion({ dir, threadId, lines, basePath, baseId, text, 
     return { ok: true, path: `designs/${threadId}/${name}`, name, shown: familyName(family, newest), file: base.id, ...(newest.id !== base.id ? { over: newest.id } : {}) };
   }
   return { ok: false, error: 'Too many versions of that file are in the way, so nothing was saved.' };
+}
+
+/**
+ * `text`, typed from a version that is no longer the newest, with whatever
+ * landed in between. Somebody typing in the big view started from the version
+ * they had open, so an agent's write arriving meanwhile used to leave two
+ * versions with one set of words each (w-27a7ae314a). Their own words when the
+ * two cannot be merged: never refused, because the words are already typed, and
+ * `over` is what tells them the other version stands.
+ */
+function withTheNewest({ dir, base, newest, text, fs }) {
+  const read = (v) => { try { return fs.readFileSync(path.isAbsolute(v.path) ? v.path : path.join(dir, v.path), 'utf8'); } catch { return null; } };
+  const was = read(base);
+  const since = read(newest);
+  if (was == null || since == null) return text;
+  const merged = mergeThree({ base: was, ours: since, theirs: text });
+  return merged.ok ? merged.text : text;
 }
