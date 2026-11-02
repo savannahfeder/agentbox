@@ -17,7 +17,7 @@ function Section({ id, picked, label, lines, extra, range, titleOf, onOpen }: {
   const [open, setOpen] = useState(false);
   if (!lines.length && !extra) return null;
   const more = lines.length - SHOWN;
-  return <div className="td-sec">
+  return <div className="td-sec" data-group={id.split('/').pop()}>
     <span className="td-label">{label}</span>
     <ul>
       {(open ? lines : lines.slice(0, SHOWN)).map((l) => <li key={l.key}>

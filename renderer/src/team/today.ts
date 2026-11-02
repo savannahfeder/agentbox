@@ -72,8 +72,10 @@ export interface TodayCounts { needYou: number; blocked: number; shipped: number
 export interface TodayApproval { key: string; name: string; by: string | null; at: number; threads?: string[] }
 
 const SAYS_MOST = 80;
+// Progress is a trail of steps, one a line; the last is how far it got.
 const howFar = (words: string | null | undefined) => {
-  const one = String(words ?? '').replace(/\s+/g, ' ').trim();
+  const steps = String(words ?? '').split('\n').map((l) => l.replace(/^\s*(?:[-*•✓]\s*)?/, '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const one = steps[steps.length - 1] ?? '';
   if (!one) return undefined;
   return one.length > SAYS_MOST ? `${one.slice(0, SAYS_MOST).trimEnd()}…` : one;
 };

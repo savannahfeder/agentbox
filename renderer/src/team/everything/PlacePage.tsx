@@ -45,8 +45,8 @@ export function PlaceList({ title, rows, now, empty, more }: { title: string; ro
     {rows.length ? <ul className="pl-rows">{rows.map((r) => <li key={r.key}>
       <button type="button" className={`pl-row ${r.tone ?? 'work'}`} onClick={r.onOpen} disabled={!r.onOpen} title={r.title}>
         <i aria-hidden="true" /><span className="pl-t">{r.title}</span>
-        {r.word ? <span className="pl-w">{r.word}</span> : <span />}
         <span className="pl-at">{agoQuiet(r.at, now)}</span>
+        {r.word && <span className="pl-w">{r.word}</span>}
       </button>
     </li>)}</ul> : <p className="pl-none">{empty}</p>}
     {more}
