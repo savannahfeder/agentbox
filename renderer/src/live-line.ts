@@ -281,22 +281,6 @@ export function cameBackEmpty(
   return !!silent && !said(item.result) && !said(item.note);
 }
 
-const DOING_MOST = 80;
-const SAY_HOW_LONG_MS = 60_000;
-
-/** The one line a long run's row carries: the step it is on and for how long, or that it is thinking. */
-export function doingWords(session: { startedAt: number; activity?: { label?: string; startedAt?: number }[] } | null | undefined, now = Date.now()): string | null {
-  if (!session) return null;
-  const step = session.activity?.at(-1);
-  const label = step?.label?.trim();
-  const since = label ? step?.startedAt ?? session.startedAt : session.startedAt;
-  const span = now - since;
-  if (!label && span < SAY_HOW_LONG_MS) return null;
-  const words = (label || 'Thinking').replace(/\s+/g, ' ');
-  const cut = words.length > DOING_MOST - 6 ? `${words.slice(0, DOING_MOST - 7).trimEnd()}…` : words;
-  return span < SAY_HOW_LONG_MS ? cut : `${cut}, ${shortSpan(span)}`;
-}
-
 export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null {
   const {
     session = null, queued = [], runNow = [], stalled = false, paused = false, silent = null, signInNeeded = {}, atLimit = {}, cannotStart = {},

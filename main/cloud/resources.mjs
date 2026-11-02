@@ -8,7 +8,7 @@ import { HAND_BACK } from '../../shared/cloud-hand-back.mjs';
 const digest = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const inside = (p, root) => p === root || p.startsWith(root + path.sep);
 const unavailable = (why) => ({ status: 'unavailable', why,
-  message: `The resource could not be delivered: ${why}. If the request names this file, folder or skill, do not build around a guess: end your turn with the one line ${HAND_BACK} followed by what is missing. Otherwise go on without it and say what is missing.` });
+  message: `The resource could not be delivered: ${why}. If the request names or needs this file, folder or skill, do not build around a guess: end your turn with the one line ${HAND_BACK} followed by what is missing. Otherwise go on without it and say what is missing.` });
 const OLD_IMAGE = 'this cloud machine\'s image is older than file delivery and has to be rebuilt (npm run deploy)';
 
 // The account's documents folder, `<store>/accounts/<id>`, which holds every
@@ -29,6 +29,8 @@ export function resourceContextFor(marker, defaults) {
 }
 
 const OUTSIDE = 'Request a path under this task folder or the account\'s documents (relative with a scope, or written out in full), or an installed skill name.';
+const ONLY_THERE = `This file is only on the computer. If the request is for it or needs it, end your turn with the one line ${HAND_BACK} followed by what is missing.`;
+const tooBig = (message) => ({ status: 'too_large', message: `${message}. ${ONLY_THERE}` });
 
 // A file is named by where it is on the computer, whichever way it was asked
 // for, and is served only from inside the folder that holds it.
@@ -50,7 +52,7 @@ function normalized(args, { cwd, docs, account, homeDir }) {
   } else return null;
   if (!full) return null;
   const root = [cwd, docs, account].filter(Boolean).map((r) => path.resolve(r)).find((r) => inside(full, r));
-  if (!root) return { refused: OUTSIDE };
+  if (!root) return { refused: `${OUTSIDE} ${ONLY_THERE}` };
   if (path.relative(root, full).split(path.sep).some((p) => p.startsWith('.'))) return null;
   return { kind: 'file', root, full };
 }
@@ -121,7 +123,7 @@ export function createResourceRequests({ cwd, docs, account = null, engine, home
           const file = await readPortableFile(named.full, named.root, limits.file, { allowHidden: false });
           if (!live()) return unavailable('this cloud run is ending');
           content = file.body; mode = file.mode; bytes = content.length; hash = digest(content); basename = path.basename(named.full);
-          if (!reserve(bytes)) return { status: 'too_large', message: 'This run has reached its resource byte limit.' };
+          if (!reserve(bytes)) return tooBig('This run has reached its resource byte limit');
         }
         if (!live()) return unavailable('this cloud run is ending');
         const at = path.posix.join('/tmp/agentbox-resources', digest(runId), digest(`${id}:${hash}`));
@@ -143,6 +145,7 @@ export function createResourceRequests({ cwd, docs, account = null, engine, home
         if (transferring) return unavailable(`the delivery failed: ${err.message}`);
         const status = ['ENOENT', 'ENOTDIR'].includes(err.code) ? 'not_found' : err.status || (['EACCES', 'EPERM', 'ELOOP'].includes(err.code) ? 'denied' : null);
         if (status === 'not_found') return { status, message: named.kind === 'file' ? `Nothing at ${named.full} on the computer.` : 'That resource was not found.' };
+        if (status === 'too_large' && named.kind === 'file') return tooBig(err.message);
         return status ? { status, message: err.message } : unavailable(`the computer could not read it (${err.message})`);
       } finally { snapshot?.close(); active -= 1; }
     });

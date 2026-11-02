@@ -163,6 +163,7 @@ static napi_value Tone(napi_env env, napi_callback_info info) {
 static char kLumaKey;
 static char kWatchedKey;
 static SEL TracksLuma() { return NSSelectorFromString(@"setTracksLuma:"); }
+static SEL TracksLumaGetter() { return NSSelectorFromString(@"tracksLuma"); }
 static SEL LumaRate() { return NSSelectorFromString(@"setLumaUpdateRate:"); }
 static SEL DidChangeLuma() { return NSSelectorFromString(@"backdropLayer:didChangeLuma:"); }
 
@@ -211,6 +212,11 @@ static CALayer *WatchedBackdrop(NSView *glass) {
     ((void (*)(id, SEL, BOOL))objc_msgSend)(layer, TracksLuma(), YES);
     if ([layer respondsToSelector:LumaRate()]) ((void (*)(id, SEL, double))objc_msgSend)(layer, LumaRate(), 0.25);
     objc_setAssociatedObject(layer, &kWatchedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+  }
+  // Holding the glass light or dark turns tracking off (macOS 27), which froze
+  // the reading at whatever it was before the hold.
+  if ([layer respondsToSelector:TracksLumaGetter()] && !((BOOL (*)(id, SEL))objc_msgSend)(layer, TracksLumaGetter())) {
+    ((void (*)(id, SEL, BOOL))objc_msgSend)(layer, TracksLuma(), YES);
   }
   return layer;
 }

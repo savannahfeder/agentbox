@@ -31,8 +31,10 @@ function NotePictureShown({ product, picture }: { product: string; picture: Note
   return src ? <img className="av-note-picture" src={src} alt={picture.name} onError={() => setSrc(null)} /> : null;
 }
 
-export function FileNoteCard({ note, wordsGone, product, active, settling, person, me, onGo, onSettle, nameOf, replying, onReplying, onReply, canReply, held, onToAgent }: {
-  note: FileNote; wordsGone: boolean; active: boolean; product: string; person: (id: string | null) => Person | null; me: string | null;
+export function FileNoteCard({ note, answeredBy = null, wordsGone, product, active, settling, person, me, onGo, onSettle, nameOf, replying, onReplying, onReply, canReply, held, onToAgent }: {
+  note: FileNote; wordsGone: boolean; product: string;
+  /** "Resolved by your agent in v15", when a newer version resolved it. */
+  answeredBy?: string | null; active: boolean; person: (id: string | null) => Person | null; me: string | null;
   /** Just resolved: it stays in place, struck, with its Undo, before it folds away. */
   settling: boolean;
   /** On an agent's file, where a note the agent was not sent went instead. */
@@ -60,8 +62,9 @@ export function FileNoteCard({ note, wordsGone, product, active, settling, perso
   const facts = [
     wordsGone && <span key="gone" className="av-note-sent">Those words were edited</span>,
     note.in && <span key="in" className="av-note-sent">In {note.in}</span>,
-    note.from && <span key="from" className="av-note-sent">From {note.from}, still open</span>,
-    note.sent && <span key="sent" className="av-note-sent"><NoteGlyph name="send" />Sent to the agent</span>,
+    note.from && <span key="from" className="av-note-sent">{note.resolved ? <>From {note.from}</> : <>From {note.from}, still open</>}</span>,
+    answeredBy && <span key="answered" className="av-note-done"><NoteGlyph name="check" />{answeredBy}</span>,
+    note.sent && !answeredBy && <span key="sent" className="av-note-sent"><NoteGlyph name="send" />Sent to the agent</span>,
     !note.sent && held && !note.resolved && <span key="held" className="av-note-sent">{held.went && <NoteGlyph name="send" />}{held.words}</span>,
   ].filter(Boolean);
   return <article className={`av-note${active ? ' is-on' : ''}${note.resolved ? ' is-settled' : ''}${settling ? ' is-just-settled' : ''}${note.saving ? ' is-saving' : ''}`} id={`av-note-${note.id}`}>
