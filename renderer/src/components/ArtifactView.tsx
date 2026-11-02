@@ -600,7 +600,6 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   }, [compare, kind]);
 
   const bylineOf = (v: { by: string | null; at: number; n: number; agent?: string }) => [
-    family && family.versions.length > 1 ? `Version ${v.n}` : null,
     sharedByWords(v, { me, nameOf }),
     v.at ? whenShared(v.at) : null,
   ].filter(Boolean).join('  ·  ');
@@ -644,6 +643,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
             <button type="button" className="av-chev" disabled={at!.vi === 0} onClick={() => stepVersion(-1)} aria-label="Older version">‹</button>
             <span className="av-of">v{version!.n} of {family.versions.length}</span>
             <button type="button" className="av-chev" disabled={at!.vi === family.versions.length - 1} onClick={() => stepVersion(1)} aria-label="Newer version">›</button>
+            {!isNewest && <button type="button" className="av-newest" onClick={() => stepVersion(family.versions.length - 1 - at!.vi)}>Show v{family.versions[family.versions.length - 1].n}</button>}
             <button type="button" className={`av-btn av-compare${compare ? ' is-on' : ''}`} aria-pressed={compare} onClick={() => (compare ? setCompare(false) : away(() => setCompare(true)))}><NoteGlyph name="sides" />Side by side</button>
           </span>
         )}
@@ -662,12 +662,6 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
         <div className="av-stage">
           {!version && <OpeningWait name={open.path?.split('/').pop() || 'This file'} kind={null} />}
           {(othersSaved || told) && <p className="av-told" role="status">{othersSaved ?? told}</p>}
-          {family && at && !isNewest && !editing && !compare && (
-            <p className="av-told" role="status">
-              v{family.versions[family.versions.length - 1].n} is the newest.
-              <button type="button" className="av-btn" onClick={() => setAt({ fi: at.fi, vi: family.versions.length - 1 })}>Show v{family.versions[family.versions.length - 1].n}</button>
-            </p>
-          )}
           {approveAsked && version && (
             <p className="av-told av-ask" role="alertdialog">
               {approveAsked.text}
