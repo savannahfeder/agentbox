@@ -107,8 +107,9 @@ by this file.
 
 ## WHEN A CHANGE SHIPS WITHOUT ASKING (2026-11-01)
 
-A project's page says when a finished change ships without asking
-(`shared/ship-mode.mjs`). When it is not "Ask me first", your brief has a
+Settings › Shipping says what a finished change may ship without asking, for
+every project and for any one (`shared/ship-mode.mjs`). When something ships
+alone, or the person wrote rules in their own words there, your brief has a
 section, "When this change ships", that sorts your change into four. In this
 repository its two reviews are skills:
 
