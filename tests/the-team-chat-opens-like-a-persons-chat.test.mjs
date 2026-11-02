@@ -88,9 +88,7 @@ describe('the team chat\'s Agents', () => {
 describe('in the app', () => {
   // Other chats open on the Chats page, never under the cards (w-2b3e1a85e5).
   it('opens the Team under a person\'s bar, and no other chat under the cards', () => {
-    // On two tabs the Team's bar also carries Today, Board and Tasks (2026-11-02).
-    expect(app).toMatch(/: <SpaceBar m=\{evMember\} tabs=\{homeLayout === 'tabs' && evMember\.team \?/);
-    expect(app).toMatch(/onTab=\{\(id\) => setTeamCardView\(id as 'today' \| 'board' \| 'tasks'\)\} onMessage=/);
+    expect(app).toMatch(/: <SpaceBar m=\{evMember\} tabs=\{\[\]\}/);
     expect(app).not.toMatch(/evMember\.kind === 'chat' && !evMember\.team \? <SpaceBar/);
   });
 

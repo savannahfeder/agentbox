@@ -13,12 +13,6 @@ import path from 'node:path';
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 
 describe('the Team page', () => {
-  it('heads its two parts People and Tasks, with no line about you', () => {
-    expect(read('renderer/src/App.tsx')).toMatch(/<div className="team-page">\{todayPage\('People'\)\}\{tasksPage\('Tasks'\)\}<\/div>/);
-    expect(read('renderer/src/team/TodayPage.tsx')).toMatch(/\{title \? <h2 className="td-title">\{title\}<\/h2> : needs && <button/);
-    expect(read('renderer/src/team/TasksPage.tsx')).toMatch(/\{title && <h2 className="td-title">\{title\}<\/h2>\}/);
-  });
-
   it('wears the team\'s own mark in the sidebar, not a calendar', () => {
     const nav = read('renderer/src/components/WorkspaceNavigation.tsx');
     const team = nav.slice(nav.indexOf('data-tab="team"'), nav.indexOf('<span>Team</span>'));

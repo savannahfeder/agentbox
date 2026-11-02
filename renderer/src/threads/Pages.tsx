@@ -367,7 +367,7 @@ function CloudButton({ cloud, onMode, onWhenOn, onSetUp, onMove }: { cloud: Clou
   </span>;
 }
 
-export type HomeChoice = { layout: 'list' | 'tabs' | 'states' | 'chats'; onLayout: (layout: 'list' | 'tabs' | 'states' | 'chats') => void; group: 'none' | 'who'; onGroup: (group: 'none' | 'who') => void };
+export type HomeChoice = { group: 'none' | 'who'; onGroup: (group: 'none' | 'who') => void };
 
 export function DisplayMenu({ page, display, onDisplay, products, items = [], shown, total, tab, people, home = null }: {
   home?: HomeChoice | null;
@@ -392,12 +392,6 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
   const privacies: [Exclude<Privacy, 'any'>, string][] = [['private', 'Private'], ['shared', 'Shared']];
   const privacy = display.privacy ?? 'any';
   return <div className="th-pop" role="dialog" aria-label={page === 'inbox' ? 'Inbox view and filters' : 'Team view and filters'}>
-    {home && <div className="line"><span className="lab">Home</span><span className="opts">
-      <button type="button" className={home.layout === 'list' ? 'on' : ''} onClick={() => home.onLayout('list')}>One list</button>
-      <button type="button" className={home.layout === 'tabs' ? 'on' : ''} onClick={() => home.onLayout('tabs')}>Two tabs</button>
-      <button type="button" className={home.layout === 'states' ? 'on' : ''} onClick={() => home.onLayout('states')}>Needs you, In progress + a Team page</button>
-      <button type="button" className={home.layout === 'chats' ? 'on' : ''} onClick={() => home.onLayout('chats')}>Needs you, In progress + the team in Chats</button>
-    </span></div>}
     {people && <PeopleLine {...people} />}
     <div className="line"><span className="lab">View</span><span className="opts">
       <button type="button" className={display.view === 'list' ? 'on' : ''} title="List (B)" onClick={() => set({ view: 'list' })}><ListIcon />List</button>
@@ -412,7 +406,7 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
       {tab === 'done' && <span className="th-pop-note">Done runs newest first</span>}
       {tab === 'progress' && <span className="th-pop-note">In progress runs newest sent first</span>}
     </span></div>
-    {home?.layout === 'list' && tab === 'inbox' && <div className="line"><span className="lab">Group by</span><span className="opts">
+    {home && tab === 'inbox' && <div className="line"><span className="lab">Group by</span><span className="opts">
       <button type="button" className={home.group === 'none' ? 'on' : ''} onClick={() => home.onGroup('none')}>None</button>
       <button type="button" className={home.group === 'who' ? 'on' : ''} onClick={() => home.onGroup('who')}>Who</button>
     </span></div>}

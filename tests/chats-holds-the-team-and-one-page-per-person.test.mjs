@@ -13,15 +13,13 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { readHomeLayout } from '../renderer/src/team/everything/place.ts';
 
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 const app = read('renderer/src/App.tsx');
-const store = (v) => ({ getItem: () => v, setItem: () => {} });
 
 describe('the chats layout', () => {
-  it('is remembered', () => {
-    expect(readHomeLayout(store('chats'))).toBe('chats');
+  it('is the home whenever there is a team, and one list without one', () => {
+    expect(app).toContain("const homeLayout: HomeLayout = teamMode ? 'chats' : 'list';");
   });
 
   it('opens a person or an AI teammate from Chats on their one page', () => {
@@ -35,7 +33,7 @@ describe('the chats layout', () => {
   });
 
   it('has no Team page in the sidebar', () => {
-    expect(app).toMatch(/onTasks=\{teamMode && homeLayout === 'states' \?/);
+    expect(app).not.toContain('onTasks={');
   });
 
   it('opens a face from Needs you on the same page in Chats', () => {

@@ -98,11 +98,6 @@ describe('in the app', () => {
   const area = read('renderer/src/team/everything/CardsArea.tsx');
   const css = read('renderer/src/team/everything/everything.css');
 
-  it('draws the cards through the area that caps them, on every page they show on', () => {
-    expect(app).toMatch(/<CardsArea rows=\{evRows\} onRows=\{setEvRows\}/);
-    expect(app).not.toMatch(/evFill && evCardsH/);
-  });
-
   it('scrolls the rows past the cut rather than drop them', () => {
     expect(css).toMatch(/\.ev-cards \{[^}]*overflow-y: auto/);
     expect(area).toMatch(/maxHeight/);
