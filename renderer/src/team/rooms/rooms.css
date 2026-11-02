@@ -131,7 +131,9 @@
 .rm-cm .act { display: none; margin-left: auto; font: 10px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint); background: none; border: 0; padding: 0; }
 .rm-cm:hover .act { display: inline; }
 .rm-cm.root { padding-bottom: 12px; border-bottom: 1px solid var(--rm-line); margin-bottom: 4px; }
-.rm-day { margin: 6px 0 4px; }
+.rm-day { display: flex; align-items: center; gap: 12px; margin: 18px 0 14px; }
+.rm-day::before, .rm-day::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.rm-day .rm-label { font: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--text-faint); }
 .rm-compose { margin: 8px 20px 20px; flex: none; border: 1px solid var(--line-strong); background: var(--control-face); display: flex; flex-direction: column; }
 /* THE DIRECT CHAT'S BOX: the words, what is attached, then the bar and Send. */
 .rm-compose-input { min-height: 40px; max-height: 200px; overflow-y: auto; padding: 10px 12px 4px; box-sizing: border-box; color: var(--text); font-size: 13.5px; line-height: 20px; }
@@ -186,9 +188,9 @@
 .rm-cm .rm-gone { color: var(--text-faint); font-style: italic; }
 .rm-cm .chat-edit { margin-top: 4px; }
 
-/* THE NEW LINE: where you had read to, a hairline in the accent with its word. */
-.rm-new { display: flex; align-items: center; gap: 10px; margin: 8px 0 2px; font: 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
-.rm-new::before { content: ''; flex: 1; height: 1px; background: var(--accent); opacity: .5; }
+/* THE NEW LINE: where you had read to, drawn as the day line is but in the accent. */
+.rm-new { display: flex; align-items: center; gap: 12px; margin: 8px 0 2px; font-size: 12px; color: var(--accent); }
+.rm-new::before, .rm-new::after { content: ''; flex: 1; height: 1px; background: var(--accent); opacity: .5; }
 /* What went wrong, in the text's own colour, with the accent kept to a dot. */
 .rm-chat-err { display: flex; align-items: center; gap: 8px; margin: 0 20px 2px; font-size: 12.5px; color: var(--text-dim); }
 .rm-chat-err::before { content: ''; flex: none; width: 6px; height: 6px; background: var(--accent); }
@@ -464,7 +466,6 @@
 .gr-prow:hover { background: var(--wash); }
 .gr-pw { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .gr-l1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 13.5px; line-height: 18px; color: var(--text); }
-.gr-lv { flex: none; font: 11.5px var(--mono); color: var(--text-faint); }
 .gr-mate, .gr-tag { flex: none; font-size: 11.5px; font-style: normal; font-weight: 400; color: var(--text-faint); letter-spacing: 0; }
 .gc-1 .gr-tag { margin-left: 8px; }
 .gc-head-group .gr-tag { font-size: 12.5px; }
@@ -509,6 +510,7 @@
 
 /* A group's chat a size up from a thread's list (w-dcaa2c122e, round 11). */
 .gr-page .rm-full .rm-cm .h { font-size: 15px; }
+.gr-page .rm-full .rm-cm .h em { font-family: inherit; font-size: 12px; }
 .gr-page .rm-full .rm-cm .tx { font-size: 16px; line-height: 25px; }
 .gr-page .rm-full.hang .rm-cm .h > .tm-av:first-child { top: 10px; }
 .gr-page .rm-compose-input { font-size: 15px; line-height: 22px; }

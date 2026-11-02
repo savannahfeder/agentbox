@@ -459,7 +459,7 @@ export function writeVisibility(v: Visibility, store?: KeyStore, project?: strin
 export type SendAs = 'message' | 'task';
 
 /** What BLOCKED BY reads when nothing blocks the task. */
-export const NOT_BLOCKED = 'Nothing';
+export const NOT_BLOCKED = 'Not blocked';
 
 /** What DUE ON reads when nobody has set a day. Her words, her capitals. */
 export const NO_DEADLINE = 'No Deadline';

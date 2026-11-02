@@ -73,8 +73,8 @@ export function TasksPage({ groups, faces, nameOf, me, picked, onPicked, keys, o
 
   const faceOf = (id: string | null) => (!id ? undefined : faces.get(id === me ? 'me' : `person:${id}`));
   const fromOf = (id: string | null) => (!id ? null : id === me ? 'you' : nameOf(id));
-  const section = (label: string, rows: TaskRow[]) => (rows.length ? <section className="tk-sec" aria-label={label}>
-    <h2 className="tk-label">{label}</h2>
+  const section = (label: string, rows: TaskRow[], named = true) => (rows.length ? <section className="tk-sec" aria-label={label}>
+    {named && <h2 className="tk-label">{label}</h2>}
     <ul>{rows.map((r) => <Row key={r.key} r={r} picked={picked === r.key} face={faceOf(r.holder)} from={fromOf(r.giver)} onOpen={onOpen} onOpenBlock={onOpenBlock} onOpenAgent={onOpenAgent} />)}</ul>
   </section> : null);
 
@@ -83,7 +83,8 @@ export function TasksPage({ groups, faces, nameOf, me, picked, onPicked, keys, o
       <p className="tk-sum">{tasksLine(groups)}</p>
       {section('Late', groups.late)}
       {section('Blocked', groups.blocked)}
-      {section(groups.late.length || groups.blocked.length ? 'Open' : 'All open', groups.open)}
+      {/* Named only when Late or Blocked is above it to tell it from. */}
+      {section('Open', groups.open, groups.late.length > 0 || groups.blocked.length > 0)}
       {groups.done.length > 0 && <section className="tk-sec tk-done" aria-label="Done this week">
         <h2 className="tk-label"><button type="button" className="tk-fold" aria-expanded={doneShown} onClick={() => setDoneShown((o) => !o)}>Done this week<b>{groups.done.length}</b></button></h2>
         {doneShown && <ul>{groups.done.map((r) => <Row key={r.key} r={r} picked={picked === r.key} face={faceOf(r.holder)} from={fromOf(r.giver)} onOpen={onOpen} onOpenBlock={onOpenBlock} />)}</ul>}

@@ -9,7 +9,7 @@
 /* Send is two buttons sharing one outline, each drawing its own outer corners from this token. */
 .tc-send { --radius: var(--artifact-corner-small); }
 .dock-send, .dock-stop, .tc-chip, .tc-word, .tc-icon, .tc-seg,
-.ts-done, .ts-more, .ts-msgbtn, .rm-btn, .cx-search, .av-step, .th-new, .th-disp {
+.ts-done, .ts-more, .ts-msgbtn, .rm-btn, .cx-search, .av-step, .th-new, .th-disp, .crumb-aside .tm-add-people {
   border-radius: var(--artifact-corner-small);
 }
 .doc-plain-text { margin: 0; padding: 20px 24px; height: 100%; overflow: auto; box-sizing: border-box; font: 12.5px/1.6 var(--mono); color: var(--text); white-space: pre; user-select: text; -webkit-user-select: text; }
@@ -20,7 +20,7 @@
 .modal, .approval-card, .opt-peek, .toast, .link-pop, .theme-picker, .si-card, .fb-card, .tm-face-card, .th-why-card,
 .th-menu, .th-pop, .th-acct-menu, .th-me-pop, .tm-add-menu, .ev-hidden-menu, .rm-pop, .av-names, .ps-menu,
 .prio-menu, .when-menu, .slash-menu, .proj-menu, .repeat-menu, .mention-menu, .mention-card, .set-picker-menu,
-.instr-scope-menu, .instruction-restore-menu, .rm-notice, .rm-opt, .one-file, .instr-card-ours {
+.instr-scope-menu, .instruction-restore-menu, .rm-notice, .rm-opt, .one-file, .instr-card-ours, .th-card {
   border-radius: var(--artifact-corner);
 }
 

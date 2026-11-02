@@ -134,7 +134,11 @@ describe('the first send', () => {
     const fs = await import('node:fs');
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     expect(app).toContain("const first = firstTask(tour);");
-    expect(app).toContain("(how.kind === 'task' || (first && how.kind === 'repeat'))");
+    expect(app).toMatch(/tabAfterSending\(\{[^}]*kind: how\.kind, first,/);
+    const { tabAfterSending } = await import('../renderer/src/threads/composer-rules.ts');
+    const sent = { team: false, later: false, view: 'inbox', covered: false };
+    expect(tabAfterSending({ ...sent, kind: 'repeat', first: true })).toBe('progress');
+    expect(tabAfterSending({ ...sent, kind: 'repeat', first: false })).toBe(null);
   });
 });
 

@@ -44,7 +44,8 @@ export function GroupsHead({ current, onFind }: { current: GroupChoice | undefin
   const chats = !!useContext(ChatsContext);
   return <div className="gc-head">
     <div className="gc-head-col"><span className="workspace-title gc-col-title">{chats ? 'Chats' : 'Groups'}</span>
-      <button type="button" className="gc-find" aria-label="Find a group" title="Find a group (G)" onClick={onFind}>{I.search()}<kbd>G</kbd></button></div>
+      {/* In Chats the list's own box is the search. */}
+      {!chats && <button type="button" className="gc-find" aria-label="Find a group" title="Find a group (G)" onClick={onFind}>{I.search()}<kbd>G</kbd></button>}</div>
     <h1 className="workspace-title gc-head-group">
       {current && (current.faces.length ? <GroupMark g={current} size={20} /> : <span className="gt-hh">{I.hash(15)}</span>)}
       <span className="rm-one">{current?.name ?? 'Groups'}</span>

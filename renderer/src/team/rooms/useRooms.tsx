@@ -129,6 +129,8 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     setOpenId(null); setEmpty(false);
   };
   // Somewhere else was picked: no group, no Find groups.
+  // In Chats the list's own box is the search.
+  const findGroup = () => { const box = document.querySelector<HTMLInputElement>('.cx-search input'); if (box) box.focus(); else setFinderOpen(true); };
   const leave = () => { setOpenId(null); setFinding(false); setEmpty(false); setBoardOn(false); setFinderOpen(false); };
   const find = () => { onLeavePage(); setFinding(true); };
   const loadListed = useCallback(async () => { const res = await call<ListedRoom[]>('listed'); return res.ok ? res.value ?? [] : null; }, [call]);
@@ -460,7 +462,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     /** Where a conversation or a project's thread files a decision: the team's own group. */
     teamGroup: teamRoom ? { name: nameOf(teamRoom), decide: (mark: { messageId: string; body: string; saidBy: string | null; project?: string }) => decide(teamRoom.id, { ...mark, kind: 'decision', on: true }) } : null,
     /** G, from any page: the finder over your groups. Null while Groups is off. */
-    findGroup: live ? () => setFinderOpen(true) : null,
+    findGroup: live ? findGroup : null,
     /** The header's View button over everyone's threads, and B; on a group's chat, its options. Null anywhere else. */
     viewButton,
     /** The groups you are in, newest first, and the way to open one: what the

@@ -36,7 +36,8 @@ import { I } from './icons';
 import type { MessageMarks } from '../decisions';
 import { LINE_MISSING } from '../../reveal-line';
 import { Face } from '../people';
-import { cardName, chatWidth, clockOf, mentionsIn, readChatWidth, writeChatWidth } from './room-rules';
+import { cardName, chatWidth, mentionsIn, readChatWidth, writeChatWidth } from './room-rules';
+import { clockOf } from '../../teammates/chat-lines';
 import { drawnRoots, holdsRead, mentionMarkdown, myNewest, newLineAt, quickOnBar, roomReader, storedName, wordsLeftAfterSend } from './room-chat-rules';
 
 export type ChatPerson = { id: string; name: string; avatarUrl: string | null; me: boolean };

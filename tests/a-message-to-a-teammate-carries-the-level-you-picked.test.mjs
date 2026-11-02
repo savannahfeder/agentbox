@@ -74,7 +74,7 @@ describe('the level crosses with the message', () => {
     await maya.on(() => maya.service.message(theo.personId, 'The checkout page is down for everyone.', LEVELS.urgent));
     await theo.service.syncNow();
     const got = theirMessage();
-    expect(got.title).toBe('The checkout page is down');
+    expect(got.title).toBe('The checkout page is down for everyone');
     expect(got.priority).toBe(LEVELS.urgent);
     // And the inbox's own reading of it, which is what decides where it sorts.
     expect(itemPriority(got)).toBe(LEVELS.urgent);

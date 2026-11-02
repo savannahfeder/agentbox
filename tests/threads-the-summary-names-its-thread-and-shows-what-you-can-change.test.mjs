@@ -60,7 +60,7 @@ describe('the panel opens with the thread’s name', () => {
     expect(text(html)).toMatch(/^Acme renewal terms Context .* Status In progress Priority \w+ Owner You Project Northwind/);
   });
   it('falls back to the title on a thread with no label', () => {
-    expect(named(draw(item({ label: undefined })))).toBe('Send Acme their renewal terms');
+    expect(named(draw(item({ label: undefined })))).toBe('Send Acme their renewal terms by Thursday');
   });
   it('treats a blank label as no label, the way the row does', () => {
     expect(named(draw(item({ label: '   ', title: 'Pricing page' })))).toBe('Pricing page');

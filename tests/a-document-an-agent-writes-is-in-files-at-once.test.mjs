@@ -1,6 +1,6 @@
 // A DOCUMENT AN AGENT WRITES IS IN FILES AT ONCE.
 //
-// Team round 4: the investor-update agent ran write_document for
+// On a team, the investor-update agent ran write_document for
 // updates/october-investor-update.md and told her it was "in the Company docs
 // under updates/"; the Pricing researcher said "the Competitor pricing
 // document". Neither was in Files until she asked the agent to save it again.

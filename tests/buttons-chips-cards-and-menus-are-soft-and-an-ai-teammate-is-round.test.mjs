@@ -63,7 +63,7 @@ describe('what you press or type in takes the small corner', () => {
     ['.av-btn', 'a viewer button'], ['.av-pin-tag', 'a pin\'s tag'], ['.av-reply-write textarea', 'a reply to a comment'],
     ['.cn-button', 'a Connections button'], ['.cn-input', 'a Connections field'],
     ['.approval-actions button', 'Allow and Deny'], ['.rm-input', 'a group\'s field'], ['.rm-search', 'Find groups'],
-    ['.gc-find', 'find in a chat'], ['.th-follow', 'Follow'], ['.tm-seg', 'a team switch'], ['.rm-btn', 'a group button'],
+    ['.gc-find', 'find in a chat'], ['.th-follow', 'Follow'], ['.tm-seg', 'a team switch'], ['.rm-btn', 'a group button'], ['.tq-sent-line', 'a thread a teammate sent you'],
   ])('%s (%s)', (sel) => {
     const v = cornerOf(sel.includes(',') ? sel.split(',')[0].trim() : sel);
     expect(v, sel).toMatch(SMALL);
@@ -72,7 +72,7 @@ describe('what you press or type in takes the small corner', () => {
 
 describe('cards, sheets and menus take the artifact corner', () => {
   it.each([
-    ['.tq-doc-card', 'the file a teammate sends in its chat'], ['.tq-sent', 'the Needs you card at the top of its chat'],
+    ['.tq-doc-card', 'the file a teammate sends in its chat'],
     ['.approval-card', 'the permission card'], ['.modal', 'a sheet or dialog'], ['.cn-tile', 'a Connections card'], ['.cn-sheet', 'a Connections sheet'],
     ['.av-note', 'a comment card in the viewer'], ['.av-write textarea', 'the comment box, like the reply box'],
     ['.th-menu', 'a thread menu'], ['.th-pop', 'the view and filters menu'], ['.tc-menu', 'the composer\'s menus'],

@@ -16,6 +16,7 @@ import { appendTo, cleanEntry, foldLine } from '../shared/version-line.mjs';
 const LINE = 'version-line.jsonl';
 const HASHES = 'version-hashes.json';
 const HASHES_AFTER_MS = 2000;
+const RACY_MS = 2000;
 const BYTES = 'version-bytes';
 // A film past this stays a version but is not copied.
 const KEEP_UP_TO = 512 * 1024 * 1024;
@@ -55,16 +56,23 @@ export function versionLine({ dir, cloud = () => null }) {
   };
 
   async function hashOf(src) {
-    const st = await fs.promises.stat(src).catch(() => null);
+    const st = await fs.promises.stat(src, { bigint: true }).catch(() => null);
     if (!st?.isFile()) return null;
+    const size = Number(st.size);
+    const mtime = Number(st.mtimeMs);
+    // A disk stamps times coarsely, so two writes of one size close together
+    // can carry one time. A hash taken while the file was that fresh is not
+    // trusted again, as git does; an older file's is. A kept entry from before has no `seen`.
+    const ns = String(st.mtimeNs);
     const was = hashes.get(src);
-    if (was && was.size === st.size && was.mtime === st.mtimeMs) return was;
+    const settled = was && (was.seen == null || was.seen - was.mtime > RACY_MS);
+    if (was && settled && was.size === size && was.mtime === mtime && (was.ns == null || was.ns === ns)) return was;
     const hash = await new Promise((resolve, reject) => {
       const h = crypto.createHash('sha256');
       fs.createReadStream(src).on('data', (d) => h.update(d)).on('end', () => resolve(h.digest('hex'))).on('error', reject);
     }).catch(() => null);
     if (!hash) return null;
-    const out = { size: st.size, mtime: st.mtimeMs, hash };
+    const out = { size, mtime, ns, seen: Date.now(), hash };
     hashes.set(src, out);
     saveHashesSoon();
     return out;

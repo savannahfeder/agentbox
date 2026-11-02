@@ -1,6 +1,6 @@
 // WHAT A PRESS SAYS IS WHAT HAPPENED, AND ONE PRESS IS ONE SEND.
 //
-// Round 5. Dev pressed "Don't send it" and the line over the reply box said "Sent to
+// Dev pressed "Don't send it" and the line over the reply box said "Sent to
 // Sofia": SentLine always says "Sent to", and on an approval row its title is the
 // audience. Sofia pressed "Send v2 to Dev" and 7 minutes later was asked again, because
 // her agent's team_tell was a first write and nothing read that she had just said so.

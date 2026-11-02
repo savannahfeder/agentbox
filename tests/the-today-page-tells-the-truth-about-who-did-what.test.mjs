@@ -6,7 +6,7 @@
 // agents' asks. Measured by feeding teamToday the store's shapes for each case
 // and reading back each person's sections and the top line.
 import { describe, it, expect } from 'vitest';
-import { teamToday, todayParts } from '../renderer/src/team/today.ts';
+import { teamToday, todayLine } from '../renderer/src/team/today.ts';
 
 const NOW = new Date(2026, 9, 31, 15, 0).getTime();
 const at = (h, dayOffset = 0) => new Date(2026, 9, 31 + dayOffset, h, 0).getTime();
@@ -56,17 +56,17 @@ describe('what someone is working on today', () => {
   });
 });
 
-describe('what needs you is all on the page, or the page says where the rest are', () => {
+describe('what needs you is counted as the tab counts it', () => {
   it('puts your own agents\' asks under you, so the count matches the lines', () => {
     const needs = [item({ id: 'a1', title: 'Merge onboarding B?' }), item({ id: 'a2', title: 'Wait for Jordan?' })];
     const day = teamToday({ ...base, needs, needsCount: 2 });
     expect(titles(of(day, 'me').waitingOnYou)).toEqual(['Merge onboarding B?', 'Wait for Jordan?']);
-    expect(todayParts(day.counts)).toEqual(['2 things need you']);
+    expect(todayLine(day.counts)).toBe('2 things need you');
   });
 
-  it('says how many are only in Needs you when some rows have no line here', () => {
+  it('counts as the Needs you tab does, even rows it has no line for', () => {
     const day = teamToday({ ...base, needs: [item({ id: 'a1', title: 'Merge onboarding B?' })], needsCount: 3 });
-    expect(todayParts(day.counts)[0]).toBe('3 things need you, 2 of them only in Needs you');
+    expect(todayLine(day.counts)).toBe('3 things need you');
   });
 });
 

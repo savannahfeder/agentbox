@@ -919,7 +919,8 @@ export function ThreadComposer({
   const sendAsChoice = (
     <span className="tc-seg" role="group" aria-label="Send as">
       {(['message', 'task'] as SendAs[]).map((k) => (
-        <button key={k} type="button" className={sendAs === k ? 'on' : ''} aria-pressed={sendAs === k}
+        // Named in full: a bare "Task" is also the Tasks tab behind the card.
+        <button key={k} type="button" className={sendAs === k ? 'on' : ''} aria-pressed={sendAs === k} aria-label={`Send as a ${k}`}
           onClick={() => { setSendAs(k); if (k === 'message') setDue(null); textRef.current?.focus(); }}>
           {k === 'task' ? 'Task' : 'Message'}
         </button>

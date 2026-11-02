@@ -23,16 +23,19 @@ export function unsentWords({ words, files, sending }: { words: string; files: n
   return !sending && (words.trim() || files > 0) ? 'Not sent yet' : null;
 }
 
-/** The line over a reply box and the toast from R on the list: whose thread this goes to. */
-export function replyingTo({ people, title }: { people?: readonly string[] | null; title: string }): string {
-  if (!people?.length) return `Replying to the agent on ${title}`;
+/**
+ * The line over a reply box and the toast from R on the list: the people who
+ * will read it. Null for an agent's thread, whose title the screen already shows.
+ */
+export function replyingTo({ people }: { people?: readonly string[] | null }): string | null {
+  if (!people?.length) return null;
   const names = people.length === 1 ? people[0] : `${people.slice(0, -1).join(', ')} and ${people[people.length - 1]}`;
   return `Replying to ${names}`;
 }
 
 /** Who a send in this box reaches, for the line over it: a person is named as one, an agent never looks like one. */
-export function replyTarget({ people, title }: { people?: readonly string[] | null; title: string }): { kind: 'person' | 'agent'; words: string; names: string[] } {
-  const words = replyingTo({ people, title });
+export function replyTarget({ people }: { people?: readonly string[] | null }): { kind: 'person' | 'agent'; words: string | null; names: string[] } {
+  const words = replyingTo({ people });
   return people?.length ? { kind: 'person', words, names: [...people] } : { kind: 'agent', words, names: [] };
 }
 

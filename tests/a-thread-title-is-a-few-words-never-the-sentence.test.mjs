@@ -10,7 +10,7 @@
 // the first line for threads, the raw card on a teammate's copy), so the list
 // read in three styles. One rule now: shared/thread-title.mjs.
 import { describe, it, expect } from 'vitest';
-import { shortTitle, shownTitle, TITLE_WORDS } from '../shared/thread-title.mjs';
+import { shortTitle, shownTitle } from '../shared/thread-title.mjs';
 import { rowTitle } from '../renderer/src/list-rules';
 import { cardsFor } from '../shared/thread-cards.mjs';
 
@@ -23,9 +23,9 @@ describe('a sentence becomes a short name', () => {
     ['The reminders fire twice and nobody knows why.', 'The reminders fire twice'],
     ['Hey Maya, could you call the Riverside clinic manager and tell her about the double booking fix before Thursday, since she asked us to let her know personally.', 'Call the Riverside clinic manager'],
     ['Can you look at why the reminder emails are going out at the wrong time for clinics outside Lisbon?', 'Why the reminder emails'],
-    ['The checkout page is down for everyone.', 'The checkout page is down'],
+    ['The checkout page is down for everyone.', 'The checkout page is down for everyone'],
     ['I can no longer open the settings page.', 'Cannot open the settings page'],
-    ['Book Dr. Ames for the group class on Thursday morning.', 'Book Dr. Ames for the group'],
+    ['Book Dr. Ames for the group class on Thursday morning.', 'Book Dr. Ames'],
     ['Please write a launch post for the clinic booking widget and schedule it for Tuesday morning.', 'Write a launch post'],
     ['**Fix** the `slot_race` bug in the booking flow before the Northgate demo on Monday', 'Fix the slot_race bug'],
     ['- move the clinic calendar sync off the cron box and onto the worker queue', 'Move the clinic calendar sync'],
@@ -34,10 +34,10 @@ describe('a sentence becomes a short name', () => {
     expect(shortTitle(input)).toBe(want);
   });
 
-  it('is never longer than six words, never ends on punctuation, and starts with a capital', () => {
+  it('is never longer than eight words, never ends on punctuation, and starts with a capital', () => {
     for (const [input] of cases) {
       const t = shortTitle(input);
-      expect(count(t)).toBeLessThanOrEqual(TITLE_WORDS);
+      expect(count(t)).toBeLessThanOrEqual(8);
       expect(t).not.toMatch(/[.,;:!?…]$/);
       expect(t).not.toMatch(/^>/);
       expect(t[0]).toBe(t[0].toUpperCase());

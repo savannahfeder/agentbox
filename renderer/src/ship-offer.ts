@@ -53,6 +53,46 @@ export const NAME_YOURSELF_OFFER: ParsedOption[] = [
   { n: 2, text: 'Discard the change', recommended: false },
 ];
 
+// A document, picture or page the thread already shows is not code to ship, so
+// over loose files of that kind alone the offer asks in plain words. The
+// presses do what the commit-first offer's do: the first is sent to the agent,
+// the second is a discard and asks first.
+const addFilesAsk = (names: readonly string[]) =>
+  (names.length === 1 ? `Add ${names[0]} to the project?` : `Add these ${names.length} files to the project?`);
+const addFilesOffer = (many: boolean): ParsedOption[] => [
+  { n: 1, text: many ? 'Add them to the project' : 'Add it to the project', recommended: true },
+  { n: 2, text: many ? 'Throw them away' : 'Throw it away', recommended: false },
+];
+
+export interface ChangedFile { path: string; abs?: string }
+
+/** The files a saved change touched (main/code-change.mjs, mergeChange). */
+export function changedFiles(change: unknown): ChangedFile[] {
+  const files = (change as { files?: unknown } | null | undefined)?.files;
+  if (!Array.isArray(files)) return [];
+  return files.flatMap((f) => (f && typeof f.path === 'string'
+    ? [{ path: f.path, ...(typeof f.abs === 'string' ? { abs: f.abs } : {}) }]
+    : []));
+}
+
+/**
+ * The names of the changed files when every one is a file the thread's words
+ * name, else null. `named` is relative to `dir`, the project folder. A path
+ * read off the disk is matched whole; one without is matched as the same path,
+ * or under a parent folder only when the name carries a folder of its own,
+ * since a bare "plan.md" could be any plan.md.
+ */
+export function onlyNamedFiles(changed: readonly ChangedFile[], named: readonly string[], dir: string | null): string[] | null {
+  if (!changed.length || !named.length) return null;
+  const root = (dir ?? '').replace(/\/+$/, '');
+  // A thread works in a folder of its own, so `abs` may sit outside `dir`;
+  // its path inside that folder still names the file.
+  const shown = (c: ChangedFile) => named.some((n) => (!!c.abs && !!root && c.abs === `${root}/${n}`)
+    || c.path === n || (n.includes('/') && c.path.endsWith(`/${n}`)));
+  if (!changed.every(shown)) return null;
+  return changed.map((c) => c.path.split('/').pop() || c.path);
+}
+
 /**
  * What the folder a run worked in holds, as the saved change records it
  * (main/git-change.mjs). Null on any of them is "could not be read", which is
@@ -86,13 +126,16 @@ export function standingFrom(change: unknown): Standing {
  * the offer that SAYS something does: a run that ended on "Ship the conversion
  * and test?" with "Ship this change?" printed under it is the same question
  * twice.
+ *
+ * `onlyFiles` is `onlyNamedFiles`: set, everything loose is a file the thread
+ * already shows.
  */
-export function shipOfferFor(stands: Standing): { ask: string; options: ParsedOption[]; headed: boolean } | null {
+export function shipOfferFor(stands: Standing, onlyFiles?: readonly string[] | null): { ask: string; options: ParsedOption[]; headed: boolean } | null {
   if (stands.committed === false && stands.uncommitted === false) return null;
   if (stands.committed === false && stands.uncommitted === true) {
-    return stands.knowsYou === false
-      ? { ask: NAME_YOURSELF_ASK, options: NAME_YOURSELF_OFFER, headed: true }
-      : { ask: NOT_COMMITTED_ASK, options: COMMIT_FIRST_OFFER, headed: true };
+    if (stands.knowsYou === false) return { ask: NAME_YOURSELF_ASK, options: NAME_YOURSELF_OFFER, headed: true };
+    if (onlyFiles?.length) return { ask: addFilesAsk(onlyFiles), options: addFilesOffer(onlyFiles.length > 1), headed: true };
+    return { ask: NOT_COMMITTED_ASK, options: COMMIT_FIRST_OFFER, headed: true };
   }
   return { ask: SHIP_ASK, options: SHIP_OFFER, headed: false };
 }

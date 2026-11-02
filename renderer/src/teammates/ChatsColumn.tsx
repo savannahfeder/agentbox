@@ -61,7 +61,7 @@ export function ChatsColumn({ current }: { current: string | null }) {
     </div>;
   };
   return <aside className="gc-list cx-list" aria-label="Chats">
-    <label className="cx-search">{I.search()}<input value={q} placeholder="Search" aria-label="Search your chats" onChange={(e) => setQ(e.target.value)} /></label>
+    <label className="cx-search">{I.search()}<input value={q} placeholder="Search" aria-label="Search your chats" onChange={(e) => setQ(e.target.value)} /><kbd>G</kbd></label>
     {section('teammates', 'AI teammates', c.teammates.length, <>
       {mates.map((t) => {
         const on = current === `teammate:${t.id}`;

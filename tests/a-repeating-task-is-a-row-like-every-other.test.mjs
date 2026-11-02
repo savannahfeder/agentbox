@@ -70,7 +70,8 @@ describe('in the table, a repeating task is one row in the columns', () => {
     expect(row).toMatch(/th-grid/);
     expect(row).toMatch(/th-cell-title[\s\S]*Check for new video skills/);
     expect(row).toMatch(/th-cell-proj[^>]*>Northwind Video</);
-    expect(row).toMatch(/th-cell-prio[^>]*>.*Medium/);
+    // Medium, the level nobody set, leaves its cell empty like any row.
+    expect(row).toMatch(/th-cell-prio[^>]*><\/div>/);
     expect(row).toMatch(/th-when[^>]*>Tomorrow</);
   });
 

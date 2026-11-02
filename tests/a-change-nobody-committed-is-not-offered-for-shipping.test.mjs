@@ -257,7 +257,7 @@ describe('where the app draws it', () => {
 
   it('reads the standing out of the same file it reads the figures from', () => {
     expect(focus).toContain('setStanding(r?.ok ? standingFrom(r.change) : UNREAD)');
-    expect(focus).toContain('const shipAsk = shipOfferLive(item, { change: !!figures, running: !!session || !!agent }) ? shipOfferFor(standing) : null;');
+    expect(focus).toContain('const shipAsk = shipOfferLive(item, { change: !!figures, running: !!session || !!agent }) ? shipOfferFor(standing, onlyNamedFiles(changed, ');
   });
 
   it('draws the offer that fits what the folder holds, not one fixed pair', () => {

@@ -1,6 +1,6 @@
 // A FILE KEEPS ITS PLACE AND ITS OWN NAME, WHOEVER NAMES IT.
 //
-// Round 5, read in the copies' stores:
+// Read in the team's stores:
 // - Maya's Files had a tile "dc1bdc0f055d-mvwlg12b-oxe1xc-group-bookings-spec.md",
 //   "Not on this computer yet". An agent had named the copy it read in
 //   _team-threads/.../attachments as a bare word, outside any attachments path, so

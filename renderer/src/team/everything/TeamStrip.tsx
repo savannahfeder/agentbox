@@ -6,6 +6,7 @@ import { Face, TeamContext } from '../people';
 import { linkWords } from '../../threads/summary-rules';
 import { LiveMark } from '../../components/LiveMark';
 import { RowCells, ThreadCells } from '../../threads/Pages';
+import { cardPlace } from '../../threads/page-rules';
 import { STATE_WORD } from '../../threads/summary-rules';
 import type { StatusCell } from '../../status-word';
 import { moveMember, type Member, type TeamRun } from './members';
@@ -175,7 +176,7 @@ function CardRow({ c, who, now, onOpen, items = [], products = [] }: { c: Thread
   return <div className="row" role="button" tabIndex={0} onClick={() => onOpen(c)}
     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onOpen(c); } }}>
     <span className="mark" aria-hidden="true" />
-    <RowCells status={status} title={title} where={c.project ?? ''} priority={c.priority} updatedAt={c.updatedAt} now={now} />
+    <RowCells status={status} title={title} where={cardPlace(c)} priority={c.priority} updatedAt={c.updatedAt} now={now} />
   </div>;
 }
 

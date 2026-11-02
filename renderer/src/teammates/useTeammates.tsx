@@ -12,7 +12,7 @@ import type { TabView } from '../threads/Pages';
 /** `new`, a teammate's id, or `sheet:`, `log:`, `about:` or `book:` one of its pages; 'team' opens the first chat. */
 export type TeammatesOpen = string | null;
 
-export function useTeammates({ items = [], view: stored, asking = [], running = [], queued = [], products, engines, models, me, mePic = null, onEnter, onOpenThread, onOpenFile, tabOf, onOpenList, onChanged }: {
+export function useTeammates({ items = [], view: stored, asking = [], running = [], queued = [], products, engines, models, me, mePic = null, onEnter, onOpenThread, onOpenFile, tabOf, onChanged }: {
   onOpenFile?: (product: string, src: string) => void;
   /** Every thread the app holds, so what a teammate sent you is drawn as its inbox row. */
   items?: WorkItem[];
@@ -33,7 +33,6 @@ export function useTeammates({ items = [], view: stored, asking = [], running = 
   onOpenThread: (product: string, id: string) => void;
   /** The inbox tab a thread sits in, and a way to open the inbox at one. */
   tabOf?: (item: WorkItem) => TabView | null;
-  onOpenList?: (view: TabView) => void;
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState<TeammatesOpen>(null);
@@ -62,7 +61,7 @@ export function useTeammates({ items = [], view: stored, asking = [], running = 
   const mate = shown && shown.kind !== 'new' ? team.find((t) => t.id === shown.id) ?? null : null;
   const page: ReactNode = shownOpen && view
     ? <TeammatesPage view={view} items={items} open={shownOpen} products={products} engines={engines} me={me}
-        onOpen={go} onOpenThread={onOpenThread} onOpenFile={onOpenFile} tabOf={tabOf} onOpenList={onOpenList} onChanged={onChanged} sessions={sessions} queued={queued} models={models} mePic={mePic} />
+        onOpen={go} onOpenThread={onOpenThread} onOpenFile={onOpenFile} tabOf={tabOf} onChanged={onChanged} sessions={sessions} queued={queued} models={models} mePic={mePic} />
     : null;
   const call = async (op: string, args: Record<string, unknown>) => { const r = await api.teammates(op, args); if (r.ok) onChanged(); return r.ok; };
   return {
@@ -83,7 +82,7 @@ export function useTeammates({ items = [], view: stored, asking = [], running = 
     chatWith: (id: string): ReactNode => {
       const t = team.find((x) => x.id === id);
       return t && view ? <TeammateChat key={t.id} view={view} items={items} products={products} t={t} me={me} mePic={mePic} sessions={sessions} queued={queued}
-        onOpen={go} onOpenThread={onOpenThread} onOpenFile={onOpenFile} onChanged={onChanged} tabOf={tabOf} onOpenList={onOpenList} /> : null;
+        onOpen={go} onOpenThread={onOpenThread} onOpenFile={onOpenFile} onChanged={onChanged} tabOf={tabOf} /> : null;
     },
     /** Change what an AI teammate you own does: null once saved, or why not. */
     setJob: async (id: string, job: string): Promise<string | null> => {
