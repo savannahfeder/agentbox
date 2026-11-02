@@ -31,7 +31,7 @@ describe('the three layouts', () => {
 
   it('give two tabs the team views on the Team card', () => {
     const app = read('renderer/src/App.tsx');
-    expect(app).toMatch(/const todayPage = \(title\?: string\) =>/);
+    expect(app).toMatch(/const todayPage = \(title\?: string, onPerson\?: \(key: string\) => void\) =>/);
     expect(app).toMatch(/const tasksPage = \(title\?: string\) =>/);
     expect(app).toMatch(/teamSpace === 'today' \? todayPage\(\) : teamSpace === 'tasks' \? tasksPage\(\)/);
   });
