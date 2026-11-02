@@ -181,11 +181,6 @@ export function initialsOf(name: string): string {
 /** The name drawn on a card: "You" on my own. */
 export const cardName = (c: Pick<RoomCard, 'me' | 'name'>) => (c.me ? 'You' : c.name || 'Someone');
 
-export function clockOf(ms: number): string {
-  const d = new Date(ms);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
 export { mentionsIn };
 
 /** A message cut into plain text and the @names in it, for drawing. */

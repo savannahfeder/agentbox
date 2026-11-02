@@ -387,8 +387,8 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
               page, so it is signed in the label it already has rather than in
               a byline of its own. */}
           <div className={unshipped ? 'appendix-label appendix-unshipped' : 'appendix-label'}>
-            {outcome.field === 'result' ? 'Result' : unshipped ? 'Not shipped' : 'Latest checkpoint'}
-            {ranSaid && <span className="appendix-ran">{ranSaid}</span>}
+            {outcome.field === 'result' ? ranSaid ?? 'Result' : unshipped ? 'Not shipped' : 'Latest checkpoint'}
+            {ranSaid && outcome.field !== 'result' && <span className="appendix-ran">{ranSaid}</span>}
           </div>
           {md(clean(outcome.text))}
         </div>

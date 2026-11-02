@@ -1,6 +1,6 @@
 // TODAY NAMES EACH THING ONCE AND SAYS HOW FAR IT GOT.
 //
-// Round 5, Maya (today2.png): "FINISHED Set up its job" on every agent, rows with no
+// Maya, on Today:"FINISHED Set up its job" on every agent, rows with no
 // word on how far along they are, "and 10 more" that left the page, the investor
 // update under both WAITING ON YOU and DECIDED at the same 8:12am, and the right half
 // of the window empty. Measured by reading what teamToday hands the page.

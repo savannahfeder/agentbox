@@ -1,6 +1,6 @@
 // A FAILED EDIT DOES NOT FOLLOW YOU INTO THE NEXT FILE.
 //
-// Round 5, Sofia: after "Not saved" she closed the document and opened a film, and
+// A designer: after "Not saved" she closed the document and opened a film, and
 // the film's window drew the document's words with "Not saved" over them until a
 // reload. Maya's first Done looked saved for the same reason: her words were still
 // on the page when she came back. Measured from the code: Back did nothing after a

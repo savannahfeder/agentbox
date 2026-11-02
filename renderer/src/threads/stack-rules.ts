@@ -9,7 +9,11 @@ export type StackTab = 'progress' | 'snoozed' | 'done' | 'inbox';
 /** Who a row in Needs you waits on you for: a person, or an agent (an AI teammate is one). */
 export type NeedsKey = 'people' | 'agents';
 
-export interface StackSection { key: StackKey; label: string; count: number; tab: StackTab; folded: boolean }
+export interface StackSection {
+  key: StackKey; label: string; count: number; tab: StackTab; folded: boolean;
+  /** Drawn with no header: it is the only section and its name is the tab's. */
+  bare?: boolean;
+}
 
 export interface Stack {
   sections: StackSection[];
@@ -45,6 +49,11 @@ export function stackRows({ progress, later, done, dayStart, folded, laterRules 
     sections.push({ ...part, count: items.length, folded: shut });
     for (const i of items) where.set(i.id, part.key);
     if (!shut) rows.push(...items);
+  }
+  // With no header left to unfold it, a folded lone section would hide its rows for good.
+  if (sections.length === 1 && sections[0].key === 'progress') {
+    if (sections[0].folded) rows.push(...(bySection.progress ?? []));
+    sections[0] = { ...sections[0], bare: true, folded: false };
   }
   const sectionOf = (item: WorkItem) => where.get(item.id) ?? 'progress';
   const tabOf = (item: WorkItem) => PARTS.find((p) => p.key === sectionOf(item))!.tab;

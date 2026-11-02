@@ -41,7 +41,7 @@ describe('a title cut short', () => {
 describe('a title that was not cut', () => {
   it('keeps its last word, even one that could lead on', () => {
     expect(said('Ship the fix before')).toBe('Ship the fix before');
-    expect(said('The checkout page is down for everyone.')).toBe('The checkout page is down');
+    expect(said('The checkout page is down for everyone.')).toBe('The checkout page is down for everyone');
   });
   it('keeps a whole name of six words', () => {
     expect(said('Two patients at the Riverside clinic both got a confirmation for the 9:30 slot.')).toBe('Two patients at the Riverside clinic');

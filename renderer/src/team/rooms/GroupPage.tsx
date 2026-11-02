@@ -23,18 +23,18 @@ export function peopleShown(room: Pick<Room, 'members' | 'wall'>): { cards: Room
 }
 
 // Where their thread is kept from you, the line they wrote about themselves.
-const onWords = (c: RoomCard) => c.away ? 'Not on Groups yet' : c.agents ? c.workingOn ?? c.bio ?? 'Private thread' : c.status ?? 'Not running';
+const onWords = (c: RoomCard) => c.away ? 'Not on Groups yet' : c.agents ? c.workingOn ?? c.bio ?? 'Private thread' : c.status;
 
 export function PeoplePanel({ room, onPerson }: { room: Pick<Room, 'members' | 'wall'> & Partial<Pick<Room, 'teamId' | 'listed'>>; onPerson: (id: string) => void }) {
   const { cards, working, more } = peopleShown(room);
   return <aside className="gr-side">
-    <div className="gr-ph"><span className="gr-pt">{peopleHeading(room)}</span><span className="gr-pn">{working} of {room.members} working</span></div>
+    <div className="gr-ph"><span className="gr-pt">{peopleHeading(room)}</span>{working > 0 && <span className="gr-pn">{working} working now</span>}</div>
     {cards.map((c) => <button type="button" key={c.id} className="gr-prow" title={`Open ${cardName(c)}'s page`} onClick={() => onPerson(c.id)}>
       <Face name={c.name} url={c.avatarUrl} size={32} />
       <span className="gr-pw">
-        <span className="gr-l1"><span className="rm-one">{cardName(c)}</span>{c.level != null && <span className="gr-lv">{c.level}</span>}
+        <span className="gr-l1"><span className="rm-one">{cardName(c)}</span>
           {c.teammate && !c.me && !room.teamId && <span className="gr-mate">Your team</span>}</span>
-        <span className={`gr-l2 rm-one${c.agents ? '' : ' idle'}`}>{onWords(c)}</span>
+        {onWords(c) && <span className={`gr-l2 rm-one${c.agents ? '' : ' idle'}`}>{onWords(c)}</span>}
       </span>
       {c.agents ? <span className="gr-ag"><LiveMark /><span>{c.agents} {c.agents === 1 ? 'agent' : 'agents'}</span></span> : null}
     </button>)}

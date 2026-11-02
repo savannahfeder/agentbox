@@ -96,18 +96,18 @@ describe('the palette itself', () => {
 
 describe('the reply box says who it goes to', () => {
   it('a person by name, as a person', () => {
-    expect(replyTarget({ people: ['Maya'], title: 'Integration branch triage' })).toEqual({ kind: 'person', words: 'Replying to Maya', names: ['Maya'] });
-    expect(replyTarget({ people: ['Sofia', 'Maya'], title: 'x' })).toEqual({ kind: 'person', words: 'Replying to Sofia and Maya', names: ['Sofia', 'Maya'] });
+    expect(replyTarget({ people: ['Maya'] })).toEqual({ kind: 'person', words: 'Replying to Maya', names: ['Maya'] });
+    expect(replyTarget({ people: ['Sofia', 'Maya'] })).toEqual({ kind: 'person', words: 'Replying to Sofia and Maya', names: ['Sofia', 'Maya'] });
   });
 
   it('an agent as the agent, never as a person', () => {
-    expect(replyTarget({ people: null, title: 'Per-clinic staff passwords' })).toEqual({ kind: 'agent', words: 'Replying to the agent on Per-clinic staff passwords', names: [] });
-    expect(replyTarget({ people: [], title: 'x' }).kind).toBe('agent');
+    expect(replyTarget({ people: null })).toEqual({ kind: 'agent', words: null, names: [] });
+    expect(replyTarget({ people: [] }).kind).toBe('agent');
   });
 
-  it('the box draws a person with their face, and an agent with none', () => {
+  it('the box draws a person with their face, and nothing for an agent', () => {
     const focus = fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/components/Focus.tsx'), 'utf8');
     expect(focus).toMatch(/dock-to-\$\{to\.kind\}/);
-    expect(focus).toMatch(/to\.kind === 'person' \? to\.names\.slice\(0, 3\)\.map\(\(n\) => <Face/);
+    expect(focus).toMatch(/to\.kind === 'person' && <div[^\n]*\n\s*\{to\.names\.slice\(0, 3\)\.map\(\(n\) => <Face/);
   });
 });

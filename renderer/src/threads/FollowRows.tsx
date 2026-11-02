@@ -5,6 +5,7 @@ import type { StatusCell } from '../status-word';
 import { followWords, type FollowNews } from '../team/following';
 import { Face, firstName, type TeamView } from '../team/people';
 import { RowCells } from './Pages';
+import { cardPlace } from './page-rules';
 
 const cell = (word: string): StatusCell => ({ word, mark: 'done', agent: false, live: false, cloud: false });
 
@@ -17,7 +18,7 @@ export function FollowRows({ news, team, now, onOpen }: { news: FollowNews[]; te
       <span className="mark" aria-hidden="true" />
       <RowCells status={cell(n.kind === 'shipped' ? 'Shipped' : 'Done')}
         title={<span className="th-msg"><Face person={who} /><span className="th-msg-text">{words}</span></span>}
-        where={n.card.project ?? ''} priority={null} updatedAt={n.at} now={now} />
+        where={cardPlace(n.card)} priority={null} updatedAt={n.at} now={now} />
     </div>;
   })}</>;
 }

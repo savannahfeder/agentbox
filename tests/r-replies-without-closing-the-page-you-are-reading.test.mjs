@@ -93,6 +93,6 @@ describe('what must not change', () => {
   });
 
   it('R on the list still opens the thread with its box', () => {
-    expect(onTheList).toMatch(/case 'r': case 'R': if \(!multiSel\.size && pointed && replyKeyWorksIn\(view\)\) \{ e\.preventDefault\(\); showToast\(replyingTo\([^\n]*setFocused\(pointed\); markSeen\(pointed\); setModal\('reply'\); \} break;/);
+    expect(onTheList).toMatch(/case 'r': case 'R': if \(!multiSel\.size && pointed && replyKeyWorksIn\(view\)\) \{ e\.preventDefault\(\); const whose = replyingTo\([^\n]*setFocused\(pointed\); markSeen\(pointed\); setModal\('reply'\); \} break;/);
   });
 });

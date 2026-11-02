@@ -81,6 +81,8 @@ const howFar = (words: string | null | undefined) => {
 type Needs = Pick<WorkItem, 'id' | 'product' | 'labels' | 'createdBy' | 'title' | 'updatedAt'> & Partial<WorkItem>;
 
 const first = (name: string) => name.split(/\s+/)[0] || name;
+/** A teammate's name is its job ("Chief of staff"), so only a person is cut to a first name. */
+const quietName = (p: { kind: string; name: string }) => (p.kind === 'mate' ? p.name : first(p.name));
 const oneLine = (s: string) => {
   const line = withoutFiles(s).split('\n').find((l) => l.trim())?.trim() || 'Sent a file';
   return line.length > 110 ? `${line.slice(0, 108).replace(/\s+\S*$/, '')}…` : line;
@@ -260,7 +262,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   const says = (p: TodayPerson) => p.finished.length + p.shipped.length + p.decided.length + p.blocked.length + p.waitingOnYou.length + p.working.length + p.tasks.length + p.privateDone > 0;
   return {
     people: all.filter(says),
-    quiet: all.filter((p) => p.kind !== 'me' && !says(p)).map((p) => first(p.name)),
+    quiet: all.filter((p) => p.kind !== 'me' && !says(p)).map(quietName),
     counts: {
       needYou: needsCount ?? needs.length + mentions.filter((m) => m.by !== me).length,
       blocked: all.reduce((n, p) => n + p.blocked.length + p.tasks.filter((l) => l.blocked).length, 0),
@@ -270,14 +272,48 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   };
 }
 
-/** A person's sections, in the order the page draws them. */
-export const SECTIONS = ['waitingOnYou', 'tasks', 'blocked', 'decided', 'shipped', 'finished', 'working'] as const;
+export type TodayGroup = 'working' | 'done' | 'blocked';
+
+/** What the page draws per person, in standup order. */
+export const GROUPS: readonly { id: TodayGroup; label: string }[] = [
+  { id: 'working', label: 'Working on' }, { id: 'done', label: 'Done' }, { id: 'blocked', label: 'Blocked' },
+];
+
+/** A drawn line: a task says its due date rather than a time, and Done says when it was not plain done. */
+export interface GroupLine extends TodayLine { task?: true; tag?: string }
+
+const byNewest = (a: TodayLine, b: TodayLine) => b.at - a.at;
+
+/** A person's lists folded into the three groups. What waits on you is left to Needs you. */
+export function groupsOf(p: TodayPerson): Record<TodayGroup, GroupLine[]> {
+  const tasks = (p.tasks ?? []).map((l): GroupLine => ({ ...l, task: true }));
+  return {
+    working: [...tasks.filter((l) => !l.blocked), ...p.working],
+    done: [
+      ...p.shipped.map((l) => ({ ...l, tag: 'Shipped' })),
+      ...p.finished,
+      ...p.decided.map((l) => (l.file ? l : { ...l, tag: 'Decided' })),
+    ].sort(byNewest),
+    blocked: [...p.blocked, ...tasks.filter((l) => l.blocked).map((l) => ({ ...l, on: l.blocked }))],
+  };
+}
+
+const drawsSomething = (p: TodayPerson) => !!p.privateDone || Object.values(groupsOf(p)).some((g) => g.length > 0);
+
+/** The people the page draws; anyone left with only what waits on you joins the quiet ones. */
+export function shownDay<T extends { people: TodayPerson[]; quiet: string[] }>(day: T): T {
+  const silent = day.people.filter((p) => p.kind !== 'me' && !drawsSomething(p)).map(quietName);
+  return { ...day, people: day.people.filter(drawsSomething), quiet: [...silent, ...day.quiet] };
+}
 
 export interface StepLine { id: string; line: TodayLine }
 
-/** The lines J and K stop on: the ones drawn, in reading order. A thread on two lists is two stops. */
+/** The lines J and K stop on: the ones drawn, in reading order. */
 export function linesToStep(people: readonly TodayPerson[]): StepLine[] {
-  return people.flatMap((p) => SECTIONS.flatMap((s) => (p[s] ?? []).slice(0, SHOWN).map((line) => ({ id: `${p.key}/${s}/${line.key}`, line }))));
+  return people.flatMap((p) => {
+    const g = groupsOf(p);
+    return GROUPS.flatMap(({ id }) => g[id].slice(0, SHOWN).map((line) => ({ id: `${p.key}/${id}/${line.key}`, line })));
+  });
 }
 
 export function stepLine(lines: readonly StepLine[], picked: string | null, dir: 1 | -1): string | null {
@@ -286,16 +322,5 @@ export function stepLine(lines: readonly StepLine[], picked: string | null, dir:
   return lines[Math.max(0, Math.min(lines.length - 1, at + dir))].id;
 }
 
-const unlisted = (c: TodayCounts) => (c.listed == null ? 0 : Math.max(0, c.needYou - c.listed));
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
-/** The one line over the page, in its parts: what needs you, then the rest. */
-export function todayParts(c: TodayCounts): [string, ...string[]] {
-  return [
-    c.needYou ? `${plural(c.needYou, 'thing', 'things')} ${c.needYou === 1 ? 'needs' : 'need'} you${unlisted(c) ? `, ${unlisted(c)} of them only in Needs you` : ''}` : 'Nothing needs you',
-    ...(c.blocked ? [`${c.blocked} blocked on others`] : []),
-    ...(c.shipped ? [`${c.shipped} shipped`] : []),
-  ];
-}
-
-export const todayLine = (c: TodayCounts) => todayParts(c).join(', ');
+/** The one line over the page, or nothing when nothing needs you. */
+export const todayLine = (c: TodayCounts) => (c.needYou ? `${c.needYou} ${c.needYou === 1 ? 'thing needs' : 'things need'} you` : '');

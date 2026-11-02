@@ -1,6 +1,6 @@
 // AN EDIT FROM FILES LANDS AS THE NEXT VERSION OF THE ONE FILE, FOR EVERYONE.
 //
-// Round 5, Maya: she edited october-investor-update.md in Files and the words were
+// Maya edited october-investor-update.md in Files and the words were
 // gone 17 minutes later. Measured on her store: no edit line for the 17:47 Done, and
 // the Done at 18:06 answered "That file is not on this thread". The big view in
 // Files hands the editor a resolved path on disk; the save looked for that path among
@@ -204,7 +204,7 @@ describe('the name a person reads', () => {
   it('an edit keeps the name of what was edited', () => {
     expect(familyName(family, family.versions[2])).toBe('a.md');
   });
-  // Round 6: a file read "group-seat-picker-v2.png" over "v5 of 5"; one file has one name.
+  // A file read "group-seat-picker-v2.png" over "v5 of 5"; one file has one name.
   it('an agent\'s own next go is still the file\'s name', () => {
     const made = { versions: [{ name: 'a.md', n: 1 }, { name: 'a-v2.md', n: 2 }] };
     expect(familyName(made, made.versions[1])).toBe('a.md');

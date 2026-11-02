@@ -84,6 +84,6 @@ describe('the key', () => {
     expect(app.lastIndexOf('if (settingsOpen) return;', g)).toBeGreaterThan(0);
   });
   it('does nothing while Groups is off', () => {
-    expect(hook).toContain('findGroup: live ? () => setFinderOpen(true) : null');
+    expect(hook).toContain('findGroup: live ? findGroup : null');
   });
 });

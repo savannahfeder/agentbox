@@ -5,13 +5,13 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Playbook, Product, RunningSession, Teammate, TeammatesView, TeamChatLine, TeamRunLine, WorkItem } from '../types';
-import { INBOX_TABS, RowCells, ThreadCells, type TabView } from '../threads/Pages';
+import { type TabView } from '../threads/Pages';
 import { api } from '../api';
 import { GREETING, MAX_HOPS, STARTERS, TEAMMATE_EFFORT, VOICES, VOICE_WORDS_MOST, starterAsks, voiceOf, yesFirst } from '../../../shared/teammates.mjs';
 import { ModelPicker } from '../components/Model';
 import type { ModelChoice } from '../models';
 import { rememberedProject } from '../compose-project';
-import { answerOf, answersMessage, chatEntries, chatWith, clockOf, dayOf, firstSentence, sentTab, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, whyWaiting, type ChatEntry } from './chat-lines';
+import { answerOf, answersMessage, chatEntries, chatWith, clockOf, dayOf, firstSentence, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, whyWaiting, type ChatEntry } from './chat-lines';
 import { ChatsColumn } from './ChatsColumn';
 import { nowLine, TeammateMark } from './TeammatesRail';
 import { AskBeforeDeleting } from '../team/MessageMore';
@@ -42,7 +42,6 @@ const NO_SESSIONS: ReadonlyMap<string, RunningSession> = new Map();
 export type TeammateModels = { engine: string | null; codex: ModelChoice[]; codexDefault: string | null };
 const NO_MODELS: TeammateModels = { engine: null, codex: [], codexDefault: null };
 const noTab = (): TabView | null => null;
-const noList = (): void => {};
 const noFile = (): void => {};
 
 /** Which page is up: `new`, `<id>` (its chat), `sheet:<id>` (its chat, About over it), `log:<id>`, `about:<id>` (all it knows and does) or `book:<playbook>:<id>`. */
@@ -112,7 +111,7 @@ export function TeammateMenu({ t, shown, onOpen, call, onDeleted }: { t: Teammat
 
 const NO_QUEUE: string[] = [];
 
-export function TeammatesPage({ view, items = [], open, products, engines, onOpen, onOpenThread, onOpenFile = noFile, onChanged, me, mePic = null, sessions = NO_SESSIONS, queued = NO_QUEUE, models = NO_MODELS, tabOf = noTab, onOpenList = noList }: {
+export function TeammatesPage({ view, items = [], open, products, engines, onOpen, onOpenThread, onOpenFile = noFile, onChanged, me, mePic = null, sessions = NO_SESSIONS, queued = NO_QUEUE, models = NO_MODELS, tabOf = noTab }: {
   queued?: string[];
   onOpenFile?: (product: string, src: string) => void;
   /** Every thread the app holds, so what a teammate sent you is drawn as its inbox row. */
@@ -131,7 +130,6 @@ export function TeammatesPage({ view, items = [], open, products, engines, onOpe
   onOpenThread: (product: string, id: string) => void;
   /** The inbox tab a thread sits in, by the app's own rule, and a way to open the inbox there. */
   tabOf?: (item: WorkItem) => TabView | null;
-  onOpenList?: (view: TabView) => void;
   onChanged: () => void;
   me: string;
 }) {
@@ -153,7 +151,7 @@ export function TeammatesPage({ view, items = [], open, products, engines, onOpe
   else if (shown.kind === 'book') main = <PlaybookPage t={t} book={view?.playbooks?.find((p) => p.id === shown.book) ?? null} team={team} onOpen={onOpen} onOpenThread={onOpenThread} />;
   else {
     main = <>
-      <ChatColumn view={view} items={items} products={products} team={team} t={t} me={me} mePic={mePic} call={call} sessions={sessions} queued={queued} onOpen={onOpen} onOpenThread={onOpenThread} onOpenFile={onOpenFile} tabOf={tabOf} onOpenList={onOpenList}
+      <ChatColumn view={view} items={items} products={products} team={team} t={t} me={me} mePic={mePic} call={call} sessions={sessions} queued={queued} onOpen={onOpen} onOpenThread={onOpenThread} onOpenFile={onOpenFile} tabOf={tabOf}
         placeholder={t.status === 'draft' ? `Answer ${t.name === 'New teammate' ? 'your new teammate' : t.name}` : `Message ${t.name}`} error={error} />
       {shown.kind === 'log' && <LogPanel view={view} team={team} t={t} sessions={sessions} call={call} onClose={() => onOpen(t.id)} onOpenThread={onOpenThread} />}
       {shown.kind === 'sheet' && <Details t={t} view={view} products={products} engines={engines} models={models} call={call} onOpen={onOpen} />}
@@ -166,12 +164,12 @@ export function TeammatesPage({ view, items = [], open, products, engines, onOpe
 }
 
 /** Your chat with one AI teammate, on its own, for a page that is not Chats: its place on the home. */
-export function TeammateChat({ view, items = [], products, t, me, mePic = null, sessions = NO_SESSIONS, queued = NO_QUEUE, onOpen, onOpenThread, onOpenFile = noFile, onChanged, tabOf = noTab, onOpenList = noList }: {
+export function TeammateChat({ view, items = [], products, t, me, mePic = null, sessions = NO_SESSIONS, queued = NO_QUEUE, onOpen, onOpenThread, onOpenFile = noFile, onChanged, tabOf = noTab }: {
   queued?: string[];
   onOpenFile?: (product: string, src: string) => void;
   view: TeammatesView | null; items?: WorkItem[]; products: Product[]; t: Teammate; me: string; mePic?: string | null;
   sessions?: ReadonlyMap<string, RunningSession>; onOpen: (open: string) => void; onOpenThread: (product: string, id: string) => void; onChanged: () => void;
-  tabOf?: (item: WorkItem) => TabView | null; onOpenList?: (view: TabView) => void;
+  tabOf?: (item: WorkItem) => TabView | null;
 }) {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { setError(null); }, [t.id]);
@@ -183,14 +181,14 @@ export function TeammateChat({ view, items = [], products, t, me, mePic = null, 
     return r.value ?? true;
   };
   return <ChatColumn view={view} items={items} products={products} team={view?.list ?? []} t={t} me={me} mePic={mePic} call={call} sessions={sessions} queued={queued} onOpen={onOpen} onOpenThread={onOpenThread} onOpenFile={onOpenFile}
-    tabOf={tabOf} onOpenList={onOpenList} placeholder={t.status === 'draft' ? `Answer ${t.name === 'New teammate' ? 'your new teammate' : t.name}` : `Message ${t.name}`} error={error} />;
+    tabOf={tabOf} placeholder={t.status === 'draft' ? `Answer ${t.name === 'New teammate' ? 'your new teammate' : t.name}` : `Message ${t.name}`} error={error} />;
 }
 
 /* ------------------------------------------------------------------ chat */
-function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions, queued = NO_QUEUE, onOpen, onOpenThread, onOpenFile, tabOf, onOpenList, placeholder, error }: {
+function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions, queued = NO_QUEUE, onOpen, onOpenThread, onOpenFile, tabOf, placeholder, error }: {
   view: TeammatesView | null; items: WorkItem[]; products: Product[]; team: Teammate[]; t: Teammate; me: string; mePic: string | null; call: Call; sessions: ReadonlyMap<string, RunningSession>; queued?: string[];
   onOpen: (open: string) => void; onOpenThread: (product: string, id: string) => void; onOpenFile: (product: string, src: string) => void; placeholder: string; error: string | null;
-  tabOf: (item: WorkItem) => TabView | null; onOpenList: (view: TabView) => void;
+  tabOf: (item: WorkItem) => TabView | null;
 }) {
   const entries = chatWith(view, t.id);
   const scroller = useRef<HTMLDivElement>(null);
@@ -246,7 +244,7 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
       prevFrom = e.from;
     } else if (e.kind === 'run' && e.verb === 'sent') {
       sent = [e as TeamRunLine];
-      rows.push(<SentCard key={e.id} runs={sent} items={items} products={products} tabOf={tabOf} onOpenThread={onOpenThread} onOpenList={onOpenList} />);
+      rows.push(<SentCard key={e.id} runs={sent} items={items} tabOf={tabOf} onOpenThread={onOpenThread} />);
       // It stands apart from the messages, so the next one says who wrote it.
       prevFrom = '';
     } else {
@@ -270,28 +268,22 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
   </div>;
 }
 
-// What it sent you, as a window onto your inbox: the tab the threads are in,
-// over the same rows the inbox draws for them, which open as they do there.
-function SentCard({ runs, items, products, tabOf, onOpenThread, onOpenList }: {
-  runs: TeamRunLine[]; items: WorkItem[]; products: Product[]; tabOf: (item: WorkItem) => TabView | null;
-  onOpenThread: (product: string, id: string) => void; onOpenList: (view: TabView) => void;
+const SENT_WORDS: Partial<Record<TabView, string>> = { inbox: 'Waiting on you', progress: 'In progress', done: 'Done' };
+
+// What it sent you: one quiet line per thread, where it stands and its title, that opens it.
+function SentCard({ runs, items, tabOf, onOpenThread }: {
+  runs: TeamRunLine[]; items: WorkItem[]; tabOf: (item: WorkItem) => TabView | null;
+  onOpenThread: (product: string, id: string) => void;
 }) {
-  const now = Date.now();
-  const found = runs.map((r) => ({ r, item: items.find((i) => i.id === r.item && i.product === r.product) ?? null }));
-  const tab = sentTab(found.map(({ item }) => (item ? tabOf(item) : null)));
   return <div className="tq-sent">
-    <div className="tq-sent-bar"><button type="button" className="tm-tab on" onClick={() => onOpenList(tab ?? 'inbox')}>{INBOX_TABS.find((x) => x.view === tab)?.label ?? 'In your inbox'}</button></div>
-    <div className="th-table tq-inrows">
-      {found.map(({ r, item }) => {
-        const product = products.find((p) => p.slug === r.product);
-        const onOpen = () => onOpenThread(r.product, r.item);
-        return <div key={r.id} className="row" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onOpen(); } }}>
-          <span className="mark" aria-hidden="true" />
-          {item ? <ThreadCells item={item} product={product} now={now} />
-            : <RowCells title={r.said || r.title} where={product?.name ?? ''} priority={null} updatedAt={r.ts} now={now} />}
-        </div>;
-      })}
-    </div>
+    {runs.map((r) => {
+      const item = items.find((i) => i.id === r.item && i.product === r.product) ?? null;
+      const tab = item ? tabOf(item) : null;
+      return <button key={r.id} type="button" className="tq-sent-line" onClick={() => onOpenThread(r.product, r.item)}>
+        {tab === 'inbox' && <i className="tq-dot-need" aria-hidden="true" />}
+        <span className="v">{(tab && SENT_WORDS[tab]) ?? 'Sent you'}:</span> <span className="t">{r.said || r.title}</span>
+      </button>;
+    })}
   </div>;
 }
 

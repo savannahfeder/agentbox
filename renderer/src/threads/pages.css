@@ -166,26 +166,34 @@
 .th-section.folded .th-fold-mark { transform: rotate(-90deg); }
 /* Thread, status, project, priority, updated. The status column is the width
    of the longest word it draws ("Nothing came back") at its own type size, with
-   the Try again mark after it. */
-.th-grid { display: grid; grid-template-columns: minmax(0, 1fr) 176px 150px 112px 96px; column-gap: 16px; align-items: center; width: 100%; min-height: 20px; }
+   the Try again mark after it. A column set to `initial` takes the empty
+   fallback, so its track and its gap go and the rest close up. */
+.th-grid { --th-state: 176px; --th-proj: 150px; --th-prio: 112px; display: grid; grid-template-columns: minmax(0, 1fr) var(--th-state,) var(--th-proj,) var(--th-person,) var(--th-prio,) 96px; column-gap: 16px; align-items: center; width: 100%; min-height: 20px; }
 .th-table .row { min-height: 0; }
 .th-grid > div { line-height: 20px; }
-.th-grid.with-person { grid-template-columns: minmax(0, 1fr) 176px 140px 130px 112px 96px; }
+.th-grid.with-person { --th-proj: 140px; --th-person: 130px; }
+/* A column no row of the table fills is not drawn, header included. */
+.th-table:has(.th-head):not(:has(.th-cell-state:not(:empty))) .th-grid { --th-state: initial; }
+.th-table:has(.th-head):not(:has(.th-cell-state:not(:empty))) :is(.th-col-state, .th-cell-state) { display: none; }
+.th-table:has(.th-head):not(:has(.th-cell-proj:not(:empty))) .th-grid { --th-proj: initial; }
+.th-table:has(.th-head):not(:has(.th-cell-proj:not(:empty))) .th-col-proj { display: none; }
+.th-table:has(.th-head):not(:has(.th-cell-prio:not(:empty))) .th-grid { --th-prio: initial; }
+.th-table:has(.th-head):not(:has(.th-cell-prio:not(:empty))) .th-col-prio { display: none; }
 /* A NARROW TABLE GIVES UP PRIORITY, THEN PROJECT, so the title keeps 240
    points. The steps are the list's own width, whose rows sit 76 inside it. */
 .th-table { container: th / inline-size; }
 @container th (max-width: 915px) {
   .th-grid > .th-col-prio { display: none; }
-  .th-grid { grid-template-columns: minmax(0, 1fr) 176px 150px 96px; }
-  .th-grid.with-person { grid-template-columns: minmax(0, 1fr) 176px 140px 130px 96px; }
+  .th-grid, .th-grid.with-person { --th-prio: initial; }
 }
 /* Narrowest, the status column gives the title back the mark's 16, and the
    mark sits in the empty left of the right-aligned time. */
 @container th (max-width: 785px) {
   .th-grid > .th-col-proj { display: none; }
-  .th-grid { grid-template-columns: minmax(0, 1fr) 160px 96px; }
+  .th-grid, .th-grid.with-person { --th-proj: initial; }
+  .th-grid { --th-state: 160px; }
   .th-cell-state.can-retry { overflow: visible; }
-  .th-grid.with-person { grid-template-columns: minmax(0, 1fr) 176px 130px 96px; }
+  .th-grid.with-person { --th-state: 176px; }
 }
 .th-grid > .num { text-align: right; }
 .th-cell-title { font-size: 14px; line-height: 20px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -395,6 +403,8 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
    and in the ink the row's status cell wears (w-ec2b04d449). */
 .th-card .m .s { display: flex; align-items: center; color: var(--text-dim); white-space: nowrap; flex: none; }
 .th-card .m .s::after { content: ""; width: 1px; height: 9px; margin: 0 9px; background: var(--line-strong); }
+/* The rule divides the state from what follows it, so it goes when nothing does. */
+.th-card .m .s:not(:has(~ .th-prio-mark, ~ .p))::after { content: none; }
 .th-card .m .s .th-st, .th-card .m .s .th-st-cloud { margin-right: 7px; }
 .th-card .m .tm-av { width: 18px; height: 18px; line-height: 16px; font-size: 8px; margin-left: auto; flex: none; }
 .th-col-empty { font-size: 13px; color: var(--text-faint); padding: 4px 2px; }

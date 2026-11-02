@@ -5,7 +5,10 @@
 .av-top {
   flex: none; height: 44px; padding: 0 12px 0 16px; display: flex; align-items: center; gap: 14px;
   border-bottom: 1px solid var(--line); font-size: 13px; min-width: 0;
+  /* Past the Mac window's buttons, which sit over this corner. */
+  padding-left: 84px;
 }
+:root[data-window="flat"] .av-top { padding-left: 16px; }
 .av-back {
   flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 8px;
   background: none; border: 0; padding: 0; font: inherit; color: var(--text-dim); cursor: default;
@@ -23,7 +26,7 @@
 .av-spring { flex: 1; }
 .av-btn {
   flex: none; height: 28px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none;
-  font: 11.5px var(--mono); color: var(--text); white-space: nowrap;
+  font: inherit; color: var(--text); white-space: nowrap;
 }
 .av-btn:hover { background: var(--wash); }
 .av-btn.is-on { background: var(--wash-strong); }

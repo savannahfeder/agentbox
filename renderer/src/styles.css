@@ -2210,13 +2210,10 @@ body {
 /* Sections appended below the body: your answer, the result. Same typographic
    system as the body, no cards, no border stripes. */
 .appendix { margin-top: 26px; }
-.appendix-label {
-  font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em;
-  color: var(--text-faint); margin-bottom: 7px; font-weight: 600;
-}
+.appendix-label { font-size: 12.5px; color: var(--text-faint); margin-bottom: 7px; }
 /* What wrote it, after the label's own word: quieter than the label, because
    the label says what this block IS and this says where it came from. */
-.appendix-ran { font-weight: 400; opacity: 0.72; }
+.appendix-ran { opacity: 0.72; }
 .appendix-unshipped::before {
   content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent); margin-right: 7px; vertical-align: 1px;
@@ -2615,7 +2612,6 @@ body {
 /* A person is the one to notice before a send: their face, their name in the text's own colour. */
 .dock-to-person { font-size: 12.5px; color: var(--text); }
 .dock-to-person > * { flex: none; }
-.dock-to-mark { flex: none; width: 8px; height: 8px; border: 1.5px solid var(--text-faint); }
 /* Words in a box have not gone: the difference from a posted message has to be read, not inferred. */
 .dock-unsent { margin-left: auto; margin-right: 10px; font-size: 12px; color: var(--accent); white-space: nowrap; }
 .dock-unsent + .dock-send { margin-left: 0; }
@@ -9339,8 +9335,10 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .pv-idle { cursor: none; }
 .pv-idle .pv-chrome { opacity: 0; pointer-events: none; }
 
-.pv-top { position: absolute; top: 16px; left: 16px; right: 16px; height: 46px; display: flex; align-items: center; justify-content: space-between;
+/* `left` clears the Mac window's buttons, which sit over this corner. */
+.pv-top { position: absolute; top: 16px; left: 84px; right: 16px; height: 46px; display: flex; align-items: center; justify-content: space-between;
   gap: 16px; }
+:root[data-window="flat"] .pv-top { left: 16px; }
 .pv-title { display: flex; align-items: center; gap: 12px; min-width: 0; height: 46px; padding: 0 18px; }
 .pv-name { font-size: 13px; letter-spacing: .01em; color: color-mix(in srgb, var(--read-paper) 86%, transparent);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }

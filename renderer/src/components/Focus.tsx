@@ -1,5 +1,5 @@
 import { RemoteControl } from './RemoteControl';
-import { dropHalfMention, heldKeyThatOpenedTheBox, keyInTheReplyBox, replyName, replyTarget, replyingTo, sendKeyFor, unsentWords } from '../reply-keys';
+import { dropHalfMention, heldKeyThatOpenedTheBox, keyInTheReplyBox, replyName, replyTarget, sendKeyFor, unsentWords } from '../reply-keys';
 import { onPhone } from '../phone-screen';
 import { FilmBar, useFilm } from './FilmPlayer';
 import { useFilmPoster } from '../film-poster';
@@ -107,7 +107,7 @@ import { foldedReply } from '../folded-reply';
 import { applyDockHeight } from '../dock-height';
 import { resumeTo } from '../thread-bottom';
 import { optionIsClipped, optionPeek } from '../option-peek';
-import { shipOfferFor, shipOfferLive, standingFrom, UNREAD, type Standing } from '../ship-offer';
+import { changedFiles, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
 import { MOVED_PX, THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw } from '../pick-settles';
 import { askHeading, askFull, askIsClipped } from '../ask-line';
 import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mjs';
@@ -1271,10 +1271,12 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // And where its folder stands, off the same file, because the figures alone
   // cannot say whether any of this reached a commit (../ship-offer.ts).
   const [standing, setStanding] = useState<Standing>(UNREAD);
+  const [changed, setChanged] = useState<ChangedFile[]>([]);
   useEffect(() => {
     let live = true;
     setFigures(null);
     setStanding(UNREAD);
+    setChanged([]);
     // One of her own Claude Code sessions is not one of our runs: nothing wrote
     // a change for it, so there is nothing to ask for.
     if (agent) return () => { live = false; };
@@ -1284,8 +1286,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           if (!live) return;
           setFigures(r?.ok ? figuresFrom(r.change) : null);
           setStanding(r?.ok ? standingFrom(r.change) : UNREAD);
+          setChanged(r?.ok ? changedFiles(r.change) : []);
         })
-        .catch(() => { if (live) { setFigures(null); setStanding(UNREAD); } });
+        .catch(() => { if (live) { setFigures(null); setStanding(UNREAD); setChanged([]); } });
     };
     read();
     if (!session) return () => { live = false; };
@@ -1527,7 +1530,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // AND WHICH WORDS IT ASKS IN COME OFF THE FOLDER, not off a fixed pair:
   // work with a commit on it is shipped, work nobody committed is committed
   // first, and work that has been thrown away is not asked about at all.
-  const shipAsk = shipOfferLive(item, { change: !!figures, running: !!session || !!agent }) ? shipOfferFor(standing) : null;
+  const shipAsk = shipOfferLive(item, { change: !!figures, running: !!session || !!agent }) ? shipOfferFor(standing, onlyNamedFiles(changed, referencedFiles(item.result, item.note, item.body, item.answer, { dir: productDir }), productDir)) : null;
   const shipOffer = !!shipAsk;
   const stripShown = showOptions || shipOffer;
   // Whatever the pane is leading with, not the ask alone: on a row the user
@@ -3287,10 +3290,10 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
         // Who a send reaches, plain enough to see before pressing it: a
         // person's face and name, or the agent, never one dressed as the other.
         const people = answering ? [answering] : talkTo;
-        const to = replyTarget({ people, title: rowTitle(item) });
-        return <div className={`dock-to dock-to-${to.kind}`}>
-          {to.kind === 'person' ? to.names.slice(0, 3).map((n) => <Face key={n} name={n} size={16} />) : <span className="dock-to-mark" aria-hidden="true" />}
-          <span>{replyingTo({ people, title: rowTitle(item) })}</span>
+        const to = replyTarget({ people });
+        return to.kind === 'person' && <div className={`dock-to dock-to-${to.kind}`}>
+          {to.names.slice(0, 3).map((n) => <Face key={n} name={n} size={16} />)}
+          <span>{to.words}</span>
         </div>;
       })()}
       {richBox ? (

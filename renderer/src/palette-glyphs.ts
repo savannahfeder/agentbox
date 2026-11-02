@@ -45,6 +45,7 @@ const BY_ID: Record<string, string> = {
   approve: '✓',
   'run-now': '»',
   done: '□',
+  'close-task': '□',
   reply: `↩${TEXT}`,
   'resume-any': '↻',
   'try-again': '↻',
