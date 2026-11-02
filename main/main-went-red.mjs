@@ -282,8 +282,8 @@ export function redRow({ sha, subject, url, machines, tries = 1, before = null }
 export function noRunnerRow({ sha, subject, url, machines, askedAgain = true }) {
   const where = machines.join(' and ');
   return {
-    title: `main's tests never ran on ${where}: GitHub had no runner`,
-    problem: `GitHub gave main's run at ${shortSha(sha)} no ${where} runner, so that part of the suite never ran. No test failed and no commit is wrong; the shortage is GitHub's.`,
+    title: `GitHub had no ${where} runner, so main's tests never ran`,
+    problem: `No test failed and no commit is wrong. GitHub had no ${where} runner for main's run at ${shortSha(sha)}, so that part of the suite never ran at all. The shortage is GitHub's own.`,
     body: [
       "main's `tests` run is red on GitHub, at this commit:",
       '',
