@@ -236,7 +236,7 @@ import { usePointerHold, useHeldOrder } from './threads/steady-rows';
 import { inviteRows, leadRows, type InviteRow, type LeadRow } from './threads/needs-you-rows';
 import { InviteRows } from './threads/InviteRows';
 import { mentionRows } from './team/rooms/room-rules';
-import { SAYS_UNDO, opensTheToast, saysWhereItWent, toastOpens, toastParts, type ToastGoes } from './toast-parts';
+import { SAYS_UNDO, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
 import { AgentSending } from './team/AgentSending';
 import { reachAudienceOf } from '../../shared/teammate-reach.mjs';
@@ -5711,6 +5711,10 @@ export default function App() {
   // the window holds by then; a row withdrawn with Z simply does not answer.
   // `openRepeat` is defined well below; it is reached through this ref.
   const openRepeatRef = useRef<((rule: RepeatRule) => void) | null>(null);
+  // An O pressed before its thread is in the lists, and when Send was last
+  // pressed (oWaitsFor, w-7f2d5329a6).
+  const oWaits = useRef<OWaits | null>(null);
+  const sentAt = useRef(0);
   const openToastRow = useCallback((to: ToastGoes) => {
     setToast(null);
     // A NEW REPEATING TASK OPENS AS ITSELF (w-5513afd09a), the way a click on
@@ -5722,7 +5726,7 @@ export default function App() {
     }
     const row = [...inbox, ...progress, ...snoozed, ...done]
       .find((i) => i.id === to.id && i.product === to.product);
-    if (!row) return;
+    if (!row) { oWaits.current = { at: Date.now(), screen: screenWas.current, goes: to }; return; }
     setSearch(null);
     setFocused(row);
     markSeen(row);
@@ -5743,6 +5747,16 @@ export default function App() {
     screenWas.current = screenIs;
     if (Date.now() - movedByKeyAt.current > 1500) screenChangedAt.current = Date.now();
   }, [screenIs]);
+  useEffect(() => {
+    const ready = (to: ToastGoes) => (to.repeat
+      ? repeats.some((r) => r.id === to.id && r.product === to.product)
+      : [...inbox, ...progress, ...snoozed, ...done].some((i) => i.id === to.id && i.product === to.product));
+    const r = oWaitsFor(oWaits.current, toast, Date.now(), screenIs, ready);
+    oWaits.current = r.keep;
+    // A toast naming a thread is the send's answer, so later O presses are ordinary ones.
+    if (toast?.goes) sentAt.current = 0;
+    if (r.open) openToastRow(r.open);
+  }, [toast, screenIs, inbox, progress, snoozed, done, repeats, openToastRow]);
   const conversationNames = (item: WorkItem): string[] | null => {
     const t = snap?.products.find((p) => p.slug === item.product)?.team;
     if (!isDirect(snap?.products.find((p) => p.slug === item.product)) || !t) return null;
@@ -5761,6 +5775,7 @@ export default function App() {
       // pressing the Z, and taking the question away underneath her would leave
       // the shift key cancelling the thing it was helping her type.
       if (!HOLDS_A_KEY.has(e.key) && e.key !== 'z' && e.key !== 'Z') undoAskRef.current = null;
+      if (!HOLDS_A_KEY.has(e.key) && e.key !== 'o' && e.key !== 'O') oWaits.current = null;
       // Settings is a SCREEN, not a modal over the list, so every key that acts
       // on the list behind it would act on something she cannot see. It owns
       // the keyboard while it is up; esc (handled inside it) is the way out.
@@ -5960,6 +5975,11 @@ export default function App() {
       // somewhere to go is up: the cap drawn on it is the only promise of it.
       const goesTo = opensTheToast(e.key, toast, focused ? { product: focused.product, id: focused.id } : null);
       if (goesTo) { e.preventDefault(); openToastRow(goesTo); return; }
+      if (oWaitsForTheSend(e.key, toast, sentAt.current, Date.now())) {
+        e.preventDefault();
+        oWaits.current = { at: Date.now(), screen: screenWas.current };
+        return;
+      }
       // AN OPEN REPEATING TASK IS A SCREEN, AND EVERY KEY STOPS HERE.
       //
       // There was no branch for it at all, so with a rule on screen the whole
@@ -7967,6 +7987,7 @@ export default function App() {
             setModal(null);
             setComposeInitial(null);
             setPickProject(null);
+            sentAt.current = Date.now();
             const later = (how.runAt != null && how.runAt > Date.now()) || how.start === 'later';
             const to = how.kind === 'message'
               ? firstNames(how.toMany ?? [how.to ?? ''])
@@ -7995,6 +8016,8 @@ export default function App() {
           // where the words are.
           onFailed={(said, back) => {
             doneSending();
+            sentAt.current = 0;
+            oWaits.current = null;
             setJustSent(false);
             if (modalNow.current) { showToast(`${said} Your words are in the new thread card.`); return; }
             setComposeInitial(back.to || back.handFrom ? back : null);

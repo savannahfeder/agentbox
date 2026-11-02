@@ -66,3 +66,29 @@ export function opensTheToast(key: string, toast: { goes?: ToastGoes } | null, h
   if (key !== 'o' && key !== 'O') return null;
   return toastOpens(toast, here) ? toast!.goes! : null;
 }
+
+/** How long an O pressed ahead of its thread is kept. */
+export const O_WAITS_MS = 10_000;
+export type OWaits = { at: number; screen: string; goes?: ToastGoes };
+
+/**
+ * AN O PRESSED WHILE A SEND IS IN THE AIR. "Starting in…" is up before the
+ * thread has an id, so the O is held for the toast that names it.
+ */
+export function oWaitsForTheSend(key: string, toast: { goes?: ToastGoes } | null, sentAt: number, now: number): boolean {
+  return (key === 'o' || key === 'O') && !toast?.goes && sentAt > 0 && now - sentAt < O_WAITS_MS;
+}
+
+/**
+ * What a held O does now: open its thread once that thread is in the lists
+ * (`ready`), keep waiting, or let go. It lets go when the window is up or the
+ * screen has moved since, so it never pulls you off something you opened.
+ */
+export function oWaitsFor(
+  w: OWaits | null, toast: { goes?: ToastGoes } | null, now: number, screen: string, ready: (to: ToastGoes) => boolean,
+): { open: ToastGoes | null; keep: OWaits | null } {
+  if (!w || now - w.at > O_WAITS_MS || w.screen !== screen) return { open: null, keep: null };
+  const goes = w.goes ?? toast?.goes;
+  if (!goes) return { open: null, keep: w };
+  return ready(goes) ? { open: goes, keep: null } : { open: null, keep: { ...w, goes } };
+}
