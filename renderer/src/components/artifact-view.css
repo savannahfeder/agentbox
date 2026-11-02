@@ -27,7 +27,7 @@
 .av-btn {
   flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; box-sizing: border-box; padding: 0 12px;
   border: 1px solid var(--line-strong); border-radius: var(--radius); background: none;
-  font: inherit; color: var(--text); white-space: nowrap;
+  font: inherit; font-size: 13px; color: var(--text); white-space: nowrap;
 }
 .av-btn:has(> .av-glyph) { padding-left: 10px; }
 .av-btn:hover:not(:disabled) { background: var(--wash); }
@@ -151,7 +151,7 @@
 .av-note-sent .av-glyph { width: 12px; height: 12px; }
 .av-note-done .av-glyph { color: var(--code-plus); }
 .av-note-btns { margin-left: auto; display: inline-flex; gap: 6px; }
-.av-note-done + .av-note-act { margin-left: auto; }
+.av-note-done + .av-note-act, .av-note-toagent { margin-left: auto; }
 .av-note-act {
   flex: none; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px 0 8px;
   border: 1px solid var(--line); border-radius: var(--radius); background: none;

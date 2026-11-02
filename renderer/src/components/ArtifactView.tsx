@@ -675,7 +675,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
                     </span>
                   )}
                   <button type="submit" className="av-btn av-write-send" disabled={!words.trim() || sending}>
-                    <NoteGlyph name="send" />{sendWords}
+                    <NoteGlyph name={sendWords === 'Add note' ? 'add' : 'send'} />{sendWords}
                   </button>
                 </div>
               </div>

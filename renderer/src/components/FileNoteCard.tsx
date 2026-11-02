@@ -66,7 +66,7 @@ export function FileNoteCard({ note, wordsGone, active, settling, person, me, on
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
         <span className="av-note-acts">
           <button type="button" className="av-note-act" onClick={() => { setWords(''); onReplying(false); }}>Cancel</button>
-          <button type="submit" className="av-note-act is-strong" disabled={!words.trim() || sending}><NoteGlyph name="send" />Reply</button>
+          <button type="submit" className="av-note-act is-strong" disabled={!words.trim() || sending}><NoteGlyph name="reply" />Reply</button>
         </span>
       </form>
     )}
@@ -80,7 +80,7 @@ export function FileNoteCard({ note, wordsGone, active, settling, person, me, on
       {note.sent && <span className="av-note-sent is-gone"><NoteGlyph name="send" />Sent to the agent</span>}
       {!note.sent && held && !note.resolved && <>
         <span className={`av-note-sent${held.went ? ' is-gone' : ''}`}>{held.went && <NoteGlyph name="send" />}{held.words}</span>
-        <button type="button" className="av-note-act" onClick={onToAgent}><NoteGlyph name="send" />Send to the agent</button>
+        <button type="button" className="av-note-act av-note-toagent" onClick={onToAgent}><NoteGlyph name="send" />Send to the agent</button>
       </>}
       {!replying && <span className="av-note-btns">
         {canReply && !note.resolved && <button type="button" className="av-note-act" onClick={() => onReplying(true)}><NoteGlyph name="reply" />Reply</button>}
