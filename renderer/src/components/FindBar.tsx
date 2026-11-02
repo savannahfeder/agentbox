@@ -14,7 +14,7 @@
 // React drew is ever rewritten under it.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { countLabel, matchesAcrossRuns, stepIndex, type TextRun } from '../find-in-page';
+import { countLabel, matchesAcrossRuns, stepIndex, whereToFind, type TextRun } from '../find-in-page';
 
 // Elements that sit inside a line of text rather than starting a new one. Two
 // pieces of text under the same non-inline parent read as one line to her, so
@@ -45,7 +45,7 @@ function textOnScreen(): { runs: TextRun[]; nodes: Text[] } {
     }
     return v!;
   };
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+  const walker = document.createTreeWalker(whereToFind(document), NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
       if (!parent || !node.nodeValue) return NodeFilter.FILTER_REJECT;

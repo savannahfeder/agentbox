@@ -31,7 +31,12 @@ const nameOf = (node: Node, at: string): Node => {
 
 const isWords = (node: Node) => !(node.type === 'text' && !/[^\s.,;:!?&+-]/.test(node.value ?? '')) && node.type !== 'break';
 
+const isPicture = (node: Node) => !/\.(?:mp4|mov|m4v|webm)(?:[?#]|$)/i.test(drawnAt(node) ?? '');
+
+// A row draws its pictures short so several fit; a lone picture is drawn large,
+// as if alone on its line.
 function rowFor(media: Node[]): Node {
+  if (media.length === 1 && isPicture(media[0])) return { type: 'paragraph', children: media };
   return { type: 'paragraph', children: media, data: { hName: 'div', hProperties: { className: MEDIA_ROW } } };
 }
 

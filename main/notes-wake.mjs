@@ -1,7 +1,7 @@
 // A teammate's note on a file an agent made wakes that agent's thread: it is
 // told the notes as a turn, once, the way a teammate's reply is
 // (shared/artifact-marks.mjs notesForItsAgent).
-import { notedFilesInLines, noteGoesTo, notesForItsAgent, notesForTheAgent, threadFiles } from '../shared/artifact-marks.mjs';
+import { answeredNotes, notedFilesInLines, noteGoesTo, notesForItsAgent, notesForTheAgent, threadFiles } from '../shared/artifact-marks.mjs';
 import { heldByAPerson } from '../shared/team-rules.mjs';
 import { readItemHistory } from './store/work-items.mjs';
 import { submitReply } from './live-replies.mjs';
@@ -28,6 +28,24 @@ export async function wakeForNotes({ store, team, tell, now = Date.now() }) {
     }
   }
   return told;
+}
+
+// The next version from whoever a comment went to resolves it, so nobody presses
+// Resolve on what the agent or a teammate already fixed. Only the thread's own
+// copy writes it; a direct conversation has two.
+export function resolveAnsweredNotes({ store, people = [], now = Date.now() }) {
+  const direct = new Set(store.listProducts().filter((p) => p.team?.direct).map((p) => p.slug));
+  let resolved = 0;
+  for (const item of store.listItems(now)) {
+    if (direct.has(item.product)) continue;
+    if (!(item.artifacts?.notes ?? []).some((n) => !n.resolved && (n.sent || people.length))) continue;
+    const lines = readItemHistory(store.productDir(item.product), item.id, { max: Number.MAX_SAFE_INTEGER });
+    for (const a of answeredNotes(lines, { people })) {
+      store.fileMark(item.product, item.id, { do: 'resolve', on: a.on, in: a.in });
+      resolved++;
+    }
+  }
+  return resolved;
 }
 
 // Your own note on a file an agent made on your thread is you speaking to that
