@@ -56,10 +56,11 @@ const cells = (html) => html.match(/<div class="th-cell-[a-z]+/g);
 const FIVE = ['<div class="th-cell-title', '<div class="th-cell-state', '<div class="th-cell-proj', '<div class="th-cell-prio', '<div class="th-cell-when'];
 
 describe('in Needs you', () => {
-  it('an agent row says nothing in Status where it would only say Waiting on you', () => {
+  // Answered rather than empty since 2026-11-02 (a-row-in-needs-you-says-why-it-is-there).
+  it('an agent row says Answered in Status where it would only say Waiting on you', () => {
     const html = draw(thread(), company, 'inbox');
     expect(html).not.toContain('Waiting on you');
-    expect(cell(html, 'state')).toBe('');
+    expect(cell(html, 'state')).toBe('Answered');
     expect(cells(html)).toEqual(FIVE);
   });
 

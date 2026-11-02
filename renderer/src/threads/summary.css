@@ -362,3 +362,4 @@ h1 .thread-crumb-with { font: 11px var(--mono); letter-spacing: .09em; text-tran
    The name is saved as typed; only the bar shows it in capitals. */
 .thread-crumb-edit { -webkit-app-region: no-drag; flex: 1; min-width: 120px; max-width: 640px; height: 28px; box-sizing: border-box; padding: 0 6px; border: 0; background: none; font: 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text); outline: none; caret-color: var(--accent); }
 .thread-crumb:has(.thread-crumb-edit) .thread-crumb-sep { color: var(--accent); }
+.ts-menu-say, .tm-menu-say { margin: 2px 0 4px; padding: 4px 10px 8px; max-width: 280px; border-bottom: 1px solid var(--line); font-size: 12.5px; line-height: 17px; color: var(--text-faint); white-space: normal; }

@@ -61,6 +61,12 @@ describe('how far a thing got', () => {
     expect(long.length).toBeLessThanOrEqual(81);
     expect(long.endsWith('…')).toBe(true);
   });
+  it('a trail of steps says only its latest step, not every step run together', () => {
+    const says = (progress) => day({ items: [row('w-1', { progress })] }).people[0].working[0].says;
+    expect(says('Drew three screens\nPicked the second with Maya')).toBe('Picked the second with Maya');
+    expect(says('- Read the code\n✓ Drew the screens\n\n')).toBe('Drew the screens');
+    expect(says('One step only')).toBe('One step only');
+  });
 });
 
 describe('the page', () => {

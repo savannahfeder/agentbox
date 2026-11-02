@@ -94,29 +94,5 @@ export function faceRow(members: readonly Member[]): Member[] {
   return row.some((m) => m.kind !== 'me') ? row : [];
 }
 
-export interface RailSection { label: 'People' | 'AI teammates' | 'Groups' | null; rows: Member[] }
-
-/** The panel beside Needs you: you and the team, then people, AI teammates and the other chats. Empty for someone alone. */
-export function railSections(members: readonly Member[]): RailSection[] {
-  const sections: RailSection[] = [
-    { label: null, rows: [...members.filter((m) => m.kind === 'me'), ...members.filter((m) => m.kind === 'chat' && m.team)] },
-    { label: 'People', rows: members.filter((m) => m.kind === 'person') },
-    { label: 'AI teammates', rows: [...members.filter((m) => m.key.startsWith('mate:')), ...members.filter((m) => m.key.startsWith('theirmate:'))] },
-    { label: 'Groups', rows: members.filter((m) => m.kind === 'chat' && !m.team) },
-  ];
-  return members.some((m) => m.kind !== 'me') ? sections.filter((x) => x.rows.length) : [];
-}
-
-/** The home: one list with the team's faces on its line, or the two tabs with cards. */
-export type HomeLayout = 'list' | 'tabs';
-const HOME_KEY = 'agentbox.home.layout';
-type Store = Pick<Storage, 'getItem' | 'setItem'> | null;
-const local = (): Store => { try { return globalThis.localStorage ?? null; } catch { return null; } };
-
-export function readHomeLayout(store: Store = local()): HomeLayout {
-  try { return store?.getItem(HOME_KEY) === 'tabs' ? 'tabs' : 'list'; } catch { return 'list'; }
-}
-
-export function writeHomeLayout(layout: HomeLayout, store: Store = local()) {
-  try { store?.setItem(HOME_KEY, layout); } catch { /* kept for this window only */ }
-}
+/** With a team, the team lives in Team beside the inbox; alone, the inbox is one list. */
+export type HomeLayout = 'list' | 'chats';

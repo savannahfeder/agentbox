@@ -46,12 +46,14 @@ function SearchGlyph() {
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, onSignIn, onFeedback, onSignOut, update = null, onUpdate, move = null, onMove, invisible = null, inboxLabel = 'Threads', onPalette, rail = false, onHover, groups = null, onGroupsPage = false, onTeammatesPage = false, onFiles, filesPage = false, onConnections, connectionsPage = false }: {
+export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, onSignIn, onFeedback, onSignOut, update = null, onUpdate, move = null, onMove, invisible = null, inboxLabel = 'Threads', onPalette, rail = false, onHover, groups = null, onGroupsPage = false, onTeammatesPage = false, onFiles, filesPage = false, onConnections, connectionsPage = false, onTasks, tasksPage = false }: {
   /** Whether one of the teammates' pages is up, which unlights Threads. */
   onTeammatesPage?: boolean;
   /** The Files place, and whether it is the page. */
   onFiles?: () => void; filesPage?: boolean;
   onConnections?: () => void; connectionsPage?: boolean;
+  /** Every task on the team, as its own page (the layout whose tabs are only states). */
+  onTasks?: () => void; tasksPage?: boolean;
   /** The first row's name: Threads, or Inbox while its page holds groups too. */
   inboxLabel?: string;
   /** Opens ⌘K, which finds threads and commands both. */
@@ -169,7 +171,11 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
           it. `onTeam` is still the sign-in link at the foot. */}
     </nav>
     {groups}
-    {(onConnections || onFiles) && <nav className="workspace-tabs workspace-places" aria-label="Places">
+    {(onConnections || onFiles || onTasks) && <nav className="workspace-tabs workspace-places" aria-label="Places">
+      {onTasks && <button data-tab="team" className={`workspace-tab${tasksPage ? ' active' : ''}`} aria-label="Team" aria-current={tasksPage ? 'page' : undefined} title={collapsed ? 'Team' : undefined} onClick={onTasks}>
+        <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="2.5"/><circle cx="6" cy="10" r="2"/><circle cx="18" cy="10" r="2"/><path d="M8 19c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5"/><path d="M3 18c0-2 1.3-3.5 3-3.5 .8 0 1.5.3 2 .8M21 18c0-2-1.3-3.5-3-3.5-.8 0-1.5.3-2 .8"/></svg>
+        <span>Team</span>
+      </button>}
       {onConnections && <button data-tab="connections" className={`workspace-tab${connectionsPage ? ' active' : ''}`} aria-label="Connections" aria-current={connectionsPage ? 'page' : undefined} title={collapsed ? 'Connections' : undefined} onClick={onConnections}>
         <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13.5a4 4 0 0 0 5.66 0l2.5-2.5a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10.5a4 4 0 0 0-5.66 0l-2.5 2.5a4 4 0 0 0 5.66 5.66l1-1"/></svg>
         <span>Connections</span>

@@ -17,7 +17,6 @@
 // The list hangs under "N hidden" outside the cards' own scroll box: drawn
 // inside it on the first try, it opened clipped to nothing (built app, shot i).
 import { describe, it, expect } from 'vitest';
-import fs from 'node:fs';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { splitHidden, hideMember, readHidden, writeHidden } from '../renderer/src/team/everything/members.ts';
@@ -91,14 +90,3 @@ describe('the cards', () => {
   });
 });
 
-describe('in the app', () => {
-  const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-  it('draws only the cards not hidden, and hiding the open one goes back to your threads', () => {
-    expect(app).toContain('const evSplit = splitHidden(members, evHidden);');
-    expect(app).toContain('<TeamStrip members={evSplit.shown}');
-    expect(app).toMatch(/<CardsArea [^>]*hidden=\{evSplit\.hidden\} onShow=\{showCard\}>/);
-    expect(fs.readFileSync(new URL('../renderer/src/team/everything/CardsArea.tsx', import.meta.url), 'utf8')).toContain('<HiddenList hidden={hidden} onShow={onShow} />');
-    expect(app).not.toContain('showHidden');
-    expect(app).toMatch(/if \(evKey === m\.key\) pickMember\('me'\);/);
-  });
-});
