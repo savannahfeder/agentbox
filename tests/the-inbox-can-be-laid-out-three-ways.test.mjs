@@ -31,14 +31,14 @@ describe('the three layouts', () => {
 
   it('give two tabs the team views on the Team card', () => {
     const app = read('renderer/src/App.tsx');
-    expect(app).toMatch(/const todayPage = \(\) =>/);
-    expect(app).toMatch(/const tasksPage = \(\) =>/);
+    expect(app).toMatch(/const todayPage = \(title\?: string\) =>/);
+    expect(app).toMatch(/const tasksPage = \(title\?: string\) =>/);
     expect(app).toMatch(/teamSpace === 'today' \? todayPage\(\) : teamSpace === 'tasks' \? tasksPage\(\)/);
   });
 
   it('give the third layout one Team page in the sidebar, the day over the tasks', () => {
     expect(read('renderer/src/components/WorkspaceNavigation.tsx')).toMatch(/data-tab="team"/);
-    expect(read('renderer/src/App.tsx')).toMatch(/<div className="team-page">\{todayPage\(\)\}\{tasksPage\(\)\}<\/div>/);
+    expect(read('renderer/src/App.tsx')).toMatch(/<div className="team-page">\{todayPage\('People'\)\}\{tasksPage\('Tasks'\)\}<\/div>/);
     // Its own page: titled Team, without the inbox's tabs over it.
     expect(read('renderer/src/App.tsx')).toMatch(/homeLayout === 'states' && tasksShown \? <h1 className="workspace-title">Team<\/h1>/);
     expect(read('renderer/src/App.tsx')).toMatch(/!\(homeLayout === 'states' && tasksShown\) && \(\n\s+<StateTabs/);

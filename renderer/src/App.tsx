@@ -2697,7 +2697,8 @@ export default function App() {
   const setNeedsGroup = (group: NeedsGroup) => { setNeedsGroupRaw(group); writeNeedsGroup(group); };
   // "In progress" on the one-list home is a list until someone picks the board.
   const [evChosen, setEvChosen] = useState<EvView | null>(() => readEvView(undefined, null));
-  const evView: EvView = evChosen ?? (homeLayout === 'tabs' ? 'board' : 'list');
+  // On the layout with only two tabs, In progress is your board, so Later and Done have a place.
+  const evView: EvView = evChosen ?? (homeLayout === 'list' ? 'list' : 'board');
   const setEvView = (v: EvView) => { setEvChosen(v); writeEvView(v); };
   const evTeamKey = roomsOn ? (snap?.team?.rooms?.rooms ?? []).find((r) => r.teamId)?.id ?? null : null;
   const sharesThreads = useCallback((personId: string) => (snap?.team?.cards ?? []).some((c) => c.personId === personId && c.visible), [snap?.team?.cards]);
@@ -6701,7 +6702,7 @@ export default function App() {
 
   // Leaving Chats forgets which conversation was open there, or the same row
   // opened from Needs you lands back on the Chats screen with another reply box.
-  const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); };
+  const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setTasksOn(false); };
   useEffect(() => {
     if (!onPhone()) return;
     if (signInGate) {
@@ -6996,7 +6997,7 @@ export default function App() {
         still={evMember.kind === 'person' ? `${evMember.inProgress ?? 0} in progress` : undefined} />} />;
   const needsYouCount = { inbox: (mineShown ? shownCount(inbox) : 0) + theirCount('inbox') + leadCount + sharedFileNews.length + followingNews.length };
   const todayShown = teamMode && todayOn && !!snap && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
-  const todayPage = () => snap ? <TodayPage range={todayRange} onRange={setTodayRange} onNeeds={goNeedsYou} picked={todayPick} onPicked={setTodayPick} keys={!modal}
+  const todayPage = (title?: string) => snap ? <TodayPage title={title} range={todayRange} onRange={setTodayRange} onNeeds={goNeedsYou} picked={todayPick} onPicked={setTodayPick} keys={!modal}
     faces={new Map(members.map((m) => [m.key, m]))}
     day={teamToday({
       range: todayRange, now, me: team?.me ?? null, items, products: snap.products, cards: weekCards,
@@ -7011,7 +7012,7 @@ export default function App() {
   const todayEl = todayShown ? todayPage() : null;
   const tasksShown = teamMode && tasksOn && !!snap && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
   const firstNameOf = (id: string) => team?.byId.get(id)?.name?.split(/\s+/)[0] ?? 'Someone';
-  const tasksPage = () => snap ? <TasksPage keys={!modal} me={team?.me ?? null} nameOf={firstNameOf} picked={tasksPick} onPicked={setTasksPick}
+  const tasksPage = (title?: string) => snap ? <TasksPage title={title} keys={!modal} me={team?.me ?? null} nameOf={firstNameOf} picked={tasksPick} onPicked={setTasksPick}
     faces={new Map(members.map((m) => [m.key, m]))}
     groups={teamTasks({ items, products: snap.products, cards: weekCards, me: team?.me ?? null, now, nameOf: firstNameOf, mates: teammatesUi.list })}
     onOpenAgent={(r) => { if (r.agent) { setFocused(r.agent.item); markSeen(r.agent.item); } }}
@@ -7019,7 +7020,7 @@ export default function App() {
     onOpenBlock={(r) => { const o = r.block?.opens; if (o?.item) { setFocused(o.item); markSeen(o.item); } else if (o?.card) openTeammateCard(o.card); }}
     onDone={(r) => { if (r.item) void markDone(r.item, { stay: true }); }} /> : null;
   // On the layout with only Needs you and In progress, the team's day and its tasks are one page.
-  const tasksEl = tasksShown ? (homeLayout === 'states' ? <div className="team-page">{todayPage()}{tasksPage()}</div> : tasksPage()) : null;
+  const tasksEl = tasksShown ? (homeLayout === 'states' ? <div className="team-page">{todayPage('People')}{tasksPage('Tasks')}</div> : tasksPage()) : null;
   // A place is the whole page under the tabs; on the one-list home there are no cards.
   const evTop = evOn && !evPlace ? <>
     {homeLayout === 'tabs' && <>
@@ -7068,7 +7069,7 @@ export default function App() {
         .map((m) => ({ ...m, name: teamMates.find((t) => `theirmate:${t.owner}:${t.id}` === m.key)?.name ?? m.name }));
       placeEl = <MemberPlace m={placeMember} waits={placeWaits} onBack={back} backTo={backTo}
         actions={<>
-          <PlaceAction onClick={() => { setComposeInitial({ to: id }); setModal('compose'); }} title={`A new thread for ${first}`}>Give a task</PlaceAction>
+          <PlaceAction onClick={() => { setComposeInitial({ to: id, sendAs: 'task' }); setModal('compose'); }} title={`A new task for ${first}`}>Give a task</PlaceAction>
           {room && <PlaceAction quiet onClick={() => pickMember(placeMember.key, 'messages')} title="This chat on the Chats page">Open in Chats</PlaceAction>}
         </>}
         chat={room ? roomsUi.chatIn(room) : roomsUi.live

@@ -173,7 +173,7 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
     {groups}
     {(onConnections || onFiles || onTasks) && <nav className="workspace-tabs workspace-places" aria-label="Places">
       {onTasks && <button data-tab="team" className={`workspace-tab${tasksPage ? ' active' : ''}`} aria-label="Team" aria-current={tasksPage ? 'page' : undefined} title={collapsed ? 'Team' : undefined} onClick={onTasks}>
-        <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4.5" y="5.5" width="15" height="14" rx="3"/><path d="M4.5 10h15M9 3.5v4M15 3.5v4"/><path d="m9.5 14.5 1.8 1.8 3.2-3.3"/></svg>
+        <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="2.5"/><circle cx="6" cy="10" r="2"/><circle cx="18" cy="10" r="2"/><path d="M8 19c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5"/><path d="M3 18c0-2 1.3-3.5 3-3.5 .8 0 1.5.3 2 .8M21 18c0-2-1.3-3.5-3-3.5-.8 0-1.5.3-2 .8"/></svg>
         <span>Team</span>
       </button>}
       {onConnections && <button data-tab="connections" className={`workspace-tab${connectionsPage ? ' active' : ''}`} aria-label="Connections" aria-current={connectionsPage ? 'page' : undefined} title={collapsed ? 'Connections' : undefined} onClick={onConnections}>

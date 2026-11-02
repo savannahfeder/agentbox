@@ -38,3 +38,5 @@
 .team-page { flex: 1; min-height: 0; overflow-y: auto; }
 .team-page > .td, .team-page > .tk { flex: none; min-height: auto; overflow: visible; }
 .team-page > .tk { padding-top: 8px; }
+.td-title { margin: 0; font-size: 15px; font-weight: 500; line-height: 24px; color: var(--text); }
+.team-page > .tk .td-title { margin-bottom: 10px; }

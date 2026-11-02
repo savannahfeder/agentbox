@@ -56,7 +56,7 @@ function Person({ p, face, picked, range, onOpen }: { p: TodayPerson; face?: Mem
   </section>;
 }
 
-export function TodayPage({ range, onRange, day, faces, picked, onPicked, keys, onOpen, onNeeds }: {
+export function TodayPage({ range, onRange, day, faces, picked, onPicked, keys, onOpen, onNeeds, title }: {
   range: TodayRange; onRange: (r: TodayRange) => void;
   day: { people: TodayPerson[]; quiet: string[]; counts: TodayCounts };
   faces: ReadonlyMap<string, Member>;
@@ -66,6 +66,8 @@ export function TodayPage({ range, onRange, day, faces, picked, onPicked, keys, 
   keys: boolean;
   onOpen: (l: TodayLine) => void;
   onNeeds: () => void;
+  /** On the Team page: a heading in place of the line about what needs you. */
+  title?: string;
 }) {
   const needs = todayLine(day.counts);
   const shown = shownDay(day);
@@ -98,7 +100,7 @@ export function TodayPage({ range, onRange, day, faces, picked, onPicked, keys, 
   return <div className="td" aria-label="Today" ref={page}>
     <div className="td-col">
       <div className="td-top">
-        {needs && <button type="button" className="td-needs" onClick={onNeeds} title="Open Needs you">{needs}</button>}
+        {title ? <h2 className="td-title">{title}</h2> : needs && <button type="button" className="td-needs" onClick={onNeeds} title="Open Needs you">{needs}</button>}
         <div className="td-range" role="tablist" aria-label="Which days">
           {RANGES.map((r) => <button type="button" role="tab" key={r.id} aria-selected={range === r.id} className={range === r.id ? 'on' : ''} onClick={() => onRange(r.id)}>{r.label}</button>)}
         </div>
