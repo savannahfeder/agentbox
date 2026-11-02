@@ -35,7 +35,8 @@ const html = (appClass) => `<html data-theme="dark"><body style="margin:0">
     <div class="focus-pane" style="height:100vh">
       <div class="focus-scroll"><div class="focus">
         <div class="focus-body markdown agent-thread">
-          <div class="one-sum"><h2 class="one-title">Document auto-save feature</h2></div>
+          <div class="one-sum"><h2 class="one-title">Document auto-save feature</h2>
+            <div class="one-cols"><div class="one-col summary">${WORDS}</div></div></div>
           <div class="outcome one-answer"><h1 class="one-q">The merge conflict is fixed.</h1><p class="words">${WORDS}</p></div>
         </div>
         <section class="one-file one-note"><div class="one-filehead">auto-save.md</div></section>
@@ -62,6 +63,7 @@ async function measure(width, appClass = TASK, height = 1000) {
       const right = outer.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
       return {
         pane: { left, right, width: right - left }, words: r('.words'), reply: r('.dock-card'), file: r('.one-file'),
+        summary: r('.one-cols'), summaryFont: parseFloat(getComputedStyle(document.querySelector('.summary')).fontSize),
         font: parseFloat(getComputedStyle(words).fontSize),
       };
     });
@@ -88,6 +90,16 @@ describe.skipIf(!browserAvailable)('an open task on a desktop window', () => {
     expect(Math.abs(m.file.left - m.words.left)).toBeLessThan(0.5);
     expect(Math.abs(m.file.right - m.words.right)).toBeLessThan(0.5);
   });
+
+  // The summary was a 680px box of 13.5px text before the column grew, and
+  // running it the column's full width read as "goes out further".
+  for (const pane of [1440, 1710]) {
+    it(`on a ${pane}pt window the summary keeps its old measure, narrower than the answer`, async () => {
+      const m = await measure(pane);
+      expect(m.summary.width).toBeLessThanOrEqual(m.summaryFont * (680 / 13.5) + 1);
+      expect(m.summary.width).toBeLessThan(m.words.width);
+    });
+  }
 
   it('a narrow window keeps room on both sides instead of running off', async () => {
     const m = await measure(820);
