@@ -2405,11 +2405,6 @@ body {
      Measured by ../scroll-gutter.ts; 0 when the scrollbar overlays. */
   padding-right: calc(32px + var(--scroll-gutter, 0px));
 }
-.focus-dock::before {
-  /* the task fades out above the dock instead of hitting a hard edge */
-  content: ""; position: absolute; left: 0; right: 0; top: -34px; height: 34px;
-  background: linear-gradient(to bottom, transparent, var(--surface)); pointer-events: none;
-}
 /* THE REPLY BOX BEGINS WHERE THE WORDS BEGIN. --read-w is the width of the
    SHEET, and .focus spends 32px of it on each side as padding, so a dock card
    set to the full sheet started 32px left of every word above it (410 against
@@ -5725,10 +5720,6 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 }
 :root[data-skin] .app.flat .focus-dock { background: transparent; }
 :root[data-skin] .app.flat .focus-dock::before { background: none; }
-:root[data-skin] .app.flat .focus-scroll {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), transparent);
-}
 :root[data-skin] .app.flat .dock-card { background: transparent; }
 :root[data-skin] .app.flat .dock-card:focus-within { background: var(--skin-pane); }
 

@@ -36,7 +36,7 @@
 .workspace-layout .focus-pane { position: relative; min-height: 0; }
 .workspace-layout .focus-pane > .back-esc { position: absolute; left: 12px; top: 14px; }
 /* What runs under the reply box dissolves before it, rather than being cut against its edge. */
-.workspace-layout .focus-scroll { background: transparent; -webkit-mask-image: linear-gradient(#000 calc(100% - 22px), transparent); mask-image: linear-gradient(#000 calc(100% - 22px), transparent); }
+.workspace-layout .focus-scroll { background: transparent; }
 .workspace-layout .focus-dock { background: transparent; padding-bottom: 24px; }
 .workspace-layout .focus-dock::before { background: none; }
 .workspace-layout .dock-card { background: var(--wash); border-radius: var(--radius); }
