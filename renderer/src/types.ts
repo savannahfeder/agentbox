@@ -230,6 +230,8 @@ export interface FileNote {
   pin?: number;
   resolved?: boolean;
   resolvedBy?: string | null;
+  /** The version that answered it, when the app resolved it rather than a press. */
+  resolvedIn?: string;
   sent?: boolean;
   /** Someone pressed "Send to the agent" on a note the agent was not sent. */
   toAgent?: boolean;

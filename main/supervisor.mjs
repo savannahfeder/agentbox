@@ -11,7 +11,7 @@ import { MainTests } from './main-went-red.mjs';
 import { folderJob } from './task-folders-offthread.mjs';
 import { gitJob } from './git-change-offthread.mjs';
 import { queuedReplyText, submitReply, framedTeammate } from './live-replies.mjs';
-import { wakeForNotes } from './notes-wake.mjs';
+import { resolveAnsweredNotes, wakeForNotes } from './notes-wake.mjs';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mjs';
 import { editedFilesLine } from '../shared/artifact-marks.mjs';
 import { readItemHistory } from './store/work-items.mjs';
@@ -7517,6 +7517,7 @@ export class Supervisor {
     // on this tick is picked up by the pass below.
     await this.serveTeammates(now);
     await this.wakeForNotes(now);
+    this.resolveAnsweredNotes(now);
     // And the folders of rows she has finished, put away. On a timer of its own
     // rather than every pass, because it is a walk of the disk and a tick is
     // fifteen seconds: she closes rows while nothing at all is running, which
@@ -7902,6 +7903,12 @@ export class Supervisor {
     try {
       if (await wakeForNotes({ store: this.store, team, tell, now })) this.wake?.();
     } catch (err) { console.warn('zero: notes on a file could not reach its agent:', err.message); }
+  }
+
+  resolveAnsweredNotes(now = Date.now()) {
+    try {
+      resolveAnsweredNotes({ store: this.store, people: this.store.teammates?.team?.state?.()?.people ?? [], now });
+    } catch (err) { console.warn('zero: comments a new version answered could not be resolved:', err.message); }
   }
 
   // Your words to a teammate that is already on a run go into that run, the
