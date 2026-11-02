@@ -327,8 +327,8 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-board { display: grid; grid-template-columns: repeat(4, minmax(260px, 1fr)); gap: 16px; padding: 10px var(--row-r, 24px) 24px var(--text-x, 32px); align-items: start; box-sizing: border-box; width: fit-content; min-width: 100%; }
 .th-col-h { display: flex; align-items: center; height: 38px; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
 .th-col-h b { font-weight: 400; color: var(--text-faint); margin-left: 8px; }
-.th-card { display: block; width: 100%; text-align: left; font: inherit; background: rgba(255,255,255,.035); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 15px 13px; margin: 0 0 10px; cursor: pointer; }
-.th-card:hover { border-color: var(--line-strong); background: rgba(255,255,255,.05); }
+.th-card { display: block; width: 100%; text-align: left; font: inherit; background: rgba(255,255,255,.035); border: 1px solid var(--card-line); border-radius: var(--radius); padding: 14px 15px 13px; margin: 0 0 10px; cursor: pointer; }
+.th-card:hover { border-color: var(--card-line-hover); background: rgba(255,255,255,.05); }
 /* THE CARD THE KEYBOARD IS ON (w-23fc91bff5). The list's selected row is
    underlined in --underline; a card has no single line to underline, so its
    edge takes that colour instead: the same ink for the same idea. One pixel,

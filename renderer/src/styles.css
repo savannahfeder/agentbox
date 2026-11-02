@@ -88,6 +88,10 @@
   */
   --row-line: .375;
   --line-strong: rgba(17, 25, 48, 0.14);
+  /* A board card's fill is invisible on a white page, so in Light its edge is
+     all that marks it, and --line alone was too faint to read. */
+  --card-line: var(--line-strong);
+  --card-line-hover: rgba(17, 25, 48, 0.24);
   /* THE GLOW IS ONE LIGHT, NOT A HIGHLIGHTER. The walk has no colour of its own
      anywhere and this is the app's own light. On a light window a cool white
      bloom is invisible, so the ring's glow there is the page's own ink at low
@@ -423,6 +427,8 @@
      eighths of its own --line too. See the light block for the reasoning. */
   --row-line: .375;
   --line-strong: rgba(255, 255, 255, 0.19);
+  --card-line: var(--line);
+  --card-line-hover: var(--line-strong);
   /* THE WALK'S RING AND ITS CARD. See the light block for the reasoning. These four
      are what every shot on the round four page was taken with: the glow is the
      cool light on both the ring and the card, the edge is what holds the card
