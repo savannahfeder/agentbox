@@ -31,9 +31,10 @@ describe('the token', () => {
     expect(styles).toMatch(/--tag-radius:\s*var\(--radius\)/);
     expect(styles.match(/--tag-radius:/g)).toHaveLength(1);
   });
-  it('squares with everything else under the Ember Grid skin', () => {
+  it('stays round under the Ember Grid skin', () => {
+    // Rounded in every theme since 2026-11-02 (one-corner-for-the-whole-app).
     const ember = styles.slice(styles.indexOf(':root[data-skin="ember-grid"] {'));
-    expect(ember.slice(0, ember.indexOf('}'))).toMatch(/--radius:\s*0px/);
+    expect(ember.slice(0, ember.indexOf('}'))).not.toMatch(/--radius:/);
   });
 });
 

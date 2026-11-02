@@ -64,14 +64,13 @@ describe('one corner for the whole app', () => {
     // It was 3px and read as square beside round faces and soft tiles (2026-10-31,
     // tests/buttons-chips-cards-and-menus-are-soft-and-an-ai-teammate-is-round).
     expect(css).toMatch(/--radius:\s*var\(--artifact-corner-small\);/)
-    // ONE THEME MAY SQUARE IT, AND ONLY TO ZERO. Ember Grid is the launch film's
-    // look (w-b3e123a0af) and the film's corners are square, so its token block
-    // turns the same one number to 0px. Every corner still follows the token;
-    // a theme that wanted some other size would be a second corner, and fails.
+    // NO THEME SQUARES IT. Ember Grid turned it to 0px for the launch film's
+    // look, which left square buttons inside round cards; the owner, 2026-11-02:
+    // "You've changed everything so that it is rounded so just keep that
+    // consistent throughout."
     const grid = css.slice(css.indexOf(':root[data-skin="ember-grid"] {'))
-    const elsewhere = css.replace(grid.slice(0, grid.indexOf('\n}')), '')
-    expect(grid.slice(0, grid.indexOf('\n}'))).toMatch(/--radius:\s*0px;/)
-    expect(elsewhere.match(/--radius:\s*[^;]+;/g)).toHaveLength(1)
+    expect(grid.slice(0, grid.indexOf('\n}'))).not.toMatch(/--radius:/)
+    expect(css.match(/--radius:\s*[^;]+;/g)).toHaveLength(1)
   })
 
   it('leaves no loose number anywhere in the stylesheet', () => {
@@ -123,11 +122,14 @@ describe('one corner for the whole app', () => {
     // The Send button and the key chips live inside the reply card, so they go
     // with it. The second change covered the inbox page and not this, so this
     // half of the exception stands. One line each to change if it is retired.
-    for (const sel of ['.dock-card', '.dock-send', '.focus-dock kbd']) {
+    for (const sel of ['.dock-card', '.dock-send']) {
       const rule = ruleFor(sel)
       expect(rule, `${sel} has no rule`).toBeTruthy()
       expect(rule, `${sel} must stay at 0`).toMatch(/border-radius:\s*0/)
     }
+    // The key chip in the reply box takes the corner like every other chip
+    // since 2026-11-02; the card and Send are rounded in soft-corners.css.
+    expect(ruleFor('.focus-dock kbd')).toMatch(/border-radius:\s*var\(--radius\)/)
   })
 
   it('never paints a solid ink around the reply card again', () => {

@@ -38,8 +38,9 @@ describe('a board card', () => {
     expect(cornerOf('.th-card')).toBe('var(--artifact-corner)');
   });
 
-  it('keeps it in Dark, which squares only the small corner', () => {
-    expect(darkBlock).toMatch(/--radius:\s*0px/);
+  it('keeps it in Dark, which squares nothing', () => {
+    // Rounded in every theme since 2026-11-02 (one-corner-for-the-whole-app).
+    expect(darkBlock).not.toMatch(/--radius:/);
     expect(darkBlock).not.toMatch(/--artifact-corner\s*:/);
   });
 

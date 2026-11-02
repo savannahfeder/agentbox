@@ -47,9 +47,10 @@ describe('the scale', () => {
     expect(styles).toMatch(/--radius:\s*var\(--artifact-corner-small\);/);
     expect(styles).toMatch(/--tag-radius:\s*var\(--radius\);/);
   });
-  it('still lets the film look square everything', () => {
+  it('keeps the film look round too', () => {
+    // Rounded in every theme since 2026-11-02 (one-corner-for-the-whole-app).
     const grid = styles.slice(styles.indexOf(':root[data-skin="ember-grid"] {'));
-    expect(grid.slice(0, grid.indexOf('}'))).toMatch(/--radius:\s*0px/);
+    expect(grid.slice(0, grid.indexOf('}'))).not.toMatch(/--radius:/);
   });
 });
 

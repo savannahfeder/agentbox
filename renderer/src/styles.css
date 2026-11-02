@@ -746,7 +746,6 @@
   /* Darker than dark's 0.45: over rows this near black, a lighter scrim left
      the new-task card reading as one more row rather than a card on top. */
   --scrim: rgba(0, 0, 0, 0.72);
-  --radius: 0px;
   --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, 'DejaVu Sans Mono', monospace;
 }
 :root[data-skin="ember-grid"] body { font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, 'DejaVu Sans', sans-serif; }
@@ -2435,7 +2434,7 @@ body {
 .focus-dock kbd {
   font-family: var(--mono); font-size: 10.5px; color: var(--text-dim);
   background: var(--wash); border: 1px solid var(--line-strong);
-  border-radius: 0; padding: 1.5px 5.5px;
+  border-radius: var(--radius); padding: 1.5px 5.5px;
 }
 .dock-pill { display: flex; align-items: center; width: 100%; background: transparent; border: none; font: inherit; cursor: text; }
 .dock-pill-text { padding: 11px 16px; color: var(--text-faint); font-size: 14.5px; flex: 1; text-align: left; }
