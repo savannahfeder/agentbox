@@ -395,7 +395,7 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
     {home && <div className="line"><span className="lab">Home</span><span className="opts">
       <button type="button" className={home.layout === 'list' ? 'on' : ''} onClick={() => home.onLayout('list')}>One list</button>
       <button type="button" className={home.layout === 'tabs' ? 'on' : ''} onClick={() => home.onLayout('tabs')}>Two tabs</button>
-      <button type="button" className={home.layout === 'states' ? 'on' : ''} onClick={() => home.onLayout('states')}>Needs you, In progress, Done</button>
+      <button type="button" className={home.layout === 'states' ? 'on' : ''} onClick={() => home.onLayout('states')}>Needs you, In progress + a Team page</button>
     </span></div>}
     {people && <PeopleLine {...people} />}
     <div className="line"><span className="lab">View</span><span className="opts">

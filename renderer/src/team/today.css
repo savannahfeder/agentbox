@@ -33,3 +33,8 @@
 .td-extra { padding: 4px 0; font-size: 13px; line-height: 20px; color: var(--text-faint); }
 
 .td-empty { margin: 0; font-size: 13.5px; line-height: 20px; color: var(--text-faint); }
+
+/* The Team page: the team's day with its tasks under it, one scroll. */
+.team-page { flex: 1; min-height: 0; overflow-y: auto; }
+.team-page > .td, .team-page > .tk { flex: none; min-height: auto; overflow: visible; }
+.team-page > .tk { padding-top: 8px; }

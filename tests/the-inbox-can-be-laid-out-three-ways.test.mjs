@@ -6,7 +6,7 @@
 // Tasks, which lived only on the four-tab row. Now:
 //   list   — Needs you, In progress, Today, Tasks (as it was)
 //   tabs   — Needs you, Everything else; the Team card holds Today, Board, Tasks
-//   states — Needs you, In progress, Done; Tasks is a page in the sidebar
+//   states — Needs you, In progress; the team's day and its tasks are one Team page in the sidebar
 // All three are picked under View and filters.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -36,8 +36,11 @@ describe('the three layouts', () => {
     expect(app).toMatch(/teamSpace === 'today' \? todayPage\(\) : teamSpace === 'tasks' \? tasksPage\(\)/);
   });
 
-  it('give the state layout a Done tab and Tasks in the sidebar', () => {
-    expect(read('renderer/src/threads/Pages.tsx')).toMatch(/team\?\.done && <button/);
-    expect(read('renderer/src/components/WorkspaceNavigation.tsx')).toMatch(/data-tab="tasks"/);
+  it('give the third layout one Team page in the sidebar, the day over the tasks', () => {
+    expect(read('renderer/src/components/WorkspaceNavigation.tsx')).toMatch(/data-tab="team"/);
+    expect(read('renderer/src/App.tsx')).toMatch(/<div className="team-page">\{todayPage\(\)\}\{tasksPage\(\)\}<\/div>/);
+    // Its own page: titled Team, without the inbox's tabs over it.
+    expect(read('renderer/src/App.tsx')).toMatch(/homeLayout === 'states' && tasksShown \? <h1 className="workspace-title">Team<\/h1>/);
+    expect(read('renderer/src/App.tsx')).toMatch(/!\(homeLayout === 'states' && tasksShown\) && \(\n\s+<StateTabs/);
   });
 });
