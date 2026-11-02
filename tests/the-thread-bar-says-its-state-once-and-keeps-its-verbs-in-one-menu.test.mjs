@@ -152,7 +152,7 @@ describe('the right side is the dots', () => {
     // One thing at a time (w-65bcefb857) puts the line saying where an answer
     // went, and its place and arrows, beside the dots, in that mode only.
     // Add people sits with them so the header is one row (2026-11-02).
-    expect(portals[0]).toMatch(/<span className="ts-top">(\{crumbFrom && !inChats && \(direct \|\| summarised\) && <ConversationAside item=\{item\} onAddPeople=\{onAddPeople\} \/>\})?(\{sentUp && aboveDock\}\{queue && <QueueNav spot=\{queue\.spot\} onStep=\{queue\.onStep\} \/>\})?\{threadMenu\}<\/span>/);
+    expect(portals[0]).toMatch(/<span className="ts-top">(\{sentUp && aboveDock\}\{queue && <QueueNav spot=\{queue\.spot\} onStep=\{queue\.onStep\} \/>\})?(\{crumbFrom && !inChats && \(direct \|\| summarised\) && <ConversationAside item=\{item\} onAddPeople=\{onAddPeople\} \/>\})?\{threadMenu\}<\/span>/);
     expect(focus).not.toMatch(/doneButton|terminalHeaderTarget|done-mark/);
   });
 

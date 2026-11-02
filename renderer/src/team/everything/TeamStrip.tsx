@@ -43,7 +43,7 @@ export function MemberWord({ m, waits = 0 }: { m: Member; waits?: number }) {
     return <span className="ev-s"><LiveMark /><span className="ev-sw">{statusWord({ ...m, kind: 'person' })}</span>{m.unread && <i className="ev-new" aria-label="New messages" />}</span>;
   }
   const word = statusWord(m, waits);
-  if (!word) return <span className="ev-s"> </span>;
+  if (!word) return <span className="ev-s ev-s-blank"> </span>;
   return <span className={`ev-s${waits > 0 && m.kind !== 'me' ? ' asks' : ''}`}>
     {waits > 0 && m.kind !== 'me' ? <i className="ev-dot" /> : isBusy(word) ? <LiveMark /> : null}<span className="ev-sw">{word}</span>
   </span>;

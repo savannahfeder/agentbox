@@ -1,7 +1,7 @@
 /* The Tasks page: one column of rows, lined up with the tabs over it, in Today's type. */
 .tk { flex: 1; min-height: 0; overflow-y: auto; padding: 18px var(--row-r, 24px) 64px var(--text-x, 32px); }
-.tk-col { max-width: 1120px; }
-.tk-sum { margin: 0 0 26px; padding-bottom: 22px; border-bottom: 1px solid var(--line); font-size: 17px; line-height: 26px; color: var(--text); }
+.tk-col { max-width: 1320px; }
+.tk-sum { margin: 0 0 22px; padding-bottom: 14px; border-bottom: 1px solid var(--line); font-size: 13px; line-height: 24px; color: var(--text-dim); }
 
 .tk-sec { margin-bottom: 26px; }
 .tk-sec ul { list-style: none; margin: 0; padding: 0; }

@@ -115,6 +115,7 @@
 .pl-name h2 { margin: 0; font-size: 17px; font-weight: 500; line-height: 22px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pl-name h2 em { font-style: normal; font-weight: 400; font-size: 13.5px; color: var(--text-faint); margin-left: 10px; }
 .pl-name .ev-s { justify-content: flex-start; }
+.pl-name .ev-s-blank { display: none; }
 .pl-acts { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .pl-btn { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: 8px; background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
 .pl-btn:hover { color: var(--text); border-color: var(--text-faint); background: var(--wash); }

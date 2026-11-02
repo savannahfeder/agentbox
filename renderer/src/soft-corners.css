@@ -27,6 +27,6 @@
 /* Things you press or type in that never had a corner. */
 .approval-allow, .approval-deny, .fr-go, .fr-submit, .fr-pick, .remote-primary, .remote-secondary,
 .chat-edit, .fmt-done, .rm-btn, .rm-input, .rm-search, .gc-find, .tm-seg, .tm-every, .th-follow,
-.gr-tile, .fb-tile, .direct-review .review-accept, .direct-review .review-feedback {
+.gr-tile, .fb-tile, .direct-review .review-accept, .direct-review .review-feedback, .cn-button, .tq-chip, .ev-msg {
   border-radius: var(--artifact-corner-small);
 }

@@ -7062,7 +7062,7 @@ export default function App() {
             ...mentionsBy.map((m) => ({ key: m.id, title: m.body || `In ${m.roomName}`, word: m.roomName, at: m.at, tone: 'ask' as const, onOpen: () => roomsUi.openMention(m) })),
           ]} />
           <PlaceList title={`You are waiting on ${first}`} now={now} rows={given.map((i) => itemRow(i, dueSaid(dayDeadline(i.due), now, { ahead: true })?.word ?? '', 'later'))} />
-          <PlaceList title="In progress" now={now} rows={theirs.now.map(cardRow)} empty={sharesThreads(id) ? `${first} has nothing in progress.` : `${first} shares no threads with the team.`} />
+          <PlaceList title="In progress" now={now} rows={theirs.now.map(cardRow)} />
           <PlaceList title="Finished this week" now={now} rows={theirs.finished.map(cardRow)} />
           <PlaceMates title={`${first}'s AI teammates`} mates={theirMates} waits={waits} onPick={(key) => pickMember(key)} />
         </>} />;
