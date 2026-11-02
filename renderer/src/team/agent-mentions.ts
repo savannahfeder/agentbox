@@ -6,8 +6,8 @@
 //   2. An agent mention reads "@Codex in Agentbox Team" in the text. Clicking it
 //      opens a small card with the project, the model and the effort ("Way 2").
 //      The reply box and its footer never change.
-//   3. Every agent works in a particular project, so Send waits until each agent
-//      mention names one, and says why.
+//   3. Every agent works in a particular project. Send on a mention without one
+//      opens its project list, and picking one sends.
 //   4. On send, each agent mention becomes a task in its project. The message
 //      keeps a link to that task, so every copy of the conversation (yours and
 //      your teammate's) knows which task answers it.
@@ -79,11 +79,8 @@ export function findMentions(text: string, projects: readonly Project[]): Mentio
   return out;
 }
 
-/** Why Send has to wait, in a sentence, or null when it need not. */
-export function sendBlock(mentions: readonly Mention[]): string | null {
-  const loose = mentions.find((m) => !m.project);
-  return loose ? `Pick a project for @${loose.label}: click it to choose.` : null;
-}
+/** The first agent mention with no project yet, or -1. Send asks for its project. */
+export const looseMention = (mentions: readonly Mention[]) => mentions.findIndex((m) => !m.project);
 
 /** The mention as the text writes it. */
 export const mentionText = (label: string, project: Project | null) => `@${label}${project ? ` in ${project.name}` : ''}`;
