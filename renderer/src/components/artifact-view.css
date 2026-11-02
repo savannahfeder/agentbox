@@ -122,8 +122,13 @@
 .av-note-text { user-select: text; -webkit-user-select: text; }
 .av-stage .pdf-pages { padding-left: 52px; padding-right: 52px; }
 .av-stage .film-stage { margin: 28px 56px 20px; }
-::highlight(av-quote) { background-color: color-mix(in srgb, var(--accent) 22%, transparent); }
-::highlight(av-quote-on) { background-color: color-mix(in srgb, var(--accent) 48%, transparent); }
+/* Light enough that a whole quoted section does not read as an alarm. */
+::highlight(av-quote) { background-color: color-mix(in srgb, var(--accent) 16%, transparent); }
+::highlight(av-quote-on) { background-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+/* Over .artifact-view, whose z-index is 9400. */
+.selection-bar { z-index: 9450; gap: 2px; padding: 4px; }
+.selection-bar .link-pop-btn { padding: 4px 8px; color: var(--text-dim); }
+.selection-bar-comment { display: inline-flex; align-items: center; gap: 6px; }
 
 
 .av-side { flex: none; width: 340px; display: flex; flex-direction: column; border-left: 1px solid var(--line); min-height: 0; }

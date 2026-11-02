@@ -321,6 +321,18 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
   return owed;
 }
 
+/**
+ * Whether an action held for Z starts an agent on the row it holds: a reply, an
+ * approval or a pick on that row. Only those read as In progress while held; a
+ * close starts nothing, and "do it in this thread" starts the parent instead.
+ */
+export function heldRowStarts(
+  row: { product: string; id: string },
+  goes: { product: string; id: string } | null | undefined,
+): boolean {
+  return !!goes && goes.id === row.id && goes.product === row.product;
+}
+
 // In progress promises that a worker is on this row or about to be, so it
 // never holds a row whose moment has not arrived. The supervisor's spawn
 // passes gate on the same thing (`isDue`, main/supervisor.mjs).

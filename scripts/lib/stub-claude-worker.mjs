@@ -43,7 +43,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { readWorld, worldTurn, worldAnswer, titleIn } from './stand-in-world.mjs';
+import { readWorld, worldTurn, worldAnswer, titleIn, stepEvery, workStep } from './stand-in-world.mjs';
 
 const argv = process.argv.slice(2);
 const say = (obj) => process.stdout.write(JSON.stringify(obj) + '\n');
@@ -298,7 +298,18 @@ if (directive('stub:hang') || turn.hang) {
 const slow = Number(directive('stub:slow')?.[1]) || turn.delayMs;
 if (slow > 0) {
   const until = Date.now() + slow;
-  while (!stopping && Date.now() < until) await wait(50);
+  // The world's pace stands in for real work, and real work shows its steps.
+  const every = directive('stub:slow') ? 0 : stepEvery(world);
+  let next = every ? Date.now() + every : Infinity;
+  let step = 0;
+  while (!stopping && Date.now() < until) {
+    if (Date.now() >= next) {
+      step += 1;
+      next += every;
+      say({ type: 'assistant', session_id: sessionId, message: { content: [workStep(step, titleIn(promptText))] } });
+    }
+    await wait(50);
+  }
 }
 
 try {

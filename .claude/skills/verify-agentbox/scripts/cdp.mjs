@@ -36,6 +36,19 @@ const KEYS = {
   ' ': { code: 'Space', keyCode: 32 },
 };
 const MODIFIERS = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
+const MODIFIER_NAMES = { control: 'ctrl', cmd: 'meta', command: 'meta', option: 'alt' };
+
+/** The modifiers a tester named, and the words that name none, which must be refused rather than dropped. */
+export function readModifiers(words) {
+  const mods = [];
+  const unknown = [];
+  for (const word of words) {
+    const name = MODIFIER_NAMES[word.toLowerCase()] ?? word.toLowerCase();
+    if (name in MODIFIERS) mods.push(name);
+    else unknown.push(word);
+  }
+  return { mods, unknown };
+}
 
 /** The editing command a Mac keyboard sends with a shortcut: a key event alone selects or undoes nothing. */
 export function editingCommands(key, mods = []) {
@@ -55,10 +68,22 @@ export function holdersOf(profile, list = processes, chrome = CHROME) {
 }
 
 /** Stop any Chrome still on this profile: one that will not answer keeps its lock, and every Chrome after it exits. */
-export function freeProfile(profile) {
-  const pids = holdersOf(profile);
+export function freeProfile(profile, bin = CHROME) {
+  const pids = holdersOf(profile, processes, bin);
   for (const pid of pids) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
   return pids.length;
+}
+
+/**
+ * End a drive: stop the browser, its helpers, and delete its throwaway profile.
+ *
+ * The helpers outlive a kill of the one process Node started and keep writing
+ * into that folder, so a delete in the next statement hits ENOTEMPTY.
+ */
+export function stopChrome(chrome, profile, { bin = CHROME } = {}) {
+  if (chrome?.pid) { try { process.kill(chrome.pid, 'SIGKILL'); } catch { /* gone */ } }
+  if (profile) freeProfile(profile, bin);
+  if (profile) fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }
 
 /**

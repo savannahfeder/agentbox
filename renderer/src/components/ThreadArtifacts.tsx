@@ -53,7 +53,10 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onNotice }: {
   const copiesKey = JSON.stringify(copies);
   useEffect(() => {
     let live = true;
-    const read = () => { void Promise.all(copies.map((c) => api.fileElsewhere({ product: item.product, id: item.id, ...c }))).then((all) => { if (live) setElsewhere(all); }); };
+    const read = () => {
+      if (!copies.length) { setElsewhere([]); return; }
+      void api.fileElsewhere({ product: item.product, id: item.id, copies }).then((all) => { if (live) setElsewhere(all); });
+    };
     read();
     // A burst of changes asks once.
     let timer: ReturnType<typeof setTimeout> | null = null;
