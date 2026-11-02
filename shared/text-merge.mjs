@@ -126,7 +126,8 @@ export function mergeText(base, head, mine, { overlap = 'mine' } = {}) {
   const groups = [];
   for (const c of all) {
     const last = groups.at(-1);
-    if (last && c.start <= last.end) {
+    // Words put at the edge of someone's change sit beside it; only the same spot, or inside it, is a clash.
+    if (last && (c.start < last.end || (c.start === c.end && last.start === last.end && c.start === last.start))) {
       last.list.push(c);
       last.end = Math.max(last.end, c.end);
     } else groups.push({ start: c.start, end: c.end, list: [c] });

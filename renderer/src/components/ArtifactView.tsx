@@ -14,7 +14,7 @@ import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
 import { hasSpot, noteSendWords, notesToSendTheAgent, otherFilesOpen, pageSpot, PIN_FRAME_S, pinned, viewOffers, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
-import { opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
+import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
 import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
 import { pressedInTheFindBox } from '../find-in-page';
@@ -303,13 +303,14 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
     if (inHand.current !== v.id) return;
     if (text === null) { setUnreadable(v.id); return; }
     // Words a sitting kept but never saved, from a failed save or a closed app.
-    let draft: string | undefined;
-    try { draft = localStorage.getItem(draftKey(v.path)) ?? undefined; } catch { /* no storage, no draft */ }
+    let kept: ReturnType<typeof keptDraft<typeof v>> = null;
+    try { kept = keptDraft(family.versions, v, (p) => localStorage.getItem(draftKey(p))); } catch { /* no storage, no draft */ }
+    const draft = kept?.draft;
     typed.current = draft ?? null;
     posted.current = null;
     setEditWord(null);
     setTold(null);
-    setEditing({ fam, text, draft, folder: opened ? opened.replace(/\/[^/]*$/, '') : null, base: v });
+    setEditing({ fam, text, draft, folder: opened ? opened.replace(/\/[^/]*$/, '') : null, base: kept?.base ?? v });
     if (draft !== undefined) idle.current = window.setTimeout(() => { void postNow.current(); }, SAVE_AFTER_A_PAUSE_MS);
   };
   useEffect(() => {

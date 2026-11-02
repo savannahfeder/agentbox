@@ -43,6 +43,16 @@ describe('a merge', () => {
     expect(a.clashes).toHaveLength(1);
     expect(a.clashes[0]).toMatchObject({ head: expect.stringContaining('over'), mine: expect.stringContaining('right') });
   });
+  it('keeps a word put right beside a word the other side changed', () => {
+    const out = mergeText('We need plan today', 'We need roadmap today', 'We need a plan today');
+    expect(out.text).toBe('We need a roadmap today');
+    expect(out.clashes).toEqual([]);
+  });
+  it('calls two different words put in the same spot a clash', () => {
+    const out = mergeText('a b', 'a x b', 'a y b', { overlap: 'head' });
+    expect(out.text).toBe('a x b');
+    expect(out.clashes).toHaveLength(1);
+  });
   it('does not stitch two rewrites of one paragraph word by word', () => {
     const head = 'Completely different words about another subject, nothing shared at all.';
     const mine = 'Yet another way to put it where few of the terms overlap whatsoever.';

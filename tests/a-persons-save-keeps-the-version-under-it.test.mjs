@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { saveNextVersion } from '../main/file-version.mjs';
+import { keptDraft } from '../renderer/src/edit-sitting.ts';
 
 const doc = (a, b = 'b', c = 'c') => `${a}\n\n${b}\n\n${c}\n`;
 let dir;
@@ -20,6 +21,23 @@ const read = (p) => fs.readFileSync(path.join(dir, p), 'utf8');
 const save = (lines, basePath, text, more = {}) => saveNextVersion({ dir, threadId: 'w-1', lines, basePath, text, ...more });
 
 beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'save-')); });
+
+describe('words a failed save kept', () => {
+  const v1 = { path: 'a.md' }; const v2 = { path: 'a-v2.md' }; const v3 = { path: 'a-v3.md' };
+  const held = (m) => (p) => m[p] ?? null;
+  it('come back on the newest version though they were kept under the one the sitting opened on', () => {
+    expect(keptDraft([v1, v2], v2, held({ 'a.md': 'words' }))).toEqual({ draft: 'words', base: v1 });
+  });
+  it('prefer the version nearest the one opened', () => {
+    expect(keptDraft([v1, v2, v3], v3, held({ 'a.md': 'old', 'a-v2.md': 'newer' }))).toEqual({ draft: 'newer', base: v2 });
+  });
+  it('do not come from a version after the one opened', () => {
+    expect(keptDraft([v1, v2], v1, held({ 'a-v2.md': 'later' }))).toBeNull();
+  });
+  it('are nothing when none were kept', () => {
+    expect(keptDraft([v1], v1, held({}))).toBeNull();
+  });
+});
 
 describe('a save from a sitting', () => {
   it('keeps an agent\'s version that landed under it, and the typed words', () => {
