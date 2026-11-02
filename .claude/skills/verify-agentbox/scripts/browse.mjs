@@ -24,7 +24,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { launchChrome, connect, freeProfile } from './cdp.mjs';
+import { launchChrome, connect, freeProfile, readModifiers } from './cdp.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { readState, INSTANCE } = await import(path.join(here, 'live.mjs'));
@@ -187,9 +187,14 @@ if (verb === 'open') {
   await report(t, `Typed ${args.join(' ').length} characters into ${await t.evaluate('document.activeElement ? document.activeElement.tagName.toLowerCase() : "nothing"')}.`);
   t.detach();
 } else if (verb === 'press') {
+  const [key, ...words] = args;
+  const { mods, unknown } = readModifiers(words);
+  if (unknown.length) {
+    console.log(`Nothing pressed: ${unknown.join(', ')} is not a key to hold. Use meta, ctrl, shift or alt.`);
+    process.exit(1);
+  }
   const t = await tab();
-  const [key, ...mods] = args;
-  await t.press(key, mods.filter((m) => ['meta', 'shift', 'ctrl', 'alt'].includes(m)));
+  await t.press(key, mods);
   await report(t, `Pressed ${[...mods, key].join('+')}.`);
   t.detach();
 } else if (verb === 'pressat') {

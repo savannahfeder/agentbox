@@ -307,7 +307,10 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
   // because the position cannot tell us apart from her. Nothing but a hand of
   // hers may switch this off.
   let hand = -Infinity;
-  const hers = () => now() - hand <= HER_HAND_MS;
+  // A button held down on the box: a scrollbar drag can wait any length of
+  // time between the press and the first move, so the window alone is not enough.
+  let held = false;
+  const hers = () => held || now() - hand <= HER_HAND_MS;
 
   // HOW WIDE THE COLUMN WAS LAST TIME WE LOOKED, and the paragraph she was
   // reading when she was not at the end. The pair is what survives a re-wrap.
@@ -410,7 +413,10 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
   // are the events a person makes, and a reflow makes none of them. A scrollbar
   // drag is `mousedown` and then a run of scroll events with no further gesture,
   // which is why this is a window and not a one-shot.
-  const took = () => { hand = now(); };
+  const took = (e?: Event) => { hand = now(); if (e?.type === 'mousedown') held = true; };
+  const letGo = () => { held = false; };
+  // The release lands wherever the pointer ended up, so it is heard on the window.
+  const win = el.ownerDocument?.defaultView ?? null;
 
   function release() {
     if (!live) return;
@@ -419,11 +425,15 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
     el!.removeEventListener('scroll', onScroll);
     el!.removeEventListener('load', onLoad, true);
     for (const ev of HER_GESTURES) el!.removeEventListener(ev, took);
+    win?.removeEventListener('mouseup', letGo);
+    win?.removeEventListener('blur', letGo);
   }
 
   el.addEventListener('scroll', onScroll, { passive: true });
   el.addEventListener('load', onLoad, true);
   for (const ev of HER_GESTURES) el.addEventListener(ev, took, { passive: true });
+  win?.addEventListener('mouseup', letGo, { passive: true });
+  win?.addEventListener('blur', letGo, { passive: true });
   // BOTH BOXES, because the two ways to fall short of the end are different
   // things growing. The content growing is the obvious one. The box itself
   // SHRINKING is the other, and it happens every time the options strip or the

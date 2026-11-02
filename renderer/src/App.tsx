@@ -90,7 +90,7 @@ import { approvalAnswered, approvalAsker, approvalReads, approvalShown } from '.
 // there is anything to confirm the card has closed.
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
-import { asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
+import { asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, wordWaits } from '../../shared/answers.mjs';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { focusTheReplyBox } from './focus-at-end';
@@ -1069,18 +1069,31 @@ export default function App() {
   const [optionSel, setOptionSel] = useState<number | null>(null);
   // The items whose action is held in the grace window, or written and not
   // yet back in a snapshot. The write waits for Z; the SIGNAL must not: the
-  // item leaves the inbox and shows under In progress immediately, because a
-  // sent thing still sitting in the inbox reads as not sent. More than one,
-  // because a slow main process can still be writing the last one when the
-  // next is held.
+  // item leaves the inbox at once, and one whose action starts an agent on it
+  // (`startingIds`) shows under In progress, because a sent thing still sitting
+  // in the inbox reads as not sent. More than one, because a slow main process
+  // can still be writing the last one when the next is held.
   const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(() => new Set());
-  const holdRow = useCallback((id: string) => setPendingIds((s) => (s.has(id) ? s : new Set(s).add(id))), []);
-  const letRowGo = useCallback((id: string) => setPendingIds((s) => {
-    if (!s.has(id)) return s;
-    const next = new Set(s);
-    next.delete(id);
-    return next;
-  }), []);
+  const [startingIds, setStartingIds] = useState<ReadonlySet<string>>(() => new Set());
+  const holdRow = useCallback((id: string, starts: boolean) => {
+    setPendingIds((s) => (s.has(id) ? s : new Set(s).add(id)));
+    setStartingIds((s) => {
+      if (s.has(id) === starts) return s;
+      const next = new Set(s);
+      if (starts) next.add(id); else next.delete(id);
+      return next;
+    });
+  }, []);
+  const letRowGo = useCallback((id: string) => {
+    const without = (s: ReadonlySet<string>) => {
+      if (!s.has(id)) return s;
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    };
+    setPendingIds(without);
+    setStartingIds(without);
+  }, []);
   // The last held action when it was an answer, which reads as queued while its row is held.
   const [heldAnswer, setHeldAnswer] = useState<string | null>(null);
 
@@ -2358,7 +2371,7 @@ export default function App() {
       // The grace window: the write waits for Z, the signal must not, because a
       // sent thing still sitting in the inbox reads as not sent. A deferred row
       // is the exception, and it has somewhere to be: Scheduled.
-      if (pendingIds.has(i.id) && deferredUntil <= now) return true;
+      if (startingIds.has(i.id) && deferredUntil <= now) return true;
       // A message waits on whoever did not speak last, and the row names them, so
       // it never reads as an agent at work.
       if (isDirect(snap?.products.find((p) => p.slug === i.product)) && !isTaskRow(i)) return iSpokeLast(i, team?.products.get(i.product), team?.me ?? null);
@@ -2386,7 +2399,7 @@ export default function App() {
     // threads/page-rules.ts): a queued row is told by its Status cell, and
     // what you just sent is on top.
   ].sort(byRunningOrder(score)),
-  [items, agentList, agentMode, scope, pendingIds, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds, stalledIds]);
+  [items, agentList, agentMode, scope, startingIds, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds, stalledIds]);
 
   // AND THE TAB COUNTS EACH THREAD ONCE: the list, less what Needs you holds,
   // the way `tabState` below has it for the board and `done` for the archive.
@@ -4323,7 +4336,7 @@ export default function App() {
     const flushed = flushPending().catch((err) => console.warn('a held action was not written', err));
     if (!stay) leaveResolved(item);
     setModal(null);
-    holdRow(item.id); // out of the inbox NOW; the write can wait, the signal cannot
+    holdRow(item.id, heldRowStarts(item, goes)); // out of the inbox NOW; the write can wait, the signal cannot
     // Only an answer passes `goes`, and only an answer starts an agent.
     setHeldAnswer(goes ? item.id : null);
     // "PRESS Z", NOT A BARE LETTER. The toast used to read "Closed: Added the
