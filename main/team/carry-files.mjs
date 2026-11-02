@@ -6,8 +6,8 @@
 //   findFileToSend   what on this computer a name may mean, and whether it may go
 //   createFileCarrier
 //     .send(ref)     the sender: up to the cloud and shelved here; answers the
-//                    entry to hand the readers. A file over 10 MB goes in parts
-//                    of 8 MB, in the background, up to 200 MB.
+//                    entry to hand the readers. A file over 10 MB goes in pieces
+//                    of 8 MB to the storage bucket, in the background, up to 1 GB.
 //     .take(entries) a reader: down from the cloud and shelved here, by the list;
 //                    the parts of a big file are put back together here
 //     .takeMissing() a reader: another try at what has not landed
@@ -188,7 +188,7 @@ export async function carryIntoRoom(body, { find, put, log = () => {}, fs = fsDe
 }
 
 export function createFileCarrier({
-  dir, has, put, get, find, now = Date.now, log = () => {}, fs = fsDefault,
+  dir, has, put, get, putPiece = null, getPiece = null, find, now = Date.now, log = () => {}, fs = fsDefault,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), retryMs = [1000, 4000],
 }) {
   const uploads = new Map(); // ref -> { key, done, entry, error }
@@ -217,16 +217,23 @@ export function createFileCarrier({
     fs.renameSync(tmp, to);
   }
 
-  async function putWithRetries(name, data) {
+  async function withRetries(send) {
     let last;
     for (let i = 0; i < TRIES_AT_A_PIECE; i += 1) {
-      try { await put(name, data); return; } catch (err) { last = err; if (i < TRIES_AT_A_PIECE - 1) await sleep(retryMs[i] ?? 0); }
+      try { await send(); return; } catch (err) { last = err; if (i < TRIES_AT_A_PIECE - 1) await sleep(retryMs[i] ?? 0); }
     }
     throw last;
   }
 
+  // A piece already in storage is the same piece, since its name is what is in it.
+  async function sendPiece(cloud, buf) {
+    if (putPiece) return withRetries(() => putPiece(cloud, buf));
+    const there = await has([cloud]);
+    if (!there.includes(cloud)) await withRetries(() => put(cloud, buf.toString('base64')));
+  }
+
   // A file over 10 MB, sent a piece at a time while the pass goes on. The
-  // pieces are read one by one, so 200 MB never sits in memory.
+  // pieces are read one by one, so 1 GB never sits in memory.
   function startUpload(ref, found, at) {
     const task = { key: `${found.file}|${found.size}`, done: false, entry: null, error: null };
     const total = pieceSizes(found.size).length;
@@ -248,14 +255,14 @@ export function createFileCarrier({
           }
           whole.update(buf);
           const cloud = `${sumOf(buf)}-${base.slice(-100)}.p${i + 1}of${total}`;
-          const there = await has([cloud]);
-          if (!there.includes(cloud)) await putWithRetries(cloud, buf.toString('base64'));
+          await sendPiece(cloud, buf);
           chunks.push({ cloud, size: length });
           progress(i + 1);
         }
         const name = base;
         const main = plainPartPath(name) ? name : `file${path.extname(name)}`;
-        task.entry = { ref, main, parts: [{ path: main, cloud: `${whole.digest('hex').slice(0, 12)}-${base}`, size: found.size, chunks }], at };
+        const part = { path: main, cloud: `${whole.digest('hex').slice(0, 12)}-${base}`, size: found.size, chunks, ...(putPiece ? { bucket: true } : {}) };
+        task.entry = { ref, main, parts: [part], at };
       } catch (err) {
         log(`team files: sending ${ref} in parts: ${err?.message ?? err}`);
         task.error = 'upload';
@@ -287,12 +294,19 @@ export function createFileCarrier({
   // checked against the name the sender gave the whole. True when it is here.
   async function gatherPart(entry, part) {
     const missing = part.chunks.filter((c) => !fs.existsSync(chunkFile(dir, entry, part, c)));
+    if (part.bucket && !getPiece) return false;
     if (missing.length) {
-      const there = new Set(await has(missing.map((c) => c.cloud)));
-      for (const c of missing.filter((m) => there.has(m.cloud))) {
-        const data = await get(c.cloud);
-        if (typeof data !== 'string') continue;
-        const bytes = Buffer.from(data, 'base64');
+      const there = part.bucket ? null : new Set(await has(missing.map((c) => c.cloud)));
+      for (const c of missing.filter((m) => !there || there.has(m.cloud))) {
+        let bytes;
+        if (part.bucket) {
+          bytes = await getPiece(c.cloud);
+          if (!Buffer.isBuffer(bytes)) continue;
+        } else {
+          const data = await get(c.cloud);
+          if (typeof data !== 'string') continue;
+          bytes = Buffer.from(data, 'base64');
+        }
         if (bytes.length > MAX_CARRIED_BYTES || !c.cloud.startsWith(`${sumOf(bytes)}-`)) { log(`team files: ${c.cloud} did not match its name`); continue; }
         const to = chunkFile(dir, entry, part, c);
         fs.mkdirSync(path.dirname(to), { recursive: true });
