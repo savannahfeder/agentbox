@@ -10,7 +10,8 @@ import { PLAIN_AGENT } from './agent-voice.mjs';
 const MARK_ID = /^[\w-]{1,64}$/;
 const FILE_ID = /^[^/\\\0]{1,160}$/;
 const MAX_NOTE_CHARS = 4000;
-const MAX_QUOTE_CHARS = 400;
+// A whole section. With a full note, both in three-byte characters, still under the cloud's 24,000 for one mark.
+export const MAX_QUOTE_CHARS = 3000;
 const MAX_NAMED = 12;
 const MAX_SEEN = 50;
 // Under the 24,000 the cloud allows one mark, with room for the rest of it.

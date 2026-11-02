@@ -12,12 +12,12 @@ const Line = memo(function Line({ text }: { text: string }) {
 // Past this a line-by-line colouring costs more than it gives.
 const MOST_COLOURED_LINES = 6000;
 
-export const CodeFile = forwardRef<HTMLDivElement, { text: string; onMouseUp?: () => void }>(function CodeFile({ text, onMouseUp }, ref) {
+export const CodeFile = memo(forwardRef<HTMLDivElement, { text: string }>(function CodeFile({ text }, ref) {
   const lines = useMemo(() => text.replace(/\n$/, '').split('\n'), [text]);
-  return <div className="code-file" ref={ref} onMouseUp={onMouseUp}>
+  return <div className="code-file" ref={ref}>
     {lines.map((line, i) => <div className="code-file-line" key={i}>
       <span className="code-file-n" aria-hidden="true" data-n={i + 1} />
       <code className="code-file-text">{i < MOST_COLOURED_LINES ? <Line text={line} /> : line}{'\n'}</code>
     </div>)}
   </div>;
-});
+}));
