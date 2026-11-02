@@ -88,7 +88,9 @@ const oneLine = (s: string) => {
   return line.length > 110 ? `${line.slice(0, 108).replace(/\s+\S*$/, '')}…` : line;
 };
 
-export function teamToday({ range, now, me, items, products, cards, decisions, needs, mentions = [], approvals = [], people, mates, mateOf, directWith = () => null, needsCount }: {
+export function teamToday({ range, now, me, items, products, cards, decisions, needs, mentions = [], approvals = [], people, mates, mateOf, directWith = () => null, needsCount, later = () => false }: {
+  /** Your own threads put off till later, by this app's own rule (which this computer keeps). */
+  later?: (item: WorkItem) => boolean;
   range: TodayRange; now: number; me: string | null;
   items: readonly WorkItem[]; products: readonly Product[]; cards: readonly ThreadCard[];
   decisions: readonly RoomDecision[];
@@ -185,7 +187,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
     if (on) who.blocked.push(line(i.updatedAt, nameOf(on)));
     else if (i.status === 'blocked') who.blocked.push(line(i.updatedAt, null));
     // A thread put off till later is not being worked on.
-    else if (inRange(i.updatedAt) && !task && threadState(i, now) !== 'scheduled') {
+    else if (inRange(i.updatedAt) && !task && threadState(i, now) !== 'scheduled' && !later(i)) {
       const says = howFar(i.progress);
       who.working.push({ ...line(i.updatedAt), ...(says ? { says } : {}) });
     }
