@@ -1194,7 +1194,7 @@ export default function App() {
     // The state goes with it because both were read from localStorage at mount
     // and neither is watching it, so writing the keys alone would only take
     // effect on the next launch.
-    const seeded = seedFirstRunLook(localStorage, THEME_KEY);
+    const seeded = seedFirstRunLook(localStorage, THEME_KEY, machineTheme());
     if (seeded) { setTheme(seeded.theme); setSkin(seeded.skin); }
   }, [snap, run, fresh, walkWaitsForSignIn]);
 
