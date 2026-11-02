@@ -2391,6 +2391,9 @@ body {
 */
 .focus-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; height: 100%; position: relative; }
 .focus-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+/* A long thread needs a bar to grab. A set `scrollbar-color` overrides the
+   `::-webkit-scrollbar-thumb` hover rule, so the colour has to be set here. */
+.focus-scroll:hover { scrollbar-color: color-mix(in srgb, var(--text-faint) 60%, transparent) transparent; }
 /* THE DOCK FADES TO WHATEVER IT SITS ON, and one edge across the middle of an
    opened task is the bug both halves of this rule exist to prevent: a
    different white in the lower half of every opened task. It has named --bg and --surface by turns as the ground
