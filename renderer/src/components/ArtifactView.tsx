@@ -1,7 +1,7 @@
 // A FILE OPENED BIG: the file filling the window, its comments down the right,
 // the thread's name and the version above, Escape back. One view for the owner
 // and for teammates; only where a comment is written differs (`write`).
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
   addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, noteGoesTo, otherFilesInLines, placeWords, reviewKind, sharedByWords, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
@@ -14,6 +14,10 @@ import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
 import { hasSpot, noteSendWords, notesToSendTheAgent, otherFilesOpen, pageSpot, PIN_FRAME_S, pinned, viewOffers, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
+import { opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
+import { quotesKey } from '../selection-bar';
+import { SelectionBar } from './SelectionBar';
+import { pressedInTheFindBox } from '../find-in-page';
 import { ArtifactStage, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
 import { OpeningWait } from './OpeningWait';
 import { CrossIcon } from './CrossIcon';
@@ -24,9 +28,7 @@ import './artifact-view.css';
 
 export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number }
 
-// One sitting is one version: a save per pause in typing would bury the chain.
-const SAVE_AFTER_A_PAUSE_MS = 30_000;
-type Editing = { text: string; draft?: string; top: number; folder: string | null; base: ReturnType<typeof threadFiles>[number]['versions'][number] };
+type Editing = { fam: string; text: string; draft?: string; folder: string | null; base: ReturnType<typeof threadFiles>[number]['versions'][number] };
 
 export const NO_MARKS: FileMarks = { notes: [], approvals: [], seen: {} };
 
@@ -148,7 +150,10 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   useEffect(() => {
     setDraftPlace(null); setHere(null); setCompare(false); setLeftVi(null); setReplyingTo(null); setFound('looking');
   }, [version?.id]);
-  const offers = viewOffers(found, !!me && !!version);
+  const [editing, setEditing] = useState<Editing | null>(null);
+  // The editor read the file itself, so it is open while it is on screen.
+  const foundNow: Found = editing ? 'open' : found;
+  const offers = viewOffers(foundNow, !!me && !!version);
 
   // Opening it is what clears a row from Needs you.
   const sawn = useRef(new Set<string>());
@@ -176,11 +181,13 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
 
   // Said here, since this view covers the window's own notices.
   const [trouble, setTrouble] = useState<string | null>(null);
-  const [editing, setEditing] = useState<Editing | null>(null);
   const [editWord, setEditWord] = useState<string | null>(null);
   const [told, setTold] = useState<string | null>(null);
-  const [leaveAsked, setLeaveAsked] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [unreadable, setUnreadable] = useState<string | null>(null);
+  const starting = useRef<string | null>(null);
+  const editPane = useRef<HTMLDivElement | null>(null);
+  const editRanges = useRef(new Map<string, Range>());
   const typed = useRef<string | null>(null);
   const posted = useRef<string | null>(null);
   const posting = useRef(false);
@@ -191,7 +198,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   useEffect(() => {
     if (!savedIn) return;
     const fam = families[savedIn.fi];
-    if (!fam || fam.versions.length <= savedIn.count) return;
+    if (!savedVersionArrived(families[savedIn.fi], savedIn.count)) return;
     setAt({ fi: savedIn.fi, vi: fam.versions.length - 1 });
     setSavedIn(null);
   }, [families, savedIn]);
@@ -279,38 +286,58 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   const pressSend = () => toAgent(sendNotes);
 
   const isNewest = !!family && !!at && at.vi === family.versions.length - 1;
-  const canEdit = !!(onNewVersion && kind === 'markdown' && version && isNewest && found === 'open' && !version.newer);
+  const canEdit = !!(onNewVersion && kind === 'markdown' && version && isNewest && !version.newer);
   const canRestore = !!(onNewVersion && kind === 'markdown' && version && !isNewest && found === 'open') && !family?.versions[family.versions.length - 1].newer;
   const draftKey = (path: string) => `doc-edit-draft:${product}:${path}`;
+  const editingNow = useRef(editing);
+  editingNow.current = editing;
   const startEdit = async () => {
-    if (!version) return;
-    const top = document.querySelector('.av-stage .av-doc-scroll')?.scrollTop ?? 0;
+    if (!version || !family || starting.current === version.id) return;
+    const v = version;
+    const fam = family.key;
+    starting.current = v.id;
     const [text, opened] = fromElsewhere
-      ? await Promise.all([fromElsewhere.readText(version.path).catch(() => null), fromElsewhere.find(version.path).catch(() => null)])
-      : await Promise.all([api.readDoc({ product, src: version.path, thread }).then((r) => (r.ok ? r.text ?? null : null)).catch(() => null), api.resolveDoc({ product, src: version.path, thread }).then((r) => r.opened ?? null).catch(() => null)]);
-    if (text === null) { setTold(`${version.name} could not be read, so it cannot be edited.`); return; }
+      ? await Promise.all([fromElsewhere.readText(v.path).catch(() => null), fromElsewhere.find(v.path).catch(() => null)])
+      : await Promise.all([api.readDoc({ product, src: v.path, thread }).then((r) => (r.ok ? r.text ?? null : null)).catch(() => null), api.resolveDoc({ product, src: v.path, thread }).then((r) => r.opened ?? null).catch(() => null)]);
+    starting.current = null;
+    if (inHand.current !== v.id) return;
+    if (text === null) { setUnreadable(v.id); return; }
+    // Words a sitting kept but never saved, from a failed save or a closed app.
     let draft: string | undefined;
-    try { draft = localStorage.getItem(draftKey(version.path)) ?? undefined; } catch { /* no storage, no draft */ }
+    try { draft = localStorage.getItem(draftKey(v.path)) ?? undefined; } catch { /* no storage, no draft */ }
     typed.current = draft ?? null;
     posted.current = null;
-    setEditWord(draft ? 'Draft restored' : null);
+    setEditWord(null);
     setTold(null);
-    setEditing({ text, draft, top, folder: opened ? opened.replace(/\/[^/]*$/, '') : null, base: version });
+    setEditing({ fam, text, draft, folder: opened ? opened.replace(/\/[^/]*$/, '') : null, base: v });
+    if (draft !== undefined) idle.current = window.setTimeout(() => { void postNow.current(); }, SAVE_AFTER_A_PAUSE_MS);
   };
-  const postEdit = async () => {
-    const out = typed.current;
-    if (!editing || !onNewVersion || out === null || out === posted.current || posting.current) return true;
-    posting.current = true;
-    setEditWord('Saving…');
-    const clash = editClash(family, editing.base.n, me, nameOf);
-    const why = await onNewVersion(editing.base.name, out, editing.base.path, editing.base.id).catch((err: Error) => err.message);
-    posting.current = false;
-    if (why) { setTold(`${why} Press back again to leave: your words come back when you press Edit.`); setEditWord('Not saved'); return false; }
-    posted.current = out;
-    try { localStorage.removeItem(draftKey(editing.base.path)); } catch { /* nothing kept */ }
-    setTold(clash ?? editGoes ?? null);
-    setEditWord(editGoes ? 'Sent' : `Saved as v${(family?.versions.length ?? 1) + 1}`);
-    return true;
+  useEffect(() => {
+    if (opensForTyping({ canEdit, compare, editing: !!editing, unreadable, version: version?.id ?? null })) void startEdit();
+  }, [canEdit, compare, !!editing, unreadable, version?.id]);
+  const waitingForEditor = opensForTyping({ canEdit, compare, editing: !!editing, unreadable, version: version?.id ?? null });
+
+  // A save asked for while one is on its way waits for it, then posts what is newer.
+  const inFlight = useRef<Promise<boolean> | null>(null);
+  const postEdit = async (): Promise<boolean> => {
+    while (inFlight.current) await inFlight.current;
+    const sitting = editingNow.current;
+    const out = sitting ? wordsToSave({ typed: typed.current, posted: posted.current, original: sitting.text }) : null;
+    if (!sitting || !onNewVersion || out === null) return true;
+    const run = (async () => {
+      setEditWord('Saving…');
+      const clash = editClash(family, sitting.base.n, me, nameOf);
+      const why = await onNewVersion(sitting.base.name, out, sitting.base.path, sitting.base.id).catch((err: Error) => err.message);
+      if (why) { setTold(`${why} Press back again to leave: your words come back when you open it again.`); setEditWord('Not saved'); return false; }
+      posted.current = out;
+      try { if (localStorage.getItem(draftKey(sitting.base.path)) === out) localStorage.removeItem(draftKey(sitting.base.path)); } catch { /* nothing kept */ }
+      setTold(clash ?? editGoes ?? null);
+      setEditWord(editGoes ? 'Sent' : 'Saved');
+      if (at && family) setSavedIn({ fi: at.fi, count: family.versions.length });
+      return true;
+    })();
+    inFlight.current = run;
+    try { return await run; } finally { inFlight.current = null; }
   };
   // An older version's words become the newest version; every version stays.
   const restore = async () => {
@@ -331,87 +358,112 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   const postNow = useRef(postEdit);
   postNow.current = postEdit;
   const clearIdle = () => { if (idle.current != null) { window.clearTimeout(idle.current); idle.current = null; } };
-  useEffect(() => clearIdle, []);
   const onDraft = useCallback((out: string | null) => {
     typed.current = out;
     clearIdle();
-    const base = editingNow.current?.base;
-    if (base) {
-      try {
-        if (out === null) localStorage.removeItem(draftKey(base.path));
-        else localStorage.setItem(draftKey(base.path), out);
-      } catch { /* the words are still in the page */ }
-    }
-    setEditWord(out === null ? null : 'Draft saved');
-    if (out !== null) idle.current = window.setTimeout(() => { void postNow.current(); }, SAVE_AFTER_A_PAUSE_MS);
+    const sitting = editingNow.current;
+    if (!sitting) return;
+    const pending = wordsToSave({ typed: out, posted: posted.current, original: sitting.text });
+    try {
+      if (pending === null) localStorage.removeItem(draftKey(sitting.base.path));
+      else localStorage.setItem(draftKey(sitting.base.path), pending);
+    } catch { /* the words are still in the page */ }
+    if (pending === null) return;
+    setEditWord('Saved');
+    idle.current = window.setTimeout(() => { void postNow.current(); }, SAVE_AFTER_A_PAUSE_MS);
   }, [product]);
-  const editingNow = useRef(editing);
-  editingNow.current = editing;
-  const finishEdit = async () => {
-    clearIdle();
-    if (flushEdit.current) typed.current = flushEdit.current();
-    if (!(await postEdit())) return false;
-    if (posted.current && at && editing) setSavedIn({ fi: at.fi, count: editing.base.n });
-    setEditing(null);
-    setEditWord(null);
-    return true;
-  };
   const saveNow = useCallback(() => {
     clearIdle();
     if (flushEdit.current) typed.current = flushEdit.current();
     void postNow.current();
   }, []);
-  const unsaved = () => {
-    if (flushEdit.current) typed.current = flushEdit.current();
-    return typed.current !== null && typed.current !== posted.current;
-  };
-  const saveAndLeave = () => { setLeaveAsked(false); void finishEdit().then((done) => { if (done) onClose(); }); };
-  const discardEdit = () => {
+  useEffect(() => {
+    window.addEventListener('blur', saveNow);
+    return () => window.removeEventListener('blur', saveNow);
+  }, [saveNow]);
+  useEffect(() => () => {
     clearIdle();
-    if (editing) { try { localStorage.removeItem(draftKey(editing.base.path)); } catch { /* nothing kept */ } }
+    if (flushEdit.current) typed.current = flushEdit.current();
+    void postNow.current();
+  }, []);
+  const endSitting = async () => {
+    if (!editingNow.current) return true;
+    clearIdle();
+    if (flushEdit.current) typed.current = flushEdit.current();
+    if (!(await postEdit())) return false;
+    setEditing(null);
+    setEditWord(null);
+    return true;
+  };
+  // After a failed save the next press goes anyway, and the words wait in the draft.
+  const dropSitting = () => {
+    const sitting = editingNow.current;
+    const words = flushEdit.current?.() ?? typed.current;
+    if (sitting && words !== null) { try { localStorage.setItem(draftKey(sitting.base.path), words); } catch { /* nothing kept */ } }
     typed.current = null;
-    setLeaveAsked(false);
+    clearIdle();
     setEditing(null);
     setEditWord(null);
     setTold(null);
-    onClose();
   };
-  // The first press after a failed save says so; the next one leaves, and the draft stays for Edit.
-  // Changes are kept only when asked: Close is how people throw an edit away.
+  const away = (go: () => void) => {
+    if (!editingNow.current) { go(); return; }
+    if (editWord === 'Not saved') { dropSitting(); go(); return; }
+    void endSitting().then((ok) => { if (ok) go(); });
+  };
   const leave = () => {
     if (!editing) { onClose(); return; }
-    if (editWord === 'Not saved') {
-      flushEdit.current?.();
-      setEditing(null);
-      setEditWord(null);
-      setTold(null);
-      onClose();
-      return;
-    }
-    if (!unsaved()) { clearIdle(); setEditing(null); setEditWord(null); onClose(); return; }
-    clearIdle();
-    setLeaveAsked(true);
+    if (editWord === 'Not saved') { dropSitting(); onClose(); return; }
+    void endSitting().then((ok) => { if (ok) onClose(); });
   };
+  useEffect(() => {
+    if (editing && family && editing.fam !== family.key) void endSitting();
+  }, [family?.key]);
   const liveQuotes = useMemo(() => [...notesHere, ...carried].flatMap((n) => (n.place.kind === 'quote' && !n.resolved ? [{ id: n.id, text: n.place.text }] : [])), [notesHere, carried]);
   const [goneQuotes, setGoneQuotes] = useState<string[]>([]);
   const noteGone = useCallback((ids: string[]) => setGoneQuotes((was) => (was.join() === ids.join() ? was : ids)), []);
   useEffect(() => { setGoneQuotes([]); }, [version?.id]);
+  const draftQuote = placeNow.kind === 'quote' ? placeNow.text : null;
   const paintEditor = (root: HTMLElement) => {
-    const found = paintQuotes(root, liveQuotes, activeId, null);
+    const found = paintQuotes(root, liveQuotes, activeId, draftQuote);
+    editRanges.current = found;
     if (canPaintQuotes()) noteGone(liveQuotes.filter((q) => !found.has(q.id)).map((q) => q.id));
+  };
+  useEffect(() => {
+    const root = editPane.current?.querySelector<HTMLElement>('.ProseMirror');
+    if (editing && root) paintEditor(root);
+  }, [editing, draftQuote, activeId, quotesKey(liveQuotes)]);
+  // A press on words a comment is about opens that comment, as it does when reading.
+  const pickInEditor = (e: ReactMouseEvent) => {
+    if (window.getSelection()?.isCollapsed === false) return;
+    const caret = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+    if (!caret) return;
+    for (const [id, range] of editRanges.current) {
+      if (!range.isPointInRange(caret.startContainer, caret.startOffset)) continue;
+      const n = [...notesHere, ...carried].find((x) => x.id === id);
+      if (n) pickNote(n);
+      return;
+    }
   };
   const othersSaved = editing ? editClash(family, editing.base.n, me, nameOf) : null;
 
   const stepFile = (by: number) => {
-    if (editing || !at || families.length < 2) return;
+    if (!at || families.length < 2) return;
     const next = Math.max(0, Math.min(families.length - 1, at.fi + by));
-    setAt({ fi: next, vi: families[next].versions.length - 1 });
-    setActiveId(null);
+    away(() => {
+      setSavedIn(null);
+      setAt({ fi: next, vi: families[next].versions.length - 1 });
+      setActiveId(null);
+    });
   };
   const stepVersion = (by: number) => {
-    if (editing || !at || !family) return;
-    setAt({ fi: at.fi, vi: Math.max(0, Math.min(family.versions.length - 1, at.vi + by)) });
-    setActiveId(null);
+    if (!at || !family) return;
+    const vi = Math.max(0, Math.min(family.versions.length - 1, at.vi + by));
+    away(() => {
+      setSavedIn(null);
+      setAt({ fi: at.fi, vi });
+      setActiveId(null);
+    });
   };
 
   // Escape first of all, ahead of the app's own. Every other key still reaches the
@@ -419,24 +471,21 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   // on its way up, so the thread behind stays still.
   useEffect(() => {
     const escape = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' || pressedInTheFindBox(e.target)) return;
       e.stopImmediatePropagation();
       e.preventDefault();
       if (asking) setAsking(null);
-      else if (leaveAsked) setLeaveAsked(false);
       else if (replyingTo) setReplyingTo(null);
       else if (draftPlace) setDraftPlace(null);
       else if (compare) setCompare(false);
-      else if (editing && editWord === 'Not saved') leave();
-      else if (editing) leave();
-      else onClose();
+      else leave();
     };
     const rest = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey) return;
       e.stopPropagation();
       const at = e.target as HTMLElement | null;
       const typing = at?.tagName === 'TEXTAREA' || !!at?.isContentEditable;
-      if (typing || followsTheFile) return;
+      if (typing || followsTheFile || pressedInTheFindBox(e.target)) return;
       if (e.key === 'ArrowRight') { e.preventDefault(); stepFile(1); }
       if (e.key === 'ArrowLeft') { e.preventDefault(); stepFile(-1); }
     };
@@ -551,17 +600,17 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
 
   return createPortal(
     <StageThread.Provider value={thread}>
-    <div className="artifact-view" role="dialog" aria-label={version?.name ?? 'File'}>
+    <div className="artifact-view" data-find-layer role="dialog" aria-label={version?.name ?? 'File'}>
       <header className="av-top">
         <button type="button" className="av-back" onClick={leave} title="Back (esc)"><span aria-hidden="true">←</span><span className="av-thread">{threadName}</span></button>
         <span className="av-name">{familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? '')}</span>
         {kind && <span className="av-kind">{KIND_WORD[kind]}</span>}
-        {family && family.versions.length > 1 && !editing && (
+        {family && family.versions.length > 1 && (
           <span className="av-versions">
             <button type="button" className="av-chev" disabled={at!.vi === 0} onClick={() => stepVersion(-1)} aria-label="Older version">‹</button>
             <span className="av-of">v{version!.n} of {family.versions.length}</span>
             <button type="button" className="av-chev" disabled={at!.vi === family.versions.length - 1} onClick={() => stepVersion(1)} aria-label="Newer version">›</button>
-            <button type="button" className={`av-btn av-compare${compare ? ' is-on' : ''}`} aria-pressed={compare} onClick={() => setCompare(!compare)}><NoteGlyph name="sides" />Side by side</button>
+            <button type="button" className={`av-btn av-compare${compare ? ' is-on' : ''}`} aria-pressed={compare} onClick={() => (compare ? setCompare(false) : away(() => setCompare(true)))}><NoteGlyph name="sides" />Side by side</button>
           </span>
         )}
         <span className="av-spring" />
@@ -570,11 +619,9 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
         )}
         {earlier && <span className="av-approved is-old" title={approvalSince(family, at!.vi, marks.approvals, nameOf) ?? undefined}>{version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`}</span>}
         {editing && editWord && <span className="av-saved" role="status">{editWord}</span>}
-        {offers.approve && !editing && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
-        {canEdit && !compare && !editing && <button type="button" className="av-btn" onClick={() => void startEdit()}><NoteGlyph name="edit" />Edit</button>}
+        {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
         {canRestore && !compare && !editing && <button type="button" className="av-btn" disabled={restoring} onClick={() => void restore()}><NoteGlyph name="undo" />Restore this version</button>}
-        {editing && <button type="button" className="av-btn is-on" onClick={() => void finishEdit()}>Done</button>}
-        {onOutside && version && found === 'open' && !editing && <button type="button" className="av-btn" onClick={() => onOutside(version.path)}><NoteGlyph name="outside" />Open outside</button>}
+        {onOutside && version && foundNow === 'open' && <button type="button" className="av-btn" onClick={() => onOutside(version.path)}><NoteGlyph name="outside" />Open outside</button>}
         <button type="button" className="av-close" onClick={leave} title="Close (esc)" aria-label="Close"><CrossIcon /></button>
       </header>
       <div className="av-body">
@@ -595,21 +642,15 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
               <button type="button" className="av-btn" onClick={() => setApproveAsked(null)}>Not yet</button>
             </p>
           )}
-          {leaveAsked && editing && (
-            <p className="av-told av-ask" role="alertdialog">
-              Keep your changes?
-              <button type="button" className="av-btn is-on" onClick={saveAndLeave}>Save as v{(family?.versions.length ?? 1) + 1}</button>
-              <button type="button" className="av-btn" onClick={discardEdit}>Discard</button>
-              <button type="button" className="av-btn" onClick={() => setLeaveAsked(false)}>Keep editing</button>
-            </p>
-          )}
-          {editing && (
-            <div className="av-pane" key={`editing-${editing.base.id}`}>
+          {editing && !compare && (
+            <div className="av-pane" key={`editing-${editing.base.id}`} ref={editPane} onClick={pickInEditor}>
               <DocText product={product} src={editing.base.path} text={editing.text} mtime={0} folder={editing.folder} onSaved={() => {}} onNotice={setTold}
-                versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, scrollTop: editing.top, draft: editing.draft, byline: bylineOf(editing.base) }} />
+                versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, draft: editing.draft, byline: bylineOf(version ?? editing.base) }} />
+              {offers.comment && <SelectionBar page={editPane} onComment={(quote) => { setWholeAsked(false); setDraftPlace({ kind: 'quote', text: quote }); box.current?.focus(); }} />}
             </div>
           )}
-          {version && !compare && !editing && <div className="av-pane" key={version.id}>{stage(version.path, version.id, version.name, true, version)}</div>}
+          {version && waitingForEditor && <OpeningWait name={version.name} kind="markdown" />}
+          {version && !compare && !editing && !waitingForEditor && <div className="av-pane" key={version.id}>{stage(version.path, version.id, version.name, true, version)}</div>}
           {version && compare && left && !editing && (
             <div className="av-split" ref={split}>
               <div className="av-pane" key={`l-${left.id}`}>
@@ -627,12 +668,12 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
               </div>
             </div>
           )}
-          {!compare && !editing && families.length > 1 && at && <>
+          {!compare && families.length > 1 && at && <>
             <button type="button" className="av-step av-prev" disabled={at.fi === 0} onClick={() => stepFile(-1)} aria-label="Previous file">‹</button>
             <button type="button" className="av-step av-next" disabled={at.fi === families.length - 1} onClick={() => stepFile(1)} aria-label="Next file">›</button>
           </>}
         </div>
-        {!compare && (found === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0) && <aside className="av-side" aria-label="Comments">
+        {!compare && (foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0) && <aside className="av-side" aria-label="Comments">
           <div className="av-list">
             {openNotes.map(card)}
             {settled.length > 0 && (

@@ -234,6 +234,8 @@ function keyOf(name, path) {
   return `${stem}\0${baseName(name)}`;
 }
 
+const endsWithPath = (whole, part) => whole === part || whole.endsWith(`/${part}`);
+
 /**
  * The files of a thread, grouped into families of versions, oldest version first
  * in the order they were first said. Each version has `id`, the name a mark uses
@@ -257,10 +259,12 @@ export function threadFiles(files, numbers = null) {
     if (!family) { family = { key, versions: [] }; families.set(key, family); }
     const line = Number.isInteger(numbers?.[path]) ? numbers[path] : undefined;
     const same = family.versions.filter((v) => v.name === name);
-    // The same name said again by another path is the same file: a card may carry either.
-    if (same.length && !SENT_COPY.test(path) && (line === undefined || same[0].line === undefined || same[0].line === line)) {
-      (same[0].also ??= []).push(path);
-      same[0].line ??= line;
+    // Another path is the same file only when one ends with the other: a bare
+    // name or a relative path inside a whole one. Two folders are two files.
+    const written = same.filter((v) => [v.path, ...(v.also ?? [])].some((p) => endsWithPath(p, path) || endsWithPath(path, p))).at(-1);
+    if (written && !SENT_COPY.test(path) && (line === undefined || written.line === undefined || written.line === line)) {
+      (written.also ??= []).push(path);
+      written.line ??= line;
       continue;
     }
     const id = f.newer && line !== undefined ? `${baseName(name)}@${line}` : same.length ? `${name}#${same.length + 1}` : name;

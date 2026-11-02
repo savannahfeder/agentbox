@@ -528,6 +528,9 @@ export function createConnections({
       if (JSON.stringify(changed) !== JSON.stringify(c.status.changed ?? [])) await saveStatus(id, { tools, changed, toolCount: tools.length });
     },
     _read: () => vault.read(),
+    // The clock that stamped every `at` here, so whoever puts one into words
+    // reads it against the same one.
+    _now: now,
     callMs,
   };
   return service;
