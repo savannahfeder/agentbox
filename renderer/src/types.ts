@@ -324,7 +324,7 @@ export interface ConnectionTile {
   since: number | null; nextTryAt: number | null; stoppedTryingAt: number | null;
   seen: number | null; seenAtLeast: boolean; things: string | null;
   changed: string[]; reads: string[]; writes: string[];
-  group: string; access: ConnectionAccess; needs: string | null; custom: boolean; address: string; redirect: string | null; hasClient: boolean;
+  group: string; access: ConnectionAccess; needs: string | null; hint: string | null; said: { reads: string; writes?: string } | null; custom: boolean; address: string; redirect: string | null; hasClient: boolean;
   lastUsedAt: number | null; failures: ConnectionFailure[]; endsAt: number | null;
   copyable: boolean; copyAsks: string | null; copy?: KeptCopy | null;
   chooses?: boolean; chosen?: string[]; offered?: { name: string; description: string; runsAlone: boolean }[];
