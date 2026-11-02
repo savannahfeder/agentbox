@@ -43,3 +43,5 @@
 /* In Chats the team's day is one person under another. */
 .cx-frame-main .td-people { columns: 1; }
 .cx-frame-main .team-page { height: 100%; }
+.td-name { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+.td-name:hover { text-decoration: underline; text-underline-offset: 3px; }

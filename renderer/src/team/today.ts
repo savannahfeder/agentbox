@@ -1,7 +1,7 @@
 // The Today page: what each person and AI teammate finished, shipped and
 // decided, what is blocked and on whom, and what waits on you, read from the
 // store with no agent.
-import { shippedAtOf } from '../../../shared/thread-cards.mjs';
+import { shippedAtOf, threadState } from '../../../shared/thread-cards.mjs';
 import { shownTitle, withoutFiles } from '../../../shared/thread-title.mjs';
 import { isTaskRow, taskNewsAt } from '../../../shared/team-rules.mjs';
 import { isSetupTitle } from '../../../shared/teammates.mjs';
@@ -184,7 +184,8 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
     const on = (i.blockedBy ?? []).map(waitsOnKey).find((o) => o && o !== k);
     if (on) who.blocked.push(line(i.updatedAt, nameOf(on)));
     else if (i.status === 'blocked') who.blocked.push(line(i.updatedAt, null));
-    else if (inRange(i.updatedAt) && !task) {
+    // A thread put off till later is not being worked on.
+    else if (inRange(i.updatedAt) && !task && threadState(i, now) !== 'scheduled') {
       const says = howFar(i.progress);
       who.working.push({ ...line(i.updatedAt), ...(says ? { says } : {}) });
     }

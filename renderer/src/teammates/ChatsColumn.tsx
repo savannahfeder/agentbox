@@ -71,7 +71,7 @@ export function ChatsColumn({ current }: { current: string | null }) {
   return <aside className="gc-list cx-list" aria-label="Chats">
     <label className="cx-search">{I.search()}<input value={q} placeholder="Search" aria-label="Search your chats" onChange={(e) => setQ(e.target.value)} /><kbd>G</kbd></label>
     {c.onTeam && <button type="button" className={`cx-row cx-team${current === 'team' ? ' on' : ''}`} aria-current={current === 'team' ? 'page' : undefined} onClick={c.onTeam}>
-      <i className="tq tq-sm tq-hash" aria-hidden="true">#</i><span className="cx-n">Team</span>
+      <span className="cx-mark" aria-hidden="true">{I.groupNav()}</span><span className="cx-n">Everyone</span>
     </button>}
     {section('teammates', 'AI teammates', c.teammates.length, <>
       {mates.map((t) => {
