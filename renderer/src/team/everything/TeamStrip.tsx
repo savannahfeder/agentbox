@@ -10,7 +10,7 @@ import { cardPlace } from '../../threads/page-rules';
 import { STATE_WORD } from '../../threads/summary-rules';
 import type { StatusCell } from '../../status-word';
 import { moveMember, type Member, type TeamRun } from './members';
-import { faceRow, isBusy, railSections, statusWord, type RailSection } from './place';
+import { faceRow, isBusy, statusWord } from './place';
 import { cardTaskWord } from '../tasks';
 import './everything.css';
 
@@ -202,10 +202,10 @@ export function TeamThreads({ runs, people, products, now, onOpenItem, onOpenCar
 }
 
 /** The one-list home's corner: everyone one glance away, a dot when something of theirs is in your list. */
-export function NeedsFaces({ members, picked, waits, onPick, onAdd, narrowOnly = false }: { members: Member[]; picked: string | null; waits: ReadonlyMap<string, number>; onPick: (key: string) => void; onAdd?: () => void; narrowOnly?: boolean }) {
+export function NeedsFaces({ members, picked, waits, onPick, onAdd }: { members: Member[]; picked: string | null; waits: ReadonlyMap<string, number>; onPick: (key: string) => void; onAdd?: () => void }) {
   const row = faceRow(members);
   if (!row.length && !onAdd) return null;
-  return <nav className={`ev-corner ev-faces${narrowOnly ? ' nr-narrow-only' : ''}`} aria-label="Your team">{row.map((m) => {
+  return <nav className="ev-corner ev-faces" aria-label="Your team">{row.map((m) => {
     const name = m.kind === 'me' ? 'You' : m.name;
     const n = waits.get(m.key) ?? 0;
     return <button type="button" key={m.key} data-key={m.key} className={`ev-cf${picked === m.key ? ' on' : ''}`} aria-label={`Open ${name}`} aria-current={picked === m.key || undefined} onClick={() => onPick(m.key)}>
@@ -217,33 +217,6 @@ export function NeedsFaces({ members, picked, waits, onPick, onAdd, narrowOnly =
     <span className="ev-ai" style={{ width: 24, height: 24, fontSize: 13 }} aria-hidden="true">+</span>
     <span className="ev-tip" role="tooltip"><b>New teammate</b></span>
   </button>}</nav>;
-}
-
-/** Beside Needs you: everyone on the team with how they are, one press from their place. */
-export function NeedsRail({ members, picked, waits, onPick, onAdd }: { members: Member[]; picked: string | null; waits: ReadonlyMap<string, number>; onPick: (key: string) => void; onAdd?: () => void }) {
-  const found = railSections(members);
-  if (!found.length) return null;
-  const sections: RailSection[] = onAdd && !found.some((x) => x.label === 'AI teammates')
-    ? [...found.filter((x) => x.label !== 'Groups'), { label: 'AI teammates', rows: [] }, ...found.filter((x) => x.label === 'Groups')]
-    : found;
-  const addRow = onAdd && <button type="button" className="nr-row nr-add" onClick={onAdd}>
-    <span className="ev-ai" style={{ width: 28, height: 28, fontSize: 13 }} aria-hidden="true">+</span>
-    <span className="nr-t"><span className="nr-n">New teammate</span></span>
-  </button>;
-  const row = (m: Member) => {
-    const n = waits.get(m.key) ?? 0;
-    return <button type="button" key={m.key} className={`nr-row${picked === m.key ? ' on' : ''}`} aria-current={picked === m.key || undefined} onClick={() => onPick(m.key)}>
-      <MemberFace m={m} size={28} />
-      <span className="nr-t"><span className="nr-n">{m.kind === 'me' ? 'You' : m.name}</span><MemberWord m={m} waits={n} /></span>
-    </button>;
-  };
-  return <aside className="nr-rail" aria-label="Your team">
-    {sections.map((x) => <section key={x.label ?? 'top'} className="nr-sec">
-      {x.label && <h3>{x.label}</h3>}
-      {x.rows.map(row)}
-      {x.label === 'AI teammates' && addRow}
-    </section>)}
-  </aside>;
 }
 
 /** Needs you's corner: the people on your team and your AI teammates, each with how many agents it runs. */
