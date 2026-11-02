@@ -11,6 +11,7 @@
 .workspace-navigation button { font: inherit; font-size: 13px; color: var(--text-faint); border: 0; background: none; border-radius: var(--radius); cursor: pointer; height: 36px; flex: none; display: flex; align-items: center; padding: 0 10px; gap: 11px; }
 .workspace-navigation svg { width: 18px; height: 18px; flex: none; }
 .workspace-tabs { display: flex; flex-direction: column; gap: 3px; }
+.workspace-tabs.workspace-places { margin-top: 3px; }
 .workspace-navigation .workspace-tab { width: 100%; text-align: left; }
 .workspace-navigation .workspace-tab.active { background: var(--wash); color: var(--text); font-weight: 500; }
 /* Light: a lifted fill and a hairline rather than a grey block (w-22da913d00). */

@@ -167,16 +167,18 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
           the Inbox were one question on two pages, so they are one page: the
           faces at the end of the Inbox's tab bar pick whose threads are on
           it. `onTeam` is still the sign-in link at the foot. */}
-      {onFiles && <button data-tab="files" className={`workspace-tab${filesPage ? ' active' : ''}`} aria-label="Files" aria-current={filesPage ? 'page' : undefined} title={collapsed ? 'Files' : undefined} onClick={onFiles}>
-        <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 4.5h6.5l4 4V19a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z"/><path d="M13.5 4.5v4h4"/></svg>
-        <span>Files</span>
-      </button>}
+    </nav>
+    {groups}
+    {(onConnections || onFiles) && <nav className="workspace-tabs workspace-places" aria-label="Places">
       {onConnections && <button data-tab="connections" className={`workspace-tab${connectionsPage ? ' active' : ''}`} aria-label="Connections" aria-current={connectionsPage ? 'page' : undefined} title={collapsed ? 'Connections' : undefined} onClick={onConnections}>
         <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13.5a4 4 0 0 0 5.66 0l2.5-2.5a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10.5a4 4 0 0 0-5.66 0l-2.5 2.5a4 4 0 0 0 5.66 5.66l1-1"/></svg>
         <span>Connections</span>
       </button>}
-    </nav>
-    {groups}
+      {onFiles && <button data-tab="files" className={`workspace-tab${filesPage ? ' active' : ''}`} aria-label="Files" aria-current={filesPage ? 'page' : undefined} title={collapsed ? 'Files' : undefined} onClick={onFiles}>
+        <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 4.5h6.5l4 4V19a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z"/><path d="M13.5 4.5v4h4"/></svg>
+        <span>Files</span>
+      </button>}
+    </nav>}
     <div className="workspace-bottom">
       {/* The card sits above the foot list; with the sidebar shut it is a
           row inside it (SidebarUpdate.tsx). */}
