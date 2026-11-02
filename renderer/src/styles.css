@@ -4528,8 +4528,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 }
 .zoom-readout.up { opacity: 1; }
 
-/* ⌘F. A small panel over whatever is on screen, in the toast's shape. Above
-   the zoom readout and below the toasts. The field is a tint of the theme,
+/* ⌘F. A small panel over whatever is on screen, in the toast's shape. The field is a tint of the theme,
    never white (the light-component rule, 2026-09-23).
 
    98 POINTS DOWN, AND NEVER HIGHER THAN 44. It sat at 10 and not one of its
@@ -4541,7 +4540,10 @@ img.product-mark { object-fit: cover; opacity: 1; }
    changes it; turning every drag strip off while the box was up (the first
    fix) left the buttons exactly as dead. 98 also clears the terminal, New task
    and Commands buttons, which sit 54 to 89 points down at the right edge in
-   every task layout, so the box never covers a control. */
+   every task layout, so the box never covers a control.
+
+   Its z-index is over the full-screen file views (.artifact-view at 9400 and
+   its selection bar at 9450) and under the 10000 screens that lock the app. */
 .find-bar {
   position: fixed;
   top: 98px;
@@ -4557,7 +4559,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
   border-radius: var(--radius);
   font-size: 13.5px;
   box-shadow: var(--shadow-md);
-  z-index: 95;
+  z-index: 9500;
   user-select: none;
 }
 .find-input {
