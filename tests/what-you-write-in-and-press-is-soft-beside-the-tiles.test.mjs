@@ -11,7 +11,8 @@ import { it, expect, describe } from 'vitest';
 import fs from 'node:fs';
 
 const soft = fs.readFileSync(new URL('../renderer/src/soft-corners.css', import.meta.url), 'utf8');
-const view = fs.readFileSync(new URL('../renderer/src/components/ArtifactView.tsx', import.meta.url), 'utf8');
+const view = fs.readFileSync(new URL('../renderer/src/components/ArtifactView.tsx', import.meta.url), 'utf8')
+  + fs.readFileSync(new URL('../renderer/src/components/FileNoteCard.tsx', import.meta.url), 'utf8');
 const entry = fs.readFileSync(new URL('../renderer/src/main.tsx', import.meta.url), 'utf8');
 
 describe('the soft controls', () => {

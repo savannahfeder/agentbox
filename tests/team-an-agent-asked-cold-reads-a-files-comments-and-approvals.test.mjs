@@ -70,7 +70,8 @@ describe('the viewer', () => {
   });
 
   it('is drawn in the notes list with the words "From v1, still open", and settles by the original id', () => {
-    const source = fs.readFileSync(path.resolve('renderer/src/components/ArtifactView.tsx'), 'utf8');
+    const source = fs.readFileSync(path.resolve('renderer/src/components/ArtifactView.tsx'), 'utf8')
+      + fs.readFileSync(path.resolve('renderer/src/components/FileNoteCard.tsx'), 'utf8');
     expect(source).toMatch(/carriedNotes\(family, at\.vi, allNotes/);
     expect(source).toMatch(/From \{note\.from\}, still open/);
     expect(source).toMatch(/do: resolved \? 'resolve' : 'reopen', on: note\.id/);
