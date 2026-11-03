@@ -1,7 +1,9 @@
 import { openSourceFile } from './open-source-file.mjs';
 import {submitReply} from './live-replies.mjs';
 import { noteToItsAgent } from './notes-wake.mjs';
-import { whyItCannotMove } from '../shared/move-thread.mjs';
+import { CHANGED_HERE, ranHere, whyItCannotMove } from '../shared/move-thread.mjs';
+import { whereTheWorkStands } from './git-change.mjs';
+import { taskFolderPath } from './task-folders.mjs';
 import { GROUPS } from '../shared/connections-catalog.mjs';
 import { projectSeenBy } from '../shared/thread-cards.mjs';
 import { createEngineSetup } from './engine-setup.mjs';
@@ -1006,6 +1008,15 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       if (live) {
         const why = whyItCannotMove(store.readItem(product, id), { live: true });
         return { ok: false, error: why };
+      }
+      // Code it changed stays on its branch in this project, so it does not move.
+      const item = store.readItem(product, id);
+      if (ranHere(item)) {
+        const prod = store.listProducts().find((p) => p.slug === product);
+        let folder = null;
+        try { folder = prod?.repoPath ? taskFolderPath(supervisor.productFolder(prod), id) : null; } catch { folder = null; }
+        const stands = folder && fsWatch.existsSync(folder) ? whereTheWorkStands(folder) : null;
+        if (stands?.committed || stands?.uncommitted) return { ok: false, error: CHANGED_HERE };
       }
       const out = store.moveItem(product, id, to);
       push();
