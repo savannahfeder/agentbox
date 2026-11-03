@@ -102,7 +102,7 @@ import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mjs';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
-import { DONE } from './done-word';
+import { DONE, manyOrOne } from './done-word';
 import { modalAfterLeavingATask } from './modal-scope';
 import { NOTHING_OVER_THE_APP, afterTheWalk, type OpenOverTheApp } from './walk-scope';
 import { splitMessage } from './message-split';
@@ -5500,15 +5500,17 @@ export default function App() {
       if (item.agent) await api.closeAgent({ key: agentKey(item.agent), through: item.agent.lastActiveAt || item.agent.startedAt || Date.now() });
       else await api.answer({ product: item.product, id: item.id, status: 'done' });
     }
-    pushUndo({ label: `Reopened ${targets.length} items`, undoes: `reopen those ${targets.length} tasks`, brings: bringsBack(targets), ticks: targets.map((i) => i.id), undid: targets.filter((i) => !i.agent).map((i) => ({ product: i.product, id: i.id, words: 'Undid closing it' })), run: async () => {
+    const closed = manyOrOne(targets.map((i) => clipToSentence(rowTitle(i), TOAST_TITLE)));
+    const which = targets.length === 1 ? '“' + closed + '”' : 'those ' + closed;
+    pushUndo({ label: `Reopened: ${closed}`, undoes: `reopen ${which}`, brings: bringsBack(targets), ticks: targets.map((i) => i.id), undid: targets.filter((i) => !i.agent).map((i) => ({ product: i.product, id: i.id, words: 'Undid closing it' })), run: async () => {
       for (const item of targets) {
         if (item.agent) await api.closeAgent({ key: agentKey(item.agent), through: 0 });
         else await api.answer({ product: item.product, id: item.id, status: 'open' });
       }
     } });
     showToast((kept.length
-      ? `${DONE.verb}: ${targets.length} items. Still open: ${kept.length}, work never reached main`
-      : `${DONE.verb}: ${targets.length} items`) + SAYS_UNDO);
+      ? `${DONE.verb}: ${closed}. Still open: ${kept.length}, work never reached main`
+      : `${DONE.verb}: ${closed}`) + SAYS_UNDO);
     setMultiSel(new Set(kept.map((i) => i.id)));
     await refresh();
   }, [selectable, refresh, showToast, run, nudgeOnStopped]);
