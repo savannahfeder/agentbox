@@ -64,7 +64,12 @@ describe('where a file opens', () => {
     keepScroll(scrollKey('p', 'c.md'), 0);
     expect(keptScroll(scrollKey('p', 'c.md'))).toBe(0);
   });
-  it('documents and code both keep it', () => {
+  it('in the file beside a thread, documents and code both', () => {
+    expect(read('renderer/src/components/DocText.tsx')).toContain('useKeptScroll(scroller, scrollKey(product, src))');
+    expect(read('renderer/src/components/DocPane.tsx')).toContain('useKeptScroll(codeBox, scrollKey(doc.product, src))');
+    expect(read('renderer/src/components/DocPane.tsx')).toContain('<div className="code-scroll" ref={setCodeBox}>');
+  });
+  it('and in the versions view', () => {
     const stage = read('renderer/src/components/ArtifactStage.tsx');
     expect(stage.match(/useKeptScroll\(scroller, scrollKey\(product, path\)\)/g)?.length).toBe(2);
   });

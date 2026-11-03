@@ -17,14 +17,33 @@ export function keepScroll(key: string, top: number): void {
 
 export const keptScroll = (key: string): number => kept.get(key) ?? 0;
 
+// The words of a file often arrive after its box, so the box is too short to
+// hold the place at first. It is put back each time the words grow, until the
+// person moves it or this long has passed.
+const SETTLES_MS = 1500;
+
 /** Puts `box` back where this file was left and follows it from there. */
 export function useKeptScroll(box: HTMLElement | null, key: string): void {
-  // Before paint, so the file is never drawn at the top first.
+  // Before paint, so the file is not drawn at the top first.
   useLayoutEffect(() => {
     if (!box) return undefined;
-    box.scrollTop = keptScroll(key);
-    const note = () => keepScroll(key, box.scrollTop);
+    const want = keptScroll(key);
+    let settling = want > 0;
+    const put = () => { if (settling) box.scrollTop = want; };
+    const settle = () => { settling = false; };
+    put();
+    const grows = new ResizeObserver(put);
+    for (const child of Array.from(box.children)) grows.observe(child);
+    const timer = window.setTimeout(settle, SETTLES_MS);
+    const note = () => { if (!settling) keepScroll(key, box.scrollTop); };
+    const hands = ['wheel', 'pointerdown', 'touchstart', 'keydown'] as const;
+    for (const h of hands) box.addEventListener(h, settle, { passive: true });
     box.addEventListener('scroll', note, { passive: true });
-    return () => box.removeEventListener('scroll', note);
+    return () => {
+      grows.disconnect();
+      window.clearTimeout(timer);
+      for (const h of hands) box.removeEventListener(h, settle);
+      box.removeEventListener('scroll', note);
+    };
   }, [box, key]);
 }
