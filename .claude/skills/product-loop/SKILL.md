@@ -39,6 +39,7 @@ folder ranks every issue, worst first, with pictures.
 | `--target` | how much of the week to have used at its reset | 90 |
 | `--focus` | what shipped and wants leaning on | none |
 | `--out` | the run folder; on the cloud, the thread's designs folder, which outlives the machine | a folder under `/tmp` |
+| `--detach` | start in the background, in a session of its own, logging to `workday.log` in the run folder | off |
 
 In the Agentbox cloud nothing a session starts can sign in: use
 `--engine external`, read each `stretch-N.prompt.md` the runner writes, run
@@ -83,15 +84,36 @@ was logged, so they check the fixes.
 
 ## Every day, on its own
 
-A repeating task on this project, daily, on Codex, with this instruction:
+A repeating task on this project, daily. The run itself is on the default
+engine; only the testers spend the Codex week. A run never sits through a
+workday: it fixes yesterday's and starts today's, and today's testers are
+told what was logged, so they check the fixes.
 
-> Run one product-loop workday on the phone app (.claude/skills/product-loop).
-> If `node .claude/skills/product-loop/scripts/pace.mjs` says stop, finish
-> clean. Otherwise start workday.mjs with --pace --hours 10 and three people
-> chosen for what changed this week, detached, and wait for its report.md.
-> Then fix and ship what they found by this project's instructions. Bring me
-> only what they say I see, with pictures.
+The workday runs from the folder the app runs from, which follows public
+main, not from the run's task folder: the testers' `phone` and `diary` load
+files from the repository all day, and a task folder is deleted when its run
+ends. `--detach` puts it in a session of its own, so the run ending does not
+end the day.
+
+> Run the product loop on the phone app (.claude/skills/product-loop).
+> Testers spend the Codex login at HOME.
+>
+> 1. Fix yesterday's. Take the newest folder under ~/.agentbox/product-loop/
+>    with no `handled` file. If it has a report.md, fix and ship what its
+>    testers found by this project's instructions, then write `handled` in
+>    it. If it has none and no workday is running, that day failed: read its
+>    workday.log and fix the cause. Bring me only the changes those
+>    instructions send to me, with pictures.
+> 2. Start today's, unless `pgrep -f product-loop/scripts/workday.mjs` finds
+>    one running or `pace.mjs --home HOME` says stop. Fast-forward the app
+>    folder to public main if it has no tracked changes, then from there run
+>    `workday.mjs --detach --pace --hours 10 --codex-home HOME --out
+>    ~/.agentbox/product-loop/<today> --who` with three people from
+>    .claude/skills/power-test/people chosen for what changed this week, or
+>    two if the Mac has under 3 GB free.
+> 3. Delete folders there older than two weeks.
+>
+> If nothing in step 1 needs me, finish clean.
 
 `--pace` waits out a hold or a full 5-hour window inside its hours, so a
-morning run that starts ahead of the line still tests once the line passes
-it. A run the pacer stops finishes clean and never reaches the inbox.
+day that starts ahead of the line still tests once the line passes it.

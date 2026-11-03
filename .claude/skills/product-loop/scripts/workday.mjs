@@ -3,7 +3,7 @@
 //
 //   node workday.mjs --who founder,new-user [--minutes 30] [--stretches 2 | --pace [--hours 10]]
 //                    [--engine codex|claude|external] [--model <id>] [--focus "what to lean on"]
-//                    [--codex-home ~/.codex] [--target 90] [--url <preview address>] [--out <folder>]
+//                    [--codex-home ~/.codex] [--target 90] [--url <preview address>] [--out <folder>] [--detach]
 //
 // Each person (../../power-test/people) gets a folder with two commands,
 // `phone` (phone.mjs, the app at an iPhone's size) and `diary` (the power
@@ -66,6 +66,12 @@ export function phonePrompt(person, { dir, minutes, focus = null, logged = [] })
   ].join('\n');
 }
 
+/** The flags a --detach run restarts itself with: the same day, in the folder it chose. */
+export function detachedArgv(args, root) {
+  const rest = args.filter((a) => a !== '--detach');
+  return rest.includes('--out') ? rest : [...rest, '--out', root];
+}
+
 /** Every issue from every diary, worst first, then most seen. */
 export function rankIssues(byPerson) {
   const all = [];
@@ -90,6 +96,15 @@ if (isMain) {
   const codexHome = String(opt('codex-home', process.env.CODEX_HOME || path.join(os.homedir(), '.codex'))).replace(/^~(?=\/)/, os.homedir());
   const root = path.resolve(opt('out', path.join(os.tmpdir(), 'agentbox-product-loop', `${new Date().toISOString().replace(/[:.]/g, '-')}-phone`)));
   fs.mkdirSync(root, { recursive: true });
+
+  // A session of its own, so ending the run that started it does not end the day.
+  if (args.includes('--detach')) {
+    const log = fs.openSync(path.join(root, 'workday.log'), 'a');
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), ...detachedArgv(args, root)], { detached: true, stdio: ['ignore', log, log] });
+    child.unref();
+    console.log(`workday started, pid ${child.pid}. Log: ${path.join(root, 'workday.log')}. Report when it ends: ${path.join(root, 'report.md')}`);
+    process.exit(0);
+  }
 
   // The preview, built once per version of mobile/ and served from here.
   let url = opt('url');
