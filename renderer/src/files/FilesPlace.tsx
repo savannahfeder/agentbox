@@ -80,7 +80,7 @@ function Face({ file, whose }: { file: PlacedFile; whose: string | null }) {
   // Says what is true rather than a bare kind on an empty tile.
   if (!file.opened || broken) return <div className="fp-face-empty">{whose ? `On ${whose}'s computer` : 'Not on this computer yet'}</div>;
   if (file.kind === 'page') return <PageFace file={file} />;
-  if (file.kind === 'code') return <CodeFace file={file} />;
+  if (file.kind === 'code' || file.kind === 'table') return <CodeFace file={file} />;
   if (file.kind === 'markdown') return <DocFace file={file} />;
   if (file.kind === 'film') return <><FileCover kind="film" opened={file.opened} onSize={setSize} />{size && <span className="fp-length">{size}</span>}</>;
   if (file.kind === 'image' || file.kind === 'pdf' || file.kind === 'deck') return <FileCover kind={file.kind} opened={file.opened} onSize={setSize} onBroken={() => setBroken(true)} />;
@@ -191,7 +191,7 @@ function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder }
     <button type="button" className="fp-open-file" onClick={onOpen} aria-label={`Open ${file.name}`} title={name === file.name ? undefined : file.name}>
       {list
         ? <>
-          <span className={`fp-face fp-thumb fp-face-${file.kind ?? 'file'}`}>{file.kind === 'image' || file.kind === 'film' ? <Face file={file} whose={whose} /> : <span className="fp-thumb-word">{file.kind === 'markdown' ? 'DOC' : file.kind === 'pdf' ? 'PDF' : file.kind === 'deck' ? 'DECK' : file.kind === 'page' ? 'PAGE' : file.kind === 'code' ? 'CODE' : 'FILE'}</span>}</span>
+          <span className={`fp-face fp-thumb fp-face-${file.kind ?? 'file'}`}>{file.kind === 'image' || file.kind === 'film' ? <Face file={file} whose={whose} /> : <span className="fp-thumb-word">{file.kind === 'markdown' ? 'DOC' : file.kind === 'pdf' ? 'PDF' : file.kind === 'deck' ? 'DECK' : file.kind === 'page' ? 'PAGE' : file.kind === 'code' ? 'CODE' : file.kind === 'table' ? 'TABLE' : 'FILE'}</span>}</span>
           <span className="fp-name">{name}</span>
           <span className="fp-line-marks">{marks}</span>
           <span className="fp-meta-words">{words}</span>

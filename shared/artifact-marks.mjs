@@ -412,10 +412,12 @@ export const editedWords = (name, path) => `Updated ${name}.\n\n[${name}](${path
 // Files the big view does not review but Files still lists: a page an agent made,
 // a script. Unlike reviewable kinds, a bare word in a sentence ("node.js") is no
 // claim, so only a link or a code span counts, and Files keeps those really on disk.
-const OTHER_KINDS = [['page', /\.html?$/i], ['code', /\.(py|ipynb|js|mjs|ts|tsx|jsx|rb|go|rs|sh|sql|css|txt|csv|tsv|json|ya?ml|xml)$/i]];
+const OTHER_KINDS = [['page', /\.html?$/i], ['table', /\.(csv|tsv)$/i], ['code', /\.(py|ipynb|js|mjs|ts|tsx|jsx|rb|go|rs|sh|sql|css|txt|json|ya?ml|xml)$/i]];
 export const otherKind = (path) => OTHER_KINDS.find(([, re]) => re.test(String(path ?? '').split(/[?#]/)[0]))?.[0] ?? null;
 /** Which page the big view draws for a file, or null. */
 export const viewKind = (path) => reviewKind(path) ?? otherKind(path);
+/** Whether a file pressed in a group opens in the big view: what it reviews, and a table. */
+export const opensBigInAGroup = (name) => !!reviewKind(name) || otherKind(name) === 'table';
 const OTHER_NAMED =/\]\(<?((?:\.?\/)?[^()\s>:]+\.[A-Za-z0-9]+)>?\)|`((?:\.?\/)?[\w.-]+(?:\/[\w.-]+)*\.[A-Za-z0-9]+)`/g;
 
 // "-390.png" is the end of a name said before it, not a file.

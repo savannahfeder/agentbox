@@ -23,7 +23,7 @@ import { isWebsiteAddress } from '../../shared/websites.mjs';
  * NOT one of them: it already has its own way through here.
  */
 export type DocKind = 'html' | 'markdown' | 'code' | 'image' | 'website' | 'pdf' | 'film';
-export type PaneKind = DocKind | 'text';
+export type PaneKind = DocKind | 'text' | 'table';
 
 /**
  * What the pane would do with this path, or null when it should be handed to
