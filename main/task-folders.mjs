@@ -654,7 +654,7 @@ export function ensureTaskFolder(dir, id, { pid = process.pid, dependencies = tr
   // main/supervisor.mjs, which puts every path and reason on the row where
   // somebody will read it, and the task waits instead of running wrong.
   if (dependencies) {
-    try { carryLocalFiles(root, staging); }
+    try { carryLocalFiles(root, staging, { landsAt: folder }); }
     catch (error) { clearUnfinished(root, staging); throw Error(`Could not make a folder for ${name}: ${error.message}`); }
   }
 
