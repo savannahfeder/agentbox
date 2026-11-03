@@ -186,7 +186,8 @@ import { waitingCounts } from './threads-made';
 import { closeAsk, closeAskOwnsKey, KEEP_OPEN, unshippedAsk } from './close-asks-first';
 import { notShipped, shipItAsk } from '../../shared/not-shipped.mjs';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
-import { agentLinks, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
+import { agentLinks, askedInLabel, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
+import { answersInTheirChat } from './team/answers-in-the-chat';
 import type { LedgerLine } from './thread-history';
 import { ruleIdOf, ruleLabel, runToOpen } from '../../shared/repeats.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
@@ -2185,6 +2186,21 @@ export default function App() {
     if (shared === true) return i.status !== 'done' && !(hiddenAt(i) > now) && !isProposal(i) && !waitsInLater(i, waitingOn(i));
     return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now, asking: asking(i), waitingOn: waitingOn(i), stopped: stalledIds.has(i.id) });
   }), [items, hiddenAt, scope, now, pendingIds, teamInbox, liveIds, shippingIds, stalledIds, asking, waitingOn, team, seenAt, myName]);
+  // A task asked for in a chat answers in that chat: Needs you lists the chat
+  // instead (team/answers-in-the-chat.ts), and closing the chat closes them.
+  const liftedBy = useRef(new Map<string, WorkItem[]>());
+  const inboxWithChats = useMemo(() => {
+    const keyOf = (i: WorkItem) => `${i.product}/${i.id}`;
+    const own = new Set(inboxCandidates);
+    const { hide, lift } = answersInTheirChat(items, { inInbox: (i) => own.has(i), ownRow: (i) => asking(i) || stalledIds.has(i.id) });
+    liftedBy.current = lift;
+    return items.filter((i) => {
+      const key = keyOf(i);
+      if (hide.has(key)) return false;
+      if (own.has(i)) return true;
+      return lift.has(key) && !pendingIds.has(i.id) && !(scope && i.product !== scope) && !(hiddenAt(i) > now);
+    });
+  }, [items, inboxCandidates, asking, stalledIds, pendingIds, scope, hiddenAt, now]);
 
   // WHAT MATTERS MOST, ONE COPY, read by every list that claims to be in an
   // order. A product's place in her running order is worth a hundred item
@@ -2216,7 +2232,7 @@ export default function App() {
     // carries priority 1, so the whole sweep sits underneath everything that is
     // actually asking her something rather than on top of it.
     const asking = agentList.filter((r) => !pendingIds.has(r.id) && r.agent && reachesInbox(r.agent, now, agentMode));
-    const rows = [...inboxCandidates, ...asking]
+    const rows = [...inboxWithChats, ...asking]
       .sort(byRunningOrder(score));
     // AND ABOVE ALL OF THEM, WHEN NOTHING IS RUNNING, THE ROW THAT SAYS SO.
     //
@@ -2270,7 +2286,7 @@ export default function App() {
     const ordinary = urgent.length ? onTime.filter((i) => !isUrgentRow(i)) : onTime;
     const top = [...(troubleItem ? [troubleItem] : []), ...fresh];
     return [...top, ...late, ...urgent, ...ordinary];
-  }, [inboxCandidates, agentList, agentMode, score, now, pendingIds, troubleItem, seen, team?.me]);
+  }, [inboxWithChats, agentList, agentMode, score, now, pendingIds, troubleItem, seen, team?.me]);
 
   // BEAT EIGHT ENDS WHEN THE INBOX IS EMPTY, and both ways of ending a task get
   // there: closing one takes it out of the list, and replying to one puts her
@@ -3616,10 +3632,11 @@ export default function App() {
     const nameOf = (by: string | undefined) => (by && team?.byId.get(by)?.name) || (by && by === team?.me ? 'You' : 'A teammate');
     const others = people.filter((p) => p !== team?.me).map((p) => nameOf(p));
     let transcript: Array<{ who: string; text: string }> = [];
+    const answerOf = (task: string) => items.find((i) => i.id === task)?.result ?? null;
     let lines: LedgerLine[] = [];
     try {
       lines = (await api.itemHistory({ product: item.product, id: item.id }))?.lines ?? [];
-      transcript = chatTranscript(lines, nameOf);
+      transcript = chatTranscript(lines, nameOf, answerOf);
     } catch { /* the ask alone still briefs it */ }
     const find = (product: string, id: string) => items.find((i) => i.id === id && i.product === product);
     const brief = taskBrief({ sent: text, asker: nameOf(team?.me ?? undefined), others, transcript });
@@ -3628,7 +3645,7 @@ export default function App() {
       const project = products.find((p) => p.slug === link.project);
       if (!project) continue;
       const made = await api.compose({
-        product: project.slug, title: taskTitle(text), body: brief, engine: link.engine, start: 'now',
+        product: project.slug, title: taskTitle(text), body: brief, engine: link.engine, start: 'now', labels: [askedInLabel(item)],
         ...(link.model ? { model: link.model } : {}), ...(link.effort ? { effort: link.effort } : {}),
         // Seen by the people in the conversation and nobody else, whoever
         // the project is shared with; a Just you project stays Just you.
@@ -4501,9 +4518,14 @@ export default function App() {
     if (closeTask && item.status === 'done') return;
     if (!stay) window.dispatchEvent(new CustomEvent(THREAD_CLOSED));
     const undid = [{ product: item.product, id: item.id, words: UNDID_CLOSING }];
+    const carried = liftedBy.current.get(`${item.product}/${item.id}`) ?? [];
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, status: 'done', ...(unshippedOk ? { closeUnshipped: true } : {}) });
-      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, undid, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'open' }); } });
+      for (const t of carried) await api.answer({ product: t.product, id: t.id, status: 'done' });
+      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, undid, run: async () => {
+        await api.answer({ product: item.product, id: item.id, status: 'open' });
+        for (const t of carried) await api.answer({ product: t.product, id: t.id, status: 'open' });
+      } });
     }, `${DONE.verb}: ${clipToSentence(item.title, TOAST_TITLE)}`, undefined, stay, undefined, undid);
   }, [deferCommit, closeAgentRow, closeTroubleRow, snap?.supervisor.spawnTrouble?.since, run, showToast, pushUndo, nudgeOnStopped, waitingFiled, focused, markSeen, team]);
 

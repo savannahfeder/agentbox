@@ -156,14 +156,33 @@ export function chatProjects(
 export function chatTranscript(
   lines: ReadonlyArray<{ ts: number; by?: string; patch?: Record<string, unknown> | null }>,
   nameOf: (by: string | undefined) => string,
+  answerOf: (task: string) => string | null | undefined = () => null,
 ): Array<{ who: string; text: string }> {
   const out: Array<{ who: string; text: string }> = [];
   for (const l of lines.slice().sort((a, b) => a.ts - b.ts)) {
     const said = l.patch?.answer ?? l.patch?.body;
     if (typeof said !== 'string' || !said.trim() || said === '(withdrawn)') continue;
     out.push({ who: nameOf(l.by), text: said });
+    // An agent's answer is drawn under the message but is not in the ledger,
+    // so a later mention would otherwise be briefed without it.
+    for (const link of agentLinks(said)) {
+      const answer = link.task ? answerOf(link.task) : null;
+      if (answer?.trim()) out.push({ who: link.label, text: answer });
+    }
   }
   return out;
+}
+
+const ASKED_IN = 'asked-in:';
+
+/** The label a task started from a chat carries, naming that chat. */
+export const askedInLabel = (chat: { product: string; id: string }) => `${ASKED_IN}${chat.product}/${chat.id}`;
+
+/** The chat a task was asked in, or null for a task started anywhere else. */
+export function askedIn(task: { labels?: readonly string[] }): { product: string; id: string } | null {
+  const where = (task.labels ?? []).find((l) => l.startsWith(ASKED_IN))?.slice(ASKED_IN.length) ?? '';
+  const at = where.lastIndexOf('/');
+  return at > 0 && at < where.length - 1 ? { product: where.slice(0, at), id: where.slice(at + 1) } : null;
 }
 
 /**
