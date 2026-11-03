@@ -997,7 +997,8 @@ const HUNG_QUIET_MS = 10 * 60_000;
 // missed passes: past any slow pass, well under the ten minutes above.
 const SLEPT_GAP_MS = 2 * 60_000;
 const PROFILES_KEPT_MS = 1000;
-const TRACES_KEPT = 500;
+// A tick may spend this long reading session logs it has never read.
+const NEW_TRACES_BUDGET_MS = 250;
 // Awake this long and not joined or taken back, a row handed to the cloud runs here (`_carriedHolds`).
 const PHONE_QUIET_MS = 10 * 60_000;
 // Two hangs on one row inside this window and the app stops restarting it and
@@ -4783,7 +4784,7 @@ export class Supervisor {
       .finally(() => { this._routing = false; });
   }
 
-  sayItOnEveryStrandedRow(items: WorkItem[], now = Date.now()) {
+  sayItOnEveryStrandedRow(items: WorkItem[], now = Date.now(), { budgetMs = NEW_TRACES_BUDGET_MS } = {}) {
     let dirty = false;
     // AND THE SAME PASS COUNTS THEM, for the line above her list. The count
     // is taken here rather than in the snapshot because this is the one place
@@ -4796,6 +4797,12 @@ export class Supervisor {
     const byKey = new Map(items.map((i) => [`${i.product}:${i.id}`, i]));
     let dirs: Map<string, string> | null = null;
     const dirOf = (slug: string) => (dirs ??= new Map(this.store.listProducts().map((p) => [p.slug, p.dir]))).get(slug);
+    // How long this pass may spend on traces it has never read: the rest are
+    // read on later ticks, and one is always read so the queue cannot stall.
+    // hrtime, so a fake clock still leaves a budget.
+    const startedAt = process.hrtime.bigint();
+    let readOne = false;
+    const outOfTime = () => readOne && Number(process.hrtime.bigint() - startedAt) / 1e6 > budgetMs;
     for (const [key, seen] of Object.entries(this._fruitless)) {
       if (!seen?.runs) continue;
       try {
@@ -4843,11 +4850,31 @@ export class Supervisor {
           continue;
         }
 
+        // A run already read to its end is not looked at again, or every stuck
+        // thread costs a folder listing and a stamp every tick while it stays stuck.
+        if (seen.quietAt != null && seen.quietAt === (seen.endedAt ?? 0)) continue;
+
         // WHAT THE LAST RUN ACTUALLY DID, read off its own trace. The session
         // object is long gone by now — often the whole process is — and the
         // trace is the only thing left that knows.
+        const unread = !this._traces?.has(key);
+        if (unread && outOfTime()) continue;
+        if (unread) readOne = true;
         const trace = this._lastTrace(product, id, dirOf);
-        if (!trace || !traceShowsASilentDeath(trace)) continue;
+        if (!trace) continue;
+        if (!traceShowsASilentDeath(trace)) {
+          // Only a trace with its exit line is settled: that line is written
+          // after the run is recorded as ended, so the first read can land
+          // before it. No trace at all can mean a read that failed, and that
+          // must not silence the thread, so it is asked about again next tick.
+          // Another run ending moves `endedAt` and reopens the question.
+          if (trace.exitCode != null) {
+            seen.quietAt = seen.endedAt ?? 0;
+            this._traces?.delete(key);
+            dirty = true;
+          }
+          continue;
+        }
 
         const cause = troubleCause(trace.stderr);
         // THE HOUR THE LIMIT LETS GO, AND THIS PASS WAS DROPPING IT.
@@ -4920,13 +4947,18 @@ export class Supervisor {
       }
     }
     this._stranded = stranded;
+    // And the traces of rows nothing is stuck on any more go with them, so the
+    // map `_lastTrace` keeps is the size of this pass.
+    if (this._traces) for (const key of this._traces.keys()) if (!this._fruitless[key]) this._traces.delete(key);
     if (dirty) this._saveState();
   }
 
   // The newest trace a row has, read once. Null when the row has never been
   // spawned, which is the ordinary case for most of `_fruitless` and is not an
   // error.
-  // Kept per log until its size or time changes: the stranded pass asks every tick.
+  // Kept per row until its log changes, with no cap: the pass walks every row in
+  // the same order, so a cap below that count evicts each answer before the next
+  // tick reaches it. The pass drops the rows that are no longer stranded.
   _lastTrace(product: string, id: string, dirOf: (slug: string) => string | undefined = (slug) => this.store.listProducts().find((p) => p.slug === slug)?.dir) {
     const dir = dirOf(product);
     if (!dir) return null;
@@ -4941,14 +4973,12 @@ export class Supervisor {
     const file = path.join(sessions, logs[logs.length - 1]);
     try {
       const st = fs.statSync(file);
-      const stamp = `${st.size}:${st.mtimeMs}`;
+      const stamp = `${file}:${st.size}:${st.mtimeMs}`;
       this._traces ??= new Map();
-      const kept = this._traces.get(file);
+      const kept = this._traces.get(`${product}:${id}`);
       if (kept?.stamp === stamp) return kept.trace;
       const trace = readDeadRunTrace(fs.readFileSync(file, 'utf8'));
-      this._traces.delete(file);
-      if (this._traces.size >= TRACES_KEPT) this._traces.delete(this._traces.keys().next().value!);
-      this._traces.set(file, { stamp, trace });
+      this._traces.set(`${product}:${id}`, { stamp, trace });
       return trace;
     } catch { return null; }
   }

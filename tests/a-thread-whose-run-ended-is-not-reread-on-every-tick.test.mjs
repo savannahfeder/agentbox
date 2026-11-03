@@ -16,7 +16,7 @@ const DEAD = `# A thread\n# w-x · spawned 2026-08-27T20:51:39.445Z\n\nstderr: T
 
 let home, docs, sup, items, lists;
 const ids = Array.from({ length: 50 }, (_, i) => `w-${String(i).padStart(10, 'a')}`);
-const logOf = (id) => path.join(machineryPath(docs, path.join('sessions', id), home), '1787863899445.log');
+const logOf = (id, name = '1787863899445.log') => path.join(machineryPath(docs, path.join('sessions', id), home), name);
 
 beforeEach(() => {
   home = fs.mkdtempSync(path.join(os.tmpdir(), 'stranded-tick-home-'));
@@ -53,11 +53,15 @@ it('reads each log once, and the project list once a pass', () => {
   expect(sup.store.written).toHaveLength(0);
 });
 
-it('reads a log again once it changes, and speaks for a run that now shows a silent death', () => {
+// A finished run's own log never changes again, so what this is about is the
+// NEXT run on the thread: its own log, and the fresh strike noteFreshRun writes.
+// Rewriting the first run's log in place is what this case used to do, and the
+// pass no longer looks at a trace it has read to its exit line
+// (the-stranded-pass-reads-no-disk-when-nothing-has-changed).
+it('reads the log of a next run that shows a silent death, and no other', () => {
   sup.sayItOnEveryStrandedRow(items);
-  fs.writeFileSync(logOf(ids[7]), DEAD);
-  const later = new Date(Date.now() + 5000);
-  fs.utimesSync(logOf(ids[7]), later, later);
+  fs.writeFileSync(logOf(ids[7], '1787863999999.log'), DEAD);
+  sup._fruitless[`agentbox:${ids[7]}`] = { runs: 2, endedAt: 9000 };
   const read = vi.spyOn(fs, 'readFileSync');
   sup.sayItOnEveryStrandedRow(items);
   expect(logReads(read)).toBe(1);
