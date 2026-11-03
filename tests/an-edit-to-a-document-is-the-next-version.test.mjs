@@ -67,8 +67,8 @@ describe('in the version chain', () => {
 describe('when two people edit', () => {
   const versions = [{ n: 1, by: 'owner' }, { n: 2, by: 'sofia' }, { n: 3, by: 'maya' }];
   const nameOf = () => 'Sofia';
-  it('says who got there first, and that both are kept', () => {
-    expect(editClash({ versions: versions.slice(0, 2) }, 1, 'maya', nameOf)).toBe('Sofia saved v2 while you were editing. Yours saves as v3, and both are kept.');
+  it('says who got there first, and that their changes are merged in', () => {
+    expect(editClash({ versions: versions.slice(0, 2) }, 1, 'maya', nameOf)).toBe('Sofia saved v2 while you were editing. Yours saves as v3, with their changes merged in.');
   });
   it('says nothing when nobody else saved', () => {
     expect(editClash({ versions: versions.slice(0, 1) }, 1, 'maya', nameOf)).toBeNull();

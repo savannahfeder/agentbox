@@ -118,7 +118,10 @@ export function namePrompt(item) {
     cut(item?.title, 300),
     // A teammate's run is titled with its own part of a message that may have
     // woken several (shared/teammates.mjs `runTitle`); the whole would mix them.
-    (item?.labels ?? []).some((l) => String(l).startsWith('teammate:')) ? '' : cut(item?.body, 1200),
+    // A task asked in a chat carries the chat after its ask
+    // (renderer/src/team/agent-mentions.ts taskBrief); the oldest lines of it
+    // are not what the thread is about.
+    (item?.labels ?? []).some((l) => String(l).startsWith('teammate:')) ? '' : cut(String(item?.body ?? '').split(/\n---\n\nAsked by /)[0], 1200),
     '--- latest ---',
     latest || '(nothing written yet)',
     '---',

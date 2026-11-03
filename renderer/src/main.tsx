@@ -58,7 +58,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // Before the first paint, not in an effect after it: a theme applied on mount
 // shows one frame of the other one, and the other one here is a white flash in
 // a dark room.
-normalizeSavedLook(localStorage);
+normalizeSavedLook(localStorage, machineTheme());
 applyTheme(resolveTheme(localStorage.getItem(THEME_KEY)));
 // And the picture, for the same reason and one worse: a skin changes what the
 // surfaces are made of, so a frame drawn before it lands is an opaque card

@@ -15,6 +15,7 @@ import type { Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } fro
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName, personOf } from '../team/people';
 import { taskWords } from '../team/company';
+import { agentSaidLast } from '../team/answers-in-the-chat';
 import { PriorityIcon } from '../components/Priority';
 import { asideBesides, notStarted, rowTitle, waitCameBack } from '../list-rules';
 import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mjs';
@@ -29,7 +30,7 @@ import {
   backWords, timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type Privacy, type UpdatedWindow,
 } from './page-rules';
-import { messageLine, messagePriority, repeatsTheTab, rowPriorityId, rowSharing, waitingWord } from './page-rules';
+import { cellUnderTab, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
 import { STATE_WORD, linkWords } from './summary-rules';
 import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
 import { stopKey } from './walk-rules';
@@ -366,7 +367,7 @@ function CloudButton({ cloud, onMode, onWhenOn, onSetUp, onMove }: { cloud: Clou
   </span>;
 }
 
-export type HomeChoice = { layout: 'list' | 'tabs'; onLayout: (layout: 'list' | 'tabs') => void; group: 'none' | 'who'; onGroup: (group: 'none' | 'who') => void };
+export type HomeChoice = { group: 'none' | 'who'; onGroup: (group: 'none' | 'who') => void };
 
 export function DisplayMenu({ page, display, onDisplay, products, items = [], shown, total, tab, people, home = null }: {
   home?: HomeChoice | null;
@@ -391,10 +392,6 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
   const privacies: [Exclude<Privacy, 'any'>, string][] = [['private', 'Private'], ['shared', 'Shared']];
   const privacy = display.privacy ?? 'any';
   return <div className="th-pop" role="dialog" aria-label={page === 'inbox' ? 'Inbox view and filters' : 'Team view and filters'}>
-    {home && <div className="line"><span className="lab">Home</span><span className="opts">
-      <button type="button" className={home.layout === 'list' ? 'on' : ''} onClick={() => home.onLayout('list')}>One list</button>
-      <button type="button" className={home.layout === 'tabs' ? 'on' : ''} onClick={() => home.onLayout('tabs')}>Two tabs</button>
-    </span></div>}
     {people && <PeopleLine {...people} />}
     <div className="line"><span className="lab">View</span><span className="opts">
       <button type="button" className={display.view === 'list' ? 'on' : ''} title="List (B)" onClick={() => set({ view: 'list' })}><ListIcon />List</button>
@@ -409,7 +406,7 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
       {tab === 'done' && <span className="th-pop-note">Done runs newest first</span>}
       {tab === 'progress' && <span className="th-pop-note">In progress runs newest sent first</span>}
     </span></div>
-    {home?.layout === 'list' && tab === 'inbox' && <div className="line"><span className="lab">Group by</span><span className="opts">
+    {home && tab === 'inbox' && <div className="line"><span className="lab">Group by</span><span className="opts">
       <button type="button" className={home.group === 'none' ? 'on' : ''} onClick={() => home.onGroup('none')}>None</button>
       <button type="button" className={home.group === 'who' ? 'on' : ''} onClick={() => home.onGroup('who')}>Who</button>
     </span></div>}
@@ -475,7 +472,9 @@ export type TeamTabs = { on: boolean; onNeeds: () => void; onEverything: () => v
   /** The team's day (team/TodayPage.tsx). */
   today?: { on: boolean; onToday: () => void };
   /** Every task on the team (team/TasksPage.tsx). */
-  tasks?: { on: boolean; onTasks: () => void } };
+  tasks?: { on: boolean; onTasks: () => void };
+  /** Your finished threads, on the layout whose tabs are only states. */
+  done?: { on: boolean; onDone: () => void } };
 export const EVERYTHING_ELSE = 'Everything else';
 
 /** `needs` renames the first tab (Waiting, once a teammate is on the page). */
@@ -504,7 +503,7 @@ function StateTabsRow({ view, counts, onView, needs, onSearch, lit = false, afte
   // In progress, Later and Done are your own card's tabs on Everything else.
   const tabs = team ? INBOX_TABS.filter((t) => t.view === 'inbox')
     : INBOX_TABS.filter((t) => t.view !== 'snoozed' || laterTabShown({ count: counts.snoozed ?? 0, view, walking: keepLater }));
-  const on = (t: TabView) => (team ? t === 'inbox' && !team.on && !team.today?.on && !team.tasks?.on : view === t && !dim);
+  const on = (t: TabView) => (team ? t === 'inbox' && !team.on && !team.today?.on && !team.tasks?.on && !team.done?.on : view === t && !dim);
   return <div className="th-bar"><div className="tm-tabs">
     {/* Every tab wears the Tab plate (hint-plate.ts, 'state-tab'). */}
     {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} onClick={() => (team ? team.onNeeds() : onView(t.view))}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
@@ -512,6 +511,7 @@ function StateTabsRow({ view, counts, onView, needs, onSearch, lit = false, afte
     {team?.progress && <button type="button" data-hint="state-tab" className={`tm-tab${team.progress.on ? ' on' : ''}`} onClick={team.onEverything}>In progress{team.progress.count > 0 && <b>{team.progress.count}</b>}</button>}
     {team?.today && <button type="button" data-hint="state-tab" className={`tm-tab${team.today.on ? ' on' : ''}`} onClick={team.today.onToday}>Today</button>}
     {team?.tasks && <button type="button" data-hint="state-tab" className={`tm-tab${team.tasks.on ? ' on' : ''}`} onClick={team.tasks.onTasks}>Tasks</button>}
+    {team?.done && <button type="button" data-hint="state-tab" className={`tm-tab${team.done.on ? ' on' : ''}`} onClick={team.done.onDone}>{DONE.short}</button>}
     {after}
   </div>{team?.corner}{onSearch && <SearchButton onSearch={onSearch} />}</div>;
 }
@@ -622,7 +622,7 @@ export function SectionHead({ label, count, tab, folded, onFold }: { label: stri
   return <div className={`row th-head th-section${folded ? ' folded' : ''}`}><span className="mark" aria-hidden="true" /><div className="row-main th-grid">
     <div><button type="button" className="th-fold" aria-expanded={!folded} onClick={onFold}>
       <svg className="th-fold-mark" width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.4" /></svg>
-      {label}<b>{count}</b>
+      {label}{count > 0 && <b>{count}</b>}
     </button></div><div className="th-col-state" /><div className="th-col-proj" /><div className="th-col-prio" /><div className="num">{timeHeading(tab)}</div>
   </div></div>;
 }
@@ -739,7 +739,8 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const worded = waits && !cell.live ? { ...cell, word: waits.word, title: waits.title }
     : peopleWaitOnYou ? { ...cell, word: 'Waiting on you', mark: 'need' as const }
       : team && (cell.word === STATE_WORD.waiting || iSpokeLast(item, product, team.me)) ? { ...cell, word: waitingWord(item, product, team.me, nameFirst, { inNeedsYou: tab === 'inbox' }) } : cell;
-  const status = repeatsTheTab(worded.word, tab) ? undefined : worded;
+  const shownWord = cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou });
+  const status = shownWord === null ? undefined : { ...worded, word: shownWord };
   // WHO SEES IT, AT A GLANCE (2026-10-01). One mark after the title, always: the
   // people on a thread the team or chosen people can see, the lock on one only
   // you can see. A thread shared with chosen people (w-41ff964775) carries the
@@ -774,7 +775,8 @@ export function ThreadCells({ item, product, now, person, tab }: {
   }
   if (said) {
     const fileNews = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string) => (said.people.length > 1 ? firstName(team?.byId.get(id) ?? null) : ''))?.trim();
-    return <RowCells status={status} title={<MessageTitle people={said.people} fromMe={!fileNews && said.fromMe} text={fileNews ?? said.text} name={item.label || (isWorkThread(item) ? item.title : null)} />} aside={due?.word} late={!!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="" person={person}
+    const agent = fileNews ? null : agentSaidLast(item, allItems);
+    return <RowCells status={status} title={<MessageTitle people={said.people} fromMe={!fileNews && !agent && said.fromMe} text={fileNews ?? (agent ? `${agent.who}: ${agent.text}` : said.text)} name={item.label || (isWorkThread(item) ? item.title : null)} />} aside={due?.word} late={!!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="" person={person}
       priority={messagePriority(item)} updatedAt={when} when={back} now={now} action={action} />;
   }
   // ONLY THE UNUSUAL CASE WEARS A MARK (2026-10-02). Shared with the team is
@@ -1062,7 +1064,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
             window.addEventListener('pointermove', move);
             window.addEventListener('pointerup', up);
             window.addEventListener('pointercancel', cancel);
-          }}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b>
+          }}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}{rows.length > 0 && <b>{rows.length}</b>}
           {/* THE HANDLE COMES UP WHEN YOU ARE OVER THE COLUMN: "a little drag
               icon comes up subtly". Only where a drag does something. */}
           {onReorderColumns && <GripIcon />}</div>
