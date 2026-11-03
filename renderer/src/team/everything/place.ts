@@ -17,6 +17,12 @@ export function pressOpensIn(key: string, teamKey: string | null): Press {
   return teamKey && key === teamKey ? 'board' : pressOpens(key);
 }
 
+/** A person's direct conversation predates chat rooms; their page opens whichever was written in last. */
+export function personChatOpens(direct: { at: number } | null, room: { at: number } | null): 'direct' | 'room' | null {
+  if (direct && (!room || direct.at > room.at)) return 'direct';
+  return room ? 'room' : null;
+}
+
 const ASKS_YOU = new Set(['Waiting on you', 'Has a question for you', 'Asking you to allow a command', 'Holding work for your go-ahead']);
 
 /** The one short word under a name: how they are, never what they are on. */
