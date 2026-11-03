@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseDelimited, readTable, isTablePath, tagTone, logoFor, sortRows, filterRows } from '../renderer/src/table-file.ts';
+import { parseDelimited, readTable, isTablePath, tagTone, logoFor, sortRows, filterRows, dateOf } from '../renderer/src/table-file.ts';
 import { besideDocument, messageDocuments } from '../renderer/src/message-artifacts.ts';
 import { readsInPlace } from '../renderer/src/components/OneThingAtATime.tsx';
 import { viewKind, opensBigInAGroup } from '../shared/artifact-marks.mjs';
@@ -202,6 +202,55 @@ describe('what a second model found', () => {
     expect(opensBigInAGroup('plan.md')).toBe(true);
     expect(opensBigInAGroup('script.mjs')).toBe(false);
     expect(opensBigInAGroup('sheet.xlsx')).toBe(false);
+  });
+});
+
+// Found by the power-user loop after the Codex review, each reproduced first.
+describe('what the last power-user loop found', () => {
+  it('gives a word it does not know a colour that cannot pass for green', () => {
+    for (let i = 0; i < 8; i++) expect(['green', 'teal', 'rose']).not.toContain(tagTone(`Thing ${i}`, i));
+  });
+  it('reads a yes under Churn risk as bad, and Critical as worse than Medium', () => {
+    expect(tagTone('TRUE', 0, 'Churn risk')).toBe('rose');
+    expect(tagTone('FALSE', 0, 'Churn risk')).toBe('green');
+    expect(tagTone('Critical', 0, 'Risk level')).toBe('rose');
+  });
+  it('reads a candidate who passed a screen as good, and an industry by no outcome at all', () => {
+    expect(tagTone('Passed phone screen', 0, 'Stage')).toBe('green');
+    for (const v of ['Non-profit', 'Customer Success', 'Win-back']) expect(['green', 'rose'], v).not.toContain(tagTone(v, 0, 'Industry'));
+  });
+  it('knows the words investors and account health use', () => {
+    expect(tagTone('Committed', 0, 'Status')).toBe('green');
+    expect(tagTone('Soft circle', 0, 'Status')).toBe('purple');
+    expect(tagTone('Positive', 0, 'Sentiment')).toBe('green');
+    expect(tagTone('Healthy', 0, 'Health')).toBe('green');
+    expect(tagTone('At risk', 0, 'Health')).toBe('rose');
+  });
+  it('reads 25/03/2025 as March, and a date with no year as this year', () => {
+    const t = readTable('Name,Signed\nA,25/03/2025\nB,2025-11-01\nC,14/03/2025\nD,2026-01-02\n', 'x.csv');
+    expect(t.columns[1].kind).toBe('date');
+    expect(sortRows(t, t.rows, { col: 1, dir: 'asc' }).map((r) => r[0])).toEqual(['C', 'A', 'B', 'D']);
+    const y = readTable('Name,Next call\nA,Dec 12\nB,Jan 5\n', 'x.csv');
+    const year = new Date().getFullYear();
+    expect(new Date(dateOf('Jan 5')).getFullYear()).toBe(year);
+    expect(sortRows(y, y.rows, { col: 1, dir: 'asc' }).map((r) => r[0])).toEqual(['B', 'A']);
+  });
+  it('sorts money written as a range, an estimate or in European form as money', () => {
+    const t = readTable('Investor,Check size\nA,$250k-$1M\nB,~$1M\nC,TBD\nD,$1.5M\nE,$500K\n', 'x.csv');
+    expect(t.columns[1].kind).toBe('number');
+    expect(sortRows(t, t.rows, { col: 1, dir: 'asc' }).map((r) => r[0])).toEqual(['A', 'E', 'B', 'D', 'C']);
+    const eu = readTable('Name;Salary\nA;€80.000\nB;€120.000\nC;€9.500,50\n', 'x.csv');
+    expect(eu.columns[1].kind).toBe('number');
+    expect(sortRows(eu, eu.rows, { col: 1, dir: 'asc' }).map((r) => r[0])).toEqual(['C', 'A', 'B']);
+  });
+  it('keeps an escaped pipe inside its markdown cell', () => {
+    const t = readTable('| Company | Stage | Website |\n|---|---|---|\n| Pipe \\| Inc | New | pipe.com |\n| Ramp | Won | ramp.com |\n', 'x.csv');
+    expect(t.columns.map((c) => c.name)).toEqual(['Company', 'Stage', 'Website']);
+    expect(t.rows[0][0]).toBe('Pipe | Inc');
+  });
+  it('never names two columns the same', () => {
+    const names = readTable('Name,Email,Email,Email 2\nA,a,b,c\n', 'x.csv').columns.map((c) => c.name);
+    expect(new Set(names).size).toBe(names.length);
   });
 });
 

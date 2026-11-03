@@ -63,10 +63,11 @@
 
 .tbl-frame { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .tbl-scroll { flex: 1; min-height: 0; overflow: auto; }
-/* More columns to the right: the table fades out at the edge. */
+/* More columns to the right: a soft shadow at the edge. A fade to the page's
+   own colour vanished wherever the cells there were empty. */
 .tbl-frame.more-right::after {
-  content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 56px; z-index: 2; pointer-events: none;
-  background: linear-gradient(to right, transparent, var(--surface));
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 18px; z-index: 4; pointer-events: none;
+  background: linear-gradient(to right, transparent, color-mix(in srgb, var(--text) 12%, transparent));
 }
 .tbl-preview .tbl-scroll { overflow-x: auto; overflow-y: hidden; }
 .tbl-grid {
@@ -127,12 +128,15 @@
 .tone-teal { background: var(--tg-teal); color: var(--ti-teal); --dot: var(--td-teal); }
 .tone-grey { background: var(--tg-grey); color: var(--ti-grey); --dot: var(--td-grey); }
 
+/* Stands in for the rows above and below the ones drawn. */
+.tbl-gap { grid-column: 1 / -1; }
+
 .tbl-none, .tbl-empty { padding: 24px 16px; color: var(--text-faint); font-size: 13px; }
-.tbl-more, .tbl-showall {
+.tbl-showall {
   align-self: flex-start; margin: 10px 0 14px; padding: 0;
   font: inherit; font-size: 13px; color: var(--text-dim);
   background: none; border: 0; cursor: pointer;
   text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px;
 }
 .tbl-showall { margin: 11px 16px 12px; }
-.tbl-more:hover, .tbl-showall:hover { color: var(--text); }
+.tbl-showall:hover { color: var(--text); }

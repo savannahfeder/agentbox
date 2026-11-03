@@ -55,7 +55,8 @@ const isMarkdownTable = (text: string) => /^\s*\|.*\|\s*$/.test(firstLine(text.r
 function parseMarkdownTable(text: string): string[][] {
   return text.replace(/^﻿/, '').split(/\r?\n/)
     .filter((l) => /^\s*\|/.test(l) && !/^\s*\|[\s|:-]+\|\s*$/.test(l))
-    .map((l) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim()));
+    // `\|` is a pipe inside a cell, not the edge of one.
+    .map((l) => l.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, '').split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|')));
 }
 
 const URLISH = /^(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(:\d+)?(\/\S*)?$/i;
@@ -76,16 +77,43 @@ const DATE_HEADER = /\b(date|day|when|time|updated|created|last|next|due|deadlin
 
 const share = (values: string[], test: (v: string) => boolean) => values.length ? values.filter(test).length / values.length : 0;
 
+// An amount as an agent writes one: "$1.2M", "~$1M", "$250k-$1M" (the low end
+// counts), "€80.000" and "1.250.000,50" (the European way). NaN when it is not.
+const SCALE: Record<string, number> = { k: 1e3, m: 1e6, mm: 1e6, b: 1e9, bn: 1e9 };
+function oneAmount(raw: string): number {
+  let s = raw.trim().replace(/^[~≈+]|^(about|approx\.?|circa|ca\.?)\s*/i, '').replace(/[$€£¥\s]/g, '');
+  const m = s.match(/^([-+]?[\d.,]+)(%|k|mm|m|bn|b)?$/i);
+  if (!m) return NaN;
+  s = m[1];
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s) || /^\d+,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
+  else s = s.replace(/,/g, '');
+  const n = Number(s);
+  return Number.isFinite(n) ? n * (SCALE[(m[2] ?? '').toLowerCase()] ?? 1) : NaN;
+}
+export function amountOf(v: string): number {
+  const s = v.trim();
+  if (!/\d/.test(s) || /^\d{4}-\d{1,2}-\d{1,2}/.test(s)) return NaN;
+  // A range only where it is plainly money, so 2026-10-01 is not one.
+  const range = /[$€£kmb]/i.test(s) ? s.match(/^(.+?)\s*(?:-|\u2013|\u2014|\bto\b)\s*(.+)$/i) : null;
+  return range && Number.isFinite(oneAmount(range[1])) ? oneAmount(range[1]) : oneAmount(s);
+}
+
 /** When a cell is, in ms, or NaN. A bare number is not a date. */
 export function dateOf(v: string): number {
   const s = v.trim();
   if (!s || NUMBER.test(s)) return NaN;
   const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (iso) return Date.UTC(+iso[1], +iso[2] - 1, +iso[3]);
-  const us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (us) return Date.UTC(us[3].length === 2 ? 2000 + +us[3] : +us[3], +us[1] - 1, +us[2]);
+  const us = s.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})$/);
+  if (us) {
+    const year = us[3].length === 2 ? 2000 + +us[3] : +us[3];
+    // 25/03/2025 can only be day first; 03/04/2025 is read the American way.
+    const [month, day] = +us[1] > 12 ? [+us[2], +us[1]] : [+us[1], +us[2]];
+    return Date.UTC(year, month - 1, day);
+  }
   if (!MONTH.test(s)) return NaN;
-  const t = Date.parse(s);
+  // "Jan 5" has no year, and Date.parse would put it in 2001.
+  const t = Date.parse(/\b\d{4}\b/.test(s) ? s : `${s} ${new Date().getFullYear()}`);
   return Number.isFinite(t) ? t : NaN;
 }
 
@@ -95,7 +123,7 @@ function kindOf(name: string, values: string[], first: boolean): ColumnKind {
   if (!filled.length) return 'text';
   if (share(filled, (v) => EMAIL.test(v)) >= 0.8) return 'email';
   if (share(filled, (v) => URLISH.test(v) && !NUMBER.test(v)) >= 0.8) return 'link';
-  if (!LABEL_NUMBER.test(name) && share(filled, (v) => NUMBER.test(v)) >= 0.9) return 'number';
+  if (!LABEL_NUMBER.test(name) && share(filled, (v) => NUMBER.test(v) || Number.isFinite(amountOf(v))) >= 0.9) return 'number';
   if (share(filled, (v) => Number.isFinite(dateOf(v))) >= 0.8 && (DATE_HEADER.test(name) || filled.some((v) => MONTH.test(v) || v.includes('/') || /^\d{4}-/.test(v)))) return 'date';
   const short = filled.every((v) => v.length <= 28 && v.split(/\s+/).length <= 4);
   const distinct = new Set(filled.map((v) => v.toLowerCase())).size;
@@ -107,8 +135,10 @@ function kindOf(name: string, values: string[], first: boolean): ColumnKind {
 // The words a pipeline uses keep the colour they mean wherever they appear.
 const MEANT: Array<[RegExp, Tone]> = [
   [/^(new|to ?do|not started|none|n\/a|unknown|backlog|idle|cold|untouched|not contacted)$/i, 'grey'],
-  [/^(done|won|closed won|meeting|booked|meeting booked|meeting set|yes|y|true|active|live|qualified|hired|signed|customer|paid|approved|shipped|complete|completed|hot|good fit|strong fit|great fit|accepted|interviewing|offer)$/i, 'green'],
-  [/^(lost|closed lost|no|n|false|rejected|blocked|churned|failed|declined|bounced|unsubscribed|disqualified|cancelled|canceled|not a fit|no fit|poor fit|bad fit|passed|pass|dead|spam|archived|do not contact|dnc|inactive|expired)$/i, 'rose'],
+  [/^(done|won|closed won|meeting|booked|meeting booked|meeting set|yes|y|true|active|live|qualified|hired|signed|customer|paid|approved|shipped|complete|completed|hot|good fit|strong fit|great fit|accepted|interviewing|offer|committed|funded|wired|positive|healthy|good|on track)$/i, 'green'],
+  [/^(lost|closed lost|no|n|false|rejected|blocked|churned|failed|declined|bounced|unsubscribed|disqualified|cancelled|canceled|not a fit|no fit|poor fit|bad fit|passed|pass|dead|spam|archived|do not contact|dnc|inactive|expired|at risk|critical|severe|off track)$/i, 'rose'],
+  [/^(neutral|mixed)$/i, 'grey'],
+  [/^(soft circle|soft circled|soft commit|term sheet|diligence|in diligence|due diligence)$/i, 'purple'],
   [/^(contacted|sent|emailed|in progress|doing|reached out|outreach|open|warm|called|messaged|applied|screening)$/i, 'blue'],
   [/^(researching|research|pending|waiting|maybe|on hold|review|in review|follow up|follow-up|later|nurture|nurturing|paused|snoozed|needs review)$/i, 'amber'],
   [/^(replied|interested|responded|engaged|demo|demo booked|proposal|negotiating|negotiation|intro|introduced)$/i, 'purple'],
@@ -116,15 +146,18 @@ const MEANT: Array<[RegExp, Tone]> = [
 // High and Low mean opposite things under Risk and under Fit.
 const BAD_WHEN_HIGH = /\b(risk|churn|severity|urgency|cost|effort|difficulty|blocker)\b/i;
 // Under these a yes is the bad news.
-const BAD_WHEN_YES = /\b(bounced?|unsubscribed?|churned|blocked|spam|lost|do not contact|dnc|opted out|complain\w*|at risk)\b/i;
-// Words outside the lists above, read by what they contain. The bad ones are
-// asked first, so "not qualified" is not taken for "qualified".
-const BAD_WORDS = /\b(not|no|non|never|un(?:qualified|interested|responsive|reachable|subscribed|successful|fit|happy|willing)|wrong|negative|ghost\w*|reject\w*|declin\w*|bounc\w*|churn\w*|lost|lose|dead|cancel\w*|fail\w*|block\w*|spam|bad|weak|poor|pass(ed)?|disqualif\w*|dropped|killed)\b/i;
+const BAD_WHEN_YES = /\b(bounced?|unsubscribed?|churn\w*|risk|blocked|spam|lost|do not contact|dnc|opted out|complain\w*)\b/i;
+// Words outside the lists above, read by what they contain, and only in a
+// column about how something went: in an Industry column "Non-profit" and
+// "Customer Success" are kinds of company, not outcomes. The bad ones are asked
+// first, so "not qualified" is not taken for "qualified".
+const OUTCOME_HEADER = /\b(status|stage|outcome|result|reply|response|replied|sentiment|intent|verdict|decision|fit|state|health|risk|level|priority|lead|deal|pipeline|progress)\b/i;
+const BAD_WORDS = /\b(not|no|never|un(?:qualified|interested|responsive|reachable|subscribed|successful|fit|happy|willing)|wrong|negative|ghost\w*|reject\w*|declin\w*|bounc\w*|churn\w*|lost|lose|dead|cancel\w*|fail\w*|block\w*|spam|bad|weak|poor|pass(?:ed)? on|disqualif\w*|dropped|killed)\b/i;
 const LATER_WORDS = /\b(not now|later|next quarter|next year|bad timing|timing|follow.?up|on hold|maybe)\b/i;
-const GOOD_WORDS = /\b(won|win|signed|booked|good|strong|great|excellent|qualified|hired|accepted|closed won|converted|success\w*)\b/i;
+const GOOD_WORDS = /\b(won|win|signed|booked|good|strong|great|excellent|qualified|hired|accepted|closed won|converted|success\w*|passed)\b/i;
 // A word nothing above knows takes the next of these. Green and red say
-// something happened, so a word that does not say so gets neither.
-const ROTATION: Tone[] = ['teal', 'blue', 'purple', 'amber', 'grey'];
+// something happened, and teal reads as green beside it, so none of the three.
+const ROTATION: Tone[] = ['blue', 'purple', 'amber', 'grey'];
 
 /** A tag's colour: the one its word means, or the next in turn by its place in the column. */
 export function tagTone(value: string, place: number, header = ''): Tone {
@@ -141,9 +174,11 @@ export function tagTone(value: string, place: number, header = ''): Tone {
   }
   const plain = v.replace(/[\s_-]+/g, ' ').trim();
   for (const [re, tone] of MEANT) if (re.test(v) || re.test(plain)) return tone;
-  if (LATER_WORDS.test(plain)) return 'amber';
-  if (BAD_WORDS.test(plain)) return 'rose';
-  if (GOOD_WORDS.test(plain)) return 'green';
+  if (!header || OUTCOME_HEADER.test(header)) {
+    if (LATER_WORDS.test(plain)) return 'amber';
+    if (BAD_WORDS.test(plain)) return 'rose';
+    if (GOOD_WORDS.test(plain)) return 'green';
+  }
   return ROTATION[place % ROTATION.length];
 }
 
@@ -161,10 +196,11 @@ export function readTable(text: string, path: string): Table {
   rows = rows.map((r) => keep.map((i) => r[i]));
   const seen = new Map<string, number>();
   const columns: Column[] = keep.map((src, i) => {
-    let name = (head[src] ?? '').trim() || `Column ${i + 1}`;
-    const n = (seen.get(name.toLowerCase()) ?? 0) + 1;
-    seen.set(name.toLowerCase(), n);
-    if (n > 1) name = `${name} ${n}`;
+    const base = (head[src] ?? '').trim() || `Column ${i + 1}`;
+    let name = base;
+    // "Email, Email, Email 2" must not end with two columns called Email 2.
+    for (let n = 2; seen.has(name.toLowerCase()); n++) name = `${base} ${n}`;
+    seen.set(name.toLowerCase(), 1);
     const values = rows.map((r) => r[i]);
     const kind = kindOf(name, values, i === 0);
     const tones: Record<string, Tone> = {};
@@ -209,35 +245,45 @@ export const hrefOf = (value: string) => (/^https?:\/\//i.test(value.trim()) ? v
 /** A link cell as it is read: no scheme, no www, no trailing slash. */
 export const shownLink = (value: string) => value.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '');
 
-const numberOf = (v: string) => {
-  const m = v.replace(/[,$€£\s]/g, '').match(/^([-+]?\d+(?:\.\d+)?)(%|k|m|bn|b)?$/i);
-  if (!m) return NaN;
-  const scale = { k: 1e3, m: 1e6, b: 1e9, bn: 1e9 }[(m[2] ?? '').toLowerCase() as 'k'] ?? 1;
-  return Number(m[1]) * scale;
+/** Rows with the words searched for in any cell and, per column, only the tags picked. */
+// Each row's cells lower-cased once, so a search reads one string a row and
+// not every cell again on every letter typed (5,200 rows x 26 columns was a
+// second a letter).
+const searchText = new WeakMap<string[], string>();
+const lowered = (r: string[]) => {
+  let s = searchText.get(r);
+  if (s === undefined) { s = r.join('\u0001').toLowerCase(); searchText.set(r, s); }
+  return s;
 };
 
-/** Rows with the words searched for in any cell and, per column, only the tags picked. */
 export function filterRows(table: Table, query: string, picked: Record<number, string[]>): string[][] {
   const q = query.trim().toLowerCase();
   const wants = Object.entries(picked).filter(([, v]) => v.length).map(([k, v]) => [Number(k), new Set(v.map((x) => x.toLowerCase()))] as const);
   if (!q && !wants.length) return table.rows;
   return table.rows.filter((r) =>
-    (!q || r.some((c) => c.toLowerCase().includes(q))) && wants.every(([i, set]) => set.has(r[i].trim().toLowerCase())));
+    (!q || lowered(r).includes(q)) && wants.every(([i, set]) => set.has(r[i].trim().toLowerCase())));
 }
+
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 export function sortRows(table: Table, rows: string[][], sort: Sort): string[][] {
   if (!sort) return rows;
   const { col, dir } = sort;
   const kind = table.columns[col]?.kind;
-  const valueOf = kind === 'number' ? numberOf : kind === 'date' ? dateOf : null;
+  const valueOf = kind === 'number' ? amountOf : kind === 'date' ? dateOf : null;
   const sign = dir === 'asc' ? 1 : -1;
-  // Blank, N/A and anything that does not read as the column's kind go last, either way.
-  const empty = (v: string) => !v.trim() || NOTHING.test(v.trim()) || (valueOf ? !Number.isFinite(valueOf(v)) : false);
-  return [...rows].sort((a, b) => {
-    const x = a[col] ?? '', y = b[col] ?? '';
-    const ex = empty(x), ey = empty(y);
-    if (ex || ey) return ex === ey ? 0 : ex ? 1 : -1;
-    if (valueOf) return sign * (valueOf(x) - valueOf(y));
-    return sign * x.localeCompare(y, undefined, { numeric: true, sensitivity: 'base' });
+  // Each row's key worked out once rather than twice per comparison. Blank, N/A
+  // and anything that does not read as the column's kind go last, either way.
+  const keyed = rows.map((r) => {
+    const v = (r[col] ?? '').trim();
+    const n = valueOf && v ? valueOf(v) : NaN;
+    const empty = !v || NOTHING.test(v) || (valueOf ? !Number.isFinite(n) : false);
+    return { r, v, n, empty };
   });
+  keyed.sort((a, b) => {
+    if (a.empty || b.empty) return a.empty === b.empty ? 0 : a.empty ? 1 : -1;
+    if (valueOf) return sign * (a.n - b.n);
+    return sign * collator.compare(a.v, b.v);
+  });
+  return keyed.map((k) => k.r);
 }

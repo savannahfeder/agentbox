@@ -1,25 +1,31 @@
 // A CSV drawn as a table: in the message as a preview, beside it, and full
 // screen. The reading is ../table-file.ts; the look is ./table-view.css, as
 // approved in designs/w-690551d7ea/tags-6-colour-on-status-only-v2.png.
-import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { filterRows, hrefOf, logoFor, readTable, shownLink, sortRows, type Column, type Sort, type Table } from '../table-file';
 import './table-view.css';
 
 export type TableMode = 'preview' | 'pane' | 'full';
 
 export const PREVIEW_ROWS = 6;
-// Past this many rows the page grows by a press, so a long export never stalls the window.
-const PAGE = 200;
+// Rows drawn above and below the ones in view, so a fast scroll does not show a gap.
+const SPARE = 12;
+// .tbl-td's height in table-view.css; the spacers above and below are counted in it.
+const ROW_H = 46;
 
 function Logo({ host, name }: { host: string | null; name: string }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [host]);
+  // A site the service does not know comes back as its 16px grey globe, which
+  // reads worse than the letter. A picture already in the cache has finished
+  // loading before React listens, so the size is also read when it mounts.
+  const seen = useCallback((img: HTMLImageElement | null) => {
+    if (img?.complete && img.naturalWidth > 0 && img.naturalWidth <= 16) setFailed(true);
+  }, []);
   if (host && !failed) {
     // Google's favicon service rather than the site itself, so the company
     // never sees a request from someone reading a list they are on.
-    // A site the service does not know comes back as its 16px grey globe, which
-    // reads worse than the letter.
-    return <img className="tbl-logo" alt="" referrerPolicy="no-referrer" loading="lazy"
+    return <img ref={seen} className="tbl-logo" alt="" referrerPolicy="no-referrer"
       src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`}
       onLoad={(e) => { if (e.currentTarget.naturalWidth <= 16) setFailed(true); }} onError={() => setFailed(true)} />;
   }
@@ -47,8 +53,6 @@ function Cell({ table, col, row, value }: { table: Table; col: number; row: stri
   return <div className="tbl-td" title={v.length > 40 ? v : undefined}><span className="tbl-ell">{v}</span></div>;
 }
 
-// A row's cells only change with its own values, so a sort or the next page
-// draws the rows already on screen again for nothing.
 const Row = memo(function Row({ table, row, n }: { table: Table; row: string[]; n: number }) {
   return <div className="tbl-tr" role="row">
     <div className="tbl-td tbl-rn">{n}</div>
@@ -56,23 +60,47 @@ const Row = memo(function Row({ table, row, n }: { table: Table; row: string[]; 
   </div>;
 });
 
-// Long text is capped (table-view.css, .tbl-ell) so the short columns after it
-// stay in view. Only the longest text column takes the spare width; equal
-// shares would make a city column as wide as a notes column.
-function widths(table: Table): string {
-  const longest = (i: number) => table.rows.reduce((m, r) => Math.max(m, r[i]?.length ?? 0), 0);
+// WIDTHS ARE MEASURED ONCE, FROM THE WHOLE FILE. Only the rows in view are
+// drawn, so a width the browser worked out from them would jump as you scroll.
+// Long text is capped at `cap` (the .tbl-ell max-width) so the short columns
+// after it stay in view, and only the longest text column takes spare width.
+function widths(table: Table, cap: number): string {
+  const canvas = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+  const family = typeof document === 'undefined' ? 'sans-serif' : getComputedStyle(document.body).fontFamily;
+  const step = Math.max(1, Math.floor(table.rows.length / 3000));
+  const measure = (font: string, s: string) => {
+    if (!canvas) return s.length * 7.5;
+    canvas.font = font;
+    return canvas.measureText(s).width;
+  };
+  const longest = table.columns.map((_, i) => {
+    let best = '';
+    for (let r = 0; r < table.rows.length; r += step) { const v = table.rows[r][i] ?? ''; if (v.length > best.length) best = v; }
+    return best;
+  });
+  const content = table.columns.map((c, i) => {
+    let w = 0;
+    if (c.kind === 'tag') for (const v of c.values) w = Math.max(w, measure(`13px ${family}`, v) + 32);
+    else for (let r = 0; r < table.rows.length; r += step) {
+      const v = table.rows[r][i] ?? '';
+      // Only strings near the longest can be the widest; measuring each would be slow.
+      if (v.length >= longest[i].length * 0.7) w = Math.max(w, Math.min(cap, measure(`14px ${family}`, c.kind === 'link' ? shownLink(v) : v)));
+    }
+    const head = c.name.length * 7.6 + 20;
+    return Math.ceil(Math.max(head, w + (c.kind === 'name' && table.logoCol >= 0 ? 28 : 0)) + 34);
+  });
   const texts = table.columns.flatMap((c, i) => (c.kind === 'text' ? [i] : []));
-  const wide = texts.reduce((best, i) => (best < 0 || longest(i) > longest(best) ? i : best), -1);
+  const wide = texts.reduce((best, i) => (best < 0 || longest[i].length > longest[best].length ? i : best), -1);
   const last = table.columns.length - 1;
-  return table.columns.map((c, i) => (i === wide ? 'minmax(140px, 1fr)'
-    : wide < 0 && i === last ? 'minmax(max-content, 1fr)'
-    : c.kind === 'name' ? 'minmax(140px, max-content)' : 'max-content')).join(' ');
+  return content.map((w, i) => (i === wide ? `minmax(${Math.min(w, 180)}px, ${w}fr)`
+    : wide < 0 && i === last ? `minmax(${w}px, 1fr)` : `${w}px`)).join(' ');
 }
 const sortWords = (c: Column, dir: 'asc' | 'desc') => {
   const [up, down] = c.kind === 'number' ? ['1 to 9', '9 to 1'] : c.kind === 'date' ? ['Oldest first', 'Newest first'] : ['A to Z', 'Z to A'];
   return dir === 'asc' ? up : down;
 };
 const rowsWord = (n: number) => `${n.toLocaleString()} ${n === 1 ? 'row' : 'rows'}`;
+const typingIn = (el: Element | null) => !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable);
 
 function Menu({ label, icon, on, children }: { label: string; icon: ReactNode; on: boolean; children: (close: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -92,6 +120,33 @@ function Menu({ label, icon, on, children }: { label: string; icon: ReactNode; o
   </span>;
 }
 
+function FilterMenu({ table, cols, picked, onToggle, onClear }: {
+  table: Table; cols: number[]; picked: Record<number, string[]>; onToggle: (col: number, v: string) => void; onClear: () => void;
+}) {
+  const [find, setFind] = useState('');
+  const many = cols.reduce((n, c) => n + table.columns[c].values.length, 0) > 12;
+  const q = find.trim().toLowerCase();
+  const filtering = Object.values(picked).some((v) => v.length);
+  return <>
+    {many && <div className="when-type-row"><input className="when-type" autoFocus placeholder="Find a tag" value={find} onChange={(e) => setFind(e.target.value)} /></div>}
+    {filtering && <button type="button" className="when-row tbl-clear" onClick={onClear}>Show every row</button>}
+    {cols.map((col) => {
+      const values = table.columns[col].values.filter((v) => !q || v.toLowerCase().includes(q));
+      if (!values.length) return null;
+      return <div key={col}>
+        <div className="when-head">{table.columns[col].name}</div>
+        {values.map((v) => {
+          const on = (picked[col] ?? []).includes(v);
+          return <button key={v} type="button" role="menuitemcheckbox" aria-checked={on} className={`when-row${on ? ' on' : ''}`} onClick={() => onToggle(col, v)}>
+            <span className={`tbl-tick${on ? ' on' : ''}`} aria-hidden="true" />
+            <span className={`tbl-tag tone-${table.columns[col].tones[v.toLowerCase()]}`}>{v}</span>
+          </button>;
+        })}
+      </div>;
+    })}
+  </>;
+}
+
 const glyph = (d: string) => <svg viewBox="0 0 16 16" aria-hidden="true"><path d={d} /></svg>;
 const SEARCH = <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>;
 
@@ -100,46 +155,49 @@ export function TableView({ text, path, mode, onShowAll }: { text: string; path:
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<Record<number, string[]>>({});
   const [sort, setSort] = useState<Sort>(null);
-  const [shown, setShown] = useState(PAGE);
-  useEffect(() => { setQuery(''); setPicked({}); setSort(null); setShown(PAGE); }, [path]);
+  useEffect(() => { setQuery(''); setPicked({}); setSort(null); }, [path]);
 
   // The box shows each letter at once; the rows catch up when the typing pauses.
   const searched = useDeferredValue(query);
   const rows = useMemo(() => sortRows(table, filterRows(table, searched, picked), sort), [table, searched, picked, sort]);
-  const template = useMemo(() => widths(table), [table]);
+  const template = useMemo(() => widths(table, mode === 'full' ? 300 : 220), [table, mode]);
+  const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
-  // A new order or a new search starts from the top, one page long.
-  useEffect(() => { box.current?.scrollTo({ top: 0 }); setShown(PAGE); }, [searched, picked, sort]);
-  const foot = useRef<HTMLDivElement>(null);
-  const searchBox = useRef<HTMLInputElement>(null);
+  const [view, setView] = useState({ top: 0, height: 900 });
   const [moreRight, setMoreRight] = useState(false);
   const preview = mode === 'preview';
 
-  // Whether columns run past the right edge, which the fade there says.
-  useEffect(() => {
+  // A new order or a new search starts from the top.
+  useEffect(() => { box.current?.scrollTo({ top: 0 }); }, [searched, picked, sort]);
+
+  // Where the box is scrolled to and how tall it is decide which rows are drawn;
+  // whether columns run past the right edge is what the fade there says.
+  useLayoutEffect(() => {
     const el = box.current;
     if (!el) return undefined;
-    const look = () => setMoreRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+    let frame = 0;
+    const look = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        setView((v) => (v.top === el.scrollTop && v.height === el.clientHeight ? v : { top: el.scrollTop, height: el.clientHeight }));
+        setMoreRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+      });
+    };
     look();
     el.addEventListener('scroll', look, { passive: true });
     const seen = new ResizeObserver(look);
     seen.observe(el);
-    return () => { el.removeEventListener('scroll', look); seen.disconnect(); };
-  }, [table, rows, shown]);
+    return () => { cancelAnimationFrame(frame); el.removeEventListener('scroll', look); seen.disconnect(); };
+  }, [table]);
 
-  // The next page comes as the foot of the table scrolls into view.
-  useEffect(() => {
-    if (preview || !foot.current || rows.length <= shown) return undefined;
-    const seen = new IntersectionObserver((e) => { if (e.some((x) => x.isIntersecting)) setShown((s) => s + PAGE); }, { root: box.current, rootMargin: '400px' });
-    seen.observe(foot.current);
-    return () => seen.disconnect();
-  }, [preview, rows.length, shown]);
-
-  // With words in the search box, Escape clears them before it closes the view the table is in.
+  // With words in the search box, Escape clears them before it closes the view
+  // the table is in, but not while you are typing somewhere else.
   useEffect(() => {
     if (!query) return undefined;
     const key = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || document.querySelector('.tbl-menu')) return;
+      const at = document.activeElement;
+      if (typingIn(at) && !root.current?.contains(at)) return;
       e.stopImmediatePropagation(); e.preventDefault(); setQuery('');
     };
     window.addEventListener('keydown', key, true);
@@ -148,7 +206,9 @@ export function TableView({ text, path, mode, onShowAll }: { text: string; path:
 
   if (!table.columns.length) return <div className="tbl-empty">This table has no rows yet.</div>;
 
-  const drawn = preview ? rows.slice(0, PREVIEW_ROWS) : rows.slice(0, shown);
+  const start = preview ? 0 : Math.max(0, Math.floor(view.top / ROW_H) - SPARE);
+  const end = preview ? Math.min(rows.length, PREVIEW_ROWS) : Math.min(rows.length, Math.ceil((view.top + view.height) / ROW_H) + SPARE);
+  const drawn = rows.slice(start, end);
   const tagCols = table.columns.flatMap((c, i) => (c.kind === 'tag' ? [i] : []));
   const filtering = Object.values(picked).some((v) => v.length);
   const total = table.rows.length;
@@ -159,30 +219,24 @@ export function TableView({ text, path, mode, onShowAll }: { text: string; path:
     return { ...p, [col]: [...now] };
   });
   const sortBy = (col: number) => setSort((s) => (!s || s.col !== col ? { col, dir: 'asc' } : s.dir === 'asc' ? { col, dir: 'desc' } : null));
+  // Enter presses a button here even where the view around the table keeps Enter for itself.
+  const enter = (e: React.KeyboardEvent) => {
+    const at = e.target as HTMLElement;
+    if (e.key !== 'Enter' || at.tagName !== 'BUTTON') return;
+    e.preventDefault(); e.stopPropagation(); at.click();
+  };
 
   return (
-    <div className={`tbl tbl-${mode}`}>
+    <div className={`tbl tbl-${mode}`} ref={root} onKeyDown={enter}>
       {!preview && (
         <div className="tbl-bar">
           <label className="tbl-search">{SEARCH}
-            <input ref={searchBox} type="search" value={query} placeholder={`Search ${rowsWord(total)}`} onChange={(e) => setQuery(e.target.value)}
+            <input type="search" value={query} placeholder={`Search ${rowsWord(total)}`} onChange={(e) => setQuery(e.target.value)}
               data-own-escape={query ? '' : undefined} />
           </label>
           {tagCols.length > 0 && (
             <Menu label="Filter" on={filtering} icon={glyph('M2.5 4h11M4.5 8h7M6.5 12h3')}>
-              {() => <>
-                {filtering && <button type="button" className="when-row tbl-clear" onClick={() => setPicked({})}>Show every row</button>}
-                {tagCols.map((col) => <div key={col}>
-                  <div className="when-head">{table.columns[col].name}</div>
-                  {table.columns[col].values.map((v) => {
-                    const on = (picked[col] ?? []).includes(v);
-                    return <button key={v} type="button" role="menuitemcheckbox" aria-checked={on} className={`when-row${on ? ' on' : ''}`} onClick={() => toggle(col, v)}>
-                      <span className={`tbl-tick${on ? ' on' : ''}`} aria-hidden="true" />
-                      <span className={`tbl-tag tone-${table.columns[col].tones[v.toLowerCase()]}`}>{v}</span>
-                    </button>;
-                  })}
-                </div>)}
-              </>}
+              {() => <FilterMenu table={table} cols={tagCols} picked={picked} onToggle={toggle} onClear={() => setPicked({})} />}
             </Menu>
           )}
           <Menu label="Sort" on={!!sort} icon={glyph('M5 3v10M2.5 10.5L5 13l2.5-2.5M11 13V3M8.5 5.5L11 3l2.5 2.5')}>
@@ -210,10 +264,11 @@ export function TableView({ text, path, mode, onShowAll }: { text: string; path:
               </button>
             ))}
           </div>
-          {drawn.map((r, n) => <Row key={n} table={table} row={r} n={n + 1} />)}
+          {start > 0 && <div className="tbl-gap" style={{ height: start * ROW_H }} />}
+          {drawn.map((r, n) => <Row key={start + n} table={table} row={r} n={start + n + 1} />)}
+          {!preview && end < rows.length && <div className="tbl-gap" style={{ height: (rows.length - end) * ROW_H }} />}
         </div>
         {!rows.length && <div className="tbl-none">{total ? 'No rows match.' : 'This table has no rows yet.'}</div>}
-        {!preview && rows.length > shown && <div ref={foot}><button type="button" className="tbl-more" onClick={() => setShown((s) => s + PAGE)}>Show {Math.min(PAGE, rows.length - shown).toLocaleString()} more rows</button></div>}
       </div>
       </div>
       {preview && total > PREVIEW_ROWS && onShowAll && (
