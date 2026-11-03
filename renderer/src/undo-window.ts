@@ -155,6 +155,15 @@ export function bringsBack<I>(rows: readonly I[]): I | undefined {
   return rows.length === 1 ? rows[0] : undefined;
 }
 
+/**
+ * The ticks once a Z has put back a close made over ticked rows. That close
+ * emptied them, and without them E falls through to the keyboard's place, which
+ * settled on a row that slid under it while the closed rows were gone.
+ */
+export function ticksAfterUndo(ticks: readonly string[] | undefined, now: Set<string>): Set<string> {
+  return ticks?.length ? new Set(ticks) : now;
+}
+
 /** What a close leaves in the thread when a Z takes it back. */
 export const UNDID_CLOSING = 'Undid closing it';
 

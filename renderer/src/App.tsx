@@ -46,7 +46,7 @@ import { NotesSidebar, NotesToggle } from './components/NotesSidebar';
 import { NOTES_CLOSED_KEY, notesSidebarOpen, rememberNotesSidebar, takesNotesSidebar } from './notes-sidebar';
 import { docKind, EVEN_SPLIT, escapeClosesDoc, escapeInTheFileClosesIt, focusIsInTheFile, readSplit, writeSplit } from './doc-pane';
 import { changeOwnsKey } from './code-keys';
-import { askStillStands, bringsBack, closesAgain, graceUndoneLine, nextUndo, shownAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO, UNDID_CLOSING } from './undo-window';
+import { askStillStands, bringsBack, closesAgain, graceUndoneLine, nextUndo, shownAfterUndo, ticksAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO, UNDID_CLOSING } from './undo-window';
 import { answeredAlready, TOO_LATE_TO_WITHDRAW } from './withdraw-send';
 import { addUndoMark, UNDO_MARKS_EVENT, type UndidSpec } from './undo-marks';
 import { whatTheFileSentUp } from '../../shared/artifact-keys.mjs';
@@ -981,6 +981,8 @@ export default function App() {
     brings?: WorkItem;
     /** What the thread of each task it touches says once it has run (./undo-marks). */
     undid?: UndidSpec[];
+    /** The ticked rows it acted on, ticked again once it has run (`ticksAfterUndo`). */
+    ticks?: string[];
   };
   const [undoStack, setUndoStack] = useState<Array<Undoable & { at: number }>>([]);
   /**
@@ -5498,7 +5500,7 @@ export default function App() {
       if (item.agent) await api.closeAgent({ key: agentKey(item.agent), through: item.agent.lastActiveAt || item.agent.startedAt || Date.now() });
       else await api.answer({ product: item.product, id: item.id, status: 'done' });
     }
-    pushUndo({ label: `Reopened ${targets.length} items`, undoes: `reopen those ${targets.length} tasks`, brings: bringsBack(targets), undid: targets.filter((i) => !i.agent).map((i) => ({ product: i.product, id: i.id, words: 'Undid closing it' })), run: async () => {
+    pushUndo({ label: `Reopened ${targets.length} items`, undoes: `reopen those ${targets.length} tasks`, brings: bringsBack(targets), ticks: targets.map((i) => i.id), undid: targets.filter((i) => !i.agent).map((i) => ({ product: i.product, id: i.id, words: 'Undid closing it' })), run: async () => {
       for (const item of targets) {
         if (item.agent) await api.closeAgent({ key: agentKey(item.agent), through: 0 });
         else await api.answer({ product: item.product, id: item.id, status: 'open' });
@@ -5774,6 +5776,7 @@ export default function App() {
           : last.label,
     );
     await refresh();
+    setMultiSel((m) => ticksAfterUndo(last.ticks, m));
     // A withdrawn reply reopens where she was writing it, words and all. A
     // withdrawn new task reopens the card instead: there is no thread to go to,
     // and the whole point of the press was to add a sentence to what was written.
