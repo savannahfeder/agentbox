@@ -19,7 +19,7 @@ export function brokerSocketPath(storeRoot) {
 // A browser copy has no keychain, so it refuses a real connection. A copy on the
 // fixture may seal with a key file beside the sealed one: no real sign-in is
 // behind it, and `testOnlyFor` keeps Linear off it.
-function fixtureCipher(keyFile) {
+export function fixtureCipher(keyFile) {
   fs.mkdirSync(path.dirname(keyFile), { recursive: true });
   if (!fs.existsSync(keyFile)) fs.writeFileSync(keyFile, crypto.randomBytes(32), { mode: 0o600 });
   const key = fs.readFileSync(keyFile);
@@ -27,12 +27,12 @@ function fixtureCipher(keyFile) {
     available: () => true,
     encrypt: (text) => {
       const iv = crypto.randomBytes(12);
-      const c = crypto.createCipheriv('aes-256-gcm', key, iv);
+      const c = crypto.createCipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
       const body = Buffer.concat([c.update(text, 'utf8'), c.final()]);
       return Buffer.concat([iv, c.getAuthTag(), body]);
     },
     decrypt: (raw) => {
-      const d = crypto.createDecipheriv('aes-256-gcm', key, raw.subarray(0, 12));
+      const d = crypto.createDecipheriv('aes-256-gcm', key, raw.subarray(0, 12), { authTagLength: 16 });
       d.setAuthTag(raw.subarray(12, 28));
       return Buffer.concat([d.update(raw.subarray(28)), d.final()]).toString('utf8');
     },
