@@ -140,7 +140,7 @@ export function QueueFile({ product, path, md, onOpen, onFullScreen }: { product
         onFold={() => { setExpanded(false); setFolded((f) => !f); }}
         onCondense={() => setExpanded(false)} onOpen={onFullScreen ?? onOpen} onSide={onFullScreen && onOpen} />
       {!folded && page && url && <HtmlPreview key={`${product}:${path}`} url={url} path={path} expanded={expanded} onExpandedChange={setExpanded} />}
-      {!folded && table && text != null && <TableView text={text} path={path} mode="preview" onShowAll={onSide ?? onOpen} />}
+      {!folded && table && text != null && <TableView text={text} path={path} mode="preview" onShowAll={onOpen} />}
       {!folded && !page && !table && text != null && <DocumentPreview key={`${product}:${path}`} expanded={expanded} onExpandedChange={setExpanded} onOpen={onOpen}><div className="markdown one-notebody doc-prose">{md(text)}</div></DocumentPreview>}
     </section>
   );
