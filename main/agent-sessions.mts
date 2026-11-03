@@ -184,19 +184,21 @@ function windowsTemps({ tmpdir = os.tmpdir(), realpath = fs.realpathSync.native 
   const cached = realpath === fs.realpathSync.native;
   const known = cached ? tempNames.get(tmpdir) : undefined;
   if (known) return known;
-  const names = [tmpdir];
+  let names = [tmpdir];
   try { names.push(realpath(tmpdir)); } catch {}
+  // A TEMP set to a whole drive would hide every chat on it.
+  names = names.filter((n) => !/^[A-Za-z]:[\\/]*$/.test(String(n ?? '')));
   if (cached) tempNames.set(tmpdir, names);
   return names;
 }
 
 // On Windows the temp folder is inside the home folder, so of the two that hold
-// a path the deeper one decides.
+// a path the deeper one decides, and a tie goes to her.
 function windowsScratch(p: string, home: string, temps: string[], sep: string) {
   const under = (root: string) => !!root && (p === root || p.startsWith(`${root}${sep}`));
   const temp = temps.filter(under).sort((a, b) => b.length - a.length)[0];
   if (!temp) return false;
-  return !(under(home) && home.length > temp.length);
+  return !(under(home) && home.length >= temp.length);
 }
 
 /** Entrypoints a person starts. `cli` is a terminal, `claude-desktop` the
