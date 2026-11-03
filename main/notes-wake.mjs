@@ -1,7 +1,7 @@
 // A teammate's note on a file an agent made wakes that agent's thread: it is
 // told the notes as a turn, once, the way a teammate's reply is
 // (shared/artifact-marks.mjs notesForItsAgent).
-import { answeredNotes, notedFilesInLines, noteGoesTo, notesForItsAgent, notesForTheAgent, threadFiles } from '../shared/artifact-marks.mjs';
+import { answeredNotes, approvalId, notedFilesInLines, noteGoesTo, notesForItsAgent, notesForTheAgent, threadFiles } from '../shared/artifact-marks.mjs';
 import { heldByAPerson } from '../shared/team-rules.mjs';
 import { readItemHistory } from './store/work-items.mjs';
 import { submitReply } from './live-replies.mjs';
@@ -53,6 +53,7 @@ export function resolveAnsweredNotes({ store, people = [], now = Date.now() }) {
 // on its question opens and the next tick starts the run. A note written to a
 // teammate, or a thank-you, waits for "Send to the agent" (a `toagent` mark).
 export async function noteToItsAgent({ store, supervisor, product, id, mark, nameOf = () => 'the person writing to you', people = [] }) {
+  if (mark?.do === 'approve') return approvalToItsAgent({ store, supervisor, product, id, mark });
   const ids = mark?.do === 'note' ? [mark.id] : mark?.do === 'toagent' ? mark.on ?? [] : [];
   if (!ids.length || ids.some((n) => !n)) return false;
   if (store.listProducts().find((p) => p.slug === product)?.team?.direct) return false;
@@ -72,6 +73,25 @@ export async function noteToItsAgent({ store, supervisor, product, id, mark, nam
     went = true;
   }
   if (!went) return false;
+  supervisor.liftBrakeForHer?.();
+  supervisor.wake?.();
+  return true;
+}
+
+// Approving a file the agent made is the go-ahead it was waiting for. A closed
+// thread is left closed: approving there is a record, not a request.
+async function approvalToItsAgent({ store, supervisor, product, id, mark }) {
+  if (!mark.file || store.listProducts().find((p) => p.slug === product)?.team?.direct) return false;
+  const item = store.readItem(product, id);
+  if (!item || item.status === 'done' || heldByAPerson(item)) return false;
+  const families = threadFiles(notedFilesInLines(readItemHistory(store.productDir(product), id)));
+  const version = families.flatMap((f) => f.versions).find((v) => v.id === mark.file);
+  if (typeof version?.agent !== 'string') return false;
+  const given = (item.artifacts?.approvals ?? []).filter((a) => a.file === mark.file).sort((a, b) => b.ts - a.ts)[0];
+  if (!given) return false;
+  const text = `Approved ${version.path}. Proceed as you proposed.`;
+  // fromNotes keeps the thread from drawing this reply beside the approval it already shows.
+  await submitReply(supervisor, { product, id, answer: text }, () => store.answerItem(product, id, { answer: text, fromNotes: [approvalId(given)] }));
   supervisor.liftBrakeForHer?.();
   supervisor.wake?.();
   return true;
