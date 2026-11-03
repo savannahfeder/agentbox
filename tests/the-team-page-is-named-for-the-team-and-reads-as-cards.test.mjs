@@ -73,3 +73,12 @@ describe('a group opened from Team', () => {
     expect(read('renderer/src/App.tsx')).toContain('<span className="workspace-title gc-col-title">{homeLayout === \'chats\' ? \'Team\' : \'Chats\'}</span>');
   });
 });
+
+describe('the command bar', () => {
+  // A tester typed "Sofia" and got only "Waits on Sofia", an action, and no Sofia.
+  it('finds a person on the team by name, and opens their page in Team', () => {
+    const app = read('renderer/src/App.tsx');
+    expect(app).toMatch(/const persons = \(chatsValue\?\.persons \?\? \[\]\)\.filter\(\(p\) => p\.name\.toLowerCase\(\)\.split\(\/\\s\+\/\)\.some\(\(w\) => w\.startsWith\(q\.toLowerCase\(\)\)\)\);/);
+    expect(app).toContain("run: () => { setModal(null); openChatsPlace(`person:${p.id}`); }");
+  });
+});

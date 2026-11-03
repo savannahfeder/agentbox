@@ -144,6 +144,12 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   // line stays put as the room is marked read under you.
   const [readFrom, setReadFrom] = useState<number | null>(room.readAt ?? null);
   useEffect(() => { setReadFrom(room.readAt ?? null); setThread(null); setEditing(null); }, [room.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!root) return undefined;
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); setThread(null); } };
+    window.addEventListener('keydown', esc, true);
+    return () => window.removeEventListener('keydown', esc, true);
+  }, [root]);
   const newAt = root ? null : newLineAt(messages, readFrom, meId);
 
   // Reading the room is staying on it with the window in front (roomReader),
@@ -195,18 +201,18 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   return <div className={full ? `rm-full${hang ? ' hang' : ''}` : 'rm-chat'} style={full || width == null ? undefined : { '--rm-chat-w': `${width}px` } as CSSProperties}>
     {!full && <div className="rm-chat-grip" role="separator" aria-orientation="vertical" aria-label="Drag to widen the chat"
       title="Drag to widen. Double-click to reset." onPointerDown={drag} onDoubleClick={() => { setWidth(null); writeChatWidth(null); }} />}
-    {head ?? <div className="rm-chat-head">
-      {root
-        ? <><button type="button" className="rm-switch" onClick={() => setThread(null)}>{I.back()}<span>Thread</span></button>
-          <span className="rm-label" style={{ marginLeft: 'auto', marginRight: 4 }}>{(replies.get(root.id)?.length ?? 0)} {(replies.get(root.id)?.length ?? 0) === 1 ? 'reply' : 'replies'}</span></>
-        : <button type="button" className={`rm-switch${switchOpen ? ' open' : ''}`} onClick={(e) => onSwitch?.(e.currentTarget.getBoundingClientRect())}>
-          {room.kind === 'group'
-            ? <><span className="rm-faces">{others.slice(0, 3).map((p) => <Face key={p.id} name={p.name} url={p.avatarUrl} size={18} />)}</span>
-              <span>{others.map((p) => p.name).join(', ') || room.name}</span></>
-            : <>{I.hash(15)}<span>{room.name}</span></>}
-          {onSwitch && I.down()}
-        </button>}
-      {!root && onInvite && room.kind !== 'group' && <button type="button" className="ic" title={`Invite people to ${room.name}`} aria-label={`Invite people to ${room.name}`} onClick={onInvite}>{I.invite(14)}</button>}
+    {root ? <div className="rm-chat-head rm-thread-head">
+      <button type="button" className="rm-switch" title="Back to the chat (Esc)" onClick={() => setThread(null)}>{I.back()}<span>Thread</span></button>
+      <span className="rm-label" style={{ marginLeft: 'auto', marginRight: 4 }}>{(replies.get(root.id)?.length ?? 0)} {(replies.get(root.id)?.length ?? 0) === 1 ? 'reply' : 'replies'}</span>
+    </div> : head ?? <div className="rm-chat-head">
+      <button type="button" className={`rm-switch${switchOpen ? ' open' : ''}`} onClick={(e) => onSwitch?.(e.currentTarget.getBoundingClientRect())}>
+        {room.kind === 'group'
+          ? <><span className="rm-faces">{others.slice(0, 3).map((p) => <Face key={p.id} name={p.name} url={p.avatarUrl} size={18} />)}</span>
+            <span>{others.map((p) => p.name).join(', ') || room.name}</span></>
+          : <>{I.hash(15)}<span>{room.name}</span></>}
+        {onSwitch && I.down()}
+      </button>
+      {onInvite && room.kind !== 'group' && <button type="button" className="ic" title={`Invite people to ${room.name}`} aria-label={`Invite people to ${room.name}`} onClick={onInvite}>{I.invite(14)}</button>}
       {onExpand && <button type="button" className="ic" title="Open full page" aria-label="Open full page" onClick={onExpand}>{I.expand()}</button>}
     </div>}
     <div className="rm-chat-list" ref={listRef}><div className="rm-chat-msgs">
@@ -430,6 +436,8 @@ function Composer({ roomId, threadId, placeholder, people, onSend, onPutFile, on
   const ref = useRef<RichBox | null>(null);
   const filePicker = useRef<HTMLInputElement>(null);
   useEffect(() => { drafts.set(draftKey, text); }, [draftKey, text]);
+  // A thread opens to be replied in; its box takes the typing, not the app's letter keys.
+  useEffect(() => { if (threadId) requestAnimationFrame(() => ref.current?.focus()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // "@" then letters at the caret opens the people in the room.
   const at = /(^|\s)@([\p{L}.]*)$/u.exec(plain.slice(0, caret));
   const matches = at ? people.filter((p) => p.name.toLowerCase().startsWith(at[2].toLowerCase())).slice(0, 6) : [];

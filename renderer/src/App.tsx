@@ -4013,11 +4013,18 @@ export default function App() {
   // Command K's chats: a group or chat by name or people, an AI teammate.
   const findChats = useCallback((q: string) => {
     const found = chatsFound({ groups: roomsUi.live ? roomsUi.groups : [], teammates: teammatesUi.live ? teammatesUi.list : [], query: q });
-    return found.map((f) => ({
-      id: `chat-${f.kind}-${f.key}`, label: f.label, hint: f.hint,
-      run: () => { setModal(null); if (f.kind === 'teammate') teammatesUi.go(f.key); else roomsUi.pickGroup(f.key); },
-    }));
-  }, [roomsUi, teammatesUi]);
+    const persons = (chatsValue?.persons ?? []).filter((p) => p.name.toLowerCase().split(/\s+/).some((w) => w.startsWith(q.toLowerCase())));
+    return [
+      ...persons.map((p) => ({
+        id: `chat-person-${p.id}`, label: p.name, hint: 'Their page in Team',
+        run: () => { setModal(null); openChatsPlace(`person:${p.id}`); },
+      })),
+      ...found.filter((f) => !persons.some((p) => p.name === f.label)).map((f) => ({
+        id: `chat-${f.kind}-${f.key}`, label: f.label, hint: f.hint,
+        run: () => { setModal(null); if (f.kind === 'teammate') teammatesUi.go(f.key); else roomsUi.pickGroup(f.key); },
+      })),
+    ];
+  }, [roomsUi, teammatesUi, chatsValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // LINES, FILES, COMMENTS AND DECISIONS (./found-inside). Threads, conversations
   // and teammates' shared threads are searched in main; groups and decisions are
