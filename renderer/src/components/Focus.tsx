@@ -1745,7 +1745,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       waitsNow={!!waitNow}
       onWait={onWait}
       blocks={(item.labels ?? []).includes('given-task')}
-      onRename={direct && crumbFrom ? () => setRenameAt(Date.now()) : null}
+      onRename={crumbFrom && !agent ? () => setRenameAt(Date.now()) : null}
     />
   );
 
