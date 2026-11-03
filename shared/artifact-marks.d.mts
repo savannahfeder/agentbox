@@ -32,6 +32,7 @@ export function asksByName(text: string | null | undefined, name: string | null 
 export function fileNewsLine(news: FileNews[] | null | undefined, nameOf: (id: string) => string): string | null;
 export function nextVersionName(name: string, count: number): string;
 export function addressedTo(text: string | null | undefined, people: ReadonlyArray<{ id: string; name?: string | null }> | null | undefined): string | null;
+export function stillWaiting(note: { wait?: boolean; toAgent?: boolean; sent?: boolean } | null | undefined): boolean;
 export function noteGoesTo(note: { text?: string; mentions?: readonly string[]; toAgent?: boolean } | null | undefined, people?: ReadonlyArray<{ id: string; name?: string | null }>): { to: 'agent' } | { to: 'person'; person: string } | { to: 'nobody' };
 export function notesForTheAgent(marks: FileMarks | null | undefined, version: FileVersion, count: number, opts?: { nameOf?: (id: string | null) => string }): { text: string; ids: string[] };
 export const MAX_EDIT_BYTES: number;

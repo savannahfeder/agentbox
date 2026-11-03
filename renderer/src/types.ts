@@ -213,6 +213,7 @@ export interface ArtifactMark {
   mentions?: string[];
   owner?: string;
   on?: string | string[];
+  wait?: boolean;
 }
 
 export interface FileNote {
@@ -235,6 +236,8 @@ export interface FileNote {
   sent?: boolean;
   /** Someone pressed "Send to the agent" on a note the agent was not sent. */
   toAgent?: boolean;
+  /** Written beside a document: held until Send rather than told at once. */
+  wait?: boolean;
   /** Said on an earlier version and still open: the version it was made on ("v1"). */
   from?: string;
   /** In the Files place, the thread or chat it was written in. */

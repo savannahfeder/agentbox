@@ -54,7 +54,8 @@ export function cleanMark(value) {
       const text = typeof value.text === 'string' ? value.text.trim().slice(0, MAX_NOTE_CHARS) : '';
       if (!id || !file || !place || !text) return undefined;
       const mentions = Array.isArray(value.mentions) ? [...new Set(value.mentions.map(shortId).filter(Boolean))].slice(0, MAX_NAMED) : [];
-      return { do: 'note', id, file, place, text, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}) };
+      // `wait`: held for Send rather than told to the agent as it is added.
+      return { do: 'note', id, file, place, text, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}), ...(value.wait === true ? { wait: true } : {}) };
     }
     case 'reply': {
       const id = shortId(value.id);
@@ -125,7 +126,7 @@ export function marksOf(entries) {
     if (e.do === 'edit' && e.path) {
       edits.push({ file: e.file, path: e.path, by: e.by ?? null, ts: e.ts });
     } else if (e.do === 'note' && !notes.has(e.id)) {
-      const note = { id: e.id, file: e.file, place: e.place, text: e.text, by: e.by ?? null, ts: e.ts, mentions: e.mentions ?? [], owner: e.owner ?? null, uid: e.uid ?? null };
+      const note = { id: e.id, file: e.file, place: e.place, text: e.text, by: e.by ?? null, ts: e.ts, mentions: e.mentions ?? [], owner: e.owner ?? null, uid: e.uid ?? null, ...(e.wait ? { wait: true } : {}) };
       if (e.place.kind === 'pin' || ((e.place.kind === 'time' || e.place.kind === 'page') && unit(e.place.x))) {
         const n = (pins.get(e.file) ?? 0) + 1;
         pins.set(e.file, n);
@@ -728,12 +729,15 @@ export const notedFilesInLines = (lines) => [...filesInLines(lines), ...otherFil
  * per file, in the words "Send these notes to the agent" uses. Notes by `me`,
  * the owner, wait for the owner's own press.
  */
-export function notesForItsAgent(lines, marks, { me, nameOf = () => 'Someone', people = [] } = {}) {
+/** A note held for Send that nobody has sent yet. */
+export const stillWaiting = (note) => !!note?.wait && !note.toAgent && !note.sent;
+
+export function notesForItsAgent(lines, marks,{ me, nameOf = () => 'Someone', people = [] } = {}) {
   const out = [];
   for (const family of threadFiles(notedFilesInLines(lines))) {
     for (const version of family.versions) {
       if (typeof version.agent !== 'string') continue;
-      const open = (marks?.notes ?? []).filter((n) => n.file === version.id && n.by && n.by !== me && !n.resolved && !n.sent && noteGoesTo(n, people).to === 'agent');
+      const open = (marks?.notes ?? []).filter((n) => n.file === version.id && n.by && n.by !== me && !n.resolved && !n.sent && !stillWaiting(n) && noteGoesTo(n, people).to === 'agent');
       if (!open.length) continue;
       const first = (id) => String(nameOf(id)).split(/\s+/)[0];
       const { text, ids } = notesForTheAgent({ notes: open }, version, family.versions.length, { nameOf: first });
