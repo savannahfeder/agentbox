@@ -200,6 +200,8 @@ export async function openStage({ dist, width = 1512, height = 945, theme = 'dar
       itemHistory: async (p) => ({ ok: true, lines: window.__SNAP__.__history?.[p.id] ?? [] }),
       sessionTrace: async (p) => ({ sessions: window.__SNAP__.__traces?.[p.id] ?? [] }),
       compactionStatus: async () => null,
+      // A chat reads its numbered file line; a refusal object is not a list and crashed it.
+      fileLine: async () => [],
       remoteControl: async () => null,
       repeats: async () => [],
       olderItems: async () => ({ items: [], more: false }),

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, noteGoesTo, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
+  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, nextStep, noteGoesTo, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
 } from '../../../shared/artifact-marks.mjs';
 import type { FileVersion } from '../../../shared/artifact-marks.mjs';
 import { api } from '../api';
@@ -14,7 +14,7 @@ import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
 import { hasSpot, noteSendWords, notesToSendTheAgent, otherFilesOpen, pageSpot, PIN_FRAME_S, pinned, viewOffers, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
-import { opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
+import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
 import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
 import { pressedInTheFindBox } from '../find-in-page';
@@ -30,7 +30,8 @@ import { FileNoteCard } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
 import './artifact-view.css';
 
-export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number }
+/** `steps`: the paths the arrows step through, in order, when the press came from a turn of the thread. */
+export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number; steps?: string[] }
 
 type Editing = { fam: string; text: string; draft?: string; folder: string | null; base: ReturnType<typeof threadFiles>[number]['versions'][number] };
 
@@ -65,7 +66,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   /** Only on a thread with an agent, on the owner's own computer. */
   withAgent?: boolean;
   /** Posts edited words as the next version of a document. Null when it went, else why not. */
-  onNewVersion?: (name: string, text: string, path: string, id: string) => Promise<string | null>;
+  onNewVersion?: (name: string, text: string, path: string, id: string, since?: string | null) => Promise<string | null>;
   /** Said after a save that only becomes a version on someone else's computer. */
   editGoes?: string;
   onClose: () => void;
@@ -85,6 +86,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   }, [lines, open.path, open.note, marks.notes]);
   const families = useMemo(() => threadFiles(files, numbers), [files, numbers]);
   const flat = useMemo(() => families.flatMap((f, fi) => f.versions.map((v, vi) => ({ fi, vi, v }))), [families]);
+  const steps = useMemo(() => stepsThrough(families, open.steps), [families, open.steps]);
 
   const [at, setAt] = useState<{ fi: number; vi: number } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(open.note ?? null);
@@ -322,13 +324,14 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
     if (inHand.current !== v.id) return;
     if (text === null) { setUnreadable(v.id); return; }
     // Words a sitting kept but never saved, from a failed save or a closed app.
-    let draft: string | undefined;
-    try { draft = localStorage.getItem(draftKey(v.path)) ?? undefined; } catch { /* no storage, no draft */ }
+    let kept: ReturnType<typeof keptDraft<typeof v>> = null;
+    try { kept = keptDraft(family.versions, v, (p) => localStorage.getItem(draftKey(p))); } catch { /* no storage, no draft */ }
+    const draft = kept?.draft;
     typed.current = draft ?? null;
     posted.current = null;
     setEditWord(null);
     setTold(null);
-    setEditing({ fam, text, draft, folder: opened ? opened.replace(/\/[^/]*$/, '') : null, base: v });
+    setEditing({ fam, text, draft, folder: opened ? opened.replace(/\/[^/]*$/, '') : null, base: kept?.base ?? v });
     if (draft !== undefined) idle.current = window.setTimeout(() => { void postNow.current(); }, SAVE_AFTER_A_PAUSE_MS);
   };
   useEffect(() => {
@@ -346,7 +349,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
     const run = (async () => {
       setEditWord('Saving…');
       const clash = editClash(family, sitting.base.n, me, nameOf);
-      const why = await onNewVersion(sitting.base.name, out, sitting.base.path, sitting.base.id).catch((err: Error) => err.message);
+      const why = await onNewVersion(sitting.base.name, out, sitting.base.path, sitting.base.id, posted.current).catch((err: Error) => err.message);
       if (why) { setTold(`${why} Press back again to leave: your words come back when you open it again.`); setEditWord('Not saved'); return false; }
       posted.current = out;
       try { if (localStorage.getItem(draftKey(sitting.base.path)) === out) localStorage.removeItem(draftKey(sitting.base.path)); } catch { /* nothing kept */ }
@@ -466,12 +469,13 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   };
   const othersSaved = editing ? editClash(family, editing.base.n, me, nameOf) : null;
 
+  const stepTo = (by: number) => nextStep(families, steps, at, by);
   const stepFile = (by: number) => {
-    if (!at || families.length < 2) return;
-    const next = Math.max(0, Math.min(families.length - 1, at.fi + by));
+    const next = stepTo(by);
+    if (!next) return;
     away(() => {
       setSavedIn(null);
-      setAt({ fi: next, vi: families[next].versions.length - 1 });
+      setAt(next);
       setActiveId(null);
     });
   };
@@ -635,7 +639,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
     <StageLink.Provider value={setLink}>
     <div className="artifact-view" data-find-layer role="dialog" aria-label={version?.name ?? 'File'}>
       <header className="av-top">
-        <button type="button" className="av-back" onClick={leave} title="Back (esc)"><span aria-hidden="true">←</span><span className="av-thread">{threadName}</span></button>
+        <button type="button" className="av-back" onClick={leave} title="Back (esc)"><span className="av-thread">{threadName}</span></button>
         <span className="av-name">{familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? '')}</span>
         {kind && <span className="av-kind">{KIND_WORD[kind]}</span>}
         {family && family.versions.length > 1 && (
@@ -656,7 +660,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
         {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
         {canRestore && !compare && !editing && <button type="button" className="av-btn" disabled={restoring} onClick={() => void restore()}><NoteGlyph name="undo" />Restore this version</button>}
         {onOutside && version && foundNow === 'open' && <button type="button" className="av-btn" onClick={() => onOutside(version.path)}><NoteGlyph name="outside" />Open outside</button>}
-        <button type="button" className="av-close" onClick={leave} title="Close (esc)" aria-label="Close"><CrossIcon /></button>
+        <button type="button" className="av-btn av-leave" onClick={leave} title="Back (esc)"><NoteGlyph name="back" />Back</button>
       </header>
       <div className="av-body">
         <div className="av-stage">
@@ -696,9 +700,9 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
               </div>
             </div>
           )}
-          {!compare && families.length > 1 && at && <>
-            <button type="button" className="av-step av-prev" disabled={at.fi === 0} onClick={() => stepFile(-1)} aria-label="Previous file">‹</button>
-            <button type="button" className="av-step av-next" disabled={at.fi === families.length - 1} onClick={() => stepFile(1)} aria-label="Next file">›</button>
+          {!compare && (steps.length ? steps.length : families.length) > 1 && at && <>
+            <button type="button" className="av-step av-prev" disabled={!stepTo(-1)} onClick={() => stepFile(-1)} aria-label="Previous file">‹</button>
+            <button type="button" className="av-step av-next" disabled={!stepTo(1)} onClick={() => stepFile(1)} aria-label="Next file">›</button>
           </>}
           {link && <FileLinkBrowser key={link} url={link} product={product} backTo={kind ? `the ${KIND_WORD[kind].toLowerCase()}` : 'the file'} onClose={closeLink} />}
         </div>

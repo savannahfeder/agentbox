@@ -33,3 +33,35 @@
 .td-extra { padding: 4px 0; font-size: 13px; line-height: 20px; color: var(--text-faint); }
 
 .td-empty { margin: 0; font-size: 13.5px; line-height: 20px; color: var(--text-faint); }
+
+/* The Team page: the team's day with its tasks under it, one scroll. */
+.team-page { flex: 1; min-height: 0; overflow-y: auto; }
+.team-page > .td, .team-page > .tk { flex: none; min-height: auto; overflow: visible; }
+.team-page > .tk { padding-top: 8px; }
+.td-title { margin: 0; font-size: 15px; font-weight: 500; line-height: 24px; color: var(--text); }
+.team-page > .tk .td-title { margin-bottom: 10px; }
+/* In Chats the team's day is one person under another. */
+.cx-frame-main .td-people { columns: 1; }
+.cx-frame-main .team-page { height: 100%; }
+.td-name { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+.td-name:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* THE TEAM'S DAY AS CARDS (the Team page, and Everyone in Chats): one card a person,
+   each line marked by what it is, a ring for working, a filled dot for done. */
+.team-page .td { padding: 28px 40px 48px; }
+.team-page .td-col { max-width: 1000px; }
+.team-page .td-top { border-bottom: 0; padding-bottom: 0; margin-bottom: 18px; }
+.team-page .td-title { font-size: 19px; font-weight: 500; line-height: 26px; }
+.team-page .td-people { columns: 1; }
+.team-page .td-person { margin: 0 0 14px; padding: 18px 22px 14px; border: 1px solid var(--line); border-radius: var(--artifact-corner); background: var(--surface); }
+.team-page .td-who { gap: 12px; margin-bottom: 12px; }
+.team-page .td-who h2 { font-size: 15px; }
+.team-page .td-sec { display: block; margin-left: 34px; }
+.team-page .td-sec + .td-sec { margin-top: 8px; }
+.team-page .td-label { display: block; padding: 0 0 2px; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--text-dim); }
+.team-page .td-line { align-items: center; padding: 6px 8px; }
+.team-page .td-line::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; box-sizing: border-box; }
+.team-page .td-sec[data-group="working"] .td-line::before { border: 1.5px solid var(--accent); }
+.team-page .td-sec[data-group="done"] .td-line::before { background: var(--text-faint); }
+.team-page .td-sec[data-group="blocked"] .td-line::before { background: var(--accent); }
+.team-page .td-t { font-size: 14px; }

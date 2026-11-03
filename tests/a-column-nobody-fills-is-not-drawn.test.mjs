@@ -79,8 +79,9 @@ describe('a list column with no value in any row', () => {
     expect(drawn(list([thread('w-1', { priority: 9 })]), 'prio')).toBe(true);
   });
 
-  it('a Status column of nothing but the tab is not drawn; a task saying who it is from keeps it', () => {
-    expect(drawn(list([thread('w-1'), thread('w-2')]), 'state')).toBe(false);
+  // Agent rows in Needs you say Answered since 2026-11-02, so their column is drawn.
+  it('a Status column of agent rows is drawn, as is a task saying who it is from', () => {
+    expect(drawn(list([thread('w-1'), thread('w-2')]), 'state')).toBe(true);
     expect(drawn(list([thread('w-1'), task()]), 'state')).toBe(true);
   });
 

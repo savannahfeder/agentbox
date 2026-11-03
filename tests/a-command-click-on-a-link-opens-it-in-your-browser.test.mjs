@@ -90,10 +90,10 @@ describe('the thread and the document pane both ask it', () => {
 
   it('a link in a message hands its click to the opener', () => {
     const link = focus.slice(focus.indexOf('function ArtifactLink'), focus.indexOf('function textOf'));
-    expect(link).toMatch(/onClick=\{\(e\) => \{ e\.preventDefault\(\); onOpen\(e\); \}\}/);
-    expect(focus).toMatch(/onOpen=\{\(click\) => openHref\(href, undefined, click\)\}/);
-    expect(focus).toMatch(/onOpen=\{\(click\) => openHref\(source, undefined, click\)\}/);
-    expect(focus).toMatch(/onOpen=\{\(click\) => openHref\(path, undefined, click\)\}/);
+    expect(link).toMatch(/onClick=\{\(e\) => \{ e\.preventDefault\(\); onOpen\(e, e\.currentTarget\); \}\}/);
+    expect(focus).toMatch(/onOpen=\{\(click, from\) => openHref\(href, from, click\)\}/);
+    expect(focus).toMatch(/onOpen=\{\(click, from\) => openHref\(source, from, click\)\}/);
+    expect(focus).toMatch(/onOpen=\{\(click, from\) => openHref\(path, from, click\)\}/);
   });
 
   it('the opener decides with this rule, before the picture or the pane', () => {

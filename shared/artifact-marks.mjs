@@ -90,12 +90,21 @@ export function cleanMark(value) {
       const text = typeof value.text === 'string' && value.text.trim() && byteLength(value.text) <= MAX_EDIT_BYTES ? value.text : null;
       return text ? { do: 'edit', file, text } : undefined;
     }
+    // What was decided about an agent's version that skipped someone's edit (main/version-reconcile.mjs).
+    case 'reconcile': {
+      const file = fileId(value.file);
+      if (!file) return undefined;
+      const path = value.path !== undefined ? documentPath(value.path) : null;
+      const missed = value.missed !== undefined ? documentPath(value.missed) : null;
+      const from = fileId(value.from);
+      return { do: 'reconcile', file, ...(path ? { path } : {}), ...(missed ? { missed } : {}), ...(from ? { from } : {}), ...(Number.isInteger(value.clash) && value.clash > 0 ? { clash: value.clash } : {}), ...(value.replace === true ? { replace: true } : {}) };
+    }
     default: return undefined;
   }
 }
 
 /** Only that this person has looked at something, which is nothing anyone else needs to read. */
-export const isBookkeepingMark = (mark) => mark?.do === 'seen' || mark?.do === 'sent';
+export const isBookkeepingMark = (mark) => mark?.do === 'seen' || mark?.do === 'sent' || mark?.do === 'reconcile';
 
 /**
  * Every mark on a thread, oldest first, as what it now says. Each entry is the
@@ -339,6 +348,36 @@ export function whereAPressLands(families, { path, file } = {}) {
   return at(flat.at(-1));
 }
 
+/** The versions `paths` name, in their order, each once: what the arrows step through. */
+export function stepsThrough(families, paths) {
+  const out = [];
+  const seen = new Set();
+  for (const p of paths ?? []) {
+    const v = versionForPath(families, p);
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    const fi = families.findIndex((f) => f.versions.includes(v));
+    out.push({ fi, vi: families[fi].versions.indexOf(v) });
+  }
+  return out;
+}
+
+/**
+ * Where an arrow press from `at` goes, or null at an end. With steps, the next
+ * of them; a version picked off the list keeps its family's place. Without,
+ * the next file at its newest version.
+ */
+export function nextStep(families, steps, at, by) {
+  if (!at) return null;
+  if (steps?.length) {
+    let i = steps.findIndex((s) => s.fi === at.fi && s.vi === at.vi);
+    if (i < 0) i = steps.findIndex((s) => s.fi === at.fi);
+    return i < 0 ? null : steps[i + by] ?? null;
+  }
+  const fi = at.fi + by;
+  return families?.[fi] ? { fi, vi: families[fi].versions.length - 1 } : null;
+}
+
 export function versionForPath(families, raw) {
   const asked = cleanAsked(raw);
   if (!asked) return null;
@@ -479,7 +518,7 @@ export function editClash(family, baseN, me, nameOf) {
   const versions = family?.versions ?? [];
   const other = versions.slice(baseN).filter((v) => v.by !== me).at(-1);
   if (!other) return null;
-  return `${nameOf(other.by)} saved v${versions.indexOf(other) + 1} while you were editing. Yours saves as v${versions.length + 1}, and both are kept.`;
+  return `${nameOf(other.by)} saved v${versions.indexOf(other) + 1} while you were editing. Yours saves as v${versions.length + 1}, with their changes merged in.`;
 }
 
 /** What a person calls a file at any version: one name, whatever each version is named on disk. */
@@ -523,10 +562,20 @@ export function newestOfFamily(path, edits) {
 
 /** The line that tells an agent which files people have edited, or null. Its own later version ends it. */
 export function editedFilesLine(lines) {
-  const moved = threadFiles(filesInLines(lines)).filter((f) => f.versions.at(-1)?.edited && f.versions.length > 1);
-  if (!moved.length) return null;
-  const said = moved.map((f) => `${f.versions[0].name} is now ${f.versions.at(-1).path}`).join('; ');
-  return `People edited files on this thread. Read the newest version, not the copy you remember: ${said}.`;
+  const families = threadFiles(filesInLines(lines));
+  const moved = families.filter((f) => f.versions.at(-1)?.edited && f.versions.length > 1);
+  const missedOn = new Map((lines ?? []).flatMap((l) => (l?.patch?.artifact?.do === 'reconcile' && l.patch.artifact.missed ? [[l.patch.artifact.file, l.patch.artifact.missed]] : [])));
+  const missed = families.flatMap((f) => {
+    const newest = f.versions.at(-1);
+    return missedOn.has(newest?.id) ? [`${newest.path} was written without the edit in ${missedOn.get(newest.id)}`] : [];
+  });
+  const clashed = new Map((lines ?? []).flatMap((l) => (l?.patch?.artifact?.do === 'reconcile' && l.patch.artifact.clash && l.patch.artifact.path ? [[l.patch.artifact.path, l.patch.artifact.file]] : [])));
+  const kept = moved.flatMap((f) => (clashed.has(f.versions.at(-1).path) ? [`${f.versions.at(-1).path} kept a person's words where your ${clashed.get(f.versions.at(-1).path)} changed the same ones`] : []));
+  const said = [];
+  if (moved.length) said.push(`People edited files on this thread. Read the newest version, not the copy you remember: ${moved.map((f) => `${f.versions[0].name} is now ${f.versions.at(-1).path}`).join('; ')}. An edit your next version leaves out is merged back in, so to undo one because they asked, pass replacesEdits to write_document.`);
+  if (kept.length) said.push(`${kept.join('; ')}.`);
+  if (missed.length) said.push(`${missed.join('; ')}. Read that edit and carry it across unless you were told otherwise.`);
+  return said.join(' ') || null;
 }
 
 /** Who said the file first, which is who an approval or a note reaches in a conversation. */

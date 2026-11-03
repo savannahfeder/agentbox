@@ -207,7 +207,9 @@ describe('Tab walks the tabs the Inbox draws', () => {
 describe('only a component that does not already show its key carries a hint', () => {
   it('wears a data-hint for every id the list knows, and knows every id worn', () => {
     const worn = new Set();
-    for (const file of [app, list, nav1, terminal, focus, pages, summary, queue, threadMenu]) {
+    // The icon buttons over a thread that name themselves on the plate (2026-11-02).
+    const named = ['team/TeamFocus.tsx', 'threads/ThreadFiles.tsx', 'threads/PlaceButton.tsx'].map((f) => fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src', f), 'utf8'));
+    for (const file of [app, list, nav1, terminal, focus, pages, summary, queue, threadMenu, ...named]) {
       // The row writes its own as a spread, because it is only worn in the
       // inbox and only off an ordinary row.
       for (const m of file.matchAll(/data-hint(?:="|': ')([a-z-]+)/g)) worn.add(m[1]);

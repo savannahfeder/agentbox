@@ -1,7 +1,7 @@
 // The Today page: what each person and AI teammate finished, shipped and
 // decided, what is blocked and on whom, and what waits on you, read from the
 // store with no agent.
-import { shippedAtOf } from '../../../shared/thread-cards.mjs';
+import { shippedAtOf, threadState } from '../../../shared/thread-cards.mjs';
 import { shownTitle, withoutFiles } from '../../../shared/thread-title.mjs';
 import { isTaskRow, taskNewsAt } from '../../../shared/team-rules.mjs';
 import { isSetupTitle } from '../../../shared/teammates.mjs';
@@ -72,8 +72,10 @@ export interface TodayCounts { needYou: number; blocked: number; shipped: number
 export interface TodayApproval { key: string; name: string; by: string | null; at: number; threads?: string[] }
 
 const SAYS_MOST = 80;
+// Progress is a trail of steps, one a line; the last is how far it got.
 const howFar = (words: string | null | undefined) => {
-  const one = String(words ?? '').replace(/\s+/g, ' ').trim();
+  const steps = String(words ?? '').split('\n').map((l) => l.replace(/^\s*(?:[-*•✓]\s*)?/, '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const one = steps[steps.length - 1] ?? '';
   if (!one) return undefined;
   return one.length > SAYS_MOST ? `${one.slice(0, SAYS_MOST).trimEnd()}…` : one;
 };
@@ -88,7 +90,9 @@ const oneLine = (s: string) => {
   return line.length > 110 ? `${line.slice(0, 108).replace(/\s+\S*$/, '')}…` : line;
 };
 
-export function teamToday({ range, now, me, items, products, cards, decisions, needs, mentions = [], approvals = [], people, mates, mateOf, directWith = () => null, needsCount }: {
+export function teamToday({ range, now, me, items, products, cards, decisions, needs, mentions = [], approvals = [], people, mates, mateOf, directWith = () => null, needsCount, later = () => false }: {
+  /** Your own threads put off till later, by this app's own rule (which this computer keeps). */
+  later?: (item: WorkItem) => boolean;
   range: TodayRange; now: number; me: string | null;
   items: readonly WorkItem[]; products: readonly Product[]; cards: readonly ThreadCard[];
   decisions: readonly RoomDecision[];
@@ -184,7 +188,8 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
     const on = (i.blockedBy ?? []).map(waitsOnKey).find((o) => o && o !== k);
     if (on) who.blocked.push(line(i.updatedAt, nameOf(on)));
     else if (i.status === 'blocked') who.blocked.push(line(i.updatedAt, null));
-    else if (inRange(i.updatedAt) && !task) {
+    // A thread put off till later is not being worked on.
+    else if (inRange(i.updatedAt) && !task && threadState(i, now) !== 'scheduled' && !later(i)) {
       const says = howFar(i.progress);
       who.working.push({ ...line(i.updatedAt), ...(says ? { says } : {}) });
     }

@@ -27,6 +27,7 @@ import { asksForANewTab } from '../link-click';
 import { pictureUrl } from '../picture';
 import { agoWords } from '../threads/summary-rules';
 import { DocOutline } from './DocOutline';
+import { scrollKey, useKeptScroll } from '../kept-scroll';
 import './doc-reading.css';
 
 const SAVE_DEBOUNCE_MS = 900;
@@ -254,6 +255,7 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   }, [linkPop?.pinned]);
 
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  useKeptScroll(scroller, scrollKey(product, src));
   const [column, setColumn] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {

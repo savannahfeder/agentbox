@@ -52,6 +52,7 @@ import type { Change } from '../code-artifact';
 import { NAME } from '../../../shared/product-name.mjs';
 import { shownName } from '../../../shared/artifact-marks.mjs';
 import { onPhone } from '../phone-screen';
+import { scrollKey, useKeptScroll } from '../kept-scroll';
 
 const COMING_LOOKS_MS = 3000;
 
@@ -135,6 +136,8 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   const [here, setHere] = useState<Browsing>({ url: src, canBack: false, canForward: false, loading: true });
   const [webFailed, setWebFailed] = useState<string | null>(null);
   const [webReady, setWebReady] = useState(false);
+  const [codeBox, setCodeBox] = useState<HTMLDivElement | null>(null);
+  useKeptScroll(codeBox, scrollKey(doc.product, src));
   // What the bar presses. Filled in by the webview while it is mounted.
   const browsing = useRef<PageControl | null>(null);
   // Asked once: can this page draw a browser of its own.
@@ -418,7 +421,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
         ) : kind === 'table' ? (
           <TableView text={text} path={src} mode="pane" />
         ) : kind === 'text' ? (
-          <div className="code-scroll"><CodeFile text={text} /></div>
+          <div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div>
         ) : (
           <DocText
             key={resolved ?? doc.src}
