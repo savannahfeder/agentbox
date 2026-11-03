@@ -61,10 +61,11 @@
 .tbl-tick.on { background: var(--text); border-color: var(--text); box-shadow: inset 0 0 0 2px var(--pop); }
 .tbl-clear { color: var(--text-faint); }
 
-/* A table is square all through, its card and its menus included, whatever
-   corner the rest of the window wears (her call, w-690551d7ea). */
-.tbl *, .tbl *::before, .when-menu.tbl-menu, .one-file.one-table,
+/* A table is square inside, and so are its pane and menus. Its card in the
+   chat keeps the corner every card there wears. */
+.tbl *, .tbl *::before, .when-menu.tbl-menu,
 .doc-pane.doc-table, .doc-pane.doc-table .doc-card { border-radius: 0; }
+.one-file.one-table { overflow: hidden; }
 
 .tbl-frame { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .tbl-scroll { flex: 1; min-height: 0; overflow: auto; }

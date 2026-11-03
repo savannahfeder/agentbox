@@ -338,6 +338,8 @@
    it with a fixed 64px kept clear, a 260px corner sat on Add people. */
 .workspace-layout.workspace-task:has(.thread-crumb) > .topbar > .topbar-right { position: static; flex: none; margin-left: 16px; transform: none; }
 .workspace-task-header:has(> .thread-crumb) { position: static; flex: 1; min-width: 0; margin: 0; padding: 0; align-self: center; }
+/* Specific enough to beat the old band's `margin-top: 18px`, which left the crumb 4.5 under the corner. */
+.workspace-layout.workspace-task .workspace-task-header:has(> .thread-crumb) { margin-top: 0; align-self: center; }
 .workspace-task-header > .thread-crumb { display: flex; align-items: center; width: auto; max-width: 100%; height: 28px; margin: 0; font: 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-faint); white-space: nowrap; overflow: hidden; }
 /* TWO CONTROLS, NOT ONE (w-ab3d51dc7d): "‹ NEEDS YOU" goes back, and the name
    renames. Each answers the pointer on its own, so it is plain which half a

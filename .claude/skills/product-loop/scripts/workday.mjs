@@ -72,6 +72,13 @@ export function detachedArgv(args, root) {
   return rest.includes('--out') ? rest : [...rest, '--out', root];
 }
 
+/** Packages the app's package.json lists that its node_modules does not have. */
+export function missingPackages(appDir) {
+  const pkg = JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8'));
+  return Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })
+    .filter((name) => !fs.existsSync(path.join(appDir, 'node_modules', name, 'package.json')));
+}
+
 /** Whether mobile/'s lock changed after its last install, as it does when main adds a package. */
 export function packagesAreBehind(mobileDir) {
   const mtime = (f) => { try { return fs.statSync(f).mtimeMs; } catch { return null; } };
@@ -129,8 +136,9 @@ if (isMain) {
       const mobileDir = path.join(REPO, 'mobile');
       const quietly = { cwd: mobileDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024, timeout: 15 * MIN };
       try {
-        if (packagesAreBehind(mobileDir)) {
-          say('installing the phone app\'s packages, which are behind its lock file');
+        const missing = missingPackages(mobileDir);
+        if (packagesAreBehind(mobileDir) || missing.length) {
+          say(missing.length ? `installing the phone app's packages; missing ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ` and ${missing.length - 5} more` : ''}` : 'installing the phone app\'s packages, which are behind its lock file');
           execFileSync('npm', ['ci', '--no-audit', '--no-fund'], quietly);
         }
         say('building the phone app preview (a minute or two)');
