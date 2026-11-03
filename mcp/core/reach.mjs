@@ -16,7 +16,7 @@ import { fileKeyIn, folderNamed, foldFolders, readFolderLog, writeFolderLog } fr
 import { teammateContext } from './teammates.mjs';
 import { resolveProduct } from './account.mjs';
 import { listProducts } from './products.mjs';
-import { MAX_SENT_BYTES, MAX_SENT_MB, sizeWords } from '../../shared/carried-files.mjs';
+import { MAX_SENT_BYTES, MAX_SENT_WORDS, sizeWords } from '../../shared/carried-files.mjs';
 import { looksSecret } from '../../main/team/carry-files.mjs';
 
 const TEXT_MOST = 8000;
@@ -130,7 +130,7 @@ function filesToCarry(list, c) {
     if (looksSecret(rel.split(path.sep).join('/'))) throw new Error(`${ask} looks like a secret, so it cannot go`);
     const st = fs.statSync(found);
     if (!st.isFile()) throw new Error(`${ask} is a folder; name the files in it`);
-    if (st.size > MAX_SENT_BYTES) throw new Error(`${ask} is ${sizeWords(st.size)}, over the ${MAX_SENT_MB} MB a message can send`);
+    if (st.size > MAX_SENT_BYTES) throw new Error(`${ask} is ${sizeWords(st.size)}, over the ${MAX_SENT_WORDS} a message can send`);
     return { name: path.basename(found), srcPath: found };
   });
 }

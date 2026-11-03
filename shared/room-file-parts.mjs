@@ -1,10 +1,10 @@
 // PURE. A file in a group chat bigger than one room file goes in parts, with a
 // short list under its own name saying how many (main/team/rooms.mjs).
-import { MAX_SENT_BYTES } from './carried-files.mjs';
+import { MAX_SHARED_SENT_BYTES } from './carried-files.mjs';
 
 /** A part fits a room file (10 MiB) with room to spare. */
 export const ROOM_PART_BYTES = 8 * 1024 * 1024;
-export const ROOM_MAX_BYTES = MAX_SENT_BYTES;
+export const ROOM_MAX_BYTES = MAX_SHARED_SENT_BYTES;
 
 /** How many parts a file of this size goes in, or 0 when it is too big to send. */
 export function partsOf(size) {

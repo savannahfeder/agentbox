@@ -255,6 +255,15 @@ export const fixtureSnapshot: Snapshot = {
       progress: 'First row waits for your reply\nTests pass\nOn its branch, ready to merge',
     },
     {
+      // A TABLE: a lead list as a csv on a line of its own (w-690551d7ea).
+      id: 'w-t1', product: 'onboard', productName: 'Onboard', status: 'open', kind: 'question',
+      title: 'Fintech companies to reach out to',
+      body: '**Pick who I write to first, or tell me who to drop.**\n\nI put 16 fintech companies in a table with a note and a status for each. Two already have a meeting booked and two replied. I would start with the five marked New.\n\nleads/fintech-leads.csv',
+      labels: [], priority: 5, epoch: 1, claim: null,
+      createdAt: now - 30 * min, updatedAt: now - 5 * min,
+      problem: 'Building a list of fintech companies to reach out to. 16 so far, waiting on which to contact first.',
+    },
+    {
       // STOPPED: she answered, a worker took it, and that worker died without
       // finishing. Three of these were on her screen at once, which is what
       // resuming-by-selection is for. Needs you shows them, since nothing will
@@ -528,6 +537,16 @@ export const fixtureHistory: Record<string, Array<Record<string, any>>> = {
         title: 'The first row a new project makes is fixed and needs your yes',
         status: 'open', kind: 'review', priority: 5,
         body: '**Merge the first row change, or pick different words for it.**\n\nMaking a project used to compose a row the fleet took as work, so an agent started before you had said anything. It asks now, and nothing runs until you reply.\n\nThe page shows the row before and after:\n\n/fixtures/onboard/designs/w-n13/the-first-row.html',
+      },
+    },
+  ],
+  'w-t1': [
+    {
+      id: 'w-t1', ts: now - 5 * min, source: 'agent',
+      patch: {
+        title: 'Fintech companies to reach out to',
+        status: 'open', kind: 'question', priority: 5,
+        body: '**Pick who I write to first, or tell me who to drop.**\n\nI put 16 fintech companies in a table with a note and a status for each. Two already have a meeting booked and two replied. I would start with the five marked New.\n\nleads/fintech-leads.csv',
       },
     },
   ],

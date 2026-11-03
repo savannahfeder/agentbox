@@ -8,7 +8,10 @@
 .doc-pane.doc-md .doc-card, .workspace-layout .doc-pane.doc-md .doc-card { border-radius: 12px; }
 .doc-sheet {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 700px) minmax(0, 1fr);
+  /* The text takes the room before the margins do; the right track keeps the
+     contents list's width, so a tight pane shifts the text left rather than
+     narrowing it. */
+  grid-template-columns: minmax(48px, 1fr) minmax(0, 820px) minmax(220px, 1fr);
   column-gap: 40px;
   padding: 44px 0 120px;
 }

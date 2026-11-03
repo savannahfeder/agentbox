@@ -25,7 +25,7 @@ import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type VoiceControl } fr
 import { createPortal } from 'react-dom';
 import { FileSheet } from '../../components/FileSheet';
 import { FileCover } from '../../components/FileCover';
-import { reviewKind, shownName } from '../../../../shared/artifact-marks.mjs';
+import { opensBigInAGroup, reviewKind, shownName } from '../../../../shared/artifact-marks.mjs';
 import { RoomFileView, type RoomFileOpening, type RoomFiles } from './RoomFileView';
 import { AttachRow } from '../../components/AttachRow';
 import { collectFiles, isImageName, type PendingAttachment } from '../../attachments';
@@ -83,7 +83,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   const [thread, setThread] = useState<string | null>(null);
   const [viewing, setViewing] = useState<RoomFileOpening | null>(null);
   const opensBig = useCallback((name: string) => {
-    if (!calls.files || !reviewKind(name)) return false;
+    if (!calls.files || !opensBigInAGroup(name)) return false;
     setViewing({ name, at: Date.now() });
     return true;
   }, [!!calls.files]);

@@ -93,7 +93,16 @@ export function answerOf(view: TeammatesView | null | undefined, q: TeamChatLine
     if (!m.answers) return { text: String(m.text ?? ''), named: false };
     if (q.id in m.answers) return { text: m.answers[q.id], named: true };
   }
-  return null;
+  // A reply typed in the thread that asked it answers it too.
+  const inThread = q.run ? view.runs.find((r) => r.verb === 'answered' && r.item === q.run && r.ts > q.ts) : null;
+  return inThread ? { text: String(inThread.text ?? ''), named: false } : null;
+}
+
+/** A teammate's questions asked in this thread, with answers to tap, that you have not answered anywhere. */
+export function openQuestionsIn(view: TeammatesView | null | undefined, item: Pick<WorkItem, 'id' | 'labels'>): TeamChatLine[] {
+  const tid = teammateIdOf(item);
+  if (!view || !tid) return [];
+  return view.chat.filter((m) => m.kind === 'msg' && m.from === tid && m.run === item.id && !!m.options?.length && !answerOf(view, m));
 }
 
 // The question a teammate's message asks: its last sentence that ends in a

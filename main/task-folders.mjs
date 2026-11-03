@@ -378,7 +378,7 @@ function registered(repoPath) {
   const out = [];
   let current = null;
   for (const line of listed.out.split('\n')) {
-    if (line.startsWith('worktree ')) { if (current) out.push(current); current = { path: line.slice(9) }; }
+    if (line.startsWith('worktree ')) { if (current) out.push(current); current = { path: fromGit(line.slice(9)) }; }
     else if (line.startsWith('branch ') && current) current.branch = line.slice(7).replace(/^refs\/heads\//, '');
     else if (line.startsWith('locked') && current) current.lock = line.slice(6).trim();
     else if (line === 'prunable' && current) current.prunable = true;
@@ -386,6 +386,9 @@ function registered(repoPath) {
   if (current) out.push(current);
   return out;
 }
+
+/** Git on Windows writes `C:/x`, and every folder here is built as `C:\x`. */
+export const fromGit = (at, platform = process.platform) => (platform === 'win32' ? path.win32.normalize(at) : at);
 
 const record = (repoPath, folder) => registered(repoPath).find((w) => w.path === folder) ?? null;
 
@@ -651,7 +654,7 @@ export function ensureTaskFolder(dir, id, { pid = process.pid, dependencies = tr
   // main/supervisor.mjs, which puts every path and reason on the row where
   // somebody will read it, and the task waits instead of running wrong.
   if (dependencies) {
-    try { carryLocalFiles(root, staging); }
+    try { carryLocalFiles(root, staging, { landsAt: folder }); }
     catch (error) { clearUnfinished(root, staging); throw Error(`Could not make a folder for ${name}: ${error.message}`); }
   }
 
@@ -769,6 +772,9 @@ function clearUnfinished(root, staging, pid = process.pid) {
  * is not an option there at all.
  */
 function cloneCheckout(root, folder, branch, from, branchExists, pid = process.pid) {
+  // On NTFS the copy shares no blocks, so it writes everything the checkout
+  // would, plus the ignored files inside tracked directories.
+  if (process.platform === 'win32') return false;
   // TRACKED CONTENT ONLY, on both sides of this. Her checkout permanently
   // carries a couple of untracked files (a scratch `:memory:.ses`, a folder of
   // screenshots somebody left), and counting those as dirty turned the fast

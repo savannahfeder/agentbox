@@ -7,7 +7,7 @@
 //
 // It behaves the way the box in a browser does, because that is the one she
 // already knows. Enter and ⌘G go to the next match, ⇧Enter and ⇧⌘G to the one
-// before, both wrap, and Escape puts the keyboard back where it was.
+// before, both wrap, and Escape leaves the page and the selection on the match.
 //
 // The words are found by find-in-page.ts and painted with the CSS highlight
 // API, which marks text without touching the page's own elements, so nothing
@@ -114,6 +114,7 @@ export function FindBar() {
   const ranges = useRef<Range[]>([]);
   const at = useRef(-1);
   const back = useRef<Element | null>(null);
+  const backSelection = useRef<Range | null>(null);
   const openRef = useRef(false);
   const queryRef = useRef('');
 
@@ -144,7 +145,14 @@ export function FindBar() {
     reveal(list[index]);
   }, []);
 
+  // Like a browser's find: the keyboard goes back without scrolling, and the
+  // selection lands on the match so the next key works there. A plain focus()
+  // on an editable page scrolls to its old caret, far from what was found. A
+  // match outside the box she was typing in is left unselected, because
+  // selecting it would take the keyboard out of her half-written reply.
   const close = useCallback(() => {
+    const match = ranges.current[at.current];
+    const had = backSelection.current;
     openRef.current = false;
     setOpen(false);
     unpaint();
@@ -152,7 +160,17 @@ export function FindBar() {
     at.current = -1;
     const to = back.current as HTMLElement | null;
     back.current = null;
-    if (to && to.isConnected && typeof to.focus === 'function') to.focus();
+    backSelection.current = null;
+    if (to && to.isConnected && typeof to.focus === 'function') to.focus({ preventScroll: true });
+    const live = (r: Range | null | undefined) => !!r && r.startContainer.isConnected && r.endContainer.isConnected;
+    const typing = !!to && (to.tagName === 'INPUT' || to.tagName === 'TEXTAREA' || to.isContentEditable);
+    const put = live(match) && (!typing || to!.contains(match.commonAncestorContainer)) ? match
+      : to?.isContentEditable && live(had) ? had : null;
+    const selection = window.getSelection();
+    if (put && selection) {
+      selection.removeAllRanges();
+      selection.addRange(put);
+    }
   }, []);
 
   // The key, from the main process, wherever the keyboard was.
@@ -162,6 +180,8 @@ export function FindBar() {
       if (!openRef.current) {
         const active = document.activeElement;
         back.current = active && !active.closest('[data-find-bar]') ? active : null;
+        const selection = window.getSelection();
+        backSelection.current = selection && selection.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
         openRef.current = true;
         setOpen(true);
       }
