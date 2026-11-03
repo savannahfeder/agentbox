@@ -27,6 +27,6 @@ describe('the first message box on a person’s page', () => {
     expect(html).not.toContain('pl-btn go');
   });
   it('sits where the reply box sits once the chat has begun', () => {
-    expect(css).toMatch(/\.pl-send \.rm-compose\.tq-compose \{ margin: 8px 0 4px; \}/);
+    expect(css).toMatch(/\.pl-send \.rm-compose\.tq-compose \{ margin: 8px 0 0; \}/);
   });
 });
