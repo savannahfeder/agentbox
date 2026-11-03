@@ -106,7 +106,7 @@ describe('the day and New lines in a group chat', () => {
   };
   it('say the day in sentence case between two lines, as a teammate chat does', () => {
     expect(rule('.rm-day')).toMatch(/display: flex/);
-    expect(css).toMatch(/\n\.rm-day::before, \.rm-day::after \{[^}]*background: var\(--line\)/);
+    expect(css).not.toMatch(/\n\.rm-day::before/);
     expect(rule('.rm-day .rm-label')).toMatch(/text-transform: none/);
     expect(rule('.rm-day .rm-label')).toMatch(/font: inherit/);
   });
