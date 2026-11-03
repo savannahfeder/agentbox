@@ -76,6 +76,27 @@ describe('on Windows a folder of her own is hers', () => {
   });
 });
 
+describe('on Windows a temp folder set oddly hides nothing of hers', () => {
+  const at = (t) => ({ platform: 'win32', tmpdir: t, realpath: (p) => p });
+
+  it('when TEMP is the home folder itself', () => {
+    expect(isScratchFolder(`${home}\\Desktop\\dev\\zero`, home, at(home))).toBe(false);
+    expect(isScratchFolder(home, home, at(home))).toBe(false);
+    expect(isScratchProjectDir('C--Users-Jane-Doe-Desktop-dev-zero', home, at(home))).toBe(false);
+  });
+
+  it('when TEMP is a whole drive', () => {
+    expect(isScratchFolder('C:\\work\\repo', home, at('C:\\'))).toBe(false);
+    expect(isScratchFolder('D:\\work\\repo', home, at('D:'))).toBe(false);
+    expect(isScratchProjectDir('C--work-repo', home, at('C:\\'))).toBe(false);
+  });
+
+  it('when TEMP sits above the home folder, which still keeps her folders hers', () => {
+    expect(isScratchFolder(`${home}\\Desktop\\x`, home, at('C:\\Users'))).toBe(false);
+    expect(isScratchFolder('C:\\Users\\Shared\\x', home, at('C:\\Users'))).toBe(true);
+  });
+});
+
 describe('on Windows a transcript folder in the temp folder is refused unopened', () => {
   it('by either name of the temp folder', () => {
     expect(isScratchProjectDir('C--Users-JANEDO-1-AppData-Local-Temp-agentbox-usage', home, win)).toBe(true);
