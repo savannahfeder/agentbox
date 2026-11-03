@@ -27,7 +27,7 @@ import { api } from './api';
 import { setClaudeModels, setCodexFreePlan } from './models';
 import { codexFromSettings } from './web-settings';
 import { advanceAfter, advanceLandsHere, pickSentWords, pickStaysPut, replyMovesOn, opensIntoNeedsYou, nextAfterAdvance, sayWhoseBox, sentLineSays, type Advance } from './advance';
-import { spotIn, stepIn } from './one-thing-at-a-time';
+import { arrowRows, spotIn, stepIn } from './one-thing-at-a-time';
 import { AIMED_AT_THE_THREAD_YOU_LEFT, pickLandsHere, type Arrival } from './pick-settles';
 import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
@@ -3617,20 +3617,22 @@ export default function App() {
 
   // One thing at a time (w-65bcefb857): every thread in Needs you opens on it,
   // however it was opened. Its place and its arrows are counted in Needs you,
-  // not in J and K's walk, which takes in teammates' rows.
+  // not in J and K's walk, which takes in teammates' rows; while a search is
+  // up they count the results, which is all J and K walk then.
   const openInQueue = useCallback((item: WorkItem) => {
     setFocused(item); markSeen(item);
     const at = list.indexOf(item);
     if (at >= 0) setSelected(at);
   }, [list, markSeen]);
   const queueSpot = spotIn(shownInbox, focused);
+  const arrowsWalk = arrowRows(shownInbox, search !== null ? list : null, focused);
   // And every thread with an agent is drawn on that page, Needs you or not; a
   // conversation between people keeps its chat.
   const onePage = !!focused && !directSlugs.has(focused.product);
   const stepQueue = useCallback((dir: 1 | -1) => {
-    const to = focused && stepIn(shownInbox, focused, dir);
+    const to = focused && stepIn(arrowsWalk, focused, dir);
     if (to) openInQueue(to);
-  }, [focused, shownInbox, openInQueue]);
+  }, [focused, arrowsWalk, openInQueue]);
 
   // WHERE THE OPEN THREAD SAT, KEPT AFTER IT LEAVES THE LIST (w-0d55a2b160).
   // A reply to a person keeps you on the thread and takes it out of Needs you
@@ -7672,7 +7674,7 @@ export default function App() {
                   waitEndedWords={asideBesides(rowTitle(focused), (waitCameBack(focused) ? focused.waitEnded?.said : null) ?? focused.handedOver?.said)}
                   onWait={(on) => { void waitOn(focused, on); }}
                   onAddPeople={addPeopleOnThread}
-                  queue={queueSpot && !inChats ? { spot: queueSpot, onStep: stepQueue } : null}
+                  queue={queueSpot && !inChats ? { spot: spotIn(arrowsWalk, focused) ?? queueSpot, onStep: stepQueue } : null}
                   inChats={inChats}
                   onePage={onePage}
                   headerTarget={taskHeader}

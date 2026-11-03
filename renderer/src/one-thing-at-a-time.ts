@@ -22,6 +22,11 @@ export function spotIn<T extends Keyed>(rows: T[], item: Keyed | null): Spot | n
   return index < 0 ? null : { pos: index + 1, total: rows.length, index };
 }
 
+/** What the arrows over a thread step through: the search results while it is one of them, as J and K do, else Needs you. */
+export function arrowRows<T extends Keyed>(needsYou: T[], hits: T[] | null, item: Keyed | null): T[] {
+  return hits && spotIn(hits, item) ? hits : needsYou;
+}
+
 /** The thread above or below, stopping at either end. */
 export function stepIn<T extends Keyed>(rows: T[], item: Keyed, dir: 1 | -1): T | null {
   const index = rows.findIndex((r) => same(r, item));
