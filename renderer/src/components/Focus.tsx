@@ -129,6 +129,7 @@ import type { PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
 import { useKeepInWindow } from '../keep-in-window';
+import { escapeClosesMenu } from '../menu-escape';
 import { isUpdateRow } from '../update-row';
 import { TeamRouteStrip, TeamSaid, teamHeld } from '../team/TeamFocus';
 import {
@@ -2581,6 +2582,7 @@ function ModePicker({ value, options, label, onChange }: {
     document.addEventListener('mousedown', away);
     return () => document.removeEventListener('mousedown', away);
   }, [open]);
+  useEffect(() => (open ? escapeClosesMenu(window, () => setOpen(false)) : undefined), [open]);
   const now = options.find((o) => o.value === value);
   return (
     <span className="compose-word-wrap" ref={wrap}>
