@@ -8050,6 +8050,7 @@ export default function App() {
           products={rankedProducts}
           items={items}
           engines={snap.engines?.choices}
+          workspaceEngine={snap.engines?.workspace}
           codexModels={codexModels}
           codexModelDefault={codexModelDefault}
           // THE TUTORIAL SENDS ITS TASK INTO THE PRACTICE PROJECT, so the card
