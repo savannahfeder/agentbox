@@ -61,7 +61,13 @@
 .tbl-tick.on { background: var(--text); border-color: var(--text); box-shadow: inset 0 0 0 2px var(--pop); }
 .tbl-clear { color: var(--text-faint); }
 
+.tbl-frame { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .tbl-scroll { flex: 1; min-height: 0; overflow: auto; }
+/* More columns to the right: the table fades out at the edge. */
+.tbl-frame.more-right::after {
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 56px; z-index: 2; pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--surface));
+}
 .tbl-preview .tbl-scroll { overflow-x: auto; overflow-y: hidden; }
 .tbl-grid {
   display: grid; width: max-content; min-width: 100%;
@@ -88,7 +94,9 @@
 }
 .tbl-rn { justify-content: flex-end; padding: 0 12px 0 0; color: var(--tbl-rn); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .tbl-th.tbl-rn { padding: 13px 12px 13px 0; cursor: default; }
-.tbl-ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 360px; }
+.tbl-ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px; }
+.tbl-pane .tbl-ell, .tbl-preview .tbl-ell { max-width: 220px; }
+.tbl-date { color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .tbl-num { justify-content: flex-end; font-variant-numeric: tabular-nums; }
 .tbl-name { gap: 10px; }
 .tbl-logo { width: 18px; height: 18px; flex: none; border-radius: 4px; object-fit: cover; }

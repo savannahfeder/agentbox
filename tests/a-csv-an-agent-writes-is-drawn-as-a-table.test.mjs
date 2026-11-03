@@ -128,7 +128,71 @@ describe('what each column is', () => {
   });
 });
 
+// Found by a tester playing a founder who lives in lists, with files an agent
+// really writes (w-690551d7ea): each case below drew wrong before its fix.
+describe('files the way agents really write them', () => {
+  const kinds = (text) => readTable(text, 'x.csv').columns.map((c) => c.kind);
+  it('keeps a quoted value whole when a space follows the comma', () => {
+    const t = readTable('Company, Website, Status, ARR\nAcme, acme.com, New, "$1,200,000"\nBeta, beta.io, New, "$90,000"\n', 'x.csv');
+    expect(t.columns).toHaveLength(4);
+    expect(t.rows[0][3]).toBe('$1,200,000');
+  });
+  it('reads a semicolon file and a markdown table saved as csv', () => {
+    expect(readTable('Name;Status\nA;New\nB;Won\n', 'x.csv').columns.map((c) => c.name)).toEqual(['Name', 'Status']);
+    const md = readTable('| Company | Website |\n|---|---|\n| Ramp | ramp.com |\n| Plaid | plaid.com |\n', 'x.csv');
+    expect(md.columns.map((c) => c.name)).toEqual(['Company', 'Website']);
+    expect(md.rows).toEqual([['Ramp', 'ramp.com'], ['Plaid', 'plaid.com']]);
+  });
+  it('drops an empty column a trailing comma makes', () => {
+    expect(readTable('A,B,\n1,x,\n2,y,\n', 'x.csv').columns.map((c) => c.name)).toEqual(['A', 'B']);
+  });
+  it('names a repeated header apart', () => {
+    expect(readTable('Name,Email,Email\nA,a@x.com,b@x.com\n', 'x.csv').columns.map((c) => c.name)).toEqual(['Name', 'Email', 'Email 2']);
+  });
+  it('keeps a number column whole when some cells say N/A, and sorts those last', () => {
+    const t = readTable('Name,ARR\nA,$5k\nB,N/A\nC,-$5k\nD,$0\nE,—\n', 'x.csv');
+    expect(t.columns[1].kind).toBe('number');
+    expect(sortRows(t, t.rows, { col: 1, dir: 'asc' }).map((r) => r[0])).toEqual(['C', 'D', 'A', 'B', 'E']);
+  });
+  it('knows a date column and sorts it by time', () => {
+    const t = readTable('Name,Last touch\nA,Mar 3 2026\nB,Dec 1 2025\nC,Mar 3 2026\nD,1/15/2026\n', 'x.csv');
+    expect(t.columns[1].kind).toBe('date');
+    expect(sortRows(t, t.rows, { col: 1, dir: 'asc' }).map((r) => r[0])).toEqual(['B', 'D', 'A', 'C']);
+  });
+  it('keeps a Status column as tags even with twenty values', () => {
+    const rows = Array.from({ length: 40 }, (_, i) => `R${i},Stage ${i % 20}`).join('\n');
+    expect(kinds(`Name,Status\n${rows}\n`)[1]).toBe('tag');
+  });
+  it('does not make tags of names, or numbers of phones and zip codes', () => {
+    expect(kinds('Name,Investor,Phone,Zip\nA,Sequoia,+1 415 555 0100,94107\nB,Sequoia,415-555-0101,94107\nC,Accel,(415) 555 0102,10001\nD,Accel,4155550103,10001\n'))
+      .toEqual(['name', 'text', 'text', 'text']);
+  });
+  it('takes no logo from a LinkedIn column', () => {
+    const t = readTable('Name,LinkedIn,Status\nAna,https://linkedin.com/in/ana,New\nBo,https://linkedin.com/in/bo,New\n', 'x.csv');
+    expect(logoFor(t, t.rows[0])).toBeNull();
+  });
+  it('treats New, new and NEW as one tag', () => {
+    const t = readTable('Name,Status\nA,New\nB,new\nC,NEW\nD,Won\n', 'x.csv');
+    expect(t.columns[1].values).toEqual(['New', 'Won']);
+    expect(filterRows(t, '', { 1: ['New'] }).map((r) => r[0])).toEqual(['A', 'B', 'C']);
+  });
+});
+
 describe('tag colours', () => {
+  it('reads a no as a no', () => {
+    for (const v of ['Not a fit', 'Passed', 'FALSE', 'Declined']) expect(tagTone(v, 0), v).toBe('rose');
+    expect(tagTone('TRUE', 3)).toBe('green');
+    expect(tagTone('Nurture', 0)).toBe('amber');
+  });
+  it('reads High and Low by what the column measures', () => {
+    expect(tagTone('High', 0, 'Churn risk')).toBe('rose');
+    expect(tagTone('Low', 0, 'Churn risk')).toBe('green');
+    expect(tagTone('High', 0, 'Fit')).toBe('green');
+    expect(tagTone('Medium', 0, 'Fit')).toBe('amber');
+  });
+  it('never hands red to a word that means nothing bad', () => {
+    for (let i = 0; i < 12; i++) expect(tagTone(`Thing ${i}`, i)).not.toBe('rose');
+  });
   it('gives the words a pipeline uses the colour they mean', () => {
     expect(tagTone('Meeting', 0)).toBe('green');
     expect(tagTone('Won', 0)).toBe('green');
@@ -145,8 +209,8 @@ describe('tag colours', () => {
   it('colours every value of a tag column, the first seen first', () => {
     const t = readTable(LEADS, 'x.csv');
     const cat = t.columns.find((c) => c.name === 'Category');
-    expect(Object.keys(cat.tones)).toEqual(['Spend', 'Banking', 'Payments', 'Payroll']);
-    expect(new Set(Object.values(cat.tones)).size).toBe(4);
+    expect(cat.values).toEqual(['Spend', 'Banking', 'Payments', 'Payroll']);
+    expect(new Set(cat.values.map((v) => cat.tones[v.toLowerCase()])).size).toBe(4);
   });
 });
 

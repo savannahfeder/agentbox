@@ -1,15 +1,16 @@
 // PURE. A CSV or TSV read into a table: its columns, what each one holds, and
 // the colour of every tag. TableView.tsx draws it; nothing here touches a window.
 
-export type ColumnKind = 'name' | 'tag' | 'number' | 'link' | 'email' | 'text';
+export type ColumnKind = 'name' | 'tag' | 'number' | 'date' | 'link' | 'email' | 'text';
 export type Tone = 'green' | 'blue' | 'purple' | 'amber' | 'rose' | 'teal' | 'grey';
-export type Column = { name: string; kind: ColumnKind; tones: Record<string, Tone> };
+/** `values` are a tag column's values as first written; `tones` is keyed by their lower case. */
+export type Column = { name: string; kind: ColumnKind; values: string[]; tones: Record<string, Tone> };
 export type Table = { columns: Column[]; rows: string[][]; logoCol: number };
 export type Sort = { col: number; dir: 'asc' | 'desc' } | null;
 
 export const isTablePath = (path: string | null | undefined) => /\.(csv|tsv)$/i.test(String(path ?? '').split(/[?#]/)[0]);
 
-/** RFC 4180, with the separator given: quotes hold commas, doubled quotes and line breaks. */
+/** RFC 4180, with the separator given: quotes hold separators, doubled quotes and line breaks. */
 export function parseDelimited(text: string, sep: string): string[][] {
   const src = text.replace(/^﻿/, '');
   const rows: string[][] = [];
@@ -24,86 +25,155 @@ export function parseDelimited(text: string, sep: string): string[][] {
       } else cell += ch;
       continue;
     }
-    if (ch === '"' && cell === '') quoted = true;
-    else if (ch === sep) { row.push(cell); cell = ''; }
+    // `a, "1,200"`: the space a person types after a separator does not stop a quote opening.
+    if (ch === '"' && cell.trim() === '') { quoted = true; cell = ''; }
+    else if (ch === sep) { row.push(cell.trim()); cell = ''; }
     else if (ch === '\n' || ch === '\r') {
       if (ch === '\r' && src[i + 1] === '\n') i++;
-      row.push(cell); rows.push(row); row = []; cell = '';
+      row.push(cell.trim()); rows.push(row); row = []; cell = '';
     } else cell += ch;
   }
-  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
-  return rows.filter((r) => r.some((c) => c.trim() !== ''));
+  if (cell !== '' || row.length) { row.push(cell.trim()); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c !== ''));
 }
+
+const firstLine = (text: string) => {
+  const nl = text.search(/\r?\n/);
+  return nl < 0 ? text : text.slice(0, nl);
+};
 
 const sepFor = (text: string, path: string) => {
   if (/\.tsv$/i.test(path.split(/[?#]/)[0])) return '\t';
-  const nl = text.search(/\r?\n/);
-  const head = nl < 0 ? text : text.slice(0, nl);
-  return (head.split('\t').length > head.split(',').length) ? '\t' : ',';
+  const head = firstLine(text);
+  const counts = [',', '\t', ';'].map((s) => [s, head.split(s).length] as const);
+  return counts.reduce((a, b) => (b[1] > a[1] ? b : a))[0];
 };
+
+// A markdown table saved under a .csv name: `| a | b |` lines and a `|---|` rule.
+const isMarkdownTable = (text: string) => /^\s*\|.*\|\s*$/.test(firstLine(text.replace(/^﻿/, '')));
+function parseMarkdownTable(text: string): string[][] {
+  return text.replace(/^﻿/, '').split(/\r?\n/)
+    .filter((l) => /^\s*\|/.test(l) && !/^\s*\|[\s|:-]+\|\s*$/.test(l))
+    .map((l) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim()));
+}
 
 const URLISH = /^(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(:\d+)?(\/\S*)?$/i;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
 const NUMBER = /^[-+]?[$€£]?\s?\d[\d,]*(\.\d+)?\s?(%|k|m|bn|b)?$/i;
+const MONTH = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b/i;
+// A cell that says there is nothing here, which a number or date column can hold.
+const NOTHING = /^(n\/?a|none|null|nil|tbd|unknown|-|–|—|\?)$/i;
+const SOCIAL = /(^|\.)(linkedin\.com|twitter\.com|x\.com|github\.com|facebook\.com|instagram\.com|youtube\.com|crunchbase\.com|angel\.co|wellfound\.com)$/i;
+
 // A header that names a choice from a short list.
-const TAG_HEADER = /\b(status|stage|category|type|tier|priority|segment|industry|tags?|label|fit|source|plan|state|kind|round|channel|owner|sector|vertical)\b/i;
+const TAG_HEADER = /\b(status|stage|category|type|tier|priority|segment|industry|tags?|label|fit|source|plan|state|kind|round|channel|owner|sector|vertical|risk|level)\b/i;
 // A header that names something each row has its own of, even when values repeat.
-const TEXT_HEADER = /\b(name|city|location|based|country|address|region|hq|headquarters|title|role|note|notes|description|summary|why|reason|comment|email|phone|website|url|domain|linkedin|date|time)\b/i;
+const TEXT_HEADER = /\b(name|company|investor|firm|fund|person|contact|candidate|employer|school|account|city|location|based|country|address|region|hq|headquarters|title|role|note|notes|description|summary|why|reason|comment|email|phone|mobile|tel|zip|postal|postcode|id|website|url|domain|linkedin)\b/i;
+// A number that is a label, not an amount: never added, sorted or lined up right.
+const LABEL_NUMBER = /\b(phone|mobile|tel|zip|postal|postcode|id|year)\b/i;
+const DATE_HEADER = /\b(date|day|when|time|updated|created|last|next|due|deadline|founded)\b/i;
 
 const share = (values: string[], test: (v: string) => boolean) => values.length ? values.filter(test).length / values.length : 0;
 
+/** When a cell is, in ms, or NaN. A bare number is not a date. */
+export function dateOf(v: string): number {
+  const s = v.trim();
+  if (!s || NUMBER.test(s)) return NaN;
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) return Date.UTC(+iso[1], +iso[2] - 1, +iso[3]);
+  const us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (us) return Date.UTC(us[3].length === 2 ? 2000 + +us[3] : +us[3], +us[1] - 1, +us[2]);
+  if (!MONTH.test(s)) return NaN;
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? t : NaN;
+}
+
 function kindOf(name: string, values: string[], first: boolean): ColumnKind {
   if (first) return 'name';
-  const filled = values.map((v) => v.trim()).filter(Boolean);
+  const filled = values.map((v) => v.trim()).filter((v) => v && !NOTHING.test(v));
   if (!filled.length) return 'text';
   if (share(filled, (v) => EMAIL.test(v)) >= 0.8) return 'email';
   if (share(filled, (v) => URLISH.test(v) && !NUMBER.test(v)) >= 0.8) return 'link';
-  if (share(filled, (v) => NUMBER.test(v)) >= 0.9) return 'number';
-  const short = filled.every((v) => v.length <= 28 && v.split(/\s+/).length <= 3);
-  const distinct = new Set(filled).size;
-  if (short && distinct <= 12 && TAG_HEADER.test(name)) return 'tag';
+  if (!LABEL_NUMBER.test(name) && share(filled, (v) => NUMBER.test(v)) >= 0.9) return 'number';
+  if (share(filled, (v) => Number.isFinite(dateOf(v))) >= 0.8 && (DATE_HEADER.test(name) || filled.some((v) => MONTH.test(v) || v.includes('/') || /^\d{4}-/.test(v)))) return 'date';
+  const short = filled.every((v) => v.length <= 28 && v.split(/\s+/).length <= 4);
+  const distinct = new Set(filled.map((v) => v.toLowerCase())).size;
+  if (short && distinct <= 30 && TAG_HEADER.test(name)) return 'tag';
   if (short && distinct <= 12 && !TEXT_HEADER.test(name) && distinct < filled.length && distinct / filled.length <= 0.6) return 'tag';
   return 'text';
 }
 
 // The words a pipeline uses keep the colour they mean wherever they appear.
 const MEANT: Array<[RegExp, Tone]> = [
-  [/^(new|to ?do|not started|none|n\/a|unknown|backlog|idle|cold)$/i, 'grey'],
-  [/^(done|won|closed won|meeting|booked|meeting booked|yes|active|live|qualified|hired|signed|customer|paid|approved|shipped|complete|completed|hot)$/i, 'green'],
-  [/^(lost|closed lost|no|rejected|blocked|churned|failed|declined|bounced|unsubscribed|disqualified|cancelled|canceled)$/i, 'rose'],
-  [/^(contacted|sent|emailed|in progress|doing|reached out|outreach|open|warm)$/i, 'blue'],
-  [/^(researching|research|pending|waiting|maybe|on hold|review|in review|follow up|follow-up|later)$/i, 'amber'],
-  [/^(replied|interested|responded|engaged|demo|proposal|negotiating|negotiation)$/i, 'purple'],
+  [/^(new|to ?do|not started|none|n\/a|unknown|backlog|idle|cold|untouched|not contacted)$/i, 'grey'],
+  [/^(done|won|closed won|meeting|booked|meeting booked|meeting set|yes|y|true|active|live|qualified|hired|signed|customer|paid|approved|shipped|complete|completed|hot|good fit|strong fit|great fit|accepted|interviewing|offer)$/i, 'green'],
+  [/^(lost|closed lost|no|n|false|rejected|blocked|churned|failed|declined|bounced|unsubscribed|disqualified|cancelled|canceled|not a fit|no fit|poor fit|bad fit|passed|pass|dead|spam|archived|do not contact|dnc|inactive|expired)$/i, 'rose'],
+  [/^(contacted|sent|emailed|in progress|doing|reached out|outreach|open|warm|called|messaged|applied|screening)$/i, 'blue'],
+  [/^(researching|research|pending|waiting|maybe|on hold|review|in review|follow up|follow-up|later|nurture|nurturing|paused|snoozed|needs review)$/i, 'amber'],
+  [/^(replied|interested|responded|engaged|demo|demo booked|proposal|negotiating|negotiation|intro|introduced)$/i, 'purple'],
 ];
-const ROTATION: Tone[] = ['teal', 'blue', 'purple', 'rose', 'amber', 'green', 'grey'];
+// High and Low mean opposite things under Risk and under Fit.
+const BAD_WHEN_HIGH = /\b(risk|churn|severity|urgency|cost|effort|difficulty|blocker)\b/i;
+// Red is kept for a word that means something went wrong.
+const ROTATION: Tone[] = ['teal', 'blue', 'purple', 'amber', 'green', 'grey'];
 
 /** A tag's colour: the one its word means, or the next in turn by its place in the column. */
-export function tagTone(value: string, place: number): Tone {
+export function tagTone(value: string, place: number, header = ''): Tone {
   const v = value.trim();
+  const level = v.match(/^(very high|high|medium|med|mid|low|very low)$/i)?.[1].toLowerCase();
+  if (level) {
+    const high = level.includes('high'), mid = !high && !level.includes('low');
+    if (mid) return 'amber';
+    return BAD_WHEN_HIGH.test(header) ? (high ? 'rose' : 'green') : (high ? 'green' : 'grey');
+  }
   for (const [re, tone] of MEANT) if (re.test(v)) return tone;
   return ROTATION[place % ROTATION.length];
 }
 
 export function readTable(text: string, path: string): Table {
-  const grid = parseDelimited(String(text ?? ''), sepFor(String(text ?? ''), path));
+  const src = String(text ?? '');
+  const grid = isMarkdownTable(src) ? parseMarkdownTable(src) : parseDelimited(src, sepFor(src, path));
   if (!grid.length) return { columns: [], rows: [], logoCol: -1 };
   const head = grid[0];
   const width = Math.max(head.length, ...grid.slice(1).map((r) => r.length));
-  const rows = grid.slice(1).map((r) => Array.from({ length: width }, (_, i) => r[i] ?? ''));
-  const columns: Column[] = Array.from({ length: width }, (_, i) => {
-    const name = (head[i] ?? '').trim() || `Column ${i + 1}`;
+  let rows = grid.slice(1).map((r) => Array.from({ length: width }, (_, i) => r[i] ?? ''));
+  // A column with no header and nothing in it is a trailing separator, not data.
+  const keep = Array.from({ length: width }, (_, i) => i).filter((i) => (head[i] ?? '').trim() || rows.some((r) => r[i].trim()));
+  rows = rows.map((r) => keep.map((i) => r[i]));
+  const seen = new Map<string, number>();
+  const columns: Column[] = keep.map((src, i) => {
+    let name = (head[src] ?? '').trim() || `Column ${i + 1}`;
+    const n = (seen.get(name.toLowerCase()) ?? 0) + 1;
+    seen.set(name.toLowerCase(), n);
+    if (n > 1) name = `${name} ${n}`;
     const values = rows.map((r) => r[i]);
     const kind = kindOf(name, values, i === 0);
     const tones: Record<string, Tone> = {};
+    const shown: string[] = [];
     if (kind === 'tag') {
-      let place = 0;
-      for (const v of values.map((x) => x.trim()).filter(Boolean)) if (!(v in tones)) tones[v] = tagTone(v, place++);
+      for (const v of values.map((x) => x.trim()).filter(Boolean)) {
+        const key = v.toLowerCase();
+        if (key in tones) continue;
+        tones[key] = tagTone(v, shown.length, name);
+        shown.push(v);
+      }
     }
-    return { name, kind, tones };
+    return { name, kind, values: shown, tones };
   });
-  const links = columns.flatMap((c, i) => (c.kind === 'link' ? [i] : []));
-  const logoCol = links.find((i) => /website|domain|site|url|homepage/i.test(columns[i].name)) ?? links[0] ?? -1;
-  return { columns, rows, logoCol };
+  return { columns, rows, logoCol: logoColumn(columns, rows) };
+}
+
+const hostOf = (raw: string) => raw.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').split(/[/:?#]/)[0].toLowerCase();
+
+// The column whose sites are each row's own: named for a website, or links that
+// are not all one network's profile pages.
+function logoColumn(columns: Column[], rows: string[][]): number {
+  const links = columns.flatMap((c, i) => (c.kind === 'link' && !/linkedin|twitter|github|crunchbase/i.test(c.name) ? [i] : []));
+  const own = (i: number) => {
+    const hosts = rows.map((r) => r[i]).filter((v) => URLISH.test(v.trim())).map(hostOf);
+    return hosts.length > 0 && share(hosts, (h) => !SOCIAL.test(h)) >= 0.8;
+  };
+  return links.find((i) => /website|domain|site|homepage/i.test(columns[i].name) && own(i)) ?? links.find(own) ?? -1;
 }
 
 /** The host a row's logo comes from, or null. */
@@ -111,8 +181,8 @@ export function logoFor(table: Table, row: string[]): string | null {
   if (table.logoCol < 0) return null;
   const raw = (row[table.logoCol] ?? '').trim();
   if (!raw || !URLISH.test(raw)) return null;
-  const host = raw.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split(/[/:?#]/)[0].toLowerCase();
-  return host || null;
+  const host = hostOf(raw);
+  return host && !SOCIAL.test(host) ? host : null;
 }
 
 /** A link cell's address, with its scheme. */
@@ -130,21 +200,25 @@ const numberOf = (v: string) => {
 /** Rows with the words searched for in any cell and, per column, only the tags picked. */
 export function filterRows(table: Table, query: string, picked: Record<number, string[]>): string[][] {
   const q = query.trim().toLowerCase();
-  const wants = Object.entries(picked).filter(([, v]) => v.length).map(([k, v]) => [Number(k), new Set(v)] as const);
+  const wants = Object.entries(picked).filter(([, v]) => v.length).map(([k, v]) => [Number(k), new Set(v.map((x) => x.toLowerCase()))] as const);
   if (!q && !wants.length) return table.rows;
   return table.rows.filter((r) =>
-    (!q || r.some((c) => c.toLowerCase().includes(q))) && wants.every(([i, set]) => set.has(r[i].trim())));
+    (!q || r.some((c) => c.toLowerCase().includes(q))) && wants.every(([i, set]) => set.has(r[i].trim().toLowerCase())));
 }
 
 export function sortRows(table: Table, rows: string[][], sort: Sort): string[][] {
   if (!sort) return rows;
   const { col, dir } = sort;
-  const num = table.columns[col]?.kind === 'number';
+  const kind = table.columns[col]?.kind;
+  const valueOf = kind === 'number' ? numberOf : kind === 'date' ? dateOf : null;
   const sign = dir === 'asc' ? 1 : -1;
+  // Blank, N/A and anything that does not read as the column's kind go last, either way.
+  const empty = (v: string) => !v.trim() || NOTHING.test(v.trim()) || (valueOf ? !Number.isFinite(valueOf(v)) : false);
   return [...rows].sort((a, b) => {
     const x = a[col] ?? '', y = b[col] ?? '';
-    if (!x.trim() !== !y.trim()) return x.trim() ? -1 : 1;
-    if (num) return sign * ((numberOf(x) || 0) - (numberOf(y) || 0));
+    const ex = empty(x), ey = empty(y);
+    if (ex || ey) return ex === ey ? 0 : ex ? 1 : -1;
+    if (valueOf) return sign * (valueOf(x) - valueOf(y));
     return sign * x.localeCompare(y, undefined, { numeric: true, sensitivity: 'base' });
   });
 }
