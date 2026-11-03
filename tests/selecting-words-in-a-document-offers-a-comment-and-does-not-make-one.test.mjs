@@ -92,8 +92,8 @@ describe('the file view', () => {
     expect(stage).not.toMatch(/onMouseUp=\{\(\) => \{\s*const picked = window\.getSelection\(\)/);
     expect(stage).not.toContain('removeAllRanges');
   });
-  it('offers the bar on a document and on code', () => {
-    expect(stage.match(/<SelectionBar /g)?.length).toBe(2);
+  it('offers the bar on a document, on code and on a table', () => {
+    expect(stage.match(/<SelectionBar /g)?.length).toBe(3);
   });
   it('draws a document once per text, not once per redraw of the view', () => {
     expect(stage).toMatch(/const MarkdownBody = memo\(/);
