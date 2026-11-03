@@ -9,13 +9,13 @@
 import crypto from 'node:crypto';
 import fsDefault from 'node:fs';
 import path from 'node:path';
-import { MAX_CARRIED_BYTES, MAX_SENT_BYTES, plainRef } from '../../shared/carried-files.mjs';
+import { MAX_CARRIED_BYTES, MAX_SENT_BYTES, PART_BYTES, plainRef } from '../../shared/carried-files.mjs';
 
 const CLOUD_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$/;
 const SEGMENT = /^[A-Za-z0-9_(][\w .()-]{0,159}$/;
 const MAX_ENTRIES = 2000;
 const WHY = new Set(['missing', 'secret', 'outside', 'hidden', 'upload', 'tooBig', 'name']);
-const MAX_CHUNKS = 40;
+const MAX_CHUNKS = Math.ceil(MAX_SENT_BYTES / PART_BYTES);
 
 const folderOf = (dir) => path.join(dir, 'attachments', 'carried');
 
@@ -59,7 +59,8 @@ export function validEntry(raw) {
         chunks.push({ cloud: c.cloud, size: bytes });
       }
     }
-    parts.push({ path: p.path, cloud: p.cloud, size, ...(chunks ? { chunks } : {}) });
+    // `bucket`: the pieces are in storage. A list from before it has them as rows.
+    parts.push({ path: p.path, cloud: p.cloud, size, ...(chunks ? { chunks, ...(p.bucket === true ? { bucket: true } : {}) } : {}) });
   }
   if (!parts.some((p) => p.path === raw.main)) return null;
   return { ref: raw.ref, main: raw.main, parts, at };

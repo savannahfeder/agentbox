@@ -9,6 +9,7 @@ import { SCHEMA_VERSION, validateCreation, creationText, TEXT_CREATION_KINDS } f
 import { assertInside, assertCreationDir, deniesGitOrEnvPath } from './paths.mjs';
 import { migrateIndex } from './migrate.mjs';
 import { withProjectLockSync } from './project-lock.mjs';
+import { projectWritten } from './projects-changed.mjs';
 import { readEnv } from '../../shared/product-name.mjs';
 import { defaultStoreRoot } from './home.mjs';
 
@@ -124,6 +125,7 @@ export function createProject(name, root = dataRoot()) {
   }
   const project = { schemaVersion: SCHEMA_VERSION, id: slug, name: String(name ?? slug), createdAt: new Date().toISOString() };
   atomicWriteJson(path.join(dir, 'project.json'), project);
+  projectWritten();
   atomicWriteJson(path.join(dir, 'index.json'), emptyIndex());
   return { ...project, dir };
 }
@@ -195,6 +197,7 @@ export function deleteProject(id, root = dataRoot()) {
   if (path.dirname(path.resolve(dir)) !== path.resolve(root)) throw new Error('refusing: path escapes the data root');
   if (!fs.existsSync(path.join(dir, 'project.json'))) throw new Error(`not a product folder: ${slug}`);
   fs.rmSync(dir, { recursive: true, force: true });
+  projectWritten();
   return true;
 }
 
@@ -210,6 +213,7 @@ export async function deleteProjectAsync(id, root = dataRoot()) {
   if (path.dirname(path.resolve(dir)) !== path.resolve(root)) throw new Error('refusing: path escapes the data root');
   if (!fs.existsSync(path.join(dir, 'project.json'))) throw new Error(`not a product folder: ${slug}`);
   await fs.promises.rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 120 });
+  projectWritten();
   return true;
 }
 
@@ -227,6 +231,7 @@ export function patchProjectAt(dir, patch) {
   const p = loadProjectAt(dir);
   if (!p) return null;
   atomicWriteJson(path.join(dir, 'project.json'), { ...p, dir: undefined, ...patch });
+  projectWritten();
   return { ...p, ...patch };
 }
 
@@ -445,6 +450,7 @@ export function deleteCreation(projectDir, id) {
   const proj = readJson(projFile);
   if (proj?.productCreationId === id) {
     atomicWriteJson(projFile, { ...proj, productCreationId: null });
+    projectWritten();
   }
   return envelope;
 }

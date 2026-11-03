@@ -134,6 +134,10 @@ select.tq-in { height: 32px; padding: 0 6px; }
 .tq-answers .dock-send:disabled { color: var(--text-faint); cursor: default; }
 .tq-answers .dock-send:disabled:hover { background: var(--wash); border-color: var(--line-strong); }
 .tq-answered { font-size: 13px; color: var(--text-faint); }
+.tq-thread-asks { margin: 28px 0 24px; }
+.tq-thread-ask + .tq-thread-ask { margin-top: 28px; }
+.tq-thread-ask .tx p { margin: 0; }
+.tq-thread-asks .tq-error { margin: 10px 0 0; }
 .tq-where-chips { margin-top: 2px; }
 .tq-works { margin-top: 6px; font-size: 13px; }
 .tq-works.tq-link { display: block; color: var(--text-dim); font-size: 13px; }

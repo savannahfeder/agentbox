@@ -168,7 +168,8 @@ describe('Chats on the phone', () => {
     expect(read('mobile/src/app/teammate/new.tsx')).toMatch(/c\.askTeammate\('describe'/);
   });
   it('asks your yes before your words go to a teammate, as before any agent', () => {
-    expect(read('mobile/src/state/cloud.tsx')).toMatch(/if \(key !== 'goAhead' && !agreed\) \{\s*router\.push\('\/ai-notice'\)/);
+    // It waits for the answer and goes on a yes (the-phone-app-sends-your-first-thread-once-you-say-yes).
+    expect(read('mobile/src/state/cloud.tsx')).toMatch(/if \(key !== 'goAhead' && !agreed\) await askNotice\(\);/);
   });
 });
 

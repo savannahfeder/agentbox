@@ -19,6 +19,7 @@ import { appendTo, cleanEntry, foldLine } from '../../shared/version-line.mjs';
 // The database's own checks on a message's file (20261013000000_message_files.sql).
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$/;
 const MAX_FILE_DATA = 14_000_000;
+const MAX_PIECE_BYTES = 10 * 1024 * 1024;
 const MAX_WORK_BYTES = 1_000_000;
 const MAX_COMMENT_CHARS = 4000;
 const MAX_MARK_CHARS = 24_000;
@@ -35,6 +36,7 @@ export function createMemoryCloud() {
     lines: [], // { seq, projectId, uid, byPerson, body, createdAt }
     cards: new Map(), // `${personId}:${threadId}` -> a thread card, as shared/thread-cards.mjs makes them
     files: new Map(), // `${projectId}:${name}` -> { projectId, name, byPerson, data (base64) }
+    pieces: new Map(), // `${projectId}/${name}` -> { projectId, name, byPerson, bytes }
     threadWork: new Map(), // `${personId}:${threadId}` -> { owner, threadId, teamId, hash, work, updatedAt }
     threadFiles: new Map(), // `${personId}:${threadId}:${name}` -> { owner, threadId, name, data (base64) }
     threadComments: [], // { id, owner, threadId, by, text, at }
@@ -473,6 +475,25 @@ export function memoryBackend(cloud, personId) {
       cloud.files.set(key, { projectId, name, byPerson: personId, data });
       cloud.events.emit('files', 1);
       return true;
+    },
+
+    // A big file's pieces, in the private message-files bucket under the
+    // conversation's folder (20261105000000_a_film_goes_in_pieces_through_storage.sql).
+    async putPiece(projectId, name, bytes) {
+      if (!canSee(projectId)) refuse('send a file to a project you cannot see');
+      if (!FILE_NAME.test(name)) refuse('a file name that is not a plain name');
+      if (!Buffer.isBuffer(bytes) || bytes.length > MAX_PIECE_BYTES) refuse('a piece that big');
+      const key = `${projectId}/${name}`;
+      if (cloud.pieces.has(key)) return false;
+      cloud.pieces.set(key, { projectId, name, byPerson: personId, bytes: Buffer.from(bytes) });
+      cloud.events.emit('files', 1);
+      return true;
+    },
+
+    async getPiece(projectId, name) {
+      if (!canSee(projectId)) return null;
+      const got = cloud.pieces.get(`${projectId}/${name}`);
+      return got ? Buffer.from(got.bytes) : null;
     },
 
     // HER OWN ROWS FOR HER PHONE (20261014000200_phone_inbox.sql): every one

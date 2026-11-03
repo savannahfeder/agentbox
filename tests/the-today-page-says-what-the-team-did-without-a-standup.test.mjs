@@ -127,13 +127,33 @@ describe('yesterday and this week', () => {
   });
 });
 
+// WHAT A BIG STORE COSTS IS COUNTED IN READS, NOT TAKEN OFF THE CLOCK
+// (2026-11-03). The line here was 20,000 threads under 250 ms, and it went red
+// on main on macOS: the same work took 70 ms on an idle machine and up to
+// 304 ms while the suite's other files ran beside it. How many times teamToday
+// reads a thread says the same thing, and no machine changes it.
+const readsPerThread = (threads, cards) => {
+  let reads = 0;
+  const watch = (o) => new Proxy(o, { get(t, k) { reads += 1; return t[k]; } });
+  const many = Array.from({ length: threads }, (_, i) => watch(item({ id: `i${i}`, status: i % 3 ? 'open' : 'done', updatedAt: at(i % 24, -(i % 9)), blockedBy: i % 50 ? [] : [`c${i}`] })));
+  const lots = Array.from({ length: cards }, (_, i) => watch(card({ personId: i % 2 ? 'p-dev' : 'p-sofia', threadId: `c${i}`, state: i % 4 ? 'running' : 'done', updatedAt: at(i % 24, -(i % 9)) })));
+  teamToday({ ...base, items: many, cards: lots, range: 'week' });
+  return reads / (threads + cards);
+};
+
 describe('a big store', () => {
-  // About 40 ms alone; a loaded machine running other test files doubles it, so the line is 250 ms.
-  it('reads 20,000 threads and 2,000 cards fast enough to draw as you open it', () => {
-    const many = Array.from({ length: 20_000 }, (_, i) => item({ id: `i${i}`, status: i % 3 ? 'open' : 'done', updatedAt: at(i % 24, -(i % 9)), blockedBy: i % 50 ? [] : [`c${i}`] }));
-    const lots = Array.from({ length: 2_000 }, (_, i) => card({ personId: i % 2 ? 'p-dev' : 'p-sofia', threadId: `c${i}`, state: i % 4 ? 'running' : 'done', updatedAt: at(i % 24, -(i % 9)) }));
-    const t = performance.now();
-    teamToday({ ...base, items: many, cards: lots, range: 'week' });
-    expect(performance.now() - t).toBeLessThan(250);
+  it('reads a thread as few times at 20,000 threads and 2,000 cards as at a tenth of them', () => {
+    const small = readsPerThread(2_000, 200);
+    const big = readsPerThread(20_000, 2_000);
+    expect(big).toBeLessThan(small * 1.1);
+    expect(big).toBeLessThan(40);
+  });
+
+  it('would catch a pass that looked at every other thread', () => {
+    let reads = 0;
+    const watch = (o) => new Proxy(o, { get(t, k) { reads += 1; return t[k]; } });
+    const rows = Array.from({ length: 1_000 }, (_, i) => watch(item({ id: `i${i}` })));
+    for (const row of rows) rows.some((other) => other.id === row.id);
+    expect(reads / rows.length).toBeGreaterThan(40);
   });
 });
