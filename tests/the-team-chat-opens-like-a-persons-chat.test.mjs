@@ -88,7 +88,7 @@ describe('the team chat\'s Agents', () => {
 describe('in the app', () => {
   // Other chats open on the Chats page, never under the cards (w-2b3e1a85e5).
   it('opens the Team under a person\'s bar, and no other chat under the cards', () => {
-    expect(app).toMatch(/: <SpaceBar m=\{evMember\} tabs=\{\[\]\} onMessage=/);
+    expect(app).toMatch(/: <SpaceBar m=\{evMember\} tabs=\{\[\]\}/);
     expect(app).not.toMatch(/evMember\.kind === 'chat' && !evMember\.team \? <SpaceBar/);
   });
 

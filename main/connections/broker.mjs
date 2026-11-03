@@ -28,14 +28,14 @@ export const WRITE_CARD_TOOL = (name, tool) => `mcp__${name}__${tool}`;
 const denied = (text) => ({ isError: true, content: [{ type: 'text', text }] });
 const firstWords = (result) => (result?.content ?? []).filter((c) => c?.type === 'text').map((c) => c.text).join(' ') || 'It said the call failed.';
 
-function wordsFor(entry, err, { wrote = false, status = null } = {}) {
+function wordsFor(entry, err, { wrote = false, status = null, now = Date.now() } = {}) {
   const state = stateOfError(err);
   const name = entry.name;
   if (state === STATES.UNREACHABLE) return `${name} answered, but not as a tool agents can use, so this was not done. ${stateWords(state).todo} Tell the owner; do not offer to connect it, as it is connected.`;
   if (state === STATES.NOT_SIGNED_IN) return `${name} no longer accepts this sign-in, so this was not done. Ask the owner to sign in again on the Connections page in ${Name}.`;
   if (state === STATES.NOT_ALLOWED) return `${name} says the owner's account is not allowed to do this, so it was not done. They may need to ask for access.`;
   if (wrote) return `${name} did not answer after this was sent, so it may or may not have gone through. Check whether it took effect before trying again.`;
-  const down = status?.at ? downWords({ name, since: status.since, at: status.at }) : `${name} is temporarily down.`;
+  const down = status?.at ? downWords({ name, since: status.since, at: status.at }, now) : `${name} is temporarily down.`;
   return `${down} So this was not done. The app tries it again by itself and puts a row in Needs you when it works. Carry on without it and say what you could not read.`;
 }
 
@@ -93,7 +93,7 @@ export function createBroker({ connections, storeRoot, socketPath, proxyFile, ru
       if (state !== STATES.DOWN || !wrote) await connections._saveStatus(entry.id, { state }).catch(() => {});
       await connections._noteUse(entry.id, { tool: name, wrote, ok: false, why: wrote && state === STATES.DOWN ? 'It did not answer, so this may or may not have gone through.' : stateWords(state).word }).catch(() => {});
       const status = (await connections._read().catch(() => ({}))).connections?.[entry.id]?.status ?? null;
-      return denied(wordsFor(entry, err, { wrote, status }));
+      return denied(wordsFor(entry, err, { wrote, status, now: connections._now?.() ?? Date.now() }));
     }
   }
 

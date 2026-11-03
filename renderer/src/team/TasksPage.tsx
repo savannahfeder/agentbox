@@ -24,8 +24,10 @@ function Row({ r, picked, face, from, onOpen, onOpenBlock, onOpenAgent }: {
   </li>;
 }
 
-export function TasksPage({ groups, faces, nameOf, me, picked, onPicked, keys, onOpen, onOpenBlock, onOpenAgent, onDone }: {
+export function TasksPage({ groups, faces, nameOf, me, picked, onPicked, keys, onOpen, onOpenBlock, onOpenAgent, onDone, title }: {
   groups: TaskGroups;
+  /** On the Team page: its heading. */
+  title?: string;
   /** By member key: `me` or `person:<id>`. */
   faces: ReadonlyMap<string, Member>;
   nameOf: (id: string) => string;
@@ -80,6 +82,7 @@ export function TasksPage({ groups, faces, nameOf, me, picked, onPicked, keys, o
 
   return <div className="tk" aria-label="Tasks" ref={page}>
     <div className="tk-col">
+      {title && <h2 className="td-title">{title}</h2>}
       <p className="tk-sum">{tasksLine(groups)}</p>
       {section('Late', groups.late)}
       {section('Blocked', groups.blocked)}

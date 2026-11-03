@@ -230,6 +230,8 @@ export interface FileNote {
   pin?: number;
   resolved?: boolean;
   resolvedBy?: string | null;
+  /** The version that answered it, when the app resolved it rather than a press. */
+  resolvedIn?: string;
   sent?: boolean;
   /** Someone pressed "Send to the agent" on a note the agent was not sent. */
   toAgent?: boolean;
@@ -673,6 +675,8 @@ export interface TeamChatLine {
   doc?: { product: string; src: string; name: string };
   /** The words that set a new teammate up; from a suggestion, with the threads it was made from. */
   setup?: boolean; threads?: { product: string; id: string; title: string }[];
+  /** The teammate's thread it was written in. */
+  run?: string;
   /** On an `act`: `learned` (kept something about you), `updated` (changed its own instructions),
    *  `lesson` (added to the playbook `ref`), and the older run and pause verbs. */
 }
@@ -1668,7 +1672,7 @@ declare global {
       setThreadOnMac?(p: { onMac: Record<string, true | null> }): Promise<unknown>;
       moveToCloud?(p: { ids: string[]; product?: string; id?: string }): Promise<{ moving?: number; ok?: boolean }>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
-      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
+      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem>;
       routeThread?(p: { product: string; id: string; to: string }): Promise<{ ok: true }>;
       // Feedback to the Agentbox team (main/feedback.mjs). Optional: an older
       // main process under a newer window has no such door.
@@ -1695,7 +1699,7 @@ declare global {
       findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number } }): Promise<FoundInThreads>;
       warmFindInThreads(): Promise<boolean>;
       fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
-      fileNewVersion?(p: { product: string; id: string; path: string; text: string }): Promise<{ ok: boolean; path?: string; error?: string }>;
+      fileNewVersion?(p: { product: string; id: string; path: string; text: string; since?: string | null }): Promise<{ ok: boolean; path?: string; error?: string }>;
       teamMarkFile(p: { personId: string; threadId: string; mark: ArtifactMark }): Promise<TeamCallResult>;
       connections?(): Promise<ConnectionsList>;
       connectionsConnect?(p: ConnectAsk): Promise<ConnectAnswer>;

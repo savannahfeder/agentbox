@@ -104,3 +104,35 @@
 
 /* Where the last answer went, in the bar's empty middle beside the place in the queue. */
 .ts-top > .sent-line { margin: 0 16px 0 0; padding: 2px 4px 2px 12px; min-width: 0; max-width: 460px; background: none; font-size: 12.5px; }
+
+/* THE TASK PAGE FILLS THE WINDOW (w-d53ba8c96c). The type grows a little with
+   the pane (16px on a 1440 window, 17 on 1710, at most 18: 21 read as too big
+   beside other reading apps), the column is a fixed measure of it, and it
+   starts a third of the way into the spare room: centred read as too much empty
+   space, flush left as pressed against the edge. The small lines never go below
+   their old sizes. The reply stays at the bottom on the column's edges. A file
+   open on the side and the phone keep their own layouts. `.focus-scroll > .focus`
+   because xterm also uses `.focus`. */
+@media (min-width: 701px) and (min-height: 521px) {
+  .app.one-at-a-time.workspace-layout:not(.doc-open) .focus-pane {
+    container-type: inline-size;
+    --task-type: clamp(16px, calc(0.25cqi + 13px), 18px);
+    --task-summary: max(13.5px, calc(var(--task-type) * 0.76));
+    --task-measure: min(calc(var(--task-type) * 47.5), calc(100cqi - 96px));
+    --task-indent: max(32px, calc((100cqi - var(--task-measure)) * 0.35));
+  }
+  .app.one-at-a-time.workspace-layout:not(.doc-open) .focus-scroll > .focus { max-width: none; margin: 0; padding-left: var(--task-indent); padding-right: 32px; }
+  .app.one-at-a-time.workspace-layout:not(.doc-open) .focus-scroll > .focus > * { max-width: var(--task-measure); }
+  .app.one-at-a-time.workspace-layout:not(.doc-open) :is(.focus-body, .focus-body .markdown, .focus-body .msg-body) { font-size: var(--task-type); }
+  .app.one-at-a-time.workspace-layout:not(.doc-open) .focus .markdown :is(p, ul, ol, blockquote, h1, h2, h3, h4) { max-width: none; }
+  .app.one-at-a-time.workspace-layout:not(.doc-open) .one-sum .one-title { font-size: calc(var(--task-type) * 1.7); margin-bottom: 8px; }
+  .app.one-at-a-time.workspace-layout:not(.doc-open) .one-answer .one-q { font-size: calc(var(--task-type) * 1.05); margin-bottom: 10px; }
+  /* The 680px it was at 13.5px, kept in step with its own text size. */
+  .app.one-at-a-time.workspace-layout:not(.doc-open) .one-cols { max-width: calc(var(--task-summary) * 50.37); }
+  .app.one-at-a-time.workspace-layout:not(.doc-open) .one-col { font-size: var(--task-summary); }
+  .app.one-at-a-time.workspace-layout:not(.doc-open) .one-earlier { font-size: max(12.5px, calc(var(--task-type) * 0.7)); }
+  .app.one-at-a-time.workspace-layout:not(.doc-open) .one-app-note { font-size: max(13px, calc(var(--task-type) * 0.72)); }
+  .app.one-at-a-time.workspace-layout:not(.doc-open) .focus-dock { padding-left: var(--task-indent); }
+  .app.one-at-a-time.workspace-layout:not(.doc-open) .focus-dock-inner { max-width: var(--task-measure); margin: 0; }
+  .app.one-at-a-time.workspace-layout:not(.doc-open) :is(.opt-row, .dock-pill) { font-size: max(14.5px, calc(var(--task-type) * 0.78)); }
+}

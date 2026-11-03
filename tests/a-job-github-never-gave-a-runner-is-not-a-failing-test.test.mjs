@@ -184,7 +184,7 @@ describe('the run GitHub had no macOS runner for', () => {
     expect(row.labels ?? []).not.toContain(MAIN_RED_LABEL);
   });
 
-  it('says so, and says it could not ask, when GitHub refuses the re-run', async () => {
+  it('files nothing when this machine cannot ask GitHub for the run at all', async () => {
     const store = await newStore();
     const watcher = new MainTests({
       store,
@@ -200,8 +200,18 @@ describe('the run GitHub had no macOS runner for', () => {
       log: { info() {}, warn() {} },
     });
     await watcher.watch({ product: { slug: 'myproduct', repoPath: root }, sha: '23ed9d4' });
-    const [row] = itemsOf(store);
-    expect(row.body).toContain('could not ask for that job again');
+    expect(itemsOf(store)).toHaveLength(0);
+  });
+
+  // A frozen clock is the caller's to set, and the watch has to end anyway.
+  it('gives up without a row when GitHub never starts the attempt it was asked for', async () => {
+    const store = await newStore();
+    const asked = [];
+    await watcherOver(store, [
+      { run: RED, jobs: [NEVER_STAFFED, LINUX_PASSED] },
+    ], { asked }).watch({ product: { slug: 'myproduct', repoPath: root }, sha: '23ed9d4' });
+    expect(asked).toHaveLength(1);
+    expect(itemsOf(store)).toHaveLength(0);
   });
 
   it('fits its title and its context inside what a card draws', () => {
