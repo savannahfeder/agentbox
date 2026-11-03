@@ -46,7 +46,7 @@ describe('the report a workday writes', () => {
       writeReport(day.root, { ...day, stretch: 3, minutes: 30, engine: 'codex', state: 'SIGTERM' });
       const report = fs.readFileSync(path.join(day.root, 'report.md'), 'utf8');
       expect(report).toContain('3 stretches');
-      expect(report).toMatch(/stopped by SIGTERM/);
+      expect(report).toMatch(/stopped by SIGTERM/i);
       expect(report).not.toMatch(/still going/i);
     } finally { fs.rmSync(day.root, { recursive: true, force: true }); }
   });

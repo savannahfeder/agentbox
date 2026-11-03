@@ -3,15 +3,16 @@
 //
 //   node workday.mjs --who founder,new-user [--minutes 30] [--stretches 2 | --pace [--hours 10]]
 //                    [--engine codex|claude|external] [--model <id>] [--focus "what to lean on"]
-//                    [--codex-home ~/.codex] [--target 90] [--url <preview address>] [--out <folder>] [--detach]
+//                    [--codex-home ~/.codex] [--claude-home ~/.claude-2] [--target 90] [--url <preview address>]
+//                    [--out <folder>] [--detach]
 //
 // Each person (../../power-test/people) gets a folder with two commands,
 // `phone` (phone.mjs, the app at an iPhone's size) and `diary` (the power
 // test's), and a tester session playing them for --minutes. Every stretch
 // after the first is told what was already logged, so testers confirm or go
 // elsewhere rather than file the same thing twice. --pace keeps starting
-// stretches while pace.mjs says the Codex week is behind its line, waits out a
-// full 5-hour window, and stops at --hours. report.md ranks every issue.
+// stretches while pace.mjs says the tester login's week is behind its line,
+// waits out a full 5-hour window, and stops at --hours. report.md ranks every issue.
 //
 // --engine external writes each stretch's prompt to <person>/stretch-N.prompt.md
 // and waits for stretch-N.done, for an agent that runs testers as subagents
@@ -20,7 +21,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readDiary } from '../../power-test/scripts/diary.mjs';
 
@@ -67,6 +68,27 @@ export function phonePrompt(person, { dir, minutes, focus = null, logged = [] })
   ].join('\n');
 }
 
+/** What a tester starts with: the named login, and for Claude the scrub the app runs before every spawn. */
+export function testerEnv(engine, base, { codexHome = null, claudeHome = 'default' } = {}) {
+  if (engine !== 'claude') return { ...base, ...(codexHome ? { CODEX_HOME: codexHome } : {}) };
+  const env = {};
+  for (const [key, value] of Object.entries(base)) {
+    if (!/^(ANTHROPIC_|CLAUDE_CODE_|CLAUDECODE$|CLAUDE_PID$|CLAUDE_EFFORT$|CLAUDE_CONFIG_DIR$|CLAUDE_SECURESTORAGE_CONFIG_DIR$)/.test(key)) env[key] = value;
+  }
+  if (claudeHome && claudeHome !== 'default') env.CLAUDE_CONFIG_DIR = claudeHome;
+  return env;
+}
+
+/** The sweeper's own mark for a program meant to outlive its run; the day still ends at --hours. */
+export function detachedEnv(env) {
+  return { ...env, AGENTBOX_KEEP: '1' };
+}
+
+/** Kept from the sweeper, so it gives memory back itself: no stretch starts while memory is tight. */
+export function stretchMayStart(pressure) {
+  return pressure === 'normal';
+}
+
 /** The flags a --detach run restarts itself with: the same day, in the folder it chose. */
 export function detachedArgv(args, root) {
   const rest = args.filter((a) => a !== '--detach');
@@ -107,7 +129,7 @@ export function writeReport(root, { people, dirs, stretch, minutes, engine, stat
   const ranked = rankIssues(byPerson);
   // A day killed outright (SIGKILL, power) leaves this version, so it must not claim the day is alive now.
   const status = state === 'running' ? ` Written after stretch ${stretch}, while the day was still going.`
-    : state === 'done' ? '' : ` The day was stopped by ${state}.`;
+    : state === 'done' ? '' : ` Stopped by ${state}; this is what was logged by then.`;
   const lines = [`# Phone app workday, ${new Date().toDateString()}`, '', `${people.map((p) => p.name).join(', ')}, ${stretch} stretch${stretch === 1 ? '' : 'es'} of ${minutes} minutes on ${engine}.${status}`, ''];
   ranked.forEach((i, k) => {
     lines.push(`## ${k + 1}. [${i.severity}] ${i.title}`, '', `${i.who}${i.seen > 1 ? `, seen ${i.seen} times` : ''}.`, '');
@@ -128,7 +150,8 @@ if (isMain) {
   const opt = (n, f = null) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : f; };
   const say = (s) => console.log(`[${new Date().toTimeString().slice(0, 8)}] ${s}`);
   const { readPeople, pickPeople } = await import(path.resolve(here, '../../power-test/scripts/plan.mjs'));
-  const { paceFor, readingFromLimits } = await import(path.join(here, 'pace.mjs'));
+  const { paceFor, readingFor, claudeProfile } = await import(path.join(here, 'pace.mjs'));
+  const { readMacPressureWord } = await import(path.join(REPO, 'main/leftovers.mjs'));
   const people = pickPeople(opt('who', 'random:2'), readPeople(path.resolve(here, '../../power-test/people')));
   const engine = opt('engine', 'codex');
   const minutes = Number(opt('minutes', 30));
@@ -136,13 +159,14 @@ if (isMain) {
   const deadline = Date.now() + Number(opt('hours', pace ? 10 : 24)) * 60 * MIN;
   const maxStretches = pace ? Infinity : Number(opt('stretches', 1));
   const codexHome = String(opt('codex-home', process.env.CODEX_HOME || path.join(os.homedir(), '.codex'))).replace(/^~(?=\/)/, os.homedir());
+  const claudeHome = claudeProfile(opt('claude-home', process.env.CLAUDE_CONFIG_DIR || 'default'));
   const root = path.resolve(opt('out', path.join(os.tmpdir(), 'agentbox-product-loop', `${new Date().toISOString().replace(/[:.]/g, '-')}-phone`)));
   fs.mkdirSync(root, { recursive: true });
 
   // A session of its own, so ending the run that started it does not end the day.
   if (args.includes('--detach')) {
     const log = fs.openSync(path.join(root, 'workday.log'), 'a');
-    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), ...detachedArgv(args, root)], { detached: true, stdio: ['ignore', log, log] });
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), ...detachedArgv(args, root)], { detached: true, stdio: ['ignore', log, log], env: detachedEnv(process.env) });
     child.unref();
     console.log(`workday started, pid ${child.pid}. Log: ${path.join(root, 'workday.log')}. Report when it ends: ${path.join(root, 'report.md')}`);
     process.exit(0);
@@ -205,21 +229,17 @@ if (isMain) {
   const report = (state) => writeReport(root, { people, dirs, stretch, minutes, engine, state });
   for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
     process.once(signal, () => {
-      say(`stopped by ${signal}`);
-      for (const c of children) c.kill('SIGTERM');
-      for (const p of people) {
-        try { execFileSync(process.execPath, [PHONE, 'close'], { env: { ...process.env, PHONE_OUT: dirs[p.slug], PHONE_URL: url }, stdio: 'ignore', timeout: 10_000 }); } catch { /* already closed */ }
-      }
+      say(`stopped by ${signal} after ${stretch} stretch${stretch === 1 ? '' : 'es'}`);
+      for (const c of children) { try { c.kill('SIGTERM'); } catch { /* gone */ } }
+      for (const p of people) spawnSync(process.execPath, [PHONE, 'close'], { env: { ...process.env, PHONE_OUT: dirs[p.slug], PHONE_URL: url }, timeout: 10_000 });
       say(`report: ${path.join(root, 'report.md')} (${report(signal)} issues so far)`);
       process.exit(1);
     });
   }
   while (stretch < maxStretches && Date.now() < deadline) {
-    if (pace && engine === 'codex') {
-      const { loggedCodexLimits } = await import(path.join(REPO, 'main/codex-usage-file.mjs'));
-      const { codexLimits } = await import(path.join(REPO, 'shared/codex-usage.mjs'));
-      const logged = loggedCodexLimits(codexHome);
-      const p = paceFor(logged ? readingFromLimits(codexLimits(logged.snapshot)) : null, { target: Number(opt('target', 90)) });
+    if (pace && engine !== 'external') {
+      const reading = await readingFor(engine, engine === 'claude' ? claudeHome : codexHome);
+      const p = paceFor(reading, { target: Number(opt('target', 90)), needsReading: engine === 'claude' });
       say(`pace: ${p.verdict}. ${p.why}`);
       if (p.verdict === 'stop') break;
       if (p.verdict === 'wait' || p.verdict === 'hold') {
@@ -227,6 +247,12 @@ if (isMain) {
         await new Promise((r) => setTimeout(r, Math.max(0, p.until - Date.now()) + MIN));
         continue;
       }
+    }
+    const pressure = await readMacPressureWord();
+    if (!stretchMayStart(pressure)) {
+      say(`memory is ${pressure}, so the next stretch waits 10 minutes`);
+      await new Promise((r) => setTimeout(r, 10 * MIN));
+      continue;
     }
     stretch += 1;
     const ends = Date.now() + minutes * MIN;
@@ -247,7 +273,7 @@ if (isMain) {
       }
       const last = path.join(dir, `stretch-${stretch}.last.txt`);
       const bin = engine === 'codex' ? 'codex' : 'claude';
-      const r = await run(bin, testerArgv(engine, { dir, prompt, model: opt('model'), last }), { cwd: dir, env: { ...process.env, CODEX_HOME: codexHome } });
+      const r = await run(bin, testerArgv(engine, { dir, prompt, model: opt('model'), last }), { cwd: dir, env: testerEnv(engine, process.env, { codexHome, claudeHome }) });
       fs.writeFileSync(path.join(dir, `stretch-${stretch}.log`), r.out);
       say(`${person.name}: stretch ${stretch} ended (${r.code === 0 ? 'ok' : `exit ${r.code}`})`);
     }));

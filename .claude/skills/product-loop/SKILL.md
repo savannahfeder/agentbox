@@ -1,6 +1,6 @@
 ---
 name: product-loop
-description: Run Agentbox's own product loop. Synthetic power users test the phone app for a workday on the person's Codex plan, paced to use about 90% of the Codex week by its reset, and the run fixes and ships what they find under the project's own instructions. Use when asked for the product loop, the self-improving loop, a workday of testers, testing the phone or iOS app with synthetic users, or spending the Codex week on testing.
+description: Run Agentbox's own product loop. Synthetic power users test the phone app for a workday on the person's Claude Code or Codex plan, paced to use about 90% of that plan's week by its reset, and the run fixes and ships what they find under the project's own instructions. Use when asked for the product loop, the self-improving loop, a workday of testers, testing the phone or iOS app with synthetic users, or spending the Codex week on testing.
 ---
 
 # The product loop
@@ -8,25 +8,30 @@ description: Run Agentbox's own product loop. Synthetic power users test the pho
 Thread w-e5f506ccb3 is the model: a synthetic team used the multiplayer
 build for whole workdays, logged what broke, agents fixed it, and the same
 team tested the fixes the next day. The person only chose between finished
-screens. This skill runs that loop on its own, one workday per day, on the
-Codex plan, starting with the phone app.
+screens. This skill runs that loop on its own, one workday per day, on a
+Claude Code or Codex plan, starting with the phone app.
 
 ## One workday
 
 ```sh
 L=.claude/skills/product-loop/scripts
-node $L/pace.mjs                         # run, hold, wait or stop, and why
-node $L/workday.mjs --who founder,startup-engineer,new-user --minutes 30 --pace --hours 10
+node $L/pace.mjs --engine claude --home ~/.claude-2   # run, hold, wait or stop, and why
+node $L/workday.mjs --who founder,startup-engineer,new-user --minutes 30 --pace --hours 10 \
+  --engine claude --claude-home ~/.claude-2
 ```
 
 `workday.mjs` builds the phone app's browser preview (`EXPO_PUBLIC_PREVIEW=1`,
 made-up threads, nothing signed in), serves it, and gives each person from
 `../power-test/people` a folder with two commands: `phone` (the app at an
-iPhone's size, touch on: look, tap, type, swipe, shot, away) and `diary`. The
-testers run as `codex exec` sessions in a sandbox with the local network open.
+iPhone's size, touch on: look, tap, type, swipe, shot, away) and `diary`. A
+Claude tester is `claude -p` allowed only those two commands and reading its
+own folder, on the login `--claude-home` names, with every API key stripped.
+A Codex tester is `codex exec` in a sandbox with the local network open.
 Each stretch after the first is told what was already logged. `--pace` keeps
-starting stretches while the Codex week is behind its line, waits out a full
-5-hour window, and stops at the target or at `--hours`. `report.md` in the run
+starting stretches while that login's week is behind its line, waits out a
+full 5-hour window, and stops at the target or at `--hours`. Claude reports
+several weeks (all models, Opus, Sonnet) and the fullest is paced; a Claude
+day whose usage cannot be read does not start, since nothing else would pace it. `report.md` in the run
 folder ranks every issue, worst first, with pictures.
 
 | flag | what | default |
@@ -34,7 +39,8 @@ folder ranks every issue, worst first, with pictures.
 | `--who` | names from `../power-test/people`, `random:N` or `all` | `random:2` |
 | `--minutes` | one stretch | 30 |
 | `--stretches` / `--pace` | how many, or as many as the week allows | 1 |
-| `--engine` | `codex`, `claude`, or `external` (you run each stretch as a subagent) | `codex` |
+| `--engine` | `claude`, `codex`, or `external` (you run each stretch as a subagent) | `codex` |
+| `--claude-home` | the Claude Code login the week is read from and spent on | `$CLAUDE_CONFIG_DIR` or `~/.claude` |
 | `--codex-home` | the Codex login the week is read from and spent on | `$CODEX_HOME` or `~/.codex` |
 | `--target` | how much of the week to have used at its reset | 90 |
 | `--focus` | what shipped and wants leaning on | none |
@@ -85,7 +91,7 @@ was logged, so they check the fixes.
 ## Every day, on its own
 
 A repeating task on this project, daily. The run itself is on the default
-engine; only the testers spend the Codex week. A run never sits through a
+engine; only the testers spend the plan the instruction names. A run never sits through a
 workday: it fixes yesterday's and starts today's, and today's testers are
 told what was logged, so they check the fixes.
 
@@ -96,7 +102,7 @@ ends. `--detach` puts it in a session of its own, so the run ending does not
 end the day.
 
 > Run the product loop on the phone app (.claude/skills/product-loop).
-> Testers spend the Codex login at HOME.
+> Testers spend the ENGINE login at HOME.
 >
 > 1. Fix yesterday's. Take the newest folder under ~/.agentbox/product-loop/
 >    with no `handled` file. If it has a report.md, fix and ship what its
@@ -105,9 +111,9 @@ end the day.
 >    workday.log and fix the cause. Bring me only the changes those
 >    instructions send to me, with pictures.
 > 2. Start today's, unless `pgrep -f product-loop/scripts/workday.mjs` finds
->    one running or `pace.mjs --home HOME` says stop. Fast-forward the app
+>    one running or `pace.mjs --engine ENGINE --home HOME` says stop. Fast-forward the app
 >    folder to public main if it has no tracked changes, then from there run
->    `workday.mjs --detach --pace --hours 10 --codex-home HOME --out
+>    `workday.mjs --detach --pace --hours 10 --engine ENGINE --ENGINE-home HOME --out
 >    ~/.agentbox/product-loop/<today> --who` with three people from
 >    .claude/skills/power-test/people chosen for what changed this week, or
 >    two if the Mac has under 3 GB free.

@@ -82,11 +82,11 @@ describe('what starts nothing', () => {
     expect(store.readItem('website', own.id).answer ?? null).toBe(null);
   });
 
-  it('a resolve and an approval', async () => {
+  // An approval does start the agent: tests/approving-an-agents-file-sends-its-thread-back-to-work.
+  it('a resolve', async () => {
     store.fileMark('website', thread.id, pin('n1', 'seat-picker.png', 'Darker cream'));
     store.fileMark('website', thread.id, { do: 'sent', on: ['n1'] });
     expect(await note({ do: 'resolve', on: 'n1' })).toBe(false);
-    expect(await note({ do: 'approve', file: 'seat-picker.png' })).toBe(false);
     expect(row().status).toBe('blocked');
     expect(woke).toBe(0);
   });
