@@ -53,7 +53,9 @@ describe('opening a document from its thread', () => {
   const tile = focus.slice(focus.indexOf('<QueueFile key={path}'), focus.indexOf('/>', focus.indexOf('<QueueFile key={path}')));
   it('opens the version its preview draws, which is the newest edit', () => {
     expect(tile).toMatch(/path=\{newestOfFamily\(path, item\.artifacts\?\.edits\)\}/);
-    expect(tile).toMatch(/openBig\(newestOfFamily\(path, item\.artifacts\?\.edits\)\)/);
+    // Beside the chat or full screen, it is the same version either way.
+    expect(tile).toMatch(/onOpen=\{\(\) => onOpenArtifact\?\.\(newestOfFamily\(path, item\.artifacts\?\.edits\), 'beside'\)\}/);
+    expect(tile).toMatch(/onFullScreen=\{\(\) => onOpenArtifact\?\.\(newestOfFamily\(path, item\.artifacts\?\.edits\), 'focus'\)\}/);
   });
   it('a press on a file with no edits opens the file it names', async () => {
     const { newestOfFamily } = await import('../shared/artifact-marks.mjs');

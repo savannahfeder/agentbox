@@ -12,7 +12,8 @@ export function isBookkeepingMark(mark: unknown): boolean;
 export function marksOf(entries: unknown[] | null | undefined): FileMarks;
 export function approvalId(a: Pick<FileApproval, 'ts'>): string;
 export function placeWords(note: { place?: NotePlace | null; pin?: number | string } | null | undefined): string;
-export function viewKind(path: string | null | undefined): 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | 'page' | 'code' | null;
+export function viewKind(path: string | null | undefined): 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | 'page' | 'table' | 'code' | null;
+export function opensBigInAGroup(name: string | null | undefined): boolean;
 export function otherFilesInLines(lines: unknown[] | null | undefined): Array<{ path: string; by: string | null; at: number; agent?: string }>;
 export function shownName(path: string | null | undefined): string;
 export function reviewKind(path: string | null | undefined): 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | null;
@@ -23,6 +24,7 @@ export function versionForPath(families: FileFamily[] | null | undefined, path: 
 export function stepsThrough(families: FileFamily[], paths: string[] | null | undefined): Array<{ fi: number; vi: number }>;
 export function nextStep(families: FileFamily[] | null | undefined, steps: Array<{ fi: number; vi: number }> | null | undefined, at: { fi: number; vi: number } | null, by: number): { fi: number; vi: number } | null;
 export function filesInLines(lines: unknown[] | null | undefined): Array<{ path: string; by: string | null; at: number; agent?: string }>;
+export function notedFilesInLines(lines: unknown[] | null | undefined): Array<{ path: string; by: string | null; at: number; agent?: string }>;
 export function sharedByWords(v: Pick<FileVersion, 'by' | 'agent'>, opts: { me: string | null; nameOf: (id: string) => string }): string;
 export function resolvedInWords(v: Pick<FileVersion, 'by' | 'agent' | 'n'>, opts: { me: string | null; nameOf: (id: string) => string }): string;
 export function carriedNotes(family: FileFamily | null | undefined, index: number, notes: FileNote[] | null | undefined, opts?: { resolved?: boolean }): Array<FileNote & { from: string }>;
@@ -32,6 +34,7 @@ export function asksByName(text: string | null | undefined, name: string | null 
 export function fileNewsLine(news: FileNews[] | null | undefined, nameOf: (id: string) => string): string | null;
 export function nextVersionName(name: string, count: number): string;
 export function addressedTo(text: string | null | undefined, people: ReadonlyArray<{ id: string; name?: string | null }> | null | undefined): string | null;
+export function stillWaiting(note: { wait?: boolean; toAgent?: boolean; sent?: boolean } | null | undefined): boolean;
 export function noteGoesTo(note: { text?: string; mentions?: readonly string[]; toAgent?: boolean } | null | undefined, people?: ReadonlyArray<{ id: string; name?: string | null }>): { to: 'agent' } | { to: 'person'; person: string } | { to: 'nobody' };
 export function notesForTheAgent(marks: FileMarks | null | undefined, version: FileVersion, count: number, opts?: { nameOf?: (id: string | null) => string }): { text: string; ids: string[] };
 export const MAX_EDIT_BYTES: number;

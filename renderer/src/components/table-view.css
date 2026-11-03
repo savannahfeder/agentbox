@@ -1,0 +1,142 @@
+/* A CSV drawn as a table (TableView.tsx). The light values are the approved
+   picture's own (designs/w-690551d7ea/tags-6-colour-on-status-only-v2.png);
+   dark keeps the same hues on a translucent ground. */
+.tbl {
+  --tbl-line: rgba(17, 25, 48, 0.08);
+  --tbl-head: #6b7280;
+  --tbl-rn: #9ca3af;
+  --tg-green: #eaf6ee; --ti-green: #23683f; --td-green: #3aa564;
+  --tg-blue: #ecf2fd; --ti-blue: #2f5596; --td-blue: #4c7fd6;
+  --tg-purple: #f2effc; --ti-purple: #573f9e; --td-purple: #7d63d4;
+  --tg-amber: #fcf3e3; --ti-amber: #8a5d12; --td-amber: #d9952b;
+  --tg-rose: #fcf0f3; --ti-rose: #9b3a58; --td-rose: #d4627f;
+  --tg-teal: #e8f5f2; --ti-teal: #1f6b5c; --td-teal: #33a08a;
+  --tg-grey: #f2f3f5; --ti-grey: #4b5563; --td-grey: #a3a9b4;
+  display: flex; flex-direction: column; min-height: 0; min-width: 0;
+  font-size: 14px; color: var(--text);
+}
+:root[data-theme="dark"] .tbl,
+:root[data-skin]:where(:not([data-theme="light"])) .tbl {
+  --tbl-line: rgba(255, 255, 255, 0.09);
+  --tbl-head: var(--text-faint);
+  --tbl-rn: rgba(255, 255, 255, 0.36);
+  --tg-green: rgba(58, 165, 100, 0.16); --ti-green: #93d8ac;
+  --tg-blue: rgba(76, 127, 214, 0.18); --ti-blue: #abc5f4;
+  --tg-purple: rgba(125, 99, 212, 0.2); --ti-purple: #c8b8f3;
+  --tg-amber: rgba(217, 149, 43, 0.17); --ti-amber: #edc583;
+  --tg-rose: rgba(212, 98, 127, 0.18); --ti-rose: #f1a8bb;
+  --tg-teal: rgba(51, 160, 138, 0.17); --ti-teal: #8bd6c5;
+  --tg-grey: rgba(255, 255, 255, 0.08); --ti-grey: #c9ccd2; --td-grey: #8d929b;
+}
+.tbl-pane, .tbl-full { height: 100%; }
+.tbl-pane { padding: 4px 28px 0; }
+.tbl-full { padding: 8px 48px 0; }
+
+.tbl-bar { display: flex; align-items: center; gap: 6px; padding: 18px 0 16px; flex: none; }
+.tbl-search {
+  flex: 0 1 280px; min-width: 140px; display: flex; align-items: center; gap: 8px;
+  height: 34px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius);
+  color: var(--text-faint);
+}
+.tbl-search svg, .tbl-btn svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.tbl-search input {
+  flex: 1; min-width: 0; font: inherit; font-size: 13px; color: var(--text);
+  background: none; border: 0; outline: none; padding: 0;
+}
+.tbl-search input::placeholder { color: var(--text-faint); }
+.tbl-search input::-webkit-search-cancel-button { display: none; }
+.tbl-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px;
+  font: inherit; font-size: 13px; color: var(--text-dim);
+  background: none; border: 0; border-radius: var(--radius); cursor: pointer;
+}
+.tbl-btn:hover, .tbl-btn.on { background: var(--bg-hover); color: var(--text); }
+.tbl-count {
+  margin-left: auto; white-space: nowrap;
+  font: 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint);
+}
+.when-menu.tbl-menu { width: 240px; max-height: min(480px, 70vh); }
+.tbl-menu .when-row { gap: 9px; }
+.tbl-tick { width: 12px; height: 12px; flex: none; border: 1px solid var(--line-strong); }
+.tbl-tick.on { background: var(--text); border-color: var(--text); box-shadow: inset 0 0 0 2px var(--pop); }
+.tbl-clear { color: var(--text-faint); }
+
+/* A table is square inside, and so are its pane and menus. Its card in the
+   chat keeps the corner every card there wears. */
+.tbl *, .tbl *::before, .when-menu.tbl-menu,
+.doc-pane.doc-table, .doc-pane.doc-table .doc-card { border-radius: 0; }
+.one-file.one-table { overflow: hidden; }
+
+.tbl-frame { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.tbl-scroll { flex: 1; min-height: 0; overflow: auto; }
+.tbl-preview .tbl-scroll { overflow-x: auto; overflow-y: hidden; }
+.tbl-grid {
+  display: grid; width: max-content; min-width: 100%;
+  border-left: 1px solid var(--tbl-line);
+}
+.tbl-preview .tbl-grid { border-left: 0; }
+.tbl-tr { display: contents; }
+.tbl-th, .tbl-td { border-right: 1px solid var(--tbl-line); border-bottom: 1px solid var(--tbl-line); min-width: 0; }
+.tbl-preview .tbl-tr > :last-child { border-right: 0; }
+.tbl-th {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: center; gap: 6px;
+  padding: 13px 16px; background: var(--surface); border-top: 1px solid var(--tbl-line);
+  font: 10.5px/1 var(--mono); letter-spacing: 0.09em; text-transform: uppercase; color: var(--tbl-head);
+  text-align: left; cursor: pointer; white-space: nowrap;
+  border-left: 0;
+}
+.tbl-preview .tbl-th { border-top: 0; cursor: default; }
+.tbl-th:not(:disabled):hover, .tbl-th.sorted { color: var(--text); }
+.tbl-arrow { font-family: inherit; }
+.tbl-td {
+  display: flex; align-items: center; height: 46px; padding: 0 16px;
+  white-space: nowrap; overflow: hidden;
+}
+/* The row number and the first column stay put while the rest scrolls sideways,
+   so a cell far to the right still says whose row it is. */
+.tbl-tr > :nth-child(1), .tbl-tr > :nth-child(2) { position: sticky; background: var(--surface); z-index: 1; }
+.tbl-tr > :nth-child(1) { left: 0; }
+.tbl-tr > :nth-child(2) { left: 44px; }
+.tbl-tr > .tbl-th:nth-child(1), .tbl-tr > .tbl-th:nth-child(2) { z-index: 3; }
+.tbl-rn { justify-content: flex-end; padding: 0 12px 0 0; color: var(--tbl-rn); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.tbl-th.tbl-rn { padding: 13px 12px 13px 0; cursor: default; }
+.tbl-ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px; }
+.tbl-pane .tbl-ell, .tbl-preview .tbl-ell { max-width: 220px; }
+.tbl-date { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.tbl-num { justify-content: flex-end; font-variant-numeric: tabular-nums; }
+.tbl-name { gap: 10px; }
+.tbl-logo { width: 18px; height: 18px; flex: none; object-fit: cover; }
+.tbl-letter {
+  display: inline-grid; place-items: center; font-size: 10.5px; font-weight: 600;
+  color: var(--text-dim); background: var(--bg-raised);
+}
+.tbl-link a { color: var(--text-dim); text-decoration: none; }
+.tbl-link a:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+
+.tbl-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 9px 2px 8px;
+  font-size: 13px; font-weight: 400; line-height: 18px; white-space: nowrap;
+}
+.tbl-tag::before { content: ''; width: 6px; height: 6px; flex: none; background: var(--dot); }
+.tone-green { background: var(--tg-green); color: var(--ti-green); --dot: var(--td-green); }
+.tone-blue { background: var(--tg-blue); color: var(--ti-blue); --dot: var(--td-blue); }
+.tone-purple { background: var(--tg-purple); color: var(--ti-purple); --dot: var(--td-purple); }
+.tone-amber { background: var(--tg-amber); color: var(--ti-amber); --dot: var(--td-amber); }
+.tone-rose { background: var(--tg-rose); color: var(--ti-rose); --dot: var(--td-rose); }
+.tone-teal { background: var(--tg-teal); color: var(--ti-teal); --dot: var(--td-teal); }
+.tone-grey { background: var(--tg-grey); color: var(--ti-grey); --dot: var(--td-grey); }
+
+/* Stands in for the rows above and below the ones drawn. */
+.tbl-gap { grid-column: 1 / -1; }
+
+.tbl-none, .tbl-empty { padding: 24px 16px; color: var(--text-faint); font-size: 13px; }
+.tbl-showall {
+  align-self: flex-start; margin: 10px 0 14px; padding: 0;
+  font: inherit; font-size: 13px; color: var(--text-dim);
+  background: none; border: 0; cursor: pointer;
+  text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px;
+}
+.tbl-showall { margin: 11px 16px 12px; }
+.tbl-showall:hover { color: var(--text); }

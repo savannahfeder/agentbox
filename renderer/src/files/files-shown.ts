@@ -2,9 +2,9 @@
 import type { FileFolder, FileKind, PlacedFile } from '../types';
 import { PLAIN_AGENT } from '../../../shared/agent-voice.mjs';
 
-export const KIND_ORDER: FileKind[] = ['markdown', 'image', 'film', 'deck', 'pdf', 'page', 'code'];
-export const KIND_PLURAL: Record<FileKind, string> = { markdown: 'Documents', image: 'Pictures', film: 'Films', deck: 'Decks', pdf: 'PDFs', page: 'Pages', code: 'Code' };
-export const KIND_ONE: Record<FileKind, string> = { markdown: 'Document', image: 'Picture', film: 'Film', deck: 'Deck', pdf: 'PDF', page: 'Page', code: 'Code' };
+export const KIND_ORDER: FileKind[] = ['markdown', 'image', 'film', 'deck', 'pdf', 'page', 'table', 'code'];
+export const KIND_PLURAL: Record<FileKind, string> = { markdown: 'Documents', image: 'Pictures', film: 'Films', deck: 'Decks', pdf: 'PDFs', page: 'Pages', table: 'Tables', code: 'Code' };
+export const KIND_ONE: Record<FileKind, string> = { markdown: 'Document', image: 'Picture', film: 'Film', deck: 'Deck', pdf: 'PDF', page: 'Page', table: 'Table', code: 'Code' };
 
 const fold = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '');
 
