@@ -793,9 +793,15 @@ export class Store {
     const { compose, after } = splitForCompose(whatMoves(item));
     // Where it came from, in the thread rather than only in a toast, because a
     // thread that turns up in a project nobody filed it in is a thread nobody
-    // can account for a week later.
+    // can account for a week later. It goes after your words: a body is what
+    // the thread shows as your first message, and a one-line ask lives only in
+    // the title. Your later replies come too, one still waiting included,
+    // since the run there starts over from this message.
     const said = movedHere(from?.name ?? fromSlug);
-    const body = compose.body ? `${compose.body}\n\n${said}` : said;
+    const yours = this.readHistory(fromSlug, id, { max: 1e6 })
+      .filter((l) => l.source === 'founder' && typeof l.patch?.answer === 'string' && l.patch.answer.trim())
+      .map((l) => l.patch.answer.trim());
+    const body = [compose.body || compose.title, ...yours, said].filter(Boolean).join('\n\n');
     let made = this.composeItem(toSlug, { ...compose, body });
     // The three `composeItem` has no argument for (shared/move-thread.mjs).
     if (Object.keys(after).length) {

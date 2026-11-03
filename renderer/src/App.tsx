@@ -103,6 +103,7 @@ import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mjs';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
 import { DONE, manyOrOne } from './done-word';
+import { listedNow, type OpensWhenListed } from './opens-when-listed';
 import { modalAfterLeavingATask } from './modal-scope';
 import { NOTHING_OVER_THE_APP, afterTheWalk, type OpenOverTheApp } from './walk-scope';
 import { splitMessage } from './message-split';
@@ -587,6 +588,9 @@ export default function App() {
   // One name for "she is reading one thing full screen".
   const inFullScreen = !!focused || !!focusedRepeat;
   const [modal, setModal] = useState<Modal>(null);
+  // Words ⌘K opens with, for the one time it was opened to show them.
+  const [paletteTyped, setPaletteTyped] = useState('');
+  useEffect(() => { if (modal !== 'palette') setPaletteTyped(''); }, [modal]);
   // Where the empty inbox wants the New thread box drawn, while it is on screen.
   const [clearSlot, setClearSlot] = useState<HTMLDivElement | null>(null);
   const [clearWriting, setClearWriting] = useState(false);
@@ -5327,8 +5331,18 @@ export default function App() {
       },
     });
     showToast(`Moved to ${name}${SAYS_UNDO}`, { product: made.product ?? slug, id: made.id });
+    // Left on the old row, now closed, people reopened it and had two copies.
+    if (focusedNow.current?.id === item.id && focusedNow.current?.product === item.product) {
+      opensWhenListed.current = { product: made.product ?? slug, id: made.id, at: Date.now() };
+    }
     await refresh();
   }, [pushUndo, refresh, showToast]);
+  const opensWhenListed = useRef<OpensWhenListed>(null);
+  useEffect(() => {
+    const r = listedNow(opensWhenListed.current, [...inbox, ...progress, ...snoozed, ...done], Date.now());
+    opensWhenListed.current = r.keep;
+    if (r.open) { setSearch(null); setFocused(r.open); markSeen(r.open); }
+  }, [inbox, progress, snoozed, done, markSeen]);
 
   const [snoozeItem, setSnoozeItem] = useState<WorkItem | WorkItem[] | null>(null);
   const [snoozeNote, setSnoozeNote] = useState<string | null>(null);
@@ -7821,6 +7835,7 @@ export default function App() {
                   onSnooze={walking ? undefined : () => openSnooze(focused)}
                   onReopen={() => sendBack(focused)}
                   onReopenDone={() => reopenDone(focused)}
+                  onMove={() => { setPaletteTyped('Move to '); setModal('palette'); }}
                   session={snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null}
                   // WHAT THE FLEET IS DOING ABOUT THIS ROW, through `factsFor`,
                   // which is the builder every row already reads. Written out
@@ -8228,6 +8243,7 @@ export default function App() {
         onTutorial={() => startTutorial(comeBackTo(snap.products, productFilter, rememberedProject()))}
         onImportAgents={() => { setModal(null); setImportAgents(true); }}
         products={rankedProducts}
+        typed={paletteTyped}
         supervisorPaused={snap.supervisor.paused}
         batch={multiSel.size > 0}
         look={look}
