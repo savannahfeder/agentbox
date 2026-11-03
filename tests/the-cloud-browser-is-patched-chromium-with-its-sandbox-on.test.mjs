@@ -68,6 +68,15 @@ describe('the browser on the cloud machine', () => {
     expect(docker).toMatch(/ln -s \/opt\/agentbox\/chromium\.sh "\$exe"/);
   });
 
+  // A project's own Playwright at another version looks for its own browser
+  // revision, which the image never had, so the agent would download the
+  // bundled one and run it with --no-sandbox (Codex review, 2026-11-03).
+  it('is what both cloud briefs tell a project\'s own Playwright to launch', () => {
+    const run = fs.readFileSync(fileURLToPath(new URL('../main/cloud/run.mjs', import.meta.url)), 'utf8');
+    const told = run.match(/executablePath: \\'\/opt\/agentbox\/chromium\.sh\\'/g) || [];
+    expect(told.length).toBe(2);
+  });
+
   it('goes up with the image, or the build cannot find it', () => {
     expect(fs.readFileSync(SETUP, 'utf8')).toMatch(/IMAGE_FILES = \[[^\]]*'chromium\.sh'/);
   });
