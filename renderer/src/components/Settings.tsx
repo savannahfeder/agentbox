@@ -36,7 +36,7 @@ import { whatTakesEscape } from '../settings-escape';
 import { WebAlertsGroup } from './WebAlerts';
 import { api, RESTART_NOTE } from '../api';
 import { updateLook } from '../update-row';
-import { InstructionSettings, Part, ScopeSwitch, sizeLabel } from './InstructionSettings';
+import { InstructionSettings, sizeLabel } from './InstructionSettings';
 import { EVERY } from '../instruction-scope';
 import type {AccountUsageReading, Usage, UsageLimit, WorkspaceSettings} from '../types';
 import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
@@ -56,8 +56,6 @@ import { chord, chords, sayKeys } from '../this-keyboard';
 import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mjs';
-import { ASK_FIRST, CHOICES, CHOICE_WORDS, KINDS, KIND_WORDS, rulesSummary, type ShipKind, type ShipRules } from '../../../shared/ship-mode.mjs';
-import { resolveScope } from '../instruction-scope';
 import { TaskTerminal } from './TaskTerminal';
 import { ProjectsPage } from './ProjectsPage';
 import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId } from '../settings-search';
@@ -1545,99 +1543,6 @@ function ProjectTitle({ project, onRename }: {
 
 // ONE MARK PER PAGE, at the weight of the app's own sidebar icons: 1.4 hairline
 // on a 24 grid, round caps, no fill except where the shape needs one.
-/* SHIPPING (w-e4d49a1539): what agents ship without asking, for every project
-   and for any one. The heading switches scope the way Instructions does. */
-function ShippingPage({ projects, every, everyNote, scope, codexReady, onScope, onEvery, onProject, onEveryNote, onProjectNote }: {
-  projects: ProjectSettings[];
-  every: ShipRules;
-  everyNote: string;
-  scope: string;
-  codexReady: boolean;
-  onScope: (s: string) => void;
-  onEvery: (rules: ShipRules) => void;
-  onProject: (slug: string, rules: ShipRules | null) => void;
-  onEveryNote: (text: string) => void;
-  onProjectNote: (slug: string, text: string) => void;
-}) {
-  const project = scope === EVERY ? null : projects.find((p) => p.slug === scope) ?? null;
-  const own = project?.shipOwn ?? null;
-  const same = (a: ShipRules, b: ShipRules) => KINDS.every((k) => a[k] === b[k]);
-  // What the row says under its name: the kind, then anything about this answer worth knowing.
-  const desc = (k: ShipKind, rules: ShipRules) => [
-    KIND_WORDS[k].desc,
-    project && own && rules[k] !== every[k] ? `Every project says “${CHOICE_WORDS[k][every[k]]}”.` : '',
-    k === 'wide' && rules.wide === 'review' && !codexReady ? 'Codex is not set up on this computer, so these will ask you.' : '',
-  ].filter(Boolean).join(' ');
-  const rows = (rules: ShipRules, set: (r: ShipRules) => void) => KINDS.map((k: ShipKind) => (
-    <Row key={k} label={KIND_WORDS[k].label} desc={desc(k, rules)}>
-      <Picker bare label={KIND_WORDS[k].label} value={rules[k] as string}
-        options={CHOICES[k].map((c) => ({ value: c, label: CHOICE_WORDS[k][c] }))}
-        onChange={(v) => set({ ...rules, [k]: v } as ShipRules)} />
-    </Row>
-  ));
-  const differ = projects.filter((p) => p.shipOwn);
-  const sameLine = !own ? rulesSummary(every)
-    : same(own, every) ? 'This project has its own rules below, copied from every project\u2019s for now. Change any row, or turn this on to follow every project again.'
-      : 'This project has its own rules below.';
-  return (
-    <div className="set-inner instructions-page">
-      <ScopeSwitch lead="Shipping for" scope={scope} projects={projects} onScope={onScope} />
-      <div className="set-lede">What agents ship without asking you. Shipping means merging into main. AI testers are agents that each play someone your product is for and use the change before you see it.</div>
-      {project ? (
-        <Group>
-          {!project.repoPath && <Row label="No code here" desc="This project has no repository, so nothing in it ships. Its rules apply once it has one." />}
-          <Row label="Same as every project" desc={sameLine}>
-            <Switch label="Same as every project" on={!own} onChange={(v) => onProject(project.slug, v ? null : project.shipKept ?? every)} />
-          </Row>
-          {own && rows(own, (r) => onProject(project.slug, r))}
-        </Group>
-      ) : (
-        <>
-          <Group>{rows(every, onEvery)}</Group>
-          <Group label="Projects with their own rules">
-            {differ.length ? differ.map((p) => (
-              <Row key={p.slug} label={p.name} desc={rulesSummary(p.shipOwn as ShipRules)}>
-                <button type="button" className="set-ghost" onClick={() => onScope(p.slug)}>Open</button>
-              </Row>
-            )) : <Row label="None yet" desc="Every project follows the rules above. Pick a project at the top to give it its own." />}
-          </Group>
-        </>
-      )}
-      <ShipWords key={scope}
-        label={project ? `In your own words, for ${project.name}` : 'In your own words, for every project'}
-        description={project
-          ? (everyNote.trim() ? `These add to every project’s words, which apply here too (“${clip(everyNote.trim(), 120)}”).` : 'Anything agents should follow before something in this project ships.')
-          : 'Anything agents should follow before something ships, like “never ship a database migration on its own”. Each project can add its own.'}
-        text={project ? project.shipNote ?? '' : everyNote}
-        onSave={(t) => (project ? onProjectNote(project.slug, t) : onEveryNote(t))} />
-    </div>
-  );
-}
-
-// Her own words about shipping, saved as she types, the way Instructions saves.
-const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
-
-function ShipWords({ label, description, text, onSave }: { label: string; description: string; text: string; onSave: (t: string) => void }) {
-  const [value, setValue] = useState(text);
-  const [status, setStatus] = useState('');
-  const timer = useRef<number | null>(null);
-  const pending = useRef<string | null>(null);
-  const flush = () => { if (pending.current !== null) { onSave(pending.current); pending.current = null; setStatus('Saved'); } };
-  useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); flush(); }, []);
-  const edit = (v: string) => {
-    setValue(v); pending.current = v; setStatus('Saving\u2026');
-    if (timer.current) window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(flush, 500);
-  };
-  return (
-    <div className="set-group">
-      <div className="instr-card">
-        <Part id="ship-words" label={label} description={description} writing={{ text: value, status, edit }} />
-      </div>
-    </div>
-  );
-}
-
 function NavIcon({ id }: { id: SettingsPageId }) {
   const paths: Record<SettingsPageId, ReactNode> = {
     general: <><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1" /><circle cx="15" cy="7" r="2" /><circle cx="9" cy="12" r="2" /><circle cx="17" cy="17" r="2" /></>,
@@ -1649,7 +1554,6 @@ function NavIcon({ id }: { id: SettingsPageId }) {
     running: <><circle cx="12" cy="12" r="8" /><path d="M10.5 9.2v5.6l4.5-2.8z" /></>,
     cloud: <path d="M4 18V9M9.5 18V5M15 18v-6M20.5 18v-9" />,
     instructions: <path d="M6.5 3.5h7.5l4 4V20.5h-11.5zM14 3.5V8h4M9.5 12h5M9.5 16h5" />,
-    shipping: <path d="M4 7.5 12 3.5l8 4v9l-8 4-8-4zM4 7.5l8 4 8-4M12 11.5v9" />,
     projects: <path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" />,
     team: <><circle cx="9" cy="9" r="3" /><path d="M3.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5" /><circle cx="16.5" cy="9.5" r="2.5" /><path d="M16 14.6c2.3-.2 4 1.2 4.5 4" /></>,
     alpha: <><path d="M9.5 3.5h5M10.5 3.5v5.2L5.6 17.6a2 2 0 0 0 1.8 2.9h9.2a2 2 0 0 0 1.8-2.9l-4.9-8.9V3.5" /><path d="M7.6 14.5h8.8" /></>,
@@ -1666,7 +1570,6 @@ function NavIcon({ id }: { id: SettingsPageId }) {
  *  name the screen has ever used still opens the page its content went to. */
 function paneFrom(want: string, has: { team: boolean }): Pane {
   if (want.startsWith('project:')) return { project: want.slice('project:'.length) };
-  if (want.startsWith('shipping:')) return 'shipping';
   if (want === 'themes') return 'appearance';
   if (want === 'priority') return 'projects';
   // The accounts were a page, then a group on Agents, then on General; they
@@ -1873,9 +1776,6 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   // open it already pointed at that project.
   const [instrScope, setInstrScope] = useState<string>(EVERY);
   const openInstructions = (slug: string) => { setInstrScope(slug); setPane('instructions'); };
-  // `shipping:<slug>` opens Shipping on that project (the new-thread box's chip).
-  const [shipScope, setShipScope] = useState<string>(() => (startPane?.startsWith('shipping:') ? startPane.slice('shipping:'.length) : EVERY));
-  const openShipping = (slug: string) => { setShipScope(slug); setPane('shipping'); };
   const current = useMemo(
     () => (typeof pane === 'string' ? null : projects.find((p) => p.slug === pane.project) ?? null),
     [pane, projects],
@@ -2204,20 +2104,6 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
 
       <div className="set-pane" ref={paneEl}>
         {pane === 'instructions' && <InstructionSettings projects={projects} scope={instrScope} onScope={setInstrScope} onSaved={load} />}
-        {model && w && pane === 'shipping' && (
-          <ShippingPage
-            projects={projects}
-            every={w.shipRules ?? ASK_FIRST}
-            everyNote={w.shipNote ?? ''}
-            scope={resolveScope(shipScope, projects)}
-            codexReady={(w.engineChoices ?? []).some((e) => e.id === 'codex')}
-            onScope={setShipScope}
-            onEvery={(rules) => setWorkspace('shipRules', rules)}
-            onProject={(slug, rules) => setProject(slug, 'shipRules', rules)}
-            onEveryNote={(text) => setWorkspace('shipNote', text)}
-            onProjectNote={(slug, text) => setProject(slug, 'shipNote', text)}
-          />
-        )}
         {/* The settings error is left off the pages that read nothing from the
             settings file. The stale-build note is shown nowhere
             (w-b3e123a0af): a released app replaces its window and its process
@@ -2639,12 +2525,6 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 desc="A task an agent writes on this project gets a session straight away. Without this it waits in your inbox for your yes. Questions and reviews always wait for you either way."
               >
                 <Switch label="Let agents start the tasks they file here" on={current.autonomous} onChange={(v) => setProject(current.slug, 'autonomous', v)} />
-              </Row>
-              <Row
-                label="What ships without asking you"
-                desc={current.shipOwn ? `Its own rules. ${rulesSummary(current.shipOwn)}` : `Same as every project. ${rulesSummary(w?.shipRules ?? ASK_FIRST)}`}
-              >
-                <button type="button" className="set-ghost" onClick={() => openShipping(current.slug)}>Open</button>
               </Row>
               {/* ONE LOGIN, NO ROW. The choice is only a choice with a second
                   account signed in, and on the one-account Mac -- which is

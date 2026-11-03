@@ -102,7 +102,7 @@ describe('shipping', () => {
       return { code: 0, out: 'ship: pushing\nship: shipped abc1234.\n' };
     } });
     await q.tick([row('w-a', { labels: ['ship', 'ui'] })], products());
-    expect(store.calls).toEqual([['shipped', 'team', 'w-a', { sha: 'abc1234', labels: ['ui'], close: false }]]);
+    expect(store.calls).toEqual([['shipped', 'team', 'w-a', { sha: 'abc1234', labels: ['ui'] }]]);
     expect(after).toBe(1);
   });
 

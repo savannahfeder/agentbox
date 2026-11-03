@@ -180,8 +180,7 @@ export function Part({id,label,writing,description,head,hidden,find}:{id:string;
  const decided=useRef(false);
  useEffect(()=>{if(text!==null&&!decided.current){decided.current=true;setWriting(startsWriting(text));}},[text]);
  const box=useRef<HTMLTextAreaElement>(null);
- // The caret at the end, so words added after Edit go after what is there.
- useEffect(()=>{if(writingNow&&text!==null){box.current?.focus({preventScroll:true});const end=box.current?.value.length??0;box.current?.setSelectionRange(end,end);}},[writingNow]);
+ useEffect(()=>{if(writingNow&&text!==null) box.current?.focus({preventScroll:true});},[writingNow]);
  return <section className="instr-part" id={`instr-${id}`} data-find={find}>
   <div className="instr-part-head">
    {label && <h2>{label}</h2>}
@@ -218,9 +217,9 @@ function ProjectPart({project,onSaved}:{project:ProjectSettings;onSaved:()=>void
    and the words after "for" open the list of who else it can be for. A dotted
    underline did not read as clickable, so the words carry a solid underline
    and an arrow, which is the one that was approved. */
-export function ScopeSwitch({scope,projects,onScope,lead='Instructions for'}:{scope:Scope;projects:ProjectSettings[];onScope:(s:Scope)=>void;lead?:string}) {
+function ScopeSwitch({scope,projects,onScope}:{scope:Scope;projects:ProjectSettings[];onScope:(s:Scope)=>void}) {
  const {open,setOpen,wrap}=useMenu();
- return <h1 className="instr-lead">{lead} <span className="instr-scope" ref={wrap as React.RefObject<HTMLSpanElement>}>
+ return <h1 className="instr-lead">Instructions for <span className="instr-scope" ref={wrap as React.RefObject<HTMLSpanElement>}>
   <button type="button" className="instr-scope-word" aria-haspopup="menu" aria-expanded={open} onClick={()=>setOpen(v=>!v)}>
    {scopeWords(scope,projects)}
    <svg className="instr-scope-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>

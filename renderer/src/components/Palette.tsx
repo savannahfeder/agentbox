@@ -25,7 +25,7 @@ export interface Command {
   run: () => void;
 }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onOpenShipping, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, findThreads, onSearchFor, onFirstRun, onTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, findThreads, onSearchFor, onFirstRun, onTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -61,7 +61,6 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   onRankFirst: (slug: string) => void;
   /** Settings, opened on the Projects page, where the running order is set. */
   onOpenProjects?: () => void;
-  onOpenShipping?: (slug?: string) => void;
   // Opens the new project card, which does the naming.
   onNewProject: () => void;
   // Opens the new thread card, the same thing N does.
@@ -133,19 +132,6 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       keywords: 'priority order rank reorder sort first top priorities rename project settings',
       run: onOpenProjects,
     }] : []),
-    ...(onOpenShipping ? [{
-      id: 'shipping-page',
-      label: 'Shipping…',
-      hint: 'what agents ship without asking you',
-      keywords: 'ship shipping deploy release merge approve approval review ask autonomous automatic rules testers factory',
-      run: () => onOpenShipping(),
-    }, ...products.map((p) => ({
-      id: `ship-${p.slug}`,
-      label: `Shipping for ${p.name}…`,
-      hint: 'what ships without asking you here',
-      keywords: 'ship shipping deploy release merge approve review ask rules',
-      run: () => onOpenShipping(p.slug),
-    }))] : []),
     // MY WORKSPACE SAYS WHAT IT IS (w-04e8d6d6e6). The app makes it at launch
     // so that a thread always has somewhere to go (main/main.mjs), and a new
     // user meets it here as a project they never made, with nothing on the row
@@ -352,7 +338,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onOpenShipping, onStanding, onSettings, onShortcuts, look, machine, onSetLook, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, cloud, onCloudMode]);
+  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, cloud, onCloudMode]);
   return open ? <PaletteBox commands={commands} findThreads={findThreads} onSearchFor={onSearchFor} onClose={onClose} phone={phone} /> : null;
 }
 

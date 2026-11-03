@@ -1,6 +1,6 @@
 ---
 name: product-loop
-description: Run Agentbox's own product loop. Synthetic power users test the phone app for a workday on the person's Codex plan, paced to use about 90% of the Codex week by its reset, and the run fixes and ships what they find under the project's ship rules. Use when asked for the product loop, the self-improving loop, a workday of testers, testing the phone or iOS app with synthetic users, or spending the Codex week on testing.
+description: Run Agentbox's own product loop. Synthetic power users test the phone app for a workday on the person's Codex plan, paced to use about 90% of the Codex week by its reset, and the run fixes and ships what they find under the project's own instructions. Use when asked for the product loop, the self-improving loop, a workday of testers, testing the phone or iOS app with synthetic users, or spending the Codex week on testing.
 ---
 
 # The product loop
@@ -56,10 +56,12 @@ them; they are not the app's:
   Queued or In progress, and the banner says the computer is offline.
 - What the phone sends is kept in memory and gone on reload.
 - Testers working at the same time cannot see each other's diaries, so one
-  bug can appear under two titles in the report. Fix the real ones in one branch, test first as CLAUDE.md
-says, and ship by the project's ship rules: fixes nobody sees ship, wide ones
-get `handoff` first, and anything on screen goes to the person with
-screenshots taken with `phone shot`. The next workday's testers are told what
+  bug can appear under two titles in the report.
+
+Fix the real ones in one branch, test first as CLAUDE.md says, and ship by the
+rules in the project's own instructions: fixes nobody sees ship, wide ones get
+`handoff` first, and anything on screen goes to the person with screenshots
+taken with `phone shot`. The next workday's testers are told what
 was logged, so they check the fixes.
 
 ## The phone, three ways
@@ -87,8 +89,8 @@ A repeating task on this project, daily, on Codex, with this instruction:
 > If `node .claude/skills/product-loop/scripts/pace.mjs` says stop, finish
 > clean. Otherwise start workday.mjs with --pace --hours 10 and three people
 > chosen for what changed this week, detached, and wait for its report.md.
-> Then fix and ship what they found by the ship rules. Bring me only what the
-> rules say I see, with pictures.
+> Then fix and ship what they found by this project's instructions. Bring me
+> only what they say I see, with pictures.
 
 `--pace` waits out a hold or a full 5-hour window inside its hours, so a
 morning run that starts ahead of the line still tests once the line passes

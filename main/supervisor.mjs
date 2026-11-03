@@ -7,7 +7,6 @@ export { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/c
 import { taskRemoteControl } from './task-remote-control.mjs';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mjs';
 import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor } from './ship-queue.mjs';
-import { notesFor, rulesFor, shipRulesBrief, shipsAlone } from '../shared/ship-mode.mjs';
 import { MainTests } from './main-went-red.mjs';
 import { folderJob } from './task-folders-offthread.mjs';
 import { gitJob } from './git-change-offthread.mjs';
@@ -500,7 +499,6 @@ export class Supervisor {
         this.spawnWorker(fresh, { continuation: true, shipFailure: reply });
       },
       afterShip: (shipped) => { this.onShipped(); this.watchMainsTests(shipped); this.reclaimShippedFolder(shipped); },
-      closesWhenShipped: (product) => shipsAlone(rulesFor(this.config, product.slug)),
     });
     // AND THEN SOMEBODY WATCHES THE RUN THAT SHIP STARTED. The whole suite runs
     // on GitHub for every push and takes about five minutes, which is after the
@@ -2717,16 +2715,8 @@ export class Supervisor {
     // A resumed session never saw the full brief's ship section if it began
     // before the project shipped through the app, and her "merge it" is
     // exactly when it needs it.
-    const ship = product ? this.shipSection(product) : '';
-    if (ship) parts.push(ship);
+    if (product && this.shipsThroughTheApp(product)) parts.push(this.shipBrief());
     return parts.join('\n');
-  }
-
-  /** How this project's tasks ship and when they ask first, or '' for neither. */
-  shipSection(product) {
-    const rules = shipRulesBrief(rulesFor(this.config, product.slug), notesFor(this.config, product.slug));
-    const how = this.shipsThroughTheApp(product) ? this.shipBrief({ ruled: !!rules }) : '';
-    return [how, rules].filter(Boolean).join('\n');
   }
 
   /** Whether this Mac ships this project's tasks itself (main/ship-queue.mjs). */
@@ -2738,7 +2728,7 @@ export class Supervisor {
   // not a push: a push or a move of another checkout from inside an agent
   // session is what Claude Code's safety check refuses, and a refusal asks
   // nobody, so the task just stopped.
-  shipBrief({ ruled = false } = {}) {
+  shipBrief() {
     return [
       '',
       '# How this task ships',
@@ -2746,9 +2736,8 @@ export class Supervisor {
       `${Name} ships this project's work itself. When the work is done and its tests`,
       'pass, commit it on your branch in your task folder, then add the label',
       `\`${SHIP_LABEL}\` to this work item (update_work_item, keeping its other labels)`,
-      ...(ruled
-        ? ['and end your turn as usual. Whether to wait for approval first is set by the', 'section after this one.']
-        : ['and end your turn as usual. Whether to wait for approval first is set by the', 'instructions you were given, not by this.']),
+      'and end your turn as usual. Whether to wait for approval first is set by the',
+      'instructions you were given, not by this.',
       '',
       `Do NOT push, do NOT merge into main, and do NOT touch any other folder. ${Name}`,
       'merges the latest main into your branch, runs the tests, pushes, and updates',
@@ -2796,8 +2785,7 @@ export class Supervisor {
       const named = this.namedThreadsBlock(item, product, [item.answer]);
       if (named) parts.push(named);
     }
-    const ship = product ? this.shipSection(product) : '';
-    if (ship) parts.push(ship);
+    if (product && this.shipsThroughTheApp(product)) parts.push(this.shipBrief());
     return parts.join('\n');
   }
 
@@ -10810,7 +10798,7 @@ export class Supervisor {
       `Product: ${product.name} (slug: ${item.product})`,
       `Product docs live in: ${product.dir}`,
       product.repoPath ? `Product code repo (your cwd): ${product.repoPath}` : `No code repo is registered for this product.`,
-      this.shipSection(product),
+      this.shipsThroughTheApp(product) ? this.shipBrief() : '',
       `Work item id: ${item.id}`,
       `Title: ${item.title}`,
       item.body ? `\n${item.body}` : '',

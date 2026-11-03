@@ -6758,8 +6758,6 @@ export default function App() {
                 <TicketItems.Provider value={items}>
                 <ChatsFrame current={inChats ? `direct:${focused.id}` : null}>
                 <Focus
-                  shipping={snap.shipping?.[focused.product] ?? null}
-                  onOpenShipping={(slug) => { setTeamOpen(false); setSettingsPane(`shipping:${slug}`); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
                   // A run of a repeating task carries its rule into the
                   // summary: what every run is told, and Stop repeating.
                   repeat={focusedRule ? {
@@ -7147,8 +7145,6 @@ export default function App() {
           // Projects page, which is where the order is set. The draft is
           // already saved, so closing loses nothing.
           onReorderProjects={() => { setModal(null); setComposeInitial(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
-          shipping={snap.shipping}
-          onOpenShipping={(slug) => { setModal(null); setTeamOpen(false); setSettingsPane(`shipping:${slug}`); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
           /* "New project", last in the project menu. The card draws OVER the
              composer rather than replacing it (it is last in this file for
              exactly that), so the draft is still here afterwards and the
@@ -7560,7 +7556,6 @@ export default function App() {
         onPauseTeammate={(id, paused) => { setModal(null); void api.teammates('update', { id, patch: { paused } }).then(() => refresh()); }}
         onShortcuts={() => { setModal(null); setSettingsPane('shortcuts'); setSettingsOpen(true); }}
         onOpenProjects={() => { setModal(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
-        onOpenShipping={(slug) => { setModal(null); setTeamOpen(false); setSettingsPane(slug ? `shipping:${slug}` : 'shipping'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onClose={() => setModal(null)}
       />
       {/* SETTINGS, as a screen over everything. Not inside the modal stack:

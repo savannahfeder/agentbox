@@ -583,10 +583,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, queue = null, onePage = false, inChats = false, shipping = null, onOpenShipping }: {
-  /** What this thread's project ships without asking, or null when everything asks. */
-  shipping?: { chip: string; summary: string } | null;
-  onOpenShipping?: (slug: string) => void;
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, queue = null, onePage = false, inChats = false }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -2205,7 +2202,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} items={items} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} talkWord={inChats ? 'Message' : undefined} shipping={inChats ? null : shipping} onOpenShipping={onOpenShipping} stop={stopButton} />
+            <DockComposer item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} items={items} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} talkWord={inChats ? 'Message' : undefined} stop={stopButton} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
@@ -2390,20 +2387,8 @@ function ModePicker({ value, options, label, onChange }: {
   );
 }
 
-// What a thread's project ships without asking, as one word of the reply
-// box's sentence: it wraps with the sentence, the way the priority word does.
-function ShipWord({ shipping, onOpen }: { shipping: { chip: string; summary: string }; onOpen: () => void }) {
-  return (
-    <span className="compose-word-wrap">
-      <button type="button" className="compose-word set" title={`${shipping.summary} Open Shipping in Settings to change it.`} onClick={onOpen}>{shipping.chip}</button>
-    </span>
-  );
-}
-
-function DockComposer({ item, runningMode, runningEngine, codexModels = [], codexModelDefault = null, engines, items = [], onSend, onClose, onNotice, stop, openModel = false, talkTo = null, talkWord = 'Reply to', shipping = null, onOpenShipping }: {
+function DockComposer({ item, runningMode, runningEngine, codexModels = [], codexModelDefault = null, engines, items = [], onSend, onClose, onNotice, stop, openModel = false, talkTo = null, talkWord = 'Reply to' }: {
   item: WorkItem;
-  shipping?: { chip: string; summary: string } | null;
-  onOpenShipping?: (slug: string) => void;
   /** "Message" on the Chats page, as a group's box says it. */
   talkWord?: string;
   /** The coding agents this Mac offers, off the snapshot. One is no choice. */
@@ -3240,13 +3225,6 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             title="Priority"
           />
           {' priority. '}
-          {/* What this thread's project ships without asking (Settings › Shipping). */}
-          {shipping && (
-            <>
-              <ShipWord shipping={shipping} onOpen={() => onOpenShipping?.(item.product)} />
-              {'. '}
-            </>
-          )}
           {/* The same control as the card's clock, opened on its repeats page,
               because "make this daily" is something she says to a thread as
               often as she sets it up front. Said on one RUN of a repeating task

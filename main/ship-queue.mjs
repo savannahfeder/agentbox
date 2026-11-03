@@ -285,8 +285,8 @@ export async function runScript(script, cwd, { timeout = SHIP_MS, env = process.
  * supervisor's own tick and returns at once; the run happens beside it.
  */
 export class ShipQueue {
-  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, closesWhenShipped = () => false, log = console }) {
-    Object.assign(this, { store, userDir, folderFor, isLive, liveSince, handBack, run, afterShip, closesWhenShipped, log });
+  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, log = console }) {
+    Object.assign(this, { store, userDir, folderFor, isLive, liveSince, handBack, run, afterShip, log });
     this.busy = null;
     this.earlyConflicts = new Map();
   }
@@ -370,7 +370,7 @@ export class ShipQueue {
       const already = /There is nothing to ship/.test(out);
       if (code === 0 || already) {
         const sha = shippedSha(out);
-        this.store.shipped(product.slug, item.id, { sha, labels: withoutShipLabel(item), close: !!this.closesWhenShipped(product) });
+        this.store.shipped(product.slug, item.id, { sha, labels: withoutShipLabel(item) });
         // THE COMMIT TRAVELS WITH THE NEWS. What follows a ship wants to know
         // which commit went out: main/main-went-red.mjs waits for that
         // commit's test run on GitHub, because nothing else is still running

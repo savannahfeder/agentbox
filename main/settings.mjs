@@ -36,7 +36,6 @@ import { isEngine } from '../shared/engines.mjs';
 import { codexAccount, codexFreePlan, codexLoginCommand, makeCodexHome } from './codex-account.mjs';
 import { codexDefaultModel, codexModelsAcross } from './codex-models.mjs';
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mjs';
-import { ASK_FIRST, cleanRules, everyProject, projectKept, projectOwn } from '../shared/ship-mode.mjs';
 import { CLOUD_SAME, CLOUD_CLAUDE_DEFAULT, CLOUD_CODEX_DEFAULT } from './cloud-permission.mjs';
 import { isPackagedElectron } from './team/session.mjs';
 import { claudeModels } from './claude-models.mjs';
@@ -616,9 +615,6 @@ export function readSettings({ config, supervisor, store }, { search = true } = 
       // workspace default and never a strip of Claude Code jargon on a page
       // she opens to change her rules.
       autonomous: (config.autonomousProducts ?? []).includes(product.slug),
-      shipOwn: projectOwn(config, product.slug),
-      shipKept: projectKept(config, product.slug),
-      shipNote: typeof config.shipNotes?.projects?.[product.slug] === 'string' ? config.shipNotes.projects[product.slug] : '',
       // ON HER PHONE WITH THE MAC SHUT (docs/cloud/PHONE-PLAN.md): its threads
       // go up to her own rows online on every sync (main/phone-inbox.mjs).
       onPhone: phoneSlugs.has(product.slug),
@@ -863,28 +859,7 @@ function engineSettings(supervisor, config, { search = true } = {}) {
     // this; `Supervisor#effectiveCodexMode` is what a run reads, and it layers
     // the project's answer over this one.
     codexMode: isCodexMode(config.codexMode) ? config.codexMode : CODEX_DEFAULT_MODE,
-    // What ships without asking on every project (shared/ship-mode.mjs).
-    shipRules: everyProject(config),
-    shipNote: typeof config.shipNotes?.every === 'string' ? config.shipNotes.every : '',
   };
-}
-
-// Nothing is kept for answers that all ask, so an untouched config stays untouched.
-function saveShipRules(config, { every, projects }) {
-  const asks = (r) => !r || Object.keys(ASK_FIRST).every((k) => r[k] === ASK_FIRST[k]);
-  const next = {
-    ...(asks(every) ? {} : { every }),
-    ...(projects && Object.keys(projects).length ? { projects } : {}),
-  };
-  saveConfig(config, { shipRules: Object.keys(next).length ? next : undefined });
-}
-
-function saveShipNotes(config, { every, projects }) {
-  const next = {
-    ...(typeof every === 'string' && every.trim() ? { every } : {}),
-    ...(projects && Object.keys(projects).length ? { projects } : {}),
-  };
-  saveConfig(config, { shipNotes: Object.keys(next).length ? next : undefined });
 }
 
 /* -------------------------------- writing -------------------------------- */
@@ -906,23 +881,6 @@ export function setProjectSetting({ config, supervisor, store }, { product, key,
     case 'autonomous':
       saveConfig(config, { autonomousProducts: withSlug(config.autonomousProducts, product, !!value) });
       break;
-    // Null is "the same as every project". Its own answers are kept, marked
-    // off, so turning that back on does not make her set them again.
-    case 'shipRules': {
-      const rules = value === null ? null : cleanRules(value);
-      if (value !== null && !rules) throw new Error('not a set of ship rules');
-      const projects = { ...(config.shipRules?.projects ?? {}) };
-      if (rules) projects[product] = rules;
-      else if (projects[product]) projects[product] = { ...projects[product], off: true };
-      saveShipRules(config, { ...config.shipRules, projects });
-      break;
-    }
-    case 'shipNote': {
-      const projects = { ...(config.shipNotes?.projects ?? {}) };
-      if (typeof value === 'string' && value.trim()) projects[product] = value; else delete projects[product];
-      saveShipNotes(config, { ...config.shipNotes, projects });
-      break;
-    }
     case 'phone':
       saveConfig(config, { phoneProducts: withPhoneProject(config.phoneProducts, process.env.AGENTBOX_PERSON_ID, product, !!value, phoneEligible(store?.listProducts?.() ?? [])) });
       break;
@@ -1228,15 +1186,6 @@ export function setWorkspaceSetting({ config, supervisor, store }, { key, value 
   switch (key) {
     // EVERY PROJECT ON HER PHONE, or none (shared/phone-snapshot.mjs). Which
     // ones she keeps here is remembered either way.
-    case 'shipRules': {
-      const rules = cleanRules(value);
-      if (!rules) throw new Error('not a set of ship rules');
-      saveShipRules(config, { ...config.shipRules, every: rules });
-      break;
-    }
-    case 'shipNote':
-      saveShipNotes(config, { ...config.shipNotes, every: typeof value === 'string' ? value : '' });
-      break;
     case 'phoneAll':
       saveConfig(config, { phoneProducts: withPhoneAll(config.phoneProducts, process.env.AGENTBOX_PERSON_ID, !!value, phoneEligible(store?.listProducts?.() ?? [])) });
       break;
