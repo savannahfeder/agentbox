@@ -14,9 +14,10 @@ function executable(file) {
 }
 
 export function codexLaunchEnv(bin, source = process.env, {
-  home = source.HOME || os.homedir(), exists = executable, readdir,
+  home = source.HOME || os.homedir(), exists = executable, readdir, platform = process.platform,
 } = {}) {
   if (!bin) return { ...source };
+  if (platform === 'win32') return windowsLaunchEnv(bin, source);
   const binDir = path.dirname(bin);
   const inherited = (source.PATH || '').split(path.delimiter).filter(Boolean);
   // Prefer the Node beside this Codex, then the user's existing PATH. A custom
@@ -28,4 +29,23 @@ export function codexLaunchEnv(bin, source = process.env, {
   ])];
   const nodeDir = directories.find(dir => exists(path.join(dir, 'node')));
   return { ...source, PATH: [...new Set([binDir, ...(nodeDir ? [nodeDir] : []), ...inherited])].join(path.delimiter) };
+}
+
+// codex.exe needs no Node. A Windows child handed several spellings of PATH
+// sees only the first in sort order, so that one is kept and the rest go.
+function windowsLaunchEnv(bin, source) {
+  const env = { ...source };
+  const keys = Object.keys(env).filter(k => k.toUpperCase() === 'PATH').sort();
+  const key = keys[0] ?? 'PATH';
+  const inherited = (env[key] || '').split(';').filter(Boolean);
+  for (const k of keys) delete env[k];
+  env[key] = [...new Set([path.win32.dirname(bin), ...inherited])].join(';');
+  // What npm's codex.js sets before it runs this same exe.
+  const npmPackage = /^(.*\\node_modules\\@openai\\codex)\\node_modules\\@openai\\codex-win32-[^\\]+\\vendor\\/i.exec(bin);
+  if (npmPackage) {
+    for (const by of ['NPM', 'BUN', 'PNPM', 'VITE_PLUS']) delete env[`CODEX_MANAGED_BY_${by}`];
+    env.CODEX_MANAGED_PACKAGE_ROOT = npmPackage[1];
+    env.CODEX_MANAGED_BY_NPM = '1';
+  }
+  return env;
 }
