@@ -22,6 +22,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { readDiary } from '../../power-test/scripts/diary.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(here, '../../../..');
@@ -100,13 +101,33 @@ export function rankIssues(byPerson) {
   return all.sort((a, b) => SEVERITY.indexOf(a.severity) - SEVERITY.indexOf(b.severity) || (b.seen ?? 1) - (a.seen ?? 1));
 }
 
+/** report.md from every diary so far. `state` is 'running', 'done', or the signal that stopped the day. */
+export function writeReport(root, { people, dirs, stretch, minutes, engine, state }) {
+  const byPerson = Object.fromEntries(people.map((p) => [p.name, readDiary(path.join(dirs[p.slug], 'diary.jsonl')).issues]));
+  const ranked = rankIssues(byPerson);
+  // A day killed outright (SIGKILL, power) leaves this version, so it must not claim the day is alive now.
+  const status = state === 'running' ? ` Written after stretch ${stretch}, while the day was still going.`
+    : state === 'done' ? '' : ` The day was stopped by ${state}.`;
+  const lines = [`# Phone app workday, ${new Date().toDateString()}`, '', `${people.map((p) => p.name).join(', ')}, ${stretch} stretch${stretch === 1 ? '' : 'es'} of ${minutes} minutes on ${engine}.${status}`, ''];
+  ranked.forEach((i, k) => {
+    lines.push(`## ${k + 1}. [${i.severity}] ${i.title}`, '', `${i.who}${i.seen > 1 ? `, seen ${i.seen} times` : ''}.`, '');
+    if (i.steps) lines.push(`Steps: ${i.steps}`, '');
+    if (i.expected) lines.push(`Expected: ${i.expected}`, '');
+    if (i.actual) lines.push(`Actual: ${i.actual}`, '');
+    const dir = dirs[people.find((p) => p.name === i.who)?.slug];
+    for (const s of i.shots ?? []) lines.push(`![${s}](${path.join(dir, s)})`, '');
+  });
+  if (!ranked.length) lines.push('Nobody logged an issue.');
+  fs.writeFileSync(path.join(root, 'report.md'), `${lines.join('\n')}\n`);
+  return ranked.length;
+}
+
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const args = process.argv.slice(2);
   const opt = (n, f = null) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : f; };
   const say = (s) => console.log(`[${new Date().toTimeString().slice(0, 8)}] ${s}`);
   const { readPeople, pickPeople } = await import(path.resolve(here, '../../power-test/scripts/plan.mjs'));
-  const { readDiary } = await import(DIARY);
   const { paceFor, readingFromLimits } = await import(path.join(here, 'pace.mjs'));
   const people = pickPeople(opt('who', 'random:2'), readPeople(path.resolve(here, '../../power-test/people')));
   const engine = opt('engine', 'codex');
@@ -168,17 +189,31 @@ if (isMain) {
     }
     return [p.slug, dir];
   }));
+  const children = new Set();
   const run = (cmd, argv, opts) => new Promise((resolve) => {
     const child = spawn(cmd, argv, { stdio: ['ignore', 'pipe', 'pipe'], ...opts });
+    children.add(child);
     let out = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });
     const timer = setTimeout(() => child.kill('SIGTERM'), (minutes + 10) * MIN);
-    child.on('exit', (code) => { clearTimeout(timer); resolve({ code, out: out.slice(-4000) }); });
+    child.on('exit', (code) => { children.delete(child); clearTimeout(timer); resolve({ code, out: out.slice(-4000) }); });
   });
   const diaries = () => Object.fromEntries(people.map((p) => [p.name, readDiary(path.join(dirs[p.slug], 'diary.jsonl')).issues]));
 
   let stretch = 0;
+  const report = (state) => writeReport(root, { people, dirs, stretch, minutes, engine, state });
+  for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
+    process.once(signal, () => {
+      say(`stopped by ${signal}`);
+      for (const c of children) c.kill('SIGTERM');
+      for (const p of people) {
+        try { execFileSync(process.execPath, [PHONE, 'close'], { env: { ...process.env, PHONE_OUT: dirs[p.slug], PHONE_URL: url }, stdio: 'ignore', timeout: 10_000 }); } catch { /* already closed */ }
+      }
+      say(`report: ${path.join(root, 'report.md')} (${report(signal)} issues so far)`);
+      process.exit(1);
+    });
+  }
   while (stretch < maxStretches && Date.now() < deadline) {
     if (pace && engine === 'codex') {
       const { loggedCodexLimits } = await import(path.join(REPO, 'main/codex-usage-file.mjs'));
@@ -217,20 +252,10 @@ if (isMain) {
       say(`${person.name}: stretch ${stretch} ended (${r.code === 0 ? 'ok' : `exit ${r.code}`})`);
     }));
     for (const p of people) await run(process.execPath, [PHONE, 'close'], { env: { ...process.env, PHONE_OUT: dirs[p.slug], PHONE_URL: url } });
+    report('running');
   }
 
-  const ranked = rankIssues(diaries());
-  const lines = [`# Phone app workday, ${new Date().toDateString()}`, '', `${people.map((p) => p.name).join(', ')}, ${stretch} stretch${stretch === 1 ? '' : 'es'} of ${minutes} minutes on ${engine}.`, ''];
-  ranked.forEach((i, k) => {
-    lines.push(`## ${k + 1}. [${i.severity}] ${i.title}`, '', `${i.who}${i.seen > 1 ? `, seen ${i.seen} times` : ''}.`, '');
-    if (i.steps) lines.push(`Steps: ${i.steps}`, '');
-    if (i.expected) lines.push(`Expected: ${i.expected}`, '');
-    if (i.actual) lines.push(`Actual: ${i.actual}`, '');
-    const dir = dirs[people.find((p) => p.name === i.who)?.slug];
-    for (const s of i.shots ?? []) lines.push(`![${s}](${path.join(dir, s)})`, '');
-  });
-  if (!ranked.length) lines.push('Nobody logged an issue.');
-  fs.writeFileSync(path.join(root, 'report.md'), `${lines.join('\n')}\n`);
-  say(`report: ${path.join(root, 'report.md')} (${ranked.length} issue${ranked.length === 1 ? '' : 's'})`);
+  const n = report('done');
+  say(`report: ${path.join(root, 'report.md')} (${n} issue${n === 1 ? '' : 's'})`);
   process.exit(0);
 }
