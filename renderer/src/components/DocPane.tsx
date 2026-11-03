@@ -35,7 +35,7 @@ import { addressYouTyped, canFrameAWebsite, isWebsiteAddress } from '../../../sh
 // doc-md / doc-html rather than off the theme.
 //
 // THE PANE HAS NO ZOOM OF ITS OWN, and it is not missing.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { CodeFile } from './CodeFile';
@@ -101,6 +101,9 @@ export type OpenDoc = { product: string; src: string; auto?: boolean; at?: strin
 // `<webview>` is a separate compositing layer and paints over everything the
 // card draws, so the hover-reveal toolbar doc-html normally gets would be
 // painted under the page and could never be pressed.
+const Beside = ({ aside, children }: { aside?: ReactNode; children: ReactNode }) =>
+  aside ? <div className="doc-notes-split">{children}{aside}</div> : <>{children}</>;
+
 function paneKindClass(kind: PaneKind): string {
   if (kind === 'html') return 'doc-html';
   if (kind === 'website') return 'doc-html doc-website';
@@ -110,8 +113,12 @@ function paneKindClass(kind: PaneKind): string {
   return 'doc-md';
 }
 
-export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, onMode, headerTarget, focusControlStyle }: {
+export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, onMode, headerTarget, focusControlStyle, aside, firstMark }: {
   focusControlStyle?: FocusControlStyle;
+  /** Drawn beside a document's words, inside the card: the notes sidebar. */
+  aside?: ReactNode;
+  /** A mark before the pane's own ones in the corner. */
+  firstMark?: ReactNode;
   headerTarget?: HTMLElement | null;
   mode?: ArtifactMode;
   onMode?: (mode: ArtifactMode) => void;
@@ -295,6 +302,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
             ))}
           </div>
           <span className="doc-marks">
+            {firstMark}
             {onMode && (focusControlStyle ? <FocusControl style={focusControlStyle} focused={!!headerTarget} onClick={() => onMode(headerTarget ? 'beside' : 'focus')}/> : !headerTarget && <button type="button" className="artifact-expand" aria-label="Expand preview" title="Expand preview to Focus" onClick={() => onMode('focus')}><Glyph><path d="M14 5h5v5M19 5l-6 6M10 19H5v-5M5 19l6-6" /></Glyph><span>Focus</span></button>)}
             {/* The two marks she approved, and nothing beside them. */}
             <button
@@ -423,17 +431,19 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
         ) : kind === 'text' ? (
           <div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div>
         ) : (
-          <DocText
-            key={resolved ?? doc.src}
-            product={doc.product}
-            src={doc.src}
-            folder={resolved ? resolved.replace(/\/[^/]*$/, '') : null}
-            text={text}
-            mtime={mtime}
-            onSaved={(at) => setMtime(at)}
-            onNotice={onNotice}
-            readOnly={doc.readOnly}
-          />
+          <Beside aside={aside}>
+            <DocText
+              key={resolved ?? doc.src}
+              product={doc.product}
+              src={doc.src}
+              folder={resolved ? resolved.replace(/\/[^/]*$/, '') : null}
+              text={text}
+              mtime={mtime}
+              onSaved={(at) => setMtime(at)}
+              onNotice={onNotice}
+              readOnly={doc.readOnly}
+            />
+          </Beside>
         )}
       </div>
     </aside>
