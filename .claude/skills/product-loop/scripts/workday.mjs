@@ -3,15 +3,16 @@
 //
 //   node workday.mjs --who founder,new-user [--minutes 30] [--stretches 2 | --pace [--hours 10]]
 //                    [--engine codex|claude|external] [--model <id>] [--focus "what to lean on"]
-//                    [--codex-home ~/.codex] [--target 90] [--url <preview address>] [--out <folder>] [--detach]
+//                    [--codex-home ~/.codex] [--claude-home ~/.claude-2] [--target 90] [--url <preview address>]
+//                    [--out <folder>] [--detach]
 //
 // Each person (../../power-test/people) gets a folder with two commands,
 // `phone` (phone.mjs, the app at an iPhone's size) and `diary` (the power
 // test's), and a tester session playing them for --minutes. Every stretch
 // after the first is told what was already logged, so testers confirm or go
 // elsewhere rather than file the same thing twice. --pace keeps starting
-// stretches while pace.mjs says the Codex week is behind its line, waits out a
-// full 5-hour window, and stops at --hours. report.md ranks every issue.
+// stretches while pace.mjs says the tester login's week is behind its line,
+// waits out a full 5-hour window, and stops at --hours. report.md ranks every issue.
 //
 // --engine external writes each stretch's prompt to <person>/stretch-N.prompt.md
 // and waits for stretch-N.done, for an agent that runs testers as subagents
@@ -66,6 +67,17 @@ export function phonePrompt(person, { dir, minutes, focus = null, logged = [] })
   ].join('\n');
 }
 
+/** What a tester starts with: the named login, and for Claude the scrub the app runs before every spawn. */
+export function testerEnv(engine, base, { codexHome = null, claudeHome = 'default' } = {}) {
+  if (engine !== 'claude') return { ...base, ...(codexHome ? { CODEX_HOME: codexHome } : {}) };
+  const env = {};
+  for (const [key, value] of Object.entries(base)) {
+    if (!/^(ANTHROPIC_|CLAUDE_CODE_|CLAUDECODE$|CLAUDE_PID$|CLAUDE_EFFORT$|CLAUDE_CONFIG_DIR$|CLAUDE_SECURESTORAGE_CONFIG_DIR$)/.test(key)) env[key] = value;
+  }
+  if (claudeHome && claudeHome !== 'default') env.CLAUDE_CONFIG_DIR = claudeHome;
+  return env;
+}
+
 /** The flags a --detach run restarts itself with: the same day, in the folder it chose. */
 export function detachedArgv(args, root) {
   const rest = args.filter((a) => a !== '--detach');
@@ -107,7 +119,7 @@ if (isMain) {
   const say = (s) => console.log(`[${new Date().toTimeString().slice(0, 8)}] ${s}`);
   const { readPeople, pickPeople } = await import(path.resolve(here, '../../power-test/scripts/plan.mjs'));
   const { readDiary } = await import(DIARY);
-  const { paceFor, readingFromLimits } = await import(path.join(here, 'pace.mjs'));
+  const { paceFor, readingFor, claudeProfile } = await import(path.join(here, 'pace.mjs'));
   const people = pickPeople(opt('who', 'random:2'), readPeople(path.resolve(here, '../../power-test/people')));
   const engine = opt('engine', 'codex');
   const minutes = Number(opt('minutes', 30));
@@ -115,6 +127,7 @@ if (isMain) {
   const deadline = Date.now() + Number(opt('hours', pace ? 10 : 24)) * 60 * MIN;
   const maxStretches = pace ? Infinity : Number(opt('stretches', 1));
   const codexHome = String(opt('codex-home', process.env.CODEX_HOME || path.join(os.homedir(), '.codex'))).replace(/^~(?=\/)/, os.homedir());
+  const claudeHome = claudeProfile(opt('claude-home', process.env.CLAUDE_CONFIG_DIR || 'default'));
   const root = path.resolve(opt('out', path.join(os.tmpdir(), 'agentbox-product-loop', `${new Date().toISOString().replace(/[:.]/g, '-')}-phone`)));
   fs.mkdirSync(root, { recursive: true });
 
@@ -180,11 +193,9 @@ if (isMain) {
 
   let stretch = 0;
   while (stretch < maxStretches && Date.now() < deadline) {
-    if (pace && engine === 'codex') {
-      const { loggedCodexLimits } = await import(path.join(REPO, 'main/codex-usage-file.mjs'));
-      const { codexLimits } = await import(path.join(REPO, 'shared/codex-usage.mjs'));
-      const logged = loggedCodexLimits(codexHome);
-      const p = paceFor(logged ? readingFromLimits(codexLimits(logged.snapshot)) : null, { target: Number(opt('target', 90)) });
+    if (pace && engine !== 'external') {
+      const reading = await readingFor(engine, engine === 'claude' ? claudeHome : codexHome);
+      const p = paceFor(reading, { target: Number(opt('target', 90)), needsReading: engine === 'claude' });
       say(`pace: ${p.verdict}. ${p.why}`);
       if (p.verdict === 'stop') break;
       if (p.verdict === 'wait' || p.verdict === 'hold') {
@@ -212,7 +223,7 @@ if (isMain) {
       }
       const last = path.join(dir, `stretch-${stretch}.last.txt`);
       const bin = engine === 'codex' ? 'codex' : 'claude';
-      const r = await run(bin, testerArgv(engine, { dir, prompt, model: opt('model'), last }), { cwd: dir, env: { ...process.env, CODEX_HOME: codexHome } });
+      const r = await run(bin, testerArgv(engine, { dir, prompt, model: opt('model'), last }), { cwd: dir, env: testerEnv(engine, process.env, { codexHome, claudeHome }) });
       fs.writeFileSync(path.join(dir, `stretch-${stretch}.log`), r.out);
       say(`${person.name}: stretch ${stretch} ended (${r.code === 0 ? 'ok' : `exit ${r.code}`})`);
     }));
