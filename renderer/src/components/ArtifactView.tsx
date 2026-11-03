@@ -14,7 +14,7 @@ import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
 import { hasSpot, noteSendWords, notesToSendTheAgent, otherFilesOpen, pageSpot, PIN_FRAME_S, pinned, viewOffers, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
-import { opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
+import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
 import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
 import { pressedInTheFindBox } from '../find-in-page';
@@ -65,7 +65,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   /** Only on a thread with an agent, on the owner's own computer. */
   withAgent?: boolean;
   /** Posts edited words as the next version of a document. Null when it went, else why not. */
-  onNewVersion?: (name: string, text: string, path: string, id: string) => Promise<string | null>;
+  onNewVersion?: (name: string, text: string, path: string, id: string, since?: string | null) => Promise<string | null>;
   /** Said after a save that only becomes a version on someone else's computer. */
   editGoes?: string;
   onClose: () => void;
@@ -322,13 +322,14 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
     if (inHand.current !== v.id) return;
     if (text === null) { setUnreadable(v.id); return; }
     // Words a sitting kept but never saved, from a failed save or a closed app.
-    let draft: string | undefined;
-    try { draft = localStorage.getItem(draftKey(v.path)) ?? undefined; } catch { /* no storage, no draft */ }
+    let kept: ReturnType<typeof keptDraft<typeof v>> = null;
+    try { kept = keptDraft(family.versions, v, (p) => localStorage.getItem(draftKey(p))); } catch { /* no storage, no draft */ }
+    const draft = kept?.draft;
     typed.current = draft ?? null;
     posted.current = null;
     setEditWord(null);
     setTold(null);
-    setEditing({ fam, text, draft, folder: opened ? opened.replace(/\/[^/]*$/, '') : null, base: v });
+    setEditing({ fam, text, draft, folder: opened ? opened.replace(/\/[^/]*$/, '') : null, base: kept?.base ?? v });
     if (draft !== undefined) idle.current = window.setTimeout(() => { void postNow.current(); }, SAVE_AFTER_A_PAUSE_MS);
   };
   useEffect(() => {
@@ -346,7 +347,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
     const run = (async () => {
       setEditWord('Saving…');
       const clash = editClash(family, sitting.base.n, me, nameOf);
-      const why = await onNewVersion(sitting.base.name, out, sitting.base.path, sitting.base.id).catch((err: Error) => err.message);
+      const why = await onNewVersion(sitting.base.name, out, sitting.base.path, sitting.base.id, posted.current).catch((err: Error) => err.message);
       if (why) { setTold(`${why} Press back again to leave: your words come back when you open it again.`); setEditWord('Not saved'); return false; }
       posted.current = out;
       try { if (localStorage.getItem(draftKey(sitting.base.path)) === out) localStorage.removeItem(draftKey(sitting.base.path)); } catch { /* nothing kept */ }
