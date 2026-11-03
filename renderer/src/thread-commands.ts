@@ -8,6 +8,8 @@
 
 import type { Seen } from './threads/summary-rules';
 import { PLACE_ROW, placeAct, type PlaceAct, type ThreadPlace } from './threads/ThreadMenu';
+import { firstName } from './team/company';
+import type { Person } from './types';
 
 export type TeamRoute = 'agent' | 'me' | 'back';
 
@@ -21,7 +23,11 @@ export type ThreadDoes =
   | { act: 'rename' }
   | { act: 'end-repeat' }
   | { act: 'add-people' }
-  | { act: 'route'; route: TeamRoute };
+  | { act: 'route'; route: TeamRoute }
+  | { act: 'give'; to: string; name: string }
+  | { act: 'shipped'; on: boolean }
+  | { act: 'wait'; on: string | null }
+  | { act: 'decide' };
 
 export interface ThreadCommand {
   id: string;
@@ -46,9 +52,32 @@ export interface ThreadFacts {
   open?: { change: boolean; summary: 'open' | 'closed' | null } | null;
   rename?: boolean;
   repeats?: boolean;
-  addPeople?: boolean;
+  /** True on a conversation, which opens a new one; 'thread' on an agent thread, which takes them in place. */
+  addPeople?: boolean | 'thread';
   /** The strip's choices on a task a teammate gave you, in its words. */
   routes?: { route: TeamRoute; label: string }[];
+  /** Who this thread could be handed on to (`giveRows`), and AI teammates beside them. */
+  give?: GiveTo[];
+  /** Whether a person has said it shipped, or null where the team would not see that. */
+  shipped?: boolean | null;
+  /** What it could wait on (`waitChoices`), and whether it waits now. */
+  waits?: readonly { id: string; label: string }[];
+  waitsNow?: boolean;
+  /** An agent thread the team can see, with an answer to save to its project's decisions. */
+  decide?: boolean;
+}
+
+export interface GiveTo { id: string; name: string }
+
+/** The people a thread can be handed on to: not a conversation, nor a finished
+ *  thread, nor one that is a teammate's to give. */
+export function giveRows(
+  item: { status?: string; agent?: unknown; createdBy?: string | null; runner?: string | null },
+  { me, people, product }: { me: string | null; people: readonly { id: string; name?: string | null; email?: string | null }[]; product?: { team?: { direct?: boolean } | null } | null },
+): GiveTo[] {
+  if (!me || !product || product.team?.direct || item.agent || item.status === 'done') return [];
+  if ((item.runner ?? item.createdBy ?? me) !== me) return [];
+  return people.filter((p) => p.id !== me).map((p) => ({ id: p.id, name: firstName(p as Person) }));
 }
 
 // THESE ROWS ARE WRITTEN THE WAY THE MENU WRITES THEM (2026-10-24). A `titled`
@@ -73,6 +102,17 @@ export function threadCommands(f: ThreadFacts): ThreadCommand[] {
       keywords: r.route === 'agent' ? 'give hand agent delegate' : r.route === 'me' ? 'myself me keep mine take' : 'hand back return decline',
       does: { act: 'route', route: r.route },
     });
+  }
+  for (const p of f.give ?? []) {
+    rows.push({ id: `give-${p.id}`, label: `Give it to ${p.name}`, keywords: `give hand pass assign delegate someone else ${p.name.toLowerCase()}`, does: { act: 'give', to: p.id, name: p.name } });
+  }
+  for (const w of f.waits ?? []) {
+    rows.push({ id: `wait-${w.id}`, label: `Waits on ${w.label}`, keywords: `waits waiting blocked by depends needs ${w.label.toLowerCase()}`, does: { act: 'wait', on: w.id } });
+  }
+  if (f.waitsNow) rows.push({ id: 'wait-stop', label: 'Stop waiting', keywords: 'waits waiting blocked unblock', does: { act: 'wait', on: null } });
+  if (f.decide) rows.push({ id: 'decide', label: 'Save its answer as a decision', keywords: 'decision decided mark pin remember project', does: { act: 'decide' } });
+  if (f.shipped != null) {
+    rows.push({ id: 'shipped', label: f.shipped ? 'Not shipped after all' : 'Mark as shipped', keywords: 'shipped ship live released deployed launched', does: { act: 'shipped', on: !f.shipped } });
   }
   // The three in the panel's order, the one it is now marked rather than
   // left out, so typing "private" on a private thread still answers.
@@ -125,6 +165,6 @@ export function threadCommands(f: ThreadFacts): ThreadCommand[] {
     });
   }
   if (f.repeats) rows.push({ id: 'end-repeat', label: 'Stop repeating', keywords: 'repeat repeating recurring every daily weekly stop end cancel', does: { act: 'end-repeat' } });
-  if (f.addPeople) rows.push({ id: 'add-people', label: 'Add people…', hint: 'a new conversation with them', keywords: 'add people invite person someone group conversation', does: { act: 'add-people' } });
+  if (f.addPeople) rows.push({ id: 'add-people', label: 'Add people…', hint: f.addPeople === 'thread' ? 'puts them on this thread' : 'a new conversation with them', keywords: 'add people invite person someone group conversation', does: { act: 'add-people' } });
   return rows;
 }

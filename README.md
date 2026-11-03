@@ -279,7 +279,7 @@ A released copy counts nineteen things, and they are counts:
 - counts were turned off
 
 Each carries a random install id, the app and platform version, whether it
-came from the Mac app or the browser copy, and at most
+came from the Mac app or the browser copy, which of two first runs a new install was shown, and at most
 eight other things: how long something took, how many of a thing there were,
 which kind of row it was out of six fixed words, whether an agent or you did
 it, whether an agent's run failed, whether it happened in setup's practice

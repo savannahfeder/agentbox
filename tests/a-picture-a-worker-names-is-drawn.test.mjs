@@ -114,7 +114,11 @@ describe('a markdown link pointing at a picture', () => {
     expect(focus).toContain('A LINK TO A PICTURE DRAWS THE PICTURE');
     // The `a` component hands an image href to ArtifactImg before it ever
     // reaches ArtifactLink.
-    const a = focus.slice(focus.indexOf('a: ({ href, children }'), focus.indexOf('img: ({ src, alt }'));
+    const whole = focus.slice(focus.indexOf('a: ({ href, children'), focus.indexOf('img: ({ src, alt }'));
+    // One link stays its name: the row under the sentence draws that one (media-row.ts).
+    const nameOnly = whole.split('\n').find((line) => line.includes('if (nameOnly && href)'));
+    expect(nameOnly).toContain('<ArtifactLink');
+    const a = whole.replace(nameOnly, '');
     expect(a).toContain('ArtifactImg');
     expect(a).toMatch(/png\|jpe\?g\|gif\|webp\|svg/);
     expect(a.indexOf('ArtifactImg')).toBeLessThan(a.indexOf('ArtifactLink'));
@@ -151,7 +155,7 @@ describe('a picture she clicks opens in the pane, not in Preview', () => {
     const css = read('renderer/src/styles.css');
     const rule = css.slice(css.indexOf('.doc-picture {'), css.indexOf('}', css.indexOf('.doc-picture {')));
     expect(rule).toContain('object-fit: contain');
-    expect(rule).toContain('max-width: 100%');
-    expect(rule).toContain('max-height: 100%');
+    expect(rule).toContain('max-width: calc(100% - 32px)');
+    expect(rule).toContain('max-height: calc(100% - 16px)');
   });
 });

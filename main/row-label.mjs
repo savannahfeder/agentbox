@@ -1,5 +1,6 @@
 import { harnessFor } from './harnesses.mjs';
 import { teammateIdOf } from '../shared/teammates.mjs';
+import { catchUpDue } from '../shared/agent-import.mjs';
 // THE NAME ON THE ROW, WRITTEN RATHER THAN TAKEN FROM THE FIRST SENTENCE.
 //
 // A dictated message keeps its first line as its title, verbatim and forever
@@ -91,6 +92,8 @@ const LIVE = new Set(['open', 'claimed', 'blocked']);
 export function wantsName(item) {
   if (!item || !LIVE.has(item.status)) return false;
   if (teammateIdOf(item)) return false;
+  // A chat just brought in is named by its rewrite (main/catch-up.mjs).
+  if (catchUpDue(item)) return false;
   if (!String(item.title ?? '').trim() && !String(item.body ?? '').trim()) return false;
   return !String(item.label ?? '').trim();
 }
@@ -105,8 +108,8 @@ export function namePrompt(item) {
   const latest = cut(item?.result || item?.note, 700);
   return [
     'Here is a work thread: the message that opened it, and the latest thing',
-    'written on it. Write a short name for the thread AS IT STANDS NOW: 3 to 7',
-    'words, sentence case, no quotes, no trailing punctuation, naming the thing',
+    'written on it. Write a short name for the thread AS IT STANDS NOW: 3 to 6',
+    'words, never a sentence, sentence case, no quotes, no trailing punctuation, naming the thing',
     'being worked on rather than restating the sentence. If the opening line is',
     'already a short name, keep its words and only fix the case. Reply with the',
     'name and nothing else.',

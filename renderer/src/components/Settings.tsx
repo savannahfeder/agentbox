@@ -29,6 +29,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { ReactNode } from 'react';
 import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel, UpdateState } from '../types';
 import { onCloudPhone, onPhone, phoneSized } from '../phone-screen';
+import { setSidebarShrinks, useSidebarShrinks } from '../sidebar-shrinks';
 import { computerSays, type PhoneRows } from '../phone-rows';
 import { changesOn, readingOf, type Reading, type SettingsRow } from '../phone-settings-view';
 import { lastAccountAsk, webProjectRow, webSettingsGroups, webSettingsPages } from '../web-settings';
@@ -1380,8 +1381,8 @@ const CodexCli = (props: EngineConnectionProps) => (
    disk. The words are all ../update-row.ts, shared with ⌘K.
 
    IT WORKS THE SAME ON BOTH KINDS OF COPY. Installed, the check is a release
-   feed (main/updater.mjs); run from a checkout, it is `git fetch` against the
-   branch (main/source-updater.mjs). Both answer the same door and the same
+   feed (main/updater.mts); run from a checkout, it is `git fetch` against the
+   branch (main/source-updater.mts). Both answer the same door and the same
    shape, so there is nothing here that knows which one it is talking to.
 
    NOTHING IS ASSUMED ABOUT THE PRESS. The check's own answer is drawn, and the
@@ -1654,6 +1655,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   roomsPane?: ReactNode;
   onClose: () => void;
 }) {
+  const sidebarShrinks = useSidebarShrinks();
   const [model, setModel] = useState<SettingsModel | null>(null);
   // ?settings=claude, or ?settings=project:kestrel. Anything else (including the
   // bare ?settings=1 that only means "open") lands on General. `startPane` is
@@ -2122,7 +2124,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
         )}
 
         {pane === 'team' && teamPane && (
-          <Page title="Team" lede="Who is on your team, who has been invited, and the team's name. Everyone sees a short summary of your threads unless you mark one private.">
+          <Page title="Team" lede="Who is on your team, who has been invited, and the team's name. Everyone can open and read your threads and their files unless you mark one private.">
             {teamPane}
           </Page>
         )}
@@ -2176,6 +2178,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 desc="Point at something and its keys appear beside it. Off, every key still works."
               >
                 <Switch label="Show keyboard shortcut hints" on={keyHints} onChange={onSetKeyHints} />
+              </Row>
+            </Group>
+            <Group id="sidebar" label="Sidebar">
+              <Row label="Shrink the sidebar to icons">
+                <Switch label="Shrink the sidebar to icons" on={sidebarShrinks} onChange={setSidebarShrinks} />
               </Row>
             </Group>
             {/* THE CORNER TAG (w-dafae58a23). The tag itself only hides for a

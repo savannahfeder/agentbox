@@ -235,6 +235,9 @@ export function readTranscriptTail(file, bytes = TAIL_BYTES) {
     let aiTitle = '';
     let customTitle = '';
     let reply = '';
+    // The answer before the last thing typed, for a turn Claude Code refused (a usage limit) with no answer of its own.
+    let before = '';
+    let refused = false;
     for (const line of lines) {
       if (!line.trim()) continue;
       let row;
@@ -242,13 +245,15 @@ export function readTranscriptTail(file, bytes = TAIL_BYTES) {
       if (row.type === 'ai-title' && row.aiTitle) aiTitle = String(row.aiTitle);
       // An empty one is a rename cleared.
       else if (row.type === 'custom-title') customTitle = String(row.customTitle ?? '');
-      else if (typedTurn(row)) reply = '';
+      else if (typedTurn(row)) { if (reply) before = reply; reply = ''; refused = false; }
+      // Claude Code's own refusal, written as if the agent said it.
+      else if (row.type === 'assistant' && row.isApiErrorMessage) refused = true;
       else if (row.type === 'assistant') {
         const text = messageText(row).trim();
         if (text) reply = reply ? `${reply}\n\n${text}` : text;
       }
     }
-    return { aiTitle, customTitle, lastSaid: reply.slice(-SAID_CHARS) };
+    return { aiTitle, customTitle, lastSaid: (reply || (refused ? before : '')).slice(-SAID_CHARS) };
   } catch {
     return { aiTitle: '', customTitle: '', lastSaid: '' };
   } finally {

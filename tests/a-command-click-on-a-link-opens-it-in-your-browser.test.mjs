@@ -75,8 +75,8 @@ describe('everything the pane opens goes outside on a ⌘-click', () => {
 
 describe('what a ⌘-click does not change', () => {
   it('a file the pane cannot draw already went outside, and still does', () => {
-    expect(whereALinkGoes('reports/audit.pdf', PLAIN)).toBe('outside');
-    expect(whereALinkGoes('reports/audit.pdf', CMD)).toBe('outside');
+    expect(whereALinkGoes('reports/audit.xlsx', PLAIN)).toBe('outside');
+    expect(whereALinkGoes('reports/audit.xlsx', CMD)).toBe('outside');
   });
 
   it('with no pane to open, a plain click goes outside as before', () => {

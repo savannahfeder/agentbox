@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createSourceUpdater } from '../main/source-updater.mjs';
+import { createSourceUpdater } from '../main/source-updater.mts';
 
 const git = (cwd, ...args) => execFileSync('git', args, {
   cwd,

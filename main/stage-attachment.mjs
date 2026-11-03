@@ -7,6 +7,7 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { turnedName } from '../shared/picture-formats.mjs';
+import { MAX_SENT_BYTES, MAX_SENT_MB } from '../shared/carried-files.mjs';
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 const SIPS_MS = 30_000;
@@ -44,6 +45,32 @@ export async function stageAttachment(dir, { name, dataBase64, srcPath } = {}, {
   if (!drawn) return { path: abs };
   try { fs.unlinkSync(abs); } catch { /* swept within the week */ }
   return { path: drawn, name: as };
+}
+
+/**
+ * One piece of a file too big to send across in one go (a film from a browser
+ * tab has no path, and a request carries 32 MB at most). Pieces come in order
+ * and are put together in the staging folder. Answers `{ path, size }`.
+ */
+export function stageAttachmentPart(dir, { id, name, at, dataBase64 } = {}) {
+  if (typeof id !== 'string' || !/^[a-z0-9]{8,40}$/.test(id)) throw new Error('That piece of the file has no proper name.');
+  const safe = String(name ?? 'file').replace(/[^\w.-]+/g, '-').replace(/^\.+/, '').slice(0, 80) || 'file';
+  const file = path.join(dir, `${id}-${safe}`);
+  const bytes = Buffer.from(String(dataBase64 ?? ''), 'base64');
+  if (at === 0) {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(file, bytes);
+    return { path: file, size: bytes.length };
+  }
+  let had;
+  try { had = fs.statSync(file).size; } catch { throw new Error(`${safe} lost its first pieces. Attach it again.`); }
+  if (had !== at) throw new Error(`A piece of ${safe} went missing. Attach it again.`);
+  if (had + bytes.length > MAX_SENT_BYTES) {
+    try { fs.unlinkSync(file); } catch { /* swept within the week */ }
+    throw new Error(`${safe} is over the ${MAX_SENT_MB} MB a message can send.`);
+  }
+  fs.appendFileSync(file, bytes);
+  return { path: file, size: had + bytes.length };
 }
 
 /**

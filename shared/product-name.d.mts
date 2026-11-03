@@ -4,3 +4,4 @@ export const Name: string;
 export const nameSlug: string;
 export const possessive: string;
 export const Possessive: string;
+export function fillName(text: string | null | undefined): string;

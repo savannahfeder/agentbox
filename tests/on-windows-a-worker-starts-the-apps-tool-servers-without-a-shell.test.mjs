@@ -77,7 +77,7 @@ describe('the config the supervisor hands a worker', () => {
   const servers = (platform) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tool-servers-'));
     const sup = new Supervisor({ storeRoot: dir }, { listItems: () => [], listProducts: () => [] }, REPO);
-    try { return sup.mcpServers(platform); } finally { sup.stop?.(); fs.rmSync(dir, { recursive: true, force: true }); }
+    try { return sup.mcpServers(null, platform); } finally { sup.stop?.(); fs.rmSync(dir, { recursive: true, force: true }); }
   };
 
   it('starts both servers on Windows without a shell, keeping their own settings', () => {

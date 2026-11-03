@@ -11,7 +11,7 @@ const read = (f) => fs.readFileSync(new URL(`../renderer/src/${f}`, import.meta.
 describe('your messages in the team chat', () => {
   it('carry your photo when you have one, and your initials when you do not', () => {
     const page = read('teammates/TeammatesPage.tsx');
-    expect(page).toMatch(/mine \? \(mePic \? <img className="rm-pic tq-you tq-ph" src=\{mePic\} alt="" referrerPolicy="no-referrer" \/> : <span className="rm-pic rm-ini tq-you"/);
+    expect(page).toMatch(/mine \? <Face name=\{me\} url=\{mePic\}>/);
   });
 
   it('are handed the same photo the sidebar draws for you', () => {

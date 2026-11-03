@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { Room } from '../../types';
 import { LiveMark } from '../../components/LiveMark';
 import { I } from './icons';
-import { RoomFace } from './RoomFace';
+import { Face } from '../people';
 import { cardName, sentWords } from './room-rules';
 import { useOutside } from './RoomsPage';
 import { joinLink } from '../../../../shared/room-links.mjs';
@@ -49,7 +49,7 @@ export function InviteDialog({ room, link, now, onCopy, onEmail, loadSent, onClo
     <div className="sec">
       <div className="room"><span className="ttl">{I.hash(15)}{room.name}</span>{close(onClose)}</div>
       <div className="who">
-        {others.length > 0 && <span className="rm-faces">{others.slice(0, 7).map((c) => <RoomFace key={c.id} name={c.name} url={c.avatarUrl} size={26} />)}</span>}
+        {others.length > 0 && <span className="rm-faces">{others.slice(0, 7).map((c) => <Face key={c.id} name={c.name} url={c.avatarUrl} size={26} />)}</span>}
         <span>{room.members} {room.members === 1 ? 'person' : 'people'}, {room.agents} {room.agents === 1 ? 'agent' : 'agents'} working right now</span>
       </div>
     </div>
@@ -68,7 +68,7 @@ export function InviteDialog({ room, link, now, onCopy, onEmail, loadSent, onClo
       {error && <span className="rm-err" role="alert">{error}</span>}
     </div>
     {sent.length > 0 && <div className="sec rm-pend"><span className="rm-label">Invited</span>
-      {sent.map((s) => <div className="row2" key={s.email}><RoomFace name={s.email} size={22} />{s.email}<em>{sentWords(s, now)}</em></div>)}
+      {sent.map((s) => <div className="row2" key={s.email}><Face name={s.email} size={22} />{s.email}<em>{sentWords(s, now)}</em></div>)}
     </div>}
   </Dialog>;
 }
@@ -134,10 +134,10 @@ export function JoinDialog({ preview, myName, onJoin, onClose }: {
       : <>
         <div className="sec">
           <div className="rm-from">{preview.invitedBy
-            ? <><RoomFace name={preview.invitedBy.name} url={preview.invitedBy.avatar} size={20} />{preview.invitedBy.name} invited you to</>
+            ? <><Face name={preview.invitedBy.name} url={preview.invitedBy.avatar} size={20} />{preview.invitedBy.name} invited you to</>
             : 'You are invited to'}</div>
           <span className="rm-big">{I.hash(24)}{preview.name}</span>
-          {preview.faces.length > 0 && <div className="rm-joinfaces">{preview.faces.slice(0, 8).map((f, i) => <RoomFace key={i} name={f.name} url={f.avatar} size={48} />)}</div>}
+          {preview.faces.length > 0 && <div className="rm-joinfaces">{preview.faces.slice(0, 8).map((f, i) => <Face key={i} name={f.name} url={f.avatar} size={48} />)}</div>}
           <span className="rm-live"><LiveMark still={!preview.agentsRunning} />{preview.members} {preview.members === 1 ? 'person' : 'people'} working with {preview.agentsRunning} {preview.agentsRunning === 1 ? 'agent' : 'agents'} right now</span>
         </div>
         <div className="sec">
@@ -160,7 +160,7 @@ export function MembersMenu({ room, at, onInvite, onClose, onPerson }: { room: R
     <div className="head"><span className="rm-label">{room.members} {room.members === 1 ? 'member' : 'members'}</span></div>
     {room.kind !== 'group' && <><button type="button" className="row" onClick={onInvite}>{I.invite()}<span>Invite people</span></button><div className="rule" /></>}
     {people.map((c) => <button type="button" key={c.id} className="row" onClick={() => onPerson?.(c.id)}>
-      <RoomFace name={c.name} url={c.avatarUrl} size={18} /><span>{cardName(c)}</span>{c.level != null && <span className="k">{c.level}</span>}</button>)}
+      <Face name={c.name} url={c.avatarUrl} size={18} /><span>{cardName(c)}</span>{c.level != null && <span className="k">{c.level}</span>}</button>)}
     {hidden > 0 && <div className="row" style={{ color: 'var(--text-faint)' }}>{hidden} more not showing</div>}
   </div>;
 }

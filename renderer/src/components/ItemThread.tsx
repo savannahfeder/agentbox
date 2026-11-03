@@ -31,6 +31,7 @@ import { pollEvery, oneAtATime } from '../phone-polls';
 import { changePathFor, type Change } from '../code-artifact';
 import { filedOnTurn } from '../filed-in-thread';
 import { itemThread, type PendingSaid } from '../item-thread';
+import { useFileLine } from '../file-numbers';
 import { resultLeads } from '../recap';
 import { withoutTrailingWork } from '../trailing-work';
 import { marksFor, readUndoMarks, UNDO_MARKS_EVENT, type UndoMark } from '../undo-marks';
@@ -39,16 +40,24 @@ import { notShipped } from '../../../shared/not-shipped.mjs';
 import type { ModelChoice } from '../models';
 import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
-import type { AgentTurn, RunningSession, WorkItem } from '../types';
+import { withEveryRun } from '../every-run';
+import type { AgentTurn, FileMarkLink, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
+import { FileMarkOpener } from './FileMarkLine';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
-import { appWrote, drawnWhole, earlierCount, earlierThan, newestAnswer, pageTitle, standsAt, workingFrom } from '../one-thing-at-a-time';
+import { catchUpDue } from '../../../shared/agent-import.mjs';
+import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, newestAnswer, pageTitle, standsAt, workingContext, workingFrom } from '../one-thing-at-a-time';
 import { gapIndex } from '../../../shared/agents.mjs';
 import { askMarkUnread, say } from '../team/chat-events';
+import { seenLine } from '../team/seen-line';
+import { conversationName } from '../threads/page-rules';
+import { firstName } from '../team/people';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { TeammatesContext } from '../teammates/row-lead';
 import { RouteLine } from './RouteLine';
+import { withoutLoneQuoteMark } from '../typed-message';
 import { teammateIdOf, OFFER_LABEL } from '../../../shared/teammates.mjs';
+import { REACH_LABEL } from '../../../shared/teammate-reach.mjs';
 import { Name } from '../../../shared/product-name.mjs';
 
 // THE BACKSTOP, NOT THE HEARTBEAT.
@@ -73,14 +82,18 @@ const REFRESH_MS = 8_000;
 // screen is the kind of drift this row exists to end.
 const THEM = 'The agent';
 
-export function ItemThread({ item, engine, engineChoice, codexModels = [], codexModelDefault = null, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent, thread, queue }: {
+export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexModels = [], codexModelDefault = null, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent, thread, queue }: {
+  /** What a "on onboarding-a.png, Pin 1" link in this thread opens. */
+  onOpenFileMark?: (link: FileMarkLink) => void;
   /** One thing at a time (w-65bcefb857): the summary on top, the newest answer, the rest folded. */
-  queue?: { context: string | null };
+  queue?: { context: string | null; repeats?: string | null };
   // A CHAT'S THREAD, IN THE PANEL BESIDE IT (w-920461cbe6). The pane owns which
   // one is open and how wide it is; this draws it, because this is where the
   // replies were read. `host` is the pane the panel is drawn into. Absent
   // everywhere but a conversation between people.
   thread?: {
+    /** Whether the panel was opened by a press, and so takes the keyboard. */
+    takeKeyboard?: boolean;
     open: string | null;
     host: HTMLElement | null;
     width: number;
@@ -114,7 +127,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   // this conversation into work. The second was a line under the whole
   // conversation and is an action on one message now (w-560647d4db).
   onQuote?: (text: string) => void;
-  onHandToAgent?: () => void;
+  onHandToAgent?: (message: AgentTurn) => void;
   // CUT THE RUNNING STEP so her waiting message is answered now (w-f37a34def6).
   // Handed in: this view draws a conversation and never writes anything.
   onSendNow?: () => unknown;
@@ -174,7 +187,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   const teammateId = teammateIdOf(item);
   const signer = teammateId ? teammates.get(teammateId) ?? null : null;
   // The offer of a teammate is the app's own words, so it is signed with its name.
-  const teammate = teammateId ? teammates.get(teammateId) ?? null : (item.labels ?? []).includes(OFFER_LABEL) ? { name: Name } : null;
+  const teammate = teammateId ? teammates.get(teammateId) ?? null : (item.labels ?? []).some((l) => l === OFFER_LABEL || l === REACH_LABEL) ? { name: Name } : null;
   // Keyed to its row: the effect below empties it only after the first paint
   // of a new row, and without the key that frame drew the last row's messages
   // under this one's header (w-388be0a968).
@@ -196,12 +209,24 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   // timer.
   const [whole, setWhole] = useState(false);
   useEffect(() => { setWhole(false); }, [item.product, item.id]);
+  // The regular read below has only the newest runs; the middle needs them all.
+  const [everyRun, setEveryRun] = useState<TraceSession[]>([]);
+  useEffect(() => {
+    setEveryRun([]);
+    if (!whole) return;
+    let live = true;
+    api.sessionTrace({ product: item.product, id: item.id, whole: true })
+      .then((r) => { if (live) setEveryRun(r?.sessions ?? []); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [item.product, item.id, whole]);
   const [earlierOpen, setEarlierOpen] = useState(false);
   useEffect(() => { setEarlierOpen(false); }, [item.product, item.id]);
 
   // A REACTION SHOWS THE MOMENT IT IS PRESSED (w-45cbac227a), in the chat and in
   // the thread panel alike, rather than after the sync and the next snapshot.
-  const me = useContext(TeamContext)?.me ?? null;
+  const team = useContext(TeamContext);
+  const me = team?.me ?? null;
   const sendReaction = useCallback((p: Press) => api.teamReact({ product: item.product, id: item.id, ...p })
     .then((r) => { if (!r?.ok) throw new Error(r?.error ?? 'that reaction did not save'); }), [item.product, item.id]);
   const chips = useReactionsNow(item.reactions, me, sendReaction);
@@ -277,6 +302,9 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
     return () => { live = false; off(); clearInterval(timer); };
   }, [item.product, item.id, item.updatedAt, session?.startedAt]);
 
+  // A note on a file names its version by the number Files gives it.
+  const fileLine = useFileLine(item.product, item.id, ledger?.lines?.length ?? 0, false);
+
   if (!ledger) return <ThreadWaiting head="Reading this conversation…" />;
   if (ledger.error) return <div className="thread-wait">{ledger.error}</div>;
 
@@ -288,7 +316,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   const saying = session?.saying && session.sayingAt
     ? { text: session.saying, at: session.sayingAt, run: session.startedAt }
     : null;
-  const built = itemThread(ledger.lines, sessions, saying, { whole, engine, pending: sending, chat, undone: marksFor(undoMarks, item.product, item.id) });
+  const built = itemThread(ledger.lines, withEveryRun(everyRun, sessions), saying, { whole, engine, pending: sending, chat, undone: marksFor(undoMarks, item.product, item.id), numbers: fileLine.numbers });
   const said = built.events.map((e) => (e.kind === 'work' ? e : { ...e, text: clean(e.text ?? '') }));
   /* * WHILE AN AGENT IS WORKING, THE LAST THING ON THE PAGE IS THE THINKING
      COMPONENT, AND THE COMMANDS UNDER IT ARE ITS OWN.
@@ -315,9 +343,11 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   // The opening ask goes in front of everything, as a message. It is never windowed
   // away, because the window keeps the opening of a conversation and this IS
   // the opening.
-  const events = opening
+  const told = opening
     ? [{ at: opening.at, who: 'you' as const, text: opening.text, on: opening.on }, ...shown]
     : shown;
+  const startsAt = told.findIndex((e) => e.kind !== 'work');
+  const events = told.map((e, n) => (n === startsAt && e.kind !== 'work' && e.who === 'you' ? { ...e, text: withoutLoneQuoteMark(e.text ?? '') } : e));
   const { omitted, outcome, after } = built;
   // The message the open thread hangs off, if it is on the screen. One that is
   // not (scrolled into the older part, or gone) draws no panel at all.
@@ -357,8 +387,8 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
               page, so it is signed in the label it already has rather than in
               a byline of its own. */}
           <div className={unshipped ? 'appendix-label appendix-unshipped' : 'appendix-label'}>
-            {outcome.field === 'result' ? 'Result' : unshipped ? 'Not shipped' : 'Latest checkpoint'}
-            {ranSaid && <span className="appendix-ran">{ranSaid}</span>}
+            {outcome.field === 'result' ? ranSaid ?? 'Result' : unshipped ? 'Not shipped' : 'Latest checkpoint'}
+            {ranSaid && outcome.field !== 'result' && <span className="appendix-ran">{ranSaid}</span>}
           </div>
           {md(clean(outcome.text))}
         </div>
@@ -372,6 +402,18 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   };
   const markUnread = () => { askMarkUnread({ product: item.product, id: item.id }); };
   const copied = () => say('Copied');
+  const record = chat ? team?.products.get(item.product)?.team : null;
+  const seenUnder = record && team ? seenLine({
+    events, me: team.me,
+    others: [...new Set([...(record.people ?? []), ...(record.sharedBy ? [record.sharedBy] : [])])].filter((p) => p !== team.me),
+    seen: team.state.seen?.[`${item.product}/${item.id}`],
+    nameOf: (id) => firstName(team.byId.get(id) ?? null),
+  }) : null;
+  const talkName = chat && team ? conversationName(item, team.products.get(item.product), team.me, (id) => firstName(team.byId.get(id) ?? null)) : null;
+  const moveToThread = (uid: string) => {
+    void api.teamMoveToThread({ product: item.product, id: item.id, on: uid })
+      .then((r) => say(r?.ok ? 'Moved to a new thread.' : r?.error ?? 'That did not move.'));
+  };
 
   // With no answer to lead with, the page draws the conversation as it always is, under the summary.
   // The app's own note ("Shipped to main as …") goes under the agent's answer rather than in its place.
@@ -385,13 +427,13 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   const start = stands > gapIndex(events, omitted) ? stands : -1;
   const alone = !!newest && !working && stands < 0;
   const behind = start >= 0 ? earlierThan(events, start) + omitted : alone ? earlierCount(events, byApp ? null : outcome) + omitted : 0;
-  const short = !earlierOpen && drawnWhole(behind);
+  const short = !earlierOpen && drawnWhole(behind, broughtIn(item));
   const from = short || earlierOpen ? -1 : start;
   const queueHead = queue && (
     <QueueSummary
       key={`${item.product}:${item.id}`}
-      title={pageTitle(item)}
-      context={queue.context}
+      title={talkName ?? pageTitle(item)}
+      context={working && !queue.context ? workingContext(item.body ?? item.title ?? '', pageTitle(item), queue.repeats ?? null) : queue.context}
       earlier={short ? 0 : behind}
       steps={!short && alone && (events.some((e) => e.kind === 'work') || after.length > 0)}
       open={earlierOpen}
@@ -404,6 +446,16 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
       {after.map((act, i) => <ActLine key={`${act.at}-${i}`} act={act} />)}
     </div>
   );
+  // A chat just brought in is being written up as a thread (main/catch-up.mjs). Its raw end stays readable until then.
+  if (queue && catchUpDue(item)) {
+    return (
+      <>
+        {queueHead}
+        <p className="one-catching-up"><span className="live-word is-shimmering">Getting this chat ready. Its summary and options will appear here.</span></p>
+        {newest && <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} />}
+      </>
+    );
+  }
   if (alone && !earlierOpen && !short) {
     return (
       <>
@@ -417,7 +469,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   }
 
   return (
-    <>
+    <FileMarkOpener.Provider value={onOpenFileMark ?? null}>
       {queueHead}
       <Thread
         events={from >= 0 ? events.slice(from) : events}
@@ -459,6 +511,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
           onEdit: editMessage,
           onMarkUnread: markUnread,
           onCopied: copied,
+          ...(team?.products.get(item.product)?.team?.direct ? { onMove: moveToThread, seenUnder } : {}),
           ...(thread ? { replies: built.replies, openThread: thread.open, onOpenThread: thread.onOpen, freshThreads: thread.fresh } : {}),
         } : {})}
       />
@@ -478,6 +531,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
           onMarkUnread={markUnread}
           onCopied={copied}
           onHandToAgent={onHandToAgent}
+          takeKeyboard={thread.takeKeyboard}
           onSend={(text) => thread.onSend(openParent.uid!, text)}
           onClose={thread.onClose}
           onResize={thread.onResize}
@@ -488,6 +542,6 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
       {afterList}
       {/* AND WHAT THE NEWEST TURN FILED, under its own last word. */}
       {madeList(made.atFoot)}
-    </>
+    </FileMarkOpener.Provider>
   );
 }

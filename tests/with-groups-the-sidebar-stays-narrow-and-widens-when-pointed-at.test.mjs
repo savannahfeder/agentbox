@@ -73,7 +73,7 @@ describe('in the app', () => {
   // (tests/the-narrow-sidebar-is-the-only-sidebar).
   it('with Groups on, on a desktop, the sidebar is narrow and wide only while pointed at', () => {
     expect(app).toContain('const narrowSidebar = !onPhone();');
-    expect(app).toContain('const sideFolded = !railOpen;');
+    expect(app).toMatch(/const sideFolded = sidebarFolded\(/);
     expect(app).toMatch(/rail=\{narrowSidebar\} onHover=\{setRailOpen\}/);
     // Narrow, the page starts 44 points past the 38-point strip; wide, it moves over
     // (tests/the-narrow-sidebar-opens-by-moving-the-page-over).

@@ -32,7 +32,7 @@ describe('what wakes a teammate', () => {
     const words = 'You have just been started. Introduce yourself.';
     expect(title({ id: 'm-s', kind: 'msg', from: 'you', to: [felix.id], text: words, start: true, ts: NOW })).toBe('Introduce itself and begin');
     expect(title({ id: 'm-d', kind: 'msg', from: 'you', to: [felix.id], text: 'Someone to chase invoices', setup: true, ts: NOW },
-      { ...felix, name: 'New teammate', status: 'draft' })).toBe('Set up its job');
+      { ...felix, name: 'New teammate', status: 'draft' })).toBe('Set up a new teammate');
     expect(title({ id: 'm-w', kind: 'msg', from: 'you', to: [felix.id], text: words, ts: NOW })).toBe(words);
     // The inbox row already leads with the name, so no title repeats it.
     const round = (t) => planWakes({ teammates: [t], chat: chat([]), items: [], now: NOW }).find((a) => a.type === 'run').title;

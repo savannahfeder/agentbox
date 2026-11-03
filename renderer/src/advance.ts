@@ -21,6 +21,8 @@
 // resolve something, because there are eight of those and fixing branches is
 // how the ninth gets missed (the same reason keys.ts exists).
 
+import { DONT_SEND } from '../../shared/teammate-reach.mjs';
+
 /**
  * The slot to reopen once the resolved item is gone: its own place in the
  *  inbox, and the id to leave out of the count while its write is deferred. */
@@ -46,6 +48,30 @@ export function advanceAfter(p: { fromTask: boolean; index: number; id: string }
 export function replyMovesOn(p: { view: string; onBoard: boolean; index: number; searching?: boolean; phone?: boolean }): boolean {
   // With search open, the tab under it is not where the work is happening.
   return !p.phone && !p.searching && advanceLandsHere(p) && p.index >= 0;
+}
+
+const MORE_COMING = /\?\s*$|\bask me\b|\bI(?:'ll| will) (?:explain|say|tell|describe)\b|\blet me (?:explain|say|describe)\b/i;
+
+/** A pick answers and moves on, unless the talk plainly carries on here: its words promise more, or an agent is on the thread now. */
+export function pickStaysPut(option: string, { live }: { live: boolean }): boolean {
+  return live || MORE_COMING.test(option.replace(/\s*\(recommended\)\s*$/i, ''));
+}
+
+/** What the toast says went, and where, for a press that may have moved you on. */
+export function pickSentWords(option: string, title: string): string {
+  const words = option.replace(/\s*\(recommended\)\s*$/i, '').trim();
+  if (words === DONT_SEND) return `Not sent to ${title}`;
+  return `Sent “${words.length > 48 ? `${words.slice(0, 47)}…` : words}” to ${title}`;
+}
+
+/** The first words of the line over the reply box, for what the toast says happened. */
+export const sentLineSays = (toast: string) => (/^Not sent\b/.test(toast) ? 'Not sent to' : 'Sent to');
+
+const JUST_ARRIVED_MS = 10_000;
+
+/** R on a thread the app just moved you to says whose box it opened: your hand may still be on the last thread. */
+export function sayWhoseBox(arrival: { key: string; at: number } | null, here: string, now: number): boolean {
+  return !!arrival && arrival.key === here && now - arrival.at < JUST_ARRIVED_MS;
 }
 
 /**

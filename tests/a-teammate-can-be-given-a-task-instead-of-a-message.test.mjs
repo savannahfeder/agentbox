@@ -47,9 +47,9 @@ describe('what Due On says', () => {
 
   it('names today and tomorrow by name, and the rest by weekday', () => {
     const friday = new Date(2026, 9, 23);
-    expect(dueWords('2026-10-23', friday)).toBe('Today');
-    expect(dueWords('2026-10-24', friday)).toBe('Tomorrow');
-    expect(dueWords('2026-10-26', friday)).toBe('Monday');
+    expect(dueWords('2026-10-23', friday)).toBe('Today, Fri 23 Oct');
+    expect(dueWords('2026-10-24', friday)).toBe('Tomorrow, Sat 24 Oct');
+    expect(dueWords('2026-10-26', friday)).toBe('Mon 26 Oct');
   });
 
   // A day further out than the picker offers still has to read as a day, not
@@ -65,11 +65,12 @@ describe('which rows the head shows', () => {
   });
 
   it('asks a person which it is', () => {
-    expect(headRows({ person: true, kind: 'message' })).toEqual(['to', 'sendAs']);
+    expect(headRows({ person: true, kind: 'message' })).toEqual(['to', 'sendAs', 'subject']);
   });
 
-  it('adds the day only once it is a task', () => {
-    expect(headRows({ person: true, kind: 'task' })).toEqual(['to', 'sendAs', 'dueOn']);
+  // And what it is blocked by (Dev wrote "blocked on my restyle" in words).
+  it('adds the day and the block only once it is a task', () => {
+    expect(headRows({ person: true, kind: 'task' })).toEqual(['to', 'sendAs', 'dueOn', 'blockedBy']);
   });
 
   // The agent card is untouched by any of this; a model is still the only

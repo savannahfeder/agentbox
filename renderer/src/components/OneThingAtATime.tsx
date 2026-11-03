@@ -9,8 +9,10 @@ import { ArtifactControlGlyph } from './ArtifactControlGlyph';
 import { DocumentPreview } from './DocumentPreview';
 import { HtmlPreview } from './HtmlPreview';
 import '../one-thing-at-a-time.css';
+import './doc-reading.css';
 import { TeammateMark } from '../teammates/TeammatesRail';
 import { clock, dayHeading } from '../thread-history';
+import { shownName } from '../../../shared/artifact-marks.mjs';
 import type { Teammate } from '../types';
 
 /** What this page reads in place rather than as a tile: a page an agent made, or a note. */
@@ -135,7 +137,7 @@ export function QueueFile({ product, path, md, onOpen, onSide }: { product: stri
         onFold={() => { setExpanded(false); setFolded((f) => !f); }}
         onCondense={() => setExpanded(false)} onOpen={onOpen} onSide={onSide} />
       {!folded && page && url && <HtmlPreview key={`${product}:${path}`} url={url} path={path} expanded={expanded} onExpandedChange={setExpanded} />}
-      {!folded && !page && text != null && <DocumentPreview key={`${product}:${path}`} expanded={expanded} onExpandedChange={setExpanded}><div className="markdown one-notebody">{md(text)}</div></DocumentPreview>}
+      {!folded && !page && text != null && <DocumentPreview key={`${product}:${path}`} expanded={expanded} onExpandedChange={setExpanded} onOpen={onOpen}><div className="markdown one-notebody doc-prose">{md(text)}</div></DocumentPreview>}
     </section>
   );
 }
@@ -148,7 +150,7 @@ export function FilePreviewHeader({ path, folded, expanded, onFold, onCondense, 
   return (
     <div className="one-filehead" onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') event.stopPropagation(); }}>
       <button ref={name} type="button" className="one-filefold" aria-expanded={!folded} onClick={onFold}>
-        {chevron(!folded)}<span className="one-filename">{path.split('/').pop()}</span>
+        {chevron(!folded)}<span className="one-filename">{shownName(path)}</span>
       </button>
       <div className="one-fileactions">
         {expanded && !folded && <button type="button" className="one-filecondense"
@@ -197,7 +199,6 @@ export function ChoicesShow({ count, onShow }: { count: number; onShow: () => vo
 export function QueueNav({ spot, onStep }: { spot: Spot; onStep: (dir: 1 | -1) => void }) {
   return (
     <span className="one-nav">
-      <span className="one-pos">{spot.pos} of {spot.total}</span>
       <button type="button" className="ts-more one-step" data-hint="previous-thread" data-hint-align="right" aria-label="Previous thread (K)" disabled={spot.index <= 0} onClick={() => onStep(-1)}>{chevron(true)}</button>
       <button type="button" className="ts-more one-step" data-hint="next-thread" data-hint-align="right" aria-label="Next thread (J)" disabled={spot.pos >= spot.total} onClick={() => onStep(1)}>{chevron(false)}</button>
     </span>

@@ -4,7 +4,7 @@ import {updateFixture} from './agent-update-fixture';
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
-import type { AccountUsageReading, AgentConversation, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FolderListing, FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, UsageLimit, WorkItem } from './types';
+import type { AccountUsageReading, AgentConversation, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, UsageLimit, WorkItem } from './types';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
@@ -13,12 +13,15 @@ import { fixtureAgents, fixtureSnapshot, fixtureDashboards, fixtureRepeats, fixt
 import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine } from './fixtures';
 import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
+import type { CarryState } from '../../shared/carried-files.mjs';
 import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
 import { whileSystemWindowIsOpen } from './system-window';
 import { USAGE_SAME_AS_ANOTHER, USAGE_UNREADABLE } from '../../shared/usage.mjs';
 import { accountSentence } from '../../shared/spawn-trouble.mjs';
 import { MOVE_SAY } from '../../shared/where-it-runs-from.mjs';
 import { cardsInFront } from '../../shared/which-card-is-in-front.mjs';
+import { snapshotReader } from '../../shared/snapshot-delta.mjs';
+import { traceReader } from '../../shared/trace-delta.mjs';
 // THE SECOND FRONT DOOR, AND IT HAS TO BE BUILT BEFORE THE LINE BELOW RUNS.
 // `useFixtures` reads `window.zero` once, at module load, and on the desktop
 // preload.cjs has already put it there. In a browser tab nothing has, so this
@@ -38,6 +41,13 @@ async function teamCall(fn: () => Promise<TeamCallResult>): Promise<TeamCallResu
   if (!window.zero?.teamSignIn) return { ok: false, error: 'This build has no team cloud set up.' };
   try { return await fn(); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
 }
+
+// The inbox and the open threads' agent logs as last answered, so each read
+// asks only for what changed since.
+const snapshots = snapshotReader();
+const traces = traceReader();
+// Which thread is on screen: only its agent's live detail is sent.
+let openThread: { product: string | null; id: string } | null = null;
 
 // READ SAFELY, BECAUSE THIS MODULE IS NOW REACHED FROM A COMPONENT THE TESTS
 // RENDER WITHOUT A WINDOW. The walk's last card is <ImportAgents> now, so
@@ -301,7 +311,7 @@ export function updateShape(wanted: string): UpdateState {
     // moment it is read.
     ready: { phase: 'ready', newVersion: '0.2.0', percent: 100, ready: true, readyAt: Date.now() - 62 * 60_000 },
     downloading: { phase: 'downloading', newVersion: '0.2.0', percent: 47 },
-    // A copy run from source (main/source-updater.mjs): versions are commit
+    // A copy run from source (main/source-updater.mts): versions are commit
     // ids, and the row lists what changed.
     source: {
       phase: 'ready', ready: true, source: true, currentVersion: '5c6afa7', newVersion: '9e1b204',
@@ -325,7 +335,7 @@ export function updateShape(wanted: string): UpdateState {
       moveError: 'The move did not work.',
     },
     // WHY A COPY DOES NOT UPDATE ITSELF AT ALL, which is the state most
-    // teammates' checkouts are actually in (main/source-updater.mjs SAY).
+    // teammates' checkouts are actually in (main/source-updater.mts SAY).
     unsupported: {
       phase: 'unsupported', source: true, currentVersion: '5c6afa7',
       error: 'This folder has changes of your own in it, so it does not update itself.',
@@ -555,7 +565,10 @@ export const api = {
       }
       return fixtureSecondEngine(base, engineFixtures);
     }
-    return window.zero!.snapshot();
+    const got = snapshots.take(await window.zero!.snapshot({ ...snapshots.ask(), open: openThread }));
+    if (got) return got;
+    // Built on a list this window no longer holds: a whole one, which take() never refuses.
+    return snapshots.take(await window.zero!.snapshot({ open: openThread })) as Snapshot;
   },
 
   // WHERE YOU ARE, FOR THE ONE THING THAT DEPENDS ON IT: the approval card in
@@ -565,6 +578,7 @@ export const api = {
   async lookingAt(at: { product: string | null; id: string } | null): Promise<void> {
     // Fixtures have no main process to order the cards, and ?approvals is how
     // this card is reviewed, so the same shared rule is applied here.
+    openThread = at?.id ? { product: at.product, id: at.id } : null;
     if (useFixtures) { fixtureLooking = at; return; }
     try { await window.zero?.looking?.({ product: at?.product ?? null, id: at?.id ?? null }); } catch { /* the card simply stays where it was */ }
   },
@@ -655,9 +669,15 @@ export const api = {
   // The session traces behind the working notes. It comes through the seam
   // like everything else, so the notes can be built, reviewed and screenshotted
   // from fixtures instead of only against a live fleet.
-  async sessionTrace(p: { product: string; id: string }): Promise<{ sessions: Array<{ startedAt: number; text: string }> }> {
+  async sessionTrace(p: { product: string; id: string; whole?: boolean }):Promise<{ sessions: Array<{ startedAt: number; text: string }> }> {
     if (useFixtures) return { sessions: (fixtureTraces as any)[p.id] ?? [] };
-    return (window.zero as any)?.sessionTrace?.(p) ?? { sessions: [] };
+    const zero = window.zero as any;
+    if (!zero?.sessionTrace) return { sessions: [] };
+    // Read once and kept by the thread page, so the newest logs' copy stays as it is.
+    if (p.whole) return (await zero.sessionTrace(p)) ?? { sessions: [] };
+    const key = `${p.product}/${p.id}`;
+    const got = traces.take(key, await zero.sessionTrace({ ...p, have: traces.have(key) }));
+    return got ?? traces.take(key, await zero.sessionTrace(p)) ?? { sessions: [] };
   },
 
   // THE DOCUMENT PANE'S THREE. All of them go through the app's own finder in
@@ -674,7 +694,7 @@ export const api = {
   // the pane points its frame at, so the page's own pictures load (main/
   // doc-scheme.mjs). An older preload has no such field, and the pane says so
   // rather than drawing a page with holes in it.
-  async resolveDoc(p: { product: string; src: string }): Promise<{ ok: boolean; opened?: string; url?: string; error?: string }> {
+  async resolveDoc(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; opened?: string; url?: string; error?: string; coming?: boolean; waits?: boolean; note?: string; carry?: CarryState }> {
     if (useFixtures && ['artifact-layout-sample.change', 'review-bundle.change'].includes(p.src)) return { ok: true, opened: p.src };
     if (useFixtures && p.src === 'artifact-layout-sample.md') return { ok: true, opened: p.src };
     if (useFixtures && p.product === 'onboard' && ['designs/w-n13/the-first-row.html', '/fixtures/onboard/designs/w-n13/the-first-row.html'].includes(p.src)) return { ok: true, opened: p.src, url: '/fixtures/onboard/designs/w-n13/the-first-row.html' };
@@ -683,11 +703,17 @@ export const api = {
     return zero.openArtifact({ ...p, mode: 'resolve' });
   },
 
-  async readDoc(p: { product: string; src: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string }> {
+  async readDoc(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string; coming?: boolean; waits?: boolean; carry?: CarryState }> {
     if (useFixtures && p.src === 'artifact-layout-sample.md') return {ok:true,text:artifactSampleNotes,mtime:0};
     const zero = window.zero as any;
     if (!zero?.readDoc) return { ok: false, error: `quit and reopen ${NAME} to open documents here` };
     return zero.readDoc(p);
+  },
+
+  /** "Try again" on a file in a conversation that was not delivered. */
+  async retryFile(p: { product: string; src: string }): Promise<boolean> {
+    const zero = window.zero as any;
+    return zero?.retryFile ? !!(await zero.retryFile(p)) : false;
   },
 
   // THE CHANGE A RUN MADE, read out of the conversation rather than out of
@@ -815,7 +841,7 @@ export const api = {
   // once instead of after it (main/claude-input.mjs `interrupt`).
   // `inReplyTo` is the uid of the message a reply in a thread answers
   // (w-920461cbe6); main keeps it only in a conversation between people.
-  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean }): Promise<WorkItem | null> {
+  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; putAway?: boolean }): Promise<WorkItem | null> {
     if (useFixtures) return null;
     return window.zero!.answer(p);
   },
@@ -845,7 +871,7 @@ export const api = {
   async teamAcceptInvite(teamId: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamAcceptInvite({ teamId })); },
   async teamInvite(email: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamInvite({ email })); },
   async teamRename(name: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRename({ name })); },
-  async teamRemoveMember(personId: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRemoveMember({ personId })); },
+  async teamRemoveMember(personId: string, handover: { handTo: string; mates: { id: string; to: string | null }[] } | null = null): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRemoveMember({ personId, ...(handover ?? {}) })); },
   async teamLeave(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamLeave()); },
   async teamCancelInvite(email: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamCancelInvite({ email })); },
   // A line you write about yourself. Saying nothing clears it.
@@ -856,14 +882,91 @@ export const api = {
   async teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRoute(p)); },
   // A chip put on or taken off one message. `on` is the uid of the ledger line
   // the message was written as (w-560647d4db).
+  async teamThreadWork(p: { personId: string; threadId: string }): Promise<TeammateThreadWork> {
+    if (!window.zero?.teamThreadWork) return { shared: false, lines: [], earlier: 0, product: null, dir: null };
+    return window.zero.teamThreadWork(p);
+  },
+  // Lines, files and comments inside threads (main/everything-found.mjs).
+  async findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number } }): Promise<FoundInThreads> {
+    const none: FoundInThreads = { lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 } };
+    if (!window.zero?.findInThreads) return none;
+    const got = await window.zero.findInThreads(p).catch(() => none);
+    return got.ok === false ? none : got;
+  },
+  warmFindInThreads(): void { void window.zero?.warmFindInThreads?.()?.catch?.(() => {}); },
+  async teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamComment(p)); },
   async teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamReact(p)); },
+  async fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }> {
+    if (!window.zero?.fileMark) return { ok: false, error: `quit and reopen ${NAME} to comment here` };
+    return window.zero.fileMark(p);
+  },
+  async fileNewVersion(p: { product: string; id: string; path: string; text: string; since?: string | null }): Promise<{ ok: boolean; path?: string; error?: string }> {
+    if (!window.zero?.fileNewVersion) return { ok: false, error: `quit and reopen ${NAME} to edit here` };
+    return window.zero.fileNewVersion(p);
+  },
+  async teamMarkFile(p: { personId: string; threadId: string; mark: ArtifactMark }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMarkFile(p)); },
+  async connections(): Promise<ConnectionsList> {
+    return (await window.zero?.connections?.().catch(() => null)) ?? { tiles: [], canEncrypt: false, projects: [], groups: [] };
+  },
+  async connectionsConnect(p: ConnectAsk): Promise<ConnectAnswer> {
+    if (!window.zero?.connectionsConnect) return { ok: false, error: `quit and reopen ${NAME} to connect this` };
+    return window.zero.connectionsConnect(p);
+  },
+  async connectionsAdd(p: { address: string; key?: string }): Promise<ConnectAnswer> {
+    if (!window.zero?.connectionsAdd) return { ok: false, error: `quit and reopen ${NAME} to connect this` };
+    return window.zero.connectionsAdd(p);
+  },
+  async connectionsChoose(p: { id: string; names: string[] }): Promise<ConnectionTile | null> { return (await window.zero?.connectionsChoose?.(p).catch(() => null)) ?? null; },
+  async connectionsCopy(p: CopyAct): Promise<{ ok: boolean; error?: string }> {
+    if (!window.zero?.connectionsCopy) return { ok: false, error: `quit and reopen ${NAME} to do this` };
+    return window.zero.connectionsCopy(p);
+  },
+  async connectionsCancel(p: { id: string }): Promise<void> { await window.zero?.connectionsCancel?.(p); },
+  async connectionsCheck(p: { id: string }): Promise<ConnectionTile | null> { return (await window.zero?.connectionsCheck?.(p).catch(() => null)) ?? null; },
+  async connectionsDisconnect(p: { id: string }): Promise<void> { await window.zero?.connectionsDisconnect?.(p); },
+  async connectionsAccept(p: { id: string }): Promise<void> { await window.zero?.connectionsAccept?.(p); },
+  async filesPlace(): Promise<FilesPlaceList> {
+    return (await window.zero?.filesPlace?.().catch(() => null)) ?? { files: [], projects: [], folders: [] };
+  },
+  async filesPlaceFolder(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null }> {
+    if (!window.zero?.filesPlaceFolder) return { ok: false, error: `quit and reopen ${NAME} to use folders` };
+    return window.zero.filesPlaceFolder(p);
+  },
+  async filesPlaceOpen(p: { key: string }): Promise<FilesPlaceView | null> {
+    return (await window.zero?.filesPlaceOpen?.(p).catch(() => null)) ?? null;
+  },
+  /** Each file a thread names, as its version line numbers it. */
+  async fileLine(p: { product: string; id: string }): Promise<FileLine[]> {
+    return (await window.zero?.fileLine?.(p).catch(() => null)) ?? [];
+  },
+  /** One answer per copy, in the order asked. */
+  async fileElsewhere(p: { product: string; id: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]> {
+    const got = await window.zero?.fileElsewhere?.(p).catch(() => null);
+    return Array.isArray(got) ? got : p.copies.map(() => ({ key: null, notes: [], approvals: [] }));
+  },
+  async filesPlaceEdit(p: { key: string; text: string }): Promise<{ ok: boolean; error?: string; goes?: 'sent'; to?: string }> {
+    if (!window.zero?.filesPlaceEdit) return { ok: false, error: `Quit and reopen ${NAME} to save this.` };
+    return window.zero.filesPlaceEdit(p);
+  },
+  async filesPlaceMark(p: { key: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }> {
+    if (!window.zero?.filesPlaceMark) return { ok: false, error: `quit and reopen ${NAME} to comment here` };
+    return window.zero.filesPlaceMark(p);
+  },
   async teamEdit(p: { product: string; id: string; on: string; text?: string; gone?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamEdit(p)); },
   // A MESSAGE TO A PERSON (people get messages, never tasks), at the level the
   // sender picked. The level counts on the first message of a conversation and
   // is ignored after, which is the main process's rule (main/team/index.mjs).
   // And the files the card carries, saved into the conversation once the main
   // process knows which one it is.
-  async teamMessage(to: string | string[], body: string, priority?: number, files?: TeamMessageFile[]): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessage({ to, body, priority, files })); },
+  async teamMessage(to: string | string[], body: string, priority?: number, files?: TeamMessageFile[], subject?: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessage({ to, body, priority, files, ...(subject ? { subject } : {}) })); },
+  async teamGiveTask(p: { to: string; title?: string; body: string; priority?: number; due?: string; files?: TeamMessageFile[]; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; blockedBy?: string[] }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamGiveTask(p)); },
+  async teamSeen(p: { product: string; id: string }): Promise<boolean> { try { return !!(await window.zero?.teamSeen?.(p)); } catch { return false; } },
+  async teamMoveToThread(p: { product: string; id: string; on: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMoveToThread(p)); },
+  async teamMessageMate(p: { owner: string; mate: string; text: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessageMate(p)); },
+  async teamHandOn(p: { product: string; id: string; to: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamHandOn(p)); },
+  async teamTaskBrief(p: { product: string; id: string }) { return window.zero!.teamTaskBrief(p); },
+  async teamContinueBrief(p: { personId: string; threadId: string }) { return window.zero!.teamContinueBrief(p); },
+  async teamContinued(p: { personId: string; threadId: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamContinued(p)); },
   // Rooms (alpha): every call goes through one door (main/ipc.mjs ROOM_OPS).
   async teammates<T = unknown>(op: string, args: Record<string, unknown> = {}): Promise<TeammatesResult<T>> {
     if (!window.zero?.teammates) return { ok: false, error: 'Teammates are not available here.' };
@@ -914,7 +1017,7 @@ export const api = {
     return out?.moving ?? (out?.ok ? ids.length : 0);
   },
 
-  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem | null> {
+  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem | null> {
     // FIXTURES ANSWER WITH THE TASK, the way the real store does. Returning
     // null here meant the send had nothing to point at, and the caller reads
     // that as "no task was made" and puts no way back on the undo pile — so the

@@ -7,7 +7,8 @@
 // The row now says "2 tasks to approve" in the same faint words a repeating
 // task uses for its schedule (`.th-aside`): "be more inspired by what already
 // exists... a little bit of text that gives you extra information if you need
-// to know." No dot, no box, no opening the row in place.
+// to know." No dot, no box, no opening the row in place. The aside is held by
+// asideBesides now, so it never says the title again (0e69f1a4).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { toApproveWords, waitingCounts } from '../renderer/src/threads-made.ts';
@@ -58,7 +59,7 @@ describe('where the words are drawn', () => {
   const app = read('renderer/src/App.tsx');
 
   it('rides the faint words after the title that a repeating task uses', () => {
-    expect(pages).toMatch(/aside=\{toApproveWords\(/);
+    expect(pages).toMatch(/aside=\{asideBesides\(rowTitle\(item\), commented \?\? \(toApproveWords\(/);
   });
 
   it('is handed the counts from the app, worked out once for the whole list', () => {

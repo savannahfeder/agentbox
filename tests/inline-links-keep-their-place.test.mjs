@@ -23,10 +23,10 @@ describe('quoted filenames keep every word', () => {
     expect(links('The film is "Sample Film.mp4".')).toEqual([['Sample Film.mp4', 'Sample Film.mp4']]);
   });
   it('keeps spaces in quoted relative paths and single quotes', () => {
-    expect(links("Try 'renders/Final Film.mp4' next.")).toEqual([['renders/Final Film.mp4', 'renders/Final Film.mp4']]);
+    expect(links("Try 'renders/Final Film.mp4' next.")).toEqual([['renders/Final Film.mp4', 'Final Film.mp4']]);
   });
   it('keeps a quoted product path whole', () => {
-    expect(links(`Open "${dir}/renders/Final Film.mp4".`)).toEqual([['renders/Final Film.mp4', `${dir}/renders/Final Film.mp4`]]);
+    expect(links(`Open "${dir}/renders/Final Film.mp4".`)).toEqual([['renders/Final Film.mp4', 'Final Film.mp4']]);
   });
   it('does not turn the suffix of an outside path into a relative link', () => {
     expect(links('It is at "/tmp/Final Film.mp4".')).toEqual([]);
@@ -78,7 +78,10 @@ it.skipIf(process.platform !== 'darwin')('keeps mounted links and exhausted prev
     expect(result.exhausted).toBe(true);
     expect(result.retriesAfterUpdates).toBe(0);
     expect(result.mediaLabel).toBe('Sample Film.mp4');
-    expect(result.calls).toEqual([{ round: 5, src: 'designs/demo.html' }, { round: 5, src: 'http://localhost:3002' }]);
+    // A page named on a thread opens big over it, an address still in the pane
+    // (tests/a-file-on-a-thread-opens-big-with-its-comments).
+    expect(result.bigView).toBe('demo.html');
+    expect(result.calls).toEqual([{ round: 5, src: 'http://localhost:3002' }]);
     expect(result.notices).toEqual([{ round: 5, text: 'File could not be opened.' }]);
     expect(result.productChanged).toBe(true);
     expect(result.otherProductResolved).toBe(true);

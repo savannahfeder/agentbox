@@ -56,8 +56,12 @@ const VIEW_KEY = 'agentbox.everything.view';
 type Store = Pick<Storage, 'getItem' | 'setItem'> | null;
 const local = (): Store => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 
-export function readEvView(store: Store = local()): EvView {
-  try { return store?.getItem(VIEW_KEY) === 'list' ? 'list' : 'board'; } catch { return 'board'; }
+/** What was picked, or `fallback` while nobody has picked. */
+export function readEvView<F extends EvView | null = EvView>(store: Store = local(), fallback: F = 'board' as F): EvView | F {
+  try {
+    const v = store?.getItem(VIEW_KEY);
+    return v === 'list' || v === 'board' ? v : fallback;
+  } catch { return fallback; }
 }
 
 export function writeEvView(view: EvView, store: Store = local()) {

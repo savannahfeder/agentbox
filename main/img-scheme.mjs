@@ -51,7 +51,8 @@ export { IMG_SCHEME, IMG_SCHEMES };
 // cross-origin to each other.
 export const IMG_HOST = 'file';
 
-const PICTURES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.bmp', '.ico']);
+// A deck travels with the pictures: the app draws it page by page (PdfPages.tsx).
+const PICTURES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.bmp', '.ico', '.svg', '.pdf', '.pptx']);
 
 // AND A SOUND OR A FILM, SINCE 2026-09-29, so a voice sample or a render a
 // worker names plays in the message (ArtifactMedia in Focus.tsx) instead of
@@ -134,7 +135,9 @@ export function byteRange(header, size) {
  * A sound or a film off disk, answered in the range the player asked for.
  * The caller has already decided the file may be served (`servable`).
  */
-export async function mediaResponse(file, rangeHeader) {
+export const MEDIA_PIECE_BYTES = 1024 * 1024;
+
+export async function mediaResponse(file, rangeHeader, { piece = null } = {}) {
   const { size } = await fs.promises.stat(file);
   const range = byteRange(rangeHeader, size);
   const headers = new Headers({ 'content-type': mediaType(file) ?? 'application/octet-stream', 'accept-ranges': 'bytes' });
@@ -143,11 +146,16 @@ export async function mediaResponse(file, rangeHeader) {
     return new Response(null, { status: 416, headers });
   }
   if (size === 0) return new Response(null, { status: 200, headers });
-  const { start, end } = range ?? { start: 0, end: size - 1 };
+  const asked = range ?? { start: 0, end: size - 1 };
+  const { start } = asked;
+  // A browser holds a connection for as long as a paused film has bytes left to
+  // send, and a tab has six. A piece ends, so its connection comes back.
+  const end = piece ? Math.min(asked.end, start + piece - 1) : asked.end;
+  const partial = !!range || end < size - 1;
   headers.set('content-length', String(end - start + 1));
-  if (range) headers.set('content-range', `bytes ${start}-${end}/${size}`);
+  if (partial) headers.set('content-range', `bytes ${start}-${end}/${size}`);
   const body = Readable.toWeb(fs.createReadStream(file, { start, end }));
-  return new Response(body, { status: range ? 206 : 200, headers });
+  return new Response(body, { status: partial ? 206 : 200, headers });
 }
 
 /** Is this a picture the window is allowed to draw? Pure, so it is testable. */

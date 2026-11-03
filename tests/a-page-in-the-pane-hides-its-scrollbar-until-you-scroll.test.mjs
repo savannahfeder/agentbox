@@ -18,7 +18,7 @@ import { EventEmitter } from 'node:events';
 import { DOC_SCHEMES } from '../shared/schemes.mjs';
 import {
   wantsQuietScrollbars, quietScrollbars, quietTheFramesScrollbars, AT_REST, SHOWN,
-} from '../main/frame-scrollbars.mjs';
+} from '../main/frame-scrollbars.mts';
 
 const read = (p) => fs.readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 

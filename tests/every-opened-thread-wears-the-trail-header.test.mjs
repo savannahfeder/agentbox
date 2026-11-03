@@ -31,7 +31,7 @@ describe('the bar over an opened thread', () => {
 
 describe('a conversation', () => {
   it('keeps its faces and Add people, at the far end of the trail', () => {
-    expect(focus).toContain('{direct && <ConversationAside item={item} onAddPeople={onAddPeople} />}');
+    expect(focus).toContain('{(direct || summarised) && <ConversationAside item={item} onAddPeople={onAddPeople} />}');
     expect(byline).toMatch(/export function ConversationAside[\s\S]{0,400}<TeamPeople item=\{item\} \/>[\s\S]{0,200}<AddPeople /);
     expect(summary).toMatch(/\.crumb-aside \{ margin-left: auto;/);
   });

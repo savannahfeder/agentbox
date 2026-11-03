@@ -5,7 +5,7 @@
 // On the desktop that is an Electron `<webview>`: a separate process on its
 // own session partition, and not a frame, so the X-Frame-Options and
 // frame-ancestors headers that come with anything carrying a sign-in do not
-// refuse it. What it may do is pinned below the tag by main/webview-guard.mjs.
+// refuse it. What it may do is pinned below the tag by main/webview-guard.mts.
 // In a browser tab there is no such tag, so it falls back to an opaque
 // iframe, which many sites will refuse; the way out to your own browser is
 // always in the bar above.
@@ -98,6 +98,9 @@ export function WebsitePane({ url, webview, ready = true, control, onNavigate, o
       if (isMainFrame === false || errorCode === -3) return;
       onFailed?.(errorDescription || 'That page could not be loaded.');
     };
+    // The page crashed, which otherwise leaves a grey page with a sad face on it.
+    const gone = () => onFailed?.('That page stopped working and cannot be shown here.');
+    node.addEventListener('render-process-gone', gone);
     node.addEventListener('dom-ready', ready);
     node.addEventListener('did-navigate', walked);
     node.addEventListener('did-navigate-in-page', walked);
@@ -106,6 +109,7 @@ export function WebsitePane({ url, webview, ready = true, control, onNavigate, o
     node.addEventListener('did-fail-load', failed);
     return () => {
       if (control) control.current = null;
+      node.removeEventListener('render-process-gone', gone);
       node.removeEventListener('dom-ready', ready);
       node.removeEventListener('did-navigate', walked);
       node.removeEventListener('did-navigate-in-page', walked);

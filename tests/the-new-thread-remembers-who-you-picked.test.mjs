@@ -22,9 +22,9 @@ it('keeps the coding agent selected when another card opens', () => {
   save({ to: 'agent', mate: null, auto: false });
   expect(draw()).not.toContain('tc-word-text">Auto</span>');
 });
-it('keeps the AI teammate selected when another card opens', () => {
+it('does not keep an AI teammate when another card opens', () => {
   save({ to: 'agent', mate: mate.id, auto: false });
-  expect(draw()).toContain('tc-word-text">Video producer</span>');
+  expect(draw()).not.toContain('tc-word-text">Video producer</span>');
 });
 it('keeps Auto when selected and uses it before any choice', () => {
   expect(draw()).toContain('tc-word-text">Auto</span>');
@@ -48,24 +48,19 @@ it('falls back when a saved recipient is gone, temporary, malformed, or unreadab
   expect(draw()).toContain('tc-word-text">Auto</span>');
 });
 
-it('saves each selection immediately and restores people who are still on the team', () => {
-  for (const recipient of [
-    { to: 'agent', mate: null, auto: false },
-    { to: 'agent', mate: null, auto: true },
-    { to: 'agent', mate: mate.id, auto: false },
-    { to: 'person', mate: null, auto: false },
-  ]) {
+it('saves Auto or a coding agent, and neither a person nor a teammate', () => {
+  for (const recipient of [{ to: 'agent', mate: null, auto: false }, { to: 'agent', mate: null, auto: true }]) {
     writeLastRecipient(recipient);
     expect(readLastRecipient([{ id: 'person' }], [mate], true)).toEqual(recipient);
   }
-  expect(readLastRecipient([], [mate], true)).toEqual({ to: 'agent', mate: null, auto: true });
+  writeLastRecipient({ to: 'agent', mate: mate.id, auto: false });
+  writeLastRecipient({ to: 'person', mate: null, auto: false });
+  expect(readLastRecipient([{ id: 'person' }], [mate], true)).toEqual({ to: 'agent', mate: null, auto: true });
 });
-it('does not remember Someone new or restore a teammate where they cannot be reached', () => {
+it('does not remember Someone new', () => {
   writeLastRecipient({ to: 'agent', mate: null, auto: false });
   writeLastRecipient({ to: 'agent', mate: 'new', auto: false });
   expect(readLastRecipient([], [mate], true).auto).toBe(false);
-  writeLastRecipient({ to: 'agent', mate: mate.id, auto: false });
-  expect(readLastRecipient([], [mate], false)).toEqual({ to: 'agent', mate: null, auto: true });
 });
 it('keeps the current selection usable when saving is refused', () => {
   globalThis.localStorage.setItem = () => { throw Error('unavailable'); };

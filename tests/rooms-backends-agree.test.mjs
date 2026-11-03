@@ -190,6 +190,16 @@ describe.each(worlds)('rooms on %s', (_kind, make) => {
     await refused(w.theo.editRoomMessage(m.id, { body: 'back again' }));
   });
 
+  it('decisions: only people in the room, the message’s own words, and one taken back stays as off', async () => {
+    const target = (await w.maya.roomMessages(teamRoom.id)).find((x) => x.body === 'hey');
+    await w.theo.markRoomDecision(teamRoom.id, { messageId: target.id, kind: 'decision', body: 'not these', on: true });
+    await refused(w.ana.markRoomDecision(teamRoom.id, { messageId: target.id, kind: 'decision', on: true }));
+    const [row] = await w.maya.roomDecisions(teamRoom.id);
+    expect(row).toMatchObject({ roomId: teamRoom.id, messageId: target.id, kind: 'decision', body: 'hey', saidBy: target.by, by: w.theo.personId, on: true, project: null });
+    await w.maya.markRoomDecision(teamRoom.id, { messageId: target.id, kind: 'decision', on: false });
+    expect((await w.theo.roomDecisions(teamRoom.id))[0].on).toBe(false);
+  });
+
   it('reactions: only people in the room, one turned off stays as off, and a deleted message loses its own', async () => {
     const target = (await w.maya.roomMessages(teamRoom.id)).find((x) => x.body === 'hey');
     await w.jun.reactRoomMessage(target.id, '👍', true);

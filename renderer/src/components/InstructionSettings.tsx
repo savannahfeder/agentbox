@@ -4,9 +4,10 @@ import remarkGfm from 'remark-gfm';
 import defaults from '../../../shared/instruction-defaults.json';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { api } from '../api';
+import { briefAsRead } from '../brief-as-read';
 import { EVERY, resolveScope, scopeChoices, scopeWords, startsWriting, type Scope } from '../instruction-scope';
 import type { ProjectSettings } from '../types';
-type Section = {id:string;label:string;description?:string;defaultText:string};
+type Section = {id:string;label:string;description?:string;defaultText:string;asRead?:(text:string,o:{storeTools:boolean})=>string};
 // The name chosen on w-3dc46f3a67, and it has to be the SAME name here, in
 // ⌘K (./Palette) and on the card itself (./Standing). This box said "Your
 // rules" while ⌘K said something else, and the cost of that was the box not
@@ -19,16 +20,17 @@ const adhd:Section = {id:'adhd',label:'ADHD mode',defaultText:defaults.adhd};
 // OURS, NOT THE USER'S, AND BEHIND A LINE THAT HAS TO BE OPENED. It is the task
 // brief every project worker is spawned with. Somebody editing it by accident
 // breaks their own inbox with no way to see why.
-const system:Section = {id:'system',label:'System prompt',description:`${Name}’s task-brief template for project work. Keep the template placeholders for task context. Personal tasks use your message directly. The coding provider’s own system instructions are managed by that provider.`,defaultText:defaults.system};
+const system:Section = {id:'system',label:'System prompt',description:`What ${Name} tells every agent on project work, as the agent reads it. Personal tasks use your message directly. The coding provider’s own system instructions are managed by that provider.`,defaultText:defaults.system,asRead:briefAsRead};
 const fixtureText = new Map<string,string>();
 const preview = () => new URLSearchParams(location.search).has('fixtures') || !window.zero;
 // What every section's writing surface needs, whichever file is under it.
-export type Writing = {text:string|null;status:string;edit:(v:string)=>void;restore?:{section:Section;defaultText:string;pick:(v:string,label:string)=>void};undo?:{label:string}|null;undoRestore?:()=>void};
+export type Writing = {text:string|null;shown?:string;status:string;edit:(v:string)=>void;restore?:{section:Section;defaultText:string;pick:(v:string,label:string)=>void};undo?:{label:string}|null;undoRestore?:()=>void};
 // Reading, saving and restoring one of the app's instruction files.
 function useInstruction(section: Section): Writing {
  const [text,setText]=useState<string|null>(null);
  const [defaultText,setDefault]=useState(section.defaultText);
  const [status,setStatus]=useState('');
+ const [storeTools,setStoreTools]=useState(false);
  // A save that failed has to be readable even when a restore has just happened,
  // because the line under the box is the only place either of them is said.
  const [trouble,setTrouble]=useState(false);
@@ -55,7 +57,7 @@ function useInstruction(section: Section): Writing {
   else if(!window.zero?.instructionRead) setStatus(`Reopen ${NAME} to edit instructions.`);
   else window.zero.instructionRead(section.id).then(r=>{
    if(!active)return;
-   if(r.error) setStatus(r.error); else {setText(r.text);setDefault(r.defaultText);}
+   if(r.error) setStatus(r.error); else {setText(r.text);setDefault(r.defaultText);setStoreTools(!!r.storeTools);}
   }).catch(e=>setStatus(e.message));
   return ()=>{active=false;if(timer.current)clearTimeout(timer.current);if(pending.current!==null)flush(pending.current);};
  },[section.id]);
@@ -64,7 +66,8 @@ function useInstruction(section: Section): Writing {
  const [undo,setUndo]=useState<{text:string;label:string}|null>(null);
  const pick=(value:string,label:string)=>{if(text!==null) setUndo({text,label});edit(value);};
  const undoRestore=()=>{if(!undo)return;edit(undo.text);setUndo(null);};
- return {text,status,edit,restore:{section,defaultText,pick},undo:trouble?null:undo,undoRestore};
+ const shown=text!==null&&section.asRead ? section.asRead(text,{storeTools}) : undefined;
+ return {text,shown,status,edit,restore:{section,defaultText,pick},undo:trouble?null:undo,undoRestore};
 }
 // A project's own instructions.md. Saved through the settings model, so the
 // project page and the spawn read the same file.
@@ -175,7 +178,7 @@ function useAdhdMode() {
    a form field. An empty section has nothing to read, so it opens as the
    writing surface with the caret in it. */
 export function Part({id,label,writing,description,head,hidden,find}:{id:string;label?:string;writing:Writing;description?:string;head?:React.ReactNode;hidden?:boolean;find?:string}) {
- const {text,status,edit,restore,undo,undoRestore}=writing;
+ const {text,shown,status,edit,restore,undo,undoRestore}=writing;
  const [writingNow,setWriting]=useState(false);
  const decided=useRef(false);
  useEffect(()=>{if(text!==null&&!decided.current){decided.current=true;setWriting(startsWriting(text));}},[text]);
@@ -196,7 +199,7 @@ export function Part({id,label,writing,description,head,hidden,find}:{id:string;
      <textarea ref={box} aria-label={label ?? 'Instructions'} spellCheck={false} disabled={text===null} value={text ?? ''} onChange={e=>edit(e.target.value)} onKeyDown={e=>{e.stopPropagation();if(e.key==='Escape') setWriting(false);}} placeholder="Write your instructions here…"/>
      <div className="instruction-save" role="status">{undo ? <>Restored {undo.label.toLowerCase()}. <button type="button" className="instruction-undo" onClick={undoRestore}>Undo</button></> : status}</div>
     </>
-   : <div className="instr-md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{text ?? ''}</ReactMarkdown></div>)}
+   : <div className="instr-md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{shown ?? text ?? ''}</ReactMarkdown></div>)}
  </section>;
 }
 function SharedPart({section}:{section:Section}) {

@@ -17,6 +17,15 @@
 // goes, and the row says so and waits for her.
 //
 // Driven for real, as tests/a-cloud-run-brings-the-agents-work-home is.
+//
+// IT WENT RED ON GITHUB'S LINUX JOB ON 2026-11-02 (run 41507422110; the Mac
+// job was green), and that log needs admin rights to read. Measured on Linux
+// first: 15 runs of this file green, 8 of them four at a time on two cores, so
+// the fault was not reproduced. What was mended is the two things in here that
+// do not depend on the code under test: a delete of the temp folder with no
+// retries, which has reddened this family of tests with ENOTEMPTY on that same
+// runner after every assertion passed, and a run that stayed away for a fixed
+// 1.5 s while this Mac raced to change the folder.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -75,7 +84,11 @@ afterEach(async () => {
   await sandbox?.close();
   s3.closeAllConnections();
   await new Promise((r) => s3.close(r));
-  fs.rmSync(tmp, { recursive: true, force: true });
+  // The retries and the catch, as in a-cloud-sandbox-runs-one-command: a write
+  // already on its way can put an entry back between the delete reading this
+  // folder and emptying it, and ENOTEMPTY on GitHub's Linux runner has failed
+  // a test here whose every assertion had passed.
+  try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); } catch { /* best effort */ }
 });
 
 const transport = {
@@ -117,6 +130,11 @@ const refsUnder = (prefix) => git(mac, 'for-each-ref', '--format=%(refname)', pr
 
 // The run has left with the folder as it was: only a change after this is one made while it was away.
 const untilAway = async () => { for (let i = 0; i < 600 && readMarker(mac)?.state !== 'running'; i += 1) await new Promise((r) => setTimeout(r, 25)); };
+// And it stays away until this says so, rather than for a moment this Mac has
+// to get its own change in under. The file is outside the folder, so the only
+// change in there is the one the test is about.
+const whileAway = (also = '') => `SLOW:${path.join(tmp, 'go.txt')} ${also}please`;
+const letItHome = () => fs.writeFileSync(path.join(tmp, 'go.txt'), 'come home\n');
 
 describe('a cloud run whose agent rewrote the commit it started on', () => {
   it('comes home onto the cloud\'s tip, and the tip it replaced is kept', async () => {
@@ -165,9 +183,10 @@ describe('an import cut off part way', () => {
 
 describe('a folder that changed on this Mac while the run was away', () => {
   it('keeps its own work, puts the run\'s on a branch of its own, frees the thread and says what to do', async () => {
-    const run = launch('SLOW please');
+    const run = launch(whileAway());
     await untilAway();
     fs.writeFileSync(path.join(mac, 'local-edit.txt'), 'made here meanwhile\n');
+    letItHome();
     expect(await run.done, run.err()).toBe(0);
     // This Mac's work, untouched.
     expect(fs.readFileSync(path.join(mac, 'local-edit.txt'), 'utf8')).toBe('made here meanwhile\n');
@@ -187,11 +206,12 @@ describe('a folder that changed on this Mac while the run was away', () => {
   });
 
   it('notices a change staged meanwhile, even one whose file was put back, and leaves it staged', async () => {
-    const run = launch('SLOW please');
+    const run = launch(whileAway());
     await untilAway();
     fs.writeFileSync(path.join(mac, 'a.txt'), 'staged meanwhile\n');
     git(mac, 'add', 'a.txt');
     fs.writeFileSync(path.join(mac, 'a.txt'), 'one\n');
+    letItHome();
     expect(await run.done, run.err()).toBe(0);
     expect(git(mac, 'diff', '--cached', '--name-only')).toBe('a.txt');
     expect(git(mac, 'log', '-1', '--format=%s', 'cloud/w-1')).toBe('Uncommitted work from a cloud run');
@@ -200,9 +220,10 @@ describe('a folder that changed on this Mac while the run was away', () => {
 
   it('gives a second such run a branch of its own rather than writing over the first', async () => {
     git(mac, 'branch', 'cloud/w-1', 'HEAD~1');
-    const run = launch('SLOW please');
+    const run = launch(whileAway());
     await untilAway();
     fs.writeFileSync(path.join(mac, 'local-edit.txt'), 'made here meanwhile\n');
+    letItHome();
     expect(await run.done, run.err()).toBe(0);
     expect(git(mac, 'log', '-1', '--format=%s', 'cloud/w-1')).toBe('first');
     const mine = git(mac, 'for-each-ref', '--format=%(refname:short)', 'refs/heads/cloud/').split('\n').find((b) => b !== 'cloud/w-1');
@@ -210,9 +231,10 @@ describe('a folder that changed on this Mac while the run was away', () => {
   });
 
   it('when the run changed nothing, keeps no branch and says nothing', async () => {
-    const run = launch('SLOW IDLE please');
+    const run = launch(whileAway('IDLE '));
     await untilAway();
     fs.writeFileSync(path.join(mac, 'local-edit.txt'), 'made here meanwhile\n');
+    letItHome();
     expect(await run.done, run.err()).toBe(0);
     expect(refsUnder('refs/heads/cloud/')).toEqual([]);
     expect(takeCloudNews(mac)).toEqual([]);
