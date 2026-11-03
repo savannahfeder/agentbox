@@ -2903,7 +2903,7 @@ export default function App() {
     ? teammateRows(cards, { tab: view, picked, me: team?.me ?? null, display: DEFAULT_DISPLAY.inbox, products: snap?.products ?? [], now }).length : 0);
   // THE TABS A PRESS OF TAB MOVES ALONG: the list the bar is drawing, so there
   // is no second copy of the order to fall out of step with it.
-  const stateTabOrder = useMemo(() => INBOX_TABS.map((t) => t.view).filter((v) => v !== 'snoozed' || laterTabShown({ count: snoozed.length, view, walking: !!run })), [snoozed.length, view, run]);
+  const stateTabOrder = useMemo(() => INBOX_TABS.map((t) => t.view).filter((v) => v !== 'snoozed' || laterTabShown({ count: scheduledCount, view, walking: !!run })), [scheduledCount, view, run]);
   // The inbox as she sees it, whichever tab is up: her filter AND her display
   // menu. Finishing a task from inside it advances through THIS, never the
   // whole inbox, or the next task opened can be one she has hidden
@@ -7864,7 +7864,8 @@ export default function App() {
                     counts={{
                       inbox: (mineShown ? shownCount(inbox) : 0) + theirCount('inbox') + leadCount + sharedFileNews.length + followingNews.length,
                       progress: (mineShown ? shownCount(progressTab) : 0) + theirCount('progress'),
-                      snoozed: (mineShown ? shownCount(snoozed) : 0) + theirCount('snoozed'),
+                      // The repeating tasks are rows on Later's page whatever the filters are.
+                      snoozed: (mineShown ? shownCount(snoozed) : 0) + repeats.length + theirCount('snoozed'),
                       done: (mineShown ? shownCount(done) : 0) + theirCount('done'),
                     }}
                     needs={team ? needsWord(picked, team.me) : undefined}
