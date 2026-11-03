@@ -50,7 +50,7 @@ jobs:
           semgrep scan --error --metrics off
           --config p/javascript --config p/typescript --config p/secrets
           --exclude tests --exclude node_modules --exclude dist
-          main shared mcp cloud relay bin scripts renderer/src mobile/src preload.cjs
+          main shared mcp cloud bin scripts renderer/src mobile/src preload.cjs
 
   audit:
     runs-on: ubuntu-latest

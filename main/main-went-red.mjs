@@ -332,7 +332,7 @@ export class MainTests {
     return null;
   }
 
-  /** Each failed job's machine, the tests it names, and what the runner said. */
+  /** Each failed job's machine, the tests it names, what the runner said, and whether a job was cancelled. */
   async machinesIn(run, cwd) {
     const jobs = (await this.ask(['api', `repos/{owner}/{repo}/actions/runs/${run.databaseId}/jobs`, '--paginate'], cwd))?.jobs ?? [];
     const machines = [];
@@ -343,17 +343,28 @@ export class MainTests {
       const tests = read ? failedTestsIn(out) : [];
       machines.push({ machine: machineOf(job), tests, read, said: read && !tests.length ? whatTheRunnerSaid(out) : [] });
     }
-    return machines;
+    return { machines, cancelled: jobs.some((job) => String(job?.conclusion ?? '') === 'cancelled') };
   }
 
   /**
    * One row per red spell, plus one per fix whose own ship left main red.
    * Any other red run while main is known red only refreshes the tests it
    * names, and a run whose log names none leaves the last list alone.
+   *
+   * A CANCELLED JOB IS A VERDICT ON NOTHING, as a cancelled run already is in
+   * `verdict`. GitHub calls a run `failure` when a job of it was cancelled,
+   * and a macOS runner is sometimes never handed over at all, so the job is
+   * cancelled unstarted while Linux runs the suite green. Jobs this machine
+   * could not read answer as none at all, which is why the cancellation and
+   * not the empty list is what holds the row back.
    */
   async wentRed(product, run, cwd, shipped) {
     const state = this.read();
-    const machines = await this.machinesIn(run, cwd);
+    const { machines, cancelled } = await this.machinesIn(run, cwd);
+    if (!machines.length && cancelled) {
+      this.log.info?.(`main-tests: ${shortSha(run.headSha)}'s run is red only for a cancelled job, so no test failed; leaving it.`);
+      return null;
+    }
     const tests = [...new Set(machines.flatMap((m) => m.tests))];
     const known = tests.length ? tests : (state.red?.tests ?? []);
     if (state.red && !(shipped?.id && shipped.id === state.red.id)) {

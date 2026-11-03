@@ -33,7 +33,8 @@ describe('the toast can carry a way in', () => {
     // branch, so both kinds of destination take it down.
     const body = app.slice(app.indexOf('const openToastRow = useCallback('), app.indexOf('/* ------------------------------- keyboard'));
     expect(body).toMatch(/useCallback\(\(to: ToastGoes\) => \{\s*setToast\(null\);/);
-    expect(body).toMatch(/if \(!row\) return;\s*setSearch\(null\);\s*setFocused\(row\);\s*markSeen\(row\);/);
+    // A row not in the lists yet is waited for (w-7f2d5329a6).
+    expect(body).toMatch(/if \(!row\) \{ oWaits\.current = [^\n]*; return; \}\s*setSearch\(null\);\s*setFocused\(row\);\s*markSeen\(row\);/);
   });
 
   it('outlives noticing it, which 2.5 seconds did not', () => {
