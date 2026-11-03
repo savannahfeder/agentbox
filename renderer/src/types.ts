@@ -87,6 +87,8 @@ export interface WorkItem {
   engine?: string;
   createdAt: number;
   updatedAt: number;
+  // Where the row sits by time when a close was taken straight back; lists sort on it.
+  placedAt?: number;
   // Per field, who set the value that survived the fold and when. The fold's own
   // bookkeeping, handed over rather than discarded, because an agent's `done`
   // and her archive are the same word for opposite events and the inbox has to
