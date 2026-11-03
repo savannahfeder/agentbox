@@ -127,11 +127,11 @@ export function messageDocuments(item: {
   answer?: string | null;
 }, dir: string | null = null): string[] {
   const notes = referencedFiles(item.result, item.body, item.answer, { dir })
-    .filter((path) => /\.(md|markdown)$/i.test(path) && !isBookkeeping(path));
+    .filter((path) => /\.(md|markdown|csv|tsv)$/i.test(path) && !isBookkeeping(path));
   return [...new Set([...embeddedDocuments(item, dir), ...notes])];
 }
 
-const BESIDE = /\.(md|markdown|html?)$/i;
+const BESIDE = /\.(md|markdown|html?|csv|tsv)$/i;
 const LINK_LINE = /^\[[^\]]*\]\(<?([^)>\s]+)>?\)$/;
 const PATH_LINE = /^[`*_<]*([^\s`*_<>]+)[`*_>]*$/;
 
@@ -139,7 +139,8 @@ const PATH_LINE = /^[`*_<]*([^\s`*_<>]+)[`*_>]*$/;
  * The page or note the newest answer puts on a line of its own, which opens
  * beside the thread by itself. The line is the agent's say: a draft still being
  * worked on gets one, and once it is settled the agent names it in a sentence
- * and it stays shut. A picture reads better inline, so only md and html count.
+ * and it stays shut. A picture reads better inline, so only md, html and a
+ * table (csv, tsv) count.
  */
 export function besideDocument(answer: string | null | undefined, dir: string | null = null): string | null {
   for (const raw of String(answer ?? '').split('\n')) {

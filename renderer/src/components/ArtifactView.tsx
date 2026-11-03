@@ -40,7 +40,7 @@ export const NO_MARKS: FileMarks = { notes: [], approvals: [], seen: {} };
 const clockAt = clock;
 const whenShared = (ts: number) => (new Date(ts).toDateString() === new Date().toDateString()
   ? `today at ${clockAt(ts)}` : new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' }));
-const KIND_WORD = { image: 'Picture', film: 'Film', pdf: 'PDF', deck: 'Slides', markdown: 'Document', page: 'Page', code: 'Code' } as const;
+const KIND_WORD = { image: 'Picture', film: 'Film', pdf: 'PDF', deck: 'Slides', markdown: 'Document', page: 'Page', table: 'Table', code: 'Code' } as const;
 
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
@@ -494,7 +494,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   // on its way up, so the thread behind stays still.
   useEffect(() => {
     const escape = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || pressedInTheFindBox(e.target)) return;
+      if (e.key !== 'Escape' || pressedInTheFindBox(e.target) || document.querySelector('[data-own-escape]')) return;
       e.stopImmediatePropagation();
       e.preventDefault();
       if (link) setLink(null);
@@ -553,7 +553,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   };
 
   const hint = kind === 'image' ? 'Click the picture to pin a note'
-    : kind === 'markdown' || kind === 'code' ? 'Select words to note them'
+    : kind === 'markdown' || kind === 'code' || kind === 'table' ? 'Select words to note them'
       : kind === 'deck' || kind === 'pdf' ? 'Click a spot to pin a note'
         : kind === 'page' ? 'Press Pin a spot, then click the page'
           : kind === 'film' ? 'Pause the film and click it to pin a note'

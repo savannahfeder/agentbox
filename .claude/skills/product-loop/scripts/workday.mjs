@@ -72,6 +72,27 @@ export function detachedArgv(args, root) {
   return rest.includes('--out') ? rest : [...rest, '--out', root];
 }
 
+/** Packages the app's package.json lists that its node_modules does not have. */
+export function missingPackages(appDir) {
+  const pkg = JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8'));
+  return Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })
+    .filter((name) => !fs.existsSync(path.join(appDir, 'node_modules', name, 'package.json')));
+}
+
+/** Whether mobile/'s lock changed after its last install, as it does when main adds a package. */
+export function packagesAreBehind(mobileDir) {
+  const mtime = (f) => { try { return fs.statSync(f).mtimeMs; } catch { return null; } };
+  const lock = mtime(path.join(mobileDir, 'package-lock.json'));
+  const installed = mtime(path.join(mobileDir, 'node_modules', '.package-lock.json'));
+  if (lock === null) return false;
+  return installed === null || lock > installed;
+}
+
+export function whyTheBuildFailed(err) {
+  const printed = `${err?.stdout ?? ''}${err?.stderr ?? ''}`.trim();
+  return `the phone app preview did not build: ${printed ? printed.slice(-3000) : err?.message}`;
+}
+
 /** Every issue from every diary, worst first, then most seen. */
 export function rankIssues(byPerson) {
   const all = [];
@@ -112,8 +133,20 @@ if (isMain) {
     const tree = execFileSync('git', ['-C', REPO, 'rev-parse', 'HEAD:mobile'], { encoding: 'utf8' }).trim();
     const built = path.join(os.tmpdir(), 'agentbox-phone-preview', tree);
     if (!fs.existsSync(path.join(built, 'index.html'))) {
-      say('building the phone app preview (a minute or two)');
-      execFileSync('npx', ['expo', 'export', '--platform', 'web', '--output-dir', built], { cwd: path.join(REPO, 'mobile'), env: { ...process.env, EXPO_PUBLIC_PREVIEW: '1', CI: '1' }, stdio: 'ignore', timeout: 15 * MIN });
+      const mobileDir = path.join(REPO, 'mobile');
+      const quietly = { cwd: mobileDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024, timeout: 15 * MIN };
+      try {
+        const missing = missingPackages(mobileDir);
+        if (packagesAreBehind(mobileDir) || missing.length) {
+          say(missing.length ? `installing the phone app's packages; missing ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ` and ${missing.length - 5} more` : ''}` : 'installing the phone app\'s packages, which are behind its lock file');
+          execFileSync('npm', ['ci', '--no-audit', '--no-fund'], quietly);
+        }
+        say('building the phone app preview (a minute or two)');
+        execFileSync('npx', ['expo', 'export', '--platform', 'web', '--output-dir', built], { ...quietly, env: { ...process.env, EXPO_PUBLIC_PREVIEW: '1', CI: '1' } });
+      } catch (err) {
+        say(whyTheBuildFailed(err));
+        process.exit(1);
+      }
     }
     url = await new Promise((resolve) => {
       const server = http.createServer((req, res) => {

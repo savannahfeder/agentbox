@@ -27,9 +27,10 @@ describe('the reading column', () => {
 describe('a document on a thread', () => {
   const one = read('components/OneThingAtATime.tsx');
   const preview = read('components/DocumentPreview.tsx');
-  it('opens big, with the button and with a click on the page', () => {
+  // It opens beside the chat now (a-note-read-in-place-opens-beside-the-chat-when-clicked).
+  it('opens, with the button and with a click on the page', () => {
     expect(one).toMatch(/<DocumentPreview[^>]*onOpen=\{onOpen\}/);
-    expect(preview).toContain('Open full size');
+    expect(preview).toContain('Open on the side');
     expect(preview).toMatch(/onClick=\{onOpen \? /);
   });
   it('a selection in the preview is not a click that takes you away', () => {

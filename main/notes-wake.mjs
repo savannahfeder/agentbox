@@ -1,12 +1,12 @@
 // A teammate's note on a file an agent made wakes that agent's thread: it is
 // told the notes as a turn, once, the way a teammate's reply is
 // (shared/artifact-marks.mjs notesForItsAgent).
-import { answeredNotes, notedFilesInLines, noteGoesTo, notesForItsAgent, notesForTheAgent, threadFiles } from '../shared/artifact-marks.mjs';
+import { answeredNotes, notedFilesInLines, noteGoesTo, notesForItsAgent, notesForTheAgent, stillWaiting, threadFiles } from '../shared/artifact-marks.mjs';
 import { heldByAPerson } from '../shared/team-rules.mjs';
 import { readItemHistory } from './store/work-items.mjs';
 import { submitReply } from './live-replies.mjs';
 
-const hasNews = (item, me, people) => (item.artifacts?.notes ?? []).some((n) => n.by && n.by !== me && !n.resolved && !n.sent && noteGoesTo(n, people).to === 'agent');
+const hasNews = (item, me, people) => (item.artifacts?.notes ?? []).some((n) => n.by && n.by !== me && !n.resolved && !n.sent && !stillWaiting(n) && noteGoesTo(n, people).to === 'agent');
 
 export async function wakeForNotes({ store, team, tell, now = Date.now() }) {
   const state = team?.state?.();
@@ -51,27 +51,31 @@ export function resolveAnsweredNotes({ store, people = [], now = Date.now() }) {
 // Your own note on a file an agent made on your thread is you speaking to that
 // agent, so it goes as your reply, the way a typed one does: a thread waiting
 // on its question opens and the next tick starts the run. A note written to a
-// teammate, or a thank-you, waits for "Send to the agent" (a `toagent` mark).
+// teammate, a thank-you, or one marked `wait` waits for Send (a `toagent`
+// mark), which tells the agent every note it names on a file in one reply.
 export async function noteToItsAgent({ store, supervisor, product, id, mark, nameOf = () => 'the person writing to you', people = [] }) {
+  if (mark?.do === 'note' && mark.wait) return false;
   const ids = mark?.do === 'note' ? [mark.id] : mark?.do === 'toagent' ? mark.on ?? [] : [];
   if (!ids.length || ids.some((n) => !n)) return false;
   if (store.listProducts().find((p) => p.slug === product)?.team?.direct) return false;
   const item = store.readItem(product, id);
   if (!item || heldByAPerson(item)) return false;
   const families = threadFiles(notedFilesInLines(readItemHistory(store.productDir(product), id)));
-  let went = false;
+  const byVersion = new Map();
   for (const note of (item.artifacts?.notes ?? []).filter((n) => ids.includes(n.id))) {
     if (note.resolved || note.sent || noteGoesTo(note, people).to !== 'agent') continue;
     const family = families.find((f) => f.versions.some((v) => v.id === note.file));
     const version = family?.versions.find((v) => v.id === note.file);
     if (typeof version?.agent !== 'string') continue;
-    const { text } = notesForTheAgent({ notes: [note] }, version, family.versions.length, { nameOf });
-    // Marked after, so a reply that fails leaves the note to send again.
-    await submitReply(supervisor, { product, id, answer: text }, () => store.answerItem(product, id, { answer: text, fromNotes: [note.id] }));
-    store.fileMark(product, id, { do: 'sent', on: [note.id] });
-    went = true;
+    if (!byVersion.has(version.id)) byVersion.set(version.id, { version, count: family.versions.length, notes: [] });
+    byVersion.get(version.id).notes.push(note);
   }
-  if (!went) return false;
+  if (!byVersion.size) return false;
+  const text = [...byVersion.values()].map(({ version, count, notes }) => notesForTheAgent({ notes }, version, count, { nameOf }).text).join('\n\n');
+  const sent = [...byVersion.values()].flatMap(({ notes }) => notes.map((n) => n.id));
+  // Marked after, so a reply that fails leaves the notes to send again.
+  await submitReply(supervisor, { product, id, answer: text }, () => store.answerItem(product, id, { answer: text, fromNotes: sent }));
+  store.fileMark(product, id, { do: 'sent', on: sent });
   supervisor.liftBrakeForHer?.();
   supervisor.wake?.();
   return true;

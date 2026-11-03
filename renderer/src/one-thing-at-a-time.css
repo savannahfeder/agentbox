@@ -1,7 +1,5 @@
-/* ONE THING AT A TIME (w-65bcefb857): "Name heads the page", picked in round eight. */
-
-/* The name is said once, on the page; the bar keeps the way back. A rename still opens its box there. */
-.app.one-at-a-time .thread-crumb-sep:has(+ .thread-crumb-name), .app.one-at-a-time .thread-crumb-name { display: none; }
+/* ONE THING AT A TIME (w-65bcefb857): "Name heads the page", picked in round eight.
+   The bar names the thread too, so it is still named once the page scrolls (w-b01d58b7df). */
 
 /* The arrows are a quiet pair, not two more boxes beside Cloud and Done. */
 .one-nav { display: inline-flex; align-items: center; gap: 0; }
