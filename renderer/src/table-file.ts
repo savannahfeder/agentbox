@@ -62,7 +62,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
 const NUMBER = /^[-+]?[$€£]?\s?\d[\d,]*(\.\d+)?\s?(%|k|m|bn|b)?$/i;
 const MONTH = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b/i;
 // A cell that says there is nothing here, which a number or date column can hold.
-const NOTHING = /^(n\/?a|none|null|nil|tbd|unknown|-|–|—|\?)$/i;
+const NOTHING = /^(n\/?a|none|null|nil|tbd|unknown|-|\u2013|\u2014|\?)$/i;
 const SOCIAL = /(^|\.)(linkedin\.com|twitter\.com|x\.com|github\.com|facebook\.com|instagram\.com|youtube\.com|crunchbase\.com|angel\.co|wellfound\.com)$/i;
 
 // A header that names a choice from a short list.
