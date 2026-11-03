@@ -27,7 +27,7 @@ it('opens a linked file without asking for a mode, so it takes beside', () => {
 });
 
 it('still opens full screen when full screen is what was pressed', () => {
-  expect(read('components/Focus.tsx')).toContain("onOpenArtifact?.(path, 'focus')");
+  expect(read('components/Focus.tsx')).toContain("onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'focus')");
   expect(app).toContain('setArtifactMode(mode); setOpenDoc({product: focused.product, src});');
 });
 
