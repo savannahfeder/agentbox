@@ -802,11 +802,12 @@ export class Store {
       made = { ...this.modules.workItemsDisk.updateWorkItem(this.productDir(toSlug), made.id, after, { source: 'founder' }), product: toSlug };
     }
 
-    // AND THE OLD ROW CLOSES SAYING WHERE ITS THREAD WENT. It is written as
-    // the app rather than as the founder: they moved a thread, they did not
-    // finish one, and a founder `done` is terminal in a way this need not be.
+    // AND THE OLD ROW CLOSES SAYING WHERE ITS THREAD WENT. The words are the
+    // app's; the close is the person's, because a thread of theirs closed by
+    // the app reads as news and stayed in Needs you. Z reopens it as before.
     const note = movedAway(to.name ?? toSlug);
-    this.modules.workItemsDisk.updateWorkItem(this.productDir(fromSlug), id, { status: 'done', note }, { source: 'system' });
+    this.modules.workItemsDisk.updateWorkItem(this.productDir(fromSlug), id, { note }, { source: 'system' });
+    this.modules.workItemsDisk.updateWorkItem(this.productDir(fromSlug), id, { status: 'done' }, { source: 'founder' });
     return { item: made, from: from?.name ?? fromSlug, to: to.name ?? toSlug, note };
   }
 

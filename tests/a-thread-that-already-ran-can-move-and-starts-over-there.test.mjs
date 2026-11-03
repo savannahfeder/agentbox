@@ -16,6 +16,7 @@ import path from 'node:path';
 import { Store } from '../main/store.mjs';
 import { CHANGED_HERE, movedAway, movedHere, whatMoves, whyItCannotMove } from '../shared/move-thread.mjs';
 import { SHIP_FAILED } from '../shared/not-shipped.mjs';
+import { belongsInInbox } from '../renderer/src/list-rules.ts';
 
 let store, root;
 const project = (slug, name) => {
@@ -81,6 +82,18 @@ describe('the move', () => {
     expect(left.status).toBe('done');
     expect(left.note).toBe(movedAway('Frontend'));
     expect(left.result).toBe('There is no ./store in this repo.');
+  });
+
+  // Closed as the app, the old row read as an agent finishing your thread and
+  // stayed in Needs you beside the moved one, marked DONE.
+  it('leaves Needs you on both ends, and Z can still reopen the old row', () => {
+    const was = answered('explain this error');
+    const out = store.moveItem('backend', was.id, 'frontend');
+    const left = store.readItem('backend', was.id);
+    expect(belongsInInbox(left)).toBe(false);
+    expect(belongsInInbox(store.readItem('frontend', out.item.id))).toBe(false);
+    store.answerItem('backend', was.id, { status: 'open' });
+    expect(store.readItem('backend', was.id).status).toBe('open');
   });
 });
 
