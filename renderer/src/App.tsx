@@ -116,6 +116,7 @@ import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, lookMeans, lookOf,
 import { WorkspaceNavigation } from './components/WorkspaceNavigation';
 import { useRooms } from './team/rooms/useRooms';
 import { useTeammates } from './teammates/useTeammates';
+import { ThreadQuestions } from './teammates/TeammatesPage';
 import { FilesPlace, useFilesList } from './files/FilesPlace';
 import { ConnectionsPlace } from './connections/ConnectionsPlace';
 import { TeammatesContext } from './teammates/row-lead';
@@ -4343,9 +4344,12 @@ export default function App() {
     setFocused(null);
   }, [noteAdvance]);
 
+  // Threads opened with O this session (openToastRow).
+  const openedWithO = useRef(new Set<string>());
   // Whether a reply from inside this thread moves her on to the next (./advance).
   const movesOn = useCallback((item: WorkItem) => replyMovesOn({
     view, onBoard, index: shownInbox.findIndex((i) => i.id === item.id), searching: search !== null, phone: onPhone(),
+    cameBack: openedWithO.current.has(keyOf(item)),
   }), [view, onBoard, shownInbox, search]);
 
   // Every resolving action goes through here: the UI advances instantly, the
@@ -5777,6 +5781,7 @@ export default function App() {
     setSearch(null);
     setFocused(row);
     markSeen(row);
+    openedWithO.current.add(keyOf(row));
   }, [inbox, progress, snoozed, done, markSeen, repeats]);
 
   /* ------------------------------- keyboard ------------------------------- */
@@ -7743,6 +7748,7 @@ export default function App() {
                   onAsked={() => setThreadAsk(null)}
                   onShown={setOpenShows}
                   aboveDock={<><PhoneStatus message={snap.phoneStatus} />{whereItWent}</>}
+                  questions={teammateIdOf(focused) ? <ThreadQuestions view={snap.teammates} item={focused} onChanged={() => { void refresh(); }} /> : null}
                   onReveal={() => revealAgent(focused)}
                   // Remind me later and stop this task are neither of the two
                   // ways a task ends, and the card beside the bar names exactly

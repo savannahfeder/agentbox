@@ -9,7 +9,7 @@
 // Now both take `files`, paths in the thread's own folders, and those files are
 // saved and carried exactly as a person's attachment is. What must not go: a
 // path outside those folders, a hidden or secret-looking one, a folder, a file
-// over the 200 MB a message can send, and a message whose file has gone.
+// over the 1 GB a message can send, and a message whose file has gone.
 import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -136,10 +136,10 @@ describe('what does not go', () => {
     expect(refused(['designs'])).toMatch(/folder/);
   });
 
-  it('a file over 200 MB', () => {
+  it('a file over 1 GB', () => {
     const big = put(t.product.dir, 'designs/raw.mov');
-    fs.truncateSync(big, 201 * 1024 * 1024);
-    expect(refused(['designs/raw.mov'])).toMatch(/201 MB.*200 MB/);
+    fs.truncateSync(big, 1024 * 1024 * 1024 + 1);
+    expect(refused(['designs/raw.mov'])).toMatch(/1 GB.*over the 1 GB/);
   });
 
   it('leaves nothing in the outbox when it refuses', async () => {
