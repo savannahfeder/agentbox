@@ -39,6 +39,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { CodeFile } from './CodeFile';
+import { TableView } from './TableView';
+import { isTablePath } from '../table-file';
 import { FilmPlayer } from './FilmPlayer';
 import { PdfPages } from './PdfPages';
 import { crumbParts, docKind, docName, isPlainText, splitFromPointer, OPENING_SPLIT, type PaneKind } from '../doc-pane';
@@ -107,6 +109,7 @@ function paneKindClass(kind: PaneKind): string {
   if (kind === 'website') return 'doc-html doc-website';
   if (kind === 'code') return 'doc-code';
   if (kind === 'image') return 'doc-image';
+  if (kind === 'table') return 'doc-table';
   return 'doc-md';
 }
 
@@ -133,7 +136,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   // another link puts it away.
   const [typed, setTyped] = useState<{ from: string; to: string } | null>(null);
   const src = typed?.from === doc.src ? typed.to : doc.src;
-  const kind: PaneKind = docKind(src) ?? (isPlainText(src) ? 'text' : 'html');
+  const kind: PaneKind = docKind(src) ?? (isTablePath(src) ? 'table' : isPlainText(src) ? 'text' : 'html');
   // Where the pane is standing. A webview keeps its own history, so after one
   // click the thread's address is no longer the page being read, and the bar
   // and the way out follow this rather than `doc.src`.
@@ -204,7 +207,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
         setChange(r.change as Change);
       });
     }
-    if (kind === 'markdown' || kind === 'text') {
+    if (kind === 'markdown' || kind === 'text' || kind === 'table') {
       api.readDoc({ product: doc.product, src: doc.src }).then((r) => {
         if (!live) return;
         if (!r.ok) { setFailed(r.error ?? 'That file could not be read.'); return; }
@@ -423,6 +426,8 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
               : <PreviewLoading />) : <PreviewLoading />
         ) : text === null ? (
           <PreviewLoading />
+        ) : kind === 'table' ? (
+          <TableView text={text} path={src} mode="pane" />
         ) : kind === 'text' ? (
           <div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div>
         ) : (

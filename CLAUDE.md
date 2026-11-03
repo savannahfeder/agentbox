@@ -120,6 +120,23 @@ nowhere else. That folder follows the public main on its own:
 Whether you ask before shipping is set by the person's own instructions, not
 by this file.
 
+## SYNTHETIC USERS, AND THE THREAD THAT SETS THE STANDARD (2026-11-01)
+
+When a change wants a second model or synthetic users before it ships, both
+are skills here:
+
+- The second model's review is `handoff` (Codex, two rounds at most).
+- Synthetic power users are `power-test`, with the people the change is for.
+  Team and Rooms changes get several testers at once on one team. The phone
+  app's testers are `product-loop`.
+
+The standard for the tester loop is thread w-e5f506ccb3: a synthetic team
+used the multiplayer build for whole workdays, logged what broke, agents
+fixed it on the branch, and the team tested the fixes. The person only chose
+between finished screens. Run a big change the same way: real use for
+hours, real people from `power-test/people/`, fixes tested again by the same
+testers, and screenshots of the result.
+
 ## RELEASING IS ONE COMMAND: `npm run deploy` (2026-10-26)
 
 A release (the Mac app, npm, the agentbox.ac download and update feed, the

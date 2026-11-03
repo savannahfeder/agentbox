@@ -25,11 +25,28 @@ export const INCLUDE_FILE = '.worktreeinclude';
 /**
  * macOS `cp -c` asks APFS for a block-sharing clone. GNU `cp` has no `-c`;
  * `-a --reflink=auto` shares blocks where the filesystem can and copies where
- * it cannot. Lives here rather than in `main/task-folders.mjs`, the other
- * caller, because that file imports this one.
+ * it cannot. Windows has no `cp`, so there it is `fs.cpSync`, landing where
+ * `cp` would and keeping links as links. Lives here rather than in
+ * `main/task-folders.mjs`, the other caller, because that file imports this one.
  */
-export function copyTree(from, to) {
-  const args = process.platform === 'darwin'
+export function copyTree(from, to, platform = process.platform, relink = (target) => target) {
+  if (platform === 'win32') {
+    const into = fs.statSync(to, { throwIfNoEntry: false })?.isDirectory();
+    fs.cpSync(from, into ? path.join(to, path.basename(from)) : to, {
+      recursive: true, preserveTimestamps: true, force: false, errorOnExist: true,
+      // cpSync copies a junction as the folder it points at. A link is made
+      // again as a link, an absolute one as a junction, which needs no
+      // Developer Mode, so the checks after the copy still see it.
+      filter: (src, dest) => {
+        if (!fs.lstatSync(src).isSymbolicLink()) return true;
+        const target = relink(fs.readlinkSync(src));
+        fs.symlinkSync(target, dest, path.isAbsolute(target) ? 'junction' : undefined);
+        return false;
+      },
+    });
+    return;
+  }
+  const args = platform === 'darwin'
     ? ['-c', '-R', from, to]
     : ['-a', '--reflink=auto', from, to];
   execFileSync('cp', args, { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -197,6 +214,31 @@ function nearestReal(abs) {
 }
 
 /**
+ * Every link at or under `at`, never walking through one. Windows has no
+ * `find`, so there the walk is Node's own, and a junction counts as a link.
+ */
+export function linksUnder(at, platform = process.platform) {
+  if (platform !== 'win32') {
+    return execFileSync('find', [at, '-type', 'l', '-print0'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+      .split('\0').filter(Boolean);
+  }
+  const top = fs.lstatSync(at);
+  if (top.isSymbolicLink()) return [at];
+  if (!top.isDirectory()) return [];
+  const found = [];
+  const waiting = [at];
+  while (waiting.length) {
+    const here = waiting.pop();
+    for (const entry of fs.readdirSync(here, { withFileTypes: true })) {
+      const inside = path.join(here, entry.name);
+      if (entry.isSymbolicLink()) found.push(inside);
+      else if (entry.isDirectory()) waiting.push(inside);
+    }
+  }
+  return found;
+}
+
+/**
  * Links in a carried entry that would let the folder write somewhere else, such
  * as `node_modules -> ../other-checkout/node_modules`, where an install rewrites
  * another folder's dependencies.
@@ -206,15 +248,18 @@ function nearestReal(abs) {
  * inside the folder, as workspace links do. Every link in the subtree is checked,
  * because `node_modules/@scope/` hides links a level down. `find` does not follow
  * links while walking, so a link cannot lead the walk out.
+ *
+ * Except on Windows, where a junction can only hold a full path. There the copy
+ * points one into the checkout at `landsAt`, the folder's path once it is moved
+ * into place, and it is judged at the same place in `folder`.
  */
-function linksThatDoNotHold(root, folder, rel) {
+function linksThatDoNotHold(root, folder, rel, landsAt, platform) {
   const to = path.join(folder, rel);
   let found = [];
   try {
     // `find <path>` on a path that is itself a link reports that link, so an
     // entry that is a link gets the same check as the links inside a directory.
-    found = execFileSync('find', [to, '-type', 'l', '-print0'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-      .split('\0').filter(Boolean);
+    found = linksUnder(to, platform);
   } catch (error) {
     throw Error(`the links inside ${rel} could not be checked: ${String(error?.stderr ?? error?.message ?? '').trim()}`);
   }
@@ -223,8 +268,15 @@ function linksThatDoNotHold(root, folder, rel) {
     const name = path.relative(folder, link);
     const target = linkTarget(link);
     if (target === null) continue; // gone from under us, or no longer a link
-    if (path.isAbsolute(target)) { bad.push({ path: name, why: 'it is a link to somewhere outside this folder' }); continue; }
-    const resolved = path.resolve(path.dirname(link), target);
+    let resolved, sourceSide;
+    if (path.isAbsolute(target)) {
+      if (platform !== 'win32' || !within(landsAt, target)) { bad.push({ path: name, why: 'it is a link to somewhere outside this folder' }); continue; }
+      resolved = path.join(folder, path.relative(landsAt, target));
+      sourceSide = path.join(root, path.relative(landsAt, target));
+    } else {
+      resolved = path.resolve(path.dirname(link), target);
+      sourceSide = path.resolve(path.dirname(path.join(root, name)), target);
+    }
     // Checked even when the link dangles: the first write through a dangling
     // link to `../../../w-neighbour/newfile` lands in another task's folder.
     if (!within(folder, resolved)) { bad.push({ path: name, why: 'it is a link that leads out of this folder' }); continue; }
@@ -240,7 +292,6 @@ function linksThatDoNotHold(root, folder, rel) {
     // Dangling but contained. It is refused only if the copy broke it, meaning
     // the target exists in the checkout and was not carried. A link already
     // dangling in the checkout is left as it was.
-    const sourceSide = path.resolve(path.dirname(path.join(root, name)), target);
     if (fs.existsSync(sourceSide)) bad.push({ path: name, why: 'it points at something that was not carried in with it' });
   }
   return bad;
@@ -252,7 +303,8 @@ function linksThatDoNotHold(root, folder, rel) {
  * this machine lacks. Anything else that cannot be carried throws, with every
  * path and reason, so the caller gets a complete folder or none.
  */
-export function carryLocalFiles(root, folder) {
+export function carryLocalFiles(root, folder, { landsAt = folder, platform = process.platform } = {}) {
+  const relink = (target) => (path.isAbsolute(target) && within(root, target) ? path.join(landsAt, path.relative(root, target)) : target);
   const { paths, source } = localFilesIn(root);
   const theirs = ignoredIn(root, paths);
   const carried = [];
@@ -275,7 +327,7 @@ export function carryLocalFiles(root, folder) {
     if (!copyFrom) { no(rel, 'it is a link to somewhere outside the repository'); continue; }
     try {
       fs.mkdirSync(path.dirname(to), { recursive: true });
-      copyTree(copyFrom, to);
+      copyTree(copyFrom, to, platform, relink);
     } catch (error) {
       no(rel, `it could not be copied: ${String(error?.stderr ?? error?.message ?? '').trim()}`);
       continue;
@@ -294,7 +346,7 @@ export function carryLocalFiles(root, folder) {
 
   // Links are judged only after every copy. `node_modules/thing ->
   // ../packages/thing` dangles until `packages`, listed later, is copied.
-  for (const rel of carried) refused.push(...linksThatDoNotHold(root, folder, rel));
+  for (const rel of carried) refused.push(...linksThatDoNotHold(root, folder, rel, landsAt, platform));
 
   if (refused.length) {
     throw Error(`${source} names files this folder could not be given:\n${

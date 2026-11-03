@@ -275,6 +275,7 @@ const HUNG_QUIET_MS = 10 * 60_000;
 // missed passes: past any slow pass, well under the ten minutes above.
 const SLEPT_GAP_MS = 2 * 60_000;
 const PROFILES_KEPT_MS = 1000;
+const TRACES_KEPT = 500;
 // Awake this long and not joined or taken back, a row handed to the cloud runs here (`_carriedHolds`).
 const PHONE_QUIET_MS = 10 * 60_000;
 // Two hangs on one row inside this window and the app stops restarting it and
@@ -3877,6 +3878,9 @@ export class Supervisor {
     // times a second. A row we have ALREADY spoken on still counts, because
     // it is still not running; being told once does not start it.
     const stranded = [];
+    const byKey = new Map(items.map((i) => [`${i.product}:${i.id}`, i]));
+    let dirs = null;
+    const dirOf = (slug) => (dirs ??= new Map(this.store.listProducts().map((p) => [p.slug, p.dir]))).get(slug);
     for (const [key, seen] of Object.entries(this._fruitless)) {
       if (!seen?.runs) continue;
       try {
@@ -3884,7 +3888,7 @@ export class Supervisor {
         const product = key.slice(0, cut);
         const id = key.slice(cut + 1);
         if (this.sessions.has(id)) continue;          // a worker is on it right now
-        const item = items.find((i) => i.id === id && i.product === product);
+        const item = byKey.get(key);
         if (!item) continue;
         // Only a row still sitting on the pile the dead run was taken from.
         // Anything else has moved on and is somebody else's news.
@@ -3927,7 +3931,7 @@ export class Supervisor {
         // WHAT THE LAST RUN ACTUALLY DID, read off its own trace. The session
         // object is long gone by now — often the whole process is — and the
         // trace is the only thing left that knows.
-        const trace = this._lastTrace(product, id);
+        const trace = this._lastTrace(product, id, dirOf);
         if (!traceShowsASilentDeath(trace)) continue;
 
         const cause = troubleCause(trace.stderr);
@@ -4007,17 +4011,30 @@ export class Supervisor {
   // The newest trace a row has, read once. Null when the row has never been
   // spawned, which is the ordinary case for most of `_fruitless` and is not an
   // error.
-  _lastTrace(product, id) {
-    const dir = this.store.listProducts().find((p) => p.slug === product)?.dir;
+  // Kept per log until its size or time changes: the stranded pass asks every tick.
+  _lastTrace(product, id, dirOf = (slug) => this.store.listProducts().find((p) => p.slug === slug)?.dir) {
+    const dir = dirOf(product);
     if (!dir) return null;
+    let sessions;
     let files;
-    try { files = fs.readdirSync(machineryPath(dir, path.join('sessions', id))); }
-    catch { return null; }
+    try {
+      sessions = machineryPath(dir, path.join('sessions', id));
+      files = fs.readdirSync(sessions);
+    } catch { return null; }
     const logs = files.filter((f) => f.endsWith('.log')).sort();
     if (!logs.length) return null;
+    const file = path.join(sessions, logs[logs.length - 1]);
     try {
-      const text = fs.readFileSync(machineryPath(dir, path.join('sessions', id, logs[logs.length - 1])), 'utf8');
-      return readDeadRunTrace(text);
+      const st = fs.statSync(file);
+      const stamp = `${st.size}:${st.mtimeMs}`;
+      this._traces ??= new Map();
+      const kept = this._traces.get(file);
+      if (kept?.stamp === stamp) return kept.trace;
+      const trace = readDeadRunTrace(fs.readFileSync(file, 'utf8'));
+      this._traces.delete(file);
+      if (this._traces.size >= TRACES_KEPT) this._traces.delete(this._traces.keys().next().value);
+      this._traces.set(file, { stamp, trace });
+      return trace;
     } catch { return null; }
   }
 

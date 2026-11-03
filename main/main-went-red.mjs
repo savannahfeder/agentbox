@@ -38,6 +38,9 @@ import path from 'node:path';
 export const POLL_MS = 60 * 1000;
 export const GIVE_UP_MS = 30 * 60 * 1000;
 
+/** How many polls GitHub gets to start an attempt it was asked for, clock or no clock. */
+export const RERUN_POLLS = 30;
+
 const STATE = 'main-tests.json';
 const WORKFLOW = 'tests';
 const LOG_BYTES = 16 * 1024 * 1024;
@@ -107,6 +110,27 @@ export function machineOf(job) {
   if (/macos/.test(`${labels} ${name}`)) return 'macOS';
   if (/windows/.test(`${labels} ${name}`)) return 'Windows';
   return name || 'that machine';
+}
+
+// GitHub queues a job it has no capacity for and gives up on it after about
+// fifteen minutes, leaving `cancelled` with not one step run and the
+// annotation "The job was not acquired by Runner of type hosted even after
+// multiple attempts". One of those concludes the whole run `failure`, which is
+// how a shortage of macOS runners reaches this file looking like a red test.
+const notStaffed = (job) => String(job?.conclusion ?? '') === 'cancelled' && !(job?.steps ?? []).length;
+
+/** The jobs of a failed run that GitHub never gave a runner, and [] when a job really failed. */
+export function unstaffedIn(jobs) {
+  const all = jobs ?? [];
+  // A job cancelled ALONGSIDE a real failure is the run being torn down rather
+  // than a shortage, so a run carrying anything concluded `failure` is never one.
+  if (all.some((job) => String(job?.conclusion ?? '') === 'failure')) return [];
+  return all.filter(notStaffed);
+}
+
+/** The machines GitHub had no runner for, and [] when that is not what is wrong. */
+export function shortOfRunners(jobs) {
+  return [...new Set(unstaffedIn(jobs).map(machineOf))];
 }
 
 const ANSI = /\u001b\[[0-9;]*m/g;
@@ -257,6 +281,31 @@ export function redRow({ sha, subject, url, machines, tries = 1, before = null }
   };
 }
 
+/** The row for a run GitHub twice had no runner for: nobody's commit, so said once and left. */
+export function noRunnerRow({ sha, subject, url, machines }) {
+  const where = machines.join(' and ');
+  return {
+    title: `GitHub had no ${where} runner, so main's tests never ran`,
+    problem: `No test failed and no commit is wrong. GitHub had no ${where} runner for main's run at ${shortSha(sha)}, so that part of the suite never ran at all. The shortage is GitHub's own.`,
+    body: [
+      "main's `tests` run is red on GitHub, at this commit:",
+      '',
+      `    ${shortSha(sha)}  ${subject || 'no title'}`,
+      '',
+      `${where}: the job was never acquired by a runner, so not one test ran.`,
+      'GitHub queues a job it has no capacity for and gives up on it after about',
+      'fifteen minutes.',
+      'The app asked for that job again, once, and it was not staffed then either.',
+      '',
+      ...(url ? [`The whole run: ${url}`, ''] : []),
+      'There is nothing to fix here: no test failed and no commit is wrong. The',
+      'next push to main runs the whole suite again, so all this says is that',
+      `${where} never covered this one commit. Ask GitHub for the job again if`,
+      'you want that cover back, or close this.',
+    ].join('\n'),
+  };
+}
+
 /** What that row hears when main comes back. */
 export function greenAgain({ sha, subject }) {
   return `main's tests are green again on GitHub, as of ${shortSha(sha)}${subject ? ` (${subject})` : ''}.`;
@@ -309,7 +358,8 @@ export class MainTests {
   async watch({ product, sha, item } = {}) {
     const cwd = product?.repoPath;
     if (!cwd || !sha || !fs.existsSync(cwd)) return null;
-    const until = this.now() + GIVE_UP_MS;
+    let until = this.now() + GIVE_UP_MS;
+    let polls = 0;
     while (!this.stopped) {
       const runs = await this.ask(
         ['run', 'list', '--branch', 'main', '--workflow', WORKFLOW, '-L', '20',
@@ -322,7 +372,27 @@ export class MainTests {
       const says = verdict(run);
       if (says === 'ignore') return null;
       if (says === 'passing') return this.wentGreen(product, run);
-      if (says === 'failing') return this.wentRed(product, run, cwd, item);
+      if (says === 'failing') {
+        const jobs = await this.jobsIn(run, cwd);
+        const unstaffed = unstaffedIn(jobs);
+        if (!unstaffed.length) return this.wentRed(product, run, cwd, item, jobs);
+        const asked = await this.askForOneMoreRun(run, cwd, unstaffed);
+        // Only a genuinely new attempt that starved too is worth a row. An ask
+        // this machine cannot make, and an attempt GitHub never starts, are
+        // left where a cancelled job already is: a verdict on nothing.
+        if (asked === 'filed') return this.noRunner(product, run, jobs);
+        if (asked === 'refused') return null;
+        // A re-run clears the run's conclusion, so waiting is all this needs to
+        // do. The deadline moves on the ask, and the polls spent waiting are
+        // counted as well, because the clock alone is the caller's to freeze.
+        if (asked === 'asked') until = this.now() + GIVE_UP_MS;
+        if (asked === 'waiting' && (polls += 1) > RERUN_POLLS) {
+          this.log.info?.(`main-tests: GitHub has not started the run it was asked for at ${shortSha(sha)}; leaving it.`);
+          return null;
+        }
+        await this.wait(POLL_MS);
+        continue;
+      }
       if (this.now() >= until) {
         this.log.info?.(`main-tests: ${shortSha(sha)}'s run has not finished in half an hour; leaving it.`);
         return null;
@@ -332,9 +402,60 @@ export class MainTests {
     return null;
   }
 
-  /** Each failed job's machine, the tests it names, what the runner said, and whether a job was cancelled. */
-  async machinesIn(run, cwd) {
-    const jobs = (await this.ask(['api', `repos/{owner}/{repo}/actions/runs/${run.databaseId}/jobs`, '--paginate'], cwd))?.jobs ?? [];
+  /** The run's jobs, as GitHub lists them. */
+  async jobsIn(run, cwd) {
+    return (await this.ask(['api', `repos/{owner}/{repo}/actions/runs/${run.databaseId}/jobs`, '--paginate'], cwd))?.jobs ?? [];
+  }
+
+  /**
+   * One more run of the jobs GitHub had no capacity for, and never a second:
+   * `asked`, `waiting` while GitHub has not replaced them yet, `filed` once the
+   * new attempt went unstaffed too, or `refused` if this machine cannot ask.
+   *
+   * WHICH JOBS WERE ASKED FOR, NOT JUST WHICH RUN. A re-run keeps the run's id
+   * and gives the attempt new job ids, and GitHub answers with the old attempt
+   * for a few seconds after the ask. Keyed on the run alone, that gap reads as
+   * a second shortage and files a row about a job that is about to start.
+   */
+  async askForOneMoreRun(run, cwd, unstaffed) {
+    const state = this.read();
+    const asked = state.askedAgain;
+    const ids = unstaffed.map((job) => job.id);
+    if (asked?.runId === run.databaseId) {
+      return ids.some((id) => (asked.jobs ?? []).includes(id)) ? 'waiting' : 'filed';
+    }
+    this.write({ ...state, askedAgain: { runId: run.databaseId, jobs: ids } });
+    // The WHOLE run, not `--failed`: GitHub's re-run-failed-jobs is about jobs
+    // concluded `failure`, and a starved job is concluded `cancelled`, so the
+    // cheaper ask is the one that might leave it unstaffed again. The job that
+    // already passed runs a second time for nothing, which is minutes.
+    const { code, out } = await this.gh(['run', 'rerun', String(run.databaseId)], { cwd });
+    if (code !== 0) {
+      this.log.warn?.(`main-tests: could not ask GitHub to run ${shortSha(run.headSha)} again: ${String(out).trim().slice(0, 200)}`);
+      return 'refused';
+    }
+    this.log.info?.(`main-tests: GitHub had no ${shortOfRunners(unstaffed).join(' or ')} runner for ${shortSha(run.headSha)}; asked for that job again.`);
+    return 'asked';
+  }
+
+  /** Said once, on its own row: no test failed, so no agent is set on it. */
+  noRunner(product, run, jobs) {
+    const machines = shortOfRunners(jobs);
+    const row = noRunnerRow({
+      sha: run.headSha, subject: run.displayTitle, url: run.url, machines,
+    });
+    try {
+      const filed = this.store.fileItem(product.slug, { ...row, kind: 'task' });
+      this.log.info?.(`main-tests: ${machines.join(' and ')} never ran at ${shortSha(run.headSha)}; filed ${filed.id}.`);
+      return filed;
+    } catch (e) {
+      this.log.warn?.(`main-tests: could not say GitHub had no runner: ${e.message}`);
+      return null;
+    }
+  }
+
+  /** Each failed job's machine, the tests it names, and what the runner said. */
+  async machinesIn(jobs, cwd) {
     const machines = [];
     for (const job of jobs) {
       if (String(job?.conclusion ?? '') !== 'failure') continue;
@@ -343,7 +464,7 @@ export class MainTests {
       const tests = read ? failedTestsIn(out) : [];
       machines.push({ machine: machineOf(job), tests, read, said: read && !tests.length ? whatTheRunnerSaid(out) : [] });
     }
-    return { machines, cancelled: jobs.some((job) => String(job?.conclusion ?? '') === 'cancelled') };
+    return machines;
   }
 
   /**
@@ -356,12 +477,14 @@ export class MainTests {
    * and a macOS runner is sometimes never handed over at all, so the job is
    * cancelled unstarted while Linux runs the suite green. Jobs this machine
    * could not read answer as none at all, which is why the cancellation and
-   * not the empty list is what holds the row back.
+   * not the empty list is what holds the row back. A job cancelled having run
+   * steps lands here; one GitHub never staffed is asked for again in `watch`
+   * before it ever gets this far.
    */
-  async wentRed(product, run, cwd, shipped) {
+  async wentRed(product, run, cwd, shipped, jobs) {
     const state = this.read();
-    const { machines, cancelled } = await this.machinesIn(run, cwd);
-    if (!machines.length && cancelled) {
+    const machines = await this.machinesIn(jobs, cwd);
+    if (!machines.length && jobs.some((job) => String(job?.conclusion ?? '') === 'cancelled')) {
       this.log.info?.(`main-tests: ${shortSha(run.headSha)}'s run is red only for a cancelled job, so no test failed; leaving it.`);
       return null;
     }

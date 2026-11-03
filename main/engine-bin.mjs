@@ -120,8 +120,8 @@ function newestFirst(a, b) {
  *   appCopies   a copy carried inside a desktop app, tried last of all
  *   evidence    files it leaves behind; never spawned, and only ever stop us
  *               saying it is missing
- *   windows     `ownPaths` and the `packageExe` an npm install keeps beside
- *               its shim, both ending in a real .exe
+ *   windows     `ownPaths` and the `packageExes` an npm install keeps beside
+ *               its shim, all ending in a real .exe
  */
 function engine({ bin, name, installUrl, ownPaths, appCopies = () => [], evidence, windows = {} }) {
   const spec = {
@@ -157,10 +157,10 @@ export function windowsCandidates(spec, home = os.homedir()) {
 // npm keeps its package beside the shim it writes, so a directory with no
 // shim is not looked into.
 function windowsExesIn(spec, dir, hasShim) {
-  const { packageExe } = spec.windows;
+  const { packageExes = [] } = spec.windows;
   return [
     path.win32.join(dir, `${spec.bin}.exe`),
-    ...(packageExe && hasShim ? [path.win32.join(dir, 'node_modules', ...packageExe)] : []),
+    ...(hasShim ? packageExes.map((exe) => path.win32.join(dir, 'node_modules', ...exe)) : []),
   ];
 }
 
@@ -200,7 +200,7 @@ export const ENGINES = {
     ],
     windows: {
       ownPaths: (home) => [path.win32.join(home, '.local', 'bin', 'claude.exe')],
-      packageExe: ['@anthropic-ai', 'claude-code', 'bin', 'claude.exe'],
+      packageExes: [['@anthropic-ai', 'claude-code', 'bin', 'claude.exe']],
     },
   }),
 
@@ -246,6 +246,18 @@ export const ENGINES = {
         );
       }
       return out;
+    },
+    // install.ps1's bin folder is a junction to the standalone current\bin. x64
+    // goes first because Windows on Arm can run it and x64 Windows cannot run arm64.
+    windows: {
+      ownPaths: (home) => [
+        path.win32.join(home, 'AppData', 'Local', 'Programs', 'OpenAI', 'Codex', 'bin', 'codex.exe'),
+        path.win32.join(home, '.codex', 'packages', 'standalone', 'current', 'bin', 'codex.exe'),
+      ],
+      packageExes: [['x64', 'x86_64'], ['arm64', 'aarch64']].map(([arch, cpu]) => [
+        '@openai', 'codex', 'node_modules', '@openai', `codex-win32-${arch}`,
+        'vendor', `${cpu}-pc-windows-msvc`, 'bin', 'codex.exe',
+      ]),
     },
   }),
 };

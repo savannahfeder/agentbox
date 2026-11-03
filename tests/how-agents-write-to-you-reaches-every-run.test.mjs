@@ -320,8 +320,11 @@ describe(`the text ${NAME} ships`, () => {
   // save a new version of a file. An agent asked for "v2 of the same file"
   // answered that it could not, and sent a separate file the comments did not
   // follow.
+  //
+  // Raised from 9000 to 9200 for 152 characters: a list goes in a csv, which
+  // draws as a table (w-690551d7ea). Lead lists came back as text.
   it('stays small enough to sit on every run', () => {
-    expect(shipped.length).toBeLessThan(9000);
+    expect(shipped.length).toBeLessThan(9200);
   });
 
   // THE SECOND COPY IS NOT ASKED FOR ANY MORE, AND THAT REPLACES THE RULE THAT
