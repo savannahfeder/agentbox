@@ -50,6 +50,14 @@ describe('a markdown table in a message', () => {
     expect(tableFromGrid([['Company', 'Stage'], ['A', 'Seed'], ['B', 'Seed']]).columns[0].kind).toBe('name');
     expect(tableFromGrid([['Year', 'Revenue'], ['2024', '$1M'], ['2025', '$2M']]).columns[0].kind).toBe('name');
   });
+  it('knows it is ranked, so the rank stands in for the row number', () => {
+    expect(t.ranked).toBe(true);
+    expect(tableFromGrid([['Company', 'Stage'], ['A', 'Seed'], ['B', 'Seed']]).ranked).toBe(false);
+  });
+  it('keeps a city under "Base" as text', () => {
+    const v = tableFromGrid([['Firm', 'Base'], ['A', 'San Francisco'], ['B', 'San Francisco'], ['C', 'New York'], ['D', 'New York']]);
+    expect(v.columns[1].kind).toBe('text');
+  });
   it('lines up money written with a ~ or a +', () => {
     expect(t.columns[3].kind).toBe('number');
   });

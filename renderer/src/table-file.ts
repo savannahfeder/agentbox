@@ -5,7 +5,8 @@ export type ColumnKind = 'name' | 'tag' | 'number' | 'date' | 'link' | 'email' |
 export type Tone = 'green' | 'blue' | 'purple' | 'amber' | 'rose' | 'teal' | 'grey';
 /** `values` are a tag column's values as first written; `tones` is keyed by their lower case. */
 export type Column = { name: string; kind: ColumnKind; values: string[]; tones: Record<string, Tone> };
-export type Table = { columns: Column[]; rows: string[][]; logoCol: number };
+/** `ranked`: the first column is the file's own rank, which stands in for the row number. */
+export type Table = { columns: Column[]; rows: string[][]; logoCol: number; ranked: boolean };
 export type Sort = { col: number; dir: 'asc' | 'desc' } | null;
 
 export const isTablePath = (path: string | null | undefined) => /\.(csv|tsv)$/i.test(String(path ?? '').split(/[?#]/)[0]);
@@ -70,7 +71,7 @@ const SOCIAL = /(^|\.)(linkedin\.com|twitter\.com|x\.com|github\.com|facebook\.c
 // A header that names a choice from a short list.
 const TAG_HEADER = /\b(status|stage|category|type|tier|priority|segment|industry|tags?|label|fit|source|plan|state|kind|round|channel|owner|sector|vertical|risk|level|outcome|result|reply|response|replied|sentiment|intent|verdict|decision)\b/i;
 // A header that names something each row has its own of, even when values repeat.
-const TEXT_HEADER = /\b(name|company|investor|firm|fund|person|contact|candidate|employer|school|account|city|location|based|country|address|region|hq|headquarters|title|role|note|notes|description|summary|why|reason|comment|email|phone|mobile|tel|zip|postal|postcode|id|website|url|domain|linkedin)\b/i;
+const TEXT_HEADER = /\b(name|company|investor|firm|fund|person|contact|candidate|employer|school|account|city|location|base|based|country|address|region|hq|headquarters|title|role|note|notes|description|summary|why|reason|comment|email|phone|mobile|tel|zip|postal|postcode|id|website|url|domain|linkedin)\b/i;
 // A number that is a label, not an amount: never added, sorted or lined up right.
 const LABEL_NUMBER = /\b(phone|mobile|tel|zip|postal|postcode|id|year)\b/i;
 // "Revenue per year" is an amount, though it names a year.
@@ -199,7 +200,7 @@ const RANK_HEADER = /^(#|no\.?|n°|rank|ranking|position|pos\.?)$/i;
 
 /** A header row and its rows, as a table. A markdown table in a message comes in this way. */
 export function tableFromGrid(grid: string[][]): Table {
-  if (!grid.length) return { columns: [], rows: [], logoCol: -1 };
+  if (!grid.length) return { columns: [], rows: [], logoCol: -1, ranked: false };
   const head = grid[0];
   // A loop, not Math.max(...rows): spreading 150,000 rows overflows the stack.
   let width = head.length;
@@ -231,7 +232,7 @@ export function tableFromGrid(grid: string[][]): Table {
     }
     return { name, kind, values: shown, tones };
   });
-  return { columns, rows, logoCol: logoColumn(columns, rows) };
+  return { columns, rows, logoCol: logoColumn(columns, rows), ranked };
 }
 
 const hostOf = (raw: string) => raw.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').split(/[/:?#]/)[0].toLowerCase();

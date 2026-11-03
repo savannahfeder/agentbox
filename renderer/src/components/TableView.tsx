@@ -53,10 +53,11 @@ function Cell({ table, col, row, value }: { table: Table; col: number; row: stri
   return <div className="tbl-td" title={v.length > 40 ? v : undefined}><span className="tbl-ell">{v}</span></div>;
 }
 
+// A ranked file's own rank stands where the row number goes, so a list is not numbered twice.
 const Row = memo(function Row({ table, row, n }: { table: Table; row: string[]; n: number | null }) {
   return <div className="tbl-tr" role="row">
-    {n !== null && <div className="tbl-td tbl-rn">{n}</div>}
-    {row.map((v, i) => <Cell key={i} table={table} col={i} row={row} value={v} />)}
+    {(n !== null || table.ranked) && <div className="tbl-td tbl-rn">{table.ranked ? row[0] : n}</div>}
+    {row.map((v, i) => (table.ranked && i === 0 ? null : <Cell key={i} table={table} col={i} row={row} value={v} />))}
   </div>;
 });
 
@@ -93,7 +94,7 @@ function widths(table: Table, cap: number): string {
   const wide = texts.reduce((best, i) => (best < 0 || longest[i].length > longest[best].length ? i : best), -1);
   const last = table.columns.length - 1;
   return content.map((w, i) => (i === wide ? `minmax(${Math.min(w, 180)}px, ${w}fr)`
-    : wide < 0 && i === last ? `minmax(${w}px, 1fr)` : `${w}px`)).join(' ');
+    : wide < 0 && i === last ? `minmax(${w}px, 1fr)` : `${w}px`)).slice(table.ranked ? 1 : 0).join(' ');
 }
 const sortWords = (c: Column, dir: 'asc' | 'desc') => {
   const [up, down] = c.kind === 'number' ? ['1 to 9', '9 to 1'] : c.kind === 'date' ? ['Oldest first', 'Newest first'] : ['A to Z', 'Z to A'];
@@ -267,10 +268,12 @@ export function TableView({ text, path, mode, onShowAll, grid }: { text: string;
       )}
       <div className="tbl-frame">
       <div className="tbl-scroll" ref={box}>
-        <div className="tbl-grid" role="table" style={{ gridTemplateColumns: inline ? template : `44px ${template}` }}>
+        <div className="tbl-grid" role="table" style={{ gridTemplateColumns: inline && !table.ranked ? template : `44px ${template}` }}>
           <div className="tbl-tr" role="row">
-            {!inline && <div className="tbl-th tbl-rn" />}
-            {table.columns.map((c, i) => (
+            {table.ranked
+              ? <button type="button" role="columnheader" className={`tbl-th tbl-rn${sort?.col === 0 ? ' sorted' : ''}`} disabled={preview && !inline} onClick={() => sortBy(0)} title={table.columns[0].name}>#</button>
+              : !inline && <div className="tbl-th tbl-rn" />}
+            {table.columns.map((c, i) => table.ranked && i === 0 ? null : (
               <button key={i} type="button" role="columnheader" className={`tbl-th${c.kind === 'number' ? ' tbl-num' : ''}${sort?.col === i ? ' sorted' : ''}`}
                 aria-sort={sort?.col === i ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
                 disabled={preview && !inline} onClick={() => sortBy(i)}>
