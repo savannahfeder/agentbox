@@ -47,14 +47,15 @@ function Menu({ label, icon, on, children }: { label: string; icon: ReactNode; o
   useEffect(() => {
     if (!open) return undefined;
     const away = (e: PointerEvent) => { if (!wrap.current?.contains(e.target as Node)) setOpen(false); };
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); } };
+    // An open menu takes Escape before the full screen view or the thread does.
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopImmediatePropagation(); e.preventDefault(); setOpen(false); } };
     document.addEventListener('pointerdown', away);
-    document.addEventListener('keydown', key, true);
-    return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key, true); };
+    window.addEventListener('keydown', key, true);
+    return () => { document.removeEventListener('pointerdown', away); window.removeEventListener('keydown', key, true); };
   }, [open]);
   return <span className="when-wrap" ref={wrap}>
     <button type="button" className={`tbl-btn${on || open ? ' on' : ''}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>{icon}{label}</button>
-    {open && <div className="when-menu tbl-menu" role="menu">{children(() => setOpen(false))}</div>}
+    {open && <div className="when-menu tbl-menu" role="menu" data-own-escape="">{children(() => setOpen(false))}</div>}
   </span>;
 }
 

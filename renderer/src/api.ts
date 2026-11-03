@@ -1,4 +1,4 @@
-import { artifactSampleChange, artifactSampleNotes, reviewSampleChange } from './artifact-fixtures';
+import { artifactSampleChange, artifactSampleNotes, reviewSampleChange, tableSample, tableSamplePath } from './artifact-fixtures';
 import {updateFixture} from './agent-update-fixture';
 // One seam between the UI and the world. Real mode talks to the preload
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
@@ -697,6 +697,7 @@ export const api = {
   async resolveDoc(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; opened?: string; url?: string; error?: string; coming?: boolean; waits?: boolean; note?: string; carry?: CarryState }> {
     if (useFixtures && ['artifact-layout-sample.change', 'review-bundle.change'].includes(p.src)) return { ok: true, opened: p.src };
     if (useFixtures && p.src === 'artifact-layout-sample.md') return { ok: true, opened: p.src };
+    if (useFixtures && p.src === tableSamplePath) return { ok: true, opened: p.src };
     if (useFixtures && p.product === 'onboard' && ['designs/w-n13/the-first-row.html', '/fixtures/onboard/designs/w-n13/the-first-row.html'].includes(p.src)) return { ok: true, opened: p.src, url: '/fixtures/onboard/designs/w-n13/the-first-row.html' };
     const zero = window.zero as any;
     if (!zero?.openArtifact) return { ok: false, error: `quit and reopen ${NAME} to open documents here` };
@@ -705,6 +706,7 @@ export const api = {
 
   async readDoc(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string; coming?: boolean; waits?: boolean; carry?: CarryState }> {
     if (useFixtures && p.src === 'artifact-layout-sample.md') return {ok:true,text:artifactSampleNotes,mtime:0};
+    if (useFixtures && p.src === tableSamplePath) return { ok: true, text: tableSample, mtime: 0 };
     const zero = window.zero as any;
     if (!zero?.readDoc) return { ok: false, error: `quit and reopen ${NAME} to open documents here` };
     return zero.readDoc(p);
