@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -78,6 +78,16 @@ export function testerEnv(engine, base, { codexHome = null, claudeHome = 'defaul
   return env;
 }
 
+/** The sweeper's own mark for a program meant to outlive its run; the day still ends at --hours. */
+export function detachedEnv(env) {
+  return { ...env, AGENTBOX_KEEP: '1' };
+}
+
+/** Kept from the sweeper, so it gives memory back itself: no stretch starts while memory is tight. */
+export function stretchMayStart(pressure) {
+  return pressure === 'normal';
+}
+
 /** The flags a --detach run restarts itself with: the same day, in the folder it chose. */
 export function detachedArgv(args, root) {
   const rest = args.filter((a) => a !== '--detach');
@@ -120,6 +130,7 @@ if (isMain) {
   const { readPeople, pickPeople } = await import(path.resolve(here, '../../power-test/scripts/plan.mjs'));
   const { readDiary } = await import(DIARY);
   const { paceFor, readingFor, claudeProfile } = await import(path.join(here, 'pace.mjs'));
+  const { readMacPressureWord } = await import(path.join(REPO, 'main/leftovers.mjs'));
   const people = pickPeople(opt('who', 'random:2'), readPeople(path.resolve(here, '../../power-test/people')));
   const engine = opt('engine', 'codex');
   const minutes = Number(opt('minutes', 30));
@@ -134,7 +145,7 @@ if (isMain) {
   // A session of its own, so ending the run that started it does not end the day.
   if (args.includes('--detach')) {
     const log = fs.openSync(path.join(root, 'workday.log'), 'a');
-    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), ...detachedArgv(args, root)], { detached: true, stdio: ['ignore', log, log] });
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), ...detachedArgv(args, root)], { detached: true, stdio: ['ignore', log, log], env: detachedEnv(process.env) });
     child.unref();
     console.log(`workday started, pid ${child.pid}. Log: ${path.join(root, 'workday.log')}. Report when it ends: ${path.join(root, 'report.md')}`);
     process.exit(0);
@@ -183,15 +194,43 @@ if (isMain) {
   }));
   const run = (cmd, argv, opts) => new Promise((resolve) => {
     const child = spawn(cmd, argv, { stdio: ['ignore', 'pipe', 'pipe'], ...opts });
+    live.add(child);
     let out = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });
     const timer = setTimeout(() => child.kill('SIGTERM'), (minutes + 10) * MIN);
-    child.on('exit', (code) => { clearTimeout(timer); resolve({ code, out: out.slice(-4000) }); });
+    child.on('exit', (code) => { clearTimeout(timer); live.delete(child); resolve({ code, out: out.slice(-4000) }); });
   });
   const diaries = () => Object.fromEntries(people.map((p) => [p.name, readDiary(path.join(dirs[p.slug], 'diary.jsonl')).issues]));
 
   let stretch = 0;
+  // Rewritten after every stretch, so a day that is stopped still leaves what it found.
+  const writeReport = (stoppedBy = null) => {
+    const ranked = rankIssues(diaries());
+    const lines = [`# Phone app workday, ${new Date().toDateString()}`, '', `${people.map((p) => p.name).join(', ')}, ${stretch} stretch${stretch === 1 ? '' : 'es'} of ${minutes} minutes on ${engine}.`, ''];
+    if (stoppedBy) lines.push(`Stopped by ${stoppedBy}; this is what was logged by then.`, '');
+    ranked.forEach((i, k) => {
+      lines.push(`## ${k + 1}. [${i.severity}] ${i.title}`, '', `${i.who}${i.seen > 1 ? `, seen ${i.seen} times` : ''}.`, '');
+      if (i.steps) lines.push(`Steps: ${i.steps}`, '');
+      if (i.expected) lines.push(`Expected: ${i.expected}`, '');
+      if (i.actual) lines.push(`Actual: ${i.actual}`, '');
+      const dir = dirs[people.find((p) => p.name === i.who)?.slug];
+      for (const s of i.shots ?? []) lines.push(`![${s}](${path.join(dir, s)})`, '');
+    });
+    if (!ranked.length) lines.push('Nobody logged an issue.');
+    fs.writeFileSync(path.join(root, 'report.md'), `${lines.join('\n')}\n`);
+    return ranked.length;
+  };
+  const live = new Set();
+  for (const signal of ['SIGTERM', 'SIGHUP', 'SIGINT']) {
+    process.on(signal, () => {
+      say(`stopped by ${signal} after ${stretch} stretch${stretch === 1 ? '' : 'es'}`);
+      for (const child of live) { try { child.kill('SIGTERM'); } catch { /* gone */ } }
+      for (const p of people) spawnSync(process.execPath, [PHONE, 'close'], { env: { ...process.env, PHONE_OUT: dirs[p.slug], PHONE_URL: url }, timeout: 10_000 });
+      writeReport(signal);
+      process.exit(1);
+    });
+  }
   while (stretch < maxStretches && Date.now() < deadline) {
     if (pace && engine !== 'external') {
       const reading = await readingFor(engine, engine === 'claude' ? claudeHome : codexHome);
@@ -203,6 +242,12 @@ if (isMain) {
         await new Promise((r) => setTimeout(r, Math.max(0, p.until - Date.now()) + MIN));
         continue;
       }
+    }
+    const pressure = await readMacPressureWord();
+    if (!stretchMayStart(pressure)) {
+      say(`memory is ${pressure}, so the next stretch waits 10 minutes`);
+      await new Promise((r) => setTimeout(r, 10 * MIN));
+      continue;
     }
     stretch += 1;
     const ends = Date.now() + minutes * MIN;
@@ -228,20 +273,10 @@ if (isMain) {
       say(`${person.name}: stretch ${stretch} ended (${r.code === 0 ? 'ok' : `exit ${r.code}`})`);
     }));
     for (const p of people) await run(process.execPath, [PHONE, 'close'], { env: { ...process.env, PHONE_OUT: dirs[p.slug], PHONE_URL: url } });
+    writeReport();
   }
 
-  const ranked = rankIssues(diaries());
-  const lines = [`# Phone app workday, ${new Date().toDateString()}`, '', `${people.map((p) => p.name).join(', ')}, ${stretch} stretch${stretch === 1 ? '' : 'es'} of ${minutes} minutes on ${engine}.`, ''];
-  ranked.forEach((i, k) => {
-    lines.push(`## ${k + 1}. [${i.severity}] ${i.title}`, '', `${i.who}${i.seen > 1 ? `, seen ${i.seen} times` : ''}.`, '');
-    if (i.steps) lines.push(`Steps: ${i.steps}`, '');
-    if (i.expected) lines.push(`Expected: ${i.expected}`, '');
-    if (i.actual) lines.push(`Actual: ${i.actual}`, '');
-    const dir = dirs[people.find((p) => p.name === i.who)?.slug];
-    for (const s of i.shots ?? []) lines.push(`![${s}](${path.join(dir, s)})`, '');
-  });
-  if (!ranked.length) lines.push('Nobody logged an issue.');
-  fs.writeFileSync(path.join(root, 'report.md'), `${lines.join('\n')}\n`);
-  say(`report: ${path.join(root, 'report.md')} (${ranked.length} issue${ranked.length === 1 ? '' : 's'})`);
+  const found = writeReport();
+  say(`report: ${path.join(root, 'report.md')} (${found} issue${found === 1 ? '' : 's'})`);
   process.exit(0);
 }
