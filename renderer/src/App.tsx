@@ -3973,6 +3973,8 @@ export default function App() {
   const filesShown = !!filesPage && !teammatesShown && !roomShown && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
   const connectionsShown = !!connectionsPage && !filesShown && !teammatesShown && !roomShown && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
   const chatsPlaceShown = !!chatsPlace && homeLayout === 'chats' && !connectionsShown && !filesShown && !teammatesShown && !roomShown && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
+  // A teammate's thread opened from a page in Team is still in Team.
+  const cardFromPlace = homeLayout === 'chats' && !!chatsPlace && !!openCard;
   useEffect(() => { if (roomsUi.openId || teammatesUi.open) { setFilesPage(null); setConnectionsPage(null); } }, [roomsUi.openId, teammatesUi.open]);
   const openFiles = (project: string | null) => {
     roomsUi.leave(); teammatesUi.leave(); setChatsPlace(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null);
@@ -7244,7 +7246,7 @@ export default function App() {
         onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inbox.length + leadCount} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
         onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} tasksPage={tasksShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomShown || directOpen}
         /* Without Groups the one row under Threads is Chats, and only while there are teammates. */
-        groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />
+        groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
           only part of our own document lying over the file, so a pointer
           brought up there wakes the marks that a pointer moving across the
@@ -7315,7 +7317,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? (inChats ? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">{homeLayout === 'chats' ? 'Team' : 'Chats'}</span></div><div className="workspace-task-header cx-task-header" ref={setTaskHeader} /></div><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (filesShown ? <h1 className="workspace-title">Files</h1> : connectionsShown ? <h1 className="workspace-title">Connections</h1> : chatsPlaceShown ? <h1 className="workspace-title">Team</h1> : teamShown ? <h1 className="workspace-title">{openCard ? 'Threads' : 'Team'}</h1> : evOn ? <h1 className="workspace-title">{roomsUi.live ? 'Inbox' : 'Threads'}</h1> : teammatesShown ? teammatesUi.title : roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Threads</h1>))}
+        ) : (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? (inChats ? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">{homeLayout === 'chats' ? 'Team' : 'Chats'}</span></div><div className="workspace-task-header cx-task-header" ref={setTaskHeader} /></div><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (filesShown ? <h1 className="workspace-title">Files</h1> : connectionsShown ? <h1 className="workspace-title">Connections</h1> : chatsPlaceShown ? <h1 className="workspace-title">Team</h1> : teamShown ? <h1 className="workspace-title">{openCard ? (cardFromPlace ? 'Team' : 'Threads') : 'Team'}</h1> : evOn ? <h1 className="workspace-title">{roomsUi.live ? 'Inbox' : 'Threads'}</h1> : teammatesShown ? teammatesUi.title : roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Threads</h1>))}
         {/* THE PLUS, THE COMMAND MARK AND THE COG STEP OFF WHILE SHE IS
             SEARCHING, and that is the half of the chosen design that is not the
             cross. It is forced, not chosen: .topbar and .body carry the same 22px
@@ -7466,7 +7468,7 @@ export default function App() {
                     was opened from. */}
                 <TeammateThread card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now}
                   syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
-                  backLabel={roomsUi.roomName ?? 'Threads'}
+                  backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Everyone' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Threads')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
                   onContinue={() => continueTeammateThread(openCard)}
                   onMessage={() => {

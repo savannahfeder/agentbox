@@ -82,3 +82,17 @@ describe('the command bar', () => {
     expect(app).toContain("run: () => { setModal(null); openChatsPlace(`person:${p.id}`); }");
   });
 });
+
+describe('a teammate’s thread opened from their page in Team', () => {
+  // A tester opened Dev's "Seat picker for group bookings" from Dev's page: the
+  // page was titled Threads, its back link said Threads, and no sidebar row was lit.
+  const app = read('renderer/src/App.tsx');
+  it('stays titled Team, with Team lit in the sidebar', () => {
+    expect(app).toContain("const cardFromPlace = homeLayout === 'chats' && !!chatsPlace && !!openCard;");
+    expect(app).toContain("<h1 className=\"workspace-title\">{openCard ? (cardFromPlace ? 'Team' : 'Threads') : 'Team'}</h1>");
+    expect(app).toContain('roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace,');
+  });
+  it('goes back to the page it came from, by name', () => {
+    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Everyone' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Threads')}");
+  });
+});

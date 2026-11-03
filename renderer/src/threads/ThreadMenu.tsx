@@ -336,7 +336,7 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
       {files}
       {place && <PlaceButton place={place} {...placeFacts} onPlace={onPlace} />}
       {onReopen && !done && <button type="button" className="ts-done ts-reopen" onClick={onReopen}><span>Reopen</span></button>}
-      {onCloseTask && <button type="button" className="ts-done ts-close-task" onClick={onCloseTask}><span>Close task</span></button>}
+      {onCloseTask && <button type="button" className="ts-done ts-close-task" data-hint="close-task" data-hint-align="right" onClick={onCloseTask}><span>Close task</span></button>}
       {done && (
         <button
           type="button"
