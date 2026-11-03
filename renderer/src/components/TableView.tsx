@@ -164,14 +164,12 @@ export function TableView({ text, path, mode, onShowAll }: { text: string; path:
   const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ top: 0, height: 900 });
-  const [moreRight, setMoreRight] = useState(false);
   const preview = mode === 'preview';
 
   // A new order or a new search starts from the top.
   useEffect(() => { box.current?.scrollTo({ top: 0 }); }, [searched, picked, sort]);
 
-  // Where the box is scrolled to and how tall it is decide which rows are drawn;
-  // whether columns run past the right edge is what the fade there says.
+  // Where the box is scrolled to and how tall it is decide which rows are drawn.
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return undefined;
@@ -180,7 +178,6 @@ export function TableView({ text, path, mode, onShowAll }: { text: string; path:
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         setView((v) => (v.top === el.scrollTop && v.height === el.clientHeight ? v : { top: el.scrollTop, height: el.clientHeight }));
-        setMoreRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
       });
     };
     look();
@@ -251,7 +248,7 @@ export function TableView({ text, path, mode, onShowAll }: { text: string; path:
           <span className="tbl-count">{count}{mode === 'full' ? ` · ${table.columns.length} ${table.columns.length === 1 ? 'column' : 'columns'}` : ''}</span>
         </div>
       )}
-      <div className={`tbl-frame${moreRight ? ' more-right' : ''}`}>
+      <div className="tbl-frame">
       <div className="tbl-scroll" ref={box}>
         <div className="tbl-grid" role="table" style={{ gridTemplateColumns: `44px ${template}` }}>
           <div className="tbl-tr" role="row">

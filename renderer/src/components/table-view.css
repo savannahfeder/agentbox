@@ -57,18 +57,17 @@
 }
 .when-menu.tbl-menu { width: 240px; max-height: min(480px, 70vh); }
 .tbl-menu .when-row { gap: 9px; }
-.tbl-tick { width: 12px; height: 12px; flex: none; border: 1px solid var(--line-strong); border-radius: 3px; }
+.tbl-tick { width: 12px; height: 12px; flex: none; border: 1px solid var(--line-strong); }
 .tbl-tick.on { background: var(--text); border-color: var(--text); box-shadow: inset 0 0 0 2px var(--pop); }
 .tbl-clear { color: var(--text-faint); }
 
+/* A table is square all through, its card and its menus included, whatever
+   corner the rest of the window wears (her call, w-690551d7ea). */
+.tbl *, .tbl *::before, .when-menu.tbl-menu, .one-file.one-table,
+.doc-pane.doc-table, .doc-pane.doc-table .doc-card { border-radius: 0; }
+
 .tbl-frame { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .tbl-scroll { flex: 1; min-height: 0; overflow: auto; }
-/* More columns to the right: a soft shadow at the edge. A fade to the page's
-   own colour vanished wherever the cells there were empty. */
-.tbl-frame.more-right::after {
-  content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 18px; z-index: 4; pointer-events: none;
-  background: linear-gradient(to right, transparent, color-mix(in srgb, var(--text) 12%, transparent));
-}
 .tbl-preview .tbl-scroll { overflow-x: auto; overflow-y: hidden; }
 .tbl-grid {
   display: grid; width: max-content; min-width: 100%;
@@ -106,7 +105,7 @@
 .tbl-date { color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .tbl-num { justify-content: flex-end; font-variant-numeric: tabular-nums; }
 .tbl-name { gap: 10px; }
-.tbl-logo { width: 18px; height: 18px; flex: none; border-radius: 4px; object-fit: cover; }
+.tbl-logo { width: 18px; height: 18px; flex: none; object-fit: cover; }
 .tbl-letter {
   display: inline-grid; place-items: center; font-size: 10.5px; font-weight: 600;
   color: var(--text-dim); background: var(--bg-raised);
@@ -116,10 +115,10 @@
 
 .tbl-tag {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 2px 9px 2px 8px; border-radius: 999px;
+  padding: 2px 9px 2px 8px;
   font-size: 13px; font-weight: 400; line-height: 18px; white-space: nowrap;
 }
-.tbl-tag::before { content: ''; width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--dot); }
+.tbl-tag::before { content: ''; width: 6px; height: 6px; flex: none; background: var(--dot); }
 .tone-green { background: var(--tg-green); color: var(--ti-green); --dot: var(--td-green); }
 .tone-blue { background: var(--tg-blue); color: var(--ti-blue); --dot: var(--td-blue); }
 .tone-purple { background: var(--tg-purple); color: var(--ti-purple); --dot: var(--td-purple); }
