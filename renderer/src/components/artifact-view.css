@@ -40,9 +40,6 @@
 .av-approved { flex: none; display: inline-flex; align-items: center; gap: 7px; font: 11.5px var(--mono); color: var(--text-dim); white-space: nowrap; }
 .av-approved i { width: 6px; height: 6px; background: var(--code-plus); }
 .av-approved.is-old { color: var(--text-faint); }
-.av-close { flex: none; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; background: none; border: 0; padding: 0; color: var(--text-dim); }
-.av-close:hover { color: var(--text); }
-.av-close svg { width: 16px; height: 16px; }
 
 .av-body { flex: 1; min-height: 0; display: flex; }
 .av-stage { flex: 1; min-width: 0; position: relative; display: flex; }

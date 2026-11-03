@@ -28,7 +28,10 @@ export function picturesFor(root: ParentNode | null, href: string, from?: Elemen
   const doors = root ? [...root.querySelectorAll<HTMLElement>('[data-picture]')].filter((d) => d.querySelector('img')) : [];
   const pressed = from?.closest<HTMLElement>('[data-picture]');
   let at = pressed ? doors.indexOf(pressed) : -1;
-  if (at < 0) at = doors.map((d) => d.dataset.picture).lastIndexOf(href);
+  // A link in words names the picture its own turn draws, before one drawn anywhere else.
+  const turn = from?.closest('[data-exchange]');
+  const named = doors.flatMap((d, i) => (d.dataset.picture === href ? [i] : []));
+  if (at < 0) at = named.filter((i) => turn?.contains(doors[i])).at(-1) ?? named.at(-1) ?? -1;
   if (at < 0) return { pictures: [{ path: href, url: null }], start: 0 };
   return picturesBeside(doors.map((d) => {
     const img = d.querySelector('img')!;

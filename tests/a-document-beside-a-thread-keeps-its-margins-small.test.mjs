@@ -2,7 +2,8 @@
 // Measured in the built app at a 1710px window with the pane 1040px wide: a
 // 700px text column with 170px of empty space either side. The column now
 // grows to 820px in a pane too narrow for the full contents list, so those
-// margins are 110px. A pane wide enough for the contents list keeps 700px.
+// margins are 110px. The wider panes, with the contents list, are held by
+// tests/a-zoomed-out-document-does-not-float-in-white-space.
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -40,7 +41,6 @@ function layout({ cols, gap }, width) {
   return { column, margin: (width - column) / 2 }
 }
 
-const top = sheetRules(css.slice(0, css.indexOf('@container')))
 const middle = sheetRules(containerBlock(1060))
 
 describe('a document beside a thread keeps its margins small', () => {
@@ -58,9 +58,5 @@ describe('a document beside a thread keeps its margins small', () => {
     const { column, margin } = layout(middle, 776)
     expect(margin).toBe(48)
     expect(column).toBe(680)
-  })
-
-  it('leaves the wide pane at 700px, where the contents list fills the margin', () => {
-    expect(layout(top, 1300).column).toBe(700)
   })
 })
