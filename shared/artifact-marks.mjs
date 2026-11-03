@@ -377,6 +377,8 @@ const OTHER_KINDS = [['page', /\.html?$/i], ['table', /\.(csv|tsv)$/i], ['code',
 export const otherKind = (path) => OTHER_KINDS.find(([, re]) => re.test(String(path ?? '').split(/[?#]/)[0]))?.[0] ?? null;
 /** Which page the big view draws for a file, or null. */
 export const viewKind = (path) => reviewKind(path) ?? otherKind(path);
+/** Whether a file pressed in a group opens in the big view: what it reviews, and a table. */
+export const opensBigInAGroup = (name) => !!reviewKind(name) || otherKind(name) === 'table';
 const OTHER_NAMED =/\]\(<?((?:\.?\/)?[^()\s>:]+\.[A-Za-z0-9]+)>?\)|`((?:\.?\/)?[\w.-]+(?:\/[\w.-]+)*\.[A-Za-z0-9]+)`/g;
 
 // "-390.png" is the end of a name said before it, not a file.

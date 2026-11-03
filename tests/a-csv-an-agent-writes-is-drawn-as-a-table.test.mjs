@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { parseDelimited, readTable, isTablePath, tagTone, logoFor, sortRows, filterRows } from '../renderer/src/table-file.ts';
 import { besideDocument, messageDocuments } from '../renderer/src/message-artifacts.ts';
 import { readsInPlace } from '../renderer/src/components/OneThingAtATime.tsx';
-import { viewKind } from '../shared/artifact-marks.mjs';
+import { viewKind, opensBigInAGroup } from '../shared/artifact-marks.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -175,6 +175,33 @@ describe('files the way agents really write them', () => {
     const t = readTable('Name,Status\nA,New\nB,new\nC,NEW\nD,Won\n', 'x.csv');
     expect(t.columns[1].values).toEqual(['New', 'Won']);
     expect(filterRows(t, '', { 1: ['New'] }).map((r) => r[0])).toEqual(['A', 'B', 'C']);
+  });
+});
+
+// Found by a Codex review (gpt-6-luna, w-690551d7ea), each reproduced first.
+describe('what a second model found', () => {
+  it('reads a 150,000-row file without running out of stack', () => {
+    const big = 'Name,Status\n' + Array.from({ length: 150_000 }, (_, i) => `R${i},${i % 2 ? 'New' : 'Won'}`).join('\n') + '\n';
+    const t = readTable(big, 'x.csv');
+    expect(t.rows).toHaveLength(150_000);
+    expect(t.columns.map((c) => c.name)).toEqual(['Name', 'Status']);
+  });
+  it('counts separators outside quotes when it picks one', () => {
+    const t = readTable('"Company, Inc";Status\nAcme;Won\nBeta;Lost\n', 'x.csv');
+    expect(t.columns.map((c) => c.name)).toEqual(['Company, Inc', 'Status']);
+    // and a comma file whose quoted header holds semicolons stays a comma file
+    expect(readTable('"A; B",C\n1,2\n', 'x.csv').columns.map((c) => c.name)).toEqual(['A; B', 'C']);
+  });
+  it('does not read every word starting with un as bad', () => {
+    for (const v of ['Unassigned', 'Under review', 'Unicorn']) expect(tagTone(v, 0), v).not.toBe('rose');
+    for (const v of ['Unqualified', 'Uninterested', 'Unresponsive', 'Unsubscribed']) expect(tagTone(v, 0), v).toBe('rose');
+  });
+  it('opens a csv shared in a group in the big view, as it does a document', () => {
+    expect(opensBigInAGroup('leads.csv')).toBe(true);
+    expect(opensBigInAGroup('export.tsv')).toBe(true);
+    expect(opensBigInAGroup('plan.md')).toBe(true);
+    expect(opensBigInAGroup('script.mjs')).toBe(false);
+    expect(opensBigInAGroup('sheet.xlsx')).toBe(false);
   });
 });
 

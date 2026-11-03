@@ -44,7 +44,8 @@ const firstLine = (text: string) => {
 
 const sepFor = (text: string, path: string) => {
   if (/\.tsv$/i.test(path.split(/[?#]/)[0])) return '\t';
-  const head = firstLine(text);
+  // Only separators outside quotes count: `"Company, Inc";Status` is a semicolon file.
+  const head = firstLine(text).replace(/"(?:[^"]|"")*"/g, '');
   const counts = [',', '\t', ';'].map((s) => [s, head.split(s).length] as const);
   return counts.reduce((a, b) => (b[1] > a[1] ? b : a))[0];
 };
@@ -118,7 +119,7 @@ const BAD_WHEN_HIGH = /\b(risk|churn|severity|urgency|cost|effort|difficulty|blo
 const BAD_WHEN_YES = /\b(bounced?|unsubscribed?|churned|blocked|spam|lost|do not contact|dnc|opted out|complain\w*|at risk)\b/i;
 // Words outside the lists above, read by what they contain. The bad ones are
 // asked first, so "not qualified" is not taken for "qualified".
-const BAD_WORDS = /\b(not|no|non|never|un\w+|wrong|negative|ghost\w*|reject\w*|declin\w*|bounc\w*|churn\w*|lost|lose|dead|cancel\w*|fail\w*|block\w*|spam|bad|weak|poor|pass(ed)?|disqualif\w*|dropped|killed)\b/i;
+const BAD_WORDS = /\b(not|no|non|never|un(?:qualified|interested|responsive|reachable|subscribed|successful|fit|happy|willing)|wrong|negative|ghost\w*|reject\w*|declin\w*|bounc\w*|churn\w*|lost|lose|dead|cancel\w*|fail\w*|block\w*|spam|bad|weak|poor|pass(ed)?|disqualif\w*|dropped|killed)\b/i;
 const LATER_WORDS = /\b(not now|later|next quarter|next year|bad timing|timing|follow.?up|on hold|maybe)\b/i;
 const GOOD_WORDS = /\b(won|win|signed|booked|good|strong|great|excellent|qualified|hired|accepted|closed won|converted|success\w*)\b/i;
 // A word nothing above knows takes the next of these. Green and red say
@@ -151,7 +152,9 @@ export function readTable(text: string, path: string): Table {
   const grid = isMarkdownTable(src) ? parseMarkdownTable(src) : parseDelimited(src, sepFor(src, path));
   if (!grid.length) return { columns: [], rows: [], logoCol: -1 };
   const head = grid[0];
-  const width = Math.max(head.length, ...grid.slice(1).map((r) => r.length));
+  // A loop, not Math.max(...rows): spreading 150,000 rows overflows the stack.
+  let width = head.length;
+  for (let i = 1; i < grid.length; i++) if (grid[i].length > width) width = grid[i].length;
   let rows = grid.slice(1).map((r) => Array.from({ length: width }, (_, i) => r[i] ?? ''));
   // A column with no header and nothing in it is a trailing separator, not data.
   const keep = Array.from({ length: width }, (_, i) => i).filter((i) => (head[i] ?? '').trim() || rows.some((r) => r[i].trim()));

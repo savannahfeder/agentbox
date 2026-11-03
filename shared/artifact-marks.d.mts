@@ -13,6 +13,7 @@ export function marksOf(entries: unknown[] | null | undefined): FileMarks;
 export function approvalId(a: Pick<FileApproval, 'ts'>): string;
 export function placeWords(note: { place?: NotePlace | null; pin?: number | string } | null | undefined): string;
 export function viewKind(path: string | null | undefined): 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | 'page' | 'table' | 'code' | null;
+export function opensBigInAGroup(name: string | null | undefined): boolean;
 export function otherFilesInLines(lines: unknown[] | null | undefined): Array<{ path: string; by: string | null; at: number; agent?: string }>;
 export function shownName(path: string | null | undefined): string;
 export function reviewKind(path: string | null | undefined): 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | null;
