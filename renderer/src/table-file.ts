@@ -66,7 +66,7 @@ const NOTHING = /^(n\/?a|none|null|nil|tbd|unknown|-|\u2013|\u2014|\?)$/i;
 const SOCIAL = /(^|\.)(linkedin\.com|twitter\.com|x\.com|github\.com|facebook\.com|instagram\.com|youtube\.com|crunchbase\.com|angel\.co|wellfound\.com)$/i;
 
 // A header that names a choice from a short list.
-const TAG_HEADER = /\b(status|stage|category|type|tier|priority|segment|industry|tags?|label|fit|source|plan|state|kind|round|channel|owner|sector|vertical|risk|level)\b/i;
+const TAG_HEADER = /\b(status|stage|category|type|tier|priority|segment|industry|tags?|label|fit|source|plan|state|kind|round|channel|owner|sector|vertical|risk|level|outcome|result|reply|response|replied|sentiment|intent|verdict|decision)\b/i;
 // A header that names something each row has its own of, even when values repeat.
 const TEXT_HEADER = /\b(name|company|investor|firm|fund|person|contact|candidate|employer|school|account|city|location|based|country|address|region|hq|headquarters|title|role|note|notes|description|summary|why|reason|comment|email|phone|mobile|tel|zip|postal|postcode|id|website|url|domain|linkedin)\b/i;
 // A number that is a label, not an amount: never added, sorted or lined up right.
@@ -114,8 +114,16 @@ const MEANT: Array<[RegExp, Tone]> = [
 ];
 // High and Low mean opposite things under Risk and under Fit.
 const BAD_WHEN_HIGH = /\b(risk|churn|severity|urgency|cost|effort|difficulty|blocker)\b/i;
-// Red is kept for a word that means something went wrong.
-const ROTATION: Tone[] = ['teal', 'blue', 'purple', 'amber', 'green', 'grey'];
+// Under these a yes is the bad news.
+const BAD_WHEN_YES = /\b(bounced?|unsubscribed?|churned|blocked|spam|lost|do not contact|dnc|opted out|complain\w*|at risk)\b/i;
+// Words outside the lists above, read by what they contain. The bad ones are
+// asked first, so "not qualified" is not taken for "qualified".
+const BAD_WORDS = /\b(not|no|non|never|un\w+|wrong|negative|ghost\w*|reject\w*|declin\w*|bounc\w*|churn\w*|lost|lose|dead|cancel\w*|fail\w*|block\w*|spam|bad|weak|poor|pass(ed)?|disqualif\w*|dropped|killed)\b/i;
+const LATER_WORDS = /\b(not now|later|next quarter|next year|bad timing|timing|follow.?up|on hold|maybe)\b/i;
+const GOOD_WORDS = /\b(won|win|signed|booked|good|strong|great|excellent|qualified|hired|accepted|closed won|converted|success\w*)\b/i;
+// A word nothing above knows takes the next of these. Green and red say
+// something happened, so a word that does not say so gets neither.
+const ROTATION: Tone[] = ['teal', 'blue', 'purple', 'amber', 'grey'];
 
 /** A tag's colour: the one its word means, or the next in turn by its place in the column. */
 export function tagTone(value: string, place: number, header = ''): Tone {
@@ -126,7 +134,15 @@ export function tagTone(value: string, place: number, header = ''): Tone {
     if (mid) return 'amber';
     return BAD_WHEN_HIGH.test(header) ? (high ? 'rose' : 'green') : (high ? 'green' : 'grey');
   }
-  for (const [re, tone] of MEANT) if (re.test(v)) return tone;
+  if (BAD_WHEN_YES.test(header)) {
+    if (/^(yes|y|true)$/i.test(v)) return 'rose';
+    if (/^(no|n|false)$/i.test(v)) return 'green';
+  }
+  const plain = v.replace(/[\s_-]+/g, ' ').trim();
+  for (const [re, tone] of MEANT) if (re.test(v) || re.test(plain)) return tone;
+  if (LATER_WORDS.test(plain)) return 'amber';
+  if (BAD_WORDS.test(plain)) return 'rose';
+  if (GOOD_WORDS.test(plain)) return 'green';
   return ROTATION[place % ROTATION.length];
 }
 

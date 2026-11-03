@@ -190,6 +190,27 @@ describe('tag colours', () => {
     expect(tagTone('High', 0, 'Fit')).toBe('green');
     expect(tagTone('Medium', 0, 'Fit')).toBe('amber');
   });
+  // Round two of the same test: a word not on the list got green by its place.
+  it('reads a bad outcome as bad even when it is not one of the listed words', () => {
+    for (const v of ['Unqualified', 'Wrong person', 'Not interested', 'Closed - Lost', 'Negative', 'Ghosted', 'Bad', 'Weak'])
+      expect(tagTone(v, 4), v).toBe('rose');
+    expect(tagTone('Not now', 4)).toBe('amber');
+    for (const v of ['Closed-Won', 'Strong', 'Good']) expect(tagTone(v, 1), v).toBe('green');
+  });
+  it('never hands green to a word it does not know', () => {
+    for (let i = 0; i < 12; i++) expect(tagTone(`Thing ${i}`, i)).not.toBe('green');
+  });
+  it('reads a yes as bad under a header that names something bad', () => {
+    expect(tagTone('TRUE', 0, 'Bounced')).toBe('rose');
+    expect(tagTone('FALSE', 0, 'Bounced')).toBe('green');
+    expect(tagTone('Yes', 0, 'Unsubscribed')).toBe('rose');
+    expect(tagTone('Yes', 0, 'Warm intro?')).toBe('green');
+  });
+  it('makes tags of Outcome and Reply columns', () => {
+    const rows = ['Won', 'Lost', 'Ghosted', 'Not now', 'Won', 'Bad timing', 'Lost', 'Signed', 'Passed', 'Won', 'Pilot', 'Churned'];
+    const t = readTable(`Name,Outcome,Reply\n${rows.map((r, i) => `C${i},${r},${['Yes', 'No', 'Later'][i % 3]}`).join('\n')}\n`, 'x.csv');
+    expect(t.columns.map((c) => c.kind)).toEqual(['name', 'tag', 'tag']);
+  });
   it('never hands red to a word that means nothing bad', () => {
     for (let i = 0; i < 12; i++) expect(tagTone(`Thing ${i}`, i)).not.toBe('rose');
   });

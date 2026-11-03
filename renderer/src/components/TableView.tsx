@@ -1,7 +1,7 @@
 // A CSV drawn as a table: in the message as a preview, beside it, and full
 // screen. The reading is ../table-file.ts; the look is ./table-view.css, as
 // approved in designs/w-690551d7ea/tags-6-colour-on-status-only-v2.png.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { filterRows, hrefOf, logoFor, readTable, shownLink, sortRows, type Column, type Sort, type Table } from '../table-file';
 import './table-view.css';
 
@@ -35,13 +35,26 @@ function Cell({ table, col, row, value }: { table: Table; col: number; row: stri
       {table.logoCol >= 0 && <Logo host={logoFor(table, row)} name={v} />}<span className="tbl-ell">{v}</span>
     </div>;
   }
-  if (column.kind === 'tag') return <div className="tbl-td"><span className={`tbl-tag tone-${column.tones[v.toLowerCase()] ?? 'grey'}`}>{v}</span></div>;
+  if (column.kind === 'tag') {
+    // "won", "Won" and "WON" are one tag, written the way it was first written.
+    const key = v.toLowerCase();
+    return <div className="tbl-td"><span className={`tbl-tag tone-${column.tones[key] ?? 'grey'}`}>{column.values.find((x) => x.toLowerCase() === key) ?? v}</span></div>;
+  }
   if (column.kind === 'number') return <div className="tbl-td tbl-num">{v}</div>;
   if (column.kind === 'date') return <div className="tbl-td tbl-date">{v}</div>;
   if (column.kind === 'link') return <div className="tbl-td tbl-link" title={v}><a className="tbl-ell" href={hrefOf(v)} target="_blank" rel="noreferrer">{shownLink(v)}</a></div>;
   if (column.kind === 'email') return <div className="tbl-td tbl-link" title={v}><a className="tbl-ell" href={`mailto:${v}`}>{v}</a></div>;
   return <div className="tbl-td" title={v.length > 40 ? v : undefined}><span className="tbl-ell">{v}</span></div>;
 }
+
+// A row's cells only change with its own values, so a sort or the next page
+// draws the rows already on screen again for nothing.
+const Row = memo(function Row({ table, row, n }: { table: Table; row: string[]; n: number }) {
+  return <div className="tbl-tr" role="row">
+    <div className="tbl-td tbl-rn">{n}</div>
+    {row.map((v, i) => <Cell key={i} table={table} col={i} row={row} value={v} />)}
+  </div>;
+});
 
 // Long text is capped (table-view.css, .tbl-ell) so the short columns after it
 // stay in view. Only the longest text column takes the spare width; equal
@@ -90,9 +103,13 @@ export function TableView({ text, path, mode, onShowAll }: { text: string; path:
   const [shown, setShown] = useState(PAGE);
   useEffect(() => { setQuery(''); setPicked({}); setSort(null); setShown(PAGE); }, [path]);
 
-  const rows = useMemo(() => sortRows(table, filterRows(table, query, picked), sort), [table, query, picked, sort]);
+  // The box shows each letter at once; the rows catch up when the typing pauses.
+  const searched = useDeferredValue(query);
+  const rows = useMemo(() => sortRows(table, filterRows(table, searched, picked), sort), [table, searched, picked, sort]);
   const template = useMemo(() => widths(table), [table]);
   const box = useRef<HTMLDivElement>(null);
+  // A new order or a new search starts from the top, one page long.
+  useEffect(() => { box.current?.scrollTo({ top: 0 }); setShown(PAGE); }, [searched, picked, sort]);
   const foot = useRef<HTMLDivElement>(null);
   const searchBox = useRef<HTMLInputElement>(null);
   const [moreRight, setMoreRight] = useState(false);
@@ -177,7 +194,7 @@ export function TableView({ text, path, mode, onShowAll }: { text: string; path:
               </button>)}
             </>}
           </Menu>
-          <span className="tbl-count">{count}{mode === 'full' ? ` · ${table.columns.length} columns` : ''}</span>
+          <span className="tbl-count">{count}{mode === 'full' ? ` · ${table.columns.length} ${table.columns.length === 1 ? 'column' : 'columns'}` : ''}</span>
         </div>
       )}
       <div className={`tbl-frame${moreRight ? ' more-right' : ''}`}>
@@ -193,19 +210,14 @@ export function TableView({ text, path, mode, onShowAll }: { text: string; path:
               </button>
             ))}
           </div>
-          {drawn.map((r, n) => (
-            <div key={n} className="tbl-tr" role="row">
-              <div className="tbl-td tbl-rn">{n + 1}</div>
-              {r.map((v, i) => <Cell key={i} table={table} col={i} row={r} value={v} />)}
-            </div>
-          ))}
+          {drawn.map((r, n) => <Row key={n} table={table} row={r} n={n + 1} />)}
         </div>
         {!rows.length && <div className="tbl-none">{total ? 'No rows match.' : 'This table has no rows yet.'}</div>}
         {!preview && rows.length > shown && <div ref={foot}><button type="button" className="tbl-more" onClick={() => setShown((s) => s + PAGE)}>Show {Math.min(PAGE, rows.length - shown).toLocaleString()} more rows</button></div>}
       </div>
       </div>
       {preview && total > PREVIEW_ROWS && onShowAll && (
-        <button type="button" className="tbl-showall" onClick={onShowAll}>Show all {total} rows</button>
+        <button type="button" className="tbl-showall" onClick={onShowAll}>Show all {total.toLocaleString()} rows</button>
       )}
     </div>
   );

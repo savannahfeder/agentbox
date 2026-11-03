@@ -92,6 +92,12 @@
   display: flex; align-items: center; height: 46px; padding: 0 16px;
   white-space: nowrap; overflow: hidden;
 }
+/* The row number and the first column stay put while the rest scrolls sideways,
+   so a cell far to the right still says whose row it is. */
+.tbl-tr > :nth-child(1), .tbl-tr > :nth-child(2) { position: sticky; background: var(--surface); z-index: 1; }
+.tbl-tr > :nth-child(1) { left: 0; }
+.tbl-tr > :nth-child(2) { left: 44px; }
+.tbl-tr > .tbl-th:nth-child(1), .tbl-tr > .tbl-th:nth-child(2) { z-index: 3; }
 .tbl-rn { justify-content: flex-end; padding: 0 12px 0 0; color: var(--tbl-rn); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .tbl-th.tbl-rn { padding: 13px 12px 13px 0; cursor: default; }
 .tbl-ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px; }
