@@ -23,10 +23,6 @@ const root = path.join(os.tmpdir(), 'agentbox-speed');
 const data = path.join(root, 'data');
 const timings = path.join(data, 'timings.jsonl');
 const log = (o) => fs.appendFileSync(timings, `${JSON.stringify({ t: Date.now(), ...o })}\n`);
-
-if (args[0] === '--serve') await serve(Number(args[1]));
-else await measure();
-
 // A THREAD WHOSE LAST RUN ENDED AND LEFT IT WHERE IT WAS. A Mac that has been
 // working for months carries thousands of them, each with its newest session log
 // still on disk, and the agents' clock walks the lot every fifteen seconds to
@@ -34,6 +30,10 @@ else await measure();
 // kept finding the held main thread (w-a20f0430a9, w-55249c1161), and the store
 // below had none of them, so nothing here ever pressed on it.
 const STRANDED_LOG_KB = 200;
+
+if (args[0] === '--serve') await serve(Number(args[1]));
+else await measure();
+
 function strandedLog(id) {
   let text = `# ${id} · spawned 2026-08-27T22:25:22.807Z\n\n`;
   for (let n = 0; text.length < STRANDED_LOG_KB * 1024; n += 1) text += `22:${String(n % 60).padStart(2, '0')}:29  [Bash] npm run test:changed\n`;
