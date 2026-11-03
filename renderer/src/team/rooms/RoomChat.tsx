@@ -203,7 +203,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
       title="Drag to widen. Double-click to reset." onPointerDown={drag} onDoubleClick={() => { setWidth(null); writeChatWidth(null); }} />}
     {root ? <div className="rm-chat-head rm-thread-head">
       <button type="button" className="rm-switch" title="Back to the chat (Esc)" onClick={() => setThread(null)}>{I.back()}<span>Thread</span></button>
-      <span className="rm-label" style={{ marginLeft: 'auto', marginRight: 4 }}>{(replies.get(root.id)?.length ?? 0)} {(replies.get(root.id)?.length ?? 0) === 1 ? 'reply' : 'replies'}</span>
+      {(replies.get(root.id)?.length ?? 0) > 0 && <span className="rm-label" style={{ marginLeft: 'auto', marginRight: 4 }}>{replies.get(root.id)!.length} {replies.get(root.id)!.length === 1 ? 'reply' : 'replies'}</span>}
     </div> : head ?? <div className="rm-chat-head">
       <button type="button" className={`rm-switch${switchOpen ? ' open' : ''}`} onClick={(e) => onSwitch?.(e.currentTarget.getBoundingClientRect())}>
         {room.kind === 'group'

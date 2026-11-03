@@ -24,4 +24,7 @@ describe('a thread in a group chat', () => {
   it('puts the cursor in its reply box when it opens', () => {
     expect(chat).toMatch(/useEffect\(\(\) => \{ if \(threadId\) requestAnimationFrame\(\(\) => ref\.current\?\.focus\(\)\); \}, \[\]\);/);
   });
+  it('says how many replies only when there are some', () => {
+    expect(chat).toContain("{(replies.get(root.id)?.length ?? 0) > 0 && <span className=\"rm-label\"");
+  });
 });
