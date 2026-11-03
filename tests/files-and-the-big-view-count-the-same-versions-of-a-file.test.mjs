@@ -106,8 +106,7 @@ describe("a thread's big view opens what it was sent, with a way to the newest",
   });
   it('offers the newest from an older version', () => {
     const view = read('renderer/src/components/ArtifactView.tsx');
-    expect(view).toMatch(/is the newest\./);
-    expect(view).toMatch(/>Show v\{/);
+    expect(view).toMatch(/className="av-newest"[^\n]*>Show v\{/);
   });
   it('a version from elsewhere is edited where it lives, not here', () => {
     const view = read('renderer/src/components/ArtifactView.tsx');

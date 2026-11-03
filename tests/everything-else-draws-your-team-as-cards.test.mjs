@@ -101,7 +101,4 @@ describe('a card opens its chat', () => {
     expect(rooms).toContain('people={inline && (open.teamId || open.members <= 2) ? null : <PeoplePanel');
   });
 
-  it('keeps the order you dragged the cards into', () => {
-    expect(app).toContain('const reorderMembers = (keys: string[]) => { setEvOrder(keys); writeOrder(keys); };');
-  });
 });

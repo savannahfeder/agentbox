@@ -20,8 +20,11 @@ export function threadFiles(files: ThreadFile[] | null | undefined, numbers?: Re
 export function lineAsThread(line: ReadonlyArray<{ key: string; versions: ReadonlyArray<{ n: number; name: string; path: string | null; by: string | null; at: number; agent?: string; here: string[] }> }> | null | undefined): { numbers: Record<string, number>; lines: unknown[] };
 export function whereAPressLands(families: FileFamily[] | null | undefined, press?: { path?: string | null; file?: string | null }): { fi: number; vi: number } | null;
 export function versionForPath(families: FileFamily[] | null | undefined, path: string | null | undefined): FileVersion | null;
+export function stepsThrough(families: FileFamily[], paths: string[] | null | undefined): Array<{ fi: number; vi: number }>;
+export function nextStep(families: FileFamily[] | null | undefined, steps: Array<{ fi: number; vi: number }> | null | undefined, at: { fi: number; vi: number } | null, by: number): { fi: number; vi: number } | null;
 export function filesInLines(lines: unknown[] | null | undefined): Array<{ path: string; by: string | null; at: number; agent?: string }>;
 export function sharedByWords(v: Pick<FileVersion, 'by' | 'agent'>, opts: { me: string | null; nameOf: (id: string) => string }): string;
+export function resolvedInWords(v: Pick<FileVersion, 'by' | 'agent' | 'n'>, opts: { me: string | null; nameOf: (id: string) => string }): string;
 export function carriedNotes(family: FileFamily | null | undefined, index: number, notes: FileNote[] | null | undefined, opts?: { resolved?: boolean }): Array<FileNote & { from: string }>;
 export function whoseIsTheFile(files: ThreadFile[], id: string): string | null;
 export function fileNewsFor(item: { artifacts?: FileMarks; runner?: string | null; createdBy?: string | null; people?: readonly string[] | null } | null | undefined, me: string | null | undefined, opts?: { myName?: string | null }): FileNews[];

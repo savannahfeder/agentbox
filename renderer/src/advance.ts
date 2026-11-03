@@ -44,10 +44,12 @@ export function advanceAfter(p: { fromTask: boolean; index: number; id: string }
  * ends (w-65bcefb857). Opened from In progress or any other list, or from
  * search, she stays: "I quite often will just stick with one chat"
  * (tests/a-reply-keeps-you-on-the-thread-unless-you-are-clearing-your-inbox).
+ * A thread you came back to with O is one you are working in, so it keeps you
+ * too (tests/a-thread-you-came-back-to-with-o-keeps-you-after-a-reply).
  */
-export function replyMovesOn(p: { view: string; onBoard: boolean; index: number; searching?: boolean; phone?: boolean }): boolean {
+export function replyMovesOn(p: { view: string; onBoard: boolean; index: number; searching?: boolean; phone?: boolean; cameBack?: boolean }): boolean {
   // With search open, the tab under it is not where the work is happening.
-  return !p.phone && !p.searching && advanceLandsHere(p) && p.index >= 0;
+  return !p.phone && !p.searching && !p.cameBack && advanceLandsHere(p) && p.index >= 0;
 }
 
 const MORE_COMING = /\?\s*$|\bask me\b|\bI(?:'ll| will) (?:explain|say|tell|describe)\b|\blet me (?:explain|say|describe)\b/i;

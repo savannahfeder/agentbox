@@ -7,6 +7,7 @@ import path from 'node:path';
 import { readOutbox, readTeamView, writeOutbox, newOutId } from '../../main/store/teammates-files.mjs';
 import { readItemHistory, readWorkItem, readWorkItems, updateWorkItem } from '../../main/store/work-items.mjs';
 import { baseName, carriedNotes, familyOfName, filesInLines, marksOf, nextVersionName, otherFilesInLines, placeWords, reviewKind, shownName, threadFiles } from '../../shared/artifact-marks.mjs';
+import { lineGap, mergeThree } from '../../shared/doc-merge.mjs';
 import { VIEW_FRESH_MS, groupTurn, mayGoNow, saidToSendTo } from '../../shared/teammate-reach.mjs';
 import { CHAT_LABEL, tooLongForAChat } from '../../shared/teammates.mjs';
 import { PLAIN_AGENT } from '../../shared/agent-voice.mjs';
@@ -137,15 +138,23 @@ function filesToCarry(list, c) {
 /**
  * What this thread and Files know of the file called `name`: how many versions,
  * every version's name, and where its newest is. Nothing when there is no thread.
+ *
+ * `chain` is the thread's own versions in order, with who wrote each, and `dir`
+ * the folder their relative paths are in, which is what a merge needs to read
+ * them. `voice` is who this run speaks as, so a version of its own can be told
+ * from somebody else's.
  */
 export function knownFile(name, ctx = {}) {
   const family = familyOfName(name);
-  const out = { versions: 0, names: new Set(), paths: [], path: null };
+  const out = { versions: 0, names: new Set(), paths: [], path: null, chain: [], dir: null, voice: PLAIN_AGENT };
   let c;
   try { c = teammateContext({ ...ctx, outsider: true }); } catch { return out; }
+  out.dir = c.project.dir;
+  out.voice = c.me?.name || PLAIN_AGENT;
   try {
     const lines = readItemHistory(c.project.dir, c.item.id, { max: Number.MAX_SAFE_INTEGER });
     const here = threadFiles([...filesInLines(lines), ...otherFilesInLines(lines)]).find((f) => f.key === family);
+    out.chain = (here?.versions ?? []).map((v) => ({ name: v.name, path: v.path, edited: v.edited === true, agent: typeof v.agent === 'string' ? v.agent : null }));
     for (const v of here?.versions ?? []) {
       out.names.add(v.name);
       out.paths.push(v.path);
@@ -172,7 +181,7 @@ export function knownFile(name, ctx = {}) {
  * another path. It goes in this thread's own folder, beside nobody's original,
  * and needs no person to send it to. null: an ordinary write.
  */
-export function documentVersion({ product, versionOf, path: rel = null, ownItem = null, env = process.env }) {
+export function documentVersion({ product, versionOf, path: rel = null, content = null, ownItem = null, env = process.env }) {
   const asked = String(versionOf ?? '').trim();
   const name = asked ? shownName(asked) : rel ? path.basename(rel) : '';
   if (!name) return null;
@@ -187,10 +196,54 @@ export function documentVersion({ product, versionOf, path: rel = null, ownItem 
   const next = nextVersionFor(name, ext, { known, taken: (n) => fs.existsSync(path.join(dir, folder, n)) });
   const at = `${folder}/${next}`;
   const base = baseName(name);
+  const kept = keepWhatOthersWrote(known, content);
   return {
     product: home, path: at, of: base, title: base.replace(/\.[^.]+$/, ''),
-    note: `Saved [${next}](${at}) as the next version of ${known.path ? `[${base}](${known.path})` : base}.`,
+    ...(kept ? { content: kept.content, merged: kept.merged } : {}),
+    note: `Saved [${next}](${at}) as the next version of ${known.path ? `[${base}](${known.path})` : base}.`
+      + (kept ? ` It kept the edit someone made in ${kept.merged} as well as your own changes.` : ''),
   };
+}
+
+const readVersion = (dir, v) => {
+  try { return fs.readFileSync(path.isAbsolute(v.path) ? v.path : path.join(dir, v.path), 'utf8'); } catch { return null; }
+};
+
+/**
+ * `content` with whatever somebody else wrote since, or null when there is
+ * nothing to keep. An agent writes its next version from the copy it remembers,
+ * so an edit saved after that one is stepped over without anyone noticing
+ * (w-27a7ae314a). The newest version is nobody's to overwrite, so the write is
+ * merged against it. Nothing records which version a write started from, so the
+ * base is the version it is fewest lines from, which is the one it was copied
+ * from. Both sides changing the same lines throws: that is the one case somebody
+ * has to answer for, and losing either set of words silently is not an answer.
+ */
+function keepWhatOthersWrote(known, content) {
+  if (typeof content !== 'string' || !known.dir) return null;
+  // Only when this thread can see every version: a copy elsewhere may hold one it cannot read.
+  if (known.chain.length < 2 || known.chain.length !== known.versions) return null;
+  const head = known.chain[known.chain.length - 1];
+  const itsOwn = !head.edited && typeof head.agent === 'string' && (head.agent || PLAIN_AGENT) === known.voice;
+  if (itsOwn || reviewKind(head.path) !== 'markdown') return null;
+  const headText = readVersion(known.dir, head);
+  if (headText == null || headText === content) return null;
+  let baseText = null;
+  let gap = Infinity;
+  for (const v of known.chain.slice(0, -1)) {
+    const was = readVersion(known.dir, v);
+    if (was == null) continue;
+    // The newest of equals: a later version of the same words is the likelier copy.
+    const far = lineGap(was, content);
+    if (far <= gap) { gap = far; baseText = was; }
+  }
+  if (baseText == null) return null;
+  const merged = mergeThree({ base: baseText, ours: headText, theirs: content });
+  if (!merged.ok) {
+    const why = merged.tooBig ? 'it is too long to merge line by line' : 'your words change the same lines';
+    throw new Error(`${head.name} changed since you read it, and ${why}, so nothing was saved. Read ${head.path} and write your next version from that.`);
+  }
+  return merged.text === content ? null : { content: merged.text, merged: head.path };
 }
 
 /** The name the next version of `name` takes: past every version known, and past `taken`. */

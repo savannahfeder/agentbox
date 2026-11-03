@@ -31,7 +31,7 @@ const FILES_FOR_AGENTS = 40;
  * same name, as the agent's tools match it (mcp/core/reach.mjs).
  */
 /** Counts for tests: how many threads were parsed for their files. */
-export const filesOfInternals = { parses: 0 };
+export const filesOfInternals = { parses: 0, entries: 0 };
 
 // Every list of Files reads every thread, so a thread is parsed again only when
 // its lines did: one agent writing must not re-read thousands of threads.
@@ -67,15 +67,24 @@ export function filesOf(threads) {
     if (t.ref.kind === 'chat' || t.ref.kind === 'room') { chats.push({ t, families, marks }); continue; }
     for (const fam of families) named.push({ t, fam, marks });
   }
-  // Only a file of the same name can be another thread's home for it.
+  // Only a file of the same name can be another thread's home for it. Oldest
+  // first, so the first thread that qualifies is the oldest one.
   const sameName = new Map();
-  for (const e of named) sameName.set(e.fam.key, [...(sameName.get(e.fam.key) ?? []), e]);
+  for (const e of named) {
+    const list = sameName.get(e.fam.key);
+    if (list) list.push(e); else sameName.set(e.fam.key, [e]);
+  }
+  for (const list of sameName.values()) list.sort((a, b) => firstAt(a.fam) - firstAt(b.fam));
   for (const e of named) {
     const project = homeElsewhere(e, sameName.get(e.fam.key)) ?? e.t.project;
     add(`${projectKey(project)}\0${e.fam.key}`, project, e.fam, e.t, e.marks);
   }
   const inProjects = new Map();
-  for (const f of files.values()) if (f.project) inProjects.set(f.familyKey, [...(inProjects.get(f.familyKey) ?? []), f]);
+  for (const f of files.values()) {
+    if (!f.project) continue;
+    const list = inProjects.get(f.familyKey);
+    if (list) list.push(f); else inProjects.set(f.familyKey, [f]);
+  }
   for (const { t, families, marks } of chats) {
     for (const fam of families) {
       const same = inProjects.get(fam.key) ?? [];
@@ -87,7 +96,16 @@ export function filesOf(threads) {
 }
 
 const COPY_PATH = /^sources\/[^/]+\/[^/]+$/;
-const firstAt = (fam) => Math.min(...fam.versions.map((v) => v.at || 0));
+const firsts = new WeakMap();
+const firstAt = (fam) => {
+  if (!firsts.has(fam)) firsts.set(fam, Math.min(...fam.versions.map((v) => v.at || 0)));
+  return firsts.get(fam);
+};
+const idSets = new WeakMap();
+const idsOf = (fam) => {
+  if (!idSets.has(fam)) idSets.set(fam, new Set(fam.versions.map((v) => v.id)));
+  return idSets.get(fam);
+};
 
 /**
  * The project whose file a thread's family belongs to when that is not the
@@ -95,22 +113,34 @@ const firstAt = (fam) => Math.min(...fam.versions.map((v) => v.at || 0));
  * either it is a kept copy of a connection, or this thread's version of that
  * name is not on its own disk (so it read the other file) and the thread adds
  * a version or can say so. Only an older file is joined, so two never swap.
+ * `named` is oldest first, so the first that qualifies is the answer.
  */
 function homeElsewhere({ t, fam }, named) {
-  const ownHere = (v) => (t.dirs ?? []).some((d) => d && !path.isAbsolute(v.path) && fs.existsSync(path.join(d, v.path)));
-  let best = null;
+  const here = new Map();
+  const ownHere = (v) => {
+    if (!here.has(v.path)) here.set(v.path, (t.dirs ?? []).some((d) => d && !path.isAbsolute(v.path) && fs.existsSync(path.join(d, v.path))));
+    return here.get(v.path);
+  };
+  const mine = firstAt(fam);
+  const home = projectKey(t.project);
+  let allHere;
   for (const o of named) {
-    if (o.t === t || o.fam.key !== fam.key || projectKey(o.t.project) === projectKey(t.project)) continue;
-    if (firstAt(o.fam) > firstAt(fam)) continue;
-    const ids = new Set(o.fam.versions.map((v) => v.id));
+    if (firstAt(o.fam) > mine) break;
+    if (o.t === t || o.fam.key !== fam.key || projectKey(o.t.project) === home) continue;
+    const ids = idsOf(o.fam);
     const shared = fam.versions.filter((v) => ids.has(v.id));
     if (!shared.length) continue;
     const copy = shared.some((v) => COPY_PATH.test(v.path) && o.fam.versions.some((x) => x.path === v.path));
+    if (!copy) {
+      // Every version on this thread's own disk and none a copy: no other thread can take it.
+      allHere ??= !fam.versions.some((v) => COPY_PATH.test(v.path)) && fam.versions.every(ownHere);
+      if (allHere) return null;
+    }
     const revised = fam.versions.some((v) => !ids.has(v.id) && v.name !== baseName(v.name));
     if (!copy && (shared.some(ownHere) || !(revised || t.dirs?.length))) continue;
-    if (!best || firstAt(o.fam) < best.at) best = { project: o.t.project, at: firstAt(o.fam) };
+    return o.t.project;
   }
-  return best?.project ?? null;
+  return null;
 }
 
 // What the copy of a connection's item is named on disk carries its id, to keep two items apart.
@@ -167,8 +197,7 @@ function summary(f) {
   const newest = chain[chain.length - 1];
   const stoodApproved = newest.edited && !approvals.some((a) => a.file === newest.id)
     ? approvals.filter((a) => chain.some((v) => v.id === a.file)).sort((a, b) => a.ts - b.ts).at(-1) : null;
-  const places = [];
-  for (const c of f.copies) if (!places.includes(c.thread)) places.push(c.thread);
+  const places = [...new Set(f.copies.map((c) => c.thread))];
   return {
     key: f.key,
     project: f.project,
@@ -319,26 +348,49 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   };
   const readable = () => [...store.listProducts(), ...(team?.sharedThreadProducts?.() ?? [])];
 
+  // A thread's entry and its part of allFiles' signature, kept while its lines
+  // and its project are the same objects and names they were.
+  const entries = new Map();
+  const sigs = new WeakMap();
+  const sigOf = (t) => sigs.get(t) ?? `${refKey(t.ref)}@${linesKey(t.lines)}|${t.title}|${t.project}|${(t.dirs ?? []).join(',')}`;
+
   function threads() {
     const state = team?.state?.() ?? {};
     const me = state.me?.id ?? null;
     const firstOf = (id) => (state.people ?? []).find((p) => p.id === id)?.name?.split(/\s+/)[0] ?? 'someone';
     const out = [];
     const bySlug = new Map(store.listProducts().map((p) => [p.slug, p]));
+    const readers = new Map();
+    const readerOf = (slug) => {
+      if (!readers.has(slug)) readers.set(slug, store.historyReader?.(slug) ?? ((id, o) => store.readHistory(slug, id, o)));
+      return readers.get(slug);
+    };
     for (const item of store.listAllWorkItems()) {
       const product = bySlug.get(item.product);
       if (!product) continue;
       const chat = !!product.team?.direct;
-      const lines = historyOf(`${product.slug}/${item.id}`, item.updatedAt, () => store.readHistory(product.slug, item.id, { max: Number.MAX_SAFE_INTEGER }));
+      const key = `${product.slug}/${item.id}`;
+      const lines = historyOf(key, item.updatedAt, () => readerOf(product.slug)(item.id, { max: Number.MAX_SAFE_INTEGER }));
+      const was = chat ? null : entries.get(key);
+      if (was && was.lines === lines && was.name === product.name && was.dir === product.dir && was.repo === product.repoPath) {
+        out.push(was.entry);
+        continue;
+      }
+      filesOfInternals.entries += 1;
       // The receiving copy lists everyone but the one who started the chat.
       const others = [...new Set([...(product.team?.people ?? []), product.team?.sharedBy, ...(item.people ?? [])])].filter((p) => p && p !== me);
-      out.push({
+      const entry = {
         ref: { kind: chat ? 'chat' : 'thread', product: product.slug, id: item.id },
         title: chat ? `Chat with ${others.map(firstOf).join(', ') || 'yourself'}` : shownTitle(item),
         project: chat ? null : product.name,
         dirs: chat ? [] : [product.dir, product.repoPath, product.repoPath ? path.join(product.repoPath, '.claude', 'worktrees', item.id) : null].filter(Boolean),
         lines,
-      });
+      };
+      if (!chat) {
+        sigs.set(entry, sigOf(entry));
+        entries.set(key, { entry, lines, name: product.name, dir: product.dir, repo: product.repoPath });
+      }
+      out.push(entry);
     }
     const cards = new Map((state.cards ?? []).map((c) => [`${c.personId}/${c.threadId}`, c]));
     for (const s of team?.sharedThreads?.() ?? []) {
@@ -366,7 +418,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   let last = { sig: null, files: [] };
   const allFiles = () => {
     const ts = threads();
-    const sig = ts.map((t) => `${refKey(t.ref)}@${linesKey(t.lines)}|${t.title}|${t.project}|${(t.dirs ?? []).join(',')}`).join('\n');
+    const sig = ts.map(sigOf).join('\n');
     if (sig !== last.sig) last = { sig, files: filesOf(ts) };
     return last.files;
   };
@@ -658,13 +710,13 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     },
 
     /** A version written on one of this person's own threads. A chat carries it as a message, which is what reaches the other person. */
-    editOnThread({ product, id, path: basePath, baseId, text, taken }) {
+    editOnThread({ product, id, path: basePath, baseId, text, taken, since }) {
       const here = store.listProducts().find((p) => p.slug === product);
       if (!here || !store.readItem(product, id)) return { ok: false, error: 'that thread is gone' };
       const lines = store.readHistory(product, id, { max: Number.MAX_SAFE_INTEGER });
       const clean = String(basePath ?? '').replace(/^\.\//, '');
       const names = taken ?? allFiles().find((f) => f.chain.some((v) => v.copies.some((c) => c.thread.ref.id === id && c.path === clean)))?.chain.map((v) => v.name) ?? [];
-      const saved = saveNextVersion({ dir: here.dir, threadId: id, lines, basePath, baseId, text, taken: names });
+      const saved = saveNextVersion({ dir: here.dir, threadId: id, lines, basePath, baseId, text, since, taken: names });
       if (!saved.ok) return saved;
       if (here.team?.direct) store.answerItem(product, id, { answer: editedWords(saved.shown, saved.path) });
       else store.fileMark(product, id, { do: 'edit', file: saved.file, path: saved.path, ...(saved.over ? { over: saved.over } : {}) });

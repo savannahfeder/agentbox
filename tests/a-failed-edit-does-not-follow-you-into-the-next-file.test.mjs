@@ -24,14 +24,16 @@ describe('leaving a document that did not save', () => {
     expect(leave).toContain('onClose()');
     expect(leave).not.toMatch(/localStorage\.removeItem/);
   });
-  it('Escape after a failed save does what the words say, rather than try again', () => {
-    expect(view).toMatch(/editing && editWord === 'Not saved'\) leave\(\)/);
+  it('Escape goes the way Back does, so after a failed save it leaves rather than try again', () => {
+    expect(view).toMatch(/else if \(compare\) setCompare\(false\);\s*else leave\(\);/);
   });
   it('the failure says what the next press does', () => {
     expect(view).toContain('Press back again to leave');
   });
-  it('cannot step to another file or version with an edit open', () => {
-    expect(view).toMatch(/const stepFile[^\n]*\n\s*if \(editing \|\|/);
-    expect(view).toMatch(/const stepVersion[^\n]*\n\s*if \(editing \|\|/);
+  it('stepping to another file or version after a failed save goes, keeping the draft', () => {
+    const away = view.slice(view.indexOf('const away = '), view.indexOf('const leave = ()'));
+    expect(away).toMatch(/editWord === 'Not saved'\) \{ dropSitting\(\); go\(\);/);
+    const drop = view.slice(view.indexOf('const dropSitting = '), view.indexOf('const away = '));
+    expect(drop).toMatch(/localStorage\.setItem/);
   });
 });

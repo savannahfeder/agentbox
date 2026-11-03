@@ -11,10 +11,11 @@ import { MainTests } from './main-went-red.mjs';
 import { folderJob } from './task-folders-offthread.mjs';
 import { gitJob } from './git-change-offthread.mjs';
 import { queuedReplyText, submitReply, framedTeammate } from './live-replies.mjs';
-import { wakeForNotes } from './notes-wake.mjs';
+import { resolveAnsweredNotes, wakeForNotes } from './notes-wake.mjs';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mjs';
 import { editedFilesLine } from '../shared/artifact-marks.mjs';
-import { readItemHistory } from './store/work-items.mjs';
+import { readItemHistory, updateWorkItem } from './store/work-items.mjs';
+import { reconcileRows } from './version-reconcile.mjs';
 import { taskCommand } from './task-commands.mjs';
 import { providerCommand, reviewTarget, nativeCommandNames } from '../shared/provider-commands.mjs';
 import {agentInstructionsUnified, readSystemTemplate, writeInstruction} from './instruction-settings.mjs';
@@ -273,6 +274,8 @@ const HUNG_QUIET_MS = 10 * 60_000;
 // A pass this late was not late, the Mac was asleep (forgiveSleep). Eight
 // missed passes: past any slow pass, well under the ten minutes above.
 const SLEPT_GAP_MS = 2 * 60_000;
+const PROFILES_KEPT_MS = 1000;
+const TRACES_KEPT = 500;
 // Awake this long and not joined or taken back, a row handed to the cloud runs here (`_carriedHolds`).
 const PHONE_QUIET_MS = 10 * 60_000;
 // Two hangs on one row inside this window and the app stops restarting it and
@@ -1750,6 +1753,18 @@ export class Supervisor {
   // A push lasts while its task runs, so a second push cannot pause the first,
   // and ends with that run. One that never starts ends when the row stops being
   // open work: finished, archived, or gone.
+  _reconcileVersions(items) {
+    reconcileRows({
+      items,
+      isLive: (item) => this.sessions.has(item.id) || this._cloudWorkOutstanding(item),
+      dirOf: (item) => this.store.productDir(item.product),
+      historyOf: (item) => readItemHistory(this.store.productDir(item.product), item.id, { max: Number.MAX_SAFE_INTEGER }),
+      writeTo: (item, patch) => updateWorkItem(this.store.productDir(item.product), item.id, patch, { source: 'system' }),
+      looked: (this._versionsLooked ??= new Map()),
+      warn: (words) => console.warn(`zero: ${words}`),
+    });
+  }
+
   _settleRunNow(items) {
     for (const [id, rec] of [...this._runNow]) {
       const item = items.find((i) => i.id === id && i.product === rec.product);
@@ -3863,6 +3878,9 @@ export class Supervisor {
     // times a second. A row we have ALREADY spoken on still counts, because
     // it is still not running; being told once does not start it.
     const stranded = [];
+    const byKey = new Map(items.map((i) => [`${i.product}:${i.id}`, i]));
+    let dirs = null;
+    const dirOf = (slug) => (dirs ??= new Map(this.store.listProducts().map((p) => [p.slug, p.dir]))).get(slug);
     for (const [key, seen] of Object.entries(this._fruitless)) {
       if (!seen?.runs) continue;
       try {
@@ -3870,7 +3888,7 @@ export class Supervisor {
         const product = key.slice(0, cut);
         const id = key.slice(cut + 1);
         if (this.sessions.has(id)) continue;          // a worker is on it right now
-        const item = items.find((i) => i.id === id && i.product === product);
+        const item = byKey.get(key);
         if (!item) continue;
         // Only a row still sitting on the pile the dead run was taken from.
         // Anything else has moved on and is somebody else's news.
@@ -3913,7 +3931,7 @@ export class Supervisor {
         // WHAT THE LAST RUN ACTUALLY DID, read off its own trace. The session
         // object is long gone by now — often the whole process is — and the
         // trace is the only thing left that knows.
-        const trace = this._lastTrace(product, id);
+        const trace = this._lastTrace(product, id, dirOf);
         if (!traceShowsASilentDeath(trace)) continue;
 
         const cause = troubleCause(trace.stderr);
@@ -3993,17 +4011,30 @@ export class Supervisor {
   // The newest trace a row has, read once. Null when the row has never been
   // spawned, which is the ordinary case for most of `_fruitless` and is not an
   // error.
-  _lastTrace(product, id) {
-    const dir = this.store.listProducts().find((p) => p.slug === product)?.dir;
+  // Kept per log until its size or time changes: the stranded pass asks every tick.
+  _lastTrace(product, id, dirOf = (slug) => this.store.listProducts().find((p) => p.slug === slug)?.dir) {
+    const dir = dirOf(product);
     if (!dir) return null;
+    let sessions;
     let files;
-    try { files = fs.readdirSync(machineryPath(dir, path.join('sessions', id))); }
-    catch { return null; }
+    try {
+      sessions = machineryPath(dir, path.join('sessions', id));
+      files = fs.readdirSync(sessions);
+    } catch { return null; }
     const logs = files.filter((f) => f.endsWith('.log')).sort();
     if (!logs.length) return null;
+    const file = path.join(sessions, logs[logs.length - 1]);
     try {
-      const text = fs.readFileSync(machineryPath(dir, path.join('sessions', id, logs[logs.length - 1])), 'utf8');
-      return readDeadRunTrace(text);
+      const st = fs.statSync(file);
+      const stamp = `${st.size}:${st.mtimeMs}`;
+      this._traces ??= new Map();
+      const kept = this._traces.get(file);
+      if (kept?.stamp === stamp) return kept.trace;
+      const trace = readDeadRunTrace(fs.readFileSync(file, 'utf8'));
+      this._traces.delete(file);
+      if (this._traces.size >= TRACES_KEPT) this._traces.delete(this._traces.keys().next().value);
+      this._traces.set(file, { stamp, trace });
+      return trace;
     } catch { return null; }
   }
 
@@ -4313,8 +4344,14 @@ export class Supervisor {
   // THE CONFIGURED ONES FIRST, THEN WHATEVER IS SIGNED IN ON THE DISK. One
   // copy of that rule, in main/account-discovery.mjs, so the fleet and the
   // Agents page can never disagree about which accounts exist.
+  // A tick asks once per waiting thread, so within one it is read at most once a second.
   _profiles() {
-    return effectiveProfiles(this.config.authProfiles, { home: this.config.home });
+    const now = Date.now();
+    const kept = this._profilesKept;
+    if (this._ticking && kept && now - kept.at < PROFILES_KEPT_MS) return [...kept.list];
+    const list = effectiveProfiles(this.config.authProfiles, { home: this.config.home });
+    this._profilesKept = { at: now, list };
+    return [...list];
   }
 
   // THE CODEX LOGIN, WHICH IS NOT ONE OF THE CLAUDE ONES.
@@ -7517,6 +7554,7 @@ export class Supervisor {
     // on this tick is picked up by the pass below.
     await this.serveTeammates(now);
     await this.wakeForNotes(now);
+    this.resolveAnsweredNotes(now);
     // And the folders of rows she has finished, put away. On a timer of its own
     // rather than every pass, because it is a walk of the disk and a tick is
     // fifteen seconds: she closes rows while nothing at all is running, which
@@ -7554,6 +7592,7 @@ export class Supervisor {
     // whose run has ended is settled first, since it no longer holds anything.
     this._settleRunNow(items);
     this._settlePreemptions(items, now);
+    this._reconcileVersions(items);
 
     // Interrupted sessions the last sweep could not fit in a slot. Ahead of
     // everything, because a row whose own session is waiting must not have a
@@ -7902,6 +7941,12 @@ export class Supervisor {
     try {
       if (await wakeForNotes({ store: this.store, team, tell, now })) this.wake?.();
     } catch (err) { console.warn('zero: notes on a file could not reach its agent:', err.message); }
+  }
+
+  resolveAnsweredNotes(now = Date.now()) {
+    try {
+      resolveAnsweredNotes({ store: this.store, people: this.store.teammates?.team?.state?.()?.people ?? [], now });
+    } catch (err) { console.warn('zero: comments a new version answered could not be resolved:', err.message); }
   }
 
   // Your words to a teammate that is already on a run go into that run, the
@@ -11892,6 +11937,7 @@ export class Supervisor {
 
   _connectionsBrief() {
     if (!this.connections) return null;
+    const now = this.connections._now?.() ?? Date.now();
     let tools = null;
     try { tools = this.connections.statusNow?.() ?? null; } catch { /* told from workingNow */ }
     if (!tools) {
@@ -11901,12 +11947,12 @@ export class Supervisor {
       tools = this.connections.catalog.map((e) => ({ id: e.id, name: e.name, state: have.has(e.id) ? 'works' : 'not_connected', given: have.has(e.id) }));
     }
     const lines = ['## Connected tools', 'Each tool the owner can connect, as their Connections page shows it. Say it the same way, and never tell the owner to connect a tool that is connected.'];
-    for (const t of tools.filter((x) => x.state !== 'not_connected')) lines.push(connectionLine(t, Date.now()));
+    for (const t of tools.filter((x) => x.state !== 'not_connected')) lines.push(connectionLine(t, now));
     const missing = tools.filter((t) => t.state === 'not_connected');
     if (missing.length) lines.push(`Not connected: ${missing.map((e) => e.name).join(', ')}. If the work needs one of them, or another tool, do not look for another way in. Say so in your message and give the owner the link: ${missing.map((e) => `[Connect ${e.name}](agentbox://connections/${e.id})`).join(' ')}, or [Connections](agentbox://connections) for anything else.`);
     let copies = [];
     try { copies = this.connections.copiesNow?.() ?? []; } catch { /* told as none */ }
-    if (copies.length || tools.some((t) => t.state !== 'not_connected')) lines.push('', filesComeFirst(copies, Date.now()));
+    if (copies.length || tools.some((t) => t.state !== 'not_connected')) lines.push('', filesComeFirst(copies, now));
     return lines.join('\n');
   }
 
