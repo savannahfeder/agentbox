@@ -5,7 +5,41 @@
 // file is split and what each column is taken to be. The look is in
 // table-view.css and was approved as designs/w-690551d7ea/tags-6-colour-on-status-only-v2.png.
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseDelimited, readTable, isTablePath, tagTone, logoFor, sortRows, filterRows } from '../renderer/src/table-file.ts';
+import { besideDocument, messageDocuments } from '../renderer/src/message-artifacts.ts';
+import { readsInPlace } from '../renderer/src/components/OneThingAtATime.tsx';
+import { viewKind } from '../shared/artifact-marks.mjs';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+describe('where a table shows', () => {
+  it('opens beside the message when its path is on a line of its own', () => {
+    expect(besideDocument('**Pick who I write to first.**\n\nleads/fintech.csv\n')).toBe('leads/fintech.csv');
+    expect(besideDocument('Done.\n\n`export.tsv`')).toBe('export.tsv');
+  });
+  it('stays shut when it is only named in a sentence', () => {
+    expect(besideDocument('I saved the list as leads/fintech.csv for later.')).toBeNull();
+  });
+  it('is previewed in the message that names it, and read in place there', () => {
+    expect(messageDocuments({ result: 'The list is leads/fintech.csv.' })).toContain('leads/fintech.csv');
+    expect(readsInPlace('leads/fintech.csv')).toBe(true);
+    expect(readsInPlace('main/ipc.mjs')).toBe(false);
+  });
+  it('opens full screen as a table, while a script stays code', () => {
+    expect(viewKind('leads/fintech.csv')).toBe('table');
+    expect(viewKind('export.tsv')).toBe('table');
+    expect(viewKind('main/ipc.mjs')).toBe('code');
+    expect(viewKind('notes.txt')).toBe('code');
+  });
+  it('is in the brief, so an agent knows to make one', () => {
+    const rules = fs.readFileSync(path.join(root, 'briefs/message-rules.md'), 'utf8').replace(/\s+/g, ' ');
+    expect(rules).toMatch(/goes in a \.csv file with a header row\. It draws as a table/);
+    expect(rules).toMatch(/Its path on a line of its own opens it beside the message/);
+  });
+});
 
 const LEADS = [
   'Company,Category,Based in,Note,Status,Website,People',

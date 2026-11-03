@@ -191,7 +191,7 @@ function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder }
     <button type="button" className="fp-open-file" onClick={onOpen} aria-label={`Open ${file.name}`} title={name === file.name ? undefined : file.name}>
       {list
         ? <>
-          <span className={`fp-face fp-thumb fp-face-${file.kind ?? 'file'}`}>{file.kind === 'image' || file.kind === 'film' ? <Face file={file} whose={whose} /> : <span className="fp-thumb-word">{file.kind === 'markdown' ? 'DOC' : file.kind === 'pdf' ? 'PDF' : file.kind === 'deck' ? 'DECK' : file.kind === 'page' ? 'PAGE' : file.kind === 'code' ? 'CODE' : 'FILE'}</span>}</span>
+          <span className={`fp-face fp-thumb fp-face-${file.kind ?? 'file'}`}>{file.kind === 'image' || file.kind === 'film' ? <Face file={file} whose={whose} /> : <span className="fp-thumb-word">{file.kind === 'markdown' ? 'DOC' : file.kind === 'pdf' ? 'PDF' : file.kind === 'deck' ? 'DECK' : file.kind === 'page' ? 'PAGE' : file.kind === 'code' ? 'CODE' : file.kind === 'table' ? 'TABLE' : 'FILE'}</span>}</span>
           <span className="fp-name">{name}</span>
           <span className="fp-line-marks">{marks}</span>
           <span className="fp-meta-words">{words}</span>
