@@ -43,12 +43,12 @@ describe('who a chat with a teammate lists beside it', () => {
   it('everyone in a chat with two teammates', () => {
     expect(directPeople({ people: ['p-priya', 'p-maya'], rooms, team, meId: 'p-me' }).wall.map((c) => c.id)).toEqual(['p-me', 'p-priya', 'p-maya']);
   });
-  it('a teammate not on Groups yet is still listed, and says so', () => {
+  it('a teammate who has not opened Agentbox yet is still listed, and says so', () => {
     const { wall } = directPeople({ people: ['p-marg'], rooms, team, meId: 'p-me' });
     expect(wall[1]).toMatchObject({ id: 'p-marg', name: 'Margarette Pineda', away: true });
     const html = renderToStaticMarkup(createElement(PeoplePanel, { room: { members: 2, wall }, onPerson: () => {} }));
     expect(html).toContain('Margarette Pineda');
-    expect(html).toContain('Not on Groups yet');
+    expect(html).toContain('Hasn’t opened Agentbox yet');
   });
   it('nobody who is not in the chat', () => {
     const ids = directPeople({ people: ['p-priya'], rooms, team, meId: 'p-me' }).wall.map((c) => c.id);

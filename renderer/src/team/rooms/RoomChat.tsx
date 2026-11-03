@@ -531,13 +531,13 @@ function Composer({ roomId, threadId, placeholder, people, onSend, onPutFile, on
     setAttachments((a) => [...a, ...got.filter((g) => !g.draftId || !a.some((x) => x.draftId === g.draftId)).map(staged)]);
   };
   return <>
-    {matches.length > 0 && <div className="rm-picker rm-pop rm-menu" style={{ position: 'absolute' }}>
-      {matches.map((p, i) => <button type="button" key={p.id} className={`row${i === pick ? ' on' : ''}`} onMouseDown={(e) => { e.preventDefault(); choose(p); }}>
-        <Face name={p.name} url={p.avatarUrl} size={18} /><span>{p.name}</span></button>)}
-    </div>}
     {error && <div className="rm-chat-err" role="alert">{error}
       {failed && !busy && <button type="button" className="rm-retry" onClick={() => void send()}>Try again</button>}</div>}
     <div className="rm-compose">
+      {matches.length > 0 && <div className="rm-picker rm-pop rm-menu">
+        {matches.map((p, i) => <button type="button" key={p.id} className={`row${i === pick ? ' on' : ''}`} onMouseDown={(e) => { e.preventDefault(); choose(p); }}>
+          <Face name={p.name} url={p.avatarUrl} size={18} /><span>{p.name}</span></button>)}
+      </div>}
       <RichReply className="rm-compose-input" boxRef={ref} value={text} onChange={setText} onPlain={setPlain}
         placeholder={placeholder} label={placeholder}
         onCaret={(box) => setCaret(box.selectionStart)}

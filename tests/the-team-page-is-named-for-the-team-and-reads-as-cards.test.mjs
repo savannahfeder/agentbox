@@ -66,3 +66,10 @@ describe('the list beside it', () => {
     expect(pages).toContain('{label}{count > 0 && <b>{count}</b>}');
   });
 });
+
+describe('a group opened from Team', () => {
+  it('keeps the page called Team, not Chats', () => {
+    expect(read('renderer/src/team/rooms/GroupsColumn.tsx')).toContain("{chats ? (team ? 'Team' : 'Chats') : 'Groups'}");
+    expect(read('renderer/src/App.tsx')).toContain('<span className="workspace-title gc-col-title">{homeLayout === \'chats\' ? \'Team\' : \'Chats\'}</span>');
+  });
+});

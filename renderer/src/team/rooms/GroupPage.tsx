@@ -23,7 +23,7 @@ export function peopleShown(room: Pick<Room, 'members' | 'wall'>): { cards: Room
 }
 
 // Where their thread is kept from you, the line they wrote about themselves.
-const onWords = (c: RoomCard) => c.away ? 'Not on Groups yet' : c.agents ? c.workingOn ?? c.bio ?? 'Private thread' : c.status;
+const onWords = (c: RoomCard) => c.away ? 'Hasn’t opened Agentbox yet' : c.agents ? c.workingOn ?? c.bio ?? 'Private thread' : c.status;
 
 export function PeoplePanel({ room, onPerson }: { room: Pick<Room, 'members' | 'wall'> & Partial<Pick<Room, 'teamId' | 'listed'>>; onPerson: (id: string) => void }) {
   const { cards, working, more } = peopleShown(room);
