@@ -85,12 +85,13 @@ describe('a full-path link out of the repository', () => {
   });
 });
 
+// The copy itself runs the machine's own `cp`, so this case is about the machine it runs on.
 describe('on a Mac or Linux', () => {
-  it('a full-path link into the checkout is refused as before', () => {
+  it.skipIf(process.platform === 'win32')('a full-path link into the checkout is refused as before', () => {
     write(path.join(root, 'node_modules', '.pnpm', 'left-pad@1', 'index.js'));
     fs.symlinkSync(path.join(root, 'node_modules', '.pnpm', 'left-pad@1'), path.join(root, 'node_modules', 'left-pad'));
 
-    expect(() => carryLocalFiles(root, staging, { landsAt, platform: 'linux' }))
+    expect(() => carryLocalFiles(root, staging, { landsAt }))
       .toThrow(/node_modules[\\/]left-pad: it is a link to somewhere outside this folder/);
   });
 });
