@@ -2,7 +2,7 @@
 // (App.tsx `.approvals`, styles.css and phone.css): one card across the foot,
 // the queue as edges behind it, Allow and Deny big enough for a thumb, and the
 // answered card stamped with what she decided on its way out.
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -115,6 +115,7 @@ function Card({ a, verdict, waiting, answer }: { a: Approval; verdict: 'allow' |
 export function Approvals() {
   const c = useCloud();
   const inset = useSafeAreaInsets();
+  const pathname = usePathname();
   const pending = c.view.approvals;
   const [answered, setAnswered] = useState<Answered | null>(null);
   // The card that held the stage when she pressed: the phone stops listing it
@@ -128,6 +129,8 @@ export function Approvals() {
   }, [answered]);
 
   const { card, verdict, waiting } = cardOnStage(pending, answered, leaving.current);
+  // The notice's own buttons sit where the card would cover them.
+  if (pathname === '/ai-notice') return null;
   if (!card || c.minimizedApproval === card.id) return null;
   const answer = async (allow: boolean) => {
     setAnswered({ id: card.id, allow });

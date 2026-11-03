@@ -87,6 +87,7 @@ import { opensAsPicture } from '../picture-view';
 import { ThreadArtifacts } from './ThreadArtifacts';
 import type { ArtifactOpen } from './ArtifactView';
 import { fileNewsFor, shownName, viewKind } from '../../../shared/artifact-marks.mjs';
+import { opensInTheLargeViewer } from '../artifact-layout';
 import { carryLine, type CarryState } from '../../../shared/carried-files.mjs';
 import { watchScrollGutter } from '../scroll-gutter';
 import { CODE_PATH, artifactUrlTransform, isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
@@ -1309,8 +1310,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const openPicture = (href: string, from?: HTMLElement) => setPicture(picturesFor(paneRef.current, href, from));
   // A file opened big, with its comments. A phone keeps the picture view its fingers know.
   const [artifact, setArtifact] = useState<ArtifactOpen | null>(null);
-  // A script opens in the pane; a page, like the rest, where it can take comments.
-  const opensBig = (path?: string | null) => !onPhone() && !item.agent && !previewSample && !!viewKind(path) && viewKind(path) !== 'code';
+  const opensBig = (path?: string | null) => !onPhone() && !item.agent && !previewSample && opensInTheLargeViewer(viewKind(path));
   // A picture clicked in the thread steps through its own turn's pictures, as the small view does.
   const openBig = (path: string, from?: HTMLElement) => setArtifact({
     path, at: Date.now(), ...(from && opensAsPicture(path) ? { steps: picturesFor(paneRef.current, path, from).pictures.map((p) => p.path) } : {}),
@@ -2217,8 +2217,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           only the review lab's sample now. */}
       {/* One thing at a time reads a page or a note in place rather than as a
           tile, and not a second time while it is open on the side. */}
-      {inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && <QueueFile key={path} product={product} path={newestOfFamily(path, item.artifacts?.edits)} md={md}
-        onOpen={() => (opensBig(path) ? openBig(newestOfFamily(path, item.artifacts?.edits)) : onOpenArtifact?.(path, 'focus'))} onSide={() => onOpenArtifact?.(path, 'beside')} />)}
+      {inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && newestOfFamily(path, item.artifacts?.edits) !== openDoc && <QueueFile key={path} product={product} path={newestOfFamily(path, item.artifacts?.edits)} md={md}
+        onOpen={() => onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'beside')} onFullScreen={() => onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'focus')} />)}
       {/* What the page cannot read in place, a deck or a PDF, is a tile under it. */}
       {page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths.filter((path) => !readsInPlace(path))} revision={item.updatedAt} openDoc={openDoc} onOpen={path => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'beside'))} />}
       {!page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths} revision={item.updatedAt} openDoc={openDoc} onOpen={path => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'beside'))} />}
