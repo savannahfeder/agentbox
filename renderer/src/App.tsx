@@ -37,6 +37,7 @@ import { isTroubleRow, troubleRow } from './trouble-row';
 import { importAnswer, isImportRow, isNotImportedRow, justImported, type ImportChoice } from './import-row';
 import { lookedAtNow, needsYouLit } from './needs-you';
 import { arrivedAt, isUnread, readMoves, waitingSince } from './unread';
+import { readWhenTheySeeIt } from './read-what-you-saw';
 import { Focus } from './components/Focus';
 import { TicketItems } from './components/TicketReference';
 import type { PendingSaid } from './item-thread';
@@ -3522,17 +3523,36 @@ export default function App() {
     setSeen((s) => { const c = new Set(s); c.delete(item.id); return c; });
     setSeenAt((m) => ({ ...m, [item.id]: 0 }));
   }, []);
-  // An answer that lands on the thread you are reading is read already. Keyed
-  // on the answer's time, so Mark Unread on the open thread is not undone.
+  // An answer that lands on the thread you are READING is read already, and
+  // only that one: `readWhenTheySeeIt` asks whether it was on the screen at
+  // all, and waits for the scroll that brings it there (./read-what-you-saw,
+  // and w-a3487b7f7b for the answer this cost). Keyed on the answer's time, so
+  // Mark Unread on the open thread is not undone. Opening a thread marks it
+  // read through its own door, not through this.
   const focusedArrival = useMemo(() => {
     if (!focused) return 0;
     return arrivedAt(items.find((i) => i.id === focused.id && i.product === focused.product) ?? focused);
   }, [focused, items]);
-  useEffect(() => { if (focused) markSeen(focused); }, [focusedArrival]); // eslint-disable-line react-hooks/exhaustive-deps
-  // A message that landed while the window was behind another is seen when she comes back to it.
   useEffect(() => {
     if (!focused) return undefined;
-    const back = () => { if (document.visibilityState === 'visible') void api.teamSeen({ product: focused.product, id: focused.id }); };
+    // "Seen by" is about being AT the app, which is the test markSeen makes
+    // itself, so it is unchanged by this: only the dot asks where on the page
+    // the message landed.
+    if (document.hasFocus() && document.visibilityState === 'visible') void api.teamSeen({ product: focused.product, id: focused.id });
+    // `back: window` so coming back from another app belongs to the same watch
+    // as scrolling down to it. Nothing else may mark an arrival read: a second
+    // place doing it leaves this one armed, and the next scroll then undoes a
+    // Mark Unread.
+    return readWhenTheySeeIt(document, focused.id, () => markSeen(focused), { back: window });
+  }, [focusedArrival]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A message that landed while the window was behind another is seen on the
+  // way back to it. The dot is the watch's above; this is the team's "Seen by".
+  useEffect(() => {
+    if (!focused) return undefined;
+    const back = () => {
+      if (document.visibilityState !== 'visible') return;
+      void api.teamSeen({ product: focused.product, id: focused.id });
+    };
     window.addEventListener('focus', back);
     return () => window.removeEventListener('focus', back);
   }, [focused?.product, focused?.id]); // eslint-disable-line react-hooks/exhaustive-deps
