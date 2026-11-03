@@ -548,6 +548,8 @@
 .workspace-layout.gt-inset[data-artifact-layout="beside"] .focus { padding-left: 44px; }
 .workspace-layout.gt-inset[data-artifact-layout="beside"] .focus-dock { padding-left: 44px; }
 .workspace-layout.gt-inset.workspace-task > .topbar > .topbar-right { right: 28px; }
+/* With nothing on that edge under it, the arrow's ink sits 28 in, as far as the corner ends from the right. */
+.workspace-layout.gt-inset.workspace-task:not([data-artifact-layout="beside"]):not(:has(.focus-pane:is([data-summary="open"], [data-summary="over"]))) > .topbar { padding-left: 20px; }
 
 /* THE SIDEBAR STAYS NARROW, for everyone since w-a1ed0e8b25 though its rules
    were written here for Groups, and here they stay: they rely on coming after
