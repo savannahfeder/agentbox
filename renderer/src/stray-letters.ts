@@ -26,7 +26,7 @@ export class StrayLetters {
 
   typed(now: number) { this.typedAt = now; }
   opening(box: BoxKind, now: number) { this.openedAt = now; this.openingBox = box; }
-  /** Escape or a press: the person chose to leave the box. */
+  /** Escape, a press or ⌘↵: the person chose to leave the box. */
   reset() { this.typedAt = -Infinity; this.openedAt = -Infinity; this.looseAt = -Infinity; }
 
   decide({ key, inInput, chord, now, boxThere, openingThere }: {
@@ -72,6 +72,8 @@ export function installStrayLetters(win: Window = window) {
     const chord = e.metaKey || e.ctrlKey || e.altKey;
     if (e.key === 'Escape') { strayLetters.reset(); return; }
     if (editable(e.target)) {
+      // Plain Enter is a new line in a brief; ⌘↵ sends, so the next letter starts something new.
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { strayLetters.reset(); return; }
       if (!chord && e.key.length === 1) { strayLetters.typed(now); lastBox = e.target; }
       return;
     }
