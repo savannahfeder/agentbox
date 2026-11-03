@@ -1220,13 +1220,13 @@ export const api = {
   // object carrying anything else.
   async composeRepeat(p: {
     product: string; title: string; body?: string; priority?: number; rule: RepeatShape;
-    engine?: string; model?: string;
+    engine?: string; model?: string; startsNext?: boolean;
   }): Promise<RepeatRule | null> {
     if (useFixtures) return null;
     return window.zero!.composeRepeat(p);
   },
 
-  async setRepeat(p: { product: string; id: string; rule: Partial<RepeatShape & { title: string; body: string; priority: number }> }): Promise<RepeatRule | null> {
+  async setRepeat(p: { product: string; id: string; rule: Partial<RepeatShape & { title: string; body: string; priority: number; startsNext: boolean }> }): Promise<RepeatRule | null> {
     // FIXTURES CAN CHANGE A RULE, because changing one is now a thing she does
     // on screen rather than a thing that only happens on disk. It used to
     // answer null, so in the fixture app the box would take the words, close,

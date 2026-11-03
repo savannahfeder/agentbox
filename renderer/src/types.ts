@@ -1742,8 +1742,8 @@ declare global {
       schedule(p: { product: string; id: string; runAt: number }): Promise<WorkItem>;
       snooze(p: { product: string; id: string; snoozedUntil: number }): Promise<WorkItem>;
       repeats(): Promise<RepeatRule[]>;
-      composeRepeat(p: { product: string; title: string; body?: string; priority?: number; rule: RepeatShape; engine?: string; model?: string }): Promise<RepeatRule>;
-      setRepeat(p: { product: string; id: string; rule: Partial<RepeatShape & { title: string; body: string; priority: number }> }): Promise<RepeatRule>;
+      composeRepeat(p: { product: string; title: string; body?: string; priority?: number; rule: RepeatShape; engine?: string; model?: string; startsNext?: boolean }): Promise<RepeatRule>;
+      setRepeat(p: { product: string; id: string; rule: Partial<RepeatShape & { title: string; body: string; priority: number; startsNext: boolean }> }): Promise<RepeatRule>;
       endRepeat(p: { product: string; id: string }): Promise<RepeatRule>;
       pauseSupervisor(paused: boolean): Promise<SupervisorStatus>;
       createProduct(p: { name: string; repoPath?: string | null }): Promise<{ slug: string }>;

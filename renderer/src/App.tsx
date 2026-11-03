@@ -6587,7 +6587,9 @@ export default function App() {
   // A schedule set on a thread. On one RUN of a repeating task it moves that
   // task's rule rather than making a second one; on ordinary work it makes that
   // work repeating, using the item's own words as the brief.
-  const applyRepeat = async (item: WorkItem, rule: RepeatShape) => {
+  // `putOff`: set from Later, so the thread leaves Needs you the way E takes it
+  // out, and Z takes back the close and the repeat together.
+  const applyRepeat = async (item: WorkItem, rule: RepeatShape, { putOff = false }: { putOff?: boolean } = {}) => {
     // AN AGENT ROW IS NOT WORK OF HERS TO CLOSE, DEFER OR RESTART. It stands
     // for a session running outside Agentbox; the only two things that mean
     // anything to it are a reply and being taken to its window.
@@ -6600,25 +6602,49 @@ export default function App() {
     if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
     if (teammateIdOf(item)) { showToast('A teammate keeps its own times. Tell it when in its chat.'); return; }
     const ruleId = ruleIdOf(item);
+    let said: string;
+    let made: RepeatRule | null = null;
     try {
       if (ruleId) {
-        await api.setRepeat({ product: item.product, id: ruleId, rule });
-        showToast(`Now ${ruleLabel(rule)}`);
+        await api.setRepeat({ product: item.product, id: ruleId, rule: { ...rule, startsNext: true } });
+        said = `Now ${ruleLabel(rule)}`;
       } else {
         // AND THE ROW'S OWN ENGINE AND MODEL, because "make this work
         // repeating" means this work, and this work has a harness. Dropping
         // them here would quietly move a Codex task onto the workspace default
         // the moment she scheduled it.
-        await api.composeRepeat({
+        // `startsNext`: this thread already did the work once, so a run now
+        // would be the same job twice.
+        made = await api.composeRepeat({
           product: item.product, title: item.title, body: item.body, priority: item.priority, rule,
-          engine: item.engine, model: item.model,
+          engine: item.engine, model: item.model, startsNext: true,
         });
-        showToast(`Repeating: ${ruleLabel(rule)}`);
+        said = `Repeating: ${ruleLabel(rule)}`;
       }
       setRepeats(await api.repeats());
     } catch (err) {
       showToast(`Not set: ${(err as Error).message}`);
+      return;
     }
+    // A thread whose work never reached main, or with filed tasks waiting for
+    // a yes, stays where it is: closing it is E's call, and E asks first.
+    const closes = putOff && item.status !== 'done' && !notShipped(item) && !waitingFiled(item).length
+      && !isGivenTask(item, team?.products.get(item.product)) && !closesAgain(pendingRef.current, item);
+    if (!closes) { showToast(said); return; }
+    const endIt = async () => {
+      if (!made) return;
+      await api.endRepeat({ product: item.product, id: made.id });
+      setRepeats(await api.repeats());
+    };
+    window.dispatchEvent(new CustomEvent(THREAD_CLOSED));
+    const undid = [{ product: item.product, id: item.id, words: UNDID_CLOSING }];
+    await deferCommit(item, async () => {
+      await api.answer({ product: item.product, id: item.id, status: 'done' });
+      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, undid, run: async () => {
+        await endIt();
+        await api.answer({ product: item.product, id: item.id, status: 'open' });
+      } });
+    }, said, () => { void endIt(); return null; }, false, undefined, undid);
   };
 
   // THE SETUP SCREENS WEAR THE PICTURE, AND THEY HAVE TO BE TOLD TO.
@@ -9061,7 +9087,7 @@ export default function App() {
              thread only: one rhythm over a dozen ticked rows would be a dozen
              repeating tasks nobody asked for. */
           onRepeat={!Array.isArray(snoozeItem) && !snoozeItem.agent
-            ? (rule) => { setModal(null); setSnoozeItem(null); void applyRepeat(snoozeItem, rule); }
+            ? (rule) => { setModal(null); setSnoozeItem(null); void applyRepeat(snoozeItem, rule, { putOff: true }); }
             : undefined}
           onNow={(Array.isArray(snoozeItem) ? snoozeItem : [snoozeItem]).some((i) => returnAt(i) > Date.now())
             ? () => unsnooze(snoozeItem)

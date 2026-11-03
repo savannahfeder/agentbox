@@ -845,8 +845,8 @@ export class Store {
   // happening to both of these: she could compose "every morning", visibly pick
   // Codex and a Codex model, and every occurrence ran on the then-current
   // workspace default.
-  composeRepeat(slug, { title, body, priority, every, at, on, engine, model }) {
-    return this.repeats.setRule(this.productDir(slug), { title, body, priority, every, at, on, engine, model });
+  composeRepeat(slug, { title, body, priority, every, at, on, engine, model, startsNext }) {
+    return this.repeats.setRule(this.productDir(slug), { title, body, priority, every, at, on, engine, model, startsNext });
   }
 
   setRepeat(slug, id, patch) {
