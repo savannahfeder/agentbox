@@ -24,6 +24,7 @@ import { PdfPages } from './PdfPages';
 import { OPEN_WITHIN_MS, didNotOpen } from '../opening-wait';
 import { OpeningWait } from './OpeningWait';
 import { DocOutline } from './DocOutline';
+import { scrollKey, useKeptScroll } from '../kept-scroll';
 import './doc-reading.css';
 
 const MD_PLUGINS = [remarkGfm];
@@ -310,6 +311,7 @@ function DocStage({ product, path, name, folder, byline, notes, draft, activeId,
   const thread = useContext(StageThread);
   const parts = useMemo(() => partsFor(folder), [folder]);
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  useKeptScroll(scroller, scrollKey(product, path));
   const [column, setColumn] = useState<HTMLDivElement | null>(null);
   const [text, setText] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -466,6 +468,8 @@ function CodeStage({ product, path, name, notes, draft, activeId, onPlace, onFou
   const thread = useContext(StageThread);
   const [text, setText] = useState<string | null | undefined>(undefined);
   const page = useRef<HTMLDivElement | null>(null);
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  useKeptScroll(scroller, scrollKey(product, path));
   useEffect(() => {
     let live = true;
     setText(undefined);
@@ -485,7 +489,7 @@ function CodeStage({ product, path, name, notes, draft, activeId, onPlace, onFou
   }, [text, quotesNow, activeId, draftQuote]);
   if (text === null) return <div className="doc-missing">{name} could not be opened.</div>;
   if (text === undefined) return <OpeningWait name={name} kind={null} onAgain={onAgain} />;
-  return <div className="av-code-scroll"><div className="av-code-sheet">
+  return <div className="av-code-scroll" ref={setScroller}><div className="av-code-sheet">
     <CodeFile ref={page} text={text} />
     {onPlace && <SelectionBar page={page} onComment={(quote) => onPlace({ kind: 'quote', text: quote })} />}
   </div></div>;

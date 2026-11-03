@@ -12,6 +12,7 @@ const PATHS = {
   picture: <><rect x="2.5" y="3" width="11" height="10" rx="1.5" /><circle cx="6" cy="6.5" r="1.1" /><path d="m3 12 3.5-3.5 2.5 2.5 1.5-1.5 2.5 2.5" /></>,
   down: <path d="m4.5 6.5 3.5 3.5 3.5-3.5" />,
   up: <path d="m4.5 9.5 3.5-3.5 3.5 3.5" />,
+  back: <path d="M12.5 8h-9M7 4.5 3.5 8 7 11.5" />,
 } as const;
 
 export type GlyphName = keyof typeof PATHS;

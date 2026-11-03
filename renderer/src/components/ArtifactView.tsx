@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, noteGoesTo, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
+  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, nextStep, noteGoesTo, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
 } from '../../../shared/artifact-marks.mjs';
 import type { FileVersion } from '../../../shared/artifact-marks.mjs';
 import { api } from '../api';
@@ -30,7 +30,8 @@ import { FileNoteCard } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
 import './artifact-view.css';
 
-export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number }
+/** `steps`: the paths the arrows step through, in order, when the press came from a turn of the thread. */
+export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number; steps?: string[] }
 
 type Editing = { fam: string; text: string; draft?: string; folder: string | null; base: ReturnType<typeof threadFiles>[number]['versions'][number] };
 
@@ -85,6 +86,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   }, [lines, open.path, open.note, marks.notes]);
   const families = useMemo(() => threadFiles(files, numbers), [files, numbers]);
   const flat = useMemo(() => families.flatMap((f, fi) => f.versions.map((v, vi) => ({ fi, vi, v }))), [families]);
+  const steps = useMemo(() => stepsThrough(families, open.steps), [families, open.steps]);
 
   const [at, setAt] = useState<{ fi: number; vi: number } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(open.note ?? null);
@@ -467,12 +469,13 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   };
   const othersSaved = editing ? editClash(family, editing.base.n, me, nameOf) : null;
 
+  const stepTo = (by: number) => nextStep(families, steps, at, by);
   const stepFile = (by: number) => {
-    if (!at || families.length < 2) return;
-    const next = Math.max(0, Math.min(families.length - 1, at.fi + by));
+    const next = stepTo(by);
+    if (!next) return;
     away(() => {
       setSavedIn(null);
-      setAt({ fi: next, vi: families[next].versions.length - 1 });
+      setAt(next);
       setActiveId(null);
     });
   };
@@ -636,7 +639,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
     <StageLink.Provider value={setLink}>
     <div className="artifact-view" data-find-layer role="dialog" aria-label={version?.name ?? 'File'}>
       <header className="av-top">
-        <button type="button" className="av-back" onClick={leave} title="Back (esc)"><span aria-hidden="true">←</span><span className="av-thread">{threadName}</span></button>
+        <button type="button" className="av-back" onClick={leave} title="Back (esc)"><span className="av-thread">{threadName}</span></button>
         <span className="av-name">{familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? '')}</span>
         {kind && <span className="av-kind">{KIND_WORD[kind]}</span>}
         {family && family.versions.length > 1 && (
@@ -657,7 +660,7 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
         {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
         {canRestore && !compare && !editing && <button type="button" className="av-btn" disabled={restoring} onClick={() => void restore()}><NoteGlyph name="undo" />Restore this version</button>}
         {onOutside && version && foundNow === 'open' && <button type="button" className="av-btn" onClick={() => onOutside(version.path)}><NoteGlyph name="outside" />Open outside</button>}
-        <button type="button" className="av-close" onClick={leave} title="Close (esc)" aria-label="Close"><CrossIcon /></button>
+        <button type="button" className="av-btn av-leave" onClick={leave} title="Back (esc)"><NoteGlyph name="back" />Back</button>
       </header>
       <div className="av-body">
         <div className="av-stage">
@@ -697,9 +700,9 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
               </div>
             </div>
           )}
-          {!compare && families.length > 1 && at && <>
-            <button type="button" className="av-step av-prev" disabled={at.fi === 0} onClick={() => stepFile(-1)} aria-label="Previous file">‹</button>
-            <button type="button" className="av-step av-next" disabled={at.fi === families.length - 1} onClick={() => stepFile(1)} aria-label="Next file">›</button>
+          {!compare && (steps.length ? steps.length : families.length) > 1 && at && <>
+            <button type="button" className="av-step av-prev" disabled={!stepTo(-1)} onClick={() => stepFile(-1)} aria-label="Previous file">‹</button>
+            <button type="button" className="av-step av-next" disabled={!stepTo(1)} onClick={() => stepFile(1)} aria-label="Next file">›</button>
           </>}
           {link && <FileLinkBrowser key={link} url={link} product={product} backTo={kind ? `the ${KIND_WORD[kind].toLowerCase()}` : 'the file'} onClose={closeLink} />}
         </div>
