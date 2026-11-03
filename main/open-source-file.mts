@@ -11,6 +11,7 @@ interface OpenSourceFileHow {
 }
 export async function openSourceFile(file: unknown, execute: (file: string, args: string[], options: { timeout: number }) => Promise<unknown> = run, {platform = process.platform, env = process.env, spawn = spawnChild}: OpenSourceFileHow = {}) {
   if (platform === 'win32') {
+    if (typeof file === 'string' && /^[\\/]{2}/.test(file)) throw Error('A file on a network share is not opened from here.');
     // Drive-rooted only, so it cannot resolve against our own folder or read as a Notepad switch.
     if (typeof file !== 'string' || !/^[A-Za-z]:[\\/]/.test(file)) throw Error('Resolve the source file before opening it.');
     // Windows has no open -t, so a source file opens as text in Notepad, by its full path.

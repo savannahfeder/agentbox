@@ -73,6 +73,14 @@ describe('on Windows', () => {
     }
   });
 
+  it('says plainly that a file on a network share is not opened', async () => {
+    for (const file of ['\\\\server\\share\\a.py', '//server/share/a.py']) {
+      const { spawn, calls } = fakeSpawn();
+      await expect(openSourceFile(file, vi.fn(), { platform: 'win32', env, spawn })).rejects.toThrow('network');
+      expect(calls).toHaveLength(0);
+    }
+  });
+
   it('reports Notepad failing to start', async () => {
     const { spawn } = fakeSpawn({ fails: Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' }) });
     await expect(openSourceFile('C:\\repo\\a.py', vi.fn(), { platform: 'win32', env, spawn })).rejects.toThrow('ENOENT');
