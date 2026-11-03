@@ -276,7 +276,7 @@ export interface FileSentIn {
   title: string;
 }
 
-export type FileKind = 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | 'page' | 'code';
+export type FileKind = 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | 'page' | 'table' | 'code';
 
 /** One file in the Files place, at its newest version. */
 export interface PlacedFile {

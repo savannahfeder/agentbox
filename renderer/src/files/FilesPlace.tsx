@@ -80,7 +80,7 @@ function Face({ file, whose }: { file: PlacedFile; whose: string | null }) {
   // Says what is true rather than a bare kind on an empty tile.
   if (!file.opened || broken) return <div className="fp-face-empty">{whose ? `On ${whose}'s computer` : 'Not on this computer yet'}</div>;
   if (file.kind === 'page') return <PageFace file={file} />;
-  if (file.kind === 'code') return <CodeFace file={file} />;
+  if (file.kind === 'code' || file.kind === 'table') return <CodeFace file={file} />;
   if (file.kind === 'markdown') return <DocFace file={file} />;
   if (file.kind === 'film') return <><FileCover kind="film" opened={file.opened} onSize={setSize} />{size && <span className="fp-length">{size}</span>}</>;
   if (file.kind === 'image' || file.kind === 'pdf' || file.kind === 'deck') return <FileCover kind={file.kind} opened={file.opened} onSize={setSize} onBroken={() => setBroken(true)} />;
