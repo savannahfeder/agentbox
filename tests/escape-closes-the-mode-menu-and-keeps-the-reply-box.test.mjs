@@ -70,6 +70,6 @@ describe('Escape with the mode menu open', () => {
   it('is what the mode menu installs while it is open', () => {
     const focus = read('renderer/src/components/Focus.tsx');
     const picker = focus.slice(focus.indexOf('function ModePicker('), focus.indexOf('function DockComposer('));
-    expect(picker).toMatch(/useEffect\(\(\) => \(open \? escapeClosesMenu\(window, \(\) => setOpen\(false\)\) : undefined\), \[open\]\);/);
+    expect(picker).toMatch(/useEffect\(\(\) => \(open \? escapeClosesMenu\(window, \(\) => \{ setOpen\(false\); onEscape\?\.\(\); \}\) : undefined\), \[open\]\);/);
   });
 });
