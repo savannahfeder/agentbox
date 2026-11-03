@@ -407,6 +407,28 @@ export function supabaseBackend(client) {
       return (rows?.length ?? 0) > 0;
     },
 
+    // A big file's pieces, raw, in a private bucket under the conversation's
+    // folder (20261105000000_a_film_goes_in_pieces_through_storage.sql): as rows
+    // of base64 a 625 MB film was 830 MB of database. A piece already there is
+    // the same piece, since its name is what is in it.
+    async putPiece(projectId, name, bytes) {
+      await myId();
+      const { error } = await client.storage.from('message-files').upload(`${projectId}/${name}`, bytes, { contentType: 'application/octet-stream', upsert: false });
+      if (!error) return true;
+      if (/exists|duplicate/i.test(`${error.message} ${error.error ?? ''}`) || String(error.statusCode ?? error.status) === '409') return false;
+      throw new Error(`sending a piece of a file: ${error.message}`);
+    },
+
+    async getPiece(projectId, name) {
+      await myId();
+      const { data, error } = await client.storage.from('message-files').download(`${projectId}/${name}`);
+      if (error) {
+        if (/not.?found/i.test(`${error.message} ${error.error ?? ''}`) || [400, 404].includes(Number(error.statusCode ?? error.status))) return null;
+        throw new Error(`taking a piece of a file: ${error.message}`);
+      }
+      return Buffer.from(await data.arrayBuffer());
+    },
+
     // HER OWN ROWS FOR HER PHONE (20261014000200_phone_inbox.sql). The owner
     // column defaults to her, and row level security keeps every row hers.
     // Every row names the computer it belongs to (`device`).

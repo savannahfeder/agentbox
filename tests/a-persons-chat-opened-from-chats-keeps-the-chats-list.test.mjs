@@ -24,7 +24,7 @@ describe('a person\'s chat opened from the Chats list', () => {
   });
 
   it('sits beside the Chats list, marked as the open chat', () => {
-    expect(app).toMatch(/<ChatsFrame current=\{inChats \? `direct:\$\{focused\.id\}` : null\}>/);
+    expect(app).toMatch(/<ChatsFrame current=\{inChats \? chatsDirectKey\(focused\.id\) : null\}>/);
     expect(column).toMatch(/export function ChatsFrame\(/);
     expect(column).toMatch(/if \(!current\) return <>\{children\}<\/>;/);
     expect(column).toMatch(/<div className="gr-page tq-chats cx-frame"><div className="gr-body"><ChatsColumn current=\{current\} \/>/);

@@ -24,6 +24,20 @@ export function savedVersionArrived(family: { versions: unknown[] } | undefined,
   return !!family && family.versions.length > count;
 }
 
+/**
+ * Words a sitting kept but never saved. A sitting keeps them under the version it
+ * opened on, which a save of its own has since moved past, so an older version's
+ * count too: `base` is where to start from, the version they were typed on.
+ */
+export function keptDraft<V extends { path: string }>(versions: V[], open: V, read: (path: string) => string | null): { draft: string; base: V } | null {
+  const upTo = versions.indexOf(open);
+  for (const v of [open, ...versions.slice(0, Math.max(0, upTo)).reverse()]) {
+    const draft = read(v.path);
+    if (draft !== null) return { draft, base: v };
+  }
+  return null;
+}
+
 /** Whether to open an editor on this version now. */
 export function opensForTyping({ canEdit, compare, editing, unreadable, version }: {
   canEdit: boolean; compare: boolean; editing: boolean; unreadable: string | null; version: string | null;

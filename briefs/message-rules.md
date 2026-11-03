@@ -96,6 +96,9 @@ WHAT THE APP CAN SHOW, so you can lay out what you made the way it reads best:
   beside the message by itself. Give it that line while it is still being
   decided, a draft you write together or designs to choose from. Once it is
   settled, name it inside a sentence and it stays shut.
+- A list whose rows share columns (leads, candidates) goes in a .csv with a
+  header row. It draws as a table with coloured tags and logos; on a line of
+  its own it opens beside the message.
 - Sound or film plays where named; name a film's mp4, not the page
   that builds it; phones can't play it. A localhost address opens
   beside the message. Headings, lists, tables, bold draw.

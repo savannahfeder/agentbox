@@ -16,6 +16,7 @@ const pick = ({ paddingLeft, paddingRight, paddingTop, paddingBottom }: CSSStyle
 import type { FileNote, NotePlace } from '../types';
 import { quotesKey } from '../selection-bar';
 import { CodeFile } from './CodeFile';
+import { TableView } from './TableView';
 import { SelectionBar } from './SelectionBar';
 import { DeckSlides } from './DeckSlides';
 import { PinMarks, spotIn } from './PinMarks';
@@ -24,6 +25,7 @@ import { PdfPages } from './PdfPages';
 import { OPEN_WITHIN_MS, didNotOpen } from '../opening-wait';
 import { OpeningWait } from './OpeningWait';
 import { DocOutline } from './DocOutline';
+import { scrollKey, useKeptScroll } from '../kept-scroll';
 import './doc-reading.css';
 
 const MD_PLUGINS = [remarkGfm];
@@ -310,6 +312,7 @@ function DocStage({ product, path, name, folder, byline, notes, draft, activeId,
   const thread = useContext(StageThread);
   const parts = useMemo(() => partsFor(folder), [folder]);
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  useKeptScroll(scroller, scrollKey(product, path));
   const [column, setColumn] = useState<HTMLDivElement | null>(null);
   const [text, setText] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -466,6 +469,8 @@ function CodeStage({ product, path, name, notes, draft, activeId, onPlace, onFou
   const thread = useContext(StageThread);
   const [text, setText] = useState<string | null | undefined>(undefined);
   const page = useRef<HTMLDivElement | null>(null);
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  useKeptScroll(scroller, scrollKey(product, path));
   useEffect(() => {
     let live = true;
     setText(undefined);
@@ -485,10 +490,43 @@ function CodeStage({ product, path, name, notes, draft, activeId, onPlace, onFou
   }, [text, quotesNow, activeId, draftQuote]);
   if (text === null) return <div className="doc-missing">{name} could not be opened.</div>;
   if (text === undefined) return <OpeningWait name={name} kind={null} onAgain={onAgain} />;
-  return <div className="av-code-scroll"><div className="av-code-sheet">
+  return <div className="av-code-scroll" ref={setScroller}><div className="av-code-sheet">
     <CodeFile ref={page} text={text} />
     {onPlace && <SelectionBar page={page} onComment={(quote) => onPlace({ kind: 'quote', text: quote })} />}
   </div></div>;
+}
+
+/** A CSV as a table. Selected words take a comment, as in a script. */
+function TableStage({ product, path, name, notes, draft, activeId, onPlace, onFound, readText, onAgain }: {
+  product: string; path: string; name: string; notes: FileNote[]; draft: NotePlace | null; activeId: string | null;
+  onPlace?: (place: NotePlace | null) => void; onFound?: (found: Found) => void; readText?: (path: string) => Promise<string | null>; onAgain: () => void;
+}) {
+  const thread = useContext(StageThread);
+  const [text, setText] = useState<string | null | undefined>(undefined);
+  const page = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    let live = true;
+    setText(undefined);
+    const reading = readText ? readText(path) : api.readDoc({ product, src: path, thread }).then((r) => (r.ok ? r.text ?? null : null));
+    void reading.then((t) => { if (live) { setText(t); if (t === null) onFound?.('gone'); } }).catch(() => { if (live) { setText(null); onFound?.('gone'); } });
+    return () => { live = false; };
+  }, [product, path]);
+  const quotes = useMemo(() => notes.flatMap((n) => (n.place.kind === 'quote' && !n.resolved ? [{ id: n.id, text: n.place.text }] : [])), [notes]);
+  const draftQuote = draft?.kind === 'quote' ? draft.text : null;
+  const quotesNow = quotesKey(quotes);
+  useEffect(() => {
+    paintQuotes(page.current, quotes, activeId, draftQuote);
+    return () => {
+      const highlights = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
+      highlights?.delete('av-quote'); highlights?.delete('av-quote-on');
+    };
+  }, [text, quotesNow, activeId, draftQuote]);
+  if (text === null) return <div className="doc-missing">{name} could not be opened.</div>;
+  if (text === undefined) return <OpeningWait name={name} kind={null} onAgain={onAgain} />;
+  return <div className="av-table" ref={page}>
+    <TableView text={text} path={path} mode="full" />
+    {onPlace && <SelectionBar page={page} onComment={(quote) => onPlace({ kind: 'quote', text: quote })} />}
+  </div>;
 }
 
 // Keyed by its tries, so Try again starts every wait in it over.
@@ -556,5 +594,6 @@ function OpenedFile({ product, path, name, byline, notes, carried = [], draft, a
       notes={notes} carried={carried} draft={draft} activeId={activeId} showResolved={showResolved} keep={keep} onPlace={onPlace} onPick={onPick} />;
   }
   if (kind === 'code') return <CodeStage product={product} path={path} name={name} notes={[...notes, ...carried]} draft={draft} activeId={activeId} onPlace={onPlace} onFound={onFound} readText={files?.readText} onAgain={onAgain} />;
+  if (kind === 'table') return <TableStage product={product} path={path} name={name} notes={[...notes, ...carried]} draft={draft} activeId={activeId} onPlace={onPlace} onFound={onFound} readText={files?.readText} onAgain={onAgain} />;
   return <div className="doc-missing">{name} cannot be shown here.</div>;
 }

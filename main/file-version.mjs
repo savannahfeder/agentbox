@@ -4,8 +4,8 @@
 import fsDefault from 'node:fs';
 import path from 'node:path';
 import { familyName, familyOfName, filesInLines, nextVersionName, reviewKind, threadFiles } from '../shared/artifact-marks.mjs';
-import { mergeThree } from '../shared/doc-merge.mjs';
-import { MAX_DOC_BYTES } from './doc-file.mjs';
+import { mergeText } from '../shared/text-merge.mjs';
+import { isInside, MAX_DOC_BYTES } from './doc-file.mjs';
 
 const THREAD_ID = /^[\w-]{1,64}$/;
 
@@ -14,8 +14,14 @@ const THREAD_ID = /^[\w-]{1,64}$/;
  * path or its version id. `over` is the version that was already newest when this
  * one was made from an older one. `taken` is the names other copies of this file
  * hold, since one name is one version across copies. Never replaces a file.
+ *
+ * When a version landed under the one this was typed from, the two are merged and
+ * the typed words win where both changed the same words. `since` is what the last
+ * save of this sitting sent, which is where this one really started: without it a
+ * word deleted since that save would come back. `by` is who is saving, so a later
+ * save with no `since`, on top of only their own, is taken whole.
  */
-export function saveNextVersion({ dir, threadId, lines, basePath, baseId, text, taken = [], fs = fsDefault }) {
+export function saveNextVersion({ dir, threadId, lines, basePath, baseId, text, since = null, by = null, taken = [], fs = fsDefault }) {
   if (!dir || !THREAD_ID.test(String(threadId ?? ''))) return { ok: false, error: 'That thread could not be found.' };
   if (typeof text !== 'string' || !text.trim()) return { ok: false, error: 'There is nothing to save.' };
   if (Buffer.byteLength(text) > MAX_DOC_BYTES) return { ok: false, error: 'That document is too big to save here.' };
@@ -29,7 +35,16 @@ export function saveNextVersion({ dir, threadId, lines, basePath, baseId, text, 
   if (reviewKind(base.path) !== 'markdown') return { ok: false, error: 'Only documents can be edited here.' };
 
   const newest = family.versions[family.versions.length - 1];
-  const words = newest.id === base.id ? text : withTheNewest({ dir, base, newest, text, fs });
+  const under = family.versions.slice(family.versions.indexOf(base) + 1);
+  const read = (v) => {
+    const file = path.resolve(dir, v.path);
+    if (!isInside(dir, file)) return null;
+    try { return fs.readFileSync(file, 'utf8'); } catch { return null; }
+  };
+  const started = typeof since === 'string' ? since : under.some((v) => !(v.edited && v.by === by)) ? read(base) : null;
+  const head = started === null ? null : read(newest);
+  const merge = head === null ? null : mergeText(started, head, text, { overlap: 'mine' });
+  const words = merge?.text ?? text;
   const folder = path.join(dir, 'designs', threadId);
   fs.mkdirSync(folder, { recursive: true });
   const held = new Set(taken);
@@ -42,24 +57,8 @@ export function saveNextVersion({ dir, threadId, lines, basePath, baseId, text, 
       if (err?.code === 'EEXIST') continue;
       return { ok: false, error: String(err?.message ?? err).slice(0, 200) };
     }
-    return { ok: true, path: `designs/${threadId}/${name}`, name, shown: familyName(family, newest), file: base.id, ...(newest.id !== base.id ? { over: newest.id } : {}) };
+    return { ok: true, path: `designs/${threadId}/${name}`, name, shown: familyName(family, newest), file: base.id, ...(newest.id !== base.id ? { over: newest.id } : {}), ...(words !== text ? { merged: true } : {}), ...(merge?.clashes.length ? { clashes: merge.clashes.length } : {}) };
   }
   return { ok: false, error: 'Too many versions of that file are in the way, so nothing was saved.' };
 }
 
-/**
- * `text`, typed from a version that is no longer the newest, with whatever
- * landed in between. Somebody typing in the big view started from the version
- * they had open, so an agent's write arriving meanwhile used to leave two
- * versions with one set of words each (w-27a7ae314a). Their own words when the
- * two cannot be merged: never refused, because the words are already typed, and
- * `over` is what tells them the other version stands.
- */
-function withTheNewest({ dir, base, newest, text, fs }) {
-  const read = (v) => { try { return fs.readFileSync(path.isAbsolute(v.path) ? v.path : path.join(dir, v.path), 'utf8'); } catch { return null; } };
-  const was = read(base);
-  const since = read(newest);
-  if (was == null || since == null) return text;
-  const merged = mergeThree({ base: was, ours: since, theirs: text });
-  return merged.ok ? merged.text : text;
-}

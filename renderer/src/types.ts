@@ -213,6 +213,7 @@ export interface ArtifactMark {
   mentions?: string[];
   owner?: string;
   on?: string | string[];
+  wait?: boolean;
 }
 
 export interface FileNote {
@@ -235,6 +236,8 @@ export interface FileNote {
   sent?: boolean;
   /** Someone pressed "Send to the agent" on a note the agent was not sent. */
   toAgent?: boolean;
+  /** Written beside a document: held until Send rather than told at once. */
+  wait?: boolean;
   /** Said on an earlier version and still open: the version it was made on ("v1"). */
   from?: string;
   /** In the Files place, the thread or chat it was written in. */
@@ -276,7 +279,7 @@ export interface FileSentIn {
   title: string;
 }
 
-export type FileKind = 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | 'page' | 'code';
+export type FileKind = 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | 'page' | 'table' | 'code';
 
 /** One file in the Files place, at its newest version. */
 export interface PlacedFile {
@@ -675,6 +678,8 @@ export interface TeamChatLine {
   doc?: { product: string; src: string; name: string };
   /** The words that set a new teammate up; from a suggestion, with the threads it was made from. */
   setup?: boolean; threads?: { product: string; id: string; title: string }[];
+  /** The teammate's thread it was written in. */
+  run?: string;
   /** On an `act`: `learned` (kept something about you), `updated` (changed its own instructions),
    *  `lesson` (added to the playbook `ref`), and the older run and pause verbs. */
 }
@@ -1697,7 +1702,7 @@ declare global {
       findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number } }): Promise<FoundInThreads>;
       warmFindInThreads(): Promise<boolean>;
       fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
-      fileNewVersion?(p: { product: string; id: string; path: string; text: string }): Promise<{ ok: boolean; path?: string; error?: string }>;
+      fileNewVersion?(p: { product: string; id: string; path: string; text: string; since?: string | null }): Promise<{ ok: boolean; path?: string; error?: string }>;
       teamMarkFile(p: { personId: string; threadId: string; mark: ArtifactMark }): Promise<TeamCallResult>;
       connections?(): Promise<ConnectionsList>;
       connectionsConnect?(p: ConnectAsk): Promise<ConnectAnswer>;

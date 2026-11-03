@@ -132,6 +132,12 @@ function sources(dir) {
   });
 }
 
+// A / here opens a regular expression rather than dividing, judged by the last
+// thing the code said: nothing yet, an operator, or an opening bracket all want
+// a value next. A quote inside that expression is a character to match, not a
+// string opening, so the walk below steps over the whole literal.
+const WANTS_A_VALUE = /(^|[([{,;:=!&|?+\-*%^~<>]|\b(return|typeof|case|in|of|do|else|void|delete|yield|await))\s*$/;
+
 // One walk over the text: comments dropped, each string literal collected, and
 // the code that is left with its strings blanked so JSX text can be read on its
 // own. It tracks whether it is inside a quote, so a // inside 'https://' is
@@ -152,6 +158,19 @@ function split(text) {
     }
     if (c === '/' && text[i + 1] === '/') { while (i < text.length && text[i] !== '\n') i++; code += '\n'; continue; }
     if (c === '/' && text[i + 1] === '*') { const end = text.indexOf('*/', i + 2); i = end < 0 ? text.length : end + 1; continue; }
+    if (c === '/' && WANTS_A_VALUE.test(code)) {
+      let inClass = false;
+      for (i++; i < text.length; i++) {
+        const r = text[i];
+        if (r === '\\') { i++; continue; }
+        if (r === '\n') break;
+        if (inClass) { if (r === ']') inClass = false; continue; }
+        if (r === '[') { inClass = true; continue; }
+        if (r === '/') break;
+      }
+      code += '0';
+      continue;
+    }
     if (c === "'" || c === '"' || c === '`') { quote = c; s = ''; classes = /className=\{?`?$/.test(code.slice(-12)); continue; }
     code += c;
   }

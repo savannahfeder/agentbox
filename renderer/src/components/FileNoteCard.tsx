@@ -18,7 +18,7 @@ function placeParts(words: string): { tag: string | null; rest: string } {
 }
 
 // A picture saved on a teammate's computer is not on this one: its name stands in.
-function NotePictureShown({ product, picture }: { product: string; picture: NotePicture }) {
+export function NotePictureShown({ product, picture }: { product: string; picture: NotePicture }) {
   const [src, setSrc] = useState<string | null | undefined>(undefined);
   useEffect(() => {
     let live = true;

@@ -78,10 +78,11 @@ it.skipIf(process.platform !== 'darwin')('keeps mounted links and exhausted prev
     expect(result.exhausted).toBe(true);
     expect(result.retriesAfterUpdates).toBe(0);
     expect(result.mediaLabel).toBe('Sample Film.mp4');
-    // A page named on a thread opens big over it, an address still in the pane
-    // (tests/a-file-on-a-thread-opens-big-with-its-comments).
-    expect(result.bigView).toBe('demo.html');
-    expect(result.calls).toEqual([{ round: 5, src: 'http://localhost:3002' }]);
+    // A page a thread names opens beside the chat, like an address, and nothing
+    // opens over it: feedback is typed in the chat while you read
+    // (tests/a-note-read-in-place-opens-beside-the-chat-when-clicked).
+    expect(result.bigView).toBeUndefined();
+    expect(result.calls).toEqual([{ round: 5, src: 'designs/demo.html' }, { round: 5, src: 'http://localhost:3002' }]);
     expect(result.notices).toEqual([{ round: 5, text: 'File could not be opened.' }]);
     expect(result.productChanged).toBe(true);
     expect(result.otherProductResolved).toBe(true);

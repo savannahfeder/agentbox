@@ -86,8 +86,8 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onNotice }: {
       return key ? api.filesPlaceMark({ key, mark }) : api.fileMark({ product: item.product, id: item.id, mark });
     }}
     withAgent={withAgent}
-    onNewVersion={async (_name, text, path) => {
-      const out = await api.fileNewVersion({ product: item.product, id: item.id, path, text });
+    onNewVersion={async (_name, text, path, _id, since) => {
+      const out = await api.fileNewVersion({ product: item.product, id: item.id, path, text, since });
       return out.ok ? null : out.error ?? 'That did not save.';
     }}
     onOutside={(src) => { void api.openArtifactExternally({ product: item.product, src }).then((r) => { if (!r.ok) onNotice(r.error || `${src} could not be opened.`); }); }}

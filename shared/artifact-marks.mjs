@@ -54,7 +54,8 @@ export function cleanMark(value) {
       const text = typeof value.text === 'string' ? value.text.trim().slice(0, MAX_NOTE_CHARS) : '';
       if (!id || !file || !place || !text) return undefined;
       const mentions = Array.isArray(value.mentions) ? [...new Set(value.mentions.map(shortId).filter(Boolean))].slice(0, MAX_NAMED) : [];
-      return { do: 'note', id, file, place, text, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}) };
+      // `wait`: held for Send rather than told to the agent as it is added.
+      return { do: 'note', id, file, place, text, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}), ...(value.wait === true ? { wait: true } : {}) };
     }
     case 'reply': {
       const id = shortId(value.id);
@@ -90,12 +91,21 @@ export function cleanMark(value) {
       const text = typeof value.text === 'string' && value.text.trim() && byteLength(value.text) <= MAX_EDIT_BYTES ? value.text : null;
       return text ? { do: 'edit', file, text } : undefined;
     }
+    // What was decided about an agent's version that skipped someone's edit (main/version-reconcile.mjs).
+    case 'reconcile': {
+      const file = fileId(value.file);
+      if (!file) return undefined;
+      const path = value.path !== undefined ? documentPath(value.path) : null;
+      const missed = value.missed !== undefined ? documentPath(value.missed) : null;
+      const from = fileId(value.from);
+      return { do: 'reconcile', file, ...(path ? { path } : {}), ...(missed ? { missed } : {}), ...(from ? { from } : {}), ...(Number.isInteger(value.clash) && value.clash > 0 ? { clash: value.clash } : {}), ...(value.replace === true ? { replace: true } : {}) };
+    }
     default: return undefined;
   }
 }
 
 /** Only that this person has looked at something, which is nothing anyone else needs to read. */
-export const isBookkeepingMark = (mark) => mark?.do === 'seen' || mark?.do === 'sent';
+export const isBookkeepingMark = (mark) => mark?.do === 'seen' || mark?.do === 'sent' || mark?.do === 'reconcile';
 
 /**
  * Every mark on a thread, oldest first, as what it now says. Each entry is the
@@ -116,7 +126,7 @@ export function marksOf(entries) {
     if (e.do === 'edit' && e.path) {
       edits.push({ file: e.file, path: e.path, by: e.by ?? null, ts: e.ts });
     } else if (e.do === 'note' && !notes.has(e.id)) {
-      const note = { id: e.id, file: e.file, place: e.place, text: e.text, by: e.by ?? null, ts: e.ts, mentions: e.mentions ?? [], owner: e.owner ?? null, uid: e.uid ?? null };
+      const note = { id: e.id, file: e.file, place: e.place, text: e.text, by: e.by ?? null, ts: e.ts, mentions: e.mentions ?? [], owner: e.owner ?? null, uid: e.uid ?? null, ...(e.wait ? { wait: true } : {}) };
       if (e.place.kind === 'pin' || ((e.place.kind === 'time' || e.place.kind === 'page') && unit(e.place.x))) {
         const n = (pins.get(e.file) ?? 0) + 1;
         pins.set(e.file, n);
@@ -339,6 +349,36 @@ export function whereAPressLands(families, { path, file } = {}) {
   return at(flat.at(-1));
 }
 
+/** The versions `paths` name, in their order, each once: what the arrows step through. */
+export function stepsThrough(families, paths) {
+  const out = [];
+  const seen = new Set();
+  for (const p of paths ?? []) {
+    const v = versionForPath(families, p);
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    const fi = families.findIndex((f) => f.versions.includes(v));
+    out.push({ fi, vi: families[fi].versions.indexOf(v) });
+  }
+  return out;
+}
+
+/**
+ * Where an arrow press from `at` goes, or null at an end. With steps, the next
+ * of them; a version picked off the list keeps its family's place. Without,
+ * the next file at its newest version.
+ */
+export function nextStep(families, steps, at, by) {
+  if (!at) return null;
+  if (steps?.length) {
+    let i = steps.findIndex((s) => s.fi === at.fi && s.vi === at.vi);
+    if (i < 0) i = steps.findIndex((s) => s.fi === at.fi);
+    return i < 0 ? null : steps[i + by] ?? null;
+  }
+  const fi = at.fi + by;
+  return families?.[fi] ? { fi, vi: families[fi].versions.length - 1 } : null;
+}
+
 export function versionForPath(families, raw) {
   const asked = cleanAsked(raw);
   if (!asked) return null;
@@ -373,10 +413,12 @@ export const editedWords = (name, path) => `Updated ${name}.\n\n[${name}](${path
 // Files the big view does not review but Files still lists: a page an agent made,
 // a script. Unlike reviewable kinds, a bare word in a sentence ("node.js") is no
 // claim, so only a link or a code span counts, and Files keeps those really on disk.
-const OTHER_KINDS = [['page', /\.html?$/i], ['code', /\.(py|ipynb|js|mjs|ts|tsx|jsx|rb|go|rs|sh|sql|css|txt|csv|tsv|json|ya?ml|xml)$/i]];
+const OTHER_KINDS = [['page', /\.html?$/i], ['table', /\.(csv|tsv)$/i], ['code', /\.(py|ipynb|js|mjs|ts|tsx|jsx|rb|go|rs|sh|sql|css|txt|json|ya?ml|xml)$/i]];
 export const otherKind = (path) => OTHER_KINDS.find(([, re]) => re.test(String(path ?? '').split(/[?#]/)[0]))?.[0] ?? null;
 /** Which page the big view draws for a file, or null. */
 export const viewKind = (path) => reviewKind(path) ?? otherKind(path);
+/** Whether a file pressed in a group opens in the big view: what it reviews, and a table. */
+export const opensBigInAGroup = (name) => !!reviewKind(name) || otherKind(name) === 'table';
 const OTHER_NAMED =/\]\(<?((?:\.?\/)?[^()\s>:]+\.[A-Za-z0-9]+)>?\)|`((?:\.?\/)?[\w.-]+(?:\/[\w.-]+)*\.[A-Za-z0-9]+)`/g;
 
 // "-390.png" is the end of a name said before it, not a file.
@@ -477,7 +519,7 @@ export function editClash(family, baseN, me, nameOf) {
   const versions = family?.versions ?? [];
   const other = versions.slice(baseN).filter((v) => v.by !== me).at(-1);
   if (!other) return null;
-  return `${nameOf(other.by)} saved v${versions.indexOf(other) + 1} while you were editing. Yours saves as v${versions.length + 1}, and both are kept.`;
+  return `${nameOf(other.by)} saved v${versions.indexOf(other) + 1} while you were editing. Yours saves as v${versions.length + 1}, with their changes merged in.`;
 }
 
 /** What a person calls a file at any version: one name, whatever each version is named on disk. */
@@ -521,10 +563,20 @@ export function newestOfFamily(path, edits) {
 
 /** The line that tells an agent which files people have edited, or null. Its own later version ends it. */
 export function editedFilesLine(lines) {
-  const moved = threadFiles(filesInLines(lines)).filter((f) => f.versions.at(-1)?.edited && f.versions.length > 1);
-  if (!moved.length) return null;
-  const said = moved.map((f) => `${f.versions[0].name} is now ${f.versions.at(-1).path}`).join('; ');
-  return `People edited files on this thread. Read the newest version, not the copy you remember: ${said}.`;
+  const families = threadFiles(filesInLines(lines));
+  const moved = families.filter((f) => f.versions.at(-1)?.edited && f.versions.length > 1);
+  const missedOn = new Map((lines ?? []).flatMap((l) => (l?.patch?.artifact?.do === 'reconcile' && l.patch.artifact.missed ? [[l.patch.artifact.file, l.patch.artifact.missed]] : [])));
+  const missed = families.flatMap((f) => {
+    const newest = f.versions.at(-1);
+    return missedOn.has(newest?.id) ? [`${newest.path} was written without the edit in ${missedOn.get(newest.id)}`] : [];
+  });
+  const clashed = new Map((lines ?? []).flatMap((l) => (l?.patch?.artifact?.do === 'reconcile' && l.patch.artifact.clash && l.patch.artifact.path ? [[l.patch.artifact.path, l.patch.artifact.file]] : [])));
+  const kept = moved.flatMap((f) => (clashed.has(f.versions.at(-1).path) ? [`${f.versions.at(-1).path} kept a person's words where your ${clashed.get(f.versions.at(-1).path)} changed the same ones`] : []));
+  const said = [];
+  if (moved.length) said.push(`People edited files on this thread. Read the newest version, not the copy you remember: ${moved.map((f) => `${f.versions[0].name} is now ${f.versions.at(-1).path}`).join('; ')}. An edit your next version leaves out is merged back in, so to undo one because they asked, pass replacesEdits to write_document.`);
+  if (kept.length) said.push(`${kept.join('; ')}.`);
+  if (missed.length) said.push(`${missed.join('; ')}. Read that edit and carry it across unless you were told otherwise.`);
+  return said.join(' ') || null;
 }
 
 /** Who said the file first, which is who an approval or a note reaches in a conversation. */
@@ -679,12 +731,15 @@ export const notedFilesInLines = (lines) => [...filesInLines(lines), ...otherFil
  * per file, in the words "Send these notes to the agent" uses. Notes by `me`,
  * the owner, wait for the owner's own press.
  */
-export function notesForItsAgent(lines, marks, { me, nameOf = () => 'Someone', people = [] } = {}) {
+/** A note held for Send that nobody has sent yet. */
+export const stillWaiting = (note) => !!note?.wait && !note.toAgent && !note.sent;
+
+export function notesForItsAgent(lines, marks,{ me, nameOf = () => 'Someone', people = [] } = {}) {
   const out = [];
   for (const family of threadFiles(notedFilesInLines(lines))) {
     for (const version of family.versions) {
       if (typeof version.agent !== 'string') continue;
-      const open = (marks?.notes ?? []).filter((n) => n.file === version.id && n.by && n.by !== me && !n.resolved && !n.sent && noteGoesTo(n, people).to === 'agent');
+      const open = (marks?.notes ?? []).filter((n) => n.file === version.id && n.by && n.by !== me && !n.resolved && !n.sent && !stillWaiting(n) && noteGoesTo(n, people).to === 'agent');
       if (!open.length) continue;
       const first = (id) => String(nameOf(id)).split(/\s+/)[0];
       const { text, ids } = notesForTheAgent({ notes: open }, version, family.versions.length, { nameOf: first });

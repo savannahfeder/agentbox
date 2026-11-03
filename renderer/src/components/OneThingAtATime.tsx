@@ -8,6 +8,8 @@ import { splitHeadline, type Spot } from '../one-thing-at-a-time';
 import { ArtifactControlGlyph } from './ArtifactControlGlyph';
 import { DocumentPreview } from './DocumentPreview';
 import { HtmlPreview } from './HtmlPreview';
+import { TableView } from './TableView';
+import { isTablePath } from '../table-file';
 import '../one-thing-at-a-time.css';
 import './doc-reading.css';
 import { TeammateMark } from '../teammates/TeammatesRail';
@@ -15,8 +17,8 @@ import { clock, dayHeading } from '../thread-history';
 import { shownName } from '../../../shared/artifact-marks.mjs';
 import type { Teammate } from '../types';
 
-/** What this page reads in place rather than as a tile: a page an agent made, or a note. */
-export const readsInPlace = (path: string) => /\.(html?|md|markdown)$/i.test(path);
+/** What this page reads in place rather than as a tile: a page an agent made, a note, or a table. */
+export const readsInPlace = (path: string) => /\.(html?|md|markdown|csv|tsv)$/i.test(path);
 
 export function QueueSummary({ title, context, earlier, steps = false, open, onToggle }: {
   title?: string;
@@ -109,7 +111,7 @@ export function QueueAnswer({ text, md, name = '', by = null }: {
  * none) keeps its name and the way to open it; a note that cannot be read
  * draws nothing, and the answer still names it.
  */
-export function QueueFile({ product, path, md, onOpen, onSide }: { product: string; path: string; md: (text: string) => ReactNode; onOpen: () => void; onSide?: () => void }) {
+export function QueueFile({ product, path, md, onOpen, onFullScreen }: { product: string; path: string; md: (text: string) => ReactNode; onOpen: () => void; onFullScreen?: () => void }) {
   const page = /\.html?$/i.test(path);
   const [url, setUrl] = useState<string | null | undefined>(undefined);
   const [text, setText] = useState<string | null | undefined>(undefined);
@@ -131,13 +133,15 @@ export function QueueFile({ product, path, md, onOpen, onSide }: { product: stri
     return () => { live = false; };
   }, [product, path, page]);
   if (text === null) return null;
+  const table = isTablePath(path);
   return (
-    <section className={`${page ? 'one-file one-page' : 'one-file one-note'}${folded ? ' one-folded' : expanded ? ' one-expanded' : ''}`}>
+    <section className={`${page ? 'one-file one-page' : table ? 'one-file one-table' : 'one-file one-note'}${folded ? ' one-folded' : expanded ? ' one-expanded' : ''}`}>
       <FilePreviewHeader path={path} folded={folded} expanded={expanded}
         onFold={() => { setExpanded(false); setFolded((f) => !f); }}
-        onCondense={() => setExpanded(false)} onOpen={onOpen} onSide={onSide} />
+        onCondense={() => setExpanded(false)} onOpen={onFullScreen ?? onOpen} onSide={onFullScreen && onOpen} />
       {!folded && page && url && <HtmlPreview key={`${product}:${path}`} url={url} path={path} expanded={expanded} onExpandedChange={setExpanded} />}
-      {!folded && !page && text != null && <DocumentPreview key={`${product}:${path}`} expanded={expanded} onExpandedChange={setExpanded} onOpen={onOpen}><div className="markdown one-notebody doc-prose">{md(text)}</div></DocumentPreview>}
+      {!folded && table && text != null && <TableView text={text} path={path} mode="preview" onShowAll={onOpen} />}
+      {!folded && !page && !table && text != null && <DocumentPreview key={`${product}:${path}`} expanded={expanded} onExpandedChange={setExpanded} onOpen={onOpen}><div className="markdown one-notebody doc-prose">{md(text)}</div></DocumentPreview>}
     </section>
   );
 }
