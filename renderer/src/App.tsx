@@ -4312,9 +4312,12 @@ export default function App() {
     setFocused(null);
   }, [noteAdvance]);
 
+  // Threads opened with O this session (openToastRow).
+  const openedWithO = useRef(new Set<string>());
   // Whether a reply from inside this thread moves her on to the next (./advance).
   const movesOn = useCallback((item: WorkItem) => replyMovesOn({
     view, onBoard, index: shownInbox.findIndex((i) => i.id === item.id), searching: search !== null, phone: onPhone(),
+    cameBack: openedWithO.current.has(keyOf(item)),
   }), [view, onBoard, shownInbox, search]);
 
   // Every resolving action goes through here: the UI advances instantly, the
@@ -5737,6 +5740,7 @@ export default function App() {
     setSearch(null);
     setFocused(row);
     markSeen(row);
+    openedWithO.current.add(keyOf(row));
   }, [inbox, progress, snoozed, done, markSeen, repeats]);
 
   /* ------------------------------- keyboard ------------------------------- */
