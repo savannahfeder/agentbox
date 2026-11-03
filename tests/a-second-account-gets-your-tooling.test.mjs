@@ -24,6 +24,7 @@ let root;
 let home;
 let account;
 let realHome;
+let realProfile;
 
 // The first login: a home folder with the three folders in it and a named file
 // inside each, so a test can prove a session reading through the link reaches
@@ -50,11 +51,15 @@ beforeEach(() => {
   // at all, no links were made, and the test failed on the first machine other
   // than hers it had ever run on. Node reads `HOME` before it asks the system,
   // so pointing it at the fixture makes the test test the fixture.
+  // Windows reads USERPROFILE instead.
   realHome = process.env.HOME;
+  realProfile = process.env.USERPROFILE;
   process.env.HOME = home;
+  process.env.USERPROFILE = home;
 });
 afterEach(() => {
   if (realHome === undefined) delete process.env.HOME; else process.env.HOME = realHome;
+  if (realProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = realProfile;
   try { fs.rmSync(root, { recursive: true, force: true }); } catch {}
 });
 
@@ -105,7 +110,7 @@ describe('it never takes anything away', () => {
   it('leaves a link of their own pointing wherever they pointed it', () => {
     const elsewhere = path.join(root, 'somewhere-else');
     fs.mkdirSync(elsewhere);
-    fs.symlinkSync(elsewhere, path.join(account, 'skills'), 'dir');
+    fs.symlinkSync(elsewhere, path.join(account, 'skills'), 'junction');
     const out = linkAccountTooling(account, { home });
     expect(out.theirs).toEqual(['skills']);
     expect(fs.realpathSync(path.join(account, 'skills'))).toBe(fs.realpathSync(elsewhere));
@@ -130,7 +135,7 @@ describe('the accounts it must not touch at all', () => {
     // A real way to arrive here: authProfiles carrying ~/.claude, or a home
     // folder that is itself a link. Left unguarded this makes skills/skills.
     const byAnotherName = path.join(root, 'same-thing');
-    fs.symlinkSync(path.join(home, '.claude'), byAnotherName, 'dir');
+    fs.symlinkSync(path.join(home, '.claude'), byAnotherName, 'junction');
     expect(linkAccountTooling(byAnotherName, { home }).skipped).toBe('same');
     expect(fs.existsSync(path.join(home, '.claude', 'skills', 'skills'))).toBe(false);
   });

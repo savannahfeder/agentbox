@@ -21,7 +21,11 @@ export interface ToolingResult {
 
 export declare function linkAccountTooling(
   dir: string | null | undefined,
-  options?: { home?: string; source?: string | null },
+  options?: {
+    home?: string;
+    source?: string | null;
+    symlink?: (target: string, path: string, type: 'junction') => void;
+  },
 ): ToolingResult;
 
 export declare function toolingLine(result: ToolingResult | null | undefined): string | null;

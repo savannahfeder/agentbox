@@ -128,7 +128,7 @@ function occupancy(target, source) {
  *  that IS the first login by another path), or 'no-dir' (a folder that does
  *  not exist, which means the account is misconfigured and making a home for it
  *  would only hide that). */
-export function linkAccountTooling(dir, { home = os.homedir(), source = null } = {}) {
+export function linkAccountTooling(dir, { home = os.homedir(), source = null, symlink = fs.symlinkSync } = {}) {
   const src = source ?? defaultClaudeHome(home);
   const out = { dir, linked: [], already: [], theirs: [], missing: [], skipped: null };
   if (!dir || dir === 'default') return { ...out, skipped: 'default' };
@@ -149,7 +149,9 @@ export function linkAccountTooling(dir, { home = os.homedir(), source = null } =
     if (held === 'ours') { out.already.push(name); continue; }
     if (held === 'theirs') { out.theirs.push(name); continue; }
     try {
-      fs.symlinkSync(from, to, 'dir');
+      // Windows refuses a 'dir' link without Developer Mode and allows a
+      // junction. Every other system ignores the type.
+      symlink(from, to, 'junction');
       out.linked.push(name);
     } catch {
       // A read-only folder, a race with another Agentbox, a permission the app
