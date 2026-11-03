@@ -105,4 +105,20 @@ describe('the way there', () => {
     const apply = app.slice(app.indexOf('const applyRepeat = async'), app.indexOf('const applyRepeat = async') + 4000);
     expect(apply).toMatch(/composeRepeat\(\{[\s\S]*?startsNext: true/);
   });
+
+  // Round two of testers: a renamed thread's repeat showed the old typo, and
+  // an unrenamed one its whole first message, as its name in Later.
+  it('names the repeat what the thread is called, and gives its runs the whole message', () => {
+    const app = read('renderer/src/App.tsx');
+    const apply = app.slice(app.indexOf('const applyRepeat = async'), app.indexOf('const applyRepeat = async') + 4000);
+    expect(apply).toMatch(/title: rowTitle\(item\), body: repeatBody\(item\)/);
+  });
+});
+
+describe('what a repeat made from a thread tells its runs', () => {
+  it('is the whole of what you wrote', async () => {
+    const { repeatBody } = await import('../renderer/src/repeat-from-thread.ts');
+    expect(repeatBody({ title: 'summarise what changed in the product this week for the team' })).toBe('summarise what changed in the product this week for the team');
+    expect(repeatBody({ title: 'Pricing page', body: 'The annual toggle shows monthly prices.' })).toBe('Pricing page\n\nThe annual toggle shows monthly prices.');
+  });
 });
