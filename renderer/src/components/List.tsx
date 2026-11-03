@@ -27,6 +27,7 @@ import type { StackKey, StackSection } from '../threads/stack-rules';
 import { cardPlace } from '../threads/page-rules';
 import { FleetContext } from '../fleet';
 import { cardStatus, factsFor, laterCell, statusCell } from '../status-word';
+import { opensOnKey } from '../repeat-from-thread';
 import { toApproveWords } from '../threads-made';
 import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
@@ -350,6 +351,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
     const running = live && last ? statusCell(last, { ...factsFor(fleet, last.id), inProgress: live, now: Date.now() }) : null;
     return (
       <div key={rule.id} data-repeat-id={rule.id} className="row" title={repeatRow(rule, last).last}
+        role="button" tabIndex={0} onKeyDown={opensOnKey(() => onOpenRepeat?.(rule))}
         onClick={() => onOpenRepeat?.(rule)}>
         <span className="mark" aria-hidden="true" />
         <RowCells status={running?.live ? running : laterCell(null)}
@@ -385,7 +387,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
             const last = rule.lastOccurrence ? pool.find((i) => i.id === rule.lastOccurrence) ?? null : null;
             const row = repeatRow(rule, last);
             return (
-              <div key={rule.id} data-repeat-id={rule.id} className="row" onClick={() => onOpenRepeat?.(rule)}>
+              <div key={rule.id} data-repeat-id={rule.id} className="row" role="button" tabIndex={0}
+                onKeyDown={opensOnKey(() => onOpenRepeat?.(rule))} onClick={() => onOpenRepeat?.(rule)}>
                 <span className="mark" />
                 <div className="row-main">
                   <div className="subject">{rule.title}</div>

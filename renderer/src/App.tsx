@@ -104,7 +104,7 @@ import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mjs';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
 import { DONE, manyOrOne } from './done-word';
 import { listedNow, type OpensWhenListed } from './opens-when-listed';
-import { repeatBody } from './repeat-from-thread';
+import { oneToRepeat, repeatBody } from './repeat-from-thread';
 import { modalAfterLeavingATask } from './modal-scope';
 import { NOTHING_OVER_THE_APP, afterTheWalk, type OpenOverTheApp } from './walk-scope';
 import { splitMessage } from './message-split';
@@ -9112,8 +9112,8 @@ export default function App() {
              reply box cannot disagree about what "every monday 9am" does. One
              thread only: one rhythm over a dozen ticked rows would be a dozen
              repeating tasks nobody asked for. */
-          onRepeat={!Array.isArray(snoozeItem) && !snoozeItem.agent
-            ? (rule) => { setModal(null); setSnoozeItem(null); void applyRepeat(snoozeItem, rule, { putOff: true }); }
+          onRepeat={oneToRepeat(snoozeItem)
+            ? (rule) => { const one = oneToRepeat(snoozeItem)!; setModal(null); setSnoozeItem(null); setMultiSel(new Set()); void applyRepeat(one, rule, { putOff: true }); }
             : undefined}
           onNow={(Array.isArray(snoozeItem) ? snoozeItem : [snoozeItem]).some((i) => returnAt(i) > Date.now())
             ? () => unsnooze(snoozeItem)
