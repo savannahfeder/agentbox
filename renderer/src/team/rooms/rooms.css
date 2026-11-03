@@ -131,7 +131,7 @@
 .rm-cm .act { display: none; margin-left: auto; font: 10px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint); background: none; border: 0; padding: 0; }
 .rm-cm:hover .act { display: inline; }
 .rm-cm.root { padding-bottom: 12px; margin-bottom: 4px; }
-.rm-day { display: flex; justify-content: center; align-items: center; margin: 18px 0 14px; }
+.rm-day { display: flex; justify-content: flex-start; align-items: center; margin: 18px 0 14px; }
 .rm-day .rm-label { font: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--text-faint); }
 .rm-compose { position: relative; margin: 8px 20px 20px; flex: none; border: 1px solid var(--line-strong); background: var(--control-face); display: flex; flex-direction: column; }
 .rm-compose > .rm-picker { position: absolute; bottom: calc(100% + 6px); left: 0; }

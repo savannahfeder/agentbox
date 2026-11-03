@@ -16,8 +16,10 @@ const mates = read('renderer/src/teammates/teammates.css');
 const chat = read('renderer/src/team/chat.css');
 
 describe('the day in a chat', () => {
-  it('is a word in the middle, with no line either side', () => {
-    expect(rooms).toMatch(/^\.rm-day \{ display: flex; justify-content: center;/m);
+  // Then: "can you left align the 'today'?" It starts on the messages' own left edge.
+  it('is a word on the left, with no line either side', () => {
+    expect(rooms).toMatch(/^\.rm-day \{ display: flex; justify-content: flex-start;/m);
+    expect(mates).toMatch(/^\.tq-chats \.tq-chat \.rm-day \{ display: flex; justify-content: flex-start;/m);
     expect(rooms).not.toMatch(/\.rm-day::before|\.rm-day::after/);
     expect(mates).not.toMatch(/\.rm-day::before|\.rm-day::after/);
   });
