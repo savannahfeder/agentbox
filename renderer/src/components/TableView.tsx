@@ -9,7 +9,7 @@ export type TableMode = 'preview' | 'pane' | 'full';
 
 export const PREVIEW_ROWS = 6;
 // Past this many rows the page grows by a press, so a long export never stalls the window.
-const PAGE = 500;
+const PAGE = 200;
 
 function Logo({ host, name }: { host: string | null; name: string }) {
   const [failed, setFailed] = useState(false);
@@ -17,8 +17,11 @@ function Logo({ host, name }: { host: string | null; name: string }) {
   if (host && !failed) {
     // Google's favicon service rather than the site itself, so the company
     // never sees a request from someone reading a list they are on.
+    // A site the service does not know comes back as its 16px grey globe, which
+    // reads worse than the letter.
     return <img className="tbl-logo" alt="" referrerPolicy="no-referrer" loading="lazy"
-      src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`} onError={() => setFailed(true)} />;
+      src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`}
+      onLoad={(e) => { if (e.currentTarget.naturalWidth <= 16) setFailed(true); }} onError={() => setFailed(true)} />;
   }
   return <span className="tbl-logo tbl-letter" aria-hidden="true">{(name.trim()[0] ?? '?').toUpperCase()}</span>;
 }
@@ -141,7 +144,7 @@ export function TableView({ text, path, mode, onShowAll }: { text: string; path:
             </div>
           ))}
         </div>
-        {!rows.length && <div className="tbl-none">No rows match.</div>}
+        {!rows.length && <div className="tbl-none">{total ? 'No rows match.' : 'This table has no rows yet.'}</div>}
         {!preview && rows.length > shown && <button type="button" className="tbl-more" onClick={() => setShown((s) => s + PAGE)}>Show {Math.min(PAGE, rows.length - shown)} more rows</button>}
       </div>
       {preview && total > PREVIEW_ROWS && onShowAll && (
