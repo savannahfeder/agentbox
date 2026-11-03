@@ -132,7 +132,7 @@ import { aBoxIsListening } from './dictation';
 import { MentionRows } from './team/rooms/MentionRows';
 import { AgentsLine, MateThreads, NeedsFaces, PersonThreads, SpaceBar, TeamThreads } from './team/everything/TeamStrip';
 import { EmptyChat, JobBlock, Place as MemberPlace, PlaceAction, PlaceList, PlaceMates, SendBox, type PlaceRow } from './team/everything/PlacePage';
-import { nowAndFinished, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
+import { nowAndFinished, personChatOpens, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
 import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, readOrder, splitHidden, teamRunsOf, type Hidden, type Member } from './team/everything/members';
 import { boardItems, cardOpens, evColumns, flipEvView, readEvView, whoseBoard, writeEvView, type EvTab, type EvView } from './team/everything/whose-board';
 import { needsByWho, readFolded, readNeedsGroup, stackRows, toggleFolded, whoIsWaiting, writeNeedsGroup, yoursOnly, type NeedsGroup, type StackKey } from './threads/stack-rules';
@@ -3999,7 +3999,12 @@ export default function App() {
   // in one list, and the sidebar's row opens the chat you had open last.
   const openChatsPlace = (key: string) => {
     roomsUi.leave(); teammatesUi.leave(); setChatsDirect(null); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false);
-    setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setFocusedRepeat(null); setEvPick(null); setChatsPlace(key);
+    setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setFocusedRepeat(null); setEvPick(null);
+    if (key.startsWith('person:')) {
+      const direct = personDirect(key.slice('person:'.length));
+      if (direct) { setChatsPlace(null); setChatsDirect(direct.id); setFocused(direct.item); markSeen(direct.item); return; }
+    }
+    setChatsPlace(key);
   };
   const chatsValue: ChatsValue | null = teammatesUi.live || teamMode ? {
     teammates: teammatesUi.list, groups: roomsUi.live ? roomsUi.groups : [], now,
@@ -4123,6 +4128,13 @@ export default function App() {
     return orderMembers(built.map((m) => (m.kind === 'me' ? { ...m, inProgress: yours } : m)), evOrder);
   }, [teamMode, runningRows, items, team, teamRoom, cards, teammatesUi.list, teamMates, roomsUi.live, roomsUi.groups, personChats, evOrder, progressTab]);
   const directWith = (personId: string) => directs.find((d) => d.people.length === 1 && d.people[0] === personId) ?? null;
+  const personDirect = (personId: string) => {
+    const direct = directWith(personId);
+    const roomId = personChats.get(personId)?.slice('room:'.length);
+    const room = roomId ? (snap?.team?.rooms?.rooms ?? []).find((r) => r.id === roomId) ?? null : null;
+    return personChatOpens(direct, room && { at: room.lastAt }) === 'direct' ? direct : null;
+  };
+  const chatsDirectKey = (id: string) => { const one = directs.find((d) => d.id === id && d.people.length === 1); return homeLayout === 'chats' && one ? `person:${one.people[0]}` : `direct:${id}`; };
   // A card opens its work under the cards: yours, the Team's, a person's or an AI
   // teammate's. Its chat, and a group's, opens on the Chats page (`cardOpens`).
   const pickMember = (key: string, tabAsked?: EvTab) => {
@@ -7330,7 +7342,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? (inChats ? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">Chats</span></div><div className="workspace-task-header cx-task-header" ref={setTaskHeader} /></div><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (filesShown ? <h1 className="workspace-title">Files</h1> : connectionsShown ? <h1 className="workspace-title">Connections</h1> : chatsPlaceShown ? <h1 className="workspace-title">Team</h1> : teamShown ? <h1 className="workspace-title">{openCard ? 'Threads' : 'Team'}</h1> : evOn ? <h1 className="workspace-title">{roomsUi.live ? 'Inbox' : 'Threads'}</h1> : teammatesShown ? teammatesUi.title : roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Threads</h1>))}
+        ) : (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? (inChats ? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">{homeLayout === 'chats' ? 'Team' : 'Chats'}</span></div><div className="workspace-task-header cx-task-header" ref={setTaskHeader} /></div><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (filesShown ? <h1 className="workspace-title">Files</h1> : connectionsShown ? <h1 className="workspace-title">Connections</h1> : chatsPlaceShown ? <h1 className="workspace-title">Team</h1> : teamShown ? <h1 className="workspace-title">{openCard ? 'Threads' : 'Team'}</h1> : evOn ? <h1 className="workspace-title">{roomsUi.live ? 'Inbox' : 'Threads'}</h1> : teammatesShown ? teammatesUi.title : roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Threads</h1>))}
         {/* THE PLUS, THE COMMAND MARK AND THE COG STEP OFF WHILE SHE IS
             SEARCHING, and that is the half of the chosen design that is not the
             cross. It is forced, not chosen: .topbar and .body carry the same 22px
@@ -7549,7 +7561,7 @@ export default function App() {
                 />
               ) : focused ? (
                 <TicketItems.Provider value={items}>
-                <ChatsFrame current={inChats ? `direct:${focused.id}` : null}>
+                <ChatsFrame current={inChats ? chatsDirectKey(focused.id) : null}>
                 <Focus
                   // A run of a repeating task carries its rule into the
                   // summary: what every run is told, and Stop repeating.
