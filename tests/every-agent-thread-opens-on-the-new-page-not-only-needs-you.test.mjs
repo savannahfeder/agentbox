@@ -39,11 +39,11 @@ describe('which threads get the page', () => {
 });
 
 describe('what the page draws outside Needs you', () => {
-  it('the same page: no side panel, the summary on top, choices at the foot, files in place', () => {
+  it('the same page: no side panel, the summary on top, choices at the foot, files as names in the words', () => {
     expect(focus).toMatch(/const summaryOffered = summarised && !openDoc && !page;/);
     expect(focus).toMatch(/queue=\{page \? \{ context: item\.problem \?\? null, repeats: repeat \? repeatsLine\(repeat\.rule\) : null \} : undefined\}/);
     expect(focus).toContain('{offerInPane && (page || closeAsk ? null : (');
-    expect(focus).toContain('inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace)');
+    expect(focus).not.toContain('<QueueFile');
   });
   it('but no place in the queue and no arrows, which are Needs you\'s alone', () => {
     expect(focus).toMatch(/\{queue && <QueueNav spot=\{queue\.spot\}/);
