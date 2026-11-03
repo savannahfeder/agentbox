@@ -72,6 +72,23 @@ export function detachedArgv(args, root) {
   return rest.includes('--out') ? rest : [...rest, '--out', root];
 }
 
+/** Packages the app's package.json lists that its node_modules does not have. */
+export function missingPackages(appDir) {
+  const pkg = JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8'));
+  return Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })
+    .filter((name) => !fs.existsSync(path.join(appDir, 'node_modules', name, 'package.json')));
+}
+
+/** Runs a build step, and on failure throws with the end of what it printed rather than only its exit code. */
+function runOrSay(cmd, argv, opts) {
+  try {
+    execFileSync(cmd, argv, { ...opts, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 });
+  } catch (err) {
+    const said = `${err.stdout ?? ''}\n${err.stderr ?? ''}`.trim().split('\n').slice(-30).join('\n');
+    throw new Error(`${cmd} ${argv.join(' ')} failed:\n${said || err.message}`);
+  }
+}
+
 /** Every issue from every diary, worst first, then most seen. */
 export function rankIssues(byPerson) {
   const all = [];
@@ -112,8 +129,15 @@ if (isMain) {
     const tree = execFileSync('git', ['-C', REPO, 'rev-parse', 'HEAD:mobile'], { encoding: 'utf8' }).trim();
     const built = path.join(os.tmpdir(), 'agentbox-phone-preview', tree);
     if (!fs.existsSync(path.join(built, 'index.html'))) {
+      const mobile = path.join(REPO, 'mobile');
+      const missing = missingPackages(mobile);
+      if (missing.length) {
+        // npm ci, not npm install: it never rewrites the tracked lockfile, which would stop tomorrow's fast-forward.
+        say(`installing the phone app's packages; missing ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ` and ${missing.length - 5} more` : ''}`);
+        runOrSay('npm', ['ci', '--no-audit', '--no-fund'], { cwd: mobile, timeout: 15 * MIN });
+      }
       say('building the phone app preview (a minute or two)');
-      execFileSync('npx', ['expo', 'export', '--platform', 'web', '--output-dir', built], { cwd: path.join(REPO, 'mobile'), env: { ...process.env, EXPO_PUBLIC_PREVIEW: '1', CI: '1' }, stdio: 'ignore', timeout: 15 * MIN });
+      runOrSay('npx', ['expo', 'export', '--platform', 'web', '--output-dir', built], { cwd: mobile, env: { ...process.env, EXPO_PUBLIC_PREVIEW: '1', CI: '1' }, timeout: 15 * MIN });
     }
     url = await new Promise((resolve) => {
       const server = http.createServer((req, res) => {
