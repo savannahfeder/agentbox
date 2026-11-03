@@ -24,7 +24,7 @@ describe('a person\'s chat opened from the Chats list', () => {
   });
 
   it('sits beside the Chats list, marked as the open chat', () => {
-    expect(app).toMatch(/<ChatsFrame current=\{inChats \? `direct:\$\{focused\.id\}` : null\}>/);
+    expect(app).toMatch(/<ChatsFrame current=\{inChats \? chatsDirectKey\(focused\.id\) : null\}>/);
     expect(column).toMatch(/export function ChatsFrame\(/);
     expect(column).toMatch(/if \(!current\) return <>\{children\}<\/>;/);
     expect(column).toMatch(/<div className="gr-page tq-chats cx-frame"><div className="gr-body"><ChatsColumn current=\{current\} \/>/);
@@ -32,7 +32,7 @@ describe('a person\'s chat opened from the Chats list', () => {
 
   it('wears the Chats bar, not the thread page\'s: Chats over the list, its name over the chat', () => {
     // With a team on too: no chat opens under Everything else's cards any more (w-2b3e1a85e5).
-    expect(app).toMatch(/focused \? \(inChats \? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">Chats<\/span><\/div><div className="workspace-task-header cx-task-header" ref=\{setTaskHeader\} \/><\/div>/);
+    expect(app).toMatch(/focused \? \(inChats \? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">\{homeLayout === 'chats' \? 'Team' : 'Chats'\}<\/span><\/div><div className="workspace-task-header cx-task-header" ref=\{setTaskHeader\} \/><\/div>/);
     expect(app).toMatch(/\$\{focused && !settingsOpen && !inChats \? ' workspace-task' : ''\}/);
     expect(focus).toMatch(/const barContent = inChats\s*\? <><h1 className="workspace-title gc-head-group cx-person"><span className="rm-one">\{threadName\}<\/span>\{audience && <span className="thread-crumb-with">\{audience\}<\/span>\}<\/h1>/);
   });

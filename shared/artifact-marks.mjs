@@ -348,6 +348,36 @@ export function whereAPressLands(families, { path, file } = {}) {
   return at(flat.at(-1));
 }
 
+/** The versions `paths` name, in their order, each once: what the arrows step through. */
+export function stepsThrough(families, paths) {
+  const out = [];
+  const seen = new Set();
+  for (const p of paths ?? []) {
+    const v = versionForPath(families, p);
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    const fi = families.findIndex((f) => f.versions.includes(v));
+    out.push({ fi, vi: families[fi].versions.indexOf(v) });
+  }
+  return out;
+}
+
+/**
+ * Where an arrow press from `at` goes, or null at an end. With steps, the next
+ * of them; a version picked off the list keeps its family's place. Without,
+ * the next file at its newest version.
+ */
+export function nextStep(families, steps, at, by) {
+  if (!at) return null;
+  if (steps?.length) {
+    let i = steps.findIndex((s) => s.fi === at.fi && s.vi === at.vi);
+    if (i < 0) i = steps.findIndex((s) => s.fi === at.fi);
+    return i < 0 ? null : steps[i + by] ?? null;
+  }
+  const fi = at.fi + by;
+  return families?.[fi] ? { fi, vi: families[fi].versions.length - 1 } : null;
+}
+
 export function versionForPath(families, raw) {
   const asked = cleanAsked(raw);
   if (!asked) return null;

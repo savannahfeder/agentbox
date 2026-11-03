@@ -167,7 +167,7 @@ describe('when no host will start', () => {
     const local = fakeTerminals();
     let t = 0;
     const launch = vi.fn();
-    const app = new TerminalHosts({ local: local.terminals, dir, launch, startMs: 300, now: () => t });
+    const app = new TerminalHosts({ local: local.terminals, dir, launch, startMs: 300, now: () => t, platform: 'darwin' });
     try {
       const state = await app.open('k', place);
       expect(state.data).toContain('This terminal ends when Agentbox quits');
@@ -189,7 +189,7 @@ describe('when no host will start', () => {
 describe('when no host will start, quickly', () => {
   it('a host that stops as it starts is given up on at once, not after the whole wait', async () => {
     const dir = shortDir();
-    const app = new TerminalHosts({ local: fakeTerminals().terminals, dir, launch: () => ({ exitCode: 1 }), startMs: 8000 });
+    const app = new TerminalHosts({ local: fakeTerminals().terminals, dir, launch: () => ({ exitCode: 1 }), startMs: 8000, platform: 'darwin' });
     const at = Date.now();
     try {
       const state = await app.open('k', place);

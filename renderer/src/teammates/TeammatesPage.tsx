@@ -7,11 +7,11 @@ import remarkGfm from 'remark-gfm';
 import type { Playbook, Product, RunningSession, Teammate, TeammatesView, TeamChatLine, TeamRunLine, WorkItem } from '../types';
 import { type TabView } from '../threads/Pages';
 import { api } from '../api';
-import { GREETING, MAX_HOPS, STARTERS, TEAMMATE_EFFORT, VOICES, VOICE_WORDS_MOST, starterAsks, voiceOf, yesFirst } from '../../../shared/teammates.mjs';
+import { GREETING, MAX_HOPS, STARTERS, TEAMMATE_EFFORT, VOICES, VOICE_WORDS_MOST, starterAsks, teammateIdOf, voiceOf, yesFirst } from '../../../shared/teammates.mjs';
 import { ModelPicker } from '../components/Model';
 import type { ModelChoice } from '../models';
 import { rememberedProject } from '../compose-project';
-import { answerOf, answersMessage, chatEntries, chatWith, clockOf, dayOf, firstSentence, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, whyWaiting, type ChatEntry } from './chat-lines';
+import { answerOf, answersMessage, chatEntries, chatWith, clockOf, dayOf, firstSentence, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, openQuestionsIn, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, whyWaiting, type ChatEntry } from './chat-lines';
 import { ChatsColumn } from './ChatsColumn';
 import { nowLine, TeammateMark } from './TeammatesRail';
 import { AskBeforeDeleting } from '../team/MessageMore';
@@ -194,26 +194,8 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
   const scroller = useRef<HTMLDivElement>(null);
   const last = entries.at(-1)?.id;
   useEffect(() => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight; }, [last, t.id]);
-  // Its questions still waiting on you. With several, a tap picks an answer
-  // and one Send answers them all, since the first message you send wakes it.
   const open = entries.filter((e): e is TeamChatLine => e.kind === 'msg' && e.from === t.id && !!(e as TeamChatLine).options?.length && !answerOf(view, e as TeamChatLine));
-  const [picks, setPicks] = useState<Record<string, Choice>>({});
-  const [sending, setSending] = useState(false);
-  useEffect(() => { setPicks({}); }, [t.id]);
-  const sendAnswers = async (chosen: Record<string, Choice>) => {
-    const m = answersMessage(open, Object.fromEntries(Object.entries(chosen).map(([q, p]) => [q, pickedText(p)])));
-    if (!m.text || sending) return;
-    setSending(true);
-    const ok = (await call('post', { text: m.text, to: [t.id], answers: m.answers })) !== false;
-    setSending(false);
-    if (ok) setPicks({});
-  };
-  const asking: Asking = {
-    picks, many: open.length > 1, sending, count: open.length, lastId: open.at(-1)?.id ?? null,
-    answered: open.filter((q) => pickedText(picks[q.id])).length,
-    onPick: (id, p) => setPicks((all) => ({ ...all, [id]: p })),
-    send: (chosen) => { void sendAnswers(chosen ?? picks); },
-  };
+  const asking = useAsking(open, t.id, call);
   let day = '';
   let prevFrom = '';
   let saved = false;
@@ -318,6 +300,51 @@ type Asking = {
   onPick: (id: string, p: Choice) => void;
   send: (chosen?: Record<string, Choice>) => void;
 };
+
+// A teammate's questions still waiting on you. With several, a tap picks an
+// answer and one Send answers them all, since the first message you send wakes it.
+function useAsking(open: TeamChatLine[], teammate: string, call: Call): Asking {
+  const [picks, setPicks] = useState<Record<string, Choice>>({});
+  const [sending, setSending] = useState(false);
+  useEffect(() => { setPicks({}); }, [teammate]);
+  const sendAnswers = async (chosen: Record<string, Choice>) => {
+    const m = answersMessage(open, Object.fromEntries(Object.entries(chosen).map(([q, p]) => [q, pickedText(p)])));
+    if (!m.text || sending) return;
+    setSending(true);
+    const ok = (await call('post', { text: m.text, to: [teammate], answers: m.answers })) !== false;
+    setSending(false);
+    if (ok) setPicks({});
+  };
+  return {
+    picks, many: open.length > 1, sending, count: open.length, lastId: open.at(-1)?.id ?? null,
+    answered: open.filter((q) => pickedText(picks[q.id])).length,
+    onPick: (id, p) => setPicks((all) => ({ ...all, [id]: p })),
+    send: (chosen) => { void sendAnswers(chosen ?? picks); },
+  };
+}
+
+/** A teammate's open questions inside the inbox thread that asked them, answered as in its chat. */
+export function ThreadQuestions({ view, item, onChanged }: { view: TeammatesView | null | undefined; item: WorkItem; onChanged: () => void }) {
+  const tid = teammateIdOf(item) ?? '';
+  const open = openQuestionsIn(view, item);
+  const [error, setError] = useState<string | null>(null);
+  const call: Call = async (op, args) => {
+    setError(null);
+    const r = await api.teammates(op, args);
+    if (!r.ok) { setError(r.error); return false; }
+    onChanged();
+    return r.value ?? true;
+  };
+  const asking = useAsking(open, tid, call);
+  if (!open.length) return null;
+  return <div className="tq-thread-asks">
+    {open.map((q) => <div key={q.id} className="tq-thread-ask">
+      <div className="tx"><ReactMarkdown remarkPlugins={MD}>{q.text ?? ''}</ReactMarkdown></div>
+      <Answers q={q.id} options={q.options ?? []} asking={asking} />
+    </div>)}
+    {error && <p className="tq-error" role="alert">{error}</p>}
+  </div>;
+}
 
 // The answers under a question still waiting on you, and your own words as
 // one more. With one question a tap sends; with several it picks.

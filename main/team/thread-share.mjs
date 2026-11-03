@@ -25,7 +25,7 @@ import { isShared, runnerOf } from '../../shared/team-rules.mjs';
 import { cleanMark, editedWords, familyName, fileNewsFor, filesInLines, isBookkeepingMark, marksOf, threadFiles } from '../../shared/artifact-marks.mjs';
 import { saveNextVersion } from '../file-version.mjs';
 import { MAX_MESSAGE_FILE_BYTES } from './sync.mjs';
-import { MAX_SENT_BYTES, PART_BYTES } from '../../shared/carried-files.mjs';
+import { MAX_SHARED_SENT_BYTES as MAX_SENT_BYTES, PART_BYTES } from '../../shared/carried-files.mjs';
 import { findFileToSend, looksSecret, pieceSizes } from './carry-files.mjs';
 
 // What one file call takes. A file over it goes in parts, up to MAX_SENT_BYTES.

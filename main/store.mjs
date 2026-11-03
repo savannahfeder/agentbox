@@ -21,6 +21,7 @@ import {
 import { NOTE_NAME } from './rail-note.mjs';
 import { iconPathFor } from './project-identity.mjs';
 import { patchProjectAt } from './store/project.mjs';
+import { projectWrites, projectWritten } from './store/projects-changed.mjs';
 import { imgUrl } from './img-scheme.mjs';
 import { teamOf, PERSONAL_FLAG } from './team/projects.mjs';
 import {
@@ -48,6 +49,14 @@ import {
 // conversation to draw.
 const ROW_ID = /^(w-[0-9a-f]{6,}|r-[0-9a-f]{6,}-\d{8})$/;
 
+// How long the project list is handed back without asking the disk anything at
+// all (Store._productsNow). One millisecond: long enough that a loop reading it
+// a thousand times reads the disk once, short enough that nothing a person can
+// do lands inside it.
+const PRODUCTS_KEPT_NS = 1_000_000n;
+const stampable = (file) => { try { return fs.statSync(file); } catch { return null; } };
+const markOf = (st) => (st ? `${st.mtimeMs}:${st.size}` : 'gone');
+
 export class Store {
   constructor(config) {
     this.config = config;
@@ -56,6 +65,7 @@ export class Store {
     this.watchers = [];
     this.onChange = null; // set by ipc layer; called on any store file change
     this._debounce = null;
+    this._products = null; // the kept project list (_productsNow)
   }
 
   async init() {
@@ -87,16 +97,64 @@ export class Store {
   // the Projects page in one write. Two callers do ask: the Projects page, so
   // an archived one can be brought back, and the team sync, which must still
   // count a shared project you archived as here or it joins it a second time.
+  // A FRESH ARRAY EVERY TIME, over rows the keeper below shares: callers have
+  // always had a list of their own to sort and filter.
   listProducts({ includeArchived = false } = {}) {
-    const root = this.config.accountRoot;
-    let entries = [];
-    try {
-      entries = fs.readdirSync(root, { withFileTypes: true });
-    } catch {
-      return [];
+    const read = this._productsNow();
+    return (includeArchived ? read.all : read.live).slice();
+  }
+
+  /** The list is read from a hundred places in the app and it is not cheap: a
+   *  readdir of the account root, then a stat, a read and a parse per project
+   *  and a readdir of its code folder, 0.28 ms on a store of nine. Reading it
+   *  in a loop is what held the main thread 1,473 times on 2026-11-01, 6,825 s
+   *  in all (w-a20f0430a9). Two callers had been fixed one at a time by then;
+   *  the answer is kept here so the next one cannot do it again.
+   *
+   *  Kept honestly. Past a millisecond the folders are stamped again — the
+   *  names in the root, each project.json's time and size, each project and
+   *  code folder's time — and the kept answer stands only while every stamp is
+   *  the one it was read at, which is a stat apiece instead of a read and a
+   *  parse apiece. Inside that millisecond no stamp is taken at all, which is
+   *  what makes a thousand asks cost what one costs. Nothing the app writes
+   *  itself can hide in there whatever the folder times say, because the
+   *  writers count their writes (main/store/projects-changed.mjs) and the
+   *  store's own writes forget the list outright; what a millisecond can hide
+   *  is another process making a project folder, and the app waits 150 ms on
+   *  its watcher before it redraws on one of those anyway.
+   *
+   *  The clock is hrtime, not Date.now: a test with a fake clock would
+   *  otherwise hold the window open for its whole run. */
+  _productsNow() {
+    const kept = this._products?.writes === projectWrites() ? this._products : null;
+    if (kept && process.hrtime.bigint() - kept.at < PRODUCTS_KEPT_NS) return kept;
+    const stamped = this._stampProducts(kept?.repos ?? []);
+    if (!stamped) return { live: [], all: [], repos: [] }; // the account root is unreadable
+    if (kept && stamped.stamp === kept.stamp) {
+      kept.at = process.hrtime.bigint();
+      return kept;
     }
+    this._products = this._readProducts(stamped);
+    return this._products;
+  }
+
+  /** The kept list goes, because the app has just made or removed a project
+   *  folder, or written a project.json by a path of its own. */
+  forgetProducts() {
+    projectWritten();
+    this._products = null;
+  }
+
+  /** The folders in the account root, each with the stamp that says whether
+   *  what was read off it is still what is there. `repos` are the code folders
+   *  the kept answer's `code` was read from. */
+  _stampProducts(repos) {
+    const root = this.config.accountRoot;
+    let entries = null;
+    try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch { return null; }
     const wanted = this.config.products;
-    const products = [];
+    const folders = [];
+    const marks = [];
     for (const entry of entries) {
       if (entry.name.startsWith('_')) continue;
       if (wanted.length && !wanted.includes(entry.name)) continue;
@@ -105,21 +163,33 @@ export class Store {
       // store root (the combined-workspace pattern), and a Dirent reports a
       // symlink as not-a-directory, which made a symlinked product silently
       // invisible to the inbox and the supervisor.
-      let st = null;
-      try { st = fs.statSync(dir); } catch { continue; }
-      if (!st.isDirectory()) continue;
+      const st = stampable(dir);
+      marks.push(`${entry.name}=${st?.isDirectory() ? markOf(st) : 'not a folder'}`);
+      if (!st?.isDirectory()) continue;
+      folders.push({ slug: entry.name, dir });
+      marks.push(markOf(stampable(path.join(dir, 'project.json'))));
+    }
+    // A code folder's own time is the cheap way to ask whether `code` still
+    // holds: hasCode reads the names directly inside it, and nothing else.
+    for (const repo of repos) marks.push(`${repo}=${markOf(stampable(repo))}`);
+    return { stamp: marks.join('|'), folders };
+  }
+
+  _readProducts({ stamp, folders }) {
+    const live = [];
+    const all = [];
+    const repos = [];
+    for (const { slug, dir } of folders) {
       let project = null;
       try {
         project = JSON.parse(fs.readFileSync(path.join(dir, 'project.json'), 'utf8'));
       } catch {
         continue;
       }
-      if (project.archived && !includeArchived) continue;
-      products.push({
-        slug: entry.name,
-        ...(includeArchived ? { archived: project.archived === true } : {}),
+      if (project.repoPath) repos.push(project.repoPath);
+      const rest = {
         dir,
-        name: project.name || entry.name,
+        name: project.name || slug,
         oneLiner: project.oneLiner || '',
         repoPath: project.repoPath || null,
         code: hasCode(project.repoPath),
@@ -154,9 +224,12 @@ export class Store {
         // project of a person who never signs in; otherwise the cloud id that
         // is the same on every teammate's Mac (main/team/projects.mjs).
         team: teamOf(project),
-      });
+      };
+      all.push({ slug, archived: project.archived === true, ...rest });
+      if (!project.archived) live.push({ slug, ...rest });
     }
-    return products.sort((a, b) => a.name.localeCompare(b.name));
+    const byName = (a, b) => a.name.localeCompare(b.name);
+    return { live: live.sort(byName), all: all.sort(byName), repos, stamp, writes: projectWrites(), at: process.hrtime.bigint() };
   }
 
   /** ARCHIVE A PROJECT, OR BRING ONE BACK. One flag in its project.json and
@@ -906,6 +979,7 @@ export class Store {
     // writing a task in it, the same way she does in every project she already
     // has. `idea` went with the row; it had no other reader, and neither call
     // site in App.tsx ever passed one.
+    this.forgetProducts();
     this.watch(); // pick up the new directory
     return { slug };
   }
@@ -963,6 +1037,7 @@ export class Store {
     // would. The third introduction slab draws the same text, so what the
     // introduction promises is what the practice project actually has.
     fs.writeFileSync(path.join(dir, NOTE_NAME), PRACTICE_NOTE, 'utf8');
+    this.forgetProducts();
     this.watch(); // pick up the new directory
     return { slug: PRACTICE_SLUG };
   }
@@ -1008,6 +1083,7 @@ export class Store {
       if (project.archived) return { removed: false, why: 'archived, not ours to delete' };
       try {
         fs.writeFileSync(file, JSON.stringify({ ...project, archived: true }, null, 2));
+        this.forgetProducts();
         this.watch();
       } catch { /* it is out of the way or it is not; neither fails the walk */ }
       return { removed: false, why: 'archived, not ours to delete' };
@@ -1068,6 +1144,7 @@ export class Store {
       console.warn(`zero: could not remove the practice project: ${err.message}`);
       return { removed: false, why: err.message, machinery: machinery.removed };
     }
+    this.forgetProducts();
     this.watch();
     return { removed: true, machinery: machinery.removed };
   }
@@ -1635,6 +1712,7 @@ export class Store {
       const project = JSON.parse(fs.readFileSync(file, 'utf8'));
       project.oneLiner = oneLiner;
       fs.writeFileSync(file, JSON.stringify(project, null, 2));
+      this.forgetProducts();
       return true;
     } catch {
       return false; // a sidebar line is not worth failing a first run over
