@@ -3015,10 +3015,18 @@ export default function App() {
   // On a lead row by J and K, or the only thing left to be on.
   const keyLeadPicked = cardSel?.startsWith('lead/') ? allLeads.find((l) => `lead/${l.key}` === cardSel) ?? null : null;
   const keyLead = keyLeadPicked ?? (view === 'inbox' && search === null && !current && !keyCard ? heldLeads.rows[0] ?? null : null);
+  // The row above the threads is first in the walk, so the mark starts there.
+  const firstLead = view === 'inbox' && search === null && !focused ? heldLeads.rows[0] ?? null : null;
   // Anything else that moves the keyboard takes it off their row. The people
   // by name, since the list of them is a new array on every refresh.
   const pickedKey = picked.join(',');
   useEffect(() => { setCardSel(null); }, [selected, view, search, inboxDisplay.view, pickedKey]);
+  // After the line above, so on arrival the mark lands on the top row rather than being cleared off it.
+  const leadStartedOn = useRef<string | null>(null);
+  useEffect(() => {
+    if (firstLead && firstLead.key !== leadStartedOn.current && cardSel === null && selected === 0) setCardSel(`lead/${firstLead.key}`);
+    leadStartedOn.current = firstLead?.key ?? null;
+  }, [firstLead?.key]); // eslint-disable-line react-hooks/exhaustive-deps
   // A DROPPED COLUMN LEAVES THE KEYBOARD ON THE SAME THREAD. `selected` is a
   // place in the walk, and moving a column moves every place after it, so the
   // highlight jumped to another card on the drop (photographed 2026-10-02).

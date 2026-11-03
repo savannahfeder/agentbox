@@ -165,7 +165,8 @@ const PATH_RE = CODE_PATH;
 // "tomorrow 8:00 AM". The same day words the Scheduled list uses, so the row
 // and the open task never name the same moment two different ways.
 function whenLabel(ts: number, now = Date.now()): string {
-  const time = new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const d = new Date(ts);
+  const time = `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}${d.getHours() < 12 ? 'am' : 'pm'}`;
   return `${dayLabel(ts, now).toLowerCase()} ${time}`;
 }
 
@@ -2262,10 +2263,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             the line says the one thing there is to say and the press starts
             it. Same button, same place as the one below. */}
         {item.start === 'later' && onUnschedule && (
-          <button className="focus-unschedule" onClick={onUnschedule}>
-            start it now
-            <span className="dim">{' · '}not started yet</span>
-          </button>
+          <><button className="focus-unschedule" onClick={onUnschedule}>Start it now</button>
+          <span className="focus-when">Not started yet</span></>
         )}
         {item.start !== 'later' && (scheduledUntil ?? 0) > 0 && onUnschedule && (
           // The two cases want different words because the button does two
@@ -2273,13 +2272,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           // back; a row an agent parked is already right here in her inbox, so
           // "back to inbox" would name a move that does not happen. What
           // clearing an agent's park actually does is let the work start.
-          <button className="focus-unschedule" onClick={onUnschedule}>
-            {scheduledByAgent ? 'let it run now' : 'back to inbox'}
-            <span className="dim">
-              {' · '}
-              {(item.snoozedUntil ?? 0) > Date.now() ? 'in Later until' : scheduledByAgent ? 'the agent paused this until' : 'scheduled for'} {whenLabel(scheduledUntil!)}
-            </span>
-          </button>
+          <><button className="focus-unschedule" onClick={onUnschedule}>{scheduledByAgent ? 'Let it run now' : 'Back to inbox'}</button>
+          <span className="focus-when">
+            {(item.snoozedUntil ?? 0) > Date.now() ? 'In Later until' : scheduledByAgent ? 'The agent paused this until' : 'Scheduled for'} {whenLabel(scheduledUntil!)}
+          </span></>
         )}
         {/* "E close this task" AND "S remind me later" USED TO SIT HERE. They
             were the first two of three removed, and they were the two with a
@@ -2318,12 +2314,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             running inside to the front, which is the whole of what is actually
             available. Nothing public focuses one pane inside another app. */}
         {agent && !agentTakesReply && onReveal && (
-          <button className="focus-stop" onClick={onReveal}>
-            take me to it
-            <span className="dim">{' · '}opens the app it is running in</span>
-          </button>
+          <><button className="focus-stop" onClick={onReveal}>Take me to it</button>
+          <span className="focus-when">Opens the app it is running in</span></>
         )}
-        {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}>send back to agent</button>}
+        {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}>Send back to agent</button>}
         {/* "esc back" was the third one removed. Escape still closes the pane
             and so does clicking away from it. */}
       </div>
