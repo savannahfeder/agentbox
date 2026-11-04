@@ -179,10 +179,13 @@ describe('what the run is told', () => {
   afterEach(() => fs.rmSync(appDir, { recursive: true, force: true }));
 
   it('names its model and effort, and how to move to others', () => {
-    const plan = supervisor().spawnPlan({ id: 'w-1', product: 'acme', title: 'Demo video', model: 'opus', effort: 'high' }, acme());
-    const system = systemOf(plan.args);
-    expect(system).toMatch(/This thread runs on Opus 5\.5 \(`opus`\) at High effort\./);
-    expect(system).toMatch(/update_work_item/);
+    const s = supervisor({ messageRules: () => 'THE MESSAGE RULES' });
+    const system = systemOf(s.spawnPlan({ id: 'w-1', product: 'acme', title: 'Demo video', model: 'opus', effort: 'high' }, acme()).args);
+    expect(system).toMatch(/This thread runs on Opus 5\.5 \(`opus`\) at High effort\.[\s\S]*update_work_item[\s\S]*THE MESSAGE RULES/);
+  });
+
+  it('adds nothing to a run given no rules at all', () => {
+    expect(supervisor().spawnPlan({ id: 'w-1', product: 'acme', title: 'Demo video' }, acme()).args).not.toContain('--append-system-prompt');
   });
 
   it('says the engine decides when nothing is set', () => {

@@ -8575,7 +8575,9 @@ export class Supervisor {
     const messages = this.messageRules({ teammate: !!teammate });
     // The connections say what this run can reach rather than how to behave,
     // so they go above the ranked blocks and the message rules stay last.
-    const ranked = [standing, project, teammate, this.modelAndEffortLine({ model, effort, engine }), messages, adhd, teammate && howYourRunEnds()];
+    const ranked = [standing, project, teammate, messages, adhd, teammate && howYourRunEnds()].filter(Boolean);
+    // Above the message rules, and only beside other rules: a run with none gets no flag.
+    if (ranked.length) ranked.splice(messages ? ranked.indexOf(messages) : ranked.length, 0, this.modelAndEffortLine({ model, effort, engine }));
     const system = fillName([this._connectionsBrief(), ...ranked].filter(Boolean).join('\n\n'));
     // `fork` IS THE FLAG THAT MAKES IT A FORK RATHER THAN A CONTINUATION: the
     // resumed conversation is written on under a NEW id, so the row it came
