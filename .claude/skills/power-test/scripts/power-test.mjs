@@ -40,6 +40,7 @@ import { fileURLToPath } from 'node:url';
 import { readPeople, pickPeople, chaosPlan, worldAt, nextRound, restartAgain, roundOutcome, coverage, testerPrompt, projectNamedIn } from './plan.mjs';
 import { createWatcher, freeMemoryMb, readAllLines, keepEvidence, sleepTargets } from './watch.mjs';
 import { writeReport } from './report.mjs';
+import { seedArtifacts } from './artifacts.mjs';
 import { readDiary } from './diary.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -173,6 +174,10 @@ function seedHistory(state, person, count) {
     if (r === 0) lines.push({ id, ts: at + 6 * MIN, source: 'founder', patch: { runAt: now + 24 * 60 * MIN } });
     else if (r > 2) lines.push({ id, ts: at + 20 * MIN, source: 'founder', patch: { status: 'done' } });
   }
+  const first = slugs[0];
+  const withFiles = seedArtifacts({ accountRoot: state.accountRoot, slug: first, picture: path.join(REPO, 'docs', 'readme', 'priority-palette.png'), now });
+  for (const l of withFiles) ids.add(l.id);
+  byProject.get(first).push(...withFiles);
   for (const [slug, lines] of byProject) {
     const dir = machinery(state, slug);
     fs.mkdirSync(dir, { recursive: true });
