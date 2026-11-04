@@ -65,6 +65,16 @@ describe('quoted filenames keep every word', () => {
 // assertion about how fast a Mac is, and a hang is still caught in 90 seconds.
 // The child's cap stays under the test's so a real hang fails with the child's
 // own error rather than an opaque vitest timeout.
+//
+// THE PROBE'S OWN WAITS WERE THE SMALL ONES (2026-11-04, w-5ec8fa4e55). This
+// file alone reddened main on five macOS runs in a row, green on the run before
+// and the one after, with its code and everything it reads unchanged across all
+// seven; those five suites took 14 to 19 minutes against the green one's 6.5.
+// The log needs admin rights, so the fault was not read. What is mended is the
+// two waits that measured the Mac rather than the code: the driver polled 5s
+// for the result, a twentieth of the caps around it, and the browser side
+// stepped through on fixed 80ms waits. Each step the next one needs now waits
+// for the thing itself and names itself when it does not come.
 it.skipIf(process.platform !== 'darwin')('keeps mounted links and exhausted previews through five parent updates', async () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'inline-links-'));
   try {

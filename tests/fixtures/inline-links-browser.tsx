@@ -28,6 +28,16 @@ function draw(round: number, product = 'demo') {
     onNotice: (text: string) => notices.push({ round, text }),
   } as any} />));
 }
+// A step whose next step needs it waits for the thing itself, named, so a slow
+// Mac cannot make this probe wrong. Only the two checks that nothing happened
+// wait a fixed while, where waiting too little can only let them pass.
+const until = async (what: string, ready: () => unknown) => {
+  for (let i = 0; i < 400; i++) {
+    if (ready()) return;
+    await new Promise(r => setTimeout(r, 25));
+  }
+  throw new Error(`waited 10s for ${what}`);
+};
 const wait = () => new Promise(r => setTimeout(r, 80));
 (async () => {
   let videosCreated = 0;
@@ -38,12 +48,13 @@ const wait = () => new Promise(r => setTimeout(r, 80));
   });
   observer.observe(document.getElementById('root')!, { childList: true, subtree: true });
   draw(0);
-  await wait();
   const link = () => [...document.querySelectorAll('a')].find(el => el.textContent === 'the page')!;
+  await until('the message to be drawn', () => link() && document.querySelector('video'));
   const before = link();
   for (let i = 0; i < 5; i++) {
+    const tried = videosCreated;
     document.querySelector('video')?.dispatchEvent(new Event('error'));
-    await wait();
+    await until('the next place the film might be', () => videosCreated > tried || !document.querySelector('video'));
   }
   const exhausted = !document.querySelector('video');
   const attemptsBefore = videosCreated;
@@ -51,14 +62,15 @@ const wait = () => new Promise(r => setTimeout(r, 80));
   const sameNode = link() === before;
   const retriesAfterUpdates = videosCreated - attemptsBefore;
   link().click();
+  await until('the page to be asked for', () => calls.length === 1);
   await wait();
   const bigView = document.querySelector('.artifact-view')?.getAttribute('aria-label');
   [...document.querySelectorAll('a')].find(el => el.textContent === 'localhost:3002')!.click();
   [...document.querySelectorAll('a')].find(el => el.textContent === 'the missing file')!.click();
-  await wait();
+  await until('the address and the missing file to be answered', () => calls.length === 2 && notices.length === 1);
   const mediaLabel = document.querySelector('.inline-media-name')?.textContent;
   draw(6, 'other');
-  await wait();
+  await until('the same file to be looked for in the other product', () => (window as any).resolves.some((r: any) => r.product === 'other' && r.src === 'designs/demo.html'));
   const productChanged = link() !== before;
   const otherProductResolved = (window as any).resolves.some((r: any) => r.product === 'other' && r.src === 'designs/demo.html');
   observer.disconnect();

@@ -15,11 +15,15 @@ app.whenReady().then(async () => {
       onChanged: () => () => {}, commandCatalog: async () => ({commands:[]}), compactionStatus: async () => null
     }; void 0;`);
     await win.webContents.executeJavaScript(fs.readFileSync(path.join(dir, 'probe.js'), 'utf8'));
-    for (let i = 0; i < 100; i++) {
+    // 60s, under the 90s this child gets, so a probe that hangs still fails
+    // with its own words. It was 5s, the smallest budget in a chain of 5s, 90s
+    // and 120s, and it is the probe's wait rather than a measure of this Mac.
+    const until = Date.now() + 60_000;
+    while (Date.now() < until) {
       await new Promise(r => setTimeout(r, 50));
       const result = await win.webContents.executeJavaScript('window.regression');
       if (result) { console.log('LINK_RESULT=' + JSON.stringify(result)); app.exit(0); return; }
     }
-    throw new Error('Link probe timed out');
+    throw new Error('Link probe timed out after 60s');
   } catch (error) { console.error(error); app.exit(1); }
 });
