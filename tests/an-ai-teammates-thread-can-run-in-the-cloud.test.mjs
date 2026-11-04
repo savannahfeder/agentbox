@@ -15,6 +15,7 @@ import { appHome } from '../main/store/home.mjs';
 import { loadStore } from '../main/store-modules.mts';
 import { Teammates } from '../main/teammates.mts';
 import { Supervisor } from '../main/supervisor.mts';
+import { filesNamedIn } from '../main/cloud/run.mts';
 import { threadPlace } from '../renderer/src/cloud-menu.ts';
 import { teammateIdOf, YOU } from '../shared/teammates.mjs';
 
@@ -47,6 +48,32 @@ describe('where an AI teammate\'s thread may run', () => {
     expect(threadPlace(RUN, { where: 'cloud' }, cloud)).toBe('cloud');
     expect(threadPlace({ ...RUN, onMac: true }, null, cloud)).toBe('kept');
     expect(threadPlace({ ...RUN, product: 'other' }, null, cloud)).toBeNull();
+  });
+});
+
+// Run over the real store on 2026-11-04, a teammate's brief naming each
+// project's documents folder would have sent 534 files, 133 MB, ledgers
+// included, up with every cloud run: a folder a prompt names travels whole.
+describe('what a teammate\'s brief carries to the cloud', () => {
+  it('names no project\'s documents folder, so none travels, and a repository still reads as code', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-tm-carry-'));
+    const docs = path.join(root, 'accounts', 'a', 'other');
+    fs.mkdirSync(docs, { recursive: true });
+    fs.writeFileSync(path.join(docs, 'work-items.jsonl'), '{}\n');
+    const listed = [{ slug: 'p', dir: path.join(root, 'accounts', 'a', 'p'), name: 'Mine', repoPath: '/r/mine' }, { slug: 'other', dir: docs, name: 'Other', repoPath: null }];
+    const here = new Teammates({ config: { storeRoot: root, accountId: 'a' }, modules: await loadStore(), listProducts: () => listed, listItems: () => [] });
+    const ada = here.create({ starter: 'quality', product: 'p' });
+    const brief = here.briefFor({ id: 'w-a', product: 'p', labels: ['founder', `teammate:${ada.id}`, 'hop:0'] });
+    expect(brief).toContain('- Mine (yours): code at /r/mine');
+    expect(brief).toContain('- Other: no code');
+    expect(filesNamedIn(brief, { cwd: '/nowhere', roots: [root] }).filter((f) => f.startsWith(docs))).toEqual([]);
+  });
+
+  it('still carries a file it names', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-tm-carry-'));
+    const file = path.join(root, 'source.md');
+    fs.writeFileSync(file, 'a thread');
+    expect(filesNamedIn(`- ${file} (a thread)`, { cwd: '/nowhere', roots: [root] })).toEqual([file]);
   });
 });
 

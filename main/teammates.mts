@@ -801,8 +801,9 @@ export class Teammates {
     if (products.length < 2) return [];
     return [
       "## The person's projects",
-      ...products.map((p) => `- ${p.name}${p.slug === t.product ? ' (yours)' : ''}: ${p.repoPath ? `code at ${p.repoPath}` : 'no code'}${p.dir ? `, docs at ${p.dir}` : ''}`),
-      'Read any of them when your job needs it. Change files only in your own, unless the person asks.',
+      // No documents folder by path: a cloud run is sent every folder its brief names.
+      ...products.map((p) => `- ${p.name}${p.slug === t.product ? ' (yours)' : ''}: ${p.repoPath ? `code at ${p.repoPath}` : 'no code'}`),
+      'Read any of them when your job needs it; list_documents and read_document open any project\'s documents by its name. Change files only in your own, unless the person asks.',
       '',
     ];
   }
