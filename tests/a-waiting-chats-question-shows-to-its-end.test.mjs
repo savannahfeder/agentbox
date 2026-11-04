@@ -8,11 +8,11 @@
 // Seen in the power test's first pass over a copy with eight waiting chats.
 //
 // The question is already kept short where it is read (ASK_CHARS in
-// shared/agent-import.mjs), so the line may wrap rather than be cut.
+// shared/agent-import.mts), so the line may wrap rather than be cut.
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { howTheChatEnded } from '../shared/agent-import.mjs';
+import { howTheChatEnded } from '../shared/agent-import.mts';
 
 const css = fs.readFileSync(new URL('../renderer/src/styles.css', import.meta.url), 'utf8');
 const rule = (sel) => {

@@ -26,7 +26,7 @@ import { startingVisibility, startingChosen } from '../renderer/src/threads/comp
 import { ProjectsPage } from '../renderer/src/components/ProjectsPage.tsx';
 import { ProjectShare, ProjectWho, seenByWords } from '../renderer/src/team/ProjectShare.tsx';
 import { TeamContext } from '../renderer/src/team/people.tsx';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 globalThis.React = React;
 
 const SINCE = 1_000_000;
@@ -218,7 +218,7 @@ describe('the store keeps it in the project', () => {
   });
   it('and the window can reach it', () => {
     const preload = fs.readFileSync(new URL('../preload.cjs', import.meta.url), 'utf8');
-    const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+    const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
     expect(preload).toMatch(/projectSeenBy: \(payload\) => ipcRenderer\.invoke\('zero:project-seen-by', payload\)/);
     expect(ipc).toMatch(/ipcMain\.handle\('zero:project-seen-by'/);
   });

@@ -6,7 +6,7 @@ import { cancelInvite, inviteTo, joinTeam, readTeam, removeFromTeam, type PhoneT
 import { useCloud } from '../state/cloud';
 import { Aside, Button, Group, Row } from './SettingsParts';
 import { T } from './parts';
-import { color, font } from './theme';
+import { color, corner, font } from './theme';
 
 const message = (err: unknown) => String((err as Error)?.message ?? err);
 
@@ -57,7 +57,7 @@ export function TeamPage() {
           <Group label="Invite people">
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }}>
               <TextInput value={email} onChangeText={setEmail} placeholder="Their email" placeholderTextColor={color.faint} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" inputMode="email"
-                style={{ flex: 1, height: 36, color: color.text, fontFamily: font.regular, fontSize: 15, paddingHorizontal: 10, borderWidth: 1, borderColor: color.line, backgroundColor: color.field }} />
+                style={{ flex: 1, height: 36, color: color.text, fontFamily: font.regular, fontSize: 15, paddingHorizontal: 10, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.field }} />
               <Button title="Invite" disabled={busy || !email.trim()} onPress={async () => { if (await run(() => inviteTo(cloud!, team.id, email))()) setEmail(''); }} />
             </View>
           </Group>

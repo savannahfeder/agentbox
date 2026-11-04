@@ -7,7 +7,7 @@
 // back, it is turned off only in Settings, it stays out of the way while you
 // are in the app itself, and it goes wherever you drag it.
 //
-// Measured against shared/corner-tag.mjs, the rules the floating window and
+// Measured against shared/corner-tag.mts, the rules the floating window and
 // its page both follow. The cases are the ones that decide what you see: the
 // count either side of zero, a hide that has just run out and one that has
 // not, midnight, and a tag dragged to every quarter of the screen.
@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import {
   HIDE_CHOICES, hiddenUntil, tagSays, tagShows, waitedFor, cardLines, readyNow,
   restingSpot, keepCorner, cardPlacement, MARGIN,
-} from '../shared/corner-tag.mjs';
+} from '../shared/corner-tag.mts';
 
 const area = { x: 0, y: 0, width: 1728, height: 1080 };
 

@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { howYourRunEnds } from '../shared/teammates.mjs';
 import { messageDocuments } from '../renderer/src/message-artifacts.ts';
 
@@ -95,7 +95,7 @@ describe('the card a document gets', () => {
 });
 
 describe('the brief itself', () => {
-  const brief = fs.readFileSync(new URL('../main/teammates.mjs', import.meta.url), 'utf8');
+  const brief = fs.readFileSync(new URL('../main/teammates.mts', import.meta.url), 'utf8');
 
   it('no longer asks a teammate for a bold first line', () => {
     expect(brief).not.toMatch(/bold first line/);

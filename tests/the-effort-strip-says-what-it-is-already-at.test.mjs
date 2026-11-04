@@ -1,6 +1,6 @@
 // THE EFFORT STRIP SAYS WHAT THE RUN IS ALREADY AT, INSTEAD OF SAYING NOTHING.
 //
-// WHY IT WAS BLANK, AND WHY THAT WAS RIGHT AT THE TIME. shared/effort-levels.mjs
+// WHY IT WAS BLANK, AND WHY THAT WAS RIGHT AT THE TIME. shared/effort-levels.mts
 // says it outright: "a level nobody picked is the engine's own choice for the
 // model... and this app does not know what that is per model, so it does not
 // claim to." An app that lit a word it had guessed would be worse than a blank
@@ -8,7 +8,7 @@
 //
 // SO THE FIX IS TO KNOW, NOT TO GUESS, and both engines publish the answer per
 // model. Codex's cache has carried `default_reasoning_level` all along, on the
-// same row as the name (main/codex-models.mjs). Claude Code's catalog carries
+// same row as the name (main/codex-models.mts). Claude Code's catalog carries
 // `default_effort` beside the display name, which main/claude-models.mjs now
 // reads in the same pass. MEASURED out of 2.1.280 on 2026-09-22 and it genuinely
 // differs per model: Opus 5.5 medium, Opus 5 high, Opus 4.7 xhigh, Sonnet 5

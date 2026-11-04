@@ -136,7 +136,7 @@ describe('asking for the middle back', () => {
     const agent = read('renderer/src/components/AgentThread.tsx');
     expect(agent).toMatch(/api\.agentConversation\(\{ pid, sessionId, cwd, whole \}\)/);
     expect(agent).toMatch(/if \(shown\.current !== which\) \{ setState\(null\); shown\.current = which; \}/);
-    expect(read('main/agents.mjs')).toMatch(/threadWindow\(turns, \{ whole: !!whole \}\)/);
+    expect(read('main/agents.mts')).toMatch(/threadWindow\(turns, \{ whole: !!whole \}\)/);
   });
 });
 

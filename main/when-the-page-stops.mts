@@ -29,9 +29,9 @@ interface PageWindow {
   isDestroyed(): boolean;
 }
 
-interface PageDialog {
-  showMessageBox(window: PageWindow, options: {
-    type: string;
+interface PageDialog<W = PageWindow> {
+  showMessageBox(window: W, options: {
+    type: 'none' | 'info' | 'error' | 'question' | 'warning';
     message: string;
     detail: string;
     buttons: string[];
@@ -45,10 +45,10 @@ interface PageLog {
   warn?: (message: string) => void;
 }
 
-export function keepThePageAlive(
+export function keepThePageAlive<W extends PageWindow>(
   { window, dialog, name, onRevived, report = () => {}, now = Date.now, log = console }: {
-    window: PageWindow;
-    dialog: PageDialog;
+    window: W;
+    dialog: PageDialog<NoInfer<W>>;
     name: string;
     onRevived: (line: string) => void;
     report?: (kind: string, error: Error) => void;

@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { runnerOf, mayRunHere } from '../shared/team-rules.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const MAYA = 'p-maya';
 const THEO = 'p-theo';

@@ -8,7 +8,7 @@
 // adding a harness meant a third file and three hundred lines of test.
 //
 // WHAT IS KEPT HERE is the vocabulary the rest of the app already imports --
-// main/config.mjs, main/settings.mjs, scripts/read-claude-commands.mjs,
+// main/config.mjs, main/settings.mts, scripts/read-claude-commands.mjs,
 // scripts/read-claude-models.mjs -- plus `askShell` and `shellProbes`, which
 // several tests reach for through this file because Claude Code is the binary the
 // app will not open an inbox without.

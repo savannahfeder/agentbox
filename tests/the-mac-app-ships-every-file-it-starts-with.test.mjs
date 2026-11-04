@@ -1,10 +1,10 @@
 // THE MAC APP SHIPS EVERY FILE IT STARTS WITH.
 //
-// The Linux pull request (2026-10-07) gave main/main.mjs a top-level import of
+// The Linux pull request (2026-10-07) gave main/main.mts a top-level import of
 // ../scripts/linux-launcher.mjs. A checkout has that file, so every test was
 // green, but the packaged app is built from package.json `build.files` and the
 // npx package from `files`, and neither lists it. A dmg built from that commit
-// would have failed to load main.mjs and never opened a window, on every Mac.
+// would have failed to load main.mts and never opened a window, on every Mac.
 // Found by reading `build.files` against the import, not by a failing test,
 // which is why this one exists.
 //
@@ -72,7 +72,7 @@ describe('the import reader', () => {
   });
 
   it('reads the file lists the way they are written', () => {
-    expect(carries(pkg.build.files, 'main/main.mjs')).toBe(true);
+    expect(carries(pkg.build.files, 'main/main.mts')).toBe(true);
     expect(carries(pkg.build.files, 'scripts/approval-server.sh')).toBe(true);
     expect(carries(pkg.build.files, 'scripts/linux-launcher.mjs')).toBe(false);
     expect(carries(pkg.build.files, 'briefs/founder.md')).toBe(false);

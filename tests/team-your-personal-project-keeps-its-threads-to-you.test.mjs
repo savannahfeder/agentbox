@@ -20,14 +20,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { cardsFor, shownToTeam, visibilityOf } from '../shared/thread-cards.mjs';
-import { ensurePersonalProject, markShared, PERSONAL_FLAG } from '../main/team/projects.mjs';
+import { ensurePersonalProject, markShared, PERSONAL_FLAG } from '../main/team/projects.mts';
 import { rowSharing, teamEntries } from '../renderer/src/threads/page-rules.ts';
 import { whoSees } from '../renderer/src/threads/summary-rules.ts';
 import { startingVisibility } from '../renderer/src/threads/composer-rules.ts';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamService } from '../main/team/index.mjs';
+import { Store } from '../main/store.mts';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
 
 const SINCE = 1_000_000;
@@ -189,7 +189,7 @@ describe('in the app', () => {
   // These two said the opposite, and they were right about the old app: it was
   // made in `signedIn()` and nowhere else, which is exactly why a Mac with no
   // team cloud opened on no projects at all and Send did nothing. Boot makes it
-  // now (main/main.mjs), so what the team service owes this project is only
+  // now (main/main.mts), so what the team service owes this project is only
   // that it leaves it alone.
   it('the store says which project is My Workspace, and signing in does not make a second', async () => {
     const cloud = createMemoryCloud();

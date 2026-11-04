@@ -137,7 +137,7 @@ describe('an agent told about the file', () => {
     expect(editedFilesLine([said(), edit(), mine])).toBeNull();
   });
   it('the line rides in every run\'s system prompt', () => {
-    expect(read('main/supervisor.mjs')).toMatch(/this\.teamLookLine\(item\.product, product\), this\.editedFilesLine\(item\)/);
+    expect(read('main/supervisor.mts')).toMatch(/this\.teamLookLine\(item\.product, product\), this\.editedFilesLine\(item\)/);
   });
 });
 

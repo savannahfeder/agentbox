@@ -13,8 +13,8 @@
 // This module is the part with no React in it, so the walk can be tested
 // without a window.
 
-import { PRACTICE_NAME, PRACTICE_TASK } from '../../shared/first-run-practice.mjs';
-import { titleFromFileName } from '../../shared/name-words.mjs';
+import { PRACTICE_NAME, PRACTICE_TASK } from '../../shared/first-run-practice.mts';
+import { titleFromFileName } from '../../shared/name-words.mts';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { DONE } from './done-word';
 // The walk's own question card, and the one answer this file shares with it:
@@ -537,7 +537,7 @@ export function projectsOfTheirOwn(products: Array<{ personal?: boolean }>): num
 //
 // So the question is now one whose answer is always there to be read, and the
 // sentence that answers it is ours with their numbers in it
-// (shared/first-run-shape.mjs). Correct on 29 of 29, in a median of 7.5ms.
+// (shared/first-run-shape.mts). Correct on 29 of 29, in a median of 7.5ms.
 // AND ON 2026-08-23 IT MOVED AGAIN, INTO THE PRACTICE PROJECT. Everything
 // above is still true of the old task and none of it is true of this one, so
 // the reasoning is kept rather than deleted: the readme-reading answer exists
@@ -545,11 +545,11 @@ export function projectsOfTheirOwn(products: Array<{ personal?: boolean }>): num
 // against a folder at all. As in Superhuman, the practice project is still the
 // whole UI. A task sent inside a project that is not theirs cannot
 // honestly report on their code, so the question and the answer are both
-// written down in shared/first-run-practice.mjs, and the answer is a decision
+// written down in shared/first-run-practice.mts, and the answer is a decision
 // an agent made on its own — which is the shape the very next beat teaches
 // them to close.
 //
-// main/first-run.mjs and shared/first-run-shape.mjs are UNCHANGED and still
+// main/first-run.mts and shared/first-run-shape.mts are UNCHANGED and still
 // read a folder: that path is what answers a task in a real project, and the
 // walk simply no longer sends one there.
 export const TASK_TITLE = PRACTICE_TASK.title;
@@ -570,7 +570,7 @@ export const SLOW_AFTER_MS = 15_000;
 //
 // So the row, the reading pane, the ledger and the result are all real, and the
 // answer is read out of the folder chosen two screens earlier: see
-// main/first-run.mjs. Nothing about it can queue, stall or need the network.
+// main/first-run.mts. Nothing about it can queue, stall or need the network.
 
 /**
  * The mark on the walk's own row. The supervisor never spawns fresh work on a
@@ -627,7 +627,7 @@ export function walkRows<T extends { id: string }>(rows: T[], run: FirstRun | nu
   // examples afterward; don't make the inbox mysteriously empty when creation
   // begins."
   // The backdrop is no longer sifted by state here (2026-10-24): nothing in it
-  // needs you, so there is no half to leave out (shared/first-run-practice.mjs).
+  // needs you, so there is no half to leave out (shared/first-run-practice.mts).
   if (WITH_EXAMPLES.includes(run.step)) {
     const keep = new Set([...(run.examples ?? []), run.item, ...(run.backdrop ?? [])].filter(Boolean) as string[]);
     return rows.filter((r) => keep.has(r.id));
@@ -688,7 +688,7 @@ export function walkRows<T extends { id: string }>(rows: T[], run: FirstRun | nu
 
    `waiting` is a field on the row rather than a guess from its kind, because
    which of the three is stopped is the whole content of the lesson and it must
-   not be inferable wrongly. See shared/first-run-practice.mjs.
+   not be inferable wrongly. See shared/first-run-practice.mts.
 */
 
 /**
@@ -922,7 +922,7 @@ export function pressAtWrongRow(beat: string[], pointed: string | null | undefin
 // what an inbox holds.
 
 // The three rows themselves are written by the main process and their copy
-// lives in shared/first-run-examples.mjs, so there is one place they are said.
+// lives in shared/first-run-examples.mts, so there is one place they are said.
 
 /**
  * WHETHER BEAT EIGHT IS OVER. It is over when none of the three is left in the
@@ -969,7 +969,7 @@ export const COPY = {
   // AND IT NO LONGER ASSUMES A CODE FOLDER (2026-10-01). An assistant has no
   // project folder and the screen had no way past it. `folderNone` is that way
   // past: the project is made with no folder, and its agents work in a folder
-  // the app keeps for it (`productFolder` in main/supervisor.mjs falls back to
+  // the app keeps for it (`productFolder` in main/supervisor.mts falls back to
   // the project's own directory in the store).
   folderHead: 'Pick a folder for your first project.',
   folderLede: 'Agents can read and change the files in it. Any folder of documents works.',
@@ -1230,7 +1230,7 @@ export const COPY = {
   // itself. What is new is that Agentbox knows they are there and remembers
   // which ones this project is for.
   //
-  // Every name on that list was read off her own Mac by main/agent-files.mjs
+  // Every name on that list was read off her own Mac by main/agent-files.mts
   // and nothing on the card said so, so the only honest reading of four
   // unfamiliar names on a setup screen is that they are samples. The line names
   // where they came from, and the folder each side was read out of is printed
@@ -1874,7 +1874,7 @@ export function coach(
        right to close and the stopped one is right to answer, so teaching S on
        either would be teaching a key on a row it is wrong for. The fourth
        practice row is real work that is nobody's emergency, and it is the shape
-       S exists for: see `later` in shared/first-run-practice.mjs.
+       S exists for: see `later` in shared/first-run-practice.mts.
 
        TWO HALVES, LIKE `unblock`. The first is the row in the list, where the
        press happens; the second is the picker that opens over it, because a
@@ -3165,7 +3165,7 @@ export function forcedStep(param: string | null): Step | null {
 // ---------------------------------------------------------------------------
 // THE LAST SCREEN: THE USER'S CLAUDE CODE AGENTS.
 //
-// The files are read in the main process (main/agent-files.mjs); everything
+// The files are read in the main process (main/agent-files.mts); everything
 // here is the part with no window in it, so the screen's shape is tested
 // rather than eyeballed.
 //

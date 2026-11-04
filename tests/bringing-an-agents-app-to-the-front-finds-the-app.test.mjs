@@ -1,6 +1,6 @@
 // BRINGING AN AGENT'S APP TO THE FRONT FINDS THE APP.
 //
-// w-a358961e3e, 2026-10-15, found while trimming comments in main/agents.mjs.
+// w-a358961e3e, 2026-10-15, found while trimming comments in main/agents.mts.
 // `owningApp` called the async `processTable()` without awaiting it, so it
 // called `.get` on a Promise and threw on every call. The IPC handler caught
 // the throw and answered "cannot tell which window it is running in", so the
@@ -12,7 +12,7 @@
 // `open` runs.
 
 import { describe, it, expect } from 'vitest';
-import { owningApp, reveal } from '../main/agents.mjs';
+import { owningApp, reveal } from '../main/agents.mts';
 
 describe('finding the app an agent runs inside', () => {
   it('answers for a live process instead of throwing', async () => {

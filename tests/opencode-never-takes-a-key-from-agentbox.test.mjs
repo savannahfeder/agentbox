@@ -17,11 +17,11 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { harnessFor } from '../main/harnesses.mjs';
+import { harnessFor } from '../main/harnesses.mts';
 import { harnessDefinition } from '../shared/harness-definitions.mjs';
-import { openCodePermissionConfig } from '../main/opencode.mjs';
-import { writePermissionConfig } from '../main/harnesses/opencode.mjs';
-import { splitModel } from '../main/opencode-server.mjs';
+import { openCodePermissionConfig } from '../main/opencode.mts';
+import { writePermissionConfig } from '../main/harnesses/opencode.mts';
+import { splitModel } from '../main/opencode-server.mts';
 
 const harness = () => harnessFor('opencode');
 

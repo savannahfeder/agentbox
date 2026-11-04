@@ -5,7 +5,7 @@ A harness owns its native protocol, account home, models, commands, and session
 state. The shared definitions contain names, flags, and capabilities; the main
 process registry contains executable adapters. The renderer never imports it.
 
-`main/harnesses.mjs` lists the operations and validates registrations. Reads
+`main/harnesses.mts` lists the operations and validates registrations. Reads
 such as usage can report `{ supported: false }`. Unsupported actions throw
 before doing anything. Unknown explicit engines are refused at this boundary;
 legacy recovery records retain the supervisor's existing Claude normalization.
@@ -154,8 +154,8 @@ requires the corresponding product policy review before admission.
 ## OpenCode: what was measured, and what billing turned out to be
 
 Measured against a real OpenCode 1.18.35 on 2026-10-07. The code is
-`main/harnesses/opencode.mjs`, `main/opencode.mjs` and
-`main/opencode-server.mjs`; it is registered and **not admitted**, so no row
+`main/harnesses/opencode.mts`, `main/opencode.mts` and
+`main/opencode-server.mts`; it is registered and **not admitted**, so no row
 can choose it and no picker draws it (`admitted: false`,
 shared/harness-definitions.mjs, filtered in shared/engines.mjs).
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // What the cloud runs on this Mac have used, from ~/.agentbox/cloud-usage.jsonl
-// (main/cloud/usage.mjs): agent-hours, the estimated AWS cost, and the cost per
+// (main/cloud/usage.mts): agent-hours, the estimated AWS cost, and the cost per
 // agent-hour the plan limits are set from.
 //   node scripts/cloud-usage.mjs            this month
 //   node scripts/cloud-usage.mjs --days 7   the last seven days
-import { readCloudUsage, summarizeCloudUsage } from '../main/cloud/usage.mjs';
+import { readCloudUsage, summarizeCloudUsage } from '../main/cloud/usage.mts';
 
 const i = process.argv.indexOf('--days');
 const days = i > 0 ? Number(process.argv[i + 1]) : null;

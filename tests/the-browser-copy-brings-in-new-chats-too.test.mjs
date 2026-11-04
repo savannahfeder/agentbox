@@ -2,7 +2,7 @@
 //
 // Setup's last screen ends on "Keep bringing in new chats from Claude Code and
 // Codex", and Settings has the same switch. The watch that does the bringing
-// was started in main/main.mjs only, so in the browser copy (bin/agentbox.mjs,
+// was started in main/main.mts only, so in the browser copy (bin/agentbox.mjs,
 // `npx agentbox-app`) the tick was saved and nothing ever came in. Found while
 // setting up the power test for w-62228098e6, whose copies are that browser
 // copy.
@@ -15,8 +15,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
-import { QUIET_MS, watchNewChatsFor } from '../main/new-chats-watch.mjs';
+import { Store } from '../main/store.mts';
+import { QUIET_MS, watchNewChatsFor } from '../main/new-chats-watch.mts';
 
 const read = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 
@@ -29,7 +29,7 @@ describe('both ways of running the app start the watch', () => {
   });
 
   it('the desktop starts the same wiring rather than its own', () => {
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).toMatch(/const newChatsWatch = watchNewChatsFor\(\{ store, config, supervisor \}\)/);
     expect(main).not.toMatch(/startNewChatsWatch\(/);
   });

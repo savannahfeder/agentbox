@@ -5,8 +5,8 @@
 // not a failed send. It is saved as an ordinary reply, left undelivered, so the
 // session's exit or the next tick starts the run that carries it.
 import {it,expect} from 'vitest';import {EventEmitter} from 'node:events';
-import {attachClaudeInput,TURN_CLOSED} from '../main/claude-input.mjs';
-import {submitReply} from '../main/live-replies.mjs';
+import {attachClaudeInput,TURN_CLOSED} from '../main/claude-input.mts';
+import {submitReply} from '../main/live-replies.mts';
 function fake(){const c=new EventEmitter();c.stdout=new EventEmitter();c.stdin={writable:true,write:()=>true,end:()=>{c.stdin.writable=false;},on:()=>{}};return c;}
 function supervisor(child){return {sessions:new Map([['w',{product:'p',child}]]),_handledAnswers:new Set(),_answerKey:i=>i.answer,_saveState(){}};}
 it('marks a send after the result as too late, not as a failure',async()=>{const c=fake();attachClaudeInput(c);c.stdout.emit('data',JSON.stringify({type:'result'})+'\n');await expect(c.steer('late')).rejects.toMatchObject({code:TURN_CLOSED});});

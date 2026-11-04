@@ -31,10 +31,10 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { readSettings } from '../main/settings.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { readSettings } from '../main/settings.mts';
 import { forgetDiscovery } from '../main/account-discovery.mjs';
-import { limitResetsAt, limitResetMoment, deadRunSentence } from '../shared/spawn-trouble.mjs';
+import { limitResetsAt, limitResetMoment, deadRunSentence } from '../shared/spawn-trouble.mts';
 
 // The line Claude Code printed on the login that hit the limit, copied off the
 // run that started this.

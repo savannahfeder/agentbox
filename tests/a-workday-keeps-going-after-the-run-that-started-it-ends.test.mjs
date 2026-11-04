@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { detachedArgv } from '../.claude/skills/product-loop/scripts/workday.mjs';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const WORKDAY = path.resolve(__dirname, '../.claude/skills/product-loop/scripts/workday.mjs');
 
@@ -40,7 +41,7 @@ describe('a detached workday', () => {
   it('returns at once, runs in its own process group, and writes its report after the starter has gone', async () => {
     const out = fs.mkdtempSync(path.join(os.tmpdir(), 'workday-detach-'));
     try {
-      const said = execFileSync(process.execPath, [WORKDAY, '--detach', '--who', 'founder', '--engine', 'external',
+      const said = execFileSync(process.execPath, [...stripTypesFlags(), WORKDAY, '--detach', '--who', 'founder', '--engine', 'external',
         '--url', 'http://127.0.0.1:9/', '--stretches', '0', '--out', out], { encoding: 'utf8', timeout: 20_000 });
       const pid = Number(said.match(/pid (\d+)/)?.[1]);
       expect(pid).toBeGreaterThan(0);

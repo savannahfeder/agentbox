@@ -18,7 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { threadPlace } from '../renderer/src/cloud-menu.ts';
 import { threadMenuRows, ThreadMenu } from '../renderer/src/threads/ThreadMenu.tsx';
 import { placeView, PlaceButton } from '../renderer/src/threads/PlaceButton.tsx';

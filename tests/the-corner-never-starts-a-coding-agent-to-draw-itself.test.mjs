@@ -2,7 +2,7 @@
 //
 // A meter that spawns a process to fill itself in is the reading paying for
 // itself, and this app already has the cautionary tale written down.
-// main/claude-usage.mjs opens on it: `claude -p '/usage'` was TIMED TWICE at
+// main/claude-usage.mts opens on it: `claude -p '/usage'` was TIMED TWICE at
 // 23.2s and 28.0s, and running it in the wrong folder raised macOS permission
 // prompts for a network volume and the Music library ten seconds into a
 // session whose only job was to print a percentage.
@@ -58,7 +58,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CodexUsage } from '../main/codex-usage.mjs';
+import { CodexUsage } from '../main/codex-usage.mts';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (p) => readFileSync(join(root, p), 'utf8');
@@ -96,7 +96,7 @@ describe('the corner asks the app-server for nothing', () => {
   // means re-adding the wiring -- which is what brings somebody back to the
   // paragraph at the top of this file.
   it('has no way to reach the app-server at all', () => {
-    const reader = code('main/codex-usage.mjs');
+    const reader = code('main/codex-usage.mts');
     expect(reader).not.toContain('account/rateLimits/read');
     expect(reader).not.toContain('.request(');
     expect(reader).not.toContain('client');
@@ -105,7 +105,7 @@ describe('the corner asks the app-server for nothing', () => {
   // AND NOWHERE ELSE IN THE APP EITHER. The method name is the thing to search
   // for: one occurrence anywhere in shipped code is the call being back.
   it('is not asked for anywhere in the app', () => {
-    for (const file of ['main/codex-usage.mjs', 'shared/codex-usage.mjs', 'main/supervisor.mjs', 'main/ipc.mjs', 'main/codex-app-server.mjs']) {
+    for (const file of ['main/codex-usage.mts', 'shared/codex-usage.mts', 'main/supervisor.mts', 'main/ipc.mts', 'main/codex-app-server.mjs']) {
       expect(code(file)).not.toContain('account/rateLimits/read');
     }
   });
@@ -114,7 +114,7 @@ describe('the corner asks the app-server for nothing', () => {
   // feed that read; leaving it behind would be the dead half of a removed
   // feature, and the next reader would wire it back up because it is there.
   it('is not handed an app-server by the supervisor', () => {
-    const sup = code('main/supervisor.mjs');
+    const sup = code('main/supervisor.mts');
     expect(sup).not.toContain('liveCodexClient');
     expect(sup).toContain('this._codexLimits = new CodexUsage({');
     expect(sup).not.toMatch(/new CodexUsage\(\{[^}]*client:/s);
@@ -144,7 +144,7 @@ describe('the corner asks the app-server for nothing', () => {
   // ban on the app-server having a `request` at all: `config/read` still goes
   // down that pipe, for the thread that is about to run.
   it('does not stop a worker asking the app-server what it needs to run', () => {
-    expect(code('main/supervisor.mjs')).toContain("client.request('config/read', {})");
+    expect(code('main/supervisor.mts')).toContain("client.request('config/read', {})");
   });
 });
 
@@ -173,7 +173,7 @@ describe('the reading it does have comes from the push alone', () => {
   // A READING OUTLIVES THE PROCESS THAT GAVE IT. The app-server going down is
   // how every Codex run ends, and a corner that empties itself each time the
   // fleet drains is worse than one that is five minutes behind -- the same
-  // judgement main/claude-usage.mjs makes when its command fails.
+  // judgement main/claude-usage.mts makes when its command fails.
   it('is kept once the app-server that pushed it has gone', () => {
     let clock = 1_000_000;
     const usage = new CodexUsage({ home: () => '/h', now: () => clock });
@@ -187,7 +187,7 @@ describe('the reading it does have comes from the push alone', () => {
 
 describe('a reading belongs to the login that gave it', () => {
   // CODEX_HOME is the variable that names which account pays
-  // (`_codexServer` in main/supervisor.mjs). Showing one login's percentage over
+  // (`_codexServer` in main/supervisor.mts). Showing one login's percentage over
   // another login's work is this whole slice's defect, one level down.
   it('is dropped rather than redrawn when the login moves', () => {
     let home = '/one';
@@ -221,7 +221,7 @@ describe('a reading belongs to the login that gave it', () => {
   });
 
   // A PUSH REDRAWS THE WINDOW, and only when the figures really moved. The same
-  // rule main/claude-usage.mjs follows: never called for a refresh that changed
+  // rule main/claude-usage.mts follows: never called for a refresh that changed
   // nothing.
   it('tells the window when the figures move, and not when they do not', () => {
     const said = [];
@@ -236,11 +236,11 @@ describe('a reading belongs to the login that gave it', () => {
 });
 
 describe('the Claude spawn is behind the corner\'s own answer', () => {
-  // main/ipc.mjs cannot be loaded here -- it imports electron at module scope --
+  // main/ipc.mts cannot be loaded here -- it imports electron at module scope --
   // so this is asserted as source, which is what the rest of this repo does for
   // wiring with no pure function under it.
   it('asks for the Claude reading only on a snapshot whose corner is Claude Code', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     expect(ipc).toContain('usageFor === DEFAULT_ENGINE ? usage.read() : supervisor.codexUsage()');
     // AND NOWHERE ELSE. One asking of it in the whole file, inside that branch,
     // is what makes the spawn unaskable rather than merely usually-unasked.

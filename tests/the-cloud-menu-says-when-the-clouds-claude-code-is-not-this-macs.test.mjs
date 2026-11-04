@@ -15,8 +15,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { cloudVersionGaps } from '../shared/cloud-versions.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { cloudVersionGaps } from '../shared/cloud-versions.mts';
 import { cloudFootLine } from '../renderer/src/cloud-menu';
 
 let tmp;

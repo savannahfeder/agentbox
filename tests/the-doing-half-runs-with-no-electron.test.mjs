@@ -8,12 +8,12 @@
 //
 // The failure this guards is quiet and it is one line. Somebody adds a channel
 // that wants a menu, or a tray icon, or a BrowserWindow, types
-// `import { Menu } from 'electron'` at the top of main/ipc.mjs, and every test
+// `import { Menu } from 'electron'` at the top of main/ipc.mts, and every test
 // here still passes, because in plain Node that import resolves to a path
 // string instead of throwing. The desktop app keeps working. The browser route
 // breaks the next time anybody runs it, and nothing says so.
 //
-// So this file does both halves: it asserts structurally that ipc.mjs takes its
+// So this file does both halves: it asserts structurally that ipc.mts takes its
 // Electron through the door rather than importing it, and it then boots the
 // whole doing half in this process, with no Electron loaded, and drives it over
 // http the way a tab would.
@@ -25,13 +25,13 @@ import path from 'node:path';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 
-import { bootHeadless, createServer, newToken, nodeHost, broadcastingWindow } from '../main/serve.mjs';
+import { bootHeadless, createServer, newToken, nodeHost, broadcastingWindow } from '../main/serve.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(here, '..');
 
-describe('main/ipc.mjs', () => {
-  const source = fs.readFileSync(path.join(repoRoot, 'main', 'ipc.mjs'), 'utf8');
+describe('main/ipc.mts', () => {
+  const source = fs.readFileSync(path.join(repoRoot, 'main', 'ipc.mts'), 'utf8');
 
   it('does not import electron', () => {
     // Both spellings, because `require('electron')` would do the same damage.
@@ -40,7 +40,7 @@ describe('main/ipc.mjs', () => {
   });
 
   it('says so plainly when a caller forgets the host', async () => {
-    const { registerIpc } = await import('../main/ipc.mjs');
+    const { registerIpc } = await import('../main/ipc.mts');
     expect(() => registerIpc({ store: {}, supervisor: {}, config: {}, window: {} }))
       .toThrow(/host/);
   });
@@ -106,7 +106,7 @@ describe('the doing half, booted with no Electron', () => {
   // answered 2026-10-24). A page whose own hostname resolves to this machine
   // can reach this port — any page can, which is why there is a token at all —
   // and it still gets nothing without one. The usual extra guard, refusing a
-  // Host that is not localhost, cannot go in: main/phone-link.mjs serves this
+  // Host that is not localhost, cannot go in: main/phone-link.mts serves this
   // same handler to a phone through a relay or over Tailscale, where the Host
   // is neither. So this pins both halves rather than leaving it to a comment.
   it('asks for the token whatever name the request arrives under', async () => {
@@ -155,7 +155,7 @@ describe('the stand-ins for the three Electron things', () => {
     // WAS WRONG. A browser cannot be handed a path by the operating system, but
     // nothing here needs it to be: this process reads the disk, and the screen
     // draws its own picker on `zero:list-folders`. `noDialog` says only that
-    // there is no Mac dialog behind this. See main/folders.mjs.
+    // there is no Mac dialog behind this. See main/folders.mts.
     expect(answer.noDialog).toBe(true);
     expect(answer.refused).toBeUndefined();
   });

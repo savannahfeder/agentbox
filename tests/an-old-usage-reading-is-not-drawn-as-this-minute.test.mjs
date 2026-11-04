@@ -13,7 +13,7 @@
 //
 //   A window whose reset has gone past is not drawn. We know what the window
 //   that ENDED was at; we know nothing about the one running now, and the
-//   dashboard law in shared/codex-usage.mjs ("absence of data and a real zero
+//   dashboard law in shared/codex-usage.mts ("absence of data and a real zero
 //   are different facts") covers a spent window as much as an unread one. A
 //   couple of minutes of grace keeps a live countdown from flickering out as
 //   it crosses zero.
@@ -30,9 +30,9 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { limitRows, limitsStillRunning, usageSentence } from '../shared/usage.mjs';
+import { limitRows, limitsStillRunning, usageSentence } from '../shared/usage.mts';
 import { UsagePill, agentsInUse } from '../renderer/src/components/UsagePill.tsx';
-import { CodexUsage } from '../main/codex-usage.mjs';
+import { CodexUsage } from '../main/codex-usage.mts';
 globalThis.React = React;
 
 const read = (p) => fs.readFileSync(new URL(p, import.meta.url), 'utf8');

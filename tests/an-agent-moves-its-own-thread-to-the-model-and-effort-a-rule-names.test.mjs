@@ -14,10 +14,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { effortWord, modelWord } from '../shared/model-words.mjs';
+import { spawnSync } from 'node:child_process';
+import { Supervisor } from '../main/supervisor.mts';
+import { EFFORT_LEVELS as THE_APPS_LEVELS } from '../shared/effort-levels.mts';
+import { EFFORT_LEVELS, effortWord, modelWord } from '../shared/model-words.mjs';
 
 describe('the words an agent may write', () => {
+  it('are the app\'s own effort levels', () => {
+    expect(EFFORT_LEVELS).toEqual(THE_APPS_LEVELS);
+  });
+
+  // Merged onto the move to TypeScript, this file imported a level list that
+  // had become .mts, and mcp/tools.mjs could not load: no agent had store tools.
+  it('load on plain Node, where the store tools start', () => {
+    const tools = new URL('../mcp/tools.mjs', import.meta.url).href;
+    const run = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(tools)})`], { encoding: 'utf8', timeout: 30_000 });
+    expect(run.stderr).toBe('');
+    expect(run.status).toBe(0);
+  });
+
   it('reads a model by alias, id or the name on screen', () => {
     expect(modelWord('opus')).toEqual({ model: 'opus' });
     expect(modelWord('Opus 5.5')).toEqual({ model: 'opus' });
@@ -114,7 +129,8 @@ describe('the next turn after an agent moves its own thread', () => {
     expect(s.spawnWorker).toHaveBeenCalledTimes(1);
     const [item, opts] = s.spawnWorker.mock.calls[0];
     expect(opts).toEqual({ continuation: true, switched: true });
-    expect(item).toMatchObject({ model: 'opus', effort: 'high', answer: null });
+    expect(item).toMatchObject({ model: 'opus', effort: 'high' });
+    expect(item.answer).toBeUndefined();
   });
 
   it('starts on an effort change alone', () => {
@@ -151,7 +167,7 @@ describe('the next turn after an agent moves its own thread', () => {
   });
 
   it('is asked at the end of every turn the app did not stop', () => {
-    const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/if \(!session\.stoppedByUs && !session\.exitFailed\) this\._carryOnAfterASwitch\(item, session\);/);
     expect(src).toMatch(/ranOn: \{ model: item\.model \|\| null, effort: item\.effort \|\| null \}/);
   });
@@ -178,19 +194,22 @@ describe('what the run is told', () => {
   });
   afterEach(() => fs.rmSync(appDir, { recursive: true, force: true }));
 
-  it('names its model and effort, and how to move to others', () => {
+  it('says what it is on, then how to move to something else, above the message rules', () => {
     const s = supervisor({ messageRules: () => 'THE MESSAGE RULES' });
     const system = systemOf(s.spawnPlan({ id: 'w-1', product: 'acme', title: 'Demo video', model: 'opus', effort: 'high' }, acme()).args);
-    expect(system).toMatch(/This thread runs on Opus 5\.5 \(`opus`\) at High effort\.[\s\S]*update_work_item[\s\S]*THE MESSAGE RULES/);
+    expect(system).toMatch(/This run is on Claude Code, Opus 5\.5, at high effort\.[\s\S]*update_work_item[\s\S]*THE MESSAGE RULES/);
   });
 
-  it('adds nothing to a run given no rules at all', () => {
-    expect(supervisor().spawnPlan({ id: 'w-1', product: 'acme', title: 'Demo video' }, acme()).args).not.toContain('--append-system-prompt');
+  it('says it once', () => {
+    const s = supervisor({ messageRules: () => 'THE MESSAGE RULES' });
+    const system = systemOf(s.spawnPlan({ id: 'w-1', product: 'acme', title: 'Demo video', model: 'opus', effort: 'high' }, acme()).args);
+    expect(system.match(/This run is on /g)).toHaveLength(1);
+    expect(system).not.toMatch(/This thread runs on/);
   });
 
-  it('says the engine decides when nothing is set', () => {
-    expect(supervisor().modelAndEffortLine({ model: null, effort: null, engine: 'codex' }))
-      .toMatch(/runs on Codex's own default model at its default effort/);
+  it('leaves the switching out of a run given no message rules', () => {
+    const system = systemOf(supervisor().spawnPlan({ id: 'w-1', product: 'acme', title: 'Demo video' }, acme()).args);
+    expect(system).not.toMatch(/update_work_item/);
   });
 
   it('opens the switched turn on the switch, not on a reply nobody wrote', () => {

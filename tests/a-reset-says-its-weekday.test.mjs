@@ -5,10 +5,10 @@
 // day now leads with the weekday ("Thu 4pm"). One six or more days out also
 // carries its date, because "Tue 1pm" read on a Tuesday means today.
 import { describe, expect, it } from 'vitest';
-import { resetDay } from '../shared/usage.mjs';
+import { resetDay } from '../shared/usage.mts';
 import { resetWords } from '../renderer/src/account-words.ts';
-import { readUsageReport } from '../shared/claude-usage.mjs';
-import { limitRows } from '../shared/usage.mjs';
+import { readUsageReport } from '../shared/claude-usage.mts';
+import { limitRows } from '../shared/usage.mts';
 
 // Tuesday, Oct 20 2026, 2:30pm, in whatever zone the run is in.
 const now = new Date(2026, 9, 20, 14, 30).getTime();

@@ -13,7 +13,7 @@
 // Now both sentences read as the plan lacking the model, whose row says to
 // pick another model or sign in an account that has it.
 import { describe, it, expect } from 'vitest';
-import { troubleCause, deadRunSentence, deadRunCause, needsHerHands } from '../shared/spawn-trouble.mjs';
+import { troubleCause, deadRunSentence, deadRunCause, needsHerHands } from '../shared/spawn-trouble.mts';
 
 const SAID = 'this row asks to run on "gpt-6.1-sol", which is not a model the Codex on this computer knows. It offers gpt-6-luna, gpt-5.6-terra, gpt-5.6-luna. Nothing here will pick a stand-in for her, so this run is stopping rather than doing her work on a model she did not choose';
 const WORKSPACE = 'every Codex agent here is set to run on "gpt-6.1-sol", which is not a model the Codex on this computer knows. It offers gpt-6-luna.';

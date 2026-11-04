@@ -32,7 +32,7 @@ export function legacyRoot() {
 }
 
 // The account currently signed in, if any. Set once at boot and re-resolved on
-// every auth change (main/ipc.mjs), so dataRoot answers per-account without
+// every auth change (main/ipc.mts), so dataRoot answers per-account without
 // every caller having to thread a userId through. One account is active per
 // running app at a time; switching accounts re-inits (see the account-scoped
 // persistence spec).

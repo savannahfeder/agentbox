@@ -2,7 +2,16 @@
 // ones a run is started with. A word the CLI does not know would stop the run
 // at start, so anything else is refused with the words that work.
 import { CLAUDE_MODELS } from './claude-models.generated.mjs';
-import { EFFORT_LEVELS, isEffortWord } from './effort-levels.mjs';
+
+// A copy of shared/effort-levels.mts: the tool server starts on plain Node,
+// which cannot load that file below 22.18. A test holds the two together.
+export const EFFORT_LEVELS = Object.freeze([
+  { id: 'low', label: 'Low' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'high', label: 'High' },
+  { id: 'xhigh', label: 'Extra' },
+  { id: 'max', label: 'Max' },
+]);
 
 const ALIASES = CLAUDE_MODELS.filter((m) => !m.alias.startsWith('claude-')).map((m) => m.alias);
 
@@ -26,7 +35,7 @@ export function effortWord(value) {
   if (!said) return { effort: '' };
   const named = EFFORT_LEVELS.find((e) => e.id === said || e.label.toLowerCase() === said);
   if (named) return { effort: named.id };
-  // Codex's one level above Claude Code's five (shared/effort-levels.mjs).
-  if (said === 'ultra' && isEffortWord(said)) return { effort: said };
+  // Codex's one level above Claude Code's five.
+  if (said === 'ultra') return { effort: said };
   return { error: `"${value}" is not an effort level. Use ${EFFORT_LEVELS.map((e) => e.id).join(', ')}.` };
 }

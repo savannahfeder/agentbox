@@ -34,7 +34,7 @@ import { threadLine, clampThreadWidth, THREAD_WIDTH } from '../renderer/src/team
 import { Thread } from '../renderer/src/components/Thread.tsx';
 import { ThreadPanel } from '../renderer/src/team/ThreadPanel.tsx';
 import { TeamContext } from '../renderer/src/team/people.tsx';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 
 const ID = 'w-1234567890';
 const ME = 'p-me', MAYA = 'p-maya', THEO = 'p-theo', JUN = 'p-jun';

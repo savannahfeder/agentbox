@@ -19,6 +19,7 @@ import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
 import { pressedInTheFindBox } from '../find-in-page';
 import { ArtifactStage, StageLink, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
+import { readCommentDraft, saveCommentDraft } from '../comment-drafts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { noteWithPictures } from '../note-pictures';
 import { AttachRow } from './AttachRow';
@@ -158,9 +159,17 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   const person = useCallback((id: string | null): Person | null => people.find((p) => p.id === (id ?? me)) ?? null, [people, me]);
   const nameOf = useCallback((id: string | null) => (id === me ? 'You' : firstName(person(id)) || 'A teammate'), [me, person]);
 
+  // The version the comment box's words belong to. Saving waits for it, so the
+  // words on screen are never written under the version just stepped onto.
+  const draftOf = useRef<string | null>(null);
   useEffect(() => {
-    setDraftPlace(null); setHere(null); setCompare(false); setLeftVi(null); setReplyingTo(null); setFound('looking');
+    const kept = readCommentDraft({ product, thread, file: version?.id ?? '' });
+    draftOf.current = version?.id ?? null;
+    setWords(kept.words); setDraftPlace(kept.place); setAsking(null);
+    setNamed(people.filter((p) => kept.words.includes(`@${firstName(p)}`)));
+    setHere(null); setCompare(false); setLeftVi(null); setReplyingTo(null); setFound('looking');
   }, [version?.id]);
+  useEffect(() => { if (draftOf.current) saveCommentDraft({ product, thread, file: draftOf.current }, { words, place: draftPlace }); }, [words, draftPlace]);
   const [editing, setEditing] = useState<Editing | null>(null);
   // The editor read the file itself, so it is open while it is on screen.
   const foundNow: Found = editing ? 'open' : found;

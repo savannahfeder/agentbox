@@ -23,11 +23,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Store } from '../main/store.mjs';
-import { listSharedProjects } from '../main/team/projects.mjs';
-import { readSettings } from '../main/settings.mjs';
+import { Store } from '../main/store.mts';
+import { listSharedProjects } from '../main/team/projects.mts';
+import { readSettings } from '../main/settings.mts';
 import { loadConfig } from '../main/config.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { selectionLine, archiveLabel, archivedLine, togglePick, keepShown } = await import('../renderer/src/project-archive.ts');
@@ -129,7 +129,7 @@ describe('a shared project you archived is not joined a second time', () => {
   });
 
   it('the team wiring asks for archived ones too', () => {
-    expect(read('main/team/index.mjs')).toMatch(/listSharedProjects\(\s*store\.listProducts\(\{\s*includeArchived:\s*true\s*\}\)/);
+    expect(read('main/team/index.mts')).toMatch(/listSharedProjects\(\s*store\.listProducts\(\{\s*includeArchived:\s*true\s*\}\)/);
   });
 });
 
@@ -220,7 +220,7 @@ describe('the window', () => {
   });
 
   it('main and the bridge carry the channel', () => {
-    expect(read('main/ipc.mjs')).toMatch(/'zero:project-archive'/);
+    expect(read('main/ipc.mts')).toMatch(/'zero:project-archive'/);
     expect(read('preload.cjs')).toMatch(/projectArchive:.*'zero:project-archive'/);
     expect(read('renderer/src/api.ts')).toMatch(/async archiveProject\(/);
   });

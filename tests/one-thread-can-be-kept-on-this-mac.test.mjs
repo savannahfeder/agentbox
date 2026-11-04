@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { threadMenuRows, PLACE_ROW } from '../renderer/src/threads/ThreadMenu.tsx';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const product = { slug: 'p', repoPath: '/r' };
@@ -80,8 +80,8 @@ describe('a thread kept on this Mac', () => {
 
 describe('the plumbing', () => {
   it('reaches the supervisor from the menu', () => {
-    expect(read('shared/bridge-map.mjs')).toMatch(/setThreadOnMac: 'zero:set-thread-on-mac'/);
-    expect(read('main/ipc.mjs')).toMatch(/ipcMain\.handle\('zero:set-thread-on-mac'[\s\S]{0,120}supervisor\.setThreadOnMac\(/);
+    expect(read('shared/bridge-map.mts')).toMatch(/setThreadOnMac: 'zero:set-thread-on-mac'/);
+    expect(read('main/ipc.mts')).toMatch(/ipcMain\.handle\('zero:set-thread-on-mac'[\s\S]{0,120}supervisor\.setThreadOnMac\(/);
     expect(read('preload.cjs')).toMatch(/setThreadOnMac: \(payload\) => ipcRenderer\.invoke\('zero:set-thread-on-mac', payload\)/);
     expect(read('renderer/src/api.ts')).toMatch(/async setThreadOnMac\(/);
     expect(read('renderer/src/App.tsx')).toMatch(/onPlace=\{/);

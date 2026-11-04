@@ -2,7 +2,7 @@
 // HOOK-WARNING-824, while PowerUp recorded zero copies. Hook failures must reach
 // both the live tail and saved conversation without changing the task result.
 import { expect, it } from 'vitest';
-import { readersFor } from '../main/supervisor.mjs';
+import { readersFor } from '../main/supervisor.mts';
 import { traceLines } from '../renderer/src/terminal.ts';
 const readers = readersFor('claude');
 const failure = { type: 'system', subtype: 'hook_response', hook_name: 'SessionStart:resume', hook_event: 'SessionStart', exit_code: 1, outcome: 'error', stderr: 'HOOK-WARNING-824: startup failed.', output: 'HOOK-WARNING-824: startup failed.' };
@@ -36,7 +36,7 @@ it('also shows failures from native Claude transcript attachments in personal ch
   const fs = await import('node:fs');
   const os = (await import('node:os')).default;
   const path = await import('node:path');
-  const { conversation } = await import('../main/agents.mjs');
+  const { conversation } = await import('../main/agents.mts');
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'hook-conversation-'));
   const id = '82400000-0000-4000-8000-000000000001';
   const cwd = '/tmp/hook-fixture';

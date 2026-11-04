@@ -9,6 +9,9 @@ import { SearchIcon } from '../components/SearchIcon';
 import type { ConnectionsList, ConnectionTile } from '../types';
 import { cardState, checkResultLine, copyLine, copyNextLine, failureLine, openConnections, pageGroups, peopleOnCard, stateLine, toolWords, whenLine, whoHasIt, whoReadsCopies } from './connections-shown';
 import { DARK_INK, logoOf } from './logos';
+import { SERVICES } from '../../../shared/cloud-needs.mjs';
+import { Name } from '../../../shared/product-name.mjs';
+import { keyLooksWrong } from '../key-asks';
 import './connections.css';
 
 function Mark({ id, name }: { id: string; name: string }) {
@@ -268,6 +271,94 @@ function Sheet({ tile, now, list, onClose, onNotice }: { tile: ConnectionTile; n
   </SheetFrame>;
 }
 
+type CloudKey = { name: string; label?: string | null; savedAt: number | null };
+type CloudTile = { id: string; mark: string | null; name: string; keys: { name: string; label: string; savedAt: number | null }[] };
+
+// WHAT CLOUD THREADS SIGN IN WITH, beside the tools agents here connect to.
+// Round six of the power test: a sign-in saved on a thread was on no page, so
+// the Stripe tile saying "Connect" read as the key being lost.
+function cloudTiles(saved: CloudKey[]): CloudTile[] {
+  const have = new Map(saved.map((k) => [k.name, k]));
+  const out: CloudTile[] = [];
+  const taken = new Set<string>();
+  for (const svc of SERVICES) {
+    if (!svc.keys.some((k) => have.has(k.name))) continue;
+    svc.keys.forEach((k) => taken.add(k.name));
+    out.push({ id: `cloud:${svc.id}`, mark: svc.id, name: svc.name, keys: svc.keys.filter((k) => have.has(k.name)).map((k) => ({ ...k, label: have.get(k.name)!.label || k.label, savedAt: have.get(k.name)!.savedAt })) });
+  }
+  for (const k of saved) if (!taken.has(k.name)) out.push({ id: `cloud:${k.name}`, mark: null, name: k.label || k.name, keys: [{ name: k.name, label: k.label || k.name, savedAt: k.savedAt }] });
+  return out;
+}
+
+function CloudTileButton({ tile, onOpen }: { tile: CloudTile; onOpen: () => void }) {
+  return <button type="button" className="cn-tile" aria-label={`Open ${tile.name}`} onClick={onOpen}>
+    {tile.mark ? <Mark id={tile.mark} name={tile.name} /> : <span className="cn-mark cn-mark-letter" aria-hidden="true">{tile.name.charAt(0)}</span>}
+    <span className="cn-tile-words">
+      <span className="cn-tile-name">{tile.name}</span>
+      <span className="cn-state"><span className="cn-dot cn-dot-good" aria-hidden="true" /><span className="cn-state-words">Connected</span></span>
+    </span>
+  </button>;
+}
+
+function CloudSheet({ tile, onClose, onNotice, here }: { tile: CloudTile; onClose: () => void; onNotice: (text: string) => void; here: (() => void) | null }) {
+  const [mode, setMode] = useState<'shown' | 'replacing' | 'removing'>('shown');
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [said, setSaid] = useState<string | null>(null);
+  const [warned, setWarned] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const day = (t: number) => (new Date(t).toDateString() === new Date().toDateString() ? 'today' : new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+  const when = Math.max(0, ...tile.keys.map((k) => k.savedAt ?? 0));
+  const replace = async () => {
+    const wrong = tile.keys.map((k) => keyLooksWrong(k.name, values[k.name] ?? '', k.label)).find(Boolean) ?? null;
+    if (wrong && warned !== JSON.stringify(values)) { setWarned(JSON.stringify(values)); setSaid(wrong); return; }
+    setBusy(true);
+    for (const k of tile.keys) {
+      const out = await api.cloudKey({ action: 'save', name: k.name, value: values[k.name], label: k.label });
+      if (!out.ok) { setBusy(false); setSaid(out.error ?? 'The cloud did not answer. Try again.'); return; }
+    }
+    setBusy(false); setMode('shown'); setValues({}); setSaid(null);
+    onNotice(`${tile.name} replaced. Every cloud thread uses the new one.`);
+  };
+  const remove = async () => {
+    setBusy(true);
+    for (const k of tile.keys) {
+      const out = await api.cloudKey({ action: 'remove', name: k.name });
+      if (!out.ok) { setBusy(false); setSaid(out.error ?? 'The cloud did not answer. Try again.'); return; }
+    }
+    setBusy(false);
+    onNotice(`${tile.name} removed. Threads that need it will ask again.`);
+    onClose();
+  };
+  return <SheetFrame label={tile.name} onClose={onClose}>
+    <div className="cn-sheet-head">
+      {tile.mark ? <Mark id={tile.mark} name={tile.name} /> : <span className="cn-mark cn-mark-letter" aria-hidden="true">{tile.name.charAt(0)}</span>}
+      <span className="cn-tile-words">
+        <span className="cn-sheet-name">{tile.name}</span>
+        <span className="cn-state"><span className="cn-dot cn-dot-good" aria-hidden="true" /><span>Kept encrypted in your {Name} Cloud</span></span>
+      </span>
+    </div>
+    <p className="cn-hint">Every cloud thread can use it.{here && <> Agents on this computer need their own: <button type="button" className="cn-inline" onClick={here}>connect {tile.name} here</button>.</>}</p>
+    {when > 0 && <p className="cn-when">{tile.keys.map((k) => k.label).join(' and ')}, saved {day(when)} at {new Date(when).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}.</p>}
+    {mode === 'replacing' && <form className="cn-form" onSubmit={(e) => { e.preventDefault(); if (!busy && tile.keys.every((k) => values[k.name]?.trim())) void replace(); }}>
+      {tile.keys.map((k, i) => <input key={k.name} className="cn-input" aria-label={k.label} placeholder={`The new ${k.label.replace(tile.name, '').trim() || 'key'}`} type="password" autoComplete="off" spellCheck={false} autoFocus={i === 0}
+        value={values[k.name] ?? ''} onChange={(e) => { setValues((v) => ({ ...v, [k.name]: e.target.value })); setSaid(null); }} />)}
+      <div className="cn-actions">
+        <button type="submit" className="cn-button cn-button-main" disabled={busy || !tile.keys.every((k) => values[k.name]?.trim())}>Save</button>
+        <button type="button" className="cn-button" onClick={() => { setMode('shown'); setSaid(null); }}>Cancel</button>
+      </div>
+    </form>}
+    {said && <p className="cn-todo" role="status">{said}</p>}
+    {mode !== 'replacing' && <div className="cn-actions">
+      {mode === 'removing'
+        ? <><span className="cn-waiting">Threads that need it will ask again.</span>
+          <button type="button" className="cn-button" onClick={() => setMode('shown')}>Keep</button>
+          <button type="button" className="cn-button cn-button-main" disabled={busy} onClick={() => void remove()}>Remove</button></>
+        : <><button type="button" className="cn-button cn-button-main" onClick={() => setMode('replacing')}>Replace</button>
+          <button type="button" className="cn-button cn-button-quiet" onClick={() => setMode('removing')}>Remove</button></>}
+    </div>}
+  </SheetFrame>;
+}
+
 /** The small button a thread shows where an agent wrote a link to this page. */
 export function ConnectionLink({ id, children }: { id: string | null; children: ReactNode }) {
   return <button type="button" className="cn-link" onClick={() => openConnections(id)}>{children}</button>;
@@ -299,7 +390,7 @@ function AddByAddress({ onAdded, onClose }: { onAdded: (id: string) => void; onC
   </SheetFrame>;
 }
 
-export function ConnectionsPlace({ now, focus, onNotice, corner }: { now: number; focus: string | null; onNotice: (text: string) => void; corner: HTMLElement | null }) {
+export function ConnectionsPlace({ now, focus, onNotice, corner, cloudKeys = null }: { now: number; focus: string | null; onNotice: (text: string) => void; corner: HTMLElement | null; cloudKeys?: CloudKey[] | null }) {
   const [list, setList] = useState<ConnectionsList | null>(null);
   const [open, setOpen] = useState<string | null>(focus);
   const [adding, setAdding] = useState(false);
@@ -312,20 +403,33 @@ export function ConnectionsPlace({ now, focus, onNotice, corner }: { now: number
     const off = api.onChanged(read);
     return () => { live = false; off?.(); };
   }, []);
-  const tiles = useMemo(() => list?.tiles ?? [], [list]);
+  // A service saved for cloud threads is one tile, at the top, unless agents here connect to it too
+  // (round eight: a second Stripe lower down, unconnected, read as the key being lost).
+  const cloudMarks = useMemo(() => new Set(cloudTiles(cloudKeys ?? []).map((t) => t.mark).filter(Boolean) as string[]), [cloudKeys]);
+  const allTiles = useMemo(() => list?.tiles ?? [], [list]);
+  const tiles = useMemo(() => allTiles.filter((t) => t.connected || !cloudMarks.has(t.id)), [allTiles, cloudMarks]);
   const shown = useMemo(() => pageGroups(tiles, list?.groups ?? [], query), [tiles, list, query]);
-  const sheet = tiles.find((t) => t.id === open) ?? null;
+  const sheet = allTiles.find((t) => t.id === open) ?? null;
+  const q = query.trim().toLowerCase();
+  const cloud = cloudTiles(cloudKeys ?? []).filter((t) => !q || t.name.toLowerCase().includes(q));
+  const cloudSheet = cloud.find((t) => t.id === open) ?? null;
   return <div className="cn-page">
     {corner && createPortal(<div className="cn-head">
       <label className="fp-find cn-find"><SearchIcon /><input aria-label="Search tools" placeholder="Search tools" value={query} onChange={(e) => setQuery(e.target.value)} /></label>
       <button type="button" className="cn-button cn-add-open" onClick={() => setAdding(true)}>Add by address</button>
     </div>, corner)}
+    {cloud.length > 0 && <section className="cn-group">
+      <h2>Saved for cloud threads</h2>
+      <div className="cn-grid">{cloud.map((t) => <CloudTileButton key={t.id} tile={t} onOpen={() => setOpen(t.id)} />)}</div>
+    </section>}
     {shown.map((g) => <section key={g.id} className="cn-group">
       <h2>{g.name}</h2>
       <div className="cn-grid">{g.tiles.map((t) => <Tile key={t.id} tile={t} now={now} onOpen={() => setOpen(t.id)} />)}</div>
     </section>)}
-    {list && !shown.length && <p className="cn-none">No tool is called that.</p>}
+    {list && !shown.length && !cloud.length && <p className="cn-none">No tool is called that.</p>}
     {adding && <AddByAddress onAdded={(id) => { setAdding(false); setOpen(id); }} onClose={() => setAdding(false)} />}
+    {cloudSheet && <CloudSheet key={cloudSheet.id} tile={cloudSheet} onClose={() => setOpen(null)} onNotice={onNotice}
+      here={allTiles.some((t) => t.id === cloudSheet.mark && !t.connected) ? () => setOpen(cloudSheet.mark) : null} />}
     {sheet && list && <Sheet key={sheet.id} tile={sheet} now={now} list={list} onClose={() => setOpen(null)} onNotice={onNotice} />}
   </div>;
 }

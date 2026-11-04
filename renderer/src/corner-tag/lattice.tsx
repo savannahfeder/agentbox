@@ -23,7 +23,7 @@
 // every dot stands the same distance from a pixel boundary as every other and
 // all nine are rasterised the same, wherever the mark's own corner lands.
 import React, { useEffect, useState } from 'react';
-import { latticeGrid } from '../../../shared/corner-tag.mjs';
+import { latticeGrid } from '../../../shared/corner-tag.mts';
 
 // Which step of the orbit each dot takes, in reading order; null is the
 // centre, which never joins in because it is never dim.

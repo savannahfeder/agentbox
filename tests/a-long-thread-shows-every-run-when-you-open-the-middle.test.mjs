@@ -123,6 +123,6 @@ describe('the thread you see', () => {
     const item = source('renderer/src/components/ItemThread.tsx');
     expect(item).toMatch(/api\.sessionTrace\(\{ product: item\.product, id: item\.id, whole: true \}\)/);
     expect(item).toMatch(/withEveryRun\(everyRun, sessions\)/);
-    expect(source('main/ipc.mjs')).toMatch(/if \(whole\) return \{ ok: true, sessions: readRunTraces\(traceDir, \{ whole: true \}\) \}/);
+    expect(source('main/ipc.mts')).toMatch(/if \(whole\) return \{ ok: true, sessions: readRunTraces\(traceDir, \{ whole: true \}\) \}/);
   });
 });

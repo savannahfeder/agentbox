@@ -17,9 +17,9 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { bootHeadless } from '../main/serve.mjs';
-import { QUIT_GRACE_MS } from '../main/supervisor.mjs';
-import { readRuns, runLedgerPath } from '../main/run-ledger.mjs';
+import { bootHeadless } from '../main/serve.mts';
+import { QUIT_GRACE_MS } from '../main/supervisor.mts';
+import { readRuns, runLedgerPath } from '../main/run-ledger.mts';
 import { setAppHome } from './app-home.mjs';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');

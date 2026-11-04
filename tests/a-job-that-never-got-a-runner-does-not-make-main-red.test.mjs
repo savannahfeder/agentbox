@@ -19,8 +19,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
-import { MainTests, MAIN_RED_LABEL, redOnMain } from '../main/main-went-red.mjs';
+import { Store } from '../main/store.mts';
+import { MainTests, MAIN_RED_LABEL, redOnMain } from '../main/main-went-red.mts';
 
 let root; let userDir;
 beforeEach(() => {

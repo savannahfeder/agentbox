@@ -61,7 +61,7 @@ describe('a suite running on a Mac somebody is signed into', () => {
   // failed on the env handed down to a worker's store server rather than on a
   // line in a ledger.
   it('hands a worker store server no person', async () => {
-    const { Supervisor } = await import('../main/supervisor.mjs');
+    const { Supervisor } = await import('../main/supervisor.mts');
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'no-person-mcp-'));
     const sup = new Supervisor({ storeRoot: tmp, storeMcpCommand: '/bin/echo' }, { listItems: () => [], listProducts: () => [] }, tmp);
     for (const server of Object.values(sup.mcpServers() ?? {})) {

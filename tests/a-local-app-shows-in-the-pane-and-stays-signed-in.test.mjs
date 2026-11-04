@@ -92,8 +92,8 @@ describe('what it leaves alone', () => {
     expect(out).toBeNull();
   });
 
-  it('is wired to the main window only, below the page, in main.mjs', () => {
-    const main = fs.readFileSync(new URL('../main/main.mjs', import.meta.url), 'utf8');
+  it('is wired to the main window only, below the page, in main.mts', () => {
+    const main = fs.readFileSync(new URL('../main/main.mts', import.meta.url), 'utf8');
     expect(main).toContain('letLocalAppsShowInThePane(window.webContents)');
   });
 });

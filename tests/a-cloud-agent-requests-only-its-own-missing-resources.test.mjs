@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createResourceRequests, resourceContextFor } from '../main/cloud/resources.mjs';
+import { createResourceRequests, resourceContextFor } from '../main/cloud/resources.mts';
 
 let root; let options; let sent; let state;
 beforeEach(() => {

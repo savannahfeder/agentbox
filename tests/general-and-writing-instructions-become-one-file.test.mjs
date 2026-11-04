@@ -7,9 +7,9 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as instructions from '../main/instruction-settings.mjs';
-import {Supervisor} from '../main/supervisor.mjs';
-import {bootHeadless} from '../main/serve.mjs';
+import * as instructions from '../main/instruction-settings.mts';
+import {Supervisor} from '../main/supervisor.mts';
+import {bootHeadless} from '../main/serve.mts';
 import {EVERY, sectionsFor} from '../renderer/src/instruction-scope.ts';
 
 const dirs=[];

@@ -16,7 +16,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createServer, newToken } from '../main/serve.mjs';
+import { createServer, newToken } from '../main/serve.mts';
 
 describe('the door marks the page it serves', () => {
   let server, base, token, dist;

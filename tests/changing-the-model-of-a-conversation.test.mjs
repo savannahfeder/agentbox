@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 
 // Every write `answerItem` makes, in order, plus the item it leaves behind.
 function answer(start, patch) {
@@ -72,7 +72,7 @@ describe('the pick lands on the row, where the next run reads it', () => {
 describe('the wiring from the reply box is present in the source', () => {
   const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-  const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+  const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
 
   it("draws the card's own menu in the reply box", () => {
     // It is the card's OWN menu since w-e1a42f6b21, not a twin of it: the few

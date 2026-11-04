@@ -40,6 +40,7 @@ import { fileURLToPath } from 'node:url';
 import { readPeople, pickPeople, chaosPlan, worldAt, nextRound, restartAgain, roundOutcome, coverage, testerPrompt, projectNamedIn } from './plan.mjs';
 import { createWatcher, freeMemoryMb, readAllLines, keepEvidence, sleepTargets } from './watch.mjs';
 import { writeReport } from './report.mjs';
+import { seedArtifacts } from './artifacts.mjs';
 import { readDiary } from './diary.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -67,6 +68,8 @@ const totalMs = ((Number(opt('hours', 0)) * 60) + Number(opt('minutes', 0))) * M
 const roundMs = Math.max(2, Number(opt('round-minutes', 20))) * MIN;
 const chaos = opt('chaos', 'normal');
 const cloud = flag('cloud');
+const standInCloud = flag('stand-in-cloud');
+if (standInCloud && (cloud || flag('real'))) stop('--stand-in-cloud is the stand-ins\' own cloud; it cannot go with --real or --cloud.');
 const real = flag('real') || cloud;
 const cloudAccounts = opt('cloud-accounts');
 if (cloudAccounts && !cloud) stop('--cloud-accounts narrows the cloud\'s accounts: add --cloud.');
@@ -115,7 +118,9 @@ const live = (name, ...verb) => {
 function layCommands(dir, name) {
   const q = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
   for (const [cmd, script] of [['app', BROWSE], ['diary', DIARY]]) {
-    fs.writeFileSync(path.join(dir, cmd), `#!/bin/sh\nexport VERIFY_INSTANCE=${q(name)} BREAKER_OUT=${q(dir)} POWER_OUT=${q(dir)}\nexec ${q(node)} ${q(script)} "$@"\n`, { mode: 0o755 });
+    // A machine whose Chrome is not at the Mac's path names it in CHROME (scripts/lib/chrome-guard.mjs).
+    const chrome = process.env.CHROME ? ` CHROME=${q(process.env.CHROME)}` : '';
+    fs.writeFileSync(path.join(dir, cmd), `#!/bin/sh\nexport VERIFY_INSTANCE=${q(name)} BREAKER_OUT=${q(dir)} POWER_OUT=${q(dir)}${chrome}\nexec ${q(node)} ${q(script)} "$@"\n`, { mode: 0o755 });
   }
   return { browse: path.join(dir, 'app'), diary: path.join(dir, 'diary') };
 }
@@ -173,6 +178,10 @@ function seedHistory(state, person, count) {
     if (r === 0) lines.push({ id, ts: at + 6 * MIN, source: 'founder', patch: { runAt: now + 24 * 60 * MIN } });
     else if (r > 2) lines.push({ id, ts: at + 20 * MIN, source: 'founder', patch: { status: 'done' } });
   }
+  const first = slugs[0];
+  const withFiles = seedArtifacts({ accountRoot: state.accountRoot, slug: first, picture: path.join(REPO, 'docs', 'readme', 'priority-palette.png'), now });
+  for (const l of withFiles) ids.add(l.id);
+  byProject.get(first).push(...withFiles);
   for (const [slug, lines] of byProject) {
     const dir = machinery(state, slug);
     fs.mkdirSync(dir, { recursive: true });
@@ -188,7 +197,7 @@ for (const person of people) {
   fs.mkdirSync(dir, { recursive: true });
   const shape = real ? [] : ['--logins', String(person.logins), ...(person.codex ? [] : ['--no-codex'])];
   say(`${person.name}: starting a copy of the app shaped like their setup`);
-  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(alpha ? ['--alpha', alpha] : []));
+  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(alpha ? ['--alpha', alpha] : []));
   fs.writeFileSync(path.join(dir, 'up.log'), up.out);
   const stateFile = path.join(instanceDir(name), 'instance.json');
   const state = readJson(stateFile);

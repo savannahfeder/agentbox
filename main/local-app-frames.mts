@@ -2,7 +2,7 @@
 //
 // The pane draws an address like http://localhost:3006 in a frame, because a
 // frame keeps every shortcut the app answers from inside a page (the
-// before-input-event handler in main.mjs hears a frame; it would not hear a
+// before-input-event handler in main.mts hears a frame; it would not hear a
 // webview's guest). Two things a local app commonly sends broke that frame:
 //
 //   X-Frame-Options / CSP frame-ancestors   Chromium refuses to draw the page

@@ -16,7 +16,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { rowTitle } from '../renderer/src/list-rules';
-import { namePrompt, wantsName } from '../main/row-label.mjs';
+import { namePrompt, wantsName } from '../main/row-label.mts';
 
 const SHORT_TYPED = [
   'add rate limiting to POST /payments',

@@ -5,7 +5,7 @@ import fsDefault from 'node:fs';
 import path from 'node:path';
 import { familyName, familyOfName, filesInLines, nextVersionName, reviewKind, threadFiles } from '../shared/artifact-marks.mjs';
 import { mergeText } from '../shared/text-merge.mjs';
-import { isInside, MAX_DOC_BYTES } from './doc-file.mjs';
+import { isInside, MAX_DOC_BYTES } from './doc-file.mts';
 
 const THREAD_ID = /^[\w-]{1,64}$/;
 

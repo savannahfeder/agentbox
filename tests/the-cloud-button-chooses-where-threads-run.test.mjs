@@ -7,7 +7,7 @@
 // opening a menu built like the filters menu with three choices, the picked
 // one in orange, and this month's use under them. She is about to run most of
 // her own work in the cloud for a few days, so the menu also says what that
-// cost, from the runs' own measurements (main/cloud/usage.mjs).
+// cost, from the runs' own measurements (main/cloud/usage.mts).
 // Here: the words and numbers the menu shows, the setting it writes, and the
 // supervisor's answer the snapshot carries.
 
@@ -15,11 +15,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { setWorkspaceSetting } from '../main/settings.mjs';
-import { appendCloudUsage } from '../main/cloud/usage.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { setWorkspaceSetting } from '../main/settings.mts';
+import { appendCloudUsage } from '../main/cloud/usage.mts';
 import { CLOUD_MODES, cloudModeOf, cloudButtonCount, cloudMonthLine, pageToOpen, accountLabel } from '../renderer/src/cloud-menu';
-import { recordCloudLogin, markCloudLogin } from '../main/cloud/logins.mjs';
+import { recordCloudLogin, markCloudLogin } from '../main/cloud/logins.mts';
 
 let dir; let config; let supervisor;
 const savedConfigEnv = process.env.AGENTBOX_CLOUD_CONFIG;

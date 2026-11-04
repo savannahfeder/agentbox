@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { usageMeter } from '../cloud/sandbox/usage.mjs';
-import { appendCloudUsage, readCloudUsage, summarizeCloudUsage, cloudUsagePath, AGENTCORE_RATES } from '../main/cloud/usage.mjs';
+import { appendCloudUsage, readCloudUsage, summarizeCloudUsage, cloudUsagePath, AGENTCORE_RATES } from '../main/cloud/usage.mts';
 
 let tmp;
 beforeEach(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cloudusage-')); });

@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const FELIX = { id: 't-felix00001', name: 'Felix', status: 'active' };
 const DRAFT = { id: 't-draft00001', name: 'Iris', status: 'draft' };

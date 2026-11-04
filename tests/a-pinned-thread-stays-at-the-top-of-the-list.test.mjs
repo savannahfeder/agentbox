@@ -22,7 +22,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { sorted, sortedEntries, rankScore, dropWithPins } from '../renderer/src/threads/page-rules.ts';
 import { threadMenuRows } from '../renderer/src/threads/ThreadMenu.tsx';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const NOW = Date.UTC(2026, 9, 12, 12);
 const MIN = 60_000;
@@ -151,8 +151,8 @@ describe('the plumbing', () => {
   const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 
   it('has a door from the window to the supervisor', () => {
-    expect(read('shared/bridge-map.mjs')).toMatch(/setThreadPins: 'zero:set-thread-pins'/);
-    expect(read('main/ipc.mjs')).toMatch(/'zero:set-thread-pins'/);
+    expect(read('shared/bridge-map.mts')).toMatch(/setThreadPins: 'zero:set-thread-pins'/);
+    expect(read('main/ipc.mts')).toMatch(/'zero:set-thread-pins'/);
   });
 
   // A stronger hairline under the pinned group was tried and read as a bug
@@ -165,6 +165,6 @@ describe('the plumbing', () => {
 
   // Closing a thread is the end of what it was pinned for.
   it('drops the pin when a thread is closed', () => {
-    expect(read('main/ipc.mjs')).toMatch(/status === 'done'\) supervisor\.setThreadPins\(\{ \[id\]: null \}\)/);
+    expect(read('main/ipc.mts')).toMatch(/status === 'done'\) supervisor\.setThreadPins\(\{ \[id\]: null \}\)/);
   });
 });

@@ -5,7 +5,7 @@
 // Sandbox 1 first, Rank Practice first. They had made two of those three.
 //
 // My Workspace is not a bug. The app makes it at launch so that a thread
-// always has somewhere to go (main/main.mjs, approved 2026-10-05), and taking
+// always has somewhere to go (main/main.mts, approved 2026-10-05), and taking
 // it away puts back the dead Send button that decision was made to fix. What
 // was missing is a word about it anywhere a new person meets it, so its row
 // says what it is until it has a place in the order, which is the point where

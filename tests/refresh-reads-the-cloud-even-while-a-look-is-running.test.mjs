@@ -12,8 +12,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cloudLoginFor, lookAtCloudLogin, recordCloudLogin } from '../main/cloud/logins.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { cloudLoginFor, lookAtCloudLogin, recordCloudLogin } from '../main/cloud/logins.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 let home;
 const savedConfig = process.env.AGENTBOX_CLOUD_CONFIG;

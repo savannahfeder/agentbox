@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readSessionThreads } from '../main/agent-sessions.mjs';
+import { readSessionThreads } from '../main/agent-sessions.mts';
 
 let home;
 const NOW = Date.now();

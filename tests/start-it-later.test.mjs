@@ -177,7 +177,7 @@ describe('a task composed to start later', () => {
     fs.writeFileSync(path.join(productDir, 'project.json'), JSON.stringify({
       schemaVersion: 1, id: 'testprod', name: 'Test Product',
     }));
-    const { Store } = await import('../main/store.mjs');
+    const { Store } = await import('../main/store.mts');
     store = await new Store({
       storeRoot: tmp, accountId: 'test-account', accountRoot, products: [],
     }).init();

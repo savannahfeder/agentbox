@@ -5,7 +5,7 @@
 // restarting things she had written off and restarting nothing.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const answered = (id, product, answer) => ({
   id, product, answer, status: 'open',

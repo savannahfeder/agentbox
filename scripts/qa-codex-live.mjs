@@ -46,13 +46,13 @@ import { spawn, execFileSync } from 'node:child_process';
 import { createCodexAppServer } from '../main/codex-app-server.mjs';
 import {
   createCodexWorker, workerThreadParams, resumeThreadParams, mcpServerNames,
-} from '../main/codex-session.mjs';
-import { compactCodexThread } from '../main/codex-compaction.mjs';
-import { denyOutput } from '../main/memory-gate-server.mjs';
-import { codexLaunchEnv } from '../main/codex-launch-env.mjs';
+} from '../main/codex-session.mts';
+import { compactCodexThread } from '../main/codex-compaction.mts';
+import { denyOutput } from '../main/memory-gate-server.mts';
+import { codexLaunchEnv } from '../main/codex-launch-env.mts';
 import { resolveCodexBin } from '../main/codex-bin.mjs';
-import { loggedCodexLimits, forgetLoggedLimits } from '../main/codex-usage-file.mjs';
-import { codexLimits, codexPlan } from '../shared/codex-usage.mjs';
+import { loggedCodexLimits, forgetLoggedLimits } from '../main/codex-usage-file.mts';
+import { codexLimits, codexPlan } from '../shared/codex-usage.mts';
 
 const CODEX_HOME = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
 const bin = resolveCodexBin()?.path;
@@ -548,7 +548,7 @@ scenarios.compaction = async () => {
  *
  * `gate deny` refuses every command; `gate wait` holds each for eight seconds
  * and then allows it. A real socket stands in for
- * main/memory-gate-server.mjs, and the deny is that file's own `denyOutput`.
+ * main/memory-gate-server.mts, and the deny is that file's own `denyOutput`.
  */
 scenarios.gate = async () => {
   const mode = process.argv[3] ?? 'deny';

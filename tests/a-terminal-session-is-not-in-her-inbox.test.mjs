@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadConfig, saveConfig } from '../main/config.mjs';
-import { outsideAgentsMode } from '../main/settings.mjs';
+import { outsideAgentsMode } from '../main/settings.mts';
 import { listed, onTheRail, reachesInbox } from '../shared/agents.mjs';
 import { NAME } from '../shared/product-name.mjs';
 

@@ -1,9 +1,9 @@
 // A CLOUD RUN THROUGH THE CLOUD SERVER BRINGS ITS WORK HOME.
 //
 // People with no AWS account of their own run in ours, through the cloud
-// server (cloud/gateway/, w-6633e825a7). The Mac's run code (main/cloud/run.mjs)
+// server (cloud/gateway/, w-6633e825a7). The Mac's run code (main/cloud/run.mts)
 // was written against two small interfaces, the session and the bucket; the
-// server's client (main/cloud/managed.mjs) is a second pair of them. If any
+// server's client (main/cloud/managed.mts) is a second pair of them. If any
 // call the run makes is shaped differently through the server, the thread
 // says it finished while its work stays in the cloud.
 //
@@ -22,9 +22,9 @@ import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { ROOMY_PLANS } from './fixtures/cloud-plans.mjs';
-import { managedClients, LOGIN_NAME } from '../main/cloud/managed.mjs';
+import { managedClients, LOGIN_NAME } from '../main/cloud/managed.mts';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { cloudRun, CLOUD_NO_ROOM } from '../main/cloud/run.mjs';
+import { cloudRun, CLOUD_NO_ROOM } from '../main/cloud/run.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');

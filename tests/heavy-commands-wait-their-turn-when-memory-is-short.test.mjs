@@ -17,8 +17,8 @@
 //   - a running command is never stopped, and no command waits forever.
 
 import { describe, it, expect } from 'vitest';
-import { MemoryGate, pressureFrom, autoSlots } from '../main/memory-gate.mjs';
-import { CommandHistory } from '../main/memory-gate-history.mjs';
+import { MemoryGate, pressureFrom, autoSlots } from '../main/memory-gate.mts';
+import { CommandHistory } from '../main/memory-gate-history.mts';
 
 const URGENT = 9, HIGH = 7, MEDIUM = 5, LOW = 2;
 

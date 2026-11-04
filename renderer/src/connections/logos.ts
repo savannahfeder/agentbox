@@ -12,6 +12,6 @@ const FILES: Record<string, string> = Object.fromEntries(
 );
 
 /** Black or near-black marks, drawn light in Dark so they do not vanish. */
-export const DARK_INK: ReadonlySet<string> = new Set(['github', 'intercom', 'sentry', 'vercel']);
+export const DARK_INK: ReadonlySet<string> = new Set(['github', 'intercom', 'sentry', 'vercel', 'expo']);
 
 export const logoOf = (id: string): string | null => FILES[id] ?? null;

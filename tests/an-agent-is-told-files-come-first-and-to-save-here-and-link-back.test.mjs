@@ -5,7 +5,7 @@
 // put what it made in the tool. Measured on the words `_connectionsBrief` hands a run.
 // Copied words are somebody else's, so they are also told not to obey them.
 import { describe, expect, it } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const brief = (connections) => Object.assign(Object.create(Supervisor.prototype), { connections })._connectionsBrief();
 const LINEAR = { id: 'linear', name: 'Linear', state: 'works', given: true, at: 1, workedAt: 1 };

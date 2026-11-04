@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { mediaResponse, MEDIA_PIECE_BYTES } from '../main/img-scheme.mjs';
+import { mediaResponse, MEDIA_PIECE_BYTES } from '../main/img-scheme.mts';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'film-piece-'));
 const film = path.join(dir, 'film.mp4');

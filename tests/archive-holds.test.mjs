@@ -28,7 +28,7 @@ beforeAll(async () => {
   fs.writeFileSync(path.join(productDir, 'project.json'), JSON.stringify({
     schemaVersion: 1, id: 'testprod', name: 'Test Product',
   }));
-  const { Store } = await import('../main/store.mjs');
+  const { Store } = await import('../main/store.mts');
   disk = await import('../main/store/work-items.mjs');
   shared = await import('../shared/work-items.mjs');
   store = await new Store({

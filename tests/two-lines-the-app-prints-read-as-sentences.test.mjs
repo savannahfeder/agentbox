@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createAnalytics } from '../main/analytics.mjs';
+import { createAnalytics } from '../main/analytics.mts';
 
 const repo = path.join(path.dirname(new URL(import.meta.url).pathname), '..');
 
@@ -41,7 +41,7 @@ describe('the line about diagnostics reads as a sentence', () => {
   });
 
   it('is printed by the one line that prints it, with no verb of its own', () => {
-    const main = fs.readFileSync(path.join(repo, 'main', 'main.mjs'), 'utf8');
+    const main = fs.readFileSync(path.join(repo, 'main', 'main.mts'), 'utf8');
     expect(main).toMatch(/zero: diagnostics \$\{analytics\.reason\}, nothing is sent/);
     expect(main).not.toMatch(/diagnostics is \$\{analytics\.reason\}/);
   });

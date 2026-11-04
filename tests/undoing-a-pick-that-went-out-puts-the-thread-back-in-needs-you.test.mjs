@@ -17,7 +17,7 @@
 // result it was undoing. The worker's answer stopped being news, the thread
 // fell out of Needs you, and `belongsInProgress` caught it on its last branch
 // — her own open thread, waiting its turn — which promises a worker is coming.
-// None was: the supervisor refuses to spawn on '(withdrawn)' (supervisor.mjs,
+// None was: the supervisor refuses to spawn on '(withdrawn)' (supervisor.mts,
 // "a cancel, not an answer"). Out of one list, into a list that was lying.
 //
 // A withdrawal is her taking a word back, not saying one. Measured through the

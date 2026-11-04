@@ -7,8 +7,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
-import { argvForTheCloud } from '../main/cloud/run.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { argvForTheCloud } from '../main/cloud/run.mts';
 import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
 
 const repo = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

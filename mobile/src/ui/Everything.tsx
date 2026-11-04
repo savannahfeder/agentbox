@@ -18,7 +18,7 @@ import { Cross } from './icons';
 import { IconButton, Sheet, T } from './parts';
 import { LiveMark } from './ThreadParts';
 import { TeammateMark } from './Teammates';
-import { color, font, size } from './theme';
+import { color, corner, font, size } from './theme';
 
 const message = (err: unknown) => String((err as Error)?.message ?? err);
 const CARDS_EVERY_MS = 30_000;
@@ -48,13 +48,12 @@ function Card({ m, on, pick }: { m: Member; on: boolean; pick: () => void }) {
   const chat = m.kind === 'chat' && !(m.team && m.agents != null);
   return (
     <Pressable onPress={pick} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={m.name}
-      style={({ pressed }) => ({ flex: 1, minWidth: 0, gap: 14, paddingTop: 14, paddingHorizontal: 14, paddingBottom: 13, borderWidth: 1,
+      style={({ pressed }) => ({ flex: 1, minWidth: 0, gap: 14, paddingTop: 14, paddingHorizontal: 14, paddingBottom: 13, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden',
         borderColor: on ? color.faint : chat ? color.lineStrong : color.line, backgroundColor: on || pressed ? color.picked : chat ? 'transparent' : color.fill })}>
       <MemberFace m={m} s={44} />
       <View style={{ gap: 5, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
           <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 14, lineHeight: 19 }}>{m.name}</T>
-          {m.level != null && <T style={{ fontFamily: font.mono, fontSize: 11, color: color.faint }}>{m.level}</T>}
         </View>
         {chat ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
@@ -75,7 +74,7 @@ function Card({ m, on, pick }: { m: Member; on: boolean; pick: () => void }) {
 function AddCard() {
   return (
     <Pressable onPress={() => router.push('/teammate/new')} accessibilityRole="button" accessibilityLabel="New teammate"
-      style={({ pressed }) => ({ flex: 1, minWidth: 0, gap: 14, paddingTop: 14, paddingHorizontal: 14, paddingBottom: 13, borderWidth: 1, borderStyle: 'dashed', borderColor: color.line, backgroundColor: pressed ? color.picked : 'transparent' })}>
+      style={({ pressed }) => ({ flex: 1, minWidth: 0, gap: 14, paddingTop: 14, paddingHorizontal: 14, paddingBottom: 13, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderStyle: 'dashed', borderColor: color.line, backgroundColor: pressed ? color.picked : 'transparent' })}>
       <TeammateMark t={null} size={44} />
       <View style={{ gap: 5 }}>
         <T numberOfLines={1} style={{ fontSize: 14, lineHeight: 19 }}>New teammate</T>
@@ -104,7 +103,7 @@ function Bar({ m, onMessage, tabs }: { m: Member; onMessage?: () => void; tabs?:
         </View>
       )}
       {onMessage && (
-        <Pressable onPress={onMessage} accessibilityRole="button" style={({ pressed }) => ({ height: 28, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingRight: 11, marginLeft: 4, borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+        <Pressable onPress={onMessage} accessibilityRole="button" style={({ pressed }) => ({ height: 28, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingRight: 11, marginLeft: 4, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
           <Bubble />
           <T style={{ fontSize: 13, color: color.dim }}>Message</T>
         </Pressable>

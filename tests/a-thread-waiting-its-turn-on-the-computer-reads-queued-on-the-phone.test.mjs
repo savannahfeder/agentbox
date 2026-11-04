@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createPhoneInbox } from '../main/phone-inbox.mjs';
+import { createPhoneInbox } from '../main/phone-inbox.mts';
 import { phoneWaitsOf } from '../shared/phone-snapshot.mjs';
 import { phoneView, phoneSlug, waitFacts } from '../renderer/src/phone-rows';
 import { liveLine } from '../renderer/src/live-line';
@@ -177,8 +177,8 @@ describe('the phone and the web read it', () => {
   });
 
   it('is wired to the supervisor on the Mac', () => {
-    const src = fs.readFileSync(new URL('../main/main.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/main.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/waits: \(\) => phoneWaitsOf\(supervisor\.status\(\)\)/);
-    expect(fs.readFileSync(new URL('../main/team/index.mjs', import.meta.url), 'utf8')).toMatch(/waitsOf: /);
+    expect(fs.readFileSync(new URL('../main/team/index.mts', import.meta.url), 'utf8')).toMatch(/waitsOf: /);
   });
 });

@@ -17,7 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   isScratchFolder, isScratchProjectDir, readSessionThreads, readTranscriptHead, threadTitle,
-} from '../main/agent-sessions.mjs';
+} from '../main/agent-sessions.mts';
 
 const NOW = Date.UTC(2026, 9, 5, 20, 0, 0);
 const ago = (mins) => NOW - mins * 60 * 1000;

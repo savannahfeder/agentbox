@@ -194,7 +194,7 @@ const cleanIds = (ids) => [...new Set((Array.isArray(ids) ? ids : []).filter((id
  * stay on each Mac; what a project decides is only whose Team page its
  * threads' summaries reach. 'private' (Just you), 'team', or 'people' with
  * the people named. A project from before this setting existed keeps the team,
- * which is what it already did; a new one is made Just you (main/store.mjs);
+ * which is what it already did; a new one is made Just you (main/store.mts);
  * My Workspace is Just you whatever its file says. Chosen people naming nobody
  * reaches nobody, so it reads as Just you and never as the team.
  */

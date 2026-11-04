@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { appFilesPlace } from '../main/files-place.mjs';
 
 const PNG = (n) => Buffer.from(`89504e470d0a1a0a0000000d49484452000000${String(n).padStart(2, '0')}`, 'hex');

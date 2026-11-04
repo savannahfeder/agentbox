@@ -45,7 +45,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

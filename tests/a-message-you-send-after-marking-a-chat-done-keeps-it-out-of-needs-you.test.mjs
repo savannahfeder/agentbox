@@ -10,7 +10,7 @@
 //
 // w-8a14927b21 fixed this case on 2026-10-16, but its test wrote the message
 // and the reopen as ONE line. The app writes them as two (`answerItem`, main/
-// store.mjs): the words, then a status line with no words. `settledBy` read
+// store.mts): the words, then a status line with no words. `settledBy` read
 // that wordless reopen as pressing Z on the close, dropped the settle, and the
 // old thread reply waited on you again. Measured before the fix through the
 // real write path below: `inMyInbox` answered true after your own message.
@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { foldWorkItems } from '../shared/work-items.mjs';
 import { inMyInbox, iSpokeLast, whatWaits } from '../shared/team-rules.mjs';
 

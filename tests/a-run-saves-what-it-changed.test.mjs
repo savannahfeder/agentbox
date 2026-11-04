@@ -30,12 +30,12 @@ describe('a run saves what it changed', () => {
     const text = [
       turn('2026-08-23T20:00:00Z', [
         { type: 'text', text: 'Now the header.' },
-        edit('/repo/main/ipc.mjs', 'const a = 1;\nconst b = 2;\n', 'const a = 1;\nconst b = 3;\n'),
+        edit('/repo/main/ipc.mts', 'const a = 1;\nconst b = 2;\n', 'const a = 1;\nconst b = 3;\n'),
       ]),
     ].join('\n');
     const change = changeFromTranscript(text, { roots: ['/repo'] });
     expect(change.files).toHaveLength(1);
-    expect(change.files[0].path).toBe('main/ipc.mjs');
+    expect(change.files[0].path).toBe('main/ipc.mts');
     // One line moved, so one green and one red, and the line that did not move
     // is still there as context. That is the whole point of the row shape.
     expect(change.plus).toBe(1);
@@ -45,12 +45,12 @@ describe('a run saves what it changed', () => {
 
   it('drops scratch a run wrote outside every root', () => {
     const text = [
-      turn('2026-08-23T20:00:00Z', [edit('/repo/main/ipc.mjs', 'a\n', 'b\n')]),
+      turn('2026-08-23T20:00:00Z', [edit('/repo/main/ipc.mts', 'a\n', 'b\n')]),
       turn('2026-08-23T20:01:00Z', [edit('/tmp/shot-once.mjs', '', 'console.log(1)\n')]),
       turn('2026-08-23T20:02:00Z', [edit('/private/tmp/scratch.mjs', '', 'x\n')]),
     ].join('\n');
     const change = changeFromTranscript(text, { roots: ['/repo'] });
-    expect(change.files.map((f) => f.path)).toEqual(['main/ipc.mjs']);
+    expect(change.files.map((f) => f.path)).toEqual(['main/ipc.mts']);
   });
 
   // IN THE APP'S HOME, NOT IN HER FOLDER. This used to assert `path.join(dir,
@@ -58,7 +58,7 @@ describe('a run saves what it changed', () => {
   // her folder, and this writer put it straight back, once per run that
   // changed any code.
   it('writes the change where the pane looks for it', () => {
-    const text = turn('2026-08-23T20:00:00Z', [edit('/repo/main/ipc.mjs', 'a\n', 'b\n')]);
+    const text = turn('2026-08-23T20:00:00Z', [edit('/repo/main/ipc.mts', 'a\n', 'b\n')]);
     const transcript = path.join(dir, 'session.jsonl');
     fs.writeFileSync(transcript, text);
     const out = writeChangeForRun({ transcript, docsDir: dir, itemId: 'w-test01', roots: ['/repo'] });
@@ -81,14 +81,14 @@ describe('a run saves what it changed', () => {
     // The trace line is not decoration: the chip on her card is found by
     // reading the run's own trace for paths (renderer/src/run-files.ts), so a
     // change written without one is a file nothing on screen can reach.
-    const src = fs.readFileSync(path.join(ROOT, 'main', 'supervisor.mjs'), 'utf8');
+    const src = fs.readFileSync(path.join(ROOT, 'main', 'supervisor.mts'), 'utf8');
     // The exit handler's work is `settleExit` (a stop signal's death waits a
     // moment to be judged: tests/a-worker-stopped-with-the-app-is-not-a-failed-run).
-    const exitHandler = src.slice(src.indexOf('const settleExit = (code, signal, how) => {'));
-    // On the git thread (main/run-change.mjs), and the trace ends after it.
+    const exitHandler = src.slice(src.indexOf('const settleExit = (code'));
+    // On the git thread (main/run-change.mts), and the trace ends after it.
     expect(exitHandler).toContain("gitJob('saveRunChange'");
     expect(exitHandler.indexOf("gitJob('saveRunChange'")).toBeLessThan(exitHandler.indexOf('trace?.end()'));
     expect(exitHandler.indexOf('[Write]')).toBeLessThan(exitHandler.indexOf('trace?.end()'));
-    expect(fs.readFileSync(path.join(ROOT, 'main', 'run-change.mjs'), 'utf8')).toContain('writeChangeForRun(');
+    expect(fs.readFileSync(path.join(ROOT, 'main', 'run-change.mts'), 'utf8')).toContain('writeChangeForRun(');
   });
 });

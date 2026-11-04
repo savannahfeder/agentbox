@@ -21,9 +21,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { codexPlanEnded } from '../main/codex-account.mjs';
-import { troubleCause, deadRunSentence, deadRunCause, runStoppedLine, causeBreakdown } from '../shared/spawn-trouble.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { codexPlanEnded } from '../main/codex-account.mts';
+import { troubleCause, deadRunSentence, deadRunCause, runStoppedLine, causeBreakdown } from '../shared/spawn-trouble.mts';
 
 // Copied off the run's trace log.
 const HER_REFUSAL = 'this row asks to run on "gpt-6.1-sol", which is not a model the Codex on this computer knows. It offers gpt-6-luna, gpt-5.6-terra, gpt-5.6-luna. Nothing here will pick a stand-in for her, so this run is stopping rather than doing her work on a model she did not choose';

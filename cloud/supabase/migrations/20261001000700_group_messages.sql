@@ -3,7 +3,7 @@
 -- against a teammate making a "direct" record that holds two others and reading
 -- what they say to each other. The app closes that door itself now: a message
 -- goes only into a record whose people are EXACTLY the ones chosen, its maker
--- among them (main/team/index.mjs, `directWith`), so a record with a stranger
+-- among them (main/team/index.mts, `directWith`), so a record with a stranger
 -- in it is never written to. The cap rises to a small group: the maker and up
 -- to eleven others.
 create or replace function public.direct_stays_between_two() returns trigger

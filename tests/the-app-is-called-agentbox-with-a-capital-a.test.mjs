@@ -14,7 +14,7 @@
 import { describe, expect, it } from 'vitest';
 import { NAME, Name, nameSlug, ENV_PREFIX, possessive } from '../shared/product-name.mjs';
 import { SAY } from '../renderer/src/update-row.ts';
-import { __wasRelayed, fromTheApp } from '../main/agents.mjs';
+import { __wasRelayed, fromTheApp } from '../main/agents.mts';
 
 describe('the name', () => {
   it('is Agentbox mid-sentence as well as at the start of one', () => {

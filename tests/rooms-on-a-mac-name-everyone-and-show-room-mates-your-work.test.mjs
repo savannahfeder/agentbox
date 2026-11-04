@@ -1,7 +1,7 @@
 // ROOMS ON A MAC NAME EVERYONE AND SHOW ROOM-MATES YOUR WORK (w-3d0fa23ffb, 2026-10-22).
 //
 // What an hour with a test account in the founder's room turned up, end to end
-// through main/team/rooms.mjs: the founder could not see what a room-mate from
+// through main/team/rooms.mts: the founder could not see what a room-mate from
 // outside the team was working on; while she was invisible every message she
 // had sent read "Someone"; and the room said five people while the wall showed
 // two, because teammates who had not turned Rooms on had no card.
@@ -13,8 +13,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createRooms, roomPrefsFile } from '../main/team/rooms.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
 
 const T0 = Date.parse('2026-10-22T15:00:00-07:00');
 const timers = { setTimeout: (fn) => { const h = { off: false }; queueMicrotask(() => { if (!h.off) fn(); }); return h; }, clearTimeout: (h) => { if (h) h.off = true; } };
