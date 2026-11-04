@@ -685,7 +685,10 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       cooldownUntil: supervisor._profileCooldown?.[profile] ?? 0,
       live: !resting && !trouble,
       state: trouble ? trouble.cause : resting ? 'resting' : 'live',
-      trouble: trouble ? { cause: trouble.cause, since: trouble.since, note: accountSentence(trouble.cause, profile === 'default' ? null : profile) } : null,
+      trouble: trouble ? {
+        cause: trouble.cause, since: trouble.since, at: trouble.at ?? trouble.since ?? null, resetsAt: trouble.resetsAt ?? null,
+        note: accountSentence(trouble.cause, profile === 'default' ? null : profile),
+      } : null,
       // SESSIONS ON THIS SUBSCRIPTION, NOT SESSIONS IN A FOLDER OF THIS NAME.
       // `profile` is a folder and a CODEX worker's profile is also 'default',
       // so this counted Codex threads as sessions on her Claude login -- the

@@ -10,10 +10,11 @@
 // is a job of its own: a branch cannot change repository, and a running worker
 // cannot have the ground moved under it.
 //
-// So this covers the case the tester actually hit, and refuses the rest out
-// loud rather than half-doing it: A THREAD NOTHING HAS EVER RUN ON. There is
-// no trace, no folder, no branch and no worker, so the whole thread is the
-// message you typed, and moving it is filing that message in the right place.
+// So the message moves and the rest stays: the thread starts over in the new
+// project from what you typed, and the old row keeps its history in Closed. A
+// thread nothing has run on loses nothing that way. One that changed code in
+// its old project is refused, because that code would be left behind on a
+// branch nobody looks at (main/ipc.mts reads the folder; `notShipped` here).
 //
 // IT GETS A NEW ID THERE, which is the one thing this does not pretend about.
 // Keeping the id would put two rows with the same id in one store, and the
@@ -33,6 +34,8 @@ export interface MovableThread {
 // Every word somebody might type into ⌘K reaching for this. "file" and
 // "project" are in here because that is what the tester typed first: "pro"
 // offered New project… and Projects… and nothing else.
+import { notShipped } from './not-shipped.mts';
+
 export const MOVE_KEYWORDS: string = 'move to project file refile wrong another switch put';
 
 /** Nothing offers a move to the project the thread is already in. */
@@ -55,16 +58,17 @@ export function whyItCannotMove(item: MovableThread | null | undefined, { live =
   // no project's ledger, so there is nothing here to move.
   if (item.agent) return 'An agent’s own session does not live in a project.';
   if (live) return 'An agent is working on this one. Stop it first.';
-  if (item.epoch! > 0) return RAN_ALREADY;
-  if (words(item.result) || words(item.note)) return RAN_ALREADY;
   if (item.status === 'done') return 'This thread is finished. Moving it would only move the record.';
+  if (notShipped(item)) return CHANGED_HERE;
   return null;
 }
 
-// The one sentence for every shape of "an agent has already had this", because
-// they are one fact to the person reading it: the thread has a history here
-// now, and the history is what cannot follow it.
-export const RAN_ALREADY: string = 'Only a thread nothing has run on can move. This one has a history here.';
+export const CHANGED_HERE: string = 'This thread changed code in its project. Ship it or close it there first.';
+
+/** Whether an agent has had this thread, so a move starts it over rather than files it. */
+export function ranHere(item: MovableThread | null | undefined): boolean {
+  return (item?.epoch ?? 0) > 0 || words(item?.result) || words(item?.note);
+}
 
 export function canMove(item: MovableThread | null | undefined, opts?: { live?: boolean }): boolean {
   return whyItCannotMove(item, opts) === null;
@@ -98,12 +102,17 @@ export const CARRIED: string[] = ['title', 'body', 'kind', 'priority', 'labels',
 // you wrote in the summary, and the thread it was filed under.
 export const CARRIED_AFTERWARDS: string[] = ['parent', 'label', 'problem'];
 
+// Labels a run puts on its row: `ship` would ship the new folder before its
+// agent says so, and a repeat's label names a rule in the old project.
+const RUN_LABEL = (label) => label === 'ship' || label === 'clean' || label.startsWith('repeat:');
+
 /** The content of `item`, machinery left behind. */
 export function whatMoves(item: MovableThread): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const field of CARRIED) {
-    const value = item?.[field];
+    let value = item?.[field];
     if (value === undefined || value === null) continue;
+    if (field === 'labels' && Array.isArray(value)) value = value.filter((l) => typeof l === 'string' && !RUN_LABEL(l));
     if (Array.isArray(value) ? value.length : value !== '') out[field] = value;
   }
   return out;

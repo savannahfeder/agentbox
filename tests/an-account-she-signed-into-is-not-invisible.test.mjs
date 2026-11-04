@@ -55,7 +55,8 @@ let home;
 function signedIn(name, email, uuid) {
   const dir = path.join(home, name);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, '.claude.json'), JSON.stringify({
+  // The default login's file sits beside ~/.claude, not in it.
+  fs.writeFileSync(path.join(name === '.claude' ? home : dir, '.claude.json'), JSON.stringify({
     oauthAccount: { emailAddress: email, accountUuid: uuid },
     projects: {},
   }));

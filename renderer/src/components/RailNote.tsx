@@ -158,7 +158,7 @@ export function RailNote({ product, oneLiner, onNotice }: {
       // not answered yet the first time this runs. If it has not, the effect
       // below picks the seeding up when it does.
       wantsSeed.current = !text && !seed;
-      editor.commands.setContent(mdToPmDoc(seed || text));
+      editor.commands.setContent(mdToPmDoc(seed || text), { emitUpdate: false });
       setReady(true);
       // A preload too old to have the bridge is worth one sentence: the panel
       // would otherwise offer her a box that throws every word away.
@@ -182,7 +182,7 @@ export function RailNote({ product, oneLiner, onNotice }: {
     wantsSeed.current = false;
     seeded.current = true;
     pending.current = seed;
-    editor.commands.setContent(mdToPmDoc(seed));
+    editor.commands.setContent(mdToPmDoc(seed), { emitUpdate: false });
   }, [editor, oneLiner]);
 
   // The window losing focus, and this panel going away, are the two other

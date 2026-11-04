@@ -54,7 +54,7 @@ import { practiceRefusal, noProjectYet } from '../compose-says';
 import { onCloudPhone } from '../phone-screen';
 import { defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type ModelChoice } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLastEffort, writeLastEffort } from '../effort';
-import { readLastEngine, startingEngine, writeLastEngine } from '../engines';
+import { startingEngine, writeLastEngine } from '../engines';
 import { repeatPresets } from '../components/When';
 import { ideasFor, type Idea } from '../first-run';
 import { readRule, repeatsLine } from '../format';
@@ -129,8 +129,10 @@ export interface ComposeStart {
 }
 
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false, onSendToAgent, blockChoicesFor,
+  products, items, engines, workspaceEngine, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false, onSendToAgent, blockChoicesFor,
 }: {
+  /** The default agent from Settings, which every new card opens on. */
+  workspaceEngine?: string | null;
   /** First-thread suggestions, offered only while the tutorial is walking someone to their first send. */
   ideas?: Idea[] | null;
   /** The tutorial's first task: the folder is asked for before the suggestions. */
@@ -328,8 +330,11 @@ export function ThreadComposer({
   const claudeOffered = engineRows.some((e) => e.id === 'claude');
   const codexDefault = codexModelDefault ?? null;
   const modelOpts = { codexModels, codexDefault };
+  // The agent is the default from Settings, not the last one picked: a pick
+  // carried silently into the next thread sent work to the wrong agent. Each
+  // agent's own last model is still remembered.
   const remembered = (): ModelPick => {
-    const engine: Harness = startingEngine(readLastEngine(), engines);
+    const engine: Harness = startingEngine(workspaceEngine ?? null, engines);
     return { engine, model: readLastModel(undefined, engine, codexDefault) ?? defaultModelFor(engine, codexDefault) };
   };
   const [pick, setPick] = useState<ModelPick>(remembered);

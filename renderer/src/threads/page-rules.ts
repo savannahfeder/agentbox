@@ -7,7 +7,7 @@
 // teammates' from the cards their Macs publish.
 import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mjs';
 import type { Seen } from './summary-rules';
-import { hiddenUntil } from '../list-rules';
+import { hiddenUntil, placedAt } from '../list-rules';
 import type { AgentVoice, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { voiceName } from '../../../shared/agent-voice.mjs';
 import { priorityIdOf, priorityValueOf, type PriorityId } from '../priority';
@@ -179,9 +179,9 @@ export const rankScore = (r: Ranked, projectOrder: string[] = [], direct?: Reado
   placedScore(r.place, placeScore(projectOrder, r.product ?? '', direct) + priorityValueOf(priorityIdOf(shownPriority(r, !!direct?.has(r.product ?? '')) || null)));
 const fromAPerson = (r: Ranked, direct?: ReadonlySet<string>) => (direct?.has(r.product ?? '') || heldByAPerson(r) ? 1 : 0);
 export const byPriority = (projectOrder: string[] = [], direct?: ReadonlySet<string>) => (a: Ranked, b: Ranked) =>
-  rankScore(b, projectOrder, direct) - rankScore(a, projectOrder, direct) || fromAPerson(b, direct) - fromAPerson(a, direct) || b.updatedAt - a.updatedAt;
+  rankScore(b, projectOrder, direct) - rankScore(a, projectOrder, direct) || fromAPerson(b, direct) - fromAPerson(a, direct) || placedAt(b) - placedAt(a);
 /** `product` is the project's slug, which is what the running order holds. */
-export type Ranked = { priority?: number | null; updatedAt: number; createdAt?: number; start?: string; status?: string; wrote?: WorkItem['wrote']; product?: string | null; place?: number; pinned?: boolean; assignee?: string };
+export type Ranked = { priority?: number | null; updatedAt: number; placedAt?: number; createdAt?: number; start?: string; status?: string; wrote?: WorkItem['wrote']; product?: string | null; place?: number; pinned?: boolean; assignee?: string };
 
 /**
  * WHEN A PERSON LAST WROTE ON THE THREAD (w-21b638d821): the newest of the
@@ -755,7 +755,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
         const state = stateOf?.(item);
         if (!state || (state === 'done' && !(item.updatedAt >= today))) continue;
         out.push({
-          key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: shownTitle(item), project: null,
+          key: `mine/${item.product}/${item.id}`, ownerId: item.assignee && item.assignee !== 'agent' ? item.assignee : me, state, title: shownTitle(item), project: null,
           projectSlug: product.slug, priority: shownPriority(item), updatedAt: item.updatedAt, item, card: null, task,
         });
         continue;

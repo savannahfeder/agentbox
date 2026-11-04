@@ -140,6 +140,7 @@ export interface RepeatInput {
   on?: number;
   engine?: string | null;
   model?: string | null;
+  startsNext?: unknown;
 }
 
 export type FiledItem = {
@@ -929,20 +930,27 @@ export class Store {
     const { compose, after } = splitForCompose(whatMoves(item!));
     // Where it came from, in the thread rather than only in a toast, because a
     // thread that turns up in a project nobody filed it in is a thread nobody
-    // can account for a week later.
+    // can account for a week later. It goes after your words: a body is what
+    // the thread shows as your first message, and a one-line ask lives only in
+    // the title. Your later replies come too, one still waiting included,
+    // since the run there starts over from this message.
     const said = movedHere(from?.name ?? fromSlug);
-    const body = compose.body ? `${compose.body}\n\n${said}` : said;
+    const yours = this.readHistory(fromSlug, id, { max: 1e6 })
+      .filter((l) => l.source === 'founder' && typeof l.patch?.answer === 'string' && l.patch.answer.trim())
+      .map((l) => l.patch.answer.trim());
+    const body = [compose.body || compose.title, ...yours, said].filter(Boolean).join('\n\n');
     let made = this.composeItem(toSlug, { ...compose, body });
     // The three `composeItem` has no argument for (shared/move-thread.mts).
     if (Object.keys(after).length) {
       made = { ...this.modules.workItemsDisk.updateWorkItem(this.productDir(toSlug), made.id, after, { source: 'founder' }), product: toSlug };
     }
 
-    // AND THE OLD ROW CLOSES SAYING WHERE ITS THREAD WENT. It is written as
-    // the app rather than as the founder: they moved a thread, they did not
-    // finish one, and a founder `done` is terminal in a way this need not be.
+    // AND THE OLD ROW CLOSES SAYING WHERE ITS THREAD WENT. The words are the
+    // app's; the close is the person's, because a thread of theirs closed by
+    // the app reads as news and stayed in Needs you. Z reopens it as before.
     const note = movedAway(to.name ?? toSlug);
-    this.modules.workItemsDisk.updateWorkItem(this.productDir(fromSlug), id, { status: 'done', note }, { source: 'system' });
+    this.modules.workItemsDisk.updateWorkItem(this.productDir(fromSlug), id, { note }, { source: 'system' });
+    this.modules.workItemsDisk.updateWorkItem(this.productDir(fromSlug), id, { status: 'done' }, { source: 'founder' });
     return { item: made, from: from?.name ?? fromSlug, to: to.name ?? toSlug, note };
   }
 
@@ -981,8 +989,8 @@ export class Store {
   // happening to both of these: she could compose "every morning", visibly pick
   // Codex and a Codex model, and every occurrence ran on the then-current
   // workspace default.
-  composeRepeat(slug: string, { title, body, priority, every, at, on, engine, model }: RepeatInput) {
-    return this.repeats.setRule(this.productDir(slug), { title, body, priority, every, at, on, engine, model });
+  composeRepeat(slug: string, { title, body, priority, every, at, on, engine, model, startsNext }: RepeatInput) {
+    return this.repeats.setRule(this.productDir(slug), { title, body, priority, every, at, on, engine, model, startsNext });
   }
 
   setRepeat(slug: string, id: string, patch: Record<string, unknown>) {

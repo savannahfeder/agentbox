@@ -1,7 +1,9 @@
 import { openSourceFile } from './open-source-file.mts';
 import {submitReply} from './live-replies.mts';
 import { noteToItsAgent } from './notes-wake.mjs';
-import { whyItCannotMove } from '../shared/move-thread.mts';
+import { CHANGED_HERE, ranHere, whyItCannotMove } from '../shared/move-thread.mts';
+import { whereTheWorkStands } from './git-change.mjs';
+import { taskFolderPath } from './task-folders.mts';
 import { GROUPS } from '../shared/connections-catalog.mjs';
 import { projectSeenBy } from '../shared/thread-cards.mjs';
 import { createEngineSetup } from './engine-setup.mts';
@@ -1146,6 +1148,15 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
         const why = whyItCannotMove(store.readItem(product, id), { live: true });
         return { ok: false, error: why };
       }
+      // Code it changed stays on its branch in this project, so it does not move.
+      const item = store.readItem(product, id);
+      if (ranHere(item)) {
+        const prod = store.listProducts().find((p) => p.slug === product);
+        let folder = null;
+        try { folder = prod?.repoPath ? taskFolderPath(supervisor.productFolder(prod), id) : null; } catch { folder = null; }
+        const stands = folder && fsWatch.existsSync(folder) ? whereTheWorkStands(folder) : null;
+        if (stands?.committed || stands?.uncommitted) return { ok: false, error: CHANGED_HERE };
+      }
       const out = store.moveItem(product, id, to);
       push();
       supervisor.wake();
@@ -1429,7 +1440,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // engine that was just refused. Both were absent here because neither field
   // reached this handler at all: the whole pair was dropped four times over on
   // the way from her card (main/repeats.mjs says where).
-  ipcMain.handle('zero:compose-repeat', (_e, { product, title, body, priority, rule, engine, model }: { product: string; title: string; body?: string; priority?: number; rule: { every: string; at: string; on?: number }; engine?: unknown; model?: string }) => {
+  ipcMain.handle('zero:compose-repeat', (_e, { product, title, body, priority, rule, engine, model, startsNext }: { product: string; startsNext?: unknown; title: string; body?: string; priority?: number; rule: { every: string; at: string; on?: number }; engine?: unknown; model?: string }) => {
     const made = store.composeRepeat(product, {
       title,
       body,
@@ -1437,6 +1448,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       ...rule,
       engine: supervisor.engineOffered(engine),
       model: supervisor.modelOffered(engine, model),
+      startsNext: startsNext === true,
     });
     // A new rule is owed at once, so its first run starts now, not on the next tick.
     supervisor.wake();

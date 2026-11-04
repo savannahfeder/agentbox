@@ -26,7 +26,7 @@ export function personChatOpens(direct: { at: number } | null, room: { at: numbe
 const ASKS_YOU = new Set(['Waiting on you', 'Has a question for you', 'Asking you to allow a command', 'Holding work for your go-ahead']);
 
 /** The one short word under a name: how they are, never what they are on. */
-export function statusWord(m: Pick<Member, 'kind' | 'agents' | 'starting' | 'inProgress' | 'now' | 'key' | 'running'>, waitsOnYou = 0): string {
+export function statusWord(m: Pick<Member, 'kind' | 'agents' | 'starting' | 'inProgress' | 'toDo' | 'now' | 'key' | 'running'>, waitsOnYou = 0): string {
   if (waitsOnYou > 0 && m.kind !== 'me') return waitsOnYou === 1 ? 'Waiting on you' : `${waitsOnYou} waiting on you`;
   if (m.kind === 'mate') {
     if (m.agents || m.running) return 'Working';
@@ -37,14 +37,15 @@ export function statusWord(m: Pick<Member, 'kind' | 'agents' | 'starting' | 'inP
     return 'Free';
   }
   if (m.kind === 'chat') return '';
-  // Agents when agents are all of it; a task they hold on top makes it work in progress.
-  if (m.agents && (m.inProgress ?? 0) <= m.agents) return m.agents === 1 ? '1 agent working' : `${m.agents} agents working`;
-  if (m.inProgress) return `${m.inProgress} in progress`;
+  const todo = m.toDo ? `${m.toDo} to do` : '';
+  const going = m.agents && (m.inProgress ?? 0) <= m.agents ? (m.agents === 1 ? '1 agent working' : `${m.agents} agents working`)
+    : m.inProgress ? `${m.inProgress} in progress` : '';
+  if (going || todo) return [going, todo].filter(Boolean).join(' · ');
   return m.agents == null ? '' : 'Nothing in progress';
 }
 
 /** Whether the word is a live one, so its mark moves. */
-export const isBusy = (word: string) => word === 'Working' || word === 'Starting' || / working$/.test(word);
+export const isBusy = (word: string) => word === 'Working' || word === 'Starting' || / working( ·|$)/.test(word);
 
 type NeedRow = { createdBy?: string | null; labels?: string[]; product: string };
 type Mention = { by: string | null };

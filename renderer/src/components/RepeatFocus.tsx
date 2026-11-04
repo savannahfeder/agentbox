@@ -32,7 +32,7 @@ import remarkGfm from 'remark-gfm';
 import type { RepeatRule, WorkItem } from '../types';
 import { ago, dayLabel, stamp } from '../format';
 import { joinMessage } from '../message-split';
-import { isCleanRun, nextRunAt, periodKey, ruleIdOf } from '../../../shared/repeats.mjs';
+import { isCleanRun, nextRunAt, periodKey, ruleIdOf, ruleLabel } from '../../../shared/repeats.mjs';
 
 export interface RunRow {
   id: string;
@@ -95,7 +95,6 @@ export function RepeatFocus({ rule, items, editing, onClose, onEdit, onEditClose
 }) {
   const runs = runLog(rule, items);
   const next = nextRunAt(rule);
-  const at = new Date(`2026-01-01T${rule.at}:00`).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   const message = joinMessage(rule);
 
   // THE SAME SKELETON A TASK HAS: a scrolling sheet with the box docked under
@@ -119,7 +118,7 @@ export function RepeatFocus({ rule, items, editing, onClose, onEdit, onEditClose
           <div className="focus-meta">
             <span>{rule.productName}</span>
             <span>·</span>
-            <span>daily at {at}</span>
+            <span>{ruleLabel(rule)}</span>
             {next && <><span>·</span><span>next {when(next)}</span></>}
           </div>
         </div>

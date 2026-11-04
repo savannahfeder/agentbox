@@ -75,7 +75,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(30), source: 'agent', patch: { result: 'All four tables are in the cloud and the Mac reads them from there.' } },
         { ts: at(28), source: 'founder', patch: { snoozedUntil: now + 26 * 60 * MIN } },
       ]),
-      thread('film', { id: 'w-5e6f7a8b9c', title: 'Write the launch script', status: 'open', priority: 0, body: 'A script for the launch film.', answer: 'Shorter, and open with the inbox.', createdAt: at(500), updatedAt: at(25), wrote: { body: her(at(500)), answer: her(at(25)), result: agent(at(60)) }, result: 'Here is a first draft.' }, [
+      thread('film', { id: 'w-5e6f7a8b9c', title: 'Write the launch script', status: 'open', priority: 0, engine: 'codex', body: 'A script for the launch film.', answer: 'Shorter, and open with the inbox.', createdAt: at(500), updatedAt: at(25), wrote: { body: her(at(500)), answer: her(at(25)), result: agent(at(60)) }, result: 'Here is a first draft.' }, [
         { ts: at(500), source: 'founder', patch: { body: 'A script for the launch film.' } },
         { ts: at(60), source: 'agent', patch: { result: 'Here is a first draft.' } },
         { ts: at(25), source: 'founder', patch: { answer: 'Shorter, and open with the inbox.' } },
@@ -115,6 +115,7 @@ export function previewSettings(now = Date.now()) {
       workspace: {
         cornerTag: true, diagnostics: true, adhdMode: true, alpha: { rooms: true, teammates: true }, outsideAgents: 'waiting',
         permission: 'auto', codexMode: 'auto', engines: ['claude', 'codex'], claude: { found: true }, codex: { found: true },
+        codexModels: [{ id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }, { id: 'gpt-5.6-terra', label: 'GPT-5.6-Terra', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }, { id: 'gpt-5.6-luna', label: 'GPT-5.6-Luna', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }], codexModelDefault: 'gpt-5.6-sol',
         agentsAuto: true, sessionsAtOnce: 4, agentsTotal: 6, agentsAutoTotal: 6, agentsNudge: 0, slotsMax: 12, slotsSuggested: 6, running: 3,
         memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 8, now: 'Memory is fine. Nothing heavy running.' },
         leftovers: { on: false, now: null },

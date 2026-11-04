@@ -103,7 +103,7 @@ describe('a cloud run that ends on the marked line', () => {
 
   it('is checked before anything writes the run\'s answer on the row', () => {
     const src = read('main/supervisor.mts');
-    const at = src.indexOf('this._noteCloudHandBack(item, session)');
+    const at = src.indexOf('this._noteCloudHandBack(item, session, cwd)');
     expect(at).toBeGreaterThan(0);
     expect(at).toBeLessThan(src.indexOf('if (this.speaksForTheSession(session, { command: !!plan.command }))'));
   });

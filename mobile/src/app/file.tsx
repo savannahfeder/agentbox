@@ -10,7 +10,7 @@ import { FlatList, Pressable, ScrollView, StyleSheet, useWindowDimensions, View 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { MAX_ZOOM, fitScale } from '../../../renderer/src/picture-view';
-import { docOnPhone, openingOf, pageOnPhone, pictureLink, pictureSource } from '../lib/files';
+import { docOnPhone, openingOf, pageOnPhone, pictureLink, pictureSource, shapeOfDrawn } from '../lib/files';
 import { useCloud } from '../state/cloud';
 import { readLink, useMessageFiles } from '../ui/Files';
 import { Back } from '../ui/icons';
@@ -177,7 +177,7 @@ function Shown({ uri, name, width, height, stage }: { uri: string | null | undef
   useEffect(() => {
     if (!uri) return;
     let live = true;
-    Image.loadAsync(pictureSource(uri)).then(({ width: w, height: h }) => { if (live) setNatural({ w, h }); }, () => {});
+    shapeOfDrawn(() => Image.loadAsync(pictureSource(uri))).then((shape) => { if (live) setNatural(shape); }, () => {});
     return () => { live = false; };
   }, [uri]);
   const box = { w: width - 32, h: height - stage.top - stage.bottom };

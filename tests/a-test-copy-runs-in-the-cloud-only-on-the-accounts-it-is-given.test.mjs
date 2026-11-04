@@ -77,7 +77,7 @@ describe('the list a run carries', () => {
   it('is the keys of the accounts the emails name, a Claude one found through its organization as the menu finds it', () => {
     const login = (dir, email, org) => {
       fs.mkdirSync(path.join(home, dir), { recursive: true });
-      fs.writeFileSync(path.join(home, dir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: `u-${dir}`, organizationUuid: org } }));
+      fs.writeFileSync(path.join(home, dir === '.claude' ? '' : dir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: `u-${dir}`, organizationUuid: org } }));
     };
     login('.claude', 'fresh@example.com', 'org-fresh');
     login('.claude-2', 'work@example.com', 'org-work');

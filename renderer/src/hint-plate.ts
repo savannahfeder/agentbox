@@ -134,6 +134,7 @@ export const HINTS: Record<string, HintLine[]> = {
   // thread's dots. It prints only its word, so E goes here, in
   // the row plate's own wording.
   done: [{ key: 'E', what: 'Mark done' }],
+  'close-task': [{ key: '', what: 'Close the task for both of you' }],
   // The Summary button printed its S on its face until w-5984544441; the key
   // is said here now, the same as every other button in the corner. Since
   // w-a3482b8c2c it hangs from the summary's rail and the icon that closes it.

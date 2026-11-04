@@ -117,6 +117,20 @@ if [ ! -x "node_modules/.bin/vitest" ]; then
   exit 1
 fi
 
+# A task folder's node_modules is a copy of the app folder's, so a branch that
+# changes packages would otherwise be tested on main's.
+installed="$hookdir/../lib/installed-matches-the-lockfile.mjs"
+if [ -f "$installed" ] && ! node "$installed"; then
+  echo "pre-push: installing what package-lock.json says before the tests run..."
+  if ! npm ci --no-audit --no-fund; then
+    echo ""
+    echo "  PUSH REFUSED. npm ci failed in $root, so the tests would run on the"
+    echo "  wrong packages. The reason is above."
+    echo ""
+    exit 1
+  fi
+fi
+
 refuse() {
   echo ""
   echo "  PUSH REFUSED, because the tests above are red."

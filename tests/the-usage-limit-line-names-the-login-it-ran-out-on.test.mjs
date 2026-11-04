@@ -103,7 +103,8 @@ describe('the supervisor names its own logins', () => {
   let root, sup;
   const signedIn = (dir, email) => {
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: email } }));
+    const beside = path.basename(dir) === '.claude' ? path.dirname(dir) : dir;
+    fs.writeFileSync(path.join(beside, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: email } }));
   };
   beforeEach(async () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'limit-login-'));

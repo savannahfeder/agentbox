@@ -430,6 +430,7 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .tp-side .ts-ticket { max-width: none; margin: 0; padding: 20px 22px 18px; border-radius: 10px; }
 .tp-side .ts-tk-part { padding: 0 0 18px; margin: 0 0 18px; border-bottom: 1px solid var(--line); }
 .tp-side .ts-tk-part > .ts-h { margin: 0 0 8px; }
+.tp-side .ts-tk-done { padding-top: 0; border-top: 0; }
 .tp-side .ts-tk-lead { margin: 0; font-size: 14px; line-height: 21px; }
 .tp-side .ts-tk-grid { grid-template-columns: 1fr; gap: 14px; padding-top: 0; border-top: 0; }
 .ts-tk-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
