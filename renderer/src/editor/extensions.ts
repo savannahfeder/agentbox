@@ -120,8 +120,11 @@ export const Arrows = Extension.create({
 // round-trips ![alt](src) through markdown.ts and renders a plain <img>. src is
 // a creation-file:// URL written by creation:save-image; the founder pastes or
 // drops an image and it lands as a real file beside the doc.
-export const Image = Node.create({
+export const Image = Node.create<{ drawnFrom: ((src: string) => string) | null }>({
   name: 'image',
+  addOptions() {
+    return { drawnFrom: null };
+  },
   group: 'block',
   atom: true,
   draggable: true,
@@ -136,7 +139,9 @@ export const Image = Node.create({
     return [{ tag: 'img[src]' }];
   },
   renderHTML({ HTMLAttributes }) {
-    return ['img', mergeAttributes(HTMLAttributes)];
+    // Only what is drawn: the document keeps the path it wrote.
+    const src = HTMLAttributes.src && this.options.drawnFrom ? this.options.drawnFrom(HTMLAttributes.src) : HTMLAttributes.src;
+    return ['img', mergeAttributes(HTMLAttributes, { src })];
   },
 });
 
@@ -151,7 +156,7 @@ export const STARTER_KIT_EXTRAS_OFF = { link: false, underline: false, trailingN
    only two ways that ends are a panel wider than its own words or a row of
    cells running off the edge. Nothing else about the set changes: the same
    markdown, the same input rules, the same file on disk either way. */
-export function buildExtensions(placeholder: string, { tables = true }: { tables?: boolean } = {}) {
+export function buildExtensions(placeholder: string, { tables = true, drawnFrom = null }: { tables?: boolean; drawnFrom?: ((src: string) => string) | null } = {}) {
   return [
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
@@ -160,7 +165,7 @@ export function buildExtensions(placeholder: string, { tables = true }: { tables
     Underline,
     UnboldHeading,
     Arrows,
-    Image,
+    Image.configure({ drawnFrom }),
     Link.configure({ openOnClick: false, autolink: true }),
     TaskList,
     TaskItem.configure({ nested: true }),

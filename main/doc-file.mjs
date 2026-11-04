@@ -19,7 +19,7 @@ import path from 'node:path';
 import { artifactRoots } from './artifact-path.mjs';
 
 export const EDITABLE_RE = /\.(md|markdown)$/i;
-export const READABLE_RE = /\.(md|markdown|html?)$/i;
+export const READABLE_RE = /\.(md|markdown|html?|py|ipynb|js|mjs|ts|tsx|jsx|rb|go|rs|sh|sql|css|txt|csv|tsv|json|ya?ml|xml)$/i;
 
 // A megabyte and a half of markdown is already far past anything in her store
 // (the largest is decisions.md). Past that the editor is not the right tool and

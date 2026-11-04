@@ -26,10 +26,10 @@ describe('in Dark, the corner marks', () => {
   it('are no longer painted inside the card', () => {
     expect(nav).not.toMatch(/grid-ticks/);
   });
-  it('stand 7px outside it, on their own element', () => {
-    expect(read('App.tsx')).toMatch(/<div className="panel-marks" aria-hidden="true" \/>/);
+  // Gone outside it too since 2026-11-02 (dark-works-like-light-and-only-its-colours-differ).
+  it('are not drawn outside it either', () => {
     expect(nav).toMatch(/^\.panel-marks \{ display: none; \}/m);
-    expect(rule(nav, `${E} \\.panel-marks::after`)).toMatch(/inset: -7px;/);
+    expect(nav).not.toMatch(/panel-marks::after/);
   });
   it('leave the window draggable', () => {
     expect(nav).not.toMatch(new RegExp(`${E} \\.workspace-layout::after`));

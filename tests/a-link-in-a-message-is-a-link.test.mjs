@@ -79,8 +79,8 @@ describe('a full path into the product folder', () => {
   it('becomes a link to the short path the rest of the app understands', () => {
     const tree = run(`It is at ${DIR}/designs/w-3a/latest.html now.`, { dir: DIR });
     expect(links(tree)).toEqual(['designs/w-3a/latest.html']);
-    // What she reads is what the worker wrote.
-    expect(only(tree)[1].children[0].value).toBe(`${DIR}/designs/w-3a/latest.html`);
+    // What she reads is the file's name, as the phone has it ("no file paths in what I read").
+    expect(only(tree)[1].children[0].value).toBe('latest.html');
     expect(only(tree)[2].value).toBe(' now.');
   });
 
@@ -149,7 +149,11 @@ describe('the pane draws a player for audio and video', () => {
   const focus = read('renderer/src/components/Focus.tsx');
 
   it('hands a media link to the player before it becomes plain blue text', () => {
-    const a = focus.slice(focus.indexOf('a: ({ href, children }'), focus.indexOf('img: ({ src, alt }'));
+    const whole = focus.slice(focus.indexOf('a: ({ href, children'), focus.indexOf('img: ({ src, alt }'));
+    // One link stays its name: the row under the sentence plays that one (media-row.ts).
+    const nameOnly = whole.split('\n').find((line) => line.includes('if (nameOnly && href)'));
+    expect(nameOnly).toContain('<ArtifactLink');
+    const a = whole.replace(nameOnly, '');
     expect(a).toContain('ArtifactMedia');
     expect(a.indexOf('ArtifactMedia')).toBeLessThan(a.indexOf('ArtifactLink'));
   });

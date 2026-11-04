@@ -6,8 +6,9 @@
 // closes the line, so the CSS pausing it under the pointer pauses the close.
 export const SENT_LINE_MS = 5000;
 
-export function SentLine({ title, undoes, onBack, onUndo, onClose }: {
+export function SentLine({ title, says = 'Sent to', undoes, onBack, onUndo, onClose }: {
   title: string;
+  says?: string;
   undoes: boolean;
   onBack: () => void;
   onUndo: () => void;
@@ -16,7 +17,7 @@ export function SentLine({ title, undoes, onBack, onUndo, onClose }: {
   return (
     <div className="sent-line" role="status">
       <span className="sent-line-dot" aria-hidden="true" />
-      <span className="sent-line-said">Sent to <span className="sent-line-title">{title}</span></span>
+      <span className="sent-line-said">{says} <span className="sent-line-title">{title}</span></span>
       <span className="sent-line-keys">
         <button type="button" className="sent-line-key" onClick={onBack}><kbd>O</kbd><span className="sent-line-word">Back</span></button>
         {undoes && <button type="button" className="sent-line-key" onClick={onUndo}><kbd>Z</kbd><span className="sent-line-word">Undo</span></button>}

@@ -28,6 +28,13 @@ export const reactionOut = (r) => ({
   messageId: r.message_id, roomId: r.room_id, by: r.person_id, emoji: r.emoji, on: !!r.is_on, at: Date.parse(r.updated_at),
 });
 
+export const DECISION_COLS = 'room_id,message_id,kind,project,body,said_by,marked_by,is_on,updated_at';
+
+export const decisionOut = (r) => ({
+  roomId: r.room_id, messageId: r.message_id, kind: r.kind, project: r.project ?? null, body: r.body,
+  saidBy: r.said_by ?? null, by: r.marked_by, on: !!r.is_on, at: Date.parse(r.updated_at),
+});
+
 // The checks room_files makes (20261022000000_room_messages_do_more.sql).
 export const ROOM_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$/;
 // 10 MiB of file, and that much as base64 with its padding.

@@ -60,7 +60,7 @@ import type { RunningSession, WhyNotCloud, WorkItem } from './types';
 export type LiveState = 'asking' | 'working' | 'elsewhere' | 'shipping' | 'next' | 'queued' | 'cannot' | 'signin' | 'limit' | 'paused' | 'silent' | 'idle';
 
 export interface CannotStart {
-  why: 'setup' | 'asleep' | 'cloud-carried' | 'engine' | 'login' | 'memory' | 'slow-folder' | 'error' | string;
+  why: 'setup' | 'asleep' | 'cloud-carried' | 'engine' | 'login' | 'memory' | 'slow-folder' | 'error' | 'brake' | string;
   /** "Claude Code" or "Codex". */
   tool: string;
 }
@@ -79,6 +79,7 @@ export function cannotStartLine({ why, tool }: CannotStart): string | null {
   if (why === 'memory') return 'This computer is short of memory, so this waits for heavier work to finish.';
   if (why === 'slow-folder') return 'Making this thread\'s own copy of the project is taking much longer than it should, so the agent has not started.';
   if (why === 'error') return 'Starting an agent on this failed. The app tries again on its own.';
+  if (why === 'brake') return `${tool}'s last runs stopped before they began, so the app is waiting before it tries again.`;
   return null;
 }
 

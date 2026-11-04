@@ -84,7 +84,7 @@ describe('every send, start and reply names where it went', () => {
   });
 
   it('a message to a teammate names the conversation', () => {
-    expect(app).toMatch(/showToast\(said \? `Sent to \$\{said\}` : 'Message sent', how\.made \?/);
+    expect(app).toMatch(/showToast\(how\.given \? `Task sent to \$\{said\}` : said \? `Sent to \$\{said\}` : 'Message sent', how\.made \?/);
   });
 
   it('the computer says which conversation a message went into', () => {

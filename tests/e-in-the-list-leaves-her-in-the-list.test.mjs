@@ -14,6 +14,9 @@
 // AND THE FLOW SHE ALREADY HAS IS NOT THE PRICE OF IT. The same script opens a
 // task and presses E in it, and that still lands on the next task; both halves
 // have to pass or the script fails.
+//
+// The import from ./advance is read in any order now: it grew names after
+// nextAfterAdvance (sayWhoseBox) and the rule did not change.
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -54,7 +57,7 @@ describe('the app', () => {
   // an agent row), and they all go through deferCommit → noteAdvance. The rule
   // is asked once, there, for the same reason keys.ts exists.
   it('asks the rule whether a task was open, in the one place that advances', () => {
-    expect(app).toMatch(/import \{ advanceAfter, [^}]*nextAfterAdvance, type Advance \} from '\.\/advance'/);
+    expect(app).toMatch(/import \{ advanceAfter, [^}]*nextAfterAdvance[^}]*\} from '\.\/advance'/);
     expect(app).toMatch(/advanceRef\.current = advanceAfter\(\{ fromTask: !!focused, index, id: item\.id \}\)/);
     // And the answer has to be able to change when she opens or leaves a task,
     // or narrows the inbox (the filtered inbox, w-27759abd33).

@@ -13,12 +13,12 @@ it('offers reading, wide and edge widths without changing inbox rows',()=>{
  expect(read('workspace-navigation.css')).not.toContain("content:'Back'");
 });
 
-// A 980px middle column sits between the original 780px and wide 1200px.
+// The balanced column is what a thread reads at: most of a 1440 window.
 it('offers a balanced width and aligns a compact arrow with the title line',()=>{
  expect(read('App.tsx')).toContain("const readingWidth = 'balanced'");
  const css=read('workspace-navigation.css');
- expect(css).toContain('[data-reading-width="balanced"] .focus { max-width:980px; }');
- expect(css).toContain('[data-reading-width="balanced"] .focus-dock-inner { max-width:916px; }');
+ expect(css).toContain('[data-reading-width="balanced"] .focus { max-width:1180px; }');
+ expect(css).toContain('[data-reading-width="balanced"] .focus-dock-inner { max-width:1116px; }');
  // One point up since w-e731ca9376 (2026-10-01): at top 0 the chevron sat a
  // couple of pixels under the title's capitals. The measurement is pinned in
  // the-thread-bar-says-its-state-once-and-keeps-its-verbs-in-one-menu.

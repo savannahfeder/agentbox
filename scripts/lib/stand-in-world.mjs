@@ -36,6 +36,21 @@ export function worldTurn(world, login, rand = Math.random) {
   };
 }
 
+/** How often a stand-in waiting out the world's pace writes a step, in ms; 0 for never. */
+export function stepEvery(world) {
+  if (!world.pace) return 0;
+  const every = Number(world.pace.stepMs ?? 4000);
+  return Number.isFinite(every) && every > 0 ? every : 0;
+}
+
+/** Step `n` of the work, as Claude Code streams it: odd steps read a file, even ones say what was found. */
+export function workStep(n, title) {
+  const what = title ? String(title).slice(0, 80) : 'the task';
+  return n % 2 === 1
+    ? { type: 'tool_use', id: `toolu_step_${n}`, name: 'Read', input: { file_path: `src/part-${(n + 1) / 2}.js` } }
+    : { type: 'text', text: `Read part ${n / 2} for "${what}"; moving on to the next.` };
+}
+
 const OPTIONS = '\n\n## Options\n1. Ship it (recommended)\n2. Change something first\n3. Throw it away';
 
 /**

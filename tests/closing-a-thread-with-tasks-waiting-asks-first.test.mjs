@@ -88,7 +88,7 @@ describe('where the question is wired', () => {
   const focus = read('renderer/src/components/Focus.tsx');
 
   it('stops every close at one place, markDone, unless the close was the answer', () => {
-    expect(app).toMatch(/const markDone = useCallback\(async \(item: WorkItem, \{ stay, force, unshippedOk \}/);
+    expect(app).toMatch(/const markDone = useCallback\(async \(item: WorkItem, \{ stay, force, unshippedOk[,\w\s]*\}/);
     expect(app).toMatch(/if \(unshipped \|\| \(!force && waitingFiled\(item\)\.length\)\)/);
   });
 

@@ -245,6 +245,6 @@ describe('the thread reads on the push, not only on the timer', () => {
     // this conversation and must not displace the live block. So the bag is
     // open at its end and the two names this test is about are still pinned
     // where they were.
-    expect(src).toMatch(/itemThread\(ledger\.lines, sessions, saying, \{ whole, engine[,}]/);
+    expect(src).toMatch(/itemThread\(ledger\.lines, withEveryRun\(everyRun, sessions\), saying, \{ whole, engine[,}]/);
   });
 });

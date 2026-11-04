@@ -43,7 +43,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { readWorld, worldTurn, worldAnswer, titleIn } from './stand-in-world.mjs';
+import { readWorld, worldTurn, worldAnswer, titleIn, stepEvery, workStep } from './stand-in-world.mjs';
 
 const argv = process.argv.slice(2);
 const say = (obj) => process.stdout.write(JSON.stringify(obj) + '\n');
@@ -211,6 +211,25 @@ async function actAsTeammate(brief, prompt, answer) {
 
 let said = plan.say ?? 'the stub worker ran';
 
+// [[stub:act:<name>]] makes the store-tool calls its plan lists under
+// acts.<name> ({ calls: [{ tool, args }], say }), so a proof can have an agent
+// write a document or attach a file. A refused call is said in the answer.
+async function actFromPlan({ calls = [], say: words }) {
+  const server = Object.entries(mcpServers()).find(([name, s]) => name !== 'zero-approvals' && s?.env?.STORE_ACCOUNT_ID)?.[1];
+  if (!server) return 'the stub had no store tools to act with';
+  const session = mcpSession(server);
+  const refused = [];
+  try {
+    for (const { tool, args } of calls) {
+      const r = await session.call(tool, args ?? {});
+      if (r?.error || r?.result?.isError) refused.push(`${tool}: ${r?.error?.message ?? r?.result?.content?.[0]?.text ?? 'refused'}`);
+    }
+  } finally {
+    session.close();
+  }
+  return [words ?? 'Done.', ...refused].join('\n\n');
+}
+
 // WHAT THE TASK ITSELF ASKS OF THE STAND-IN. A proof that runs several threads
 // at once needs each worker to behave differently, and one plan file is shared
 // by all of them, so the task's own words carry the script:
@@ -279,12 +298,25 @@ if (directive('stub:hang') || turn.hang) {
 const slow = Number(directive('stub:slow')?.[1]) || turn.delayMs;
 if (slow > 0) {
   const until = Date.now() + slow;
-  while (!stopping && Date.now() < until) await wait(50);
+  // The world's pace stands in for real work, and real work shows its steps.
+  const every = directive('stub:slow') ? 0 : stepEvery(world);
+  let next = every ? Date.now() + every : Infinity;
+  let step = 0;
+  while (!stopping && Date.now() < until) {
+    if (Date.now() >= next) {
+      step += 1;
+      next += every;
+      say({ type: 'assistant', session_id: sessionId, message: { content: [workStep(step, titleIn(promptText))] } });
+    }
+    await wait(50);
+  }
 }
 
 try {
   const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
   if (brief.includes('team_post') && process.env.ZERO_ITEM) await actAsTeammate(brief, promptText, said);
+  const act = directive('stub:act')?.[1];
+  if (act && plan.acts?.[act]) said = await actFromPlan(plan.acts[act]);
   if (plan.approval) {
     const decision = await askTheFounder(plan.approval);
     say({ type: 'assistant', message: { content: [{ type: 'text', text: `the founder said: ${decision.behavior}` }] } });

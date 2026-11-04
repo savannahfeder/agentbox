@@ -127,6 +127,11 @@ const resultOf = (out) => JSON.parse(JSON.parse(out.split('\n').find((l) => l.in
 
 // The run has left with the folder as it was: only a change after this is one made while it was away.
 const untilAway = () => waitFor('the run to be away in the cloud', () => readMarker(mac)?.state === 'running');
+// And it stays away until this says so, rather than for a moment this Mac has
+// to get its own change in under. The file is outside the folder, so the only
+// change in there is the one the test is about.
+const whileAway = () => `SLOW:${path.join(tmp, 'go.txt')} please`;
+const letItHome = () => fs.writeFileSync(path.join(tmp, 'go.txt'), 'come home\n');
 
 describe('a cloud run', () => {
   it('streams the agent, runs its store call on the Mac, and lays its commit, its loose file and its transcript into the task folder', async () => {
@@ -247,10 +252,11 @@ describe('a cloud run', () => {
 
   // What happens to the run's work then: tests/a-cloud-run-that-cannot-be-laid-in-never-blocks-its-thread.
   it('will not lay the run over a folder that changed on this Mac while it was away, and keeps the run\'s commits', async () => {
-    const run = launch({ message: 'SLOW please' });
+    const run = launch({ message: whileAway() });
     // Something on the Mac writes into the folder while the agent works.
     await untilAway();
     fs.writeFileSync(path.join(mac, 'local-edit.txt'), 'made here meanwhile\n');
+    letItHome();
     expect(await run.done).toBe(0);
     expect(run.err()).toMatch(/changed on this Mac/);
     // The local edit is untouched, and the run's commit is kept on its branch.
@@ -260,11 +266,12 @@ describe('a cloud run', () => {
   });
 
   it('notices a change staged on this Mac meanwhile, even one whose file was put back', async () => {
-    const run = launch({ message: 'SLOW please' });
+    const run = launch({ message: whileAway() });
     await untilAway();
     fs.writeFileSync(path.join(mac, 'a.txt'), 'staged meanwhile\n');
     git(mac, 'add', 'a.txt');
     fs.writeFileSync(path.join(mac, 'a.txt'), 'one\n');
+    letItHome();
     expect(await run.done).toBe(0);
     expect(run.err()).toMatch(/changed on this Mac/);
     expect(git(mac, 'diff', '--cached', '--name-only')).toBe('a.txt');

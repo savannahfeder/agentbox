@@ -75,8 +75,8 @@ describe('everything the pane opens goes outside on a ⌘-click', () => {
 
 describe('what a ⌘-click does not change', () => {
   it('a file the pane cannot draw already went outside, and still does', () => {
-    expect(whereALinkGoes('reports/audit.pdf', PLAIN)).toBe('outside');
-    expect(whereALinkGoes('reports/audit.pdf', CMD)).toBe('outside');
+    expect(whereALinkGoes('reports/audit.xlsx', PLAIN)).toBe('outside');
+    expect(whereALinkGoes('reports/audit.xlsx', CMD)).toBe('outside');
   });
 
   it('with no pane to open, a plain click goes outside as before', () => {
@@ -90,10 +90,10 @@ describe('the thread and the document pane both ask it', () => {
 
   it('a link in a message hands its click to the opener', () => {
     const link = focus.slice(focus.indexOf('function ArtifactLink'), focus.indexOf('function textOf'));
-    expect(link).toMatch(/onClick=\{\(e\) => \{ e\.preventDefault\(\); onOpen\(e\); \}\}/);
-    expect(focus).toMatch(/onOpen=\{\(click\) => openHref\(href, undefined, click\)\}/);
-    expect(focus).toMatch(/onOpen=\{\(click\) => openHref\(source, undefined, click\)\}/);
-    expect(focus).toMatch(/onOpen=\{\(click\) => openHref\(path, undefined, click\)\}/);
+    expect(link).toMatch(/onClick=\{\(e\) => \{ e\.preventDefault\(\); onOpen\(e, e\.currentTarget\); \}\}/);
+    expect(focus).toMatch(/onOpen=\{\(click, from\) => openHref\(href, from, click\)\}/);
+    expect(focus).toMatch(/onOpen=\{\(click, from\) => openHref\(source, from, click\)\}/);
+    expect(focus).toMatch(/onOpen=\{\(click, from\) => openHref\(path, from, click\)\}/);
   });
 
   it('the opener decides with this rule, before the picture or the pane', () => {

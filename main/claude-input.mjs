@@ -73,7 +73,8 @@ export function attachClaudeInput(child) {
   // Claude replays it only when that turn first speaks. Send now must not cut
   // that turn: it was the answer (w-0202576e73).
   let inTurn = false;
-  const closeInput = () => { closed = true; ended = true; clearTimeout(wakeTimer); child.stdin.end(); };
+  // `end` answers false in the run host while an app is attached and closing is the app's to do.
+  const closeInput = () => { if (child.stdin.end() === false) return; closed = true; ended = true; clearTimeout(wakeTimer); };
   const mayClose = () => !held && atResult && !pending.size && !waiting.length;
   // Not into a session she is driving, and not when her own message is about
   // to start the next turn. Kept out of `pending`, so it never holds input open.
@@ -157,8 +158,16 @@ export function attachClaudeInput(child) {
       }
     }
   });
+  // A run the app reattached to (main/hosted-run.mjs): the host has been
+  // reading the stream meanwhile, and knows where the turn stands.
+  child.on('input-state', (s) => {
+    if (s?.closed) { closed = true; ended = true; return; }
+    atResult = !!s?.atResult;
+    if (Array.isArray(s?.waiting)) waiting = s.waiting;
+  });
+  child.inputState = () => ({ atResult, waiting: [...waiting], closed });
   child.waitingOn = () => [...waiting];
-  child.ranToTheEnd = () => ended;
+  child.ranToTheEnd = () => ended || !!child.endedInHost;
   child.holdInput = value => {
     if (closed && value) throw Error('This session has ended. Open remote control again to resume it.');
     held = !!value;

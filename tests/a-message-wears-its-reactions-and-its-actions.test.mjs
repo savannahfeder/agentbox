@@ -109,10 +109,13 @@ describe('the look round one asked for', () => {
   const css = fs.readFileSync(new URL('../renderer/src/team/chat.css', import.meta.url), 'utf8');
   const rule = (name) => css.slice(css.indexOf(`${name} {`)).slice(0, css.slice(css.indexOf(`${name} {`)).indexOf('}'));
 
-  it('keeps every new plate square', () => {
-    for (const name of ['.chat-chip', '.chat-acts', '.chat-emoji', '.chat-emoji-one', '.fmt-btn']) {
-      expect(rule(name)).toContain('border-radius: 0');
+  // These were square until the owner asked for soft corners on chips and
+  // buttons (2026-10-31): the plates take the small corner, the picker the card's.
+  it('gives every plate the small corner and the emoji picker the card corner', () => {
+    for (const name of ['.chat-chip', '.chat-acts', '.chat-emoji-one', '.fmt-btn']) {
+      expect(rule(name)).toContain('border-radius: var(--radius)');
     }
+    expect(rule('.chat-emoji')).toContain('border-radius: var(--artifact-corner)');
   });
 
   it('says which chip is yours with brightness, never with a colour', () => {
@@ -159,6 +162,6 @@ describe('the line that used to sit under the whole conversation', () => {
   it('is gone from the pane, because it is on the message now', () => {
     const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
     expect(focus).not.toContain('className="ts-hand"');
-    expect(focus).toContain('onHandToAgent={onHandToAgent ? () => onHandToAgent(item) : undefined}');
+    expect(focus).toContain('onHandToAgent={onHandToAgent ? (message) => onHandToAgent(item, message) : undefined}');
   });
 });

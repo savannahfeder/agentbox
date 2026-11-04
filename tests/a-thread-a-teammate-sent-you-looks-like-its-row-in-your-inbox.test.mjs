@@ -13,35 +13,31 @@ const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8')
 const page = read('renderer/src/teammates/TeammatesPage.tsx');
 const card = page.slice(page.indexOf('function SentCard('), page.indexOf('\nfunction ', page.indexOf('function SentCard(') + 10));
 
+// 2026-11-01: the row is now one quiet line, Waiting on you and its title
+// (a-thread-a-teammate-sent-you-is-one-quiet-line-in-its-chat). What stays from
+// here: it is never a card with an "Open it" button, and it is drawn from the
+// thread itself.
 describe('a thread a teammate sent you, in its chat', () => {
-  it('is the inbox\'s own row inside the inbox\'s own table, not a card with a button', () => {
-    expect(card).toMatch(/<div className="th-table tq-inrows">/);
-    expect(card).toMatch(/className="row" role="button" tabIndex=\{0\}/);
-    expect(card).toMatch(/<ThreadCells item=\{item\} product=\{product\} now=\{now\} \/>/);
+  it('is not a card with a button of its own', () => {
     expect(card).not.toMatch(/Open it/);
     expect(card).not.toMatch(/tq-card/);
-  });
-
-  it('opens on a click or Enter, as a row in the inbox does', () => {
-    expect(card).toMatch(/onClick=\{onOpen\}/);
-    expect(card).toMatch(/onKeyDown=\{\(e\) => \{ if \(e\.key === 'Enter'\) \{ e\.preventDefault\(\); onOpen\(\); \} \}\}/);
   });
 
   it('is drawn from the thread itself, which the app hands the page', () => {
     expect(read('renderer/src/App.tsx')).toMatch(/const teammatesUi = useTeammates\(\{\s*items,/);
     expect(read('renderer/src/teammates/useTeammates.tsx')).toMatch(/<TeammatesPage [^>]*items=\{items\}/);
-    expect(card).toMatch(/item: items\.find\(\(i\) => i\.id === r\.item && i\.product === r\.product\) \?\? null/);
+    expect(card).toMatch(/const item = items\.find\(\(i\) => i\.id === r\.item && i\.product === r\.product\) \?\? null/);
   });
 
   // Two threads sent one after another drew as two lists with a gap between.
   // Since round 12 they show whose they are, as the inbox does
-  // (a-thread-a-teammate-sent-you-sits-under-the-inbox-tab-it-is-in).
+  // (threads-a-teammate-sent-you-together-share-one-window).
   it('joins threads sent one after another into one list', () => {
     expect(page).toMatch(/if \(e\.kind === 'run' && e\.verb === 'sent' && sent\) \{ sent\.push\(e as TeamRunLine\); continue; \}/);
-    expect(card).toMatch(/\{found\.map\(\(\{ r, item \}\) => \{/);
+    expect(card).toMatch(/\{runs\.map\(\(r\) => \{/);
   });
 
-  it('still reads as a row when the thread is not loaded, with its title and when', () => {
-    expect(card).toMatch(/: <RowCells title=\{r\.said \|\| r\.title\} where=\{product\?\.name \?\? ''\} priority=\{null\} updatedAt=\{r\.ts\} now=\{now\} \/>/);
+  it('still has a title when the thread is not loaded', () => {
+    expect(card).toMatch(/\{r\.said \|\| r\.title\}/);
   });
 });

@@ -1,0 +1,170 @@
+.fp-page { flex: 1; min-height: 0; overflow-y: auto; padding: 18px var(--row-r, 24px) 48px var(--text-x, 32px); display: flex; flex-direction: column; }
+
+.fp-bar { display: flex; align-items: center; gap: 24px; min-height: 32px; }
+.fp-crumbs { flex: 1; min-width: 0; display: flex; align-items: center; overflow-x: auto; scrollbar-width: none; font-size: 14px; }
+.fp-crumb-box { flex: none; display: inline-flex; align-items: center; }
+.fp-crumb-gap { margin: 0 8px; color: var(--text-faint); }
+.fp-crumb { height: 28px; padding: 0; background: none; border: 0; font: inherit; color: var(--text-faint); white-space: nowrap; cursor: pointer; }
+.fp-crumb:hover { color: var(--text); }
+.fp-crumb.is-on { color: var(--text); cursor: default; }
+.fp-find {
+  flex: none; width: 220px; height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 10px;
+  background: var(--wash); border: 1px solid var(--line); border-radius: var(--artifact-corner-small); color: var(--text-faint);
+}
+.fp-find:focus-within { border-color: var(--line-strong); }
+.fp-find svg { flex: none; width: 13px; height: 13px; }
+.fp-find input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; padding: 0; font: inherit; font-size: 13px; color: var(--text); }
+.fp-find input::placeholder { color: var(--text-faint); }
+
+.fp-tools { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 26px; margin: 14px 0 0; }
+.fp-kinds, .fp-views, .fp-switch { display: flex; align-items: center; gap: 2px; }
+.fp-views { flex: none; gap: 12px; }
+.fp-kind {
+  height: 26px; padding: 0 9px; display: inline-flex; align-items: center; background: none; border: 0; border-radius: var(--artifact-corner-small);
+  font: inherit; font-size: 12.5px; color: var(--text-faint); white-space: nowrap; cursor: pointer;
+}
+.fp-kind:hover { color: var(--text-dim); }
+.fp-kind.is-on { color: var(--text); background: var(--wash-strong); }
+.fp-view-icon { width: 26px; padding: 0; justify-content: center; }
+.fp-new {
+  height: 26px; padding: 0 10px; background: none; border: 1px solid var(--line); border-radius: var(--artifact-corner-small);
+  font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer;
+}
+.fp-new:hover { color: var(--text); border-color: var(--line-strong); }
+
+.fp-empty { margin: 26px 0 0; font-size: 13.5px; line-height: 20px; color: var(--text-faint); }
+
+.fp-folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 10px 22px; margin-top: 18px; }
+.fp-folder {
+  position: relative; min-width: 0; height: 56px; display: flex; align-items: center;
+  background: var(--wash); border: 1px solid var(--line); border-radius: var(--artifact-corner); transition: border-color .12s ease;
+}
+.fp-folder:hover, .fp-folder:focus-within { border-color: var(--line-strong); }
+.fp-folder.is-over { border-color: var(--text-faint); background: var(--wash-strong); }
+.fp-folder-open {
+  flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; gap: 11px; padding: 0 14px; background: none; border: 0;
+  border-radius: inherit; font: inherit; color: inherit; text-align: left; cursor: default;
+}
+.fp-folder-open:focus-visible { outline: none; }
+.fp-folder-glyph { flex: none; color: var(--text-faint); }
+.fp-folder-words { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fp-folder-name { font-size: 13.5px; line-height: 18px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-folder-count { font-size: 12px; line-height: 16px; color: var(--text-faint); }
+.fp-rename {
+  position: absolute; right: 8px; top: 50%; width: 24px; height: 24px; margin-top: -12px; display: flex; align-items: center; justify-content: center;
+  background: none; border: 0; border-radius: var(--artifact-corner-small); color: var(--text-faint); opacity: 0; cursor: pointer;
+}
+.fp-folder:hover .fp-rename, .fp-rename:focus-visible { opacity: 1; }
+.fp-rename:hover { color: var(--text); background: var(--wash-strong); }
+.fp-name-box {
+  width: 100%; min-width: 0; height: 24px; padding: 0 6px; margin-left: -6px; background: var(--wash); border: 1px solid var(--line-strong);
+  border-radius: var(--artifact-corner-small); outline: 0; font: inherit; font-size: 13px; color: var(--text); box-sizing: border-box;
+}
+.fp-name-box::placeholder { color: var(--text-faint); }
+
+.fp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 30px 22px; margin-top: 22px; }
+.fp-tile { position: relative; min-width: 0; }
+.fp-open-file {
+  width: 100%; min-width: 0; display: flex; flex-direction: column; gap: 0; padding: 0; background: none; border: 0;
+  text-align: left; font: inherit; color: inherit; cursor: default;
+}
+.fp-open-file:focus-visible { outline: none; }
+/* 16:10, a screenshot's shape, so a picture fills its tile with nothing cut at the sides. */
+.fp-face {
+  position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 10; overflow: hidden;
+  background: var(--wash); border: 1px solid var(--line); border-radius: var(--artifact-corner); transition: border-color .12s ease;
+}
+.fp-tile:hover .fp-face, .fp-open-file:focus-visible .fp-face { border-color: var(--line-strong); }
+.fp-face img, .fp-face video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fp-face-image img { object-fit: cover; object-position: top; }
+
+.fp-more-box { position: absolute; top: 8px; right: 8px; z-index: 2; opacity: 0; }
+.fp-tile:hover .fp-more-box, .fp-line:hover .fp-more-box, .fp-more-box.is-open, .fp-more-box:focus-within { opacity: 1; }
+.fp-more {
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--artifact-corner-small); color: var(--text-dim);
+}
+.fp-more:hover { color: var(--text); }
+.fp-menu {
+  position: absolute; top: 30px; right: 0; width: 200px; max-height: 280px; overflow-y: auto; padding: 5px; z-index: 5;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--artifact-corner); box-shadow: var(--shadow-sm);
+}
+.fp-menu.is-up { top: auto; bottom: 30px; }
+.fp-menu-head { padding: 5px 8px 4px; font-size: 12px; color: var(--text-faint); }
+.fp-menu-find { display: block; box-sizing: border-box; width: calc(100% - 8px); height: 26px; margin: 0 4px 4px; padding: 0 8px; background: none; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); font: inherit; font-size: 13px; color: var(--text); outline: none; }
+.fp-menu-find:focus { border-color: var(--line-strong); }
+.fp-menu-none { padding: 6px 8px; font-size: 13px; color: var(--text-faint); }
+.fp-scratch-row { display: flex; align-items: center; gap: 8px; margin-top: 30px; }
+.fp-scratch-row .fp-scratch { margin: 0; }
+.fp-scratch-row .fp-more-box { position: relative; top: auto; right: auto; opacity: 1; }
+.fp-menu-item {
+  width: 100%; min-height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 8px; background: none; border: 0; border-radius: var(--artifact-corner-small);
+  font: inherit; font-size: 13px; color: var(--text); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default;
+}
+.fp-menu-item.is-sub { padding-left: 22px; }
+.fp-menu-item:hover:not(:disabled) { background: var(--wash-strong); }
+.fp-menu-item:disabled { color: var(--text-faint); }
+.fp-menu-new { padding: 2px 8px 3px 14px; }
+
+/* Out by the row's own padding, so a thumbnail lines up with the breadcrumb. */
+.fp-lines { display: flex; flex-direction: column; margin: 18px -6px 0; }
+.fp-line { position: relative; min-width: 0; border-radius: var(--artifact-corner-small); }
+.fp-line:hover { background: var(--wash); }
+.fp-line .fp-open-file { height: 44px; flex-direction: row; align-items: center; gap: 12px; padding: 0 44px 0 6px; }
+.fp-line .fp-name { flex: 1; margin-top: 0; }
+.fp-line .fp-meta-words { flex: none; font-size: 12px; color: var(--text-faint); }
+.fp-line-marks { flex: none; display: inline-flex; align-items: center; gap: 12px; font-size: 12px; color: var(--text-faint); }
+.fp-thumb { flex: none; width: 46px; height: 32px; aspect-ratio: auto; border-radius: var(--artifact-corner-small); }
+.fp-thumb-word { font-size: 9.5px; letter-spacing: .04em; color: var(--text-faint); }
+.fp-face.fp-thumb { padding: 0; align-items: center; aspect-ratio: auto; }
+.fp-face.fp-thumb .fp-length, .fp-face.fp-thumb .file-cover-play, .fp-face.fp-thumb .fp-face-empty { display: none; }
+.fp-line .fp-more-box { top: 9px; right: 8px; }
+
+/* The app's body type: this is a fold, not a leftover. */
+.fp-scratch { display: inline-flex; align-items: center; gap: 6px; margin: 24px 0 0; padding: 4px 8px 4px 6px; margin-left: -6px; text-align: left; background: none; border: 0; border-radius: 7px; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
+.fp-scratch:hover { background: var(--wash); }
+.fp-scratch:hover { color: var(--text-dim); }
+.fp-grid-scratch { margin-top: 16px; }
+/* A page seen from above: its top, running off the foot of the tile. */
+.fp-face-pdf { background: var(--wash-strong); }
+.fp-face-pdf .pdf-page { padding: 0; width: auto; border: 0; background: #fff; }
+.fp-face-pdf canvas { display: block; }
+.fp-face-deck { background: var(--wash-strong); }
+.fp-face-deck > :not(.fp-face-empty) { max-width: 78%; box-shadow: 0 2px 10px rgba(0, 0, 0, .3); }
+.fp-face .file-cover-play { left: 8px; bottom: 8px; width: 24px; height: 24px; }
+.fp-length { position: absolute; right: 8px; bottom: 8px; padding: 2px 6px; border-radius: 6px; background: rgba(0, 0, 0, .55); color: #fff; font: 10.5px/14px var(--mono); font-variant-numeric: tabular-nums; }
+.fp-face-empty { font-size: 12px; color: var(--text-faint); }
+/* Drawn at a window's width and scaled down; a tile is for opening, not for clicking inside. */
+.fp-page-face { position: absolute; left: 0; top: 0; width: 400%; height: 400%; border: 0; transform: scale(.25); transform-origin: 0 0; pointer-events: none; background: #fff; }
+.fp-code-face { align-self: stretch; width: 100%; margin: 0; padding: 14px 16px; overflow: hidden; font: 10.5px/1.5 var(--mono); color: var(--text-dim); white-space: pre; box-sizing: border-box; background: var(--doc-page); }
+
+.fp-doc {
+  align-self: stretch; width: 100%; padding: 20px 20px 0; display: flex; flex-direction: column; gap: 9px; overflow: hidden;
+  background: var(--doc-page); color: var(--text);
+  -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent);
+  mask-image: linear-gradient(to bottom, #000 72%, transparent);
+}
+.fp-doc strong { font-size: 15px; line-height: 1.3; font-weight: 600; letter-spacing: -.005em; margin-bottom: 2px; }
+.fp-doc b { margin-top: 4px; font-size: 12px; line-height: 1.4; font-weight: 600; }
+.fp-doc p { margin: 0; font-size: 11.5px; line-height: 1.55; color: var(--text-dim); }
+.fp-doc-li { position: relative; margin-top: -4px; padding-left: 14px; font-size: 11.5px; line-height: 1.55; color: var(--text-dim); }
+.fp-doc-li::before { content: ''; position: absolute; left: 3px; top: .72em; width: 3px; height: 3px; background: var(--text-faint); }
+
+.fp-name { margin-top: 10px; font-size: 13.5px; line-height: 18px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-meta { margin-top: 3px; display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 12px; line-height: 16px; color: var(--text-faint); }
+.fp-meta-words { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-open { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.fp-approved { flex: none; display: inline-flex; align-items: center; gap: 6px; color: var(--text-dim); }
+.fp-approved i { width: 6px; height: 6px; background: var(--code-plus); }
+
+.fp-sent {
+  flex: none; height: 40px; padding: 0 16px; display: flex; align-items: center; gap: 18px; min-width: 0; overflow-x: auto;
+  border-top: 1px solid var(--line); scrollbar-width: none;
+}
+.fp-sent-label { flex: none; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.fp-sent-place {
+  flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 0; background: none; border: 0;
+  font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap;
+}
+.fp-sent-place:hover { color: var(--text); }
+.fp-sent-place svg { color: var(--text-faint); }

@@ -58,9 +58,9 @@ describe('what the list calls a row', () => {
       .toBe('The positioning line');
   });
 
-  it('draws her title when there is not, which is every row until one is named', () => {
+  it('draws her title, held to a few words, when there is not, which is every row until one is named', () => {
     expect(rowTitle({ title: 'I can no longer open the settings page.' }))
-      .toBe('I can no longer open the settings page.');
+      .toBe('Cannot open the settings page');
   });
 
   it('NEVER draws a nameless row, whatever whitespace arrives in the field', () => {

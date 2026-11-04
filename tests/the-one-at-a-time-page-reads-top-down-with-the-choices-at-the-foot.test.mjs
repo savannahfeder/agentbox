@@ -88,15 +88,16 @@ describe('a page or a note the answer names is read in place', () => {
   });
   it('and the thread page draws them in this mode in place of the tiles', () => {
     const focus = read('renderer/src/components/Focus.tsx');
-    expect(focus).toContain('inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && <QueueFile');
+    expect(focus).toContain('inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && newestOfFamily(path, item.artifacts?.edits) !== openDoc && <QueueFile');
     expect(focus).toContain('{!page && inlineArtifacts && !previewSample && <MessageFiles');
   });
 });
 
 describe('the corner', () => {
-  it('says where you are and steps up and down', () => {
+  // The "2 of 5" beside the arrows went in w-1c1092f465, as clutter.
+  it('steps up and down', () => {
     const html = renderToStaticMarkup(h(QueueNav, { spot: { pos: 2, total: 5, index: 1 }, onStep: noop }));
-    expect(visible(html)).toBe('2 of 5');
+    expect(visible(html)).toBe('');
     expect(html).toContain('aria-label="Previous thread (K)"');
     expect(html).toContain('aria-label="Next thread (J)"');
   });

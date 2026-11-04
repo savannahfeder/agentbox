@@ -32,11 +32,15 @@ describe('what the pane opens', () => {
   });
 
   it('leaves everything else to the app that owns it', () => {
-    // A pdf inside a sandboxed frame draws nothing at all in Chromium, and a
-    // source file belongs in her editor.
-    for (const p of ['reports/audit.pdf', 'main/ipc.mjs', 'data.csv']) {
+    // A pdf has a viewer of its own (a-deck-or-a-film-opens-in-the-app), and a
+    // script is drawn as its text (every-kind-of-file-has-one-good-page).
+    for (const p of ['reports/audit.xlsx', 'voice.mp3']) {
       expect(docKind(p), p).toBeNull();
       expect(opensInPane(p), p).toBe(false);
+    }
+    for (const p of ['main/ipc.mjs', 'data.csv']) {
+      expect(docKind(p), p).toBeNull();
+      expect(opensInPane(p), p).toBe(true);
     }
     expect(docKind(null)).toBeNull();
     expect(docKind(undefined)).toBeNull();

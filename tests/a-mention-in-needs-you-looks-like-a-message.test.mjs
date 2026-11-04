@@ -25,7 +25,6 @@ describe('a mention row', () => {
   it('draws the face a message row draws, not the room wall’s small square', () => {
     const html = draw([mention()]);
     expect(html).toMatch(/<span class="tm-av"[^>]*>Ma<\/span>/);
-    expect(html).not.toContain('rm-pic');
   });
 
   it('draws their photo the way a message row does when they have one', () => {
@@ -33,11 +32,11 @@ describe('a mention row', () => {
     expect(html).toContain('class="tm-av tm-ph" src="https://example.com/maya.png"');
   });
 
-  it('says Waiting in the Status column, like a message waiting on you', () => {
-    expect(draw([mention()])).toMatch(/class="th-cell-state"[^>]*>Waiting</);
+  it('says Waiting on you in the Status column, like a message waiting on you', () => {
+    expect(draw([mention()])).toMatch(/class="th-cell-state"[^>]*>Waiting on you</);
   });
 
-  it('wears the new mark, because it only shows while unread', () => {
+  it('wears the new mark', () => {
     expect(draw([mention()])).toMatch(/class="row rm-mention unread"/);
   });
 

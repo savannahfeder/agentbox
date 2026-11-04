@@ -1,4 +1,5 @@
-.document-preview-frame { max-height: min(560px, 60vh); overflow: hidden; }
+.document-preview-frame { max-height: min(720px, 66vh); overflow: hidden; }
+.document-preview-frame.opens { cursor: pointer; }
 .document-preview-frame.is-cut { mask-image: linear-gradient(to bottom, black calc(100% - 48px), transparent); }
 .document-preview-frame.is-expanded { max-height: none; overflow: visible; }
 .document-preview-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 11px 16px;

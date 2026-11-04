@@ -16,10 +16,13 @@ import { Gear } from './icons';
 import { IconButton, T, TopBar } from './parts';
 import { color, font, size } from './theme';
 
-/** A teammate's mark: its letter in a dashed square, with a dot when it waits on you (TeammatesRail.tsx). */
+/** The corner of an AI teammate's dashed mark, as `--mate-corner` is on the web: round, like a person. */
+export const mateCorner = (s: number) => s / 2;
+
+/** A teammate's mark: its letter in a dashed ring, with a dot when it waits on you (TeammatesRail.tsx). */
 export function TeammateMark({ t, size: s = 20, waiting = false }: { t: Pick<Teammate, 'letter' | 'name'> | null; size?: number; waiting?: boolean }) {
   return (
-    <View style={{ width: s, height: s, borderWidth: 1, borderStyle: 'dashed', borderColor: color.lineStrong, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: s, height: s, borderRadius: mateCorner(s), borderWidth: 1, borderStyle: 'dashed', borderColor: color.lineStrong, alignItems: 'center', justifyContent: 'center' }}>
       <T style={{ fontFamily: font.mono, fontSize: Math.max(9.5, Math.round(s * 0.36 * 2) / 2), color: t ? color.dim : color.faint }}>{t ? t.letter || t.name.slice(0, 1) : '+'}</T>
       {waiting && <View style={{ position: 'absolute', top: -4, right: -4, width: 7, height: 7, borderRadius: 3.5, backgroundColor: color.accent }} />}
     </View>
@@ -32,16 +35,16 @@ export function YouFace({ size: s = 32 }: { size?: number }) {
   const name = g.state.rooms.flatMap((r) => r.wall).find((w) => w.me)?.name;
   if (name) return <Face name={name} size={s} />;
   return (
-    <View style={{ width: s, height: s, borderWidth: 1, borderColor: color.lineStrong, backgroundColor: color.film, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: s, height: s, borderRadius: s / 2, borderWidth: 1, borderColor: color.lineStrong, backgroundColor: color.film, alignItems: 'center', justifyContent: 'center' }}>
       <Svg width={s * 0.5} height={s * 0.5} viewBox="0 0 24 24" fill="none" stroke={color.dim} strokeWidth={1.6} strokeLinecap="round"><Path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /><Path d="M4.5 20c.9-3.6 3.8-5.5 7.5-5.5s6.6 1.9 7.5 5.5" /></Svg>
     </View>
   );
 }
 
-/** Auto's mark in To: the agent's dashed square with a fork in it (AutoFace.tsx). */
+/** Auto's mark in To: the agent's dashed tile with a fork in it (AutoFace.tsx). */
 export function AutoMark({ size: s = 20 }: { size?: number }) {
   return (
-    <View style={{ width: s, height: s, borderWidth: 1, borderStyle: 'dashed', borderColor: color.lineStrong, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: s, height: s, borderRadius: mateCorner(s), borderWidth: 1, borderStyle: 'dashed', borderColor: color.lineStrong, alignItems: 'center', justifyContent: 'center' }}>
       <Svg width={s * 0.62} height={s * 0.62} viewBox="0 0 24 24" fill="none" stroke={color.dim} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
         <Path d="M5 12h6" /><Path d="M11 12c3 0 4-5 8-5" /><Path d="M11 12c3 0 4 5 8 5" /><Path d="M16 4.5 19 7l-3 2.5" /><Path d="M16 14.5 19 17l-3 2.5" />
       </Svg>

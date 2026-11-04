@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Room, RoomsState } from '../../types';
 import { I } from './icons';
-import { RoomFace } from './RoomFace';
+import { Face } from '../people';
 import { agentsWords, peopleCount } from './room-rules';
 import { roomConversations } from './conversations';
 import { updatedWords } from '../../threads/page-rules';
@@ -40,7 +40,7 @@ export function RoomsPage({ state, invisible, now, onOpen, onFind, onMenu, tabbe
         onContextMenu={(e) => { e.preventDefault(); setMenu({ id: r.id, at: new DOMRect(e.clientX, e.clientY, 0, 0) }); }}>
         <span className="mark" aria-hidden="true" /><div className="row-main th-grid rm-rgrid">
           <div className={`th-cell-title rm-rnm${r.muted ? ' muted' : ''}`}>{I.hash(14)}<span>{r.name}</span></div>
-          <div className="rm-rpp"><span className="fs">{r.wall.slice(0, 4).map((p) => <RoomFace key={p.id} name={p.name} url={p.avatarUrl} size={20} />)}</span><span className="n">{peopleCount(r, invisible)}</span></div>
+          <div className="rm-rpp"><span className="fs">{r.wall.slice(0, 4).map((p) => <Face key={p.id} name={p.name} url={p.avatarUrl} size={20} />)}</span><span className="n">{peopleCount(r, invisible)}</span></div>
           <div className="th-cell-state">{agentsWords(r.agents)}</div>
           <div className="th-cell-title rm-rlast">{c?.last ?? ''}</div>
           <div className="th-cell-when num has-act"><span className="th-when">{c?.last ? updatedWords(c.at, now) : ''}</span>

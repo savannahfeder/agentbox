@@ -24,7 +24,7 @@
   ],
   "license": "GPL-3.0-or-later",
   "type": "module",
-  "main": "main/main.mjs",
+  "main": "main/start.mjs",
   "bin": {
     "agentbox": "bin/agentbox.mjs"
   },
@@ -159,6 +159,7 @@
       "scripts/approval-server.sh",
       "scripts/cloud-shim.pl",
       "scripts/memory-gate-hook.sh",
+      "mcp/connection-proxy.mjs",
       "renderer/dist/**/*",
       "package.json"
     ],

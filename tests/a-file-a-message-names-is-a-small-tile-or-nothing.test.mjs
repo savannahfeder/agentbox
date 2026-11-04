@@ -85,10 +85,20 @@ describe('the thread draws the tiles', ()=>{
     expect(tiles).not.toContain('<span>Preview unavailable</span>');
     expect(tiles).not.toContain('localStorage');
   });
-  it('keeps the frame square and its corner marks on the picture, in the line colour', ()=>{
+  // 2026-10-30 the owner asked for artifacts like Kylon's, rounded where it
+  // helps: the square frame with corner marks became a rounded card in the
+  // line colour, holding the file's own face.
+  it('is a rounded card in the line colour, with no corner marks left', ()=>{
     const css=read('components/message-files.css');
-    expect(css).not.toMatch(/border-radius:(?!0)/);
-    expect(css).toContain('.message-file .tick {position:absolute;z-index:1;width:8px;height:8px;border:0 solid var(--line-strong);}');
-    expect(css).toContain('.message-file .tick.tl {top:0;left:0;');
+    expect(css).toMatch(/\.message-file \{[^}]*border:1px solid var\(--line\);border-radius:var\(--artifact-corner\);/);
+    expect(css).not.toContain('.tick');
+    expect(read('components/MessageFiles.tsx')).not.toContain('className="tick');
+  });
+  it('knows where a deck, a PDF or a film is, so its face can be drawn from the file', async()=>{
+    const found={readDoc:async()=>({ok:false}),codeChange:async()=>({ok:false}),resolveDoc:async({src})=>({ok:true,opened:`/store/p/${src}`})};
+    for (const path of ['attachments/lumen-pitch.pptx','attachments/seed.pdf','attachments/teaser.mp4'])
+      expect(await glanceFile(found,'p',path)).toMatchObject({opened:`/store/p/${path}`});
+    // A file that did not resolve still has no tile, with or without a path.
+    expect(await glanceFile(reader(),'p','attachments/lumen-pitch.pptx')).toBeNull();
   });
 });

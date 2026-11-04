@@ -2,7 +2,7 @@
 // cloud/supabase/migrations/20261021000000_rooms.sql. Row level security and
 // the functions there are what keep people apart; nothing here is trusted to.
 import { Name } from '../../shared/product-name.mjs';
-import { PROFILE_COLS, PRESENCE_COLS, OLD_PRESENCE_COLS, PROFILE_FIELDS, PRESENCE_FIELDS, OLD_PRESENCE_FIELDS, MSG_COLS, REACTION_COLS, pick, roomOut, messageOut, reactionOut, fileExists } from './rooms-shape.mjs';
+import { PROFILE_COLS, PRESENCE_COLS, OLD_PRESENCE_COLS, PROFILE_FIELDS, PRESENCE_FIELDS, OLD_PRESENCE_FIELDS, MSG_COLS, REACTION_COLS, DECISION_COLS, pick, roomOut, messageOut, reactionOut, decisionOut, fileExists } from './rooms-shape.mjs';
 
 // How long the chat waits to hear that reactions are listening before it says
 // it is ready anyway.
@@ -171,6 +171,19 @@ export function roomsSupabase(client, myId, must) {
       await newRpc('react_room_message', { m: messageId, p_emoji: emoji, p_on: !!on }, 'reacting');
     },
 
+    // Taken-back ones too, since the service folds them.
+    async roomDecisions(roomId) {
+      await myId();
+      const res = await client.from('room_decisions').select(DECISION_COLS).eq('room_id', roomId).limit(1000);
+      if (res.error && notThere(res.error)) return [];
+      return must(res, 'reading decisions').map(decisionOut);
+    },
+
+    async markRoomDecision(roomId, { messageId, kind, body = null, saidBy = null, project = null, on = true }) {
+      await myId();
+      await newRpc('mark_room_decision', { r: roomId, p_message: messageId, p_kind: kind, p_body: body, p_said_by: saidBy, p_project: project, p_on: !!on }, 'marking a decision');
+    },
+
     async putRoomFile(roomId, name, data) {
       const me = await myId();
       const { error } = await client.from('room_files').insert({ room_id: roomId, name, by_person: me, data });
@@ -179,6 +192,21 @@ export function roomsSupabase(client, myId, must) {
       if (error) throw new Error(`sending the file: ${error.message}`);
       settle();
       return name;
+    },
+
+    async roomFileMarks(roomId) {
+      await myId();
+      const res = await client.from('room_file_marks').select('id,by_person,mark,created_at').eq('room_id', roomId).order('created_at').limit(2000);
+      if (res.error && notThere(res.error)) return [];
+      return must(res, 'reading comments on files').map((r) => ({ id: r.id, by: r.by_person, mark: r.mark, at: Date.parse(r.created_at) }));
+    },
+
+    async markRoomFile(roomId, { id, mark }) {
+      const me = await myId();
+      const { error } = await client.from('room_file_marks').insert({ room_id: roomId, id, by_person: me, mark });
+      if (error?.code === '23505') return;
+      if (error && notThere(error)) throw new Error(BEHIND);
+      if (error) throw new Error(`saving the comment: ${error.message}`);
     },
 
     async roomFile(roomId, name) {
@@ -315,6 +343,8 @@ export function roomsSupabase(client, myId, must) {
       const reacting = client.channel(`room-reactions-${Math.random().toString(36).slice(2)}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'room_reactions' }, (p) => onEvent({ kind: 'reaction', reaction: reactionOut(p.new) }))
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'room_reactions' }, (p) => onEvent({ kind: 'reaction', reaction: reactionOut(p.new) }))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'room_decisions' }, () => onEvent({ kind: 'decision' }))
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'room_file_marks' }, () => onEvent({ kind: 'fileMark' }))
         .subscribe((status) => { if (['SUBSCRIBED', 'CHANNEL_ERROR', 'TIMED_OUT'].includes(status)) { reactionsSettled = true; ready(); } });
       const giveUp = setTimeout(() => { reactionsSettled = true; ready(); }, REACTIONS_WAIT_MS);
       giveUp.unref?.();
