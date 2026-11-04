@@ -199,9 +199,12 @@ describe('the preview picture at /f/<token>/preview', () => {
 });
 
 describe('what the worker leaves alone', () => {
-  it('hands every other address under /f/ to the site, and asks the cloud nothing', async () => {
+  // A bare /f/ drew a white page: the app's files were asked for under /f/ (power test, round 4, 2026-11-04).
+  it('answers every other address under /f/ with the page loading its files from the root, and asks the cloud nothing', async () => {
     for (const p of ['/f/short', `/f/${TOK}/other`, `/f/${'a'.repeat(65)}`, '/f/']) {
-      expect(await (await get(p)).text(), p).toMatch(/^asset /);
+      const html = await (await get(p)).text();
+      expect(html, p).toContain('src="/assets/main.js"');
+      expect(html, p).toContain('<meta property="og:title" content="Agentbox">');
     }
     expect(asked).toEqual([]);
   });
@@ -233,8 +236,8 @@ describe('the site as built for Pages', () => {
     // The rest of the site keeps framing blob: only.
     expect(fs.readFileSync(path.join(out, '_headers'), 'utf8')).toMatch(/frame-src blob:;/);
     const { default: built } = await import(`${pathToFileURL(path.join(out, '_worker.js')).href}?t=${Date.now()}`);
-    const res = await built.fetch(new Request(`https://app.example/f/short`), { ASSETS });
-    expect(await res.text()).toBe('asset /f/short');
+    const res = await built.fetch(new Request(`https://app.example/about`), { ASSETS });
+    expect(await res.text()).toBe('asset /about');
   });
 
   it('takes a cloud on this computer only when asked to, for the stage', () => {

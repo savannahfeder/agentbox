@@ -72,7 +72,7 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
   });
 
   function tagsFor(url, tok, file) {
-    const page = `${url.origin}/f/${tok}`;
+    const page = tok ? `${url.origin}/f/${tok}` : `${url.origin}${url.pathname}`;
     const picture = file?.kind === 'image';
     const title = file ? titleOf(file) : 'Agentbox';
     const name = String(file?.owner_name || 'someone').replace(/\s+/g, ' ').trim();
@@ -88,7 +88,7 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
 
   async function thePage(request, env, url, tok) {
     let file = null;
-    try { file = await view(tok); } catch { /* the page says what became of it */ }
+    try { if (tok) file = await view(tok); } catch { /* the page says what became of it */ }
     const shell = await env.ASSETS.fetch(new URL('/', url));
     // The app's files are named from the page's own folder, and this page is two folders down.
     let html = (await shell.text()).replace(/(\s(?:src|href))="\.\//g, '$1="/');
@@ -127,7 +127,8 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
       const p = PUNCTUATED.exec(url.pathname);
       if (p) return new Response(null, { status: 301, headers: { location: `${url.origin}/f/${p[1]}`, 'cache-control': 'no-store' } });
       const m = PATH.exec(url.pathname);
-      if (!m) return env.ASSETS.fetch(request);
+      // Any other address under /f/ is the page saying the link does not work, its files loaded from the root.
+      if (!m) return url.pathname.startsWith('/f/') ? thePage(request, env, url, null) : env.ASSETS.fetch(request);
       if (request.method !== 'GET' && request.method !== 'HEAD') return plain(405, 'Not here.', { allow: 'GET, HEAD' });
       const [, tok, part] = m;
       if (!part) return thePage(request, env, url, tok);
