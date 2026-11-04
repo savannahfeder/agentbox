@@ -118,6 +118,16 @@ describe('the card', () => {
     expect(card).toMatch(/const send = \(\) => \([^\n]*sendTask\(when \? whenToSend\(when\) :/);
   });
 
+  // A power tester picked a time, then "Send now" to change her mind, and
+  // waited for a send that never came: the row only cleared the time.
+  it('the row that clears a picked time says so, on the card and on the reply box', () => {
+    const reply = read('components/ReplyLater.tsx');
+    for (const box of [menu, reply]) {
+      expect(box).toMatch(/<span className="tc-row-label">Remove the time<\/span>/);
+      expect(box).not.toMatch(/tc-row-label">Send now</);
+    }
+  });
+
   it('writes the pick into the draft and opens on it', () => {
     expect(card).toMatch(/when: whenOnDraft\(when\)/);
     expect(card).toMatch(/useState<SendWhen>\(\(\) => startingWhen\(opened\.current\.when\)\)/);

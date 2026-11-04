@@ -87,7 +87,7 @@ export function ReplyLater({ at, onPick, onClosed }: {
           <span className="tc-menu-head">Send later</span>
           {at > 0 && (
             <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => pick(0)}>
-              <SendNowIcon /><span className="tc-row-label">Send now</span>
+              <ClearIcon /><span className="tc-row-label">Remove the time</span>
             </button>
           )}
           <button type="button" data-item className={`tc-row ${at === tomorrow ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pick(tomorrow)}>
@@ -121,8 +121,8 @@ export function ReplyLater({ at, onPick, onClosed }: {
 const CaretIcon = () => (
   <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
 );
-const SendNowIcon = () => (
-  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M5 12h13M13 7l5 5-5 5" /></svg>
+const ClearIcon = () => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
 );
 const ClockIcon = () => (
   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 8v4.5l3 2" /></svg>

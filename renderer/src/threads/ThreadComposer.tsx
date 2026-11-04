@@ -1115,7 +1115,7 @@ export function ThreadComposer({
         <span className="tc-menu-head">Send later</span>
         {when && (
           <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => pickWhen(null)}>
-            <SendNowIcon /><span className="tc-row-label">Send now</span>
+            <ClearIcon /><span className="tc-row-label">Remove the time</span>
           </button>
         )}
         <button type="button" data-item className={`tc-row ${when && 'start' in when ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pickWhen({ start: 'later' })}>
@@ -1542,8 +1542,8 @@ const CaretIcon = () => (
 const PlusIcon = () => (
   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
 );
-const SendNowIcon = () => (
-  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M5 12h13M13 7l5 5-5 5" /></svg>
+const ClearIcon = () => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
 );
 const ClockIcon = () => (
   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 8v4.5l3 2" /></svg>
