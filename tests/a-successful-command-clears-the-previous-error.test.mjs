@@ -41,7 +41,7 @@ it.each([['claude','/reload-skills'],['codex','/review --base main'],['claude','
  touched:false,model:null,effort:null,
  // The conversation's agent mentions (w-7b9cb8636a). Off here, as on any box
  // that is not a conversation with a person: nothing waits, words go as typed.
- chat:{block:null,encode:(w)=>w},
+ chat:{askForProject:()=>false,encode:(w)=>w},
  // Threads named with # (w-c110f2371d). None named here.
  named:{encode:(w)=>w},
  // No picture going up from the phone, and no file still being attached.

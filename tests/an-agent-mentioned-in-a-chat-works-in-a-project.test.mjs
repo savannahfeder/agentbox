@@ -14,7 +14,7 @@
 // and how a sent message carries its agents to every copy of the conversation.
 import { describe, it, expect } from 'vitest';
 import {
-  agentLinks, chatProjects, chatTranscript, encodeMentions, findMentions, mentionQuery, plainWords, sendBlock, taskBrief, taskTitle, withProject, withTask,
+  agentLinks, chatProjects, chatTranscript, encodeMentions, findMentions, looseMention, mentionQuery, plainWords, taskBrief, taskTitle, withProject, withTask,
 } from '../renderer/src/team/agent-mentions.ts';
 
 const PROJECTS = [{ slug: 'agentbox', name: 'Agentbox' }, { slug: 'agentbox-team', name: 'Agentbox Team' }, { slug: 'video', name: 'Astral Video' }];
@@ -56,14 +56,14 @@ describe('what counts as an agent mention', () => {
   });
 });
 
-describe('when Send has to wait', () => {
-  it('waits, and says why, while an agent has no project', () => {
-    expect(sendBlock(findMentions('@Codex look at this', PROJECTS))).toBe('Pick a project for @Codex: click it to choose.');
+describe('when Send asks for a project', () => {
+  it('asks while an agent has no project', () => {
+    expect(looseMention(findMentions('@Codex look at this', PROJECTS))).toBe(0);
   });
 
-  it('does not wait once every agent has one, or when there is no agent', () => {
-    expect(sendBlock(findMentions('@Codex in Astral Video look', PROJECTS))).toBeNull();
-    expect(sendBlock(findMentions('thanks Maya', PROJECTS))).toBeNull();
+  it('does not ask once every agent has one, or when there is no agent', () => {
+    expect(looseMention(findMentions('@Codex in Astral Video look', PROJECTS))).toBe(-1);
+    expect(looseMention(findMentions('thanks Maya', PROJECTS))).toBe(-1);
   });
 
   it('sets a project by rewriting the mention in place', () => {

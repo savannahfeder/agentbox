@@ -103,8 +103,16 @@ describe('the push gate, while main is red', () => {
 
 describe('the ship queue', () => {
   let userDir;
-  beforeEach(() => { userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-red-on-main-user-')); });
-  afterEach(() => { fs.rmSync(userDir, { recursive: true, force: true }); });
+  // A ship made while main is red runs this suite with the variable set.
+  const inherited = process.env.AGENTBOX_RED_ON_MAIN;
+  beforeEach(() => {
+    userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-red-on-main-user-'));
+    delete process.env.AGENTBOX_RED_ON_MAIN;
+  });
+  afterEach(() => {
+    fs.rmSync(userDir, { recursive: true, force: true });
+    if (inherited !== undefined) process.env.AGENTBOX_RED_ON_MAIN = inherited;
+  });
 
   async function shipOnce() {
     const { ShipQueue } = await import('../main/ship-queue.mjs');
