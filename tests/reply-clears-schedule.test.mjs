@@ -1,14 +1,13 @@
 // A reply is a claim on now.
 //
-// A reply to a scheduled row used to do nothing visible, and nothing invisible
-// either: the row stayed in Scheduled, and the supervisor's continuation pass
-// skips an answered row that is not yet due, so the reply was going to sit
-// unread until 8am the next day. The reply had no effect on anything at all
-// until a moment twenty hours away.
-//
-// The rule: replying pulls it back. It costs the approve-Friday-run-Monday
-// case, which is now answer-then-S, and the reply's own undo restores the
-// moment it cancelled.
+// A reply to a scheduled row used to do nothing until the moment came: the
+// supervisor skipped an answered row that was not yet due. So a reply cleared
+// the moment, whoever set it. The cost, in use: Maya's message on the
+// chief of staff's thread cleared the Monday 8:30 check it was parked for, and
+// the agent could not book it again. Now the reply runs at once by itself
+// (`wordWaits`, shared/work-items.mjs, pinned in
+// a-message-on-a-scheduled-thread-runs-now-and-the-schedule-stays), so a reply
+// lifts only a reminder and the moment to run stays.
 
 import { describe, it, expect } from 'vitest';
 import { replyClearsSchedule, statusForReply } from '../renderer/src/list-rules';
@@ -17,16 +16,18 @@ const NOW = 1_786_480_000_000;
 const HOUR = 3_600_000;
 
 describe('replying to a scheduled task', () => {
-  it('cancels a schedule an agent set', () => {
-    expect(replyClearsSchedule({ status: 'open', runAt: NOW + 20 * HOUR }, NOW)).toBe(true);
+  it('keeps a schedule an agent set', () => {
+    expect(replyClearsSchedule({ status: 'open', runAt: NOW + 20 * HOUR }, NOW)).toBe(false);
   });
 
-  it('cancels a schedule she set herself', () => {
-    // This applies without a caveat, so it does not ask who wrote the moment.
-    // One rule the user can hold in their head.
+  it('keeps a schedule she set herself', () => {
     expect(replyClearsSchedule({
       status: 'open', runAt: NOW + 20 * HOUR, wrote: { runAt: { ts: NOW, source: 'founder' } },
-    }, NOW)).toBe(true);
+    }, NOW)).toBe(false);
+  });
+
+  it('lifts a reminder, which only hides the row', () => {
+    expect(replyClearsSchedule({ status: 'open', snoozedUntil: NOW + HOUR }, NOW)).toBe(true);
   });
 
   it('leaves an unscheduled task alone', () => {
@@ -35,15 +36,12 @@ describe('replying to a scheduled task', () => {
   });
 
   it('does nothing to a moment that has already passed', () => {
-    // Nothing to cancel, and clearing runAt here would be a pointless write.
-    expect(replyClearsSchedule({ status: 'open', runAt: NOW - HOUR }, NOW)).toBe(false);
+    expect(replyClearsSchedule({ status: 'open', snoozedUntil: NOW - HOUR }, NOW)).toBe(false);
   });
 
   it('is separate from what the reply does to status', () => {
-    // The two rules answer different questions and must not be collapsed: a
-    // reply to a claimed row leaves status alone (a worker is on it) but still
-    // has every reason to cancel a schedule.
+    // A reply to a claimed row leaves status alone (a worker is on it) but still lifts a reminder.
     expect(statusForReply('claimed')).toBeUndefined();
-    expect(replyClearsSchedule({ status: 'claimed', runAt: NOW + HOUR }, NOW)).toBe(true);
+    expect(replyClearsSchedule({ status: 'claimed', snoozedUntil: NOW + HOUR }, NOW)).toBe(true);
   });
 });

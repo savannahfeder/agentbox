@@ -439,8 +439,18 @@ function historiesOf(file) {
 }
 // `before` keeps the lines written at or before that moment, and the cap then
 // counts back from there rather than from the newest line.
-export function readItemHistory(projectDir, id, { max = 400, before } = {}) {
-  const lines = historiesOf(ledgerPath(projectDir)).get(id);
+export function readItemHistory(projectDir, id, opts) {
+  return historyFrom(historiesOf(ledgerPath(projectDir)), id, opts);
+}
+
+/** readItemHistory for many threads of one project, its ledger found and read once. */
+export function readItemHistories(projectDir) {
+  const byId = historiesOf(ledgerPath(projectDir));
+  return (id, opts) => historyFrom(byId, id, opts);
+}
+
+function historyFrom(byId, id, { max = 400, before } = {}) {
+  const lines = byId.get(id);
   if (!lines) return [];
   const upTo = Number.isFinite(before) ? lines.filter((l) => l.ts <= before) : lines;
   return upTo.slice(-max);

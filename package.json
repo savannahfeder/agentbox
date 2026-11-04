@@ -159,6 +159,7 @@
       "scripts/approval-server.sh",
       "scripts/cloud-shim.pl",
       "scripts/memory-gate-hook.sh",
+      "mcp/connection-proxy.mjs",
       "renderer/dist/**/*",
       "package.json"
     ],

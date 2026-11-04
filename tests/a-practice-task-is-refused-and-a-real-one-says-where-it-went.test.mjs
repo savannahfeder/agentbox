@@ -21,6 +21,9 @@
 // The words themselves are tested, not only the plumbing, because copy is part
 // of the design here (CLAUDE.md) and a refusal nobody finishes reading is a
 // refusal that did not happen.
+//
+// canSend may wait on more than the refusal after it (files still attaching,
+// 2b4d937f); the refusal is still one of its conditions.
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -89,7 +92,7 @@ describe('the card cannot send a refused task by any route', () => {
   // The button is one route and ⌘↵ is the other, and the keyboard is how this
   // card is actually used. A guard on the button alone is not a guard.
   it('disables Start it and returns before the send', () => {
-    expect(compose).toMatch(/const canSend = \(.*\) && !refusal;/);
+    expect(compose).toMatch(/const canSend = \(.*\) && !refusal( && .*)?;/);
     expect(compose).toMatch(/if \(refusal\) return;/);
   });
 

@@ -118,9 +118,10 @@ describe('the sidebar', () => {
 
 describe('a teammate\'s page', () => {
   const page = fs.readFileSync(new URL('../renderer/src/teammates/TeammatesPage.tsx', import.meta.url), 'utf8');
-  it('puts About, Log and Pause behind one ⋯ button, not buttons of their own', () => {
+  it('puts Log and Pause behind one ⋯ button, with About one quiet word beside it', () => {
     expect(page).toMatch(/aria-label="Teammate options"/);
-    for (const w of ['About', 'Log', 'Pause', 'Resume']) expect(page).toContain(`'${w}'`);
+    for (const w of ['Log', 'Pause', 'Resume']) expect(page).toContain(`'${w}'`);
+    expect(page).toMatch(/tq-about-key[^\n]*>About</);
   });
 
   it('writes to it in the app\'s own chat box', () => {

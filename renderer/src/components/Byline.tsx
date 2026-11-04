@@ -27,11 +27,11 @@ function Said({ parts }: { parts: (string | null)[] }) {
 }
 
 /** A conversation's faces and Add people, at the end of its trail, now that no line under a title carries them. */
-export function ConversationAside({ item, onAddPeople }: { item: WorkItem; onAddPeople?: (who: { to: string; also: string[] }) => void }) {
+export function ConversationAside({ item, onAddPeople }: { item: WorkItem; onAddPeople?: (item: WorkItem, person?: string) => void }) {
   const team = useContext(TeamContext);
   return <span className="crumb-aside">
     {teamHeld(item, team) && <TeamPeople item={item} />}
-    {onAddPeople && <AddPeople product={team?.products.get(item.product) ?? null} onAdd={onAddPeople} />}
+    {onAddPeople && <AddPeople item={item} product={team?.products.get(item.product) ?? null} onAdd={onAddPeople} />}
   </span>;
 }
 
@@ -61,10 +61,8 @@ export function Byline({ item, facts, returned, lead, stateShown, onAddPeople }:
    *  would say the state in other words ("In your inbox", "Working"), exactly
    *  as it does when it is led by the mark. */
   stateShown?: boolean;
-  /** Opens New thread with a conversation's people already in To. Only a
-   *  conversation draws the control that calls it (../team/TeamFocus AddPeople),
-   *  so passing it on a task page adds nothing to the line. */
-  onAddPeople?: (who: { to: string; also: string[] }) => void;
+  /** Puts someone on the thread on screen. */
+  onAddPeople?: (item: WorkItem, person?: string) => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const running = !!facts.session;
@@ -84,7 +82,7 @@ export function Byline({ item, facts, returned, lead, stateShown, onAddPeople }:
   // conversation either way. The control itself draws nothing off a
   // conversation, so the second copy costs no ink.
   const addPeople = onAddPeople
-    ? <AddPeople product={team?.products.get(item.product) ?? null} onAdd={onAddPeople} />
+    ? <AddPeople item={item} product={team?.products.get(item.product) ?? null} onAdd={onAddPeople} />
     : null;
   if (teamHeld(item, team)) {
     return <div className="focus-meta by-lead">

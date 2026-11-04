@@ -25,7 +25,7 @@ import { SEND } from '../this-keyboard';
 import { TeamContext, firstName } from '../team/people';
 import { WhoPicker, DuePicker } from '../team/WhoPicker';
 import { isShared } from '../../../shared/team-rules.mjs';
-import { collectFiles, fromPaste, persistAttachments, type PendingAttachment } from '../attachments';
+import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { AttachRow } from './AttachRow';
 import { PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId } from './Priority';
 import { parseRepeat } from '../format';
@@ -182,6 +182,7 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
   const [modelOpen, setModelOpen] = useState(false);
   const [engineOpen, setEngineOpen] = useState(false);
   const [attachments, setAttachments] = useState<PendingAttachment[]>(() => opened.current.attachments);
+  const { attaching, collect } = useAttaching();
   // How many images on the card the draft could not save, said at the paste
   // while the user still has them.
   const [dropped, setDropped] = useState(0);
@@ -285,6 +286,8 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
     if ((!trimmed && !attachments.length) || !product) return;
     // ⌘↵ refuses too, not only the disabled button. The draft stays.
     if (refusal) return;
+    // The row under the files already says why.
+    if (attaching.length || attachProblem(attachments)) return;
     // ../message-split.ts owns the title and body split.
     const { title, body: written } = splitMessage(trimmed || `Attached: ${attachments[0]?.name}`);
     const attachedMd = await persistAttachments(product.slug, attachments);
@@ -447,7 +450,7 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
     </span>
   );
 
-  const canSend = (!!text.trim() || attachments.length > 0) && !refusal;
+  const canSend = (!!text.trim() || attachments.length > 0) && !refusal && !attaching.length && !attachProblem(attachments);
 
   // The footer names the project only when there is a choice, except a practice
   // project, which always names itself because there it decides whether
@@ -490,11 +493,11 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
           onDragOver={(e) => e.preventDefault()}
           onDrop={async (e) => {
             e.preventDefault();
-            const dropped = await collectFiles(e.dataTransfer.files);
+            const dropped = await collect(e.dataTransfer.files);
             if (dropped.length) setAttachments((a) => [...a, ...dropped]);
           }}
         />
-        <AttachRow attachments={attachments} onRemove={(i) => setAttachments((x) => x.filter((_, j) => j !== i))} />
+        <AttachRow attachments={attachments} attaching={attaching} onRemove={(i) => setAttachments((x) => x.filter((_, j) => j !== i))} />
         {/* Notes take a line only when there is something to say. They are not
             clauses in the sentence, so the sentence never moves and a failure
             reads as a failure, not as another setting. */}

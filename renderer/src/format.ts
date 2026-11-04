@@ -195,8 +195,20 @@ export function liveOption(item: HasFields & { answer?: string }, n: number): Pa
 // alone or with a reason after them: "Ship it, then close the task" and "Close
 // this task, then file the follow-up" are still replies.
 const CLOSES = /^close (?:this|the) (?:task|thread)(?:$|\s*[,:;\p{Pd}](?!\s*(?:then|and|also)\b)|\s+(?:since|because|as|now that)\b)/iu;
+// "Keep it as sent and close this task" asks for no work either. Keeping something
+// in particular ("Keep the first layout and close this task") does.
+const KEEPS_AND_CLOSES = /^(?:keep|leave) (?:it|this|them|that)(?: as (?:is|sent|it is))?\s*,?\s+and close (?:this|the) (?:task|thread)$/i;
+// "Looks right, close this task" is a close too.
+const RIGHT_FIRST = /^(?:(?:that|it|this|all)\s+)?(?:looks\s+|is\s+)?(?:right|good|fine|great|perfect|correct)\s*[,.;:!]?\s+(?:and\s+|so\s+)?(?=close\b)/i;
 export function closesTheTask(option: string): boolean {
-  return CLOSES.test(bareOption(option));
+  const words = bareOption(option).replace(RIGHT_FIRST, '');
+  return CLOSES.test(words) || KEEPS_AND_CLOSES.test(words);
+}
+
+// "Keep it on the branch" is the same, and leaves the work off main on purpose.
+const STAYS_ON_BRANCH = /^(?:keep|leave)\s+(?:(?:it|this|them|that|the (?:change|changes|work|commits?))\s+)?(?:on|in)\s+(?:(?:the|its|this|a)\s+)?branch(?:\s+for now)?$/i;
+export function leavesItOnTheBranch(option: string): boolean {
+  return STAYS_ON_BRANCH.test(bareOption(option));
 }
 
 const bareOption = (option: string) => option.replace(/\s*\(recommended\)\s*/i, '').trim().replace(/[.!]+$/, '');

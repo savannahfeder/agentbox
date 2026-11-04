@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { foldTeammates, foldChat, foldPlaybooks } from '../../shared/teammates.mjs';
+import { foldOutbox } from '../../shared/teammate-reach.mjs';
 
 const MAX_READ = 4 * 1024 * 1024;
 const MAX_LINE = 64 * 1024;
@@ -18,6 +19,10 @@ export function teamDir(storeRoot, accountId) {
 export const teammatesFile = (dir) => path.join(dir, 'teammates.jsonl');
 export const chatFile = (dir) => path.join(dir, 'chat.jsonl');
 export const playbooksFile = (dir) => path.join(dir, 'playbooks.jsonl');
+// What agents asked to say to people, which only the app can send, and who is on
+// the team and what the owner can read, which only the app can know.
+export const outboxFile = (dir) => path.join(dir, 'outbox.jsonl');
+export const teamViewFile = (dir) => path.join(dir, 'team-view.json');
 // A teammate's method, which its own runs edit, and the threads it learns
 // from, which the app writes out whole.
 export const methodFile = (dir, id) => path.join(dir, 'methods', `${id}.md`);
@@ -125,6 +130,28 @@ export function writeChat(dir, line, now = Date.now()) {
   const full = { ...line, ts: line.ts ?? now };
   if (full.kind !== 'seen' && !full.id) full.id = newMessageId();
   return append(chatFile(dir), full);
+}
+
+export function readOutbox(dir) {
+  return foldOutbox(readLines(outboxFile(dir)));
+}
+
+export function writeOutbox(dir, line, now = Date.now()) {
+  return append(outboxFile(dir), { ...line, ts: line.ts ?? now });
+}
+
+export const newOutId = () => `o-${crypto.randomBytes(6).toString('hex')}`;
+
+export function readTeamView(dir) {
+  try { return JSON.parse(fs.readFileSync(teamViewFile(dir), 'utf8')); } catch { return null; }
+}
+
+export function writeTeamView(dir, view) {
+  fs.mkdirSync(dir, { recursive: true });
+  const file = teamViewFile(dir);
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(view));
+  fs.renameSync(tmp, file);
 }
 
 export function readPlaybooks(dir) {

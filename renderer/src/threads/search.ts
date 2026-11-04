@@ -2,6 +2,8 @@ import { matchedSentence, parseQuery, searchItems, searchScore } from '../search
 import { searchText } from '../format';
 import { isDirect, messageLine } from './page-rules';
 import type { Person, Product, WorkItem } from '../types';
+import { shownTitle } from '../../../shared/thread-title.mjs';
+import { isTaskRow } from '../../../shared/team-rules.mjs';
 
 export interface SearchContext { products: Product[]; people: Person[]; me: string | null }
 
@@ -59,7 +61,8 @@ export function searchThreads(items: WorkItem[], query: string, context: SearchC
 
 export function threadSearchDetails(item: WorkItem, context: SearchContext) {
   const { chat, names, people } = indexed(item, context);
-  const title = chat ? (names.replace(/ \. /g, ', ') || 'Conversation') : item.label || item.title;
+  // A task in a conversation has a title of its own; the people are its record's.
+  const title = chat && !isTaskRow(item) ? (names.replace(/ \. /g, ', ') || 'Conversation') : shownTitle(item);
   return { title, kind: chat ? 'chat' : 'agent', people };
 }
 

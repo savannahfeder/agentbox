@@ -142,7 +142,7 @@ describe('the menu is told which engine the row runs on', () => {
     // Passed all the way down rather than stopping at Focus, which is where it
     // stopped: Focus has taken `runningEngine` for the byline the whole time and
     // the composer inside it never saw it.
-    expect(focus).toContain('<DockComposer item={item} runningMode={runningMode} runningEngine={runningEngine}');
+    expect(focus).toContain('item={item} runningMode={runningMode} runningEngine={runningEngine}');
   });
 });
 

@@ -9,15 +9,23 @@
 import { EventEmitter } from 'node:events';
 import crypto from 'node:crypto';
 import { asPulled } from '../../shared/team-rules.mjs';
+import { cleanMates } from '../../shared/team-departures.mjs';
 import { cleanStatus } from '../../shared/team-status.mjs';
+import { cleanConnections } from '../../shared/team-connections.mjs';
 import { PHONE_COMMANDS } from '../../shared/phone-snapshot.mjs';
 import { roomsMemory } from './rooms-memory.mts';
 import type { MemoryRoomsFields } from './rooms-memory.mts';
 import type { LedgerLine } from './sync.mts';
+import { appendTo, cleanEntry, foldLine } from '../../shared/version-line.mjs';
 
 // The database's own checks on a message's file (20261013000000_message_files.sql).
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$/;
 const MAX_FILE_DATA = 14_000_000;
+const MAX_PIECE_BYTES = 10 * 1024 * 1024;
+const MAX_WORK_BYTES = 1_000_000;
+const MAX_COMMENT_CHARS = 4000;
+const MAX_MARK_CHARS = 24_000;
+const MAX_FOLDER_NAME = 120;
 
 export interface MemoryPerson {
   id: string;
@@ -25,6 +33,7 @@ export interface MemoryPerson {
   name: string;
   avatarUrl: string | null;
   status: { text: string; until: number | null } | null;
+  connections?: string[];
 }
 export interface MemoryTeam { id: string; name: string; createdBy: string | null; made?: number }
 export interface MemoryMember { teamId: string; personId: string; role: string }
@@ -32,6 +41,19 @@ export interface MemoryInvite { teamId: string; email: string; invitedBy: string
 export interface MemoryProject { id: string; teamId: string; name: string; visibility: string; createdBy: string; direct: boolean }
 export interface MemoryLine { seq: number; projectId: string; uid: string; byPerson: string; body: LedgerLine; createdAt: number }
 export interface MemoryFile { projectId: string; name: string; byPerson: string; data: string }
+export interface MemoryFolder { id: string; teamId: string; project: string; name: string; parent: string | null; people: string[] | null; by: string; at: number }
+export interface MemoryFilePlace { owner: string; threadId: string; project: string; family: string; folder: string | null; by: string; at: number }
+export interface MemoryFileVersion { teamId: string; file: string; n: number; hash: string; name: string | null; by: string | null; at: number }
+export interface MemoryThreadWork { owner: string; threadId: string; teamId: string; hash: string; work: unknown; updatedAt: number }
+export interface MemoryThreadFile { owner: string; threadId: string; name: string; data: string }
+export interface MemoryThreadComment { id: string; owner: string; threadId: string; by: string; text: string; at: number }
+export interface MemoryFileMark { id: string; owner: string; threadId: string; by: string; mark: object; at: number }
+export interface MemoryPiece { projectId: string; name: string; byPerson: string; bytes: Buffer }
+export interface MemorySeen { projectId: string; itemId: string; personId: string; at: number }
+/** What a person who leaves hands over: their open work to `handTo`, each AI teammate to `to`. */
+export interface MemoryHandover { handTo: string; name?: unknown; mates?: unknown }
+export interface MemoryDeparture { teamId: string; personId: string; name: string; handTo: string; mates: { id: string; name: string; job: string | null; to: string | null }[]; at: number; by: string }
+
 /** A thread card as the team sees it; the rest of it passes through. */
 export interface MemoryCard {
   [key: string]: unknown;
@@ -71,6 +93,16 @@ export interface MemoryCloud extends MemoryRoomsFields {
   lines: MemoryLine[];
   cards: Map<string, MemoryCard>;
   files: Map<string, MemoryFile>;
+  pieces: Map<string, MemoryPiece>;
+  threadWork: Map<string, MemoryThreadWork>;
+  threadFiles: Map<string, MemoryThreadFile>;
+  threadComments: MemoryThreadComment[];
+  fileMarks: MemoryFileMark[];
+  fileFolders: MemoryFolder[];
+  filePlaces: MemoryFilePlace[];
+  fileVersions: MemoryFileVersion[];
+  reads: Map<string, MemorySeen>;
+  departures?: MemoryDeparture[];
   seq: number;
   teamsMade: number;
   now: () => number;
@@ -96,6 +128,15 @@ export function createMemoryCloud(): MemoryCloud {
     lines: [], // { seq, projectId, uid, byPerson, body, createdAt }
     cards: new Map(), // `${personId}:${threadId}` -> a thread card, as shared/thread-cards.mjs makes them
     files: new Map(), // `${projectId}:${name}` -> { projectId, name, byPerson, data (base64) }
+    pieces: new Map(), // `${projectId}/${name}` -> { projectId, name, byPerson, bytes }
+    threadWork: new Map(), // `${personId}:${threadId}` -> { owner, threadId, teamId, hash, work, updatedAt }
+    threadFiles: new Map(), // `${personId}:${threadId}:${name}` -> { owner, threadId, name, data (base64) }
+    threadComments: [], // { id, owner, threadId, by, text, at }
+    fileMarks: [], // { id, owner, threadId, by, mark, at }
+    fileFolders: [], // { id, teamId, project, name, parent, people, by, at }
+    filePlaces: [], // { owner, threadId, project, family, folder, by, at }
+    fileVersions: [], // { teamId, file, n, hash, name, by, at }
+    reads: new Map(), // `${projectId}:${itemId}:${personId}` -> { projectId, itemId, personId, at }
     seq: 0,
     teamsMade: 0, // the order teams were made in, which is their age
     now: () => Date.now(), // the server's clock
@@ -143,7 +184,13 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
     people: cloud.projectPeople.filter((pp) => pp.projectId === p.id).map((pp) => pp.personId),
   });
   const refuse: (what: string) => never = (what) => { throw new Error(`not allowed: ${what}`); };
-  const personOut = (p: MemoryPerson | undefined) => p && ({ id: p.id, email: p.email, name: p.name, avatarUrl: p.avatarUrl ?? null, status: p.status ?? null });
+  // The read rule of `listCards` below, for one card.
+  const canReadFolder = (f: MemoryFolder) => myTeams().includes(f.teamId) && (f.people == null || f.by === personId || f.people.includes(personId));
+  const canReadCard = (owner: string, threadId: string) => {
+    const c = cloud.cards.get(`${owner}:${threadId}`);
+    return !!c && myTeams().includes(c.teamId) && (c.people == null || owner === personId || c.people.includes(personId));
+  };
+  const personOut = (p: MemoryPerson | undefined) => p && ({ id: p.id, email: p.email, name: p.name, avatarUrl: p.avatarUrl ?? null, status: p.status ?? null, connections: p.connections ?? [] });
 
   return {
     kind: 'memory',
@@ -209,6 +256,16 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
       return rows.map((m) => ({ ...personOut(cloud.people.get(m.personId)), role: m.role })).filter((p) => p.id);
     },
 
+    // Only ever your own, as 20261101180000_who_has_which_tool.sql says.
+    async setConnections(ids: unknown, { personId: who = personId }: { personId?: string } = {}) {
+      if (who !== personId) refuse('write somebody else\'s connections');
+      const me = cloud.people.get(personId);
+      if (!me) refuse('set connections before signing in');
+      me.connections = cleanConnections(ids);
+      cloud.events.emit('people', {});
+      return me.connections;
+    },
+
     // TEAM SETTINGS (2026-10-01), the same rules as 20261001000600_team_settings.sql.
     async renameTeam(teamId: string, name: unknown) {
       if (!owns(teamId)) refuse('rename a team you do not own');
@@ -217,10 +274,28 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
       return { id: t.id, name: t.name };
     },
 
-    async removeMember(teamId: string, who: string) {
+    // `handover` is { handTo, name, mates: [{ id, name, job, to }] }, as
+    // remove_and_hand_over in 20261101093000_a_person_who_leaves_hands_over.sql.
+    async removeMember(teamId: string, who: string, handover: MemoryHandover | null = null) {
       if (who !== personId && !owns(teamId)) refuse('remove somebody from a team you do not own');
+      if (handover && !owns(teamId)) refuse('hand over work on a team you do not own');
+      if (handover) {
+        const member = (id: string) => cloud.members.some((m) => m.teamId === teamId && m.personId === id);
+        if (who === personId) refuse('hand over your own work: the owner does that');
+        if (!member(who)) refuse('hand over the work of somebody not on the team');
+        if (!member(handover.handTo) || handover.handTo === who) refuse('hand work to somebody not on the team');
+        const mates = cleanMates(handover.mates);
+        if (mates.some((m) => m.to && (!member(m.to) || m.to === who))) refuse('give an AI teammate to somebody not on the team');
+        cloud.departures = (cloud.departures ?? []).filter((d) => !(d.teamId === teamId && d.personId === who));
+        cloud.departures.push({ teamId, personId: who, name: String(handover.name ?? '').slice(0, 120), handTo: handover.handTo, mates, at: cloud.now(), by: personId });
+      }
       cloud.members = cloud.members.filter((m) => !(m.teamId === teamId && m.personId === who));
       cloud.events.emit('rooms', { kind: 'membership' });
+    },
+
+    async departures(teamId: string) {
+      if (!myTeams().includes(teamId)) return [];
+      return (cloud.departures ?? []).filter((d) => d.teamId === teamId).map(({ teamId: _t, ...d }) => structuredClone(d));
     },
 
     async listInvites(teamId: string) {
@@ -285,6 +360,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
 
     async putCards(teamId: string, cards: { threadId: string; visible?: unknown; people?: string[] | null; [key: string]: unknown }[]) {
       if (!myTeams().includes(teamId)) throw new Error('not on that team');
+      const had = [...cloud.cards.values()].filter((c) => c.personId === personId).map((c) => c.threadId);
       for (const key of [...cloud.cards.keys()]) if (key.startsWith(`${personId}:`)) cloud.cards.delete(key);
       // A private card never goes up at all, whatever the Mac handed over, as
       // supabase-backend does; the database refuses words on one besides.
@@ -296,6 +372,16 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
         const people = c.people == null ? null : [...new Set(c.people.filter((p) => typeof p === 'string' && p))];
         if (people && !people.length) refuse('share a thread with nobody');
         cloud.cards.set(`${personId}:${c.threadId}`, { ...structuredClone(c), people, personId, teamId });
+      }
+      // A thread's work goes with its card (the foreign keys in
+      // 20261030120000_shared_threads_carry_their_work.sql).
+      for (const threadId of had) {
+        if (cloud.cards.has(`${personId}:${threadId}`)) continue;
+        cloud.threadWork.delete(`${personId}:${threadId}`);
+        for (const [k, f] of [...cloud.threadFiles]) if (f.owner === personId && f.threadId === threadId) cloud.threadFiles.delete(k);
+        cloud.threadComments = cloud.threadComments.filter((x) => !(x.owner === personId && x.threadId === threadId));
+        cloud.fileMarks = cloud.fileMarks.filter((x) => !(x.owner === personId && x.threadId === threadId));
+        cloud.filePlaces = cloud.filePlaces.filter((x) => !(x.owner === personId && x.threadId === threadId));
       }
       cloud.events.emit('cards', {});
     },
@@ -312,9 +398,143 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
         .map(({ teamId, ...c }) => structuredClone(c));
     },
 
+    // A SHARED THREAD'S WORK. Whoever can read the card can read the work and
+    // comment, and nobody else: 20261030120000_shared_threads_carry_their_work.sql.
+    async threadWorkHeads() {
+      return [...cloud.threadWork.values()].filter((w) => canReadCard(w.owner, w.threadId))
+        .map((w) => ({ personId: w.owner, threadId: w.threadId, hash: w.hash, updatedAt: w.updatedAt }));
+    },
+
+    async getThreadWork(owner: string, threadId: string) {
+      const w = cloud.threadWork.get(`${owner}:${threadId}`);
+      return w && canReadCard(owner, threadId) ? { work: structuredClone(w.work), hash: w.hash } : null;
+    },
+
+    async putThreadWork(teamId: string, { threadId, hash, work }: { threadId: string; hash: string; work: unknown }) {
+      if (!myTeams().includes(teamId)) refuse('share into a team you are not on');
+      if (!cloud.cards.has(`${personId}:${threadId}`)) refuse('share the work of a thread with no card');
+      if (new TextEncoder().encode(JSON.stringify(work)).length > MAX_WORK_BYTES) refuse('a thread that big');
+      cloud.threadWork.set(`${personId}:${threadId}`, { owner: personId, threadId, teamId, hash, work: structuredClone(work), updatedAt: cloud.now() });
+      cloud.events.emit('work', {});
+    },
+
+    async threadFileNames(threadId: string) {
+      return [...cloud.threadFiles.values()].filter((f) => f.owner === personId && f.threadId === threadId).map((f) => f.name);
+    },
+
+    async putThreadFile(threadId: string, name: string, data: string) {
+      if (!cloud.cards.has(`${personId}:${threadId}`)) refuse('share a file of a thread with no card');
+      if (!FILE_NAME.test(name)) refuse('a file name that is not a plain name');
+      if (data.length > MAX_FILE_DATA) refuse('a file that big');
+      const key = `${personId}:${threadId}:${name}`;
+      if (!cloud.threadFiles.has(key)) cloud.threadFiles.set(key, { owner: personId, threadId, name, data });
+    },
+
+    async pruneThreadFiles(threadId: string, keep: string[]) {
+      for (const [k, f] of [...cloud.threadFiles]) {
+        if (f.owner === personId && f.threadId === threadId && !keep.includes(f.name)) cloud.threadFiles.delete(k);
+      }
+    },
+
+    async getThreadFile(owner: string, threadId: string, name: string) {
+      return canReadCard(owner, threadId) ? cloud.threadFiles.get(`${owner}:${threadId}:${name}`)?.data ?? null : null;
+    },
+
+    async addThreadComment(owner: string, threadId: string, text: unknown) {
+      if (!canReadCard(owner, threadId)) refuse('comment on a thread you cannot read');
+      const clean = String(text ?? '').trim();
+      if (!clean || clean.length > MAX_COMMENT_CHARS) refuse('a comment with nothing in it, or that long');
+      const row = { id: crypto.randomUUID(), owner, threadId, by: personId, text: clean, at: cloud.now() };
+      cloud.threadComments.push(row);
+      cloud.events.emit('work', {});
+      return { ...row };
+    },
+
+    async threadComments() {
+      return cloud.threadComments.filter((c) => canReadCard(c.owner, c.threadId)).map((c) => ({ ...c }));
+    },
+
+    // WHAT PEOPLE MARK ON A SHARED THREAD'S FILES: the card's rule again, and an
+    // id sent twice lands once (20261030180000_shared_files_carry_their_marks.sql).
+    async addFileMark(owner: string, threadId: string, { id, mark }: { id: string; mark?: unknown }) {
+      if (!canReadCard(owner, threadId)) refuse('mark a file on a thread you cannot read');
+      if (!mark || typeof mark !== 'object' || JSON.stringify(mark).length > MAX_MARK_CHARS) refuse('a mark that big');
+      if (!cloud.fileMarks.some((m) => m.owner === owner && m.threadId === threadId && m.by === personId && m.id === id)) {
+        cloud.fileMarks.push({ id, owner, threadId, by: personId, mark: structuredClone(mark), at: cloud.now() });
+        cloud.events.emit('work', {});
+      }
+    },
+
+    async fileMarks() {
+      return cloud.fileMarks.filter((m) => canReadCard(m.owner, m.threadId)).map((m) => structuredClone(m));
+    },
+
+    // FOLDERS (20261102000000_a_teams_folders.sql). A folder says who reads it; a
+    // file's place hangs on a card, so it reaches only those who may read the
+    // file, and goes when the card does.
+    async putFileFolder(teamId: string, { id, project, name, parent = null, people = null, at }: { id: string; project: unknown; name: unknown; parent?: string | null; people?: string[] | null; at: number }) {
+      if (!myTeams().includes(teamId)) refuse('make a folder on a team you are not on');
+      const clean = String(name ?? '').trim();
+      if (!clean || clean.length > MAX_FOLDER_NAME) refuse('a folder with no name, or that long a name');
+      if (people && (!people.length || !people.includes(personId))) refuse('share a folder with nobody, or leave yourself out');
+      const was = cloud.fileFolders.find((f) => f.id === id);
+      if (was && !canReadFolder(was)) refuse('change a folder you cannot read');
+      const row = { id, teamId, project: String(project), name: clean, parent: parent ?? null, people: people ?? null, by: was?.by ?? personId, at };
+      if (was) Object.assign(was, row); else cloud.fileFolders.push(row);
+      cloud.events.emit('work', {});
+    },
+
+    async fileFolders() {
+      return cloud.fileFolders.filter(canReadFolder).map((f) => structuredClone(f));
+    },
+
+    async placeFile(owner: string, threadId: string, { project, family, folder = null, at }: { project: unknown; family: string; folder?: string | null; at: number }) {
+      if (!canReadCard(owner, threadId)) refuse('place a file on a thread you cannot read');
+      if (folder && !cloud.fileFolders.some((f) => f.id === folder && canReadFolder(f))) refuse('place a file in a folder you cannot read');
+      const was = cloud.filePlaces.find((p) => p.owner === owner && p.threadId === threadId && p.family === family);
+      const row = { owner, threadId, project: String(project), family, folder: folder ?? null, by: personId, at };
+      if (was) Object.assign(was, row); else cloud.filePlaces.push(row);
+      cloud.events.emit('work', {});
+    },
+
+    async filePlaces() {
+      return cloud.filePlaces.filter((p) => canReadCard(p.owner, p.threadId)).map((p) => structuredClone(p));
+    },
+
+    // THE VERSION LINE (20261104000000_one_version_line_per_file.sql). The cloud
+    // gives each new set of bytes a file's next number; the same bytes keep theirs.
+    async addFileVersion(teamId: string, { file, hash, name, at }: { file: string; hash: string; name: string | null; at: number }) {
+      if (!myTeams().includes(teamId)) refuse('number a file on a team you are not on');
+      const asked = cleanEntry({ file, hash, name, n: 1, at });
+      if (!asked) refuse('a version with no file or no bytes');
+      const all = (cloud.fileVersions ??= []);
+      const line = foldLine(all.filter((v) => v.teamId === teamId && v.file === asked.file)).get(asked.file) ?? [];
+      const { entry, added } = appendTo(line, { ...asked, by: personId } as unknown as Parameters<typeof appendTo>[1]);
+      if (added) { all.push({ teamId, ...entry }); cloud.events.emit('work', {}); }
+      const { teamId: _t, ...row } = entry;
+      return structuredClone(row);
+    },
+
+    async fileVersions(teamId: string) {
+      if (!myTeams().includes(teamId)) return [];
+      return (cloud.fileVersions ?? []).filter((v) => v.teamId === teamId).map(({ teamId: _t, ...v }) => structuredClone(v));
+    },
+
     // THE FILES A CONVERSATION'S MESSAGES LINK TO (w-140ac855b1). Read and
     // written by whoever may see the project, each name stored once and never
     // replaced: 20261013000000_message_files.sql.
+    // WHO HAS OPENED A CONVERSATION (20261101000000_a_conversation_says_who_has_seen_it.sql).
+    async markSeen(projectId: string, itemId: string) {
+      if (!canSee(projectId)) refuse('mark a conversation you cannot see');
+      if (!/^w-[0-9a-f]{10}$/.test(String(itemId))) refuse('mark something that is not a row');
+      cloud.reads.set(`${projectId}:${itemId}:${personId}`, { projectId, itemId, personId, at: cloud.now() });
+      cloud.events.emit('lines', { projectId });
+    },
+
+    async seenMarks() {
+      return [...cloud.reads.values()].filter((r) => canSee(r.projectId)).map((r) => ({ ...r }));
+    },
+
     async hasFiles(projectId: string, names: string[]) {
       if (!canSee(projectId)) return [];
       return names.filter((n) => cloud.files.has(`${projectId}:${n}`));
@@ -334,6 +554,25 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
       cloud.files.set(key, { projectId, name, byPerson: personId, data });
       cloud.events.emit('files', 1);
       return true;
+    },
+
+    // A big file's pieces, in the private message-files bucket under the
+    // conversation's folder (20261105000000_a_film_goes_in_pieces_through_storage.sql).
+    async putPiece(projectId: string, name: string, bytes: unknown) {
+      if (!canSee(projectId)) refuse('send a file to a project you cannot see');
+      if (!FILE_NAME.test(name)) refuse('a file name that is not a plain name');
+      if (!Buffer.isBuffer(bytes) || bytes.length > MAX_PIECE_BYTES) refuse('a piece that big');
+      const key = `${projectId}/${name}`;
+      if (cloud.pieces.has(key)) return false;
+      cloud.pieces.set(key, { projectId, name, byPerson: personId, bytes: Buffer.from(bytes) });
+      cloud.events.emit('files', 1);
+      return true;
+    },
+
+    async getPiece(projectId: string, name: string) {
+      if (!canSee(projectId)) return null;
+      const got = cloud.pieces.get(`${projectId}/${name}`);
+      return got ? Buffer.from(got.bytes) : null;
     },
 
     // HER OWN ROWS FOR HER PHONE (20261014000200_phone_inbox.sql): every one
@@ -477,7 +716,8 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
       cloud.events.on('cards', fire);
       cloud.events.on('people', fire);
       cloud.events.on('phone', fire);
-      return () => { cloud.events.off('lines', fire); cloud.events.off('cards', fire); cloud.events.off('people', fire); cloud.events.off('phone', fire); };
+      cloud.events.on('work', fire);
+      return () => { cloud.events.off('lines', fire); cloud.events.off('cards', fire); cloud.events.off('people', fire); cloud.events.off('phone', fire); cloud.events.off('work', fire); };
     },
 
     ...roomsMemory(cloud, personId, { confirmedEmail, refuse }),

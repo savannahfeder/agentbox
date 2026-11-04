@@ -15,6 +15,9 @@
 // box, by the Mac's own `sips`. Where that cannot happen (not a Mac, sips
 // fails) it stays the file it was, as before, and is never drawn as a broken
 // picture.
+//
+// An attachment now carries the size of the file she gave it (2b4d937f, the
+// 200 MB limit), so the shapes below include it.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -165,8 +168,9 @@ describe('the TIFF in the reply box and in the message', () => {
   const tiffFile = () => new File([tinyTiff(4, 3)], HERS, { type: 'image/tiff' });
 
   it('is a picture in the box once it has been turned', async () => {
-    const [a] = await collectFiles([tiffFile()]);
-    expect(a).toEqual({ name: 'file-3674d0dea94a72e6b8c93fc8e9cf731c.png', srcPath: '/Users/you/Zero/.staging/abc-file-3674d0dea94a72e6b8c93fc8e9cf731c.png', image: true });
+    const f = tiffFile();
+    const [a] = await collectFiles([f]);
+    expect(a).toEqual({ name: 'file-3674d0dea94a72e6b8c93fc8e9cf731c.png', srcPath: '/Users/you/Zero/.staging/abc-file-3674d0dea94a72e6b8c93fc8e9cf731c.png', image: true, size: f.size });
   });
 
   it('is a file, not a broken picture, when it could not be turned', async () => {
@@ -178,16 +182,17 @@ describe('the TIFF in the reply box and in the message', () => {
 
   it('is copied in to be turned when it is dropped from the disk', async () => {
     window.zero.pathForFile = () => '/Users/you/Desktop/scan.tiff';
-    const [a] = await collectFiles([new File([tinyTiff(4, 3)], 'scan.tiff', { type: 'image/tiff' })]);
+    const f = new File([tinyTiff(4, 3)], 'scan.tiff', { type: 'image/tiff' });
+    const [a] = await collectFiles([f]);
     expect(staged).toEqual([{ name: 'scan.tiff', from: '/Users/you/Desktop/scan.tiff' }]);
-    expect(a).toEqual({ name: 'scan.png', srcPath: '/Users/you/Zero/.staging/abc-scan.png', image: true });
+    expect(a).toEqual({ name: 'scan.png', srcPath: '/Users/you/Zero/.staging/abc-scan.png', image: true, size: f.size });
   });
 
   it('still leaves a dropped PDF where it is', async () => {
     window.zero.pathForFile = () => '/Users/you/Desktop/notes.pdf';
     const [a] = await collectFiles([new File([new Uint8Array(8)], 'notes.pdf', { type: 'application/pdf' })]);
     expect(staged).toEqual([]);
-    expect(a).toEqual({ name: 'notes.pdf', srcPath: '/Users/you/Desktop/notes.pdf', image: false });
+    expect(a).toEqual({ name: 'notes.pdf', srcPath: '/Users/you/Desktop/notes.pdf', image: false, size: 8 });
   });
 
   it('goes into the message as a picture, not a link', () => {

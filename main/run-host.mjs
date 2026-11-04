@@ -5,7 +5,7 @@
 // running; the restarted app attaches again and reads on from where it was.
 //
 // While no app is attached, the input is closed the way the app would close it
-// (main/claude-input.mjs, run here on the same stream), so a finished run ends
+// (main/claude-input.mts, run here on the same stream), so a finished run ends
 // rather than waiting for an app that may not come back.
 //
 // Lines of JSON over a socket only this user can reach. The first line says

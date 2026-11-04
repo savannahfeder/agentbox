@@ -44,12 +44,12 @@ import { AutoFace } from '../components/AutoFace';
 import { AUTO_LABEL } from '../../../shared/auto-route.mjs';
 import { readLastRecipient, writeLastRecipient } from './recipient';
 import { conversationWith } from './page-rules';
-import { collectFiles, fromPaste, persistAttachments, type PendingAttachment } from '../attachments';
+import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { AttachRow } from '../components/AttachRow';
 import { Listening, MicButton, useWebDictation } from '../components/WebDictation';
 import { PRIORITIES, priorityLabelOf, priorityValueOf, startingPriority, type PriorityId } from '../priority';
-import { composeDraftIsEmpty, dropComposeDraft, markComposeDraftSending, openingComposeDraft, readComposeDraft, restoreComposeDraft, saveComposeDraft, type ComposeDraft } from '../drafts';
-import { LAST_PRODUCT_KEY } from '../compose-project';
+import { clearComposeDraft, composeDraftIsEmpty, dropComposeDraft, markComposeDraftSending, openingComposeDraft, readComposeDraft, restoreComposeDraft, saveComposeDraft, type ComposeDraft } from '../drafts';
+import { codeProjectFor, LAST_PRODUCT_KEY, rememberedProject } from '../compose-project';
 import { practiceRefusal, noProjectYet } from '../compose-says';
 import { onCloudPhone } from '../phone-screen';
 import { defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type ModelChoice } from '../models';
@@ -65,12 +65,18 @@ import {
   agentChoices, agentWordFor, autoOffered,
   allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayMorning, moreCount,
   joinNames, placeholderFor, projectsOffered, projectSwatch, recentModels,
-  sharingFields, startingProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
-  dueChoices, dueWords, headRows, keyOnTheNewThreadCard, taskFields,
-  type Harness, type Keyboard, type ModelPick, type SendAs, type Visibility,
+  sharingFields, cardProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
+  dueChoices, dueWords, headRows, NOT_BLOCKED, keyOnTheNewThreadCard, messageSubject, toSections, findInvited, type ToSection,
+  agentOnThisWork, atOffers, atWordAt, cardDraftPlace, cardDraftToKeep, handedFromLabel, withoutAtWord,
+  type AtOffer, type HandFrom, type Harness, type Keyboard, type ModelPick, type SendAs, type Visibility,
 } from './composer-rules';
+import { heldKeyThatOpenedTheBox } from '../reply-keys';
 import './thread-composer.css';
 import { TeammateMark } from '../teammates/TeammatesRail';
+import { shownTitle } from '../../../shared/thread-title.mjs';
+import { dayDeadline, dueFromWords, dueSaid } from '../../../shared/team-tasks.mjs';
+import { nameWait } from '../../../shared/thread-waits.mjs';
+import { continuedFromLabel } from '../../../shared/thread-continued.mjs';
 
 /** What went out, so the caller can say so and offer the way back. */
 export interface ThreadSent {
@@ -91,9 +97,11 @@ export interface ThreadSent {
   draft?: ComposeDraft;
   /** The conversation a message went into, so its toast can open it with O. */
   made?: { product: string; id: string };
+  /** It went to the person as a task rather than a message. */
+  given?: boolean;
 }
 
-type MenuKey = 'to' | 'model' | 'sendAs' | 'dueOn' | 'project' | 'priority' | 'visibility' | 'later';
+type MenuKey = 'to' | 'model' | 'dueOn' | 'blockedBy' | 'project' | 'priority' | 'visibility' | 'later';
 
 /** What a card opens on. Project, model and priority need no field: the card
  *  reads them from what was last picked and from the saved draft. */
@@ -108,16 +116,30 @@ export interface ComposeStart {
   chosen?: string[] | null;
   /** Where the caret was, as [start, end]. */
   caret?: [number, number];
+  /** Files already on disk that go with it: what a handed-over message or task carries. */
+  attachments?: PendingAttachment[];
+  /** The message this card was opened from, when it was handed to an agent. */
+  handFrom?: HandFrom;
+  /** The teammate's thread this one carries on: labelled on the new thread, and its owner told once it is sent. */
+  continueFrom?: { personId: string; threadId: string };
+  /** The box on the page moving into the dialog: the plain card's draft, wherever it is addressed. */
+  moved?: boolean;
+  /** A message's subject: it starts a thread of its own with those people. */
+  subject?: string;
 }
 
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false,
+  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false, onSendToAgent, blockChoicesFor,
 }: {
   /** First-thread suggestions, offered only while the tutorial is walking someone to their first send. */
   ideas?: Idea[] | null;
   /** The tutorial's first task: the folder is asked for before the suggestions. */
   askFolder?: boolean;
+  /** What a task to this person can be blocked by (shared/team-tasks.mjs blockChoices). */
+  blockChoicesFor?: (holder: string) => readonly { id: string; label: string }[];
   statusLine?: string | null;
+  /** Hands the words to the agent already on this work, instead of starting another. */
+  onSendToAgent?: (row: WorkItem, words: string) => void;
   /** On the page: whether the keyboard is in the box or words are left in it. */
   onWriting?: (writing: boolean) => void;
   /** On the page: filled with a reading of the box, for the dialog to open on. */
@@ -189,7 +211,7 @@ export function ThreadComposer({
    */
   onSending?: (p: { kind: ThreadSent['kind']; product?: string; to?: string; toMany?: string[]; runAt?: number; start?: 'later' }) => void;
   /** A send handed over with `onSending` that did not stand. The words are back in the draft. */
-  onFailed?: (reason: string, p: { to?: string; also?: string[] }) => void;
+  onFailed?: (reason: string, p: ComposeStart) => void;
   /** Drawn open on the empty inbox rather than as a dialog: no veil, To and
    *  Model as chips in the bar, and the keyboard is only its own once you are in it. */
   inline?: boolean;
@@ -221,6 +243,7 @@ export function ThreadComposer({
   const group = person ? [person, ...extra] : [];
   const names = joinNames(group.map((p) => firstName(p)));
   const found = findPeople(others, query).filter((p) => !adding || (p.id !== person?.id && !also.includes(p.id)));
+  const invitedFound = findInvited(team?.state.sent, team?.state.people ?? [], query);
   // THE CONVERSATION YOU ALREADY HAVE IS OFFERED, NEVER OPENED FOR YOU
   // (w-c34591721f). Picking a name used to jump straight into the chat and
   // throw the card away, which fired on the PICK — before the card could know
@@ -233,25 +256,30 @@ export function ThreadComposer({
   // made; a task is the thing you now say out loud.
   const [sendAs, setSendAs] = useState<SendAs>(() => initial?.sendAs ?? 'message');
   const [due, setDue] = useState<string | null>(() => initial?.due ?? null);
+  const [blockedBy, setBlockedBy] = useState<string | null>(null);
+  const [subject, setSubject] = useState(() => initial?.subject ?? '');
   // An agent has no Send As, so going back to one puts both away rather than
   // leaving a day on a card that cannot carry it.
-  useEffect(() => { if (!person) { setSendAs('message'); setDue(null); } }, [person]);
+  useEffect(() => { if (!person) { setSendAs('message'); setDue(null); } setBlockedBy(null); }, [person]);
   const rows = mate ? [] : headRows({ person: !!person, kind: sendAs });
 
   /* ------------------------------ words --------------------------------- */
-  const opened = useRef(openingComposeDraft());
-  const [text, setText] = useState(() => initial?.body || opened.current.text || '');
-  const [attachments, setAttachments] = useState<PendingAttachment[]>(() => opened.current.attachments);
+  const place = useRef(cardDraftPlace(initial)).current;
+  const opened = useRef(openingComposeDraft(undefined, undefined, place));
+  const seeded = !!(initial?.handFrom || initial?.continueFrom);
+  // A handed-over or continued message you already added to opens on what you added.
+  const [text, setText] = useState(() => (initial?.handFrom || initial?.continueFrom ? opened.current.text || initial.body : initial?.body || opened.current.text) || '');
+  const [attachments, setAttachments] = useState<PendingAttachment[]>(() => (seeded && opened.current.attachments.length ? opened.current.attachments : initial?.attachments ?? opened.current.attachments));
   const [dropped, setDropped] = useState(0);
+  const { attaching, collect } = useAttaching();
+  const onThisWork = initial?.handFrom ? agentOnThisWork(items, initial.handFrom) : null;
 
   /* ----------------------------- project -------------------------------- */
   const offered = useMemo(() => projectsOffered(products), [products]);
-  const [productSlug, setProductSlug] = useState<string | null>(() => {
-    let remembered: string | null = null;
-    try { remembered = localStorage.getItem(LAST_PRODUCT_KEY); } catch { /* a refused store opens on the first */ }
-    return startingProject(offered, { defaultProduct, remembered })?.slug ?? null;
-  });
-  const product = offered.find((p) => p.slug === productSlug) ?? startingProject(offered, { defaultProduct, remembered: null });
+  const [productSlug, setProductSlug] = useState<string | null>(null);
+  const pointedAt = cardProject(offered, { picked: productSlug, defaultProduct, remembered: rememberedProject() });
+  const toCode = !productSlug && pointedAt ? codeProjectFor(text, offered, pointedAt.slug) : null;
+  const product = toCode ?? pointedAt;
   // Picked from the menu, My Workspace included: the tutorial takes it as the folder chosen.
   const [projectChosen, setProjectChosen] = useState(false);
   const pickProject = (slug: string) => {
@@ -284,6 +312,8 @@ export function ThreadComposer({
   // who can see it (composer-rules.ts `sharingFields`).
   const [picked, setPicked] = useState<Visibility | null>(() => initial?.visibility ?? null);
   const visibility: Visibility = picked ?? startingVisibility(product);
+  // A task to a person is the team's to see unless you say otherwise, so anyone can list it.
+  const taskSees: Visibility = picked ?? 'team';
   const [chosenPicked, setChosen] = useState<string[] | null>(() => initial?.chosen ?? null);
   const chosen = chosenPicked ?? (picked ? [] : startingChosen(product));
   const [visPage, setVisPage] = useState<'rows' | 'people'>('rows');
@@ -346,6 +376,8 @@ export function ThreadComposer({
   const [modelPage, setModelPage] = useState<'recent' | 'all'>('recent');
   const [laterPage, setLaterPage] = useState<'list' | 'repeat'>('list');
   const [laterText, setLaterText] = useState('');
+  const [dueText, setDueText] = useState('');
+  const [blockText, setBlockText] = useState('');
   const [repeatText, setRepeatText] = useState('');
   const anchors = useRef<Partial<Record<MenuKey, HTMLElement | null>>>({});
   const anchor = (key: MenuKey) => (el: HTMLElement | null) => { anchors.current[key] = el; };
@@ -425,14 +457,23 @@ export function ThreadComposer({
   /* ------------------------------ draft --------------------------------- */
   // On every keystroke, every paste, every pick, the same draft the old card
   // kept, so an Escape or a reload never takes her words or her pictures.
+  const whatTheCardHolds = () => ({ text, attachments, priority: prio, when: { runAt: 0, repeat: null }, dropped: 0 });
   useEffect(() => {
-    const draft = { text, attachments, priority: prio, when: { runAt: 0, repeat: null }, dropped: 0 };
+    const kept = cardDraftToKeep(text, initial);
+    const unchanged = seeded && !kept && attachments.length === (initial?.attachments?.length ?? 0);
+    const draft = { ...whatTheCardHolds(), text: kept, attachments: unchanged ? [] : attachments };
     // A card opened while the last send is in flight starts empty, and must not
     // wipe the copy that send keeps until it lands (`openingComposeDraft`).
-    if (composeDraftIsEmpty(draft) && readComposeDraft().sendingAt) return;
-    const stored = saveComposeDraft(draft);
+    if (composeDraftIsEmpty(draft) && readComposeDraft(undefined, place).sendingAt) return;
+    const stored = saveComposeDraft(draft, undefined, place);
     setDropped(stored.dropped);
   }, [text, attachments, prio]);
+  // What is sent is written down first, even a hand-off nobody changed, so a
+  // send that fails still has its words to give back.
+  const takeTheDraft = () => {
+    saveComposeDraft(whatTheCardHolds(), undefined, place);
+    return markComposeDraftSending(undefined, undefined, place);
+  };
 
   // A LAYOUT EFFECT, SO THE CARD HAS THE KEYBOARD BEFORE THE NEXT KEYSTROKE.
   // N opens the card inside a keydown; a passive effect is scheduled and can
@@ -445,6 +486,8 @@ export function ThreadComposer({
     t.focus();
     const [from, to] = initial?.caret ?? [t.value.length, t.value.length];
     t.setSelectionRange(from, to);
+    // A long start (a continued thread's quote) opens on its end, where the caret is.
+    if (!initial?.caret) t.scrollTop = t.scrollHeight;
   }, []);
   // On the page the box is one line until the words need more.
   useLayoutEffect(() => {
@@ -526,15 +569,24 @@ export function ThreadComposer({
   // (w-f8d123be62). It gets a line in the bar rather than a tooltip, because
   // the whole fault was that nothing on screen said anything.
   const stopper = noProjectYet(product, { person: !!person, noComputer: onCloudPhone() });
-  // A task needs somewhere to live whoever it is for, so a task to a person
-  // is held to the task's bar, not the message's.
-  const asMessage = !!person && sendAs === 'message';
-  const canSend = !sending && (asMessage ? !!text.trim() || attachments.length > 0 : !!message && !!product && !refusal);
+  // A task to a person rides the record the two of you share, so it needs a
+  // project no more than a message does, and it goes to one person.
+  const taskToMany = !!person && sendAs === 'task' && extra.length > 0;
+  // A file still coming in, or one that cannot go, holds the send; the box says which.
+  const filesReady = !attaching.length && !attachProblem(attachments);
+  const canSend = !sending && !taskToMany && filesReady && (person ? !!text.trim() || attachments.length > 0 : !!message && !!product && !refusal);
 
   // The dialog closes on Send; the box on the page stays, so it empties. The
   // send goes on with the words it already took, and a failed one reopens them
   // in the dialog (`onFailed`).
-  const emptyForTheNext = () => { setText(''); setAttachments([]); setSending(false); };
+  // Starts over as a new card does: left addressed to the last person, or holding
+  // the keyboard, the next N typed an "n" and the next task went to them.
+  const emptyForTheNext = () => {
+    const next = readLastRecipient(others, agentMates, !!onToTeammate);
+    setText(''); setAttachments([]); setSending(false);
+    setTo(next.to); setMate(next.mate); setAuto(next.auto); setAlso([]); setSendAs('message'); setDue(null); setSubject('');
+    textRef.current?.blur();
+  };
 
   const sendTask = async (when: { runAt?: number; start?: 'later'; repeat?: { every: 'day' | 'weekday' | 'week'; on?: number; at: string } } = {}) => {
     // A teammate takes the words in the team chat rather than as a thread.
@@ -550,18 +602,14 @@ export function ThreadComposer({
     // the send, for Z, and back onto it if the send does not stand.
     //
     // The written-down copy stays until something answers (`dropComposeDraft`).
-    const taken = markComposeDraftSending();
+    const taken = takeTheDraft();
     try { localStorage.setItem(LAST_PRODUCT_KEY, product.slug); } catch { /* the send still stands */ }
     onSending?.({ kind: when.repeat ? 'repeat' : 'task', product: product.slug, ...(when.runAt ? { runAt: when.runAt } : {}), ...(when.start ? { start: when.start } : {}) });
     if (inline) emptyForTheNext();
     try {
       const attached = await persistAttachments(product.slug, attachments);
       const body = [message.body, attached].filter(Boolean).join('\n\n');
-      // A TASK GIVEN TO A PERSON RUNS ON NOBODY (w-c34591721f). `assignee`
-      // already holds every agent off, on every Mac (shared/team-rules.mjs),
-      // so sending a model with it would be a model nothing will ever use.
-      const given = person ? taskFields({ personId: person.id, due }) : null;
-      const harness = given ? {} : harnessFields({
+      const harness = harnessFields({
         engine: pick.engine, model: pick.model,
         effort: effortPicked(effort, effortRows) ? effort : null,
         engineCount: engineRows.length, codexDefault,
@@ -574,7 +622,7 @@ export function ThreadComposer({
           product: product.slug, title: message.title, body: body || undefined, priority, rule: when.repeat,
           ...(harness.engine ? { engine: harness.engine } : {}), ...(harness.model ? { model: harness.model } : {}),
         });
-        dropComposeDraft(taken);
+        dropComposeDraft(taken, undefined, place);
         onSent(null, { kind: 'repeat', product: product.slug, title: message.title, ruleId: rule?.id, draft: taken });
       } else {
         const made = await api.compose({
@@ -585,13 +633,17 @@ export function ThreadComposer({
           // clock in it, and the only one that answers "I am not ready yet".
           ...(when.start ? { start: when.start } : {}),
           ...harness,
-          ...(given ?? {}),
           ...(team ? sharingFields(visibility, chosenHere) : {}),
-          ...(onAuto ? { labels: [AUTO_LABEL] } : {}),
+          ...(onAuto || initial?.handFrom || initial?.continueFrom ? { labels: [
+            ...(onAuto ? [AUTO_LABEL] : []),
+            ...(initial?.handFrom ? [handedFromLabel(initial.handFrom.product, initial.handFrom.id)] : []),
+            ...(initial?.continueFrom ? [continuedFromLabel(initial.continueFrom.personId, initial.continueFrom.threadId)] : []),
+          ] } : {}),
           // The tutorial's own task, and only ever that one. See `scripted`.
           ...(scripted ? { labels: scripted.labels } : {}),
         });
-        dropComposeDraft(taken);
+        dropComposeDraft(taken, undefined, place);
+        if (initial?.continueFrom) void api.teamContinued(initial.continueFrom);
         onSent(made, { kind: 'task', product: product.slug, title: message.title, draft: taken, ...(when.runAt ? { runAt: when.runAt } : {}), ...(when.start ? { start: when.start } : {}) });
       }
     } catch (err) {
@@ -599,9 +651,9 @@ export function ThreadComposer({
       // is two failures, and the second is the expensive one. With the card
       // already closed, the caller reopens it on them. Ordinarily they are
       // still written down and this declines, which is the same thing.
-      restoreComposeDraft(taken);
+      restoreComposeDraft(taken, undefined, place);
       const said = `Not sent: ${String((err as Error)?.message ?? err)}`;
-      if (onFailed) { onFailed(said, {}); return; }
+      if (onFailed) { onFailed(said, place ? { ...initial } : {}); return; }
       setError(said);
       setSending(false);
     }
@@ -613,13 +665,14 @@ export function ThreadComposer({
     setError(null);
     // Handed over at once, as a task is, and the written-down copy kept until
     // the cloud answers (sendTask above).
-    const taken = markComposeDraftSending();
-    const toMany = extra.length ? [person.id, ...also] : undefined;
+    const taken = takeTheDraft();
+    const asTask = sendAs === 'task';
+    const toMany = !asTask && extra.length ? [person.id, ...also] : undefined;
     onSending?.({ kind: 'message', to: person.id, ...(toMany ? { toMany } : {}) });
     if (inline) emptyForTheNext();
     const failed = (said: string) => {
-      restoreComposeDraft(taken);
-      if (onFailed) { onFailed(said, { to: person.id, ...(also.length ? { also } : {}) }); return; }
+      restoreComposeDraft(taken, undefined, place);
+      if (onFailed) { onFailed(said, { to: person.id, ...(also.length ? { also } : {}), ...(subject ? { subject } : {}), moved: !place }); return; }
       setError(said);
       setSending(false);
     };
@@ -635,12 +688,14 @@ export function ThreadComposer({
     // sorted there rather than arriving flat.
     let res: Awaited<ReturnType<typeof api.teamMessage>>;
     try {
-      res = await api.teamMessage(
-        toMany ?? person.id,
-        named.encode(text.trim()),
-        prio ? priorityValueOf(prio) : undefined,
-        attachments.map(({ name, dataBase64, srcPath }) => ({ name, dataBase64, srcPath })),
-      );
+      const files = attachments.map(({ name, dataBase64, srcPath }) => ({ name, dataBase64, srcPath }));
+      const level = prio ? priorityValueOf(prio) : undefined;
+      // Send As decides which it is: a task is a row of its own with their name
+      // on it, a message goes on the end of the conversation you two already have.
+      res = asTask
+        ? await api.teamGiveTask({ to: person.id, title: message?.title, body: named.encode(text.trim()), priority: level, due: due ?? undefined, files,
+          ...sharingFields(taskSees, chosenHere), ...(blockedBy ? { blockedBy: [blockedBy] } : {}) })
+        : await api.teamMessage(toMany ?? person.id, named.encode(text.trim()), level, files, asTask ? undefined : messageSubject(subject));
     } catch (err) {
       failed(`Not sent: ${String((err as Error)?.message ?? err)}`);
       return;
@@ -649,28 +704,30 @@ export function ThreadComposer({
       failed(`Not sent: ${res.error ?? 'the team cloud did not answer.'}`);
       return;
     }
-    dropComposeDraft(taken);
-    onSent(null, { kind: 'message', to: person.id, draft: taken, ...(toMany ? { toMany } : {}), ...(res.made ? { made: res.made } : {}) });
+    dropComposeDraft(taken, undefined, place);
+    onSent(null, { kind: 'message', to: person.id, draft: taken, ...(asTask ? { given: true } : {}), ...(toMany ? { toMany } : {}), ...(res.made ? { made: res.made } : {}) });
   };
 
-  // Send As decides which of the two a person gets: a task is a row in a
-  // project with their name on it, a message goes on the end of the
-  // conversation the two of you already have (main/team/index.mts).
   const sendToTeammate = async () => {
     const words = text.trim();
     if (!mate || !words || sending || !onToTeammate) return;
     setSending(true);
     setError(null);
-    const taken = markComposeDraftSending();
+    const taken = takeTheDraft();
     const err = await onToTeammate(mate, words, product?.slug ?? null);
     setSending(false);
-    if (err) { restoreComposeDraft(taken); setError(err); }
-    else { dropComposeDraft(taken); setText(''); onClose(); }
+    if (err) { restoreComposeDraft(taken, undefined, place); setError(err); }
+    else { dropComposeDraft(taken, undefined, place); setText(''); onClose(); }
+  };
+  const sendToAgentOnIt = () => {
+    if (!onThisWork || !onSendToAgent || !text.trim()) return;
+    clearComposeDraft(undefined, place);
+    onSendToAgent(onThisWork, text.trim());
   };
   // A picked suggestion that keeps a schedule sends as that repeating task, while its words are unchanged.
   const [idea, setIdea] = useState<Idea | null>(null);
   const ideaRule = idea?.repeat && text.trim() === idea.text ? (({ short: _s, label: _l, ...rule }) => rule)(idea.repeat) : null;
-  const send = () => (person && sendAs === 'message' ? sendMessage() : sendTask(ideaRule ? { repeat: ideaRule } : {}));
+  const send = () => (person ? sendMessage() : sendTask(ideaRule ? { repeat: ideaRule } : {}));
   const ideaList = useRef<HTMLDivElement>(null);
   const takeIdea = (i: Idea) => {
     setIdea(i);
@@ -726,7 +783,7 @@ export function ThreadComposer({
 
   const addFiles = async (files: FileList | File[] | null) => {
     if (!files || !files.length) return;
-    const got = await collectFiles(files);
+    const got = await collect(files);
     if (got.length) setAttachments((a) => [...a, ...got]);
   };
 
@@ -746,17 +803,40 @@ export function ThreadComposer({
   const chooseMate = (id: string) => { setAdding(false); setAuto(false); setTo('agent'); setAlso([]); setMate(id); writeLastRecipient({ to: 'agent', mate: id, auto: false }); setError(null); close('text'); };
   const chooseAuto = () => { setAdding(false); setMate(null); setTo('agent'); setAlso([]); setAuto(true); writeLastRecipient({ to: 'agent', mate: null, auto: true }); setError(null); close('text'); };
 
-  const toMenu = (
-    <div className="tc-menu tc-drop tc-to-menu" role="listbox" aria-label="To" onKeyDown={menuKeys}>
-      {!adding && autoHere && (
-        <button type="button" data-item className={`tc-row ${onAuto ? 'on' : ''}`} onPointerEnter={hover} onClick={chooseAuto}>
+  /* -------------------------------- @ ---------------------------------- */
+  const [caret, setCaret] = useState(0);
+  const [atRow, setAtRow] = useState(0);
+  const atHere = atWordAt(text, caret);
+  const atRows = atHere ? atOffers(atHere.word, team ? others : [], onToTeammate ? agentMates ?? [] : []) : [];
+  useEffect(() => { setAtRow(0); }, [atHere?.word]);
+  const pickAt = (o: AtOffer) => {
+    if (!atHere) return;
+    const next = withoutAtWord(text, atHere);
+    setText(next.text);
+    setCaret(next.caret);
+    caretTo.current = next.caret;
+    if (o.kind === 'mate') chooseMate(o.id);
+    else if (person && o.id !== person.id) setAlso((was) => (was.includes(o.id) ? was : [...was, o.id]));
+    else chooseTo(o.id);
+  };
+  const atKeys = (e: React.KeyboardEvent<HTMLTextAreaElement>): boolean => {
+    if (!atRows.length) return false;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setAtRow((n) => (n + 1) % atRows.length); return true; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setAtRow((n) => (n + atRows.length - 1) % atRows.length); return true; }
+    if ((e.key === 'Enter' && !e.metaKey && !e.ctrlKey) || e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); pickAt(atRows[atRow] ?? atRows[0]); return true; }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setCaret(-1); return true; }
+    return false;
+  };
+
+  const toSection = (s: ToSection) => s === 'auto' ? (
+        <button key="auto" type="button" data-item className={`tc-row ${onAuto ? 'on' : ''}`} onPointerEnter={hover} onClick={chooseAuto}>
           <AutoFace /><span className="tc-row-label">Auto</span><small className="tc-row-aside">picks who when you send</small>
         </button>
-      )}
-      {/* ONE ROW PER AGENT WHERE THIS MAC HAS TWO, and the one row it has
+      )
+      /* ONE ROW PER AGENT WHERE THIS MAC HAS TWO, and the one row it has
           always drawn where it has one. Picking an agent is picking where the
-          task runs, so it moves the model with it (`chooseAgent`). */}
-      {!adding && (agents.length
+          task runs, so it moves the model with it (`chooseAgent`). */
+      : s === 'agents' ? (agents.length
         ? agents.map((a) => (
           <button key={a.id} type="button" data-item className={`tc-row ${!person && !mate && !onAuto && pick.engine === a.id ? 'on' : ''}`}
             onPointerEnter={hover} onClick={() => { chooseAgent(a.id); chooseTo('agent'); }}>
@@ -764,14 +844,14 @@ export function ThreadComposer({
           </button>
         ))
         : (
-          <button type="button" data-item className={`tc-row ${person || mate || onAuto ? '' : 'on'}`} onPointerEnter={hover} onClick={() => chooseTo('agent')}>
+          <button key="agent" type="button" data-item className={`tc-row ${person || mate || onAuto ? '' : 'on'}`} onPointerEnter={hover} onClick={() => chooseTo('agent')}>
             <AgentFace /><span className="tc-row-label">Agent</span>
           </button>
-        ))}
-      {!adding && agentMates && onToTeammate && (<>
+        ))
+      : s === 'mates' ? (<Fragment key="mates">
         <span className="tc-sep" />
         <span className="tc-menu-head">Teammates</span>
-        {agentMates.map((t) => (
+        {(agentMates ?? []).map((t) => (
           <button key={t.id} type="button" data-item className={`tc-row ${mate === t.id ? 'on' : ''}`} onPointerEnter={hover} onClick={() => chooseMate(t.id)}>
             <TeammateMark t={t} /><span className="tc-row-label">{t.name}</span>{t.role && <small className="tc-row-aside">{t.role}</small>}
           </button>
@@ -779,9 +859,8 @@ export function ThreadComposer({
         <button type="button" data-item className={`tc-row ${mate === 'new' ? 'on' : ''}`} onPointerEnter={hover} onClick={() => chooseMate('new')}>
           <i className="tq tq-sm tq-hash" aria-hidden="true">+</i><span className="tc-row-label">Someone new</span><small className="tc-row-aside">makes a teammate for this</small>
         </button>
-      </>)}
-      {team && others.length > 0 && (<>
-        {!adding && <span className="tc-sep" />}
+      </Fragment>)
+      : (<Fragment key="people">
         <span className="tc-menu-head">People</span>
         <input
           data-item
@@ -796,8 +875,17 @@ export function ThreadComposer({
             <Face person={p} /><span className="tc-row-label">{p.name}</span>
           </button>
         ))}
-        {!found.length && <span className="tc-none">Nobody on the team matches that.</span>}
-      </>)}
+        {invitedFound.map((e) => (
+          <div key={e} className="tc-row tc-invited" aria-disabled="true">
+            <Face name={e} /><span className="tc-row-label">{e}</span><small className="tc-row-aside">Invited, not joined yet</small>
+          </div>
+        ))}
+        {!found.length && !invitedFound.length && <span className="tc-none">Nobody on the team matches that.</span>}
+        {!adding && <span className="tc-sep" />}
+      </Fragment>);
+  const toMenu = (
+    <div className="tc-menu tc-drop tc-to-menu" role="listbox" aria-label="To" onKeyDown={menuKeys}>
+      {toSections({ people: !!team && (others.length > 0 || !!team.state.sent?.length), auto: autoHere, mates: !!agentMates && !!onToTeammate, adding }).map(toSection)}
     </div>
   );
 
@@ -825,31 +913,67 @@ export function ThreadComposer({
     />
   );
 
-  // IS THIS A TASK OR A MESSAGE. Two rows, in the head's own menu, because
-  // the head is where the card already answers what a thread IS. Picking
-  // Message puts the day away: a message has nothing to be due.
-  const sendAsMenu = (
-    <div className="tc-menu tc-drop" role="listbox" aria-label="Send As" onKeyDown={menuKeys}>
+  // IS THIS A TASK OR A MESSAGE. Both are drawn, because a word that only showed
+  // its other choice when pressed was missed. Picking Message puts the day away:
+  // a message has nothing to be due.
+  const sendAsChoice = (
+    <span className="tc-seg" role="group" aria-label="Send as">
       {(['message', 'task'] as SendAs[]).map((k) => (
-        <button key={k} type="button" data-item className={`tc-row ${sendAs === k ? 'on' : ''}`} onPointerEnter={hover}
-          onClick={() => { setSendAs(k); if (k === 'message') setDue(null); close('text'); }}>
-          <span className="tc-row-label">{k === 'task' ? 'Task' : 'Message'}</span>
+        // Named in full: a bare "Task" is also the Tasks tab behind the card.
+        <button key={k} type="button" className={sendAs === k ? 'on' : ''} aria-pressed={sendAs === k} aria-label={`Send as a ${k}`}
+          onClick={() => { setSendAs(k); if (k === 'message') setDue(null); textRef.current?.focus(); }}>
+          {k === 'task' ? 'Task' : 'Message'}
         </button>
       ))}
-    </div>
+    </span>
   );
 
   // THE DAY, AND THE WAY OUT OF HAVING ONE. "No Deadline" sits first because
   // most tasks never carry a day, and the row has to read as an answer rather
   // than as a field somebody forgot (w-c34591721f).
+  const typedDue = dueFromWords(dueText, Date.now());
+  const pickDue = (key: string | null) => { setDue(key); setDueText(''); close('text'); };
   const dueOnMenu = (
     <div className="tc-menu tc-drop" role="listbox" aria-label="Due On" onKeyDown={menuKeys}>
       {dueChoices().map((c) => (
-        <button key={c.key ?? 'none'} type="button" data-item className={`tc-row ${c.key === due ? 'on' : ''}`} onPointerEnter={hover}
-          onClick={() => { setDue(c.key); close('text'); }}>
+        <button key={c.key ?? 'none'} type="button" data-item className={`tc-row ${c.key === due?.slice(0, 10) || (!c.key && !due) ? 'on' : ''}`} onPointerEnter={hover}
+          onClick={() => pickDue(c.key)}>
           <span className="tc-row-label">{c.label}</span>
         </button>
       ))}
+      <span className="tc-sep" />
+      <span className="tc-pick">
+        <ClockIcon />
+        <input data-item className="tc-when" placeholder="Or type: tomorrow 10am, fri 3pm" aria-label="Due at a time you type"
+          value={dueText} onChange={(e) => setDueText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && typedDue) { e.preventDefault(); pickDue(typedDue); } }} />
+        {dueText.trim() && (typedDue
+          ? <button type="button" data-item className="tc-schedule" onClick={() => pickDue(typedDue)}>{dueSaid(dayDeadline(typedDue), Date.now(), { ahead: true })?.word ?? dueWords(typedDue)}</button>
+          : <small className="tc-when-no">Not a time yet</small>)}
+      </span>
+    </div>
+  );
+
+  const blockOffers = person && rows.includes('blockedBy') ? blockChoicesFor?.(person.id) ?? [] : [];
+  const typedBlock = nameWait(blockText);
+  const blockLabel = !blockedBy ? NOT_BLOCKED : blockOffers.find((c) => c.id === blockedBy)?.label ?? (blockedBy.startsWith('name:') ? blockedBy.slice('name:'.length) : NOT_BLOCKED);
+  const pickBlock = (id: string | null) => { setBlockedBy(id); setBlockText(''); close('text'); };
+  const blockedByMenu = (
+    <div className="tc-menu tc-drop" role="listbox" aria-label="Blocked By" onKeyDown={menuKeys}>
+      {[{ id: null as string | null, label: NOT_BLOCKED }, ...blockOffers].map((c) => (
+        <button key={c.id ?? 'none'} type="button" data-item className={`tc-row ${c.id === blockedBy ? 'on' : ''}`} onPointerEnter={hover}
+          onClick={() => pickBlock(c.id)}>
+          <span className="tc-row-label">{c.label}</span>
+        </button>
+      ))}
+      {/* Someone off the team, or what it waits on, in plain words. */}
+      <span className="tc-sep" />
+      <span className="tc-pick">
+        <input data-item className="tc-when" placeholder="Or type what it waits on" aria-label="Blocked by someone or something you type"
+          value={blockText} onChange={(e) => setBlockText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && typedBlock) { e.preventDefault(); pickBlock(typedBlock); } }} />
+        {typedBlock && <button type="button" data-item className="tc-schedule" onClick={() => pickBlock(typedBlock)}>Use this</button>}
+      </span>
     </div>
   );
 
@@ -925,7 +1049,7 @@ export function ThreadComposer({
       {visPage === 'rows' ? (<>
         <span className="tc-menu-head">Who sees it</span>
         {VISIBILITY_ROWS.map((v) => (
-          <button key={v.id} type="button" data-item className={`tc-row tc-two ${v.id === visibility ? 'on' : ''}`} onPointerEnter={hover}
+          <button key={v.id} type="button" data-item className={`tc-row tc-two ${v.id === (person && sendAs === 'task' ? taskSees : visibility) ? 'on' : ''}`} onPointerEnter={hover}
             onClick={() => {
               pickVisibility(v.id);
               if (v.id === 'people') setVisPage('people');
@@ -936,7 +1060,7 @@ export function ThreadComposer({
             {v.id === 'private' ? <LockIcon /> : <PeopleIcon />}
             <span className="tc-row-label">
               {v.label}
-              <small>{v.id === 'people' && chosenHere.length ? `${chosenWords(chosenHere, others)} see its summary.` : v.line}</small>
+              <small>{v.id === 'people' && chosenHere.length ? `${chosenWords(chosenHere, others)} can open and read it.` : v.line}</small>
             </span>
           </button>
         ))}
@@ -1066,14 +1190,12 @@ export function ThreadComposer({
         {open === 'to' && toMenu}
       </span>
     ) },
-    ...(rows.includes('sendAs') ? [{ label: 'Send As', node: (
-      <span className="tc-anchor" ref={anchor('sendAs')}>
-        <button type="button" data-trigger className={trigger('sendAs')} aria-haspopup="listbox" aria-expanded={open === 'sendAs'}
-          onClick={() => toggle('sendAs')} onKeyDown={triggerKeys('sendAs')}>
-          <span className="tc-word-text">{sendAs === 'task' ? 'Task' : 'Message'}</span>
-        </button>
-        {open === 'sendAs' && sendAsMenu}
-      </span>
+    ...(rows.includes('sendAs') ? [{ label: 'Send As', node: sendAsChoice }] : []),
+    ...(rows.includes('subject') ? [{ label: 'Subject', node: (
+      <input className="tc-subject" value={subject} aria-label="Subject" spellCheck
+        placeholder={inline ? 'Subject, for a thread of its own' : 'Name the work to give it a thread of its own'}
+        onChange={(e) => setSubject(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && !(e.metaKey || e.ctrlKey)) { e.preventDefault(); textRef.current?.focus(); } }} />
     ) }] : []),
     ...(rows.includes('dueOn') ? [{ label: 'Due On', node: (
       <span className="tc-anchor" ref={anchor('dueOn')}>
@@ -1084,6 +1206,15 @@ export function ThreadComposer({
           <span className={`tc-word-text${due ? '' : ' tc-unset'}`}>{dueWords(due)}</span>
         </button>
         {open === 'dueOn' && dueOnMenu}
+      </span>
+    ) }] : []),
+    ...(rows.includes('blockedBy') && blockOffers.length ? [{ label: 'Blocked By', node: (
+      <span className="tc-anchor" ref={anchor('blockedBy')}>
+        <button type="button" data-trigger className={trigger('blockedBy')} aria-haspopup="listbox" aria-expanded={open === 'blockedBy'}
+          onClick={() => toggle('blockedBy')} onKeyDown={triggerKeys('blockedBy')}>
+          <span className={`tc-word-text${blockedBy ? '' : ' tc-unset'}`}>{blockLabel}</span>
+        </button>
+        {open === 'blockedBy' && blockedByMenu}
       </span>
     ) }] : []),
     ...(rows.includes('model') ? [{ label: 'Model', node: (
@@ -1110,7 +1241,7 @@ export function ThreadComposer({
     handOver.current = () => {
       const t = textRef.current;
       return {
-        to, also, body: text, mate, sendAs, due, visibility: picked, chosen: chosenPicked,
+        to, also, body: text, mate, sendAs, due, visibility: picked, chosen: chosenPicked, moved: true, ...(subject ? { subject } : {}),
         ...(t && document.activeElement === t ? { caret: [t.selectionStart, t.selectionEnd] as [number, number] } : {}),
       };
     };
@@ -1163,9 +1294,14 @@ export function ThreadComposer({
           </div>
         )}
 
-        {convo && onOpenConversation && (
+        {convo && onOpenConversation && sendAs === 'message' && !messageSubject(subject) && (
           <div className="tc-note tc-continues">
-            Continues your conversation with {names}. <button type="button" onClick={() => onOpenConversation(convo, text)}>Open it</button>
+            Continues your conversation with {names}. <button type="button" onClick={() => { clearComposeDraft(undefined, place); onOpenConversation(convo, text); }}>Open it</button>
+          </div>
+        )}
+        {onThisWork && onSendToAgent && (
+          <div className="tc-note tc-continues">
+            An agent is already on this: {shownTitle(onThisWork)}. <button type="button" onClick={sendToAgentOnIt}>Send it there</button>
           </div>
         )}
 
@@ -1176,17 +1312,19 @@ export function ThreadComposer({
           className={`tc-text ${named.over}`}
           rows={inline ? 1 : undefined}
           value={text}
-          onChange={(e) => { talk.typed(); setText(e.target.value); named.track(e.target); }}
-          onSelect={(e) => named.track(e.currentTarget)}
+          onChange={(e) => { talk.typed(); setText(e.target.value); setCaret(e.target.selectionStart); named.track(e.target); }}
+          onSelect={(e) => { setCaret(e.currentTarget.selectionStart); named.track(e.currentTarget); }}
           onScroll={(e) => named.track(e.currentTarget)}
           onKeyDown={(e) => {
+            if (heldKeyThatOpenedTheBox({ key: e.key, repeat: e.repeat, empty: !text, opener: 'n' })) { e.preventDefault(); return; }
+            if (atKeys(e)) return;
             named.keyDown(e);
             if (e.defaultPrevented || !ideasShown || e.key !== 'ArrowDown' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
             if (e.currentTarget.value.slice(e.currentTarget.selectionEnd).includes('\n')) return;
             e.preventDefault();
             ideaList.current?.querySelector<HTMLButtonElement>('button')?.focus();
           }}
-          placeholder={mate === 'new' ? 'What should they do? They set themselves up from it and ask what they need' : mateRow ? `What should ${mateRow.name} do?` : person ? `Message ${names}` : placeholderFor(null)}
+          placeholder={mate === 'new' ? 'What should they do?' : mateRow ? `What should ${mateRow.name} do?` : person ? (sendAs === 'task' && !extra.length ? `What should ${person.name.split(/\s+/)[0]} do?` : `Message ${names}`) : placeholderFor(null)}
           onPaste={async (e) => {
             const pasted = await fromPaste(e);
             if (pasted.length) { e.preventDefault(); setAttachments((a) => [...a, ...pasted]); }
@@ -1198,7 +1336,22 @@ export function ThreadComposer({
           }}
         />
         {named.menu}
-        <AttachRow attachments={attachments} onRemove={(i) => setAttachments((x) => x.filter((_, j) => j !== i))} />
+        {atRows.length > 0 && (
+          <div className="tc-menu tc-at-menu" role="listbox" aria-label="People and teammates">
+            {atRows.map((o, i) => {
+              const who = o.kind === 'person' ? others.find((p) => p.id === o.id) : null;
+              const mateRowHere = o.kind === 'mate' ? agentMates?.find((t) => t.id === o.id) : null;
+              return (
+                <button key={`${o.kind}:${o.id}`} type="button" className={`tc-row ${i === atRow ? 'on' : ''}`} onMouseDown={(e) => { e.preventDefault(); pickAt(o); }}>
+                  {who ? <Face person={who} /> : mateRowHere ? <TeammateMark t={mateRowHere} /> : null}
+                  <span className="tc-row-label">{o.name}</span>
+                  {o.kind === 'mate' && <small className="tc-row-aside">Teammate</small>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <AttachRow attachments={attachments} attaching={attaching} onRemove={(i) => setAttachments((x) => x.filter((_, j) => j !== i))} />
         {ideaRule && (
           <div className="tc-note tc-repeat-note">
             <RepeatIcon />{repeatsLine(ideaRule)}. <button type="button" onClick={() => setIdea(null)}>Send it once instead</button>
@@ -1207,6 +1360,7 @@ export function ThreadComposer({
         {!inline && ideaRows}
 
         {refusal && <div className="tc-note">{refusal}</div>}
+        {toCode && !person && <div className="tc-note">Going to {toCode.name}, where the code is. <button type="button" onClick={() => setProductSlug(pointedAt!.slug)}>Keep {pointedAt!.name}</button></div>}
         {dropped > 0 && (
           <div className="tc-note">
             {dropped === 1
@@ -1221,9 +1375,20 @@ export function ThreadComposer({
         {error && <div className="tc-note tc-error" role="alert">{error}</div>}
         {!talk.on && talk.problem && <div className="tc-note">{talk.problem}</div>}
 
-        {person && sendAs === 'message' ? (
+        {person ? (
           <div className="tc-bar">
             {headChips}
+            {taskToMany && <span className="tc-why">A task goes to one person.</span>}
+            {team && sendAs === 'task' && (
+              <span className="tc-anchor" ref={anchor('visibility')}>
+                <button type="button" data-trigger className={`tc-chip ${open === 'visibility' ? 'open' : ''}`} title="Who sees it"
+                  aria-haspopup="listbox" aria-expanded={open === 'visibility'} onClick={() => toggle('visibility')} onKeyDown={triggerKeys('visibility')}>
+                  {taskSees === 'private' ? <LockIcon /> : <PeopleIcon />}
+                  {taskSees === 'team' ? 'Team' : taskSees === 'private' ? 'Private' : chosenWords(chosenHere, others)}
+                </button>
+                {open === 'visibility' && visibilityMenu}
+              </span>
+            )}
             {/* HOW URGENT IT IS, AND NOTHING ELSE (w-7ba439c883, approved
                 2026-10-05). The corner used to carry "Goes to Maya's inbox.",
                 which was put there because a bare corner reads as a control

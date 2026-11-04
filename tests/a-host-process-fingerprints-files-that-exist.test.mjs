@@ -1,7 +1,7 @@
 // The run host and the cloud host each hash a list of their own source files
 // (MADE_OF), so an updated app can tell an old host from a current one and
 // replace it. A name that matches no file is hashed as the bare name instead,
-// and edits to that file stop counting. When main/claude-input.mjs became
+// and edits to that file stop counting. When main/claude-input.mts became
 // claude-input.mts on 2026-11-01, main/run-host.mjs still listed the .mjs
 // name, so a change to how replies reach a run would have left old hosts
 // running the old rules.

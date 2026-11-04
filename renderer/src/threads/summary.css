@@ -66,6 +66,17 @@
 /* WHERE IT RUNS, Done's box with its own words (threads/PlaceButton.tsx). The
    dot is the one accent: a thread the cloud handed back. */
 .ts-place-wrap { position: relative; display: inline-flex; }
+.ts-files-wrap { position: relative; display: inline-flex; }
+.ts-done.ts-files { height: 30px; min-width: 30px; padding: 0 9px; gap: 6px; justify-content: center; }
+.ts-files-n { font-weight: 400; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--text-dim); }
+.ts-files-pop { width: 360px; max-height: min(440px, 70vh); overflow-y: auto; padding: 6px; }
+.ts-files-pop ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.ts-files-pop button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 6px 10px; border: 0; border-radius: var(--artifact-corner-small); background: none; font: inherit; font-size: 13.5px; color: var(--text); text-align: left; cursor: pointer; }
+.ts-files-pop button:hover { background: var(--wash); }
+.ts-files-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ts-files-notes { flex: none; font-size: 12px; color: var(--text-faint); }
+.ts-done.ts-place { width: 30px; padding: 0; justify-content: center; position: relative; }
+.ts-done.ts-place .ts-place-dot { position: absolute; top: 4px; right: 4px; margin: 0; }
 .ts-place.open { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .ts-place-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-left: -2px; }
 .th-pop.ts-place-pop { top: calc(100% + 8px); right: 0; width: 440px; font-size: 13px; }
@@ -79,6 +90,9 @@
 .ts-more-menu .ts-more-row:focus-visible { outline: none; background: rgba(255,255,255,.07); color: var(--text); }
 :root[data-theme="light"] .ts-more-menu .ts-more-row:focus-visible { background: var(--wash-strong); }
 .ts-more-label { flex: 1; }
+.ts-wait-words { cursor: text; border-top: 1px solid var(--line); }
+.ts-wait-words input { flex: 1; min-width: 0; padding: 0; border: 0; background: none; font: inherit; color: var(--text); outline: none; }
+.ts-wait-words input::placeholder { color: var(--text-faint); }
 .ts-more-menu kbd { margin-left: 18px; font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; padding: 0; }
 /* The figures on the code row are the ones that closed the line under the
    title, in the code pane's two colours. Here they are a detail of the row,
@@ -320,8 +334,12 @@
    thread with no summary has no crumb, and these rules only hold while a
    crumb is in the bar. */
 .workspace-layout.workspace-task:has(.thread-crumb) > .topbar { height: 56px; min-height: 56px; flex-basis: 56px; padding-top: 0; padding-bottom: 0; }
-.workspace-layout.workspace-task:has(.thread-crumb) > .topbar > .topbar-right { top: 50%; transform: translateY(-50%); }
-.workspace-task-header:has(> .thread-crumb) { position: static; flex: 1; min-width: 0; margin: 0 64px 0 0; padding: 0; align-self: center; }
+/* The corner (2 of 3, Done, the menu) takes its own room in the row. Floated over
+   it with a fixed 64px kept clear, a 260px corner sat on Add people. */
+.workspace-layout.workspace-task:has(.thread-crumb) > .topbar > .topbar-right { position: static; flex: none; margin-left: 16px; transform: none; }
+.workspace-task-header:has(> .thread-crumb) { position: static; flex: 1; min-width: 0; margin: 0; padding: 0; align-self: center; }
+/* Specific enough to beat the old band's `margin-top: 18px`, which left the crumb 4.5 under the corner. */
+.workspace-layout.workspace-task .workspace-task-header:has(> .thread-crumb) { margin-top: 0; align-self: center; }
 .workspace-task-header > .thread-crumb { display: flex; align-items: center; width: auto; max-width: 100%; height: 28px; margin: 0; font: 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-faint); white-space: nowrap; overflow: hidden; }
 /* TWO CONTROLS, NOT ONE (w-ab3d51dc7d): "‹ NEEDS YOU" goes back, and the name
    renames. Each answers the pointer on its own, so it is plain which half a
@@ -339,8 +357,11 @@
 .thread-crumb-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-dim); }
 button.thread-crumb-name { -webkit-app-region: no-drag; height: 28px; padding: 0 6px; border: 0; border-radius: var(--radius); background: none; font: inherit; letter-spacing: inherit; text-transform: inherit; white-space: nowrap; cursor: text; }
 button.thread-crumb-name:hover, button.thread-crumb-name:focus-visible { color: var(--text); outline: none; }
+.thread-crumb-with { flex: none; margin-left: 10px; color: var(--text-faint); }
+h1 .thread-crumb-with { font: 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; }
 /* Typing a new name: the same capitals in the same place, no box, and the
    slash before it lit apricot the way a summary label lights (w-ab3d51dc7d).
    The name is saved as typed; only the bar shows it in capitals. */
 .thread-crumb-edit { -webkit-app-region: no-drag; flex: 1; min-width: 120px; max-width: 640px; height: 28px; box-sizing: border-box; padding: 0 6px; border: 0; background: none; font: 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text); outline: none; caret-color: var(--accent); }
 .thread-crumb:has(.thread-crumb-edit) .thread-crumb-sep { color: var(--accent); }
+.ts-menu-say, .tm-menu-say { margin: 2px 0 4px; padding: 4px 10px 8px; max-width: 280px; border-bottom: 1px solid var(--line); font-size: 12.5px; line-height: 17px; color: var(--text-faint); white-space: normal; }

@@ -7,8 +7,15 @@ import path from 'node:path';
 import { wallCards, myPresence, displayNameOf, withoutHidden } from '../../shared/room-cards.mts';
 import type { WallCard, TeamCardLike } from '../../shared/room-cards.mts';
 import type { AgentHoursSummary } from '../../shared/agent-hours.mts';
+import { groupFileRow, groupRow } from '../../shared/room-needs-you.mjs';
+import type { GroupRow } from '../../shared/room-needs-you.mjs';
 import { GENERAL_ROOM } from './rooms-memory.mts';
 import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mjs';
+import { carryIntoRoom } from './carry-files.mjs';
+import { readRoomMessage } from '../../shared/agent-voice.mjs';
+import { cleanMark } from '../../shared/artifact-marks.mjs';
+import { TEAM_LOOK, TEAM_LOOK_POSTED, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../../shared/team-look.mjs';
+import { ROOM_MAX_BYTES, ROOM_PART_BYTES, partName, partList, partsOf, readPartList } from '../../shared/room-file-parts.mjs';
 
 /** A room as `roomOut` shapes it. */
 export interface RoomRow {
@@ -34,6 +41,27 @@ export interface RoomMessage {
   editedAt: number | null;
   deleted: boolean;
   reactions?: Record<string, (string | null)[]>;
+}
+
+/** A message the team marked as a decision or as the week's priorities. */
+export interface RoomDecision {
+  roomId: string;
+  messageId: string;
+  kind: string;
+  project: string | null;
+  body: string;
+  saidBy: string | null;
+  by: string | null;
+  on: boolean;
+  at: number;
+}
+
+/** A comment, reply, resolve or approval on a file in a room. */
+export interface RoomFileMark {
+  id: string;
+  by: string | null;
+  mark: object;
+  at: number;
 }
 
 export interface RoomReaction {
@@ -101,7 +129,7 @@ export interface RoomInviteRow {
 export type RoomEvent =
   | { kind: 'message'; message: RoomMessage; roomId?: string }
   | { kind: 'reaction'; reaction: RoomReaction }
-  | { kind: 'subscribed' | 'membership' | 'profile' | 'presence' };
+  | { kind: 'subscribed' | 'membership' | 'profile' | 'presence' | 'decision' | 'fileMark' };
 
 /** The calls the rooms code makes of the cloud; the two backends both answer them. */
 export interface RoomsBackend {
@@ -119,6 +147,10 @@ export interface RoomsBackend {
   editRoomMessage(messageId: string, message: { body: string; mentions: string[] }): Promise<RoomMessage>;
   deleteRoomMessage(messageId: string): Promise<void>;
   roomReactions(roomId: string): Promise<RoomReaction[]>;
+  roomDecisions(roomId: string): Promise<RoomDecision[]>;
+  markRoomDecision(roomId: string, mark: unknown): Promise<void>;
+  roomFileMarks?(roomId: string): Promise<RoomFileMark[]>;
+  markRoomFile(roomId: string, mark: { id: string; mark: object }): Promise<void>;
   reactRoomMessage(messageId: string, emoji: string, on: boolean): Promise<void>;
   putRoomFile(roomId: string, name: string, data: string): Promise<string | void>;
   roomFile(roomId: string, name: string): Promise<string | null>;
@@ -149,6 +181,7 @@ export interface RoomPrefs {
   muted: string[];
   markedUnread: string[];
   autoPinned: boolean;
+  doneAt: Record<string, number>;
 }
 
 /** A room as the window draws it. */
@@ -166,17 +199,6 @@ export interface RoomView extends RoomRow {
 
 export type { WallCard };
 
-export interface RoomMention {
-  id: string;
-  messageId: string;
-  roomId: string;
-  roomName: string;
-  by: string | null;
-  byName: string;
-  body: string;
-  at: number;
-}
-
 export interface RoomsState {
   on: boolean;
   ready: boolean;
@@ -185,7 +207,10 @@ export interface RoomsState {
   me: RoomProfile | null;
   ranks: Record<string, number>;
   invites: RoomInviteRow[];
-  mentions: RoomMention[];
+  mentions: GroupRow[];
+  decisions: Record<string, RoomDecision[]>;
+  fileMarks: Record<string, RoomFileMark[]>;
+  sending: Record<string, { done: number; total: number }>;
   error: string | null;
   rawRooms?: RoomRow[];
 }
@@ -201,11 +226,19 @@ export interface PresenceFacts {
 export interface RoomsOptions {
   backend: () => RoomsBackend | null;
   me: () => { id: string; name?: string; avatarUrl?: string | null; status?: { text?: string | null; until?: number | string | null } | null } | null | undefined;
-  team: () => { people?: { id: string }[]; cards?: TeamCardLike[]; team?: unknown } | null | undefined;
+  team: () => { people?: { id: string; name?: string }[]; cards?: TeamCardLike[]; team?: unknown } | null | undefined;
   enabled: () => boolean;
   device: () => string;
   presenceFacts: () => PresenceFacts | null | undefined;
   prefsFile: string;
+  /** What a name in a message means on this computer (./carry-files.mjs). */
+  findFile?: ((ref: string, how?: { meant?: boolean }) => unknown) | null;
+  /** Writes the team's decisions where agents read (./decisions-doc.mjs). */
+  decisionDocs?: ((args: { teamName: string; rows: RoomDecision[]; nameOf: (id: string) => string }) => unknown) | null;
+  /** Writes the Team look where agents read (./team-look-doc.mjs). */
+  teamLookDocs?: ((args: { text: string }) => unknown) | null;
+  /** Where a room's file is put back together whole, inside a folder the window may draw from. */
+  filesDir?: string | null;
   now?: () => number;
   log?: (line: string) => void;
   onChange?: () => void;
@@ -221,13 +254,13 @@ const FILE_CHARS_HELD = 64_000_000;
 const HEARTBEAT_MS = 5 * 60_000;
 const SETTLE_MS = 400;
 
-// Pins, mutes, rooms marked unread and the first-room pin are this Mac's,
-// kept per person.
+// Pins, mutes, rooms marked unread, the first-room pin and each group's Mark
+// done are this Mac's, kept per person.
 export function roomPrefsFile(storeRoot: string) {
   return path.join(storeRoot, '.rooms.json');
 }
 
-const PREFS: RoomPrefs = { pinned: [], muted: [], markedUnread: [], autoPinned: false };
+const PREFS: RoomPrefs = { pinned: [], muted: [], markedUnread: [], autoPinned: false, doneAt: {} };
 
 function prefsStore(file: string) {
   const read = (): Record<string, Partial<RoomPrefs>> => { try { return JSON.parse(fs.readFileSync(file, 'utf8')) ?? {}; } catch { return {}; } };
@@ -242,7 +275,7 @@ function prefsStore(file: string) {
   };
 }
 
-const EMPTY: RoomsState = { on: false, ready: false, rooms: [], messages: {}, me: null, ranks: {}, invites: [], mentions: [], error: null };
+const EMPTY: RoomsState = { on: false, ready: false, rooms: [], messages: {}, me: null, ranks: {}, invites: [], mentions: [], decisions: {}, fileMarks: {}, sending: {}, error: null };
 
 const reactionKey = (x: { messageId: string; by: string | null; emoji: string }) => `${x.messageId}\n${x.by}\n${x.emoji}`;
 
@@ -272,6 +305,10 @@ export function createRooms({
   prefsFile,
   now = Date.now,
   log = () => {},
+  findFile = null, // (ref) => what a name in a message means on this computer (./carry-files.mjs)
+  decisionDocs = null, // ({ teamName, rows, nameOf }) => writes the team's decisions where agents read (./decisions-doc.mjs)
+  teamLookDocs = null, // ({ text }) => writes the Team look where agents read (./team-look-doc.mjs)
+  filesDir = null, // where a room's file is put back together whole, inside a folder the window may draw from
   onChange = () => {},
   timers = { setTimeout, clearTimeout },
 }: RoomsOptions) {
@@ -284,7 +321,10 @@ export function createRooms({
   let messages = new Map<string, RoomMessage[]>(); // roomId -> [message], oldest first
   let reads = new Map<string, number>(); // roomId -> ms
   let reactions = new Map<string, Map<string, RoomReaction>>(); // roomId -> Map(reactionKey -> reaction), off ones too
+  let decisions = new Map<string, RoomDecision[]>(); // roomId -> [decision], taken-back ones too
   let files = new Map<string, string>(); // `${roomId}/${name}` -> base64, oldest first
+  let fileMarks = new Map<string, RoomFileMark[]>(); // roomId -> [{ id, by, mark, at }]
+  const sending = new Map<string, { done: number; total: number }>(); // `${roomId}/${name}` -> { done, total } parts
   let mentioned: RoomMessage[] = []; // my newest mentions, which may be older than the messages held
   let unsubscribe: (() => void) | null = null;
   let started: RoomsBackend | null = null; // the backend rooms were started on
@@ -308,7 +348,7 @@ export function createRooms({
     const muted = new Set(p.muted);
     const marked = new Set(p.markedUnread);
     const at = now();
-    const mentions: RoomMention[] = [];
+    const mentions: GroupRow[] = [];
     const mine = ownWork();
     const shown = new Map<string, ReturnType<typeof withReactions>>();
     const rooms = (state.rawRooms ?? []).map((r): RoomView => {
@@ -320,10 +360,15 @@ export function createRooms({
       // Everyone in the room by name, invisible or with no card, for the chat.
       const everyone = called?.map((n) => ({ id: n.person_id, name: n.has_card ? n.name : displayNameOf(n.name), avatarUrl: n.avatar_url ?? null })) ?? null;
       const nameOf = (id: string | null) => profiles.get(id as string)?.display_name || everyone?.find((p) => p.id === id)?.name || '';
-      const pool = new Map([...mentioned.filter((m) => m.roomId === r.id && m.at > readAt && m.by !== who && !m.deleted), ...unreadMsgs].map((m): [string, RoomMessage] => [m.id, m]));
-      for (const m of pool.values()) {
-        if (m.mentions.includes(who as string)) mentions.push({ id: `room-mention:${m.id}`, messageId: m.id, roomId: r.id, roomName: r.name, by: m.by, byName: nameOf(m.by), body: m.body, at: m.at });
-      }
+      const row = groupRow({
+        roomId: r.id, roomName: r.name, messages: held, mentioned: mentioned.filter((m) => m.roomId === r.id), me: who, readAt,
+        people: [...(called?.map((n) => ({ id: n.person_id, name: n.name })) ?? []), { id: who as string, name: me()?.name ?? '' }, { id: who as string, name: profiles.get(who as string)?.display_name ?? '' }],
+        doneAt: p.doneAt[r.id] ?? 0, nameOf,
+        answeredAt: Math.max(0, ...(fileMarks.get(r.id) ?? []).filter((m) => m.by === who).map((m) => m.at)),
+      });
+      if (row) mentions.push(row);
+      const fileRow = groupFileRow({ roomId: r.id, roomName: r.name, marks: fileMarks.get(r.id) ?? [], me: who, myName: me()?.name ?? null, doneAt: p.doneAt[r.id] ?? 0, nameOf });
+      if (fileRow) mentions.push(fileRow);
       const wall = wallCards({ members: people.get(r.id) ?? [], profiles: [...profiles.values()], presence, teammates, teamCards: t.cards ?? [], meId: who, now: at, mine, names: called, listed: !!r.listed }) as WallCard[];
       return {
         ...r,
@@ -345,8 +390,50 @@ export function createRooms({
       on: true,
       rooms,
       messages: Object.fromEntries(rooms.map((r) => [r.id, shown.get(r.id)!])),
+      // A deleted message's words are gone from the chat, so they go from the list.
+      decisions: Object.fromEntries(rooms.map((r) => {
+        const gone = new Set((messages.get(r.id) ?? []).filter((m) => m.deleted).map((m) => m.id));
+        return [r.id, (decisions.get(r.id) ?? []).filter((d) => !gone.has(d.messageId))];
+      })),
       mentions: mentions.sort((a, b) => b.at - a.at),
+      fileMarks: Object.fromEntries(rooms.map((r) => [r.id, fileMarks.get(r.id) ?? []])),
+      sending: Object.fromEntries(sending),
     };
+  }
+
+  // Agents read the team's decisions as a document in each project.
+  function writeDocs() {
+    const room = (state.rooms ?? []).find((r) => r.teamId);
+    if (!decisionDocs || !room) return;
+    const nameOf = (id: string) => room.people?.find((p) => p.id === id)?.name || (team()?.people ?? []).find((p) => p.id === id)?.name || 'Someone';
+    try { decisionDocs({ teamName: room.name, rows: state.decisions?.[room.id] ?? [], nameOf }); } catch (err) { log(`rooms: decisions document: ${(err as Error).message}`); }
+  }
+
+  // The Team look's newest version, as a document in each project. The first
+  // version has a fixed name, so of every copy that finds none, one makes it.
+  let lookWritten: string | null = null;
+  let lookAsked = false;
+  async function keepTeamLook() {
+    const room = (state.rooms ?? []).find((r) => r.teamId);
+    const b = backend();
+    if (!teamLookDocs || !room || !b) return;
+    const name = newestTeamLook(messages.get(room.id) ?? []) ?? TEAM_LOOK;
+    if (name === lookWritten) return;
+    let text = await api.fileText(room.id, name).catch(() => null);
+    if (text == null && name === TEAM_LOOK && !lookAsked) {
+      lookAsked = true;
+      try {
+        await b.putRoomFile(room.id, TEAM_LOOK, Buffer.from(TEAM_LOOK_TEMPLATE).toString('base64'));
+        await api.send(room.id, TEAM_LOOK_POSTED);
+        text = TEAM_LOOK_TEMPLATE;
+      } catch (err) {
+        if ((err as { code?: string })?.code !== FILE_EXISTS) throw err;
+        text = await api.fileText(room.id, name).catch(() => null);
+      }
+    }
+    if (text == null) return;
+    teamLookDocs({ text });
+    lookWritten = name;
   }
 
   const changed = () => { build(); onChange(); };
@@ -395,10 +482,17 @@ export function createRooms({
       ]);
       const held = new Map<string, RoomMessage[]>();
       const reacted = new Map<string, Map<string, RoomReaction>>();
+      const marked = new Map<string, RoomDecision[]>();
+      const onFiles = new Map<string, RoomFileMark[]>();
       await Promise.all(rooms.map(async (r) => {
-        const [fresh, rows] = await Promise.all([b.roomMessages(r.id, { limit: MESSAGES_HELD }), b.roomReactions(r.id)]);
+        const [fresh, rows, decided, said] = await Promise.all([
+          b.roomMessages(r.id, { limit: MESSAGES_HELD }), b.roomReactions(r.id), b.roomDecisions(r.id).catch(() => []),
+          b.roomFileMarks ? b.roomFileMarks(r.id).catch(() => []) : [],
+        ]);
         held.set(r.id, merge(messages.get(r.id), fresh));
         reacted.set(r.id, new Map(rows.map((x): [string, RoomReaction] => [reactionKey(x), x])));
+        marked.set(r.id, decided);
+        onFiles.set(r.id, said);
       }));
       if (backend() !== b || started !== b) return;
       if (g !== gen) { again = true; return; }
@@ -408,6 +502,8 @@ export function createRooms({
       presence = presenceRows;
       messages = held;
       reactions = reacted;
+      decisions = marked;
+      fileMarks = onFiles;
       reads = new Map(readRows.map((r): [string, number] => [r.roomId, r.readAt]));
       mentioned = mentionRows;
       autoPin(rooms);
@@ -417,11 +513,13 @@ export function createRooms({
       log(`rooms: ${state.error}`);
     }
     changed();
+    writeDocs();
+    keepTeamLook().catch((err) => log(`rooms: team look: ${err.message}`));
   }
 
   function merge(old: RoomMessage[] = [], fresh: RoomMessage[] = []) {
     const byId = new Map(old.map((m): [string, RoomMessage] => [m.id, m]));
-    for (const m of fresh) byId.set(m.id, m);
+    for (const m of fresh) byId.set(m.id, readRoomMessage(m));
     return [...byId.values()].sort((a, b) => a.at - b.at || String(a.id).localeCompare(String(b.id))).slice(-MESSAGES_HELD);
   }
 
@@ -552,7 +650,7 @@ export function createRooms({
     setUp = false;
     lastSent = null;
     people = new Map(); names = new Map(); profiles = new Map(); presence = []; messages = new Map(); reads = new Map(); mentioned = [];
-    reactions = new Map(); files = new Map();
+    reactions = new Map(); decisions = new Map(); files = new Map(); fileMarks = new Map(); sending.clear();
     state = { ...EMPTY, on: !!enabled() };
     if (b) await b.putPresence(device(), { gone: true, agents_running: 0, working_on: null, working_private: false, activity: [] }).catch(() => {});
     onChange();
@@ -568,6 +666,16 @@ export function createRooms({
     await syncName().catch((err) => log(`rooms: name: ${err.message}`));
     await syncStatus().catch((err) => log(`rooms: status: ${err.message}`));
     await publish().catch((err) => log(`rooms: presence: ${err.message}`));
+    await syncInvites().catch((err) => log(`rooms: invites: ${err.message}`));
+  }
+
+  // An invitation makes no event a running copy hears, so each pass asks.
+  async function syncInvites() {
+    const invites = await backend()!.pendingRoomInvites();
+    if (JSON.stringify(invites) === JSON.stringify(state.invites ?? [])) return;
+    local();
+    state = { ...state, invites };
+    changed();
   }
 
   // A card made before my name was known reads "Someone" until it is.
@@ -598,17 +706,23 @@ export function createRooms({
   const need = () => { const b = backend(); if (!b || !started) throw new Error('turn on Rooms and sign in first'); return b; };
   const after = async <T,>(p: Promise<T>) => { const out = await p; await refresh(); return out; };
 
-  return {
+  const api = {
     state: () => { const { rawRooms, ...shown } = state; return shown; },
     start, stop, tick, refresh, publish,
 
     async send(roomId: string, body: unknown, { inReplyTo = null, mentions = [] }: { inReplyTo?: string | null; mentions?: string[] } = {}) {
       const b = need();
-      const m = await b.sendRoomMessage(roomId, { body: String(body ?? '').trim(), inReplyTo, mentions });
+      const words = await carryIntoRoom(String(body ?? '').trim(), {
+        find: findFile,
+        put: async (name: string, data: string) => { try { await b.putRoomFile(roomId, name, data); } catch (err) { if ((err as { code?: string })?.code !== FILE_EXISTS) throw err; } },
+        log: (line = '') => log(line),
+      });
+      const m = await b.sendRoomMessage(roomId, { body: words, inReplyTo, mentions });
       local();
       messages.set(roomId, merge(messages.get(roomId), [m]));
       reads.set(roomId, Math.max(reads.get(roomId) ?? 0, m.at));
       changed();
+      keepTeamLook().catch((err) => log(`rooms: team look: ${err.message}`));
       return m;
     },
 
@@ -625,6 +739,18 @@ export function createRooms({
       if (behind) reads.set(roomId, last);
       changed();
       if (behind) await b.markRoomRead(roomId, last);
+    },
+
+    // Done with what the group has said so far, so what lands after is new
+    // whatever this Mac's clock says.
+    async markDone(roomId: string) {
+      const who = meId();
+      const p = prefs.get(who);
+      const newest = Math.max(0, ...[...(messages.get(roomId) ?? []), ...mentioned.filter((m) => m.roomId === roomId), ...(fileMarks.get(roomId) ?? [])].map((m) => m.at));
+      local();
+      prefs.set(who, { doneAt: { ...p.doneAt, [roomId]: Math.max(p.doneAt[roomId] ?? 0, newest) } });
+      changed();
+      await this.markRead(roomId);
     },
 
     // `at` is the time of the first message that should read as unread.
@@ -650,6 +776,8 @@ export function createRooms({
       holdReaction({ messageId, roomId, by: meId(), emoji, on: !!on, at: now() });
       changed();
     },
+
+    decide: (roomId: string, mark: unknown) => after(need().markRoomDecision(roomId, mark)),
 
     async edit(roomId: string, messageId: string, body: unknown, { mentions = [] }: { mentions?: string[] } = {}) {
       const b = need();
@@ -696,8 +824,93 @@ export function createRooms({
       }
       if (!ROOM_FILE_NAME.test(String(name ?? ''))) return null;
       const data = await b.roomFile(roomId, String(name));
+      const list = readPartList(data);
+      if (list) return fs.readFileSync((await this.fileOnDisk(roomId, name))!).toString('base64');
       if (data != null) keepFile(key, data);
       return data;
+    },
+
+    // THE FILE IS READ HERE, NOT IN THE WINDOW: the window could only read
+    // pictures and films through its picture address, and whole into memory.
+    async putFileFrom(roomId: string, { name, srcPath }: { name?: unknown; srcPath?: unknown } = {}) {
+      const b = need();
+      const n = String(name ?? '');
+      if (!ROOM_FILE_NAME.test(n) || n.length > 150) throw new Error(`A room cannot keep a file named “${n}”.`);
+      const src = String(srcPath ?? '');
+      if (!path.isAbsolute(src)) throw new Error(`${n} could not be read`);
+      const { size } = await fs.promises.stat(src).catch(() => { throw new Error(`${path.basename(src)} could not be read`); });
+      const count = partsOf(size);
+      if (!count) throw new Error(`${path.basename(src)} is over the ${Math.round(ROOM_MAX_BYTES / 1024 / 1024)} MB a message can send.`);
+      if (count === 1) return this.putFile(roomId, { name: n, dataBase64: (await fs.promises.readFile(src)).toString('base64') });
+      const key = `${roomId}/${n}`;
+      const handle = await fs.promises.open(src, 'r');
+      try {
+        for (let i = 1; i <= count; i += 1) {
+          sending.set(key, { done: i - 1, total: count });
+          changed();
+          const chunk = Buffer.alloc(Math.min(ROOM_PART_BYTES, size - (i - 1) * ROOM_PART_BYTES));
+          await handle.read(chunk, 0, chunk.length, (i - 1) * ROOM_PART_BYTES);
+          try { await b.putRoomFile(roomId, partName(n, i), chunk.toString('base64')); } catch (err) { if ((err as { code?: string })?.code !== FILE_EXISTS) throw err; }
+        }
+        // The list goes last, so a file that reads as whole is whole.
+        try { await b.putRoomFile(roomId, n, partList(count, size)); } catch (err) { if ((err as { code?: string })?.code !== FILE_EXISTS) throw err; }
+      } finally {
+        await handle.close();
+        sending.delete(key);
+        changed();
+      }
+      return n;
+    },
+
+    /** Where the whole file sits on this Mac, put back together from its parts if it went in parts. */
+    fileIfKept(roomId: string, name: unknown) {
+      const n = String(name ?? '');
+      if (!filesDir || !ROOM_FILE_NAME.test(n) || !/^[\w-]+$/.test(String(roomId))) return null;
+      const there = path.join(filesDir, String(roomId), n);
+      return fs.existsSync(there) ? there : null;
+    },
+
+    async fileOnDisk(roomId: string, name: unknown): Promise<string | null> {
+      const b = need();
+      const n = String(name ?? '');
+      if (!filesDir || !ROOM_FILE_NAME.test(n) || !/^[\w-]+$/.test(String(roomId))) return null;
+      const there = path.join(filesDir, String(roomId), n);
+      if (fs.existsSync(there)) return there;
+      const data = files.get(`${roomId}/${n}`) ?? await b.roomFile(roomId, n);
+      if (data == null) return null;
+      fs.mkdirSync(path.dirname(there), { recursive: true });
+      const list = readPartList(data);
+      const going = `${there}.${process.pid}.part`;
+      if (!list) {
+        fs.writeFileSync(going, Buffer.from(data, 'base64'));
+      } else {
+        fs.writeFileSync(going, '');
+        for (let i = 1; i <= list.parts; i += 1) {
+          const part = await b.roomFile(roomId, partName(n, i));
+          if (part == null) { fs.rmSync(going, { force: true }); throw new Error(`Part ${i} of ${n} is not in the room yet.`); }
+          fs.appendFileSync(going, Buffer.from(part, 'base64'));
+        }
+      }
+      fs.renameSync(going, there);
+      return there;
+    },
+
+    async fileText(roomId: string, name: unknown): Promise<string | null> {
+      const there = await this.fileOnDisk(roomId, name);
+      return there ? fs.readFileSync(there, 'utf8') : null;
+    },
+
+    // A comment, reply, resolve or approval on a file in the group, as a thread keeps them.
+    async markFile(roomId: string, mark: unknown) {
+      const b = need();
+      const clean = cleanMark(mark);
+      if (!clean) throw new Error('That comment could not be read.');
+      const id = `m${now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+      await b.markRoomFile(roomId, { id, mark: clean });
+      local();
+      fileMarks.set(roomId, [...(fileMarks.get(roomId) ?? []), { id, by: meId(), mark: clean, at: now() }]);
+      changed();
+      return id;
     },
 
     async older(roomId: string) {
@@ -776,4 +989,5 @@ export function createRooms({
       changed();
     },
   };
+  return api;
 }

@@ -30,7 +30,16 @@ export interface McpServerEntry {
   command?: string;
   env?: Record<string, string | null | undefined>;
   args?: string[];
+  tool_timeout_sec?: number;
 }
+
+export interface ConnectionServer {
+  command: string;
+  args: string[];
+  env?: Record<string, string | null | undefined>;
+}
+
+export type ConnectionServers = Record<string, ConnectionServer>;
 
 export interface StoreServer {
   name?: string;
@@ -45,6 +54,7 @@ export interface WorkerThreadOptions {
   instructions?: string | null;
   mcpServers?: unknown[];
   storeServer?: StoreServer | null;
+  connectionServers?: ConnectionServers | null;
   mode?: string | null;
   reviewer?: string | null;
 }
@@ -125,6 +135,7 @@ export interface CodexWorkerOptions {
   resumeThreadId?: string | null;
   onApproval?: ((method: string, params: CodexParams) => unknown) | null;
   requireMcpServer?: string | null;
+  askedMcpServers?: string[];
   mcpReadyMs?: number;
 }
 
@@ -176,7 +187,9 @@ export const MCP_READY_MS = 30_000;
  * The store server is written last, so it wins over a server of the user's
  * with the same name.
  */
-export function mcpIsolation(names: unknown[] = [], storeServer: StoreServer | null = null) {
+const CONNECTION_TOOL_TIMEOUT_SEC = 8 * 60 * 60;
+
+export function mcpIsolation(names: unknown[] = [], storeServer: StoreServer | null = null, connectionServers: ConnectionServers | null = null) {
   // Null prototype, because a server may be named `__proto__`. On a plain
   // object that key hits the prototype setter, is never serialised, and the
   // server would stay on.
@@ -190,6 +203,11 @@ export function mcpIsolation(names: unknown[] = [], storeServer: StoreServer | n
     // starts and never completes its handshake, so pass them when given.
     if (Array.isArray(storeServer.args) && storeServer.args.length) entry.args = [...storeServer.args];
     mcp_servers[storeServer.name] = entry;
+  }
+  // Codex gives up on a tool call after 60 seconds by default, and a write here
+  // waits for a person's yes. A give-up would read as a failure and draw a retry.
+  for (const [name, server] of Object.entries(connectionServers ?? {})) {
+    mcp_servers[name] = { command: server.command, args: [...server.args], env: server.env, tool_timeout_sec: CONNECTION_TOOL_TIMEOUT_SEC };
   }
   return mcp_servers;
 }
@@ -254,7 +272,7 @@ const plainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof 
  * while signed out, so `createCodexWorker` also reports any server that starts
  * unasked (`sayUnasked`).
  */
-export function workerThreadParams({ cwd, model = null, instructions = null, mcpServers = [], storeServer = null, mode = null, reviewer = null }: WorkerThreadOptions = {}) {
+export function workerThreadParams({ cwd, model = null, instructions = null, mcpServers = [], storeServer = null, connectionServers = null, mode = null, reviewer = null }: WorkerThreadOptions = {}) {
   const posture = codexPosture(mode, { reviewer });
   const params: WorkerThreadParams = {
     cwd,
@@ -264,7 +282,7 @@ export function workerThreadParams({ cwd, model = null, instructions = null, mcp
     // Omission inherits the account's reviewer, so every mode names its own.
     approvalsReviewer: posture.approvalsReviewer,
     config: {
-      mcp_servers: mcpIsolation(mcpServers, storeServer),
+      mcp_servers: mcpIsolation(mcpServers, storeServer, connectionServers),
       projects: projectIsolation(cwd),
       // Plugins can contribute MCP servers outside config.mcp_servers.
       // Keep this worker on the same explicit integration boundary.
@@ -355,6 +373,7 @@ export function createCodexWorker({
   resumeThreadId = null,
   onApproval = null,
   requireMcpServer = null,
+  askedMcpServers = [],
   mcpReadyMs = MCP_READY_MS,
 }: CodexWorkerOptions = {}): CodexWorker {
   if (!server) throw new Error('createCodexWorker needs a codex app-server client');
@@ -402,7 +421,7 @@ export function createCodexWorker({
   const spoken = new Set<string>();
   const sayUnasked = (params: CodexParams) => {
     const name = typeof params?.name === 'string' ? params.name : '';
-    if (!name || name === requireMcpServer) return;
+    if (!name || name === requireMcpServer || askedMcpServers.includes(name)) return;
     if (params.status !== 'starting' && params.status !== 'ready') return;
     if (spoken.has(name)) return;
     spoken.add(name);

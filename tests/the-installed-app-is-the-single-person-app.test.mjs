@@ -9,7 +9,7 @@
 //      the team app. The founder's call: "users are no longer using the
 //      multiplayer version so this should never be visible."
 //   2. macOS asked for the login keychain password for "Agentbox Safe Storage".
-//      main.mts called safeStorage.isEncryptionAvailable() at every launch, team
+//      main.mjs called safeStorage.isEncryptionAvailable() at every launch, team
 //      or not, and on a Mac that touches the keychain. Only the team's saved
 //      sign-in uses it.
 //
@@ -19,6 +19,10 @@
 // still be run from source. Since 2026-10-23 a build carries its own cloud for
 // the phone, and the team version is an alpha switch
 // (tests/multiplayer-is-an-alpha-feature-in-the-installed-app).
+//
+// Connections (2ad7fc93) sealed their sign-ins with safeStorage on every copy,
+// team or not. Their keychain is now made only where there is a team cloud,
+// like the team's own.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -72,17 +76,19 @@ describe('a checkout, run with npm run app', () => {
 });
 
 describe('the keychain', () => {
-  // Read off main.mts because the call is Electron's and cannot run here: every
-  // use of safeStorage must sit inside the branch that has a team config.
+  // Read off main.mjs because the call is Electron's and cannot run here: every
+  // use of safeStorage must sit inside a branch that has a team config. The
+  // team's sign-in is one; a Connections sign-in is the other (2ad7fc93).
   it('is only reached for when there is a team to keep a sign-in for', () => {
     const main = fs.readFileSync(path.join(root, 'main', 'main.mts'), 'utf8');
     const uses = [...main.matchAll(/safeStorage\.\w+/g)].map((m) => m.index);
     expect(uses.length).toBeGreaterThan(0);
-    const branch = main.indexOf('const team = cloudConfig ?');
-    const end = main.indexOf('}) : null;', branch);
-    expect(branch).toBeGreaterThan(-1);
+    const branches = [...main.matchAll(/const \w+ = cloudConfig \? /g)]
+      .map((m) => [m.index, main.indexOf(' : null;', m.index)]);
+    expect(branches.map(([at]) => main.slice(at, main.indexOf('=', at)).trim())).toEqual(['const team', 'const connectionsKeychain']);
     for (const at of uses) {
-      expect(at > branch && at < end, `safeStorage used outside the team branch at ${at}`).toBe(true);
+      expect(branches.some(([from, to]) => at > from && at < to), `safeStorage used outside a team branch at ${at}`).toBe(true);
     }
+    expect(main).toMatch(/startConnections\(\{\s*config, supervisor, appDir, userDir,\s*cipher: connectionsKeychain,/);
   });
 });

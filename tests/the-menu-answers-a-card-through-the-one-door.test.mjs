@@ -85,7 +85,9 @@ describe('the Allow/Deny items in the Agents menu', () => {
     expect(at).toBeGreaterThan(-1);
     // Filled in immediately after the IPC surface is built, and before anything
     // else can be pressed.
-    expect(main.slice(at, at + 400)).toMatch(/answerApproval = ipc\.answerApproval/);
+    const after = main.slice(main.indexOf('\n  });\n', at) + '\n  });\n'.length);
+    const firstStatement = after.split('\n').find((line) => line.trim() && !line.trim().startsWith('//'));
+    expect(firstStatement.trim()).toBe('answerApproval = ipc.answerApproval;');
     // And the menu is still installed early, where it only needs the config.
     expect(main.indexOf('installMenu({')).toBeLessThan(at);
   });

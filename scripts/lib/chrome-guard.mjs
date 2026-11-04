@@ -37,10 +37,14 @@ const OURS = process.env.CHROME || '/Applications/Google Chrome.app';
 
 // Every process on the box, as {pid, ppid, command}. `ps` is the only thing that
 // sees processes this one did not start, which is the whole point of the sweep.
+//
+// `-ww`, or a Mac's ps cuts each line to the terminal's width, and to 79 columns
+// when there is no terminal: a headless Chrome's --user-data-dir sits past that
+// cut, so every match below silently found nothing.
 export function processes() {
   let out;
   try {
-    out = execFileSync('ps', ['-Ao', 'pid=,ppid=,command='], { encoding: 'utf8', maxBuffer: 32 << 20 });
+    out = execFileSync('ps', ['-ww', '-Ao', 'pid=,ppid=,command='], { encoding: 'utf8', maxBuffer: 32 << 20 });
   } catch {
     return []; // ps is unavailable; a failed sweep must never fail the screenshot
   }

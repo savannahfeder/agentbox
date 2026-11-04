@@ -123,7 +123,7 @@ describe('what the page says', () => {
     const app = src('App.tsx');
     // Your project order rides after the tab since w-e263a8a0fb.
     expect(app).toMatch(/sortedByDisplay\([^;]*inboxDisplay, view[,)]/);
-    expect(app).toMatch(/mergeRows\(displayedBox, theirRows, view === 'done' \? 'done' : view === 'progress' \? 'updated' : inboxDisplay\.sort[,)]/);
+    expect(app).toMatch(/mergeRows\(heldBox\.rows, theirRows, view === 'done' \? 'done' : view === 'progress' \? 'updated' : inboxDisplay\.sort[,)]/);
   });
   it('the Display menu says Done keeps its own order while you are on it', () => {
     expect(src('threads', 'Pages.tsx')).toMatch(/Done runs newest first/);

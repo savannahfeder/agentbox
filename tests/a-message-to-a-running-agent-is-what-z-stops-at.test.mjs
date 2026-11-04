@@ -56,7 +56,7 @@ describe('the three seconds in which it is still hers', () => {
     const branch = liveBranch();
     const restore = branch.slice(branch.indexOf('restore: (): Restored => {'));
     expect(restore).toMatch(/setSending\(\(q\) => q\.filter\(\(s\) => s !== mine\)\)/);
-    expect(restore).toMatch(/restoreDraft\(item, sent\?\.words \?\? text, sent\?\.attachments \?\? \[\]\)/);
+    expect(restore).toMatch(/wordsBackInTheBox\(item, sent\?\.words \?\? text, sent\?\.attachments \?\? \[\]\)/);
   });
 
   it('flushes first, so a second message inside the window sends the first', () => {

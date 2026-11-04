@@ -237,7 +237,10 @@ export function createCodexApprovals({
     // Every other MCP tool call still goes to the founder as a card.
     if (method === 'mcpServer/elicitation/request'
       && isMcpToolCall(params)
-      && isStoreElicitation(params, context?.storeServer)) {
+      && (isStoreElicitation(params, context?.storeServer)
+        // The app decides these itself, with its own card for a write
+        // (main/connections/broker.mjs). The names come from the app, like the store's.
+        || context?.connectionServers?.includes(elicitationServer(params)))) {
       resolve(ACCEPT_DECISION);
       return;
     }

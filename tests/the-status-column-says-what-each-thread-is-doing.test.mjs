@@ -204,7 +204,8 @@ describe('the row', () => {
   // column off its own heading. The cell starts at the column's edge.
   it('puts nothing before a word that carries no mark', () => {
     const waiting = item({ kind: 'question', note: 'Two ways to do it.' });
-    const cell = stateCell(draw({ queued: [] }, waiting, 'inbox'));
+    // Off Needs you, whose rows no longer repeat the tab's own word.
+    const cell = stateCell(draw({ queued: [] }, waiting, null));
     expect(cell).toContain('Waiting');
     expect(cell).not.toContain('<span');
   });

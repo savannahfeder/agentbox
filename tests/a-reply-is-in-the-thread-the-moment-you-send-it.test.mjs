@@ -19,7 +19,8 @@
 // Pinned here: both sends put their words in the `sending` queue before the
 // undo window, whether or not you stay, and take them off when Z takes the
 // send back or once the written copy has landed; and a thread never draws
-// messages read for another thread.
+// messages read for another thread. The pick's toast words and whether it
+// stays put moved into their own rules (4d1de530); takeBack is still its restore.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { itemThread } from '../renderer/src/item-thread.ts';
@@ -71,7 +72,7 @@ describe('a picked option', () => {
     // The window's restore, the later undo's restore, and the failed write.
     expect(picked).toContain('const takeBack = (): Restored => { letGo(); return null; };');
     expect(picked).toContain('restore: takeBack,');
-    expect(picked).toMatch(/`, takeBack, !movesOn\(item\),/);
+    expect(picked).toMatch(/, takeBack, !movesOn\(item\)/);
     expect(picked).toMatch(/catch \(error\) \{ letGo\(\); throw error; \}/);
     expect(picked).toMatch(/setTimeout\(letGo, LANDED_MS\)/);
   });

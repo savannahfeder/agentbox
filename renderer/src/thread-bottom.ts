@@ -228,6 +228,17 @@ const markOf = (el: HTMLElement): RestoreMark => {
   return fresh;
 };
 
+const ABOVE_THE_FIRST_LINE = 20;
+
+/** The first line of the last message near the top, or the end when all of it already fits. */
+export const landingTop = (top: number, bottom: number) => Math.max(0, Math.min(bottom, Math.round(top - ABOVE_THE_FIRST_LINE)));
+
+/** Where a person starts reading a thread: the last message, as either kind of page draws it. */
+export function lastMessageIn(box: HTMLElement): Element | null {
+  const all = box.querySelectorAll('.thread-block.is-msg, .thread-block.is-msg-same, .outcome, .appendix-foot');
+  return all[all.length - 1] ?? null;
+}
+
 /**
  * Keep a scrolling box at its bottom for as long as it is at its bottom.
  *
@@ -235,9 +246,13 @@ const markOf = (el: HTMLElement): RestoreMark => {
  * component's own cleanup does when she leaves the task. Her scrolling up stops
  * it too, until she scrolls back down.
  */
-export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number; keepPlace?: boolean } = {}): () => void {
+export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number; keepPlace?: boolean; readFrom?: () => Element | null } = {}): () => void {
   if (!el) return () => {};
   const now = opts.now ?? (() => Date.now());
+  // A message longer than the window lands on its first line, not its last, while
+  // the page settles and until she touches it. Then the ordinary rules hold.
+  const opened = now();
+  let landing = !!opts.readFrom;
   // KEEP HER PARAGRAPH WHERE IT IS WHEN ANYTHING ABOVE IT CHANGES HEIGHT, not
   // only on a re-wrap. The desktop's browser does this itself (scroll
   // anchoring); Safari on an iPhone does not, so there every picture or block
@@ -292,7 +307,10 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
   // because the position cannot tell us apart from her. Nothing but a hand of
   // hers may switch this off.
   let hand = -Infinity;
-  const hers = () => now() - hand <= HER_HAND_MS;
+  // A button held down on the box: a scrollbar drag can wait any length of
+  // time between the press and the first move, so the window alone is not enough.
+  let held = false;
+  const hers = () => held || now() - hand <= HER_HAND_MS;
 
   // HOW WIDE THE COLUMN WAS LAST TIME WE LOOKED, and the paragraph she was
   // reading when she was not at the end. The pair is what survives a re-wrap.
@@ -313,6 +331,18 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
       underRestore = false;
       stuck = gapToBottom(el) <= LEAVE_SLACK;
       mine = Math.round(el.scrollTop);
+      landing = false;
+    }
+    if (landing && (hand !== -Infinity || now() - opened > RESUME_WINDOW_MS)) landing = false;
+    const start = landing ? opts.readFrom!() : null;
+    if (start) {
+      const top = start.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+      const want = landingTop(top, bottomOf(el));
+      if (Math.round(el.scrollTop) !== want) el.scrollTop = want;
+      mine = want;
+      stuck = want >= bottomOf(el) - AT_BOTTOM_SLACK;
+      width = widthOf(el);
+      return;
     }
     // THE COLUMN CHANGED WIDTH, so whatever moved scrollTop just now was the
     // page re-wrapping and not her, even with her hand a moment behind it: the
@@ -383,7 +413,10 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
   // are the events a person makes, and a reflow makes none of them. A scrollbar
   // drag is `mousedown` and then a run of scroll events with no further gesture,
   // which is why this is a window and not a one-shot.
-  const took = () => { hand = now(); };
+  const took = (e?: Event) => { hand = now(); if (e?.type === 'mousedown') held = true; };
+  const letGo = () => { held = false; };
+  // The release lands wherever the pointer ended up, so it is heard on the window.
+  const win = el.ownerDocument?.defaultView ?? null;
 
   function release() {
     if (!live) return;
@@ -392,11 +425,15 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
     el!.removeEventListener('scroll', onScroll);
     el!.removeEventListener('load', onLoad, true);
     for (const ev of HER_GESTURES) el!.removeEventListener(ev, took);
+    win?.removeEventListener('mouseup', letGo);
+    win?.removeEventListener('blur', letGo);
   }
 
   el.addEventListener('scroll', onScroll, { passive: true });
   el.addEventListener('load', onLoad, true);
   for (const ev of HER_GESTURES) el.addEventListener(ev, took, { passive: true });
+  win?.addEventListener('mouseup', letGo, { passive: true });
+  win?.addEventListener('blur', letGo, { passive: true });
   // BOTH BOXES, because the two ways to fall short of the end are different
   // things growing. The content growing is the obvious one. The box itself
   // SHRINKING is the other, and it happens every time the options strip or the
@@ -415,6 +452,7 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number;
   if (placed !== null && Math.round(el.scrollTop) === placed) {
     stuck = gapToBottom(el) <= LEAVE_SLACK;
     mine = placed;
+    landing = false;
   }
 
   pin();

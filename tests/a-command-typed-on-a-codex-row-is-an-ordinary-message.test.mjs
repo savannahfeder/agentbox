@@ -164,7 +164,7 @@ describe('what the thread calls a blocked row after a slash command', () => {
     // The bag is open at its end since put her in-flight message in it; what
     // this pins is that the engine is still handed down with it.
     expect(thread).toMatch(/itemThread\(ledger\.lines, withEveryRun\(everyRun, sessions\), saying, \{ whole, engine[,}]/);
-    expect(built).toContain('threadEvents(lines, opts.engine)');
+    expect(built).toContain('threadEvents(lines, opts.engine, opts.numbers)');
   });
 });
 

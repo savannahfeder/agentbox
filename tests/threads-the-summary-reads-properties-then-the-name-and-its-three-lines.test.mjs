@@ -95,6 +95,7 @@ describe('Blocked by and Blocks are gone from the panel', () => {
         blockedBy: [{ id: 'w-google', title: 'Sign in with Google' }], blocks: [], updatedAt: NOW },
       person: null,
     })));
-    expect(card).toMatch(/Blocked by Sign in with Google Blocks Nothing/);
+    expect(card).toMatch(/Blocked by Sign in with Google Owner/);
+    expect(card).not.toContain('Nothing');
   });
 });

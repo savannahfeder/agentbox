@@ -336,7 +336,7 @@ export async function runScript(script: string, cwd: string, { timeout = SHIP_MS
 let shipTurns = 0;
 
 /**
- * A ship's turn at the memory check (main/memory-gate.mjs), like any heavy
+ * A ship's turn at the memory check (main/memory-gate.mts), like any heavy
  * command's, because its tests run from a git hook the check cannot see. Answers
  * with what gives the slot back. Told no, it says so and asks again; after its
  * last turn it goes anyway, because a ship left behind is a thread stuck in In

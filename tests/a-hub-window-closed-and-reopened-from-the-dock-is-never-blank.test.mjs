@@ -5,7 +5,7 @@
 // notifier's `zero:notify-test` handler a second time. Electron throws on that,
 // before the page loads, so the reopened window stayed blank until a restart.
 // Reproduced with a fake ipcMain that throws as Electron's does. The whole app
-// quits when its window closes (main/main.mjs) and so never reopens; the hub
+// quits when its window closes (main/main.mts) and so never reopens; the hub
 // window now does the same.
 import { describe, it, expect, vi, afterEach } from 'vitest';
 

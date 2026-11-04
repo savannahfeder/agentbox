@@ -102,9 +102,9 @@ describe('the card hands over before it waits on anything', () => {
       const send = body(name);
       // Read and stamped as sending, still not taken
       // (tests/a-new-thread-box-opened-right-after-send-starts-empty).
-      expect(send.indexOf('const taken = markComposeDraftSending()')).toBeGreaterThan(-1);
-      expect(send.indexOf('const taken = markComposeDraftSending()')).toBeLessThan(send.indexOf('await '));
-      expect(send).toMatch(/restoreComposeDraft\(taken\)/);
+      expect(send.indexOf('const taken = takeTheDraft()')).toBeGreaterThan(-1);
+      expect(send.indexOf('const taken = takeTheDraft()')).toBeLessThan(send.indexOf('await '));
+      expect(send).toMatch(/restoreComposeDraft\(taken, undefined, place\)/);
       // Nothing clears the draft outright after the send lands: by then it may
       // be a second card's words. `dropComposeDraft` is the one that may,
       // because it looks first (tests/a-send-the-app-has-not-taken-keeps-your-words).

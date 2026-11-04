@@ -2,6 +2,9 @@
 // shared/work-items.mjs; these are just the shapes that cross the bridge.
 
 import type { Engine } from '../../shared/engines.mjs';
+import type { AgentVoice } from '../../shared/agent-voice.mjs';
+
+export type { AgentVoice };
 
 export interface WorkItem {
   id: string;
@@ -28,8 +31,8 @@ export interface WorkItem {
   // busy chat is in and what its row says (`whatWaits`, shared/team-rules.mjs).
   // Absent on every row without people on it.
   talk?: {
-    chat: { by: string; ts: number; text: string }[];
-    threads: Record<string, { by: string; text: string; replies: { by: string; ts: number; text: string }[] }>;
+    chat: { by: string; ts: number; text: string; voice?: AgentVoice; forAgent?: AgentVoice }[];
+    threads: Record<string, { by: string; text: string; voice?: AgentVoice; replies: { by: string; ts: number; text: string }[] }>;
     /** Per person, when they last marked it done; what came before is settled for them. */
     settled?: Record<string, number>;
   };
@@ -59,6 +62,10 @@ export interface WorkItem {
   runAt?: number;
   // When the existing answer returns to the human inbox. Never starts work.
   snoozedUntil?: number;
+  /** Teammates' comments its owner has not yet dealt with (shared/work-items.mjs). */
+  waitingComments?: { by: string; ts: number; text: string }[];
+  /** Comments and approvals on this thread's files. */
+  artifacts?: FileMarks;
   // Whether this has been started at all (w-afb66e6661). 'later' is a thread
   // written down and deliberately not begun: it waits for a person rather than
   // a clock, lives in Later, and nothing runs on it. 'now' is how it is
@@ -84,7 +91,7 @@ export interface WorkItem {
   // bookkeeping, handed over rather than discarded, because an agent's `done`
   // and her archive are the same word for opposite events and the inbox has to
   // tell them apart (shared/work-items.mjs).
-  wrote?: Record<string, { ts: number; source: string; by?: string } | undefined>;
+  wrote?: Record<string, { ts: number; source: string; by?: string; voice?: AgentVoice; forAgent?: AgentVoice } | undefined>;
   // THE TEAM FIELDS (shared/work-items.mjs). Absent on every private row.
   // `createdBy` is the person who started the row, `assignee` the person who
   // has to act next (or 'agent'), `runner` whose Mac runs its agents, `due` a
@@ -108,6 +115,12 @@ export interface WorkItem {
   solution?: string;
   blockedBy?: string[];
   blocks?: string[];
+  /** When a person said it shipped; 0 is taken back. */
+  shippedAt?: number;
+  /** What ended a wait a person set (shared/thread-waits.mjs). */
+  waitEnded?: { said: string; at: number };
+  /** Where it went when someone left the team (main/team/departures.mjs). */
+  handedOver?: { said: string; at: number };
   // Set only on the synthesized rows that stand for a running Claude Code
   // agent. Its presence is what every action path checks: an agent row is drawn
   // by the same list and reached by the same keys, and nothing may write it to
@@ -121,6 +134,8 @@ export interface Product {
   name: string;
   oneLiner: string;
   repoPath: string | null;
+  /** Its folder holds more than a new repository's README. */
+  code?: boolean;
   /** When it was made (epoch ms), or null on one made before that was written
    *  down. It places an unplaced project under the ones already here. */
   createdAt?: number | null;
@@ -164,6 +179,8 @@ export interface Person {
   email: string;
   name: string;
   avatarUrl: string | null;
+  /** Which tools they have connected, by catalog id, so a teammate knows who to ask. */
+  connections?: string[];
   /** On a team's member list: who owns it (and so may rename it and remove people). */
   role?: 'owner' | 'member';
   /** A line they wrote about themselves, so a day in meetings is not read
@@ -177,6 +194,190 @@ export interface Person {
 /** A file a message to a person carries: pasted bytes or a path on this Mac. */
 export interface TeamMessageFile { name: string; dataBase64?: string; srcPath?: string }
 
+/** Where a comment sits on a file (shared/artifact-marks.mjs). */
+export type NotePlace =
+  | { kind: 'pin'; x: number; y: number }
+  | { kind: 'time'; s: number; x?: number; y?: number }
+  | { kind: 'page'; n: number; word?: 'Slide'; x?: number; y?: number }
+  | { kind: 'quote'; text: string }
+  | { kind: 'whole' };
+
+/** One `artifact` ledger field, as written. */
+export interface ArtifactMark {
+  do: 'note' | 'reply' | 'resolve' | 'reopen' | 'approve' | 'unapprove' | 'seen' | 'sent' | 'toagent' | 'edit';
+  id?: string;
+  file?: string;
+  path?: string;
+  place?: NotePlace;
+  text?: string;
+  mentions?: string[];
+  owner?: string;
+  on?: string | string[];
+  wait?: boolean;
+}
+
+export interface FileNote {
+  /** Sent, and the app has not said it is kept yet. Never stored. */
+  saving?: boolean;
+  id: string;
+  file: string;
+  place: NotePlace;
+  text: string;
+  by: string | null;
+  ts: number;
+  mentions: string[];
+  owner: string | null;
+  uid: string | null;
+  pin?: number;
+  resolved?: boolean;
+  resolvedBy?: string | null;
+  /** The version that answered it, when the app resolved it rather than a press. */
+  resolvedIn?: string;
+  sent?: boolean;
+  /** Someone pressed "Send to the agent" on a note the agent was not sent. */
+  toAgent?: boolean;
+  /** Written beside a document: held until Send rather than told at once. */
+  wait?: boolean;
+  /** Said on an earlier version and still open: the version it was made on ("v1"). */
+  from?: string;
+  /** In the Files place, the thread or chat it was written in. */
+  in?: string;
+  replies?: { id: string; text: string; by: string | null; ts: number }[];
+}
+
+export interface FileApproval { file: string; by: string | null; ts: number; owner: string | null }
+
+/** Comments and approvals on other copies of a thread's file with the same bytes; `key` is the copy's file in the Files place. */
+export interface FileElsewhere {
+  key: string | null;
+  notes: (FileNote & { key: string })[];
+  approvals: (FileApproval & { key: string })[];
+}
+
+/** A thread's file as its version line numbers it. `path` is null where only a teammate has that version; `here` is how this thread named it. */
+export interface FileLine {
+  key: string;
+  versions: Array<{ n: number; name: string; path: string | null; by: string | null; at: number; agent?: string; here: string[] }>;
+}
+
+/** Everything said on a thread's files, as the fold reads it back. */
+export interface FileMarks {
+  notes: FileNote[];
+  approvals: FileApproval[];
+  seen: Record<string, string[]>;
+  edits?: Array<{ file: string; path: string; by: string | null; ts: number }>;
+}
+
+/** A place a file was sent in: your thread, a chat, or a teammate's thread (main/files-place.mjs). */
+export interface FileSentIn {
+  kind: 'thread' | 'chat' | 'shared' | 'room';
+  roomId?: string;
+  product?: string;
+  id?: string;
+  ownerId?: string;
+  threadId?: string;
+  title: string;
+}
+
+export type FileKind = 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | 'page' | 'table' | 'code';
+
+/** One file in the Files place, at its newest version. */
+export interface PlacedFile {
+  key: string;
+  project: string | null;
+  name: string;
+  kind: FileKind | null;
+  versions: number;
+  at: number;
+  by: string | null;
+  agent?: string;
+  open: number;
+  approvedBy: (string | null)[];
+  /** Each person's newest approval of any version; null is you. */
+  approved?: { by: string | null; at: number }[];
+  /** A person changed the words after an earlier version was approved. */
+  changedSinceApproval?: { by: string | null; approvedBy: string | null };
+  sentIn: FileSentIn[];
+  /** The newest version on this computer, or null while it has not come down. */
+  opened: string | null;
+  /** The folder it sits in, or null at the top of its project. */
+  folder?: string | null;
+  /** Nobody put it there: it sits beside its thread's other files. */
+  folderFollows?: boolean;
+}
+
+export interface FileFolder { id: string; project: string; name: string; parent: string | null; at: number }
+export type FileFolderAct =
+  | { do: 'make'; project: string; name: string; parent?: string | null }
+  | { do: 'rename'; id: string; name: string }
+  | { do: 'move'; key: string; folder: string | null };
+
+export interface FilesPlaceList { files: PlacedFile[]; projects: string[]; folders?: FileFolder[] }
+export type ConnectionState = 'not_connected' | 'works' | 'not_signed_in' | 'not_allowed' | 'nothing_to_read' | 'down' | 'unreachable' | 'choose_reads';
+export type ConnectionAccess = 'sign_in' | 'own_client' | 'key' | 'vendor_approval';
+export interface ConnectionFailure { at: number; tool: string; wrote: boolean; why: string }
+export interface KeptCopy {
+  project: string; projectName: string | null; channels: string[]; count: number; ranAt: number | null; okAt: number | null;
+  failed: { what: string | null; why: string; at: number }[]; nextAt: number | null; stoppedAt: number | null;
+}
+export interface ConnectAsk { id: string; clientId?: string; clientSecret?: string; key?: string }
+export interface ConnectAnswer { ok: boolean; error?: string; tile?: ConnectionTile; needsKey?: boolean; needsClient?: boolean; existing?: string }
+export type CopyAct = { id: string; do: 'start'; project: string; channels?: string[] } | { id: string; do: 'now' | 'stop' };
+export interface ConnectionTile {
+  id: string; name: string; state: ConnectionState; word: string; todo: string | null; connected: boolean;
+  at: number | null; workedAt: number | null; toolCount: number | null; read: string | null;
+  since: number | null; nextTryAt: number | null; stoppedTryingAt: number | null;
+  seen: number | null; seenAtLeast: boolean; things: string | null;
+  changed: string[]; reads: string[]; writes: string[];
+  group: string; access: ConnectionAccess; needs: string | null; hint: string | null; said: { reads: string; writes?: string } | null; custom: boolean; address: string; redirect: string | null; hasClient: boolean;
+  lastUsedAt: number | null; failures: ConnectionFailure[]; endsAt: number | null;
+  copyable: boolean; copyAsks: string | null; copy?: KeptCopy | null;
+  chooses?: boolean; chosen?: string[]; offered?: { name: string; description: string; runsAlone: boolean }[];
+}
+export interface ConnectionsList {
+  tiles: ConnectionTile[]; canEncrypt: boolean;
+  projects: { slug: string; name: string; seenBy: 'private' | 'team' | 'people' }[];
+  groups: { id: string; name: string }[];
+}
+
+export interface FilesPlaceView {
+  key: string;
+  project: string | null;
+  name: string;
+  sentIn: FileSentIn[];
+  /** Where Done in the editor puts the next version. */
+  editsTo?: FileSentIn | null;
+  lines: LedgerLineShape[];
+  marks: FileMarks;
+}
+
+type LedgerLineShape = { ts: number; by?: string | null; source?: string; patch?: Record<string, unknown> };
+
+/** What a comment or approval in the thread links to. */
+export interface FileMarkLink { kind: 'note' | 'approved' | 'edited'; file: string; id?: string; place?: string; /** The file's one name and version, for the words. */ shown?: string }
+
+/** A note naming you on a teammate's shared thread: a row in Needs you. */
+export interface SharedFileNews {
+  owner: string;
+  threadId: string;
+  id: string;
+  file: string;
+  text: string;
+  by: string;
+  ts: number;
+}
+
+/** A teammate's shared thread as this copy holds it (main/team/thread-share.mjs). */
+export interface TeammateThreadWork {
+  shared: boolean;
+  lines: { id: string; ts: number; source: string; by?: string; uid?: string; patch?: Record<string, unknown> | null }[];
+  /** Older messages left on the owner's computer. */
+  earlier: number;
+  /** Where the file pane reads its copied files from. */
+  product: string | null;
+  dir: string | null;
+}
+
 export interface TeamCallResult {
   ok: boolean;
   team?: TeamState;
@@ -187,7 +388,28 @@ export interface TeamCallResult {
   made?: { product: string; id: string };
 }
 
-export type ThreadStateWord = 'waiting' | 'running' | 'scheduled' | 'done';
+/** Where a found line, file or comment sits: your thread, a conversation with people, or a teammate's shared thread. */
+export interface FoundWhere {
+  kind: 'thread' | 'chat' | 'shared';
+  product: string | null;
+  id: string | null;
+  ownerId: string | null;
+  threadId: string | null;
+  updatedAt: number;
+}
+export interface FoundLine extends FoundWhere { uid: string; by: string | null; source: 'founder' | 'agent' | 'system'; at: number; comment: boolean; text: string }
+export interface FoundFile extends FoundWhere { how: 'name' | 'contents'; src: string; name: string; by: string | null; at: number; text: string }
+export interface FoundComment extends FoundWhere { src: string; name: string; by: string | null; at: number; resolved: boolean; noteId: string; fileId: string; text: string }
+/** What the finder in main answers (main/everything-found.mjs). */
+export interface FoundInThreads {
+  ok?: boolean;
+  lines: FoundLine[];
+  files: FoundFile[];
+  comments: FoundComment[];
+  total: { lines: number; files: number; comments: number };
+}
+
+export type ThreadStateWord ='waiting' | 'running' | 'scheduled' | 'done';
 
 /** What a teammate sees of one of your threads: its summary and nothing more. */
 export interface ThreadCard {
@@ -206,6 +428,10 @@ export interface ThreadCard {
   /** Whom it reaches: the chosen people, or null for the whole team. */
   people: string[] | null;
   updatedAt: number;
+  /** When it shipped. */
+  shippedAt?: number;
+  /** A task its holder publishes: who gave it, and when it is due (shared/team-tasks.mjs). */
+  task?: { from: string | null; dueAt?: number; clock?: boolean };
 }
 
 /** The team, as the main process sees it (main/team/index.mts). */
@@ -245,6 +471,12 @@ export interface TeamState {
   people: Person[];
   /** Every card in the team, yours included (shared/thread-cards.mjs). */
   cards: ThreadCard[];
+  /** Other people's AI teammates (shared/mate-cards.mjs). */
+  teamMates?: TeamMate[];
+  /** Notes on teammates' threads that name you and wait on you. */
+  sharedFileNews?: SharedFileNews[];
+  /** When each person last opened a conversation, by `${product}/${id}` then person. */
+  seen?: Record<string, Record<string, number>>;
   lastSyncAt: number | null;
   error: string | null;
   /** Rooms (alpha), while switched on in Alpha features (main/team/rooms.mts). */
@@ -288,7 +520,11 @@ export interface RoomActivity {
   at: number;
 }
 
+export interface TeamMate { id: string; owner: string; name: string; job: string | null; now: string | null; open: boolean; running?: boolean; updatedAt: number }
+
 export interface RoomMessage {
+  /** The agent that wrote it, on its owner's behalf. */
+  voice?: AgentVoice;
   id: string;
   roomId: string;
   by: string | null;
@@ -354,6 +590,25 @@ export interface RoomMention {
   byName: string;
   body: string;
   at: number;
+  /** The newest words are a reply in a side thread: one I started, or another I am in. */
+  thread?: 'yours' | 'theirs' | null;
+  unread?: boolean;
+  /** A row about a file in the group: the comment and the file it opens on. */
+  note?: string | null;
+  file?: string | null;
+}
+
+/** A message marked a decision, or pinned as the week's priorities. */
+export interface RoomDecision {
+  roomId: string;
+  messageId: string;
+  kind: 'decision' | 'priority';
+  project: string | null;
+  body: string;
+  saidBy: string | null;
+  by: string;
+  on: boolean;
+  at: number;
 }
 
 export interface RoomsState {
@@ -361,6 +616,11 @@ export interface RoomsState {
   ready: boolean;
   rooms: Room[];
   messages: Record<string, RoomMessage[]>;
+  decisions?: Record<string, RoomDecision[]>;
+  /** Comments and approvals on each room's files, as written. */
+  fileMarks?: Record<string, { id: string; by: string | null; mark: ArtifactMark; at: number }[]>;
+  /** A file going up in parts: `${roomId}/${name}` -> parts sent of how many. */
+  sending?: Record<string, { done: number; total: number }>;
   me: RoomProfile | null;
   /** Each person's place on the whole app by agent hours, for me and people I share a room with. */
   ranks: Record<string, number>;
@@ -381,6 +641,13 @@ export interface Teammate {
   paused: boolean; status: 'draft' | 'active'; memory: TeammateMemory[]; createdAt: number; starter?: string | null;
   /** The one you talk to: takes what Auto cannot place, and checks in. */
   primary?: boolean;
+  /** Its owner lets it read their direct messages. */
+  readsMessages?: boolean;
+  /** Anyone on the team may give it work without asking its owner. */
+  openToTeam?: boolean;
+  /** How it writes: one of VOICES, or its owner's own words, which win. */
+  voice?: string | null;
+  voiceText?: string | null;
   /** Its run is waiting for you to allow or deny a command (drawn from `approvals`, not the store). */
   asking?: boolean;
   /** It asked you something in the team chat and has not heard back (chat-lines `asksYou`). */
@@ -394,7 +661,7 @@ export interface Teammate {
   /** The playbooks it reads, by id (TeammatesView.playbooks). */
   playbooks?: string[];
 }
-export interface TeammateDuty { id: string; what: string; when: string; lastRan?: number | null }
+export interface TeammateDuty { id: string; what: string; when: string; lastRan?: number | null; every?: 'day' | 'weekday' | 'week'; at?: string[]; on?: number; after?: 'ship'; most?: number; tell?: string }
 /** What the person has taught their teammates about one kind of work, shared by every teammate that reads it. */
 export interface Playbook {
   id: string; title: string; readers: string[]; updatedAt: number;
@@ -407,8 +674,12 @@ export interface TeamChatLine {
   answers?: Record<string, string>;
   /** Said for you by one of your threads, when you asked it to. */
   via?: string; viaProduct?: string;
+  /** A document that goes with the words, drawn as a card to open. */
+  doc?: { product: string; src: string; name: string };
   /** The words that set a new teammate up; from a suggestion, with the threads it was made from. */
   setup?: boolean; threads?: { product: string; id: string; title: string }[];
+  /** The teammate's thread it was written in. */
+  run?: string;
   /** On an `act`: `learned` (kept something about you), `updated` (changed its own instructions),
    *  `lesson` (added to the playbook `ref`), and the older run and pause verbs. */
 }
@@ -422,7 +693,9 @@ export interface TeamRunLine {
 }
 export interface TeammatesView { list: Teammate[]; chat: TeamChatLine[]; runs: TeamRunLine[]; error?: string; playbooks?: Playbook[];
   /** Something the loop that wakes teammates could not do lately, in words. */
-  trouble?: string }
+  trouble?: string;
+  /** An agent's message to someone already allowed, held for Undo until `until`. */
+  sending?: { id: string; from: string; to: string; text: string; until: number }[] }
 export type TeammatesResult<T = unknown> = { ok: true; value: T } | { ok: false; error: string };
 
 export type RoomsResult<T = unknown> ={ ok: true; value: T; rooms: RoomsState } | { ok: false; error: string; rooms?: RoomsState };
@@ -755,6 +1028,12 @@ export interface AgentTurn {
   /** An agent teammate that handed this thread work: drawn as an agent's
    *  message under that teammate's name, never as yours. */
   from?: string;
+  /** The agent that wrote this message on its owner's behalf (`by`). */
+  voice?: AgentVoice;
+  /** A comment on a file: the link that opens the file at it. */
+  fileMark?: FileMarkLink;
+  /** A teammate's comment, or an agent's checkpoint (thread-history.ts). */
+  says?: 'comment' | 'progress';
   // THE MESSAGE'S OWN NAME, the uid of the ledger line it was written as. A
   // reaction is stored against it (w-560647d4db), so only a message that has
   // one can wear chips: a message still on its way has not been written down
@@ -847,6 +1126,8 @@ export interface AgentWork {
   // it, on a shared project.
   yours?: true;
   by?: string;
+  /** An approval of a file: the link that opens it. */
+  fileMark?: FileMarkLink;
 }
 
 // ONE SIDE OF THAT UNION, NAMED, because a type guard has to be able to say it
@@ -1394,7 +1675,7 @@ declare global {
       setThreadOnMac?(p: { onMac: Record<string, true | null> }): Promise<unknown>;
       moveToCloud?(p: { ids: string[]; product?: string; id?: string }): Promise<{ moving?: number; ok?: boolean }>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
-      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
+      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem>;
       routeThread?(p: { product: string; id: string; to: string }): Promise<{ ok: true }>;
       // Feedback to the Agentbox team (main/feedback.mts). Optional: an older
       // main process under a newer window has no such door.
@@ -1406,7 +1687,7 @@ declare global {
       teamSignOut(): Promise<TeamCallResult>;
       teamSignInEmail(p: { email: string; password: string }): Promise<TeamCallResult>;
       teamRename(p: { name: string }): Promise<TeamCallResult>;
-      teamRemoveMember(p: { personId: string }): Promise<TeamCallResult>;
+      teamRemoveMember(p: { personId: string; handTo?: string | null; mates?: { id: string; to: string | null }[] }): Promise<TeamCallResult>;
       teamLeave(): Promise<TeamCallResult>;
       teamCancelInvite(p: { email: string }): Promise<TeamCallResult>;
       teamSignUp(p: { name: string; email: string; password: string }): Promise<TeamCallResult>;
@@ -1417,10 +1698,41 @@ declare global {
       teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult>;
       teamSync(): Promise<TeamCallResult>;
       teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult>;
+      teamThreadWork(p: { personId: string; threadId: string }): Promise<TeammateThreadWork>;
+      findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number } }): Promise<FoundInThreads>;
+      warmFindInThreads(): Promise<boolean>;
+      fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
+      fileNewVersion?(p: { product: string; id: string; path: string; text: string; since?: string | null }): Promise<{ ok: boolean; path?: string; error?: string }>;
+      teamMarkFile(p: { personId: string; threadId: string; mark: ArtifactMark }): Promise<TeamCallResult>;
+      connections?(): Promise<ConnectionsList>;
+      connectionsConnect?(p: ConnectAsk): Promise<ConnectAnswer>;
+      connectionsAdd?(p: { address: string; key?: string }): Promise<ConnectAnswer>;
+      connectionsChoose?(p: { id: string; names: string[] }): Promise<ConnectionTile | null>;
+      connectionsCopy?(p: CopyAct): Promise<{ ok: boolean; error?: string }>;
+      connectionsCancel?(p: { id: string }): Promise<boolean>;
+      connectionsCheck?(p: { id: string }): Promise<ConnectionTile | null>;
+      connectionsDisconnect?(p: { id: string }): Promise<boolean>;
+      connectionsAccept?(p: { id: string }): Promise<boolean>;
+      filesPlace?(): Promise<FilesPlaceList>;
+      filesPlaceOpen?(p: { key: string }): Promise<FilesPlaceView | null>;
+      filesPlaceEdit?(p: { key: string; text: string }): Promise<{ ok: boolean; error?: string; goes?: 'sent'; to?: string }>;
+      filesPlaceMark?(p: { key: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
+      filesPlaceFolder?(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null }>;
+      fileElsewhere?(p: { product: string; id: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]>;
+      fileLine?(p: { product: string; id: string }): Promise<FileLine[]>;
+      teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult>;
+      teamContinueBrief(p: { personId: string; threadId: string }): Promise<{ title: string; body: string; files: { name: string; srcPath: string }[]; from: { personId: string; threadId: string } }>;
+      teamContinued(p: { personId: string; threadId: string }): Promise<TeamCallResult>;
       teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult>;
       teamEdit(p: { product: string; id: string; on: string; text?: string; gone?: boolean }): Promise<TeamCallResult>;
       micAccess?(): Promise<'granted' | 'settings'>;
-      teamMessage(p: { to: string | string[]; body: string; priority?: number; files?: TeamMessageFile[] }): Promise<TeamCallResult>;
+      teamMessage(p: { to: string | string[]; body: string; priority?: number; files?: TeamMessageFile[]; subject?: string }): Promise<TeamCallResult>;
+      teamSeen(p: { product: string; id: string }): Promise<boolean>;
+      teamMoveToThread(p: { product: string; id: string; on: string }): Promise<TeamCallResult>;
+      teamGiveTask(p: { to: string; title?: string; body: string; priority?: number; due?: string; files?: TeamMessageFile[]; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; blockedBy?: string[] }): Promise<TeamCallResult>;
+      teamMessageMate(p: { owner: string; mate: string; text: string }): Promise<TeamCallResult>;
+      teamHandOn(p: { product: string; id: string; to: string }): Promise<TeamCallResult>;
+      teamTaskBrief(p: { product: string; id: string }): Promise<{ title: string; body: string; files: { name: string; srcPath: string }[] }>;
       rooms?(p: { op: string; args?: unknown[] }): Promise<RoomsResult>;
       teammates?(p: { op: string; args?: unknown }): Promise<TeammatesResult>;
       threadEdit(p: { product: string; id: string; patch: ThreadEditPatch }): Promise<{ ok: boolean; error?: string }>;
@@ -1458,7 +1770,7 @@ declare global {
       runNow?(p: { product: string; id: string }): Promise<{ ok: boolean; reason?: 'running' | 'missing' | 'paused' | 'scheduled' | 'held' }>;
       reopen(p: { product: string; id: string }): Promise<WorkItem>;
       // The user's standing instructions: one text, briefed to every session.
-      instructionRead?(id: string): Promise<{text:string;defaultText:string;error?:string}>;
+      instructionRead?(id: string): Promise<{text:string;defaultText:string;storeTools?:boolean;error?:string}>;
       instructionWrite?(id:string,text:string): Promise<{ok:boolean;error?:string}>;
       // Her own earlier versions of one instruction box, newest first.
       instructionHistory?(id:string): Promise<{versions:{ts:number;chars:number}[];error?:string}>;
@@ -1489,6 +1801,8 @@ declare global {
       // Bytes for a paste, a path for a drag. One or the other, never neither.
       // `name` comes back when a TIFF or HEIC was turned into a PNG or JPEG.
       stageAttachment(p: { name: string; dataBase64?: string; srcPath?: string }): Promise<{ path: string; name?: string }>;
+      /** One piece of a file with no path, in order from `at: 0`; answers the staged file so far. */
+      stageAttachmentPart?(p: { id: string; name: string; at: number; dataBase64: string }): Promise<{ path: string; size: number }>;
       onChanged(fn: () => void): () => void;
       approve?(p: { id: string; allow: boolean; note?: string }): Promise<{ ok: boolean }>;
       // Fired for the button AND for the Cmd+Y/Cmd+N chord that main catches
@@ -1562,6 +1876,8 @@ export type FolderListing = {
 /** What a person may change on a thread from its summary (main/store.mts threadEdit). */
 export type ThreadEditPatch = Partial<{
   problem: string; progress: string; solution: string;
+  /** When a person said it shipped; 0 takes that back. */
+  shippedAt: number;
   /** A rename: the name every row shows. The title stays the message. */
   label: string;
   /** 'now' is how a thread leaves Later and starts (w-afb66e6661). */

@@ -3,9 +3,9 @@
 // tests/the-tutorial-walks-you-through-your-first-real-thread.test.mjs holds
 // what each rule is for.
 
-export type TourStep = 'start' | 'folder' | 'pick' | 'write' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'gettingReady' | 'inPalette' | 'startHere';
+export type TourStep = 'start' | 'folder' | 'pick' | 'write' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'gettingReady' | 'inPalette' | 'startHere' | 'urgent';
 /** Each tip shows until it is done or put away, then never again. The New thread box's three steps are one. */
-export type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy';
+export type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'urgent';
 /** Every lesson there is; a tour with all of them done has nothing left to say. */
 export const LESSONS: Lesson[] = ['start', 'compose', 'working', 'open', 'choose', 'reply', 'close', 'palette'];
 
@@ -14,6 +14,8 @@ export interface Tour {
   /** Skip tutorial or Escape: nothing more, ever. */
   skipped: boolean;
   done: Lesson[];
+  /** A thread was made urgent from ⌘K, so the next tip says what that does. */
+  urgent?: boolean;
 }
 
 /** What is on the screen, read from the window by the caller. */
@@ -57,7 +59,11 @@ export const THREAD_CLOSED = 'agentbox:thread-closed';
 
 export const startTour = (): Tour => ({ sent: false, skipped: false, done: [] });
 export const skipTour = (t: Tour): Tour => ({ ...t, skipped: true });
-export const tourLive = (t: Tour | null): boolean => !!t && !t.skipped && LESSONS.some((l) => !t.done.includes(l));
+/** A thread closed, ⌘K used, a new task known, and urgent explained if it was picked: the confetti, and no tip after it. */
+export const tourOver = (t: Tour | null): boolean =>
+  !!t && !t.skipped && t.done.includes('close') && t.done.includes('palette') && (t.sent || t.done.includes('start')) && !(t.urgent && !t.done.includes('urgent'));
+export const tourLive = (t: Tour | null): boolean => !!t && !t.skipped && !tourOver(t) && LESSONS.some((l) => !t.done.includes(l));
+export const madeUrgent = (t: Tour): Tour => ({ ...t, urgent: true });
 export const noteSent = (t: Tour): Tour => finishLesson({ ...t, sent: true }, 'compose');
 export const finishLesson = (t: Tour, l: Lesson): Tour => (t.done.includes(l) ? t : { ...t, done: [...t.done, l] });
 export const lessonOf = (s: TourStep): Lesson =>
@@ -87,7 +93,8 @@ export function learnedBy(step: TourStep, before: TourScreen | null, after: Tour
 /** What E on a thread teaches: the close, and the tip it closed over when that tip was about the thread. */
 export function closeLessons(step: TourStep): Lesson[] {
   const own = lessonOf(step);
-  return own === 'reply' || own === 'choose' || own === 'busy' ? [own, 'close'] : ['close'];
+  // A thread you closed is one you opened, whether or not the open tip was the way in.
+  return own === 'reply' || own === 'choose' || own === 'busy' ? [own, 'open', 'close'] : ['open', 'close'];
 }
 
 /** E on an open thread closes it, which is the close lesson whatever tip is up. */
@@ -109,9 +116,10 @@ export const cursorOwed = (step: TourStep | null, { writing, byHand }: { writing
   step === 'open' && writing && !byHand;
 
 export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
-  if (!t || t.skipped || s.covered) return null;
+  if (!t || t.skipped || s.covered || tourOver(t)) return null;
   const todo = (l: Lesson) => !t.done.includes(l);
   if (s.palette) return todo('palette') ? 'inPalette' : null;
+  if (t.urgent && todo('urgent')) return 'urgent';
   // The command bar is the last tip, so it goes before the suggestions on the empty inbox.
   if (!todo('close') && todo('palette') && (t.sent || !todo('start')) && s.composer === 'inline' && !s.thread) return 'palette';
   if (s.composer !== 'none' && !t.sent && todo('compose')) {
@@ -153,7 +161,7 @@ export function readTour(store: Store): Tour | null {
     if (!raw) return null;
     const t = JSON.parse(raw);
     if (typeof t !== 'object' || !t) return null;
-    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [] };
+    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}) };
   } catch { return null; }
 }
 

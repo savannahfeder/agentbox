@@ -142,6 +142,12 @@ export const HINTS: Record<string, HintLine[]> = {
   // The up and down arrows on a thread in Needs you (w-65bcefb857).
   'previous-thread': [{ key: 'K', what: 'Previous thread' }],
   'next-thread': [{ key: 'J', what: 'Next thread' }],
+  // The icon buttons over a thread that have no key: the plate names them.
+  'add-people': [{ key: '', what: 'Add people to this thread' }],
+  'add-to-group': [{ key: '', what: 'Start a group with more people' }],
+  'thread-files': [{ key: '', what: 'Files in this thread' }],
+  'runs-on': [{ key: '', what: 'Where this thread runs' }],
+  more: [{ key: '', what: 'More actions' }],
 };
 
 export interface Rect { top: number; left: number; right: number; bottom: number; width: number; height: number }

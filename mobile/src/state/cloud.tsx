@@ -176,10 +176,18 @@ function useCloudState() {
     }).catch(() => {}).finally(() => setNoticeRead(true));
   }, []);
   const agreed = !!notice && 'agreed' in notice;
+  // Sends waiting on the notice's answer: a yes lets them go on, a no drops them.
+  const noticeWaiters = useRef<Array<(yes: boolean) => void>>([]);
   const answerNotice = useCallback((yes: boolean) => {
     const v = yes ? { agreed: Date.now() } : { declined: Date.now() };
     setNotice(v);
     void persist.write(NOTICE_KEY, JSON.stringify(v));
+    for (const go of noticeWaiters.current.splice(0)) go(yes);
+  }, []);
+  const askNotice = useCallback(async () => {
+    router.push('/ai-notice');
+    const yes = await new Promise<boolean>((resolve) => { noticeWaiters.current.push(resolve); });
+    if (!yes) throw new Error('Nothing went to an agent. Settings, under General, asks you again.');
   }, []);
 
   const keepAlerts = useCallback((kept: KeptAlerts) => {
@@ -227,10 +235,7 @@ function useCloudState() {
 
   const send = useCallback(async (press: Press, item: PressedItem | null, opts: { undone?: () => void } = {}) => {
     if (!sender) return null;
-    if (needsNotice(press.kind) && !agreed) {
-      router.push('/ai-notice');
-      throw new Error('Not sent yet. Your agent needs your yes first.');
-    }
+    if (needsNotice(press.kind) && !agreed) await askNotice();
     const plan = planFor(press, item, Date.now());
     if (!plan) return null;
     const made = await runSteps(sender, plan.steps);
@@ -247,7 +252,7 @@ function useCloudState() {
     }
     setNow(Date.now());
     return made;
-  }, [sender, say, agreed]);
+  }, [sender, say, agreed, askNotice]);
 
   // Where a command in Search sends the inbox page, and a permission card put aside (App.tsx `minimizedApproval`).
   const [wanted, setWanted] = useState<{ place: PlaceId; menu?: boolean; group?: boolean } | null>(null);
@@ -257,16 +262,13 @@ function useCloudState() {
   // that sent the teammates (shared/phone-settings.mjs `teammate`).
   const askTeammate = useCallback(async (key: 'post' | 'describe' | 'goAhead', value: Record<string, unknown>) => {
     if (!cloud || !team) throw new Error('Your computer has not sent your teammates yet.');
-    if (key !== 'goAhead' && !agreed) {
-      router.push('/ai-notice');
-      throw new Error('Not sent yet. Your agent needs your yes first.');
-    }
+    if (key !== 'goAhead' && !agreed) await askNotice();
     const asked = cloud.generation();
     const row = await cloud.insertCommand(settingCommand(team.device, { scope: 'teammate', key, value }));
     if (cloud.generation() === asked) setRows({ ...rowsNow.current, commands: [...rowsNow.current.commands, row] });
     setNow(Date.now());
     return row;
-  }, [cloud, team, agreed, setRows]);
+  }, [cloud, team, agreed, setRows, askNotice]);
 
   // Files go to your own storage, in the folder of the computer the project is
   // on, as the phone site sends them; the message then links them.

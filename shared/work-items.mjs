@@ -33,6 +33,12 @@
 // shared/dashboard.mts.
 
 import { resolveEdits } from './message-edits.mjs';
+import { cleanVoice } from './agent-voice.mjs';
+import { cleanMark, isBookkeepingMark, marksOf } from './artifact-marks.mjs';
+import { isContinuedNote } from './thread-continued.mjs';
+import { wordWaits } from './answers.mts';
+
+export { wordWaits };
 
 /* ------------------------------- lifecycle ------------------------------- */
 // The only states the claim machinery reasons about. Everything else about what
@@ -124,7 +130,7 @@ export const WORK_ITEM_FIELDS = [
   //             handed it back to the agents
   //   runner    the person whose Mac runs agents on this row; without one it
   //             is whoever started it (`createdBy`)
-  //   due       a calendar day, YYYY-MM-DD, or 'none' to clear one
+  //   due       a calendar day, YYYY-MM-DD, or with a time, YYYY-MM-DDTHH:MM, or 'none' to clear one
   //   people    who is on the conversation
   'assignee', 'runner', 'due', 'people',
   // THE THREAD'S OWN FIELDS (the team version, approved 2026-10-01).
@@ -166,6 +172,13 @@ export const WORK_ITEM_FIELDS = [
   // reply is the teammate's, so it starts a turn as yours does, but it is not
   // yours: the line is the app's, and it carries none of your authority.
   'from',
+  // AN AGENT'S MESSAGE, ON THE LINE ITS OWNER'S COPY WROTE: `{ id, name, run }`
+  // (shared/agent-voice.mjs), and SOMEONE'S MESSAGE MEANT FOR AN AI TEAMMATE:
+  // `{ id, name }`. Marks on one line, like `from`.
+  'voice', 'forAgent',
+  // THE NOTES ON A FILE THIS ANSWER HANDS THE AGENT, by note id. A mark on one
+  // line: the thread draws the notes themselves, not the instruction made of them.
+  'fromNotes',
   // WHICH COMMAND FROM HER PHONE WROTE THIS LINE (docs/cloud/PHONE-PLAN.md):
   // the command's id, on the line of the reply or the new thread it made. It
   // is how the computer, starting again after stopping half way through a
@@ -176,6 +189,27 @@ export const WORK_ITEM_FIELDS = [
   // `{ to: 'mate:<id>' | 'agent', why, at, by }`, or `{ ask: [two of those], ... }`
   // while it waits for the person to pick (shared/auto-route.mjs).
   'routed',
+  // WHEN A PERSON SAID THIS THREAD SHIPPED (shippedAtOf, shared/thread-cards.mjs).
+  // 0 is a person taking it back, which also outranks the app's merge note.
+  'shippedAt',
+  // WHAT ENDED A WAIT A PERSON SET: `{ said, at }`. It puts the thread back in
+  // its owner's Needs you, saying so, until they next act on it (shared/thread-waits.mjs).
+  'waitEnded',
+  // WHERE A THREAD WENT WHEN SOMEONE LEFT THE TEAM: `{ said, at }`, the line
+  // each copy writes on what it moved (main/team/departures.mjs).
+  'handedOver',
+  // WORDS A TEAMMATE LEFT ON A SHARED THREAD: `{ text }`, on a line the sync
+  // writes from the cloud's own comment (main/team/thread-share.mjs). A delta
+  // like `react`, read back as `waitingComments` until the owner deals with
+  // them. Nothing starts an agent on it, and a pulled line may not carry it.
+  'comment',
+  // A COMMENT, RESOLVE, APPROVAL OR "SEEN" ON ONE FILE OF THE THREAD
+  // (shared/artifact-marks.mjs). A delta like `react`, read back as `artifacts`.
+  'artifact',
+  // E ON A TASK BETWEEN PEOPLE: true puts it out of the writer's own Needs you
+  // until someone else writes, false takes that back. Never the task's status,
+  // which both people share (`settledBy`); a pulled line may not carry it.
+  'putAway',
 ];
 
 // THE SUMMARY IS SHARED BETWEEN THE PERSON AND THE AGENT. Everywhere else the
@@ -205,7 +239,8 @@ const MAX_PERSON_CHARS = 64;
 function shortId(value) {
   return typeof value === 'string' && value && value.length <= MAX_PERSON_CHARS ? value : null;
 }
-const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+// A day, or a day and a time on the reader's clock: "2026-11-01T10:00".
+const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})(?:T([01]\d|2[0-3]):([0-5]\d))?$/;
 function calendarDay(value) {
   if (value === 'none') return 'none';
   const m = typeof value === 'string' ? DAY_RE.exec(value) : null;
@@ -505,11 +540,21 @@ function coerceField(field, value) {
       return value.off === true ? { on, emoji, off: true } : { on, emoji };
     }
     case 'inReplyTo': return shortId(value) ?? undefined;
+    case 'comment': {
+      const text = value && typeof value === 'object' ? str(value.text, MAX_TEXT_BYTES) : undefined;
+      return text ? { text } : undefined;
+    }
+    case 'artifact': return cleanMark(value);
     case 'from': {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
       const teammate = shortId(value.teammate);
       const name = str(value.name, MAX_SHORT);
       return teammate && name ? { teammate, name } : undefined;
+    }
+    case 'voice': case 'forAgent': return cleanVoice(value) ?? undefined;
+    case 'fromNotes': {
+      const ids = Array.isArray(value) ? value.map(shortId).filter(Boolean).slice(0, MAX_LABELS) : [];
+      return ids.length ? ids : undefined;
     }
     case 'edit': {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
@@ -536,6 +581,13 @@ function coerceField(field, value) {
       return [...new Set(value.map(shortId).filter(Boolean))].slice(0, MAX_LABELS);
     }
     case 'routed': return cleanRouted(value);
+    case 'putAway': return typeof value === 'boolean' ? value : undefined;
+    case 'shippedAt': return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : undefined;
+    case 'waitEnded': case 'handedOver': {
+      if (!value || typeof value !== 'object' || !Number.isFinite(value.at)) return undefined;
+      const said = str(value.said, MAX_SUMMARY);
+      return said ? { said, at: Math.trunc(value.at) } : undefined;
+    }
     default: return undefined;
   }
 }
@@ -604,6 +656,10 @@ export function finishItem(raw, now = Date.now()) {
     delete item.reacts;
     if (chips) item.reactions = chips;
   }
+  if (item.artifactLines) {
+    item.artifacts = marksOf(item.artifactLines);
+    delete item.artifactLines;
+  }
   const closes = item.closes;
   delete item.closes;
   const editLines = item.editLines;
@@ -621,16 +677,27 @@ export function finishItem(raw, now = Date.now()) {
       item.talk = talkOf(said);
       const settled = settledBy(closes ?? [], said);
       if (settled) item.talk.settled = settled;
+      reopenIfWrittenPastTheClose(item, said);
     }
   }
   return item;
 }
 
-/** A line that writes the row's short name and nothing else (see the fold's foot). */
-function onlyTheName(line) {
+// The owner replied, closed it or put it off. Read in ledger order, not by
+// clock, because a comment's time is the cloud's and a reply's is this Mac's.
+function dealsWithComments({ source, patch }) {
+  if (source !== 'founder' || !patch) return false;
+  return (typeof patch.answer === 'string' && !!patch.answer.trim() && patch.answer !== WITHDRAWN)
+    || patch.status === 'done' || patch.start === 'later'
+    || Number(patch.runAt) > 0 || Number(patch.snoozedUntil) > 0;
+}
+
+/** A line that writes the row's short name, or who has seen what, and nothing else (see the fold's foot). */
+function isNotNews(line) {
   if (line.claim || line.release || line.heartbeat) return false;
   const fields = Object.keys(line.patch ?? {});
-  return fields.length === 1 && fields[0] === 'label';
+  if (fields.length !== 1) return false;
+  return fields[0] === 'label' || fields[0] === 'putAway' || (fields[0] === 'artifact' && isBookkeepingMark(line.patch.artifact));
 }
 
 /** Lines folded onto `items` in place, unfinished: `finishItem` makes each one readable. */
@@ -696,14 +763,17 @@ export function foldRawInto(items, lines, touched = null) {
     // A teammate's reply, written by the app on this Mac and so stamped with
     // this person's `by`, is not something this person said.
     const told = line.source === 'system' && patch.from && typeof patch.answer === 'string' ? patch.from : null;
-    if (line.by && words && words.trim() && !told) {
-      (item.said ??= []).push({ uid: line.uid ?? null, by: line.by, ts: line.ts, text: words.trim().slice(0, TALK_TEXT), inReplyTo: patch.inReplyTo ?? null, body: typeof patch.answer !== 'string' });
+    if (line.by && words && words.trim() && !told && !patch.fromNotes) {
+      const close = item.status === 'done' ? item.wrote.status : null;
+      const crossed = close?.by && close.by !== line.by && line.ts < close.ts && !item.said?.some((s) => s.uid && s.uid === line.uid);
+      (item.said ??= []).push({ uid: line.uid ?? null, by: line.by, ts: line.ts, text: words.trim().slice(0, TALK_TEXT), inReplyTo: patch.inReplyTo ?? null, body: typeof patch.answer !== 'string', ...(crossed ? { crossed: close.ts } : {}), ...(patch.voice ? { voice: patch.voice } : {}), ...(patch.forAgent ? { forAgent: patch.forAgent } : {}) });
     }
     // Who closed the chat and when, so `whatWaits` can tell a reopen by your own
     // message (still settled) from an undo of the close (not).
     if (line.by && typeof patch.status === 'string') {
       (item.closes ??= []).push({ by: line.by, ts: line.ts, done: patch.status === 'done', spoke: !!(words && words.trim()) });
     }
+    if (line.by && typeof patch.putAway === 'boolean') (item.closes ??= []).push({ by: line.by, ts: line.ts, done: patch.putAway, spoke: false });
 
     for (const [field, value] of Object.entries(patch)) {
       // A REACTION IS ACCUMULATED, NOT HELD. Every other field below keeps one
@@ -724,7 +794,15 @@ export function foldRawInto(items, lines, touched = null) {
       }
       // WHICH MESSAGE A REPLY ANSWERS belongs to that reply's line alone. Held
       // as a value, the row would carry the newest reply's parent forever.
-      if (field === 'inReplyTo' || field === 'from') continue;
+      if (field === 'inReplyTo' || field === 'from' || field === 'voice' || field === 'forAgent' || field === 'fromNotes' || field === 'putAway') continue;
+      if (field === 'comment') {
+        if (line.by && String(line.uid ?? '').startsWith('comment-') && !isContinuedNote(value.text)) (item.waitingComments ??= []).push({ by: line.by, ts: line.ts, text: value.text });
+        continue;
+      }
+      if (field === 'artifact') {
+        (item.artifactLines ??= []).push({ ...value, by: line.by ?? null, ts: line.ts, uid: line.uid ?? null });
+        continue;
+      }
       if (field === 'edit') {
         (item.editLines ??= []).push({ on: value.on, by: line.by ?? null, ts: line.ts, ...(value.gone ? { gone: true } : { text: value.text }) });
         continue;
@@ -744,6 +822,11 @@ export function foldRawInto(items, lines, touched = null) {
       item.wrote[field] = { ts: line.ts, source: authorityOf(line, field, value) };
       if (line.by) item.wrote[field].by = line.by;
       if (toldNow) Object.assign(item.wrote[field], { from: told.name, teammate: told.teammate });
+      // On the field the words are held in, so a row can say who wrote its newest.
+      if ((field === 'answer' || field === 'body') && line.by) {
+        if (patch.voice) item.wrote[field].voice = patch.voice;
+        if (patch.forAgent) item.wrote[field].forAgent = patch.forAgent;
+      }
     }
 
     // THE APP WRITING A ROW'S NAME IS NOT NEWS ABOUT THE ROW. Lists break ties
@@ -752,7 +835,8 @@ export function foldRawInto(items, lines, touched = null) {
     // the heartbeat rule above is, because the lines that did it are in the
     // ledger already. Only the name ALONE: a line that carries it with anything
     // else carries that too.
-    if (!onlyTheName(line)) item.updatedAt = Math.max(item.updatedAt, line.ts);
+    if (!isNotNews(line)) item.updatedAt = Math.max(item.updatedAt, line.ts);
+    if (item.waitingComments && dealsWithComments(line)) delete item.waitingComments;
     if (line.ts < item.createdAt) item.createdAt = line.ts;
   }
 
@@ -799,6 +883,24 @@ function settledBy(closes, said = []) {
   return Object.keys(at).length ? at : null;
 }
 
+/** The mark on a task given to a person (shared/team-rules.mjs). */
+export const GIVEN_TASK = 'given-task';
+/** The mark on a thread about one piece of work, started with a subject in a message record. */
+export const WORK_THREAD = 'work-thread';
+
+// A reply reopens a closed chat only if its sender's Mac saw the close, since
+// that is what writes the reopen. One that did not (stamped after the close, or
+// before it but reaching this Mac after) reopens it here, or it is on no list.
+function reopenIfWrittenPastTheClose(item, said) {
+  const close = item.status === 'done' ? item.wrote.status : null;
+  if (!close?.by) return;
+  const others = said.filter((s) => s.by !== close.by && !s.body);
+  const crossed = others.filter((s) => s.crossed === close.ts);
+  if (!crossed.length && !others.some((s) => s.ts > close.ts)) return;
+  item.status = 'open';
+  if (crossed.length && item.talk.settled?.[close.by]) item.talk.settled[close.by] = Math.min(...crossed.map((s) => s.ts)) - 1;
+}
+
 function talkOf(said) {
   const lines = [...said].sort((a, b) => a.ts - b.ts);
   const chat = [];
@@ -808,10 +910,10 @@ function talkOf(said) {
   for (const s of lines) {
     // A rename that sends the same opening words again is not a new message.
     if (s.body) { if (bodies.has(s.text)) continue; bodies.add(s.text); }
-    const said1 = { by: s.by, ts: s.ts, text: s.text };
+    const said1 = { by: s.by, ts: s.ts, text: s.text, ...(s.voice ? { voice: s.voice } : {}), ...(s.forAgent ? { forAgent: s.forAgent } : {}) };
     const parent = s.inReplyTo ? parents.get(s.inReplyTo) : null;
     if (parent) {
-      (threads[s.inReplyTo] ??= { by: parent.by, text: parent.text, replies: [] }).replies.push(said1);
+      (threads[s.inReplyTo] ??= { by: parent.by, text: parent.text, replies: [], ...(parent.voice ? { voice: parent.voice } : {}) }).replies.push(said1);
       continue;
     }
     // A reply to a message this chat does not hold is drawn in the chat, so it
@@ -886,6 +988,8 @@ export function threadOf(lines, id) {
 // as it should.
 function authorityOf(line, field, value) {
   if (line.source === 'founder' && field === 'status' && value === 'open') return 'system';
+  // Her clearing a moment is not a moment she set, so the agent may book one again.
+  if (line.source === 'founder' && field === 'runAt' && !value) return 'system';
   return line.source;
 }
 
@@ -916,7 +1020,7 @@ function beats(incoming, held, field) {
 // session, not in the inbox. Pressing start on the thread writes 'now'.
 export function isDue(item, now = Date.now()) {
   if (item?.start === 'later') return false;
-  return !item?.runAt || item.runAt <= now;
+  return !item?.runAt || item.runAt <= now || wordWaits(item);
 }
 
 /** Written down and deliberately not begun. */

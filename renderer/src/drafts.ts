@@ -142,7 +142,7 @@ export function readDraftAttachments(item: ItemRef, store?: DraftStore): DraftAt
     // image, which reads as the app having damaged her paste.
     return parsed
       .filter((a) => a && typeof a === 'object' && typeof a.name === 'string' && (a.dataBase64 || a.srcPath))
-      .map((a) => ({ name: a.name, dataBase64: a.dataBase64, srcPath: a.srcPath, image: !!a.image, ...(typeof a.draftId === 'string' ? { draftId: a.draftId } : {}) }));
+      .map((a) => ({ name: a.name, dataBase64: a.dataBase64, srcPath: a.srcPath, image: !!a.image, ...(typeof a.draftId === 'string' ? { draftId: a.draftId } : {}), ...(typeof a.size === 'number' ? { size: a.size } : {}) }));
   } catch {
     return [];
   }
@@ -402,6 +402,7 @@ export interface DraftAttachment {
   image: boolean;
   /** A voice note's id in the store of unsent notes, so it is never put back twice. */
   draftId?: string;
+  size?: number;
 }
 
 export interface ComposeDraft {
@@ -418,6 +419,11 @@ export interface ComposeDraft {
 }
 
 export const COMPOSE_DRAFT_KEY = 'zero.draft.compose';
+
+// A card opened on a person, or on a message handed to an agent, has its own
+// place, so what it holds never opens in another card. No `place` is the plain
+// card, on the key it has always had.
+const composeKey = (place?: string) => (place ? `${COMPOSE_DRAFT_KEY}.${place}` : COMPOSE_DRAFT_KEY);
 
 /** How much of the store one unsent card may take, serialized. */
 export const COMPOSE_DRAFT_MAX_BYTES = 3_000_000;
@@ -444,9 +450,9 @@ const attachmentOf = (raw: unknown): DraftAttachment | null => {
  * refuses to open because of a bad string in storage is worse than a card that
  * opens empty, and the user has no way to clear it.
  */
-export function readComposeDraft(store?: DraftStore): ComposeDraft {
+export function readComposeDraft(store?: DraftStore, place?: string): ComposeDraft {
   let raw: string | null = null;
-  try { raw = backing(store).getItem(COMPOSE_DRAFT_KEY); } catch { return { ...EMPTY_COMPOSE_DRAFT }; }
+  try { raw = backing(store).getItem(composeKey(place)); } catch { return { ...EMPTY_COMPOSE_DRAFT }; }
   if (!raw) return { ...EMPTY_COMPOSE_DRAFT };
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { return { ...EMPTY_COMPOSE_DRAFT }; }
@@ -467,10 +473,10 @@ export function readComposeDraft(store?: DraftStore): ComposeDraft {
 export const COMPOSE_SENDING_GRACE_MS = 6_000;
 
 /** Stamp the written copy as being sent, and return it. */
-export function markComposeDraftSending(store?: DraftStore, now = Date.now()): ComposeDraft {
-  const d = readComposeDraft(store);
+export function markComposeDraftSending(store?: DraftStore, now = Date.now(), place?: string): ComposeDraft {
+  const d = readComposeDraft(store, place);
   if (composeDraftIsEmpty(d)) return d;
-  return saveComposeDraft({ ...d, sendingAt: now }, store);
+  return saveComposeDraft({ ...d, sendingAt: now }, store, place);
 }
 
 /**
@@ -478,8 +484,8 @@ export function markComposeDraftSending(store?: DraftStore, now = Date.now()): C
  * draft yet, or N straight after Send opens on the task just sent; once the
  * send has hung past the grace they come back, as a frozen app needs.
  */
-export function openingComposeDraft(store?: DraftStore, now = Date.now()): ComposeDraft {
-  const d = readComposeDraft(store);
+export function openingComposeDraft(store?: DraftStore, now = Date.now(), place?: string): ComposeDraft {
+  const d = readComposeDraft(store, place);
   if (d.sendingAt && now - d.sendingAt < COMPOSE_SENDING_GRACE_MS) return { ...EMPTY_COMPOSE_DRAFT };
   return d;
 }
@@ -498,10 +504,11 @@ export function composeDraftIsEmpty(d: ComposeDraft): boolean {
  * one that goes is counted. The caller shows that count, because an image that
  * vanished without a word is indistinguishable from the app losing it.
  */
-export function saveComposeDraft(draft: ComposeDraft, store?: DraftStore): ComposeDraft {
+export function saveComposeDraft(draft: ComposeDraft, store?: DraftStore, place?: string): ComposeDraft {
   const s = backing(store);
+  const key = composeKey(place);
   if (composeDraftIsEmpty(draft)) {
-    try { s.removeItem(COMPOSE_DRAFT_KEY); } catch { /* nothing to undo */ }
+    try { s.removeItem(key); } catch { /* nothing to undo */ }
     return { ...EMPTY_COMPOSE_DRAFT };
   }
   // Attachments carrying only a path cost nothing, so they are never the ones
@@ -513,7 +520,7 @@ export function saveComposeDraft(draft: ComposeDraft, store?: DraftStore): Compo
     const candidate: ComposeDraft = { ...draft, attachments: kept, dropped };
     const body = JSON.stringify(candidate);
     if (body.length > COMPOSE_DRAFT_MAX_BYTES) return null;
-    try { s.setItem(COMPOSE_DRAFT_KEY, body); } catch { return null; }
+    try { s.setItem(key, body); } catch { return null; }
     return candidate;
   };
   for (;;) {
@@ -527,12 +534,12 @@ export function saveComposeDraft(draft: ComposeDraft, store?: DraftStore): Compo
   // Even with no image bytes left it would not go in. The words are the thing
   // that must not be lost, so they go in alone.
   const bare: ComposeDraft = { ...draft, attachments: kept, dropped };
-  try { s.setItem(COMPOSE_DRAFT_KEY, JSON.stringify(bare)); } catch { return bare; }
+  try { s.setItem(key, JSON.stringify(bare)); } catch { return bare; }
   return bare;
 }
 
-export function clearComposeDraft(store?: DraftStore): void {
-  try { backing(store).removeItem(COMPOSE_DRAFT_KEY); } catch { /* nothing to undo */ }
+export function clearComposeDraft(store?: DraftStore, place?: string): void {
+  try { backing(store).removeItem(composeKey(place)); } catch { /* nothing to undo */ }
 }
 
 /**
@@ -548,11 +555,11 @@ export function clearComposeDraft(store?: DraftStore): void {
  * `restoreComposeDraft` below: a card opened and typed into in the meantime is
  * never emptied by an older send landing.
  */
-export function dropComposeDraft(sent: ComposeDraft, store?: DraftStore): void {
-  const now = readComposeDraft(store);
+export function dropComposeDraft(sent: ComposeDraft, store?: DraftStore, place?: string): void {
+  const now = readComposeDraft(store, place);
   if (now.text !== sent.text) return;
   if (now.attachments.length !== sent.attachments.length) return;
-  clearComposeDraft(store);
+  clearComposeDraft(store, place);
 }
 
 /**
@@ -578,15 +585,15 @@ export function dropComposeDraft(sent: ComposeDraft, store?: DraftStore): void {
  * Returns whether anything actually came back, because the caller says so out
  * loud and must not promise a restore that did not happen.
  */
-export function restoreComposeDraft(draft: ComposeDraft, store?: DraftStore): boolean {
+export function restoreComposeDraft(draft: ComposeDraft, store?: DraftStore, place?: string): boolean {
   if (!draft || composeDraftIsEmpty(draft)) return false;
-  const now = readComposeDraft(store);
+  const now = readComposeDraft(store, place);
   // A send that failed still holds its stamped copy: it comes back as a draft.
   if (now.sendingAt && now.text === draft.text) {
-    saveComposeDraft({ ...now, sendingAt: undefined }, store);
+    saveComposeDraft({ ...now, sendingAt: undefined }, store, place);
     return true;
   }
   if (!composeDraftIsEmpty(now)) return false;
-  saveComposeDraft({ ...draft, sendingAt: undefined }, store);
+  saveComposeDraft({ ...draft, sendingAt: undefined }, store, place);
   return true;
 }

@@ -20,7 +20,8 @@
 //   4. PRIVATE WORK. One title-free line per open task in a private project
 //      (who, what state, when it moved), and only when that set changed.
 //
-//   And in a conversation, the files its messages link to (below, FILES).
+//   And in a conversation, the files its messages link to (below, FILES) and
+//   every other file they name (./carry-files.mjs).
 //
 // Everything outside this file is passed in, so two "Macs" can run in one test
 // over an in-memory cloud. The app wires the real ones in main/team/index.mts.
@@ -29,13 +30,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { whatATeammateMaySet, whatYourOtherCopyMaySet } from '../../shared/team-rules.mjs';
 import type { CloudProject, SharedProjectRef } from './projects.mts';
+import { MAX_CARRIED_BYTES, namedFiles, wordsOfLine } from '../../shared/carried-files.mjs';
+import { createFileCarrier } from './carry-files.mjs';
 
 /** A ledger line as it is written and pushed; other keys pass through. */
 export interface LedgerLine {
   [key: string]: unknown;
   by?: string;
   uid?: string;
-  patch?: unknown;
+  id?: string;
+  ts?: number;
+  patch?: { carries?: unknown[]; [key: string]: unknown };
 }
 
 /** A file a message names that the cloud did not have yet. */
@@ -47,7 +52,12 @@ export interface SyncCursor {
   pulledSeq: number;
   filesFrom?: number;
   wanted?: WantedFile[];
+  carriedFrom?: number;
+  carrying?: CarryPending[];
 }
+
+/** A file a message of mine names that is not yet delivered, tried again for a while. */
+export interface CarryPending { ref: string; id: string; meant: boolean; since: number; tries: number }
 
 export interface SyncState {
   get(projectId: string): SyncCursor;
@@ -58,6 +68,8 @@ export interface SyncState {
   setTeam(personId: string, teamId: string | null): void;
   getSince(personId: string): number | null;
   setSince(personId: string, at: number): void;
+  handedOver(): string[];
+  markHandedOver(key: string): void;
 }
 
 type FsForState = Pick<typeof fs, 'readFileSync' | 'writeFileSync' | 'renameSync'>;
@@ -86,6 +98,20 @@ export interface SyncBackend {
   hasFiles?(projectId: string, names: string[]): Promise<string[]>;
   getFile?(projectId: string, name: string): Promise<unknown>;
   putFile?(projectId: string, name: string, data: string): Promise<boolean>;
+  putPiece?(projectId: string, name: string, bytes: Buffer): Promise<unknown>;
+  getPiece?(projectId: string, name: string): Promise<unknown>;
+}
+
+/** What a conversation's file carrier answers to `send` (./carry-files.mjs). */
+export interface CarrySent { sent?: boolean; entry?: object; looking?: boolean; working?: boolean; failed?: boolean }
+
+export interface FileCarrier {
+  send(ref: string, how?: { meant?: boolean; final?: boolean }): Promise<CarrySent>;
+  giveUp(ref: string, why?: string): void;
+  expect(ref: string, by: string, at: unknown): void;
+  forget(ref: string): void;
+  take(entries: unknown[]): Promise<void>;
+  takeMissing(): Promise<void>;
 }
 
 export interface TeamSyncOptions {
@@ -97,6 +123,12 @@ export interface TeamSyncOptions {
   listCards?: () => SyncCard[] | null | undefined;
   teamIdOf?: () => string | null | undefined;
   files?: SyncFiles;
+  /** Runs after the cards: the cloud takes a thread's work only while it has a card. */
+  threadShare?: { pass(teamId: string | null | undefined): unknown } | null;
+  /** What on this Mac a name in a message may mean. */
+  findFile?: ((ask: { ref: string; project: SharedProjectRef; meant: boolean }) => unknown) | null;
+  /** Options for each conversation's file carrier (tests make its waits short). */
+  carrierOptions?: Record<string, unknown> | null;
   now?: () => number;
   log?: (line: string) => void;
 }
@@ -123,7 +155,7 @@ export const MAX_SHARED_PROJECTS = 50;
 // (shared/team-rules.mjs), so nothing they link to does either. And every file
 // call is best effort. A cloud without the table, or one file that will not
 // come, must never stop a message.
-export const MAX_MESSAGE_FILE_BYTES = 10 * 1024 * 1024;
+export const MAX_MESSAGE_FILE_BYTES = MAX_CARRIED_BYTES;
 // A file named in a message the cloud does not have yet, which is a sender who
 // has not updated. Asked about again at most once a minute, for two weeks.
 const WANTED_MAX = 200;
@@ -132,6 +164,10 @@ const WANTED_FOR_MS = 14 * 24 * 60 * 60 * 1000;
 // A PLAIN NAME and nothing else: no slash, no leading dot. The reader writes
 // what a teammate's line names, so a name is all a line may hand it.
 const NAMED = /\]\(attachments\/([A-Za-z0-9][\w.-]{0,159})\)/g;
+const CARRY_AGAIN_FOR_MS = 10 * 60 * 1000;
+const CARRY_PENDING_MAX = 30;
+// Passes a cloud may refuse a file before it is called not delivered.
+const CARRY_TRIES = 6;
 
 /** The files a ledger line's message links to, by name, each once. */
 export function filesNamedIn(line: LedgerLine | null | undefined): string[] {
@@ -154,7 +190,7 @@ export const diskFiles: SyncFiles = {
 
 // Where each shared project's cursors stand, kept between runs.
 export function memorySyncState(): SyncState {
-  const map = new Map<string, Partial<SyncCursor> & { hash?: string | null; [personId: string]: unknown }>();
+  const map = new Map<string, Partial<SyncCursor> & { hash?: string | null; keys?: string[]; [personId: string]: unknown }>();
   return {
     get: (projectId) => ({ pushedTo: 0, pulledSeq: 0, ...(map.get(projectId) || {}) }),
     set: (projectId, value) => { map.set(projectId, { ...value }); },
@@ -164,6 +200,8 @@ export function memorySyncState(): SyncState {
     setTeam: (personId, teamId) => { map.set('__teams__', { ...(map.get('__teams__') || {}), [personId]: teamId }); },
     getSince: (personId) => map.get('__since__')?.[personId] as number | null | undefined ?? null,
     setSince: (personId, at) => { map.set('__since__', { ...(map.get('__since__') || {}), [personId]: at }); },
+    handedOver: () => map.get('__handed__')?.keys ?? [],
+    markHandedOver: (key) => { map.set('__handed__', { keys: [...(map.get('__handed__')?.keys ?? []), key] }); },
   };
 }
 
@@ -173,6 +211,7 @@ export function fileSyncState(file: string, fs: FsForState): SyncState {
     cardsHash?: string | null;
     teams?: Record<string, string | null>;
     since?: Record<string, number | null>;
+    handedOver?: string[];
   } = {};
   try { data = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { data = {}; }
   const save = () => {
@@ -193,6 +232,9 @@ export function fileSyncState(file: string, fs: FsForState): SyncState {
     // theirs unless they share one (shared/thread-cards.mjs, `shownToTeam`).
     getSince: (personId) => data.since?.[personId] ?? null,
     setSince: (personId, at) => { data.since = { ...(data.since || {}), [personId]: at }; save(); },
+    // What this copy already moved for someone who left (main/team/departures.mjs).
+    handedOver: () => data.handedOver ?? [],
+    markHandedOver: (key) => { data.handedOver = [...(data.handedOver ?? []), key]; save(); },
   };
 }
 
@@ -204,8 +246,9 @@ function adopt(line: LedgerLine, me: string): LedgerLine {
   return { ...line, by: line.by || me, uid };
 }
 
-export function createTeamSync({ backend, disk, state, listShared, joinProject, listCards = () => [], teamIdOf = () => null, files = diskFiles, now = Date.now, log = () => {} }: TeamSyncOptions) {
+export function createTeamSync({ backend, disk, state, listShared, joinProject, listCards = () => [], teamIdOf = () => null, threadShare = null, files = diskFiles, findFile = null, carrierOptions = null, now = Date.now, log = () => {} }: TeamSyncOptions) {
   let running: Promise<SyncReport> | null = null;
+  const saidBefore = new Set<string>();
   const quietly = async <T, F = undefined>(what: string, fn: () => T | Promise<T>, fallback?: F): Promise<Awaited<T> | F> => {
     try { return await fn(); } catch (err) { log(`team files: ${what}: ${(err as Error | undefined)?.message ?? err}`); return fallback as F; }
   };
@@ -253,7 +296,103 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
     state.set(project.projectId, { ...state.get(project.projectId), filesFrom: end, wanted: [...wanted.values()].slice(-WANTED_MAX) });
   }
 
+  // One carrier per conversation, kept: a big file goes up and comes down in
+  // the background, and a second carrier would start the same work again.
+  const carriers = new Map<string, FileCarrier>();
+  const carrierFor = (project: SharedProjectRef) => {
+    if (!carriers.has(project.dir)) {
+      carriers.set(project.dir, createFileCarrier({
+        dir: project.dir,
+        has: (names: string[]) => backend.hasFiles!(project.projectId, names),
+        put: (name: string, data: string) => backend.putFile!(project.projectId, name, data),
+        get: (name: string) => backend.getFile!(project.projectId, name),
+        ...(backend.putPiece ? {
+          putPiece: (name: string, bytes: Buffer) => backend.putPiece!(project.projectId, name, bytes),
+          getPiece: (name: string) => backend.getPiece!(project.projectId, name),
+        } : {}),
+        find: (ref: string, how: { meant?: boolean } = {}) => findFile!({ ref, project, meant: how.meant === true }),
+        now,
+        log: (line = '') => log(line),
+        ...(carrierOptions ?? {}),
+      } as Parameters<typeof createFileCarrier>[0]));
+    }
+    return carriers.get(project.dir)!;
+  };
+
+  // Beyond the attachments above: every other file your own lines name goes up,
+  // and a list of them follows on a line of its own, so a reader knows each name
+  // and a message pushed before this existed still gets its file. What is not
+  // finished (a big file going up, a name that finds nothing yet, a cloud that
+  // did not answer) waits in `carrying`, each for a bounded time: an agent may
+  // write the file just after the message that names it, but nothing is tried
+  // for ever. A file the sender points at (a link, a code span, a path) is
+  // `meant`; a bare word that looks like a file name is a guess.
+  async function sendCarried(project: SharedProjectRef, me: string) {
+    if (!findFile || !backend.putFile) return;
+    const cursor = state.get(project.projectId);
+    const { lines, end } = disk.readLinesFrom(project.dir, cursor.carriedFrom ?? 0);
+    const carrier = carrierFor(project);
+    const at = now();
+    const pending = new Map((cursor.carrying ?? []).map((p): [string, CarryPending] => [p.ref, p]));
+    const note = (ref: string, id: string, meant: boolean) => {
+      pending.set(ref, { ref, id, meant: !!(meant || pending.get(ref)?.meant), since: at, tries: 0 });
+    };
+    for (const line of lines) {
+      if (line?.by && line.by !== me) continue;
+      if (!line?.id) continue;
+      // A file over what one message-file call takes goes in parts.
+      for (const name of filesNamedIn(line)) {
+        if ((files.size(project.dir, name) ?? 0) > MAX_MESSAGE_FILE_BYTES) note(`attachments/${name}`, line.id, true);
+      }
+      for (const text of wordsOfLine(line)) {
+        for (const { ref, meant } of namedFiles(text)) if (!ref.startsWith('attachments/')) note(ref, line.id, meant);
+      }
+    }
+    const entries: object[] = [];
+    const keep: CarryPending[] = [];
+    let lastId = lines.findLast((l) => l?.id)?.id ?? null;
+    for (const p of pending.values()) {
+      const r = await carrier.send(p.ref, { meant: p.meant, final: at - p.since >= CARRY_AGAIN_FOR_MS });
+      if (r.working) { keep.push(p); continue; }
+      if (!r.sent) {
+        if ((p.tries ?? 0) + 1 >= CARRY_TRIES) carrier.giveUp(p.ref, 'upload'); else keep.push({ ...p, tries: (p.tries ?? 0) + 1 });
+        continue;
+      }
+      if (r.entry) { entries.push(r.entry); lastId = p.id; }
+      if (r.looking && at - p.since < CARRY_AGAIN_FOR_MS) keep.push(p);
+    }
+    const unsaid = entries.filter((e) => { const k = JSON.stringify({ ...e, at: 0 }); if (saidBefore.has(k)) return false; saidBefore.add(k); return true; });
+    if (unsaid.length && lastId) {
+      const body = { id: lastId, ts: at, source: 'system', by: me, patch: { carries: unsaid } };
+      const uid = `c-${crypto.createHash('sha256').update(JSON.stringify(unsaid)).digest('hex').slice(0, 24)}`;
+      try { await backend.pushLines(project.projectId, [{ ...body, uid }]); } catch (err) {
+        log(`team files: telling the others: ${(err as Error | undefined)?.message ?? err}`);
+        for (const e of unsaid) saidBefore.delete(JSON.stringify({ ...e, at: 0 }));
+        return;
+      }
+    }
+    state.set(project.projectId, { ...state.get(project.projectId), carriedFrom: end, carrying: keep.slice(0, CARRY_PENDING_MAX) });
+  }
+
+  // "Try again" on a file that did not go: the one thing that sends a file again
+  // after it was given up on.
+  async function retryCarried(dir: string, ref: string) {
+    const project = listShared().find((p) => p.dir === dir && p.direct === true);
+    if (!project || !findFile) return false;
+    const { lines } = disk.readLinesFrom(project.dir, 0);
+    const named = lines.findLast?.((l) => l?.id && (wordsOfLine(l).some((t) => namedFiles(t).some((f) => f.ref === ref)) || filesNamedIn(l).some((n) => `attachments/${n}` === ref)));
+    const id = named?.id ?? lines.findLast?.((l) => l?.id)?.id;
+    if (!id) return false;
+    carrierFor(project).forget(ref);
+    const cursor = state.get(project.projectId);
+    const rest = (cursor.carrying ?? []).filter((p) => p.ref !== ref);
+    state.set(project.projectId, { ...cursor, carrying: [...rest, { ref, id, meant: true, since: now(), tries: 0 }] });
+    for (const key of [...saidBefore]) if (key.includes(JSON.stringify(ref))) saidBefore.delete(key);
+    return true;
+  }
+
   async function takeWanted(project: SharedProjectRef) {
+    if (findFile || backend.getFile) await carrierFor(project).takeMissing();
     const cursor = state.get(project.projectId);
     const at = now();
     const wanted = (cursor.wanted ?? []).filter((w) => at - w.since < WANTED_FOR_MS && files.size(project.dir, w.name) == null);
@@ -281,7 +420,21 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
       const rows = await backend.pullLines(project.projectId, cursor.pulledSeq, PAGE);
       if (!rows.length) break;
       const direct = project.direct === true;
-      const bring = rows.map((r) => r.line as LedgerLine).filter(Boolean)
+      // A list of files is for this step and goes no further: it is not
+      // something said, so it never reaches the ledger.
+      const lists = rows.map((r) => r.line?.patch?.carries).filter(Array.isArray);
+      if (direct && lists.length && backend.getFile) await carrierFor(project).take(lists.flat());
+      // A teammate's words that name a file, before its list has come: the tile
+      // says it is on its way, and for whom.
+      if (direct && backend.getFile) {
+        const carrier = carrierFor(project);
+        for (const row of rows) {
+          const l = row.line;
+          if (!l || !l.by || l.by === me || l.patch?.carries) continue;
+          for (const text of wordsOfLine(l)) for (const { ref } of namedFiles(text)) carrier.expect(ref, l.by, l.ts);
+        }
+      }
+      const bring = rows.map((r) => r.line).filter((l): l is LedgerLine => !!l && !l.patch?.carries)
         // A line of your own comes back only in a conversation, and a line of a
         // teammate's keeps only what they may set here (shared/team-rules.mjs).
         .map((l) => (l.by === me ? whatYourOtherCopyMaySet(l, { direct }) : whatATeammateMaySet(l, { direct })))
@@ -328,17 +481,20 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
     for (const project of cloudProjects) {
       const here = local.get(project.id);
       if (!here) continue;
-      if (here.direct === true) await sendFiles(here, me);
+      if (here.direct === true) { await sendFiles(here, me); await sendCarried(here, me); }
       report.pushed += await pushProject(here, me);
       report.pulled += await pullProject(here, me);
       if (here.direct === true) await takeWanted(here);
     }
 
     report.cards = await publishCards();
+    // After the cards: the cloud takes a thread's work only while it has a card.
+    await threadShare?.pass(teamIdOf?.());
     return report;
   }
 
   return {
+    retryCarried,
     // One pass at a time: a second call while one runs waits for it and then
     // runs again, so a change that lands mid-pass is never left behind.
     async syncOnce() {

@@ -126,8 +126,13 @@ export function installPictureWatch(root: Node = document) {
   }).observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['src'] });
 }
 
+let installedKey: string | null = null;
+/** An address to fetch: the rewrite below only reaches what the page draws. */
+export const fetchableFileUrl = (url: string) => (installedKey ? phoneFileUrl(url, installedKey) : url);
+
 /** Rewrite every address already drawn and every one drawn from now on. */
 export function installPhoneFiles(key: string, root: Node = document) {
+  installedKey = key;
   const fix = (el: Element) => {
     for (const attr of ATTRS) {
       const was = el.getAttribute(attr);

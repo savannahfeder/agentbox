@@ -312,10 +312,6 @@
   :root:root:root .ts-top { align-items: center; gap: 2px; }
   :root:root:root .ts-top .ts-more { width: 44px; height: 44px; border-color: transparent; }
   :root:root:root .ts-top .ts-done { height: 44px; padding: 0 10px; border-color: transparent; }
-  :root:root:root .ts-top .one-nav { gap: 0; margin-right: 0; align-items: center; }
-  /* "1 OF 4" is read, not pressed: its size stays, and it keeps clear of the
-     arrow's box, which now reaches further left than its chevron does. */
-  :root:root:root .ts-top .one-pos { margin-right: 6px; color: var(--text-dim); }
   /* Open, it is a page of its own over the thread, under the same top bar,
      closed from its own icon at its top right. */
   :root:root:root .focus-pane .ts-panel {

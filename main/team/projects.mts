@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { projectWritten } from '../store/projects-changed.mjs';
 
 const PROJECT_FILE = 'project.json';
 
@@ -58,6 +59,7 @@ function writeProject(dir: string, project: ProjectJson) {
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(project, null, 2));
   fs.renameSync(tmp, file);
+  projectWritten();
 }
 
 // The `team` record, cleaned, or null for a private project.

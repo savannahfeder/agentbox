@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 
 import { spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
-import { mediaResponse, mediaType, servable } from './img-scheme.mts';
+import { MEDIA_PIECE_BYTES, mediaResponse, mediaType, servable } from './img-scheme.mts';
 import { readPictureShape } from './picture-shape.mts';
 import { loadConfig } from './config.mjs';
 import { Store } from './store.mts';
@@ -46,9 +46,11 @@ import type { AnalyticsConfig } from './analytics.mts';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mts';
 import type { TeamSession } from './team/index.mts';
+import { startConnections } from './connections/start.mjs';
 import { ensurePersonalProject } from './team/projects.mts';
 import { loadCloudConfig, supabaseSession, headlessSessionFile } from './team/session.mjs';
 import { roomsSetup } from './team/room-setup.mts';
+import { matesForTheTeam } from './teammate-reach.mjs';
 import { appHome, carryMisplacedMachinery, storeRootEnv } from './store/home.mjs';
 import { keepAnswerModesIn } from './answer-modes.mts';
 
@@ -278,8 +280,10 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
     accountRoot: config.accountRoot,
     stateFile: teamStateFile(config.storeRoot),
     onChange: () => ipc?.push?.(),
+    ownMates: () => matesForTheTeam(store, config),
     rooms: roomsSetup({ config, store, supervisor, userDir }),
   }) : null;
+  if (team) store.teammates?.bindTeam(team);
   // AND IT STOPS ITS OWN WORKERS ON THE WAY OUT, as main/main.mts does for the
   // desktop. Control-C reaches the whole process group, so without this each
   // worker died of the signal itself and was written down as a run that failed
@@ -297,7 +301,9 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   }
   supervisor.count = (name, props) => analytics.track(name, props);
   host.app.on('before-quit', () => analytics.track('app_quit', { seconds: Math.round(process.uptime()) }));
-  ipc = registerIpc({ store, supervisor, config, window, analytics, host, team, onCount: () => usedToday(now()) });
+  const connected = startConnections({ config, supervisor, appDir, userDir, openExternal: host.shell.openExternal, onChange: () => ipc?.push?.() });
+  host.app.on('before-quit', () => { void connected.stop(); });
+  ipc = registerIpc({ store, supervisor, config, window, analytics, host, team, connections: connected.connections, copies: connected.copies, onCount: () => usedToday(now()) });
   answerWhatOnlyTheWindowAnswered(host.ipcMain);
   return { config, store, supervisor, window, host, ipc, team, analytics, channels: host.ipcMain.handlers };
 }
@@ -405,7 +411,7 @@ async function answerFile(req: IncomingMessage, res: ServerResponse, url: URL, {
   }
   const media = mediaType(file);
   if (media) {
-    const out = await mediaResponse(file, req.headers.range);
+    const out = await mediaResponse(file, req.headers.range, { piece: MEDIA_PIECE_BYTES });
     res.writeHead(out.status, { ...Object.fromEntries(out.headers), 'cache-control': 'no-store' });
     if (out.body) Readable.fromWeb(out.body).pipe(res); else res.end();
     return;

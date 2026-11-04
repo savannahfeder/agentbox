@@ -4,8 +4,8 @@
 // runs one scenario against this and against a real database.
 import crypto from 'node:crypto';
 import type { MemoryCloud } from './memory-cloud.mts';
-import type { RoomEvent, RoomMessage, RoomPresenceRow, RoomProfile, RoomReaction } from './rooms.mts';
-import { PROFILE_FIELDS, PRESENCE_FIELDS, pick, roomOut, messageOut, reactionOut, ROOM_FILE_NAME, ROOM_FILE_MAX_DATA, ROOM_FILE_MAX_BYTES, fileExists } from './rooms-shape.mjs';
+import type { RoomDecision, RoomEvent, RoomFileMark, RoomMessage, RoomPresenceRow, RoomProfile, RoomReaction } from './rooms.mts';
+import { PROFILE_FIELDS, PRESENCE_FIELDS, pick, roomOut, messageOut, reactionOut, decisionOut, ROOM_FILE_NAME, ROOM_FILE_MAX_DATA, ROOM_FILE_MAX_BYTES, fileExists } from './rooms-shape.mjs';
 
 export const GENERAL_ROOM = '9e9e9e9e-0000-4000-8000-000000000001';
 const MIN = 60_000;
@@ -45,6 +45,8 @@ export interface MemoryRoomsFields {
   roomMessages?: RoomMessage[];
   roomReads?: Map<string, number>;
   roomReactions?: Map<string, RoomReaction>;
+  roomDecisions?: Map<string, RoomDecision>;
+  roomFileMarks?: (RoomFileMark & { roomId: string })[];
   roomFiles?: Map<string, MemoryRoomFile>;
   roomActs?: { personId: string; kind: string; at: number }[];
 }
@@ -55,6 +57,7 @@ type MemoryRoomEvent =
   | { kind: 'message'; message: RoomMessage; roomId: string }
   | { kind: 'reaction'; reaction: RoomReaction }
   | { kind: 'membership'; roomId: string }
+  | { kind: 'decision' | 'fileMark'; roomId: string }
   | { kind: 'profile' | 'presence' };
 
 function state(cloud: MemoryCloud): RoomsCloud {
@@ -67,8 +70,10 @@ function state(cloud: MemoryCloud): RoomsCloud {
   cloud.roomMessages ??= [];
   cloud.roomReads ??= new Map();
   cloud.roomReactions ??= new Map(); // `${messageId}:${personId}:${emoji}` -> reactionOut row
+  cloud.roomDecisions ??= new Map(); // `${roomId}:${messageId}:${kind}` -> decisionOut row
   cloud.roomFiles ??= new Map(); // `${roomId}:${name}` -> { roomId, name, byPerson, data, createdAt }
   cloud.roomActs ??= []; // { personId, kind, at }: edits and reactions, for their limits
+  cloud.roomFileMarks ??= []; // { roomId, id, by, mark, at }: comments and approvals on a room's files
   if (!cloud.rooms.has(GENERAL_ROOM)) cloud.rooms.set(GENERAL_ROOM, { id: GENERAL_ROOM, name: 'Coworking', kind: 'room', teamId: null, listed: true, createdBy: null, createdAt: 0 });
   // Every team has its room, named after it (the team_room_kept trigger).
   for (const t of cloud.teams.values()) {
@@ -160,7 +165,9 @@ export function roomsMemory(cloud: MemoryCloud, personId: string, helpers: { con
     s.roomInvites = s.roomInvites.filter((i) => i.roomId !== r);
     s.roomMessages = s.roomMessages.filter((m) => m.roomId !== r);
     for (const [k, x] of s.roomReactions) if (x.roomId === r) s.roomReactions.delete(k);
+    for (const [k, x] of s.roomDecisions) if (x.roomId === r) s.roomDecisions.delete(k);
     for (const [k, f] of s.roomFiles) if (f.roomId === r) s.roomFiles.delete(k);
+    s.roomFileMarks = s.roomFileMarks.filter((x) => x.roomId !== r);
   };
 
   const room = (r: string) => state(cloud).rooms.get(r);
@@ -285,6 +292,37 @@ export function roomsMemory(cloud: MemoryCloud, personId: string, helpers: { con
       emit({ kind: 'message', message: copy(m), roomId: m.roomId });
     },
 
+    // Taken-back ones too, since the service folds them, as reactions are read.
+    async roomDecisions(r: string) {
+      if (!inRoom(r)) refuse('read a room you are not in');
+      return [...state(cloud).roomDecisions.values()].filter((x) => x.roomId === r).map((x) => ({ ...x }));
+    },
+
+    // A message in the room gives its own words and author. A project's decision,
+    // or one filed from a conversation (`chat:<uid>`), has no message here, so only
+    // then is the caller's word taken.
+    async markRoomDecision(r: string, { messageId, kind, body, saidBy = null, project = null, on = true }: { messageId: string; kind: string; body?: unknown; saidBy?: string | null; project?: unknown; on?: boolean }) {
+      const s = state(cloud);
+      if (!inRoom(r)) refuse('mark a decision in a room you are not in');
+      if (kind !== 'decision' && kind !== 'priority') refuse('a mark that is neither a decision nor priorities');
+      const key = `${r}:${messageId}:${kind}`;
+      if (!on) {
+        const had = s.roomDecisions.get(key);
+        if (had) { s.roomDecisions.set(key, { ...had, on: false, at: now() }); emit({ kind: 'decision', roomId: r }); }
+        return;
+      }
+      const elsewhere = !!project || String(messageId).startsWith('chat:');
+      const m = elsewhere ? null : s.roomMessages.find((x) => x.id === messageId && x.roomId === r);
+      if (!elsewhere && (!m || m.deleted)) refuse('mark a message that is not in this room');
+      const words = elsewhere ? String(body ?? '').trim() : m!.body;
+      if (!words || words.length > 4000) refuse('a decision that empty or that long');
+      s.roomDecisions.set(key, decisionOut({
+        room_id: r, message_id: messageId, kind, project: project ? String(project).slice(0, 120) : null, body: words,
+        said_by: elsewhere ? (saidBy != null && peopleOf(r).has(saidBy) ? saidBy : null) : m!.by, marked_by: personId, is_on: true, updated_at: iso(now()),
+      }));
+      emit({ kind: 'decision', roomId: r });
+    },
+
     async roomReactions(r: string) {
       if (!inRoom(r)) return [];
       return [...state(cloud).roomReactions.values()].filter((x) => x.roomId === r)
@@ -311,7 +349,7 @@ export function roomsMemory(cloud: MemoryCloud, personId: string, helpers: { con
       const s = state(cloud);
       const n = String(name ?? '');
       const d = String(data ?? '');
-      limit('files', [...s.roomFiles.values()].filter((f) => f.byPerson === personId && f.createdAt > now() - 10 * MIN).length, 30);
+      limit('files', [...s.roomFiles.values()].filter((f) => f.byPerson === personId && f.createdAt > now() - 10 * MIN).length, 80);
       if (!inRoom(r)) refuse('send a file to a room you are not in');
       if (!ROOM_FILE_NAME.test(n)) refuse('a file name that is not a plain name');
       if (d.length > ROOM_FILE_MAX_DATA || Buffer.from(d, 'base64').length > ROOM_FILE_MAX_BYTES) refuse('a file that big');
@@ -323,6 +361,23 @@ export function roomsMemory(cloud: MemoryCloud, personId: string, helpers: { con
     async roomFile(r: string, name: string) {
       if (!inRoom(r)) return null;
       return state(cloud).roomFiles.get(`${r}:${name}`)?.data ?? null;
+    },
+
+    // The mark is not believed by whoever reads it; each copy cleans it.
+    async roomFileMarks(r: string) {
+      if (!inRoom(r)) refuse('read a room you are not in');
+      return state(cloud).roomFileMarks.filter((x) => x.roomId === r).map(({ roomId: _r, ...x }) => ({ ...x, mark: { ...x.mark } }));
+    },
+
+    async markRoomFile(r: string, { id, mark }: { id?: unknown; mark?: unknown }) {
+      const s = state(cloud);
+      if (!inRoom(r)) refuse('comment in a room you are not in');
+      const key = String(id ?? '');
+      if (!/^[\w-]{1,64}$/.test(key)) refuse('a mark with no id');
+      if (!mark || typeof mark !== 'object' || JSON.stringify(mark).length > 24000) refuse('a mark that big');
+      if (s.roomFileMarks.some((x) => x.roomId === r && x.by === personId && x.id === key)) return;
+      s.roomFileMarks.push({ roomId: r, id: key, by: personId, mark: { ...mark }, at: now() });
+      emit({ kind: 'fileMark', roomId: r });
     },
 
     async roomReads() {

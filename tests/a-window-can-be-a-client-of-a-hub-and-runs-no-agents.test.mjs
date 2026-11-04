@@ -4,7 +4,7 @@
 // holds the store, a task folder for every thread, one process per cloud run,
 // the packing, the bringing home and the shipping, so what it costs grows with
 // every agent, and 200 cannot work however cheap each part is. The design agreed
-// with Codex moves all of that to one headless copy (main/serve.mjs) on a machine
+// with Codex moves all of that to one headless copy (main/serve.mts) on a machine
 // of its own, the hub, and the Mac keeps a window. This is that window: when a hub
 // is named, no store and no supervisor are even loaded.
 //

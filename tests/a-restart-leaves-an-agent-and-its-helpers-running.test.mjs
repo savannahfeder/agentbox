@@ -3,7 +3,7 @@
 // On 2026-10-31 the app restarted three times in about ten minutes, and each
 // time every local worker was killed with it (Supervisor#killAll). The worker
 // was resumed from its transcript, but its subagents and background jobs were
-// not: three builders, three watch jobs and three testers with their copies of
+// not: three agents, three watch jobs and three helpers with their copies of
 // the app came back as "didn't finish". Measured before this change: a worker
 // was a child of the app with its input on a pipe, and nothing outlived a quit.
 //

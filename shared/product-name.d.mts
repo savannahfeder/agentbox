@@ -12,4 +12,4 @@ export const ENV_PREFIX: string;
 export const WAS_ENV_PREFIXES: readonly string[];
 export function envName(suffix: string): string;
 export function envNames(suffix: string): string[];
-export function fillName(text: unknown): string;
+export function fillName(text: string | null | undefined): string;

@@ -26,6 +26,15 @@ const columnsIn = (css, sel) => {
 };
 const step = (width) => pages.match(new RegExp(`@container th \\(max-width: ${width}px\\) \\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
 
+// The grid's tracks come from variables; a step sets them, and `initial` drops a track.
+const gridRule = (css) => css.match(/\n\.th-grid \{[^}]*\}/)[0];
+const varsIn = (body) => Object.fromEntries([...body.matchAll(/(?:^|\n)\s*\.th-grid(?:, \.th-grid\.with-person)? \{([^}]*)\}/g)]
+  .flatMap((m) => [...m[1].matchAll(/--th-([a-z]+): ([^;]+);/g)].map((v) => [v[1], v[2]])));
+const columnsWith = (css, ...bodies) => {
+  const v = Object.assign({}, ...[gridRule(css), ...bodies].map(varsIn));
+  return gridRule(css).match(/grid-template-columns: ([^;]+);/)[1].replace(/ ?var\(--th-([a-z]+),\)/g, (_, n) => (v[n] && v[n] !== 'initial' ? ` ${v[n]}` : ''));
+};
+
 describe('a thread in a teammate\'s chat', () => {
   it('is drawn as five cells, as the inbox draws it', () => {
     const html = renderToStaticMarkup(React.createElement(RowCells, { title: 'Two cuts of the launch video are ready', where: 'Kestrel', priority: 5, updatedAt: 0, now: 6 * 60_000 }));
@@ -39,17 +48,17 @@ describe('a thread in a teammate\'s chat', () => {
   });
 
   it('has a column for every cell at full width', () => {
-    expect(tracks(columnsIn(pages, '.th-grid'))).toBe(5);
+    expect(tracks(columnsWith(pages))).toBe(5);
   });
 
   it('drops priority, and its column, on a narrower list', () => {
     expect(step(915)).toMatch(/\.th-grid > \.th-col-prio \{ display: none; \}/);
-    expect(tracks(columnsIn(step(915), '.th-grid'))).toBe(4);
+    expect(tracks(columnsWith(pages, step(915)))).toBe(4);
   });
 
   it('drops project as well, and its column, on a narrow one', () => {
     expect(step(785)).toMatch(/\.th-grid > \.th-col-proj \{ display: none; \}/);
-    expect(tracks(columnsIn(step(785), '.th-grid'))).toBe(3);
+    expect(tracks(columnsWith(pages, step(915), step(785)))).toBe(3);
   });
 
   it('does not count a minmax as two columns', () => {

@@ -285,6 +285,8 @@ export function phoneGroups(c: GroupsRest, { now = Date.now }: { now?: () => num
     refresh: async () => null,
     send: (roomId: string, body: string, opts?: { inReplyTo?: string | null; mentions?: string[] }) => send(roomId, body, opts),
     markRead: (roomId: string) => markRead(roomId),
+    // A phone's rows still end when the group is read.
+    markDone: (roomId: string) => markRead(roomId),
     older: (roomId: string) => older(roomId),
     file: (roomId: string, name: string) => groupFile(c, roomId, name),
   };

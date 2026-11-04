@@ -72,7 +72,7 @@ describe('a teammate’s card', () => {
   const drawCard = (o) => renderToStaticMarkup(React.createElement(TeammateCard, { card: card(o), person: null }));
   it('leads with the Context, then the same Done trail', () => {
     const html = drawCard();
-    expect(text(html)).toMatch(/Cards flicker in Safari when you hover to zoom\. Done Found it Tests pass Blocked by/);
+    expect(text(html)).toMatch(/^About Cards flicker in Safari when you hover to zoom\. Done Found it Tests pass Owner/);
     expect(html).toMatch(/<li class="ts-step ts-step-last">Tests pass<\/li>/);
   });
   it('draws no Problem, Solution or solution words', () => {

@@ -1,9 +1,10 @@
 // User-owned shells. Never provider tool calls; no transcript or analytics writes.
 import fs from 'node:fs';
+import path from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {execFileSync} from 'node:child_process';
+import {execFile,execFileSync} from 'node:child_process';
 import {commandRunning} from '../shared/terminal-state.mts';
-import {loginShell} from './shell-path.mjs';
+import {terminalShell,windowsRoot} from './shell-path.mjs';
 import {loadPty} from './pty.mts';
 const LIMIT=262144;
 
@@ -60,12 +61,21 @@ export interface TerminalPlaceSpec {
 export type TerminalPlace = string | TerminalPlaceSpec;
 type NoPlaceFields = { [K in keyof TerminalPlaceSpec]?: undefined };
 
+/** The shell a terminal starts when its place names none. */
+export interface TerminalShell {
+  file: string;
+  args: string[];
+}
+
+/** How the Windows branch of `disposeTerminalProcess` runs taskkill. */
+type TaskKillRun = (file: string, args: string[], options: { windowsHide: boolean; timeout: number }, callback: () => void) => unknown;
+
 export interface TaskTerminalsOptions {
   spawn?: PtySpawn;
   resolve?: (key: string) => TerminalPlace;
   disposeProcess?: (pty: TerminalPty) => void;
   env?: NodeJS.ProcessEnv;
-  shell?: string;
+  shell?: TerminalShell;
   idleMs?: number;
   sweepMs?: number;
   now?: () => number;
@@ -131,7 +141,15 @@ export function terminalPlace({store,supervisor,product,id,agent}: TerminalPlace
 export function terminalFolder(args: TerminalPlaceArgs){return terminalPlace(args).cwd;}
 // Enumerate only descendants of our own shell, including background process
 // groups. Kill children before shell; closing a pane never calls this.
-export function disposeTerminalProcess(pty: Pick<TerminalPty,'pid'|'kill'>){
+export function disposeTerminalProcess(pty: Pick<TerminalPty,'pid'|'kill'>,platform: NodeJS.Platform=process.platform,run: TaskKillRun=execFile){
+  // node-pty on Windows throws on any signal, and its kill misses a child with
+  // a console of its own. taskkill by full path, never from the shell's folder,
+  // and without holding the window. The shell goes last, or its tree is lost.
+  if(platform==='win32'){
+    const kill=()=>{try{pty.kill();}catch{}};
+    try{run(path.win32.join(windowsRoot(),'System32','taskkill.exe'),['/T','/F','/PID',String(pty.pid)],{windowsHide:true,timeout:5000},kill);}catch{kill();}
+    return;
+  }
   const descendants: number[]=[];
   try{
     const rows=execFileSync('/bin/ps',['-axo','pid=,ppid='],{encoding:'utf8',timeout:2000}).trim().split('\n').map(s=>s.trim().split(/\s+/).map(Number));
@@ -217,7 +235,7 @@ export class TaskTerminals {
   declare resolve: ((key: string) => TerminalPlace) | undefined;
   declare disposeProcess: (pty: TerminalPty) => void;
   declare env: NodeJS.ProcessEnv;
-  declare shell: string;
+  declare shell: TerminalShell;
   declare sessions: Map<string, TerminalSession>;
   declare idleMs: number;
   declare now: () => number;
@@ -225,7 +243,7 @@ export class TaskTerminals {
   declare watchedMs: number;
   declare reaped: Map<string, { why: string; screen: string }>;
   declare timer: ReturnType<typeof setInterval> | null | undefined;
-  constructor({spawn,resolve,disposeProcess=disposeTerminalProcess,env=terminalEnv(),shell=loginShell(),idleMs=IDLE_MS,sweepMs=SWEEP_MS,now=()=>Date.now(),readPressure=null,watchedMs=WATCHED_MS}: TaskTerminalsOptions={}){
+  constructor({spawn,resolve,disposeProcess=disposeTerminalProcess,env=terminalEnv(),shell=terminalShell(),idleMs=IDLE_MS,sweepMs=SWEEP_MS,now=()=>Date.now(),readPressure=null,watchedMs=WATCHED_MS}: TaskTerminalsOptions={}){
     this.spawn=spawn??((...args: Parameters<PtySpawn>)=>loadPty().spawn(...args));this.resolve=resolve;this.disposeProcess=disposeProcess;this.env=env;this.shell=shell;this.sessions=new Map();
     this.idleMs=idleMs;this.now=now;this.readPressure=readPressure;this.watchedMs=watchedMs;
     // Keys whose shell this class ended on its own, and WHY. The next open on
@@ -329,7 +347,7 @@ export class TaskTerminals {
     const place=(given??this.resolve!(key)) as (string & NoPlaceFields)|TerminalPlaceSpec;
     const cwd=typeof place==='string'?place:place.cwd;
     const command=place?.command;
-    const pty=this.spawn(command?.file??place?.shell??this.shell,command?.args??['-l'],{cwd,env:{...(place?.env??this.env),...command?.env},cols:80,rows:24,name:'xterm-256color'});
+    const pty=this.spawn(command?.file??place?.shell??this.shell.file,command?.args??this.shell.args,{cwd,env:{...(place?.env??this.env),...command?.env},cols:80,rows:24,name:'xterm-256color'});
     let resolveExit: () => void;const exitPromise=new Promise<void>(resolve=>{resolveExit=resolve;});
     const session: TerminalSession={token:randomUUID(),pty,cwd,buffer:'',offset:0,exitCode:null,exited:false,exitPromise,lastReadAt:this.now(),waiters:new Set()};this.sessions.set(key,session);
     /*

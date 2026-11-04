@@ -103,7 +103,9 @@ const SKIP = new Set([
 
 type Node = { type: string; value?: string; url?: string; alt?: string; children?: Node[] };
 
-export type Options = { dir?: string | null };
+// `anyFull`: in a conversation a whole path may be a teammate's, from their
+// computer, and the app knows it by that name once it has come.
+export type Options = { dir?: string | null; anyFull?: boolean };
 
 // The short path a full one names, or null when it is not inside `dir`.
 // Focus's code span asks the same question of a path in backticks.
@@ -119,9 +121,13 @@ export function productPath(full: string, dir: string): string | null {
   return abs.startsWith(root + '/') ? abs.slice(root.length + 1) : null;
 }
 
-type Hit = { at: number; text: string; url: string };
+type Hit = { at: number; text: string; url: string; asIs?: true };
 
-function pieces(text: string, dir: string): Node[] {
+// A person reads a file by its name; the path is the app's to follow.
+const nameOf = (written: string) => written.replace(/\/+$/, '').split('/').pop() || written;
+const PATH_LIKE = /^(?:~\/|\/|\.?\/?[\w-])[^\s:]*\.[A-Za-z0-9]{1,8}$/;
+
+function pieces(text: string, dir: string, anyFull = false): Node[] {
   const hits: Hit[] = [];
   const quoted: { start: number; end: number }[] = [];
   for (const m of text.matchAll(QUOTED)) {
@@ -148,7 +154,7 @@ function pieces(text: string, dir: string): Node[] {
   if (dir) {
     for (const m of text.matchAll(FULL)) {
       if (inQuote(m.index!)) continue;
-      const rel = productPath(m[0], dir);
+      const rel = productPath(m[0], dir) ?? (anyFull && m[0].startsWith('/') ? m[0] : null);
       if (rel) hits.push({ at: m.index ?? 0, text: m[0], url: rel });
     }
     for (const m of text.matchAll(FOLDER_LINE)) {
@@ -156,13 +162,13 @@ function pieces(text: string, dir: string): Node[] {
       if (FILE_LIKE.test(folder)) continue;
       const rel = productPath(folder, dir);
       if (!rel) continue;
-      hits.push({ at: m.index! + lead.length + pad.length, text: folder + slash, url: `${rel}/` });
+      hits.push({ at: m.index! + lead.length + pad.length, text: folder + slash, url: `${rel}/`, asIs: true });
     }
   }
   for (const m of text.matchAll(LOCAL)) {
     // The full stop or comma that ends the sentence is not part of the address.
     const address = m[0].replace(/[.,;:!?]+$/, '');
-    hits.push({ at: m.index ?? 0, text: address, url: `http://${address}` });
+    hits.push({ at: m.index ?? 0, text: address, url: `http://${address}`, asIs: true });
   }
   hits.sort((a, b) => a.at - b.at);
 
@@ -171,11 +177,12 @@ function pieces(text: string, dir: string): Node[] {
   for (const hit of hits) {
     if (hit.at < at) continue;
     if (hit.at > at) out.push({ type: 'text', value: text.slice(at, hit.at) });
+    const words = hit.asIs ? hit.text : nameOf(hit.text);
     out.push(PICTURE.test(hit.url)
       // `alt` is the path, so a picture whose file is missing still says which
       // one it was and a copy of the message carries the name.
       ? { type: 'image', url: hit.url, alt: hit.text }
-      : { type: 'link', url: hit.url, children: [{ type: 'text', value: hit.text }] });
+      : { type: 'link', url: hit.url, children: [{ type: 'text', value: words }] });
     at = hit.at + hit.text.length;
   }
   if (!out.length) return [];
@@ -190,11 +197,13 @@ export function linkArtifactPaths(node: Node, options: Options = {}): void {
   const out: Node[] = [];
   for (const child of node.children) {
     if (child.type === 'text' && typeof child.value === 'string') {
-      const split = pieces(child.value, dir);
+      const split = pieces(child.value, dir, !!options?.anyFull);
       if (split.length) { out.push(...split); continue; }
       out.push(child);
       continue;
     }
+    const said = child.type === 'link' && child.children?.length === 1 && child.children[0].type === 'text' ? child.children[0] : null;
+    if (said && said.value === child.url && PATH_LIKE.test(said.value ?? '')) said.value = nameOf(said.value ?? '');
     if (!SKIP.has(child.type)) linkArtifactPaths(child, options);
     out.push(child);
   }

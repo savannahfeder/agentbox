@@ -109,7 +109,7 @@ describe('joining the regular read onto every run', () => {
 });
 
 describe('the thread you see', () => {
-  const lines = [{ id: 'w-long', ts: BEGAN, source: 'founder', patch: { body: 'Run the team loop.' } }];
+  const lines = [{ id: 'w-long', ts: BEGAN, source: 'founder', patch: { body: 'Run the weekly checks.' } }];
 
   it('lost the first run before, and has it once the middle is opened', () => {
     writeRuns(45);

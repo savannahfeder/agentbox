@@ -48,6 +48,21 @@ your change and you fix only what is likely and bad) run when someone asks.
 
 Do not design for rare or future cases nobody asked about.
 
+Never add explanatory or filler text on screen to get around a design problem; fix the design.
+
+## THE TRAY'S LOOK IS APPROVED. DO NOT CHANGE IT ON YOUR OWN (2026-11-02)
+
+After it was approved, the corner tray (its glass, tint, ink, list, and when it
+goes light or dark) was reworked about fifteen times, each time to fix one
+thing. The last rework left it a grey slab over dark windows, and only its
+owner's screen showed it. `tests/the-trays-approved-look-stays-as-approved`
+now pins every part of that look. A change to the tray page, its styles, the
+Mac glass code or the light-or-dark rule fails until the person approves a
+picture of the real tray over a dark window and a light one. A bug fix in
+those files still counts as a change to the look. Never move the fingerprints in
+`tests/fixtures/the-trays-approved-look.json` without that approval. Taking
+those pictures puts windows on their screen, so ask before you do it.
+
 ## NOTHING RETRIES FOR EVER, NOTHING WAITS FOR EVER, NOTHING FAILS IN SILENCE (2026-10-19)
 
 One cloud thread's start died in under a second, every 15 seconds, 16,135
@@ -104,6 +119,23 @@ nowhere else. That folder follows the public main on its own:
 
 Whether you ask before shipping is set by the person's own instructions, not
 by this file.
+
+## SYNTHETIC USERS, AND THE THREAD THAT SETS THE STANDARD (2026-11-01)
+
+When a change wants a second model or synthetic users before it ships, both
+are skills here:
+
+- The second model's review is `handoff` (Codex, two rounds at most).
+- Synthetic power users are `power-test`, with the people the change is for.
+  Team and Rooms changes get several testers at once on one team. The phone
+  app's testers are `product-loop`.
+
+The standard for the tester loop is thread w-e5f506ccb3: a synthetic team
+used the multiplayer build for whole workdays, logged what broke, agents
+fixed it on the branch, and the team tested the fixes. The person only chose
+between finished screens. Run a big change the same way: real use for
+hours, real people from `power-test/people/`, fixes tested again by the same
+testers, and screenshots of the result.
 
 ## RELEASING IS ONE COMMAND: `npm run deploy` (2026-10-26)
 

@@ -18,6 +18,7 @@
 // Liveness for free, and nothing to remember.
 
 import path from 'node:path';
+import { bringPicturesHome } from './pictures-home.mjs';
 import { listProjects } from '../../main/store/project.mjs';
 import {
   readWorkItems, readWorkItem, createWorkItem, updateWorkItem,
@@ -221,9 +222,12 @@ const plainly = (s) => String(s ?? '')
   .replace(/\s+/g, ' ')
   .trim();
 
+// A thread she sent to Auto or to a teammate carries `routed` and a teammate
+// label, and is her ask all the same.
 export function herRow(item) {
   const labels = item?.labels ?? [];
-  return labels.includes('founder') && !labels.some((l) => String(l).startsWith('repeat:') || String(l).startsWith('teammate:'));
+  if (!labels.includes('founder')) return false;
+  return !!item.routed || !labels.some((l) => String(l).startsWith('repeat:') || String(l).startsWith('teammate:'));
 }
 
 export function saidToClose(item, words) {
@@ -279,6 +283,9 @@ function takeOverLong(patch) {
   return { summaryTooLong: `Not saved: ${said.join(', ')}. The summary has to fit the panel without scrolling; everything else you sent was written, and ${said.length === 1 ? 'that part keeps' : 'those parts keep'} what ${said.length === 1 ? 'it' : 'they'} said before. Send ${said.length === 1 ? 'it' : 'them'} again shorter.` };
 }
 
+const REOPENED = 'This thread was marked done, so your write opened it again for the people on it.';
+const SAYING = ['note', 'result', 'progress', 'summary', 'problem'];
+const saysSomething = (patch) => patch?.status !== 'done' && SAYING.some((k) => typeof patch?.[k] === 'string' && patch[k].trim());
 const LEFT_OPEN = 'The row was left OPEN. The founder wrote it, and only she closes her own rows unless she asked you to: everything else you sent was written, and your answer reaches her inbox as an answer. If she did ask you to close it, send status done again with closeBecause set to her exact words asking for it.';
 
 /**
@@ -421,9 +428,19 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
      */
     async update(id, patch) {
       let holding = held.get(id);
+      let reopened = false;
       if (!holding?.live) {
         let taken = null;
         try { taken = await registry.claim({ id }); } catch { /* an id in no product: park below */ }
+        // Something said to a finished thread opens it again, so its people see
+        // it. A person's Done outranks an agent's word, so the reopen is theirs.
+        if (!holding && !held.get(id)?.live && taken?.reason === 'already done' && saysSomething(patch)) {
+          try {
+            updateWorkItem(locate(id).project.dir, id, { status: 'open' }, { source: 'founder' });
+            taken = await registry.claim({ id });
+            reopened = !!held.get(id)?.live;
+          } catch { /* parked below */ }
+        }
         const fresh = held.get(id);
         if (fresh?.live) holding = fresh;
         else if (!holding) {
@@ -461,7 +478,7 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
         }
       }
       const summaryTooLong = takeOverLong(asked);
-      patch = asked;
+      patch = bringPicturesHome(holding.dir, id, asked);
       let item = Object.keys(patch).length
         ? updateWorkItem(holding.dir, id, patch, { epoch: holding.epoch })
         : readWorkItem(holding.dir, id);
@@ -510,9 +527,9 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
           holding.live = false;
           stopTimer();
         }
-        return { ...item, leftOpen: LEFT_OPEN, ...deferredAsAgent, ...summaryTooLong };
+        return { ...item, leftOpen: LEFT_OPEN, ...deferredAsAgent, ...summaryTooLong, ...(reopened ? { reopened: REOPENED } : {}) };
       }
-      return { ...item, ...deferredAsAgent, ...summaryTooLong };
+      return { ...item, ...deferredAsAgent, ...summaryTooLong, ...(reopened ? { reopened: REOPENED } : {}) };
     },
 
     release(id) {

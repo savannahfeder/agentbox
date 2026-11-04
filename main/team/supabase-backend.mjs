@@ -4,6 +4,8 @@
 // actually keeps people apart; nothing here is trusted to.
 import { asPulled } from '../../shared/team-rules.mjs';
 import { cleanStatus } from '../../shared/team-status.mjs';
+import { cleanConnections } from '../../shared/team-connections.mjs';
+import { cleanMates } from '../../shared/team-departures.mjs';
 import { roomsSupabase } from './rooms-supabase.mjs';
 
 const PAGE = 500;
@@ -27,6 +29,8 @@ const COMMAND_COLUMNS = 'id,owner,device,project,item,kind,payload,created_at,cl
 const CLOUD_COLUMNS = `${COMMAND_COLUMNS},claimed_by`;
 const noCloudColumn = (error) => /claimed_by|column .*cloud|cloud.* column/i.test(String(error?.message ?? ''));
 const commandOut = (r) => ({ id: r.id, owner: r.owner, device: r.device, project: r.project, item: r.item, kind: r.kind, payload: r.payload ?? {}, createdAt: r.created_at, claimedAt: r.claimed_at ?? null, claimedBy: r.claimed_by ?? null, takenAt: r.taken_at ?? null, outcome: r.outcome ?? null });
+
+const commentOut = (r) => ({ id: r.id, owner: r.owner, threadId: r.thread_id, by: r.by_person, text: r.body, at: Date.parse(r.created_at) });
 
 export function supabaseBackend(client) {
   let personId = null;
@@ -114,7 +118,17 @@ export function supabaseBackend(client) {
       if (!ids.length) return [];
       const roles = new Map(members.map((m) => [m.person_id, m.role]));
       const people = must(await client.from('people').select(PERSON_COLS).in('id', ids), 'reading your teammates');
-      return people.map((p) => ({ ...personOut(p), role: roles.get(p.id) ?? 'member' }));
+      // Asked apart, so an app newer than the database still reads its team.
+      const tools = new Map();
+      try { for (const r of must(await client.from('people').select('id,connections').in('id', ids), 'reading connections')) tools.set(r.id, r.connections ?? []); } catch { /* nobody's are shown */ }
+      return people.map((p) => ({ ...personOut(p), role: roles.get(p.id) ?? 'member', connections: tools.get(p.id) ?? [] }));
+    },
+
+    async setConnections(ids) {
+      const me = await myId();
+      const clean = cleanConnections(ids);
+      must(await client.from('people').update({ connections: clean }).eq('id', me), 'saving your connections');
+      return clean;
     },
 
     // TEAM SETTINGS (2026-10-01). The rules are the database's
@@ -127,10 +141,22 @@ export function supabaseBackend(client) {
       return rows[0];
     },
 
-    async removeMember(teamId, who) {
+    async removeMember(teamId, who, handover = null) {
       await myId();
+      if (handover) {
+        must(await client.rpc('remove_and_hand_over', {
+          p_team: teamId, p_who: who, p_to: handover.handTo, p_name: String(handover.name ?? '').slice(0, 120), p_mates: cleanMates(handover.mates),
+        }), 'handing over their work');
+        return;
+      }
       const rows = must(await client.from('team_members').delete().eq('team_id', teamId).eq('person_id', who).select('person_id'), 'removing them');
       if (!rows.length) throw new Error('only the team’s owner can remove somebody');
+    },
+
+    async departures(teamId) {
+      await myId();
+      const rows = must(await client.from('team_departures').select('person_id,name,hand_to,mates,left_at,left_by').eq('team_id', teamId), 'reading who left');
+      return rows.map((r) => ({ personId: r.person_id, name: r.name, handTo: r.hand_to, mates: cleanMates(r.mates), at: Date.parse(r.left_at), by: r.left_by }));
     },
 
     async listInvites(teamId) {
@@ -211,7 +237,7 @@ export function supabaseBackend(client) {
       const me = await myId();
       const cards = all.filter((c) => c.visible === true);
       if (cards.length) {
-        must(await client.from('thread_cards').upsert(cards.map((c) => ({
+        const rows = cards.map((c) => ({
           person_id: me, team_id: teamId, thread_id: c.threadId, visible: !!c.visible,
           // WHO IT REACHES: the chosen people, or no list at all for the whole
           // team (w-41ff964775). The read rule on the table does the enforcing.
@@ -221,7 +247,16 @@ export function supabaseBackend(client) {
           problem: c.visible ? c.problem : null, progress: c.visible ? c.progress : null, solution: c.visible ? c.solution : null,
           blocked_by: c.visible ? c.blockedBy ?? [] : [], blocks: c.visible ? c.blocks ?? [] : [],
           updated_at: new Date(c.updatedAt).toISOString(),
-        })), { onConflict: 'person_id,thread_id' }), 'sharing your threads with the team');
+          shipped_at: Number.isFinite(c.shippedAt) ? new Date(c.shippedAt).toISOString() : null,
+          task: c.visible && c.task ? c.task : null,
+        }));
+        const put = (list) => client.from('thread_cards').upsert(list, { onConflict: 'person_id,thread_id' });
+        let res = await put(rows);
+        // A cloud from before 20261031000000 has no such column; the cards still go up.
+        // A cloud from before 20261103000000 has no task column.
+        if (['PGRST204', '42703'].includes(res.error?.code)) res = await put(rows.map(({ task: _, ...r }) => r));
+        if (['PGRST204', '42703'].includes(res.error?.code)) res = await put(rows.map(({ shipped_at: _, task: __, ...r }) => r));
+        must(res, 'sharing your threads with the team');
       }
       let stale = client.from('thread_cards').delete().eq('person_id', me);
       if (cards.length) stale = stale.not('thread_id', 'in', `(${cards.map((c) => `"${c.threadId}"`).join(',')})`);
@@ -235,7 +270,122 @@ export function supabaseBackend(client) {
         personId: r.person_id, threadId: r.thread_id, visible: r.visible, title: r.title, project: r.project, people: r.people ?? null,
         state: r.state, priority: r.priority, problem: r.problem, progress: r.progress, solution: r.solution,
         blockedBy: r.blocked_by ?? [], blocks: r.blocks ?? [], updatedAt: Date.parse(r.updated_at),
+        ...(r.shipped_at ? { shippedAt: Date.parse(r.shipped_at) } : {}),
+        ...(r.task ? { task: r.task } : {}),
       }));
+    },
+
+    // A SHARED THREAD'S WORK. Row level security holds the rule: whoever can
+    // read the card (20261030120000_shared_threads_carry_their_work.sql).
+    async threadWorkHeads() {
+      await myId();
+      const rows = must(await client.from('thread_work').select('person_id,thread_id,hash,updated_at'), 'reading what your team has shared');
+      return rows.map((r) => ({ personId: r.person_id, threadId: r.thread_id, hash: r.hash, updatedAt: Date.parse(r.updated_at) }));
+    },
+
+    async getThreadWork(owner, threadId) {
+      const rows = must(await client.from('thread_work').select('work,hash').eq('person_id', owner).eq('thread_id', threadId).limit(1), 'reading a teammate\'s thread');
+      return rows[0] ? { work: rows[0].work, hash: rows[0].hash } : null;
+    },
+
+    async putThreadWork(teamId, { threadId, hash, work }) {
+      const me = await myId();
+      must(await client.from('thread_work').upsert({ person_id: me, thread_id: threadId, team_id: teamId, hash, work, updated_at: new Date().toISOString() }, { onConflict: 'person_id,thread_id' }), 'sharing a thread\'s work');
+    },
+
+    async threadFileNames(threadId) {
+      const me = await myId();
+      const rows = must(await client.from('thread_work_files').select('name').eq('person_id', me).eq('thread_id', threadId), 'asking which files are shared');
+      return rows.map((r) => r.name);
+    },
+
+    async putThreadFile(threadId, name, data) {
+      const me = await myId();
+      must(await client.from('thread_work_files').upsert({ person_id: me, thread_id: threadId, name, data }, { onConflict: 'person_id,thread_id,name', ignoreDuplicates: true }), 'sharing a file');
+    },
+
+    async pruneThreadFiles(threadId, keep) {
+      const me = await myId();
+      let gone = client.from('thread_work_files').delete().eq('person_id', me).eq('thread_id', threadId);
+      if (keep.length) gone = gone.not('name', 'in', `(${keep.map((n) => `"${n}"`).join(',')})`);
+      must(await gone, 'clearing files a thread no longer names');
+    },
+
+    async getThreadFile(owner, threadId, name) {
+      const rows = must(await client.from('thread_work_files').select('data').eq('person_id', owner).eq('thread_id', threadId).eq('name', name).limit(1), 'taking a file from a teammate\'s thread');
+      return rows[0]?.data ?? null;
+    },
+
+    async addThreadComment(owner, threadId, text) {
+      const me = await myId();
+      const rows = must(await client.from('thread_comments').insert({ owner, thread_id: threadId, by_person: me, body: String(text ?? '').trim() }).select('id,owner,thread_id,by_person,body,created_at'), 'sending your comment');
+      return commentOut(rows[0]);
+    },
+
+    async threadComments() {
+      await myId();
+      const rows = must(await client.from('thread_comments').select('id,owner,thread_id,by_person,body,created_at'), 'reading comments');
+      return rows.map(commentOut);
+    },
+
+    // Row level security holds the card's rule (20261030180000_shared_files_carry_their_marks.sql).
+    async addFileMark(owner, threadId, { id, mark }) {
+      const me = await myId();
+      must(await client.from('thread_file_marks').upsert({ owner, thread_id: threadId, by_person: me, id, mark }, { onConflict: 'owner,thread_id,by_person,id', ignoreDuplicates: true }), 'sending your note on a file');
+    },
+
+    async fileMarks() {
+      await myId();
+      const rows = must(await client.from('thread_file_marks').select('id,owner,thread_id,by_person,mark,created_at'), 'reading notes on files');
+      return rows.map((r) => ({ id: r.id, owner: r.owner, threadId: r.thread_id, by: r.by_person, mark: r.mark, at: Date.parse(r.created_at) }));
+    },
+
+    // Row level security holds who reads a folder and a place (20261102000000_a_teams_folders.sql).
+    async putFileFolder(teamId, { id, project, name, parent = null, people = null, at }) {
+      await myId();
+      must(await client.from('file_folders').upsert({ id, team_id: teamId, project, name, parent, people, at }, { onConflict: 'id' }), 'saving a folder');
+    },
+
+    async fileFolders() {
+      await myId();
+      const rows = must(await client.from('file_folders').select('id,team_id,project,name,parent,people,created_by,at'), 'reading folders');
+      return rows.map((r) => ({ id: r.id, teamId: r.team_id, project: r.project, name: r.name, parent: r.parent, people: r.people, by: r.created_by, at: Number(r.at) }));
+    },
+
+    async placeFile(owner, threadId, { project, family, folder = null, at }) {
+      const me = await myId();
+      must(await client.from('file_places').upsert({ owner, thread_id: threadId, project, family, folder, by_person: me, at }, { onConflict: 'owner,thread_id,family' }), 'placing a file');
+    },
+
+    async filePlaces() {
+      await myId();
+      const rows = must(await client.from('file_places').select('owner,thread_id,project,family,folder,by_person,at'), 'reading where files sit');
+      return rows.map((r) => ({ owner: r.owner, threadId: r.thread_id, project: r.project, family: r.family, folder: r.folder, by: r.by_person, at: Number(r.at) }));
+    },
+
+    // The database numbers a version, under a lock per file (20261104000000_one_version_line_per_file.sql).
+    async addFileVersion(teamId, { file, hash, name, at }) {
+      const me = await myId();
+      const n = must(await client.rpc('add_file_version', { p_team: teamId, p_file: file, p_hash: hash, p_name: name, p_at: at }), 'numbering a version');
+      return { file, n: Number(n), hash, name, by: me, at };
+    },
+
+    async fileVersions(teamId) {
+      await myId();
+      const rows = must(await client.from('file_versions').select('file,n,hash,name,by_person,at').eq('team_id', teamId), 'reading the versions of files');
+      return rows.map((r) => ({ file: r.file, n: Number(r.n), hash: r.hash, name: r.name, by: r.by_person, at: Number(r.at) }));
+    },
+
+    // Row level security keeps the lines' rule (20261101000000_a_conversation_says_who_has_seen_it.sql).
+    async markSeen(projectId, itemId) {
+      const me = await myId();
+      must(await client.from('conversation_reads').upsert({ project_id: projectId, item_id: itemId, person_id: me }, { onConflict: 'project_id,item_id,person_id' }), 'saying you have read it');
+    },
+
+    async seenMarks() {
+      await myId();
+      const rows = must(await client.from('conversation_reads').select('project_id,item_id,person_id,seen_at'), 'reading who has seen what');
+      return rows.map((r) => ({ projectId: r.project_id, itemId: r.item_id, personId: r.person_id, at: Date.parse(r.seen_at) }));
     },
 
     // THE FILES A CONVERSATION'S MESSAGES LINK TO (w-140ac855b1). Row level
@@ -255,6 +405,28 @@ export function supabaseBackend(client) {
       const me = await myId();
       const rows = must(await client.from('message_files').upsert({ project_id: projectId, name, by_person: me, data }, { onConflict: 'project_id,name', ignoreDuplicates: true }).select('name'), 'sending a picture');
       return (rows?.length ?? 0) > 0;
+    },
+
+    // A big file's pieces, raw, in a private bucket under the conversation's
+    // folder (20261105000000_a_film_goes_in_pieces_through_storage.sql): as rows
+    // of base64 a 625 MB film was 830 MB of database. A piece already there is
+    // the same piece, since its name is what is in it.
+    async putPiece(projectId, name, bytes) {
+      await myId();
+      const { error } = await client.storage.from('message-files').upload(`${projectId}/${name}`, bytes, { contentType: 'application/octet-stream', upsert: false });
+      if (!error) return true;
+      if (/exists|duplicate/i.test(`${error.message} ${error.error ?? ''}`) || String(error.statusCode ?? error.status) === '409') return false;
+      throw new Error(`sending a piece of a file: ${error.message}`);
+    },
+
+    async getPiece(projectId, name) {
+      await myId();
+      const { data, error } = await client.storage.from('message-files').download(`${projectId}/${name}`);
+      if (error) {
+        if (/not.?found/i.test(`${error.message} ${error.error ?? ''}`) || [400, 404].includes(Number(error.statusCode ?? error.status))) return null;
+        throw new Error(`taking a piece of a file: ${error.message}`);
+      }
+      return Buffer.from(await data.arrayBuffer());
     },
 
     // HER OWN ROWS FOR HER PHONE (20261014000200_phone_inbox.sql). The owner
@@ -401,7 +573,9 @@ export function supabaseBackend(client) {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'phone_commands' }, () => onChange())
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lines' }, () => onChange())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'thread_cards' }, () => onChange())
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'thread_comments' }, () => onChange())
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'people' }, () => onChange())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_reads' }, () => onChange())
         .subscribe();
       return () => { client.removeChannel(channel); };
     },

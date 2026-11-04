@@ -13,7 +13,7 @@
 .first-run * { box-sizing: border-box; }
 .first-run button { font: inherit; cursor: pointer; }
 .first-run button:disabled { cursor: default; }
-.first-run .ob-back { position: absolute; left: 40px; top: 64px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border: 0; border-radius: 0; background: transparent; color: var(--text-dim); font-size: 14px; }
+.first-run .ob-back { position: absolute; left: 40px; top: 64px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border: 0; border-radius: var(--radius); background: transparent; color: var(--text-dim); font-size: 14px; }
 .first-run .ob-back:hover:not(:disabled), .first-run .ob-back:focus-visible { background: var(--wash-strong); color: var(--text); }
 .first-run .ob-back:disabled { opacity: .5; }
 

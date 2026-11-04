@@ -69,11 +69,12 @@ describe('the picture in the message', () => {
   });
 
   // THE CASE THAT MUST NOT CHANGE: a picture that is there is drawn exactly as
-  // before, and one with no finder to ask stays plain words.
-  it('still draws a picture it can find, and plain words when there is no finder', () => {
+  // before, and one with no finder to ask is a tile that cannot be pressed.
+  it('still draws a picture it can find, and a still tile when there is no finder', () => {
     const drawn = renderToStaticMarkup(createElement(ArtifactImg, { src: 'attachments/a.png', roots: ['/x'], onOpen: () => {} }));
     expect(drawn).toMatch(/<img/);
     const words = renderToStaticMarkup(createElement(ArtifactImg, { src: 'attachments/a.png', roots: [] }));
-    expect(words).toMatch(/<span class="missing-artifact">missing image: attachments\/a.png<\/span>/);
+    expect(words).toMatch(/<span class="message-file" title="[^"]*"><span class="message-file-face picture-tile-face">/);
+    expect(words).toContain('>a.png<');
   });
 });
