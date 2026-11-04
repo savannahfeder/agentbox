@@ -9166,7 +9166,7 @@ export default function App() {
           AND IT NAMES THE TASK: the row's own title is the card's first line,
           and the sentence ("Started in Agentbox Team") the quiet one under it,
           picked out of fourteen drawings over four rounds. */}
-      {multiSel.size > 0 && !toast && !focused && !modal && (
+      {multiSel.size > 0 && !toast && !focused && !modal && !settingsOpen && !filesShown && !connectionsShown && (
         <TickedBar count={multiSel.size} view={view} onKey={(does) => {
           const sel = selectable.filter((i) => multiSel.has(i.id));
           if (does === 'clear') setMultiSel(new Set());
