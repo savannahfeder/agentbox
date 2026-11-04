@@ -2,7 +2,7 @@
 //
 // The spinning wheel kept coming up while reading threads and nothing recorded
 // why, so the cause could only be guessed from reading the code. The minute
-// line in the memory log (main/memory-log.mjs) now carries the longest time
+// line in the memory log (main/memory-log.mts) now carries the longest time
 // the main process went without answering, and every request from the window
 // that held it for 100 ms or more, by name.
 import { describe, it, expect } from 'vitest';

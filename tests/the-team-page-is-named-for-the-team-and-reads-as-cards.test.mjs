@@ -66,3 +66,33 @@ describe('the list beside it', () => {
     expect(pages).toContain('{label}{count > 0 && <b>{count}</b>}');
   });
 });
+
+describe('a group opened from Team', () => {
+  it('keeps the page called Team, not Chats', () => {
+    expect(read('renderer/src/team/rooms/GroupsColumn.tsx')).toContain("{chats ? (team ? 'Team' : 'Chats') : 'Groups'}");
+    expect(read('renderer/src/App.tsx')).toContain('<span className="workspace-title gc-col-title">{homeLayout === \'chats\' ? \'Team\' : \'Chats\'}</span>');
+  });
+});
+
+describe('the command bar', () => {
+  // A tester typed "Sofia" and got only "Waits on Sofia", an action, and no Sofia.
+  it('finds a person on the team by name, and opens their page in Team', () => {
+    const app = read('renderer/src/App.tsx');
+    expect(app).toMatch(/const persons = \(chatsValue\?\.persons \?\? \[\]\)\.filter\(\(p\) => p\.name\.toLowerCase\(\)\.split\(\/\\s\+\/\)\.some\(\(w\) => w\.startsWith\(q\.toLowerCase\(\)\)\)\);/);
+    expect(app).toContain("run: () => { setModal(null); openChatsPlace(`person:${p.id}`); }");
+  });
+});
+
+describe('a teammate’s thread opened from their page in Team', () => {
+  // A tester opened Dev's "Seat picker for group bookings" from Dev's page: the
+  // page was titled Threads, its back link said Threads, and no sidebar row was lit.
+  const app = read('renderer/src/App.tsx');
+  it('stays titled Team, with Team lit in the sidebar', () => {
+    expect(app).toContain("const cardFromPlace = homeLayout === 'chats' && !!chatsPlace && !!openCard;");
+    expect(app).toContain("<h1 className=\"workspace-title\">{openCard ? (cardFromPlace ? 'Team' : 'Threads') : 'Team'}</h1>");
+    expect(app).toContain('roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace,');
+  });
+  it('goes back to the page it came from, by name', () => {
+    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Everyone' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Threads')}");
+  });
+});

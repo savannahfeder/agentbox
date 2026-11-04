@@ -76,6 +76,10 @@ export const font = {
   mono: 'GeistMono_400Regular',
 };
 
+// The desktop's three corners (renderer/src/styles.css): small for what you press or type in, card for
+// cards, sheets, menus and what somebody made, round for faces. Rows, dividers, tabs and panels stay square.
+export const corner = { small: 6, card: 10 };
+
 export const size = {
   topBar: 56,
   tabs: 48,

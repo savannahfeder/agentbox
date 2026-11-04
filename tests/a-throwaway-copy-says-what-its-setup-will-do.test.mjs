@@ -19,7 +19,7 @@
 // the same sentences with the readings handed in.
 
 import { describe, it, expect } from 'vitest';
-import { freshUserNotes } from '../main/fresh-user.mjs';
+import { freshUserNotes } from '../main/fresh-user.mts';
 
 /** A throwaway home with no Claude Code, no keychain and no agents in it. */
 const NOTHING = { claudeBin: null, keychain: null, agents: null };

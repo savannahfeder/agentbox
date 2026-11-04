@@ -55,7 +55,8 @@ let home;
 function signedIn(name, email, uuid) {
   const dir = path.join(home, name);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, '.claude.json'), JSON.stringify({
+  // The default login's file sits beside ~/.claude, not in it.
+  fs.writeFileSync(path.join(name === '.claude' ? home : dir, '.claude.json'), JSON.stringify({
     oauthAccount: { emailAddress: email, accountUuid: uuid },
     projects: {},
   }));
@@ -258,7 +259,7 @@ describe('the fleet asks the disk, not the config file', () => {
     signedIn('.claude', 'you@example.com', PERSONAL);
     const work = signedIn('.claude-work', 'work@example.com', WORK);
 
-    const { Supervisor } = await import('../main/supervisor.mjs');
+    const { Supervisor } = await import('../main/supervisor.mts');
     const store = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-store-'));
     const make = (extra) => new Supervisor(
       { storeRoot: store, maxConcurrentSessions: 3, authProfiles: ['default'], home, ...extra },

@@ -28,12 +28,12 @@ import { madeHere, threadSnapshot, withCloudTurn, newThreadSnapshot } from '../s
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { cloudRun } from '../main/cloud/run.mjs';
-import { kitFrom } from '../main/cloud/run-cli.mjs';
-import { readKitCopy, kitCopyPath } from '../main/cloud/kit.mjs';
-import { readMarker } from '../main/cloud/marker.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { Store } from '../main/store.mjs';
+import { cloudRun } from '../main/cloud/run.mts';
+import { kitFrom } from '../main/cloud/run-cli.mts';
+import { readKitCopy, kitCopyPath } from '../main/cloud/kit.mts';
+import { readMarker } from '../main/cloud/marker.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { Store } from '../main/store.mts';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const DEVICE = 'a1b2c3d4e5f6';
@@ -475,8 +475,8 @@ describe('the supervisor and a new thread', () => {
 
 describe('the phone\'s pass, waking to a new thread the cloud started', () => {
   async function inboxWorld({ adoptNewAs = () => 'adopted', home = () => true } = {}) {
-    const { createMemoryCloud, signUpMemory, memoryBackend, claimForTheCloud } = await import('../main/team/memory-cloud.mjs');
-    const { createPhoneInbox } = await import('../main/phone-inbox.mjs');
+    const { createMemoryCloud, signUpMemory, memoryBackend, claimForTheCloud } = await import('../main/team/memory-cloud.mts');
+    const { createPhoneInbox } = await import('../main/phone-inbox.mts');
     const cloud = createMemoryCloud();
     let clock = Date.parse('2026-10-24T12:00:00Z');
     cloud.now = () => clock;
@@ -549,8 +549,8 @@ describe('end to end, through the real sandbox', () => {
     const crypto = await import('node:crypto');
     const { fileURLToPath } = await import('node:url');
     const { createSandbox } = await import('../cloud/sandbox/server.mjs');
-    const { writeMarker } = await import('../main/cloud/marker.mjs');
-    const { markerForCloudRun } = await import('../main/cloud/kit.mjs');
+    const { writeMarker } = await import('../main/cloud/marker.mts');
+    const { markerForCloudRun } = await import('../main/cloud/kit.mts');
     const { cloudUserLine, lastAnswerIn } = await import('../shared/cloud-kit.mjs');
     const here = (p) => fileURLToPath(new URL(p, import.meta.url));
     const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'new-e2e-')));

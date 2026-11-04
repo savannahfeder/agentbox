@@ -25,12 +25,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import {
   recordCloudLogin, markCloudLogin, pickCloudLogin, cloudLoginInUse, cloudAccountFrom,
   noCloudAccountSentence, CLOUD_ACCOUNT_ENV,
-} from '../main/cloud/logins.mjs';
-import { loginForCloudRun } from '../main/cloud/run-cli.mjs';
+} from '../main/cloud/logins.mts';
+import { loginForCloudRun } from '../main/cloud/run-cli.mts';
 import { cloudAccountInUse, cloudFootLine } from '../renderer/src/cloud-menu';
 
 let home;
@@ -125,7 +125,7 @@ describe('a run that finds no account to take', () => {
 /* -------------------------- the app's side of it -------------------------- */
 const login = (dir, email, org) => {
   fs.mkdirSync(path.join(home, dir), { recursive: true });
-  fs.writeFileSync(path.join(home, dir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: `u-${dir}`, organizationUuid: org } }));
+  fs.writeFileSync(path.join(home, dir === '.claude' ? '' : dir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: `u-${dir}`, organizationUuid: org } }));
 };
 const make = (activeAccount = {}) => {
   login('.claude', 'me@example.test', 'org-me');

@@ -5,7 +5,7 @@
 // and the shell's first line says so; with no folder at all it still refuses.
 import {it,expect,vi} from 'vitest';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
-import {TaskTerminals,terminalFolder,terminalPlace,terminalEnv} from '../main/task-terminals.mjs';
+import {TaskTerminals,terminalFolder,terminalPlace,terminalEnv} from '../main/task-terminals.mts';
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'terminal cases '));
 function fixture(){let data,exit;const child={pid:999999,write:vi.fn(),resize:vi.fn(),kill:vi.fn(),onData:f=>data=f,onExit:f=>exit=f};const spawn=vi.fn(()=>child);return {manager:new TaskTerminals({spawn,resolve:()=>dir,disposeProcess:p=>p.kill()}),spawn,child,output:s=>data(s),exit:()=>exit({exitCode:2})};}
 it('opens once, preserves literal input and isolates another task',()=>{const f=fixture();f.manager.open('p:a');f.manager.open('p:a');expect(f.spawn).toHaveBeenCalledTimes(1);f.manager.write('p:a','printf "C:\\folder"\n');expect(f.child.write).toHaveBeenCalledWith('printf "C:\\folder"\n');expect(()=>f.manager.write('p:b','bad')).toThrow();});

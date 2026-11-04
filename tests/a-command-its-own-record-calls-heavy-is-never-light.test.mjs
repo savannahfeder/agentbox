@@ -29,7 +29,7 @@
 // and running added together, so that needs the per-grant log instead.
 
 import { describe, it, expect } from 'vitest';
-import { CommandHistory } from '../main/memory-gate-history.mjs';
+import { CommandHistory } from '../main/memory-gate-history.mts';
 
 /** A history whose records are exactly these letters. A key with a space is a
  *  command key (a chain key included); a bare word is a program record. */

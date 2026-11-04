@@ -21,7 +21,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { prepareHome, makeHome } from '../shared/fresh-user-home.mjs';
-import { readAgentFiles } from '../main/agent-files.mjs';
+import { readAgentFiles } from '../main/agent-files.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');

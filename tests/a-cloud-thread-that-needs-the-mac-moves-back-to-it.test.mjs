@@ -17,9 +17,9 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { HAND_BACK, handsBack } from '../shared/cloud-hand-back.mjs';
-import { argvForTheCloud, CLOUD_NOTE } from '../main/cloud/run.mjs';
+import { argvForTheCloud, CLOUD_NOTE } from '../main/cloud/run.mts';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const dirs = [];
@@ -102,8 +102,8 @@ describe('a cloud run that ends on the marked line', () => {
   });
 
   it('is checked before anything writes the run\'s answer on the row', () => {
-    const src = read('main/supervisor.mjs');
-    const at = src.indexOf('this._noteCloudHandBack(item, session)');
+    const src = read('main/supervisor.mts');
+    const at = src.indexOf('this._noteCloudHandBack(item, session, cwd)');
     expect(at).toBeGreaterThan(0);
     expect(at).toBeLessThan(src.indexOf('if (this.speaksForTheSession(session, { command: !!plan.command }))'));
   });

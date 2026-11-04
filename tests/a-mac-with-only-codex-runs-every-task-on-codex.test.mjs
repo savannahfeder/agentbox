@@ -49,7 +49,7 @@ vi.mock('../main/account-tooling.mjs', async (importActual) => ({
   linkAccountTooling: () => null,
 }));
 
-const { Supervisor } = await import('../main/supervisor.mjs');
+const { Supervisor } = await import('../main/supervisor.mts');
 const { engineFor, availableEngines, homeEngine } = await import('../shared/engines.mjs');
 
 const CLAUDE_BIN = '/nonexistent/claude-code/claude';

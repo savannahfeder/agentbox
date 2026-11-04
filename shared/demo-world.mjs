@@ -6,7 +6,7 @@
 // the new-user row already opens. It is a store with a plausible day in it.
 //
 // THIS FILE IS THE CONTENT AND NOTHING ELSE. No disk, no spawn, no Electron:
-// `main/demo.mjs` writes it out and opens the copy. Two reasons for the split.
+// `main/demo.mts` writes it out and opens the copy. Two reasons for the split.
 // The content is the half she will want to change, and a file she can be
 // pointed at is easier to change than a paragraph inside a launcher. And the
 // shape of every row here is checked by the same rules the real ones are, which
@@ -21,7 +21,7 @@ import { envName, nameSlug } from './product-name.mjs';
 
 /**
  * The mark a demo copy carries, so it can tell what it is. Set in the child's
- *  environment by `main/demo.mjs` and read by `shared/install-id.mjs`. */
+ *  environment by `main/demo.mts` and read by `shared/install-id.mts`. */
 export const DEMO_ENV = envName('DEMO');
 
 /**

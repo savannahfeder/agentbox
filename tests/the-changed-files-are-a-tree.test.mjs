@@ -13,10 +13,10 @@ import {
 // The real change the drawings are made of: 48 edits over 11 files in one of
 // her own conversations (designs//changes.json).
 const FILES = [
-  'renderer/src/App.tsx', 'renderer/src/components/Rail.tsx', 'main/main.mjs',
+  'renderer/src/App.tsx', 'renderer/src/components/Rail.tsx', 'main/main.mts',
   'renderer/src/components/Browser.tsx', 'renderer/src/main.tsx',
   'renderer/src/components/Focus.tsx', 'renderer/src/components/Palette.tsx',
-  'main/ipc.mjs', 'main/supervisor.mjs', 'renderer/src/format.ts', 'renderer/src/types.ts',
+  'main/ipc.mts', 'main/supervisor.mts', 'renderer/src/format.ts', 'renderer/src/types.ts',
 ].map((path) => ({ path, hunks: [], plus: 3, minus: 1 }));
 
 describe('a change is a kind of artifact', () => {
@@ -50,7 +50,7 @@ describe('the changed files as folders', () => {
     const top = rows.filter((r) => r.depth === 0);
     expect(top.map((r) => r.label)).toEqual(['main', 'renderer/src']);
     const main = rows.filter((r) => r.kind === 'file' && r.path.startsWith('main/'));
-    expect(main.map((r) => r.label)).toEqual(['ipc.mjs', 'main.mjs', 'supervisor.mjs']);
+    expect(main.map((r) => r.label)).toEqual(['ipc.mts', 'main.mts', 'supervisor.mts']);
   });
 
   it('carries the count and the totals of everything under a folder', () => {
@@ -65,7 +65,7 @@ describe('the changed files as folders', () => {
     const shown = visibleRows(rows, shut);
     expect(shown.some((r) => r.label === 'renderer/src')).toBe(true);
     expect(shown.some((r) => r.path === 'renderer/src/App.tsx')).toBe(false);
-    expect(shown.some((r) => r.path === 'main/ipc.mjs')).toBe(true);
+    expect(shown.some((r) => r.path === 'main/ipc.mts')).toBe(true);
   });
 });
 

@@ -7,10 +7,10 @@
 // She can rebuild main as often as she likes and the branch build stays where
 // it is until she deletes it.
 //
-// THE ONE THING THAT IS DELIBERATELY *NOT* SEPARATE, and the reason main.mjs
+// THE ONE THING THAT IS DELIBERATELY *NOT* SEPARATE, and the reason main.mts
 // has a setName line at the top of it: THE DATA FOLDER. Two Astrals with two
 // data folders is two supervisors, and two supervisors spawn twin workers for
-// every answered item (main.mjs says so where the single-instance lock is, and
+// every answered item (main.mts says so where the single-instance lock is, and
 // it was measured on 2026-08-04: nine items double-spawned a second apart).
 // The lock lives inside the data folder, so sharing the folder is what makes it
 // impossible to run both at once. Measured on this Mac 2026-08-27: the running
@@ -42,7 +42,7 @@ const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
 const install = argv.includes('--install');
 
-// The name has to keep starting with the app's own name, because main.mjs
+// The name has to keep starting with the app's own name, because main.mts
 // recognises a side build by exactly that and puts its data folder back to the
 // real one's. A name that does not is a second supervisor waiting to happen, so
 // it stops here rather than at the end of a ten minute build.
@@ -55,7 +55,7 @@ const nameArg = argv.indexOf('--name');
 const productName = nameArg >= 0 ? argv[nameArg + 1] : `${REAL_NAME} Rest`;
 if (!isSideBuild(productName)) {
   console.error(`\nThe name has to be "${REAL_NAME} something", and it is "${productName}".`);
-  console.error(`main.mjs shares the data folder with the real ${REAL_NAME} by matching on that,`);
+  console.error(`main.mts shares the data folder with the real ${REAL_NAME} by matching on that,`);
   console.error('and without the match this build gets its own supervisor beside hers.\n');
   process.exit(1);
 }
@@ -95,7 +95,7 @@ const args = [
   'electron-builder', '--mac',
   `-c.productName=${productName}`,
   // ALSO into the packaged package.json, because `app.getName` reads THAT and
-  // everything in main.mjs that tells a side build apart keys off it. The
+  // everything in main.mts that tells a side build apart keys off it. The
   // new-user build hands itself over only if it can see its own name.
   `-c.extraMetadata.productName=${productName}`,
   `-c.appId=${appId}`,

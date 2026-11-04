@@ -1,5 +1,5 @@
 // THE ONE RULE FOR A THREAD'S TITLE: a few words naming the thing being worked
-// on, never the sentence that opened it. The namer (main/row-label.mjs) writes
+// on, never the sentence that opened it. The namer (main/row-label.mts) writes
 // such a name with a model; this is what every title falls back to before it
 // has one, on a copy that cannot ask a model, and on a teammate's copy that
 // received a raw first sentence.
@@ -144,5 +144,7 @@ export function shownTitle(i) {
   const theirs = i?.wrote?.title;
   const ours = i?.wrote?.label;
   const renamed = !!theirs && !!ours && theirs.source === 'founder' && theirs.ts > ours.ts;
-  return shortTitle((renamed && title.trim()) || label);
+  if (renamed && title.trim()) return shortTitle(title);
+  // A name the person typed (Rename) is theirs to the letter; only the app's is cut.
+  return ours?.source === 'founder' ? label : shortTitle(label);
 }

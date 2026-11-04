@@ -12,7 +12,7 @@ import { Back, Repeat } from '../../../ui/icons';
 import { TimeBox, TypingSheet } from '../../../ui/Later';
 import { Markdown } from '../../../ui/Markdown';
 import { IconButton, Sheet, SheetHead, SheetRow, SheetSep, T, TopBar, Wall } from '../../../ui/parts';
-import { color, font, size } from '../../../ui/theme';
+import { color, corner, font, size } from '../../../ui/theme';
 
 const label = { fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase' as const, get color() { return color.faint; } };
 
@@ -75,7 +75,7 @@ export default function RepeatPage() {
 
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 32 }}>
           <Pressable onPress={() => setSheet('when')} accessibilityRole="button"
-            style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+            style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
             <T style={{ fontSize: 14 }}>Change when</T>
           </Pressable>
           <Pressable onPress={() => setSheet('end')} accessibilityRole="button"

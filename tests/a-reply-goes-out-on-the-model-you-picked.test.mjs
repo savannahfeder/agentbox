@@ -25,7 +25,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { pickOnTheRow, pickToSend, replyOpensOn } from '../renderer/src/reply-pick.ts';
 import { ModelPicker } from '../renderer/src/components/Model.tsx';
 import { DEFAULT_MODEL } from '../renderer/src/models.ts';

@@ -34,7 +34,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { nameSlug, nameSlugs, WAS_SLUGS, isOurSlug } from '../shared/product-name.mjs';
-import { storeGrantUnderAnyOfOurNames } from '../main/supervisor.mjs';
+import { storeGrantUnderAnyOfOurNames } from '../main/supervisor.mts';
 import { createCodexApprovals, isStoreElicitation } from '../main/codex-approvals.mjs';
 import { listPending } from '../main/approvals.mjs';
 

@@ -17,8 +17,8 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { imgUrl, imgPath, servable, IMG_SCHEME } from '../main/img-scheme.mjs';
-import { DOC_SCHEME } from '../shared/schemes.mjs';
+import { imgUrl, imgPath, servable, IMG_SCHEME } from '../main/img-scheme.mts';
+import { DOC_SCHEME } from '../shared/schemes.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -58,7 +58,7 @@ describe('what the app agrees to hand back', () => {
 
   it('serves pictures and nothing else, whatever folder it is in', () => {
     expect(servable('/Users/x/Store/accounts/acct/zero.config.json', roots)).toBe(false);
-    expect(servable('/Users/x/code/zero/main/main.mjs', roots)).toBe(false);
+    expect(servable('/Users/x/code/zero/main/main.mts', roots)).toBe(false);
     expect(servable('/Users/x/Store/accounts/acct/notes.md', roots)).toBe(false);
   });
 
@@ -88,7 +88,7 @@ describe('the window never builds a file:// picture again', () => {
   });
 
   it('is registered before the app is ready, or it is not a standard scheme', () => {
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).toContain('IMG_SCHEMES.map((scheme) => ({');
     expect(main).toContain('for (const scheme of IMG_SCHEMES) protocol.handle(scheme');
     // The handler asks the store every time, so a project made after launch is

@@ -39,9 +39,9 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun, IMPORT_FAILED } from '../main/cloud/run.mjs';
-import { readMarker, takeCloudNews, addCloudNews } from '../main/cloud/marker.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { cloudRun, IMPORT_FAILED } from '../main/cloud/run.mts';
+import { readMarker, takeCloudNews, addCloudNews } from '../main/cloud/marker.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { waitFor } from './waiting.mjs';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));

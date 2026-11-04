@@ -68,6 +68,6 @@ describe('the offer of a teammate', () => {
     const items = [1, 2, 3, 4].map((d) => ask('Onboarding is confusing people, fix the first screen', d)).concat([ask('Onboarding confusing people, fix the screen', 5)]);
     const offer = offerFrom({ items, now: NOW });
     expect(offer.asked).toEqual([{ title: 'Onboarding is confusing people, fix the first screen', n: 4 }, { title: 'Onboarding confusing people, fix the screen', n: 1 }]);
-    expect(read('main/teammates.mjs')).toMatch(/offer\.asked\.map\(\(\{ title, n \}\) => `- \$\{title\}\$\{n > 1 \? ` \(\$\{n\} times\)` : ''\}`\)/);
+    expect(read('main/teammates.mts')).toMatch(/offer\.asked\.map\(\(\{ title, n \}\) => `- \$\{title\}\$\{n > 1 \? ` \(\$\{n\} times\)` : ''\}`\)/);
   });
 });

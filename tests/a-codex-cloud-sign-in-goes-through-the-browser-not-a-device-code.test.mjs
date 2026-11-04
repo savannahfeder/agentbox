@@ -26,7 +26,7 @@ import net from 'node:net';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { createSandbox, pickBaseEnv } from '../cloud/sandbox/server.mjs';
-import { startCloudSignIn, cloudLoginFor } from '../main/cloud/logins.mjs';
+import { startCloudSignIn, cloudLoginFor } from '../main/cloud/logins.mts';
 
 const FAKE = fileURLToPath(new URL('./fixtures/cloud/fake-vendor-cli.mjs', import.meta.url));
 

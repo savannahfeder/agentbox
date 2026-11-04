@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { finishedTheFirstRun, tutorialRun } from '../renderer/src/onboarding.ts';
-import { EVENT_NAMES } from '../shared/analytics-events.mjs';
+import { EVENT_NAMES } from '../shared/analytics-events.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const app = fs.readFileSync(path.join(here, '../renderer/src/App.tsx'), 'utf8');

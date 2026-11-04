@@ -65,7 +65,7 @@ describe('the reply box in a thread', () => {
   });
 
   // The file is saved into the conversation's own project, which is the folder
-  // the team sync reads to send it on (main/team/sync.mjs), and the reply
+  // the team sync reads to send it on (main/team/sync.mts), and the reply
   // carries the link to it after the words.
   it('saves the picture into the conversation and links it from the reply', () => {
     const src = code(read('renderer/src/team/ThreadPanel.tsx'));

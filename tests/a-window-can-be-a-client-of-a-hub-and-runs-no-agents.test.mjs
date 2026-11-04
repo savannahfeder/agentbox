@@ -4,7 +4,7 @@
 // holds the store, a task folder for every thread, one process per cloud run,
 // the packing, the bringing home and the shipping, so what it costs grows with
 // every agent, and 200 cannot work however cheap each part is. The design agreed
-// with Codex moves all of that to one headless copy (main/serve.mjs) on a machine
+// with Codex moves all of that to one headless copy (main/serve.mts) on a machine
 // of its own, the hub, and the Mac keeps a window. This is that window: when a hub
 // is named, no store and no supervisor are even loaded.
 //
@@ -19,6 +19,7 @@ import { spawnSync } from 'node:child_process';
 import { readHubAddress, whichApp } from '../main/hub-address.mjs';
 import { withDesktopShell, onPhoneDoor } from '../renderer/src/browser-bridge';
 import { mayOpenOutside, sameHub } from '../main/hub-rules.mjs';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const home = () => fs.mkdtempSync(path.join(os.tmpdir(), 'hub-'));
@@ -76,7 +77,7 @@ describe('whether this Mac has a hub', () => {
     const env = { ...process.env, HOME: dir };
     for (const k of Object.keys(env)) if (/^(AGENTBOX_|ZERO_|STORE_|ASTRAL_|XDG_)/.test(k)) delete env[k];
     const data = path.join(dir, 'data');
-    const ran = spawnSync(process.execPath, [path.join(root, 'bin', 'agentbox.mjs'), '--dir', data, '--no-open'], { env, encoding: 'utf8', timeout: 20_000 });
+    const ran = spawnSync(process.execPath, [...stripTypesFlags(), path.join(root, 'bin', 'agentbox.mjs'), '--dir', data, '--no-open'], { env, encoding: 'utf8', timeout: 20_000 });
     expect(ran.status).toBe(1);
     expect(ran.stderr).toMatch(/hub/);
     expect(fs.existsSync(path.join(data, 'zero.config.json'))).toBe(false);
@@ -100,14 +101,14 @@ describe('the client carries no part of the hub', () => {
   }
   it('nothing the client loads reaches the store, the supervisor or the handlers', () => {
     const loaded = [...reach(path.join(root, 'main', 'hub-client.mjs'))].map((f) => path.relative(root, f));
-    for (const heavy of ['main/supervisor.mjs', 'main/store.mjs', 'main/ipc.mjs', 'main/main.mjs', 'main/serve.mjs']) expect(loaded).not.toContain(heavy);
+    for (const heavy of ['main/supervisor.mts', 'main/store.mts', 'main/ipc.mts', 'main/main.mts', 'main/serve.mts']) expect(loaded).not.toContain(heavy);
   });
 
   it('the app starts from a file that loads one or the other, never both', () => {
     expect(JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).main).toBe('main/start.mjs');
     const start = fs.readFileSync(path.join(root, 'main', 'start.mjs'), 'utf8');
-    expect(start).not.toMatch(/^\s*import\s[^(]*from\s*['"]\.\/(main|hub-client)\.mjs/m);
-    expect(start).toMatch(/import\(['"]\.\/main\.mjs['"]\)/);
+    expect(start).not.toMatch(/^\s*import\s[^(]*from\s*['"]\.\/(main|hub-client)\.m[jt]s/m);
+    expect(start).toMatch(/import\(['"]\.\/main\.mts['"]\)/);
     expect(start).toMatch(/import\(['"]\.\/hub-client\.mjs['"]\)/);
   });
 });

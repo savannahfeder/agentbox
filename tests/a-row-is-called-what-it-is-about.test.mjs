@@ -22,7 +22,7 @@
 import { describe, it, expect } from 'vitest';
 import { foldWorkItems, WORK_ITEM_FIELDS } from '../shared/work-items.mjs';
 import { rowTitle } from '../renderer/src/list-rules';
-import { cleanName, namePrompt, wantsName, NAME_MAX } from '../main/row-label.mjs';
+import { cleanName, namePrompt, wantsName, NAME_MAX } from '../main/row-label.mts';
 
 const line = (patch, { id = 'w-1', ts = 1000, source = 'agent' } = {}) => ({ id, ts, source, patch });
 

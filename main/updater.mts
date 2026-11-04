@@ -39,7 +39,7 @@
 // ERR_UPDATER_ZIP_FILE_NOT_FOUND. `scripts/publish-download.mjs` is what puts
 // all three files on the release together.
 //
-// AND THE ONE THING THAT IS NOT TRUE ANY MORE. `main/analytics.mjs` opens by
+// AND THE ONE THING THAT IS NOT TRUE ANY MORE. `main/analytics.mts` opens by
 // calling itself the only place anything leaves this machine. Since this file
 // exists that is no longer so: an update check is a request to github.com. It
 // carries no identity, no key and no account, and it is not routed through
@@ -49,7 +49,7 @@
 import { createRequire } from 'node:module';
 import type { AppUpdater } from 'electron-updater';
 import { Name } from '../shared/product-name.mjs';
-import { MOVE_SAY } from '../shared/where-it-runs-from.mjs';
+import { MOVE_SAY } from '../shared/where-it-runs-from.mts';
 
 const require = createRequire(import.meta.url);
 
@@ -150,7 +150,7 @@ export function createUpdater({ app, log = console, onChanged = () => {}, autoUp
 }) {
   // READ ONCE, at construction (main/where-it-runs-from.mjs says why the
   // bundle cannot move under a running process). A build with no place passed
-  // in — the tests, and `main/serve.mjs` — simply never offers the move.
+  // in — the tests, and `main/serve.mts` — simply never offers the move.
   const where = place?.state?.() ?? { place: null, canUpdate: true, offerMove: false };
   let state: UpdaterState = {
     phase: 'idle',
@@ -251,7 +251,7 @@ export function createUpdater({ app, log = console, onChanged = () => {}, autoUp
       // `downloadUpdate` dispatches the `error` event and then RE-THROWS. The
       // await above resolves on the RESULT, not on the download, so a failed
       // download had nowhere to land but `unhandledRejection` — and
-      // `main/crash-report.mjs` files one of those as a crash.
+      // `main/crash-report.mts` files one of those as a crash.
       //
       // That is 7 of the 14 crash reports of launch week (PostHog, 2026-10-08)
       // and not one of them was a crash: five are Squirrel's read-only volume
@@ -329,7 +329,7 @@ export function shortError(e: unknown): string {
   // https://github.com/Squirrel/Squirrel.Mac …" — the whole of what 23 of the
   // 26 main-rejection reports carried (PostHog, 2026-10-12), and the Settings
   // row showed the first 160 characters of it. The app knows where it is
-  // running from (shared/where-it-runs-from.mjs), so this is one sentence and
+  // running from (shared/where-it-runs-from.mts), so this is one sentence and
   // the row beside it is the press that fixes it.
   if (/read-only volume/i.test(raw)) return MOVE_SAY.cannotUpdateHere;
   if (/ERR_UPDATER_ZIP_FILE_NOT_FOUND/.test(named)) return 'That release has no app in it to install.';

@@ -1,8 +1,8 @@
 // A WORKER CANNOT SET ITS OWN PERMISSION MODE (security audit 2026-10-23,
 // finding 4).
 //
-// What one reply may do on this computer (main/answer-modes.mjs) was kept in
-// the app's own home, and main/main.mjs and main/serve.mjs make that home the
+// What one reply may do on this computer (main/answer-modes.mts) was kept in
+// the app's own home, and main/main.mts and main/serve.mts make that home the
 // store root. The store root is in every Claude worker's additionalDirectories,
 // so a file edit there goes through without a card. One write of
 // answer-modes.json gave a thread bypassPermissions on its next run, and each
@@ -17,9 +17,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Store } from '../main/store.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { answerModes, answerModesFile, keepAnswerModesIn, setAnswerMode, _internals } from '../main/answer-modes.mjs';
+import { Store } from '../main/store.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { answerModes, answerModesFile, keepAnswerModesIn, setAnswerMode, _internals } from '../main/answer-modes.mts';
 import { appHomeEnv, setAppHome } from './app-home.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -205,7 +205,7 @@ describe('both ways the app starts say where, before the store opens', () => {
     plant(path.join(store, FILE), { 'acme/w-1': { mode: 'acceptEdits', at: Date.now() } });
     _internals.useFile(null);
 
-    const { bootHeadless } = await import('../main/serve.mjs');
+    const { bootHeadless } = await import('../main/serve.mts');
     const booted = await bootHeadless({ dataDir: dir, appDir: repoRoot, userDir: dir });
     try {
       expect(answerModesFile()).toBe(path.join(dir, FILE));
@@ -217,7 +217,7 @@ describe('both ways the app starts say where, before the store opens', () => {
   }, 30_000);
 
   it('the desktop app names her folder before it opens the store', () => {
-    const src = fs.readFileSync(path.join(repoRoot, 'main', 'main.mjs'), 'utf8');
+    const src = fs.readFileSync(path.join(repoRoot, 'main', 'main.mts'), 'utf8');
     const named = src.indexOf('keepAnswerModesIn({ userDir, storeRoot: config.storeRoot })');
     expect(named).toBeGreaterThan(src.indexOf('Object.assign(process.env, storeRootEnv(config.storeRoot))'));
     expect(named).toBeLessThan(src.indexOf('new Store(config)'));

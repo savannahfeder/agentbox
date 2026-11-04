@@ -9,10 +9,8 @@ import { Platform, Pressable, TextInput, View } from 'react-native';
 import { readRule, repeatPresets } from '../../../renderer/src/format';
 import { engineModelLabel } from '../../../renderer/src/models';
 import { ruleLabel } from '../../../shared/repeats.mjs';
-import { readSettingsRows } from '../../../renderer/src/phone-rows';
 import { priorityIdOf, priorityLabelOf, priorityValueOf } from '../../../renderer/src/priority';
 import { agentChoices, agentWordFor, autoOffered, laterHint, momentFromWords, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
-import { computerAgents } from '../../../renderer/src/web-settings';
 import { splitSlug } from '../../../renderer/src/phone-rows';
 import { AUTO_LABEL } from '../../../shared/auto-route.mjs';
 import type { Choices } from '../lib/actions';
@@ -21,16 +19,16 @@ import { AutoMark, TeammateMark } from './Teammates';
 import { roleOf } from '../lib/teammates';
 import type { Teammate } from '../../../renderer/src/types';
 import { useDraft } from '../lib/drafts';
-import { computerOf } from '../lib/settings-view';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
+import { useComputerAgents } from '../state/computer-agents';
 import { AttachSheet, Attached } from './Attach';
 import { DictationProblem, Listening, MicButton, useDictation } from './Dictation';
 import { Caret, Clip, Clock, Repeat } from './icons';
 import { TimeBox, TypingSheet } from './Later';
 import { Pickable, PriorityBars, Sheet, SheetHead, SheetRow, SheetSep, T } from './parts';
 import { ModelSheet, PrioritySheet, barsFor } from './Pickers';
-import { color, font, size } from './theme';
+import { color, corner, font, size } from './theme';
 
 const Swatch = ({ slug }: { slug: string }) => <View style={{ width: 9, height: 9, backgroundColor: projectSwatch(slug) }} />;
 
@@ -53,19 +51,7 @@ export function useNewThread(sent: () => void) {
   const [opening] = useState(() => openingChoices(projects, appStore));
   const [picked, setPicked] = useState<string | null>(null);
   const product = projectNow(projects, picked, appStore) ?? '';
-  // WHICH CODING AGENTS THE COMPUTER OFFERS, off its settings copy
-  // (w-24119e8784): To read "Agent" and every thread went to Claude Code,
-  // whatever the computer had. Claude Code alone until the copy is read.
-  const [agents, setAgents] = useState(() => computerAgents(null));
-  useEffect(() => {
-    const cloud = c.cloud;
-    if (!cloud?.signedIn()) return;
-    let gone = false;
-    readSettingsRows((t, q) => cloud.select(t, q))
-      .then((rows) => { if (!gone) setAgents(computerAgents(computerOf(rows))); })
-      .catch(() => { /* Claude Code alone, as before */ });
-    return () => { gone = true; };
-  }, [c.cloud]);
+  const agents = useComputerAgents();
   const codex = { codexModels: agents.codexModels, codexDefault: agents.codexDefault };
   const offered = agentChoices(agents.engines);
   const [pickedEngine, setPickedEngine] = useState<Harness | null>(null);
@@ -149,13 +135,13 @@ export function SendButtons({ form }: { form: NewThread }) {
   return (
     <View style={{ flexDirection: 'row', opacity: canSend ? 1 : 0.45 }}>
       <Pressable disabled={!canSend} onPress={() => (talk.on ? talk.send() : void send())} accessibilityRole="button" accessibilityLabel="Send"
-        style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: color.accent, opacity: pressed ? 0.85 : 1 })}>
+        style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: color.accent, borderTopLeftRadius: corner.small, borderBottomLeftRadius: corner.small, opacity: pressed ? 0.85 : 1 })}>
         <T style={{ fontSize: 15, fontFamily: font.medium, color: '#fff' }}>{busy ? 'Sending…' : 'Send'}</T>
       </Pressable>
       {/* A message to a teammate goes now; it has no later. */}
       {!form.mate && (
         <Pressable disabled={!canSend} onPress={() => setSheet('later')} accessibilityRole="button" accessibilityLabel="Send later"
-          style={({ pressed }) => ({ width: 32, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: color.accent, borderLeftWidth: 1, borderLeftColor: 'rgba(26, 24, 23, 0.28)', opacity: pressed ? 0.85 : 1 })}>
+          style={({ pressed }) => ({ width: 32, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: color.accent, borderLeftWidth: 1, borderLeftColor: 'rgba(26, 24, 23, 0.28)', borderTopRightRadius: corner.small, borderBottomRightRadius: corner.small, opacity: pressed ? 0.85 : 1 })}>
           <Caret />
         </Pressable>
       )}
@@ -299,7 +285,7 @@ export function InboxComposer() {
   text.current = form.draft.text;
   useEffect(() => () => { if (typing.current && text.current.trim()) router.push('/new'); }, []);
   return (
-    <View style={{ borderWidth: 1, borderColor: color.lineStrong, backgroundColor: color.card }}>
+    <View style={{ borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.lineStrong, backgroundColor: color.card }}>
       <NewThreadFields form={form} inline onFocus={() => { typing.current = true; }} onBlur={() => { typing.current = false; }} />
       <NewThreadFoot form={form} send={<SendButtons form={form} />} />
       <NewThreadSheets form={form} now={c.now} />

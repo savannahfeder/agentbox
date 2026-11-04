@@ -35,7 +35,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createPlace, placeOfApp, sayWhere } from '../shared/where-it-runs-from.mjs';
+import { createPlace, placeOfApp, sayWhere } from '../shared/where-it-runs-from.mts';
 import { createUpdater, shortError } from '../main/updater.mts';
 import { MOVE_SAY, updateLook } from '../renderer/src/update-row.ts';
 
@@ -324,9 +324,9 @@ describe('the three surfaces that offer it', () => {
   });
 
   it('reaches main through the same bridge as the other two update doors', () => {
-    expect(read('shared/bridge-map.mjs')).toContain("updateMove: 'zero:update-move'");
+    expect(read('shared/bridge-map.mts')).toContain("updateMove: 'zero:update-move'");
     expect(read('preload.cjs')).toContain("zero:update-move");
-    expect(read('main/ipc.mjs')).toContain("zero:update-move");
+    expect(read('main/ipc.mts')).toContain("zero:update-move");
   });
 
   // The screen imports this file's sentences (update-row, SidebarUpdate, api),
@@ -334,6 +334,6 @@ describe('the three surfaces that offer it', () => {
   // bundle tests/inline-links-keep-their-place builds, and blocked every ship
   // on 2026-10-12; in a dev window Vite throws on `path.sep` at load.
   it('the file the screen reads its sentences from imports nothing from Node', () => {
-    expect(read('shared/where-it-runs-from.mjs')).not.toMatch(/from ['"]node:/);
+    expect(read('shared/where-it-runs-from.mts')).not.toMatch(/from ['"]node:/);
   });
 });

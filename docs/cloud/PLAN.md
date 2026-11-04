@@ -67,7 +67,7 @@ each vendor's own sign-in, kept between runs.
     `codex login` sends the browser back to http://127.0.0.1:1455/auth/callback
     on the machine it runs on. The sandbox sends the Mac the link; the Mac
     listens on that address while the person signs in
-    (`main/cloud/browser-return.mjs`) and passes the query, a one-time code
+    (`main/cloud/browser-return.mts`) and passes the query, a one-time code
     only the sandbox's Codex can spend (PKCE), to the sandbox
     (`signin-callback`), which hands it to Codex and follows its redirect to
     `/success` itself, because that link carries the id token. This is
@@ -152,7 +152,7 @@ cloud Codex thread gets an app-server of its OWN, in its sandbox:
 
 - **The connection.** `createCodexAppServer` already takes any process that
   speaks the protocol on stdin/stdout. For a cloud thread that process is
-  `main/cloud/run-cli.mjs --agentbox-codex app-server`, the same proxy, whose
+  `main/cloud/run-cli.mts --agentbox-codex app-server`, the same proxy, whose
   remote command is `codex app-server`. Approvals are server requests on the
   same stream, so they reach the existing cards untouched; steering and
   interrupts are client requests on it.
@@ -216,7 +216,7 @@ cloud Codex thread gets an app-server of its OWN, in its sandbox:
 - **The project's documents folder travels (2026-10-15).** Its small files and
   the thread's own `designs/<id>`, newest first within 50 MB (2026-10-17: a
   thread whose designs did not all fit used to stay on the Mac, and those were
-  the busy ones), go up at the same path (main/cloud/docs.mjs); what the agent
+  the busy ones), go up at the same path (main/cloud/docs.mts); what the agent
   writes there comes back every 10 s and at the end, never over a file changed
   on the Mac meanwhile, and never over one the run did not take (`docs.sent` in
   the marker): those keep their place and the run's copy goes beside them.
@@ -247,7 +247,7 @@ cloud Codex thread gets an app-server of its OWN, in its sandbox:
 
 ### The proxy: one local process per cloud run
 
-For a cloud run the supervisor spawns `main/cloud/run.mjs` in place of
+For a cloud run the supervisor spawns `main/cloud/run.mts` in place of
 `claude`, with the same argv, env and cwd, through Electron's node
 (`ELECTRON_RUN_AS_NODE`), the way the approvals server already runs. It is a
 duplex pipe (R8): stdin bytes go to the remote command in order, EOF included,
@@ -278,7 +278,7 @@ stdout and stderr come back byte for byte. Its life:
    (`~/.agentbox/cloud-image.json`). Skills, commands, agents and saved
    memories go to the same cache, named by what they hold, and go up again
    only when that changes. Everything is sent side by side, not in turn
-   (main/cloud/reuse.mjs). A pending-import marker goes into the task
+   (main/cloud/reuse.mts). A pending-import marker goes into the task
    folder's git dir (`<git dir>/agentbox-cloud.json`), naming the run id and the
    start commit.
 3. **Start.** `InvokeAgentRuntime {action:"start"}` with presigned URLs: a GET
@@ -361,7 +361,7 @@ from the cloud button: `cloudRuns: false` is "This Mac only", null is "When
 this Mac is full", `'all'` is "Everything" (the cloud first; this Mac for
 what cannot go there or when the cloud is at its cap).
 
-This Mac's memory gate (main/start-hold.mjs) holds only this Mac: a row it
+This Mac's memory gate (main/start-hold.mts) holds only this Mac: a row it
 holds goes to the cloud when a cloud slot is free (`_roomFor`).
 
 ### What the user sees
@@ -431,7 +431,7 @@ at AgentCore's published rates. The plan limits are set from these.
 2. **Done.** The sandbox image and server (cloud/sandbox/), with the bridge.
 3. **Done.** `scripts/cloud-setup.mjs`, run against the real account
    2026-10-13: bucket, ECR, CodeBuild ARM build, roles, runtime, app user.
-4. **Done.** The proxy (main/cloud/run.mjs, run-cli.mjs, aws.mjs), tested end
+4. **Done.** The proxy (main/cloud/run.mts, run-cli.mts, aws.mjs), tested end
    to end against the real sandbox server on one machine, and against real
    AWS with a shell command in place of Claude Code: packed, started,
    committed in the sandbox and brought home in 11 s. The microVM measured:
@@ -487,7 +487,7 @@ input. In order:
    the run, and a reply that arrived too late is kept for the next one.
    Codex turns still end only with the Mac. Needs the image rebuilt.
 2. **Done (2026-10-17): one process for every cloud run.** Every run's relay
-   lives in one host (main/cloud/host.mjs), started detached by the supervisor
+   lives in one host (main/cloud/host.mts), started detached by the supervisor
    and ending a minute after its last run; the supervisor holds, per run, a
    Perl stand-in (scripts/cloud-shim.pl) that carries input, output, signals
    and the exit code, so a cloud run is still one process to it. The relay
@@ -497,7 +497,7 @@ input. In order:
    against about 110 MB a run with a relay and servers of their own. A machine
    without /usr/bin/perl runs each relay on its own, as before. The pack, the
    import and the documents' tars run as child processes awaited one by one
-   (main/cloud/exec.mjs), so one run's git never holds the others (2026-10-19).
+   (main/cloud/exec.mts), so one run's git never holds the others (2026-10-19).
 3. **Done (2026-10-19): what an agent writes on its thread while the Mac
    sleeps is made when it wakes.** The Mac names at start the store calls safe
    to make late (`KEPT_WHILE_AWAY`: update_work_item, create_work_item,
@@ -517,7 +517,7 @@ input. In order:
    from the last branch bundle the Mac uploaded for that thread, with the
    thread's brief and transcript; it marks the command taken with the run id,
    and the Mac, waking, joins that run as it joins one left going on a quit
-   (main/cloud/run.mjs `joining`). It needs, per thread, a durable checkpoint
+   (main/cloud/run.mts `joining`). It needs, per thread, a durable checkpoint
    (bundle, uncommitted work, transcript) kept for the thread's life, which
    the Mac writes after every turn, and a lease so one executor at a time owns
    a thread.
@@ -907,7 +907,7 @@ approved:
 A Lambda behind a function URL, in the same account and region as the
 runtime (`cloud/gateway/`). The Mac's two interfaces (transport and storage,
 `main/cloud/aws.mjs`) get a second implementation that talks to it
-(`main/cloud/managed.mjs`); `run.mjs` and `logins.mjs` do not change.
+(`main/cloud/managed.mts`); `run.mts` and `logins.mts` do not change.
 
 - **Who is asking.** A Mac trades the person's signed-in session for a cloud
   key once (`POST /v1/devices`, checked against the database's own

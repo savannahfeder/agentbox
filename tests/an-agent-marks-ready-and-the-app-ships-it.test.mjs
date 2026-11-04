@@ -4,7 +4,7 @@
 // because Claude Code's auto-mode safety check refused the agent's own push to
 // main or its update of the app folder, 16 on a folder left mid-merge or
 // committed into, 6 on racing pushes. A refusal asks nobody, so nothing reached
-// the approvals corner. main/ship-queue.mjs moves the ship out of the agent:
+// the approvals corner. main/ship-queue.mts moves the ship out of the agent:
 // the agent labels its row `ship`, and the app runs the project's ship script,
 // one task at a time, and sends a failure back to that agent.
 //
@@ -18,7 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   SHIP_LABEL, ShipQueue, failureReply, nextToShip, readShipSettings, shipScriptFor, shippedSha, withoutShipLabel,
-} from '../main/ship-queue.mjs';
+} from '../main/ship-queue.mts';
 
 let tmp; let repo; let userDir; let folders;
 beforeEach(() => {
@@ -177,7 +177,7 @@ describe('what the thread says', async () => {
 });
 
 describe('what the store writes', async () => {
-  const { Store } = await import('../main/store.mjs');
+  const { Store } = await import('../main/store.mts');
   it('has a write for each outcome', () => {
     expect(typeof Store.prototype.shipped).toBe('function');
     expect(typeof Store.prototype.shipFailed).toBe('function');
@@ -185,8 +185,8 @@ describe('what the store writes', async () => {
 });
 
 describe('what the agent is told', async () => {
-  const { Store } = await import('../main/store.mjs');
-  const { Supervisor } = await import('../main/supervisor.mjs');
+  const { Store } = await import('../main/store.mts');
+  const { Supervisor } = await import('../main/supervisor.mts');
   async function brief({ on }) {
     const root = path.join(tmp, 'store');
     const dir = path.join(root, 'team');
@@ -219,8 +219,8 @@ describe('what a resumed agent is told', async () => {
   // "merge it" and "build it and ship" were resumed with only her words, the
   // short prompt a resumed session gets, so neither learned the new way to
   // ship and both would have pushed by hand and been refused again.
-  const { Store } = await import('../main/store.mjs');
-  const { Supervisor } = await import('../main/supervisor.mjs');
+  const { Store } = await import('../main/store.mts');
+  const { Supervisor } = await import('../main/supervisor.mts');
   async function resumed({ on }) {
     const root = path.join(tmp, 'store2');
     const dir = path.join(root, 'team');

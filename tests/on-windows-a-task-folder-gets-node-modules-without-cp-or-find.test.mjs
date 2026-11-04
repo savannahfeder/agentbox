@@ -28,8 +28,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { copyTree, linksUnder } from '../main/worktree-include.mjs';
-import { ensureTaskFolder } from '../main/task-folders.mjs';
+import { copyTree, linksUnder } from '../main/worktree-include.mts';
+import { ensureTaskFolder } from '../main/task-folders.mts';
 
 let dir;
 beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'no-cp-or-find-')); });

@@ -7,7 +7,7 @@
 // node on PATH, and a Dock launch starts with launchd's four folders, so the
 // app found Claude Code and every worker died at once:
 // `env: node: No such file or directory`. Codex in the same setup worked,
-// because main/codex-launch-env.mjs adds the node beside it; Claude workers
+// because main/codex-launch-env.mts adds the node beside it; Claude workers
 // got the environment passed straight through.
 //
 // The fix is deliberately narrower than Codex's: a worker's PATH is the PATH
@@ -17,8 +17,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { claudeLaunchEnv } from '../main/claude-launch-env.mjs';
-import { claudeHarness } from '../main/harnesses/claude.mjs';
+import { claudeLaunchEnv } from '../main/claude-launch-env.mts';
+import { claudeHarness } from '../main/harnesses/claude.mts';
 
 const DOCK = '/usr/bin:/bin:/usr/sbin:/sbin';
 let root, home;

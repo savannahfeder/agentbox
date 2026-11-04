@@ -26,8 +26,9 @@ export interface TeamView {
  *  the opened task's header, the composer). Null unless someone is signed in. */
 export const TeamContext = createContext<TeamView | null>(null);
 
-export function teamView(state: TeamState | null | undefined, products: Product[]): TeamView | null {
-  if (!state?.signedIn || !state.me) return null;
+export function teamView(state: TeamState | null | undefined, products: Product[], multiplayer?: boolean): TeamView | null {
+  // With Multiplayer off the sign-in is kept for the phone only.
+  if (multiplayer === false || !state?.signedIn || !state.me) return null;
   return {
     state,
     me: state.me.id,

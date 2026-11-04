@@ -8,11 +8,11 @@
 // So this answers for ANY row, in or out of In progress, by asking live-line
 // first and falling back to the thread's own state word. One function, because
 // three surfaces were going to answer it three ways.
-import { catchUpDue } from '../../shared/agent-import.mjs';
+import { catchUpDue } from '../../shared/agent-import.mts';
 import { liveLine, shortWord, type LiveFacts } from './live-line';
 import { STATE_WORD, stateWordOf } from './threads/summary-rules';
 import { threadState } from '../../shared/thread-cards.mjs';
-import { closedUnshipped, notShippedLine, shippedAs } from '../../shared/not-shipped.mjs';
+import { closedUnshipped, notShippedLine, shippedAs } from '../../shared/not-shipped.mts';
 import { asksWho, isAuto } from '../../shared/auto-route.mjs';
 import type { ThreadStateWord, WorkItem } from './types';
 import type { Fleet } from './fleet';
@@ -59,6 +59,13 @@ export interface StatusFacts extends LiveFacts {
 // they wear different marks.
 const WAITING_ITS_TURN = new Set(['queued', 'next', 'shipping']);
 
+/** A row on Later: one word for everything that comes back at the time beside
+ *  it. `null` is a repeating task with no run going. */
+export function laterCell(item: WorkItem | null, facts: StatusFacts = {}): StatusCell {
+  if (!item) return { word: STATE_WORD.scheduled, mark: 'sched', agent: false, live: false, cloud: false };
+  return statusCell(item, { ...facts, state: 'scheduled' });
+}
+
 export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell {
   const now = facts.now ?? Date.now();
   const state = facts.state ?? (threadState(item, now) as ThreadStateWord);
@@ -66,7 +73,7 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
   const says = (word: string, mark: StatusMark, agent: boolean, title?: string): StatusCell => ({ word, mark, agent, live: false, cloud: false, title });
   const plain = (word: string, mark: StatusMark) => says(word, mark, false);
   // Said over "Waiting" and "Done", which do not tell a shipped thread from
-  // one that never shipped (shared/not-shipped.mjs).
+  // one that never shipped (shared/not-shipped.mts).
   const ship = shippedAs(item);
   const shipped = (item.shippedAt ?? 0) > 0 ? says('Shipped', 'done', false, 'Marked as shipped')
     : ship && item.shippedAt !== 0 ? says('Shipped', 'done', false, ship.sha ? `Shipped to main as ${ship.sha}` : 'Shipped to main') : null;

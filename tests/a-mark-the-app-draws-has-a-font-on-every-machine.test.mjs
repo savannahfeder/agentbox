@@ -12,7 +12,7 @@
 //
 //   ⌘ U+2318   ✓ U+2713   ✕ U+2715
 //
-// ⌘ never reaches a Linux screen: shared/key-caps.mjs turns it into "Ctrl"
+// ⌘ never reaches a Linux screen: shared/key-caps.mts turns it into "Ctrl"
 // where there is no Command key. ✓ and ✕ are drawn as themselves, on the
 // approval verdict, the Later picker's repeat tick, the box filter, the
 // teammates menu and every "copied ✓". On a machine whose system sans has no

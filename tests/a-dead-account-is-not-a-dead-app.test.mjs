@@ -19,8 +19,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { troubleCause, troubleSentence, troubleRemedy, accountSentence, needsHerHands } from '../shared/spawn-trouble.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { troubleCause, troubleSentence, troubleRemedy, accountSentence, needsHerHands } from '../shared/spawn-trouble.mts';
 
 // A MAC WITH ONE CLAUDE LOGIN ON IT. Since 2026-08-31 the fleet's account list
 // is what is signed in on the disk and not only what the config names

@@ -8,7 +8,7 @@
 //   1. recover the PATH from the login shell        main/shell-path.mjs
 //   2. ask the shell where the sessions live         main/shell-path.mjs
 //   3. find Claude Code and Codex                    main/claude-bin.mjs, main/codex-bin.mjs
-//   4. build a worker's environment and launch it    main/harnesses.mjs (workerEnv, launchEnv)
+//   4. build a worker's environment and launch it    main/harnesses.mts (workerEnv, launchEnv)
 //
 // and compare each answer with what a person on that machine needs. Step 4
 // really spawns the found binary with `--version`, under the environment the
@@ -30,7 +30,7 @@ const { recoverShellPath, readShellSettings, launchAdditions } = await import(pa
 const { findClaudeBin, askShell } = await import(path.join(repo, 'main/claude-bin.mjs'));
 const { shellRunner } = await import(path.join(repo, 'main/engine-bin.mjs'));
 const { findCodexBin } = await import(path.join(repo, 'main/codex-bin.mjs'));
-const { harnessFor } = await import(path.join(repo, 'main/harnesses.mjs'));
+const { harnessFor } = await import(path.join(repo, 'main/harnesses.mts'));
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 const args = isMain ? process.argv.slice(2) : [];

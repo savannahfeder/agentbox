@@ -15,10 +15,10 @@
 
 import type { UpdateState } from './types';
 import { NAME, Name } from '../../shared/product-name.mjs';
-import { MOVE_SAY, sayWhere } from '../../shared/where-it-runs-from.mjs';
+import { MOVE_SAY, sayWhere } from '../../shared/where-it-runs-from.mts';
 
 // WHERE THIS COPY IS RUNNING FROM, in the words main and the renderer share
-// (shared/where-it-runs-from.mjs). Re-exported here because this file is where
+// (shared/where-it-runs-from.mts). Re-exported here because this file is where
 // every surface already comes for the update words, and two doors to one set
 // of sentences is how a button and the row above it start disagreeing.
 export { MOVE_SAY };
@@ -138,7 +138,7 @@ export type UpdateLook = {
   /** Pressing it restarts onto the new version rather than looking again. */
   restart: boolean;
   /** Pressing it moves the app into Applications, which is the only thing
-   *  that will ever get this copy an update (shared/where-it-runs-from.mjs). */
+   *  that will ever get this copy an update (shared/where-it-runs-from.mts). */
   move: boolean;
   /** Nothing to press: a check, a download or a rebuild is under way. */
   busy: boolean;

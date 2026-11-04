@@ -10,7 +10,7 @@
 // migrated out; and when there is no dir outside the store at all, it throws
 // rather than write the token where a worker can read it. The desktop app's
 // storeRoot/.team-session is left where it is for now, by decision: moving it
-// conflicted with main/main.mjs and was taken out of this change.
+// conflicted with main/main.mts and was taken out of this change.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';

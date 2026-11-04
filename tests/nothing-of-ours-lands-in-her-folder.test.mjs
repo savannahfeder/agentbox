@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { appHome, encodeProjectPath, isMachineryDir, machineryDir, machineryPath } from '../main/store/home.mjs';
 import * as workItems from '../main/store/work-items.mjs';
 import { WAS, envNames, nameSlug } from '../shared/product-name.mjs';

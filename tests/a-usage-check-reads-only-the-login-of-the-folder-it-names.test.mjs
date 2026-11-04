@@ -19,9 +19,9 @@
 // one, so no variable we have not heard of can choose its login; and every
 // worker's clear-list takes the variable out.
 import { describe, it, expect } from 'vitest';
-import { ClaudeUsage, usageEnv } from '../main/claude-usage.mjs';
-import { harnessFor } from '../main/harnesses.mjs';
-import { terminalEnv } from '../main/task-terminals.mjs';
+import { ClaudeUsage, usageEnv } from '../main/claude-usage.mts';
+import { harnessFor } from '../main/harnesses.mts';
+import { terminalEnv } from '../main/task-terminals.mts';
 
 const OUT = JSON.stringify({ rate_limits_available: true, rate_limits: { five_hour: { utilization: 39 }, seven_day: { utilization: 6 } } });
 

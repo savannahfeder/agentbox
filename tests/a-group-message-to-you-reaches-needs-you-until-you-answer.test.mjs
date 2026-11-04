@@ -15,8 +15,8 @@ import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { addressedByOpening, mentionsIn, groupRow } from '../shared/room-needs-you.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createRooms, roomPrefsFile } from '../main/team/rooms.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
 import { MentionRows } from '../renderer/src/team/rooms/MentionRows.tsx';
 import { GroupWaits } from '../renderer/src/team/rooms/GroupPage.tsx';
 

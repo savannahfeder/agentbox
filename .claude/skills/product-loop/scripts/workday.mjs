@@ -21,9 +21,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
+import crypto from 'node:crypto';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readDiary } from '../../power-test/scripts/diary.mjs';
+import { rerunWithStripTypes } from '../../../../scripts/lib/rerun-with-strip-types.mjs';
+
+rerunWithStripTypes(import.meta.url);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(here, '../../../..');
@@ -116,6 +120,16 @@ export function whyTheBuildFailed(err) {
   return `the phone app preview did not build: ${printed ? printed.slice(-3000) : err?.message}`;
 }
 
+/** Which preview build to reuse: the phone app bundles renderer/ and shared/ as well as mobile/. */
+export function previewKeyOf({ mobile, renderer, shared }) {
+  return crypto.createHash('sha1').update(`${mobile} ${renderer} ${shared}`).digest('hex');
+}
+
+/** The preview's build, clear of the bundler's cache: a cached transform once carried an old copy of the app's config. */
+export function previewBuildArgv(built) {
+  return ['expo', 'export', '--platform', 'web', '--clear', '--output-dir', built];
+}
+
 /** Every issue from every diary, worst first, then most seen. */
 export function rankIssues(byPerson) {
   const all = [];
@@ -151,7 +165,8 @@ if (isMain) {
   const say = (s) => console.log(`[${new Date().toTimeString().slice(0, 8)}] ${s}`);
   const { readPeople, pickPeople } = await import(path.resolve(here, '../../power-test/scripts/plan.mjs'));
   const { paceFor, readingFor, claudeProfile } = await import(path.join(here, 'pace.mjs'));
-  const { readMacPressureWord } = await import(path.join(REPO, 'main/leftovers.mjs'));
+  const { readMacPressureWord } = await import(path.join(REPO, 'main/leftovers.mts'));
+  const { stripTypesFlags } = await import(path.join(REPO, 'main/strip-types.mts'));
   const people = pickPeople(opt('who', 'random:2'), readPeople(path.resolve(here, '../../power-test/people')));
   const engine = opt('engine', 'codex');
   const minutes = Number(opt('minutes', 30));
@@ -166,7 +181,7 @@ if (isMain) {
   // A session of its own, so ending the run that started it does not end the day.
   if (args.includes('--detach')) {
     const log = fs.openSync(path.join(root, 'workday.log'), 'a');
-    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), ...detachedArgv(args, root)], { detached: true, stdio: ['ignore', log, log], env: detachedEnv(process.env) });
+    const child = spawn(process.execPath, [...stripTypesFlags(), fileURLToPath(import.meta.url), ...detachedArgv(args, root)], { detached: true, stdio: ['ignore', log, log], env: detachedEnv(process.env) });
     child.unref();
     console.log(`workday started, pid ${child.pid}. Log: ${path.join(root, 'workday.log')}. Report when it ends: ${path.join(root, 'report.md')}`);
     process.exit(0);
@@ -175,7 +190,8 @@ if (isMain) {
   // The preview, built once per version of mobile/ and served from here.
   let url = opt('url');
   if (!url) {
-    const tree = execFileSync('git', ['-C', REPO, 'rev-parse', 'HEAD:mobile'], { encoding: 'utf8' }).trim();
+    const [mobile, renderer, shared] = execFileSync('git', ['-C', REPO, 'rev-parse', 'HEAD:mobile', 'HEAD:renderer', 'HEAD:shared'], { encoding: 'utf8' }).trim().split('\n');
+    const tree = previewKeyOf({ mobile, renderer, shared });
     const built = path.join(os.tmpdir(), 'agentbox-phone-preview', tree);
     if (!fs.existsSync(path.join(built, 'index.html'))) {
       const mobileDir = path.join(REPO, 'mobile');
@@ -187,7 +203,7 @@ if (isMain) {
           execFileSync('npm', ['ci', '--no-audit', '--no-fund'], quietly);
         }
         say('building the phone app preview (a minute or two)');
-        execFileSync('npx', ['expo', 'export', '--platform', 'web', '--output-dir', built], { ...quietly, env: { ...process.env, EXPO_PUBLIC_PREVIEW: '1', CI: '1' } });
+        execFileSync('npx', previewBuildArgv(built), { ...quietly, env: { ...process.env, EXPO_PUBLIC_PREVIEW: '1', CI: '1' } });
       } catch (err) {
         say(whyTheBuildFailed(err));
         process.exit(1);

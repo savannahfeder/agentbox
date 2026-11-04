@@ -2,21 +2,21 @@
 //
 // That was macOS, and the thing pointing it at her Mac was ours. The setup's
 // folder picker opens on the home folder, so pressing Open without navigating
-// made the home folder the project, and main/store.mjs then calls answerFor ->
+// made the home folder the project, and main/store.mts then calls answerFor ->
 // countFolder on it to write one sentence about the project. countFolder walks
 // three levels, so it read ~/Desktop, ~/Documents, ~/Downloads, ~/Movies,
 // ~/Music, ~/Pictures and ~/Library, and the system answered every one of them
 // with a consent panel carrying our name.
 //
 // The picker refusing the home folder is the first door and it is in
-// shared/project-folder-check.mjs. This is the second: whatever folder the walk
+// shared/project-folder-check.mts. This is the second: whatever folder the walk
 // is handed, and by whatever caller, it does not open a guarded one.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { countFolder } from '../main/first-run.mjs';
+import { countFolder } from '../main/first-run.mts';
 
 const GUARDED = ['Desktop', 'Documents', 'Downloads', 'Movies', 'Music', 'Pictures', 'Library', 'Public'];
 

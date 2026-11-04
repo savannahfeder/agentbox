@@ -13,7 +13,7 @@
 // sign-in exits in the middle of a check, before that check answers.
 
 import { describe, it, expect } from 'vitest';
-import { createEngineSetup } from '../main/engine-setup.mjs';
+import { createEngineSetup } from '../main/engine-setup.mts';
 
 // `signedInAfterLogin` is what a check started AFTER the sign-in exited says.
 // `loginEnds` picks when the sign-in exits: during the second status check, or

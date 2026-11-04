@@ -8,7 +8,7 @@ import {expect,it} from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {readInstruction,writeInstruction} from '../main/instruction-settings.mjs';
+import {readInstruction,writeInstruction} from '../main/instruction-settings.mts';
 it.each(['rules','messages','system'])('%s restores its immutable default',id=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'instructions-'));
  try {
@@ -25,7 +25,7 @@ it('rejects unknown IDs and non-string edits',()=>{
  expect(()=>writeInstruction('/tmp','rules',null)).toThrow();
 });
 it('keeps packaged edits in writable data and leaves the shipped template intact',async()=>{
- const {readSystemTemplate}=await import('../main/instruction-settings.mjs');
+ const {readSystemTemplate}=await import('../main/instruction-settings.mts');
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'instruction-package-'));
  try {
   const app=path.join(dir,'app'),data=path.join(dir,'data');

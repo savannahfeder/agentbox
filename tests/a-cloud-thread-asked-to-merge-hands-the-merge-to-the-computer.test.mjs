@@ -10,7 +10,7 @@
 // Codex cloud runs were told nothing about the cloud at all: the note rode only
 // on Claude Code's command line, so a Codex run could not know to hand back.
 import { describe, it, expect } from 'vitest';
-import { CLOUD_NOTE, PLAIN_CLOUD_NOTE, codexLineForTheCloud } from '../main/cloud/run.mjs';
+import { CLOUD_NOTE, PLAIN_CLOUD_NOTE, codexLineForTheCloud } from '../main/cloud/run.mts';
 import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
 
 describe('what a cloud run is told about branches', () => {

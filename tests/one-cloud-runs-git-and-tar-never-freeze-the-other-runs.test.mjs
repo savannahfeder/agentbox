@@ -1,7 +1,7 @@
 // ONE CLOUD RUN'S GIT AND TAR NEVER FREEZE THE OTHER RUNS.
 //
 // What broke: every cloud run's relay lives in one process on the Mac
-// (main/cloud/host.mjs), and main/cloud/run.mjs and main/cloud/docs.mjs ran git
+// (main/cloud/host.mts), and main/cloud/run.mts and main/cloud/docs.mts ran git
 // and tar synchronously: the folder's state, the bundle, the import's fetch,
 // reset and apply, the transcripts' unpacking, and the documents every ten
 // seconds. While one run packed a big repository, every other run's events,
@@ -29,8 +29,8 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun } from '../main/cloud/run.mjs';
-import { readMarker } from '../main/cloud/marker.mjs';
+import { cloudRun } from '../main/cloud/run.mts';
+import { readMarker } from '../main/cloud/marker.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');

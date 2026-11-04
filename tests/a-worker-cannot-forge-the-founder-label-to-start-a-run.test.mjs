@@ -7,7 +7,7 @@
 // fold + `_isFreshWork`: before the fix an agent-authored 'founder' label read
 // as fresh work (true); after, only a founder/system author does.
 import { describe, it, expect } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { foldWorkItems } from '../shared/work-items.mjs';
 
 const row = ({ source, labels = [], id = 'w-1', product = 'acme' }) => {

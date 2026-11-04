@@ -10,7 +10,7 @@
 // the next run's at 12:11. She typed "continue" at 11:59 into a thread that
 // looked stuck, and the next run read it as a yes to picks she never saw.
 //
-// The joined run's stream now comes to the app (main/cloud/run.mjs), and the
+// The joined run's stream now comes to the app (main/cloud/run.mts), and the
 // supervisor follows it for the thread whose record names that folder: the
 // thread shows it running in the cloud, its steps go into the thread's record,
 // its last message goes onto the row as any run's does, and Stop stops it.
@@ -21,8 +21,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { Supervisor } from '../main/supervisor.mjs';
-import { Store } from '../main/store.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { Store } from '../main/store.mts';
 import { machineryPath } from '../main/store/home.mjs';
 
 let tmp; let store; let sup; let row; let folder; let relays;

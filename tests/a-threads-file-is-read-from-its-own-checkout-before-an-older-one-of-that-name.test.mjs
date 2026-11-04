@@ -79,7 +79,7 @@ describe('which changes.md a thread opens', () => {
 describe('the big view says which thread it reads for', () => {
   const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
   it('read-doc passes the thread to the finder', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     const at = ipc.indexOf("ipcMain.handle('zero:read-doc'");
     expect(ipc.slice(at, at + 400)).toMatch(/thread: typeof thread === 'string'/);
   });

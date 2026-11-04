@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { setWorkspaceSetting } from '../main/settings.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { setWorkspaceSetting } from '../main/settings.mts';
 
 let dir, supervisor, config, started;
 const task = (id, engine = 'codex') => ({

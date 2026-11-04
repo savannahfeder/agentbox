@@ -12,7 +12,7 @@
 // her on In progress, which is the tab she opened it from, would show her a list
 // the row is no longer in. That is the exception she names.
 
-import { commandPrompt } from '../../shared/claude-commands.mjs';
+import { commandPrompt } from '../../shared/claude-commands.mts';
 import { DEFAULT_ENGINE } from '../../shared/engines.mjs';
 
 /**
@@ -113,11 +113,12 @@ export function wayOut(following: Followed, focused: unknown): 'inbox' | 'stay' 
  *
  * Keep-on-this-Mac and a hand-back are laid over the row by the supervisor
  * without moving `updatedAt`, so a change to either counts too: the Runs on
- * button reads them (w-bac3eb6bd2).
+ * button reads them (w-bac3eb6bd2). So does a rename: a `label` written alone
+ * is not news and leaves `updatedAt` where it was (shared/work-items.mjs).
  *
  * Returns the copy to take, or null for leave it alone.
  */
-export function freshCopy<T extends { id: string; product: string; updatedAt?: number; onMac?: boolean; needsMac?: string }>(
+export function freshCopy<T extends { id: string; product: string; updatedAt?: number; onMac?: boolean; needsMac?: string; label?: string }>(
   items: readonly T[],
   focused: T | null,
   following: Followed,
@@ -127,5 +128,6 @@ export function freshCopy<T extends { id: string; product: string; updatedAt?: n
   if (!fresh || fresh === focused) return null;
   if (following) return fresh;
   if (!!fresh.onMac !== !!focused.onMac || (fresh.needsMac ?? null) !== (focused.needsMac ?? null)) return fresh;
+  if ((fresh.label ?? '') !== (focused.label ?? '')) return fresh;
   return (fresh.updatedAt ?? 0) !== (focused.updatedAt ?? 0) ? fresh : null;
 }

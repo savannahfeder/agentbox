@@ -50,7 +50,7 @@ export const GATEWAY_FUNCTION = NAMES.fn;
 // does not stop machines already going; `admin pause` and the sweep do.
 const CONCURRENCY = 200;
 // Longer than its own 60 s wait on AgentCore (main/cloud/aws.mjs), shorter
-// than the Mac's wait on it (main/cloud/managed.mjs).
+// than the Mac's wait on it (main/cloud/managed.mts).
 export const FUNCTION_SECONDS = 90;
 
 /**
@@ -80,7 +80,7 @@ export function rolePolicy({ bucket, runtimeArn, region, account, signerSecretAr
  * What the signer's links may do: runs and sign-ins, never the ledger, and
  * only inside a link, so the key used any other way is refused. It may list
  * runs, so a link to a missing run file answers 404, not 403; never sign-ins,
- * whose every reader takes a 403 as "not there" (main/cloud/logins.mjs).
+ * whose every reader takes a 403 as "not there" (main/cloud/logins.mts).
  */
 export function signerPolicy({ bucket }) {
   const inALink = { 's3:authType': 'REST-QUERY-STRING' };
@@ -220,7 +220,7 @@ export async function bundle(outDir) {
   fs.mkdirSync(outDir, { recursive: true });
   await build({
     entryPoints: [path.join(ROOT, 'cloud', 'gateway', 'lambda.mjs')],
-    outfile: path.join(outDir, 'index.mjs'),
+    outfile: path.join(outDir, 'index.mts'),
     bundle: true, platform: 'node', format: 'esm', target: 'node22', logLevel: 'warning',
     // Lambda's own copy of the AWS libraries has it; this repository does not.
     external: ['@aws-sdk/client-secrets-manager'],
@@ -229,7 +229,7 @@ export async function bundle(outDir) {
   });
   const zip = path.join(outDir, 'gateway.zip');
   fs.rmSync(zip, { force: true });
-  execFileSync('zip', ['-q', '-j', zip, path.join(outDir, 'index.mjs')]);
+  execFileSync('zip', ['-q', '-j', zip, path.join(outDir, 'index.mts')]);
   return zip;
 }
 

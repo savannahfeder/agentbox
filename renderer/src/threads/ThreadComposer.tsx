@@ -33,7 +33,7 @@ import { PriorityIcon } from '../components/Priority';
 import { PhoneStatus } from '../components/PhoneStatus';
 import { SEND } from '../this-keyboard';
 import { Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
-import { PRACTICE_TASK } from '../../../shared/first-run-practice.mjs';
+import { PRACTICE_TASK } from '../../../shared/first-run-practice.mts';
 import type { Product, WorkItem } from '../types';
 import type { Engine } from '../../../shared/engines.mjs';
 import { ENGINES } from '../../../shared/engines.mjs';
@@ -54,7 +54,7 @@ import { practiceRefusal, noProjectYet } from '../compose-says';
 import { onCloudPhone } from '../phone-screen';
 import { defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type ModelChoice } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLastEffort, writeLastEffort } from '../effort';
-import { readLastEngine, startingEngine, writeLastEngine } from '../engines';
+import { startingEngine, writeLastEngine } from '../engines';
 import { repeatPresets } from '../components/When';
 import { ideasFor, type Idea } from '../first-run';
 import { readRule, repeatsLine } from '../format';
@@ -129,8 +129,10 @@ export interface ComposeStart {
 }
 
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false, onSendToAgent, blockChoicesFor,
+  products, items, engines, workspaceEngine, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false, onSendToAgent, blockChoicesFor,
 }: {
+  /** The default agent from Settings, which every new card opens on. */
+  workspaceEngine?: string | null;
   /** First-thread suggestions, offered only while the tutorial is walking someone to their first send. */
   ideas?: Idea[] | null;
   /** The tutorial's first task: the folder is asked for before the suggestions. */
@@ -164,7 +166,7 @@ export function ThreadComposer({
    *
    * The walk types one task into this card and the app answers it a couple of
    * seconds later out of a pre-written line, with no session behind it
-   * (main/first-run.mjs). Two things follow, and both are why the walk needed a
+   * (main/first-run.mts). Two things follow, and both are why the walk needed a
    * card of its own until now:
    *
    *  - IT MAY BE SENT INTO THE PRACTICE PROJECT. Every other task there is
@@ -236,7 +238,7 @@ export function ThreadComposer({
   const [query, setQuery] = useState('');
   // MORE THAN ONE PERSON (2026-10-01): one message can go to several people
   // at once. `to` is the first person; `also` is everyone added after.
-  // One conversation belongs to exactly that group (main/team/index.mjs).
+  // One conversation belongs to exactly that group (main/team/index.mts).
   const [also, setAlso] = useState<string[]>(() => initial?.also ?? []);
   const [adding, setAdding] = useState(false);
   const extra = also.map((id) => others.find((p) => p.id === id)).filter((p): p is NonNullable<typeof p> => !!p);
@@ -328,8 +330,11 @@ export function ThreadComposer({
   const claudeOffered = engineRows.some((e) => e.id === 'claude');
   const codexDefault = codexModelDefault ?? null;
   const modelOpts = { codexModels, codexDefault };
+  // The agent is the default from Settings, not the last one picked: a pick
+  // carried silently into the next thread sent work to the wrong agent. Each
+  // agent's own last model is still remembered.
   const remembered = (): ModelPick => {
-    const engine: Harness = startingEngine(readLastEngine(), engines);
+    const engine: Harness = startingEngine(workspaceEngine ?? null, engines);
     return { engine, model: readLastModel(undefined, engine, codexDefault) ?? defaultModelFor(engine, codexDefault) };
   };
   const [pick, setPick] = useState<ModelPick>(remembered);
@@ -683,7 +688,7 @@ export function ThreadComposer({
     // A LEVEL NOBODY PICKED IS NOT SENT, and the chip reads Medium either way.
     // The two land in the same place, because an unsent level is composeItem's
     // 0 and the inbox reads 0 as Medium. What it keeps is the other Mac's own
-    // reading of the message (main/message-priority.mjs): a level the sender
+    // reading of the message (main/message-priority.mts): a level the sender
     // chose is theirs and is left alone, and a message nobody ranked is still
     // sorted there rather than arriving flat.
     let res: Awaited<ReturnType<typeof api.teamMessage>>;
@@ -1371,7 +1376,7 @@ export function ThreadComposer({
         {/* A MESSAGE TO A PERSON CARRIES ITS FILES (w-140ac855b1). It used to
             say they stayed here, because the conversation they are saved in
             may not exist until the message makes it; the send hands them over
-            and main/team/index.mjs saves them once it knows where. */}
+            and main/team/index.mts saves them once it knows where. */}
         {error && <div className="tc-note tc-error" role="alert">{error}</div>}
         {!talk.on && talk.problem && <div className="tc-note">{talk.problem}</div>}
 

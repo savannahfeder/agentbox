@@ -130,7 +130,7 @@ export const SETUPS = [
     expect: NORMAL,
     // Claude Code reads this one out of the settings file itself, past the
     // environment scrub. Found by this setup on its first run and fixed by the
-    // blank in every worker's --settings (NO_METERED_KEY, main/harnesses/claude.mjs).
+    // blank in every worker's --settings (NO_METERED_KEY, main/harnesses/claude.mts).
   },
   {
     name: 'api-key-in-project',
@@ -317,7 +317,7 @@ export function layCodexHome(setup, { home, url }) {
   const login = spec.login === 'chatgpt' ? chatgptLogin() : spec.login === 'apikey' ? apiKeyLogin() : null;
   if (login) fs.writeFileSync(path.join(dir, 'auth.json'), `${JSON.stringify(login, null, 2)}\n`, { mode: 0o600 });
   // The model list a signed-in codex keeps beside its login, which is where
-  // the app's picker reads Codex's models from (main/codex-models.mjs). The
+  // the app's picker reads Codex's models from (main/codex-models.mts). The
   // stand-in has no catalog to serve, so without this file the composer had
   // no Codex column at all, on a home where Settings said Codex was signed in.
   if (login) fs.writeFileSync(path.join(dir, 'models_cache.json'), `${JSON.stringify(modelsCache(), null, 1)}\n`);

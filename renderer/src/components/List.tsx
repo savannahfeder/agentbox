@@ -3,6 +3,8 @@
 // end, on the title's line, the things that are not the message: priority, the
 // product, and when (or that an agent is on it, or that one stopped).
 
+import { NeedsWaiting } from '../threads/NeedsWaiting';
+import './need-card.css';
 import { useContext, useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { Product, RepeatRule, RunningSession, ThreadCard, View, WorkItem } from '../types';
 import { ago, dayAndTime, dayLabel, stamp } from '../format';
@@ -26,12 +28,13 @@ import { CloudOfferRow, RepeatMark, RowCells, SectionHead, TableHead, ThreadCell
 import type { StackKey, StackSection } from '../threads/stack-rules';
 import { cardPlace } from '../threads/page-rules';
 import { FleetContext } from '../fleet';
-import { cardStatus, factsFor, statusCell } from '../status-word';
+import { cardStatus, factsFor, laterCell, statusCell } from '../status-word';
+import { opensOnKey } from '../repeat-from-thread';
 import { toApproveWords } from '../threads-made';
 import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mjs';
-import { catchUpDue } from '../../../shared/agent-import.mjs';
+import { catchUpDue } from '../../../shared/agent-import.mts';
 
 /**
  * THE AGENT A ROW WITH NOTHING RUNNING WOULD RUN ON.
@@ -346,11 +349,14 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
     const pool = allItems ?? items;
     const last = rule.lastOccurrence ? pool.find((i) => i.id === rule.lastOccurrence) ?? null : null;
     const live = !!last && (last.status === 'open' || last.status === 'claimed');
+    // Its run's word only while an agent is on that run; otherwise it comes back at its time.
+    const running = live && last ? statusCell(last, { ...factsFor(fleet, last.id), inProgress: live, now: Date.now() }) : null;
     return (
       <div key={rule.id} data-repeat-id={rule.id} className="row" title={repeatRow(rule, last).last}
+        role="button" tabIndex={0} onKeyDown={opensOnKey(() => onOpenRepeat?.(rule))}
         onClick={() => onOpenRepeat?.(rule)}>
         <span className="mark" aria-hidden="true" />
-        <RowCells status={last ? statusCell(last, { ...factsFor(fleet, last.id), inProgress: live, now: Date.now() }) : undefined}
+        <RowCells status={running?.live ? running : laterCell(null)}
           lead={<RepeatMark />} title={rule.title} aside={repeatTag(rule)} where={rule.productName}
           person={withPerson ? personCell?.(team?.me ?? null) : undefined}
           priority={rule.priority ?? 5} updatedAt={rule.updatedAt ?? rule.createdAt}
@@ -361,6 +367,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
 
   return (
     <div className={`list${table ? ' th-table' : ''}`} ref={drag.listRef} {...pointer}>
+      {view === 'inbox' && <NeedsWaiting items={items} onOpen={onOpen} />}
       {table && (!stack || stack.sections.every((x) => x.bare)) && <TableHead person={withPerson} tab={view} />}
       {!leadIn && lead}
       {/* Repeating tasks sit above the deferred rows, in the tab that already
@@ -383,7 +390,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
             const last = rule.lastOccurrence ? pool.find((i) => i.id === rule.lastOccurrence) ?? null : null;
             const row = repeatRow(rule, last);
             return (
-              <div key={rule.id} data-repeat-id={rule.id} className="row" onClick={() => onOpenRepeat?.(rule)}>
+              <div key={rule.id} data-repeat-id={rule.id} className="row" role="button" tabIndex={0}
+                onKeyDown={opensOnKey(() => onOpenRepeat?.(rule))} onClick={() => onOpenRepeat?.(rule)}>
                 <span className="mark" />
                 <div className="row-main">
                   <div className="subject">{rule.title}</div>

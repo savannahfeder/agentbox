@@ -21,11 +21,11 @@ import { zoomPercentFor } from './zoom-readout.mts';
 // cannot work around, because Chromium persists the zoom level per page URL
 // and hands it back after every reload.
 //
-// So the chords are now handled in main.mjs as well, and this stays for the
+// So the chords are now handled in main.mts as well, and this stays for the
 // menu's label and for a click. On macOS the two are exclusive (AppKit eats a
 // key equivalent before the page can see it); the guard below is what keeps
 // that an assumption rather than a load-bearing one, exactly like the reload
-// debounce in main.mjs.
+// debounce in main.mts.
 let lastZoomAt = 0;
 let lastZoomDelta: number | null = null;
 
@@ -70,7 +70,7 @@ function announceZoom(level: number): void {
 // says why it is not Chromium's findInPage), so all this does is tell the page
 // which one was pressed: 0 opens the box, 1 and -1 walk the matches.
 //
-// Two routes again, the menu and before-input-event in main.mjs, for the reason
+// Two routes again, the menu and before-input-event in main.mts, for the reason
 // zoom has two, and the same guard keeps one press from arriving twice.
 let lastFindAt = 0;
 let lastFindStep: number | null = null;
@@ -99,7 +99,7 @@ interface MenuHandlers {
 export function installMenu({ onApproval, onReload, onZoom }: MenuHandlers = {}): void {
   // A CLICK NAMES ITS WINDOW.after the chords were fixed. Electron hands a menu
   // click the window it was chosen from, so the click stops asking what is
-  // focused, which is the question that was coming back null. main.mjs decides
+  // focused, which is the question that was coming back null. main.mts decides
   // the keystroke's target from where the event arrived: inside the junk
   // browser it is the guest, which carries its own zoom.
   const zoom = (delta: number, window: BaseWindow | undefined) => {

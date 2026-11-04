@@ -117,6 +117,20 @@ if [ ! -x "node_modules/.bin/vitest" ]; then
   exit 1
 fi
 
+# A task folder's node_modules is a copy of the app folder's, so a branch that
+# changes packages would otherwise be tested on main's.
+installed="$hookdir/../lib/installed-matches-the-lockfile.mjs"
+if [ -f "$installed" ] && ! node "$installed"; then
+  echo "pre-push: installing what package-lock.json says before the tests run..."
+  if ! npm ci --no-audit --no-fund; then
+    echo ""
+    echo "  PUSH REFUSED. npm ci failed in $root, so the tests would run on the"
+    echo "  wrong packages. The reason is above."
+    echo ""
+    exit 1
+  fi
+fi
+
 refuse() {
   echo ""
   echo "  PUSH REFUSED, because the tests above are red."
@@ -188,7 +202,7 @@ elif [ -z "$code" ]; then
 else
   # WHAT THIS PUSH CAN AFFORD TO WAIT FOR (scripts/lib/tests-the-push-runs.mjs).
   # `related` reaches most of the suite for a core file — 216 of 1,207 files
-  # name main/supervisor.mjs — so over the cap it hands back the files most
+  # name main/supervisor.mts — so over the cap it hands back the files most
   # about the change and GitHub runs the lot after the push. It names the tests
   # that read a changed file as text too, which `related` cannot see.
   runargs=$(node scripts/lib/tests-the-push-runs.mjs $code | tr '\n' ' ') || runargs=""
@@ -256,7 +270,7 @@ fi
 
 # A TEST ALREADY RED ON MAIN IS NOT THIS PUSH'S (w-73e6011de3). The app sets
 # AGENTBOX_RED_ON_MAIN, one file per line, from GitHub's last red run on main,
-# and a thread is already fixing those (main/main-went-red.mjs). Only a file
+# and a thread is already fixing those (main/main-went-red.mts). Only a file
 # red here and not in that list refuses the push.
 if [ -n "${AGENTBOX_RED_ON_MAIN:-}" ]; then
   still=$(node scripts/red-test-files.mjs "$again" 2>/dev/null)

@@ -8,7 +8,7 @@
 // WHAT CHANGED IN THE PORT, and why:
 //   - The file is the document. That app saved a creation by id through its own
 //     IPC; here the pane already has a path, and main writes markdown straight
-//     onto it (main/doc-file.mjs).
+//     onto it (main/doc-file.mts).
 //   - Pasting an image is gone. That app wrote it into the doc's own assets/
 //     folder through an IPC the app does not have, and inventing one would be a
 //     second feature inside this one. A pasted image lands as text; nothing
@@ -21,7 +21,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import { buildExtensions } from '../editor/extensions';
 import { mdToPmDoc, pmDocToMd } from '../editor/markdown';
 import { patchOriginal } from '../editor/patch-md';
-import { theAppKeepsThisKey } from '../../../shared/artifact-keys.mjs';
+import { theAppKeepsThisKey } from '../../../shared/artifact-keys.mts';
 import { api } from '../api';
 import { asksForANewTab } from '../link-click';
 import { pictureUrl } from '../picture';
@@ -143,7 +143,7 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
     const doc = mdToPmDoc(text);
     onDisk.current = text;
     baseMd.current = pmDocToMd(doc);
-    editor.commands.setContent(doc);
+    editor.commands.setContent(doc, { emitUpdate: false });
   }, [text, editor]);
 
   // ⌘S SAVES IT NOW.A markdown file was already saving itself on a pause and on

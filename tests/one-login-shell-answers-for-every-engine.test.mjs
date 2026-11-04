@@ -6,7 +6,7 @@
 //   findClaudeBin() + findCodexBin(), cold:  1640, 1432, 1435 ms
 //   the same two with the shell stubbed out:    0 ms
 //
-// `main/main.mjs` calls `loadConfig` at line 279, inside `createWindow` and
+// `main/main.mts` calls `loadConfig` at line 279, inside `createWindow` and
 // before `new BrowserWindow` at line 597. So that was not 1.4 s somewhere in
 // the background: it was 1.4 s of nothing on screen added to every launch, and
 // it was the price of asking the shell first.

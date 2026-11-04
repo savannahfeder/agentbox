@@ -11,7 +11,7 @@
 // So the folders the message itself names come first, then the thread's own
 // designs folder, then the five it always tried. Only folders inside this
 // project's own folder count: anything else is outside what the window may
-// draw (main/img-scheme.mjs), so naming it as a place to look would only add a
+// draw (main/img-scheme.mts), so naming it as a place to look would only add a
 // request that is refused.
 import { referencedFiles } from './referenced-files';
 import { productPath } from './remark-artifact-paths';
@@ -58,7 +58,7 @@ export function pictureRoots({ dir, repo, id, texts }: {
     ...(dir ? namedFolders(texts, dir).map((f) => `${dir}/${f}`) : []),
     dir && id && `${dir}/designs/${id}`,
     // THE WORKER'S OWN CHECKOUT. Every run works in `.claude/worktrees/<task
-    // id>` under the repository (main/task-folders.mjs), so a path it writes is
+    // id>` under the repository (main/task-folders.mts), so a path it writes is
     // relative to that folder. Her screenshot that evening was seven of them,
     // all "missing image" (tests/a-picture-in-the-workers-own-checkout-is-drawn).
     repo && id && `${repo}/.claude/worktrees/${id}`,

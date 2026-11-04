@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { harnessFor, supportsHarnessOperation, HARNESS_OPERATIONS } from '../main/harnesses.mjs';
+import { harnessFor, supportsHarnessOperation, HARNESS_OPERATIONS } from '../main/harnesses.mts';
 import { harnessDefinition, HARNESS_DEFINITIONS } from '../shared/harness-definitions.mjs';
 import { ENGINES, ENGINE_IDS, DEFAULT_ENGINE, isEngine, engineFor } from '../shared/engines.mjs';
 
@@ -77,8 +77,8 @@ describe('adding OpenCode touched no existing engine branch', () => {
     // `opencode` branch in any of them would mean the seam did not hold and
     // the next harness will cost twelve edits again.
     const counted = [
-      'main/supervisor.mjs', 'main/agent-updates.mjs', 'main/ipc.mjs', 'main/settings.mjs',
-      'main/task-commands.mjs', 'main/sign-in-files.mjs', 'main/row-label.mjs', 'main/engine-setup.mjs',
+      'main/supervisor.mts', 'main/agent-updates.mts', 'main/ipc.mts', 'main/settings.mts',
+      'main/task-commands.mts', 'main/sign-in-files.mts', 'main/row-label.mts', 'main/engine-setup.mts',
     ];
     for (const file of counted) {
       const source = read(file);
@@ -88,7 +88,7 @@ describe('adding OpenCode touched no existing engine branch', () => {
   });
 
   it('lives in its own files, and the shared list is data only', () => {
-    for (const file of ['main/harnesses/opencode.mjs', 'main/opencode.mjs', 'main/opencode-server.mjs']) {
+    for (const file of ['main/harnesses/opencode.mts', 'main/opencode.mts', 'main/opencode-server.mts']) {
       expect(fs.existsSync(path.join(root, file)), `${file} is missing`).toBe(true);
     }
     // The renderer-safe definitions file must stay free of processes, keys and
@@ -106,7 +106,7 @@ describe('adding OpenCode touched no existing engine branch', () => {
     // can only approve everything or refuse everything. Neither is a card,
     // which is why the harness drives the server and why this flag must never
     // appear anywhere in it.
-    for (const file of ['main/harnesses/opencode.mjs', 'main/opencode.mjs', 'main/opencode-server.mjs']) {
+    for (const file of ['main/harnesses/opencode.mts', 'main/opencode.mts', 'main/opencode-server.mts']) {
       const source = read(file);
       const code = source.split('\n').filter(line => !/^\s*(\/\/|\*|\/\*)/.test(line)).join('\n');
       expect(code, `${file} passes --auto`).not.toMatch(/--auto\b/);

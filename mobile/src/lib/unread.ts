@@ -35,5 +35,7 @@ export function markUnseen(seen: Seen, item: { product: string; id: string }, st
   return { ...seen, at };
 }
 
-export const isUnread =(item: { product: string; id: string; createdAt?: number; wrote?: any }, seen: Seen) =>
-  arrivedAt(item as any) > (seen.at[keyOf(item)] ?? seen.since);
+// Her own thread with no answer yet holds nothing new: only her message, and "Queued".
+export const isUnread =(item: { product: string; id: string; createdAt?: number; wrote?: any; waitsForMac?: boolean }, seen: Seen) =>
+  !(!item.wrote?.result && (item.waitsForMac || item.wrote?.body?.source === 'founder'))
+  && arrivedAt(item as any) > (seen.at[keyOf(item)] ?? seen.since);

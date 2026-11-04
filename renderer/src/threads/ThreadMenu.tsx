@@ -34,10 +34,11 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { chord } from '../this-keyboard';
 import { DONE } from '../done-word';
+import { onPhone } from '../phone-screen';
 import { PlaceButton, type PlaceFacts } from './PlaceButton';
 import { nameWait } from '../../../shared/thread-waits.mjs';
 
-export type ThreadMenuRowId = 'run' | 'code' | 'terminal' | 'later' | 'pin' | 'rename' | 'give' | 'wait' | 'shipped' | 'close-task' | 'done';
+export type ThreadMenuRowId = 'run' | 'code' | 'terminal' | 'later' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'close-task' | 'done';
 
 /**
  * WHERE THIS THREAD RUNS: in the cloud now (`cloud`), free to go there
@@ -79,18 +80,21 @@ export interface ThreadMenuRow { id: ThreadMenuRowId; label: string; key: string
  * door to one verb; on a phone there was no door at all and the Later tab
  * could not be filled. It names no key for the same reason.
  */
-export function threadMenuRows({ change, terminal, finish, runNow = false, later = false, pin = null, rename = false, give = false, wait = false, shipped = null, closeTask = false }: {
+export function threadMenuRows({ change, terminal, finish, runNow = false, later = false, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, closeTask = false }: {
   /** An open task between people: E only clears it from your Needs you, so closing it is its own row. */
   closeTask?: boolean;
   /** Whether a person has said it shipped, or null where the team would not see that. */
   shipped?: 'marked' | 'unmarked' | null;
   wait?: boolean | 'blocked';
   rename?: boolean;
+  /** Opens ⌘K on its Move to rows, which already know the projects and say when a thread cannot move. */
+  move?: boolean;
   change: boolean;
   terminal: 'open' | 'closed' | null;
   finish: boolean;
   runNow?: boolean;
-  later?: boolean;
+  /** 'key' on the laptop, where L does it and the row says so. */
+  later?: boolean | 'key';
   pin?: 'pinned' | 'unpinned' | null;
   give?: boolean;
 }): ThreadMenuRow[] {
@@ -98,8 +102,9 @@ export function threadMenuRows({ change, terminal, finish, runNow = false, later
   if (runNow) rows.push({ id: 'run', label: 'Run now', key: null });
   if (change) rows.push({ id: 'code', label: 'View code changes', key: null });
   if (terminal) rows.push({ id: 'terminal', label: terminal === 'open' ? 'Hide terminal' : 'Open terminal', key: '⌘J' });
-  if (later) rows.push({ id: 'later', label: 'Later', key: null });
+  if (later) rows.push({ id: 'later', label: 'Later', key: later === 'key' ? 'L' : null });
   if (rename) rows.push({ id: 'rename', label: 'Rename', key: null });
+  if (move) rows.push({ id: 'move', label: 'Move to another project', key: null });
   if (pin) rows.push({ id: 'pin', label: pin === 'pinned' ? 'Unpin thread' : 'Pin thread', key: null });
   if (give) rows.push({ id: 'give', label: 'Give it to someone else…', key: null });
   if (wait) rows.push({ id: 'wait', label: wait === 'blocked' ? 'Blocked by…' : 'Waits on…', key: null });
@@ -162,7 +167,11 @@ function WaitMark() {
 function RenameMark() {
   return <svg {...mark}><path d="M4 20h4L19 9l-4-4L4 16z" /></svg>;
 }
-const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { run: RunMark, code: CodeMark, terminal: TerminalMark, later: LaterMark, pin: () => <PinMark />, rename: RenameMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'close-task': DoneMark, done: DoneMark };
+/** An arrow into a wall: somewhere else. */
+function MoveMark() {
+  return <svg {...mark}><path d="M3 12h13m-4-4 4 4-4 4" /><path d="M20 4v16" /></svg>;
+}
+const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { run: RunMark, code: CodeMark, terminal: TerminalMark, later: LaterMark, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'close-task': DoneMark, done: DoneMark };
 
 /** Three square dots, because every shape in this skin is square. */
 function Dots() {
@@ -207,7 +216,9 @@ function BlockWords({ onPick }: { onPick: (id: string) => void }) {
 
 /* ----------------------------------------------------------------- button */
 
-export function ThreadMenu({ change = null, onViewChange, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onReopen = null, onRunNow = null, onLater = null, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
+export function ThreadMenu({ change = null, onViewChange, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onReopen = null, onRunNow = null, onLater = null, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
+  /** Opens ⌘K on the Move to rows. */
+  onMove?: (() => void) | null;
   /** Whether a person has said it shipped, or null where the team would not see that. */
   shipped?: boolean | null;
   onShipped?: (on: boolean) => void;
@@ -249,7 +260,7 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
   /** True keeps it on this Mac (moving it here if it is in the cloud). */
   onPlace?: (keep: PlaceAct) => void;
 }) {
-  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change, terminal, finish: !!onFinish, runNow: !!onRunNow, later: !!onLater, rename: !!onRename, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', closeTask: !!onCloseTask }));
+  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', closeTask: !!onCloseTask }));
   const [open, setOpen] = useState(false);
   const [giving, setGiving] = useState(false);
   const [waiting, setWaiting] = useState(false);
@@ -324,6 +335,7 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
     else if (id === 'terminal') onToggleTerminal?.();
     else if (id === 'later') onLater?.();
     else if (id === 'rename') onRename?.();
+    else if (id === 'move') onMove?.();
     else if (id === 'pin') onPin?.(!pinned);
     else if (id === 'shipped') onShipped?.(!shipped);
     else if (id === 'close-task') onCloseTask?.();
@@ -336,7 +348,7 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
       {files}
       {place && <PlaceButton place={place} {...placeFacts} onPlace={onPlace} />}
       {onReopen && !done && <button type="button" className="ts-done ts-reopen" onClick={onReopen}><span>Reopen</span></button>}
-      {onCloseTask && <button type="button" className="ts-done ts-close-task" onClick={onCloseTask}><span>Close task</span></button>}
+      {onCloseTask && <button type="button" className="ts-done ts-close-task" data-hint="close-task" data-hint-align="right" onClick={onCloseTask}><span>Close task</span></button>}
       {done && (
         <button
           type="button"

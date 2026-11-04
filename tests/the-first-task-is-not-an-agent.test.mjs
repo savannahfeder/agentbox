@@ -21,10 +21,10 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   MAX_LINE, clip, firstRunAnswer, fromDescription, fromReadme, plainText,
-} from '../shared/first-run-line.mjs';
-import { answerFor, countFolder, describeFor, readDescription, readReadme } from '../main/first-run.mjs';
-import { howLongAgo, mainLanguage, projectSentence } from '../shared/first-run-shape.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+} from '../shared/first-run-line.mts';
+import { answerFor, countFolder, describeFor, readDescription, readReadme } from '../main/first-run.mts';
+import { howLongAgo, mainLanguage, projectSentence } from '../shared/first-run-shape.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { ANSWER_AFTER_MS, FIRST_RUN_LABEL, coach, walkRows } from '../renderer/src/onboarding.ts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
@@ -364,7 +364,7 @@ describe('the answer, written to a real store', () => {
     fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify({
       schemaVersion: 1, id: 'agentbox-v2', name: `${Name} v2`, repoPath: repo,
     }));
-    const { Store } = await import('../main/store.mjs');
+    const { Store } = await import('../main/store.mts');
     store = await new Store({ storeRoot: tmp, accountId: 'test-account', accountRoot, products: [] }).init();
   });
 
@@ -455,7 +455,7 @@ describe('the wiring, which is the half a pure test cannot see', () => {
   });
 
   it('keeps the found line under the project name in the sidebar, and only that', () => {
-    const store = mainSrc('store.mjs');
+    const store = mainSrc('store.mts');
     const fn = store.slice(store.indexOf('finishFirstRunTask('), store.indexOf('setOneLiner(slug, oneLiner)'));
     expect(fn).toMatch(/if \(described\.found\) this\.setOneLiner\(slug, described\.line\);/);
   });

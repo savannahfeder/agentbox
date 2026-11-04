@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const make = (teammates) => new Supervisor(
   { storeRoot: fs.mkdtempSync(path.join(os.tmpdir(), 'zero-tm-hang-')), maxConcurrentSessions: 2, teammateReplyDeadlineMs: 50, alphaTeammates: true },

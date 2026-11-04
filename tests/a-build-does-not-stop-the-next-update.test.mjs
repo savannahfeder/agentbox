@@ -1,7 +1,7 @@
 // A BUILD DOES NOT STOP THE NEXT UPDATE.
 //
 // Measured on the team app folder, 2026-10-02: `git status` showed two files
-// changed, shared/claude-commands.generated.mjs and
+// changed, shared/claude-commands.generated.mts and
 // shared/claude-models.generated.mjs, both only a version and date stamp. The
 // updater's own restart runs `npm run build`, and the build rewrites those two
 // files from the Claude Code on this Mac. So after one update the folder read

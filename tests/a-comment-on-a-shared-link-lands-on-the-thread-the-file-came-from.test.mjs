@@ -6,7 +6,7 @@
 // a stand-in thread store: which comments become a note, on which thread, in
 // what words, and that none is said twice.
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { noticeLinkComments, threadOfSource, noteFor } from '../main/team/link-comments.mjs';
 
 let cloud, maya, chris, lena, clock, cursor, notes, items;
@@ -113,8 +113,8 @@ describe('in the app', () => {
     const os = await import('node:os');
     const path = await import('node:path');
     const disk = await import('../main/store/work-items.mjs');
-    const { Store } = await import('../main/store.mjs');
-    const { createTeamService } = await import('../main/team/index.mjs');
+    const { Store } = await import('../main/store.mts');
+    const { createTeamService } = await import('../main/team/index.mts');
     const { memorySession } = await import('../main/team/session.mjs');
     disk._internals.forgetFolds();
     const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'link-comments-'));

@@ -5,15 +5,15 @@
    underline (Cmd+U — StarterKit omits it), and "type an arrow, get an arrow"
    (-> becomes →, one Backspace undoes it). */
 import { Mark, Node, Extension, mergeAttributes, textInputRule } from '@tiptap/core';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
-import TaskList from '@tiptap/extension-task-list';
-import TaskItem from '@tiptap/extension-task-item';
-import Link from '@tiptap/extension-link';
-import Table from '@tiptap/extension-table';
-import TableRow from '@tiptap/extension-table-row';
-import TableHeader from '@tiptap/extension-table-header';
-import TableCell from '@tiptap/extension-table-cell';
+import { StarterKit } from '@tiptap/starter-kit';
+import { Placeholder } from '@tiptap/extension-placeholder';
+import { TaskList } from '@tiptap/extension-task-list';
+import { TaskItem } from '@tiptap/extension-task-item';
+import { Link } from '@tiptap/extension-link';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { TableCell } from '@tiptap/extension-table-cell';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -145,6 +145,11 @@ export const Image = Node.create<{ drawnFrom: ((src: string) => string) | null }
   },
 });
 
+// StarterKit 3 added these. Link and underline are configured here and in the
+// chat box, and a trailing empty paragraph would change the markdown written
+// back to disk.
+export const STARTER_KIT_EXTRAS_OFF = { link: false, underline: false, trailingNode: false, listKeymap: false } as const;
+
 /*
  * `tables` is off for the sidebar note and on everywhere else.
    The rail's column is 298px, a table cannot be narrowed to fit one, and the
@@ -155,6 +160,7 @@ export function buildExtensions(placeholder: string, { tables = true, drawnFrom 
   return [
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
+      ...STARTER_KIT_EXTRAS_OFF,
     }),
     Underline,
     UnboldHeading,

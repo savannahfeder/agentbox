@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { effectiveProfiles, forgetDiscovery } from '../main/account-discovery.mjs';
-import { addClaudeAccount } from '../main/settings.mjs';
+import { addClaudeAccount } from '../main/settings.mts';
 
 let home;
 
@@ -34,7 +34,8 @@ const login = (email, accountUuid) => ({ oauthAccount: { emailAddress: email, ac
 function folder(name, claudeJson) {
   const dir = path.join(home, name);
   fs.mkdirSync(dir, { recursive: true });
-  if (claudeJson) fs.writeFileSync(path.join(dir, '.claude.json'), JSON.stringify(claudeJson));
+  // The default login's file sits beside ~/.claude, not in it.
+  if (claudeJson) fs.writeFileSync(path.join(name === '.claude' ? home : dir, '.claude.json'), JSON.stringify(claudeJson));
   return dir;
 }
 
@@ -92,7 +93,7 @@ describe('what must not change', () => {
   // The default login is never judged by a file: some installs keep it where
   // this check does not look, and dropping it would stop a working fleet.
   it('never drops the default login', () => {
-    fs.rmSync(path.join(home, '.claude', '.claude.json'));
+    fs.rmSync(path.join(home, '.claude.json'));
     expect(effectiveProfiles(['default'], { home })).toEqual(['default']);
   });
 

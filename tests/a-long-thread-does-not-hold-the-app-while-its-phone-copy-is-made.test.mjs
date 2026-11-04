@@ -8,7 +8,7 @@ import { it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { filesNamed } from '../main/phone-uploads.mjs';
+import { filesNamed } from '../main/phone-uploads.mts';
 
 let root, docs, repo;
 const put = (file) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, 'x'); };

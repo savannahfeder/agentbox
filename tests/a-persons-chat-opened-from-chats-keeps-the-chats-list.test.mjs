@@ -38,7 +38,7 @@ describe('a person\'s chat opened from the Chats list', () => {
   });
 
   it('has no back link to another list and no counter through one', () => {
-    expect(app).toMatch(/queue=\{queueSpot && !inChats \? \{ spot: queueSpot, onStep: stepQueue \} : null\}/);
+    expect(app).toMatch(/queue=\{queueSpot && !inChats \? \{ spot: spotIn\(arrowsWalk, focused\) \?\? queueSpot, onStep: stepQueue \} : null\}/);
   });
 });
 

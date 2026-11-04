@@ -39,7 +39,7 @@ const app = src('App.tsx');
 
 // The global handler, from where modals and inputs have already returned to the
 // end of the effect. Everything below the guard is a shortcut branch.
-const GUARD = 'if (opensATextField(e.key)) e.preventDefault();';
+const GUARD = 'if (opensATextField(e.key) && !(nothingToActOn && actsOnARow(e.key))) e.preventDefault();';
 
 // The global key handler's own span. Bounding on the file instead caught a
 // setModal('reply') in an unrelated effect, which is how a source-level test

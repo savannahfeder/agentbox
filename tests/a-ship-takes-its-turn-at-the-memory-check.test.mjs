@@ -1,17 +1,17 @@
 // A SHIP TAKES ITS TURN AT THE MEMORY CHECK.
 //
 // On 2026-10-30 a 16 GB Mac swapping 14 GB showed vitest workers at 604, 522 and
-// 496 MB from a ship's push. The memory check (main/memory-gate.mjs) holds heavy
+// 496 MB from a ship's push. The memory check (main/memory-gate.mts) holds heavy
 // commands back and judges each by what it measured, but a ship ran its script
-// straight from the app (main/ship-queue.mjs) and its tests from a git hook, and
+// straight from the app (main/ship-queue.mts) and its tests from a git hook, and
 // neither is an agent's shell command, so the check never saw them. A cap on
 // workers was tried first and turned down: "certain actions cost memory and we'd
 // built a decent system for that". So a ship asks for a slot like any heavy
 // command, and holds it until it ends.
 import { describe, it, expect } from 'vitest';
-import { MemoryGate } from '../main/memory-gate.mjs';
-import { CommandHistory } from '../main/memory-gate-history.mjs';
-import { shipSlot } from '../main/ship-queue.mjs';
+import { MemoryGate } from '../main/memory-gate.mts';
+import { CommandHistory } from '../main/memory-gate-history.mts';
+import { shipSlot } from '../main/ship-queue.mts';
 
 const item = { id: 'w-ship', product: 'p' };
 function setup(opts = {}) {

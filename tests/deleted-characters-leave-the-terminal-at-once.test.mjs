@@ -16,8 +16,8 @@
 // together as the next write. These pin both halves.
 import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
-import { TaskTerminals } from '../main/task-terminals.mjs';
-import { inputQueue } from '../shared/terminal-input.mjs';
+import { TaskTerminals } from '../main/task-terminals.mts';
+import { inputQueue } from '../shared/terminal-input.mts';
 
 function fixture() {
   let emit = () => {}, exit = () => {};
@@ -133,7 +133,7 @@ describe('the panel', () => {
     expect(source).toMatch(/state\.live\?0:150/);
   });
   it('main passes the wait through for both kinds of terminal', () => {
-    expect(fs.readFileSync('main/ipc.mjs', 'utf8')).toMatch(/terminals\.read\(key,offset,wait\)/);
-    expect(fs.readFileSync('main/agent-updates.mjs', 'utf8')).toMatch(/terminals\.read\(engine,p\.offset,p\.wait\)/);
+    expect(fs.readFileSync('main/ipc.mts', 'utf8')).toMatch(/terminals\.read\(key,offset,wait\)/);
+    expect(fs.readFileSync('main/agent-updates.mts', 'utf8')).toMatch(/terminals\.read\(engine,p\.offset,p\.wait\)/);
   });
 });

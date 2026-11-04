@@ -80,7 +80,7 @@ describe('the keychain', () => {
   // use of safeStorage must sit inside a branch that has a team config. The
   // team's sign-in is one; a Connections sign-in is the other (2ad7fc93).
   it('is only reached for when there is a team to keep a sign-in for', () => {
-    const main = fs.readFileSync(path.join(root, 'main', 'main.mjs'), 'utf8');
+    const main = fs.readFileSync(path.join(root, 'main', 'main.mts'), 'utf8');
     const uses = [...main.matchAll(/safeStorage\.\w+/g)].map((m) => m.index);
     expect(uses.length).toBeGreaterThan(0);
     const branches = [...main.matchAll(/const \w+ = cloudConfig \? /g)]

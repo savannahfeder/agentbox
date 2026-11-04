@@ -21,9 +21,9 @@
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { EVENTS, sanitize } from '../shared/analytics-events.mjs';
-import { createCornerTag } from '../main/corner-tag.mjs';
-import { cornerTagTurnedOff } from '../main/settings.mjs';
+import { EVENTS, sanitize } from '../shared/analytics-events.mts';
+import { createCornerTag } from '../main/corner-tag.mts';
+import { cornerTagTurnedOff } from '../main/settings.mts';
 
 const read = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 
@@ -38,7 +38,7 @@ describe('the new counts are on the approved list', () => {
 
 describe('quitting', () => {
   it('says how long the app was open, on the way out', () => {
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).toMatch(/quitStep\(app, 'before-quit', 'count the quit', \(\) => analytics\.track\('app_quit', \{ seconds: Math\.round\(process\.uptime\(\)\) \}\)\)/);
     // Counted before the hold that waits for the last batch, so it is in it.
     expect(main.indexOf("'count the quit'")).toBeLessThan(main.indexOf('flushBeforeQuit(app'));
@@ -97,10 +97,10 @@ describe('the corner tag', () => {
     expect(cornerTagTurnedOff({ key: 'cornerTag', value: true })).toBe(false);
     expect(cornerTagTurnedOff({ key: 'adhdMode', value: false })).toBe(false);
     expect(cornerTagTurnedOff({})).toBe(false);
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     const at = ipc.indexOf("ipcMain.handle('zero:settings-set-workspace',");
     expect(ipc.slice(at, at + 500)).toMatch(/if \(cornerTagTurnedOff\(payload\)\) analytics\.track\('tag_turned_off'\)/);
-    expect(read('main/main.mjs')).toMatch(/createCornerTag\(\{[\s\S]{0,300}count: \(name, props\) => analytics\.track\(name, props\)/);
+    expect(read('main/main.mts')).toMatch(/createCornerTag\(\{[\s\S]{0,300}count: \(name, props\) => analytics\.track\(name, props\)/);
   });
 });
 

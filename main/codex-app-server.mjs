@@ -2,8 +2,8 @@
 // It speaks newline-delimited JSON-RPC 2.0 over stdio, and when a turn needs an
 // approval the server sends us a request with an id that we must answer.
 //
-// main/supervisor.mjs spawns the process and holds the client,
-// main/codex-session.mjs wraps one thread of it per work item, and
+// main/supervisor.mts spawns the process and holds the client,
+// main/codex-session.mts wraps one thread of it per work item, and
 // main/codex-approvals.mjs is the `onApproval` handler. This file does
 // transport and routing only. The transport is injected so the tests run
 // without `codex` installed.

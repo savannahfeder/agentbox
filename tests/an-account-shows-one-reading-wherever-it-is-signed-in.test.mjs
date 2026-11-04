@@ -16,8 +16,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { recordCloudLogin } from '../main/cloud/logins.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { recordCloudLogin } from '../main/cloud/logins.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { accountsOnce } from '../renderer/src/accounts-once.ts';
 
 let home;

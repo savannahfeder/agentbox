@@ -1,4 +1,4 @@
-// THE PHONE DOOR (main/phone-link.mjs, 2026-10-09). The desktop
+// THE PHONE DOOR (main/phone-link.mts, 2026-10-09). The desktop
 // app's own inbox, reached from a phone that scanned the QR code in Settings.
 // It is off until turned on, answers nothing without the key, lists the phones
 // that use it, and a reset key locks every one of them out at once.
@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { createPhoneLink, phoneAddresses, deviceName } from '../main/phone-link.mjs';
+import { createPhoneLink, phoneAddresses, deviceName } from '../main/phone-link.mts';
 import { aFreePort } from './helpers/free-port.mjs';
 
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
@@ -77,7 +77,7 @@ describe('the phone door', () => {
     const ok = await request(port, '/api/zero:snapshot', { method: 'POST', headers: { 'x-agentbox-token': link.key, 'x-agentbox-device': 'abc', 'user-agent': IPHONE } });
     expect(ok.status).toBe(200);
     expect(JSON.parse(ok.body)).toEqual({ items: ['one'] });
-    // The page itself is public files, as on the loopback door, marked with the door it came through (serve.mjs markTheDoor).
+    // The page itself is public files, as on the loopback door, marked with the door it came through (serve.mts markTheDoor).
     expect((await request(port, '/')).body).toBe('<meta name="agentbox-door" content="this-computer"><p>inbox</p>');
   });
 

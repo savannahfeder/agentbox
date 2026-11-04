@@ -30,7 +30,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CODEX_OWN, DEFAULT_MODEL, engineModelPicked } from '../renderer/src/models.ts';
 import { DEFAULT_ENGINE } from '../shared/engines.mjs';
-import { setModelArg } from '../main/settings.mjs';
+import { setModelArg } from '../main/settings.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');

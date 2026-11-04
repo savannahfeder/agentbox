@@ -2,8 +2,8 @@
 // Compaction must target the existing thread, never send a prompt, and never
 // confuse request acceptance or another thread's completion with success.
 import { describe, it, expect, vi } from 'vitest';
-import { compactCodexThread } from '../main/codex-compaction.mjs';
-import { codexCommand } from '../shared/codex-commands.mjs';
+import { compactCodexThread } from '../main/codex-compaction.mts';
+import { codexCommand } from '../shared/codex-commands.mts';
 
 const flush = async () => { for(let i=0;i<12;i++) await Promise.resolve(); };
 function setup({busy=false,error=null}={}) {
@@ -53,7 +53,7 @@ describe('compaction lifecycle',()=>{
  });
 });
 
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 function supervisorFixture() {
  const sup=Object.create(Supervisor.prototype);
  const row={id:'w-1',product:'p'};

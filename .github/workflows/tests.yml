@@ -47,7 +47,7 @@ permissions:
 # A second push to the same branch cancels the first, so a branch pushed five
 # times in a minute pays for one run rather than five. NOT ON MAIN: each commit
 # there is its own group and runs to the end, because a red main starts its own
-# fix from the commit that broke it (main/main-went-red.mjs), and a cancelled
+# fix from the commit that broke it (main/main-went-red.mts), and a cancelled
 # run names no commit.
 concurrency:
   group: tests-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
@@ -57,7 +57,9 @@ jobs:
   vitest:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: macos-latest
-    timeout-minutes: 20
+    # The same suite takes 5 to 20 minutes here, depending on how busy
+    # GitHub's macOS runners are.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 

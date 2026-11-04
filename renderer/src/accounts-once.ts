@@ -6,7 +6,7 @@
 // twice with two numbers (tests/an-account-shows-one-reading-wherever-it-is-signed-in).
 import { accountLabel, type CloudAccount } from './cloud-menu';
 import type { AccountUsageReading, Usage, UsageLimit } from './types';
-import { readingsDisagree } from '../../shared/usage.mjs';
+import { readingsDisagree } from '../../shared/usage.mts';
 
 /** A login on this computer, as the Claude Code page reads it. */
 export type HereLogin = {
@@ -19,6 +19,9 @@ export type HereLogin = {
   trouble: string | null;
   /** The trouble is only that it is at its limit, which its meters can say better. */
   atLimit?: boolean;
+  /** When that limit was last seen, and when it said it resets. */
+  limitAt?: number | null;
+  limitResetsAt?: number | null;
   /** The folder, needed only to print the command that signs it back in. */
   dir: string | null;
 };

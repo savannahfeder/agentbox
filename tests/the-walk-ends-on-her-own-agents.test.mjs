@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { agentTitle, firstFromBody, oneLine, parseAgentFile, readAgentFiles } from '../main/agent-files.mjs';
+import { agentTitle, firstFromBody, oneLine, parseAgentFile, readAgentFiles } from '../main/agent-files.mts';
 import { NAME } from '../shared/product-name.mjs';
 import {
   anyAgents, COPY, BEAT, N_BEATS, forcedStep,

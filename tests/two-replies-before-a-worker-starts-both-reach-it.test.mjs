@@ -1,7 +1,7 @@
 // MP-04: a latest-answer field must not discard the earlier queued correction.
 // Preserve ledger order and repeated words; stop at a prior delivery/result.
 import {it,expect} from 'vitest';
-import {queuedReplyText} from '../main/live-replies.mjs';
+import {queuedReplyText} from '../main/live-replies.mts';
 const item={product:'p',id:'w',answer:'two',wrote:{answer:{ts:3}}};
 const line=(ts,answer)=>({ts,source:'founder',patch:{answer}});
 const both=(a,b)=>`The person wrote:\n\n${a}\n\nThe person wrote:\n\n${b}`;

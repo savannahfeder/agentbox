@@ -31,7 +31,7 @@ get an app approved.
 - **The renderer's language.** React and TypeScript. The app has its own
   dependencies, because Expo SDK 58 needs React 19.3 and the desktop is on
   React 18 (package.json). It imports only the shared modules that run without
-  Node: some import Node's own modules (`shared/install-id.mjs`).
+  Node: some import Node's own modules (`shared/install-id.mts`).
 - **iPhone and Android from one code base.**
 
 Not chosen:
@@ -75,7 +75,7 @@ adds no server of its own except the alert sender.
   size, a rate limit and blocks, then writes the line. A message between
   people then needs no Mac awake.
 - **The sync cursor is fixed first, for the desktop too.** A pull sets
-  `pulledSeq` to the last row it saw (main/team/sync.mjs), so a line whose
+  `pulledSeq` to the last row it saw (main/team/sync.mts), so a line whose
   lower `seq` commits late is skipped for good. Phones add writers and make
   that likelier. Either sequence numbers are handed out one at a time per
   project, or the pull rereads a window behind its cursor. Edits made at the
@@ -131,7 +131,7 @@ and the Edge Function, is still to build.
   where it came from. Two things write it:
   - the Mac, for its own threads, from the same arrivals that make a desktop
     banner today (`shared/notify-rules.mjs`, and the arrivals
-    main/phone-link.mjs fed to web push);
+    main/phone-link.mts fed to web push);
   - the database, when a line for a person is written: a Direct message, an
     @mention, a task given to them. These have to buzz with every Mac shut.
 - **One rule on the server decides what is sent**, for both: duplicates,
@@ -139,7 +139,7 @@ and the Edge Function, is still to build.
   they are at a computer. The desk rule stays: no buzz while they have used a
   Mac in the last five minutes (`shared/notify-rules.mjs`), read from an
   activity record each Mac renews and that expires on its own. Alerts close
-  together are folded into one, as main/phone-link.mjs does.
+  together are folded into one, as main/phone-link.mts does.
 - **History is never an alert.** Lines brought in from history get a fresh
   insert time, so their age cannot tell them apart; a line is marked as an
   import when it is written, and imports are never sent.

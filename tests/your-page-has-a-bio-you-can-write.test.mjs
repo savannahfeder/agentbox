@@ -15,8 +15,8 @@ import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ProfilePage } from '../renderer/src/team/rooms/RoomPerson.tsx';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createRooms, roomPrefsFile } from '../main/team/rooms.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
 globalThis.React = React;
 
 const card = (o = {}) => ({ id: 'sam', me: false, name: 'Sam R.', avatarUrl: null, headline: null, bio: null, agents: 0, level: 3, hoursTotal: 1, hoursWeek: 1, hoursToday: 0, streak: 1, byMonth: [], teammate: false, showActivity: true, status: null, workingOn: null, workingPrivate: false, ...o });

@@ -23,8 +23,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FIRST_RUN_STEP } from '../renderer/src/first-run.ts';
 import { BEAT } from '../renderer/src/onboarding.ts';
-import { WRAPPED_ARGS } from '../shared/bridge-map.mjs';
-import { sanitize } from '../shared/analytics-events.mjs';
+import { WRAPPED_ARGS } from '../shared/bridge-map.mts';
+import { sanitize } from '../shared/analytics-events.mts';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (f) => fs.readFileSync(path.join(repoRoot, f), 'utf8');

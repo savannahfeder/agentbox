@@ -3,7 +3,7 @@
 // provider-supplied URL outside Claude. Ordinary sessions still close normally.
 import {it,expect} from 'vitest';
 import {EventEmitter} from 'node:events';
-import {attachClaudeInput} from '../main/claude-input.mjs';
+import {attachClaudeInput} from '../main/claude-input.mts';
 function fake(){const c=new EventEmitter();c.stdout=new EventEmitter();c.stdin=new EventEmitter();c.frames=[];c.stdin.writable=true;c.stdin.write=s=>c.frames.push(JSON.parse(s));c.stdin.end=()=>c.stdin.writable=false;c.event=x=>c.stdout.emit('data',JSON.stringify(x)+'\n');return c;}
 it('holds an opted-in session across results and releases it when disabled',()=>{const c=attachClaudeInput(fake());c.holdInput(true);c.event({type:'result'});expect(c.stdin.writable).toBe(true);c.holdInput(false);expect(c.stdin.writable).toBe(false);});
 it('does not hold unrelated sessions',()=>{const a=attachClaudeInput(fake()),b=attachClaudeInput(fake());a.holdInput(true);b.event({type:'result'});expect(b.stdin.writable).toBe(false);expect(a.stdin.writable).toBe(true);});

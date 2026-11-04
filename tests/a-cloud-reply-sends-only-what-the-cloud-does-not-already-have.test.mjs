@@ -29,9 +29,9 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun } from '../main/cloud/run.mjs';
-import { pickBase, periodOf, CACHE_PERIOD_MS, sendConversation, sentRecordPath, MIN_JOIN_BYTES } from '../main/cloud/reuse.mjs';
-import { transcriptFolderName } from '../main/cloud/run.mjs';
+import { cloudRun } from '../main/cloud/run.mts';
+import { pickBase, periodOf, CACHE_PERIOD_MS, sendConversation, sentRecordPath, MIN_JOIN_BYTES } from '../main/cloud/reuse.mts';
+import { transcriptFolderName } from '../main/cloud/run.mts';
 import { copyRanges } from '../main/cloud/aws.mjs';
 import { imageCaps, noteImageCaps } from '../main/cloud/config.mjs';
 

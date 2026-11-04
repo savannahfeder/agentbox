@@ -10,5 +10,7 @@ const config = getDefaultConfig(__dirname);
 
 config.watchFolders = [path.join(repo, 'shared'), path.join(repo, 'renderer', 'src')];
 config.resolver.nodeModulesPaths = [path.join(__dirname, 'node_modules')];
+// The shared code the app reads is TypeScript in .mts files now, imported by that name.
+if (!config.resolver.sourceExts.includes('mts')) config.resolver.sourceExts.push('mts');
 
 module.exports = config;

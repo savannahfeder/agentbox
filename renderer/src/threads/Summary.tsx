@@ -9,7 +9,7 @@
 // because a summary she has to remember to save is one that goes stale.
 //
 // The data was already there (shared/thread-cards.mjs reads the state and the
-// summary, main/store.mjs threadEdit writes an edit); this file only draws it.
+// summary, main/store.mts threadEdit writes an edit); this file only draws it.
 // The rules that decide words (how long ago, when it was updated, which threads
 // may be linked) are in ./summary-rules.ts, and the bar's crumb in
 // ./crumb-rules.ts, where the tests read them.

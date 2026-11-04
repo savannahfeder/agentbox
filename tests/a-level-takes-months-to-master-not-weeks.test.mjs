@@ -10,7 +10,7 @@
 // agent hours a day): a month is the middle of the climb, five months is the
 // edge of 99, and 99 is 10,000 hours.
 import { describe, it, expect } from 'vitest';
-import { levelFor, hoursForLevel, MASTERY_HOURS } from '../shared/agent-hours.mjs';
+import { levelFor, hoursForLevel, MASTERY_HOURS } from '../shared/agent-hours.mts';
 
 const PACE = 1945 / 30;
 const SECOND = 1 / 3600;

@@ -9,7 +9,7 @@ import { crumbParts, docKind } from '../renderer/src/doc-pane';
 import { glanceFile } from '../renderer/src/file-glance';
 import { linkArtifactPaths } from '../renderer/src/artifact-paths';
 import { whereALinkGoes } from '../renderer/src/link-click';
-import { servable } from '../main/img-scheme.mjs';
+import { servable } from '../main/img-scheme.mts';
 import { filesNamedInWords, isCarriedKind } from '../shared/carried-files.mjs';
 
 describe('where a click goes', () => {

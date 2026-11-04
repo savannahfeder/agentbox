@@ -277,11 +277,11 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   };
 }
 
-export type TodayGroup = 'working' | 'done' | 'blocked';
+export type TodayGroup = 'working' | 'todo' | 'done' | 'blocked';
 
 /** What the page draws per person, in standup order. */
 export const GROUPS: readonly { id: TodayGroup; label: string }[] = [
-  { id: 'working', label: 'Working on' }, { id: 'done', label: 'Done' }, { id: 'blocked', label: 'Blocked' },
+  { id: 'working', label: 'Working on' }, { id: 'todo', label: 'To do' }, { id: 'done', label: 'Done' }, { id: 'blocked', label: 'Blocked' },
 ];
 
 /** A drawn line: a task says its due date rather than a time, and Done says when it was not plain done. */
@@ -293,7 +293,8 @@ const byNewest = (a: TodayLine, b: TodayLine) => b.at - a.at;
 export function groupsOf(p: TodayPerson): Record<TodayGroup, GroupLine[]> {
   const tasks = (p.tasks ?? []).map((l): GroupLine => ({ ...l, task: true }));
   return {
-    working: [...tasks.filter((l) => !l.blocked), ...p.working],
+    working: p.working,
+    todo: tasks.filter((l) => !l.blocked),
     done: [
       ...p.shipped.map((l) => ({ ...l, tag: 'Shipped' })),
       ...p.finished,

@@ -1,6 +1,6 @@
 // A STOPPED ROW SAYS WHAT AN OLD CLAUDE CODE OR A BLOCKED NETWORK NEEDS — w-6d8c543a43.
 //
-// WHAT BROKE. shared/spawn-trouble.mjs learned two causes on this branch:
+// WHAT BROKE. shared/spawn-trouble.mts learned two causes on this branch:
 // 'too-old' (Claude Code before 2.1.71 rejects `--permission-mode auto` and
 // every worker dies in under a second, measured on 14 versions from npm) and
 // 'network' (a company proxy or certificate the app never had). The pane got
@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { shortNext } from '../renderer/src/trouble-row.ts';
-import { troubleCause } from '../shared/spawn-trouble.mjs';
+import { troubleCause } from '../shared/spawn-trouble.mts';
 
 const row = (cause) => ({ cause, count: 1, what: '', next: '', act: null, hers: true });
 

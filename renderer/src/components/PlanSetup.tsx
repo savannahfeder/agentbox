@@ -299,7 +299,7 @@ export function PlanQuestion({ onPick, onReady, onSkip, look, found = null }: {
   /*
    * SHOW IT WHERE ONE IS. The panel opens in the main process and the choice is
    * applied there in the same call, so no path off anybody's disk crosses the
-   * bridge (main/ipc.mjs, `zero:engine-bin`). A file that is not something
+   * bridge (main/ipc.mts, `zero:engine-bin`). A file that is not something
    * agents can run comes back as words, here, where the press was.
    *
    * Claude Code is what is asked for, because that is the one the app will not

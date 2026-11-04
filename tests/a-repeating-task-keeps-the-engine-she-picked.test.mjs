@@ -48,7 +48,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Repeats } from '../main/repeats.mjs';
-import { loadStore } from '../main/store-modules.mjs';
+import { loadStore } from '../main/store-modules.mts';
 import { foldRepeats } from '../shared/repeats.mjs';
 import { Name } from '../shared/product-name.mjs';
 import {
@@ -179,7 +179,7 @@ describe('each run of a repeating task', () => {
 
 /* ==================== and the path from her card is whole ================ */
 // Four hand-offs, and the bug was that any one of them could drop the pair
-// without a symptom. Three of them are asserted as source: `main/ipc.mjs`
+// without a symptom. Three of them are asserted as source: `main/ipc.mts`
 // imports electron at module scope, `App.tsx` and `preload.cjs` are not loadable
 // here either, and what is worth checking is that each one names both fields.
 
@@ -233,7 +233,7 @@ describe('the whole path from the card to the rule', () => {
   });
 
   it('gates the edit door on the same two tests as the compose door', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     const start = ipc.indexOf("ipcMain.handle('zero:set-repeat'");
     expect(start).toBeGreaterThan(-1);
     const next = ipc.indexOf('ipcMain.handle(', start + 1);
@@ -245,11 +245,11 @@ describe('the whole path from the card to the rule', () => {
   it('the bridge and the door both name them', () => {
     const preload = read('preload.cjs');
     const api = read('renderer/src/api.ts');
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     expect(preload).toContain("composeRepeat: (payload) => ipcRenderer.invoke('zero:compose-repeat', payload)");
     expect(api).toMatch(/composeRepeat\(p: \{[^}]*engine\?: string;[^}]*model\?: string;/s);
-    expect(ipc).toMatch(/zero:compose-repeat[\s\S]{0,400}?engine: supervisor\.engineOffered\(engine\)/);
-    expect(ipc).toMatch(/zero:compose-repeat[\s\S]{0,400}?model: supervisor\.modelOffered\(engine, model\)/);
+    expect(ipc).toMatch(/zero:compose-repeat[\s\S]{0,800}?engine: supervisor\.engineOffered\(engine\)/);
+    expect(ipc).toMatch(/zero:compose-repeat[\s\S]{0,800}?model: supervisor\.modelOffered\(engine, model\)/);
   });
 
   // AND THE STORE'S OWN HAND-OFF IS RUN, NOT READ. `composeRepeat` names the
@@ -264,7 +264,7 @@ describe('the whole path from the card to the rule', () => {
     fs.writeFileSync(path.join(productDir, 'project.json'), JSON.stringify({
       schemaVersion: 1, id: 'agentbox', name: Name, repoPath: null,
     }));
-    const { Store } = await import('../main/store.mjs');
+    const { Store } = await import('../main/store.mts');
     const store = await new Store({
       storeRoot: tmp, accountId: 'test-account', accountRoot, products: [],
     }).init();
@@ -291,7 +291,7 @@ describe('the whole path from the card to the rule', () => {
     fs.writeFileSync(path.join(productDir, 'project.json'), JSON.stringify({
       schemaVersion: 1, id: 'agentbox', name: Name, repoPath: null,
     }));
-    const { Store } = await import('../main/store.mjs');
+    const { Store } = await import('../main/store.mts');
     const store = await new Store({
       storeRoot: tmp, accountId: 'test-account', accountRoot, products: [],
     }).init();

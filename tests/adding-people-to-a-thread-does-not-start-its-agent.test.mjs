@@ -6,7 +6,7 @@
 // edits that are not a reply, so `awaitingHer` turned false and the row was
 // fresh work. A rename (`label`) did the same.
 import { describe, it, expect } from 'vitest';
-import { awaitingHer } from '../main/supervisor.mjs';
+import { awaitingHer } from '../main/supervisor.mts';
 
 const answered = (extra = {}) => ({
   id: 'w-add', product: 'lumen', status: 'open', kind: 'directive', labels: ['founder'],

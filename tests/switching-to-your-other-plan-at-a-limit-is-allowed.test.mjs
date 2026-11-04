@@ -3,7 +3,7 @@
 // Her words, 2026-10-23: "It is 100% acceptable to have a personal and work
 // plan" and "It is 100% acceptable to switch to work plan when you've hit your
 // limit." On 2026-09-22 she had already withdrawn the old "do not encourage
-// multi-accounting" call (w-3498e0cad2, main/settings.mjs). The comments added
+// multi-accounting" call (w-3498e0cad2, main/settings.mts). The comments added
 // on w-dac993a554 brought that back as a claim that switching at a limit breaks
 // Anthropic's Usage Policy, and an agent read that comment the same evening and
 // refused to move her stuck agents: 12 of 15 threads sat on a personal login at
@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PERSONAL = '/Users/her/.claude-personal';

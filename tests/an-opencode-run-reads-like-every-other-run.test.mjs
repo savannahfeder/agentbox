@@ -15,8 +15,8 @@
 //                         unified diff, which neither other harness provides
 //   session.error         error is an OBJECT: { name, data: { message } }
 import { describe, it, expect } from 'vitest';
-import { harnessFor } from '../main/harnesses.mjs';
-import { openCodeApprovalCard, openCodeErrorText, rememberOpenCodeProsePart } from '../main/opencode.mjs';
+import { harnessFor } from '../main/harnesses.mts';
+import { openCodeApprovalCard, openCodeErrorText, rememberOpenCodeProsePart } from '../main/opencode.mts';
 
 const readers = () => harnessFor('opencode').readers();
 const SESSION = 'ses_ee664c43cffe09NFlNa9LMgVW1';

@@ -7,7 +7,7 @@
 // teammates' from the cards their Macs publish.
 import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mjs';
 import type { Seen } from './summary-rules';
-import { hiddenUntil } from '../list-rules';
+import { hiddenUntil, placedAt } from '../list-rules';
 import type { AgentVoice, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { voiceName } from '../../../shared/agent-voice.mjs';
 import { priorityIdOf, priorityValueOf, type PriorityId } from '../priority';
@@ -179,9 +179,9 @@ export const rankScore = (r: Ranked, projectOrder: string[] = [], direct?: Reado
   placedScore(r.place, placeScore(projectOrder, r.product ?? '', direct) + priorityValueOf(priorityIdOf(shownPriority(r, !!direct?.has(r.product ?? '')) || null)));
 const fromAPerson = (r: Ranked, direct?: ReadonlySet<string>) => (direct?.has(r.product ?? '') || heldByAPerson(r) ? 1 : 0);
 export const byPriority = (projectOrder: string[] = [], direct?: ReadonlySet<string>) => (a: Ranked, b: Ranked) =>
-  rankScore(b, projectOrder, direct) - rankScore(a, projectOrder, direct) || fromAPerson(b, direct) - fromAPerson(a, direct) || b.updatedAt - a.updatedAt;
+  rankScore(b, projectOrder, direct) - rankScore(a, projectOrder, direct) || fromAPerson(b, direct) - fromAPerson(a, direct) || placedAt(b) - placedAt(a);
 /** `product` is the project's slug, which is what the running order holds. */
-export type Ranked = { priority?: number | null; updatedAt: number; createdAt?: number; start?: string; status?: string; wrote?: WorkItem['wrote']; product?: string | null; place?: number; pinned?: boolean; assignee?: string };
+export type Ranked = { priority?: number | null; updatedAt: number; placedAt?: number; createdAt?: number; start?: string; status?: string; wrote?: WorkItem['wrote']; product?: string | null; place?: number; pinned?: boolean; assignee?: string };
 
 /**
  * WHEN A PERSON LAST WROTE ON THE THREAD (w-21b638d821): the newest of the
@@ -664,7 +664,7 @@ export function waitingWord(item: Pick<WorkItem, 'assignee' | 'people' | 'wrote'
 /**
  * A MESSAGE'S PRIORITY, once anyone has set one. A message is made with 0 by
  * the system, which would read as Low on every row; the sorter
- * (main/message-priority.mjs) or the person setting it is what makes it real.
+ * (main/message-priority.mts) or the person setting it is what makes it real.
  */
 export function messagePriority(item: WorkItem): number | null {
   const set = item.wrote?.priority;
@@ -755,7 +755,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
         const state = stateOf?.(item);
         if (!state || (state === 'done' && !(item.updatedAt >= today))) continue;
         out.push({
-          key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: shownTitle(item), project: null,
+          key: `mine/${item.product}/${item.id}`, ownerId: item.assignee && item.assignee !== 'agent' ? item.assignee : me, state, title: shownTitle(item), project: null,
           projectSlug: product.slug, priority: shownPriority(item), updatedAt: item.updatedAt, item, card: null, task,
         });
         continue;
@@ -967,7 +967,7 @@ export function conversationWith(personIds: string | string[], { products, items
   const want = new Set([...[].concat(personIds as never), ...(me ? [me] : [])] as string[]);
   const on = (t: NonNullable<Product['team']>) => [...new Set([...t.people, ...(t.sharedBy ? [t.sharedBy] : [])])];
   const exactly = (t: NonNullable<Product['team']>) => on(t).length === want.size && on(t).every((p) => want.has(p));
-  // The record both Macs settle on: the lowest id (main/team/index.mjs, directWith).
+  // The record both Macs settle on: the lowest id (main/team/index.mts, directWith).
   const record = products
     .filter((p) => p.team?.direct && exactly(p.team))
     .sort((a, b) => String(a.team!.projectId).localeCompare(String(b.team!.projectId)))[0];

@@ -3,7 +3,7 @@
 // REPORTED 2026-10-14 by a teammate trying the team version: "attachments do
 // not open in threads and DM". A file in a conversation crosses on its own,
 // after the line that names it whenever the cloud does not have it yet: the
-// reader's Mac keeps asking for it once a minute (main/team/sync.mjs). But the
+// reader's Mac keeps asking for it once a minute (main/team/sync.mts). But the
 // picture in the message asked for its file ONCE. Measured by reading
 // `ArtifactImg` in renderer/src/components/Focus.tsx on this branch: `find`
 // ran when every root missed, `found` became null, and nothing ever set it

@@ -41,7 +41,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { DEFAULT_SESSIONS_AT_ONCE } from '../main/config.mjs';
 import { NAME } from '../shared/product-name.mjs';
 

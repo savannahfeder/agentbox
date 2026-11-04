@@ -120,8 +120,8 @@ describe('the wiring, which is the half a pure test cannot see', () => {
   });
 
   it('withdrawing stops the worker as well as closing the row', () => {
-    // main/ipc.mjs kills the session on any archive, so one call does both.
-    const ipc = fs.readFileSync(path.join(here, '..', 'main', 'ipc.mjs'), 'utf8');
+    // main/ipc.mts kills the session on any archive, so one call does both.
+    const ipc = fs.readFileSync(path.join(here, '..', 'main', 'ipc.mts'), 'utf8');
     expect(ipc).toMatch(/if \(status === 'done'\) supervisor\.stopSession\(id\)/);
     // 2026-09-27: the second argument is the plain phrase a late Z asks with,
     // "press Z again to take back the task you just made" (renderer/src/undo-window.ts).

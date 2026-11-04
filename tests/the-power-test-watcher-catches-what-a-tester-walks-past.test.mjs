@@ -149,7 +149,7 @@ describe('the copy\'s processes', () => {
     const table = [
       { pid: 10, ppid: 1, rss: 100, command: 'node bin/agentbox.mjs --dir /tmp/i/data' },
       { pid: 11, ppid: 10, rss: 50, command: 'node /tmp/i/bin/stub-claude-worker.mjs -p --output-format stream-json --permission-prompt-tool mcp__zero-approvals__approval_prompt' },
-      { pid: 12, ppid: 11, rss: 20, command: 'node approval-prompt-server.mjs' },
+      { pid: 12, ppid: 11, rss: 20, command: 'node approval-prompt-server.mts' },
       { pid: 13, ppid: 10, rss: 70, command: '/home/u/.local/share/claude/versions/2.1.302 -p --output-format stream-json --permission-prompt-tool mcp__zero-approvals__approval_prompt' },
       { pid: 20, ppid: 1, rss: 300, command: 'claude -p You are Maya --output-format stream-json' },
       { pid: 30, ppid: 1, rss: 400, command: '/opt/chrome --user-data-dir=/tmp/i/chrome-profile' },

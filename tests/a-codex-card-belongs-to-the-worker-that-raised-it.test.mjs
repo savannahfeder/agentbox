@@ -80,8 +80,8 @@ const commandAsk = (command, extra = {}) => ['item/commandExecution/requestAppro
 
 describe('the card one gated command is drawn as', () => {
   it('carries the whole command when it is an ordinary one', () => {
-    const card = codexApprovalCard(...commandAsk('sed -n "1,200p" main/supervisor.mjs'));
-    expect(card.input.command).toBe('sed -n "1,200p" main/supervisor.mjs');
+    const card = codexApprovalCard(...commandAsk('sed -n "1,200p" main/supervisor.mts'));
+    expect(card.input.command).toBe('sed -n "1,200p" main/supervisor.mts');
   });
 
   // THE BUG. Anything over the renderer's silent 400 was authorised unread.

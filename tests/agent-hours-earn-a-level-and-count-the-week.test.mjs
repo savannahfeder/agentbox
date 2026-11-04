@@ -3,7 +3,7 @@
 // Rooms shows a level from agent hours ("I find agent hours level
 // compelling"), ranks by this week's hours, a streak of days in a row, and a
 // chart of hours since you started. Nothing in the app kept a history of runs:
-// a run's length went to PostHog and was gone (main/analytics.mjs
+// a run's length went to PostHog and was gone (main/analytics.mts
 // runEndedProps), and the only durable trace of a run was its log file.
 //
 // These are the rules, measured with fixed clocks in the test time zone
@@ -12,7 +12,7 @@
 // are written, and a run read back from its trace log. The level curve is
 // tests/a-level-takes-months-to-master-not-weeks.test.mjs.
 import { describe, it, expect } from 'vitest';
-import { summarizeRuns, dedupeRuns, runFromTrace } from '../shared/agent-hours.mjs';
+import { summarizeRuns, dedupeRuns, runFromTrace } from '../shared/agent-hours.mts';
 
 const H = 3600;
 const at = (iso) => new Date(iso).getTime();
@@ -131,7 +131,7 @@ describe('reading a run back from its trace log', () => {
     expect(r).toMatchObject({ key: `w-abc:${start}`, start, at: at('2026-10-20T16:30:00.000Z'), seconds: 1800, item: 'w-abc', product: 'p' });
   });
 
-  // A run the person stopped says so after the time (shared/dead-run-trace.mjs).
+  // A run the person stopped says so after the time (shared/dead-run-trace.mts).
   it('a run stopped on request still ends at its footer', () => {
     const text = '# x\n# w-abc · spawned …\n\n# exited (143) 2026-10-20T16:30:00.000Z · stopped on request\n';
     const r = runFromTrace({ name, text, mtimeMs: start + 99_999_999, item: 'w-abc', product: 'p' });

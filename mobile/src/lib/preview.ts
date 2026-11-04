@@ -1,6 +1,7 @@
 // THE APP WITH NO ACCOUNT BEHIND IT, for drawing its screens in a browser
 // (EXPO_PUBLIC_PREVIEW=1). Made-up threads in the shape a Mac sends, and a
 // stand-in for the cloud that keeps what the phone sends in memory.
+import { macAway, macSeenOf } from '../../../renderer/src/phone-rows';
 import type { PhoneRows } from '../../../renderer/src/phone-rows';
 import { PREVIEW_ATTACHED, previewLink } from './preview-files.mjs';
 
@@ -12,13 +13,15 @@ const agent = (ts: number) => ({ ts, source: 'agent' });
 export function previewRows(now = Date.now()): PhoneRows {
   const at = (m: number) => now - m * MIN;
   const iso = (ms: number) => new Date(ms).toISOString();
+  // No computer is behind the preview to say its runs are still going, so they say it for the whole session.
+  const STILL_GOING = now + 24 * 60 * MIN;
   const thread = (project: string, item: any, history: any[], extra: Record<string, unknown> = {}) => ({
     device: DEV, project, item: item.id, updated_at: iso(item.updatedAt),
     snapshot: { v: 3, item: { kind: 'directive', labels: ['founder'], priority: 0, ...item }, history: history.map((l) => ({ id: item.id, ...l })), olderLines: 0, ...extra },
   });
   const planAsk = 'Plan the phone app. I want alerts that reach my lock screen and a way to reply without opening the Mac.';
   const planResult = 'The plan is ready and Codex has reviewed it.\n\nThe first version signs you in, shows your inbox and lets you reply. Alerts come next, then messages between people.\n\n![The inbox on the phone](designs/w-1a2b3c4d5e/inbox.png)\n\n**Getting it approved** is mostly about two things: deleting an account has to delete what you shared, and messages need a report button.\n\n## Options\n1. Start building the first version (recommended)\n2. Wait until the Apple account is checked';
-  // The files a Mac lists for a project, as main/phone-inbox.mjs sends them.
+  // The files a Mac lists for a project, as main/phone-inbox.mts sends them.
   const attached = PREVIEW_ATTACHED;
   const roundAsk = 'Draw three versions of the inbox for the phone.';
   const roundNote = "Three versions of the inbox are in the folder below. I'd go with the quiet one: it reads fastest at arm's length.\n\n~/docs/agentbox/designs/w-8b9c0d1e2f/\n\nWhat each one changes is in `designs/w-8b9c0d1e2f/inbox-versions.md`, and `designs/w-8b9c0d1e2f/compare.html` sets them side by side.\n\nThe walk-through is a short film: `designs/w-8b9c0d1e2f/walkthrough.mp4`\n\nThe full recording, `recordings/session.mov`, is too big for the phone.\n\n## Options\n1. Go with the quiet one (recommended)\n2. Try a fourth version";
@@ -53,8 +56,8 @@ export function previewRows(now = Date.now()): PhoneRows {
       thread('agentbox', { id: 'w-4d5e6f7a8b', title: 'Draw the sign-in screen', status: 'claimed', priority: 5, body: 'Draw five sign-in screens on the real app.', createdAt: at(40), updatedAt: at(2), wrote: { body: her(at(40)) } }, [
         { ts: at(40), source: 'founder', patch: { body: 'Draw five sign-in screens on the real app.' } },
       ], {
-        live: { since: at(12), at: at(0.5), where: 'cloud', doing: [{ label: 'Read the sign-in page', startedAt: at(9) }, { label: 'Wrote the five screens', startedAt: at(6) }, { label: 'Ran the screenshot script', startedAt: at(3) }, { label: 'Drawing the third screen', startedAt: at(1) }] },
-        // A permission it is waiting on, as main/phone-inbox.mjs sends one (shared/phone-snapshot.mjs `phoneApproval`).
+        live: { since: at(12), at: STILL_GOING, where: 'cloud', doing: [{ label: 'Read the sign-in page', startedAt: at(9) }, { label: 'Wrote the five screens', startedAt: at(6) }, { label: 'Ran the screenshot script', startedAt: at(3) }, { label: 'Drawing the third screen', startedAt: at(1) }] },
+        // A permission it is waiting on, as main/phone-inbox.mts sends one (shared/phone-snapshot.mjs `phoneApproval`).
         approvals: [{ id: 'ap-preview-1', at: at(1), tool: 'Bash', input: { command: 'npx eas-cli init --non-interactive', description: 'Link this folder to the Expo project' }, card: 'cHJldmlldy1jYXJk' }],
       }),
       // Two threads the phone plan filed: one waiting on you, one finished.
@@ -75,7 +78,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(30), source: 'agent', patch: { result: 'All four tables are in the cloud and the Mac reads them from there.' } },
         { ts: at(28), source: 'founder', patch: { snoozedUntil: now + 26 * 60 * MIN } },
       ]),
-      thread('film', { id: 'w-5e6f7a8b9c', title: 'Write the launch script', status: 'open', priority: 0, body: 'A script for the launch film.', answer: 'Shorter, and open with the inbox.', createdAt: at(500), updatedAt: at(25), wrote: { body: her(at(500)), answer: her(at(25)), result: agent(at(60)) }, result: 'Here is a first draft.' }, [
+      thread('film', { id: 'w-5e6f7a8b9c', title: 'Write the launch script', status: 'open', priority: 0, engine: 'codex', body: 'A script for the launch film.', answer: 'Shorter, and open with the inbox.', createdAt: at(500), updatedAt: at(25), wrote: { body: her(at(500)), answer: her(at(25)), result: agent(at(60)) }, result: 'Here is a first draft.' }, [
         { ts: at(500), source: 'founder', patch: { body: 'A script for the launch film.' } },
         { ts: at(60), source: 'agent', patch: { result: 'Here is a first draft.' } },
         { ts: at(25), source: 'founder', patch: { answer: 'Shorter, and open with the inbox.' } },
@@ -86,8 +89,12 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(800), source: 'founder', patch: { body: 'Try a light theme.' } },
       ]),
       // Two runs of the daily report (previewSettings' repeating tasks): one quiet, one with news.
-      thread('agentbox', { id: 'w-r1a2b3c4d5', title: 'Daily report', labels: ['repeat:r-preview-1', 'clean'], status: 'done', priority: 5, body: 'Write the daily report.', result: 'Nothing new since yesterday.', createdAt: at(26 * 60), updatedAt: at(26 * 60 - 6), wrote: { status: agent(at(26 * 60 - 6)) } }, []),
-      thread('agentbox', { id: 'w-r2b3c4d5e6', title: 'Daily report', labels: ['repeat:r-preview-1'], status: 'done', priority: 5, body: 'Write the daily report.', result: 'Two sign-ups failed at the email step. The fix is in its own thread.', createdAt: at(120), updatedAt: at(112), wrote: { status: agent(at(112)) } }, []),
+      thread('agentbox', { id: 'w-r1a2b3c4d5', title: 'Daily report', labels: ['repeat:r-preview-1', 'clean'], status: 'done', priority: 5, body: 'Write the daily report.', result: 'Nothing new since yesterday.', createdAt: at(26 * 60), updatedAt: at(26 * 60 - 6), wrote: { status: agent(at(26 * 60 - 6)) } }, [
+        { ts: at(26 * 60 - 6), source: 'agent', patch: { result: 'Nothing new since yesterday.', status: 'done' } },
+      ]),
+      thread('agentbox', { id: 'w-r2b3c4d5e6', title: 'Daily report', labels: ['repeat:r-preview-1'], status: 'done', priority: 5, body: 'Write the daily report.', result: 'Two sign-ups failed at the email step. The fix is in its own thread.', createdAt: at(120), updatedAt: at(112), wrote: { status: agent(at(112)) } }, [
+        { ts: at(112), source: 'agent', patch: { result: 'Two sign-ups failed at the email step. The fix is in its own thread.', status: 'done' } },
+      ]),
       // Two teammates' runs (previewTeammates): one waiting on you, signed; one working.
       thread('agentbox', { id: 'w-t2b3c4d5e6', title: 'Try sign-up the way a new user would', labels: ['founder', 'teammate:t-quality001'], status: 'blocked', priority: 5, body: 'Try sign-up the way a new user would, on a slow connection.', note: qualityNote, createdAt: at(45), updatedAt: at(30), wrote: { body: agent(at(45)), status: agent(at(30)), note: agent(at(30)) } }, [
         { ts: at(45), source: 'agent', patch: { body: 'Try sign-up the way a new user would, on a slow connection.' } },
@@ -95,7 +102,7 @@ export function previewRows(now = Date.now()): PhoneRows {
       ]),
       thread('film', { id: 'w-t1a2b3c4d5', title: 'Cut the launch film to 60 seconds', labels: ['founder', 'teammate:t-launch0001'], status: 'claimed', priority: 5, body: 'Cut the launch film to 60 seconds. Open on the inbox.', createdAt: at(21), updatedAt: at(1), wrote: { body: agent(at(21)) } }, [
         { ts: at(21), source: 'agent', patch: { body: 'Cut the launch film to 60 seconds. Open on the inbox.' } },
-      ], { live: { since: at(20), at: at(0.5), where: 'mac', doing: [{ label: 'Trimmed the middle', startedAt: at(8) }, { label: 'Rendering the 60-second cut', startedAt: at(2) }] } }),
+      ], { live: { since: at(20), at: STILL_GOING, where: 'mac', doing: [{ label: 'Trimmed the middle', startedAt: at(8) }, { label: 'Rendering the 60-second cut', startedAt: at(2) }] } }),
       thread('agentbox', { id: 'w-7a8b9c0d1e', title: 'Rename the Display menu', status: 'done', priority: 0, body: 'Rename it to View.', result: 'Renamed.', createdAt: at(3000), updatedAt: at(1500), wrote: { body: her(at(3000)), result: agent(at(1600)), status: her(at(1500)) } }, [
         { ts: at(3000), source: 'founder', patch: { body: 'Rename it to View.' } },
         { ts: at(1600), source: 'agent', patch: { result: 'Renamed.' } },
@@ -115,12 +122,13 @@ export function previewSettings(now = Date.now()) {
       workspace: {
         cornerTag: true, diagnostics: true, adhdMode: true, alpha: { rooms: true, teammates: true }, outsideAgents: 'waiting',
         permission: 'auto', codexMode: 'auto', engines: ['claude', 'codex'], claude: { found: true }, codex: { found: true },
+        codexModels: [{ id: 'gpt-5.6-sol', label: 'GPT-5.6-Sol', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }, { id: 'gpt-5.6-terra', label: 'GPT-5.6-Terra', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }, { id: 'gpt-5.6-luna', label: 'GPT-5.6-Luna', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' }], codexModelDefault: 'gpt-5.6-sol',
         agentsAuto: true, sessionsAtOnce: 4, agentsTotal: 6, agentsAutoTotal: 6, agentsNudge: 0, slotsMax: 12, slotsSuggested: 6, running: 3,
         memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 8, now: 'Memory is fine. Nothing heavy running.' },
         leftovers: { on: false, now: null },
         accounts: [
           { id: 'default', email: 'you@example.com', chosen: false, state: 'live', note: null, plan: 'Max 20x', running: 2 },
-          { id: '.claude-work', email: 'you@work.example', chosen: false, state: 'limited', note: 'Out of usage until 6:19pm.', plan: 'Max 5x', running: 1 },
+          { id: '.claude-work', email: 'you@work.example', chosen: false, state: 'at-limit', note: 'At its limit. Agents start again on their own when it resets.', resetsAt: now + 19 * 60 * MIN, plan: 'Max 5x', running: 1 },
         ],
         codexAccounts: [{ id: 'default', email: 'you@example.com', name: 'You', plan: 'Plus', signedIn: true, chosen: false }],
       },
@@ -261,31 +269,52 @@ export function previewGroups(now = Date.now()) {
   };
 }
 
+/** `?scene=first-run`: signed out, and the computer's threads arrive a little after you sign in, so the whole first run can be walked. */
+const WALKS = typeof location !== 'undefined' && new URLSearchParams(location.search).get('scene') === 'first-run';
+// Read once as the page opens: the scene leaves the address at the first redirect.
+export const previewWalksFirstRun = () => WALKS;
+const COMPUTER_JOINS_MS = 20_000;
+
 /** A stand-in for the sign-in client (renderer/src/cloud-rest.ts), signed in. */
 export function previewCloud(now = () => Date.now()) {
   const rows = previewRows(now());
+  const walking = previewWalksFirstRun();
+  const full = { ...rows };
+  let signedInAt = 0;
+  if (walking) Object.assign(rows, { projects: [], threads: [], commands: [] });
+  // Once joined, the stand-in computer stays online, as a real one sending every few seconds does.
+  const joined = () => {
+    if (!walking || !signedInAt || now() - signedInAt <= COMPUTER_JOINS_MS) return;
+    if (!rows.projects.length) Object.assign(rows, full);
+    rows.projects = rows.projects.map((p) => ({ ...p, updated_at: new Date(now()).toISOString() }));
+  };
   // `?scene=clear` draws an empty inbox, `?scene=connect` an account no computer has joined, `?scene=signed-out` the sign-in page.
   const scene = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('scene');
   if (scene === 'clear' || scene === 'connect') { rows.threads = []; rows.commands = []; }
   if (scene === 'connect') rows.projects = [];
   // `?scene=queued`: a reply on a thread nothing is running, which reads Queued.
   if (scene === 'queued') rows.commands.push({ id: 'c-preview-q', device: DEV, project: 'film', item: 'w-5e6f7a8b9c', kind: 'reply', payload: { text: 'Open on the inbox.' }, created_at: new Date(now() - 30_000).toISOString(), claimed_at: null, taken_at: null, outcome: null } as PhoneRows['commands'][number]);
-  let signedIn = scene !== 'signed-out';
+  let signedIn = scene !== 'signed-out' && !walking;
   const settings = previewSettings(now());
   const team = { ...PREVIEW_TEAM, members: [...PREVIEW_TEAM.members], invites: [...PREVIEW_TEAM.invites] };
   // The Mac takes a change a moment later and sends its settings again.
   const takeSetting = (c: PhoneRows['commands'][number]) => setTimeout(() => {
     const { scope, key, value, product } = c.payload ?? {};
+    // Away, as the banner says it is: a teammate does not get what you sent, as it would not from a real computer.
+    if (scope === 'teammate' && macAway(macSeenOf(rows.projects), now())) return;
     const w: any = settings.settings.workspace;
     const repeats: any[] = (settings.settings as any).repeats;
     const mates: any = (settings.settings as any).teammates;
     if (scope === 'teammate' && key === 'post') {
       mates.chat.push({ id: `m-${c.id}`, kind: 'msg', from: 'you', to: value.to, text: value.text, ...(value.answers ? { answers: value.answers } : {}), ts: now() });
-      // The teammate answers a moment later, as a run of it would.
-      setTimeout(() => {
+      // The teammate answers a moment later, as a run of it would; a paused one does not.
+      if (!mates.list.find((x: any) => x.id === value.to[0])?.paused) setTimeout(() => {
         mates.chat.push({ id: `m-${c.id}-r`, kind: 'msg', from: value.to[0], to: ['you'], text: 'Got it. I will tell you when it is done.', ts: now() });
         settings.updated_at = new Date(now()).toISOString();
       }, 4000);
+    } else if (scope === 'teammate' && key === 'pause') {
+      const m = mates.list.find((x: any) => x.id === value.id);
+      if (m) Object.assign(m, { paused: value.paused, now: value.paused ? 'Paused' : m.nowBeforePause ?? null, nowBeforePause: value.paused ? m.now : undefined });
     } else if (scope === 'teammate' && key === 'describe') {
       mates.list.push({ id: `t-${c.id}`, name: 'New teammate', letter: 'N', role: null, job: value.text ?? value.starter, primary: false, paused: false, status: 'draft', product: value.product, waiting: [], running: null, duties: [], runsThisWeek: 0 });
     } else if (scope === 'thread') { const t = rows.threads.find((r) => r.project === product && r.item === c.payload.item); if (t) { t.snapshot.item.pinned = value || undefined; t.updated_at = new Date(now() + 1).toISOString(); } }
@@ -314,6 +343,7 @@ export function previewCloud(now = () => Date.now()) {
     async select(table: string, query: string) {
       const group = groups.select(table, query);
       if (group) return group;
+      joined();
       if (table === 'phone_projects') return rows.projects;
       if (table === 'phone_threads') return rows.threads;
       if (table === 'phone_commands') return /taken_at=is\.null/.test(query) ? rows.commands.filter((c) => !c.taken_at) : rows.commands.filter((c) => c.taken_at);
@@ -359,12 +389,12 @@ export function previewCloud(now = () => Date.now()) {
       if (made.kind === 'setting') takeSetting(made);
       return made;
     },
-    async signInWithPassword() { signedIn = true; return session()!; },
-    async signInWithIdToken() { signedIn = true; return session()!; },
+    async signInWithPassword() { signedIn = true; signedInAt = now(); return session()!; },
+    async signInWithIdToken() { signedIn = true; signedInAt = now(); return session()!; },
     async signUp() { signedIn = true; return { confirm: false }; },
     async putFile() {},
     async googleUrl() { return ''; },
-    async finishGoogle() { signedIn = true; return session()!; },
+    async finishGoogle() { signedIn = true; signedInAt = now(); return session()!; },
     signOut() { signedIn = false; },
   };
 }

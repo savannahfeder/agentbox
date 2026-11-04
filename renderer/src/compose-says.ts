@@ -6,7 +6,7 @@
 //
 // 1. WHY IT WILL NOT TAKE THIS. She sent a task into the practice project and
 // it was accepted, filed, and never run. Nobody misbehaved. The supervisor skips
-// practice projects in four separate places on purpose (main/supervisor.mjs): a
+// practice projects in four separate places on purpose (main/supervisor.mts): a
 // practice project is not a project anybody works in, it points at no folder,
 // and starting a real session in it is the thing that must never happen. The
 // defect is that the CARD did not know that, so it took the task, filed it, and
@@ -31,7 +31,7 @@
 
 /**
  * As much of a project as either sentence needs. The practice mark is written
- *  by main/store.mjs off `project.json` (PRACTICE_FLAG) rather than matched on
+ *  by main/store.mts off `project.json` (PRACTICE_FLAG) rather than matched on
  *  a name, because "Practice" is a name somebody could reasonably give a real
  *  project of their own, and a refusal aimed at real work is worse than the
  *  bug it fixes. */
@@ -59,7 +59,7 @@ export const PRACTICE_REFUSAL =
  * `scripted` IS THE ONE EXEMPTION AND IT IS NOT A LOOPHOLE. The first run's own
  * example task really is sent into the practice project, and it really is
  * answered a couple of seconds later — by the app itself, out of a pre-written
- * line (main/store.mjs finishFirstRunTask, shared/first-run-practice.mjs), with
+ * line (main/store.mts finishFirstRunTask, shared/first-run-practice.mts), with
  * no session behind it. That task is the only one in the practice project with
  * something waiting to answer it, and the card can tell it apart with no
  * guessing: it is the one the walk typed in itself, so it is the one arriving
@@ -83,7 +83,7 @@ export function practiceRefusal(
  * product and there was not one, and the only tooltip the button had was the
  * practice refusal, which had nothing to say about this.
  *
- * My Workspace is made for everybody at boot now (main/main.mjs), so this
+ * My Workspace is made for everybody at boot now (main/main.mts), so this
  * should be unreachable. "Should be" is why the sentence exists: making that
  * folder can fail on a full or locked disk, and the old failure mode was a log
  * line nobody reads and a dead button. The wording is the one approved on

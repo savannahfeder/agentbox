@@ -23,12 +23,12 @@ export interface PublicLink { token: string; url: string; source: string; name: 
 export interface LinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean }
 /** `site` null: this copy's cloud has no website, so there is nothing to share on. */
 export interface FileLinkState { ok: boolean; error?: string; site?: string | null; signedIn?: boolean; link?: FileLink | null }
-import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
+import { checkProjectFolder } from '../../shared/project-folder-check.mts';
 import { whileSystemWindowIsOpen } from './system-window';
-import { USAGE_SAME_AS_ANOTHER, USAGE_UNREADABLE } from '../../shared/usage.mjs';
-import { accountSentence } from '../../shared/spawn-trouble.mjs';
-import { MOVE_SAY } from '../../shared/where-it-runs-from.mjs';
-import { cardsInFront } from '../../shared/which-card-is-in-front.mjs';
+import { USAGE_SAME_AS_ANOTHER, USAGE_UNREADABLE } from '../../shared/usage.mts';
+import { accountSentence } from '../../shared/spawn-trouble.mts';
+import { MOVE_SAY } from '../../shared/where-it-runs-from.mts';
+import { cardsInFront } from '../../shared/which-card-is-in-front.mts';
 import { snapshotReader } from '../../shared/snapshot-delta.mjs';
 import { traceReader } from '../../shared/trace-delta.mjs';
 // THE SECOND FRONT DOOR, AND IT HAS TO BE BUILT BEFORE THE LINE BELOW RUNS.
@@ -233,6 +233,10 @@ if (twoLogins) {
   if (accountTrouble === 'at-limit' && first) {
     first.trouble = { cause: 'at-limit', since: Date.now(), note: accountSentence('at-limit') };
   }
+  // &account=stale-limit: that mark is ten minutes old and the login read since has nothing full.
+  if (accountTrouble === 'stale-limit' && first) {
+    first.trouble = { cause: 'at-limit', since: Date.now() - 600_000, at: Date.now() - 600_000, note: accountSentence('at-limit') };
+  }
 }
 
 function fixtureAccountUsage(): AccountUsageReading[] {
@@ -254,6 +258,7 @@ function fixtureAccountUsage(): AccountUsageReading[] {
   // &fablefull: the first login has room in its session and week and none left on Fable.
   const firstLimits = params.has('fablefull')
     ? [limit('session', 30, '5:09pm', session), limit('week', 60, '11:59am', week, 'all models'), limit('week', 100, '11:59am', week, 'Fable')]
+    : accountTrouble === 'stale-limit' ? [limit('session', 4, '5:09pm', session), limit('week', 13, '11:59am', week, 'all models'), limit('week', 2, '11:59am', week, 'Fable')]
     : [limit('session', twoLogins ? 100 : 42, '5:09pm', session), limit('week', 15, '11:59am', week, 'all models'), limit('week', 24, '11:59am', week, 'Fable')];
   return [
     { profile: first.profile, ...failed, limits: firstLimits },
@@ -288,7 +293,7 @@ function fixtureWrite(scope: 'project' | 'workspace', p: any): Settings {
     } else if (p.key === 'memoryGateSlots' && w.memoryGate) {
       w.memoryGate = { ...w.memoryGate, slots: p.value === null ? null : Math.max(1, Math.min(w.memoryGate.slotsMax, Number(p.value) || 1)) };
     } else if (p.key === 'activeAccount') {
-      // The account picked is the one marked chosen, as main/settings.mjs
+      // The account picked is the one marked chosen, as main/settings.mts
       // answers it, so the In use row can be seen in a preview.
       const list = p.value?.engine === 'codex' ? w.codex?.accounts ?? [] : w.accounts;
       for (const a of list) a.chosen = a.profile === p.value?.profile;
@@ -336,7 +341,7 @@ export function updateShape(wanted: string): UpdateState {
     current: { phase: 'current' },
     error: { phase: 'error', error: 'Could not reach the internet.' },
     // A COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS
-    // (shared/where-it-runs-from.mjs). This is the state two real installs
+    // (shared/where-it-runs-from.mts). This is the state two real installs
     // were in for a week, and the only way to look at the card and the row
     // without a disk image and a packaged build.
     'disk-image': { phase: 'error', error: MOVE_SAY.cannotUpdateHere, canMove: true, place: 'disk-image' },
@@ -370,7 +375,7 @@ export const api = {
 
   // IS A SCREEN READER RUNNING. Asked by the terminal pane before it builds an
   // xterm, so the accessibility tree is built for the people it is for rather
-  // than for everybody (main/ipc.mjs 'zero:assistiveTech').
+  // than for everybody (main/ipc.mts 'zero:assistiveTech').
   //
   // Every failure is "no": fixtures, a preload from before this channel
   // existed, or a refused call. A terminal that cannot ask the question still
@@ -445,7 +450,7 @@ export const api = {
       // be looked at.
       if (params.has('stale')) {
         base.restartNeeded = {
-          files: ['main/supervisor.mjs', 'main/ipc.mjs', 'preload.cjs', 'shared/rank.mjs'],
+          files: ['main/supervisor.mts', 'main/ipc.mts', 'preload.cjs', 'shared/rank.mjs'],
           since: Date.now() - 2.9 * 24 * 3_600_000,
         };
       }
@@ -639,7 +644,7 @@ export const api = {
   },
 
   // MOVING THE APP INTO APPLICATIONS, for a copy that cannot update itself
-  // from where it is (shared/where-it-runs-from.mjs). A real move relaunches
+  // from where it is (shared/where-it-runs-from.mts). A real move relaunches
   // the app, so fixtures answer the only interesting half: `?update=move-failed`
   // is the refusal, which is the one state that has anything left to draw.
   async updateMove(): Promise<{ moved: boolean; error: string | null }> {
@@ -884,7 +889,7 @@ export const api = {
   // choice. `engine` is set by ⌘K (w-c9da359466) and by the reply box's menu,
   // which lists both agents' models (w-e1a42f6b21).
   // `now` cuts the running agent's current step so this message is answered at
-  // once instead of after it (main/claude-input.mjs `interrupt`).
+  // once instead of after it (main/claude-input.mts `interrupt`).
   // `inReplyTo` is the uid of the message a reply in a thread answers
   // (w-920461cbe6); main keeps it only in a conversation between people.
   async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; putAway?: boolean }): Promise<WorkItem | null> {
@@ -898,7 +903,7 @@ export const api = {
   },
 
   /* --------------------------------- feedback ------------------------------- */
-  // Answers { ok } or { ok: false, error } in words (main/feedback.mjs).
+  // Answers { ok } or { ok: false, error } in words (main/feedback.mts).
   async sendFeedback(p: { text: string; files: { name: string; type: string; size: number; data: string }[] }): Promise<{ ok: boolean; error?: string }> {
     if (useFixtures) return { ok: true };
     if (!window.zero?.sendFeedback) return { ok: false, error: `Restart ${Name} to send feedback.` };
@@ -1001,7 +1006,7 @@ export const api = {
   async teamEdit(p: { product: string; id: string; on: string; text?: string; gone?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamEdit(p)); },
   // A MESSAGE TO A PERSON (people get messages, never tasks), at the level the
   // sender picked. The level counts on the first message of a conversation and
-  // is ignored after, which is the main process's rule (main/team/index.mjs).
+  // is ignored after, which is the main process's rule (main/team/index.mts).
   // And the files the card carries, saved into the conversation once the main
   // process knows which one it is.
   async teamMessage(to: string | string[], body: string, priority?: number, files?: TeamMessageFile[], subject?: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessage({ to, body, priority, files, ...(subject ? { subject } : {}) })); },
@@ -1013,7 +1018,7 @@ export const api = {
   async teamTaskBrief(p: { product: string; id: string }) { return window.zero!.teamTaskBrief(p); },
   async teamContinueBrief(p: { personId: string; threadId: string }) { return window.zero!.teamContinueBrief(p); },
   async teamContinued(p: { personId: string; threadId: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamContinued(p)); },
-  // Rooms (alpha): every call goes through one door (main/ipc.mjs ROOM_OPS).
+  // Rooms (alpha): every call goes through one door (main/ipc.mts ROOM_OPS).
   async teammates<T = unknown>(op: string, args: Record<string, unknown> = {}): Promise<TeammatesResult<T>> {
     if (!window.zero?.teammates) return { ok: false, error: 'Teammates are not available here.' };
     try { return (await window.zero.teammates({ op, args })) as TeammatesResult<T>; } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
@@ -1027,7 +1032,7 @@ export const api = {
     if (useFixtures || !window.zero?.threadEdit) return { ok: true };
     try { return await window.zero.threadEdit({ product, id, patch }); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   },
-  // Move a thread to another project (shared/move-thread.mjs). Answers with
+  // Move a thread to another project (shared/move-thread.mts). Answers with
   // the row it became there, or with the reason in words: only a thread
   // nothing has ever run on can go, and main asks that again before it writes.
   async moveItem(product: string, id: string, to: string): Promise<{ ok: boolean; error?: string; item?: WorkItem; from?: string; to?: string }> {
@@ -1167,7 +1172,7 @@ export const api = {
 
   // BEING A BRAND NEW USER ON THE APP SHE DOWNLOADED.A second Agentbox opens in
   // a throwaway home beside hers; nothing of hers is deleted and her own
-  // window keeps running (main/fresh-user.mjs).
+  // window keeps running (main/fresh-user.mts).
   //
   // IT SAYS WHY IT COULD NOT RATHER THAN FALLING BACK QUIETLY. A missing
   // channel here means a main process older than this build, which is exactly
@@ -1264,13 +1269,13 @@ export const api = {
   // object carrying anything else.
   async composeRepeat(p: {
     product: string; title: string; body?: string; priority?: number; rule: RepeatShape;
-    engine?: string; model?: string;
+    engine?: string; model?: string; startsNext?: boolean;
   }): Promise<RepeatRule | null> {
     if (useFixtures) return null;
     return window.zero!.composeRepeat(p);
   },
 
-  async setRepeat(p: { product: string; id: string; rule: Partial<RepeatShape & { title: string; body: string; priority: number }> }): Promise<RepeatRule | null> {
+  async setRepeat(p: { product: string; id: string; rule: Partial<RepeatShape & { title: string; body: string; priority: number; startsNext: boolean }> }): Promise<RepeatRule | null> {
     // FIXTURES CAN CHANGE A RULE, because changing one is now a thing she does
     // on screen rather than a thing that only happens on disk. It used to
     // answer null, so in the fixture app the box would take the words, close,
@@ -1587,6 +1592,32 @@ export const api = {
     return zero.cloudSignIn(p);
   },
 
+  /** A file a cloud run asked for, sent from this computer (or one picked instead) to the thread's next cloud turn. */
+  async cloudSendFile(p: { product: string; id: string; path?: string; choose?: boolean; hold?: boolean; also?: string }): Promise<{ ok: boolean; path?: string; canceled?: boolean; held?: boolean; words?: string; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudSendFile) return { ok: false, error: RESTART_NOTE };
+    return zero.cloudSendFile(p);
+  },
+  /** A one-time code a cloud run asked for, sent as the reply that carries it on. */
+  /** Whether a file a cloud run asked for is on this computer to send, and its size. */
+  async cloudFileInfo(p: { path: string }): Promise<{ ok: boolean; size?: number; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudFileInfo) return { ok: true };
+    return zero.cloudFileInfo(p);
+  },
+  async cloudSendCode(p: { product: string; id: string; about: string; code: string; also?: string }): Promise<{ ok: boolean; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudSendCode) return { ok: false, error: RESTART_NOTE };
+    return zero.cloudSendCode(p);
+  },
+
+  /** A key kept in the cloud for every cloud run: saved under its name, or removed. */
+  async cloudKey(p: { action: 'save' | 'remove'; name: string; value?: string; label?: string; reply?: { product: string; id: string; answer: string } }): Promise<{ ok: boolean; keys?: { name: string; savedAt: number | null; label?: string | null }[]; freed?: string[]; cloudOff?: boolean; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudKey) return { ok: false, error: RESTART_NOTE };
+    return zero.cloudKey(p);
+  },
+
   /** Signing in to Agentbox Cloud itself, on the app's sign-in page: Google, email, a new account and its link again, or a password reset. */
   async cloudAccountSignIn(p: { method: 'google' | 'email' | 'sign-up' | 'resend' | 'agree' | 'reset' | 'reset-wait' | 'new-password'; email?: string; password?: string; name?: string; acceptTerms?: boolean }): Promise<{ ok: boolean; confirm?: boolean; needsTerms?: boolean; sent?: boolean; opened?: boolean; error?: string; cancelled?: boolean }> {
     const zero = window.zero as any;
@@ -1650,7 +1681,7 @@ export const api = {
   },
 
   // `ofMany` says this one is part of a press that connects several folders and
-  // will count itself once (main/ipc.mjs); it changes nothing about the project.
+  // will count itself once (main/ipc.mts); it changes nothing about the project.
   async createProduct(p: { name: string; repoPath?: string | null; ofMany?: boolean }) {
     if (useFixtures) return null;
     return window.zero!.createProduct(p);
@@ -1849,7 +1880,7 @@ export const api = {
     return window.zero!.onChanged(fn);
   },
 
-  /** The phone door (main/phone-link.mjs). Null where there is none: the
+  /** The phone door (main/phone-link.mts). Null where there is none: the
    *  fixtures, and a browser tab, whose server has no such channel. */
   async phoneLink(p: { action: 'status' | 'on' | 'off' | 'reset' | 'via' | 'stop-alerts'; via?: PhoneRoute; device?: string }): Promise<PhoneLink | null> {
     if (useFixtures) return null;

@@ -36,7 +36,7 @@ import { resultLeads } from '../recap';
 import { withoutTrailingWork } from '../trailing-work';
 import { marksFor, readUndoMarks, UNDO_MARKS_EVENT, type UndoMark } from '../undo-marks';
 import { ranWords } from '../byline';
-import { notShipped } from '../../../shared/not-shipped.mjs';
+import { notShipped } from '../../../shared/not-shipped.mts';
 import type { ModelChoice } from '../models';
 import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
@@ -45,7 +45,7 @@ import type { AgentTurn, FileMarkLink, RunningSession, WorkItem } from '../types
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { FileMarkOpener } from './FileMarkLine';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
-import { catchUpDue } from '../../../shared/agent-import.mjs';
+import { catchUpDue } from '../../../shared/agent-import.mts';
 import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, newestAnswer, pageTitle, standsAt, workingContext, workingFrom } from '../one-thing-at-a-time';
 import { gapIndex } from '../../../shared/agents.mjs';
 import { askMarkUnread, say } from '../team/chat-events';
@@ -70,7 +70,7 @@ import { Name } from '../../../shared/product-name.mjs';
 // another 8 on top of every one of them.
 //
 // The app has known the instant a worker writes a line the whole time. The
-// supervisor fires its change hook on every stdout line and `main/ipc.mjs`
+// supervisor fires its change hook on every stdout line and `main/ipc.mts`
 // coalesces those into one `zero:changed` push every 400ms. So the read is
 // hung off that push now, and this timer stays only for the things no push
 // covers: a trace written by an Agentbox in another window, and a session whose
@@ -446,7 +446,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
       {after.map((act, i) => <ActLine key={`${act.at}-${i}`} act={act} />)}
     </div>
   );
-  // A chat just brought in is being written up as a thread (main/catch-up.mjs). Its raw end stays readable until then.
+  // A chat just brought in is being written up as a thread (main/catch-up.mts). Its raw end stays readable until then.
   if (queue && catchUpDue(item)) {
     return (
       <>

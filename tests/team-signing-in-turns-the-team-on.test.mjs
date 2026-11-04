@@ -1,6 +1,6 @@
 // SIGNING IN TURNS THE TEAM ON, AND SIGNING OUT TURNS IT ALL THE WAY OFF.
 //
-// main/team/index.mjs is the one place the app becomes a team member. These
+// main/team/index.mts is the one place the app becomes a team member. These
 // pin what that has to mean: after sign-in every line this Mac writes carries
 // the person (and the store server the supervisor starts is told who they
 // are), a team that invited their email is offered and joined on their yes, a
@@ -16,10 +16,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as disk from '../main/store/work-items.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamService } from '../main/team/index.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
-import { teamOf } from '../main/team/projects.mjs';
+import { teamOf } from '../main/team/projects.mts';
 
 // The slice of the store the service reads: the products in an account folder.
 function storeAt(accountRoot) {

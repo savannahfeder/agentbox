@@ -1,6 +1,6 @@
 // A DAY THE APP FROZE IS A THREAD THAT FIXES IT.
 //
-// main/freeze-recorder.mjs writes each hold of the main thread to the log on
+// main/freeze-recorder.mts writes each hold of the main thread to the log on
 // this computer. This reads yesterday's once a day and, when the longest hold
 // reached FILE_AT_MS, files one thread in the project whose repository the app
 // runs from, with the holds grouped by the function that held them and the
@@ -12,7 +12,7 @@
 // time: while it is open, another bad day is a note on it.
 import fs from 'node:fs';
 import path from 'node:path';
-import { dayOf } from './freeze-recorder.mjs';
+import { dayOf } from './freeze-recorder.mts';
 
 export const FILE_AT_MS = 1000;
 export const FREEZE_LABEL = 'app-froze';

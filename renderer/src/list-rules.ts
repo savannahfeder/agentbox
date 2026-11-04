@@ -3,8 +3,8 @@
 import { instructionOf, isCleanRun } from '../../shared/repeats.mjs';
 import { teammateIdOf } from '../../shared/teammates.mjs';
 import { answerSettled, filedByThePerson } from '../../shared/answers.mjs';
-import { saysARunGotNowhere } from '../../shared/spawn-trouble.mjs';
-import { notShippedLine } from '../../shared/not-shipped.mjs';
+import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
+import { notShippedLine } from '../../shared/not-shipped.mts';
 import { setByPerson } from '../../shared/thread-waits.mjs';
 import { isTaskRow } from '../../shared/team-rules.mjs';
 import { shownTitle } from '../../shared/thread-title.mjs';
@@ -297,7 +297,8 @@ export const PROPOSAL_PATIENCE = 24 * 3_600_000;
  *
  * A proposal whose parent is not in `items` is skipped. A thread the user
  * closed stays closed, without answering its proposals; reopening it turns
- * the reminder back on.
+ * the reminder back on. A thread the user put in Later stays there until
+ * Later ends.
  *
  * While a reply is on its way to an agent, or an agent is on the thread, the
  * reminder waits: Needs you wins over In progress, so it made the reply look
@@ -315,6 +316,7 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
     const parent = i.parent ? byId.get(i.parent) : undefined;
     if (!parent) continue;
     if (parent.status === 'done' && parent.wrote?.status?.source === 'founder') continue;
+    if (hiddenUntil(parent) > now) continue; // in Later: it comes back when Later ends
     if (parent.status === 'claimed' || (liveAnswer(parent) && !answerSettled(parent))) continue;
     owed.add(parent.id);
   }
@@ -335,7 +337,7 @@ export function heldRowStarts(
 
 // In progress promises that a worker is on this row or about to be, so it
 // never holds a row whose moment has not arrived. The supervisor's spawn
-// passes gate on the same thing (`isDue`, main/supervisor.mjs).
+// passes gate on the same thing (`isDue`, main/supervisor.mts).
 //
 // `deferredUntil` is the caller's dueAt: the ledger's runAt, maxed with the old
 // localStorage snooze the view still honours on read.
@@ -479,7 +481,7 @@ export function rowSummary(
 // The name on the row: the written label when there is one, otherwise the
 // title. `label` is its own field because the fold refuses a rewrite of the
 // title on a row the user wrote (shared/work-items.mjs). It is written once,
-// when the thread is made (main/row-label.mjs), because Claude Code names its
+// when the thread is made (main/row-label.mts), because Claude Code names its
 // terminal tab but never saves that name to a transcript.
 //
 // A title the user wrote after the label is a rename and wins, because the
@@ -543,9 +545,12 @@ export function clipToSentence(text: string, budget = SUMMARY_BUDGET): string {
 // Every ordered list sorts through this, so the inbox, In progress and the
 // fleet agree on which row comes next. `score` is the one in shared/rank.mjs,
 // passed in so this stays pure. Recency only breaks ties.
-export function byRunningOrder<T extends { updatedAt: number }>(score: (i: T) => number) {
-  return (a: T, b: T) => score(b) - score(a) || b.updatedAt - a.updatedAt;
+export function byRunningOrder<T extends { updatedAt: number; placedAt?: number }>(score: (i: T) => number) {
+  return (a: T, b: T) => score(b) - score(a) || placedAt(b) - placedAt(a);
 }
+
+/** Where a row sits by time: a close taken straight back leaves it where it was (shared/work-items.mjs). */
+export const placedAt = (i: { updatedAt: number; placedAt?: number }): number => i.placedAt ?? i.updatedAt;
 
 // The heading urgent rows are lifted under. Which rows count is `isUrgent` in
 // shared/rank.mjs and nothing else, so the heading never sits over a row that

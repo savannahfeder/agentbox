@@ -23,9 +23,9 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun } from '../main/cloud/run.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { CLOUD_SENT, sentLine, readSent } from '../shared/cloud-start.mjs';
+import { cloudRun } from '../main/cloud/run.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { CLOUD_SENT, sentLine, readSent } from '../shared/cloud-start.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');
@@ -216,7 +216,7 @@ describe('the app', () => {
   });
 
   it('is read where the relay\'s output arrives, and said where the agent\'s id does', () => {
-    const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/child\.stderr\.on\('data', \(d\) => \{[\s\S]{0,200}this\._noteCloudSent\(session, /);
     const id = src.indexOf('if (session.sessionId && !session.idRemembered)');
     const said = src.indexOf('this._cloudStartLine(session, item)');

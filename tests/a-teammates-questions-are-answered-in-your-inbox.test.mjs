@@ -10,8 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { openQuestionsIn, answerTo } from '../renderer/src/teammates/chat-lines.ts';
 import { appHome } from '../main/store/home.mjs';
-import { loadStore } from '../main/store-modules.mjs';
-import { Teammates } from '../main/teammates.mjs';
+import { loadStore } from '../main/store-modules.mts';
+import { Teammates } from '../main/teammates.mts';
 
 const ADA = 't-aaaaaaaaaa';
 const BO = 't-bbbbbbbbbb';

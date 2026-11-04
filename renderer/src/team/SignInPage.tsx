@@ -34,7 +34,7 @@ type Mode = 'sign-in' | 'sign-up' | 'check-email' | 'agree' | 'reset' | 'reset-s
 // AND IT SIGNS IN TO AGENTBOX CLOUD (2026-10-20, w-6633e825a7). The owner
 // turned down new screens for the cloud: "We already have a sign-in page
 // built that's pretty darn decent." With purpose cloud the same page signs in
-// through main/cloud/account.mjs, says one line about the terms, and can be
+// through main/cloud/account.mts, says one line about the terms, and can be
 // left: the cloud is something chosen, not a gate over the app. With purpose
 // phone it is the team sign-in, opened from Settings › Phone and closable the
 // same way, for a build whose team version is off.

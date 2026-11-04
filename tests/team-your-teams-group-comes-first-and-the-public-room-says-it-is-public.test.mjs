@@ -6,8 +6,8 @@
 // The people list read the same in both, so teammates looked like strangers.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { GENERAL_ROOM } from '../main/team/rooms-memory.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { GENERAL_ROOM } from '../main/team/rooms-memory.mts';
 import { groupsInOrder } from '../renderer/src/team/rooms/GroupsSidebar.tsx';
 import { groupChoices } from '../renderer/src/team/rooms/GroupList.tsx';
 import { groupInTab, peopleHeading, groupTag } from '../renderer/src/team/rooms/room-rules.ts';

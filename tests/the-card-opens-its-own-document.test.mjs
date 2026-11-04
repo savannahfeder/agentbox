@@ -99,7 +99,7 @@ describe('which document a card opens by itself', () => {
     // A png opens in Preview and a source file in her editor; neither belongs
     // in a pane that took half her window without being asked.
     expect(mainDocument({ result: 'attachments/pasted-77668.png' })).toBeNull();
-    expect(mainDocument({ result: 'renderer/src/App.tsx and main/ipc.mjs' })).toBeNull();
+    expect(mainDocument({ result: 'renderer/src/App.tsx and main/ipc.mts' })).toBeNull();
     expect(mainDocument({})).toBeNull();
   });
 
@@ -132,7 +132,7 @@ describe('esc does not get in the way of a pane she never opened', () => {
 //
 // A keydown does not cross a document boundary, so once her click lands inside
 // the page the app's own window listener never hears escape again. Main
-// forwards it from below the page (before-input-event, main/main.mjs) and these
+// forwards it from below the page (before-input-event, main/main.mts) and these
 // two rules are what the renderer does with it.
 const activeFrame = (cls) => ({ tagName: 'IFRAME', classList: { contains: (c) => c === cls } });
 

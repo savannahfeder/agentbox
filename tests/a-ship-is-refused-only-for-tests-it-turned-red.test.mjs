@@ -6,7 +6,7 @@
 // hook with a stand-in vitest whose only red file was one main is known red
 // on: the hook refused the push.
 //
-// The app knows which tests are red on main (main/main-went-red.mjs keeps
+// The app knows which tests are red on main (main/main-went-red.mts keeps
 // them, and a thread is already fixing them), so the ship queue hands that
 // list to the hook, and the hook leaves those out of its refusal. Anything
 // else still red refuses the push as before, and with no list nothing changes.
@@ -103,11 +103,19 @@ describe('the push gate, while main is red', () => {
 
 describe('the ship queue', () => {
   let userDir;
-  beforeEach(() => { userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-red-on-main-user-')); });
-  afterEach(() => { fs.rmSync(userDir, { recursive: true, force: true }); });
+  // A ship made while main is red runs this suite with the variable set.
+  const inherited = process.env.AGENTBOX_RED_ON_MAIN;
+  beforeEach(() => {
+    userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-red-on-main-user-'));
+    delete process.env.AGENTBOX_RED_ON_MAIN;
+  });
+  afterEach(() => {
+    fs.rmSync(userDir, { recursive: true, force: true });
+    if (inherited !== undefined) process.env.AGENTBOX_RED_ON_MAIN = inherited;
+  });
 
   async function shipOnce() {
-    const { ShipQueue } = await import('../main/ship-queue.mjs');
+    const { ShipQueue } = await import('../main/ship-queue.mts');
     const folders = path.join(dir, 'folders');
     fs.mkdirSync(path.join(folders, 'w-a'), { recursive: true });
     fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });

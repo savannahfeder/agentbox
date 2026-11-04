@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { appHome } from '../main/store/home.mjs';
 import { Repeats } from '../main/repeats.mjs';
-import { loadStore } from '../main/store-modules.mjs';
+import { loadStore } from '../main/store-modules.mts';
 
 const at = (y, m, d, h) => new Date(y, m - 1, d, h, 0, 0, 0).getTime();
 
