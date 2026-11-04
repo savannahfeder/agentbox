@@ -5461,6 +5461,12 @@ export default function App() {
     refresh();
   }, [showToast, refresh, inboxCandidates, writeMoment, leaveResolved, pushUndo]);
 
+  // A reply set for later, sent now from under the thread: the time comes off
+  // and the reply runs, and she stays where she is.
+  const sendWaitingNow = useCallback(async (item: WorkItem) => {
+    await api.schedule({ product: item.product, id: item.id, runAt: 0 });
+    showToast('Your reply is on its way');
+  }, [showToast]);
   const unsnooze = useCallback(async (target: WorkItem | WorkItem[]) => {
     // An agent row belongs here for the same reason it belongs in the picker:
     // the way back has to exist wherever the way out did.
@@ -7807,7 +7813,7 @@ export default function App() {
                   returnedFromSnooze={returnAt(focused) > 0 && returnAt(focused) <= now}
                   scheduledUntil={returnAt(focused) > now ? returnAt(focused) : 0}
                   scheduledByAgent={parkedByAgent(focused, now)}
-                  onUnschedule={() => unsnooze(focused)}
+                  onUnschedule={() => (replyWaitsUntil(focused, Date.now()) ? sendWaitingNow(focused) : unsnooze(focused))}
                   replyOpen={modal === 'reply'}
                   /*
                    * WHAT SHE HAS SENT TO THIS ROW'S RUNNING AGENT IN THE LAST

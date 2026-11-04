@@ -159,3 +159,25 @@ describe('on a shared thread', () => {
     expect(events.find((e) => e.words === 'And make the button go to /start')?.sendsAt).toBe(SENDS);
   });
 });
+
+// The second tester pressed "send it now" under a reply set for tomorrow and
+// was put back on the list with Later one higher, not knowing whether the
+// reply had gone. And the first tester found a thread she had undone with Z
+// in Done, still offering "back to inbox · scheduled for today 5:00 PM".
+describe('the button under a waiting reply', () => {
+  const app = read('renderer/src/App.tsx');
+  const focus = read('renderer/src/components/Focus.tsx');
+
+  it('sends it and stays on the thread', () => {
+    expect(app).toMatch(/onUnschedule=\{\(\) => \(replyWaitsUntil\(focused, Date\.now\(\)\) \? sendWaitingNow\(focused\) : unsnooze\(focused\)\)\}/);
+    const fn = app.slice(app.indexOf('const sendWaitingNow = '), app.indexOf('const sendWaitingNow = ') + 600);
+    expect(fn).toMatch(/api\.schedule\(\{ product: item\.product, id: item\.id, runAt: 0 \}\)/);
+    expect(fn).toMatch(/showToast\('Your reply is on its way'\)/);
+    expect(fn).not.toMatch(/setFocused\(null\)/);
+  });
+
+  it('is not offered on a closed thread', () => {
+    expect(focus).toMatch(/const scheduledHere = item\.status !== 'done' && \(scheduledUntil \?\? 0\) > 0;/);
+    expect(focus).not.toMatch(/\(scheduledUntil \?\? 0\) > 0 && (!!)?onUnschedule/);
+  });
+});

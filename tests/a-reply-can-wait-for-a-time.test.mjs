@@ -230,7 +230,7 @@ describe('the reply box and the app', () => {
   });
 
   it('Z puts back the time the row had before', () => {
-    expect(answerWith).toMatch(/if \(later\) await api\.schedule\(\{ product: item\.product, id: item\.id, runAt: priorRunAt \}\)/);
+    expect(answerWith).toMatch(/if \(later \|\| waiting\) await api\.schedule\(\{ product: item\.product, id: item\.id, runAt: priorRunAt \}\)/);
   });
 
   // A reply for later started nothing, so its Z has nothing of its own to stop.

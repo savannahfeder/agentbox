@@ -1831,6 +1831,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       {(direct || summarised) && !cornerHeaderTarget && <ConversationAside item={item} onAddPeople={onAddPeople} />}</>
     : <>{backButton}{bandLine}</>;
 
+  // A closed thread has nothing to bring back, whatever time it still carries.
+  const scheduledHere = item.status !== 'done' && (scheduledUntil ?? 0) > 0;
+
   // ANYTHING ADDED TO THIS ELEMENT RIDES BESIDE THE LITERAL, NEVER INSIDE IT.
   // `the way out of an opened task` finds this element by the literal string
   // `className="focus-pane"` to prove the chevron is a sibling of the scroll
@@ -2269,7 +2272,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
          screen that was measured and the whole 51px.
        */}
       {((item.start === 'later' && !!onUnschedule)
-        || ((scheduledUntil ?? 0) > 0 && !!onUnschedule)
+        || (scheduledHere && !!onUnschedule)
         || (!!agent && !agentTakesReply && !!onReveal)
         || (!agent && item.status === 'blocked' && !session)) && (
       <div className="focus-actions">
@@ -2282,7 +2285,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             <span className="dim">{' · '}not started yet</span>
           </button>
         )}
-        {item.start !== 'later' && (scheduledUntil ?? 0) > 0 && onUnschedule && (
+        {item.start !== 'later' && scheduledHere && onUnschedule && (
           // The two cases want different words because the button does two
           // different things. A row SHE scheduled is somewhere else and comes
           // back; a row an agent parked is already right here in her inbox, so
