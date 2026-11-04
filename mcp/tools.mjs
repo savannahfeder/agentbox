@@ -219,7 +219,10 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
         model: z.string().max(80).optional().describe(MODEL_WORDS),
         effort: z.string().optional().describe(EFFORT_WORDS),
       },
-      run: ({ product, ...fields }) => json(claims.file(product, runWords(fields))),
+      run: ({ product, ...fields }) => {
+        runWords(fields);
+        return json(claims.file(product, fields));
+      },
     },
     {
       name: 'claim_work_item',
