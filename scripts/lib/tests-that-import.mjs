@@ -27,7 +27,7 @@ const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)['"](\.[^'"\
 // What this repo writes an extensionless import to mean. Order is the order
 // node and vite try them.
 const ENDINGS = ['', '.mjs', '.ts', '.tsx', '.js', '.jsx', '.cjs',
-  '/index.mjs', '/index.ts', '/index.tsx', '/index.js'];
+  '/index.mts', '/index.ts', '/index.tsx', '/index.js'];
 
 function resolve(fromFile, specifier) {
   const base = path.resolve(path.dirname(fromFile), specifier);

@@ -1,6 +1,6 @@
 // A SHIP THAT HITS A MERGE CONFLICT SAYS WHAT THE OTHER SIDE WAS FOR.
 //
-// When main/ship-queue.mjs ran the ship script and the merge of main
+// When main/ship-queue.mts ran the ship script and the merge of main
 // conflicted, the thread got the script's words and nothing else: the
 // conflicting files, but not what the work on main was for or which thread
 // made it. Threads could not resolve it on their own, so the conflict went to
@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ShipQueue, SHIP_LABEL } from '../main/ship-queue.mjs';
+import { ShipQueue, SHIP_LABEL } from '../main/ship-queue.mts';
 import { conflictingBranches, threads as someThreads } from './helpers/conflicting-branches.mjs';
 
 const SHIP_SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'ship.mjs');

@@ -9,8 +9,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { GENERAL_ROOM } from '../main/team/rooms-memory.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { GENERAL_ROOM } from '../main/team/rooms-memory.mts';
 
 const dir = path.join(import.meta.dirname, '..', 'cloud/supabase/migrations');
 const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();

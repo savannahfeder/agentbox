@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { openFreshUser } from '../main/fresh-user.mjs';
+import { openFreshUser } from '../main/fresh-user.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // electron-builder names the folder after the arch it packed, so this is

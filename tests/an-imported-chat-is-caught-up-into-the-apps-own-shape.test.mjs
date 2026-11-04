@@ -8,13 +8,13 @@
 // same morning, it never landed: the account was at its weekly limit, and the
 // dead run's "usage limit" line was drawn over the agent's answer. So the
 // rewrite is now a small-model call asked on any account or engine with room
-// (main/catch-up.mjs), and no agent run starts for it.
+// (main/catch-up.mts), and no agent run starts for it.
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, threadImportRow, THREAD_LABEL } from '../shared/agent-import.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, threadImportRow, THREAD_LABEL } from '../shared/agent-import.mts';
 
 const dirs = [];
 afterEach(() => { while (dirs.length) fs.rmSync(dirs.pop(), { recursive: true, force: true }); });
@@ -99,7 +99,7 @@ describe('one name, not two', () => {
   // the row in the same tick, and the name changed twice in five seconds,
   // ending on the namer's.
   it('the namer leaves a chat still owed its rewrite, which names it', async () => {
-    const { wantsName } = await import('../main/row-label.mjs');
+    const { wantsName } = await import('../main/row-label.mts');
     expect(wantsName(imported())).toBe(false);
     expect(wantsName(imported({ labels: [THREAD_LABEL, 'thread:abc'] }))).toBe(true);
   });

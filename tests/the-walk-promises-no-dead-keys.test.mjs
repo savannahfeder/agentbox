@@ -315,7 +315,7 @@ describe('the coaching card promises no dead key either', () => {
 
   it('1 sends the option under it, which is what beat fourteen says', () => {
     // The stopped row's answer is one key because its offer is in its result
-    // (shared/first-run-practice.mjs) and a digit on a focused row picks AND
+    // (shared/first-run-practice.mts) and a digit on a focused row picks AND
     // sends. If this ever became select-then-Enter the card would be promising
     // one key for a two-key move.
     // IT MAY BE HELD AND IT MAY NOT BECOME TWO KEYS. The branch holds the key

@@ -22,7 +22,7 @@
 import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { IMG_SCHEME } from '../shared/schemes.mjs';
+import { IMG_SCHEME } from '../shared/schemes.mts';
 import { ArtifactImg } from '../renderer/src/components/Focus.tsx';
 
 const ROOTS = ['/store/accounts/acct/agentbox', '/store/accounts/acct/astral/designs'];

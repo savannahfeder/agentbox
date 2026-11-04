@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { teamConfigFile } from '../phone-site-config.mjs';
 
-export const SITE_PATHS = ['renderer/', 'shared/', 'phone-legal/', 'scripts/build-phone-site.mjs', 'main/phone-icon.png'];
+export const SITE_PATHS = ['renderer/', 'shared/', 'phone-legal/', 'scripts/build-phone-site.mjs', 'cloud/web/', 'main/phone-icon.png'];
 
 export const siteChanged = (files) => (files ?? []).some((f) => SITE_PATHS.some((p) => (p.endsWith('/') ? f.startsWith(p) : f === p)));
 
@@ -44,7 +44,7 @@ export async function deployWebApp({ site, head, mainTip, fetchPage, changedSinc
 }
 
 // A build and an upload take a few minutes; with less than this left before
-// `until`, the ship queue (main/ship-queue.mjs, 20 minutes) would cut it off.
+// `until`, the ship queue (main/ship-queue.mts, 20 minutes) would cut it off.
 export const DEPLOY_NEEDS_MS = 6 * 60_000;
 
 /** The same, with this checkout's git, the network and npm, done by `until`. */

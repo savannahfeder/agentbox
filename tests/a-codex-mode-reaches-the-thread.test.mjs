@@ -14,7 +14,7 @@ import {
   codexPosture,
   isCodexMode,
 } from '../shared/codex-modes.mjs';
-import { workerThreadParams, WORKER_APPROVAL_POLICY, WORKER_SANDBOX } from '../main/codex-session.mjs';
+import { workerThreadParams, WORKER_APPROVAL_POLICY, WORKER_SANDBOX } from '../main/codex-session.mts';
 
 describe('the three modes are Codex\'s own settings', () => {
   // Read off `codex app-server generate-json-schema` on codex-cli 0.153.4,

@@ -3,7 +3,7 @@
 // upgrades instead of requiring manual manifest edits. The lockfile still
 // records exactly what was tested. Only the app's exact top frame may access its local shell.
 import {it,expect} from 'vitest';
-import {terminalSenderAllowed} from '../main/terminal-access.mjs';
+import {terminalSenderAllowed} from '../main/terminal-access.mts';
 import fs from 'node:fs';
 import semver from 'semver';
 it('accepts only the app main frame',()=>{

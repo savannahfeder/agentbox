@@ -14,7 +14,7 @@ import path from 'node:path';
 import { cleanMark, editedFilesLine, filesInLines, newestOfFamily } from '../shared/artifact-marks.mjs';
 import { planReconcile, reconcileRows, reconcileThread } from '../main/version-reconcile.mjs';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 
 const doc = (oneLiner, para = 'The first paragraph as it stands.', tail = 'The closing words.') => `# Doc\n\n${oneLiner}\n\n${para}\n\n${tail}\n`;
 let dir;

@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ensureCodexHome } from '../main/codex-account.mjs';
+import { ensureCodexHome } from '../main/codex-account.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -74,12 +74,12 @@ describe('where it is called', () => {
   // Every local spawn that names a CODEX_HOME. The cloud one names a path
   // inside its own sandbox, which this process cannot make.
   it('runs before the app-server every Codex thread talks to', () => {
-    const sup = read('main/supervisor.mjs');
+    const sup = read('main/supervisor.mts');
     const fn = sup.slice(sup.indexOf('  _codexServer('), sup.indexOf('  _codexServer(') + 2000);
     expect(fn).toMatch(/ensureCodexHome/);
   });
 
   it('runs before the app-server the model list is read from', () => {
-    expect(read('main/refresh-agent-models.mjs')).toMatch(/ensureCodexHome/);
+    expect(read('main/refresh-agent-models.mts')).toMatch(/ensureCodexHome/);
   });
 });

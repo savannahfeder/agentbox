@@ -10,7 +10,7 @@
 // died and that nothing will retry. Measured off the run logs and the
 // person's two screenshots, both timed by the row's "5 min ago".
 import { describe, it, expect } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const T = 1_792_606_358_625;
 

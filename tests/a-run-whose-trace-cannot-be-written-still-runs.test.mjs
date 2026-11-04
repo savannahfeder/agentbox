@@ -49,7 +49,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync 
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-// The one seam, and the same one the sibling file uses: `main/supervisor.mjs`
+// The one seam, and the same one the sibling file uses: `main/supervisor.mts`
 // imports `spawn` at module scope, so this is the only place to stand between
 // the app and a real process. The stub keeps the handlers it is given, because
 // the second half of the claim is that the run's OWN narration still works
@@ -74,7 +74,7 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { machineryPath } from '../main/store/home.mjs';
 
 const CLAUDE_BIN = '/nonexistent/claude-code/claude';

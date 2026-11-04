@@ -16,8 +16,8 @@ import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
-import { scanNewChats, startNewChatsWatch, QUIET_MS } from '../main/new-chats-watch.mjs';
+import { Store } from '../main/store.mts';
+import { scanNewChats, startNewChatsWatch, QUIET_MS } from '../main/new-chats-watch.mts';
 
 const ON_AT = Date.UTC(2026, 9, 24, 9, 0, 0);
 const NOW = ON_AT + 3 * 3600e3;
@@ -135,7 +135,7 @@ describe('end to end, off the disk', () => {
     ].map((r) => JSON.stringify(r)).join('\n'));
     const quiet = new Date(NOW - QUIET_MS - 60e3);
     fs.utimesSync(file, quiet, quiet);
-    const { readRecentThreads } = await import('../main/importable-threads.mjs');
+    const { readRecentThreads } = await import('../main/importable-threads.mts');
     const out = await scanNewChats({
       store: w.store, config: w.config, now: NOW, isOpen: () => false,
       readThreads: (opts) => readRecentThreads({ ...opts, home, env: {}, readCodex: async () => ({ threads: [] }) }),

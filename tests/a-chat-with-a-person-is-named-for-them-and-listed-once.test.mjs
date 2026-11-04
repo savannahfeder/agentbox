@@ -93,8 +93,8 @@ describe('the team as it is shown', () => {
     expect(teamPeopleShown([{ id: 'm', email: 'maya@lumen.test', name: 'Maya' }, { id: 'm', email: 'maya@lumen.test', name: 'Maya' }])).toHaveLength(1);
   });
   it('the team is read through it', () => {
-    const team = fs.readFileSync(new URL('../main/team/index.mjs', import.meta.url), 'utf8');
-    expect(team.match(/teamPeopleShown\(await backend\.teamPeople/g) ?? []).toHaveLength(1);
-    expect(team).toMatch(/backend\.teamPeople\(state\.team\.id\)\.then\(teamPeopleShown\)/);
+    const team = fs.readFileSync(new URL('../main/team/index.mts', import.meta.url), 'utf8');
+    expect(team.match(/teamPeopleShown\(await backend!?\.teamPeople/g) ?? []).toHaveLength(1);
+    expect(team).toMatch(/backend!?\.teamPeople\(state\.team\.id\)\.then\(teamPeopleShown\)/);
   });
 });

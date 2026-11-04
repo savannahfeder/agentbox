@@ -42,7 +42,7 @@ vi.mock('../main/account-tooling.mjs', async (importActual) => ({
   linkAccountTooling: () => null,
 }));
 
-const { Supervisor } = await import('../main/supervisor.mjs');
+const { Supervisor } = await import('../main/supervisor.mts');
 
 const CODEX_BIN = '/nonexistent/codex/codex';
 const dirs = [];

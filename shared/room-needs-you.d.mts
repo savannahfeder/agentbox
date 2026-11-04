@@ -14,5 +14,5 @@ export function mentionsIn(body: string, people: readonly RoomNamed[]): string[]
 export function addressedByOpening(body: string, people: readonly RoomNamed[]): string[];
 export function groupRow(args: {
   roomId: string; roomName: string; messages?: readonly RoomSaid[]; mentioned?: readonly RoomSaid[]; me: string | null;
-  people?: readonly RoomNamed[]; doneAt?: number; readAt?: number; nameOf?: (id: string | null) => string;
+  people?: readonly RoomNamed[]; doneAt?: number; answeredAt?: number; readAt?: number; nameOf?: (id: string | null) => string;
 }): GroupRow | null;

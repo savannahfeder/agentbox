@@ -7,7 +7,7 @@
 // in Done, and sending the words again would have run it a second time.
 //
 // A task the agent has not answered yet is still truly withdrawn: closing it
-// stops the worker (main/ipc.mjs stops the session on any close). Only the
+// stops the worker (main/ipc.mts stops the session on any close). Only the
 // answered case changes: nothing is closed, the words stay where they are, and
 // the answer is opened.
 

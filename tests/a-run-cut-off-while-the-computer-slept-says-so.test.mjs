@@ -4,7 +4,7 @@
 // the lid for two or three minutes, and the thread said "Claude Code was cut
 // off partway through, so this task is not finished. Agentbox runs it again on
 // its own at 6:28pm." It gave no reason, and the app knew one: it hears the
-// Mac go to sleep and wake (powerMonitor in main/main.mjs). Now a run that
+// Mac go to sleep and wake (powerMonitor in main/main.mts). Now a run that
 // dies with no cause of its own, across a sleep or just after one, says the
 // computer went to sleep ("computer", since the app runs on Linux too). A
 // cause the run did name, and a death long after waking, keep their own words.
@@ -12,8 +12,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { deadRunSentence } from '../shared/spawn-trouble.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { deadRunSentence } from '../shared/spawn-trouble.mts';
 import { Name } from '../shared/product-name.mjs';
 
 const MIN = 60_000;

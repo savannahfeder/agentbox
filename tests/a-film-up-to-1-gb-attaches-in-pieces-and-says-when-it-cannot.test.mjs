@@ -5,7 +5,7 @@
 // the card loses it."; Send then did nothing, or sent the message without the
 // film and said nothing. Measured: a file from a browser tab has no path, so its
 // bytes went to the computer whole, as base64, in one request, and the server
-// takes 32 MB at most (main/serve.mjs), about a 24 MB file. The staging failed,
+// takes 32 MB at most (main/serve.mts), about a 24 MB file. The staging failed,
 // the box kept the whole film as base64 in its draft, the draft could not hold
 // it, and a send dropped it.
 //
@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { stageAttachmentPart } from '../main/stage-attachment.mjs';
+import { stageAttachmentPart } from '../main/stage-attachment.mts';
 import { PIECE_BYTES, attachProblem, collectFiles, persistAttachments } from '../renderer/src/attachments.ts';
 
 const MB = 1024 * 1024;

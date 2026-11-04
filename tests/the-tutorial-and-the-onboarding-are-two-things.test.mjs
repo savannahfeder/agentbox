@@ -194,7 +194,7 @@ describe('1. the tutorial offers itself when somebody makes a new project', () =
     expect(COPY.offerLater).toContain('⌘K');
     expect(COPY.offerLater.toLowerCase()).toContain('tutorial');
     // `sayKeys` draws that ⌘K as the key this keyboard really has, so the
-    // sentence says Ctrl+K on Linux (shared/key-caps.mjs).
+    // sentence says Ctrl+K on Linux (shared/key-caps.mts).
     expect(app).toContain('showToast(sayKeys(WALK_COPY.offerLater))');
   });
 });

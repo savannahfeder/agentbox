@@ -95,7 +95,7 @@ describe('a screenshot run ends when it has taken the picture', () => {
   });
 
   it('is what the screenshot path uses, and the only thing that uses it', () => {
-    const main = fs.readFileSync(path.join(repo, 'main', 'main.mjs'), 'utf8');
+    const main = fs.readFileSync(path.join(repo, 'main', 'main.mts'), 'utf8');
     const block = main.slice(main.indexOf('const shotPath = process.env.ZERO_SCREENSHOT'));
     expect(block.slice(0, block.indexOf('window.on(\'closed\''))).toMatch(/quitThenExit\(app, \{ what: 'the screenshot run' \}\)/);
     // A quit somebody asked for by hand is not cut short: this is for a run

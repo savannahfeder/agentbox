@@ -20,7 +20,7 @@
 // So the fix is the missing half of that pair: `liveReplyBrief`, around their
 // words only when they are reaching a session that is genuinely mid-turn.
 import { it, expect } from 'vitest';
-import { submitReply, liveReplyBrief } from '../main/live-replies.mjs';
+import { submitReply, liveReplyBrief } from '../main/live-replies.mts';
 
 const QUESTION = "I'm not sure I fully understand. Can you explain why you researched the website twice? Was the information lost or something?";
 

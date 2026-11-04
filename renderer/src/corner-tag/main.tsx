@@ -1,7 +1,7 @@
 // THE CORNER TAG'S PAGES (w-dafae58a23). One page, drawn twice: `?part=tag` is
 // the tag itself and `?part=card` is the list that opens beside it, each in its
-// own window (main/corner-tag.mjs), each window exactly the size of what it
-// shows, drawing its own glass. shared/corner-tag.mjs owns the
+// own window (main/corner-tag.mts), each window exactly the size of what it
+// shows, drawing its own glass. shared/corner-tag.mts owns the
 // words and the rules; this is the drawing and the pointer.
 //
 // THE POINTER, settled with Codex and then with real mouse events:
@@ -14,7 +14,7 @@
 // - Off both the tag and the list for a moment, and the list shuts.
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Grip, HIDE_CHOICES, cardLines, cardScale, inPoints, tagSays } from '../../../shared/corner-tag.mjs';
+import { Grip, HIDE_CHOICES, cardLines, cardScale, inPoints, tagSays } from '../../../shared/corner-tag.mts';
 import { NAME } from '../../../shared/product-name.mjs';
 import { Lattice, Move, markMoves } from './lattice';
 import { MoveButton, PlacePicker } from './place';
@@ -82,7 +82,7 @@ function useTagState() {
   const [state, setState] = useState<State>(demo?.state ?? { ready: [], working: 0, now: Date.now() });
   useEffect(() => bridge?.onState((s) => setState(s)), []);
   // ONE NUMBER IS THE WHOLE SIZE. The main process reads the width of the
-  // screen the tag rests on (shared/corner-tag.mjs, tagScale) and sends it
+  // screen the tag rests on (shared/corner-tag.mts, tagScale) and sends it
   // here; everything in the tag and its list is written against it, so they
   // grow together on a 32" and stay small on a laptop.
   // The nine dots are the exception: they are whole pixels off that height,

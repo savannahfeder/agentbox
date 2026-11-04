@@ -55,7 +55,7 @@ describe('what a press on a file opens', () => {
 
   it('says why it cannot, in the site\'s words', () => {
     expect(open('recordings/session.mov')).toEqual({ kind: 'refused', error: 'This file is too big for your phone. Open it on your computer.' });
-    expect(open('main/main.mjs')).toEqual({ kind: 'refused', error: 'This file is on your computer.' });
+    expect(open('main/main.mts')).toEqual({ kind: 'refused', error: 'This file is on your computer.' });
     expect(open(`${ROUND}/late.png`)).toEqual({ kind: 'refused', error: 'This file is on its way from your computer.' });
     expect(open(`phone-files/${n('f2', 'png')}`)).toEqual({ kind: 'refused', error: 'This file is still on its way.' });
   });

@@ -2,7 +2,7 @@
 // lifetime. This runs a harmless local shell script, never a real updater.
 import {it,expect} from 'vitest';
 import os from 'node:os';
-import {TaskTerminals} from '../main/task-terminals.mjs';
+import {TaskTerminals} from '../main/task-terminals.mts';
 it('captures a real command exit and leaves the unrelated task shell alive',async()=>{
  const dir=os.tmpdir();
  const m=new TaskTerminals({sweepMs:0,resolve:key=>key==='update'?{cwd:dir,command:{file:'/bin/sh',args:['-c','printf "update-test-output\\n"; exit 7']}}:dir});

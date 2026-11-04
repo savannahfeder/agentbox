@@ -26,7 +26,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cardsInFront } from '../shared/which-card-is-in-front.mjs';
+import { cardsInFront } from '../shared/which-card-is-in-front.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (...p) => fs.readFileSync(path.join(here, '..', ...p), 'utf8');
@@ -75,8 +75,8 @@ describe('the approval card in front', () => {
 });
 
 describe('the screen, the chord and the Agents menu', () => {
-  const ipc = read('main', 'ipc.mjs');
-  const main = read('main', 'main.mjs');
+  const ipc = read('main', 'ipc.mts');
+  const main = read('main', 'main.mts');
 
   it('all read the one order, so ⌘Y answers the card being read', () => {
     // The snapshot the card is drawn from.
@@ -88,7 +88,7 @@ describe('the screen, the chord and the Agents menu', () => {
     // have been pressed, and the phone, which draws every card as a list of its
     // own and has no thread open on this computer.
     expect(main.match(/approvals\.listPending\(/g)).toHaveLength(2);
-    expect(main).toMatch(/let cardInFront = \(\) => approvals\.listPending\(config\.storeRoot\)\[0\]/);
+    expect(main).toMatch(/let cardInFront(?:: [^\n]*?)? = \(\) => approvals\.listPending\(config\.storeRoot\)\[0\]/);
     expect(main).toMatch(/cardInFront = \(\) => ipc\.pendingApprovals\(\)\[0\]/);
   });
 

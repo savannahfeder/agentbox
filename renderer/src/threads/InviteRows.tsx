@@ -14,6 +14,6 @@ export function InviteRows({ rows, onJoin, onOpen, selected }: {
     <span className="mark" aria-hidden="true" />
     <RowCells status={WAITING}
       title={<span className="th-msg"><span className="th-msg-text">{r.words}</span><button type="button" className="rm-btn inv-join" onClick={(e) => { e.stopPropagation(); onJoin(r); }}>Join</button></span>}
-      where={r.kind === 'team' ? 'Team' : 'Group'} priority={null} updatedAt={0} when="" now={0} />
+      where="Team" priority={null} updatedAt={0} when="" now={0} />
   </div>)}</>;
 }

@@ -107,7 +107,7 @@ export function rememberedProject(): string | null {
  *     never run anything, and an agent can end up run in the practice project
  *     by accident.
  *   - The slug is the reserved practice slug and there is no such project at
- *     all. The folder is deleted at the end of the walk now (main/store.mjs), so
+ *     all. The folder is deleted at the end of the walk now (main/store.mts), so
  *     this is the ordinary leftover, and it is worth forgetting rather than
  *     leaving to be adopted later by anything that happens to take that name.
  *

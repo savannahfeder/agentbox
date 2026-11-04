@@ -1,5 +1,5 @@
 // PURE. A file in a group chat bigger than one room file goes in parts, with a
-// short list under its own name saying how many (main/team/rooms.mjs).
+// short list under its own name saying how many (main/team/rooms.mts).
 import { MAX_SHARED_SENT_BYTES } from './carried-files.mjs';
 
 /** A part fits a room file (10 MiB) with room to spare. */

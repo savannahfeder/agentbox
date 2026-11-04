@@ -17,8 +17,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { docsToSend, tarDocs, layDocs, DOCS_LIMITS } from '../main/cloud/docs.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { docsToSend, tarDocs, layDocs, DOCS_LIMITS } from '../main/cloud/docs.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 let tmp; let docs;
 const put = (file, body, ageMs = 0) => {

@@ -1,6 +1,6 @@
 // A RED MAIN STARTS ITS OWN FIX, AND COMES TO YOU ONLY WHEN TWO FIXES FAIL.
 //
-// main/main-went-red.mjs filed one task when GitHub's full run went red on
+// main/main-went-red.mts filed one task when GitHub's full run went red on
 // main, but it filed it as a proposal, so it sat in the inbox until someone
 // read it and said "it's broken, fix it". Meanwhile every other ship bounced
 // on the same red tests (5614801f and ce30416b on 2026-10-24 say so). Measured
@@ -15,8 +15,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
-import { FIX_TRIES, MAIN_RED_LABEL, MainTests, redOnMain } from '../main/main-went-red.mjs';
+import { Store } from '../main/store.mts';
+import { FIX_TRIES, MAIN_RED_LABEL, MainTests, redOnMain } from '../main/main-went-red.mts';
 
 let root; let userDir; let dir;
 beforeEach(() => {
@@ -63,7 +63,7 @@ const watch = (store, gh, shipped) => new MainTests({
 const rows = (store) => store.listItems().filter((i) => i.product === 'myproduct');
 
 async function supervisorOver(store) {
-  const { Supervisor } = await import('../main/supervisor.mjs');
+  const { Supervisor } = await import('../main/supervisor.mts');
   const config = { accountRoot: root, storeRoot: root, products: [], personalProducts: [], accountId: 'nobody', claudeBin: '/nonexistent' };
   const sup = new Supervisor(config, store, root, path.join(root, 'data'), userDir);
   sup._saveState = () => {};

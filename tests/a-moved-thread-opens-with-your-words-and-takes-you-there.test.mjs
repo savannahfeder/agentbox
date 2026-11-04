@@ -9,8 +9,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
-import { movedHere } from '../shared/move-thread.mjs';
+import { Store } from '../main/store.mts';
+import { movedHere } from '../shared/move-thread.mts';
 import { listedNow, OPENS_WITHIN_MS } from '../renderer/src/opens-when-listed.ts';
 
 let store, root;

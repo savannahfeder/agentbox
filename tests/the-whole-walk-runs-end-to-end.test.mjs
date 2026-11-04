@@ -26,7 +26,7 @@ import {
   COACHED, BEAT, N_BEATS, START,
   advance, coach, inboxCleared, stepTo, walkRows,
 } from '../renderer/src/onboarding.ts';
-import { PRACTICE_ROWS } from '../shared/first-run-practice.mjs';
+import { PRACTICE_ROWS } from '../shared/first-run-practice.mts';
 
 const FOLDER = '/Users/leon/Developer/side-quest';
 const EXAMPLE_IDS = PRACTICE_ROWS.map((_, i) => `w-ex${i + 1}`);

@@ -26,7 +26,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   ensureTaskFolder, parkTaskFolder, releaseTaskFolder, restoreTaskFolder,
-} from '../main/task-folders.mjs';
+} from '../main/task-folders.mts';
 
 // `protocol.file.allow` because the submodule here is a local folder, which git
 // refuses to clone from by default since 2.38.1. The identity because the

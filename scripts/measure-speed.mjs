@@ -72,8 +72,8 @@ async function makeStore(projects, perProject) {
 }
 
 async function serve(port) {
-  const { bootHeadless, createServer, newToken, picturesTheAppOwns } = await import('../main/serve.mjs');
-  const { startFreezeRecorder } = await import('../main/freeze-recorder.mjs');
+  const { bootHeadless, createServer, newToken, picturesTheAppOwns } = await import('../main/serve.mts');
+  const { startFreezeRecorder } = await import('../main/freeze-recorder.mts');
   const booted = await bootHeadless({ dataDir: data, appDir: repo, userDir: data });
   startFreezeRecorder({ dir: path.join(data, 'memory-log'), appDir: repo, thresholdMs: 200, onFreeze: (f) => log({ freeze: f }) });
   for (const [channel, fn] of booted.channels) {

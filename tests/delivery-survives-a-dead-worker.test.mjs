@@ -11,7 +11,7 @@
 // Duration was never the question. These are the four cases.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const ITEM = {
   id: 'w-9ccc2474bf', product: 'the-frontier', answer: 'Option 1: One design pass, as an HTML page.',

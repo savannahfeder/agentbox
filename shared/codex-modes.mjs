@@ -20,7 +20,7 @@
 // `untrusted` IS DELIBERATELY NOT OFFERED. It is the one Agentbox used to run
 // and it is why Codex was unusable here: it cards every command before it runs,
 // and it adds no containment the sandbox was not already providing. The
-// measurements are in main/codex-session.mjs. Leaving it off the list is not
+// measurements are in main/codex-session.mts. Leaving it off the list is not
 // hiding a choice, it is declining to offer a broken one. `granular` is not
 // offered either: it is an object of five switches, which is a settings screen
 // of its own and not a mode.
@@ -104,7 +104,7 @@ export function isCodexMode(word) {
  * The pair for a mode, or the default's pair when the word is not one of ours.
  *  FALLING BACK RATHER THAN THROWING IS DELIBERATE at this level: a stale word
  *  in her config should start a worker in the safe-ish default, not refuse to
- *  start one. The writers (main/settings.mjs) validate on the way IN, which is
+ *  start one. The writers (main/settings.mts) validate on the way IN, which is
  *  where a typo can still be reported to the person who made it.
  */
 export function codexPosture(mode, { reviewer = null } = {}) {

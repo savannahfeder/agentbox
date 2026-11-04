@@ -8,13 +8,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
-import { Supervisor, awaitingHer } from '../main/supervisor.mjs';
+import { Store } from '../main/store.mts';
+import { Supervisor, awaitingHer } from '../main/supervisor.mts';
 import { isDue } from '../shared/work-items.mjs';
 import { belongsInInbox, hiddenUntil, replyClearsSchedule } from '../renderer/src/list-rules';
 import { threadEvents } from '../renderer/src/thread-history';
-import { registerIpc } from '../main/ipc.mjs';
-import { collectingIpcMain, broadcastingWindow, nodeHost } from '../main/serve.mjs';
+import { registerIpc } from '../main/ipc.mts';
+import { collectingIpcMain, broadcastingWindow, nodeHost } from '../main/serve.mts';
 
 const NOW = 1_791_400_000_000;
 const HOUR = 3_600_000;

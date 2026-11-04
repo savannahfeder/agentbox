@@ -22,7 +22,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import * as disk from '../main/store/work-items.mjs';
 import { ENGINE_CHOICE_ENABLED, engineFor, modelForEngine } from '../shared/engines.mjs';
 import { pickToSend } from '../renderer/src/reply-pick';
@@ -118,7 +118,7 @@ describe('the store takes the agent with the reply', () => {
 
 describe('the reply box draws the card\'s own menu', () => {
   const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
-  const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+  const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
   const api = fs.readFileSync(new URL('../renderer/src/api.ts', import.meta.url), 'utf8');
 
   it('uses the one menu component rather than a second drawer', () => {

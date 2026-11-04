@@ -490,7 +490,8 @@
    and is silently ignored, and the marks then never come back at all. That is
    how it was found: `data-chrome` said "up" and the opacity stayed 0.
 */
-.workspace-layout[data-artifact-layout="focus"][data-chrome="up"]:not(.workspace-settings) .workspace-artifact-header .doc-marks {
+.workspace-layout[data-artifact-layout="focus"][data-chrome="up"]:not(.workspace-settings) .workspace-artifact-header .doc-marks,
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .workspace-artifact-header .doc-marks:has(.av-share-box) {
   opacity:1; transform:none; pointer-events:auto;
 }
 /* The corner that wakes them. Transparent, and the only piece of our own
@@ -959,7 +960,7 @@ body {
      980x600   2.20     980x1200  1.49     980x1400  1.43
 
    1.43 is the unfixed number; it started at 1.40. The app's minimum is 980x600
-   (main/main.mjs), so 980 wide on a tall display is reachable, and anyone
+   (main/main.mts), so 980 wide on a tall display is reachable, and anyone
    running the window down one side of a portrait monitor would have seen no
    fix at all.
 

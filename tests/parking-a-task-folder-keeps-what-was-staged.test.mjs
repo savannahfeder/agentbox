@@ -1,6 +1,6 @@
 // PARKING A TASK FOLDER KEEPS WHAT WAS STAGED, NOT JUST WHAT WAS ON DISK.
 //
-// FOUND 2026-10-07 reading main/task-folders.mjs (w-5952e6de3e, with Codex).
+// FOUND 2026-10-07 reading main/task-folders.mts (w-5952e6de3e, with Codex).
 // `parkTaskFolder` committed the work with `git add -A` and `restoreTaskFolder`
 // undid it with a mixed reset, and the file said a reopened task comes back
 // "staged exactly as they were". It did not: `add -A` REPLACES the index with
@@ -27,7 +27,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   ensureTaskFolder, parkTaskFolder, restoreTaskFolder, PARKED,
-} from '../main/task-folders.mjs';
+} from '../main/task-folders.mts';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 

@@ -37,8 +37,8 @@ import {
 import { cardDigest } from '../shared/approval-card.mjs';
 import { cardDigest as appCardDigest } from '../main/approvals.mjs';
 import { threadSnapshot, checkCommand } from '../shared/phone-snapshot.mjs';
-import { approvalsHandshakes, asksPermission } from '../main/cloud/kit.mjs';
-import { serveApprovals } from '../main/approval-prompt-core.mjs';
+import { approvalsHandshakes, asksPermission } from '../main/cloud/kit.mts';
+import { serveApprovals } from '../main/approval-prompt-core.mts';
 
 const STUB = fileURLToPath(new URL('../cloud/sandbox/mcp-stub.mjs', import.meta.url));
 const read = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
@@ -46,7 +46,7 @@ const read = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'ut
 describe('what the computer and the server agree on', () => {
   it('the approvals server is the one the app runs, by its name in the run\'s tools', () => {
     expect(APPROVALS_SERVER).toBe('zero-approvals');
-    expect(read('main/supervisor.mjs')).toContain("'mcp__zero-approvals__approval_prompt'");
+    expect(read('main/supervisor.mts')).toContain("'mcp__zero-approvals__approval_prompt'");
   });
   it('a card\'s fingerprint is the one the app takes, from one place', () => {
     const request = { id: 'cloud-r-c1-9', at: 1, tool: 'Bash', input: { b: 2, a: 1 } };
@@ -65,7 +65,7 @@ describe('what the computer and the server agree on', () => {
     const no = JSON.parse(approvalAnswerLine(9, { allow: false, note: 'not now' }));
     expect(JSON.parse(no.result.content[0].text)).toEqual({ behavior: 'deny', message: 'not now' });
     expect(JSON.parse(JSON.parse(approvalAnswerLine(9, { allow: false })).result.content[0].text).message).toBe(DECLINED);
-    expect(read('main/approval-prompt-core.mjs')).toContain(DECLINED);
+    expect(read('main/approval-prompt-core.mts')).toContain(DECLINED);
   });
 });
 
@@ -88,7 +88,7 @@ describe('the kit', () => {
     expect(asksPermission(asks.map((a) => (a === 'default' ? 'bypassPermissions' : a)))).toBe(false);
     expect(asksPermission([...asks, '--dangerously-skip-permissions'])).toBe(false);
     expect(asksPermission(['claude', '--permission-mode', 'default'])).toBe(false);
-    expect(read('main/cloud/run.mjs')).toMatch(/asksPermission\(/);
+    expect(read('main/cloud/run.mts')).toMatch(/asksPermission\(/);
   });
   it('a start from a kit that asks holds that server, from the start, with its handshake', async () => {
     const kit = {
@@ -383,8 +383,8 @@ describe('the cloud server, with the computer shut', () => {
 
 describe('the computer', () => {
   it('leaves an answer to a card the cloud put on the phone to the cloud, and still does its own', async () => {
-    const { createMemoryCloud, signUpMemory, memoryBackend } = await import('../main/team/memory-cloud.mjs');
-    const { createPhoneInbox } = await import('../main/phone-inbox.mjs');
+    const { createMemoryCloud, signUpMemory, memoryBackend } = await import('../main/team/memory-cloud.mts');
+    const { createPhoneInbox } = await import('../main/phone-inbox.mts');
     const cloud = createMemoryCloud();
     const me = signUpMemory(cloud, { email: `o-${Math.random()}@example.com` });
     const mac = memoryBackend(cloud, me);

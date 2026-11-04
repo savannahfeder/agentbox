@@ -7,7 +7,7 @@
 // threads only. Now the Mac sends a copy of what the phone's pages draw, and
 // the phone asks for a change as a command the Mac's own handlers carry out.
 //
-// The Mac's settings model (main/settings.mjs readSettings) holds home paths:
+// The Mac's settings model (main/settings.mts readSettings) holds home paths:
 // the store, every project's folder and repository, and each extra login's
 // folder as its `profile`. It also holds the full text of every project's
 // instructions. None of that goes to the cloud, so a login travels as the last

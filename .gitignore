@@ -111,7 +111,7 @@ cloud/cloud.public.json
 #
 # `npm run build` reads the installed Claude Code for the commands the reply box
 # offers and the models the picker draws, and it used to write what it found over
-# two TRACKED files, shared/claude-commands.generated.mjs and
+# two TRACKED files, shared/claude-commands.generated.mts and
 # shared/claude-models.generated.mjs. Measured 2026-10-07 (w-5952e6de3e): every
 # folder that had ever run the app then reported itself dirty, for a version
 # number and a date. `releaseTaskFolder` answered "uncommitted" and never

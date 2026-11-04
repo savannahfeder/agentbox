@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { CHAT_LABEL } from '../shared/teammates.mjs';
 
 const ONE_ACCOUNT_HOME = '/nonexistent-home-with-no-second-account';
@@ -72,8 +72,8 @@ describe('the next free agent', () => {
 
 describe('which teammate runs are marked as talk', () => {
   it('a run your own words in its chat woke, and not a duty, a hand-off or a thread speaking for you', async () => {
-    const { loadStore } = await import('../main/store-modules.mjs');
-    const { Teammates } = await import('../main/teammates.mjs');
+    const { loadStore } = await import('../main/store-modules.mts');
+    const { Teammates } = await import('../main/teammates.mts');
     const { writeChat } = await import('../main/store/teammates-files.mjs');
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-talk-'));
     const mods = await loadStore();

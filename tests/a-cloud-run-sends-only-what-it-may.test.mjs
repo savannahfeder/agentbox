@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { filesNamedIn, remoteForTheCloud, settingsForTheCloud, toolEnv } from '../main/cloud/run.mjs';
+import { filesNamedIn, remoteForTheCloud, settingsForTheCloud, toolEnv } from '../main/cloud/run.mts';
 
 let tmp; let store; let cwd; let outside;
 

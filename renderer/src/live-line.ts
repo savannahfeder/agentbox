@@ -7,7 +7,7 @@
 // know what an agent is doing was the one screen that would not tell her.
 //
 // The app has known the answer the entire time. `supervisor.status` in
-// main/supervisor.mjs returns the live sessions, the ids waiting for a slot,
+// main/supervisor.mts returns the live sessions, the ids waiting for a slot,
 // the ids whose worker died, the capacity and whether spawning is paused. Every
 // one of those was already on the snapshot the pane is drawn from.
 //
@@ -25,13 +25,13 @@
 // nothing back, so the tick is resting it (`restingUntil`). A live claim this
 // window did not take is not that: an agent is on it, just not one of ours
 // (`elsewhere`). Saying "queued" there would be the lie this whole vocabulary
-// was invented to stop telling (`queued` in supervisor.mjs, and the founder's
+// was invented to stop telling (`queued` in supervisor.mts, and the founder's
 // own report on of a row reading "queued" under a sentence saying it was
 // reading).
 
 import { spanLabel } from './notes';
 import { Name } from '../../shared/product-name.mjs';
-import { resetDay } from '../../shared/usage.mjs';
+import { resetDay } from '../../shared/usage.mts';
 import { MAC } from './this-keyboard';
 import { whyWords, type WhyCard } from './where-why';
 import type { RunningSession, WhyNotCloud, WorkItem } from './types';
@@ -169,7 +169,7 @@ export function shortWord(state: LiveState, helpers = 0): string {
   // still open. The lead is not idle. So at "1 Agent Working" two agents were
   // working, and the word counted one of them.
   //
-  // `countHelpers` in main/supervisor.mjs only ever adds a `task_started` id,
+  // `countHelpers` in main/supervisor.mts only ever adds a `task_started` id,
   // so this number is subagents and can never be anything else. Naming what it
   // counts is the fix. Counting the lead as well was the alternative and it
   // costs more than it is worth: it would put "1 Agent Working" on every run in
@@ -269,7 +269,7 @@ function said(text: string | null | undefined): boolean {
  * the one she reads first.
  *
  * a row with something on it to read has NOT come back empty, whatever the last
- * run did. `main/supervisor.mjs` refuses these too; this is the same rule kept
+ * run did. `main/supervisor.mts` refuses these too; this is the same rule kept
  * where the window can enforce it, because a renderer that trusts the main
  * process to be the only careful one is a renderer that draws whatever it is
  * sent.
@@ -353,7 +353,7 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   // her, and "Nothing came back" printed underneath. Both facts were true and
   // the pair was a lie: an agent had come back, at length.
   //
-  // `_silentRows` in main/supervisor.mjs now refuses these too, and this is the
+  // `_silentRows` in main/supervisor.mts now refuses these too, and this is the
   // same rule kept where a test can hold it, because the pane must not depend on
   // the main process being the only careful one. A row with a result or a
   // checkpoint on it has news already; this state is only ever about a row with

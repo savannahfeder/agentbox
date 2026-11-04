@@ -13,7 +13,7 @@ import path from 'node:path';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { signInToCloud, cloudPlan, payForCloud, openCloudBilling } from '../main/cloud/account.mjs';
+import { signInToCloud, cloudPlan, payForCloud, openCloudBilling } from '../main/cloud/account.mts';
 
 const P = '77777777-7777-4777-8777-777777777777';
 let home; let server; let gateway; let opened; let stripe; const env = {};

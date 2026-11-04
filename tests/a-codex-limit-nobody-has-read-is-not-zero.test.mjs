@@ -31,8 +31,8 @@
 // trap in this file.
 
 import { describe, expect, it } from 'vitest';
-import { codexLimits, mergeRateLimits } from '../shared/codex-usage.mjs';
-import { limitRows, sessionLimit, usageSentence } from '../shared/usage.mjs';
+import { codexLimits, mergeRateLimits } from '../shared/codex-usage.mts';
+import { limitRows, sessionLimit, usageSentence } from '../shared/usage.mts';
 
 // Verbatim off this Mac, 2026-09-05. `now` is the second it was taken.
 const NOW = 1788565827 * 1000;

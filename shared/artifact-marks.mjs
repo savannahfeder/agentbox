@@ -193,7 +193,7 @@ export function placeWords(note) {
 /* --------------------------------- versions ------------------------------ */
 
 // `<sha12>-name`, how a shared thread names its copy, and `<time>-<random>-name`,
-// how a saved attachment is named: main/team/thread-share.mjs, main/save-attachments.mjs.
+// how a saved attachment is named: main/team/thread-share.mjs, main/save-attachments.mts.
 const COPY_PREFIX = /^[0-9a-f]{12}-/;
 const SAVED_PREFIX = /^[a-z0-9]{8}-[a-z0-9]{1,6}-/;
 
@@ -245,6 +245,9 @@ function keyOf(name, path) {
   if (kind) return `${stem}\0${kind}`;
   return `${stem}\0${baseName(name)}`;
 }
+
+/** The key of the family a path belongs to, in plain characters (a database refuses \0). */
+export const familyKeyOf = (path) => keyOf(shownName(path), path).replace(/\0/g, '/');
 
 const endsWithPath = (whole, part) => whole === part || whole.endsWith(`/${part}`);
 
@@ -413,7 +416,7 @@ export const editedWords = (name, path) => `Updated ${name}.\n\n[${name}](${path
 // Files the big view does not review but Files still lists: a page an agent made,
 // a script. Unlike reviewable kinds, a bare word in a sentence ("node.js") is no
 // claim, so only a link or a code span counts, and Files keeps those really on disk.
-const OTHER_KINDS = [['page', /\.html?$/i], ['table', /\.(csv|tsv)$/i], ['code', /\.(py|ipynb|js|mjs|ts|tsx|jsx|rb|go|rs|sh|sql|css|txt|json|ya?ml|xml)$/i]];
+const OTHER_KINDS = [['page', /\.html?$/i], ['table', /\.(csv|tsv)$/i], ['code', /\.(py|ipynb|js|mjs|cjs|ts|mts|cts|tsx|jsx|rb|go|rs|sh|sql|css|txt|json|ya?ml|xml)$/i]];
 export const otherKind = (path) => OTHER_KINDS.find(([, re]) => re.test(String(path ?? '').split(/[?#]/)[0]))?.[0] ?? null;
 /** Which page the big view draws for a file, or null. */
 export const viewKind = (path) => reviewKind(path) ?? otherKind(path);

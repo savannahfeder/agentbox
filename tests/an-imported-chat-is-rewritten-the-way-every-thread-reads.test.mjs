@@ -10,7 +10,7 @@
 // one small-model call, asked on any account or engine with room, and it
 // writes the name, the context and the answer with three options.
 import { describe, it, expect } from 'vitest';
-import { catchUpPrompt, cleanCatchUp, catchUpResult } from '../main/catch-up.mjs';
+import { catchUpPrompt, cleanCatchUp, catchUpResult } from '../main/catch-up.mts';
 
 const chat = {
   title: 'can you look at the notes store and tell me whats wrong with it',

@@ -18,7 +18,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { guard, sweep } from './lib/chrome-guard.mjs';
-import { answerFor } from '../main/first-run.mjs';
+import { answerFor } from '../main/first-run.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'renderer', 'dist-fr');
@@ -157,7 +157,7 @@ await call('Page.addScriptToEvaluateOnNewDocument', {
       chooseFolder: async () => ({ path: ${JSON.stringify(folder)} }),
       folderExists: async () => ({ exists: true }),
       // MAKING THE PROJECT COMPOSES A DIRECTIVE, the way the real store does
-      // (main/store.mjs createProduct). That row is the one that started eight
+      // (main/store.mts createProduct). That row is the one that started eight
       // seconds ahead of her example task, and it is the row the list must not
       // show her while the walk is up.
       createProduct: async (p) => {

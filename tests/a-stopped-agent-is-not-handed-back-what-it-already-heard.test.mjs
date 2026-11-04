@@ -19,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const product = { slug: 'acme', name: 'Acme', dir: os.tmpdir() };
 const at = (ts, answer, source = 'founder') => ({ ts, source, patch: { answer } });

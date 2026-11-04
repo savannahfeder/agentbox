@@ -6,7 +6,7 @@
 // after Maya had said he left ("a recommended option should follow the latest
 // facts"); and its brief to Maya was "a wall of text with internal ids"
 // (w-c4132930b0ef, "(Unavailable thread)", 20+ lines). Read in the brief
-// main/teammates.mjs writes: nothing in it said any of the four rules below.
+// main/teammates.mts writes: nothing in it said any of the four rules below.
 import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mjs';
 

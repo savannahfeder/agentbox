@@ -293,7 +293,7 @@ describe('after Codex\'s second review', () => {
 
 describe('the Mac\'s relay', () => {
   it('replays the input closing in the cloud from the saved log, when the session is gone before it read it', () => {
-    const src = fs.readFileSync(new URL('../main/cloud/run.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/cloud/run.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/e\.kind === 'login' \|\| e\.kind === 'input-closed'\)\) await replay\(e\)/);
   });
 });

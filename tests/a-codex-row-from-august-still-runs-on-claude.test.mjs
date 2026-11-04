@@ -46,7 +46,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-// The one seam. `main/supervisor.mjs` imports `spawn` at module scope, so this
+// The one seam. `main/supervisor.mts` imports `spawn` at module scope, so this
 // is the only place a test can stand between the app's choice of executable
 // and a real process. Nothing else about child_process is touched.
 const spawns = vi.hoisted(() => []);
@@ -74,7 +74,7 @@ import {
   enginePicked,
 } from '../shared/engines.mjs';
 import { foldWorkItems } from '../shared/work-items.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -408,14 +408,14 @@ describe('nothing in the app can reach the second engine yet', () => {
   // ever needs to know whether the gate is open, it asks main for the answer
   // rather than importing the permission.
   it('lets exactly one file reach the gate token, and it is the supervisor', () => {
-    expect(holding('ENGINE_CHOICE_ENABLED')).toEqual([join(repo, 'main', 'supervisor.mjs')]);
+    expect(holding('ENGINE_CHOICE_ENABLED')).toEqual([join(repo, 'main', 'supervisor.mts')]);
   });
 
   // AND THE OPT-IN ITSELF IS READ IN ONE PLACE TOO. `engineChoiceSince` is what
   // turns a line in her config into the token above, so a second reader of it
   // is a second way to open the gate and has to be argued for here as well.
   it('reads the opt-in in that same one place', () => {
-    expect(holding('engineChoiceSince')).toEqual([join(repo, 'main', 'supervisor.mjs')]);
+    expect(holding('engineChoiceSince')).toEqual([join(repo, 'main', 'supervisor.mts')]);
   });
 
   // AND THE HONEST LIMIT OF THE GATE, WHICH THE PICKER SLICE HAD TO ANSWER FOR.
@@ -442,12 +442,12 @@ describe('nothing in the app can reach the second engine yet', () => {
   // out of a list main handed it on the snapshot; it never asks what is on this
   // Mac and it never decides what counts as a choice.
   it('lets only the supervisor answer what is on offer, and never the renderer', () => {
-    expect(calling('availableEngines')).toEqual([join(repo, 'main', 'supervisor.mjs')]);
+    expect(calling('availableEngines')).toEqual([join(repo, 'main', 'supervisor.mts')]);
   });
 
   // AND `enginePicked` NOW HAS NO CALLER OUTSIDE shared/engines.mjs, WHICH IS A
   // TIGHTENING RATHER THAN A LOSS (2026-09-05). This line read
-  // `[main/supervisor.mjs]`, because `engineOffered` and `modelOffered` asked
+  // `[main/supervisor.mts]`, because `engineOffered` and `modelOffered` asked
   // it -- and what it answers is "not Claude Code", which those two were using
   // to mean "not what this row would run on anyway". The two are only the same
   // sentence where the WORKSPACE default is Claude Code, so on a Mac set to

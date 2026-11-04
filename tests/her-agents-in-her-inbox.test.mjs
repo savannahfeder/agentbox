@@ -37,7 +37,7 @@ import {
   howItEnded, lastAsk, lastWord, listed, reachesInbox, replyIsSwallowed, replyReaches,
   sameInstant, startedByZero, whatItIs, whereItRuns,
 } from '../shared/agents.mjs';
-import { outsideAgentsMode } from '../main/settings.mjs';
+import { outsideAgentsMode } from '../main/settings.mts';
 import { clipToSentence, SUMMARY_BUDGET } from '../renderer/src/list-rules';
 import { previewText } from '../renderer/src/format';
 import { NAME, Name } from '../shared/product-name.mjs';
@@ -117,7 +117,7 @@ describe('one inbox, and how much of it is her agents is her setting', () => {
   });
 
   // OFF IS THE DEFAULT NOW, and it is not this argument that says so. The app's
-  // default is one line in main/settings.mjs and is pinned in
+  // default is one line in main/settings.mts and is pinned in
   // tests/a-terminal-session-is-not-in-her-inbox.test.mjs; this argument keeps
   // its own default so the modes can be read here one at a time.
   it('none of them by default, whatever is running on the machine', () => {
@@ -158,7 +158,7 @@ describe('one inbox, and how much of it is her agents is her setting', () => {
   it('a mode nobody understands is not silently an empty inbox', () => {
     // Nothing may narrow the list by accident: a junk value behaves as the
     // default rather than hiding her agents. The write side refuses it outright
-    // (main/settings.mjs); this is the second lock.
+    // (main/settings.mts); this is the second lock.
     expect(reachesInbox(stalled, AUG16, 'nonsense')).toBe(true);
     expect(reachesInbox(idle, AUG16, 'nonsense')).toBe(true);
   });
@@ -212,9 +212,9 @@ describe('the only agent she cannot write to is the one behind a box', () => {
   });
 
   it('and it agrees with the one place that actually refuses a send', () => {
-    // main/agents.mjs `reply` refuses exactly this case and nothing else, so
+    // main/agents.mts `reply` refuses exactly this case and nothing else, so
     // the UI gate and the delivery gate cannot drift apart.
-    const main = fs.readFileSync(new URL('../main/agents.mjs', import.meta.url), 'utf8');
+    const main = fs.readFileSync(new URL('../main/agents.mts', import.meta.url), 'utf8');
     expect(main).toMatch(/if \(agent\.waitingFor === 'permission prompt'\) \{/);
     expect(main).not.toMatch(/if \(!replyReaches\(agent\)\)/);
   });
@@ -279,7 +279,7 @@ const remembered = {
   about: `${NAME} product not displaying in Harbour`,
   lastAsked: 'sounds good. just make sure the login is remembered between sessions now that i am signed in. and above all, make sure our work is saved to the cloud.',
   lastSaid: "The sync is running steadily (+300 rows in 5 min) but the queue count isn't going down. Checking each project next:",
-  touched: ['sync-service.mjs', 'store.mjs', 'cloud.mjs'],
+  touched: ['sync-service.mjs', 'store.mts', 'cloud.mjs'],
   productName: 'Harbour',
 };
 
@@ -314,7 +314,7 @@ describe('an agent row says what the work actually is', () => {
   it('carries what it said back, and the files it has been in', () => {
     const row = agentRow(remembered, AUG16);
     expect(row.body).toContain('It stopped here:');
-    expect(row.body).toContain('It is working in Harbour, in sync-service.mjs, store.mjs and cloud.mjs.');
+    expect(row.body).toContain('It is working in Harbour, in sync-service.mjs, store.mts and cloud.mjs.');
   });
 
   // NEVER CALLS HER LAST MESSAGE HER FIRST. Measured: on session-71 the two

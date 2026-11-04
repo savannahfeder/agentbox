@@ -14,7 +14,7 @@
 // - every 4 to 15 seconds for the inbox, the thread, its steps and its change;
 // - and again for the inbox and the thread on every "something changed" the
 //   Mac pushed, which it does up to two and a half times a second while any
-//   agent is writing (main/ipc.mjs, 400 ms).
+//   agent is writing (main/ipc.mts, 400 ms).
 //
 // On a phone the timers now wait at least 30 seconds, since the pushes keep
 // it current, and the pushes reach the screen at most once every 2 seconds,

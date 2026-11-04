@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { applySplices, postImage, editableRows, savedLine, unsavedIn } from '../renderer/src/code-edit.ts';
 import { hunkViewAt, hunkView } from '../renderer/src/code-artifact.ts';
-import { findFile, canWriteCode, writeCodeFile, readCodeFile } from '../main/code-file.mjs';
+import { findFile, canWriteCode, writeCodeFile, readCodeFile } from '../main/code-file.mts';
 import { changeFromTranscript } from '../main/code-change.mjs';
 
 const FILE = [
@@ -252,9 +252,9 @@ describe('which files have something unsaved in them', () => {
   it('is every file she typed in when there are several', () => {
     const edits = new Map([
       typed('renderer/src/api.ts', 0, 2, 'one'),
-      typed('main/code-file.mjs', 1, 0, 'two'),
+      typed('main/code-file.mts', 1, 0, 'two'),
     ]);
-    expect(unsavedIn(edits)).toEqual(['renderer/src/api.ts', 'main/code-file.mjs']);
+    expect(unsavedIn(edits)).toEqual(['renderer/src/api.ts', 'main/code-file.mts']);
   });
 
   it('is not a file whose edits were cleared by a save', () => {

@@ -18,7 +18,7 @@
 // These tests pin that round trip, both answers, and the deny-by-default that
 // has to hold when no card is answered.
 import { describe, it, expect, vi } from 'vitest';
-import { createOpenCodeWorker } from '../main/opencode-server.mjs';
+import { createOpenCodeWorker } from '../main/opencode-server.mts';
 import { fakeOpenCodeServer } from './helpers/fake-opencode-server.mjs';
 
 const plan = { prompt: 'Change the file', model: 'opencode/big-pickle' };

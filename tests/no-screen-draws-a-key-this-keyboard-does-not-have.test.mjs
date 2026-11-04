@@ -3,7 +3,7 @@
 // The Send button, the walk's cards, the shortcuts page and a dozen tooltips
 // each wrote ⌘ into their own string, so on Linux the app named a key the
 // keyboard does not have while Ctrl was what worked. Every one of them now asks
-// shared/key-caps.mjs, through renderer/src/this-keyboard.ts.
+// shared/key-caps.mts, through renderer/src/this-keyboard.ts.
 //
 // What is pinned here is the rule rather than the fourteen labels: a glyph in a
 // string a person reads has to come from the table. Comments are stripped
@@ -57,7 +57,7 @@ describe('the glyphs come from the table', () => {
 
   it('reads the keyboard once, and from the shared table', () => {
     const keyboard = fs.readFileSync(path.join(root, 'renderer/src/this-keyboard.ts'), 'utf8');
-    expect(keyboard).toContain("from '../../shared/key-caps.mjs'");
+    expect(keyboard).toContain("from '../../shared/key-caps.mts'");
     // Nobody else decides which keyboard this is. (`navigator.userAgent` is
     // still read elsewhere, for the phone, which is a different question.)
     const askers = files

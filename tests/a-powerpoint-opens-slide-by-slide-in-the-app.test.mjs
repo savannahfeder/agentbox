@@ -7,7 +7,7 @@ import { it, expect, describe } from 'vitest';
 import zlib from 'node:zlib';
 import { readDeck, readSlide } from '../shared/pptx-slides.mjs';
 import { reviewKind } from '../shared/artifact-marks.mjs';
-import { servable } from '../main/img-scheme.mjs';
+import { servable } from '../main/img-scheme.mts';
 
 function zip(files) {
   const parts = [];

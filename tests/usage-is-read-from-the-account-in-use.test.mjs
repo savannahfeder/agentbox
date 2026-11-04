@@ -23,8 +23,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ClaudeUsage, STALE_MS } from '../main/claude-usage.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { ClaudeUsage, STALE_MS } from '../main/claude-usage.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 const OUT = JSON.stringify({ rate_limits_available: true, rate_limits: { five_hour: { utilization: 24 }, seven_day: { utilization: 4 } } });
 const OTHER = JSON.stringify({ rate_limits_available: true, rate_limits: { five_hour: { utilization: 90 } } });

@@ -69,7 +69,7 @@ describe('the cards in the spool when the app starts', () => {
   it('stay gone when an orphan that outlived the app puts its own file back', () => {
     // The boundary on one side. A worker orphaned by a crash rather than a quit
     // goes on waiting, and its loop writes its request again every two seconds
-    // (main/approval-prompt-core.mjs). It still holds the last run's public
+    // (main/approval-prompt-core.mts). It still holds the last run's public
     // key, so this run's answer is a forgery to it: the card is unanswerable
     // however many times it comes back, and it must not come back.
     const { root, dir } = spool();

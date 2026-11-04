@@ -24,10 +24,10 @@ import { occurrenceFields } from '../main/repeats.mjs';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend, claimForTheCloud } from '../main/team/memory-cloud.mjs';
-import { createPhoneInbox } from '../main/phone-inbox.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { kitCopyPath } from '../main/cloud/kit.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend, claimForTheCloud } from '../main/team/memory-cloud.mts';
+import { createPhoneInbox } from '../main/phone-inbox.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { kitCopyPath } from '../main/cloud/kit.mts';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const DEVICE = 'a1b2c3d4e5f6';

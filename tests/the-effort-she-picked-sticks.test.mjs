@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EFFORT_LEVELS, effortLabel, isEffort, isEffortWord } from '../shared/effort-levels.mjs';
+import { EFFORT_LEVELS, effortLabel, isEffort, isEffortWord } from '../shared/effort-levels.mts';
 import {
   EFFORTS,
   LAST_EFFORT_KEY,
@@ -32,9 +32,9 @@ import {
 } from '../renderer/src/effort.ts';
 import { CODEX_OWN } from '../renderer/src/models.ts';
 import { buildLine, foldWorkItems, pickFields } from '../shared/work-items.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { parseSessionArgs } from '../main/settings.mjs';
-import { codexModelLevels, codexModels } from '../main/codex-models.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { parseSessionArgs } from '../main/settings.mts';
+import { codexModelLevels, codexModels } from '../main/codex-models.mts';
 
 const FIXTURE = fileURLToPath(new URL('./fixtures/codex-models-cache.json', import.meta.url));
 
@@ -140,7 +140,7 @@ describe("Codex's words, which are the model's own", () => {
   });
 });
 
-/** The rows as main/settings.mjs hands them to the card: id, label, levels. */
+/** The rows as main/settings.mts hands them to the card: id, label, levels. */
 function rowsFor(rows) {
   return rows.map((m) => ({ id: m.id, label: m.label, levels: m.levels.map((l) => l.id), defaultLevel: m.defaultLevel }));
 }

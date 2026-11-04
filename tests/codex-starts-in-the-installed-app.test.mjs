@@ -39,7 +39,7 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
-const { Supervisor } = await import('../main/supervisor.mjs');
+const { Supervisor } = await import('../main/supervisor.mts');
 
 const CODEX_BIN = '/nonexistent/codex/codex';
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');

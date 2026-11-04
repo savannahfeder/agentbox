@@ -41,7 +41,7 @@ import { liftReplies } from './team/chat-threads';
 import type { UndoMark } from './undo-marks';
 
 // `[Read] strategy/art-style.md` — how the supervisor writes a tool call into a
-// trace (`traceStreamLine`, main/supervisor.mjs). The name is the tool and the
+// trace (`traceStreamLine`, main/supervisor.mts). The name is the tool and the
 // rest is its key input, already flattened to one string on the way to disk.
 const TOOL = /^\[([^\]]+)\]\s*(.*)$/;
 
@@ -84,7 +84,7 @@ export interface ItemOutcome {
  * ONE MESSAGE OF HERS THAT IS ON ITS WAY AND NOT IN THE LEDGER YET.
  *
  * A reply typed while a worker is up does not go to the ledger first. It goes
- * to the running session, and `submitReply` (main/live-replies.mjs) writes the
+ * to the running session, and `submitReply` (main/live-replies.mts) writes the
  * row only once the provider has acknowledged it. Claude acknowledges by
  * replaying the message, which it does at its next break, and
  * `attachClaudeInput` lets that wait run to 120 seconds before it gives up. The
@@ -601,7 +601,7 @@ export function itemThread(
     if (event.message && event.words) {
       const isAnswer = event.who === 'agent' && (event.field === 'result' || event.field === 'note');
       placed.push({
-        node: { at: event.at, who: event.who === 'you' ? 'you' : 'it', text: event.words, ...(event.by ? { by: event.by } : {}), ...(event.from ? { from: event.from } : {}), ...(event.voice ? { voice: event.voice } : {}), ...(event.uid ? { uid: event.uid } : {}), ...(event.inReplyTo ? { inReplyTo: event.inReplyTo } : {}), ...(event.ran ? { ran: event.ran } : {}), ...(event.edited ? { edited: event.edited } : {}), ...(event.deleted ? { deleted: true } : {}), ...(event.fileMark ? { fileMark: event.fileMark } : {}), ...(event.says ? { says: event.says } : {}) },
+        node: { at: event.at, who: event.who === 'you' ? 'you' : 'it', text: event.words, ...(event.by ? { by: event.by } : {}), ...(event.from ? { from: event.from } : {}), ...(event.voice ? { voice: event.voice } : {}), ...(event.uid ? { uid: event.uid } : {}), ...(event.inReplyTo ? { inReplyTo: event.inReplyTo } : {}), ...(event.ran ? { ran: event.ran } : {}), ...(event.edited ? { edited: event.edited } : {}), ...(event.deleted ? { deleted: true } : {}), ...(event.fileMark ? { fileMark: event.fileMark } : {}), ...(event.says ? { says: event.says } : {}), ...(event.sendsAt ? { sendsAt: event.sendsAt } : {}) },
         run: null,
         answer: isAnswer ? { at: event.at, text: event.words, field: event.field as 'result' | 'note', ...(event.ran ? { ran: event.ran } : {}) } : null,
       });

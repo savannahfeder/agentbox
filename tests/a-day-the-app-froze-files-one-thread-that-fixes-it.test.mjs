@@ -1,4 +1,4 @@
-// The freeze recorder (main/freeze-recorder.mjs) has written every hold of the
+// The freeze recorder (main/freeze-recorder.mts) has written every hold of the
 // main thread to a log on the computer since 2026-10-21, and nobody read it: the
 // spinning wheel kept coming on most actions, and the freezes were fixed one at
 // a time, a dozen times that month, each after somebody complained. A cloud run
@@ -11,8 +11,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
-import { writeFreeze } from '../main/freeze-recorder.mjs';
+import { Store } from '../main/store.mts';
+import { writeFreeze } from '../main/freeze-recorder.mts';
 import { FreezeWatch, FREEZE_LABEL } from '../main/freeze-watch.mjs';
 
 const DAY = 86_400_000;
@@ -48,7 +48,7 @@ beforeEach(() => aComputer());
 
 it('a day with a hold of a second or more files one thread that starts on its own', () => {
   froze(NOON_NOV_2 - DAY, 1200);
-  froze(NOON_NOV_2 - DAY + 60_000, 600, '_tick main/supervisor.mjs:7477');
+  froze(NOON_NOV_2 - DAY + 60_000, 600, '_tick main/supervisor.mts:7477');
   watch(NOON_NOV_2).check();
   const [row] = rows();
   expect(rows()).toHaveLength(1);
@@ -58,7 +58,7 @@ it('a day with a hold of a second or more files one thread that starts on its ow
   expect(row.title).toBe('The app froze 2 times on 2026-11-01, longest 1.2 s');
   expect(row.body).toContain('filesInLines shared/artifact-marks.mjs:404');
   expect(row.body).toContain('lineFor main/files-place.mjs:707');
-  expect(row.body).toContain('_tick main/supervisor.mjs:7477');
+  expect(row.body).toContain('_tick main/supervisor.mts:7477');
   expect(row.body.indexOf('filesInLines')).toBeLessThan(row.body.indexOf('_tick'));
 });
 
@@ -97,12 +97,12 @@ it('while its thread is open, the next day is a note on it; once closed, a new t
   froze(NOON_NOV_2 - DAY, 1500);
   watch(NOON_NOV_2).check();
   const [first] = rows();
-  froze(NOON_NOV_2, 2500, 'status main/supervisor.mjs:6894');
+  froze(NOON_NOV_2, 2500, 'status main/supervisor.mts:6894');
   watch(NOON_NOV_2 + DAY).check();
   expect(rows()).toHaveLength(1);
   const history = store.readHistory('agentbox', first.id).map((l) => l.patch?.note).filter(Boolean);
   expect(history.at(-1)).toContain('2026-11-02');
-  expect(history.at(-1)).toContain('status main/supervisor.mjs:6894');
+  expect(history.at(-1)).toContain('status main/supervisor.mts:6894');
   disk.updateWorkItem(store.productDir('agentbox'), first.id, { status: 'done' }, { source: 'founder' });
   froze(NOON_NOV_2 + DAY, 3000);
   watch(NOON_NOV_2 + 2 * DAY).check();

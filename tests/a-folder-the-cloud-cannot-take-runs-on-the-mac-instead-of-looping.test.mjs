@@ -20,8 +20,8 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
-import { cloudRun, KEEP_ON_MAC, IMPORT_FAILED } from '../main/cloud/run.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { cloudRun, KEEP_ON_MAC, IMPORT_FAILED } from '../main/cloud/run.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 const git = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 let tmp; let repo;
@@ -121,7 +121,7 @@ describe('the app', () => {
   });
 
   it('reads the exit at the moment a cloud run ends', () => {
-    const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/this\._cloudKeptOnMac\(item, session, code, signal\)/);
   });
 });

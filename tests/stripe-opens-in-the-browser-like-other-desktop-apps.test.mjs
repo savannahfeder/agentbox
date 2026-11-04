@@ -24,7 +24,7 @@ const exists = (p) => fs.existsSync(new URL(`../${p}`, import.meta.url));
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
 describe('the app hands Stripe to the browser', () => {
-  const ipc = read('main/ipc.mjs');
+  const ipc = read('main/ipc.mts');
   it('paying and the billing page both open with the browser', () => {
     expect(ipc).toMatch(/cloudCall\('payForCloud', \{ plan \}\)/);
     expect(ipc).toMatch(/cloudCall\('openCloudBilling'\)/);
@@ -114,7 +114,7 @@ describe('a link back into the app', () => {
     expect(ourLink(undefined)).toBe(false);
   });
   it('brings the window to the front when it opens the app', () => {
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).toMatch(/app\.on\('open-url', \(e, url\) => \{[^}]*ourLink\(url\)[^}]*showWindow\(\)/);
   });
 });

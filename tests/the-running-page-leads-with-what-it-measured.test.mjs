@@ -14,7 +14,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { memoryReading, setWorkspaceSetting } from '../main/settings.mjs';
+import { memoryReading, setWorkspaceSetting } from '../main/settings.mts';
 import { agentCountOptions } from '../renderer/src/components/Settings.tsx';
 
 const dirs = [];

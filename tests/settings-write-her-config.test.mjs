@@ -16,8 +16,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadConfig, saveConfig } from '../main/config.mjs';
-import { outsideAgentsMode, parseSessionArgs, permissionMode, buildSessionArgs, readSettings, setModelArg, setProjectSetting, setWorkspaceSetting } from '../main/settings.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { outsideAgentsMode, parseSessionArgs, permissionMode, buildSessionArgs, readSettings, setModelArg, setProjectSetting, setWorkspaceSetting } from '../main/settings.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { machineSlots } from '../main/machine.mjs';
 
 // A real supervisor over an empty store, for the one assertion that has to go

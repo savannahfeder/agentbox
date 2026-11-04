@@ -1,7 +1,7 @@
 // A web link clicked inside a file opened full screen, drawn over the file
 // with the pane's own browser bar. Closing it puts you back on the file.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { addressYouTyped, canFrameAWebsite } from '../../../shared/websites.mjs';
+import { addressYouTyped, canFrameAWebsite } from '../../../shared/websites.mts';
 import { api } from '../api';
 import { BrowserChrome } from './BrowserChrome';
 import { CrossIcon } from './CrossIcon';

@@ -75,7 +75,7 @@ describe('which engine the pane says the open row is on', () => {
     expect(app.match(/const runningEngine = /g)).toHaveLength(1);
     // And read, not re-derived, at each of the places that need it.
     expect(app).toContain('runningEngine={runningEngine}');
-    expect(app).toContain('answerWith(focused, text, priority, sent, mode, runningEngine, pick)');
+    expect(app).toContain('answerWith(focused, text, priority, sent, mode, runningEngine, pick, sendAt)');
   });
 
   // A MAC WITH ONE CODING AGENT, which is every copy of Agentbox until she writes

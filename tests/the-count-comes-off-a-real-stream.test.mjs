@@ -19,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { countHelpers } from '../main/supervisor.mjs';
+import { countHelpers } from '../main/supervisor.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const lines = fs

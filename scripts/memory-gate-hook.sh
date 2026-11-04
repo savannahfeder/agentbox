@@ -3,7 +3,7 @@
 #
 # Claude Code runs this as a PreToolUse hook on every Bash call of a worker
 # Agentbox started ("pre"), and again after it ("post"). The answer comes from
-# main/memory-gate-server.mjs over a local socket and is printed as it arrives:
+# main/memory-gate-server.mts over a local socket and is printed as it arrives:
 # nothing at all means "carry on as normal", and a deny is JSON Claude Code
 # reads. While the Mac is short of memory the answer simply arrives later.
 #

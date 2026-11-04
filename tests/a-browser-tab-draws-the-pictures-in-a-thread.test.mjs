@@ -3,7 +3,7 @@
 // Found in the 3-hour cloud test, 2026-10-22. The window asks for a picture on
 // the app's own scheme, `agentbox-img://file/…` (renderer/src/picture.ts),
 // which only Electron answers. The phone was given the same files over http
-// instead, at /f/<file key>/img/… (main/serve.mjs), and that rewrite was
+// instead, at /f/<file key>/img/… (main/serve.mts), and that rewrite was
 // switched on for the phone door alone — so in a tab on this computer every
 // pasted screenshot and every picture a worker named drew as a broken image.
 // The server bin/agentbox.mjs builds was handed no files to serve either, so
@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createServer, fileKey, picturesTheAppOwns } from '../main/serve.mjs';
+import { createServer, fileKey, picturesTheAppOwns } from '../main/serve.mts';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TOKEN = 'a-token-for-this-run';

@@ -17,8 +17,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createPhoneInbox, phoneFilesIn } from '../main/phone-inbox.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createPhoneInbox, phoneFilesIn } from '../main/phone-inbox.mts';
 
 const NOW = Date.parse('2026-10-18T09:00:00Z');
 const sha = (data) => crypto.createHash('sha256').update(data).digest('hex');

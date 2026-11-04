@@ -20,9 +20,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { Supervisor } from '../main/supervisor.mjs';
-import { Store } from '../main/store.mjs';
-import { CLOUD_NOTE, PLAIN_CLOUD_NOTE } from '../main/cloud/run.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { Store } from '../main/store.mts';
+import { CLOUD_NOTE, PLAIN_CLOUD_NOTE } from '../main/cloud/run.mts';
 import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
 
 let tmp; let store; let sup; let row; let folder; let relays;

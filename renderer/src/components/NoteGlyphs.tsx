@@ -13,6 +13,7 @@ const PATHS = {
   down: <path d="m4.5 6.5 3.5 3.5 3.5-3.5" />,
   up: <path d="m4.5 9.5 3.5-3.5 3.5 3.5" />,
   back: <path d="M12.5 8h-9M7 4.5 3.5 8 7 11.5" />,
+  globe: <><circle cx="8" cy="8" r="5.5" /><path d="M2.5 8h11M8 2.5c1.5 1.5 2.3 3.4 2.3 5.5S9.5 12 8 13.5M8 2.5C6.5 4 5.7 5.9 5.7 8s.8 4 2.3 5.5" /></>,
 } as const;
 
 export type GlyphName = keyof typeof PATHS;

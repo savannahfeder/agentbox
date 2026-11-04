@@ -17,8 +17,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { setWorkspaceSetting } from '../main/settings.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { setWorkspaceSetting } from '../main/settings.mts';
 import { forgetDiscovery } from '../main/account-discovery.mjs';
 
 // The line Claude Code prints, with a reset three hours from now on this
@@ -246,7 +246,7 @@ describe('a login whose plan changes on disk is let back in', () => {
   });
 
   it('is asked on every pass', () => {
-    const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/async _tick\(\) \{[\s\S]{0,1500}this\._forgetLimitsOfAnOldPlan\(\)/);
   });
 });

@@ -17,7 +17,7 @@
 // icon key holding an empty image is how this would silently regress.
 
 import { describe, it, expect, vi } from 'vitest';
-import { createNotifier, markFor } from '../main/notify.mjs';
+import { createNotifier, markFor } from '../main/notify.mts';
 
 function fakeNotifications() {
   const shown = [];

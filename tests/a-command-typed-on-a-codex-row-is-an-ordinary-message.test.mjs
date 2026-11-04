@@ -1,7 +1,7 @@
 // SHE WAITED ON THE ROW FOR A TABLE CODEX WAS NEVER GOING TO PRINT.
 //
 // THE MAIN PROCESS IS RIGHT AND THE RENDERER IS NOT, which is the whole of this
-// file. `main/supervisor.mjs` guards the eight commands on the engine in two
+// file. `main/supervisor.mts` guards the eight commands on the engine in two
 // places, in the same words both times:
 //
 // const command = continuation && engine === DEFAULT_ENGINE ?
@@ -45,7 +45,7 @@ import { fileURLToPath } from 'node:url';
 import { staysOnTheTask } from '../renderer/src/stay-with-a-command';
 import { threadEvents } from '../renderer/src/thread-history';
 import { itemThread } from '../renderer/src/item-thread';
-import { commandPrompt, CLAUDE_COMMANDS } from '../shared/claude-commands.mjs';
+import { commandPrompt, CLAUDE_COMMANDS } from '../shared/claude-commands.mts';
 import { DEFAULT_ENGINE } from '../shared/engines.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -104,7 +104,7 @@ describe('staying on the row a command runs on', () => {
     // Handed in rather than read off the item: `item.engine` is what she MARKED
     // and may be an August row the gate refuses, while `runningEngine` is what
     // will really pick it up.
-    expect(app).toContain('answerWith(focused, text, priority, sent, mode, runningEngine, pick)');
+    expect(app).toContain('answerWith(focused, text, priority, sent, mode, runningEngine, pick, sendAt)');
     expect(app.match(/staysOnTheTask\(/g)).toHaveLength(1);
   });
 });

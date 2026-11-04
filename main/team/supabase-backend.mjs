@@ -1,4 +1,4 @@
-// THE SHARED CLOUD, ON SUPABASE. The same calls as memory-cloud.mjs, made
+// THE SHARED CLOUD, ON SUPABASE. The same calls as memory-cloud.mts, made
 // against the tables in cloud/supabase/migrations, through a supabase-js
 // client that is already signed in. Row level security on the server is what
 // actually keeps people apart; nothing here is trusted to.
@@ -30,6 +30,8 @@ const CLOUD_COLUMNS = `${COMMAND_COLUMNS},claimed_by`;
 const noCloudColumn = (error) => /claimed_by|column .*cloud|cloud.* column/i.test(String(error?.message ?? ''));
 const commandOut = (r) => ({ id: r.id, owner: r.owner, device: r.device, project: r.project, item: r.item, kind: r.kind, payload: r.payload ?? {}, createdAt: r.created_at, claimedAt: r.claimed_at ?? null, claimedBy: r.claimed_by ?? null, takenAt: r.taken_at ?? null, outcome: r.outcome ?? null });
 
+// A time as text or as a Date, to the millisecond (Date.parse of a Date drops them).
+const msOf = (v) => new Date(v).getTime();
 const commentOut = (r) => ({ id: r.id, owner: r.owner, threadId: r.thread_id, by: r.by_person, text: r.body, at: Date.parse(r.created_at) });
 
 export function supabaseBackend(client) {
@@ -90,7 +92,7 @@ export function supabaseBackend(client) {
     },
 
     // Every team you are on, oldest first. Which one this Mac is in is the
-    // Mac's own record (main/team/index.mjs), never this order alone.
+    // Mac's own record (main/team/index.mts), never this order alone.
     async myTeams() {
       const id = await myId();
       const members = must(await client.from('team_members').select('team_id').eq('person_id', id), 'reading your team');
@@ -309,6 +311,48 @@ export function supabaseBackend(client) {
       let gone = client.from('thread_work_files').delete().eq('person_id', me).eq('thread_id', threadId);
       if (keep.length) gone = gone.not('name', 'in', `(${keep.map((n) => `"${n}"`).join(',')})`);
       must(await gone, 'clearing files a thread no longer names');
+    },
+
+    // A FILE ANYONE WITH ITS LINK CAN READ: only through the functions in
+    // 20261105000000_a_file_anyone_with_its_link_can_read.sql.
+    async shareFile({ source, name, kind, type, body, version = 1, hash = '' }) {
+      await myId();
+      return must(await client.rpc('share_file', { src: source, nm: name, k: kind, typ: type, b: body, v: version, h: hash }), 'sharing the file');
+    },
+
+    async fileLinkFor(source) {
+      await myId();
+      const rows = must(await client.rpc('my_file_link', { src: source }), 'asking for the file\'s link');
+      const r = rows?.[0];
+      return r ? { token: r.token, version: r.version, hash: r.hash ?? '', createdAt: msOf(r.created_at ?? r.updated_at), updatedAt: msOf(r.updated_at), comments: r.comments } : null;
+    },
+
+    async stopFileLink(token) {
+      await myId();
+      must(await client.rpc('stop_file_link', { tok: token }), 'stopping the link');
+    },
+
+    async fileLinkComments(token) {
+      await myId();
+      const rows = must(await client.rpc('file_link_comments_of', { tok: token }), 'reading the comments');
+      return (rows ?? []).map((c) => ({ id: c.id, byName: c.by_name, byAvatar: c.by_avatar ?? null, text: c.body, at: msOf(c.created_at), mine: !!c.mine, byOwner: !!c.by_owner }));
+    },
+
+    async myFileLinks() {
+      await myId();
+      const rows = must(await client.rpc('my_file_links'), 'reading your public links');
+      return (rows ?? []).map((r) => ({ token: r.token, source: r.source, name: r.name, kind: r.kind, createdAt: msOf(r.created_at), updatedAt: msOf(r.updated_at), comments: r.comments }));
+    },
+
+    async newLinkComments(since) {
+      await myId();
+      const rows = must(await client.rpc('new_comments_on_my_links', { since: new Date(since).toISOString() }), 'reading new comments on your links');
+      return (rows ?? []).map((c) => ({ token: c.token, source: c.source, name: c.name, byName: c.by_name, text: c.body, at: msOf(c.created_at) }));
+    },
+
+    async commentOnFileLink(token, text) {
+      await myId();
+      return must(await client.rpc('comment_on_file_link', { tok: token, b: text }), 'sending your comment');
     },
 
     async getThreadFile(owner, threadId, name) {

@@ -19,7 +19,7 @@
 // HAPPENED. The dev server that day was started by hand, straight out of a
 // scratchpad, and the app was started beside it with the environment variable
 // set. A guard in the npm script would have watched it go past. Every dev window
-// there can ever be goes through main.mjs asking for this verdict, so this is
+// there can ever be goes through main.mts asking for this verdict, so this is
 // the only place that actually closes the door.
 //
 // WHAT IS STILL ALLOWED, because a guard that stops the work is a guard somebody

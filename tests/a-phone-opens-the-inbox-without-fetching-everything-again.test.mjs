@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { createHandler, newToken } from '../main/serve.mjs';
+import { createHandler, newToken } from '../main/serve.mts';
 
 const SCRIPT = 'function drawTheInbox(){return "rows"}\n'.repeat(20_000);
 

@@ -19,9 +19,9 @@ import { it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { appSessionFolders, claudeDataDirs, codexDataDirs, sessionFolders } from '../main/agent-homes.mjs';
-import { readSessionThreads } from '../main/agent-sessions.mjs';
-import { readCodexThreads } from '../main/codex-threads.mjs';
+import { appSessionFolders, claudeDataDirs, codexDataDirs, sessionFolders } from '../main/agent-homes.mts';
+import { readSessionThreads } from '../main/agent-sessions.mts';
+import { readCodexThreads } from '../main/codex-threads.mts';
 import { scanCodex } from '../main/codex-watch.mts';
 
 const NOW = Date.UTC(2026, 9, 11, 18);
@@ -199,8 +199,8 @@ it('a damaged newest Claude copy does not erase the valid older session', () => 
 // THE APP'S WIRING. The import card, the import "yes" and the Codex watch all
 // take their folders from `appSessionFolders`, which is called here exactly as
 // they call it; the last test checks they still do.
-const ipcText = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
-const mainText = fs.readFileSync(new URL('../main/main.mjs', import.meta.url), 'utf8');
+const ipcText = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
+const mainText = fs.readFileSync(new URL('../main/main.mts', import.meta.url), 'utf8');
 function wiredRead(config, supervisor, env = {}) {
   const { dirs, codexDirs } = appSessionFolders({ config, supervisor, env, home });
   return [...cr({ dirs }).threads, ...xr({ codexDirs }).threads];
@@ -299,6 +299,6 @@ it('the import card, the import "yes" and the Codex watch all take their folders
   // folders with appSessionFolders; the import "yes" calls it directly.
   expect(ipcText).toMatch(/const readAllThreads = \(\) => readImportableThreads\(\{ config, supervisor, readCodex: readCodexThreadsOffThread \}\)/);
   expect(ipcText.match(/appSessionFolders\(\{ config, supervisor \}\)/g)).toHaveLength(1);
-  expect(fs.readFileSync(new URL('../main/importable-threads.mjs', import.meta.url), 'utf8')).toMatch(/appSessionFolders\(\{ config, supervisor, env, home[,\s}]/);
+  expect(fs.readFileSync(new URL('../main/importable-threads.mts', import.meta.url), 'utf8')).toMatch(/appSessionFolders\(\{ config, supervisor, env, home[,\s}]/);
   expect(mainText).toMatch(/readThreads: \(opts\) => readCodexThreadsOffThread\(\{ \.\.\.opts, codexDirs: appSessionFolders\(\{ config, supervisor \}\)\.codexDirs \}\)/);
 });

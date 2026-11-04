@@ -33,8 +33,8 @@
 // the LOGIC she asked to match.
 
 import { describe, it, expect } from 'vitest';
-import { readUsage } from '../shared/claude-usage.mjs';
-import { limitRows, spanLeft, untilReset } from '../shared/usage.mjs';
+import { readUsage } from '../shared/claude-usage.mts';
+import { limitRows, spanLeft, untilReset } from '../shared/usage.mts';
 
 // VERBATIM off her Mac, 2026-09-01 13:46 America/Los_Angeles.
 const HERS = `You are currently using your subscription to power your Claude Code usage

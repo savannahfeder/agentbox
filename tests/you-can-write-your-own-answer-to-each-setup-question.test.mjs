@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { answerTo, answersMessage, questionOf } from '../renderer/src/teammates/chat-lines.ts';
 import { appHome } from '../main/store/home.mjs';
-import { Teammates } from '../main/teammates.mjs';
+import { Teammates } from '../main/teammates.mts';
 
 const ADA = 't-aaaaaaaaaa';
 const ask = (id, text, ts, options) => ({ id, kind: 'msg', from: ADA, to: [], text, ts, options });
@@ -83,7 +83,7 @@ describe('the store keeps which question each answer is for', () => {
   });
 
   it('the app passes your answers through to the store', () => {
-    const ipc = fs.readFileSync(path.join(import.meta.dirname, '../main/ipc.mjs'), 'utf8');
+    const ipc = fs.readFileSync(path.join(import.meta.dirname, '../main/ipc.mts'), 'utf8');
     expect(ipc).toMatch(/mates\.post\(\{[^}]*answers: a\.answers/);
   });
 });

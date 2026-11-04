@@ -12,7 +12,7 @@ import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 
 // The same shape every other Store test uses: a throwaway root, and the app's
 // own work-item code underneath it.

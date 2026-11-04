@@ -35,13 +35,15 @@ import { changesOn, readingOf, type Reading, type SettingsRow } from '../phone-s
 import { lastAccountAsk, webProjectRow, webSettingsGroups, webSettingsPages } from '../web-settings';
 import { whatTakesEscape } from '../settings-escape';
 import { WebAlertsGroup } from './WebAlerts';
-import { api, RESTART_NOTE } from '../api';
+import { api, RESTART_NOTE, type PublicLink } from '../api';
+import { shareWords } from './ShareLink';
 import { updateLook } from '../update-row';
 import { InstructionSettings, sizeLabel } from './InstructionSettings';
 import { EVERY } from '../instruction-scope';
 import type {AccountUsageReading, Usage, UsageLimit, WorkspaceSettings} from '../types';
 import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
 import { cloudBilling, planSummary, type PaidPlan } from '../cloud-upgrade';
+import { keyLooksWrong } from '../key-asks';
 import { CloudPlanCards } from './CloudPlanCards';
 import type { CloudPlan } from '../types';
 import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-words';
@@ -56,7 +58,7 @@ import { SHORTCUTS } from '../shortcuts';
 import { chord, chords, sayKeys } from '../this-keyboard';
 import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
-import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mjs';
+import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mts';
 import { TaskTerminal } from './TaskTerminal';
 import { ProjectsPage } from './ProjectsPage';
 import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId } from '../settings-search';
@@ -344,6 +346,48 @@ function agentStory(w: WorkspaceSettings, readings: Usage[], engine: 'claude' | 
 type Agent = ReturnType<typeof agentStory>;
 
 /** Whichever of two readings was taken later, either possibly absent. */
+const loadPublicLinks = () => api.fileLinks();
+
+/** One live link's row: its file, when it went up or was updated, and its comments. */
+export function publicLinkLine(l: PublicLink, now = Date.now()): string {
+  const when = shareWords.shared(l, now);
+  return l.comments ? `${when} · ${shareWords.comments(l.comments)}` : when;
+}
+
+/** WHAT THIS PERSON MADE PUBLIC, in one list, so it can be checked and stopped without finding each file. */
+export function PublicLinks({ load = loadPublicLinks, first = null, now = Date.now() }: {
+  load?: () => Promise<{ ok: boolean; links?: PublicLink[] }>; first?: PublicLink[] | null; now?: number;
+}) {
+  const [links, setLinks] = useState<PublicLink[] | null>(first);
+  const [asking, setAsking] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => { let live = true; void load().then((r) => { if (live && r.ok) setLinks(r.links ?? []); }); return () => { live = false; }; }, [load]);
+  if (!links?.length) return null;
+  const stop = async (l: PublicLink) => {
+    if (asking !== l.token) { setAsking(l.token); return; }
+    setAsking(null);
+    const out = await api.fileLinkStop({ token: l.token });
+    if (!out.ok) { setProblem(out.error ?? 'That did not stop.'); return; }
+    setLinks(links.filter((x) => x.token !== l.token));
+  };
+  const copy = async (l: PublicLink) => {
+    try { await navigator.clipboard.writeText(l.url); setCopied(l.token); } catch { setCopied(null); }
+  };
+  return (
+    <Group id="public-links" label="Public links" warn={problem}>
+      {links.map((l) => (
+        <Row key={l.token} label={l.name} desc={publicLinkLine(l, now)}>
+          <button type="button" className="set-ghost" onBlur={() => setCopied(null)} onClick={() => void copy(l)}>{copied === l.token ? 'Copied' : 'Copy link'}</button>
+          <button type="button" className="set-ghost" onBlur={() => setAsking(null)} onClick={() => void stop(l)}>
+            {asking === l.token ? shareWords.stopAsk(l.comments) : 'Stop sharing'}
+          </button>
+        </Row>
+      ))}
+    </Group>
+  );
+}
+
 export function newerReading(a: Usage | null, b: Usage | null): Usage | null {
   if (!a) return b;
   if (!b) return a;
@@ -554,7 +598,7 @@ export function cloudRunsLine(mode: CloudStatus['mode'], inUse: string | null): 
 
 /*
  * THE SETTINGS SHELL, which is the app's own terminal opened against the one
-   reserved key that belongs to no task (shared/settings-terminal.mjs). It is
+   reserved key that belongs to no task (shared/settings-terminal.mts). It is
    `TaskTerminal` and not a second terminal: one xterm in this app, one set of
    keys, one scrollback rule.
 
@@ -607,6 +651,48 @@ const Group = ({ id, label, warn, action, bare = false, children }: { id?: strin
   </div>
 );
 
+/** One key kept in the cloud: replaced in place, or removed once asked twice, since getting it again means a trip to the service. */
+function CloudKeyRow({ name, label, savedAt }: { name: string; label: string | null; savedAt: number | null }) {
+  const [mode, setMode] = useState<'shown' | 'replacing' | 'removing'>('shown');
+  const [value, setValue] = useState('');
+  const [said, setSaid] = useState<string | null>(null);
+  const [warned, setWarned] = useState<string | null>(null);
+  const day = (t: number) => (new Date(t).toDateString() === new Date().toDateString() ? 'today' : new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+  const when = savedAt ? `saved ${day(savedAt)} at ${new Date(savedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : null;
+  const act = async (p: { action: 'save' | 'remove'; name: string; value?: string }) => {
+    const out = await api.cloudKey(p);
+    if (!out.ok) { setSaid(out.error ?? 'The cloud did not answer. Try again.'); return; }
+    setSaid(p.action === 'save' ? `${name}, replaced just now` : null); setValue(''); setMode('shown');
+  };
+  if (mode === 'replacing') {
+    return (
+      <form className="set-row set-key-replace" aria-label={`Replace ${label ?? name}`} onSubmit={(e) => {
+        e.preventDefault();
+        if (!value.trim()) return;
+        const wrong = keyLooksWrong(name, value, label ?? undefined);
+        if (wrong && warned !== value) { setWarned(value); setSaid(wrong); return; }
+        void act({ action: 'save', name, value });
+      }}>
+        <span className="set-key-name">{label ?? name}</span>
+        <input className="set-key-input" type="password" aria-label={name} placeholder="Paste the new key" autoComplete="off" spellCheck={false} autoFocus
+          value={value} onChange={(e) => { setValue(e.target.value); setSaid(null); }} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setMode('shown'); } }} />
+        <span className="set-row-ctl">
+          <button type="submit" className="set-ghost" disabled={!value.trim()}>Save</button>
+          <button type="button" className="set-ghost" onClick={() => { setMode('shown'); setSaid(null); }}>Cancel</button>
+        </span>
+        {said && <span className="set-key-said">{said}</span>}
+      </form>
+    );
+  }
+  return (
+    <Row label={label ?? name} desc={said ?? (mode === 'removing' ? 'Threads that need it will ask again.' : [label ? name : null, when].filter(Boolean).join(', '))}>
+      {mode === 'removing'
+        ? <><button type="button" className="set-ghost" onClick={() => setMode('shown')}>Keep</button><button type="button" className="set-ghost" onClick={() => void act({ action: 'remove', name })}>Remove</button></>
+        : <><button type="button" className="set-ghost" onClick={() => setMode('replacing')}>Replace</button><button type="button" className="set-ghost" onClick={() => setMode('removing')}>Remove</button></>}
+    </Row>
+  );
+}
+
 /**
  * THE MENU BEHIND "How many run at once": Automatic, then every number it could
  * have been, all of them counted for the MACHINE.
@@ -640,7 +726,7 @@ export function agentCountOptions(w: {
  *
  * Every figure here is read, never worked out for display: the agents are the
  * sessions this app is running, and the rest comes from the memory check's own
- * coordinator (main/memory-gate-server.mjs) through `memoryReading`. ANYTHING IT
+ * coordinator (main/memory-gate-server.mts) through `memoryReading`. ANYTHING IT
  * DOES NOT KNOW IS LEFT OUT. A card whose whole job is to be the measured corner
  * of the screen cannot afford one invented number, so a kernel reading that did
  * not arrive takes its cell with it rather than showing a nought.
@@ -720,7 +806,7 @@ function PhoneFeedbackGroup({ onFeedback }: { onFeedback: () => void }) {
 // thing"): Every project, None, or a tick beside each project.
 type MacShut = {
   site: string | null; siteQr: string | null; all: boolean; projects: ProjectSettings[]; onChoose: (all: boolean, except: string[]) => void;
-  // Who this computer sends as, and whether its threads are reaching the web app (main/team/index.mjs phoneOnce).
+  // Who this computer sends as, and whether its threads are reaching the web app (main/team/index.mts phoneOnce).
   email?: string | null; sentAt?: number | null; error?: string | null;
 };
 function PhoneConnection({ macShut }: { macShut: MacShut }) {
@@ -1211,7 +1297,7 @@ function Connection({ copy, check, engine, found, certain, bin, chosen = false, 
   /**
    * WHICH AGENT THIS CARD IS ABOUT, and the only thing the window hands over
    *  when somebody points at the file themselves. The path comes back from the
-   *  panel main opened; it never goes the other way (main/ipc.mjs,
+   *  panel main opened; it never goes the other way (main/ipc.mts,
    *  `zero:engine-bin`). */
   engine: 'claude' | 'codex';
   /**
@@ -1228,8 +1314,8 @@ function Connection({ copy, check, engine, found, certain, bin, chosen = false, 
   account?: EngineAccount | null;
   /**
    * WHY NOTHING RUNS ON IT DESPITE IT BEING HERE, or null. Main's sentence,
-   *  never one derived here (main/settings.mjs `engineTroubleFor`, off
-   *  shared/spawn-trouble.mjs). BEING FOUND IS NOT BEING USABLE: a subscription
+   *  never one derived here (main/settings.mts `engineTroubleFor`, off
+   *  shared/spawn-trouble.mts). BEING FOUND IS NOT BEING USABLE: a subscription
    *  that lapsed leaves the binary exactly where it was and stops every task on
    *  that engine. */
   trouble?: string | null;
@@ -1254,7 +1340,7 @@ function Connection({ copy, check, engine, found, certain, bin, chosen = false, 
       const r = await check();
       setAgain(!r.found);
       // The search has already updated the path the rest of the app spawns
-      // from (main/settings.mjs, recheckClaude and recheckCodex), so re-reading
+      // from (main/settings.mts, recheckClaude and recheckCodex), so re-reading
       // settings is what puts this row and every other row in step with it.
       await onChecked();
     } finally {
@@ -1413,7 +1499,7 @@ function Updates({ state }: { state?: UpdateState | null }) {
     // THE COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS: the press moves the
     // app into Applications and macOS relaunches it, so nothing after a
     // success here is ever drawn. A refusal arrives in the state, through the
-    // snapshot, like every other failure (shared/where-it-runs-from.mjs).
+    // snapshot, like every other failure (shared/where-it-runs-from.mts).
     if (look.move) { void api.updateMove(); return; }
     setChecking(true);
     try {
@@ -1443,7 +1529,7 @@ function Updates({ state }: { state?: UpdateState | null }) {
 // THE PICTURE BESIDE A PROJECT'S NAME, AND THE ONE CONTROL THAT CHANGES IT.
 //
 // Nothing is uploaded and nothing is hosted: the picture is copied into the
-// project's own folder and read from there. main/project-identity.mjs says why
+// project's own folder and read from there. main/project-identity.mts says why
 // it is copied rather than pointed at.
 //
 // THE MARK IS THE BUTTON. Clicking it opens the Mac's own picker. THE WAY BACK
@@ -1954,6 +2040,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 </Row>
               </Group>
             )}
+            {cloudHere && !!cloudHere.keys?.length && (
+              <Group id="cloud-keys" label="Keys for cloud threads">
+                {cloudHere.keys.map((k) => <CloudKeyRow key={k.name} name={k.name} label={k.label ?? null} savedAt={k.savedAt} />)}
+              </Group>
+            )}
             {/* SIGNING A SECOND ACCOUNT IN, IN THE APP (w-c2904cc8d9). Main
                 makes the folder and registers the login, and the shell below
                 is left with the one part that is genuinely hers, signing in to
@@ -2019,7 +2110,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 )}
                 {/* THE CLOUD'S OWN MODE: a cloud run works on a throwaway copy
                     with nobody there to approve anything, so by default it
-                    does not ask (main/cloud-permission.mjs). */}
+                    does not ask (main/cloud-permission.mts). */}
                 {cloudHere && (
                   <Row label="In the cloud" desc={w.cloudPermission && w.cloudPermission !== 'same' ? PERMISSION_SENTENCE[w.cloudPermission] : SAME_AS_HERE}>
                     <Picker
@@ -2230,6 +2321,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 "How do i log out" looks for it: "should be at bottom of
                 settings page". Your account menu in the sidebar's corner has
                 it too. */}
+            {account && <PublicLinks />}
             {account && (
               <Group id="account" label="Account">
                 <Row label={`Signed in as ${account.email}`} desc={account.team ? `On the ${account.team} team.` : undefined}>
@@ -2332,7 +2424,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               )}
               {/* STOP WHAT FINISHED AGENTS LEAVE RUNNING (2026-10-05). A night
                   of agents left 7.7 GB running after every agent had finished
-                  and the Mac ran out of memory; main/leftovers.mjs has the
+                  and the Mac ran out of memory; main/leftovers.mts has the
                   numbers and the rules agreed with Codex. Its own switch,
                   because the memory switch only ever delays commands and this
                   one stops programs, and the person should agree to that by
@@ -2365,7 +2457,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                   outside the folder the app keeps its own in, about 740 MB, and
                   nothing in the app could list, show or sweep one: the same
                   invisibility that stranded 26 GB a fortnight earlier, in a new
-                  place. main/task-folders.mjs has the measurement and the rules.
+                  place. main/task-folders.mts has the measurement and the rules.
 
                   A SENTENCE AND NO CONTROL, and the row is absent whenever there
                   is nothing to say. A folder the app did not make is not the

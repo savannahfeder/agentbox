@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { effectiveProfiles, forgetDiscovery } from '../main/account-discovery.mjs';
-import { codexHome } from '../main/codex-models.mjs';
+import { codexHome } from '../main/codex-models.mts';
 
 let home;
 beforeEach(() => {

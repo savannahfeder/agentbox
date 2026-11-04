@@ -2,7 +2,7 @@
 // worker runs in. Claude Code keeps per-project state under
 // `~/.claude/projects/<encoded path>/` and Codex under `~/.codex`; this is the
 // same convention. A product with no code repo makes its docs folder the
-// worker's cwd (main/supervisor.mjs), so without this our records sat there.
+// worker's cwd (main/supervisor.mts), so without this our records sat there.
 //
 // Our records move: the ledger, session traces, run records, repeat rules and
 // parked writes. What describes the folder stays in it (`project.json`,
@@ -11,7 +11,7 @@
 //
 // This does not protect the ledger: a worker with Bash reaches this folder as
 // easily as its own cwd. The grant that used to sit on the ledger is handled in
-// main/answer-modes.mjs.
+// main/answer-modes.mts.
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -219,7 +219,7 @@ export function machineryPath(projectDir, rel, home = appHome()) {
 
 /**
  * Carries records a copy wrote under the wrong home over to `toHome`. The
- * headless door (main/serve.mjs) once wrote its ledgers under whatever home it
+ * headless door (main/serve.mts) once wrote its ledgers under whatever home it
  * inherited, and this keeps the rows it wrote then.
  *
  * Only a machinery directory whose `.origin` is inside `storeRoot` moves;

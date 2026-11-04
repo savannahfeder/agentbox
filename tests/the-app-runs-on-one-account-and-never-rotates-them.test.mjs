@@ -16,10 +16,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { deadRunSentence, troubleRemedy, causeNext, accountSentence } from '../shared/spawn-trouble.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { deadRunSentence, troubleRemedy, causeNext, accountSentence } from '../shared/spawn-trouble.mts';
 import { COPY } from '../renderer/src/plan-setup';
-import { pickCloudLogin, recordCloudLogin, markCloudLogin } from '../main/cloud/logins.mjs';
+import { pickCloudLogin, recordCloudLogin, markCloudLogin } from '../main/cloud/logins.mts';
 
 const SECOND = '/Users/her/.claude-second';
 const CODEX_SECOND = '/Users/her/.codex-2';

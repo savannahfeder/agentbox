@@ -16,10 +16,10 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { limitResetMoment } from '../shared/spawn-trouble.mjs';
-import { recordCloudLogin, markCloudLogin, cloudLoginState, mayRunOn, pickCloudLogin } from '../main/cloud/logins.mjs';
-import { limitInResultLine } from '../main/cloud/run.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { limitResetMoment } from '../shared/spawn-trouble.mts';
+import { recordCloudLogin, markCloudLogin, cloudLoginState, mayRunOn, pickCloudLogin } from '../main/cloud/logins.mts';
+import { limitInResultLine } from '../main/cloud/run.mts';
 
 const dirs = [];
 const tmp = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'cloud-limit-')); dirs.push(d); return d; };

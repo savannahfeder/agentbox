@@ -1,0 +1,137 @@
+/* A FILE SHARED BY ITS LINK, on the web app (SharedFilePage.tsx). The app's
+   own ground, type, lines and corners, and the accent only on small things.
+   The page scrolls; the app's body does not. */
+.sf-page {
+  height: 100%; overflow-y: auto; display: flex; flex-direction: column;
+  background: var(--bg); color: var(--text);
+  user-select: text; -webkit-user-select: text;
+}
+
+.sf-bar {
+  position: sticky; top: 0; z-index: 5; flex: none;
+  height: 52px; padding: 0 24px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg);
+}
+.sf-brand { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-dim); text-decoration: none; }
+.sf-brand:hover { color: var(--text); }
+.sf-brand .app-mark { display: block; }
+.sf-bar-links { display: flex; align-items: center; gap: 20px; }
+.sf-bar-links a, .sf-bar-links button { padding: 0; border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--text-dim); text-decoration: none; cursor: pointer; }
+.sf-bar-links a:hover, .sf-bar-links button:hover, .sf-bar-links .is-on { color: var(--text); }
+
+/* The file alone, on the page itself: a document at reading width, anything wider wider. */
+.sf-main { width: 100%; max-width: 1200px; margin: 0 auto; padding: 48px 32px 120px; box-sizing: border-box; }
+.sf-main.is-markdown { max-width: 784px; }
+.sf-head { margin: 0 0 40px; }
+.sf-head h1 { margin: 0 0 8px; font-size: 32px; line-height: 40px; font-weight: 600; letter-spacing: -0.022em; overflow-wrap: anywhere; }
+.sf-main:not(.is-markdown) .sf-head { margin-bottom: 24px; }
+.sf-main:not(.is-markdown) .sf-head h1 { font-size: 22px; line-height: 28px; }
+.sf-head p { margin: 0; font-size: 13.5px; line-height: 20px; color: var(--text-faint); }
+.sf-download { color: var(--text-dim); text-decoration: none; }
+.sf-download:hover { color: var(--text); }
+
+.sf-file { min-width: 0; }
+.sf-doc { container-type: inline-size; }
+.sf-doc .doc-prose { user-select: text; -webkit-user-select: text; }
+.sf-doc .doc-prose img { max-width: 100%; }
+.sf-image { display: grid; place-items: center; }
+.sf-image img { display: block; max-width: 100%; max-height: calc(100vh - 220px); object-fit: contain; border-radius: var(--artifact-corner); }
+/* A page with no ground of its own is drawn on white, as a browser draws it. */
+.sf-frame { display: block; width: 100%; height: calc(100vh - 230px); min-height: 520px; border: 0; border-radius: var(--artifact-corner); background: #fff; }
+.sf-pdf { height: calc(100vh - 230px); min-height: 520px; display: flex; }
+.sf-pdf > * { flex: 1; min-width: 0; }
+
+/* The comments: a panel over the page's right edge, opened from the bar. */
+.sf-panel {
+  position: fixed; z-index: 4; top: 52px; right: 0; bottom: 0; width: 380px; box-sizing: border-box;
+  padding: 18px 24px 24px; overflow-y: auto;
+  background: var(--bg); border-left: 1px solid var(--line);
+}
+@media (min-width: 1180px) { .sf-page.has-panel { padding-right: 380px; } }
+.sf-panel-head { display: flex; align-items: center; justify-content: space-between; height: 28px; margin-bottom: 4px; }
+.sf-panel-head h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.sf-panel-close { width: 28px; height: 28px; margin-right: -6px; padding: 0; display: grid; place-items: center; border: 0; border-radius: var(--radius); background: none; color: var(--text-dim); cursor: pointer; }
+.sf-panel-close:hover { color: var(--text); background: var(--wash); }
+.sf-panel-close svg { width: 14px; height: 14px; }
+.sf-me { display: flex; align-items: center; gap: 10px; margin: 24px 0 0; font-size: 12.5px; color: var(--text-faint); }
+.sf-me span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sf-me button { flex: none; padding: 0; border: 0; background: none; font: inherit; color: var(--text-dim); cursor: pointer; }
+.sf-me button:hover { color: var(--text); }
+.sf-list { margin: 0; padding: 0; list-style: none; }
+.sf-comment { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.sf-face {
+  width: 28px; height: 28px; overflow: hidden; border-radius: 50%; display: grid; place-items: center;
+  background: var(--bg-raised); color: var(--text-dim); font-size: 12.5px; font-weight: 600;
+}
+.sf-face img { width: 100%; height: 100%; object-fit: cover; }
+.sf-who { display: flex; align-items: baseline; gap: 8px; min-width: 0; height: 18px; }
+.sf-who b { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sf-owner { font: 9.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
+.sf-who time { margin-left: auto; font-size: 12px; color: var(--text-faint); white-space: nowrap; }
+/* Remove takes the time's place under the pointer, so every time sits on the same edge. */
+.sf-remove { display: none; margin-left: auto; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--text-dim); cursor: pointer; }
+.sf-comment:hover .sf-remove, .sf-comment:focus-within .sf-remove { display: block; }
+.sf-comment:hover:has(.sf-remove) time, .sf-comment:focus-within:has(.sf-remove) time { display: none; }
+.sf-remove:hover { color: var(--text); }
+@media (hover: none) { .sf-remove { display: block; margin-left: 0; } }
+.sf-said p { margin: 4px 0 0; font-size: 14px; line-height: 21px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 252px; overflow-y: auto; }
+.sf-remove.is-asking { display: block; color: var(--text); }
+.sf-comment:has(.sf-remove.is-asking) time { display: none; }
+
+.sf-write { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; margin-top: 14px; }
+.sf-write textarea {
+  width: 100%; box-sizing: border-box; min-height: 84px; padding: 10px 11px; resize: vertical;
+  border: 1px solid var(--line-strong); border-radius: var(--radius); background: rgba(0, 0, 0, 0.18);
+  color: var(--text); font: inherit; font-size: 14px; line-height: 20px; outline: none;
+}
+:root[data-theme="light"] .sf-write textarea { background: var(--surface); }
+.sf-write textarea:focus { border-color: var(--accent); }
+.sf-write-row { display: flex; align-items: center; gap: 12px; }
+.sf-left { font-size: 12px; color: var(--text-faint); }
+.sf-left.is-over { color: #f5a894; }
+.sf-send { height: 32px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--wash-strong); color: var(--text); font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; }
+.sf-send:hover:not(:disabled) { background: var(--wash); }
+.sf-send:disabled { opacity: 0.45; cursor: default; }
+.sf-join {
+  width: 100%; height: 40px; margin-top: 14px; border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: none; color: var(--text); font: inherit; font-size: 14px; cursor: pointer;
+}
+.sf-join:hover { background: var(--wash); }
+.sf-have { margin: 10px 0 0; text-align: center; font-size: 13px; color: var(--text-faint); }
+.sf-have button { padding: 0; border: 0; background: none; font: inherit; color: var(--text-dim); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.sf-have button:hover { color: var(--text); }
+.sf-error { margin: 12px 0 0; padding: 9px 11px; border-radius: var(--radius); border: 1px solid rgba(245, 168, 148, 0.32); background: rgba(232, 131, 107, 0.1); font-size: 13.5px; line-height: 19px; color: #f5a894; }
+:root[data-theme="light"] .sf-error { border-color: rgba(176, 58, 31, 0.3); background: rgba(176, 58, 31, 0.07); color: #9d3318; }
+.sf-offer { margin: 14px 0 0; font-size: 13px; line-height: 19px; color: var(--text-dim); }
+.sf-offer a { color: var(--text); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+
+.sf-state { flex: 1; display: grid; align-content: center; justify-items: center; gap: 14px; padding: 80px 24px; text-align: center; }
+.sf-state p { margin: 0; font-size: 16px; line-height: 22px; color: var(--text-dim); }
+.sf-quiet-btn { height: 34px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13.5px; cursor: pointer; }
+.sf-quiet-btn:hover { background: var(--wash); }
+.sf-dots { display: inline-flex; gap: 6px; }
+.sf-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); animation: sf-dot 1.2s ease-in-out infinite; }
+.sf-dots i:nth-child(2) { animation-delay: 0.15s; }
+.sf-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes sf-dot { 0%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+
+.sf-sign-in { -webkit-app-region: no-drag; }
+:root .si-page.sf-sign-in { background: rgba(18, 17, 16, 0.72); backdrop-filter: blur(4px); }
+.sf-close {
+  position: fixed; top: 12px; right: 14px; width: 32px; height: 32px; padding: 0;
+  display: grid; place-items: center; border: 0; border-radius: var(--radius); background: none; color: var(--text-dim); cursor: pointer;
+}
+.sf-close:hover { color: var(--text); background: var(--wash); }
+.sf-close svg { width: 16px; height: 16px; }
+
+@media (max-width: 820px) {
+  .sf-bar { padding: 0 16px; }
+  .sf-main { padding: 24px 20px 64px; }
+  .sf-head { margin-bottom: 28px; }
+  .sf-head h1 { font-size: 26px; line-height: 32px; }
+  .sf-frame, .sf-pdf { height: calc(100svh - 150px); min-height: 420px; }
+  .sf-panel { width: 100%; border-left: 0; }
+  .sf-sign-in .si-card { width: auto; box-sizing: border-box; padding: 30px 22px 22px; }
+  .sf-sign-in { grid-template-columns: minmax(0, 1fr); }
+}

@@ -12,10 +12,10 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { mcpIsolation, resumeThreadParams, workerThreadParams } from '../main/codex-session.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { mcpIsolation, resumeThreadParams, workerThreadParams } from '../main/codex-session.mts';
 import { createCodexApprovals } from '../main/codex-approvals.mjs';
-import { codexLineForTheCloud, KEPT_WHILE_AWAY, mcpConfigForTheCloud, servedHere, toolEnv } from '../main/cloud/run.mjs';
+import { codexLineForTheCloud, KEPT_WHILE_AWAY, mcpConfigForTheCloud, servedHere, toolEnv } from '../main/cloud/run.mts';
 import { connectionServerName } from '../shared/connections-catalog.mjs';
 import { listPending } from '../main/approvals.mjs';
 
@@ -155,7 +155,7 @@ describe('a cloud run', () => {
 
   it('never keeps a connection\'s write for later, so nothing replays when the Mac wakes', () => {
     expect(Object.keys(KEPT_WHILE_AWAY).filter((s) => s.startsWith('connection-'))).toEqual([]);
-    const run = fs.readFileSync(path.resolve(import.meta.dirname, '../main/cloud/run.mjs'), 'utf8');
+    const run = fs.readFileSync(path.resolve(import.meta.dirname, '../main/cloud/run.mts'), 'utf8');
     expect(run).toMatch(/hold: \[APPROVALS_SERVER\]/);
   });
 

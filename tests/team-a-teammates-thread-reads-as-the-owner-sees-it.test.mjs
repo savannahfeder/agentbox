@@ -15,7 +15,7 @@ import { earlierWords, commentLine, teammateThreadsFound } from '../renderer/src
 import { belongsInInbox } from '../renderer/src/list-rules';
 import { foldWorkItems } from '../shared/work-items.mjs';
 import { cardsFor } from '../shared/thread-cards.mjs';
-import { wallCards } from '../shared/room-cards.mjs';
+import { wallCards } from '../shared/room-cards.mts';
 
 const OWNER = 'owner-id';
 const THEO = 'theo-id';
