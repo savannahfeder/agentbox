@@ -8859,8 +8859,11 @@ export default function App() {
       {/* Offered and nobody signed in yet: the app's own sign-in page first.
           Signing in sets the cloud up, and the same open state then shows
           the setup's accounts. */}
-      {(phoneSignInOpen || shareSignInOpen) && snap?.team && !snap.team.signedIn && (
-        drawnIn(<SignInPage purpose={shareSignInOpen ? 'share' : 'phone'} waitingUrl={snap.team.signingIn?.url ?? null} onClose={closeAccountSignIn} onSignedIn={closeAccountSignIn} />, document.body)
+      {phoneSignInOpen && snap?.team && !snap.team.signedIn && (
+        drawnIn(<SignInPage purpose="phone" waitingUrl={snap.team.signingIn?.url ?? null} onClose={closeAccountSignIn} onSignedIn={closeAccountSignIn} />, document.body)
+      )}
+      {shareSignInOpen && !phoneSignInOpen && snap?.team && !snap.team.signedIn && (
+        drawnIn(<SignInPage purpose="share" waitingUrl={snap.team.signingIn?.url ?? null} onClose={closeAccountSignIn} onSignedIn={closeAccountSignIn} />, document.body)
       )}
       {cloudSetupOpen && !snap.cloud?.setUp && snap.cloud?.offered && (
         drawnIn(<SignInPage purpose="cloud" onClose={() => setCloudSetupOpen(false)} onSignedIn={() => setCloudSetupOpen(true)} />, document.body)
