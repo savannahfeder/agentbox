@@ -153,12 +153,12 @@ export function ComputerWait({ email, signOut }: { email: string | null; signOut
     <Screen top={24} foot={<Btn kind="quiet" label="Use another account" onPress={signOut} />}>
       <Bars at="computer" />
       <Devices state="waiting" />
-      <Head style={{ marginTop: 28 }}>Waiting for your computer</Head>
+      <Head style={{ marginTop: 28 }}>{'Waiting for\nyour computer'}</Head>
       <Lede>It connects once Agentbox there is open and signed in to the same account.</Lede>
       <View style={{ marginTop: 22 }}>
         <Steps items={['Open Agentbox on your computer', email
-          ? <>Check it is signed in as <T style={{ fontFamily: font.medium }}>{email}</T></>
-          : 'Check it is signed in to the account you use here']} />
+          ? <>In Settings › Phone, check it is signed in as <T style={{ fontFamily: font.medium }}>{email}</T></>
+          : 'In Settings › Phone, check it is signed in to the account you use here']} />
       </View>
       <View style={{ marginTop: 22, marginLeft: 2 }}><Live>Checking every few seconds</Live></View>
     </Screen>
