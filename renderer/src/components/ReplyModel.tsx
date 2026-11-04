@@ -16,8 +16,10 @@ import type { EffortChoice } from '../effort';
 
 export function ReplyModel({
   label, pick, onPick, recent, every, more, labelOf, engineLabel, engineTags = false,
-  effortRows, effortLit, onEffort, title, openAtStart = false, onOpenChange,
+  effortRows, effortLit, onEffort, title, openAtStart = false, onOpenChange, chip,
 }: {
+  /** Drawn as the new thread card's chip, this glyph beside the word. */
+  chip?: React.ReactNode;
   /** The word on the line, the model's own name. */
   label: string;
   pick: ModelPick;
@@ -110,7 +112,7 @@ export function ReplyModel({
       <button
         type="button"
         data-trigger
-        className={`compose-word set ${open ? 'open' : ''}`}
+        className={`${chip ? 'tc-chip' : 'compose-word set'} ${open ? 'open' : ''}`}
         title={title ?? 'Which model this conversation runs on'}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -127,7 +129,7 @@ export function ReplyModel({
             wrap.current?.querySelector<HTMLElement>('[data-item].on, [data-item]')?.focus();
           }
         }}
-      >{label}</button>
+      >{chip}{label}</button>
     </span>
   );
 }

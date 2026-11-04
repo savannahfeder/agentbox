@@ -2571,7 +2571,9 @@ function SlashMenu({ rows, at, onPick, onHover }: {
  *  underline, no box and no icon. The menu is `.prio-menu`, the same list the
  *  priority and the engine already open. Nothing new is drawn.
  */
-function ModePicker({ value, options, label, onChange }: {
+function ModePicker({ value, options, label, onChange, chip }: {
+  /** Drawn as the new thread card's chip, this glyph beside the word. */
+  chip?: ReactNode;
   value: string;
   options: Array<{ value: string; label: string }>;
   label: string;
@@ -2609,12 +2611,13 @@ function ModePicker({ value, options, label, onChange }: {
       )}
       <button
         type="button"
-        className={`compose-word set ${open ? 'open' : ''}`}
+        className={`${chip ? 'tc-chip' : 'compose-word set'} ${open ? 'open' : ''}`}
         title={label}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
+        {chip}
         {/* TITLE CASE, with "Mode" after it capitalised too: "In Auto Mode."
             Settled on w-86dd93ab0d. */}
         {(now?.label ?? value).replace(/(^|\s)\S/g, (c) => c.toUpperCase())}
@@ -3295,6 +3298,56 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
       else onClose();
     }
   };
+  // REVIEW ONLY (w-54cdf7c768): ?replyLook=1..5 draws each of the five looks
+  // drawn for this round. The four not picked go once one is.
+  const look = REPLY_LOOK;
+  const modelWord = (chip?: ReactNode) => (
+    <ReplyModel
+      chip={chip}
+      label={`${engineModelLabel(engineShown, model, modelOpts)}${chip && levelSaid ? ` · ${levelSaid}` : ''}`}
+      pick={pick}
+      onPick={pickModel}
+      recent={recent}
+      every={every}
+      more={moreCount(recent, every)}
+      labelOf={(p) => engineModelLabel(p.engine, p.model, modelOpts)}
+      engineLabel={(id) => engineRows.find((e) => e.id === id)?.label ?? ENGINES.find((e) => e.id === id)?.label ?? id}
+      // The agent is named beside each model only where there are two of
+      // them; on every other Mac the menu reads as it always did.
+      engineTags={engineRows.length > 1}
+      effortRows={effortRows}
+      effortLit={effortLit}
+      // Toggled against HER pick, not against what is lit, so pressing
+      // the lit default sets it and pressing her own clears it.
+      onEffort={(id) => pickTo({ effort: id === effort ? null : id })}
+      // AND THE BOX TAKES FOCUS BACK WHEN THE DRAWER SHUTS, because every
+      // way of closing it leaves focus on a button that has just been
+      // unmounted, which is the body, and ⌘↵ sends from the box.
+      onOpenChange={(drawer) => {
+        if (drawer) drawerWasOpen.current = true;
+        else if (drawerWasOpen.current) ref.current?.focus();
+      }}
+      // TRUE WHETHER OR NOT A RUN IS UP. On an idle row the reply starts
+      // a run on this model; on a running one the pick lands on the row
+      // and the next run takes it, because a spawned harness cannot
+      // change model mid-flight.
+      title="Which model this conversation runs on"
+      // Open already when she got here by pressing the model word on
+      // the folded box, which is what that word promised.
+      openAtStart={openModel}
+    />
+  );
+  const modeWord = (chip?: ReactNode) => (
+    <ModePicker
+      chip={chip}
+      label="What this message may do"
+      value={running}
+      options={claudeCode
+        ? MODE_ORDER.map((m) => ({ value: m, label: MODE_WORDS[m] }))
+        : CODEX_MODE_ORDER.map((m) => ({ value: m, label: CODEX_MODES[m].label }))}
+      onChange={(v) => pickMode(v as PermissionMode | CodexModeId)}
+    />
+  );
   return (
     <>
       {/* THE MENU RIDES ON THE CARD, NOT ON THE BOX, and it opens upward for
@@ -3329,6 +3382,12 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           <span>{to.words}</span>
         </div>;
       })()}
+      {look === 2 && !item.agent && !talkTo?.length && (
+        <div className="dock-head">
+          <span className="tc-label">Model</span>{modelWord()}
+          {canSetMode && <><span className="tc-label dock-head-gap">Mode</span>{modeWord()}</>}
+        </div>
+      )}
       {richBox ? (
         // The editor draws a mention's chip on its own words; the layer of
         // chips behind a text field has no text field to sit behind.
@@ -3443,7 +3502,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
       {/* ONE text run, ONE size, ONE baseline, and the app's own send button:
           the new-task card's footer, on the reply box, because they are the same
           act. See the note at the top of this file for the measurements. */}
-      <div className="compose-sentence">
+      <div className={`compose-sentence dock-bar look-${look}`}>
         {talk.on ? <Listening talk={talk} /> : <>
         {/* NO PRIORITY AND NO REPEAT ON A MESSAGE TO AN AGENT. Both are
             work-item fields with nowhere to be written, and "Urgent priority.
@@ -3461,13 +3520,21 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             which takes files only those two ways on the desktop, took none
             ("I can't upload files in mobile", 2026-10-12). It gets the same
             picker the chat's + opens. */}
-        {!talkTo?.length && onPhone() ? (
+        {!talkTo?.length && onPhone() && look === 4 ? (
           <button type="button" className="compose-attach" aria-label="Attach a file or picture" title="Attach a file or picture" onClick={pickFiles}>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l8-8" /></svg>
           </button>
         ) : null}
         {!talkTo?.length && talk.allowed && <MicButton talk={talk} />}
-        <span className="compose-clauses">
+        {look !== 4 && (item.agent ? <span className="compose-clauses"><span className="dim">Goes straight into {item.agent.name}.</span></span> : talkTo?.length ? null : (
+          <span className="dock-chips">
+            <PriorityPicker variant="chip" value={shown} set={!!prio} onChange={setPrio} title="Priority" />
+            {repeat && <WhenPicker value={{ runAt: 0, repeat }} onChange={(v) => setRepeat(v.repeat)} only="repeat" empty="Runs once" />}
+            {look !== 2 && canSetMode && modeWord(<ModeGlyph />)}
+            {look !== 2 && <span className="dock-model">{modelWord(<ModelGlyph />)}</span>}
+          </span>
+        ))}
+        {look === 4 && <span className="compose-clauses">
           {/* NOTHING ABOUT WHERE IT GOES (w-140ac855b1, 2026-10-13). This
               slot read "Goes to Maya's inbox.", put there so the corner was
               never bare; the formatting bar now sits in that corner, and the
@@ -3530,53 +3597,14 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           {canSetMode && (
             <>
               {'In '}
-              <ModePicker
-                label="What this message may do"
-                value={running}
-                options={claudeCode
-                  ? MODE_ORDER.map((m) => ({ value: m, label: MODE_WORDS[m] }))
-                  : CODEX_MODE_ORDER.map((m) => ({ value: m, label: CODEX_MODES[m].label }))}
-                onChange={(v) => pickMode(v as PermissionMode | CodexModeId)}
-              />
+              {modeWord()}
               {' Mode. '}
             </>
           )}
           {/* One span, so the cloud hides "On" and the stop with the model. */}
           <span className="dock-model">
           {'On '}
-          <ReplyModel
-            label={engineModelLabel(engineShown, model, modelOpts)}
-            pick={pick}
-            onPick={pickModel}
-            recent={recent}
-            every={every}
-            more={moreCount(recent, every)}
-            labelOf={(p) => engineModelLabel(p.engine, p.model, modelOpts)}
-            engineLabel={(id) => engineRows.find((e) => e.id === id)?.label ?? ENGINES.find((e) => e.id === id)?.label ?? id}
-            // The agent is named beside each model only where there are two of
-            // them; on every other Mac the menu reads as it always did.
-            engineTags={engineRows.length > 1}
-            effortRows={effortRows}
-            effortLit={effortLit}
-            // Toggled against HER pick, not against what is lit, so pressing
-            // the lit default sets it and pressing her own clears it.
-            onEffort={(id) => pickTo({ effort: id === effort ? null : id })}
-            // AND THE BOX TAKES FOCUS BACK WHEN THE DRAWER SHUTS, because every
-            // way of closing it leaves focus on a button that has just been
-            // unmounted, which is the body, and ⌘↵ sends from the box.
-            onOpenChange={(drawer) => {
-              if (drawer) drawerWasOpen.current = true;
-              else if (drawerWasOpen.current) ref.current?.focus();
-            }}
-            // TRUE WHETHER OR NOT A RUN IS UP. On an idle row the reply starts
-            // a run on this model; on a running one the pick lands on the row
-            // and the next run takes it, because a spawned harness cannot
-            // change model mid-flight.
-            title="Which model this conversation runs on"
-            // Open already when she got here by pressing the model word on
-            // the folded box, which is what that word promised.
-            openAtStart={openModel}
-          />
+          {modelWord()}
           {/* AND HOW HARD IT THINKS, WHEN THIS THREAD IS SET TO ANYTHING. The
               level was readable in one place only, lit inside the drawer, and
               the drawer is shut while she reads this line and decides to send.
@@ -3591,7 +3619,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           {levelSaid ? `, ${levelSaid}.` : '.'}
           </span>
           </>}
-        </span>
+        </span>}
         {/* WHAT WAS PHOTOGRAPHED WAS A REAL COLLISION, NOT A PREFERENCE. The
             footer is one flex row and the chip was the widest thing in it at
             184x24; on a narrow reply card the clauses ahead of it ("High
@@ -3631,8 +3659,11 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             rather than sitting side by side. A stop next to a live Send is two
             things to choose between; a stop INSTEAD of a dead Send is one
             thing that is always the thing she can do. */}
+        {!talkTo?.length && !(onPhone() && look === 4) && (
+          <button type="button" className="tc-icon dock-clip" title="Attach files" aria-label="Attach files" onClick={pickFiles}><ClipGlyph /></button>
+        )}
         {stop && !hasDraft ? stop : (
-        <span className="dock-send-pair">
+        <span className={`dock-send-pair${canWait ? '' : ' solo'}`}>
         <button
           className="dock-send"
           onClick={() => send()}
@@ -3647,3 +3678,24 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
     </>
   );
 }
+
+const REPLY_LOOK = (() => {
+  const n = Number(new URLSearchParams(typeof location === 'undefined' ? '' : location.search).get('replyLook'));
+  return n >= 1 && n <= 5 ? n : 1;
+})();
+
+const ClipGlyph = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+    <path d="m20 11.5-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7" />
+  </svg>
+);
+const ModeGlyph = () => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+    <path d="M12 3.5 5 6.3v5.2c0 4.3 3 7.6 7 9 4-1.4 7-4.7 7-9V6.3z" />
+  </svg>
+);
+const ModelGlyph = () => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+    <path d="M12 3.5c.7 4.6 2.6 6.6 7.5 8.5-4.9 1.9-6.8 3.9-7.5 8.5-.7-4.6-2.6-6.6-7.5-8.5 4.9-1.9 6.8-3.9 7.5-8.5z" strokeLinejoin="round" />
+  </svg>
+);

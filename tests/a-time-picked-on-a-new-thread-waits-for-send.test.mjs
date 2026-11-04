@@ -115,7 +115,7 @@ describe('the card', () => {
   });
 
   it('Send carries what was picked', () => {
-    expect(card).toMatch(/const send = \(\) => \([^\n]*sendTask\(whenToSend\(when\)\)/);
+    expect(card).toMatch(/const send = \(\) => \([^\n]*sendTask\(when \? whenToSend\(when\) :/);
   });
 
   it('writes the pick into the draft and opens on it', () => {
