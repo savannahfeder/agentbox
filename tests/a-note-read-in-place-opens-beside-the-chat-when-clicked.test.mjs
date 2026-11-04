@@ -33,8 +33,8 @@ it('a picture, a film, a pdf and a deck still do', () => {
   for (const f of ['a.png', 'a.mp4', 'a.pdf', 'a.pptx']) expect(kindOpensBig(f), f).toBe(true);
 });
 
-it('a click on a note read in place, or its button, opens it beside', () => {
-  expect(focus).toContain("onOpen={() => onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'beside')} onFullScreen={() => onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'focus')}");
+it('a click on a note named in an answer, or its button, opens it beside', () => {
+  expect(focus).toContain("if (goes === 'pane') { onOpenDoc?.(newestOfFamily(href, edits)); return; }");
   expect(one).toMatch(/<DocumentPreview[^>]*onOpen=\{onOpen\}/);
   expect(preview).toContain('Open on the side');
   expect(preview).not.toContain('Open full size');
@@ -44,7 +44,7 @@ it('full screen is still there, only behind its own corner mark', () => {
   expect(one).toContain('onOpen={onFullScreen ?? onOpen}');
   expect(one).toContain('aria-label="Open full screen"');
   const opens = [...focus.matchAll(/onOpenArtifact\?\.\((?:path|newestOfFamily\(path, item\.artifacts\?\.edits\)), '(beside|focus)'\)/g)].map((m) => m[1]);
-  expect(opens.filter((m) => m === 'focus')).toHaveLength(1);
+  expect(opens.filter((m) => m === 'focus')).toHaveLength(0);
 });
 
 it('does not count a missing path as media', () => {

@@ -103,6 +103,6 @@ describe('the Later tab', () => {
   });
   it('is left out of the strip and of what Tab walks along', () => {
     expect(read('renderer/src/threads/Pages.tsx')).toContain("(t) => t.view !== 'snoozed' || laterTabShown({ count: counts.snoozed ?? 0, view, walking: keepLater })");
-    expect(read('renderer/src/App.tsx')).toContain("INBOX_TABS.map((t) => t.view).filter((v) => v !== 'snoozed' || laterTabShown({ count: snoozed.length, view, walking: !!run }))");
+    expect(read('renderer/src/App.tsx')).toContain("INBOX_TABS.map((t) => t.view).filter((v) => v !== 'snoozed' || laterTabShown({ count: scheduledCount, view, walking: !!run }))");
   });
 });

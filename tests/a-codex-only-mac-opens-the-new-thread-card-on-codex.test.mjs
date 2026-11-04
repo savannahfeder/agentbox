@@ -73,8 +73,9 @@ describe('the model menu on a Codex-only Mac', () => {
 });
 
 describe('the card', () => {
+  // From the default agent since w-8b637c7802 (tests/a-new-thread-starts-on-your-default-agent-not-the-last-one).
   it('opens on startingEngine', () => {
     const card = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
-    expect(card).toMatch(/startingEngine\(readLastEngine\(\), engines\)/);
+    expect(card).toMatch(/startingEngine\(workspaceEngine \?\? null, engines\)/);
   });
 });

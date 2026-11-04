@@ -1,50 +1,66 @@
-// THE DEFAULT LOGIN NAMES ITS ACCOUNT, EVEN THOUGH ITS FILE SITS BESIDE THE
-// FOLDER RATHER THAN INSIDE IT.
+// THE DEFAULT LOGIN IS NAMED FROM THE FILE CLAUDE CODE SIGNS IT IN WITH.
 //
-// WHAT WAS WRONG, reported on PR 13: the Accounts page drew the default row with
-// no email, while every row for a second login had one. The page cannot tell a
-// person which subscription their primary login actually is, which is the whole
-// reason it reads the file at all.
+// Claude Code with no CLAUDE_CONFIG_DIR keeps its login in ~/.claude.json,
+// beside ~/.claude, and never reads ~/.claude/.claude.json (read from the
+// 2.1.314 binary: `join(CLAUDE_CONFIG_DIR || homedir(), '.claude.json')`).
+// That inside file is left by a run with CLAUDE_CONFIG_DIR=~/.claude.
 //
-// HOW IT WAS MEASURED: Claude Code keeps the default login's `.claude.json` in
-// the HOME folder, next to `~/.claude`, and keeps it INSIDE the folder only when
-// that folder came from a `CLAUDE_CONFIG_DIR`. `accountIdentity` looked inside
-// `~/.claude` in both cases, so on the ordinary Mac it found nothing.
+// WHAT BROKE: accountIdentity preferred the inside file for the default login.
+// On a Mac holding a stale one, Settings named the default row after an
+// account it was not signed in as, and read its usage on the account it really
+// was: two tiles with different emails and the same 96% session, 54% week.
 //
-// WHAT CAN SILENTLY BREAK: the fallback is applied to a NAMED folder too, and
-// then a second login with no file of its own reports the default account's
-// email -- one subscription shown as two, which is the exact confusion
-// `duplicateAccountNote` exists to catch. The third expectation below is that.
+// WHAT CAN SILENTLY BREAK: a NAMED folder must still be read from inside, or
+// every second login reports the default account's email.
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { accountIdentity } from '../main/account-tooling.mjs';
+import { effectiveProfiles } from '../main/account-discovery.mjs';
+
+const login = (file, uuid) => {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ oauthAccount: { accountUuid: uuid, emailAddress: `${uuid}@example.com` } }));
+};
+
+function withHome(fn) {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-default-login-'));
+  try { return fn(home); } finally { fs.rmSync(home, { recursive: true, force: true }); }
+}
 
 describe('whose login the default account is', () => {
-  it('reads the file beside the folder when the folder holds none', () => {
-    const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-default-login-'));
-    try {
-      fs.mkdirSync(path.join(bare, '.claude'));
-      expect(accountIdentity(null, { home: bare })).toBe(null);
-      fs.writeFileSync(path.join(bare, '.claude.json'), JSON.stringify({ oauthAccount: { accountUuid: 'beside', emailAddress: 'beside@example.com' } }));
-      expect(accountIdentity(null, { home: bare })).toEqual({ email: 'beside@example.com', accountUuid: 'beside' });
-      expect(accountIdentity(path.join(bare, '.claude'), { home: bare })).toBe(null);
-    } finally {
-      fs.rmSync(bare, { recursive: true, force: true });
-    }
-  });
+  it('reads the file beside the folder', () => withHome((home) => {
+    fs.mkdirSync(path.join(home, '.claude'));
+    expect(accountIdentity(null, { home })).toBe(null);
+    login(path.join(home, '.claude.json'), 'beside');
+    expect(accountIdentity(null, { home })).toEqual({ email: 'beside@example.com', accountUuid: 'beside' });
+    expect(accountIdentity(path.join(home, '.claude'), { home })).toBe(null);
+  }));
 
-  it('prefers the file inside the folder when there is one', () => {
-    const full = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-default-login-'));
-    try {
-      fs.mkdirSync(path.join(full, '.claude'));
-      fs.writeFileSync(path.join(full, '.claude', '.claude.json'), JSON.stringify({ oauthAccount: { accountUuid: 'inside', emailAddress: 'inside@example.com' } }));
-      fs.writeFileSync(path.join(full, '.claude.json'), JSON.stringify({ oauthAccount: { accountUuid: 'beside', emailAddress: 'beside@example.com' } }));
-      expect(accountIdentity(null, { home: full })?.accountUuid).toBe('inside');
-    } finally {
-      fs.rmSync(full, { recursive: true, force: true });
-    }
-  });
+  it('ignores a file inside the folder, which Claude Code does not read without CLAUDE_CONFIG_DIR', () => withHome((home) => {
+    login(path.join(home, '.claude', '.claude.json'), 'inside');
+    login(path.join(home, '.claude.json'), 'beside');
+    expect(accountIdentity(null, { home })?.accountUuid).toBe('beside');
+  }));
+
+  it('is not signed in when only the inside file holds a login', () => withHome((home) => {
+    login(path.join(home, '.claude', '.claude.json'), 'inside');
+    expect(accountIdentity(null, { home })).toBe(null);
+  }));
+
+  it('still reads a named folder from inside, including ~/.claude named out loud', () => withHome((home) => {
+    login(path.join(home, '.claude', '.claude.json'), 'inside');
+    login(path.join(home, '.claude.json'), 'beside');
+    expect(accountIdentity(path.join(home, '.claude'), { home })?.accountUuid).toBe('inside');
+  }));
+
+  it('lists one account, not two, when a second folder holds the default login and ~/.claude holds a stale one', () => withHome((home) => {
+    login(path.join(home, '.claude', '.claude.json'), 'stale');
+    login(path.join(home, '.claude.json'), 'real');
+    login(path.join(home, '.claude-2', '.claude.json'), 'real');
+    login(path.join(home, '.claude-3', '.claude.json'), 'other');
+    expect(effectiveProfiles([], { home, shellDir: undefined })).toEqual(['default', path.join(home, '.claude-3')]);
+  }));
 });

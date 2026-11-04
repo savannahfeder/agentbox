@@ -86,9 +86,9 @@ describe('a page or a note the answer names is read in place', () => {
   it('tells a note from a page', () => {
     expect(renderToStaticMarkup(h(QueueFile, { product: 'p', path: 'reports/listings.md', md, onOpen: noop }))).toContain('one-file one-note');
   });
-  it('and the thread page draws them in this mode in place of the tiles', () => {
+  it('but the thread page no longer draws them; the answer names them (w-658f249bb9)', () => {
     const focus = read('renderer/src/components/Focus.tsx');
-    expect(focus).toContain('inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && newestOfFamily(path, item.artifacts?.edits) !== openDoc && <QueueFile');
+    expect(focus).not.toContain('<QueueFile');
     expect(focus).toContain('{!page && inlineArtifacts && !previewSample && <MessageFiles');
   });
 });

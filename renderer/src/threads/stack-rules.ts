@@ -46,7 +46,7 @@ export function stackRows({ progress, later, done, dayStart, folded, laterRules 
     const items = (bySection[part.key] ?? []).filter((i) => !where.has(i.id));
     if (!items.length && !(part.key === 'later' && laterRules > 0)) continue;
     const shut = folded.has(part.key);
-    sections.push({ ...part, count: items.length, folded: shut });
+    sections.push({ ...part, count: items.length + (part.key === 'later' ? laterRules : 0), folded: shut });
     for (const i of items) where.set(i.id, part.key);
     if (!shut) rows.push(...items);
   }

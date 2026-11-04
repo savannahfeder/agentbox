@@ -5,7 +5,8 @@ export type ColumnKind = 'name' | 'tag' | 'number' | 'date' | 'link' | 'email' |
 export type Tone = 'green' | 'blue' | 'purple' | 'amber' | 'rose' | 'teal' | 'grey';
 /** `values` are a tag column's values as first written; `tones` is keyed by their lower case. */
 export type Column = { name: string; kind: ColumnKind; values: string[]; tones: Record<string, Tone> };
-export type Table = { columns: Column[]; rows: string[][]; logoCol: number };
+/** `ranked`: the first column is the file's own rank, which stands in for the row number. */
+export type Table = { columns: Column[]; rows: string[][]; logoCol: number; ranked: boolean };
 export type Sort = { col: number; dir: 'asc' | 'desc' } | null;
 
 export const isTablePath = (path: string | null | undefined) => /\.(csv|tsv)$/i.test(String(path ?? '').split(/[?#]/)[0]);
@@ -61,7 +62,7 @@ function parseMarkdownTable(text: string): string[][] {
 
 const URLISH = /^(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(:\d+)?(\/\S*)?$/i;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
-const NUMBER = /^[-+]?[$€£]?\s?\d[\d,]*(\.\d+)?\s?(%|k|m|bn|b)?$/i;
+const NUMBER = /^[-+]?[$€£]?\s?\d[\d,]*(\.\d+)?\s?(%|k|m|bn|b|t|tn)?$/i;
 const MONTH = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b/i;
 // A cell that says there is nothing here, which a number or date column can hold.
 const NOTHING = /^(n\/?a|none|null|nil|tbd|unknown|-|\u2013|\u2014|\?)$/i;
@@ -70,19 +71,22 @@ const SOCIAL = /(^|\.)(linkedin\.com|twitter\.com|x\.com|github\.com|facebook\.c
 // A header that names a choice from a short list.
 const TAG_HEADER = /\b(status|stage|category|type|tier|priority|segment|industry|tags?|label|fit|source|plan|state|kind|round|channel|owner|sector|vertical|risk|level|outcome|result|reply|response|replied|sentiment|intent|verdict|decision)\b/i;
 // A header that names something each row has its own of, even when values repeat.
-const TEXT_HEADER = /\b(name|company|investor|firm|fund|person|contact|candidate|employer|school|account|city|location|based|country|address|region|hq|headquarters|title|role|note|notes|description|summary|why|reason|comment|email|phone|mobile|tel|zip|postal|postcode|id|website|url|domain|linkedin)\b/i;
+const TEXT_HEADER = /\b(name|company|investor|firm|fund|person|contact|candidate|employer|school|account|city|location|base|based|country|address|region|hq|headquarters|title|role|note|notes|description|summary|why|reason|comment|email|phone|mobile|tel|zip|postal|postcode|id|website|url|domain|linkedin)\b/i;
 // A number that is a label, not an amount: never added, sorted or lined up right.
 const LABEL_NUMBER = /\b(phone|mobile|tel|zip|postal|postcode|id|year)\b/i;
+// "Revenue per year" is an amount, though it names a year.
+const AMOUNT_HEADER = /\b(revenue|arr|mrr|amount|price|cost|salary|spend|budget|funding|raised|valuation|per|count|size)\b/i;
 const DATE_HEADER = /\b(date|day|when|time|updated|created|last|next|due|deadline|founded)\b/i;
 
 const share = (values: string[], test: (v: string) => boolean) => values.length ? values.filter(test).length / values.length : 0;
 
 // An amount as an agent writes one: "$1.2M", "~$1M", "$250k-$1M" (the low end
 // counts), "€80.000" and "1.250.000,50" (the European way). NaN when it is not.
-const SCALE: Record<string, number> = { k: 1e3, m: 1e6, mm: 1e6, b: 1e9, bn: 1e9 };
+const SCALE: Record<string, number> = { k: 1e3, m: 1e6, mm: 1e6, b: 1e9, bn: 1e9, t: 1e12, tn: 1e12 };
 function oneAmount(raw: string): number {
-  let s = raw.trim().replace(/^[~≈+]|^(about|approx\.?|circa|ca\.?)\s*/i, '').replace(/[$€£¥\s]/g, '');
-  const m = s.match(/^([-+]?[\d.,]+)(%|k|mm|m|bn|b)?$/i);
+  // "$7B+" is at least $7B.
+  let s = raw.trim().replace(/^[~≈+]|^(about|approx\.?|circa|ca\.?)\s*/i, '').replace(/\+$/, '').replace(/[$€£¥\s]/g, '');
+  const m = s.match(/^([-+]?[\d.,]+)(%|k|mm|m|bn|b|tn|t)?$/i);
   if (!m) return NaN;
   s = m[1];
   if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s) || /^\d+,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
@@ -94,8 +98,12 @@ export function amountOf(v: string): number {
   const s = v.trim();
   if (!/\d/.test(s) || /^\d{4}-\d{1,2}-\d{1,2}/.test(s)) return NaN;
   // A range only where it is plainly money, so 2026-10-01 is not one.
-  const range = /[$€£kmb]/i.test(s) ? s.match(/^(.+?)\s*(?:-|\u2013|\u2014|\bto\b)\s*(.+)$/i) : null;
-  return range && Number.isFinite(oneAmount(range[1])) ? oneAmount(range[1]) : oneAmount(s);
+  const range = /[$€£kmbt]/i.test(s) ? s.match(/^(.+?)\s*(?:-|\u2013|\u2014|\bto\b)\s*(.+)$/i) : null;
+  if (!range) return oneAmount(s);
+  // "$12.4-13.2B": the low end shares the high end's B.
+  const scale = range[2].trim().match(/(k|mm|m|bn|b|tn|t)\+?$/i)?.[1] ?? '';
+  const low = /[kmbt]\+?$/i.test(range[1].trim()) ? range[1] : `${range[1]}${scale}`;
+  return Number.isFinite(oneAmount(low)) ? oneAmount(low) : oneAmount(s);
 }
 
 /** When a cell is, in ms, or NaN. A bare number is not a date. */
@@ -123,7 +131,7 @@ function kindOf(name: string, values: string[], first: boolean): ColumnKind {
   if (!filled.length) return 'text';
   if (share(filled, (v) => EMAIL.test(v)) >= 0.8) return 'email';
   if (share(filled, (v) => URLISH.test(v) && !NUMBER.test(v)) >= 0.8) return 'link';
-  if (!LABEL_NUMBER.test(name) && share(filled, (v) => NUMBER.test(v) || Number.isFinite(amountOf(v))) >= 0.9) return 'number';
+  if (!(LABEL_NUMBER.test(name) && !AMOUNT_HEADER.test(name)) && share(filled, (v) => NUMBER.test(v) || Number.isFinite(amountOf(v))) >= 0.9) return 'number';
   if (share(filled, (v) => Number.isFinite(dateOf(v))) >= 0.8 && (DATE_HEADER.test(name) || filled.some((v) => MONTH.test(v) || v.includes('/') || /^\d{4}-/.test(v)))) return 'date';
   const short = filled.every((v) => v.length <= 28 && v.split(/\s+/).length <= 4);
   const distinct = new Set(filled.map((v) => v.toLowerCase())).size;
@@ -184,8 +192,15 @@ export function tagTone(value: string, place: number, header = ''): Tone {
 
 export function readTable(text: string, path: string): Table {
   const src = String(text ?? '');
-  const grid = isMarkdownTable(src) ? parseMarkdownTable(src) : parseDelimited(src, sepFor(src, path));
-  if (!grid.length) return { columns: [], rows: [], logoCol: -1 };
+  return tableFromGrid(isMarkdownTable(src) ? parseMarkdownTable(src) : parseDelimited(src, sepFor(src, path)));
+}
+
+// "#", "No." or "Rank" over 1, 2, 3: a rank, and the name is the column after it.
+const RANK_HEADER = /^(#|no\.?|n°|rank|ranking|position|pos\.?)$/i;
+
+/** A header row and its rows, as a table. A markdown table in a message comes in this way. */
+export function tableFromGrid(grid: string[][]): Table {
+  if (!grid.length) return { columns: [], rows: [], logoCol: -1, ranked: false };
   const head = grid[0];
   // A loop, not Math.max(...rows): spreading 150,000 rows overflows the stack.
   let width = head.length;
@@ -195,6 +210,8 @@ export function readTable(text: string, path: string): Table {
   const keep = Array.from({ length: width }, (_, i) => i).filter((i) => (head[i] ?? '').trim() || rows.some((r) => r[i].trim()));
   rows = rows.map((r) => keep.map((i) => r[i]));
   const seen = new Map<string, number>();
+  const ranked = keep.length > 1 && RANK_HEADER.test((head[keep[0]] ?? '').trim()) && rows.every((r) => /^\d{1,4}\.?$/.test(r[0].trim()));
+  const nameAt = ranked ? 1 : 0;
   const columns: Column[] = keep.map((src, i) => {
     const base = (head[src] ?? '').trim() || `Column ${i + 1}`;
     let name = base;
@@ -202,7 +219,7 @@ export function readTable(text: string, path: string): Table {
     for (let n = 2; seen.has(name.toLowerCase()); n++) name = `${base} ${n}`;
     seen.set(name.toLowerCase(), 1);
     const values = rows.map((r) => r[i]);
-    const kind = kindOf(name, values, i === 0);
+    const kind: ColumnKind = ranked && i === 0 ? 'number' : kindOf(name, values, i === nameAt);
     const tones: Record<string, Tone> = {};
     const shown: string[] = [];
     if (kind === 'tag') {
@@ -215,7 +232,7 @@ export function readTable(text: string, path: string): Table {
     }
     return { name, kind, values: shown, tones };
   });
-  return { columns, rows, logoCol: logoColumn(columns, rows) };
+  return { columns, rows, logoCol: logoColumn(columns, rows), ranked };
 }
 
 const hostOf = (raw: string) => raw.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').split(/[/:?#]/)[0].toLowerCase();
