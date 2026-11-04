@@ -201,7 +201,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
       <div className="sb-list">
         {waiting.length > 0 && <>
           <div className="sb-sec">
-            <span className="doc-outline-head">{canSend ? 'Not sent yet' : 'Notes'}</span>
+            <span className="doc-outline-head">{canSend ? 'Unsent' : 'Notes'}</span>
             {canSend && <button type="button" className="sb-send" onClick={() => void send()}><Glyph d="M2.5 8h9M8 4.5 11.5 8 8 11.5" />Send {waiting.length}</button>}
           </div>
           {waiting.map(note)}

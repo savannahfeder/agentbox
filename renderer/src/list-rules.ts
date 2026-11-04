@@ -297,7 +297,8 @@ export const PROPOSAL_PATIENCE = 24 * 3_600_000;
  *
  * A proposal whose parent is not in `items` is skipped. A thread the user
  * closed stays closed, without answering its proposals; reopening it turns
- * the reminder back on.
+ * the reminder back on. A thread the user put in Later stays there until
+ * Later ends.
  *
  * While a reply is on its way to an agent, or an agent is on the thread, the
  * reminder waits: Needs you wins over In progress, so it made the reply look
@@ -315,6 +316,7 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
     const parent = i.parent ? byId.get(i.parent) : undefined;
     if (!parent) continue;
     if (parent.status === 'done' && parent.wrote?.status?.source === 'founder') continue;
+    if (hiddenUntil(parent) > now) continue; // in Later: it comes back when Later ends
     if (parent.status === 'claimed' || (liveAnswer(parent) && !answerSettled(parent))) continue;
     owed.add(parent.id);
   }

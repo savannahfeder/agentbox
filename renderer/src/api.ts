@@ -222,6 +222,10 @@ if (twoLogins) {
   if (accountTrouble === 'at-limit' && first) {
     first.trouble = { cause: 'at-limit', since: Date.now(), note: accountSentence('at-limit') };
   }
+  // &account=stale-limit: that mark is ten minutes old and the login read since has nothing full.
+  if (accountTrouble === 'stale-limit' && first) {
+    first.trouble = { cause: 'at-limit', since: Date.now() - 600_000, at: Date.now() - 600_000, note: accountSentence('at-limit') };
+  }
 }
 
 function fixtureAccountUsage(): AccountUsageReading[] {
@@ -243,6 +247,7 @@ function fixtureAccountUsage(): AccountUsageReading[] {
   // &fablefull: the first login has room in its session and week and none left on Fable.
   const firstLimits = params.has('fablefull')
     ? [limit('session', 30, '5:09pm', session), limit('week', 60, '11:59am', week, 'all models'), limit('week', 100, '11:59am', week, 'Fable')]
+    : accountTrouble === 'stale-limit' ? [limit('session', 4, '5:09pm', session), limit('week', 13, '11:59am', week, 'all models'), limit('week', 2, '11:59am', week, 'Fable')]
     : [limit('session', twoLogins ? 100 : 42, '5:09pm', session), limit('week', 15, '11:59am', week, 'all models'), limit('week', 24, '11:59am', week, 'Fable')];
   return [
     { profile: first.profile, ...failed, limits: firstLimits },

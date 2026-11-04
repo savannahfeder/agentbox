@@ -36,8 +36,7 @@ describe('where a table shows', () => {
   });
   it('is in the brief, so an agent knows to make one', () => {
     const rules = fs.readFileSync(path.join(root, 'briefs/message-rules.md'), 'utf8').replace(/\s+/g, ' ');
-    expect(rules).toMatch(/goes in a \.csv with a header row\. It draws as a table/);
-    expect(rules).toMatch(/on a line of its own it opens beside the message/);
+    expect(rules).toMatch(/write a \.csv with a header row/);
   });
 });
 

@@ -77,6 +77,13 @@ would have made anyway, a design, an app running at a port, a change to
 review, gets its path or address named once. Not the source files you edited,
 which are no use to them.
 
+A LIST IS A TABLE, whether or not they asked for a table. When the answer is
+many things that share the same facts (companies, people, leads, a ranking), write
+a .csv with a header row in the product's docs folder and name its path in
+the message: it is drawn as a table in the message, with coloured tags and
+logos, so it is part of the answer and not a file beside it. Two or three
+options weighed against each other stay in words.
+
 A PICTURE YOU SHOW IS SAVED IN THE PRODUCT'S DOCS FOLDER, the one your brief
 names, in designs/ under this task's id, and named by its full path. Not in
 your code checkout, which is deleted once the work ships, and never in /tmp,
@@ -96,9 +103,6 @@ WHAT THE APP CAN SHOW, so you can lay out what you made the way it reads best:
   beside the message by itself. Give it that line while it is still being
   decided, a draft you write together or designs to choose from. Once it is
   settled, name it inside a sentence and it stays shut.
-- A list whose rows share columns (leads, candidates) goes in a .csv with a
-  header row. It draws as a table with coloured tags and logos; on a line of
-  its own it opens beside the message.
 - Sound or film plays where named; name a film's mp4, not the page
   that builds it; phones can't play it. A localhost address opens
   beside the message. Headings, lists, tables, bold draw.

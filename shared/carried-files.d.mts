@@ -11,8 +11,9 @@ export type CarryLine = { state: CarryState['state']; label: string; percent: nu
 export const MAX_CARRIED_MB: number;
 export const MAX_CARRIED_BYTES: number;
 export const PART_BYTES: number;
-export const MAX_SENT_MB: number;
 export const MAX_SENT_BYTES: number;
+export const MAX_SENT_WORDS: string;
+export const MAX_SHARED_SENT_BYTES: number;
 
 export function isCarriedKind(file: unknown): boolean;
 export function isDrawnInADocument(file: unknown): boolean;
