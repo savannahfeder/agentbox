@@ -38,7 +38,8 @@ export async function noticeLinkComments({ backend, cursor, setCursor, now, read
   for (const [source, list] of bySource) {
     const place = threadOfSource(source);
     if (!place || !readItem(place)) continue;
-    try { write(place, noteFor(list)); wrote += 1; } catch (err) { log(`link comments: ${err.message}`); }
+    const last = list[list.length - 1];
+    try { write(place, noteFor(list), { name: last.byName, file: last.name, text: last.text }); wrote += 1; } catch (err) { log(`link comments: ${err.message}`); }
   }
   setCursor(Math.max(...comments.map((c) => c.at)));
   return wrote;

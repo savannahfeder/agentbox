@@ -146,3 +146,27 @@ describe('in the app', () => {
     service.stop();
   });
 });
+
+// In the next round the comment read "Checkpoint · Opus 5.5", as if the agent
+// had said it (power test, round 4, 2026-11-04).
+describe('in the thread', () => {
+  it('is a line naming who commented and on which file, with their words, and never the agent checking in', async () => {
+    const { threadEvents } = await import('../renderer/src/thread-history.ts');
+    const { pickFields } = await import('../shared/work-items.mjs');
+    const line = { id: 'w-1', ts: 1, source: 'system', patch: { note: 'Chris Novak commented on q1-roadmap.md. "Hi"', linkComment: { name: 'Chris Novak', file: 'q1-roadmap.md', text: 'Hi' } } };
+    const events = threadEvents([{ id: 'w-1', ts: 0, source: 'founder', patch: { title: 'Plan', status: 'open' } }, line]);
+    const said = events.find((e) => /commented/.test(e.said ?? ''));
+    expect(said).toMatchObject({ who: 'agent', said: 'Chris Novak commented on q1-roadmap.md', words: 'Hi' });
+    expect(said.says).toBeUndefined();
+    expect(said.message).toBeUndefined();
+    expect(events.some((e) => e.says === 'progress')).toBe(false);
+    expect(pickFields({ linkComment: { name: 'Chris', file: 'a.md', text: 'x', extra: 1 } })).toEqual({ linkComment: { name: 'Chris', file: 'a.md', text: 'x' } });
+    expect(pickFields({ linkComment: { name: '', file: 'a.md', text: 'x' } })).toBeNull();
+  });
+  it('is written on the thread with the note, through the store', async () => {
+    let written = null;
+    const fake = { newLinkComments: async () => [{ token: 't', source: 'payments/w-1a2b/x', name: 'x.md', byName: 'Chris', text: 'Yo', at: 5 }] };
+    await noticeLinkComments({ backend: fake, now: () => 10, cursor: () => 1, setCursor: () => {}, readItem: () => ({}), write: (place, note, comment) => { written = { note, comment }; } });
+    expect(written).toEqual({ note: 'Chris commented on x.md. "Yo"', comment: { name: 'Chris', file: 'x.md', text: 'Yo' } });
+  });
+});

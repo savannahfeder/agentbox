@@ -198,6 +198,9 @@ export const WORK_ITEM_FIELDS = [
   // WHERE A THREAD WENT WHEN SOMEONE LEFT THE TEAM: `{ said, at }`, the line
   // each copy writes on what it moved (main/team/departures.mjs).
   'handedOver',
+  // SOMEONE'S COMMENT ON THE THREAD'S FILE THROUGH ITS PUBLIC LINK:
+  // `{ name, file, text }`, beside the note that says it (main/team/link-comments.mjs).
+  'linkComment',
   // WORDS A TEAMMATE LEFT ON A SHARED THREAD: `{ text }`, on a line the sync
   // writes from the cloud's own comment (main/team/thread-share.mjs). A delta
   // like `react`, read back as `waitingComments` until the owner deals with
@@ -583,6 +586,13 @@ function coerceField(field, value) {
     case 'routed': return cleanRouted(value);
     case 'putAway': return typeof value === 'boolean' ? value : undefined;
     case 'shippedAt': return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : undefined;
+    case 'linkComment': {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+      const name = str(value.name, MAX_SHORT);
+      const file = str(value.file, MAX_SHORT);
+      const text = str(value.text, MAX_TEXT_BYTES);
+      return name && file && text ? { name, file, text } : undefined;
+    }
     case 'waitEnded': case 'handedOver': {
       if (!value || typeof value !== 'object' || !Number.isFinite(value.at)) return undefined;
       const said = str(value.said, MAX_SUMMARY);

@@ -904,10 +904,10 @@ export class Store {
   // (main/team/link-comments.mjs). Said as a note; a closed thread comes back
   // to wait on her as `closedBeforeItShipped` brings one, and a thread still
   // going is left going.
-  commentOnASharedFile(slug, id, note) {
+  commentOnASharedFile(slug, id, note, linkComment = null) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
-    const item = workItemsDisk.updateWorkItem(dir, id, { note }, { source: 'system' });
+    const item = workItemsDisk.updateWorkItem(dir, id, { note, ...(linkComment ? { linkComment } : {}) }, { source: 'system' });
     if (item?.status !== 'done') return item;
     workItemsDisk.updateWorkItem(dir, id, { status: 'open' }, { source: 'founder' });
     return workItemsDisk.updateWorkItem(dir, id, { status: 'blocked' }, { source: 'system' });

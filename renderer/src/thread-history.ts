@@ -474,6 +474,12 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       continue;
     }
 
+    const fromLink = (patch as { linkComment?: { name?: unknown; file?: unknown; text?: unknown } } | null)?.linkComment;
+    if (fromLink && typeof fromLink.name === 'string' && typeof fromLink.file === 'string') {
+      events.push({ at, who: 'agent', said: `${fromLink.name} commented on ${fromLink.file}`, ...(words(fromLink.text) ? { words: words(fromLink.text)! } : {}) });
+      continue;
+    }
+
     if (words(patch.note)) {
       events.push({ at, who: 'agent', said: 'It checked in', words: words(patch.note)!, message: true, field: 'note', says: 'progress', ...(ranNow() ? { ran: ranNow() } : {}) });
       continue;

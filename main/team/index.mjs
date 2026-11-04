@@ -307,7 +307,7 @@ export function createTeamService({
           const p = products().find((x) => x.slug === product);
           return p ? disk.readWorkItems(p.dir).find((i) => i.id === thread) ?? null : null;
         },
-        write: ({ product, thread }, note) => store.commentOnASharedFile(product, thread, note),
+        write: ({ product, thread }, note, comment) => store.commentOnASharedFile(product, thread, note, comment),
       });
       if (wrote) onChange();
     } catch (err) { log(`link comments: ${err.message}`); }
