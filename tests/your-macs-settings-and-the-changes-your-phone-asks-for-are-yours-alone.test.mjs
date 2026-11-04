@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const migrationsDir = path.join(root, 'cloud/supabase/migrations');
@@ -61,7 +62,7 @@ const setting = (person = OWNER, { project = null, item = null } = {}) => as(per
    values ($1, $2, $3, 'setting', '{"scope":"workspace","key":"adhdMode","value":false}') returning id, project, item`, [DEV, project, item]);
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite(await emptyDatabase());
   await db.exec(SUPABASE_STAND_IN);
   await db.exec(migration);
   await db.exec(GRANTS);

@@ -9,6 +9,7 @@ import { it, expect, beforeAll, afterAll, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 
 const dir = path.join(import.meta.dirname, '..', 'cloud/supabase/migrations');
 const migration = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort().map((f) => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n');
@@ -45,7 +46,7 @@ const refused = async (person, sql, params) => { try { await as(person, sql, par
 const add = async (who, hash, file = FILE) => (await rows(who, 'select public.add_file_version($1, $2, $3, $4, 1) as n', [team.id, file, hash, 'aa11bb22']))[0].n;
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite(await emptyDatabase());
   await db.exec(STAND_IN);
   await db.exec(migration);
   await db.exec(GRANTS);
