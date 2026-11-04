@@ -12,6 +12,9 @@
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { rerunWithStripTypes } from '../../../../scripts/lib/rerun-with-strip-types.mjs';
+
+rerunWithStripTypes(import.meta.url);
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 const WEEK = 7 * 24 * 3600_000;

@@ -17,24 +17,23 @@ const group = { roomId: 'r-1', roomName: 'Design', invitedBy: 'p-sofia', invited
 
 describe('the rows', () => {
   it('say who invited you to what, by first name', () => {
-    expect(inviteRows([team], [])).toEqual([{ key: 'invite/team/t-1', kind: 'team', id: 't-1', words: 'Maya invited you to Lumen' }]);
+    expect(inviteRows([team])).toEqual([{ key: 'invite/team/t-1', kind: 'team', id: 't-1', words: 'Maya invited you to Lumen' }]);
   });
   it('still read with no name', () => {
-    expect(inviteRows([{ ...team, invitedByName: null }], [])[0].words).toBe('You are invited to Lumen');
+    expect(inviteRows([{ ...team, invitedByName: null }])[0].words).toBe('You are invited to Lumen');
   });
-  it('include group invitations, under the team ones', () => {
-    expect(inviteRows([team], [group]).map((r) => r.words)).toEqual(['Maya invited you to Lumen', 'Sofia invited you to Design']);
-    expect(inviteRows([], [group])[0]).toMatchObject({ key: 'invite/group/r-1', kind: 'group', id: 'r-1' });
+  it('are only ever a team, since a group is only ever your team', () => {
+    expect(inviteRows([team], [group]).map((r) => r.words)).toEqual(['Maya invited you to Lumen']);
   });
   it('are nothing when nothing is waiting', () => {
-    expect(inviteRows(undefined, undefined)).toEqual([]);
+    expect(inviteRows(undefined)).toEqual([]);
   });
 });
 
 const draw = (rows, over = {}) => renderToStaticMarkup(React.createElement(InviteRows, { rows, onJoin: () => {}, onOpen: () => {}, selected: null, ...over }));
 
 describe('the row on screen', () => {
-  const html = draw(inviteRows([team], []));
+  const html = draw(inviteRows([team]));
   it('says it, with a Join button', () => {
     expect(html).toContain('Maya invited you to Lumen');
     expect(html).toMatch(/<button[^>]*>Join<\/button>/);
@@ -43,7 +42,7 @@ describe('the row on screen', () => {
     expect(html).toMatch(/class="th-cell-state"[^>]*>.*Waiting on you/);
   });
   it('wears the keyboard when it is on it', () => {
-    expect(draw(inviteRows([team], []), { selected: 'invite/team/t-1' })).toMatch(/class="row rm-mention unread selected"/);
+    expect(draw(inviteRows([team]), { selected: 'invite/team/t-1' })).toMatch(/class="row rm-mention unread selected"/);
     expect(html).not.toMatch(/selected/);
   });
 });

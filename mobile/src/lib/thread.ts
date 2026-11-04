@@ -14,7 +14,7 @@ import { recapFor, resultLeads } from '../../../renderer/src/recap';
 import { withoutTrailingWork } from '../../../renderer/src/trailing-work';
 import { herTurnEnds, herTurnStarts } from '../../../renderer/src/her-turns';
 import { filedOnTurn } from '../../../renderer/src/filed-in-thread';
-import { approvableFiled, threadsMade } from '../../../renderer/src/threads-made';
+import { approvableFiled, doItHereWords, threadsMade } from '../../../renderer/src/threads-made';
 import { closeAsk } from '../../../renderer/src/close-asks-first';
 import { conversationGap, gapIndex } from '../../../shared/agents.mjs';
 import { groupWork } from '../../../shared/work-lines.mjs';
@@ -23,7 +23,7 @@ import type { Row, TabId } from './tabs';
 
 type View = ReturnType<typeof phoneView>;
 
-export interface FiledRow { id: string; title: string; state: ThreadStateWord | null; approve: boolean; at: number; item: any }
+export interface FiledRow { id: string; title: string; state: ThreadStateWord | null; approve: boolean; here: boolean; at: number; item: any }
 
 /** Which tab each thread is in, the later lists winning, as App.tsx's `tabState` has it. */
 export function tabStates(tabs: Record<TabId, Row[]>): Map<string, ThreadStateWord> {
@@ -84,9 +84,13 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   const cutAt = nodes.findIndex((n) => lastOf(n) === gapAfter);
 
   const states = tabs ? tabStates(tabs) : new Map<string, ThreadStateWord>();
+  // Do here closes the task and sends its words up here, so "done" would claim work nothing has run yet.
+  const saidHere = events.filter((e) => e.kind !== 'work' && e.who !== 'it' && typeof e.text === 'string').map((e) => e.text as string);
   const filed: FiledRow[] = threadsMade(view.items, item).map((i: any) => {
     const state = states.get(`${i.product}/${i.id}`) ?? null;
-    return { id: i.id, title: i.label || i.title, state, approve: approvableFiled(i, state), at: i.createdAt ?? 0, item: i };
+    const head = doItHereWords({ id: i.id, title: String(i.title ?? '') }).split('\n')[0];
+    const here = state === 'done' && saidHere.some((t) => t.startsWith(head));
+    return { id: i.id, title: i.label || i.title, state, approve: approvableFiled(i, state), here, at: i.createdAt ?? 0, item: i };
   });
   const placed = filedOnTurn(events, filed);
   const waitingFiled = filed.filter((f) => f.approve);

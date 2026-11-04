@@ -3010,9 +3010,9 @@ export default function App() {
   // them whether or not the Groups page has been opened.
   const groupRows = useMemo(() => (snap?.alpha?.rooms && snap?.team?.rooms?.on ? mentionRows(snap.team.rooms.mentions) : []), [snap?.alpha?.rooms, snap?.team?.rooms]);
   const allLeads = useMemo(() => leadRows(
-    inviteRows(snap?.team?.invites, snap?.alpha?.rooms ? snap?.team?.rooms?.invites : []),
+    inviteRows(snap?.team?.invites),
     groupRows,
-  ), [snap?.team?.invites, snap?.alpha?.rooms, snap?.team?.rooms?.invites, groupRows]);
+  ), [snap?.team?.invites, groupRows]);
   const leadCount = allLeads.length;
   // One list by priority, unless someone chose Group by Who under View and filters.
   const [needsFolded, setNeedsFolded] = useState<ReadonlySet<string>>(() => new Set());
@@ -4026,16 +4026,13 @@ export default function App() {
   });
   // AN INVITATION IS ASKED, NEVER TAKEN UP ON ITS OWN: Join or Enter takes it.
   const joinInvite = async (r: InviteRow) => {
-    const out = r.kind === 'team' ? await api.teamAcceptInvite(r.id) : await api.rooms('acceptInvite', r.id);
+    const out = await api.teamAcceptInvite(r.id);
     showToast(out.ok ? 'Joined' : (out as { error?: string }).error ?? 'That invitation could not be taken up');
-    if (out.ok && r.kind === 'team') roomsUi.openTeamGroup();
+    if (out.ok) roomsUi.openTeamGroup();
     void refresh();
   };
-  // The Team page says more about a team. A group has no page to go to before you join it.
-  const openInvite = (r: InviteRow) => {
-    if (r.kind === 'team') { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }
-    else setCardSel(`lead/${r.key}`);
-  };
+  // The Team page says more about a team.
+  const openInvite = () => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); };
   const answerLead = (l: LeadRow) => {
     if (l.invite) void joinInvite(l.invite);
     else if (l.mention) roomsUi.openMention(l.mention);

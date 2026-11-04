@@ -56,11 +56,11 @@ describe('the room page', () => {
     expect(html).toContain('the-board');
     expect(html).not.toContain('rm-grid');
   });
-  it('still says it is just you, with the link, in a room of one', () => {
+  it('still says it is just you in a room of one, with no link to hand anyone', () => {
     const html = page(room([me], 1), board);
     expect(html).toContain('the-board');
     expect(html).toContain('It is just you in Northwind.');
-    expect(html).toContain('Copy link');
+    expect(html).not.toContain('Copy link');
   });
   it('does not say so once someone else is in it', () => {
     expect(page(room([me, maya], 2), board)).not.toContain('It is just you');

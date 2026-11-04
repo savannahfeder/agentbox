@@ -92,7 +92,7 @@ describe('a team invite', () => {
   });
   it('joining opens that group', () => {
     const app = readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-    expect(app).toMatch(/r\.kind === 'team'[\s\S]{0,400}openTeamGroup/);
+    expect(app).toMatch(/teamAcceptInvite[\s\S]{0,400}openTeamGroup/);
   });
 });
 

@@ -36,24 +36,24 @@ export function world(now = Date.now(), faces = {}) {
   const hr = 60 * min;
   const card = (id, name, extra = {}) => ({
     id, me: false, name, avatarUrl: faces[id] ?? null, headline: null, bio: null,
-    agents: 0, level: 12, hoursTotal: 80, hoursWeek: 9, hoursToday: 1.5, streak: 4,
+    agents: 0, hoursTotal: 80, hoursWeek: 9, hoursToday: 1.5, streak: 4,
     byMonth: [], teammate: false, showActivity: true, activity: null, status: null,
     workingOn: null, workingPrivate: false, ...extra,
   });
-  const me = card('p-me', 'Sam Rivera', { me: true, teammate: true, agents: 3, level: 31, workingOn: 'Groups: one place to talk and see work' });
-  const maya = card('p-maya', 'Maya Chen', { teammate: true, agents: 5, level: 44, workingOn: 'Billing page moves to Stripe checkout' });
-  const theo = card('p-theo', 'Theo Park', { teammate: true, agents: 2, level: 18, workingOn: 'Phone app: reply from the lock screen' });
-  const priya = card('p-priya', 'Priya Nair', { teammate: true, agents: 0, level: 27, status: 'In interviews until 3pm' });
+  const me = card('p-me', 'Sam Rivera', { me: true, teammate: true, agents: 3, workingOn: 'Groups: one place to talk and see work' });
+  const maya = card('p-maya', 'Maya Chen', { teammate: true, agents: 5, workingOn: 'Billing page moves to Stripe checkout' });
+  const theo = card('p-theo', 'Theo Park', { teammate: true, agents: 2, workingOn: 'Phone app: reply from the lock screen' });
+  const priya = card('p-priya', 'Priya Nair', { teammate: true, agents: 0, status: 'In interviews until 3pm' });
   const act = (title, project, state, ago) => ({ title, project, state, at: now - ago });
-  const jonah = card('p-jonah', 'Jonah Weiss', { agents: 4, level: 52, workingOn: 'Eval harness for the pricing model', activity: [
+  const jonah = card('p-jonah', 'Jonah Weiss', { agents: 4, workingOn: 'Eval harness for the pricing model', activity: [
     act('Eval harness for the pricing model', 'Pricing', 'running', 70 * min), act('Fix flaky checkout test', 'Pricing', 'done', 3.2 * hr), act('Price page A/B copy', 'Pricing', 'done', 25 * min)] });
-  const ines = card('p-ines', 'Ines Duarte', { agents: 1, level: 9, workingOn: 'Landing page copy, round 3', activity: [
+  const ines = card('p-ines', 'Ines Duarte', { agents: 1, workingOn: 'Landing page copy, round 3', activity: [
     act('Landing page copy, round 3', 'Site', 'running', 35 * min), act('Landing page copy, round 2', 'Site', 'done', 2.4 * hr)] });
-  const kai = card('p-kai', 'Kai Moreno', { agents: 6, level: 61, workingOn: 'Migrating the ledger to Postgres', activity: [
+  const kai = card('p-kai', 'Kai Moreno', { agents: 6, workingOn: 'Migrating the ledger to Postgres', activity: [
     act('Migrating the ledger to Postgres', 'Ledger', 'running', 2.1 * hr), act('Backfill script for old rows', 'Ledger', 'done', 55 * min),
     act('Index on account and day', 'Ledger', 'done', 18 * min), act('Read replica for reports', 'Ledger', 'running', 8 * min)] });
-  const lena = card('p-lena', 'Lena Fischer', { agents: 0, level: 15, workingPrivate: true });
-  const omar = card('p-omar', 'Omar Haddad', { agents: 2, level: 22, workingOn: 'Onboarding emails', activity: [
+  const lena = card('p-lena', 'Lena Fischer', { agents: 0, workingPrivate: true });
+  const omar = card('p-omar', 'Omar Haddad', { agents: 2, workingOn: 'Onboarding emails', activity: [
     act('Onboarding emails', 'Growth', 'running', 50 * min), act('Welcome email subject lines', 'Growth', 'done', 1.4 * hr)] });
   const team = [me, maya, theo, priya];
   const general = [me, jonah, ines, kai, lena, omar, maya];
