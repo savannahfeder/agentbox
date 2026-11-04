@@ -233,6 +233,7 @@ import { revealLine } from './reveal-line';
 import { FoundInside } from './components/FoundInside';
 import type { PlaceAct } from './threads/ThreadMenu';
 import { SignInPage } from './team/SignInPage';
+import { SIGN_IN_TO_SHARE } from './components/ShareLink';
 import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
 import { inboxEveryone, mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 import { boardStops, leadStops, listStops, stepFromPlace, stepStop, stopKey, type PageStop, type Stop } from './threads/walk-rules';
@@ -816,6 +817,14 @@ export default function App() {
   const [cloudSetupOpen, setCloudSetupOpen] = useState(false);
   // Settings › Phone's own sign-in, for a build whose team version is off.
   const [phoneSignInOpen, setPhoneSignInOpen] = useState(false);
+  // Share's "Sign in", pressed inside a file opened big (ShareLink.tsx).
+  const [shareSignInOpen, setShareSignInOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setShareSignInOpen(true);
+    window.addEventListener(SIGN_IN_TO_SHARE, open);
+    return () => window.removeEventListener(SIGN_IN_TO_SHARE, open);
+  }, []);
+  const closeAccountSignIn = useCallback(() => { setPhoneSignInOpen(false); setShareSignInOpen(false); }, []);
   useEffect(() => { if (snap?.team?.signedIn) setPhoneSignInOpen(false); }, [snap?.team?.signedIn]);
   // The account a cloud sign-in started from Settings is for, so its page can say whom to sign in as.
   const [cloudSignInAs, setCloudSignInAs] = useState<string | null>(null);
@@ -8847,8 +8856,8 @@ export default function App() {
       {/* Offered and nobody signed in yet: the app's own sign-in page first.
           Signing in sets the cloud up, and the same open state then shows
           the setup's accounts. */}
-      {phoneSignInOpen && snap?.team && !snap.team.signedIn && (
-        drawnIn(<SignInPage purpose="phone" waitingUrl={snap.team.signingIn?.url ?? null} onClose={() => setPhoneSignInOpen(false)} onSignedIn={() => setPhoneSignInOpen(false)} />, document.body)
+      {(phoneSignInOpen || shareSignInOpen) && snap?.team && !snap.team.signedIn && (
+        drawnIn(<SignInPage purpose={shareSignInOpen ? 'share' : 'phone'} waitingUrl={snap.team.signingIn?.url ?? null} onClose={closeAccountSignIn} onSignedIn={closeAccountSignIn} />, document.body)
       )}
       {cloudSetupOpen && !snap.cloud?.setUp && snap.cloud?.offered && (
         drawnIn(<SignInPage purpose="cloud" onClose={() => setCloudSetupOpen(false)} onSignedIn={() => setCloudSetupOpen(true)} />, document.body)

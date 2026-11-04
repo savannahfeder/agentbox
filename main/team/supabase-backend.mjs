@@ -311,6 +311,25 @@ export function supabaseBackend(client) {
       must(await gone, 'clearing files a thread no longer names');
     },
 
+    // A FILE ANYONE WITH ITS LINK CAN READ: only through the functions in
+    // 20261105000000_a_file_anyone_with_its_link_can_read.sql.
+    async shareFile({ source, name, kind, type, body, version = 1 }) {
+      await myId();
+      return must(await client.rpc('share_file', { src: source, nm: name, k: kind, typ: type, b: body, v: version }), 'sharing the file');
+    },
+
+    async fileLinkFor(source) {
+      await myId();
+      const rows = must(await client.rpc('my_file_link', { src: source }), 'asking for the file\'s link');
+      const r = rows?.[0];
+      return r ? { token: r.token, version: r.version, updatedAt: Date.parse(r.updated_at), comments: r.comments } : null;
+    },
+
+    async stopFileLink(token) {
+      await myId();
+      must(await client.rpc('stop_file_link', { tok: token }), 'stopping the link');
+    },
+
     async getThreadFile(owner, threadId, name) {
       const rows = must(await client.from('thread_work_files').select('data').eq('person_id', owner).eq('thread_id', threadId).eq('name', name).limit(1), 'taking a file from a teammate\'s thread');
       return rows[0]?.data ?? null;

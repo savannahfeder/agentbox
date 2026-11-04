@@ -44,6 +44,7 @@ import { artifactRoots, resolveArtifact } from './artifact-path.mjs';
 import { folderPictures } from './folder-pictures.mjs';
 import { docUrl } from './doc-scheme.mjs';
 import { readDoc, writeDoc } from './doc-file.mjs';
+import { fileForLink, linkSource } from './file-link.mjs';
 import { readItemHistory } from './store/work-items.mjs';
 import { readChange } from './code-change.mjs';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mjs';
@@ -2388,6 +2389,25 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     if (!found.ok) return found;
     return { ...readDoc({ file: found.path }), ...(found.carry ? { carry: found.carry } : {}) };
   });
+
+  // A LINK ANYONE CAN OPEN, to one of this person's files (main/file-link.mjs).
+  const linkOf = ({ product, thread, family } = {}) => linkSource(product, thread, family);
+  const linkCall = (fn) => async (_e, arg = {}) => {
+    if (!team?.fileLink) return { ok: false, error: 'This copy has no cloud to share files on.' };
+    try { return { ok: true, ...(await fn(arg)) }; } catch (err) { return { ok: false, error: String(err?.message ?? err) }; }
+  };
+  ipcMain.handle('zero:file-link', linkCall((arg) => team.fileLink(linkOf(arg))));
+  ipcMain.handle('zero:file-link-share', linkCall(async ({ product, src, thread, family, version } = {}) => {
+    const found = await resolveArtifact({
+      src, product, thread: typeof thread === 'string' ? thread : null,
+      products: readableProducts(), accountRoot: config.accountRoot, storeRoot: config.storeRoot, nameOf: team?.firstNameOf,
+    });
+    if (!found.ok) throw new Error(found.error || 'This file is not on this computer.');
+    const file = fileForLink(found.path);
+    if (file.error) throw new Error(file.error);
+    return team.shareFile({ source: linkOf({ product, thread, family }), name: path.basename(found.path), ...file, version: Number.isInteger(version) ? version : 1 });
+  }));
+  ipcMain.handle('zero:file-link-stop', linkCall(async ({ token } = {}) => { await team.stopFileLink(String(token ?? '')); return {}; }));
 
   // "Try again" on a file in a conversation that was not delivered.
   ipcMain.handle('zero:retry-file', async (_e, { product, src } = {}) => (team?.retryFile ? team.retryFile({ product, src }) : false));

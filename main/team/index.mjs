@@ -36,6 +36,7 @@ import { createRooms } from './rooms.mjs';
 import { noticeEndedWaits } from './waits.mjs';
 import { handOverDepartures } from './departures.mjs';
 import { mateCard, splitCards } from '../../shared/mate-cards.mjs';
+import { linkAddress, linkSiteFor } from '../file-link.mjs';
 
 // `signingIn` is { url } while a Google sign-in waits on the browser, so the
 // page can offer that link again rather than a button that does nothing.
@@ -59,6 +60,8 @@ export function createTeamService({
   // projects she put on it (slugs), how a command from it is done, and where
   // this Mac remembers what it sent. Needs no team, only a sign-in.
   phone = null,
+  // Where a file's link opens; the phone site unless said.
+  shareSite = undefined,
   // ROOMS (alpha, docs/team/ROOMS-PLAN.md): { enabled, device, presenceFacts, prefsFile }.
   rooms: roomsSetup = null,
   // The threads an agent is on right now, by id, so a card says so.
@@ -69,6 +72,7 @@ export function createTeamService({
   // The phone site's address, only an https one, and its code for Settings.
   const site = typeof phone?.site === 'string' && /^https:\/\/[^\s/]+(\/[^\s]*)?$/.test(phone.site) ? phone.site : null;
   let siteQr = null;
+  const linkSite = linkSiteFor(shareSite === undefined ? site : shareSite);
   // `settling` holds the window's boot screen until the team is known, so it
   // never draws the single-person app first and then redraws with the team.
   // `canSignIn` survives teamForWindow, so a build with Multiplayer off still asks.
@@ -967,6 +971,24 @@ export function createTeamService({
       if (!dir || !sync?.retryCarried || !(await sync.retryCarried(dir, plainRef(String(src ?? ''))))) return false;
       await syncNow();
       return true;
+    },
+    /** This person's live link for one of their files, or why there is none. */
+    async fileLink(source) {
+      if (!linkSite) return { site: null, signedIn: !!state.me, link: null };
+      if (!backend?.fileLinkFor || !state.me) return { site: linkSite, signedIn: false, link: null };
+      const l = await backend.fileLinkFor(source);
+      return { site: linkSite, signedIn: true, link: l ? { ...l, url: linkAddress(linkSite, l.token) } : null };
+    },
+    /** Shares the file, or puts this copy of it in its live link. */
+    async shareFile({ source, name, kind, type, body, version }) {
+      if (!linkSite) throw new Error('This cloud has no website to share files on.');
+      if (!backend?.shareFile || !state.me) throw new Error('Sign in to share a link.');
+      await backend.shareFile({ source, name, kind, type, body, version });
+      return this.fileLink(source);
+    },
+    async stopFileLink(token) {
+      if (!backend?.stopFileLink || !state.me) throw new Error('Sign in first.');
+      await backend.stopFileLink(token);
     },
     /** A first name for the tile that says whose computer a file waits for. */
     firstNameOf: (id) => (state.people ?? []).find((p) => p.id === id)?.name?.split(/\s+/)[0] ?? null,

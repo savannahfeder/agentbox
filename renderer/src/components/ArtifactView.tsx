@@ -28,7 +28,10 @@ import { CrossIcon } from './CrossIcon';
 import { DocText } from './DocText';
 import { FileNoteCard } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
+import { ShareLink } from './ShareLink';
 import './artifact-view.css';
+
+const LINK_KINDS = new Set(['markdown', 'page', 'image', 'pdf']);
 
 /** `steps`: the paths the arrows step through, in order, when the press came from a turn of the thread. */
 export interface ArtifactOpen { path?: string; file?: string; note?: string; at?: number; steps?: string[] }
@@ -659,6 +662,9 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
         {editing && editWord && <span className="av-saved" role="status">{editWord}</span>}
         {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
         {canRestore && !compare && !editing && <button type="button" className="av-btn" disabled={restoring} onClick={() => void restore()}><NoteGlyph name="undo" />Restore this version</button>}
+        {thread && family && version && foundNow === 'open' && !compare && !editing && kind && LINK_KINDS.has(kind) && (
+          <ShareLink product={product} thread={thread} family={family.key} path={version.path} version={version.n} signedIn={!!me} />
+        )}
         {onOutside && version && foundNow === 'open' && <button type="button" className="av-btn" onClick={() => onOutside(version.path)}><NoteGlyph name="outside" />Open outside</button>}
         <button type="button" className="av-btn av-leave" onClick={leave} title="Back (esc)"><NoteGlyph name="back" />Back</button>
       </header>

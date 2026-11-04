@@ -1,0 +1,108 @@
+// SHARING A FILE AGAIN KEEPS ITS LINK, AND STOPPING IT ENDS IT.
+//
+// Shareable files (w-d7e61eb261). The Share button in a file opened big asks
+// the team service for the file's link, makes it, puts a newer version in it
+// and stops it. Measured here against the memory cloud the stand-in serves,
+// with the same calls the database half answers
+// (a-shared-file-link-shows-strangers-that-file-and-nothing-else): the link
+// stays one address across versions, a stopped one is a new address next
+// time, nobody signed out can share, and a copy whose cloud has no website
+// offers nothing.
+import { it, expect, beforeEach, describe } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import * as disk from '../main/store/work-items.mjs';
+import { Store } from '../main/store.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
+import { createTeamService } from '../main/team/index.mjs';
+import { memorySession } from '../main/team/session.mjs';
+import { linkSiteFor } from '../main/file-link.mjs';
+import { PHONE_SITE } from '../shared/cloud-address.mjs';
+import { linkOffer } from '../renderer/src/components/ShareLink.tsx';
+
+async function aMac(cloud, personId, site = 'https://app.agentbox.ac') {
+  const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'file-link-'));
+  const accountRoot = path.join(storeRoot, 'accounts', 'a');
+  fs.mkdirSync(accountRoot, { recursive: true });
+  const store = await new Store({ storeRoot, accountId: 'a', accountRoot, products: [] }).init();
+  return createTeamService({
+    session: memorySession(() => memoryBackend(cloud, personId)),
+    store, disk, accountRoot, stateFile: path.join(storeRoot, '.team-sync.json'), intervalMs: 3_600_000,
+    shareSite: site,
+  });
+}
+const SOURCE = 'agentbox-team/w-1/plan.md';
+const file = (v, body = `# Plan v${v}`) => ({ source: SOURCE, name: 'plan.md', kind: 'markdown', type: 'text/markdown', body, version: v });
+
+let cloud, maya;
+beforeEach(async () => {
+  disk._internals.forgetFolds();
+  cloud = createMemoryCloud();
+  maya = await aMac(cloud, signUpMemory(cloud, { email: 'maya@lumen.test', name: 'Maya Chen' }));
+});
+
+describe('signed in', () => {
+  beforeEach(() => maya.signIn());
+
+  it('a file with no link says so, then shares to an address on the site', async () => {
+    expect(await maya.fileLink(SOURCE)).toEqual({ site: 'https://app.agentbox.ac', signedIn: true, link: null });
+    const made = await maya.shareFile(file(1));
+    expect(made.link.url).toMatch(/^https:\/\/app\.agentbox\.ac\/f\/[0-9a-f]{40}$/);
+    expect(made.link).toMatchObject({ version: 1, comments: 0 });
+  });
+
+  it('a newer version goes into the same link', async () => {
+    const first = (await maya.shareFile(file(1))).link;
+    const second = (await maya.shareFile(file(3))).link;
+    expect(second.url).toBe(first.url);
+    expect(second.version).toBe(3);
+    expect([...cloud.fileLinks.values()][0].body).toBe('# Plan v3');
+  });
+
+  it('stopping ends the link, and sharing again makes a new one', async () => {
+    const first = (await maya.shareFile(file(1))).link;
+    await maya.stopFileLink(first.token);
+    expect((await maya.fileLink(SOURCE)).link).toBeNull();
+    expect(cloud.fileLinks.get(first.token)).toMatchObject({ body: '' });
+    expect((await maya.shareFile(file(1))).link.url).not.toBe(first.url);
+  });
+
+  it('another person cannot stop it', async () => {
+    const first = (await maya.shareFile(file(1))).link;
+    const jun = memoryBackend(cloud, signUpMemory(cloud, { email: 'jun@else.test', name: 'Jun' }));
+    await jun.stopFileLink(first.token);
+    expect((await maya.fileLink(SOURCE)).link?.token).toBe(first.token);
+  });
+
+  it('refuses what a link cannot draw', async () => {
+    await expect(maya.shareFile({ ...file(1), kind: 'film' })).rejects.toThrow(/cannot draw/);
+  });
+});
+
+it('signed out, it says so and shares nothing', async () => {
+  expect(await maya.fileLink(SOURCE)).toEqual({ site: 'https://app.agentbox.ac', signedIn: false, link: null });
+  await expect(maya.shareFile(file(1))).rejects.toThrow(/Sign in/);
+  expect(cloud.fileLinks.size).toBe(0);
+});
+
+it('a cloud with no website offers no link at all', async () => {
+  const bare = await aMac(cloud, signUpMemory(cloud, { email: 'x@else.test', name: 'X' }), null);
+  await bare.signIn();
+  expect((await bare.fileLink(SOURCE)).site).toBeNull();
+  await expect(bare.shareFile(file(1))).rejects.toThrow(/no website/);
+});
+
+it('links on our cloud read as app.agentbox.ac, whichever address the phone site has', () => {
+  expect(linkSiteFor(PHONE_SITE)).toBe('https://app.agentbox.ac');
+  expect(linkSiteFor('https://app.agentbox.ac/')).toBe('https://app.agentbox.ac');
+  expect(linkSiteFor('https://phone.other-team.test')).toBe('https://phone.other-team.test');
+  expect(linkSiteFor(null)).toBeNull();
+});
+
+it('the panel offers the version on screen when the link holds another', () => {
+  const link = { token: 't', url: 'u', version: 2, updatedAt: 0, comments: 0 };
+  expect(linkOffer({ ok: true, link }, 2)).toEqual({ link, behind: false });
+  expect(linkOffer({ ok: true, link }, 3)).toEqual({ link, behind: true });
+  expect(linkOffer({ ok: true, link: null }, 3)).toEqual({ link: null, behind: false });
+});

@@ -19,6 +19,8 @@ import { appendTo, cleanEntry, foldLine } from '../../shared/version-line.mjs';
 // The database's own checks on a message's file (20261013000000_message_files.sql).
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$/;
 const MAX_FILE_DATA = 14_000_000;
+const LINK_KINDS = new Set(['markdown', 'page', 'image', 'pdf']);
+const MAX_LINK_BODY = 8_400_000;
 const MAX_PIECE_BYTES = 10 * 1024 * 1024;
 const MAX_WORK_BYTES = 1_000_000;
 const MAX_COMMENT_CHARS = 4000;
@@ -44,6 +46,8 @@ export function createMemoryCloud() {
     fileFolders: [], // { id, teamId, project, name, parent, people, by, at }
     filePlaces: [], // { owner, threadId, project, family, folder, by, at }
     fileVersions: [], // { teamId, file, n, hash, name, by, at }
+    fileLinks: new Map(), // token -> { token, owner, source, name, kind, type, body, version, updatedAt, stoppedAt }
+    fileLinkComments: [], // { id, token, by, text, at }
     reads: new Map(), // `${projectId}:${itemId}:${personId}` -> { projectId, itemId, personId, at }
     seq: 0,
     teamsMade: 0, // the order teams were made in, which is their age
@@ -355,6 +359,62 @@ export function memoryBackend(cloud, personId) {
       for (const [k, f] of [...cloud.threadFiles]) {
         if (f.owner === personId && f.threadId === threadId && !keep.includes(f.name)) cloud.threadFiles.delete(k);
       }
+    },
+
+    // A FILE ANYONE WITH ITS LINK CAN READ, as
+    // 20261105000000_a_file_anyone_with_its_link_can_read.sql keeps it.
+    async shareFile({ source, name, kind, type, body, version = 1 }) {
+      if (!LINK_KINDS.has(kind)) refuse('a link to a file it cannot draw');
+      if (String(body ?? '').length > MAX_LINK_BODY) refuse('a link to a file that big');
+      const live = [...cloud.fileLinks.values()].find((l) => l.owner === personId && l.source === source && !l.stoppedAt);
+      const fields = { name, kind, type, body, version: Math.max(1, version | 0), updatedAt: cloud.now() };
+      if (live) { Object.assign(live, fields); return live.token; }
+      const token = crypto.randomBytes(20).toString('hex');
+      cloud.fileLinks.set(token, { token, owner: personId, source, ...fields, stoppedAt: null });
+      return token;
+    },
+
+    async fileLinkFor(source) {
+      const l = [...cloud.fileLinks.values()].find((x) => x.owner === personId && x.source === source && !x.stoppedAt);
+      return l ? { token: l.token, version: l.version, updatedAt: l.updatedAt, comments: cloud.fileLinkComments.filter((c) => c.token === l.token).length } : null;
+    },
+
+    async stopFileLink(token) {
+      const l = cloud.fileLinks.get(token);
+      if (l && l.owner === personId && !l.stoppedAt) Object.assign(l, { stoppedAt: cloud.now(), body: '' });
+    },
+
+    // What anyone with the link reads (file_link_view, file_link_comments_of).
+    async fileLinkView(token) {
+      const l = cloud.fileLinks.get(token);
+      if (!l || l.stoppedAt) return { stopped: !!l, file: null };
+      const owner = cloud.people.get(l.owner);
+      return { stopped: false, file: { name: l.name, kind: l.kind, type: l.type, body: l.body, version: l.version, updatedAt: l.updatedAt, ownerName: owner?.name || null, ownerAvatar: owner?.avatarUrl ?? null, mine: l.owner === personId } };
+    },
+
+    async fileLinkComments(token) {
+      const l = cloud.fileLinks.get(token);
+      if (!l || l.stoppedAt) return [];
+      return cloud.fileLinkComments.filter((c) => c.token === token).map((c) => {
+        const p = cloud.people.get(c.by);
+        return { id: c.id, byName: p?.name || 'Someone', byAvatar: p?.avatarUrl ?? null, text: c.text, at: c.at, mine: c.by === personId, byOwner: c.by === l.owner };
+      });
+    },
+
+    async commentOnFileLink(token, text) {
+      const l = cloud.fileLinks.get(token);
+      if (!l || l.stoppedAt) refuse('comment on a stopped link');
+      const clean = String(text ?? '').trim();
+      if (!clean || clean.length > 4000) refuse('a comment with nothing in it, or that long');
+      const row = { id: crypto.randomUUID(), token, by: personId, text: clean, at: cloud.now() };
+      cloud.fileLinkComments.push(row);
+      return row.id;
+    },
+
+    async removeFileLinkComment(id) {
+      const c = cloud.fileLinkComments.find((x) => x.id === id);
+      if (!c || (c.by !== personId && cloud.fileLinks.get(c.token)?.owner !== personId)) return;
+      cloud.fileLinkComments.splice(cloud.fileLinkComments.indexOf(c), 1);
     },
 
     async getThreadFile(owner, threadId, name) {

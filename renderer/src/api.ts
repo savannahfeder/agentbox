@@ -14,6 +14,11 @@ import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine } from '
 import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import type { CarryState } from '../../shared/carried-files.mjs';
+
+export interface FileLinkAsk { product: string; thread: string; family: string }
+export interface FileLink { token: string; url: string; version: number; updatedAt: number; comments: number }
+/** `site` null: this copy's cloud has no website, so there is nothing to share on. */
+export interface FileLinkState { ok: boolean; error?: string; site?: string | null; signedIn?: boolean; link?: FileLink | null }
 import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
 import { whileSystemWindowIsOpen } from './system-window';
 import { USAGE_SAME_AS_ANOTHER, USAGE_UNREADABLE } from '../../shared/usage.mjs';
@@ -30,9 +35,11 @@ import { traceReader } from '../../shared/trace-delta.mjs';
 // remember to, and no import order anywhere can get it wrong.
 import { installBrowserBridge } from './browser-bridge';
 import { installCloudBridge } from './cloud-bridge';
+import { onASharedFilePage } from './shared-file/route';
 
 // The Mac's own page first; the phone with the Mac shut only on its own site.
-if (!installBrowserBridge()) installCloudBridge();
+// A shared file's page is neither: it is for people with no app at all.
+if (!onASharedFilePage() && !installBrowserBridge()) installCloudBridge();
 
 // A team call, in words: a build or a window with no team door says so rather
 // than throwing somewhere the person cannot see. Below the bridge's install,
@@ -710,6 +717,23 @@ export const api = {
     const zero = window.zero as any;
     if (!zero?.readDoc) return { ok: false, error: `quit and reopen ${NAME} to open documents here` };
     return zero.readDoc(p);
+  },
+
+  /** A link anyone can open, to one of this person's files (main/file-link.mjs). */
+  async fileLink(p: FileLinkAsk): Promise<FileLinkState> {
+    const zero = window.zero as any;
+    if (!zero?.fileLink) return { ok: false, error: 'not here' };
+    return zero.fileLink(p);
+  },
+  async fileLinkShare(p: FileLinkAsk & { src: string; version: number }): Promise<FileLinkState> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinkShare) return { ok: false, error: `quit and reopen ${NAME} to share files` };
+    return zero.fileLinkShare(p);
+  },
+  async fileLinkStop(p: { token: string }): Promise<{ ok: boolean; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinkStop) return { ok: false, error: `quit and reopen ${NAME} to share files` };
+    return zero.fileLinkStop(p);
   },
 
   /** "Try again" on a file in a conversation that was not delivered. */
