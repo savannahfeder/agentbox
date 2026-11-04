@@ -105,6 +105,15 @@ describe('a row that names its own model', () => {
     expect(modelOf({ model: 'claude-opus-5' })).toBe('claude-opus-5');
   });
 
+  // The owner, 2026-11-04: "if the user selects a model, that should
+  // definitely be the one that gets applied." A reply goes back to the session
+  // that wrote what it answers, so the pick has to ride that resume too.
+  it('reaches a reply that resumes the thread\'s own session', () => {
+    const plan = supervisor(FOSSIL).spawnPlan(row({ model: 'sonnet', answer: 'make it faster' }), product, { engine: 'claude', continuation: true, resumeSessionId: 'session-abc' });
+    expect(plan.args).toContain('--resume');
+    expect(flagIn(plan.args)).toBe('sonnet');
+  });
+
   it('is sent once, rewriting the config\'s flag rather than landing beside it', () => {
     const args = supervisor(FOSSIL).spawnPlan(row({ model: 'sonnet' }), product, { engine: 'claude' }).args;
     expect(args.filter((a) => a === '--model' || String(a).startsWith('--model=')).length).toBe(1);
