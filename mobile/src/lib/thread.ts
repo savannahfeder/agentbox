@@ -6,6 +6,7 @@
 import { itemThread } from '../../../renderer/src/item-thread';
 import { itemOptions, offerIsLive, optionsFrom, stripOptionsSection, type ParsedOption } from '../../../renderer/src/format';
 import { rowTitle } from '../../../renderer/src/list-rules';
+import { pageTitle } from '../../../renderer/src/one-thing-at-a-time';
 import { askLine } from '../../../renderer/src/ask-line';
 import { phoneHistory, type PhoneRows, type phoneView } from '../../../renderer/src/phone-rows';
 import { approvalReads } from '../../../renderer/src/approval-card';
@@ -44,8 +45,10 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   if (!item) return null;
   const { lines } = phoneHistory(rows, product, id, view.aliases);
   const mine = view.waiting.filter((w) => w.product === product && w.id === id);
-  // A thread sent from here that the computer has not taken: its message is the first thing she said.
-  const sent = item.waitsForMac && String(item.body ?? '').trim() ? [{ at: item.createdAt ?? 0, text: String(item.body) }] : [];
+  // A thread sent from here that the computer has not taken: its message is the first thing she said,
+  // unless the title on the page already says all of it.
+  const message = String(item.body || item.title || '').trim();
+  const sent = item.waitsForMac && message && message !== pageTitle(item).trim() ? [{ at: item.createdAt ?? 0, text: message }] : [];
   const pending = [...sent, ...mine.map((w) => ({ at: w.at, text: w.text, ...(w.refused ? { refused: w.refused } : {}) }))];
   // A reply Agentbox Cloud took with the computer away says so (shared/cloud-kit.mjs).
   const inCloud = new Set(mine.filter((w) => w.cloud).map((w) => w.at));

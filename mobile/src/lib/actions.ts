@@ -50,8 +50,8 @@ export interface Plan {
   undo?: (made: any) => Step[];
   /** What the toast says once Undo has worked. */
   undone?: (made: any) => string;
-  /** The thread a tap on the toast opens, when it is not the one pressed. */
-  goes?: { product: string; id: string };
+  /** The thread a tap on the toast opens, when it is not the one pressed; null for none. */
+  goes?: { product: string; id: string } | null;
 }
 export interface PressedItem { product: string; id: string; status: string; title?: string; productName?: string; runAt?: number | null; snoozedUntil?: number | null; waitsForMac?: boolean }
 /** Where the computer is: away, and whether Agentbox Cloud starts what is sent meanwhile. */
@@ -119,6 +119,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
   const close = (): Plan => (item.waitsForMac ? {
     steps: [{ door: 'answer', payload: { ...on, status: 'done' } }],
     toast: `Withdrawn: ${clipToSentence(item.title ?? '', TOAST_TITLE)}. It never reached your computer.`,
+    goes: null,
   } : {
     steps: [{ door: 'answer', payload: { ...on, status: 'done' } }],
     toast: `${DONE.verb}: ${clipToSentence(item.title ?? '', TOAST_TITLE)}${UNDO}`,
@@ -162,7 +163,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
     case 'stop':
       return { steps: [{ door: 'stopSession', payload: on }], toast: 'Stop sent. Your computer stops the agent when it gets it.' };
     case 'run-now':
-      return { steps: [{ door: 'runNow', payload: on }], toast: waits ? 'Up next. It starts as soon as your computer is back.' : 'Up next. It starts as soon as an agent is free.' };
+      return { steps: [{ door: 'runNow', payload: on }], toast: waits ? 'Up next once your computer is back.' : 'Up next. It starts as soon as an agent is free.' };
     case 'move-to-cloud':
       return { steps: [{ door: 'moveToCloud', payload: { ...on, ids: [item.id] } }], toast: 'Moving to the cloud. It keeps working until the cloud has room.' };
     case 'send-back':

@@ -19,7 +19,7 @@ const away = { away: true, cloud: false };
 
 describe('Run now', () => {
   it('while the computer is away, says it runs when the computer is back', () => {
-    expect(planFor({ kind: 'run-now' }, item, NOW, away).toast).toBe('Up next. It starts as soon as your computer is back.');
+    expect(planFor({ kind: 'run-now' }, item, NOW, away).toast).toBe('Up next once your computer is back.');
   });
   it('while the computer is here, says it waits for a free agent, as before', () => {
     expect(planFor({ kind: 'run-now' }, item, NOW).toast).toBe('Up next. It starts as soon as an agent is free.');
@@ -48,6 +48,8 @@ describe('closing', () => {
     const plan = planFor({ kind: 'close' }, { ...item, waitsForMac: true }, NOW, away);
     expect(plan.toast).toBe('Withdrawn: Rate limiter. It never reached your computer.');
     expect(plan.undo).toBeUndefined();
+    // Names no thread, since there is none to open, so the toast wraps whole rather than cut to one line.
+    expect(plan.goes).toBeNull();
   });
   it('a thread the computer has says Done, with Undo, as before', () => {
     const plan = planFor({ kind: 'close' }, item, NOW, away);

@@ -89,11 +89,9 @@ export function previewRows(now = Date.now()): PhoneRows {
       ]),
       // Two runs of the daily report (previewSettings' repeating tasks): one quiet, one with news.
       thread('agentbox', { id: 'w-r1a2b3c4d5', title: 'Daily report', labels: ['repeat:r-preview-1', 'clean'], status: 'done', priority: 5, body: 'Write the daily report.', result: 'Nothing new since yesterday.', createdAt: at(26 * 60), updatedAt: at(26 * 60 - 6), wrote: { status: agent(at(26 * 60 - 6)) } }, [
-        { ts: at(26 * 60), source: 'system', patch: { title: 'Daily report', body: 'Write the daily report.', status: 'open' } },
         { ts: at(26 * 60 - 6), source: 'agent', patch: { result: 'Nothing new since yesterday.', status: 'done' } },
       ]),
       thread('agentbox', { id: 'w-r2b3c4d5e6', title: 'Daily report', labels: ['repeat:r-preview-1'], status: 'done', priority: 5, body: 'Write the daily report.', result: 'Two sign-ups failed at the email step. The fix is in its own thread.', createdAt: at(120), updatedAt: at(112), wrote: { status: agent(at(112)) } }, [
-        { ts: at(120), source: 'system', patch: { title: 'Daily report', body: 'Write the daily report.', status: 'open' } },
         { ts: at(112), source: 'agent', patch: { result: 'Two sign-ups failed at the email step. The fix is in its own thread.', status: 'done' } },
       ]),
       // Two teammates' runs (previewTeammates): one waiting on you, signed; one working.

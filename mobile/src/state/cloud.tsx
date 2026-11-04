@@ -242,7 +242,7 @@ function useCloudState() {
     const made = await runSteps(sender, plan.steps);
     if (made && typeof made === 'object' && 'ok' in made && made.ok === false) throw new Error(String((made as { error?: string }).error ?? 'Not sent.'));
     if (plan.toast && !opts.quiet) {
-      const goes = plan.goes ?? (item ? { product: item.product, id: item.id } : made?.id ? { product: made.product, id: made.id } : undefined);
+      const goes = plan.goes !== undefined ? plan.goes ?? undefined : item ? { product: item.product, id: item.id } : made?.id ? { product: made.product, id: made.id } : undefined;
       say(plan.toast, plan.undo ? async () => {
         try {
           await runSteps(sender, plan.undo!(made));

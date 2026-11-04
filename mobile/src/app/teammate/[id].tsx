@@ -188,7 +188,7 @@ export default function TeammateChat() {
         {(t.paused || asked !== null) && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44, paddingHorizontal: size.inset, borderTopWidth: 1, borderTopColor: color.line }}>
             <T style={{ flex: 1, fontSize: 13.5, lineHeight: 20, color: color.dim }}>
-              {asked === false ? `Resuming when your computer gets this` : asked === true ? `Pausing when your computer gets this` : `${t.name} is paused`}
+              {asked === false ? 'Resuming when your computer gets this' : asked === true ? 'Pausing when your computer gets this' : 'Your messages wait until you resume it'}
             </T>
             {asked === null && (
               <Pressable disabled={busy} onPress={() => void setPaused(false)} accessibilityRole="button"

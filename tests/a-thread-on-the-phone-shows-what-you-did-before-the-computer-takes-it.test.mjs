@@ -30,6 +30,18 @@ describe('a thread sent from the phone', () => {
     expect(yours(t)).toMatchObject([{ text: 'Add a rate limiter to the login endpoint, 5 tries a minute.', pending: true }]);
   });
 
+  it('a long one-line message, sent whole as its title and shortened on the page, shows whole', () => {
+    const long = 'Find the slowest endpoint in the API, tell me why it is slow, and suggest two fixes with the trade-offs of each one';
+    const one = cmd({ id: 'c-3', kind: 'new', payload: { title: long, body: '' } });
+    const t = open({ projects, threads: [], commands: [one] }, madeHere(one.id));
+    expect(yours(t)).toMatchObject([{ text: long, pending: true }]);
+  });
+
+  it('a short one-line message is its title, already on the page, so it is not said twice', () => {
+    const short = cmd({ id: 'c-4', kind: 'new', payload: { title: 'Fix the rate limiter', body: '' } });
+    expect(yours(open({ projects, threads: [], commands: [short] }, madeHere(short.id)))).toEqual([]);
+  });
+
   it('once the computer has its own copy, shows that copy and not a second message', () => {
     const taken = { ...sent, taken_at: iso(NOW - 30_000), outcome: 'ok' };
     const id = madeHere(sent.id);

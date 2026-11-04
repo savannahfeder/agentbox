@@ -40,7 +40,7 @@ export function ActLine({ act, joined }: { act: any; joined?: boolean }) {
         {words.lead}
         {words.choice ? <T style={{ fontSize: 13, color: color.text }}>{` ${words.choice}`}</T> : null}
       </T>
-      <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.44, color: color.faint }}>{actWhen(act.at)}</T>
+      <T numberOfLines={1} style={{ flexShrink: 0, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.44, color: color.faint }}>{actWhen(act.at)}</T>
     </View>
   );
 }
