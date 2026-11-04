@@ -211,6 +211,25 @@ export function filterChoices(table: Table, most = 40): Array<{ col: number; val
   });
 }
 
+/**
+ * A plain number typed into a column of amounts, written the way the column
+ * writes them: "7200" in a column of "$1,200" is "$7,200". Anything else
+ * typed is left exactly as it was.
+ */
+export function likeItsColumn(value: string, column: string[]): string {
+  const v = value.trim();
+  const m = v.match(/^(-?)(\d+)(\.\d+)?$/);
+  if (!m) return value;
+  const filled = column.map((x) => x.trim()).filter((x) => /\d/.test(x));
+  if (!filled.length) return value;
+  const most = (test: (x: string) => boolean) => filled.filter(test).length / filled.length >= 0.8;
+  const sign = ['$', '€', '£'].find((c) => most((x) => x.replace(/^-/, '').startsWith(c))) ?? '';
+  const big = filled.filter((x) => /\d{4,}|\d{1,3},\d{3}/.test(x));
+  const grouped = big.length > 0 && big.filter((x) => /\d,\d{3}/.test(x)).length / big.length >= 0.8;
+  const whole = grouped ? m[2].replace(/\B(?=(\d{3})+(?!\d))/g, ',') : m[2];
+  return `${m[1]}${sign}${whole}${m[3] ?? ''}`;
+}
+
 // ---- Back to the file.
 
 export type Shape = { sep: string; eol: string; markdown: boolean; bom: boolean };

@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { readTable } from '../renderer/src/table-file.ts';
 import {
   boxOf, inBox, moved, toClipboard, fromClipboard, pasteInto, writeCells, addRows, dropRows,
-  orderAfterDrop, orderAfterAdd, addColumn, dropColumn, renameColumn, showColumnAs, shapeOf, writeTable, learnTag, filterChoices,
+  orderAfterDrop, orderAfterAdd, addColumn, dropColumn, renameColumn, showColumnAs, shapeOf, writeTable, learnTag, filterChoices, likeItsColumn,
 } from '../renderer/src/table-edit.ts';
 import { canWrite, writeDoc } from '../main/doc-file.mts';
 
@@ -211,6 +211,24 @@ describe('the Filter menu offers any column with a short list of values', () => 
     const many = ['Name,City', ...Array.from({ length: 120 }, (_, i) => `P${i},Town ${i % 60}`)].join('\n');
     expect(filterChoices(readTable(many, 'x.csv'), 40)).toEqual([]);
     expect(filterChoices(readTable(many, 'x.csv'), 80).map((f) => f.col)).toEqual([1]);
+  });
+});
+
+describe('a number typed into a column of amounts is written the way the column writes them', () => {
+  // A tester typed 7200 into MRR and it sat there as 7200 among $1,200 and $3,450.
+  const mrr = ['$1,200', '$3,450', '$980', '$12,000'];
+  it('takes the column\'s currency and thousands commas', () => {
+    expect(likeItsColumn('7200', mrr)).toBe('$7,200');
+    expect(likeItsColumn('1234567.5', mrr)).toBe('$1,234,567.5');
+    expect(likeItsColumn('-40', mrr)).toBe('-$40');
+  });
+  it('leaves alone what was typed with its own format, or is not a plain number', () => {
+    expect(likeItsColumn('$7,200', mrr)).toBe('$7,200');
+    expect(likeItsColumn('7.2k', mrr)).toBe('7.2k');
+    expect(likeItsColumn('n/a', mrr)).toBe('n/a');
+  });
+  it('adds nothing to a column of plain counts', () => {
+    expect(likeItsColumn('7200', ['12', '40', '1200', '4000'])).toBe('7200');
   });
 });
 

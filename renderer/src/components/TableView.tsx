@@ -10,7 +10,7 @@
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { filterRows, hrefOf, logoFor, readTable, shownLink, sortRows, tableFromGrid, type Column, type ColumnKind, type Sort, type Table } from '../table-file';
 import {
-  addColumn, addRows, boxOf, filterChoices, cellsIn, dropColumn, dropRows, fromClipboard, inBox, moved, orderAfterAdd, orderAfterDrop,
+  addColumn, addRows, boxOf, filterChoices, likeItsColumn, cellsIn, dropColumn, dropRows, fromClipboard, inBox, moved, orderAfterAdd, orderAfterDrop,
   pasteInto, renameColumn, shapeOf, showColumnAs, toClipboard, writeCells, writeTable, type At, type Box, type Pick,
 } from '../table-edit';
 import { api } from '../api';
@@ -63,7 +63,7 @@ function CellBody({ table, col, row, value }: { table: Table; col: number; row: 
   if (column.kind === 'tag') return <TagChip column={column} value={v} />;
   if (column.kind === 'link') return <a className="tbl-ell" href={hrefOf(v)} target="_blank" rel="noreferrer">{shownLink(v)}</a>;
   if (column.kind === 'email') return <a className="tbl-ell" href={`mailto:${v}`}>{v}</a>;
-  if (column.kind === 'number' || column.kind === 'date') return <>{v}</>;
+  if (column.kind === 'number' || column.kind === 'date') return <span className="tbl-ell">{v}</span>;
   return <span className="tbl-ell">{v}</span>;
 }
 
@@ -142,6 +142,31 @@ function tracks(table: Table, natural: ReturnType<typeof measure>, sized: Record
     if (!fills && i === shown.length - 1) return `minmax(${w}px, 1fr)`;
     return `${w}px`;
   }).join(' ');
+}
+
+// Kept by column name, so a column added or taken away does not move a filter onto another.
+const viewKey = (path: string) => `agentbox.table-view:${path}`;
+function readView(path: string, table: Table): { picked: Record<number, string[]>; sort: Sort } {
+  const none = { picked: {}, sort: null };
+  if (path.startsWith('inline:')) return none;
+  try {
+    const kept = JSON.parse(localStorage.getItem(viewKey(path)) ?? 'null') as { sort?: { name: string; dir: 'asc' | 'desc' } | null; picked?: Record<string, string[]> } | null;
+    if (!kept) return none;
+    const at = (name: string) => table.columns.findIndex((c) => c.name === name);
+    const picked: Record<number, string[]> = {};
+    for (const [name, values] of Object.entries(kept.picked ?? {})) if (at(name) >= 0 && values.length) picked[at(name)] = values;
+    const sort: Sort = kept.sort && at(kept.sort.name) >= 0 ? { col: at(kept.sort.name), dir: kept.sort.dir } : null;
+    return { picked, sort };
+  } catch { return none; }
+}
+function keepView(path: string, table: Table, picked: Record<number, string[]>, sort: Sort) {
+  if (path.startsWith('inline:')) return;
+  const named = Object.fromEntries(Object.entries(picked).filter(([, v]) => v.length).map(([c, v]) => [table.columns[Number(c)]?.name, v]).filter(([n]) => n));
+  const kept = { sort: sort && table.columns[sort.col] ? { name: table.columns[sort.col].name, dir: sort.dir } : null, picked: named };
+  try {
+    if (!kept.sort && !Object.keys(named).length) localStorage.removeItem(viewKey(path));
+    else localStorage.setItem(viewKey(path), JSON.stringify(kept));
+  } catch { /* the view is only a nicety */ }
 }
 
 const widthsKey = (path: string) => `agentbox.table-widths:${path}`;
@@ -444,9 +469,17 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   const editable = hands && !!onSave;
 
   const [query, setQuery] = useState('');
-  const [picked, setPicked] = useState<Record<number, string[]>>({});
-  const [sort, setSort] = useState<Sort>(null);
-  useEffect(() => { setQuery(''); setPicked({}); setSort(null); }, [path]);
+  // The sort and the filter stay with the file, through another thread and a reload.
+  const [picked, setPicked] = useState<Record<number, string[]>>(() => (hands ? readView(path, base).picked : {}));
+  const [sort, setSort] = useState<Sort>(() => (hands ? readView(path, base).sort : null));
+  const viewFor = useRef(path);
+  useEffect(() => {
+    if (viewFor.current === path) return;
+    viewFor.current = path;
+    const v = hands ? readView(path, base) : { picked: {}, sort: null };
+    setQuery(''); setPicked(v.picked); setSort(v.sort);
+  }, [path]);
+  useEffect(() => { if (hands && viewFor.current === path) keepView(path, base, picked, sort); }, [picked, sort]);
   const searched = useDeferredValue(query);
 
   // The table as edited, and the view's order of its rows. The order is worked
@@ -463,6 +496,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   useEffect(() => { past.current = []; ahead.current = []; }, [base]);
 
   const [pick, setPick] = useState<Pick | null>(null);
+  const pickRef = useRef(pick);
+  pickRef.current = pick;
   const [editing, setEditing] = useState<Editing | null>(null);
   const [sheet, setSheet] = useState<number | null>(null);
   const [float, setFloat] = useState<Float | null>(null);
@@ -472,8 +507,14 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   useEffect(() => { setSized(readWidths(path)); }, [path]);
 
   useEffect(() => {
-    setDoc((d) => ({ ...d, order: viewOrder(d.table, searched, picked, sort) }));
-    setPick(null); setEditing(null); setSheet(null);
+    // The picked row stays picked in its new place, so typing after a sort lands where you were.
+    const d = docRef.current;
+    const order = viewOrder(d.table, searched, picked, sort);
+    const p = pickRef.current;
+    const r = p ? order.indexOf(d.order[p.a.r]) : -1;
+    setDoc({ ...d, order });
+    setPick(p && r >= 0 ? { a: { r, c: p.a.c }, b: { r, c: p.a.c } } : null);
+    setEditing(null); setSheet(null);
   }, [searched, picked, sort]);
   useEffect(() => { setPick(null); setEditing(null); setSheet(null); setFloat(null); setRenaming(null); setProblem(null); }, [base]);
 
@@ -703,7 +744,11 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     if (!e) return;
     open.current = null;
     setEditing(null);
-    if (e && value !== null && editable) writeAt([{ r: e.r, c: e.c, v: value }]);
+    if (e && value !== null && editable) {
+      const column = docRef.current.table.columns[e.c];
+      const v = column?.kind === 'number' ? likeItsColumn(value, docRef.current.table.rows.map((row) => row[e.c] ?? '')) : value;
+      writeAt([{ r: e.r, c: e.c, v }]);
+    }
     if (e && move) {
       const key = move === 'down' ? 'ArrowDown' : move === 'right' ? 'ArrowRight' : 'ArrowLeft';
       const to = moved({ r: e.r, c: e.c }, key, edges);
