@@ -6,7 +6,7 @@
 // ship script and the push hook skipped it, and main went red on GitHub after
 // 5677cee and 04ee8bd (10-04), 1c0ea84 (10-04), 7d44da9 (10-05) and e492610
 // (10-12). Measured before the fix: testsThatRead for Settings.tsx,
-// plan-setup.ts, main/feedback.mjs and main/memory-gate.mjs, the files those
+// plan-setup.ts, main/feedback.mts and main/memory-gate.mts, the files those
 // commits touched, did not include it.
 
 import { describe, it, expect } from 'vitest';
@@ -38,7 +38,7 @@ describe('a test that lists every tracked file', () => {
 
   it('runs for any source change', () => {
     expect(testsThatRead(['renderer/src/components/Settings.tsx'], root)).toEqual(['tests/every-file.test.mjs']);
-    expect(testsThatRead(['main/feedback.mjs'], root)).toEqual(['tests/every-file.test.mjs']);
+    expect(testsThatRead(['main/feedback.mts'], root)).toEqual(['tests/every-file.test.mjs']);
   });
 
   it('does not count a test that lists one path, or lists a throwaway folder', () => {
@@ -59,7 +59,7 @@ describe('a test that lists every tracked file', () => {
 
 describe('in this repository', () => {
   it('picks the naming test for the files that turned main red', () => {
-    for (const f of ['renderer/src/components/Settings.tsx', 'main/feedback.mjs', 'main/memory-gate.mjs']) {
+    for (const f of ['renderer/src/components/Settings.tsx', 'main/feedback.mts', 'main/memory-gate.mts']) {
       expect(testsThatRead([f], here), f).toContain('tests/the-app-is-named-in-one-place.test.mjs');
     }
   });

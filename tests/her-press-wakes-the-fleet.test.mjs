@@ -12,7 +12,7 @@
 // of milliseconds would be a test about the machine it runs on.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const sup = (over = {}) => Object.assign(Object.create(Supervisor.prototype), {
   paused: false,

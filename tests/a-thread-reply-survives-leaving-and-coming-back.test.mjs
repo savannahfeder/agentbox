@@ -54,7 +54,7 @@ beforeEach(async () => {
   await page.goto('http://draft.test/');
   await page.addScriptTag({ content: bundle });
 });
-// The Send cap is ↵ on a Mac and Enter elsewhere (shared/key-caps.mjs).
+// The Send cap is ↵ on a Mac and Enter elsewhere (shared/key-caps.mts).
 const sendButton = () => page.getByRole('button', { name: /^Send (↵|Enter)$/ });
 const editor = () => page.getByRole('textbox', { name: 'Reply in thread', exact: true });
 const text = () => editor().innerText();

@@ -12,13 +12,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkProjectFolder } from '../shared/project-folder-check.mjs';
+import { checkProjectFolder } from '../shared/project-folder-check.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
 
 describe('the picker turns it down before the renderer ever sees it', () => {
-  const ipc = read('main/ipc.mjs');
+  const ipc = read('main/ipc.mts');
 
   it('checks what the Mac dialog handed back', () => {
     expect(ipc).toMatch(/checkProjectFolder\(picked, \{ home: os\.homedir\(\) \}\)/);
@@ -30,7 +30,7 @@ describe('the picker turns it down before the renderer ever sees it', () => {
 });
 
 describe('the store is the backstop', () => {
-  const store = read('main/store.mjs');
+  const store = read('main/store.mts');
 
   it('refuses a repoPath that is the whole Mac, before it makes anything', () => {
     expect(store).toMatch(/const verdict = checkProjectFolder\(repo, \{ home: os\.homedir\(\) \}\)/);

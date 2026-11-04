@@ -5,7 +5,7 @@
 // at about 75 MB (measured that day), so 100 runs cost the Mac gigabytes of
 // mostly waiting.
 //
-// Now every run's relay lives in one host process (main/cloud/host.mjs), and
+// Now every run's relay lives in one host process (main/cloud/host.mts), and
 // for each run the supervisor holds a small stand-in (scripts/cloud-shim.pl)
 // that carries the run's input, output, signals and exit code there and back.
 // Driven here with the real stand-in against the real host, and a stand-in
@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { startCloudHost, hostSocketPath, perlRunsTheShim } from '../main/cloud/host.mjs';
+import { startCloudHost, hostSocketPath, perlRunsTheShim } from '../main/cloud/host.mts';
 
 const SHIM = fileURLToPath(new URL('../scripts/cloud-shim.pl', import.meta.url));
 let host; let tmp; const others = [];
@@ -191,7 +191,7 @@ describe('the host\'s socket', () => {
 
 describe('the supervisor', () => {
   it('starts a cloud run as a stand-in on the host where this Mac has perl, and as a relay of its own where told not to', async () => {
-    const { Supervisor } = await import('../main/supervisor.mjs');
+    const { Supervisor } = await import('../main/supervisor.mts');
     const sockPath = startHost();
     await ready(sockPath);
     const appDir = fileURLToPath(new URL('..', import.meta.url));
@@ -210,13 +210,13 @@ describe('the supervisor', () => {
     sup.config.cloudHost = false;
     const relay = sup._spawnCloudRelay(['--x'], { cwd: tmp, env: { ...process.env } });
     expect(relay.spawnfile).toBe(process.execPath);
-    expect(relay.spawnargs[1]).toMatch(/main\/cloud\/run-cli\.mjs$/);
+    expect(relay.spawnargs.slice(1).find((a) => !a.startsWith('-'))).toMatch(/main\/cloud\/run-cli\.mts$/);
     relay.kill();
   });
 
   it('starts a host again when its socket has gone, and uses one another app left running', async () => {
-    const { Supervisor } = await import('../main/supervisor.mjs');
-    const { HOST_ALREADY_THERE } = await import('../main/cloud/host.mjs');
+    const { Supervisor } = await import('../main/supervisor.mts');
+    const { HOST_ALREADY_THERE } = await import('../main/cloud/host.mts');
     tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cloud-host-'));
     const appDir = fileURLToPath(new URL('..', import.meta.url));
     const sup = new Supervisor({ storeRoot: tmp, home: tmp, authProfiles: ['default'] }, { listItems: () => [], listProducts: () => [], isDue: () => true }, appDir, tmp, tmp);

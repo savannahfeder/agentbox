@@ -11,10 +11,10 @@ import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadConfig } from '../main/config.mjs';
-import { setWorkspaceSetting, memoryGateSettings } from '../main/settings.mjs';
+import { setWorkspaceSetting, memoryGateSettings } from '../main/settings.mts';
 import { NAME } from '../shared/product-name.mjs';
 import { totalmem } from 'node:os';
-import { autoSlots } from '../main/memory-gate.mjs';
+import { autoSlots } from '../main/memory-gate.mts';
 
 function withConfig(onDisk) {
   const appDir = mkdtempSync(join(tmpdir(), 'gate-settings-'));

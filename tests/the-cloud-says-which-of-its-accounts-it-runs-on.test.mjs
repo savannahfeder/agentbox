@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cloudLoginInUse, cloudLoginState, listCloudLogins, markCloudLogin, pickCloudLogin, recordCloudLogin } from '../main/cloud/logins.mjs';
+import { cloudLoginInUse, cloudLoginState, listCloudLogins, markCloudLogin, pickCloudLogin, recordCloudLogin } from '../main/cloud/logins.mts';
 import { cloudAccountInUse, cloudFootLine } from '../renderer/src/cloud-menu';
 import { cloudPlaceAccounts } from '../renderer/src/components/Settings';
 
@@ -79,7 +79,7 @@ describe('a cloud with two Claude accounts signed in', () => {
 });
 
 describe('a cloud with one Claude account', () => {
-  // Marked, as this computer's one account is (main/settings.mjs `chosen`):
+  // Marked, as this computer's one account is (main/settings.mts `chosen`):
   // the badge says which subscription is being spent, and with one account
   // that is still worth saying once.
   it('marks it, and it is simply ready', () => {

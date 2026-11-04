@@ -15,7 +15,7 @@
 import { it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
-import { DOC_SCHEMES } from '../shared/schemes.mjs';
+import { DOC_SCHEMES } from '../shared/schemes.mts';
 import {
   wantsQuietScrollbars, quietScrollbars, quietTheFramesScrollbars, AT_REST, SHOWN,
 } from '../main/frame-scrollbars.mts';
@@ -135,7 +135,7 @@ it('never touches the app window itself or a running app in the pane', () => {
 });
 
 it('is wired to the app window', () => {
-  expect(read('main/main.mjs')).toMatch(/quietTheFramesScrollbars\(window\.webContents\)/);
+  expect(read('main/main.mts')).toMatch(/quietTheFramesScrollbars\(window\.webContents\)/);
 });
 
 it('tells the small preview under a message not to scroll', () => {

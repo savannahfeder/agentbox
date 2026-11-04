@@ -4,7 +4,7 @@
 // a summary of every one of them on the team's board.
 import { it, expect, describe } from 'vitest';
 import { cardsFor, shownToTeam } from '../shared/thread-cards.mjs';
-import { memorySyncState } from '../main/team/sync.mjs';
+import { memorySyncState } from '../main/team/sync.mts';
 import { teamEntries } from '../renderer/src/threads/page-rules.ts';
 
 const SINCE = 1_000_000;

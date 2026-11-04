@@ -24,8 +24,8 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { streamingText } from '../main/supervisor.mjs';
-import { workerArgsFrom } from '../main/harnesses/common.mjs';
+import { streamingText } from '../main/supervisor.mts';
+import { workerArgsFrom } from '../main/harnesses/common.mts';
 import { harnessDefinition } from '../shared/harness-definitions.mjs';
 import { itemThread } from '../renderer/src/item-thread.ts';
 
@@ -107,7 +107,7 @@ describe('the sentence being typed, held on the live session', () => {
 /* ---------------- and the flag that makes those frames exist -------------- */
 describe('the sessions are spawned asking for it', () => {
   it('passes --include-partial-messages', () => {
-    // 2026-10-08: the flag left main/supervisor.mjs for the engine's own `run`
+    // 2026-10-08: the flag left main/supervisor.mts for the engine's own `run`
     // definition (w-380b06bf53), so this asks for the line the app would
     // actually start rather than reading the source that used to spell it.
     expect(workerArgsFrom(harnessDefinition('claude').run, { prompt: 'anything', grants: [] }).join(' '))
@@ -119,7 +119,7 @@ describe('the sessions are spawned asking for it', () => {
     // count in decisions.md is measured off. A half-typed sentence in it would
     // corrupt both. `traceStreamLine` reads `assistant` and `result` and
     // nothing else, and the partial frames are handled by their own function.
-    const src = read('main/supervisor.mjs');
+    const src = read('main/supervisor.mts');
     const fn = src.slice(src.indexOf('function traceStreamLine'));
     expect(fn.slice(0, fn.indexOf('\n}\n'))).not.toMatch(/stream_event|text_delta|saying/);
   });
@@ -218,7 +218,7 @@ describe('the live sentence in her conversation', () => {
 /* ----------------- and it reaches the screen on the push ------------------ */
 describe('the thread reads on the push, not only on the timer', () => {
   it('subscribes to the change the supervisor already fires', () => {
-    // The supervisor fires its hook on every stdout line and main/ipc.mjs
+    // The supervisor fires its hook on every stdout line and main/ipc.mts
     // coalesces those to one `zero:changed` every 400ms. Hanging the read off
     // it is the difference between a line appearing when it happens and
     // appearing up to eight seconds later.

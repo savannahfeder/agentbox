@@ -291,7 +291,7 @@ describe('what the sidebar is told for a copy run from source', () => {
 
 describe('the app picks it', () => {
   it('uses the source updater when it is not an installed app', () => {
-    const main = fs.readFileSync(path.join(import.meta.dirname, '..', 'main', 'main.mjs'), 'utf8');
+    const main = fs.readFileSync(path.join(import.meta.dirname, '..', 'main', 'main.mts'), 'utf8');
     expect(main).toMatch(/app\.isPackaged\s*\?\s*createUpdater\(/);
     expect(main).toContain('createSourceUpdater(');
   });

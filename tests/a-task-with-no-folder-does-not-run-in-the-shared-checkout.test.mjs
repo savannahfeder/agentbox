@@ -2,7 +2,7 @@
 //
 // FOUND 2026-10-07 (w-5952e6de3e), reviewing with Codex why people call agent
 // worktrees brittle. Isolation had an unconditional back door: three places in
-// main/supervisor.mjs answered "the folder could not be made" with "then use
+// main/supervisor.mts answered "the folder could not be made" with "then use
 // the checkout the app is built from", and said so only to a console.
 //
 //   workFolderFor      `catch { console.warn('... is running in the shared
@@ -33,8 +33,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { taskFolderPath } from '../main/task-folders.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { taskFolderPath } from '../main/task-folders.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { waitFor } from './waiting.mjs';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();

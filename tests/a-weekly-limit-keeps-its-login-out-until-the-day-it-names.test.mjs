@@ -14,9 +14,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { limitResetMoment, troubleCause } from '../shared/spawn-trouble.mjs';
-import { limitInResultLine } from '../main/cloud/run.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { limitResetMoment, troubleCause } from '../shared/spawn-trouble.mts';
+import { limitInResultLine } from '../main/cloud/run.mts';
 import { liveLine } from '../renderer/src/live-line.ts';
 
 // Copied off the run log.

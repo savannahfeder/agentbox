@@ -4,9 +4,9 @@
 // desktop is built by preload.cjs out of Electron's private channel between a
 // window and the app. A browser tab has no such channel, so this builds the
 // identical object out of ordinary http instead: every name calls the same
-// handler, through the server in main/serve.mjs.
+// handler, through the server in main/serve.mts.
 //
-// It is built rather than written out. Both halves read shared/bridge-map.mjs,
+// It is built rather than written out. Both halves read shared/bridge-map.mts,
 // so a channel cannot be added to one door and forgotten on the other, and
 // nothing in api.ts had to change to gain a second transport: it asks whether
 // `window.zero` is there, and now it is either way.
@@ -16,7 +16,7 @@
 // finished before the first import of api.ts, which is why main.tsx calls it
 // on its very first line.
 
-import { REQUEST_CHANNELS, PUSH_CHANNELS, WRAPPED_ARGS, DESKTOP_ONLY } from '../../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS, PUSH_CHANNELS, WRAPPED_ARGS, DESKTOP_ONLY } from '../../shared/bridge-map.mts';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { setIconCount, startPhoneAlerts } from './phone-alerts';
 import { installPhoneFiles } from './phone-files';
@@ -27,7 +27,7 @@ import { callLane } from './tab-calls';
 type Push = (payload: unknown) => void;
 
 // The header and the storage key are spelled out rather than built from the
-// product name, on purpose. They are wire identifiers that main/serve.mjs has
+// product name, on purpose. They are wire identifiers that main/serve.mts has
 // to agree with exactly, and renaming the app should not invalidate a token a
 // tab is already holding. Everything a person READS uses `Name`.
 const TOKEN_HEADER = 'x-agentbox-token';
@@ -42,7 +42,7 @@ const KEEPALIVE_MAX = 16_000;
  *  not want it in a screenshot, and it would otherwise ride along into every
  *  link somebody copies out of here.
  */
-// THE PHONE DOOR IS THE OTHER CASE (main/phone-link.mjs). Its address is not
+// THE PHONE DOOR IS THE OTHER CASE (main/phone-link.mts). Its address is not
 // this computer's own, and there the key stays in the address bar on purpose:
 // a phone's home-screen icon is saved from that address, and on a phone the
 // icon gets storage of its own, so a key kept anywhere else is lost to it.
@@ -98,7 +98,7 @@ function deviceId(): string {
 // THE DOOR IS HERE AND THE ADDRESS HAS NO KEY ON IT. api.ts falls back to the
 // canned fixtures whenever there is no bridge, and on a page this computer
 // served that read as somebody else's inbox: invented products, invented
-// threads, nothing saying so (w-5aa14b9a8a). The mark main/serve.mjs puts in
+// threads, nothing saying so (w-5aa14b9a8a). The mark main/serve.mts puts in
 // the html is how this page knows it came from the door rather than from a
 // build somebody is previewing, which is the one case the fixtures are for.
 let needsItsKey = false;
@@ -186,7 +186,7 @@ export function installBrowserBridge(): boolean {
   // asks for them on the app's own scheme, which only Electron answers, so in
   // the browser copy every local picture in a thread drew as missing. They come
   // from this computer under the file key, which reads files and nothing else
-  // (main/serve.mjs fileKey).
+  // (main/serve.mts fileKey).
   fetch('/file-key', { headers: { [TOKEN_HEADER]: token } })
     .then((res) => (res.ok ? res.json() : null))
     .then((said) => { if (said?.key) installPhoneFiles(said.key); })

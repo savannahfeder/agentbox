@@ -131,8 +131,8 @@ vi.mock('../main/account-tooling.mjs', async (importActual) => ({
   linkAccountTooling: () => null,
 }));
 
-import { Supervisor } from '../main/supervisor.mjs';
-import { mcpIsolation, mcpServerNames } from '../main/codex-session.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { mcpIsolation, mcpServerNames } from '../main/codex-session.mts';
 
 const CODEX_BIN = '/nonexistent/codex/codex';
 const dirs = [];

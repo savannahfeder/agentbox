@@ -5,7 +5,7 @@
 // running; the restarted app attaches again and reads on from where it was.
 //
 // While no app is attached, the input is closed the way the app would close it
-// (main/claude-input.mjs, run here on the same stream), so a finished run ends
+// (main/claude-input.mts, run here on the same stream), so a finished run ends
 // rather than waiting for an app that may not come back.
 //
 // Lines of JSON over a socket only this user can reach. The first line says
@@ -25,7 +25,7 @@ import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { nameSlug } from '../shared/product-name.mjs';
-import { attachClaudeInput } from './claude-input.mjs';
+import { attachClaudeInput } from './claude-input.mts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // The app attaches to any host speaking this, whichever version started it, so
@@ -33,7 +33,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 // with a client that still speaks the old one.
 export const PROTOCOL = 1;
 export const HOST_ALREADY_THERE = 3;
-const MADE_OF = ['run-host.mjs', 'claude-input.mjs'];
+const MADE_OF = ['run-host.mjs', 'claude-input.mts'];
 // An ended run nobody attached to is forgotten after this.
 const KEEP_ENDED_MS = 6 * 60 * 60 * 1000;
 

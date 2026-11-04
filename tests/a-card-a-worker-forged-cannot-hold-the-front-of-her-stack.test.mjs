@@ -30,7 +30,7 @@
 //    planted in.
 //
 // 2. A REQUEST NOBODY IS WAITING ON IS REAPED. Both engines give up on a card
-//    after fifteen minutes -- main/approval-prompt-server.mjs's own deadline,
+//    after fifteen minutes -- main/approval-prompt-server.mts's own deadline,
 //    main/codex-approvals.mjs's `timeoutMs` -- and both delete the pair when
 //    they do. A request file still there well after that is either a forgery or
 //    the leftovers of a worker that died before its own deadline, and in both
@@ -175,7 +175,7 @@ describe('a request nobody is waiting on any more', () => {
   // clock that must not come back.
   it('is not a deadline either engine shadows', () => {
     const codex = fs.readFileSync(path.join(here, '..', 'main', 'codex-approvals.mjs'), 'utf8');
-    const claude = fs.readFileSync(path.join(here, '..', 'main', 'approval-prompt-core.mjs'), 'utf8');
+    const claude = fs.readFileSync(path.join(here, '..', 'main', 'approval-prompt-core.mts'), 'utf8');
 
     expect(codex).not.toMatch(/setTimeout\(\(\) => entry\.decide/);
     expect(claude).not.toMatch(/TIMEOUT_MS = 15 \* 60_000/);

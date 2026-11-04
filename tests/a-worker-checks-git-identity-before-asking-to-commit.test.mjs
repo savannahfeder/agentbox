@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { COMMIT_IDENTITY_CHECK, workerGitBrief, withWorkerGitBrief } from '../main/worker-git.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { COMMIT_IDENTITY_CHECK, workerGitBrief, withWorkerGitBrief } from '../main/worker-git.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 it('does not give Git work to a task without a repository', () => {
   expect(workerGitBrief(null)).toBe('');
@@ -16,7 +16,7 @@ it('refreshes commit instructions on resumed turns without duplicating a fresh b
   expect(prompt).toContain(COMMIT_IDENTITY_CHECK);
   expect(withWorkerGitBrief(prompt, '/a/repository')).toBe(prompt);
   expect(withWorkerGitBrief('A personal task.', null)).toBe('A personal task.');
-  expect(fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8').includes('prompt = withWorkerGitBrief(prompt, product.repoPath)')).toBe(true);
+  expect(fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8').includes('prompt = withWorkerGitBrief(prompt, product.repoPath)')).toBe(true);
 });
 
 it('requires identity before approval and batches one commit request', () => {
@@ -26,7 +26,7 @@ it('requires identity before approval and batches one commit request', () => {
   expect(brief).toContain('Never invent an author');
   expect(brief).toContain('one approval request');
   expect(brief).toContain('Do not add user.name or user.email overrides');
-  expect(fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8')).toContain('workerGitBrief(product.repoPath)');
+  expect(fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8')).toContain('workerGitBrief(product.repoPath)');
 });
 
 it('includes the commit checks for both engines even with custom worker instructions', () => {

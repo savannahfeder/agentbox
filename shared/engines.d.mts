@@ -45,6 +45,7 @@ export declare function engineChoiceOnRowIsStale(
 export declare function isEngine(id: unknown): boolean;
 export declare function engineLabel(id: string | null): string;
 export declare function availableEngines(found?: Record<string, boolean>): Engine[];
+export declare function homeEngine(found?: Record<string, boolean>): string;
 export declare function engineChoiceExists(found?: Record<string, boolean>): boolean;
 export declare function engineFor(
   item: EngineRow | null | undefined,

@@ -29,8 +29,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlaceTiles, accountTile } from '../renderer/src/components/Settings';
 import { SETUP } from '../renderer/src/cloud-setup.ts';
 import { whatTakesEscape } from '../renderer/src/settings-escape.ts';
-import { recordCloudLogin } from '../main/cloud/logins.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { recordCloudLogin } from '../main/cloud/logins.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 const here = (extra = {}) => ({ profile: 'default', email: 'work@example.test', plan: 'Max 20x', chosen: true, signedIn: true, trouble: null, dir: null, ...extra });
 const cloud = (extra = {}) => ({ engine: 'claude', key: 'acct-1', name: 'work@example.test', ready: true, state: 'ready', ...extra });

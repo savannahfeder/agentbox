@@ -2,7 +2,7 @@
 //
 // Measured in a fresh window with two Claude Code chats and one Codex chat
 // brought in at setup: both Claude Code chats opened on a name, a context and
-// a question with three options (main/catch-up.mjs), and the Codex chat on its
+// a question with three options (main/catch-up.mts), and the Codex chat on its
 // raw last message, because only a Claude Code row was marked as owed the
 // rewrite. A Codex row is also re-read from Codex once a minute
 // (`refreshCodexMirrors`), which would put the raw message back over the
@@ -11,9 +11,9 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
-import { codexMirrorPatch, codexIdOf } from '../shared/codex-import.mjs';
-import { CATCH_UP_LABEL, catchUpDue } from '../shared/agent-import.mjs';
+import { Store } from '../main/store.mts';
+import { codexMirrorPatch, codexIdOf } from '../shared/codex-import.mts';
+import { CATCH_UP_LABEL, catchUpDue } from '../shared/agent-import.mts';
 
 const NOW = Date.UTC(2026, 9, 29, 9);
 

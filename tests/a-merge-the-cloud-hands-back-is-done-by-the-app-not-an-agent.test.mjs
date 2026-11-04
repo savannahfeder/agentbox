@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { isPlainMerge, mergeHome, mergedSentence } from '../main/cloud/merge-home.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
 
 const dirs = [];

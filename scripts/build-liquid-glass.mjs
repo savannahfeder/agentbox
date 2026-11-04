@@ -1,4 +1,4 @@
-// Builds main/native/liquid-glass into a .node the tray loads (main/liquid-glass.mjs).
+// Builds main/native/liquid-glass into a .node the tray loads (main/liquid-glass.mts).
 //
 // It runs on every `npm run build`, on a Mac only, and never fails the build:
 // without it the tray draws its own glass, as it always has. The binary is

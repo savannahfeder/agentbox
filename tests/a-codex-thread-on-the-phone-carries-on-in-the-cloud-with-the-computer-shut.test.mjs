@@ -29,10 +29,10 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun } from '../main/cloud/run.mjs';
-import { readMarker } from '../main/cloud/marker.mjs';
-import { markerForCloudRun, readKitCopy, kitCopyPath } from '../main/cloud/kit.mjs';
-import { kitFrom } from '../main/cloud/run-cli.mjs';
+import { cloudRun } from '../main/cloud/run.mts';
+import { readMarker } from '../main/cloud/marker.mts';
+import { markerForCloudRun, readKitCopy, kitCopyPath } from '../main/cloud/kit.mts';
+import { kitFrom } from '../main/cloud/run-cli.mts';
 import {
   KIT_VERSION, REPLY_MARK, kitKey, checkKit, startPayload, replyFrame, runOfClaim,
   codexOpenLines, codexTurnLines, codexReadLines, codexAnswersIn, codexAnswerIn,
@@ -42,8 +42,8 @@ import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 import { threadSnapshot } from '../shared/phone-snapshot.mjs';
 import { ANSWERED_OUTCOME } from '../cloud/gateway/phone.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { Store } from '../main/store.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { Store } from '../main/store.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CODEX = here('./fixtures/fake-codex-app-server.mjs');

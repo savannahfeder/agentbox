@@ -18,10 +18,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Store } from '../main/store.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
-import { deadRunSentence, undeliveredAnswerSentence, saysARunGotNowhere } from '../shared/spawn-trouble.mjs';
+import { deadRunSentence, undeliveredAnswerSentence, saysARunGotNowhere } from '../shared/spawn-trouble.mts';
 import { belongsInInbox, belongsInProgress, gaveUpOnTheAnswer } from '../renderer/src/list-rules';
 
 const ANSWER_AT = 1_792_455_359_012;

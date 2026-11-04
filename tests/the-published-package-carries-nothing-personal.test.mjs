@@ -115,8 +115,8 @@ describe('the tarball npm would publish', () => {
 
   it('carries the command, the doing half and the licence', () => {
     expect(has((p) => p === 'bin/agentbox.mjs')).toBe(true);
-    expect(has((p) => p === 'main/serve.mjs')).toBe(true);
-    expect(has((p) => p === 'main/ipc.mjs')).toBe(true);
+    expect(has((p) => p === 'main/serve.mts')).toBe(true);
+    expect(has((p) => p === 'main/ipc.mts')).toBe(true);
     expect(has((p) => p === 'LICENSE')).toBe(true);
     expect(has((p) => p === 'worker-permissions.json')).toBe(true);
   });

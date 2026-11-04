@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ANCHOR, COPY, INTRO, SLAB_OF, beatRows, coach } from '../renderer/src/onboarding.ts';
-import { PRACTICE_NOTE, PRACTICE_ROWS } from '../shared/first-run-practice.mjs';
+import { PRACTICE_NOTE, PRACTICE_ROWS } from '../shared/first-run-practice.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const view = fs.readFileSync(path.join(root, 'renderer/src/components/Onboarding.tsx'), 'utf8');

@@ -42,7 +42,7 @@ beforeAll(async () => {
     { type: 'assistant', cwd: folder, entrypoint: 'cli', timestamp: at(25), message: { role: 'assistant', content: [{ type: 'text', text: 'An index takes it to 40ms. Shall I add the migration?' }] } },
   ].map((r) => JSON.stringify(r)).join('\n')}\n`);
   fs.writeFileSync(path.join(dir, 'zero.config.json'), JSON.stringify({ storeRoot: path.join(dir, 'store') }));
-  const { bootHeadless } = await import('../main/serve.mjs');
+  const { bootHeadless } = await import('../main/serve.mts');
   booted = await bootHeadless({ dataDir: dir, appDir: repoRoot, userDir: dir });
   booted.store.createProduct({ name: 'Kestrel', repoPath: folder });
 }, 30_000);

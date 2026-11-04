@@ -4,10 +4,10 @@
 // open, stopped while it was being used, and the agent had to explain how to
 // start it again. Three rules could each end it with the task still open:
 //   - what an agent left running was stopped two hours after its run ended
-//     (main/leftovers.mjs), unless the agent had guessed to mark it
+//     (main/leftovers.mts), unless the agent had guessed to mark it
 //     AGENTBOX_KEEP=1;
 //   - a shipped task's folder is deleted once its work is in main
-//     (main/task-folders.mjs), with the server still running from it;
+//     (main/task-folders.mts), with the server still running from it;
 //   - closed tasks' folders are packed away (`parkClosedFolders`) the same way.
 // The rule asked for instead: what a task runs lives while the task is open,
 // and goes when it is closed. Measured here with injected listings and clocks,
@@ -17,9 +17,9 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { LeftoverCleaner } from '../main/leftovers.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { ensureTaskFolder } from '../main/task-folders.mjs';
+import { LeftoverCleaner } from '../main/leftovers.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { ensureTaskFolder } from '../main/task-folders.mts';
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;

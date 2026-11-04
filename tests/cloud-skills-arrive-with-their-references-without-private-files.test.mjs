@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { snapshotSkills } from '../main/cloud/skills.mjs';
+import { snapshotSkills } from '../main/cloud/skills.mts';
 
 let home; let snapshots;
 beforeEach(() => { home = fs.mkdtempSync(path.join(os.tmpdir(), 'cloud-skills-')); snapshots = []; });

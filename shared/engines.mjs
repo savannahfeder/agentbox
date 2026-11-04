@@ -59,7 +59,7 @@ function momentIn(written) {
  * It is a moment, not a flag, so an engine written on a row or as the default
  * before it is not a choice made now and is ignored. It lives in the config
  * rather than app state so every machine reading the same store agrees.
- * main/supervisor.mjs `_engineFor` is the only place that turns it into the token.
+ * main/supervisor.mts `_engineFor` is the only place that turns it into the token.
  */
 export function engineChoiceSince(config = {}) {
   return momentIn(config?.engineChoice);
@@ -171,7 +171,7 @@ export function enginePicked(id) {
  * engine. Claude and Codex model names do not overlap, so a Codex slug must not
  * reach `claude --model` when `engineFor` falls back to Claude Code. This is the
  * mirror of `codexModelRefusal`. Null means "no model for this run", and
- * main/supervisor.mjs decides what to do with it. A row naming no engine keeps
+ * main/supervisor.mts decides what to do with it. A row naming no engine keeps
  * its model.
  */
 export function modelForEngine(item, engine) {

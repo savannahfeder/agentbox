@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hardenAttachedWebview } from '../main/webview-guard.mts';
-import { WEBSITE_PARTITION } from '../shared/websites.mjs';
+import { WEBSITE_PARTITION } from '../shared/websites.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -104,13 +104,13 @@ describe('what the guard must not touch', () => {
 
 describe('the guard is actually wired to the window', () => {
   it('runs on every webview the window attaches', () => {
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).toContain("will-attach-webview");
     expect(main).toContain('hardenAttachedWebview');
   });
 
   it('sends a link that wants a new window out to your own browser', () => {
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).toContain('setWindowOpenHandler');
     // On the guest's own contents, not only on the app's page.
     expect(main).toMatch(/contents\.setWindowOpenHandler/);
@@ -119,7 +119,7 @@ describe('the guard is actually wired to the window', () => {
   it('still never lets an agent drive the browser you are signed into', () => {
     // The standing rule (tests/no-worker-drives-her-own-browser.test.mjs).
     // This pane is read by a person; nothing here spawns against it.
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).not.toMatch(/['"`]--chrome['"`]/);
     expect(read('CLAUDE.md')).toContain('NO WORKER EVER DRIVES THE USER');
   });

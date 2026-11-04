@@ -3,7 +3,7 @@
 // w-fda2165ec6. The snapshot reads a ledger's last 8 MB, so a long one's
 // oldest finished threads are missing from it and a few more are half there
 // (their first lines cut, so a blank title). The foot of Done and All asks
-// main for them a page at a time (`listOlderItems`, main/store.mjs), and this
+// main for them a page at a time (`listOlderItems`, main/store.mts), and this
 // is where a page meets the snapshot. The snapshot is the live copy and wins,
 // except over a half-cut thread, which the page has whole: same id, a
 // different `createdAt`, and nothing written to it since the page was read.

@@ -29,7 +29,7 @@
 
 import { describe, expect, it } from 'vitest';
 import os from 'node:os';
-import { proposeParent, checkProjectFolder } from '../shared/project-folder-check.mjs';
+import { proposeParent, checkProjectFolder } from '../shared/project-folder-check.mts';
 import { shortPath } from '../renderer/src/onboarding.ts';
 import { NAME } from '../shared/product-name.mjs';
 
@@ -48,7 +48,7 @@ describe('the home folder the renderer works with', () => {
   });
 
   it('is carried on the settings payload, from os.homedir()', async () => {
-    const { readSettings } = await import('../main/settings.mjs');
+    const { readSettings } = await import('../main/settings.mts');
     const supervisor = {
       paused: false,
       sessions: new Map(),

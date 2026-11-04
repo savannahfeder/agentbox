@@ -10,11 +10,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createRooms, roomPrefsFile } from '../main/team/rooms.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
 import { writeTeamLookDocs } from '../main/team/team-look-doc.mjs';
 import { TEAM_LOOK, TEAM_LOOK_LINE, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../shared/team-look.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 const timers = { setTimeout: (fn) => { const h = { off: false }; queueMicrotask(() => { if (!h.off) fn(); }); return h; }, clearTimeout: (h) => { if (h) h.off = true; } };
@@ -106,7 +106,7 @@ describe('what a worker is told', () => {
     expect(sup(fs.mkdtempSync(path.join(os.tmpdir(), 'team-look-none-'))).teamLookLine('app')).toBeNull();
   });
   it('rides in the system prompt beside the project instructions', () => {
-    expect(read('main/supervisor.mjs')).toContain('const project = [this.projectInstructions(item.product, product), this.teamLookLine(item.product, product), this.editedFilesLine(item), this.filesFoldersLine(item, product)].filter(Boolean).join');
+    expect(read('main/supervisor.mts')).toContain('const project = [this.projectInstructions(item.product, product), this.teamLookLine(item.product, product), this.editedFilesLine(item), this.filesFoldersLine(item, product)].filter(Boolean).join');
   });
 });
 

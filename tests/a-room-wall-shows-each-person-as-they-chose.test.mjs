@@ -12,7 +12,7 @@
 // added together, a Mac gone quiet, the order of the wall, and the row my own
 // Mac publishes.
 import { describe, it, expect } from 'vitest';
-import { displayNameOf, wallCards, myPresence } from '../shared/room-cards.mjs';
+import { displayNameOf, wallCards, myPresence } from '../shared/room-cards.mts';
 
 const NOW = Date.parse('2026-10-22T15:00:00-07:00');
 const MIN = 60_000;

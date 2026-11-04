@@ -26,10 +26,10 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   HOMES as DEMO_HOMES, clearDemoHomes, demoEnv, demoPaths, makeDemoHome, openDemo, seedDemoStore,
-} from '../main/demo.mjs';
+} from '../main/demo.mts';
 import { DEMO_ENV, DEMO_INSTALL_ID, DEMO_PRODUCTS, demoLedgerLines, runningAsADemo } from '../shared/demo-world.mjs';
 import { HOMES as FRESH_HOMES } from '../shared/fresh-user-home.mjs';
-import { readInstallId } from '../shared/install-id.mjs';
+import { readInstallId } from '../shared/install-id.mts';
 import { readWorkItems } from '../main/store/work-items.mjs';
 import { NAME, Name } from '../shared/product-name.mjs';
 import { setAppHome, clearAppHome, appHomeEnv } from './app-home.mjs';

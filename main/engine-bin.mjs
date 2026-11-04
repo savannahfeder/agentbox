@@ -14,7 +14,7 @@
 // shell probe that throws falls through and does not count as an answer.
 //
 // A path somebody set (`claudeBin`, `codexBin`) wins and is never searched
-// around; that is what makes "point at it yourself" work (main/ipc.mjs,
+// around; that is what makes "point at it yourself" work (main/ipc.mts,
 // `zero:engine-bin`).
 
 import fs from 'node:fs';

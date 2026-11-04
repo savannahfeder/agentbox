@@ -1,6 +1,6 @@
 // HER CHECKOUT STAYS ON main, AND A WORKTREE IS LEFT ALONE.
 //
-// Her app runs `npm start` from ~/Desktop/dev/zero, so `appDir` in main.mjs IS
+// Her app runs `npm start` from ~/Desktop/dev/zero, so `appDir` in main.mts IS
 // that working tree: the code she runs, and the worker brief every agent gets
 // at spawn, are whatever branch that one checkout is standing on. Measured off
 // its HEAD reflog that day: 57 branch switches in seven days and 79.4 of 168

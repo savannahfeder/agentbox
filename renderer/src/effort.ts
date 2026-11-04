@@ -10,9 +10,9 @@
 // Code's words are in ../../shared/effort-levels so the spawn and the card
 // cannot disagree about them; Codex's are per model and arrive beside the
 // model's name off this Mac (`levels` on a codexModels row,
-// main/codex-models.mjs).
+// main/codex-models.mts).
 
-import { EFFORT_LEVELS, effortLabel, isEffort, isEffortWord } from '../../shared/effort-levels.mjs';
+import { EFFORT_LEVELS, effortLabel, isEffort, isEffortWord } from '../../shared/effort-levels.mts';
 import { CODEX_OWN, claudeModelRows, defaultModelFor, type ModelChoice } from './models';
 
 export interface EffortChoice {
@@ -64,12 +64,12 @@ export function effortPicked(id: string | null, rows: EffortChoice[] = EFFORTS):
  * WHAT THE PICKED MODEL THINKS AT WHEN SHE HAS PICKED NO LEVEL.
  *
  * The strip drew nothing lit, and until today that was the honest answer:
- * ../../shared/effort-levels.mjs says "a level nobody picked is the engine's own
+ * ../../shared/effort-levels.mts says "a level nobody picked is the engine's own
  * choice for the model... and this app does not know what that is per model, so
  * it does not claim to." It knows now. BOTH engines publish it per model and it
  * arrives beside the model's own name from each: `default_reasoning_level` out
  * of Codex's cache and `default_effort` out of Claude Code's catalog
- * (main/codex-models.mjs, main/claude-models.mjs).
+ * (main/codex-models.mts, main/claude-models.mjs).
  *
  * NULL IS A REAL ANSWER and it draws the strip exactly as it drew before. A
  * model whose catalog entry names no default gets no lit button rather than a

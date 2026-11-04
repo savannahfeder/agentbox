@@ -1,7 +1,7 @@
 // September 18 live /review started creative_production_mcp despite apps=false
 // and named MCP isolation. Current Codex plugins are a separate config layer.
 import {it,expect} from 'vitest';
-import {workerThreadParams,resumeThreadParams} from '../main/codex-session.mjs';
+import {workerThreadParams,resumeThreadParams} from '../main/codex-session.mts';
 it.each([false,true])('disables plugin loading on a worker (resume=%s)',resume=>{
  const base=workerThreadParams({cwd:'/fixture',mcpServers:['personal'],storeServer:{name:'agentbox',command:'/store'}});
  const params=resume?resumeThreadParams('same-thread',base):base;

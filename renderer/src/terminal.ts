@@ -13,7 +13,7 @@
 // read the same trace for two different purposes — that one keeps the
 // SENTENCES the agent wrote, this one keeps every line it typed.
 import { momentOf, type TraceSession } from './notes';
-import { runStoppedLine } from '../../shared/spawn-trouble.mjs';
+import { runStoppedLine } from '../../shared/spawn-trouble.mts';
 
 export interface TraceLine {
   // "9:12:04", in the time zone she is sitting in.
@@ -31,7 +31,7 @@ export interface TraceLine {
 const STAMPED = /^(\d\d):(\d\d):(\d\d) {2}(.*)$/;
 const EXIT = /^# exited \((-?\d+)\)/;
 
-// The trace's clock is UTC and carries no date (supervisor.mjs stamps every
+// The trace's clock is UTC and carries no date (supervisor.mts stamps every
 // line with toISOString.slice(11, 19)), so a local 10pm can be written "05:00:12".
 // The session's own startedAt supplies the missing date; notes.ts owns that
 // arithmetic and this borrows it rather than keeping a second copy.
@@ -70,7 +70,7 @@ function oneLine(text: string): string {
 // one, and a second normaliser is a second answer to "are these the same
 // words".
 // The body of the run's ERROR result, or '' when it ended any other way. The
-// same block shared/dead-run-trace.mjs reads for a cause.
+// same block shared/dead-run-trace.mts reads for a cause.
 const ERROR_RESULT = /^\d{2}:\d{2}:\d{2}\s{2}== RESULT \([^)]*\bERROR\b[^)]*\) ==$/m;
 function errorResultText(raw: string): string {
   const at = ERROR_RESULT.exec(raw);

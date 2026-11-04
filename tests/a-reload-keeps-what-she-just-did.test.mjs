@@ -8,7 +8,7 @@
 // and approval goes through `deferCommit` in App.tsx, which holds the write in
 // the page's memory for UNDO_GRACE_MS (3000 ms) so Z can take it back. The
 // only thing that ever writes it is a setTimeout in that page. ⌘R
-// (`reloadRenderer` in main/main.mjs) called `reloadIgnoringCache()` straight
+// (`reloadRenderer` in main/main.mts) called `reloadIgnoringCache()` straight
 // away, so a reload inside those three seconds threw the timer and the write
 // away together, and nothing anywhere else knew the action had happened. A
 // typed reply rides the same window and was lost the same way.
@@ -127,7 +127,7 @@ describe('⌘R writes what the page is holding before it reloads', () => {
 
 describe('the wiring from ⌘R to the held write', () => {
   it('main reloads through the handshake, not straight away', () => {
-    const main = read('main', 'main.mjs');
+    const main = read('main', 'main.mts');
     const body = main.slice(main.indexOf('function reloadRenderer'), main.indexOf('async function createWindow'));
     expect(body).toMatch(/writeHeldThenReload\(/);
     expect(body).toMatch(/reloadIgnoringCache\(\)/);

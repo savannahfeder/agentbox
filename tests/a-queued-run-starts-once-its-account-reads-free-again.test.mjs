@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { cannotStartLine } from '../renderer/src/live-line.ts';
 import { liveLine } from '../renderer/src/teammates/chat-lines.ts';
 
@@ -77,7 +77,7 @@ describe('what a queued row says while the fleet is braked', () => {
     const line = cannotStartLine({ why: 'brake', tool: 'Claude Code' });
     expect(line).toMatch(/Claude Code/);
     expect(line).not.toMatch(/as soon as one is free/);
-    const status = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const status = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     expect(status).toMatch(/SAID_WHY_NOT_STARTED = new Set\(\[[^\]]*'brake'/);
   });
 });

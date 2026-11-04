@@ -20,8 +20,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ensureTaskFolder, parkTaskFolder } from '../main/task-folders.mjs';
-import { runScript } from '../main/ship-queue.mjs';
+import { ensureTaskFolder, parkTaskFolder } from '../main/task-folders.mts';
+import { runScript } from '../main/ship-queue.mts';
 
 const g = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 

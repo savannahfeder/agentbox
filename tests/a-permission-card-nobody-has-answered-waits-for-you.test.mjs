@@ -26,7 +26,7 @@
 //
 // Measured by driving both engines' own code: the Codex handler
 // (main/codex-approvals.mjs) and the Claude Code channel
-// (main/approval-prompt-core.mjs), with the sweep done by hand exactly as
+// (main/approval-prompt-core.mts), with the sweep done by hand exactly as
 // `listPending` does it.
 import { describe, it, expect, vi, afterAll } from 'vitest';
 import fs from 'node:fs';
@@ -35,7 +35,7 @@ import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { createCodexApprovals } from '../main/codex-approvals.mjs';
-import { serveApprovals } from '../main/approval-prompt-core.mjs';
+import { serveApprovals } from '../main/approval-prompt-core.mts';
 import { answer, approvalPublicKey, listPending, spoolDir } from '../main/approvals.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));

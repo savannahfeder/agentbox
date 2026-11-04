@@ -53,7 +53,7 @@ describe('the colour Safari paints around the page', () => {
     expect(groundColour('', '')).toBe('#1e1b1a');
   });
   it('and the home-screen manifest no longer says a cool grey', () => {
-    const link = fs.readFileSync(path.join(root, 'main/phone-link.mjs'), 'utf8');
+    const link = fs.readFileSync(path.join(root, 'main/phone-link.mts'), 'utf8');
     expect(link).not.toMatch(/#16161a/);
     expect(link).toMatch(/theme_color:\s*'#1e1b1a'/);
   });

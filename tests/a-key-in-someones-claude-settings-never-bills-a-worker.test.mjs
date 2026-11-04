@@ -24,8 +24,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
-import { harnessFor } from '../main/harnesses.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { harnessFor } from '../main/harnesses.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 

@@ -30,8 +30,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { matchesQuery } from '../renderer/src/palette-rows';
-import { Supervisor } from '../main/supervisor.mjs';
-import { carryHerBriefsAcross, joinMessageRules, readInstruction, readSystemTemplate, writeInstruction } from '../main/instruction-settings.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { carryHerBriefsAcross, joinMessageRules, readInstruction, readSystemTemplate, writeInstruction } from '../main/instruction-settings.mts';
 
 const repo = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(repo, p), 'utf8');
@@ -240,14 +240,14 @@ describe('the move carries her text across once and never eats anything', () => 
   });
 
   it('runs at startup, before the supervisor that reads the files', () => {
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).toContain('carryHerBriefsAcross(appDir, userDir)');
     expect(main.indexOf('carryHerBriefsAcross(appDir, userDir)'))
       .toBeLessThan(main.indexOf('new Supervisor('));
   });
 
   it('is the founder\'s own folder that the Settings boxes write to', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     expect(ipc).toContain('readInstruction(supervisor.userDir, id, supervisor.appDir)');
     expect(ipc).toContain('writeInstruction(supervisor.userDir, id, text)');
   });
@@ -312,7 +312,7 @@ describe('the two message documents are joined once', () => {
   });
 
   it('runs at startup, after the carry and before the supervisor', () => {
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).toContain('joinMessageRules(appDir, userDir)');
     expect(main.indexOf('carryHerBriefsAcross(appDir, userDir)'))
       .toBeLessThan(main.indexOf('joinMessageRules(appDir, userDir)'));

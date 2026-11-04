@@ -11,7 +11,7 @@ export const DONE_STEPS: number;
 export const DONE_STEP_WORDS: number;
 export function doneSteps(progress: string | undefined | null): string[];
 export function summaryOf(item: Partial<WorkItem>): { problem: string; progress: string; solution: string; written: boolean };
-export function cardsFor(p: { products: unknown[]; readItems: (product: any) => any[]; now?: number; since?: number | null }): any[];
+export function cardsFor(p: { products: unknown[]; readItems: (product: any) => any[]; now?: number; since?: number | null; me?: string | null; running?: Iterable<string> }): any[];
 type ProjectSeen = { personal?: boolean; seenBy?: string; seenByPeople?: string[] } | null | undefined;
 export function shownToTeam(item: Partial<WorkItem>, since?: number | null, product?: ProjectSeen): boolean;
 export function visibilityOf(item: Partial<WorkItem>, product?: ProjectSeen): 'team' | 'people' | 'private' | undefined;

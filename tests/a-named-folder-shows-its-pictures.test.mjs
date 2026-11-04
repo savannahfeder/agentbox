@@ -10,13 +10,13 @@
 // So a folder on its own line asks main which pictures are in it, newest first,
 // because the round a worker just finished is the one it is pointing at. Only
 // pictures, only inside this product's own folders, the same two rules the
-// picture scheme enforces (main/img-scheme.mjs), so a folder line can never be
+// picture scheme enforces (main/img-scheme.mts), so a folder line can never be
 // a way to list anything else on her disk.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { folderPictures } from '../main/folder-pictures.mjs';
+import { folderPictures } from '../main/folder-pictures.mts';
 
 let root, dir, repo, prod;
 const touch = (rel, ageMinutes) => {

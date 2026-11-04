@@ -4,13 +4,13 @@
 // merging into main" ends on the hand-back line, and a ship is a merge into
 // main, so a cloud run asked to ship moved its thread to the computer instead
 // of adding `ship`. The ship queue already waits for a cloud run's branch to
-// come home before it ships (main/supervisor.mjs `isLive`/`liveSince`), so the
+// come home before it ships (main/supervisor.mts `isLive`/`liveSince`), so the
 // label is all a cloud run needs. Measured by reading CLOUD_NOTE: before the
 // fix it named the hand-back for any merge into main and said nothing of `ship`.
 import { describe, it, expect } from 'vitest';
-import { CLOUD_NOTE, PLAIN_CLOUD_NOTE } from '../main/cloud/run.mjs';
+import { CLOUD_NOTE, PLAIN_CLOUD_NOTE } from '../main/cloud/run.mts';
 import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
-import { SHIP_LABEL } from '../main/ship-queue.mjs';
+import { SHIP_LABEL } from '../main/ship-queue.mts';
 
 const branches = CLOUD_NOTE.split('\n\n').find((p) => p.startsWith('Only this task\'s own branch comes back'));
 

@@ -6,7 +6,7 @@
 // minutes. They could no longer find their own threads. On a team that is worse
 // again: people point each other at a thread by the name one of them wrote.
 //
-// How it was measured: the app's namer (main/row-label.mjs) is the only writer
+// How it was measured: the app's namer (main/row-label.mts) is the only writer
 // of `label`, it runs one row a tick off the supervisor, and `wantsName` said
 // yes again every time anything on the row's CONTENT moved. An agent writes a
 // note and a result on every run, so every run earned a fresh name.
@@ -24,7 +24,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { rowTitle } from '../renderer/src/list-rules';
-import { wantsName } from '../main/row-label.mjs';
+import { wantsName } from '../main/row-label.mts';
 
 // A dictated message, whose first line was too long to be a title and was
 // clipped into one by the app. This is the row the namer exists for.

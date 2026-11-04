@@ -16,8 +16,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cornerTagRig } from './helpers/corner-tag-rig.mjs';
-import { MEASURE_EVERY_MS } from '../main/corner-tag.mjs';
-import { inPoints } from '../shared/corner-tag.mjs';
+import { MEASURE_EVERY_MS } from '../main/corner-tag.mts';
+import { inPoints } from '../shared/corner-tag.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const page = fs.readFileSync(path.join(root, 'renderer/src/corner-tag/main.tsx'), 'utf8');

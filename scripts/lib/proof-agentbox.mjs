@@ -1,7 +1,7 @@
 // A WHOLE AGENTBOX, UNDER /tmp, FOR A PROOF SCRIPT TO DRIVE.
 //
 // The proofs beside this file are not tests and they are not mocks: they run
-// main/store.mjs and main/supervisor.mjs exactly as the app runs them, and the
+// main/store.mts and main/supervisor.mts exactly as the app runs them, and the
 // only things constructed here are the throwaway store and the throwaway git
 // repos the work is about. Nothing reaches the founder's ~/Zero, her
 // zero.config.json, her ~/.codex or her ~/.claude.
@@ -16,8 +16,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { Store } from '../../main/store.mjs';
-import { Supervisor } from '../../main/supervisor.mjs';
+import { Store } from '../../main/store.mts';
+import { Supervisor } from '../../main/supervisor.mts';
 
 export const APP_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 
@@ -122,7 +122,7 @@ export function git(cwd, ...args) {
  *
  *   `engineChoice` IS THE GATE. shared/engines.mjs refuses the second engine
  *   for every caller that cannot produce the ENGINE_CHOICE_ENABLED symbol, and
- *   main/supervisor.mjs derives that symbol from exactly this value. Without a
+ *   main/supervisor.mts derives that symbol from exactly this value. Without a
  *   date here every row in these proofs would run on Claude Code -- which is
  *   what the app does today, and is itself one of the things proved.
  *

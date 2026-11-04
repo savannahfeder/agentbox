@@ -1,6 +1,6 @@
 // A MODEL SHE PICKED FOR CODEX IS HONOURED, OR THE RUN SAYS WHY IT IS NOT.
 //
-// Until `main/codex-models.mjs` existed, the supervisor had no way to tell one
+// Until `main/codex-models.mts` existed, the supervisor had no way to tell one
 // model word from another, so it treated EVERY model on a Codex row as a Claude
 // Code name and dropped it:
 //
@@ -21,7 +21,7 @@
 //
 // 3. AND IT REACHED NOBODY. Measured 2026-09-04 by reading the two line
 //    numbers: `_spawnCodexWorker` emitted the refusal on `worker.stderr`
-//    SYNCHRONOUSLY, at main/supervisor.mjs:3967, and returned the worker to
+//    SYNCHRONOUSLY, at main/supervisor.mts:3967, and returned the worker to
 //    `spawnWorker`, which attaches `child.stderr.on('data', ...)` 430 lines
 //    later at :4397. An EventEmitter buffers nothing, so the only notice she
 //    was ever going to get about her model choice being dropped was emitted
@@ -33,7 +33,7 @@
 //
 // A word this Mac's Codex knows is carried. A word it does not know STOPS THE
 // RUN before `thread/start`, with the reason on the pipe `troubleCause` reads
-// -- the same gate main/codex-session.mjs already uses two steps later when the
+// -- the same gate main/codex-session.mts already uses two steps later when the
 // store server never comes up, and the same shape `mcpServerNames` uses when it
 // cannot tell which servers to switch off.
 //
@@ -132,9 +132,9 @@ vi.mock('../main/account-tooling.mjs', async (importActual) => {
   return { ...actual, linkAccountTooling: () => null };
 });
 
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { foldWorkItems } from '../shared/work-items.mjs';
-import { codexModels } from '../main/codex-models.mjs';
+import { codexModels } from '../main/codex-models.mts';
 
 const CODEX_BIN = '/nonexistent/codex/codex';
 const dirs = [];

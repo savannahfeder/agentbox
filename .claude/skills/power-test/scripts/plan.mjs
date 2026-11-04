@@ -113,7 +113,7 @@ export function chaosPlan(level, totalMs, { real = false, cloud = false, logins 
 }
 
 // How long the cloud waits without a word from the Mac before it calls the
-// Mac away (main/cloud/run.mjs OFFLINE_AFTER_MS). A sleep shorter than this
+// Mac away (main/cloud/run.mts OFFLINE_AFTER_MS). A sleep shorter than this
 // never reaches the cloud's away path.
 export const CLOUD_AWAY_MS = 90_000;
 

@@ -25,6 +25,8 @@ export interface Member {
   starting?: boolean;
   /** Someone else's AI teammate at work, which its owner's card says. */
   running?: boolean;
+  /** Your AI teammate, paused, with no run still going. */
+  paused?: boolean;
   /** What they are on, or the line that says why nothing is running. */
   now: string | null;
   /** A chat's people, its newest line, and whether it holds something you have not read. */
@@ -105,8 +107,9 @@ export function buildMembers({ me, people = [], wall = null, cards = [], tasksHe
   for (const t of teammates) {
     const agents = mateAgents.get(t.id) ?? 0;
     // A run under way outranks Paused, which stops nothing already going.
-    const now = t.status === 'draft' && !t.waiting?.length ? 'Setting up' : t.paused && !t.running ? 'Paused' : t.now;
-    out.push({ key: `mate:${t.id}`, kind: 'mate', name: t.name, letter: t.letter || t.name.slice(0, 1), role: t.role, agents, starting: !!t.running && !agents, now });
+    const paused = t.paused && !t.running;
+    const now = t.status === 'draft' && !t.waiting?.length ? 'Setting up' : paused ? 'Paused' : t.now;
+    out.push({ key: `mate:${t.id}`, kind: 'mate', name: t.name, letter: t.letter || t.name.slice(0, 1), role: t.role, agents, starting: !!t.running && !agents, now, ...(paused ? { paused: true } : {}) });
   }
   for (const t of theirMates) {
     const owner = people.find((p) => p.id === t.owner)?.name ?? '';

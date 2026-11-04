@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 import { commandWork, isBookkeeping, workVerb } from '../shared/work-lines.mjs';
 import { runNodes } from '../renderer/src/item-thread';
 import { activitySummary } from '../renderer/src/activity-summary';
-import { claudeActivity, currentActivity } from '../main/agent-activity.mjs';
+import { claudeActivity, currentActivity } from '../main/agent-activity.mts';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const trace = (lines) => ({ startedAt: Date.parse('2026-10-01T12:00:00Z'), text: lines.join('\n') });

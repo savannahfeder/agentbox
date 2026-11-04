@@ -2,10 +2,10 @@
 //
 // WHY, 2026-10-19. Ships took 12 to 20 minutes each and the top-priority
 // thread waited about two hours to land. Measured on this Mac that evening:
-// 1,207 test files, of which 216 name main/supervisor.mjs, 128 name
-// renderer/src/styles.css and 73 name main/store.mjs. `vitest related` on a
+// 1,207 test files, of which 216 name main/supervisor.mts, 128 name
+// renderer/src/styles.css and 73 name main/store.mts. `vitest related` on a
 // core file pulled in 228 files and 2,953 tests. The 93 files a change to
-// main/store.mjs pulls in took 77 s at load 16, and the suite ran TWICE per
+// main/store.mts pulls in took 77 s at load 16, and the suite ran TWICE per
 // ship, so a core change cost 12 minutes before anything was pushed.
 //
 // Almost all of that is fixed cost per file: of those 77 s, 102 s of fork time
@@ -38,15 +38,15 @@ function manyThatName(file, n, prefix = 'audit') {
 
 describe('a change only a few tests name', () => {
   const root = checkout({
-    'the-store-keeps-a-row.test.mjs': "import { store } from '../main/store.mjs';\n",
+    'the-store-keeps-a-row.test.mjs': "import { store } from '../main/store.mts';\n",
     'something-else.test.mjs': "import { other } from '../main/other.mjs';\n",
   });
 
   it('is gated by every test that imports it, as it always was', () => {
-    const gate = gateFor(['main/store.mjs'], root);
+    const gate = gateFor(['main/store.mts'], root);
     expect(gate.mode).toBe('related');
     expect(vitestArgs(gate)).toEqual([
-      'related', '--run', '--passWithNoTests', 'main/store.mjs', 'tests/the-store-keeps-a-row.test.mjs',
+      'related', '--run', '--passWithNoTests', 'main/store.mts', 'tests/the-store-keeps-a-row.test.mjs',
     ]);
   });
 
@@ -59,12 +59,12 @@ describe('a change only a few tests name', () => {
 
 describe('a change most of the suite names', () => {
   const root = checkout({
-    ...manyThatName('main/supervisor.mjs', GATE_CAP + 40),
+    ...manyThatName('main/supervisor.mts', GATE_CAP + 40),
     'the-supervisor-starts-a-worker.test.mjs':
-      "import { Supervisor } from '../main/supervisor.mjs';\n// main/supervisor.mjs, main/supervisor.mjs\n",
+      "import { Supervisor } from '../main/supervisor.mts';\n// main/supervisor.mts, main/supervisor.mts\n",
   });
 
-  const gate = gateFor(['main/supervisor.mjs'], root);
+  const gate = gateFor(['main/supervisor.mts'], root);
 
   it('runs the cap and no more, because the push cannot wait for the rest', () => {
     expect(gate.mode).toBe('capped');
@@ -84,7 +84,7 @@ describe('a change most of the suite names', () => {
   });
 
   it('picks the same files every time, so a red test can be run again', () => {
-    expect(gateFor(['main/supervisor.mjs'], root).files).toEqual(gate.files);
+    expect(gateFor(['main/supervisor.mts'], root).files).toEqual(gate.files);
   });
 });
 

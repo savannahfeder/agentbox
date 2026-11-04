@@ -4,7 +4,7 @@
 // CONFIDENT WRONG ONE. Every one of these sentences is a promise about a
 // process she cannot see, so a row that says "queued" while nothing is going to
 // spawn on it is worse than the silence it replaced. That exact confusion
-// already happened once, on, and it is why `queued` in main/supervisor.mjs is
+// already happened once, on, and it is why `queued` in main/supervisor.mts is
 // filtered as narrowly as it is.
 
 import { describe, it, expect } from 'vitest';
@@ -135,7 +135,7 @@ describe('the timing beside it', () => {
 
 // HOW MANY SUBAGENTS ARE ON IT.
 //
-// `countHelpers` in main/supervisor.mjs only ever counts a `task_started` id,
+// `countHelpers` in main/supervisor.mts only ever counts a `task_started` id,
 // so the lead is never in the number, and a run measured on Claude Code 2.1.246
 // has the lead issuing its own tool calls while a subagent is still open. So "1
 // Agent Working" was drawn while two agents were working. The word names what

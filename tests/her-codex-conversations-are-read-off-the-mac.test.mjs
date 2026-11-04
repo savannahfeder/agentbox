@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   cleanAnswer, cleanPrompt, isInjected, isLive, listRolloutFiles, readCodexIndex, readCodexThreads, readRollout,
-} from '../main/codex-threads.mjs';
+} from '../main/codex-threads.mts';
 
 const NOW = Date.parse('2026-09-14T19:30:00-07:00');
 let home;

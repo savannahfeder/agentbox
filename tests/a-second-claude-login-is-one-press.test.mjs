@@ -24,7 +24,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { claudeLoginCommand, makeClaudeHome, SHARED_DIRS } from '../main/account-tooling.mjs';
 import { discoverProfiles, effectiveProfiles, forgetDiscovery } from '../main/account-discovery.mjs';
-import { addClaudeAccount } from '../main/settings.mjs';
+import { addClaudeAccount } from '../main/settings.mts';
 
 const root = path.resolve(path.dirname(path.dirname(fileURLToPath(import.meta.url))), '.');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -163,7 +163,7 @@ describe('the door on the screen', () => {
 
   it('carries the bridge end to end, so no press lands on a missing channel', () => {
     expect(read('preload.cjs')).toContain("claudeAddAccount: () => ipcRenderer.invoke('zero:claude-add-account')");
-    expect(read('main/ipc.mjs')).toContain("ipcMain.handle('zero:claude-add-account'");
+    expect(read('main/ipc.mts')).toContain("ipcMain.handle('zero:claude-add-account'");
     expect(read('renderer/src/api.ts')).toContain('async addClaudeAccount(');
   });
 
@@ -171,7 +171,7 @@ describe('the door on the screen', () => {
   // is holding the previous folder, and it would sign the new account into the
   // old one.
   it('ends the previous sign-in shell', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     const handler = ipc.slice(
       ipc.indexOf("ipcMain.handle('zero:claude-add-account'"),
       ipc.indexOf("ipcMain.handle('zero:settings-set-project'"),

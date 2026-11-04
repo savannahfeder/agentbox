@@ -30,7 +30,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const pkg = JSON.parse(read('package.json'));
 const updater = read('main/updater.mts');
 const publish = read('scripts/publish-download.mjs');
-const ipc = read('main/ipc.mjs');
+const ipc = read('main/ipc.mts');
 const preload = read('preload.cjs');
 
 /* ------------------------- what a release must carry ---------------------- */

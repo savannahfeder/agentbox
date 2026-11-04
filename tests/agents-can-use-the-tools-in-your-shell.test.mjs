@@ -66,7 +66,7 @@ describe('agents can use the tools in your shell', () => {
   });
 
   it('recovers PATH before the app loads configuration or starts workers', () => {
-    const src = fs.readFileSync(new URL('../main/main.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/main.mts', import.meta.url), 'utf8');
     const window = src.slice(src.indexOf('async function createWindow()'));
     // Awaited, alongside the shell's login folders since w-6d8c543a43.
     const recovered = window.search(/await (Promise\.all\(\[)?recoverShellPath\(/);

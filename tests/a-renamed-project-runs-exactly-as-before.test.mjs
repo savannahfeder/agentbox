@@ -21,9 +21,9 @@ import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { setProjectName } from '../main/project-identity.mjs';
+import { Store } from '../main/store.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { setProjectName } from '../main/project-identity.mts';
 import { resolveAccount, resolveProduct } from '../mcp/core/account.mjs';
 import { envName } from '../shared/product-name.mjs';
 

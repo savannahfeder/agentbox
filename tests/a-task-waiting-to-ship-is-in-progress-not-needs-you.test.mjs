@@ -20,7 +20,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { belongsInInbox, belongsInProgress, belongsOnTheRail, stoppable } from '../renderer/src/list-rules';
 import { liveLine, shortWord } from '../renderer/src/live-line';
-import { SHIP_LABEL, ShipQueue, waitingToShip } from '../main/ship-queue.mjs';
+import { SHIP_LABEL, ShipQueue, waitingToShip } from '../main/ship-queue.mts';
 
 const NOW = 1_791_514_000_000;
 
@@ -160,8 +160,8 @@ describe('which rows the queue still owes a ship', () => {
 describe('the window is told', () => {
   const src = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
   it('the supervisor puts the ids on its status, and the inbox reads them', () => {
-    expect(src('main/supervisor.mjs')).toMatch(/shipping = this\.shipQueue\.waitingIds\(/);
-    expect(src('main/supervisor.mjs')).toMatch(/paused: this\.paused,\s*shipping,/);
+    expect(src('main/supervisor.mts')).toMatch(/shipping = this\.shipQueue\.waitingIds\(/);
+    expect(src('main/supervisor.mts')).toMatch(/paused: this\.paused,\s*shipping,/);
     expect(src('renderer/src/App.tsx')).toMatch(/snap\?\.supervisor\.shipping/);
   });
 });

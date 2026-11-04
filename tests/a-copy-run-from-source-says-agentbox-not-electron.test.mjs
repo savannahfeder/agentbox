@@ -144,7 +144,7 @@ describe('what it must never do', () => {
   });
 
   it('has an About box that names Agentbox and its version, not Electron 43', () => {
-    const main = fs.readFileSync(new URL('../main/main.mjs', import.meta.url), 'utf8');
+    const main = fs.readFileSync(new URL('../main/main.mts', import.meta.url), 'utf8');
     expect(main).toMatch(/app\.setAboutPanelOptions\(\{ applicationName: NAME, applicationVersion: app\.getVersion\(\), version: '' \}\)/);
   });
 

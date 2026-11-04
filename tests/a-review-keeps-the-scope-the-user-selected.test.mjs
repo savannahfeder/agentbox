@@ -1,7 +1,7 @@
 // MP-05 scope validation: whitespace must not turn a branch into custom prose,
 // and multiple scope arguments must be refused rather than combined into a ref.
 import {it,expect} from 'vitest';
-import {reviewTarget} from '../shared/provider-commands.mjs';
+import {reviewTarget} from '../shared/provider-commands.mts';
 it.each(['--base main','--base\tmain','--base\nmain'])('preserves the branch scope in %j',text=>expect(reviewTarget(text)).toEqual({type:'baseBranch',branch:'main'}));
 it('preserves commit and custom instruction scopes',()=>{
  expect(reviewTarget('--commit abc1234')).toEqual({type:'commit',sha:'abc1234'});

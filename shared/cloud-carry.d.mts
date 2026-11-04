@@ -52,3 +52,5 @@ export function carryCommand(options?: {
   notBefore?: number | null;
   repeat?: { rule: string; key: string } | null;
 }): CarriedCommand | null;
+export const CARRY_AGAIN_MS: number;
+export function handOverSpent(options?: { at?: number; notBefore?: number | null; now?: number; againMs?: number }): boolean;

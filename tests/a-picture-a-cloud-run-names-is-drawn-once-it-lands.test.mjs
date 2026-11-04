@@ -18,7 +18,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ArtifactImg } from '../renderer/src/components/Focus.tsx';
 import { pictureUrl } from '../renderer/src/picture.ts';
-import { imgPath } from '../main/img-scheme.mjs';
+import { imgPath } from '../main/img-scheme.mts';
 
 const source = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
 const picture = source.slice(source.indexOf('export function ArtifactImg'), source.indexOf('// A SOUND OR A FILM'));

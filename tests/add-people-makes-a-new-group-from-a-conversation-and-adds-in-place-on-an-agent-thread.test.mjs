@@ -8,9 +8,9 @@
 // makes a separate group and leaves the conversation as it was.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import * as projects from '../main/team/projects.mjs';
-import { REQUEST_CHANNELS } from '../shared/bridge-map.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import * as projects from '../main/team/projects.mts';
+import { REQUEST_CHANNELS } from '../shared/bridge-map.mts';
 import { threadCommands } from '../renderer/src/thread-commands';
 import { peopleToAdd, addPeopleToAgentThread, whatAddPeopleDoes } from '../renderer/src/threads/page-rules';
 
@@ -44,13 +44,13 @@ describe('nothing can add a person to an existing conversation', () => {
     expect(projects).not.toHaveProperty('addPeopleToRecord');
   });
   it('sync does not write who joined into the record', () => {
-    expect(read('main/team/sync.mjs')).not.toContain('peopleJoined');
-    expect(read('main/team/index.mjs')).not.toContain('peopleJoined');
+    expect(read('main/team/sync.mts')).not.toContain('peopleJoined');
+    expect(read('main/team/index.mts')).not.toContain('peopleJoined');
   });
   it('the window has no door for it', () => {
     expect(REQUEST_CHANNELS).not.toHaveProperty('teamAddPeople');
-    expect(read('main/team/index.mjs')).not.toContain('addToConversation');
-    expect(read('main/ipc.mjs')).not.toContain('zero:team-add-people');
+    expect(read('main/team/index.mts')).not.toContain('addToConversation');
+    expect(read('main/ipc.mts')).not.toContain('zero:team-add-people');
   });
   it('neither cloud has one, and the database does not allow it', () => {
     const cloud = createMemoryCloud();

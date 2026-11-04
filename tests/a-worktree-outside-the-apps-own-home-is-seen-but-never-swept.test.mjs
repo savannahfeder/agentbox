@@ -31,9 +31,9 @@ import {
   ensureTaskFolder, taskFolderPath, buildingFolderPath, listTaskFolders,
   inventoryWorktrees, strayWorktrees, pruneMissingWorktrees,
   releaseTaskFolder, parkTaskFolder, PARKED,
-} from '../main/task-folders.mjs';
-import { strayFolderSettings } from '../main/settings.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+} from '../main/task-folders.mts';
+import { strayFolderSettings } from '../main/settings.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 

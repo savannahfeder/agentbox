@@ -2,7 +2,7 @@
 // running. One stale command would mislabel every subsequent thinking pause.
 // Match starts/ends by id, including overlapping tools and both engines.
 import { describe, it, expect } from 'vitest';
-import { claudeActivity, codexActivity, currentActivity } from '../main/agent-activity.mjs';
+import { claudeActivity, codexActivity, currentActivity } from '../main/agent-activity.mts';
 // `Running the tests` since w-0bd0d8b2ef: a recognised command says what it
 // does, and the command itself stays on `detail`.
 const start = (id, command='npm test') => JSON.stringify({type:'assistant',message:{content:[{type:'tool_use',id,name:'Bash',input:{command}}]}});

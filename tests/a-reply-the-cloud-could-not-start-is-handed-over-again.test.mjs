@@ -28,9 +28,9 @@ import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { GIVEN_UP_FOR_MS, PHONE_TRIES } from '../cloud/gateway/phone.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { kitCopyPath } from '../main/cloud/kit.mjs';
-import { writeMarker } from '../main/cloud/marker.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { kitCopyPath } from '../main/cloud/kit.mts';
+import { writeMarker } from '../main/cloud/marker.mts';
 import { cannotStartLine } from '../renderer/src/live-line';
 
 const MIN = 60_000;

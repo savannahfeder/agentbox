@@ -53,7 +53,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, copyFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const CODEX_BIN = '/nonexistent/codex/codex';
 const dirs = [];
@@ -366,7 +366,7 @@ describe('the wake sweep, on a Mac that does not have the harness', () => {
 //
 // THIS BLOCK USED TO ASSERT THAT EVERY MODEL WORD WAS DROPPED, and that was
 // only ever right because the app had no way to tell one word from another.
-// `main/codex-models.mjs` reads the slugs this Mac's Codex publishes, so the
+// `main/codex-models.mts` reads the slugs this Mac's Codex publishes, so the
 // question is now answerable and the rule is: carried, or the run does not
 // happen. The whole of it, and the argument for stopping rather than running on
 // Codex's own default, is in

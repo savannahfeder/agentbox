@@ -14,7 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { addressYouTyped } from '../shared/websites.mjs';
+import { addressYouTyped } from '../shared/websites.mts';
 import { BrowserChrome } from '../renderer/src/components/BrowserChrome.tsx';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

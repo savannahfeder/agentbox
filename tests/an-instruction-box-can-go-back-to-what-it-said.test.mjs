@@ -10,7 +10,7 @@ import {expect,it} from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {readInstruction,writeInstruction,listVersions,readVersion} from '../main/instruction-settings.mjs';
+import {readInstruction,writeInstruction,listVersions,readVersion} from '../main/instruction-settings.mts';
 
 const QUIET=10*60*1000;
 const FILES={rules:'founder.md',messages:'message-rules.md'};

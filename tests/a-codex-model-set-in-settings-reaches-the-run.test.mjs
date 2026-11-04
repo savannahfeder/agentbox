@@ -121,10 +121,10 @@ vi.mock('../main/account-tooling.mjs', async (importActual) => {
   return { ...actual, linkAccountTooling: () => null };
 });
 
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { foldWorkItems } from '../shared/work-items.mjs';
 import { loadConfig, saveConfig } from '../main/config.mjs';
-import { readSettings, setWorkspaceSetting } from '../main/settings.mjs';
+import { readSettings, setWorkspaceSetting } from '../main/settings.mts';
 
 const CODEX_BIN = '/nonexistent/codex/codex';
 const OPENED = '2026-09-04T00:00:00Z';

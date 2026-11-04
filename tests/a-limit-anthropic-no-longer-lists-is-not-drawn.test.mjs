@@ -12,7 +12,7 @@
 // the list (an older Claude Code, or one served from its own cache) reads the
 // named fields as before.
 import { describe, it, expect } from 'vitest';
-import { readUsageReport } from '../shared/claude-usage.mjs';
+import { readUsageReport } from '../shared/claude-usage.mts';
 
 const T = Date.parse('2026-10-30T22:24:00Z');
 const answer = (rateLimits) => JSON.stringify({ rate_limits_available: true, rate_limits: rateLimits });

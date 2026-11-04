@@ -30,7 +30,7 @@
 // supervisor tick — so it fails if any one of them stops agreeing.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { statusForReply, withdrawReply } from '../renderer/src/list-rules';
 import { Name } from '../shared/product-name.mjs';
 

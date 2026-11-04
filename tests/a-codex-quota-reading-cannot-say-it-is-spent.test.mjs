@@ -3,7 +3,7 @@
 //
 // MEASURED 2026-10-09 on codex-cli 0.160.0. A real `codex app-server` on her
 // own Codex home, one real turn, and the `account/rateLimits/updated` push
-// caught at `onNotification` -- the one channel main/codex-usage.mjs draws the
+// caught at `onNotification` -- the one channel main/codex-usage.mts draws the
 // corner from. Repeat with `node scripts/qa-codex-live.mjs usage`.
 //
 //   { "rateLimits": {
@@ -33,7 +33,7 @@
 // manufactures a hundred: a window is only drawn at 100 when it really is
 // finished.
 import { describe, expect, it } from 'vitest';
-import { codexLimits, codexPlan, mergeRateLimits, windowSpan } from '../shared/codex-usage.mjs';
+import { codexLimits, codexPlan, mergeRateLimits, windowSpan } from '../shared/codex-usage.mts';
 
 /** The push above, verbatim, as it arrived. */
 const MEASURED = Object.freeze({
@@ -171,7 +171,7 @@ describe('the account-level facts the corner had no way to name', () => {
 
   it('answers nulls rather than guesses when the push says nothing', () => {
     // A plan nobody reported may never be drawn as a plan, for the same reason
-    // main/codex-usage.mjs refuses to draw an unread limit as a zero.
+    // main/codex-usage.mts refuses to draw an unread limit as a zero.
     expect(codexPlan({})).toEqual({ plan: null, credits: null, unlimitedCredits: null, spendControlReached: null, reached: null });
     expect(codexPlan(null)).toEqual({ plan: null, credits: null, unlimitedCredits: null, spendControlReached: null, reached: null });
   });

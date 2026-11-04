@@ -6,11 +6,11 @@
 // in one line: the login shell `main/engine-bin.mjs` runs with execFileSync to
 // find Claude Code and Codex. Usually 1 to 3 s; 6.5 s, 9.3 s and 6.5 s at
 // 16:02, 16:03 and 16:04 while a stress test held memory at "tight". Pictures
-// are answered on that same thread (protocol.handle in main/main.mjs), so they
+// are answered on that same thread (protocol.handle in main/main.mts), so they
 // waited out each freeze.
 //
 // The caller was the phone link: it reads the Settings model every minute
-// (SETTINGS_EVERY_MS in main/phone-inbox.mjs), the model looked both engines up
+// (SETTINGS_EVERY_MS in main/phone-inbox.mts), the model looked both engines up
 // again, and the shell answer is held for only thirty seconds, so every pass
 // started two shells. The phone needs only whether each engine is here, which
 // the app found at launch. So that read uses what is known, and the Settings
@@ -47,7 +47,7 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
-const { readSettings, lookAgainFor } = await import('../main/settings.mjs');
+const { readSettings, lookAgainFor } = await import('../main/settings.mts');
 const { forgetClaudeBin } = await import('../main/claude-bin.mjs');
 const { forgetCodexBin } = await import('../main/codex-bin.mjs');
 const { resolveEngine } = await import('../main/engine-bin.mjs');
@@ -168,25 +168,25 @@ describe('Check again, setup and the update check', () => {
   });
 
   it('are all wired to it, and nothing in the window\'s handlers forces a waiting look', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     expect(ipc).not.toMatch(/recheckClaude\(|recheckCodex\(/);
     expect(ipc).toMatch(/installation:async engine=>\{await lookAgainFor\(engine,config\)/);
     expect(ipc).toMatch(/refresh:async engine=>\{await lookAgainFor\(engine,config\)/);
     expect(ipc).toMatch(/'zero:claude-recheck', async \(\) => \{[\s\S]{0,80}await lookAgainFor\('claude', config\)/);
     expect(ipc).toMatch(/'zero:codex-recheck', async \(\) => \{[\s\S]{0,80}await lookAgainFor\('codex', config\)/);
     expect(ipc).toMatch(/claude: async \(\) => \{ const s = await lookAgainFor\('claude', config\)/);
-    const setup = read('main/engine-setup.mjs');
+    const setup = read('main/engine-setup.mts');
     expect(setup.match(/await find\(/g)).toHaveLength(3);
   });
 });
 
 describe('the wiring', () => {
   it('the phone asks the settings channel not to search', () => {
-    expect(read('main/main.mjs')).toMatch(/phoneChannels\.get\('zero:settings-read'\)\?\.\(\{ sender: null \}, \{ search: false \}\)/);
+    expect(read('main/main.mts')).toMatch(/phoneChannels\.get\('zero:settings-read'\)\?\.\(\{ sender: null \}, \{ search: false \}\)/);
   });
 
   it('the settings channel hands that on', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     const handler = ipc.slice(ipc.indexOf("ipcMain.handle('zero:settings-read'"), ipc.indexOf("ipcMain.handle('zero:settings-read'") + 400);
     expect(handler).toMatch(/readSettings\(\{ config, supervisor, store \}, \{ search: how\?\.search !== false \}\)/);
   });

@@ -11,7 +11,7 @@
 // and a message from tomorrow sorts last forever.
 //
 // And the words on that line were the CLI's own, which this app never prints
-// (shared/spawn-trouble.mjs). The thread now says what happened in ours.
+// (shared/spawn-trouble.mts). The thread now says what happened in ours.
 
 import { describe, it, expect } from 'vitest';
 import { momentOf } from '../renderer/src/notes.ts';

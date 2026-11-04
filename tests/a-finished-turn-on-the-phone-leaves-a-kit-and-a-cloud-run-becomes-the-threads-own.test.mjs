@@ -16,10 +16,10 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
-import { Supervisor } from '../main/supervisor.mjs';
-import { Store } from '../main/store.mjs';
-import { readMarker, writeMarker } from '../main/cloud/marker.mjs';
-import { kitCopyPath } from '../main/cloud/kit.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { Store } from '../main/store.mts';
+import { readMarker, writeMarker } from '../main/cloud/marker.mts';
+import { kitCopyPath } from '../main/cloud/kit.mts';
 import { REPLY_MARK, replyPrompt, cloudSessionId } from '../shared/cloud-kit.mjs';
 
 const DEVICE = 'a1b2c3d4e5f6';

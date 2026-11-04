@@ -138,7 +138,7 @@ describe('a document path in a sentence is a link', () => {
   });
 
   it('does not link source files, because a link is a promise it opens', () => {
-    const tree = para(text('The fold is in renderer/src/list-rules.ts and supervisor.mjs.'));
+    const tree = para(text('The fold is in renderer/src/list-rules.ts and supervisor.mts.'));
     linkArtifactPaths(tree);
     expect(only(tree).every((n) => n.type === 'text')).toBe(true);
   });

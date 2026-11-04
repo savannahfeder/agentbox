@@ -7,8 +7,8 @@
 // the cloud, so it stays, named for what it hides.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import * as hours from '../shared/agent-hours.mjs';
-import { wallCards } from '../shared/room-cards.mjs';
+import * as hours from '../shared/agent-hours.mts';
+import { wallCards } from '../shared/room-cards.mts';
 import { openGroupWords } from '../renderer/src/team/rooms/room-rules.ts';
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');

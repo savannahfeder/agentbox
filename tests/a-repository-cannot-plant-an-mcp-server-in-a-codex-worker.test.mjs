@@ -123,8 +123,8 @@ vi.mock('../main/account-tooling.mjs', async (importActual) => ({
   linkAccountTooling: () => null,
 }));
 
-import { Supervisor } from '../main/supervisor.mjs';
-import { projectIsolation, workerThreadParams, resumeThreadParams } from '../main/codex-session.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { projectIsolation, workerThreadParams, resumeThreadParams } from '../main/codex-session.mts';
 
 const dirs = [];
 const settle = async () => { for (let i = 0; i < 8; i += 1) await new Promise((r) => { setImmediate(r); }); };

@@ -26,7 +26,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CODE_PATH, linkArtifactPaths, isMediaPath, productPath } from '../renderer/src/remark-artifact-paths.ts';
 import os from 'node:os';
-import { servable, byteRange, mediaResponse, mediaType } from '../main/img-scheme.mjs';
+import { servable, byteRange, mediaResponse, mediaType } from '../main/img-scheme.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
@@ -141,7 +141,7 @@ describe('a local address with no http in front', () => {
 
 describe('what stays text, because pressing it would go nowhere she wants', () => {
   it('source files and scripts', () => {
-    expect(links(run('The fold is in renderer/src/list-rules.ts, main/store.mjs and scripts/land.sh.'))).toEqual([]);
+    expect(links(run('The fold is in renderer/src/list-rules.ts, main/store.mts and scripts/land.sh.'))).toEqual([]);
   });
 });
 
@@ -245,7 +245,7 @@ describe('a sound or a film is answered in the piece the player asks for', () =>
   });
 
   it('is what the app answers a sound or a film with, and only those', () => {
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).toMatch(/mediaType\(file\)\s*\?\s*await mediaResponse\(file, request\.headers\.get\('range'\)\)/);
     expect(mediaType('/a/b.mp4')).toBe('video/mp4');
     expect(mediaType('/a/b.png')).toBe(null);

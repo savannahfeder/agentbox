@@ -30,7 +30,7 @@ import { filesFromPatch } from './git-change.mjs';
 /**
  * The longest live sentence kept in memory. Past it the live text is dropped
  * and the trace delivers the block whole. This is the only copy; the Claude
- * Code stream reader (main/harnesses/claude-stream.mjs) imports it.
+ * Code stream reader (main/harnesses/claude-stream.mts) imports it.
  */
 export const SAYING_CAP = 20_000;
 

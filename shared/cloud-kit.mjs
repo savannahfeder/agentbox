@@ -8,9 +8,9 @@
 // within CLOUD_TAKES_AFTER_MS is started from the kit by the cloud server
 // (cloud/gateway/phone.mjs), which claims the command `cloud:<run id>`; the
 // computer, waking, joins that run as it joins one it left going
-// (main/cloud/run.mjs `joining`) and brings its work home.
+// (main/cloud/run.mts `joining`) and brings its work home.
 //
-// Shared by the computer (main/cloud/kit.mjs), the server and the phone, so
+// Shared by the computer (main/cloud/kit.mts), the server and the phone, so
 // all three agree on the names. Pure: no file, no network.
 
 export const KIT_VERSION = 1;
@@ -32,7 +32,7 @@ const CLAIM = /^cloud:([A-Za-z0-9._-]{1,120})$/;
 export const cloudClaim = (runId) => `cloud:${runId}`;
 export const runOfClaim = (claimedBy) => (typeof claimedBy === 'string' && CLAIM.test(claimedBy) ? claimedBy.match(CLAIM)[1] : null);
 
-// The same name main/cloud/run.mjs gives a run it starts, so a computer
+// The same name main/cloud/run.mts gives a run it starts, so a computer
 // joining a run the server started asks for it by the name it would have used.
 export const cloudSessionId = (item, runId) => `agentbox-${String(item || 'run').replace(/[^a-zA-Z0-9-]/g, '')}-${runId}`;
 
@@ -43,7 +43,7 @@ export const kitKey = (device, project, item) => `runs/kits/${seg(device)}/${seg
 export const serverRunKey = (runId) => `runs/server/${seg(runId)}.json`;
 /** Written by a computer that has joined a run the server started: the server feeds and closes it no more. */
 export const serverJoinedKey = (runId) => `runs/server/${seg(runId)}.joined.json`;
-/** The objects a run writes as it ends, named as main/cloud/run.mjs names them. */
+/** The objects a run writes as it ends, named as main/cloud/run.mts names them. */
 export const runKey = (runId, name) => `runs/${runId}/${name}`;
 
 /** The text either side of the reply, or null when the prompt has no one place for it. */
@@ -57,8 +57,8 @@ export function replyFrame(prompt) {
 export const replyPrompt = (frame, reply) => `${frame.before}${String(reply ?? '')}${frame.after}`;
 
 // The first line on the agent's input, as the computer writes one
-// (main/claude-input.mjs), with the cloud's note at its top the way
-// main/cloud/run.mjs `claudeLineForTheCloud` puts it on a resumed run.
+// (main/claude-input.mts), with the cloud's note at its top the way
+// main/cloud/run.mts `claudeLineForTheCloud` puts it on a resumed run.
 export function cloudUserLine(text, { note = null, uuid } = {}) {
   const content = note ? `${note}\n\n${text}` : String(text);
   return `${JSON.stringify({ type: 'user', uuid, message: { role: 'user', content }, parent_tool_use_id: null, session_id: '' })}\n`;
@@ -97,7 +97,7 @@ export function checkKit(kit, { now = Date.now() } = {}) {
 
 /**
  * The sandbox's `start` for a run from this kit (cloud/sandbox/server.mjs),
- * built as main/cloud/run.mjs builds one. `getUrl(key)` and `putUrl(key)` make
+ * built as main/cloud/run.mts builds one. `getUrl(key)` and `putUrl(key)` make
  * links; the sign-in goes by name (`loginName(key)`) for the server to swap.
  */
 export async function startPayload(kit, { runId, getUrl, putUrl, loginName, offlineAfterMs = 90_000, kept = null, endTurn = 'claude-stream-json', refs = null, away = false }) {
@@ -149,7 +149,7 @@ export const askId = (runId, conn, id) => `cloud-${String(runId)}-${String(conn)
 /** Whether a card's id is one the cloud put on the phone, so its answer is the cloud's to give. */
 export const cloudCard = (approval) => typeof approval === 'string' && approval.startsWith('cloud-');
 
-// What the app's approvals server answers (main/approval-prompt-core.mjs).
+// What the app's approvals server answers (main/approval-prompt-core.mts).
 export const DECLINED = 'The founder declined this action. Work with what you are already allowed to do, or park the remainder as a review.';
 /** The answer to a held approval_prompt call, as the app's own server would write it. */
 export function approvalAnswerLine(id, { allow, note = null, input = {} } = {}) {
@@ -205,7 +205,7 @@ export function lastAnswerIn(eventsText) {
 // A CODEX KIT'S THREAD (main/codex-app-server.mjs). A Codex run is
 // `codex app-server` spoken to in JSON-RPC, so the kit holds the lines the
 // computer's own client would send to open the thread in the cloud
-// (initialize, initialized, thread/resume rewritten as main/cloud/run.mjs
+// (initialize, initialized, thread/resume rewritten as main/cloud/run.mts
 // rewrites them) and the turn's settings; her reply goes into a `turn/start`
 // whose input is the turn's prompt. Request ids are fixed: `resumeId` names
 // the resume's answer, and turns go from `firstTurnId` on.
@@ -306,7 +306,7 @@ export function codexAnswerIn(eventsText) {
 // A NEW THREAD FROM THE PHONE WITH THE COMPUTER SHUT. Each project on the
 // phone keeps a kit for a fresh thread beside its threads' kits, built for a
 // stand-in item whose id, title and body are these marks and packed from
-// main (main/cloud/run.mjs, Supervisor#_leaveNewThreadKit). The item's mark
+// main (main/cloud/run.mts, Supervisor#_leaveNewThreadKit). The item's mark
 // is plain letters, so a folder name made from a path that holds it
 // (Claude Code's transcripts) holds it unchanged too.
 export const NEW_THREAD = '_new';

@@ -10,7 +10,7 @@
 import type { cloudClient } from './cloud-rest';
 import type { Room, RoomCard, RoomMention, RoomMessage, RoomProfile, RoomsState } from './types';
 import { computerOf, type SettingsRow } from './phone-settings-view';
-import { displayNameOf, wallCards as wallCardsJs } from '../../shared/room-cards.mjs';
+import { displayNameOf, wallCards as wallCardsJs } from '../../shared/room-cards.mts';
 import { Name } from '../../shared/product-name.mjs';
 
 const wallCards = wallCardsJs as unknown as (o: Record<string, unknown>) => RoomCard[];
@@ -161,7 +161,7 @@ export async function groupPeople(c: GroupsRest, roomIds: readonly string[]): Pr
   };
 }
 
-/** The Mac's rooms state (main/team/rooms.mjs `build`), without what only a Mac keeps: pins, mutes, my own running agents. */
+/** The Mac's rooms state (main/team/rooms.mts `build`), without what only a Mac keeps: pins, mutes, my own running agents. */
 export function groupsState({ rooms, people, names, profiles, presence, teammates, teamCards, me = null, messages, reads, mentioned, meId, now, error = null }: GroupPeople & {
   rooms: Group[]; messages: Map<string, RoomMessage[]>; reads: Map<string, number>; mentioned: RoomMessage[]; meId: string; now: number; error?: string | null;
 }): RoomsState {
@@ -291,7 +291,7 @@ export function phoneGroups(c: GroupsRest, { now = Date.now }: { now?: () => num
     file: (roomId: string, name: string) => groupFile(c, roomId, name),
   };
 
-  /** The desktop's `rooms` door (main/ipc.mjs `zero:rooms`), answered from here. */
+  /** The desktop's `rooms` door (main/ipc.mts `zero:rooms`), answered from here. */
   async function door({ op, args = [] }: { op: string; args?: unknown[] }) {
     const fn = ops[op];
     if (!fn) return { ok: false as const, error: NOT_ON_PHONE, rooms: state };

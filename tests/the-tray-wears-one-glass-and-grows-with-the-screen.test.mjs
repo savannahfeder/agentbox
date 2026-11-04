@@ -21,7 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { LATTICE, TAG_BASE, TAG_HEIGHTS, latticeGrid, tagHeight, tagScale } from '../shared/corner-tag.mjs';
+import { LATTICE, TAG_BASE, TAG_HEIGHTS, latticeGrid, tagHeight, tagScale } from '../shared/corner-tag.mts';
 import { Lattice, markMoves } from '../renderer/src/corner-tag/lattice.tsx';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -192,7 +192,7 @@ describe('one glass, whatever the Mac is set to', () => {
   });
 
   it('draws no outer shadow, because the window is exactly the tag', () => {
-    // main/corner-tag.mjs: padding the window for a drawn shadow let a real
+    // main/corner-tag.mts: padding the window for a drawn shadow let a real
     // first click fall through to the app beneath. So the glass is defined by
     // its edge, and every shadow in this page is an inset one.
     for (const line of css.split('\n')) {

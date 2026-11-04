@@ -18,9 +18,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { CLOUD_KEY, cloudIsOn, cloudToggleTarget, cloudToggleNote, cloudCommands, CLOUD_WHEN_ON } from '../renderer/src/cloud-menu';
 import { HINTS } from '../renderer/src/hint-plate';
-import { SHORTCUTS } from '../shared/shortcuts.mjs';
-import { setWorkspaceSetting } from '../main/settings.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { SHORTCUTS } from '../shared/shortcuts.mts';
+import { setWorkspaceSetting } from '../main/settings.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 const read = (p) => fs.readFileSync(new URL(p, import.meta.url), 'utf8');
 const status = (mode, whenOn) => ({ setUp: true, mode, whenOn, running: 0, month: { runs: 0, agentHours: 0, estimatedCost: 0, costPerAgentHour: null } });

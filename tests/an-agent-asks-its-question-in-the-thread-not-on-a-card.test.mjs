@@ -24,13 +24,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { answer, approvalPublicKey, listPending, spoolDir } from '../main/approvals.mjs';
-import { streamInputArgs } from '../main/claude-input.mjs';
+import { streamInputArgs } from '../main/claude-input.mts';
 import { harnessDefinition } from '../shared/harness-definitions.mjs';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const SERVER = path.join(here, '..', 'main', 'approval-prompt-server.mjs');
+const SERVER = path.join(here, '..', 'main', 'approval-prompt-server.mts');
 
 const launch = ({ mcp = '/tmp/mcp.json', rules = '/tmp/rules.json' } = {}) => {
   const plan = { args: ['-p', 'go'] };
@@ -75,7 +76,7 @@ function call(tool, input, settle = 3_000) {
   const dir = spoolDir(root);
   fs.mkdirSync(dir, { recursive: true });
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [SERVER], {
+    const child = spawn(process.execPath, [...stripTypesFlags(), SERVER], {
       env: { ...process.env, ZERO_APPROVALS_DIR: dir, ZERO_APPROVALS_PUBKEY: approvalPublicKey(), ZERO_PRODUCT: 'p', ZERO_ITEM: 'w-1' },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -146,7 +147,7 @@ function roundTrip(tool, input, allow) {
   const dir = spoolDir(root);
   fs.mkdirSync(dir, { recursive: true });
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [SERVER], {
+    const child = spawn(process.execPath, [...stripTypesFlags(), SERVER], {
       env: { ...process.env, ZERO_APPROVALS_DIR: dir, ZERO_APPROVALS_PUBKEY: approvalPublicKey(), ZERO_PRODUCT: 'p', ZERO_ITEM: 'w-1' },
       stdio: ['pipe', 'pipe', 'pipe'],
     });

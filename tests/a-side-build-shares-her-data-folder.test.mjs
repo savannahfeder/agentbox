@@ -49,7 +49,7 @@ describe(`a build packed beside the real ${NAME}`, () => {
   it('puts the name back before the app reads a path from it', () => {
     // Order is the whole of it. app.getPath('userData') is derived from the
     // name, so a rename after the first read is a rename that did nothing.
-    const src = read('main/main.mjs');
+    const src = read('main/main.mts');
     const rename = src.indexOf('app.setName(dataFolderName');
     const firstPath = src.indexOf("app.getPath('appData')");
     expect(rename).toBeGreaterThan(-1);
