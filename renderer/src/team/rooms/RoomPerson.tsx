@@ -4,7 +4,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Room, RoomCard } from '../../types';
 import { I } from './icons';
-import { RoomFace } from './RoomFace';
+import { Face } from '../people';
 import { cardName, chartNamed, hoursWords, weekRank } from './room-rules';
 import { useOutside } from './RoomsPage';
 import { Name } from '../../../../shared/product-name.mjs';
@@ -16,7 +16,7 @@ export function PersonHover({ card, room, at, onMessage, onProfile, onRanks, onC
   const left = Math.min(window.innerWidth - 310, Math.max(10, at.left + at.width / 2 - 150));
   const top = Math.min(window.innerHeight - 280, at.top + 94);
   return <div ref={ref} className="rm-hc rm-pop" style={{ left, top }}>
-    <div className="hd"><RoomFace name={card.name} url={card.avatarUrl} size={44} />
+    <div className="hd"><Face name={card.name} url={card.avatarUrl} size={44} />
       <div className="w"><span className="rm-nm"><span className="n">{cardName(card)}</span></span>{card.headline && <span className="rl">{card.headline}</span>}</div></div>
     {card.bio && <div className="bio">{card.bio}</div>}
     <div className="nums">
@@ -42,7 +42,7 @@ export function ProfilePage({ card, room, rooms, rank, onMessage, onRanks, onRoo
   const firstMonth = card.byMonth.find((m) => m.hours > 0)?.month ?? null;
   return <div className="rm-prof">
     <div className="rm-ph">
-      <div className="top"><RoomFace name={card.name} url={card.avatarUrl} size={72} />
+      <div className="top"><Face name={card.name} url={card.avatarUrl} size={72} />
         <div className="who">
           <span className="rm-nm"><span className="n">{cardName(card)}</span></span>
           {card.headline && <span className="rl">{card.headline}</span>}

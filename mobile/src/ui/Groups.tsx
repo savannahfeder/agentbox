@@ -8,7 +8,8 @@ import { File, Paths } from 'expo-file-system';
 import Svg, { Circle, Path } from 'react-native-svg';
 import type { Room, RoomMessage } from '../../../renderer/src/types';
 import { Name } from '../../../shared/product-name.mjs';
-import { cardName, clockOf, initialsOf, markMentions, mentionsIn } from '../../../renderer/src/team/rooms/room-rules';
+import { cardName, initialsOf, markMentions, mentionsIn } from '../../../renderer/src/team/rooms/room-rules';
+import { clockOf } from '../../../renderer/src/teammates/chat-lines';
 import { newLineAt, READ_AFTER_MS } from '../../../renderer/src/team/rooms/room-chat-rules';
 import { updatedWords } from '../../../renderer/src/threads/page-rules';
 import { bodyParts, chatRoots, dayWords, groupName, groupsInOrder, groupToOpen, onWords, peopleInOrder, pictureType, repliesTo, startsRun } from '../lib/groups';
@@ -18,10 +19,10 @@ import { Back, Caret, Clip } from './icons';
 import { IconButton, RunningMark, Sheet, SheetHead, SheetRow, T, TopBar } from './parts';
 import { color, font, size } from './theme';
 
-/** A square face: the photo, or two letters in mono on one grey tile for everyone (RoomFace.tsx). */
+/** A round face: two letters in mono on one grey ground for everyone (renderer/src/team/people.tsx). */
 export function Face({ name, size: s }: { name: string; size: number }) {
   return (
-    <View style={{ width: s, height: s, borderWidth: 1, borderColor: color.lineStrong, backgroundColor: color.film, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: s, height: s, borderRadius: s / 2, borderWidth: 1, borderColor: color.lineStrong, backgroundColor: color.film, alignItems: 'center', justifyContent: 'center' }}>
       <T style={{ fontFamily: font.mono, fontSize: Math.max(8, Math.round(s * 0.28 * 2) / 2), letterSpacing: 0.5, color: color.dim }}>{initialsOf(name)}</T>
     </View>
   );

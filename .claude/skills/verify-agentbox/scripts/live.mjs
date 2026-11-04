@@ -36,7 +36,8 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const REPO = path.resolve(here, '../../../..');
-export const ROOT = '/tmp/agentbox-verify';
+// VERIFY_ROOT: a long-lived copy that must survive a restart, which empties /tmp.
+export const ROOT = process.env.VERIFY_ROOT || '/tmp/agentbox-verify';
 export const RUNS = path.join(ROOT, 'runs');
 const { FRESH_USER_ENV } = await import(path.join(REPO, 'shared', 'fresh-user-home.mjs'));
 const { listCloudLogins } = await import(path.join(REPO, 'main', 'cloud', 'logins.mjs'));
@@ -446,6 +447,11 @@ async function start(state) {
       env.ASTRAL_STUB_KEY = process.env.ASTRAL_STUB_KEY;
     }
   }
+  // `up --tools-fixture <url>`: the Test tracker's tile, and its sign-in screen
+  // left in a file for a driver instead of on the screen of whoever owns this Mac.
+  if (state.toolsFixture) Object.assign(env, { AGENTBOX_TOOLS_FIXTURE: state.toolsFixture, AGENTBOX_TOOLS_FIXTURE_OPEN: path.join(INSTANCE, 'oauth-url.txt') });
+  // `up --tool-standins <file>`: real tiles on the stand-ins in scripts/standin-tools.mjs.
+  if (state.toolStandins) Object.assign(env, { AGENTBOX_TOOLS_STANDINS: fs.readFileSync(state.toolStandins, 'utf8'), AGENTBOX_TOOLS_FIXTURE_OPEN: path.join(INSTANCE, 'oauth-url.txt') });
   if (state.cloudTmp) { fs.mkdirSync(state.cloudTmp, { recursive: true, mode: 0o700 }); env.TMPDIR = state.cloudTmp; }
   if (state.cloudAccounts) env.AGENTBOX_CLOUD_ACCOUNTS = state.cloudAccounts;
   // The app writes its account id back into this file, so keep what it added.
@@ -523,7 +529,9 @@ async function up(args) {
     cloudAccounts = keys.join(',');
   }
   const alpha = value('alpha');
-  const prepared = { ...(await prepare(real, setupName, shape)), teamFile, ...(alpha ? { alpha: alpha.split(',').map((f) => f.trim()).filter(Boolean) } : {}), ...(cloud ? { cloud: true, cloudTmp: cloudTmpFor(INSTANCE), cloudAccounts } : {}) };
+  const toolsFixture = value('tools-fixture');
+  const toolStandins = value('tool-standins');
+  const prepared = { ...(await prepare(real, setupName, shape)), teamFile, ...(toolsFixture ? { toolsFixture } : {}), ...(toolStandins ? { toolStandins } : {}), ...(alpha ? { alpha: alpha.split(',').map((f) => f.trim()).filter(Boolean) } : {}), ...(cloud ? { cloud: true, cloudTmp: cloudTmpFor(INSTANCE), cloudAccounts } : {}) };
   const next = await start(installed ? { ...prepared, installed: true } : prepared);
   say(installed ? `up: the installed app, pid ${next.pid}, window on debugging port ${next.cdpPort}` : `up: ${next.url}`);
   say(setupName

@@ -6,6 +6,9 @@
 // And the other half: on many rows the title is the only place the first
 // sentence of the request is stored, so once the header stops printing it,
 // the conversation has to.
+//
+// A thread about work with people is named for the work, not the people
+// (11402f89), so the person's name now also waits on !audience.
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -33,7 +36,7 @@ describe('the header', () => {
   it('prints the name the row prints, with her title on hover', () => {
     // A conversation with a person is named for the person (2026-10-01); every
     // other thread prints the name its row prints.
-    expect(focus).toMatch(/className="keep-line-title" title=\{item\.title\}>\{direct && talkFull \? talkFull : rowTitle\(item\)\}</);
+    expect(focus).toMatch(/className="keep-line-title" title=\{item\.title\}>\{direct && !givenTask && !audience && talkFull \? talkFull : rowTitle\(item\)\}</);
   });
 });
 

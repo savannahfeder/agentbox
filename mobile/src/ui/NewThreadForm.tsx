@@ -119,7 +119,7 @@ export function useNewThread(sent: () => void) {
       }
       const saved = await c.attach(product, draft.files);
       const harness = newThreadChoices({ priority: draft.priority, engine, model, effort, engineCount: agents.engines.length, ...codex });
-      await c.send({ kind: 'new', product, text: draft.text, saved, choices: { ...harness, ...later, ...(onAuto ? { labels: [AUTO_LABEL] } : {}) } }, null);
+      await c.send({ kind: 'new', product, to: projectName, text: draft.text, saved, choices: { ...harness, ...later, ...(onAuto ? { labels: [AUTO_LABEL] } : {}) } }, null);
       // The draft goes only once the thread has: a failed send keeps every word on the page.
       draft.take();
       sent();

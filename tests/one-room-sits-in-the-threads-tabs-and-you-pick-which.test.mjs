@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { readRoomTab, writeRoomTab, tabRoom } from '../renderer/src/team/rooms/room-rules.ts';
 
-const room = (id, o = {}) => ({ id, name: id, kind: 'room', teamId: 't', listed: false, inviteOnly: false, role: 'member', members: 4, createdAt: 0, pinned: false, muted: false, unread: 0, lastAt: 0, agents: 0, wall: [], ...o });
+const room = (id, o = {}) => ({ id, name: id, kind: 'room', teamId: null, listed: false, inviteOnly: false, role: 'member', members: 4, createdAt: 0, pinned: false, muted: false, unread: 0, lastAt: 0, agents: 0, wall: [], ...o });
 const general = room('general', { name: 'General', members: 23 });
 const astral = room('astral', { name: 'Astral', members: 8, pinned: true });
 const crit = room('crit', { name: 'Design crit', members: 5 });

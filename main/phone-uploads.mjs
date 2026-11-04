@@ -182,12 +182,31 @@ export function filesNamed(snapshot, { dir, repoPath = null, home }) {
     ...folders, id && path.join(docs, 'designs', id), repo && id && path.join(repo, '.claude', 'worktrees', id),
     docs, path.join(docs, 'designs'), path.join(docs, 'attachments'), repo, repo && path.join(repo, 'designs'),
   ].filter(Boolean))];
-  for (const n of named) {
+  // Each folder is listed once; a name its listing lacks is not there, and one it
+  // has is confirmed on disk, which also settles a case-sensitive volume.
+  const listings = new Map();
+  const listed = (dir) => {
+    if (!listings.has(dir)) {
+      let names = null;
+      try { names = new Set(fs.readdirSync(dir).map((n) => n.normalize('NFC').toLowerCase())); } catch (err) {
+        // No such folder holds nothing; one we may not list is asked file by file.
+        if (err.code === 'ENOENT' || err.code === 'ENOTDIR') names = new Set();
+      }
+      listings.set(dir, names);
+    }
+    return listings.get(dir);
+  };
+  const exists = (file) => {
+    const names = listed(path.dirname(file));
+    if (names && !names.has(path.basename(file).normalize('NFC').toLowerCase())) return false;
+    return fs.existsSync(file);
+  };
+  for (const n of new Set(named)) {
     if (/^[a-z]+:\/\//i.test(n)) continue;
     if (n.startsWith('/') || n.startsWith('~/')) { take(full(n)); continue; }
     const rel = n.replace(/^\.\//, '');
     if (rel.split('/').includes('..')) continue;
-    for (const root of roots) if (fs.existsSync(path.join(root, rel)) && take(path.join(root, rel))) break;
+    for (const root of roots) if (exists(path.join(root, rel)) && take(path.join(root, rel))) break;
   }
   return [...found].map(([key, file]) => ({ key, file }));
 }

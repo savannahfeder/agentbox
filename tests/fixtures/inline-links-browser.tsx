@@ -10,7 +10,7 @@ const notices: unknown[] = [];
 const item = {
   id: 'w-link-test', product: 'demo', title: 'Files in a message', status: 'open',
   kind: 'directive', labels: ['founder'], createdAt: 1, updatedAt: 2,
-  body: '**Your film is "Sample Film.mp4".**\n\nTry [the page](designs/demo.html), localhost:3002 or [the missing file](missing.pdf).',
+  body: '**Your film is "Sample Film.mp4".**\n\nTry [the page](designs/demo.html), localhost:3002 or [the missing file](missing.xlsx).',
 };
 (window as any).zero.itemHistory = async () => ({ ok: true, lines: [
   { id: item.id, ts: 2, source: 'agent', patch: { result: item.body } },
@@ -51,6 +51,8 @@ const wait = () => new Promise(r => setTimeout(r, 80));
   const sameNode = link() === before;
   const retriesAfterUpdates = videosCreated - attemptsBefore;
   link().click();
+  await wait();
+  const bigView = document.querySelector('.artifact-view')?.getAttribute('aria-label');
   [...document.querySelectorAll('a')].find(el => el.textContent === 'localhost:3002')!.click();
   [...document.querySelectorAll('a')].find(el => el.textContent === 'the missing file')!.click();
   await wait();
@@ -60,5 +62,5 @@ const wait = () => new Promise(r => setTimeout(r, 80));
   const productChanged = link() !== before;
   const otherProductResolved = (window as any).resolves.some((r: any) => r.product === 'other' && r.src === 'designs/demo.html');
   observer.disconnect();
-  (window as any).regression = { sameNode, exhausted, retriesAfterUpdates, attemptsBefore, calls, notices, mediaLabel, productChanged, otherProductResolved };
+  (window as any).regression = { sameNode, exhausted, retriesAfterUpdates, attemptsBefore, calls, notices, bigView, mediaLabel, productChanged, otherProductResolved };
 })().catch(error => { (window as any).regression = { error: String(error) }; });

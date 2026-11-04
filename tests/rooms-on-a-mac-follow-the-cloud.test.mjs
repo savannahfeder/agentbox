@@ -124,14 +124,14 @@ describe('switched on', () => {
     expect(w.maya.rooms.state().rooms[0].unread).toBe(0);
     await w.theo.rooms.markRead(room);
     expect(w.theo.rooms.state().rooms[0].unread).toBe(0);
-    expect(w.theo.rooms.state().mentions).toEqual([]);
+    expect(w.theo.rooms.state().mentions).toHaveLength(1);
     await w.theo.rooms.refresh();
     expect(w.theo.rooms.state().rooms[0].unread).toBe(0);
   });
 
   // Codex's review of the build: mentions were read only from the newest 200
   // messages held, so a busy room buried an older one out of Needs you.
-  it('a mention stays in Needs you under two hundred newer messages, until read', async () => {
+  it('a mention stays in Needs you under two hundred newer messages, until marked done', async () => {
     const room = w.maya.rooms.state().rooms[0].id;
     await w.maya.rooms.send(room, '@Theo B. can you look at this?', { mentions: [w.theo.id] });
     for (let i = 0; i < 210; i += 1) {
@@ -139,8 +139,11 @@ describe('switched on', () => {
       await w.maya.backend.sendRoomMessage(room, { body: `note ${i}` });
     }
     await w.theo.rooms.refresh();
-    expect(w.theo.rooms.state().mentions.map((m) => m.body)).toEqual(['@Theo B. can you look at this?']);
+    expect(w.theo.rooms.state().mentions).toHaveLength(1);
     await w.theo.rooms.markRead(room);
+    await w.theo.rooms.refresh();
+    expect(w.theo.rooms.state().mentions).toHaveLength(1);
+    await w.theo.rooms.markDone(room);
     await w.theo.rooms.refresh();
     expect(w.theo.rooms.state().mentions).toEqual([]);
   });

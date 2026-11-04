@@ -72,7 +72,8 @@ describe('a file tile, while the file is read', () => {
   });
 
   it('has a face as tall as a finished one', () => {
-    expect(rule(tiles, '.message-file-face')).toMatch(/height:\s*104px/);
+    // One rule draws the waiting face and the finished one, at a 16:9 slide's height.
+    expect(rule(tiles, '.message-file-face')).toMatch(/height:\s*124px/);
   });
 });
 

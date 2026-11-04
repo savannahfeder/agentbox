@@ -44,7 +44,7 @@ function noRoom(error: WhyNotCloud['detail']): string {
 
 function forCloud(why: string, detail: WhyNotCloud['detail']): string {
   switch (why) {
-    case 'two-at-a-time': return 'The cloud starts two threads at a time, and this one is in line.';
+    case 'starting-in-turn': return 'The cloud starts threads a few at a time, and this one is in line.';
     case 'cloud-full': return `The cloud is running all ${detail ? `${detail} threads ` : ''}it can, so this starts when one finishes.`;
     case 'accounts-limited': return 'Your cloud accounts are at their usage limit, so this starts when one resets.';
     default: return 'It starts as soon as the cloud has room.';

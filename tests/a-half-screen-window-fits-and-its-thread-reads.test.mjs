@@ -64,6 +64,15 @@ describe('a summary opened without room lies over the conversation', () => {
   });
 });
 
+// The grid's tracks come from variables; a step sets them, and `initial` drops a track.
+const gridRule = (css) => css.match(/\n\.th-grid \{[^}]*\}/)[0];
+const varsIn = (body) => Object.fromEntries([...body.matchAll(/(?:^|\n)\s*\.th-grid(?:, \.th-grid\.with-person)? \{([^}]*)\}/g)]
+  .flatMap((m) => [...m[1].matchAll(/--th-([a-z]+): ([^;]+);/g)].map((v) => [v[1], v[2]])));
+const columnsWith = (css, ...bodies) => {
+  const v = Object.assign({}, ...[gridRule(css), ...bodies].map(varsIn));
+  return gridRule(css).match(/grid-template-columns: ([^;]+);/)[1].replace(/ ?var\(--th-([a-z]+),\)/g, (_, n) => (v[n] && v[n] !== 'initial' ? ` ${v[n]}` : ''));
+};
+
 describe('the inbox table gives up columns before it gives up titles', () => {
   const css = read('renderer/src/threads/pages.css');
   it('measures the table, not the window', () => {
@@ -76,7 +85,7 @@ describe('the inbox table gives up columns before it gives up titles', () => {
   const steps = [...css.matchAll(/@container th \(max-width: (\d+)px\) \{([\s\S]*?)\n\}/g)].map((m) => ({ below: Number(m[1]), body: m[2] }));
   const fixed = (cols) => cols.match(/minmax\(0, 1fr\)((?: \d+px)+)/)[1].trim().split(' ').map((c) => parseInt(c, 10));
   const titleAt = (width, cols) => { const f = fixed(cols); return width - INSET - f.reduce((a, b) => a + b, 0) - 16 * f.length; };
-  const full = css.match(/\.th-grid \{[^}]*grid-template-columns: ([^;]+);/)[1];
+  const full = columnsWith(css);
   it('drops Priority first, then Project', () => {
     expect(steps.length).toBe(2);
     expect(steps[0].below).toBeGreaterThan(steps[1].below);
@@ -88,7 +97,7 @@ describe('the inbox table gives up columns before it gives up titles', () => {
   });
   it('leaves the title 240 points or more just under each step', () => {
     for (const s of steps) {
-      const cols = s.body.match(/\.th-grid \{ grid-template-columns: ([^;]+);/)[1];
+      const cols = columnsWith(css, ...steps.filter((t) => t.below >= s.below).map((t) => t.body));
       const next = steps.find((t) => t.below < s.below);
       expect(titleAt(next ? next.below + 1 : NARROWEST_LIST, cols)).toBeGreaterThanOrEqual(240);
     }

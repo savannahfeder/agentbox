@@ -39,7 +39,7 @@ ipcRenderer.on('zero:write-held', async (_e, nonce) => {
 contextBridge.exposeInMainWorld('zero', {
   terminal: (payload) => ipcRenderer.invoke('zero:terminal', payload),
   agentUpdate: (payload) => ipcRenderer.invoke('zero:agent-update', payload),
-  snapshot: () => ipcRenderer.invoke('zero:snapshot'),
+  snapshot: (ask) => ipcRenderer.invoke('zero:snapshot', ask),
   // Which thread is on screen, so the approval card in front is its own and
   // ⌘Y answers the card being read (shared/which-card-is-in-front.mjs).
   looking: (payload) => ipcRenderer.invoke('zero:looking', payload),
@@ -80,10 +80,41 @@ contextBridge.exposeInMainWorld('zero', {
   teamShare: (payload) => ipcRenderer.invoke('zero:team-share', payload),
   teamSync: () => ipcRenderer.invoke('zero:team-sync'),
   teamRoute: (payload) => ipcRenderer.invoke('zero:team-route', payload),
+  teamThreadWork: (payload) => ipcRenderer.invoke('zero:team-thread-work', payload),
+  findInThreads: (payload) => ipcRenderer.invoke('zero:find-in-threads', payload),
+  warmFindInThreads: () => ipcRenderer.invoke('zero:warm-find-in-threads'),
+  teamComment: (payload) => ipcRenderer.invoke('zero:team-comment', payload),
+  teamContinueBrief: (payload) => ipcRenderer.invoke('zero:team-continue-brief', payload),
+  teamContinued: (payload) => ipcRenderer.invoke('zero:team-continued', payload),
   teamReact: (payload) => ipcRenderer.invoke('zero:team-react', payload),
+  fileMark: (payload) => ipcRenderer.invoke('zero:file-mark', payload),
+  fileNewVersion: (payload) => ipcRenderer.invoke('zero:file-new-version', payload),
+  teamMarkFile: (payload) => ipcRenderer.invoke('zero:team-mark-file', payload),
+  filesPlace: () => ipcRenderer.invoke('zero:files-place'),
+  filesPlaceOpen: (payload) => ipcRenderer.invoke('zero:files-place-open', payload),
+  filesPlaceEdit: (payload) => ipcRenderer.invoke('zero:files-place-edit', payload),
+  filesPlaceMark: (payload) => ipcRenderer.invoke('zero:files-place-mark', payload),
+  filesPlaceFolder: (payload) => ipcRenderer.invoke('zero:files-place-folder', payload),
+  fileElsewhere: (payload) => ipcRenderer.invoke('zero:file-elsewhere', payload),
+  fileLine: (payload) => ipcRenderer.invoke('zero:file-line', payload),
+  connections: () => ipcRenderer.invoke('zero:connections'),
+  connectionsConnect: (payload) => ipcRenderer.invoke('zero:connections-connect', payload),
+  connectionsCancel: (payload) => ipcRenderer.invoke('zero:connections-cancel', payload),
+  connectionsCheck: (payload) => ipcRenderer.invoke('zero:connections-check', payload),
+  connectionsDisconnect: (payload) => ipcRenderer.invoke('zero:connections-disconnect', payload),
+  connectionsAccept: (payload) => ipcRenderer.invoke('zero:connections-accept', payload),
+  connectionsAdd: (payload) => ipcRenderer.invoke('zero:connections-add', payload),
+  connectionsChoose: (payload) => ipcRenderer.invoke('zero:connections-choose', payload),
+  connectionsCopy: (payload) => ipcRenderer.invoke('zero:connections-copy', payload),
   teamEdit: (payload) => ipcRenderer.invoke('zero:team-edit', payload),
   micAccess: () => ipcRenderer.invoke('zero:mic-access'),
   teamMessage: (payload) => ipcRenderer.invoke('zero:team-message', payload),
+  teamSeen: (payload) => ipcRenderer.invoke('zero:team-seen', payload),
+  teamMoveToThread: (payload) => ipcRenderer.invoke('zero:team-move-to-thread', payload),
+  teamMessageMate: (payload) => ipcRenderer.invoke('zero:team-message-mate', payload),
+  teamGiveTask: (payload) => ipcRenderer.invoke('zero:team-give-task', payload),
+  teamHandOn: (payload) => ipcRenderer.invoke('zero:team-hand-on', payload),
+  teamTaskBrief: (payload) => ipcRenderer.invoke('zero:team-task-brief', payload),
   rooms: (payload) => ipcRenderer.invoke('zero:rooms', payload),
   teammates: (payload) => ipcRenderer.invoke('zero:teammates', payload),
   takeJoin: () => ipcRenderer.invoke('zero:take-join'),
@@ -214,6 +245,7 @@ contextBridge.exposeInMainWorld('zero', {
   // A pasted screenshot's bytes, straight to disk, so the draft carries a path
   // and never an image budget.
   stageAttachment: (payload) => ipcRenderer.invoke('zero:stage-attachment', payload),
+  stageAttachmentPart: (payload) => ipcRenderer.invoke('zero:stage-attachment-part', payload),
   pathForFile: (file) => { try { return webUtils.getPathForFile(file); } catch { return null; } },
   // One way, name/message/stack only, scrubbed on the far side before it is
   // written. The window never chooses what a crash report contains.
@@ -234,6 +266,7 @@ contextBridge.exposeInMainWorld('zero', {
   // The document pane's own two: the text of a file it has open, and her edit
   // going back onto disk. Markdown only on the way back (main/doc-file.mjs).
   readDoc: (payload) => ipcRenderer.invoke('zero:read-doc', payload),
+  retryFile: (payload) => ipcRenderer.invoke('zero:retry-file', payload),
   // The change a run made, read as a built artifact.
   codeChange: (payload) => ipcRenderer.invoke('zero:code-change', payload),
   codeFile: (payload) => ipcRenderer.invoke('zero:code-file', payload),

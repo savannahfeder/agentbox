@@ -1,6 +1,9 @@
 import { openSourceFile } from './open-source-file.mjs';
 import {submitReply} from './live-replies.mjs';
+import { noteToItsAgent } from './notes-wake.mjs';
 import { whyItCannotMove } from '../shared/move-thread.mjs';
+import { GROUPS } from '../shared/connections-catalog.mjs';
+import { projectSeenBy } from '../shared/thread-cards.mjs';
 import { createEngineSetup } from './engine-setup.mjs';
 // IPC: a thin, typed-by-convention surface. The renderer asks; the main
 // process derives from files and answers. Pushes go one way: "state changed,
@@ -41,6 +44,7 @@ import { artifactRoots, resolveArtifact } from './artifact-path.mjs';
 import { folderPictures } from './folder-pictures.mjs';
 import { docUrl } from './doc-scheme.mjs';
 import { readDoc, writeDoc } from './doc-file.mjs';
+import { readItemHistory } from './store/work-items.mjs';
 import { readChange } from './code-change.mjs';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mjs';
 import { readNote, writeNote } from './rail-note.mjs';
@@ -69,11 +73,16 @@ import { AgentSchedule } from './agent-schedule.mjs';
 import { agentKey } from '../shared/agents.mjs';
 import { machineryPath } from './store/home.mjs';
 import { EVENT_NAMES } from '../shared/analytics-events.mjs';
+import { appFinder } from './everything-found.mjs';
+import { appFilesPlace } from './files-place.mjs';
 import { Name } from '../shared/product-name.mjs';
-import { handedOnByReply } from '../shared/team-rules.mjs';
+import { handedOnByReply, isGivenTask } from '../shared/team-rules.mjs';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mjs';
+import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mjs';
+import { traceAnswer } from '../shared/trace-delta.mjs';
 import { saveAttachments } from './save-attachments.mjs';
-import { stageAttachment } from './stage-attachment.mjs';
+import { stageAttachment, stageAttachmentPart } from './stage-attachment.mjs';
+import { readRunTraces } from './run-traces.mjs';
 
 // WHAT A WORKER IS TOLD WHEN HER DECISION COULD NOT BE RECORDED.
 const SPOOL_REFUSED = `${Name} could not record the founder's decision, so nothing was allowed. Finish what your grants cover and file the rest as a review.`;
@@ -110,10 +119,10 @@ const NO_UPDATER = {
   move: () => ({ moved: false, error: null }),
 };
 
-const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget', 'method']);
-const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markUnread', 'react', 'edit', 'deleteMessage', 'putFile', 'file', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute']);
+const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget', 'method', 'unsend']);
+const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markDone', 'markUnread', 'react', 'decide','edit', 'deleteMessage', 'putFile', 'putFileFrom', 'file', 'fileOnDisk', 'fileText', 'markFile', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute']);
 
-export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, onCount = () => {} }) {
+export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {} }) {
   // The three Electron things, or a plain Node stand-in for them. There is no
   // default: a caller that forgets says so here rather than throwing eighty
   // lines further down on `ipcMain.handle` of undefined.
@@ -485,7 +494,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     try { return !!host.app?.accessibilitySupportEnabled; } catch { return false; }
   });
 
-  ipcMain.handle('zero:snapshot', () => {
+  // `ask.since` names the last answer the screen holds, and the threads that
+  // did not change since are left out (shared/snapshot-delta.mjs).
+  const snapshots = snapshotSender();
+  ipcMain.handle('zero:snapshot', (_e, ask) => {
     const now = Date.now();
     const items = store.listItems(now);
     const running = supervisor.status();
@@ -503,7 +515,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // now. The Codex side never starts anything at all (main/codex-usage.mjs).
     const reading = usageFor === DEFAULT_ENGINE ? usage.read() : supervisor.codexUsage();
     const alpha = alphaFeatures(config);
-    return {
+    return snapshots.answer({
       products: store.listProducts(),
       // Each with the place she dragged it to, if she did (w-6e5b532a95).
       items: supervisor.withPlaces(items),
@@ -519,7 +531,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // The open thread's own card first, which is the order the chord and the
       // Agents menu answer in too (shared/which-card-is-in-front.mjs).
       approvals: pendingApprovals(),
-      supervisor: running,
+      // A screen that says which thread it has open is sent only that thread's
+      // live detail.
+      supervisor: ask && 'open' in ask ? { ...running, running: lightRunning(running.running, ask.open) } : running,
       // WHETHER THERE ARE TWO CODING AGENTS TO CHOOSE BETWEEN, AND WHICH ONE
       // EACH ROW RUNS ON. Answered whole by the supervisor, because the two
       // rules underneath it -- the capability gate and "an August choice is not
@@ -597,7 +611,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
           ...store.listProducts().map((p) => [p.slug, supervisor.effectivePermission(p.slug)]),
         ]),
       },
-    };
+    }, ask?.since);
   });
 
   // THE USER'S WORDS, INTO ONE OF THEIR LIVE AGENTS. The only thing in the app that writes
@@ -692,8 +706,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // answered at once (supervisor.sendNow).
   ipcMain.handle('zero:send-now', (_e, { product, id }) => supervisor.sendNow(product, id));
 
-  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped }) => {
+  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped, putAway }) => {
     if (isAgentRow(id)) return { ok: false };
+    // Out of your own Needs you, on a task between people: no reply, no close, no run.
+    if (typeof putAway === 'boolean' && !answer && !status) {
+      const out = store.answerItem(product, id, { putAway });
+      push();
+      return out;
+    }
     // WORK THAT NEVER REACHED MAIN IS NOT CLOSED UNASKED (shared/not-shipped.mjs).
     // The window asks first and says so with `closeUnshipped`; the phone and
     // anything else are turned down with the reason.
@@ -816,6 +836,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // WHO IS SIGNED IN, and the project a row is in, for the team's rules.
   const teamMe = () => team?.state()?.me?.id ?? null;
+  const noteBy = (by) => team?.firstNameOf?.(by) || 'the person writing to you';
+  const teamPeople = () => team?.state?.()?.people ?? [];
   const productOf = (slug) => store.listProducts().find((p) => p.slug === slug) ?? null;
 
   function handOnByReply(product, id) {
@@ -880,7 +902,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:team-accept-invite', teamCall(({ teamId }) => team.acceptInvite(teamId)));
   ipcMain.handle('zero:team-invite', teamCall(({ email }) => team.invite(email)));
   ipcMain.handle('zero:team-rename', teamCall(({ name }) => team.renameTeam(name)));
-  ipcMain.handle('zero:team-remove-member', teamCall(({ personId }) => team.removeMember(personId)));
+  ipcMain.handle('zero:team-remove-member', teamCall(({ personId, handTo, mates }) => team.removeMember(personId, { handTo: typeof handTo === 'string' ? handTo : null, mates: Array.isArray(mates) ? mates : [] })));
   ipcMain.handle('zero:team-leave', teamCall(() => team.leaveTeam()));
   ipcMain.handle('zero:team-cancel-invite', teamCall(({ email }) => team.cancelInvite(email)));
   // A line you write about yourself, so a day in meetings is not read off
@@ -888,9 +910,34 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:team-status', teamCall(({ text, hold, until }) => team.setStatus({ text, hold, until })));
   ipcMain.handle('zero:team-share', teamCall(({ product, visibility, people }) => team.share(product, { visibility, people })));
   ipcMain.handle('zero:team-sync', teamCall(() => team.syncNow()));
+  ipcMain.handle('zero:team-thread-work', (_e, { personId, threadId } = {}) => team?.threadWork(personId, threadId) ?? { shared: false, lines: [], earlier: 0, product: null, dir: null });
+  ipcMain.handle('zero:team-comment', teamCall(({ personId, threadId, text }) => team.commentOnThread(personId, threadId, text)));
+  // Seeds a thread of your own; it runs only once you send it, on this Mac.
+  ipcMain.handle('zero:team-continue-brief', (_e, { personId, threadId } = {}) => {
+    if (!team) throw new Error('This build has no team cloud set up.');
+    return team.continueBrief(personId, threadId);
+  });
+  ipcMain.handle('zero:team-continued', teamCall(({ personId, threadId }) => team.continuedThread(personId, threadId)));
   // A MESSAGE TO A PERSON (approved 2026-10-01: people get messages, never
   // tasks). main/team/index.mjs keeps it between the two of them.
-  ipcMain.handle('zero:team-message', teamCall(({ to, body, priority, files }) => team.message(to, body, priority, files)));
+  ipcMain.handle('zero:team-message', teamCall(({ to, body, priority, files, subject }) => team.message(to, body, priority, files, { subject })));
+  // A mark only: nothing on screen changes, so the window is not pushed again.
+  ipcMain.handle('zero:team-seen', async (_e, { product, id } = {}) => { try { return await team?.seen(product, id) ?? false; } catch { return false; } });
+  ipcMain.handle('zero:team-move-to-thread', teamCall(({ product, id, on }) => team.moveToThread({ product, id, on })));
+  ipcMain.handle('zero:team-message-mate', teamCall(({ owner, mate, text }) => team.messageMate({ owner, mate, text })));
+  ipcMain.handle('zero:team-give-task', teamCall(({ to, title, body, priority, due, files, visibility, visibleTo, blockedBy }) => team.giveTask(to, { title, body, priority, due, files, visibility, visibleTo, blockedBy })));
+  // Only a thread nothing is running on: closing one with an agent on it would
+  // leave that agent writing into a thread its owner has given away.
+  ipcMain.handle('zero:team-hand-on', teamCall(async ({ product, id, to }) => {
+    if (supervisor.status().running?.some((r) => r.itemId === id)) throw new Error('An agent is still on this thread. Stop it, then give it.');
+    const made = await team.handOn({ product, id, to });
+    supervisor.setThreadPins({ [id]: null });
+    return made;
+  }));
+  ipcMain.handle('zero:team-task-brief', (_e, { product, id }) => {
+    if (!team) throw new Error('This build has no team cloud set up.');
+    return team.taskBrief(product, id);
+  });
   // ROOMS (alpha): one door, and only these calls through it (main/team/rooms.mjs).
   ipcMain.handle('zero:teammates', async (_e, { op, args = {} } = {}) => {
     const mates = store.teammates;
@@ -914,6 +961,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       else if (op === 'remember') value = mates.remember(a.id, a.text, { from: 'you' });
       else if (op === 'forget') value = mates.forget(a.id, a.memory);
       else if (op === 'method') return { ok: true, value: mates.method(a.id) };
+      else if (op === 'unsend') value = mates.unsend(String(a.id ?? ''));
       supervisor.wake?.();
       push();
       return { ok: true, value: value ?? null };
@@ -977,6 +1025,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const row = store.readItem(product, id);
     if (!row) throw new Error('that task is gone');
     if (row.assignee !== me) throw new Error('this task is not yours to route');
+    // It stays yours: an agent works it from a new thread of yours (TeamFocus.tsx).
+    if (isGivenTask(row, productOf(product))) throw new Error('give this task to an agent from a new thread');
     if (route === 'agent') store.teamPatch(product, id, { assignee: 'agent', runner: me });
     else if (route === 'me') store.teamPatch(product, id, { assignee: me });
     else if (route === 'back') {
@@ -1003,6 +1053,38 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     await team.syncNow();
   }));
 
+  // A note, resolve or approval on a file of your own thread or a conversation.
+  // Works with nobody signed in: a comment for your own agent needs no team.
+  ipcMain.handle('zero:file-mark', async (_e, { product, id, mark } = {}) => {
+    try {
+      if (!store.readItem(product, id)) return { ok: false, error: 'that thread is gone' };
+      store.fileMark(product, id, mark);
+      push();
+      void team?.syncNow?.()?.catch?.(() => {});
+      try { await noteToItsAgent({ store, supervisor, product, id, mark, nameOf: noteBy, people: teamPeople() }); }
+      catch (err) { return { ok: false, error: `The note is saved, but it did not reach the agent: ${err?.message ?? err}` }; }
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String(err?.message ?? err) };
+    }
+  });
+  // An edited document, as the next version of itself. In a conversation it goes
+  // as a message, which is what carries a file to the other person; elsewhere as
+  // a mark, which starts nothing.
+  ipcMain.handle('zero:file-new-version', async (_e, { product, id, path: basePath, text, since } = {}) => {
+    try {
+      const out = filesPlaceNow().editOnThread({ product, id, path: basePath, text, since });
+      if (!out.ok) return out;
+      push();
+      void team?.syncNow?.()?.catch?.(() => {});
+      return out;
+    } catch (err) {
+      return { ok: false, error: String(err?.message ?? err) };
+    }
+  });
+  // The same on a teammate's thread: kept here, then sent to the cloud.
+  ipcMain.handle('zero:team-mark-file', teamCall(({ personId, threadId, mark }) => team.markSharedFile(personId, threadId, mark)));
+
   // 'granted', or 'settings' once macOS's Microphone page has been opened instead.
   ipcMain.handle('zero:mic-access', async () => {
     try { return host.micAccess ? await host.micAccess() : 'granted'; } catch { return 'settings'; }
@@ -1020,7 +1102,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     await team.syncNow();
   }));
 
-  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo, fromPhone }) => {
+  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo, fromPhone, onMac }) => {
     const out = store.composeItem(product, {
       // HOW HARD IT THINKS rides through unjudged: the store keeps any word
       // shaped like a level, and the spawn is the gate that knows each
@@ -1051,6 +1133,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // fields cannot be corrected separately.
       model: supervisor.modelOffered(engine, model),
     });
+    // Before the wake below, so its first run cannot start in the cloud.
+    if (onMac === true && out?.id) supervisor.setThreadOnMac({ [out.id]: true });
     // A real thread ends the walk's hold on agents (`Supervisor#sentByThem`).
     supervisor.sentByThem(labels);
     // THAT a task was written, and whether in practice. Never its words.
@@ -1573,7 +1657,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // worker's `git checkout` with nothing to show it had happened. The shipped
   // defaults still come from appDir; only her own copy moved.
   ipcMain.handle('zero:instruction-read', (_e, id) => {
-    try { return readInstruction(supervisor.userDir, id, supervisor.appDir); }
+    try {
+      const read = readInstruction(supervisor.userDir, id, supervisor.appDir);
+      // The page shows the brief as a worker reads it, which depends on this.
+      return id === 'system' ? { ...read, storeTools: !!supervisor.storeMcpCommand?.() } : read;
+    }
     catch (e) { return {text:'',defaultText:'',error:e.message}; }
   });
   ipcMain.handle('zero:instruction-write', (_e, {id,text}) => {
@@ -2072,6 +2160,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // copies from `srcPath`. Bytes are copied on disk rather than carried through
   // this bridge as base64, which a file picked off disk should never need.
   ipcMain.handle('zero:stage-attachment', async (_e, file) => stageAttachment(path.join(config.accountRoot, '.staging'), file));
+  ipcMain.handle('zero:stage-attachment-part', async (_e, piece) => stageAttachmentPart(path.join(config.accountRoot, '.staging'), piece));
 
   // Unstick ONE stalled item: forget its answer's delivery mark and tick, so
   // a fresh worker picks the answer up now.
@@ -2118,18 +2207,137 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // of eleven chips on one card opened two other products' files (her answer,
   // 2026-08-19). When it finds nothing it now hands back a sentence she can
   // read, and the renderer shows it.
-  ipcMain.handle('zero:open-artifact', async (_e, { product, src, mode }) => {
+  // A teammate's shared thread keeps its copied files in a folder of its own.
+  // Reading goes through this list and writing does not, so they stay read-only.
+  const readableProducts = () => [...store.listProducts(), ...(team?.sharedThreadProducts?.() ?? [])];
+  // WHAT A QUERY FINDS INSIDE THREADS (main/everything-found.mjs): made on the
+  // first ask, read ahead when the search opens.
+  let finder = null;
+  const finderNow = () => (finder ??= appFinder({ store, team, readableProducts, accountRoot: config.accountRoot, storeRoot: config.storeRoot }));
+  ipcMain.handle('zero:find-in-threads', async (_e, { query, limit } = {}) => {
+    try { return { ok: true, ...(await finderNow().search(String(query ?? '').slice(0, 200), limit)) }; }
+    catch (err) { return { ok: false, error: String(err?.message ?? err), lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 } }; }
+  });
+  ipcMain.handle('zero:warm-find-in-threads', () => { finderNow().warm().catch(() => {}); return true; });
+  let filesPlace = null;
+  const filesPlaceNow = () => (filesPlace ??= appFilesPlace({ store, team, accountRoot: config.accountRoot, storeRoot: config.storeRoot, notify: () => push() }));
+  // An agent's team_read reads folders from the view the reach tick writes.
+  if (store.teammates) store.teammates.foldersForAgents = () => filesPlaceNow().forAgents();
+  ipcMain.handle('zero:files-place', async () => {
+    try { return await filesPlaceNow().list(); } catch { return { files: [], projects: [], folders: [] }; }
+  });
+  ipcMain.handle('zero:files-place-folder', async (_e, { do: what, ...p } = {}) => {
+    try {
+      const place = filesPlaceNow();
+      const out = what === 'make' ? await place.makeFolder({ project: p.project, name: p.name, parent: p.parent ?? null })
+        : what === 'rename' ? await place.renameFolder({ id: String(p.id ?? ''), name: p.name })
+          : what === 'move' ? await place.moveFile({ key: String(p.key ?? ''), folder: p.folder ?? null })
+            : null;
+      if (!out) return { ok: false, error: 'that cannot be done here' };
+      push();
+      return { ok: true, folder: out.id ?? null };
+    } catch (err) { return { ok: false, error: String(err?.message ?? err) }; }
+  });
+  ipcMain.handle('zero:files-place-open', async (_e, { key } = {}) => {
+    try { return await filesPlaceNow().open(String(key ?? '')); } catch { return null; }
+  });
+  ipcMain.handle('zero:files-place-edit', async (_e, { key, text } = {}) => {
+    const out = await filesPlaceNow().edit(String(key ?? ''), text);
+    if (out.ok) { push(); void team?.syncNow?.()?.catch?.(() => {}); }
+    return out;
+  });
+  ipcMain.handle('zero:file-elsewhere', async (_e, { product, id, copies } = {}) => {
+    const asked = Array.isArray(copies) ? copies : [];
+    try { return await filesPlaceNow().sameFiles({ product: String(product ?? ''), id: String(id ?? ''), copies: asked }); } catch { return asked.map(() => ({ key: null, notes: [], approvals: [] })); }
+  });
+  ipcMain.handle('zero:file-line', async (_e, { product, id } = {}) => {
+    try { return await filesPlaceNow().lineFor({ product: String(product ?? ''), id: String(id ?? '') }); } catch { return []; }
+  });
+  ipcMain.handle('zero:files-place-mark', async (_e, { key, mark } = {}) => {
+    const { wrote, ...out } = await filesPlaceNow().mark(String(key ?? ''), mark);
+    if (out.ok) { push(); void team?.syncNow?.()?.catch?.(() => {}); }
+    if (out.ok && wrote) {
+      try { await noteToItsAgent({ store, supervisor, ...wrote, mark, nameOf: noteBy, people: teamPeople() }); }
+      catch (err) { return { ok: false, error: `The note is saved, but it did not reach the agent: ${err?.message ?? err}` }; }
+    }
+    return out;
+  });
+  // A failing check still answers with a tile: its state is the answer.
+  const toolsChanged = () => { void team?.publishConnections?.(); push(); };
+  team?.bindConnections?.(() => connections.connectedIds());
+  const noTools = { tiles: [], canEncrypt: false, projects: [], groups: [] };
+  copies?.bindPlace(filesPlaceNow);
+  const copyProjects = () => store.listProducts().filter((p) => !p.team?.direct).map((p) => {
+    const seen = projectSeenBy(p);
+    return { slug: p.slug, name: p.name, seenBy: seen.who };
+  });
+  ipcMain.handle('zero:connections', async () => {
+    if (!connections) return noTools;
+    void connections.checkStale().catch(() => {});
+    const list = await connections.list();
+    const kept = copies?.all() ?? {};
+    return { ...list, tiles: list.tiles.map((t) => ({ ...t, copy: kept[t.id] ?? null })), projects: copyProjects(), groups: GROUPS };
+  });
+  ipcMain.handle('zero:connections-connect', async (_e, { id, clientId, clientSecret, key } = {}) => {
+    if (!connections) return { ok: false, error: 'Connections are not available here.' };
+    const out = await connections.connect(String(id ?? ''), { clientId, clientSecret, key });
+    toolsChanged();
+    if (out.ok) void copies?.kick(String(id ?? ''))?.catch?.(() => {});
+    return out;
+  });
+  ipcMain.handle('zero:connections-add', async (_e, { address, key } = {}) => {
+    if (!connections) return { ok: false, error: 'Connections are not available here.' };
+    const out = await connections.addByAddress({ address, key });
+    toolsChanged();
+    return out;
+  });
+  ipcMain.handle('zero:connections-choose', async (_e, { id, names } = {}) => {
+    const tile = await connections?.chooseReads(String(id ?? ''), Array.isArray(names) ? names : []);
+    toolsChanged();
+    return tile ?? null;
+  });
+  ipcMain.handle('zero:connections-copy', async (_e, { id, do: what, project, channels } = {}) => {
+    if (!copies) return { ok: false, error: 'Connections are not available here.' };
+    const tool = String(id ?? '');
+    try {
+      if (what === 'start') return await copies.start(tool, { project, channels });
+      if (what === 'stop') { await copies.stopKeeping(tool); return { ok: true }; }
+      if (what === 'now') { await copies.run(tool); return { ok: true }; }
+      return { ok: false, error: 'that cannot be done here' };
+    } catch (err) { return { ok: false, error: String(err?.message ?? err) }; } finally { push(); }
+  });
+  ipcMain.handle('zero:connections-cancel', (_e, { id } = {}) => { connections?.cancelConnect(String(id ?? '')); return true; });
+  ipcMain.handle('zero:connections-check', async (_e, { id } = {}) => {
+    const tile = await connections?.check(String(id ?? ''));
+    toolsChanged();
+    return tile ?? null;
+  });
+  ipcMain.handle('zero:connections-disconnect', async (_e, { id } = {}) => {
+    await connections?.disconnect(String(id ?? ''));
+    toolsChanged();
+    return true;
+  });
+  ipcMain.handle('zero:connections-accept', async (_e, { id } = {}) => { await connections?.acceptTools(String(id ?? '')); push(); return true; });
+  ipcMain.handle('zero:open-artifact', async (_e, { product, src, mode, thread }) => {
     const shell = await shellNow();
     if (typeof src !== 'string' || !src) return { ok: false, error: 'no path' };
     if (/^https?:/.test(src)) { if (mode !== 'resolve') shell.openExternal(src); return { ok: true, opened: src } }
     const found = await resolveArtifact({
       src,
       product,
-      products: store.listProducts(),
+      thread: typeof thread === 'string' ? thread : null,
+      products: readableProducts(),
       accountRoot: config.accountRoot,
       storeRoot: config.storeRoot,
+      nameOf: team?.firstNameOf,
     });
-    if (!found.ok) return { ok: false, error: found.error };
+    if (!found.ok) {
+      // A document's picture can name a version that was sent under another name.
+      const inFiles = await filesPlaceNow().pictureNamed(src).catch(() => null);
+      if (!inFiles) return found;
+      found.ok = true;
+      found.path = inFiles;
+    }
     if (mode === 'resolve') {
       // RESOLVING FOR THE PANE IS WHAT OPENS THE DOOR. An html page is drawn
       // in a frame of its own and its pictures sit beside it on disk, so the
@@ -2138,11 +2346,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // the path. Nothing else on disk is reachable from that page. A markdown
       // file is read through zero:read-doc and never needs this.
       if (docGrants && /\.html?$/i.test(found.path)) {
-        const prod = store.listProducts().find((p) => p.slug === product) ?? null;
+        const prod = readableProducts().find((p) => p.slug === product) ?? null;
         docGrants.grant(found.path, artifactRoots(prod));
-        return { ok: true, opened: found.path, url: docUrl(found.path) };
+        return { ok: true, opened: found.path, url: docUrl(found.path), ...(found.carry ? { carry: found.carry } : {}) };
       }
-      return { ok: true, opened: found.path };
+      return { ok: true, opened: found.path, ...(found.carry ? { carry: found.carry } : {}) };
     }
     if (mode === 'source') {
       try { await openSourceFile(found.path); return { ok: true, opened: found.path }; }
@@ -2167,17 +2375,22 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // exactly the file a click would have opened, and then main hands back the
   // text rather than the path. What may be written is decided in
   // main/doc-file.mjs: markdown only, inside this product's own folders only.
-  ipcMain.handle('zero:read-doc', async (_e, { product, src }) => {
+  ipcMain.handle('zero:read-doc', async (_e, { product, src, thread }) => {
     const found = await resolveArtifact({
       src,
       product,
-      products: store.listProducts(),
+      thread: typeof thread === 'string' ? thread : null,
+      products: readableProducts(),
       accountRoot: config.accountRoot,
       storeRoot: config.storeRoot,
+      nameOf: team?.firstNameOf,
     });
-    if (!found.ok) return { ok: false, error: found.error };
-    return readDoc({ file: found.path });
+    if (!found.ok) return found;
+    return { ...readDoc({ file: found.path }), ...(found.carry ? { carry: found.carry } : {}) };
   });
+
+  // "Try again" on a file in a conversation that was not delivered.
+  ipcMain.handle('zero:retry-file', async (_e, { product, src } = {}) => (team?.retryFile ? team.retryFile({ product, src }) : false));
 
   // THE CHANGE A RUN MADE. Same finder as every other artifact, so a click on
   // the chip and a click on a path in her message open the same file.
@@ -2189,7 +2402,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       accountRoot: config.accountRoot,
       storeRoot: config.storeRoot,
     });
-    if (!found.ok) return { ok: false, error: found.error };
+    if (!found.ok) return found;
     try {
       return { ok: true, change: readChange(found.path) };
     } catch (e) {
@@ -2211,7 +2424,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       accountRoot: config.accountRoot,
       storeRoot: config.storeRoot,
     });
-    if (!found.ok) return { ok: false, error: found.error };
+    if (!found.ok) return found;
     try {
       return { ok: true, change: readChange(found.path), prod: store.listProducts().find((p) => p.slug === product) ?? null };
     } catch (e) {
@@ -2244,7 +2457,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       accountRoot: config.accountRoot,
       storeRoot: config.storeRoot,
     });
-    if (!found.ok) return { ok: false, error: found.error };
+    if (!found.ok) return found;
     return writeDoc({ file: found.path, product: prod, text, mtime });
   });
 
@@ -2268,21 +2481,23 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // The trace: what each session on this item actually did, from the logs the
   // supervisor persists under <product>/sessions/<item-id>/. Read-only.
-  ipcMain.handle('zero:session-trace', async (_e, { product, id }) => {
+  // `whole` is a thread's middle being asked for: every log, whole, once
+  // (main/run-traces.mjs). Otherwise the newest, and `have` holds the stamps
+  // of the logs the screen already has (shared/trace-delta.mjs).
+  ipcMain.handle('zero:session-trace', async (_e, { product, id, have, whole } = {}) => {
     const fs = await import('node:fs');
     const path = await import('node:path');
     const dir = store.listProducts().find((p) => p.slug === product)?.dir;
     if (!dir || !/^[\w-]+$/.test(String(id ?? ''))) return { ok: false, sessions: [] };
     const traceDir = machineryPath(dir, path.join('sessions', id));
+    if (whole) return { ok: true, sessions: readRunTraces(traceDir, { whole: true }) };
     let files = [];
     try {
       files = fs.readdirSync(traceDir).filter((f) => f.endsWith('.log')).sort();
     } catch { return { ok: true, sessions: [] }; }
     const sessions = files.slice(-20).map((f) => {
-      let text = '';
-      try { text = fs.readFileSync(path.join(traceDir, f), 'utf8'); } catch {}
-      if (text.length > 120_000) text = `… truncated (${text.length} bytes total)\n\n${text.slice(-120_000)}`;
-      return { startedAt: Number(f.replace('.log', '')) || 0, text };
+      const startedAt = Number(f.replace('.log', '')) || 0;
+      return traceAnswer({ fs, file: path.join(traceDir, f), startedAt, had: have?.[startedAt] });
     });
     return { ok: true, sessions };
   });

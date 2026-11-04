@@ -57,7 +57,7 @@
 // in In progress rather than the inbox.
 
 import { replyReaches } from '../../shared/agents.mjs';
-import { offerIsLive } from './format';
+import { closesTheTask, itemOptions, offerIsLive } from './format';
 
 const WARNED_KEY = 'zero.stoppedWarned';
 
@@ -123,7 +123,8 @@ export interface MaybeStopped {
 /** Is an agent stopped on this row, waiting on a person? See the header. */
 export function stoppedWaiting(item: MaybeStopped): boolean {
   if (item.agent) return replyReaches(item.agent);
-  return offerIsLive(item);
+  // An agent whose every choice is to close is asking to be closed, not waiting.
+  return offerIsLive(item) && !itemOptions(item).every((o) => closesTheTask(o.text));
 }
 
 /**

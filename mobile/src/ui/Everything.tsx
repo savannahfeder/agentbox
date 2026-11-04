@@ -28,7 +28,7 @@ function MemberFace({ m, s }: { m: Member; s: number }) {
   if (m.kind === 'mate') return <TeammateMark t={{ letter: m.letter ?? '', name: m.name }} size={s} />;
   if (m.kind === 'chat') {
     const faces = m.faces ?? [];
-    if (!faces.length) return <View style={{ width: s, height: s, borderWidth: 1, borderColor: color.lineStrong, alignItems: 'center', justifyContent: 'center' }}><T style={{ fontFamily: font.mono, fontSize: Math.round(s * 0.3), color: color.dim }}>#</T></View>;
+    if (!faces.length) return <View style={{ width: s, height: s, borderRadius: s * 0.28, borderWidth: 1, borderColor: color.lineStrong, alignItems: 'center', justifyContent: 'center' }}><T style={{ fontFamily: font.mono, fontSize: Math.round(s * 0.3), color: color.dim }}>#</T></View>;
     if (faces.length === 1) return <Face name={faces[0].name} size={s} />;
     const side = Math.round(s * 0.6);
     return (

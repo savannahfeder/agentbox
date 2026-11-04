@@ -138,13 +138,19 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, fold
     // that as a press inside left the row unreachable (w-7b7182ef61). The bar is
     // left out because its own click already toggles.
     const onDown = (e: MouseEvent) => {
-      if (!bar.current?.contains(e.target as Node)) setPinned(false);
+      if (!bar.current?.contains(e.target as Node)) { setPinned(false); setHovering(false); }
     };
+    // Any key moves on from it, or it stays standing over the next screen.
+    const onAnyKey = (e: KeyboardEvent) => { if (!['Shift', 'Meta', 'Control', 'Alt'].includes(e.key)) { setPinned(false); setHovering(false); } };
     window.addEventListener('keydown', onKey, true);
+    window.addEventListener('keydown', onAnyKey);
     window.addEventListener('mousedown', onDown);
+    window.addEventListener('click', onDown);
     return () => {
       window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('keydown', onAnyKey);
       window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('click', onDown);
     };
   }, [pinned]);
 

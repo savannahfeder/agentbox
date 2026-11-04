@@ -7,6 +7,8 @@ import { readCloudUsage } from '../cloud/usage.mjs';
 import { phoneDevice } from '../phone-inbox.mjs';
 import { roomPrefsFile } from './rooms.mjs';
 import { createRoomHours } from './room-hours.mjs';
+import { writeDecisionDocs } from './decisions-doc.mjs';
+import { writeTeamLookDocs } from './team-look-doc.mjs';
 
 export function roomsSetup({ config, store, supervisor, userDir, log = (line) => console.log(line) }) {
   const hours = createRoomHours({
@@ -20,6 +22,10 @@ export function roomsSetup({ config, store, supervisor, userDir, log = (line) =>
     enabled: () => config.alphaRooms === true,
     device: () => phoneDevice(userDir, config.storeRoot),
     prefsFile: roomPrefsFile(config.storeRoot),
+    // Inside the account folder, the one the window may draw a picture or a film from.
+    filesDir: config.accountRoot ? path.join(config.accountRoot, '.room-files') : null,
+    decisionDocs: (args) => writeDecisionDocs({ products: store.listProducts(), ...args }),
+    teamLookDocs: ({ text }) => writeTeamLookDocs({ products: store.listProducts(), text }),
     presenceFacts: () => {
       const running = supervisor.runsGoing().map((s) => ({ itemId: s.itemId, product: s.product, startedAt: s.startedAt }));
       const items = running.map((r) => { try { return store.readItem(r.product, r.itemId); } catch { return null; } }).filter(Boolean);

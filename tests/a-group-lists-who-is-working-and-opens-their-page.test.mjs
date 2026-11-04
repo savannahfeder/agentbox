@@ -43,12 +43,14 @@ describe('who is listed, in what order', () => {
 
 describe('a row', () => {
   const html = renderToStaticMarkup(createElement(PeoplePanel, { room: small, onPerson: () => {} }));
+  // Since 2026-11-01 in words and without the level, which read as a bare
+  // number (a-group-chat-reads-as-plainly-as-a-teammate-chat).
   it('says how many of the group are working', () => {
-    expect(html).toContain('3 of 4 working');
+    expect(html).toContain('3 working now');
   });
-  it('is face, name, level, what they are on, and their agents', () => {
+  it('is face, name, what they are on, and their agents', () => {
     const maya = html.split('class="gr-prow"').find((r) => r.includes('Maya'));
-    expect(maya).toMatch(/Maya<\/span><span class="gr-lv">10</);
+    expect(maya).toMatch(/Maya<\/span><\/span>/);
     expect(maya).toContain('Billing page');
     expect(maya).toContain('5 agents');
   });

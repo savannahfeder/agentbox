@@ -95,21 +95,20 @@ describe('an opened task wears the treatment exactly once', () => {
     }
   });
 
-  it('covers the three surfaces that used to paint', () => {
+  // The reply card keeps its own fill, as in Light, since 2026-11-02
+  // (dark-works-like-light-and-only-its-colours-differ).
+  it('covers the two grounds that used to paint, and leaves the reply card a card', () => {
     const covered = (needle) => insideFlat.some((r) => r.sel.includes(needle));
     expect(covered('.list-pane')).toBe(true);
     expect(covered('.focus-dock')).toBe(true);
-    expect(covered('.dock-card')).toBe(true);
+    expect(covered('.dock-card')).toBe(false);
   });
 
-  // The fade above the composer still has to exist, or a task scrolled halfway
-  // is cut off mid-line. It is a mask on the words now instead of a painted
-  // band, which is the only way to fade them without changing the ground.
-  it('fades the words with a mask rather than a band of its own', () => {
-    const dockBefore = insideFlat.find((r) => r.sel.includes('.focus-dock::before'));
-    expect(paints(dockBefore.body, 'background')).toBe('none');
+  // No fade above the composer at all: the words end where the dock begins
+  // (a-thread-ends-at-its-options-with-no-haze).
+  it('draws no fade over the words above the composer', () => {
     const scroll = insideFlat.find((r) => r.sel.includes('.focus-scroll'));
-    expect(paints(scroll.body, 'mask-image')).toMatch(/linear-gradient/);
+    expect(scroll?.body ?? '').not.toMatch(/mask-image/);
   });
 });
 

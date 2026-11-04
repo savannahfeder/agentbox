@@ -2,7 +2,7 @@
 // here now; a pasted invite link joins the room it is for.
 import { useEffect, useState } from 'react';
 import { I } from './icons';
-import { RoomFace } from './RoomFace';
+import { Face } from '../people';
 import { findOrder } from './room-rules';
 import { tokenFromLink } from '../../../../shared/room-links.mjs';
 
@@ -40,7 +40,7 @@ export function FindRooms({ load, onJoin, onOpen, onLink }: {
     {rooms !== null && !shown.length && <div className="rm-froom"><span className="rm-priv">{q ? `No group called “${query.trim()}”.` : 'No groups are open to everyone yet.'}</span></div>}
     {shown.map((r) => <div key={r.id} className="rm-froom">
       <div><span className="rm-nm">{I.hash()}{r.name}</span></div>
-      <div className="here">{r.faces.slice(0, 4).map((f, i) => <RoomFace key={i} name={f.name} url={f.avatar} size={22} />)}<em>{r.hereNow} here now</em></div>
+      <div className="here">{r.faces.slice(0, 4).map((f, i) => <Face key={i} name={f.name} url={f.avatar} size={22} />)}<em>{r.hereNow} here now</em></div>
       <div className="v">{r.members.toLocaleString('en-US')}</div>
       <div className="j">{r.joined
         ? <button type="button" className="joined" title={`Open ${r.name}`} onClick={() => onOpen(r.id)}>Joined</button>

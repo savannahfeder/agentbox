@@ -3,9 +3,10 @@
 import type { GroupChoice } from './GroupList';
 import { I } from './icons';
 
-/** Named groups first, your pinned one leading, then chats as they come. */
+/** Named groups first: your team's, then yours, then the public ones. Then chats as they come. */
 export function groupsInOrder<T extends GroupChoice>(groups: readonly T[]): T[] {
-  const named = groups.filter((g) => !g.faces.length).sort((a, b) => Number(b.pinned) - Number(a.pinned) || a.name.localeCompare(b.name));
+  const named = groups.filter((g) => !g.faces.length).sort((a, b) => Number(!!b.team) - Number(!!a.team) || Number(!!a.open) - Number(!!b.open)
+    || Number(b.pinned) - Number(a.pinned) || a.name.localeCompare(b.name));
   return [...named, ...groups.filter((g) => g.faces.length)];
 }
 

@@ -102,7 +102,7 @@ describe('the snapshot says why', () => {
     sup._isFreshWork = () => true;
     sup._cloudStarting = () => 2;
     expect(sup.status().queued).toContain('w-2');
-    expect(sup.status().whyNotCloud['w-2']).toEqual({ at: 'wait-cloud', why: 'two-at-a-time' });
+    expect(sup.status().whyNotCloud['w-2']).toEqual({ at: 'wait-cloud', why: 'starting-in-turn' });
   });
 
   it('for a queued thread that has to run on this computer', () => {
@@ -179,9 +179,9 @@ describe('the Status cell', () => {
   });
 
   it('keeps Queued, with a card saying it waits for the cloud', () => {
-    const cell = statusCell(row, facts({ queued: ['w-1'], whyNotCloud: { at: 'wait-cloud', why: 'two-at-a-time' } }));
+    const cell = statusCell(row, facts({ queued: ['w-1'], whyNotCloud: { at: 'wait-cloud', why: 'starting-in-turn' } }));
     expect(cell.word).toBe('Queued');
-    expect(cell.why).toEqual({ head: 'Queued for the cloud', body: 'The cloud starts two threads at a time, and this one is in line.' });
+    expect(cell.why).toEqual({ head: 'Queued for the cloud', body: 'The cloud starts threads a few at a time, and this one is in line.' });
   });
 
   it('draws the card under the word in the list, hidden until hovered', () => {

@@ -237,6 +237,7 @@ function saidLine(event: ThreadEvent): AgentWork {
     // file writes into "You put it off, wrote files".
     ...(event.who === 'you' ? { yours: true as const } : {}),
     ...(event.who === 'you' && event.by ? { by: event.by } : {}),
+    ...(event.fileMark ? { fileMark: event.fileMark } : {}),
   };
 }
 
@@ -540,14 +541,14 @@ export function itemThread(
   //
   // `undone`: THE Zs PRESSED ON THIS TASK (./undo-marks). Each is drawn as one
   // of her actions, and the ledger lines that Z wrote itself fold under it.
-  opts: { whole?: boolean; engine?: string | null; pending?: PendingSaid[]; chat?: boolean; undone?: UndoMark[] } = {},
+  opts: { whole?: boolean; engine?: string | null; pending?: PendingSaid[]; chat?: boolean; undone?: UndoMark[]; numbers?: Record<string, number> } = {},
 ): ItemThread {
   // The pickup-to-run match is thread-history's, not a second copy of it: it is
   // the part that can be wrong while the screen still looks perfect (a run
   // credited to the wrong pickup reads exactly like one credited to the right
   // one), and it is pinned in tests/one-door-one-list.test.mjs. `readNotes` is
   // given one session at a time there, so a run's `raw` IS that session's text.
-  const events = withEdits(withRuns(threadEvents(lines, opts.engine), sessions), lines);
+  const events = withEdits(withRuns(threadEvents(lines, opts.engine, opts.numbers), sessions), lines);
   const out: AgentEvent[] = [];
   // Where the newest thing SAID sits, and which ledger message it was. A run's
   // narration is a message on the screen too, so it counts here: a row picked
@@ -600,7 +601,7 @@ export function itemThread(
     if (event.message && event.words) {
       const isAnswer = event.who === 'agent' && (event.field === 'result' || event.field === 'note');
       placed.push({
-        node: { at: event.at, who: event.who === 'you' ? 'you' : 'it', text: event.words, ...(event.by ? { by: event.by } : {}), ...(event.from ? { from: event.from } : {}), ...(event.uid ? { uid: event.uid } : {}), ...(event.inReplyTo ? { inReplyTo: event.inReplyTo } : {}), ...(event.ran ? { ran: event.ran } : {}), ...(event.edited ? { edited: event.edited } : {}), ...(event.deleted ? { deleted: true } : {}) },
+        node: { at: event.at, who: event.who === 'you' ? 'you' : 'it', text: event.words, ...(event.by ? { by: event.by } : {}), ...(event.from ? { from: event.from } : {}), ...(event.voice ? { voice: event.voice } : {}), ...(event.uid ? { uid: event.uid } : {}), ...(event.inReplyTo ? { inReplyTo: event.inReplyTo } : {}), ...(event.ran ? { ran: event.ran } : {}), ...(event.edited ? { edited: event.edited } : {}), ...(event.deleted ? { deleted: true } : {}), ...(event.fileMark ? { fileMark: event.fileMark } : {}), ...(event.says ? { says: event.says } : {}) },
         run: null,
         answer: isAnswer ? { at: event.at, text: event.words, field: event.field as 'result' | 'note', ...(event.ran ? { ran: event.ran } : {}) } : null,
       });

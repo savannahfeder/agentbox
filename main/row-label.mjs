@@ -108,8 +108,8 @@ export function namePrompt(item) {
   const latest = cut(item?.result || item?.note, 700);
   return [
     'Here is a work thread: the message that opened it, and the latest thing',
-    'written on it. Write a short name for the thread AS IT STANDS NOW: 3 to 7',
-    'words, sentence case, no quotes, no trailing punctuation, naming the thing',
+    'written on it. Write a short name for the thread AS IT STANDS NOW: 3 to 6',
+    'words, never a sentence, sentence case, no quotes, no trailing punctuation, naming the thing',
     'being worked on rather than restating the sentence. If the opening line is',
     'already a short name, keep its words and only fix the case. Reply with the',
     'name and nothing else.',
@@ -118,7 +118,10 @@ export function namePrompt(item) {
     cut(item?.title, 300),
     // A teammate's run is titled with its own part of a message that may have
     // woken several (shared/teammates.mjs `runTitle`); the whole would mix them.
-    (item?.labels ?? []).some((l) => String(l).startsWith('teammate:')) ? '' : cut(item?.body, 1200),
+    // A task asked in a chat carries the chat after its ask
+    // (renderer/src/team/agent-mentions.ts taskBrief); the oldest lines of it
+    // are not what the thread is about.
+    (item?.labels ?? []).some((l) => String(l).startsWith('teammate:')) ? '' : cut(String(item?.body ?? '').split(/\n---\n\nAsked by /)[0], 1200),
     '--- latest ---',
     latest || '(nothing written yet)',
     '---',

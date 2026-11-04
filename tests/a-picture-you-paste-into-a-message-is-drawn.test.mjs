@@ -109,8 +109,7 @@ describe('where the words end and a picture begins', () => {
     expect(typedParts(`${SHOT}\nand this`)).toEqual([{ embed: SHOT }, { text: 'and this' }]);
   });
 
-  it('a line with a picture and words on it is not an attachment line', () => {
-    const text = `see ${SHOT}`;
-    expect(typedParts(text)).toEqual([{ text }]);
+  it('a line with an attached picture and words on it draws the picture beside the words', () => {
+    expect(typedParts(`see ${SHOT}`)).toEqual([{ text: 'see' }, { embed: SHOT }]);
   });
 });

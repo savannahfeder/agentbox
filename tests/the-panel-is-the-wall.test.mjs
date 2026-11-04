@@ -91,7 +91,7 @@ describe('the thing she opened is the lit object', () => {
     // different white from the top: "there's a diff colored white background in
     // the second half of all the focused page" (2026-08-12).
     expect(rule('.focus-dock')).toMatch(/background:\s*var\(--surface\)/);
-    expect(css).toMatch(/\.focus-dock::before \{[^}]*linear-gradient\(to bottom, transparent, var\(--surface\)\)/s);
+    expect(css).not.toMatch(/\.focus-dock::before \{[^}]*gradient/s);
   });
 });
 

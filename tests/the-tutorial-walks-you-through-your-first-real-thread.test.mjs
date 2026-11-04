@@ -134,7 +134,11 @@ describe('the first send', () => {
     const fs = await import('node:fs');
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     expect(app).toContain("const first = firstTask(tour);");
-    expect(app).toContain("(how.kind === 'task' || (first && how.kind === 'repeat'))");
+    expect(app).toMatch(/tabAfterSending\(\{[^}]*kind: how\.kind, first,/);
+    const { tabAfterSending } = await import('../renderer/src/threads/composer-rules.ts');
+    const sent = { team: false, later: false, view: 'inbox', covered: false };
+    expect(tabAfterSending({ ...sent, kind: 'repeat', first: true })).toBe('progress');
+    expect(tabAfterSending({ ...sent, kind: 'repeat', first: false })).toBe(null);
   });
 });
 
@@ -297,7 +301,7 @@ describe('the command bar', () => {
     // Drawn first on the page title: the glow hugged "Threads" and the card covered the tabs.
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
-    expect(tour).toContain("{step !== 'palette' && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && step !== 'startHere' && <div key={`glow-${step}`}");
+    expect(tour).toContain("{step !== 'palette' && !(step === 'urgent' && !urgentCell()) && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && step !== 'startHere' && <div key={`glow-${step}`}");
   });
 });
 
@@ -349,7 +353,8 @@ describe('the end of the tutorial', () => {
   it('bursts the confetti once, when the close and the command bar are both learned', async () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
-    expect(tour).toContain("const ended = (t: TourState | null) => !!t && !t.skipped && t.done.includes('close') && t.done.includes('palette') && (t.sent || t.done.includes('start'));");
+    expect(tour).toContain('const ended = (t: TourState | null) => tourOver(t);');
+    expect(fs.readFileSync(new URL('../renderer/src/tour.ts', import.meta.url), 'utf8')).toContain("!!t && !t.skipped && t.done.includes('close') && t.done.includes('palette') && (t.sent || t.done.includes('start'))");
     expect(tour).toContain('if (covered || hadEnded.current === ended(tour)) return;');
     expect(tour).toContain('{burst ? <ConfettiBurst key={burst} /> : null}');
   });
@@ -464,7 +469,7 @@ describe('the glow around the working line', () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
     expect(tour).toContain("n.parentElement?.closest('.live-announcement')");
-    expect(tour).toContain("el.querySelectorAll('svg, .th-st, .live-mark')");
+    expect(tour).toContain("el.querySelectorAll('svg, .th-st, .live-mark, .prio-bars')");
   });
 });
 
@@ -483,9 +488,9 @@ describe('a key a tip counts', () => {
   });
   it('E counts the close, and not the command bar', async () => {
     const { closeLessons } = await import('../renderer/src/tour.ts');
-    expect(closeLessons('palette')).toEqual(['close']);
-    expect(closeLessons('reply')).toEqual(['reply', 'close']);
-    expect(closeLessons('choose')).toEqual(['choose', 'close']);
+    expect(closeLessons('palette')).toEqual(['open', 'close']);
+    expect(closeLessons('reply')).toEqual(['reply', 'open', 'close']);
+    expect(closeLessons('choose')).toEqual(['choose', 'open', 'close']);
   });
 });
 

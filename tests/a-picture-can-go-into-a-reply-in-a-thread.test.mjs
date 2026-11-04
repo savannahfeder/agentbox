@@ -14,6 +14,10 @@
 //
 // So the panel's box now takes a picture the three ways the chat's box does,
 // and both draw a paperclip.
+//
+// Since 2026-10-30 the box reads files through useAttaching's `collect`, which
+// is collectFiles with the progress of a large file shown under the box, so
+// the checks below name `collect` and check that it is that wrapper.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -53,9 +57,11 @@ describe('the reply box in a thread', () => {
     const src = code(read('renderer/src/team/ThreadPanel.tsx'));
     // The box is the chat's editor since w-0d55a2b160, which hands a pasted
     // or dropped file to `onFiles` rather than putting it in the text.
-    expect(src).toMatch(/onFiles=\{async \(files\) => \{\s*const got = await collectFiles\(files\)/);
+    expect(src).toMatch(/const \{ attaching, collect \} = useAttaching\(\);/);
+    expect(code(read('renderer/src/attachments.ts'))).toMatch(/return await collectFiles\(files, show\)/);
+    expect(src).toMatch(/onFiles=\{async \(files\) => \{\s*const got = await collect\(files\)/);
     expect(code(read('renderer/src/team/RichReply.tsx'))).toMatch(/if \(files\.length\) \{ live\.current\.onFiles\?\.\(files\); return true; \}/);
-    expect(src).toMatch(/onDrop=\{async \(e\) => \{[\s\S]*?collectFiles\(e\.dataTransfer\.files\)/);
+    expect(src).toMatch(/onDrop=\{async \(e\) => \{[\s\S]*?collect\(e\.dataTransfer\.files\)/);
   });
 
   // The file is saved into the conversation's own project, which is the folder
@@ -140,13 +146,12 @@ describe('a new message to a person', () => {
 
   it('sends the files it holds with the words', () => {
     expect(src).toMatch(/attachments\.map\(\(\{ name, dataBase64, srcPath \}\) => \(\{ name, dataBase64, srcPath \}\)\)/);
-    // Addressed to a person AND sent as a message: a task to a person is
-    // held to the task's bar instead (w-c34591721f).
-    expect(src).toMatch(/asMessage \? !!text\.trim\(\) \|\| attachments\.length > 0/);
+    // To a person, as a message or a task alike: files alone can be sent.
+    expect(src).toMatch(/person \? !!text\.trim\(\) \|\| attachments\.length > 0/);
   });
 
   it('has an attach button beside Send', () => {
-    const from = src.indexOf("{person && sendAs === 'message' ? (");
+    const from = src.indexOf('{person ? (\n');
     const bar = src.slice(from, src.indexOf('\n        ) : (', from));
     expect(bar).toMatch(/aria-label="Attach files"/);
   });

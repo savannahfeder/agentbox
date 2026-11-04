@@ -5,7 +5,9 @@ import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialo
 import './no-default-menu.mjs';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mjs';
+import { startConnections } from './connections/start.mjs';
 import { roomsSetup } from './team/room-setup.mjs';
+import { matesForTheTeam } from './teammate-reach.mjs';
 import { loadCloudConfig, supabaseSession } from './team/session.mjs';
 // MY WORKSPACE IS NOT A TEAM FEATURE ANY MORE (w-f8d123be62), even though it
 // still lives in the team folder next to the sharing rules it has to obey.
@@ -29,6 +31,7 @@ import { appSessionFolders } from './agent-homes.mjs';
 import { registerIpc } from './ipc.mjs';
 import { stallWatch } from './stall-watch.mts';
 import { startFreezeRecorder } from './freeze-recorder.mjs';
+import { FreezeWatch } from './freeze-watch.mjs';
 import { applyThrough, phoneDevice } from './phone-inbox.mjs';
 import { answerWhatOnlyTheWindowAnswered } from './serve.mjs';
 import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mjs';
@@ -55,6 +58,7 @@ import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mjs';
 import { quietTheFramesScrollbars } from './frame-scrollbars.mts';
 import { letLocalAppsShowInThePane } from './local-app-frames.mts';
 import { hardenAttachedWebview } from './webview-guard.mts';
+import { leavesTheApp } from './app-window-stays.mjs';
 import { IMG_SCHEMES, imgPath, mediaResponse, mediaType, servable } from './img-scheme.mjs';
 import { hotWindowVerdict, storeHasWork } from './dev-window.mjs';
 import { writeHeldThenReload } from './write-before-reload.mts';
@@ -425,6 +429,8 @@ async function createWindow() {
   // request so a project made after launch is not a folder of broken images.
   imageRoots = () => [config.accountRoot, ...store.listProducts().map((p) => p.repoPath).filter(Boolean)];
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
+  // Local runs outlive a quit or a restart of the app (main/run-host.mjs).
+  supervisor.hostRuns = true;
   // THAT agents start and stop work (main/analytics.mjs checks the switch).
   supervisor.count = (name, props) => analytics.track(name, props);
   // Whether anyone has touched the Mac since a wake (Supervisor#asleep).
@@ -438,6 +444,13 @@ async function createWindow() {
     onFreeze: (f) => { stalls.noteFreeze(f); console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`); },
   });
   quitStep(app, 'before-quit', 'freezes.stop', () => freezes.stop());
+  const freezeWatch = new FreezeWatch({ store, userDir, appDir });
+  const checkFreezes = () => { try { freezeWatch.check(); } catch (err) { console.warn(`zero: could not read yesterday's freezes: ${err.message}`); } };
+  const freezeFirst = setTimeout(checkFreezes, 60_000);
+  const freezeHourly = setInterval(checkFreezes, 60 * 60_000);
+  freezeFirst.unref?.();
+  freezeHourly.unref?.();
+  quitStep(app, 'before-quit', 'freezeWatch.stop', () => { clearTimeout(freezeFirst); clearInterval(freezeHourly); });
   quitStep(app, 'before-quit', 'supervisor.killAll', () => supervisor.killAll());
   // THE TEAM. Off entirely on a build with no team cloud (the single-person
   // app). Otherwise it restores whoever was signed in, and from then on every
@@ -470,6 +483,8 @@ async function createWindow() {
     // exists; until then a change has nobody to tell.
     onChange: () => { try { pushUpdate(); } catch { /* no window yet */ } },
     log: (line) => console.log(line),
+    runningIds: () => supervisor.runsGoing().map((s) => s.itemId),
+    ownMates: () => matesForTheTeam(store, config),
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mjs). What it left is done
     // through the window's own handlers, filed below once the window exists.
     phone: {
@@ -515,6 +530,7 @@ async function createWindow() {
     rooms: roomsSetup({ config, store, supervisor, userDir }),
   }) : null;
   if (team) {
+    store.teammates?.bindTeam(team);
     team.start().then(() => supervisor.wake?.()).catch((err) => console.warn(`team: ${err.message}`));
     quitStep(app, 'before-quit', 'team.stop', () => team.stop());
   }
@@ -857,16 +873,33 @@ async function createWindow() {
       ? getMic({ systemPreferences, openExternal: (url) => shell.openExternal(url) })
       : 'granted'),
   };
+  // Like the team's sign-in, a connection's is sealed by the keychain only on
+  // a copy with a team cloud; without one the vault keeps nothing.
+  const connectionsKeychain = cloudConfig ? {
+    encrypt: (text) => (safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : null),
+    decrypt: (buf) => (safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : null),
+  } : null;
+  const connected = startConnections({
+    config, supervisor, appDir, userDir,
+    cipher: connectionsKeychain,
+    openExternal: (url) => shell.openExternal(url),
+    packaged: app.isPackaged,
+    onChange: () => { try { pushUpdate(); } catch { /* no window yet */ } },
+    onWhoChanged: () => { void team?.publishConnections?.(); },
+  });
+  quitStep(app, 'before-quit', 'connections.stop', () => connected.stop());
   const ipc = registerIpc({
     store, supervisor, config, window, analytics, docGrants, updater,
     host: filingHost,
     team,
+    connections: connected.connections,
+    copies: connected.copies,
   });
-  pushUpdate = ipc.push;
   // The Agents menu's Allow/Deny, bound to the real door now that there is one.
   // See the `installMenu` call above for what writing the file instead did to a
   // Codex card.
   answerApproval = ipc.answerApproval;
+  pushUpdate = ipc.push;
   cardInFront = () => ipc.pendingApprovals()[0] ?? null;
   // What the window answers itself (badge, boot info) gets the plain stand-ins
   // a browser tab gets.
@@ -1106,6 +1139,13 @@ async function createWindow() {
     if (/^https?:/.test(url)) shell.openExternal(url);
     else if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
     return { action: 'deny' };
+  });
+  // A plain link the renderer did not catch would turn the whole window into
+  // that page, with no Back and no Close. It goes to your own browser instead.
+  window.webContents.on('will-navigate', (e, url) => {
+    if (!leavesTheApp(window.webContents.getURL(), url)) return;
+    e.preventDefault();
+    if (/^https?:/.test(url)) shell.openExternal(url);
   });
 
   // WHAT AN EMBEDDED PAGE MAY DO IS DECIDED HERE, NOT ON THE TAG THAT ASKED.

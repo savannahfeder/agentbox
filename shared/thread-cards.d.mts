@@ -17,3 +17,4 @@ export function shownToTeam(item: Partial<WorkItem>, since?: number | null, prod
 export function visibilityOf(item: Partial<WorkItem>, product?: ProjectSeen): 'team' | 'people' | 'private' | undefined;
 export function projectSeenBy(product: ProjectSeen): { who: 'private' | 'team' | 'people'; people: string[] };
 export function shownToPeople(item: Partial<WorkItem>, product?: ProjectSeen): string[];
+export function shippedAtOf(item: unknown): number | null;
