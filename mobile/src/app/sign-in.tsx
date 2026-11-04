@@ -1,12 +1,14 @@
-// Sign in, the first of the first run's four steps. Accounts are made on the
-// computer, so this signs in and never makes one. Sign in with Apple sits
-// beside Google on an iPhone (guideline 4.8).
+// Sign in, the first screen and the first of the four steps. Nearly everyone
+// has an account from the computer already, so it opens on email and password,
+// with Google under them. Accounts are made on the computer: Sign up, and a
+// sign-in that fails, point there. Only ways the computer also signs in with,
+// so no account made here is one the computer cannot open.
 import { Redirect, router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
-import { appleAvailable, appleSignIn, googleSignIn } from '../platform/sign-in';
+import { googleSignIn } from '../platform/sign-in';
 import { useCloud } from '../state/cloud';
-import { AppleMark, AppMark, GoogleMark } from '../ui/icons';
+import { AppMark, GoogleMark } from '../ui/icons';
 import { Bars, Btn, CORNER, Head, Label, Lede, Screen } from '../ui/Onboarding';
 import { T } from '../ui/parts';
 import { color, font } from '../ui/theme';
@@ -32,54 +34,62 @@ function Field({ label, secureTextEntry, ...rest }: { label: string } & React.Co
   );
 }
 
+const toNoAccount = () => router.push('/no-account');
+
 export default function SignIn() {
   const c = useCloud();
-  const [apple, setApple] = useState(false);
-  const [byEmail, setByEmail] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { void appleAvailable().then(setApple); }, []);
+  // An email sign-in that failed may be someone with no account yet.
+  const [failed, setFailed] = useState(false);
   if (c.signedIn) return <Redirect href="/" />;
 
   const run = (which: string, how: () => Promise<unknown>) => async () => {
     if (!c.cloud) return;
-    setBusy(which); setError(null);
+    setBusy(which); setError(null); setFailed(false);
     try { await c.signedInWith(how); } catch (err: any) {
-      if (err?.code !== 'ERR_REQUEST_CANCELED') setError(String(err?.message ?? '') || 'That did not work. Try again.');
+      if (err?.code === 'ERR_REQUEST_CANCELED') return;
+      setError(String(err?.message ?? '') || 'That did not work. Try again.');
+      setFailed(which === 'email');
     } finally { setBusy(null); }
   };
   const canSubmit = !!email.trim() && !!password && !busy && !!c.cloud;
-  const back = () => (byEmail ? setByEmail(false) : router.canGoBack() ? router.back() : router.replace('/welcome'));
-
-  const foot = byEmail ? (
-    <Btn kind="primary" label={busy === 'email' ? 'Signing in…' : 'Sign in'} disabled={!canSubmit}
-      onPress={run('email', () => c.cloud!.signInWithPassword(email.trim(), password))} />
-  ) : (
-    <>
-      {(apple || c.preview) && <Btn label={busy === 'apple' ? 'Signing in…' : 'Continue with Apple'} lead={<AppleMark />} disabled={!!busy} onPress={run('apple', () => appleSignIn(c.cloud!))} />}
-      <Btn label={busy === 'google' ? 'Signing in…' : 'Continue with Google'} lead={<GoogleMark />} disabled={!!busy} onPress={run('google', () => googleSignIn(c.cloud!))} />
-      <Btn kind="quiet" label="Continue with email" onPress={() => { setByEmail(true); setError(null); }} />
-      <T style={{ fontSize: 13.5, lineHeight: 19, color: color.faint, textAlign: 'center', marginTop: 4 }}>No account yet? Make one in Agentbox on your computer.</T>
-    </>
-  );
+  const signIn = run('email', () => c.cloud!.signInWithPassword(email.trim(), password));
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Screen top={64} back={back} foot={foot}>
+      <Screen top={24} foot={<>
+        <Btn kind="primary" label={busy === 'email' ? 'Signing in…' : 'Sign in'} disabled={!canSubmit} onPress={signIn} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 4 }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
+          <Label>or</Label>
+          <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
+        </View>
+        <Btn label={busy === 'google' ? 'Signing in…' : 'Continue with Google'} lead={<GoogleMark />} disabled={!!busy} onPress={run('google', () => googleSignIn(c.cloud!))} />
+        <T style={{ fontSize: 14, lineHeight: 20, color: color.faint, textAlign: 'center', marginTop: 6 }}>
+          {'No account? '}
+          <T onPress={toNoAccount} accessibilityRole="link" style={{ fontSize: 14, color: color.text, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }}>Sign up</T>
+        </T>
+      </>}>
         <Bars at="account" />
         <AppMark size={36} />
         <Head style={{ marginTop: 28 }}>Sign in</Head>
-        <Lede>Use the account you made in Agentbox on your computer.</Lede>
+        <Lede>Use the account from Agentbox on your computer.</Lede>
         {!c.cloud && !c.preview && <Lede>This build was made without the cloud's address, so it cannot sign in.</Lede>}
-        {byEmail && (
-          <View style={{ gap: 16, marginTop: 28 }}>
-            <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" autoFocus />
-            <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry textContentType="password" autoComplete="password" />
-          </View>
+        <View style={{ gap: 16, marginTop: 28 }}>
+          <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" />
+          <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry textContentType="password" autoComplete="password"
+            returnKeyType="go" onSubmitEditing={() => { if (canSubmit) void signIn(); }} />
+        </View>
+        {error && <T accessibilityRole="alert" style={{ fontSize: 14, lineHeight: 20, color: color.dim, marginTop: 16 }}>{error}</T>}
+        {failed && (
+          <T style={{ fontSize: 14, lineHeight: 20, color: color.dim, marginTop: 6 }}>
+            {'New to Agentbox? '}
+            <T onPress={toNoAccount} accessibilityRole="link" style={{ fontSize: 14, color: color.text, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }}>Make your account on your computer</T>
+          </T>
         )}
-        {error && <T accessibilityRole="alert" style={{ fontSize: 14, lineHeight: 20, color: color.dim, marginTop: 18 }}>{error}</T>}
       </Screen>
     </KeyboardAvoidingView>
   );

@@ -12,7 +12,7 @@ import { useCloud } from '../state/cloud';
 import { footRoom, T } from './parts';
 import { color, font } from './theme';
 
-const FIRST_RUN_SCREENS = new Set(['/welcome', '/sign-in', '/ai-notice', '/alerts']);
+const FIRST_RUN_SCREENS = new Set(['/sign-in', '/no-account', '/ai-notice', '/alerts']);
 
 // The site's glass is --bg-raised at 62% over a 22px blur. The app has no
 // blur, and paint alone lets the words under it show through, so it is the

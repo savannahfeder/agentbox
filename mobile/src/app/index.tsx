@@ -273,7 +273,7 @@ export default function Threads() {
     ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, display, c.now).filter((col) => col.state !== 'waiting') : null), [onEverything, evView, display, c.view, c.tabs, c.now]);
   const rowOf = useMemo(() => new Map(Object.values(c.tabs).flat().map((r) => [r.key, r])), [c.tabs]);
   if (!c.opened) return <Wall><Waiting /></Wall>;
-  if (!c.signedIn) return <Redirect href="/welcome" />;
+  if (!c.signedIn) return <Redirect href="/sign-in" />;
   // Under your own card, your threads without your AI teammates' runs, which their cards hold.
   const rows = onEverything ? myItems(shown.rows[tab].map((r) => ({ ...r, labels: r.item?.labels }))) as typeof shown.rows[TabId] : shown.rows[tab];
   // Later counts its repeating tasks too, as the desktop's does (App.tsx `scheduledCount`).

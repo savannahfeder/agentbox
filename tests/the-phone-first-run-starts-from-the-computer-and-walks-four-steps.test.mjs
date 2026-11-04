@@ -9,10 +9,12 @@
 // already covers (main/team/index.mjs makes the phone's copy for whoever is
 // signed in). Measured by drawing those screens in the phone preview.
 //
-// Now the first screen asks whether Agentbox is on your computer. Not yet
-// sends you there to make your account. Yes walks four steps in order, each
-// drawn with the same four bars: sign in, the computer, where your messages
-// go, alerts. A step already done is skipped, and the inbox comes after.
+// Now it opens on sign-in, since nearly everyone already has an account from
+// the computer: email and password first, then Google. No Apple, which the
+// computer cannot sign in with, so an Apple account would be stranded. Sign up,
+// or a sign-in that fails, says accounts are made in Agentbox on the computer.
+// Then four steps in order, each drawn with the same four bars: sign in, the
+// computer, where your messages go, alerts. A step already done is skipped.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { nextSetup, SETUP_STEPS } from '../mobile/src/lib/first-run';
@@ -49,20 +51,32 @@ describe('the order of the steps', () => {
 });
 
 describe('the screens', () => {
-  it('a signed-out phone opens on the question about the computer', () => {
-    expect(read('mobile/src/app/index.tsx')).toMatch(/<Redirect href="\/welcome" \/>/);
-    const welcome = read('mobile/src/app/welcome.tsx');
-    expect(welcome).toMatch(/Is Agentbox on your computer\?/);
-    expect(welcome).toMatch(/Start on your computer/);
-    expect(welcome).toMatch(/agentbox\.ac\/download/);
+  it('a signed-out phone opens on sign-in, with no question first', () => {
+    expect(read('mobile/src/app/index.tsx')).toMatch(/<Redirect href="\/sign-in" \/>/);
+    expect(fs.existsSync(new URL('../mobile/src/app/welcome.tsx', import.meta.url))).toBe(false);
   });
 
-  it('the phone signs in to an account and never makes one', () => {
+  it('sign-in leads with email and password, then Google, and offers no Apple', () => {
     const signIn = read('mobile/src/app/sign-in.tsx');
     expect(signIn).toMatch(/signInWithPassword/);
+    // The fields are always drawn, not behind a "Continue with email" button.
+    expect(signIn).toMatch(/<Field label="Email"/);
+    expect(signIn).not.toMatch(/Continue with email|byEmail/);
+    // The email Sign in is the main button, and Google comes after it.
+    expect(signIn.indexOf('kind="primary"')).toBeGreaterThan(-1);
+    expect(signIn.indexOf('kind="primary"')).toBeLessThan(signIn.indexOf('Continue with Google'));
+    expect(signIn).not.toMatch(/Apple/);
+  });
+
+  it('the phone never makes an account; sign up and a failed sign-in point to the computer', () => {
+    const signIn = read('mobile/src/app/sign-in.tsx');
     expect(signIn).not.toMatch(/signUp\(/);
-    expect(signIn).not.toMatch(/Create an account/);
-    expect(signIn).toMatch(/make one in Agentbox on your computer/i);
+    expect(signIn).toMatch(/router\.push\('\/no-account'\)/);
+    expect(signIn).toMatch(/Sign up/);
+    expect(signIn).toMatch(/failed && /);
+    const noAccount = read('mobile/src/app/no-account.tsx');
+    expect(noAccount).toMatch(/Make your account\\non your computer/);
+    expect(noAccount).toMatch(/agentbox\.ac\/download/);
   });
 
   it('waiting on the computer asks for its sign-in, not a Phone switch', () => {
@@ -95,12 +109,7 @@ describe('the screens', () => {
   // card rose over the alerts step and covered both its buttons.
   it('a permission card waits until the first run is over', () => {
     const cards = read('mobile/src/ui/Approvals.tsx');
-    for (const screen of ['/welcome', '/sign-in', '/ai-notice', '/alerts']) expect(cards).toMatch(new RegExp(`FIRST_RUN_SCREENS = new Set\\([^)]*'${screen}'`));
+    for (const screen of ['/sign-in', '/no-account', '/ai-notice', '/alerts']) expect(cards).toMatch(new RegExp(`FIRST_RUN_SCREENS = new Set\\([^)]*'${screen}'`));
     expect(cards).toMatch(/if \(FIRST_RUN_SCREENS\.has\(pathname\)\) return null;/);
-  });
-
-  it('nothing from the drafts is left: no made-up inbox to try, no pairing code', () => {
-    const welcome = read('mobile/src/app/welcome.tsx');
-    expect(welcome).not.toMatch(/made up|K7Q4MX|option/);
   });
 });
