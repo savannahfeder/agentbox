@@ -2414,6 +2414,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return team.fileLink(linkOf(arg), now?.hash ?? null);
   }));
   ipcMain.handle('zero:file-link-share', linkCall(async (arg) => team.shareFile({ source: linkOf(arg), ...(await fileOnScreen(arg)) })));
+  ipcMain.handle('zero:file-links', linkCall(async () => team.fileLinks()));
   ipcMain.handle('zero:file-link-stop', linkCall(async ({ token } = {}) => { await team.stopFileLink(String(token ?? '')); return {}; }));
   ipcMain.handle('zero:file-link-comments', linkCall(async ({ token } = {}) => ({ comments: await team.fileLinkComments(String(token ?? '')) })));
   ipcMain.handle('zero:file-link-comment', linkCall(async ({ token, text } = {}) => ({ comments: await team.commentOnFileLink(String(token ?? ''), text) })));

@@ -192,6 +192,7 @@ export const REQUEST_CHANNELS = {
   fileLink: 'zero:file-link',
   fileLinkShare: 'zero:file-link-share',
   fileLinkStop: 'zero:file-link-stop',
+  fileLinks: 'zero:file-links',
   fileLinkComments: 'zero:file-link-comments',
   fileLinkComment: 'zero:file-link-comment',
   codeChange: 'zero:code-change',

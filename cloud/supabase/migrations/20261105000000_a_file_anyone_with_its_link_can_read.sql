@@ -77,6 +77,18 @@ language sql stable security definer set search_path = public as $$
   where l.owner = auth.uid() and l.source = src and l.stopped_at is null
 $$;
 
+-- Every live link of this person's, for the one list of what they made public.
+create or replace function public.my_file_links()
+returns table (token text, source text, name text, kind text, created_at timestamptz, updated_at timestamptz, comments int)
+language sql stable security definer set search_path = public as $$
+  select l.token, l.source, l.name, l.kind, l.created_at, l.updated_at,
+         (select count(*)::int from public.file_link_comments c where c.token = l.token)
+  from public.file_links l
+  where l.owner = auth.uid() and l.stopped_at is null
+  order by l.updated_at desc
+  limit 500
+$$;
+
 -- Stops a link for good: the page says it was stopped, and its copy is emptied.
 create or replace function public.stop_file_link(tok text)
 returns void
@@ -167,11 +179,11 @@ grant select on public.file_links to authenticated;
 revoke execute on function public.share_file(text, text, text, text, text, int, text), public.my_file_link(text),
   public.stop_file_link(text), public.file_link_view(text), public.file_link_stopped(text),
   public.file_link_comments_of(text), public.comment_on_file_link(text, text), public.remove_file_link_comment(uuid),
-  public.new_comments_on_my_links(timestamptz)
+  public.new_comments_on_my_links(timestamptz), public.my_file_links()
   from public, anon, authenticated;
 grant execute on function public.share_file(text, text, text, text, text, int, text), public.my_file_link(text),
   public.stop_file_link(text), public.comment_on_file_link(text, text), public.remove_file_link_comment(uuid),
-  public.new_comments_on_my_links(timestamptz)
+  public.new_comments_on_my_links(timestamptz), public.my_file_links()
   to authenticated;
 grant execute on function public.file_link_view(text), public.file_link_stopped(text), public.file_link_comments_of(text)
   to anon, authenticated;

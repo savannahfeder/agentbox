@@ -18,6 +18,7 @@ import type { CarryState } from '../../shared/carried-files.mjs';
 export interface FileLinkAsk { product: string; thread: string; src: string }
 /** `current`: the link holds the copy of the file on screen now. */
 export interface FileLink { token: string; url: string; version: number; createdAt: number; updatedAt: number; comments: number; current: boolean }
+export interface PublicLink { token: string; url: string; source: string; name: string; kind: string; createdAt: number; updatedAt: number; comments: number }
 export interface LinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean }
 /** `site` null: this copy's cloud has no website, so there is nothing to share on. */
 export interface FileLinkState { ok: boolean; error?: string; site?: string | null; signedIn?: boolean; link?: FileLink | null }
@@ -736,6 +737,12 @@ export const api = {
     const zero = window.zero as any;
     if (!zero?.fileLinkStop) return { ok: false, error: `quit and reopen ${NAME} to share files` };
     return zero.fileLinkStop(p);
+  },
+  /** Every live link of this person's, for the list of what they made public. */
+  async fileLinks(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinks) return { ok: false, error: 'not here' };
+    return zero.fileLinks();
   },
   async fileLinkComments(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
     const zero = window.zero as any;

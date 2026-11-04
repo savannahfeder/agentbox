@@ -1013,6 +1013,12 @@ export function createTeamService({
       await backend.shareFile({ source, name, kind, type, body, version, hash });
       return this.fileLink(source, hash);
     },
+    /** Every live link of this person's, for the one list of what they made public. */
+    async fileLinks() {
+      if (!linkSite || !backend?.myFileLinks || !state.me) return { site: linkSite, links: [] };
+      const links = await backend.myFileLinks();
+      return { site: linkSite, links: links.map((l) => ({ ...l, url: linkAddress(linkSite, l.token) })) };
+    },
     async stopFileLink(token) {
       if (!backend?.stopFileLink || !state.me) throw new Error('Sign in first.');
       await backend.stopFileLink(token);

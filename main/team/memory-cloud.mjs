@@ -401,6 +401,13 @@ export function memoryBackend(cloud, personId) {
       });
     },
 
+    async myFileLinks() {
+      return [...cloud.fileLinks.values()]
+        .filter((l) => l.owner === personId && !l.stoppedAt)
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .map((l) => ({ token: l.token, source: l.source, name: l.name, kind: l.kind, createdAt: l.createdAt ?? l.updatedAt, updatedAt: l.updatedAt, comments: cloud.fileLinkComments.filter((c) => c.token === l.token).length }));
+    },
+
     async newLinkComments(since) {
       return cloud.fileLinkComments
         .filter((c) => c.at > since && c.by !== personId)

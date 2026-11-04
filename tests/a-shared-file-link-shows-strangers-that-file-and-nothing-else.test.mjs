@@ -229,6 +229,25 @@ describe('the comments new to the owner', () => {
   });
 });
 
+// Two sharers had no one place to see what they had made public (power test, round 3).
+describe('the owner\'s list of live links', () => {
+  it('is every live link of theirs, newest first, with its comment count, and none of anyone else\'s', async () => {
+    const SOFIA = '77777777-7777-7777-7777-777777777777';
+    await db.query(`insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values ($1, 'sofia@else.test', now(), $2)`, [SOFIA, { full_name: 'Sofia' }]);
+    const a = await share(SOFIA, 'p/w-1/a', '# A', { name: 'a.md' });
+    const b = await share(SOFIA, 'p/w-1/b', '# B', { name: 'b.md' });
+    const c = await share(SOFIA, 'p/w-1/c', '# C', { name: 'c.md' });
+    await as(SOFIA, `select public.stop_file_link($1)`, [c]);
+    await comment(JUN, a, 'On a');
+    await db.query(`update public.file_links set updated_at = now() + interval '1 minute' where token = $1`, [a]);
+    const mine = await rows(SOFIA, `select * from public.my_file_links()`);
+    expect(mine.map((l) => [l.token, l.name, l.comments])).toEqual([[a, 'a.md', 1], [b, 'b.md', 0]]);
+    expect(mine[0]).toHaveProperty('source', 'p/w-1/a');
+    expect((await rows(JUN, `select * from public.my_file_links()`)).map((l) => l.token)).not.toContain(a);
+    expect(await refused(null, `select * from public.my_file_links()`, [], 'anon')).toBe(true);
+  });
+});
+
 describe('what a link will hold', () => {
   it('refuses a kind it cannot draw, and a file over its size', async () => {
     expect(await refused(MAYA, `select public.share_file('a', 'a.mov', 'film', 'video/mp4', 'x', 1, '')`)).toBe(true);

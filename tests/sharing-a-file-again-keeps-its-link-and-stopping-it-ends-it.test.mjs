@@ -77,6 +77,20 @@ describe('signed in', () => {
     expect(shareWords.shared(later, now + 2 * 86_400_000)).toBe('Updated Nov 4');
   });
 
+  // Two sharers had no one place to see what they had made public (power test, round 3).
+  it('lists every live link, newest first, with its address, and none once stopped', async () => {
+    let now = Date.parse('2026-11-04T09:00:00Z');
+    cloud.now = () => now;
+    const first = (await maya.shareFile(file(1))).link;
+    now += 60_000;
+    await maya.shareFile({ ...file(1), source: 'agentbox-team/w-2/pricing.html', name: 'pricing.html', kind: 'page', type: 'text/html' });
+    const { links } = await maya.fileLinks();
+    expect(links.map((l) => l.name)).toEqual(['pricing.html', 'plan.md']);
+    expect(links[1]).toMatchObject({ token: first.token, url: first.url, comments: 0, kind: 'markdown' });
+    await maya.stopFileLink(first.token);
+    expect((await maya.fileLinks()).links.map((l) => l.name)).toEqual(['pricing.html']);
+  });
+
   it('says whether the link holds the copy on screen', async () => {
     await maya.shareFile(file(1));
     expect((await maya.fileLink(SOURCE, 'h1')).link.current).toBe(true);
