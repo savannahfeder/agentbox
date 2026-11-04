@@ -85,55 +85,58 @@ export function SharedFilePage({ token, client, finishing = null }: {
   const title = file ? titleOf(file).title : null;
   useEffect(() => { document.title = title ? `${title} · Agentbox` : 'Agentbox'; }, [title]);
 
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  // Signing in from this page is always for commenting, so it comes back to the comments.
   const signedInNow = async () => {
     setAsking(null);
     setBackError(null);
     setSignedIn(client.signedIn());
+    setCommentsOpen(true);
     await readAll();
   };
+  useEffect(() => { if (finishing) void finishing.then((failed) => { if (!failed && client.signedIn()) setCommentsOpen(true); }); }, [finishing, client]);
+  useEffect(() => {
+    if (!commentsOpen) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !asking) setCommentsOpen(false); };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [commentsOpen, asking]);
 
   let body: ReactNode;
   if (load.state === 'loading') body = <div className="sf-state" aria-busy="true"><span className="sf-dots" aria-label="Loading"><i /><i /><i /></span></div>;
   else if (load.state === 'failed') body = <div className="sf-state" role="alert"><p>This file did not load.</p><button type="button" className="sf-quiet-btn" onClick={() => { setLoad({ state: 'loading' }); void readAll(); }}>Try again</button></div>;
   else if (load.state === 'stopped') body = <div className="sf-state"><p>This link was stopped. Ask whoever sent it for a new one.</p></div>;
   else if (load.state === 'unknown') body = <div className="sf-state"><p>This link does not work. Check it with whoever sent it.</p></div>;
-  else {
-    const kept = load.file.kind === 'image' || load.file.kind === 'pdf';
-    body = (
-      <main className={`sf-main is-${load.file.kind}`}>
-        <div className="sf-head">
-          <div>
-            <h1>{titleOf(load.file).title}</h1>
-            <p>{sharedLine(load.file)}</p>
-          </div>
-          {kept && <a className="sf-download" href={`/f/${token}/raw`} download={load.file.name}>Download</a>}
-        </div>
-        <div className="sf-split">
-          <section className="sf-file" aria-label={load.file.name}><FileBody token={token} file={load.file} /></section>
-          <Comments
-            file={load.file} comments={comments} signedIn={signedIn}
-            onAsk={setAsking}
-            post={async (words) => { await postComment(asMe, token, words); setComments(await readComments(anyone, token)); }}
-            remove={async (id) => { await removeComment(asMe, id); setComments(await readComments(anyone, token)); }}
-          />
-        </div>
-      </main>
-    );
-  }
+  else body = <FilePage token={token} file={load.file} />;
 
   return (
-    <div className="sf-page">
-      <header className="sf-bar">
-        <a className="sf-brand" href={SITE}><AppMark size={14} />agentbox<span className="sf-pitch">Give your agents an inbox</span></a>
-        <nav className="sf-bar-links">
-          <a href={SITE}>Get Agentbox</a>
-          {signedIn && <span className="sf-me" title={client.email() ?? undefined}>{client.email()}</span>}
-          {signedIn
-            ? <button type="button" onClick={() => { client.signOut(); setSignedIn(false); void readAll(); }}>Sign out</button>
-            : load.state !== 'loading' && <button type="button" onClick={() => setAsking('sign-in')}>Sign in</button>}
-        </nav>
-      </header>
+    <div className={`sf-page${commentsOpen ? ' has-panel' : ''}`}>
+      <TopBar count={file ? comments?.length ?? 0 : null} open={commentsOpen} onComments={() => setCommentsOpen(!commentsOpen)} />
       {body}
+      {commentsOpen && (
+        <aside className="sf-panel" aria-label="Comments">
+          <div className="sf-panel-head">
+            <h2>Comments</h2>
+            <button type="button" className="sf-panel-close" aria-label="Close comments" onClick={() => setCommentsOpen(false)}>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+            </button>
+          </div>
+          {file && (
+            <Comments
+              file={file} comments={comments} signedIn={signedIn}
+              onAsk={setAsking}
+              post={async (words) => { await postComment(asMe, token, words); setComments(await readComments(anyone, token)); }}
+              remove={async (id) => { await removeComment(asMe, id); setComments(await readComments(anyone, token)); }}
+            />
+          )}
+          {signedIn && (
+            <p className="sf-me">
+              <span title={client.email() ?? undefined}>{client.email()}</span>
+              <button type="button" onClick={() => { client.signOut(); setSignedIn(false); void readAll(); }}>Sign out</button>
+            </p>
+          )}
+        </aside>
+      )}
       {asking && (
         <SharedSignIn
           client={client} startOn={asking} error={backError}
@@ -143,6 +146,40 @@ export function SharedFilePage({ token, client, finishing = null }: {
         />
       )}
     </div>
+  );
+}
+
+/** The mark, the comments and the way to the app. `count` null: there is no file to comment on. */
+export function TopBar({ count, open, onComments }: { count: number | null; open: boolean; onComments: () => void }) {
+  return (
+    <header className="sf-bar">
+      <a className="sf-brand" href={SITE}><AppMark size={14} />agentbox</a>
+      <nav className="sf-bar-links">
+        {count !== null && (
+          <button type="button" className={`sf-talk${open ? ' is-on' : ''}`} aria-pressed={open} onClick={onComments}>
+            {count === 0 ? 'Comment' : count === 1 ? '1 comment' : `${count} comments`}
+          </button>
+        )}
+        <a href={SITE}>Get Agentbox</a>
+      </nav>
+    </header>
+  );
+}
+
+/** The file on its own: its title, who shared it, and the file. */
+export function FilePage({ token, file }: { token: string; file: SharedFile }) {
+  const kept = file.kind === 'image' || file.kind === 'pdf';
+  return (
+    <main className={`sf-main is-${file.kind}`}>
+      <div className="sf-head">
+        <h1>{titleOf(file).title}</h1>
+        <p>
+          {sharedLine(file)}
+          {kept && <> · <a className="sf-download" href={`/f/${token}/raw`} download={file.name}>Download</a></>}
+        </p>
+      </div>
+      <section className="sf-file" aria-label={file.name}><FileBody token={token} file={file} /></section>
+    </main>
   );
 }
 
@@ -200,8 +237,7 @@ export function Comments({ file, comments, signedIn, onAsk, post, remove }: {
   const left = 4000 - words.length;
 
   return (
-    <aside className="sf-comments" aria-label="Comments">
-      <h2>Comments{comments?.length ? <span>{comments.length}</span> : null}</h2>
+    <div className="sf-comments">
       {comments && comments.length > 0 && (
         <ol className="sf-list">
           {comments.map((c) => (
@@ -242,6 +278,6 @@ export function Comments({ file, comments, signedIn, onAsk, post, remove }: {
       )}
       {error && <p className="sf-error" role="alert">{error}</p>}
       {offer && <p className="sf-offer">{WHAT_AGENTBOX_IS} <a href={DOWNLOAD}>Get Agentbox</a></p>}
-    </aside>
+    </div>
   );
 }
