@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const approval = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/the-trays-approved-look.json'), 'utf8'));
@@ -41,18 +42,25 @@ export function body(code, name) {
 
 const fingerprint = (text) => crypto.createHash('sha256').update(withoutComments(text)).digest('hex').slice(0, 16);
 
+// Types, and whether an import says .mjs or .mts, say nothing about the look
+// either: the code is read as the JavaScript it runs as.
+export function asCode(code, file) {
+  const options = { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext, jsx: ts.JsxEmit.Preserve, verbatimModuleSyntax: true, removeComments: true };
+  return ts.transpileModule(code, { fileName: file, compilerOptions: options }).outputText.replace(/\.m[jt]s(['"])/g, '.mjs$1');
+}
+
 // What the tray looks like, part by part.
 export const PARTS = {
   'the tray page styles (renderer/src/corner-tag/corner-tag.css)': () => read('renderer/src/corner-tag/corner-tag.css'),
-  'the tray page (renderer/src/corner-tag/main.tsx)': () => read('renderer/src/corner-tag/main.tsx'),
-  'the nine dots (renderer/src/corner-tag/lattice.tsx)': () => read('renderer/src/corner-tag/lattice.tsx'),
-  'the corner picker (renderer/src/corner-tag/place.tsx)': () => read('renderer/src/corner-tag/place.tsx'),
+  'the tray page (renderer/src/corner-tag/main.tsx)': () => asCode(read('renderer/src/corner-tag/main.tsx'), 'main.tsx'),
+  'the nine dots (renderer/src/corner-tag/lattice.tsx)': () => asCode(read('renderer/src/corner-tag/lattice.tsx'), 'lattice.tsx'),
+  'the corner picker (renderer/src/corner-tag/place.tsx)': () => asCode(read('renderer/src/corner-tag/place.tsx'), 'place.tsx'),
   "the Mac's glass (main/native/liquid-glass/liquid-glass.mm)": () => read('main/native/liquid-glass/liquid-glass.mm'),
   'how the tray holds its glass light or dark (main/corner-tag.mts readTone, dress, make)': () => {
     const code = read('main/corner-tag.mts');
-    return ['readTone', 'dress', 'make'].map((n) => body(code, n)).join('\n');
+    return ['readTone', 'dress', 'make'].map((n) => asCode(body(code, n), 'corner-tag.mts')).join('\n');
   },
-  'where light turns to dark (shared/corner-tag.mts toneFromLuma)': () => body(read('shared/corner-tag.mts'), 'toneFromLuma'),
+  'where light turns to dark (shared/corner-tag.mts toneFromLuma)': () => asCode(body(read('shared/corner-tag.mts'), 'toneFromLuma'), 'corner-tag.mts'),
 };
 
 describe("the tray's approved look", () => {
@@ -86,6 +94,13 @@ describe('what counts as a change', () => {
 
   it('notices a changed value', () => {
     expect(fingerprint('a { color: red; }')).not.toBe(fingerprint('a { color: blue; }'));
+  });
+
+  it('ignores types and an import that now ends .mts, and still notices a changed value under them', () => {
+    const was = "import { tone } from './glass.mjs';\nfunction dress(win) { return tone(win, 0.42); }";
+    const typed = "import { tone } from './glass.mts';\nimport type { Win } from './win.mts';\nfunction dress(win: Win): number { return tone(win, 0.42); }";
+    expect(fingerprint(asCode(typed, 'a.mts'))).toBe(fingerprint(asCode(was, 'a.mjs')));
+    expect(fingerprint(asCode(typed.replace('0.42', '0.5'), 'a.mts'))).not.toBe(fingerprint(asCode(was, 'a.mjs')));
   });
 
   it('cuts one function out of a file whole', () => {
