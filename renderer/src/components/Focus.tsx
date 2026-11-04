@@ -2937,9 +2937,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
     } else if (finishing.current) return;
     if (saving || (!(spoken ?? text).trim() && !attachments.length)) return;
     if (attaching.length) { onNotice(`${attaching[0].name} is still being attached.`); return; }
-    // AN AGENT WITH NO PROJECT DOES NOT GO OUT. The footer already says why;
-    // ⌘↵ says it again rather than doing nothing.
-    if (chat.block) { onNotice(chat.block); return; }
+    // An agent with no project does not go out: its project list opens instead.
+    if (chat.askForProject()) return;
     const originalDraft = text;
     const consumeCommand = () => {
       if (ref.current?.value !== originalDraft) return;
@@ -3005,6 +3004,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   };
   // A note being recorded is a draft: the box stays open round it.
   const hasDraft = !!text.trim() || attachments.length > 0 || recording;
+  useEffect(() => { if (chat.readyToSend) { chat.sent(); void send(); } }, [chat.readyToSend]);
   // THE SLASH MENU, AND THE MODE THAT IS ALWAYS ON THE SCREEN.
   //
   // It does. Claude Code has no backslash TRIGGER: `/` opens its commands and
@@ -3461,9 +3461,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
               never bare; the formatting bar now sits in that corner, and the
               person asked for the line to go. The conversation's header
               already names who it is with. */}
-          {/* AN AGENT IN THE MESSAGE WITH NO PROJECT says so here, and Send
-              waits (w-7b9cb8636a). */}
-          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo?.length ? (chat.block ? <span className="dim">{chat.block}</span> : null) : <>
+          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo?.length ? null : <>
           <PriorityPicker
             variant="word"
             value={shown}
@@ -3625,8 +3623,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
         <button
           className="dock-send"
           onClick={() => send()}
-          disabled={!hasDraft || !!chat.block || saving}
-          title={chat.block ?? `Send · ${sendKeyFor(enterSends)}`}
+          disabled={!hasDraft || saving}
+          title={`Send · ${sendKeyFor(enterSends)}`}
         >{saving ? 'Sending…' : <>Send <kbd>{sendKeyFor(enterSends)}</kbd></>}</button>
         </>)}
         </>}

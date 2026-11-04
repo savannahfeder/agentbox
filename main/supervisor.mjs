@@ -4771,13 +4771,13 @@ export class Supervisor {
    * its mark. A limit mark goes only when nothing in the reading is at 100%.
    * Trouble that is not the account's (an old Claude Code, the network) stays.
    */
-  noteUsageReading(profile, reading) {
+  noteUsageReading(profile, reading, { onlyLimit = false } = {}) {
     const key = this._accountKey(DEFAULT_ENGINE, profile || 'default');
     const trouble = this._profileTrouble?.[key];
     const limits = reading?.limits ?? [];
     if (!trouble || !limits.length) return false;
     if ((reading.at ?? 0) < (trouble.at ?? trouble.since ?? 0)) return false;
-    const proven = ['signed-out', 'org-blocked', 'subscription-ended', 'unknown'].includes(trouble.cause)
+    const proven = (!onlyLimit && ['signed-out', 'org-blocked', 'subscription-ended', 'unknown'].includes(trouble.cause))
       || (trouble.cause === 'at-limit' && limits.every((l) => !(l.percent >= 100)));
     if (!proven) return false;
     this._clearProfileTrouble(key);
@@ -5210,6 +5210,7 @@ export class Supervisor {
    */
   async lookAtCloudLogins({ force = false } = {}) {
     if (!readCloudConfig(process.env, this.config.home)) return;
+    try { this._noteCloudReadings(); } catch (e) { console.warn('zero: could not read the cloud sign-ins for a limit:', e.message); }
     // A Refresh pressed mid-look is kept for when that look ends.
     if (this._cloudLooking) { if (force) this._cloudLookAgain = true; return; }
     const now = Date.now();
@@ -5230,10 +5231,25 @@ export class Supervisor {
     } finally {
       this._cloudLooking = false;
     }
+    try { this._noteCloudReadings(); } catch (e) { console.warn('zero: could not read the cloud sign-ins for a limit:', e.message); }
     if (this._cloudLookAgain) {
       this._cloudLookAgain = false;
       await this.lookAtCloudLogins({ force: true });
     }
+  }
+
+  /**
+   * A cloud reading is the same subscription as the folder it is paired with,
+   * so it can show that folder's limit mark is over. Only a limit: the cloud
+   * signs in with its own login, which says nothing about the one here.
+   */
+  _noteCloudReadings() {
+    let cleared = false;
+    for (const c of this._cloudAccounts()) {
+      if (c.engine !== DEFAULT_ENGINE || !c.profile || !c.limits?.length || !c.readAt) continue;
+      if (this.noteUsageReading(c.profile, { at: c.readAt, limits: c.limits }, { onlyLimit: true })) cleared = true;
+    }
+    return cleared;
   }
 
   // The sign-ins going on, or just ended, for the setup screen to draw.
