@@ -2390,7 +2390,8 @@ export function servedHere(cfg: Partial<ServerConfig> | undefined, env: NodeJS.P
     for (const [k, v] of Object.entries(want)) { if (v == null) delete process.env[k]; else process.env[k] = v; }
     // Named here: runs share this process, so its own ZERO_ITEM is whichever run set it last.
     const ownItem = cfg!.env?.ZERO_ITEM || env.ZERO_ITEM || null;
-    return channel(async (io) => (await import('../../mcp/stdio.mjs')).serveStore({ ...io, holder: `mcp-cloud-${holder}`, ownItem, requestCloudResource } as {}));
+    const ownProduct = cfg!.env?.ZERO_PRODUCT || env.ZERO_PRODUCT || null;
+    return channel(async (io) => (await import('../../mcp/stdio.mjs')).serveStore({ ...io, holder: `mcp-cloud-${holder}`, ownItem, ownProduct, requestCloudResource } as {}));
   }
   return null;
 }
