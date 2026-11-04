@@ -3,7 +3,8 @@
 // with Google under them. Accounts are made on the computer: Sign up, and a
 // sign-in that fails, point there. Only ways the computer also signs in with,
 // so no account made here is one the computer cannot open.
-import { Redirect, router } from 'expo-router';
+import { Redirect } from 'expo-router';
+import { router } from '../lib/router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { googleSignIn } from '../platform/sign-in';

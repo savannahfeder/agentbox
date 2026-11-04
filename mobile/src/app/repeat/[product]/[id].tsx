@@ -1,7 +1,8 @@
 // An opened repeating task on the phone, as the desktop's RepeatFocus has it:
 // its project, schedule and next run, the instruction every run reads, and
 // the runs still on file. Change when and End go to the computer that keeps it.
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { router } from '../../../lib/router';
 import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { readRule, repeatPresets, stamp } from '../../../../../renderer/src/format';

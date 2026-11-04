@@ -2,7 +2,8 @@
 // last word, the threads it filed, the options it still offers, and the reply
 // box that opens into the desktop's sentence. A press leaves a command for the
 // Mac and shows at once as waiting for it.
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
+import { router } from '../../../lib/router';
 import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
