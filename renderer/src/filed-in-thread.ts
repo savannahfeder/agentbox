@@ -63,3 +63,11 @@ export function filedOnTurn<T extends Filed>(events: readonly Spoken[], rows: re
   }
   return { onTurn, atFoot };
 }
+
+/** The turn whose list the close question stands under: the newest one with a
+ *  task waiting on you, or -1 for the foot of the thread. */
+export function askTurnOf<T extends { approve?: boolean }>(made: FiledInThread<T>): number {
+  if (made.atFoot.some((r) => r.approve)) return -1;
+  const asking = [...made.onTurn].filter(([, rows]) => rows.some((r) => r.approve)).map(([at]) => at);
+  return asking.length ? Math.max(...asking) : -1;
+}

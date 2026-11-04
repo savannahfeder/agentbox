@@ -41,9 +41,11 @@ describe('the board under the cards', () => {
     expect(evColumns(['done', 'waiting', 'running', 'scheduled'])).toEqual(['done', 'running', 'scheduled']);
   });
 
-  it('holds only your own threads with You picked, not your AI teammates\' runs or anyone else\'s', () => {
-    expect(titles('me').all.sort()).toEqual(['My later thread', 'My running thread']);
-    expect(titles(null).all.sort()).toEqual(['My later thread', 'My running thread']);
+  // Your AI teammates' runs are on it under their names since 2026-11-04
+  // (your-ai-teammates-threads-sit-on-your-board-under-their-names).
+  it('holds your own threads and your AI teammates\' runs with You picked, not anyone else\'s', () => {
+    expect(titles('me').all.sort()).toEqual(['My later thread', 'My running thread', 'QA run']);
+    expect(titles(null).all.sort()).toEqual(['My later thread', 'My running thread', 'QA run']);
   });
 
   it('holds everybody\'s work with the Team picked', () => {

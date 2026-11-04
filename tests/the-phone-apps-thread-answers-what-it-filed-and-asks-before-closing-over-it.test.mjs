@@ -117,7 +117,7 @@ describe('closing', () => {
   it('asks first while a filed task waits, in the site\'s words', () => {
     const t = open(rows());
     expect(t.closeAsk).toEqual(closeAsk(1));
-    expect(t.closeAsk.ask).toBe('Before this closes: one task it filed has not started.');
+    expect(t.closeAsk.ask).toBe('Before this thread closes, what happens to the task it filed?');
   });
 
   it('closes without asking when nothing waits', () => {
