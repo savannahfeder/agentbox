@@ -8329,8 +8329,9 @@ export default function App() {
           // A cmd-A (or shift-J/K) selection turns the palette into batch
           // mode: every command it offers acts on the whole selection, and
           // single-item commands (Reply, Approve) drop out rather than
-          // silently acting on one row of a many-row selection.
-          if (multiSel.size) {
+          // silently acting on one row of a many-row selection. Only on the
+          // list: with a thread open, the ticks are nowhere on screen.
+          if (multiSel.size && !focused) {
             const sel = selectable.filter((i) => multiSel.has(i.id));
             const n = sel.length;
             const moves = readMoves(sel, seenAt, unreadSince);
