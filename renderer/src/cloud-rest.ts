@@ -18,6 +18,7 @@ type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 const SESSION_KEY = 'agentbox-cloud-session';
 const VERIFIER_KEY = 'agentbox-cloud-verifier';
+const RESET_KEY = 'agentbox-cloud-reset';
 
 const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
@@ -81,11 +82,24 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
     keep(s);
     return s;
   };
+  // The proof (PKCE) a code that comes back is traded with; kept until then.
+  const challenge = async () => {
+    const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+    try { storage.setItem(VERIFIER_KEY, verifier); } catch { /* the return will say so */ }
+    return b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  };
   const signIn = async (path: string, payload: unknown) => {
     const mine = ++gen;
     renewing = null;
     return took(await call(path, { method: 'POST', auth: false, body: JSON.stringify(payload) }), mine);
   };
+  const tradeCode = async (code: string) => {
+    const verifier = storage.getItem(VERIFIER_KEY);
+    if (!verifier) throw new Error('This sign-in was started somewhere else. Try again here.');
+    storage.removeItem(VERIFIER_KEY);
+    return signIn('/auth/v1/token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
+  };
+  const resetAsked = () => { try { return !!storage.getItem(RESET_KEY); } catch { return false; } };
 
   // A token good for at least another minute, renewed if it is not: one
   // renewal at a time, and one that is refused outright signs her out.
@@ -160,18 +174,30 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
     // (PKCE) so the code that comes back is no use to anybody else. It comes
     // back only to this page's own address.
     async googleUrl(returnTo: string) {
-      const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
-      const challenge = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
-      try { storage.setItem(VERIFIER_KEY, verifier); } catch { /* the return will say so */ }
-      const q = new URLSearchParams({ provider: 'google', redirect_to: returnTo, code_challenge: challenge, code_challenge_method: 's256' });
+      const q = new URLSearchParams({ provider: 'google', redirect_to: returnTo, code_challenge: await challenge(), code_challenge_method: 's256' });
       return `${base}/auth/v1/authorize?${q}`;
     },
-    async finishGoogle(code: string) {
-      const verifier = storage.getItem(VERIFIER_KEY);
-      if (!verifier) throw new Error('This sign-in was started somewhere else. Try again here.');
-      storage.removeItem(VERIFIER_KEY);
-      return signIn('/auth/v1/token?grant_type=pkce', { auth_code: code, code_verifier: verifier });
+    // A RESET comes back like Google, with a code only this device's proof can
+    // trade, to an address nothing else listens on (the phone app's own).
+    async askPasswordReset(email: string, returnTo: string) {
+      const at = String(email ?? '').trim();
+      if (!at) throw new Error('Type your email first.');
+      storage.removeItem(RESET_KEY);
+      await call(`/auth/v1/recover?redirect_to=${encodeURIComponent(returnTo)}`, {
+        method: 'POST', auth: false, body: JSON.stringify({ email: at, code_challenge: await challenge(), code_challenge_method: 's256' }),
+      });
+      try { storage.setItem(RESET_KEY, at); } catch { /* the link will say so */ }
     },
+    resetAsked,
+    async finishReset(code: string) {
+      if (!resetAsked()) throw new Error('Ask for the reset email again.');
+      storage.removeItem(RESET_KEY);
+      return tradeCode(code);
+    },
+    async setPassword(password: string) {
+      await call('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ password }) });
+    },
+    finishGoogle: tradeCode,
     signOut() {
       const had = session;
       gen += 1;

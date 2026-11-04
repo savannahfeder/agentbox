@@ -5,34 +5,14 @@
 // so no account made here is one the computer cannot open.
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { googleSignIn } from '../platform/sign-in';
 import { useCloud } from '../state/cloud';
 import { AppMark, GoogleMark } from '../ui/icons';
-import { Bars, Btn, CORNER, Head, Label, Lede, Screen } from '../ui/Onboarding';
+import { Field } from '../ui/Field';
+import { Bars, Btn, Head, Label, Lede, Screen } from '../ui/Onboarding';
 import { T } from '../ui/parts';
 import { color, font } from '../ui/theme';
-
-function Field({ label, secureTextEntry, ...rest }: { label: string } & React.ComponentProps<typeof TextInput>) {
-  const [focused, setFocused] = useState(false);
-  const [shown, setShown] = useState(false);
-  return (
-    <View style={{ gap: 8 }}>
-      <Label style={{ marginLeft: 2 }}>{label}</Label>
-      <View style={{ justifyContent: 'center' }}>
-        <TextInput placeholderTextColor={color.faint} autoCapitalize="none" autoCorrect={false} {...rest} secureTextEntry={secureTextEntry && !shown}
-          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          style={[{ height: 48, paddingLeft: 14, paddingRight: secureTextEntry ? 64 : 14, borderRadius: CORNER.small, borderWidth: 1, borderColor: focused ? color.accent : color.lineStrong, backgroundColor: color.field, fontFamily: font.regular, fontSize: 16, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
-        {secureTextEntry && (
-          <Pressable onPress={() => setShown(!shown)} accessibilityRole="button" accessibilityLabel={shown ? 'Hide password' : 'Show password'} hitSlop={6}
-            style={{ position: 'absolute', right: 0, height: 48, paddingHorizontal: 14, justifyContent: 'center' }}>
-            <T style={{ fontSize: 14, color: color.dim }}>{shown ? 'Hide' : 'Show'}</T>
-          </Pressable>
-        )}
-      </View>
-    </View>
-  );
-}
 
 const toNoAccount = () => router.push('/no-account');
 
@@ -83,6 +63,8 @@ export default function SignIn() {
           <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry textContentType="password" autoComplete="password"
             returnKeyType="go" onSubmitEditing={() => { if (canSubmit) void signIn(); }} />
         </View>
+        <T onPress={() => router.push({ pathname: '/reset-password', params: { email: email.trim() } })} accessibilityRole="link" suppressHighlighting
+          style={{ alignSelf: 'flex-end', fontSize: 14, lineHeight: 20, color: color.dim, marginTop: 12, paddingVertical: 4 }}>Forgot password?</T>
         {error && <T accessibilityRole="alert" style={{ fontSize: 14, lineHeight: 20, color: color.dim, marginTop: 16 }}>{error}</T>}
         {failed && (
           <T style={{ fontSize: 14, lineHeight: 20, color: color.dim, marginTop: 6 }}>
