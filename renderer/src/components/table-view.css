@@ -278,3 +278,9 @@
 .tbl-problem .tbl-btn { height: 28px; padding: 0 9px; font-size: 12.5px; color: var(--text); }
 .tbl:focus { outline: none; }
 .tbl-filter-n { margin-left: auto; font-variant-numeric: tabular-nums; }
+/* A wide column scrolled half out of view keeps its name beside the frozen columns. */
+.tbl-pane .tbl-th:not(.tbl-rn) > .tbl-ell, .tbl-full .tbl-th:not(.tbl-rn) > .tbl-ell { position: sticky; left: calc(var(--tbl-stuck) + 16px); }
+.tbl-pane .tbl-tr > .tbl-th:nth-child(2) > .tbl-ell, .tbl-full .tbl-tr > .tbl-th:nth-child(2) > .tbl-ell { position: static; }
+/* A cell's words never widen its column: the widest note would otherwise set
+   the spare-width column as wide as itself, and the table scrolled off into it. */
+.tbl-pane .tbl-td, .tbl-full .tbl-td { contain: inline-size; }

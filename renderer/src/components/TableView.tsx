@@ -515,6 +515,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     const p = pickRef.current;
     const r = p ? order.indexOf(d.order[p.a.r]) : -1;
     setDoc({ ...d, order });
+    follow.current = !!p && r >= 0;
     setPick(p && r >= 0 ? { a: { r, c: p.a.c }, b: { r, c: p.a.c } } : null);
     setEditing(null); setSheet(null);
   }, [searched, picked, sort]);
@@ -664,6 +665,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   const goTo = (p: Pick | null) => { follow.current = true; setPick(p); };
   /** The keys to the table itself, which is no text box, so the app's own Escape and letters work again. */
   const rest = () => root.current?.focus({ preventScroll: true });
+  // The app's own Escape steps aside for a text box, and the keys were in one: hand this Escape on from the table itself.
+  const passEscape = () => { rest(); root.current?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); };
 
   // ---- Changing cells.
   const writeAt = (cells: Array<{ r: number; c: number; v: string }>) => {
@@ -775,6 +778,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     if (meta && /^[cxv]$/i.test(k)) { e.stopPropagation(); return; }
     if (!pick) {
       if (/^(Arrow|Tab$|Enter$|Home$|End$|Page)/.test(k) && order.length) { stop(); goTo({ a: { r: 0, c: first }, b: { r: 0, c: first } }); }
+      if (k === 'Escape') { stop(); passEscape(); }
       return;
     }
     if (k === 'Escape') {
@@ -914,7 +918,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   };
   const fitColumn = (col: number) => {
     const name = table.columns[col].name;
-    const w = measure(table, 640, col).px.get(name) ?? 160;
+    // Slack for a font the canvas measures a hair narrower than the cell draws it.
+    const w = (measure(table, 640, col).px.get(name) ?? 160) + 12;
     const next = { ...sized, [name]: w };
     setSized(next); keepWidths(path, next);
   };
@@ -955,7 +960,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     requestAnimationFrame(() => {
       const at = document.activeElement;
       if (at && at !== keys.current && root.current?.contains(at) && typingIn(at)) return;
-      focusKeys();
+      if (pickRef.current) focusKeys(); else rest();
     });
   };
 
@@ -967,6 +972,9 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   const start = preview ? 0 : Math.max(0, Math.floor(view.top / ROW_H) - SPARE);
   const end = inline ? order.length : preview ? Math.min(order.length, PREVIEW_ROWS) : Math.min(order.length, Math.ceil((view.top + view.height) / ROW_H) + SPARE);
   const choices = filterChoices(table);
+  // Where the row number and the first column end, so a wide column's name stays in view beside them.
+  const firstName = table.columns[first]?.name ?? '';
+  const stuckAt = RN_W + (sized[firstName] ?? natural.px.get(firstName) ?? 160);
   const filtering = Object.values(picked).some((v) => v.length);
   const filteredBy = Object.entries(picked).filter(([, v]) => v.length).map(([c]) => table.columns[Number(c)]?.name).filter(Boolean);
   const filterLabel = !filteredBy.length ? 'Filter' : `Filtered by ${filteredBy.slice(0, 2).join(' and ')}${filteredBy.length > 2 ? ` and ${filteredBy.length - 2} more` : ''}`;
@@ -1008,7 +1016,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
           <label className="tbl-search">{SEARCH}
             <input type="search" value={query} placeholder={`Search ${rowsWord(total)}`} onChange={(e) => setQuery(e.target.value)}
               data-own-escape={query ? '' : undefined}
-              onKeyDown={(e) => { if (e.key === 'Escape' && !query) { e.preventDefault(); rest(); } }} />
+              onKeyDown={(e) => { if (e.key === 'Escape' && !query) { e.preventDefault(); e.stopPropagation(); passEscape(); } }} />
           </label>
           {choices.length > 0 && (
             <Menu label={filterLabel} on={filtering} icon={glyph('M2.5 4h11M4.5 8h7M6.5 12h3')}>
@@ -1051,7 +1059,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
           if (hands && !pressed.current) { const hit = atOf(e.target); if (hit && hit.kind === 'cell') { setPick(pickFor('cell', hit.at, e.shiftKey)); focusKeys(); } }
           pressed.current = false;
         }}>
-        <div className="tbl-grid" role="table" style={{ gridTemplateColumns: inline && !table.ranked ? template : `${RN_W}px ${template}` }}>
+        <div className="tbl-grid" role="table" style={{ gridTemplateColumns: inline && !table.ranked ? template : `${RN_W}px ${template}`, ['--tbl-stuck' as string]: `${stuckAt}px` }}>
           <div className="tbl-tr" role="row">
             {table.ranked
               ? <button type="button" role="columnheader" className={`tbl-th tbl-rn${sort?.col === 0 ? ' sorted' : ''}`} disabled={preview && !inline} onClick={() => sortBy(0)} title={table.columns[0].name}>#</button>
