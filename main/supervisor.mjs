@@ -169,6 +169,7 @@ import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPre
 import { startDecision, readMacPressureNow, SETTLE_MS } from './start-hold.mjs';
 import { MemoryLog } from './memory-log.mjs';
 import { StartBudget } from './cloud/start-budget.mjs';
+import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mjs';
 import { autoSlots, DEFAULTS as MEMORY_GATE, pressureFrom } from './memory-gate.mjs';
 import { LeftoverCleaner } from './leftovers.mjs';
 import { syncCodexMemoryGate } from './codex-memory-gate.mjs';
@@ -922,6 +923,12 @@ export class Supervisor {
       trouble.stamp = stamp;
       if (this._profileCooldown) this._profileCooldown[key] = 0;
       if (!key.startsWith('codex:')) this._spawnCooldownUntil = 0;
+      // A thread held for dying on this login gets its next try now. Only one
+      // with a try left, so a sign-in never adds to the 30m/2h/8h ladder.
+      const now = Date.now();
+      for (const held of Object.values(this._heldStarts ?? {})) {
+        if (held?.account === key && !held.trying && held.next > now) held.next = now;
+      }
       lifted = true;
     }
     if (lifted) this._saveState();
@@ -4271,14 +4278,62 @@ export class Supervisor {
   // A CLOUD RUN THAT ENDED ON THE MARKED LINE (shared/cloud-hand-back.mjs):
   // its request needs this Mac. Nothing it said goes on the row, and the same
   // request runs again here, told why (`replyBrief`). True when it was one.
-  _noteCloudHandBack(item, session) {
+  // A plain merge into main is tried by the app first (`_mergeHome`), and the
+  // move here waits for it.
+  _noteCloudHandBack(item, session, cwd = session?.cwd ?? null) {
     if (!session?.cloud || session.resultIsError || !handsBack(session.result)) return false;
     session.handedBack = true;
     this._handedBack ??= new Set();
     this._handedBack.add(item.id);
     (this._movedWhy ??= {})[item.id] = { why: 'handed-back', detail: handBackWhat(session.result) };
-    this._moveToMac(item.id);
+    if (!this._mergeHome(item, session.result, cwd, session.startedAt ?? 0)) this._moveToMac(item.id);
     return true;
+  }
+
+  // The thread holds while git runs (spawnWorker). Merged: the merge is its
+  // answer and the reply is settled. Not merged: it moves here as any hand-back,
+  // and the run that takes it is told why. A project that ships through the app
+  // has its own way to main (main/ship-queue.mjs).
+  _mergeHome(item, result, cwd, startedAt) {
+    if (!cwd || !isPlainMerge(handBackWhat(result))) return null;
+    const product = this.store.listProducts?.().find((p) => p.slug === item.product);
+    if (product && this.shipsThroughTheApp(product)) return null;
+    const done = mergeHome(cwd).then((merge) => {
+      this._mergingHome?.delete(item.id);
+      if (merge.ok) this._answeredByMerge(item, merge, startedAt);
+      else {
+        (this._mergeHomeSaid ??= {})[item.id] = merge;
+        this._moveToMac(item.id);
+      }
+      this.onChange?.();
+      this.wake?.();
+    });
+    (this._mergingHome ??= new Map()).set(item.id, done);
+    return done;
+  }
+
+  // Only a reply written before the run began was carried by it; a later one still goes to a run.
+  _answeredByMerge(item, merge, startedAt) {
+    this._handedBack?.delete(item.id);
+    delete this._movedWhy?.[item.id];
+    try {
+      const fresh = this.store.readItem?.(item.product, item.id);
+      this.store.recordSessionResult?.(item.product, item.id, { result: mergedSentence(merge), status: null });
+      if (fresh && (!fresh.answer || (answerTs(fresh) ?? 0) <= startedAt)) {
+        this._handledAnswers.add(this._answerKey(fresh));
+        if (fresh.answer) this.store.settleAnswer?.(item.product, item.id, answerTs(fresh));
+      }
+      this._saveState();
+    } catch (e) { console.warn('zero: writing the merge as the answer failed:', e.message); }
+  }
+
+  // Why the app's own merge stopped, told once to the run that does it instead.
+  _mergeHomeNote(item) {
+    const said = this._mergeHomeSaid?.[item?.id];
+    if (!said) return null;
+    delete this._mergeHomeSaid[item.id];
+    const words = said.said ? `\n\n${String(said.said).slice(0, 2000)}` : '';
+    return `${Name} tried to merge this thread's branch into main itself and stopped: ${said.why}.${words}`;
   }
 
   // Moved here by the app (`_moveToMac`) and not yet spent or run out.
@@ -4765,13 +4820,13 @@ export class Supervisor {
    * its mark. A limit mark goes only when nothing in the reading is at 100%.
    * Trouble that is not the account's (an old Claude Code, the network) stays.
    */
-  noteUsageReading(profile, reading) {
+  noteUsageReading(profile, reading, { onlyLimit = false } = {}) {
     const key = this._accountKey(DEFAULT_ENGINE, profile || 'default');
     const trouble = this._profileTrouble?.[key];
     const limits = reading?.limits ?? [];
     if (!trouble || !limits.length) return false;
     if ((reading.at ?? 0) < (trouble.at ?? trouble.since ?? 0)) return false;
-    const proven = ['signed-out', 'org-blocked', 'subscription-ended', 'unknown'].includes(trouble.cause)
+    const proven = (!onlyLimit && ['signed-out', 'org-blocked', 'subscription-ended', 'unknown'].includes(trouble.cause))
       || (trouble.cause === 'at-limit' && limits.every((l) => !(l.percent >= 100)));
     if (!proven) return false;
     this._clearProfileTrouble(key);
@@ -5204,6 +5259,7 @@ export class Supervisor {
    */
   async lookAtCloudLogins({ force = false } = {}) {
     if (!readCloudConfig(process.env, this.config.home)) return;
+    try { this._noteCloudReadings(); } catch (e) { console.warn('zero: could not read the cloud sign-ins for a limit:', e.message); }
     // A Refresh pressed mid-look is kept for when that look ends.
     if (this._cloudLooking) { if (force) this._cloudLookAgain = true; return; }
     const now = Date.now();
@@ -5224,10 +5280,25 @@ export class Supervisor {
     } finally {
       this._cloudLooking = false;
     }
+    try { this._noteCloudReadings(); } catch (e) { console.warn('zero: could not read the cloud sign-ins for a limit:', e.message); }
     if (this._cloudLookAgain) {
       this._cloudLookAgain = false;
       await this.lookAtCloudLogins({ force: true });
     }
+  }
+
+  /**
+   * A cloud reading is the same subscription as the folder it is paired with,
+   * so it can show that folder's limit mark is over. Only a limit: the cloud
+   * signs in with its own login, which says nothing about the one here.
+   */
+  _noteCloudReadings() {
+    let cleared = false;
+    for (const c of this._cloudAccounts()) {
+      if (c.engine !== DEFAULT_ENGINE || !c.profile || !c.limits?.length || !c.readAt) continue;
+      if (this.noteUsageReading(c.profile, { at: c.readAt, limits: c.limits }, { onlyLimit: true })) cleared = true;
+    }
+    return cleared;
   }
 
   // The sign-ins going on, or just ended, for the setup screen to draw.
@@ -5699,11 +5770,13 @@ export class Supervisor {
     }
     const said = (session.tail ?? []).filter((l) => typeof l === 'string' && l.startsWith('stderr:'))
       .flatMap((l) => l.slice('stderr:'.length).split('\n')).map((l) => l.trim()).filter((l) => l && !l.startsWith(CLOUD_SENT)).at(-1) ?? null;
+    // The login that refused it, so a sign-in on it can bring the next try forward (`_noticeSignIns`).
+    const account = refused && !session.cloud ? this._accountKey(session.engine, session.profile || 'default') : null;
     // A try of its own that died at once is held again straight away.
     if (held?.trying) {
       const tries = (held.tries ?? 0) + 1;
       const next = tries < HELD_RETRY_MS.length ? Math.max(held.trying + HELD_RETRY_MS[tries], now + HELD_RETRY_MS[0]) : null;
-      this._heldStarts[key] = { since: now, said: said ?? held.said ?? null, tries, next };
+      this._heldStarts[key] = { since: now, said: said ?? held.said ?? null, tries, next, account };
       delete this._deadStarts[key];
       this._saveState();
       this._sayItStoppedStarting(item, stoppedStartingSentence({ tries, triedAt: held.trying, said: said ?? held.said, next }));
@@ -5715,7 +5788,7 @@ export class Supervisor {
     // Saved every time, so the six are still six across a restart of the app.
     if (starts.length < STORM_STARTS || held) { this._saveState(); return; }
     const next = now + HELD_RETRY_MS[0];
-    this._heldStarts[key] = { since: now, said, tries: 0, next };
+    this._heldStarts[key] = { since: now, said, tries: 0, next, account };
     this._saveState();
     this._sayItStoppedStarting(item, stoppedStartingSentence({ starts: starts.length, minutes: Math.round(STORM_WINDOW_MS / 60_000), said, next }));
   }
@@ -6271,7 +6344,7 @@ export class Supervisor {
         const session = { ...view, startedAt: rec.startedAt, child: { ranToTheEnd: () => code === 0 } };
         // Same as a run the app started: its reply was marked heard when it was
         // joined, so it is released here or nothing would run it on this Mac.
-        if (this.runFinished(session) && this._noteCloudHandBack(item, session)) {
+        if (this.runFinished(session) && this._noteCloudHandBack(item, session, rec.cwd)) {
           const fresh = this.store.readItem?.(rec.product, itemId);
           if (fresh?.answer) this.redeliverAnswer({ ...fresh, product: rec.product }, fresh.answer);
         }
@@ -8269,11 +8342,13 @@ export class Supervisor {
     if (leftoverNote) prompt = `${prompt}\n\n${leftoverNote}`;
     // A request the cloud handed back (`_toldItMoved`).
     if (movedHere) {
+      const tried = this._mergeHomeNote(item);
       prompt = [
         'This thread has just moved from the cloud to this computer, because the',
         'request below needed something the cloud machine did not have. This',
         'computer has the files, programs and keys. Do the request here, from the start.',
         '',
+        ...(tried ? [tried, ''] : []),
         prompt,
       ].join('\n');
     }
@@ -9994,6 +10069,9 @@ export class Supervisor {
   spawnWorker(item, { continuation = false, resumeSessionId = null, profile: forcedProfile = null, engine: forcedEngine = null, remoteOnly = false, shipFailure = null, asked = false } = {}) {
     const refuse = (reason, engine = null) => this._noteNotStarting(item, reason, engine ?? forcedEngine);
     if (this._heldFromStarting(item)) { refuse('held'); return; }
+    // The app is merging its branch into main, which takes seconds and ends in
+    // an answer or a move to this computer (`_mergeHome`).
+    if (this._mergingHome?.has(item?.id)) return;
     // Every other way in (a resume on wake, a held thread's retry) meets the
     // same rule as the queue: a run started in a dark wake dies at the next.
     if (this.asleep()) {
@@ -10621,7 +10699,7 @@ export class Supervisor {
       this._leaveKitForThePhone(item, session);
       this._noteHowTheRunStarted(item, session);
       onLine(`session exited (${code})`);
-      if (this._noteCloudHandBack(item, session)) onLine('the cloud handed this request back to this computer; the next one goes to the cloud');
+      if (this._noteCloudHandBack(item, session, cwd)) onLine('the cloud handed this request back to this computer; the next one goes to the cloud');
       else if (this._cloudKeptOnMac(item, session, code, signal)) onLine('the cloud could not run this thread, so this request runs on this computer');
       this._spendMoveToMac(item, session);
       // WHAT THE RUN CHANGED, SAVED WHERE SHE CAN OPEN IT.
