@@ -70,6 +70,9 @@ export interface SyncState {
   setSince(personId: string, at: number): void;
   handedOver(): string[];
   markHandedOver(key: string): void;
+  /** When the newest comment on this person's links already noted was made. */
+  getLinkComments(personId: string): number | null;
+  setLinkComments(personId: string, at: number): void;
 }
 
 type FsForState = Pick<typeof fs, 'readFileSync' | 'writeFileSync' | 'renameSync'>;
@@ -202,6 +205,8 @@ export function memorySyncState(): SyncState {
     setSince: (personId, at) => { map.set('__since__', { ...(map.get('__since__') || {}), [personId]: at }); },
     handedOver: () => map.get('__handed__')?.keys ?? [],
     markHandedOver: (key) => { map.set('__handed__', { keys: [...(map.get('__handed__')?.keys ?? []), key] }); },
+    getLinkComments: (personId) => map.get('__links__')?.[personId] as number | null | undefined ?? null,
+    setLinkComments: (personId, at) => { map.set('__links__', { ...(map.get('__links__') || {}), [personId]: at }); },
   };
 }
 
@@ -212,6 +217,7 @@ export function fileSyncState(file: string, fs: FsForState): SyncState {
     teams?: Record<string, string | null>;
     since?: Record<string, number | null>;
     handedOver?: string[];
+    linkComments?: Record<string, number>;
   } = {};
   try { data = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { data = {}; }
   const save = () => {
@@ -235,6 +241,9 @@ export function fileSyncState(file: string, fs: FsForState): SyncState {
     // What this copy already moved for someone who left (main/team/departures.mjs).
     handedOver: () => data.handedOver ?? [],
     markHandedOver: (key) => { data.handedOver = [...(data.handedOver ?? []), key]; save(); },
+    // The newest comment on this person's shared links already put on a thread (main/team/link-comments.mjs).
+    getLinkComments: (personId) => data.linkComments?.[personId] ?? null,
+    setLinkComments: (personId, at) => { data.linkComments = { ...(data.linkComments || {}), [personId]: at }; save(); },
   };
 }
 

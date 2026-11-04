@@ -246,6 +246,9 @@ function keyOf(name, path) {
   return `${stem}\0${baseName(name)}`;
 }
 
+/** The key of the family a path belongs to, in plain characters (a database refuses \0). */
+export const familyKeyOf = (path) => keyOf(shownName(path), path).replace(/\0/g, '/');
+
 const endsWithPath = (whole, part) => whole === part || whole.endsWith(`/${part}`);
 
 /**

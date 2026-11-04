@@ -280,6 +280,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
     accountRoot: config.accountRoot,
     stateFile: teamStateFile(config.storeRoot),
     onChange: () => ipc?.push?.(),
+    shareSite: cloudConfig.phoneSite ?? null,
     ownMates: () => matesForTheTeam(store, config),
     rooms: roomsSetup({ config, store, supervisor, userDir }),
   }) : null;

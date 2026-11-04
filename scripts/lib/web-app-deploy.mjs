@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { teamConfigFile } from '../phone-site-config.mjs';
 
-export const SITE_PATHS = ['renderer/', 'shared/', 'phone-legal/', 'scripts/build-phone-site.mjs', 'main/phone-icon.png'];
+export const SITE_PATHS = ['renderer/', 'shared/', 'phone-legal/', 'scripts/build-phone-site.mjs', 'cloud/web/', 'main/phone-icon.png'];
 
 export const siteChanged = (files) => (files ?? []).some((f) => SITE_PATHS.some((p) => (p.endsWith('/') ? f.startsWith(p) : f === p)));
 
