@@ -14,6 +14,8 @@ import fs from 'node:fs';
 const browse = fs.readFileSync(new URL('../.claude/skills/verify-agentbox/scripts/browse.mjs', import.meta.url), 'utf8');
 
 it('a click on a text field puts the cursor in it', () => {
-  const click = browse.slice(browse.indexOf("} else if (verb === 'click') {"), browse.indexOf("} else if (verb === 'type') {"));
+  // Every press (click, double click, right click, drag) finds its thing through thingAt.
+  const click = browse.slice(browse.indexOf('async function thingAt('), browse.indexOf('const MOD_BITS'));
+  expect(browse).toMatch(/\['click', 'dblclick', 'rightclick'\]\.includes\(verb\)[\s\S]*?thingAt\(t, which, verb === 'click'\)/);
   expect(click).toMatch(/el\.click\(\);\s*if \(el\.matches\('input, textarea, select, \[contenteditable\]'\)\) el\.focus\(\);/);
 });

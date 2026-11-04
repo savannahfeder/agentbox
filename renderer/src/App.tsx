@@ -72,7 +72,7 @@ import { Palette } from './components/Palette';
 import { Standing, STANDING } from './components/Standing';
 import { Settings } from './components/Settings';
 import { Snooze } from './components/Snooze';
-import { LATER_KEYWORDS } from './palette-rows';
+import { LATER_KEYWORDS, REOPEN_KEYWORDS } from './palette-rows';
 /* The line, the toast and the dot on the cog were the other three drawn for that round and
  are gone; their copy is in decisions.md and their photographs on
  `astral/w-86452550e5-looks`.
@@ -141,7 +141,7 @@ import { EmptyChat, JobBlock, Place as MemberPlace, PlaceAction, PlaceList, Plac
 import { nowAndFinished, personChatOpens, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
 import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, readOrder, splitHidden, teamRunsOf, type Hidden, type Member } from './team/everything/members';
 import { boardItems, cardOpens, evColumns, flipEvView, readEvView, whoseBoard, writeEvView, type EvTab, type EvView } from './team/everything/whose-board';
-import { needsByWho, readFolded, readNeedsGroup, stackRows, toggleFolded, whoIsWaiting, writeNeedsGroup, yoursOnly, type NeedsGroup, type StackKey } from './threads/stack-rules';
+import { needsByWho, readFolded, readNeedsGroup, stackRows, toggleFolded, whoIsWaiting, writeNeedsGroup, type NeedsGroup, type StackKey } from './threads/stack-rules';
 import { FeedbackCard } from './components/FeedbackCard';
 import { searchFieldInStrip, workspaceDestinations, workspacePageTitle } from './workspace-navigation.mjs';
 import { UsagePill } from './components/UsagePill';
@@ -189,7 +189,7 @@ import { URGENT_PRIORITY, itemPriority, moveProduct, placeScore, placedScore } f
 import { rankProducts } from './project-priority';
 import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT } from './threads-made';
 import { waitingCounts } from './threads-made';
-import { closeAsk, closeAskOwnsKey, KEEP_OPEN, unshippedAsk } from './close-asks-first';
+import { closeAsk, closeAskOwnsKey, unshippedAsk } from './close-asks-first';
 import { notShipped, shipItAsk } from '../../shared/not-shipped.mts';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, askedInLabel, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
@@ -2446,10 +2446,6 @@ export default function App() {
   // the way `tabState` below has it for the board and `done` for the archive.
   // The rule above is untouched; only what the tab draws and counts is this.
   const progressTab = useMemo(() => inProgressTab(progress, inbox), [progress, inbox]);
-  const inProgressNow = useMemo(() => {
-    const ids = new Set(progressTab.map((i) => `${i.product}/${i.id}`));
-    return (i: WorkItem) => ids.has(`${i.product}/${i.id}`);
-  }, [progressTab]);
 
   const queuedIds = useMemo(() => new Set(snap?.supervisor.queued ?? []), [snap?.supervisor.queued]);
   // AGENTBOX CLOUD OFFERS ITSELF WHERE THE FOUNDER PUT IT (2026-10-13,
@@ -2983,9 +2979,9 @@ export default function App() {
   // The columns themselves are kept too, for the left and right arrows
   // (`boardSideways`), and they come in the order you dragged them to.
   const boardArgs = useMemo(
-    () => ({ items: evBoard ? boardItems(items, evBoard, teammateIdOf, inProgressNow) : items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards,
+    () => ({ items: evBoard ? boardItems(items, evBoard, teammateIdOf) : items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards,
       picked: evBoard ? evBoard.picked : team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: liveIds, projectOrder, waitingIsInProgress: !!evBoard && !evBoard.mate && !evBoard.mineOnly && evBoard.picked.length > 1 }),
-    [items, evBoard, inProgressNow, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds, projectOrder],
+    [items, evBoard, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds, projectOrder],
   );
   const boardCols = useMemo(
     () => (onBoard ? boardColumns({ ...boardArgs, order: teamMode ? evColumns(columnOrder) : columnOrder }) : null),
@@ -2998,11 +2994,9 @@ export default function App() {
   const shownAs = useCallback((rows: WorkItem[], tab: View) => (mineShown
     ? sortedByDisplay(filterBox(rows, boxFilter, directSlugs).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i), directSlugs)), inboxDisplay, tab, projectOrder, directSlugs)
     : []), [mineShown, boxFilter, directSlugs, inboxDisplay, now, seenOf, projectOrder]);
-  // Your AI teammates' runs under way are in your In progress; their Later and Done stay on their own place.
   const stacked = useMemo(() => {
     if (!(teamMode && view !== 'inbox' && search === null && !onBoard)) return null;
-    const yours = (rows: WorkItem[]) => yoursOnly(rows, teammateIdOf);
-    return stackRows({ progress: shownAs(progressTab, 'progress'), later: shownAs(yours(snoozed), 'snoozed'), done: shownAs(yours(done), 'done'),
+    return stackRows({ progress: shownAs(progressTab, 'progress'), later: shownAs(snoozed, 'snoozed'), done: shownAs(done, 'done'),
       dayStart: new Date(now).setHours(0, 0, 0, 0), folded: stackFolded, laterRules: repeats.length,
       isChat: (i) => directSlugs.has(i.product) && !isTaskRow(i) });
   }, [teamMode, view, search, onBoard, shownAs, progressTab, snoozed, done, now, stackFolded, repeats.length, directSlugs]);
@@ -4732,7 +4726,7 @@ export default function App() {
   }, [flushPending, pushUndo, showToast, refresh]);
 
   // THE ANSWER TO WHAT A CLOSE ASKED (w-d2744c6daa, ./close-asks-first.ts).
-  // Deciding each one keeps the thread open and brings the list into view;
+  // Deciding each one keeps the thread open, under the list it stands beneath;
   // starting or dropping them does so one at a time through the same presses
   // the rows carry, and then closes the thread for real. Each press commits the
   // one before it (`deferCommit`), so Z takes back the close, the last thing.
@@ -4750,7 +4744,8 @@ export default function App() {
     // THE ONE QUESTION HERE THAT IS NOT ABOUT CLOSING (./discard-asks-first.ts).
     // Keeping the change is the whole of its own answer: the question goes and
     // the thread is where it was, with its offer still standing.
-    if (option.act === 'keep') return;
+    // Deciding each one is the same: the question stood under their rows.
+    if (option.act === 'keep' || option.act === 'decide') return;
     if (option.act === 'discard') {
       if (pick) await pickRef.current?.(item, pick.n, { confirmed: true });
       return;
@@ -4761,10 +4756,6 @@ export default function App() {
       return;
     }
     if (option.act === 'close') { await markDone(item, { unshippedOk: true }); return; }
-    if (option.act === 'decide') {
-      document.querySelector('.made-waiting')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      return;
-    }
     for (const kid of waiting) {
       if (option.act === 'start') await resolve(kid, { stay: true });
       else await markDone(kid, { stay: true, force: true });
@@ -7828,10 +7819,8 @@ export default function App() {
                   // The question a close asks while tasks still wait (w-d2744c6daa).
                   closeAsk={(() => {
                     const asked = askingToClose(focused);
-                    // No esc row on the discard question: its option 2 is the
-                    // same answer (./discard-asks-first.ts).
-                    const keep = closeAskWhy === 'discard' ? undefined : { label: KEEP_OPEN, onKeep: keepThreadOpen };
-                    return asked && { ...asked, raised: closeAskRaised, onPick: (n: number) => answerCloseAsk(focused, n), keep };
+                    const named = closeAskWhy === 'filed' ? waitingFiled(focused).map((i) => ({ id: i.id, title: rowTitle(i) })) : undefined;
+                    return asked && { ...asked, raised: closeAskRaised, onPick: (n: number) => answerCloseAsk(focused, n), named };
                   })()}
                   onNotice={showToast}
                   /*
@@ -8452,7 +8441,9 @@ export default function App() {
               inProgress: belongsInProgress(target, { deferredUntil: dueAt(target), now, live: liveIds.has(target.id), stopped: stalledIds.has(target.id) }),
             }, () => { setModal(null); void runNow(target); }),
             // "Mark done" is what the thread's own menu calls this (threads/ThreadMenu).
-            { id: 'done', label: target.agent ? DONE.verb : `Mark ${DONE.verb.toLowerCase()}`, keyHint: 'E', run: () => { setModal(null); markDone(target); } },
+            target.status === 'done' && !target.agent
+              ? { id: 'reopen', label: 'Reopen', keywords: REOPEN_KEYWORDS, run: () => { setModal(null); void reopenDone(target); } }
+              : { id: 'done', label: target.agent ? DONE.verb : `Mark ${DONE.verb.toLowerCase()}`, keyHint: 'E', run: () => { setModal(null); markDone(target); } },
             ...(target.status !== 'done' && isGivenTask(target, team?.products.get(target.product)) ? [{ id: 'close-task', label: 'Close task', run: () => { setModal(null); void markDone(target, { closeTask: true }); } }] : []),
             { id: 'reply', label: 'Reply', keyHint: 'R', run: () => { open(); setModal('reply'); } },
             // Carry on with this row. Offered on ANY status a worker is not
@@ -8589,7 +8580,8 @@ export default function App() {
         onOpenFilter={() => setModal('filter')}
         onClearFilter={() => { setBoxFilter(NO_FILTER); setModal(null); }}
         onEndTutorial={tourLive(tour) ? () => { setTour(skipTour(tour!)); setModal(null); } : undefined}
-        onView={(v) => { setView(v); setModal(null); setSelected(0); }}
+        onView={(v) => { setModal(null); openView(v); }}
+        teamLayout={!!teamTabs}
         onPause={async (paused) => { await api.pauseSupervisor(paused); setModal(null); await refresh(); }}
         order={snap.supervisor.productOrder ?? []}
         onRankFirst={async (slug) => {
@@ -8618,7 +8610,7 @@ export default function App() {
           ...roomsUi.decisionLists.map((l) => ({ id: l.id, title: l.title, run: () => { setModal(null); l.open(); } })),
         ] : undefined}
         filePages={[
-          { id: 'all', title: 'Files', hint: 'every file you can see', run: () => { setModal(null); openFiles(null); } },
+          { id: 'all', title: 'Go to Files', hint: 'every file you can see', run: () => { setModal(null); openFiles(null); } },
           ...(filesForPalette?.projects ?? []).map((p) => ({ id: `project-${p}`, title: `Files in ${p}`, run: () => { setModal(null); openFiles(p); } })),
         ]}
         onConnections={() => { setModal(null); openConnectionsPage(null); }}

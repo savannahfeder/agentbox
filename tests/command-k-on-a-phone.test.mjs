@@ -55,7 +55,7 @@ describe('the box on a phone', () => {
   });
 
   it('keeps what a phone can do', () => {
-    for (const label of ['New thread', 'Inbox', 'Settings…']) expect(rows(phone)).toContain(label);
+    for (const label of ['New thread', 'Go to Inbox', 'Settings…']) expect(rows(phone)).toContain(label);
   });
 
   it('leaves the desktop box as it was', () => {
