@@ -1548,6 +1548,32 @@ export const api = {
     return zero.cloudSignIn(p);
   },
 
+  /** A file a cloud run asked for, sent from this computer (or one picked instead) to the thread's next cloud turn. */
+  async cloudSendFile(p: { product: string; id: string; path?: string; choose?: boolean; hold?: boolean; also?: string }): Promise<{ ok: boolean; path?: string; canceled?: boolean; held?: boolean; words?: string; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudSendFile) return { ok: false, error: RESTART_NOTE };
+    return zero.cloudSendFile(p);
+  },
+  /** A one-time code a cloud run asked for, sent as the reply that carries it on. */
+  /** Whether a file a cloud run asked for is on this computer to send, and its size. */
+  async cloudFileInfo(p: { path: string }): Promise<{ ok: boolean; size?: number; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudFileInfo) return { ok: true };
+    return zero.cloudFileInfo(p);
+  },
+  async cloudSendCode(p: { product: string; id: string; about: string; code: string; also?: string }): Promise<{ ok: boolean; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudSendCode) return { ok: false, error: RESTART_NOTE };
+    return zero.cloudSendCode(p);
+  },
+
+  /** A key kept in the cloud for every cloud run: saved under its name, or removed. */
+  async cloudKey(p: { action: 'save' | 'remove'; name: string; value?: string; label?: string; reply?: { product: string; id: string; answer: string } }): Promise<{ ok: boolean; keys?: { name: string; savedAt: number | null; label?: string | null }[]; freed?: string[]; cloudOff?: boolean; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudKey) return { ok: false, error: RESTART_NOTE };
+    return zero.cloudKey(p);
+  },
+
   /** Signing in to Agentbox Cloud itself, on the app's sign-in page: Google, email, a new account and its link again, or a password reset. */
   async cloudAccountSignIn(p: { method: 'google' | 'email' | 'sign-up' | 'resend' | 'agree' | 'reset' | 'reset-wait' | 'new-password'; email?: string; password?: string; name?: string; acceptTerms?: boolean }): Promise<{ ok: boolean; confirm?: boolean; needsTerms?: boolean; sent?: boolean; opened?: boolean; error?: string; cancelled?: boolean }> {
     const zero = window.zero as any;

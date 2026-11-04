@@ -40,6 +40,7 @@ import { pipeline } from 'node:stream/promises';
 import { spawn, execFile, execFileSync } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 import { usageMeter } from './usage.mjs';
+import { keyNameRefused, HIDE_FROM } from './key-names.mjs';
 
 // One stdout event at most this many bytes of output.
 const CHUNK = 48 * 1024;
@@ -119,7 +120,7 @@ export async function unpackFileArchive(file, destination) {
 }
 // What this server can do beyond the first version, said in a start's answer,
 // so a Mac knows rather than guesses whether its asks are honoured.
-const CAPS = ['offline', 'setup', 'kept', 'base', 'plain', 'hold', 'resources'];
+const CAPS = ['offline', 'setup', 'kept', 'base', 'plain', 'hold', 'resources', 'keys'];
 // A conversation sent home as only what the run added is listed in this file
 // (the same name in main/cloud/run.mts).
 const TAILS = '.agentbox-tails.json';
@@ -719,6 +720,7 @@ export function createSandbox({
       fs.rmSync(bundle, { force: true });
       if (r.spec.login) await placeLogin(r);
       if (r.spec.also) await placeCodexToo(r);
+      if (r.spec.keys) await placeKeys(r);
       // What the documents folder held before the agent started, so only what
       // it writes there goes home (`sendDocs`).
       if (r.spec.docs) r.docsSeen = scanDocs(r.spec.docs);
@@ -762,6 +764,7 @@ export function createSandbox({
         env: {
           ...baseEnv,
           ...(runAs ? { HOME: runAs.home, USER: runAs.user, LOGNAME: runAs.user, TMPDIR: '/tmp' } : {}),
+          ...(r.keyEnv || {}),
           ...env,
           ...(r.secretEnv || {}),
           AGENTBOX_BRIDGE_SOCK: bridgeSocket,
@@ -986,6 +989,24 @@ export function createSandbox({
         if (runAs) await sh('chown', ['-R', `${runAs.uid}:${runAs.gid}`, dir], '/').catch(() => {});
       } catch { /* Codex stays signed out in this run */ }
     }
+  }
+
+  // THE KEYS THEY SAVED FOR CLOUD RUNS (main/cloud/keys.mjs), each fetched
+  // by its own link and given to the agent as the variable it is named for.
+  // Never a reason to stop the run: one that cannot be fetched is left out,
+  // and the agent asks for it as if it had never been saved.
+  async function placeKeys(r) {
+    const got = {};
+    await Promise.all(r.spec.keys.map(async (k) => {
+      try {
+        const res = await fetchImpl(k.url, { signal: AbortSignal.timeout(30_000) });
+        const key = res.ok ? JSON.parse(Buffer.from(await res.arrayBuffer()).toString('utf8')) : null;
+        if (key?.name !== k.name || keyNameRefused(key.name) || typeof key.value !== 'string' || !key.value) throw new Error('not that key');
+        got[key.name] = key.value;
+      } catch { log(`run ${String(r.spec.runId || '').slice(-8)}: the key ${k.name} could not be fetched`); }
+    }));
+    r.keyEnv = got;
+    r.secrets = [...(r.secrets || []), ...Object.values(got).filter((v) => v.length >= HIDE_FROM)];
   }
 
   const shape = (text) => String(text || '').replace(/[A-Za-z0-9_\-+/=]{16,}/g, '<long>').replace(/\s+/g, ' ').trim().slice(-600);
@@ -1803,6 +1824,7 @@ function invalidStart(req) {
   if (req.login && (!req.login.url || !['claude', 'codex'].includes(req.login.engine))) return 'a login needs its engine and its link';
   if (req.also != null && (!Array.isArray(req.also) || req.also.some((l) => l?.engine !== 'codex' || typeof l.url !== 'string' || !l.url))) return 'also is a list of Codex logins, each by its link';
   if (req.also?.length && req.login?.engine !== 'claude') return 'only a Claude run carries a Codex login too';
+  if (req.keys != null && (!Array.isArray(req.keys) || req.keys.some((k) => keyNameRefused(k?.name) || typeof k.url !== 'string' || !k.url))) return 'keys is a list of saved keys, each by its name and link';
   if (!req.runId || typeof req.runId !== 'string') return 'runId is required';
   if (!req.cwd || !path.isAbsolute(req.cwd)) return 'cwd must be an absolute path';
   if (req.plain != null && req.plain !== true) return 'plain is true or absent';

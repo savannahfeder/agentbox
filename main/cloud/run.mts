@@ -69,6 +69,8 @@ import { docsFolderFor, docsToSend, tarDocs, layDocs } from './docs.mts';
 import type { LaidFile } from './docs.mts';
 import { troubleCause, limitResetMoment } from '../../shared/spawn-trouble.mts';
 import { HAND_BACK } from '../../shared/cloud-hand-back.mjs';
+import { NEED, SERVICES } from '../../shared/cloud-needs.mjs';
+import { filesSentFor } from '../../shared/cloud-sent-files.mjs';
 import { sentLine } from '../../shared/cloud-start.mts';
 import { referencedFiles } from '../../shared/referenced-files.mts';
 import { serveApprovals } from '../approval-prompt-core.mts';
@@ -268,6 +270,7 @@ export interface CloudRunOptions {
   storage: CloudStorage;
   login?: CloudLogin | null;
   also?: CloudLogin[];
+  keys?: { name: string; key: string }[];
   onLoginTrouble?: (trouble: { state: string; id: string | null }) => void;
   onLimit?: (limit: { until: number }) => void;
   stdin?: Readable;
@@ -320,9 +323,27 @@ const COMMIT_NOTE = 'Your commits on this task\'s branch are sent back to their 
 // thread (2026-10-16). Kept true to cloud/sandbox/Dockerfile and ./docs.mts.
 const HEADING = '# You are running on a cloud machine, not on the person\'s own computer';
 const HAND_BACK_NOTE = `For a missing installed skill or task file, first use the store tool request_cloud_resource. Request a skill by name, or a file or folder by its path: relative to this task or the product's documents, or any path under the account's documents, other products' folders included, written out in full as the request writes it (\`~/...\` works). It returns a separate scratch path when delivery succeeds; read the skill's SKILL.md there with its references and scripts. A folder answers with its files, which you then ask for. Their own files outside the documents (on their Desktop, in Downloads or Movies, a film, recording or screenshot they made) and anything over 25 MB are only on their computer. When the request is for such files, or cannot be done without them, whether it gives their path or only says what they are ("the original launch video", "my screenshots"), that is work that cannot go ahead here: hand it back as below rather than answering in part. For something the work can do without, such as a skill or a reference it would have liked, finish the rest and say exactly what is missing. Something missing does not end the conversation. When they ask a question or for a status, answer it from what you have (this thread, the documents, the code), say in one sentence what you could not recheck from here, and end with the option "Check from my computer". When the missing thing is something they can tell you in a reply, such as a link, a choice, a name or where a file is, ask for it in plain words as your usual final answer with options. Never ask them to type a password, key or sign-in into the thread. When the work itself cannot go ahead without a key, one of their apps, a private repository this machine cannot reach, or a file, folder or skill the request names or needs that request_cloud_resource cannot deliver, stop at once. Do not work around it, do not write to the work item, do not give the person commands to run, and do not offer to move the thread: the app moves it. End your turn with one line and nothing else: ${HAND_BACK} followed by what was missing, in a few words they would use (your AWS sign-in, the iOS simulator), since the app shows those words to them. A person who asks to have this thread moved to their computer, or picks "Check from my computer", is answered with this line as well. That line replaces your usual final answer and its options. The app then runs the same request again on their computer, where all of it is. A program you can install is not a reason to stop. Otherwise work as usual, and never write that line.`;
+// With keys (the names of those saved for cloud runs; null when this run's
+// image cannot place them), a missing key is asked for, not handed back.
+const handBackNote = (keys: string[] | null) => (keys
+  ? HAND_BACK_NOTE
+    .replace(/When the request is for such files, or cannot be done without them, .*?rather than answering in part\./, 'When the request needs such a file, ask for it with a file line, below, rather than handing the thread back.')
+    .replace('into the thread. When the work itself cannot go ahead without a key,', `into the thread. ${keysNote(keys)} When the work itself cannot go ahead without something none of those can carry (a browser session, a file over 1 GB),`)
+    .replace('or picks "Check from my computer"', 'or picks "Check from my computer" or "Do it from my computer"')
+    .replace('(your AWS sign-in, the iOS simulator)', '(the iOS simulator, their Xcode)')
+  : HAND_BACK_NOTE);
+const keysNote = (names: string[]) => [
+  names.length ? `Keys and sign-ins they saved for cloud runs are in your environment under these names: ${names.join(', ')}.` : 'They have saved no keys or sign-ins for cloud runs yet.',
+  'When the work needs something only they can give, do all of the work that does not need it, then ask for it: line one of your usual final answer says what you need in plain words, and just above its Options goes one line per thing, in one of these forms.',
+  `\`${NEED} sign-in SERVICE | what it is for\` connects a service whose tools read a token from the environment. SERVICE is one of ${SERVICES.map((s) => s.id).join(', ')}; once connected, every later cloud run has ${SERVICES.slice(0, 3).map((s) => s.keys.map((k) => k.name).join(' and ')).join(', ')} and the rest.`,
+  `\`${NEED} key VARIABLE | what it is and where they get it\` asks for any other key a tool reads from the environment, under the variable the tool reads.`,
+  `\`${NEED} file PATH | what it is for\` asks for a file only their computer has, by its full or ~/ path there, up to 1 GB. It is at that same path here on your next turn.`,
+  `\`${NEED} code WHAT | what it is for\` asks for a one-time code, such as an npm one-time password or a verification code. It comes back as their reply.`,
+  'The app draws each line as a card they answer on the thread. A sign-in or a key is kept in the cloud and given to every later cloud run of every thread, and their reply comes back to you once it is given. The card already offers doing it on their computer instead, so do not add that as an option. A key under a name Claude Code or Codex read for their own sign-in (ANTHROPIC_, CLAUDE_, CODEX_, OPENAI_API_KEY) cannot be saved.',
+].join(' ');
 
 /** The note a cloud run is given, for a project with a repository or without one. */
-export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS }: { plain?: boolean; limitMs?: number } = {}) {
+export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS, keys = null }: { plain?: boolean; limitMs?: number; keys?: string[] | null } = {}) {
   if (plain) {
     return [
       HEADING,
@@ -330,7 +351,7 @@ export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS }: { plain?: b
       'Install whatever else the work needs: you have sudo (`sudo apt-get update && sudo apt-get install -y <package>`, `pip install --user`, `npm install`).',
       'It does not have: any other file from their computer (documents over 256 KB, other threads\' design folders, large media, files under the home folder, /tmp from an earlier turn); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins).',
       howLongNote(limitMs),
-      HAND_BACK_NOTE,
+      handBackNote(keys),
     ].join('\n\n');
   }
   return [
@@ -340,7 +361,7 @@ export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS }: { plain?: b
     'It does not have: the project\'s other branches (only this task\'s branch and main came up); any other file from their computer (other threads\' design folders, large media, files under the home folder); files an earlier turn left outside git (node_modules, gitignored folders such as scripts/scratch, /tmp); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins). Run `npm ci --ignore-scripts` before anything that needs node_modules. Open files are capped at 1024 here (the cloud fixes that ceiling), so a test runner that watches the whole project (`vitest related`, `npm run test:changed`) fails with EMFILE: run the test files you changed and the ones that import them by name with `npx vitest run <files>`.',
     `Only this task's own branch comes back to their computer. A commit, merge or reset on main or any other branch stays in this sandbox and is thrown away with it, so a merge done here has not happened. To ship, when your brief has a section on How this task ships, do what it says from here: commit on this branch and add the label \`ship\`. The app ships the branch on their computer once it comes home, so a ship never needs the hand-back line. When your brief has no section on how this task ships and the request includes merging into main, or whenever it includes changing any branch but this task's, do the rest of the work and commit it on this branch, then end your turn with the one line \`${HAND_BACK} merging into main\` (as below): the app merges on their computer.`,
     `${howLongNote(limitMs)} ${COMMIT_NOTE}`,
-    HAND_BACK_NOTE,
+    handBackNote(keys),
   ].join('\n\n');
 }
 
@@ -350,8 +371,8 @@ export const CLOUD_NOTE = cloudNote();
 export const PLAIN_CLOUD_NOTE = cloudNote({ plain: true });
 
 // The app's own instructions with the cloud note after them.
-export function argvForTheCloud(argv: string[], { plain = false, limitMs = RUN_LIMIT_MS }: { plain?: boolean; limitMs?: number } = {}) {
-  const note = limitMs === RUN_LIMIT_MS ? (plain ? PLAIN_CLOUD_NOTE : CLOUD_NOTE) : cloudNote({ plain, limitMs });
+export function argvForTheCloud(argv: string[], { plain = false, limitMs = RUN_LIMIT_MS, note }: { plain?: boolean; limitMs?: number; note?: string } = {}) {
+  note ??= limitMs === RUN_LIMIT_MS ? (plain ? PLAIN_CLOUD_NOTE : CLOUD_NOTE) : cloudNote({ plain, limitMs });
   const i = argv.indexOf('--append-system-prompt');
   if (i < 0 || i + 1 >= argv.length) return [...argv, '--append-system-prompt', note];
   const out = [...argv];
@@ -852,6 +873,8 @@ export async function cloudRun({
   // Other sign-ins the run carries, in the same shape (./run-cli.mts
   // `loginsCarriedBy`). The sandbox places them if it can and starts anyway.
   also = [],
+  // The keys saved for cloud runs (./keys.mjs keysCarried): { name, key }.
+  keys = [],
   // Told when the sandbox says the login was missing, refused or ran out.
   onLoginTrouble = () => {},
   // Told the moment the account's limit resets, when a run ends on it.
@@ -901,6 +924,10 @@ export async function cloudRun({
   // A project with no repository: the agent works in the documents folder,
   // and the thread's marker is the file the supervisor named (./marker.mts).
   const plain = !!env.AGENTBOX_CLOUD_MARKER;
+  // Keys go only to an image that places them, and the agent is told of them
+  // only then, or it would ask for one, have it saved, and still not find it.
+  const keysGo = imageCaps.includes('keys') && !kit ? keys : [];
+  const note = cloudNote({ plain, limitMs: runLimitMs, keys: imageCaps.includes('keys') && !kit ? keysGo.map((k) => k.name) : null });
   const here = plain ? { folder: cwd, file: env.AGENTBOX_CLOUD_MARKER } : cwd;
   const configDir = env.CLAUDE_CONFIG_DIR || path.join(homeDir, '.claude');
   const codexHome = env.CODEX_HOME || path.join(homeDir, '.codex');
@@ -997,13 +1024,13 @@ export async function cloudRun({
       stdinBuf = stdinBuf.slice(i + 1);
       const named = filesNamedIn(line, { cwd: plain ? null : cwd, roots, docs: env.AGENTBOX_DOCS, home: homeDir });
       if (codex) {
-        const c = codexLineForTheCloud(line, { stubPath, codexHome, keep: mcpConfig.mcpServers, note: plain ? PLAIN_CLOUD_NOTE : CLOUD_NOTE });
+        const c = codexLineForTheCloud(line, { stubPath, codexHome, keep: mcpConfig.mcpServers, note });
         line = c.line;
         if (c.conversation) conversations.add(c.conversation);
         named.push(...c.files.filter((f) => !named.includes(f)));
       } else if (untold) {
         const was = line;
-        line = claudeLineForTheCloud(line, { note: plain ? PLAIN_CLOUD_NOTE : CLOUD_NOTE });
+        line = claudeLineForTheCloud(line, { note });
         untold = line === was;
       }
       if (named.length) enqueue({ action: 'files', paths: named });
@@ -1128,6 +1155,8 @@ export async function cloudRun({
     const { key: k } = await sendOnce(storage, cacheKey(`folder-${await folderKey(dir)}.tgz`), () => tarOf(dir));
     return { path: remotePath, url: await storage.getUrl(k), key: k, untar };
   };
+  // Files the person sent from this Mac for this turn, at the same path there.
+  for (const f of kit ? [] : filesSentFor(env, { home: homeDir })) sending.push(sendFile(f));
   const settingsPath = argValue(argv, '--settings');
   if (settingsPath && fs.existsSync(settingsPath)) sending.push(sendFile(settingsPath, settingsPath, Buffer.from(settingsForTheCloud(fs.readFileSync(settingsPath, 'utf8')))));
   const mcpPath = argValue(argv, '--mcp-config');
@@ -1277,12 +1306,13 @@ export async function cloudRun({
   const base = pack.base ? { url: await storage.getUrl(pack.base.key), sha: pack.base.sha } : null;
   const loginUrl = await storage.getUrl(login!.key, LOGIN_LINK_SECONDS);
   const carried = await Promise.all(also.map(async (l) => ({ engine: l.engine, id: l.id, url: await storage.getUrl(l.key, LOGIN_LINK_SECONDS) })));
+  const keysSent = await Promise.all(keysGo.map(async (k) => ({ name: k.name, url: await storage.getUrl(k.key, LOGIN_LINK_SECONDS) })));
   const started = await retry(() => transport.invoke(sessionId, {
     action: 'start', runId, cwd, branch, bundleUrl,
     ...(env.AGENTBOX_PHONE_DEVICE ? { phone: { device: env.AGENTBOX_PHONE_DEVICE, project: env.ZERO_PRODUCT, item: env.ZERO_ITEM } } : {}),
     ...(plain ? { plain: true } : {}),
     ...(base ? { base, refs: pack.refs } : {}),
-    argv: [remoteCommand, ...(remoteCommand === 'claude' ? argvForTheCloud(argv, { plain, limitMs: runLimitMs }) : argv)], env: remoteEnv, files: withoutKeys(files),
+    argv: [remoteCommand, ...(remoteCommand === 'claude' ? argvForTheCloud(argv, { note }) : argv)], env: remoteEnv, files: withoutKeys(files),
     // The same number the agent was told in its note, rather than leaving the
     // image's own copy of it as the only one.
     deadlineMs: runLimitMs,
@@ -1291,6 +1321,7 @@ export async function cloudRun({
     ...(docsDir ? { docs: docsDir } : {}),
     login: { engine: login!.engine, id: login!.id, url: loginUrl },
     ...(carried.length ? { also: carried } : {}),
+    ...(keysSent.length ? { keys: keysSent } : {}),
     results,
     // A conversation comes home as only what the run added (`layTails`). An
     // image that does not know this ignores it and sends it whole.
