@@ -6,7 +6,7 @@
 export { keyNameRefused, HIDE_FROM, KEY_VALUE_MAX } from './cloud-key-names.mjs';
 
 export const KEY_ASK = 'AGENTBOX-NEEDS-A-KEY:';
-const ASK_LINE = /^\s*AGENTBOX-NEEDS-A-KEY:\s*([A-Z][A-Z0-9_]{1,79})\b[\s:—–-]*(.*)$/;
+const ASK_LINE = /^\s*AGENTBOX-NEEDS-A-KEY:\s*([A-Z][A-Z0-9_]{1,79})\b[\s:\u2014\u2013-]*(.*)$/;
 
 /** The keys a message asks for, in order and once each: [{ name, what }]. */
 export function keyAsks(text) {

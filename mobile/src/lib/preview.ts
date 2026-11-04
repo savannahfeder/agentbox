@@ -269,16 +269,32 @@ export function previewGroups(now = Date.now()) {
   };
 }
 
+/** `?scene=first-run`: signed out, and the computer's threads arrive a little after you sign in, so the whole first run can be walked. */
+const WALKS = typeof location !== 'undefined' && new URLSearchParams(location.search).get('scene') === 'first-run';
+// Read once as the page opens: the scene leaves the address at the first redirect.
+export const previewWalksFirstRun = () => WALKS;
+const COMPUTER_JOINS_MS = 20_000;
+
 /** A stand-in for the sign-in client (renderer/src/cloud-rest.ts), signed in. */
 export function previewCloud(now = () => Date.now()) {
   const rows = previewRows(now());
+  const walking = previewWalksFirstRun();
+  const full = { ...rows };
+  let signedInAt = 0;
+  if (walking) Object.assign(rows, { projects: [], threads: [], commands: [] });
+  // Once joined, the stand-in computer stays online, as a real one sending every few seconds does.
+  const joined = () => {
+    if (!walking || !signedInAt || now() - signedInAt <= COMPUTER_JOINS_MS) return;
+    if (!rows.projects.length) Object.assign(rows, full);
+    rows.projects = rows.projects.map((p) => ({ ...p, updated_at: new Date(now()).toISOString() }));
+  };
   // `?scene=clear` draws an empty inbox, `?scene=connect` an account no computer has joined, `?scene=signed-out` the sign-in page.
   const scene = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('scene');
   if (scene === 'clear' || scene === 'connect') { rows.threads = []; rows.commands = []; }
   if (scene === 'connect') rows.projects = [];
   // `?scene=queued`: a reply on a thread nothing is running, which reads Queued.
   if (scene === 'queued') rows.commands.push({ id: 'c-preview-q', device: DEV, project: 'film', item: 'w-5e6f7a8b9c', kind: 'reply', payload: { text: 'Open on the inbox.' }, created_at: new Date(now() - 30_000).toISOString(), claimed_at: null, taken_at: null, outcome: null } as PhoneRows['commands'][number]);
-  let signedIn = scene !== 'signed-out';
+  let signedIn = scene !== 'signed-out' && !walking;
   const settings = previewSettings(now());
   const team = { ...PREVIEW_TEAM, members: [...PREVIEW_TEAM.members], invites: [...PREVIEW_TEAM.invites] };
   // The Mac takes a change a moment later and sends its settings again.
@@ -327,6 +343,7 @@ export function previewCloud(now = () => Date.now()) {
     async select(table: string, query: string) {
       const group = groups.select(table, query);
       if (group) return group;
+      joined();
       if (table === 'phone_projects') return rows.projects;
       if (table === 'phone_threads') return rows.threads;
       if (table === 'phone_commands') return /taken_at=is\.null/.test(query) ? rows.commands.filter((c) => !c.taken_at) : rows.commands.filter((c) => c.taken_at);
@@ -372,12 +389,12 @@ export function previewCloud(now = () => Date.now()) {
       if (made.kind === 'setting') takeSetting(made);
       return made;
     },
-    async signInWithPassword() { signedIn = true; return session()!; },
-    async signInWithIdToken() { signedIn = true; return session()!; },
+    async signInWithPassword() { signedIn = true; signedInAt = now(); return session()!; },
+    async signInWithIdToken() { signedIn = true; signedInAt = now(); return session()!; },
     async signUp() { signedIn = true; return { confirm: false }; },
     async putFile() {},
     async googleUrl() { return ''; },
-    async finishGoogle() { signedIn = true; return session()!; },
+    async finishGoogle() { signedIn = true; signedInAt = now(); return session()!; },
     signOut() { signedIn = false; },
   };
 }

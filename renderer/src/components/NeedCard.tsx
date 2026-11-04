@@ -3,6 +3,7 @@ import { keysOf, needId, type Need } from '../../../shared/cloud-needs.mjs';
 import { keyLabel, keyWords } from '../../../shared/cloud-keys.mjs';
 import { codeLooksWrong, keyLooksWrong } from '../key-asks';
 import { DARK_INK, logoOf } from '../connections/logos';
+import { Name } from '../../../shared/product-name.mjs';
 import './need-card.css';
 
 // What a message that asks for things knows (shared/cloud-needs.mjs): the keys
@@ -200,7 +201,7 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
         {why ? <div className="need-why">{why}</div> : key?.what && <div className="need-why">{withLinks(sentence(key.what), open)}</div>}
         {showFacts ? <div className="need-facts">
           {getIt && <div>{I.arrow}<span>{getIt}</span></div>}
-          <div>{I.lock}<span>Kept encrypted in your Agentbox Cloud</span></div>
+          <div>{I.lock}<span>Kept encrypted in your {Name} Cloud</span></div>
           <div>{I.cloud}<span>Every thread can use it from now on</span></div>
         </div> : getIt && <div className="need-why need-also">{getIt}. Kept the same way.</div>}
         <KeyFields need={need} fields={fields} plain={plain} />
