@@ -4,6 +4,7 @@ import { Name } from '../../../shared/product-name.mjs';
 import { keyLabel, keyWords } from '../../../shared/cloud-keys.mjs';
 import { codeLooksWrong, keyLooksWrong } from '../key-asks';
 import { DARK_INK, logoOf } from '../connections/logos';
+import { Name } from '../../../shared/product-name.mjs';
 import './need-card.css';
 
 // What a message that asks for things knows (shared/cloud-needs.mjs): the keys

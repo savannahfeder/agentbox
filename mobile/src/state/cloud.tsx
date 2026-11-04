@@ -197,6 +197,8 @@ function useCloudState() {
   }, []);
   const turnOnAlerts = useCallback(async () => {
     if (!cloud?.signedIn()) throw new Error('Sign in first.');
+    // The browser preview has no phone to alert; it keeps a stand-in so the first run can be walked.
+    if (PREVIEW) { keepAlerts({ token: 'preview', at: Date.now() }); return; }
     const token = await alertToken();
     await leaveAddress(cloud, { token, platform: Platform.OS, appVersion: APP_VERSION, now: Date.now() });
     keepAlerts({ token, at: Date.now() });

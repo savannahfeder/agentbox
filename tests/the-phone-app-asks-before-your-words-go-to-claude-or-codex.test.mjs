@@ -43,7 +43,7 @@ describe('the screens', () => {
     const notice = read('app/ai-notice.tsx');
     expect(notice).toMatch(/Anthropic/);
     expect(notice).toMatch(/OpenAI/);
-    expect(notice).toMatch(/title="Continue"|>Continue</);
+    expect(notice).toMatch(/title="Continue"|label="Allow and continue"|>Continue</);
     expect(notice).toMatch(/Not now/);
   });
   it('a send that needs it opens the notice instead of going', () => {

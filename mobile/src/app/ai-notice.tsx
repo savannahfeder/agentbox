@@ -1,37 +1,38 @@
 // Before your first message: where your words go, and a yes (App Review
-// guideline 5.1.2(i)). Asked once; Settings › General turns it off again.
-import { router } from 'expo-router';
-import { Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+// guideline 5.1.2(i)). Asked once, as the first run's third step, or by a
+// send after a no; Settings › General turns it off again.
+import { useLocalSearchParams } from 'expo-router';
+import { View } from 'react-native';
 import { useCloud } from '../state/cloud';
-import { T, Wall } from '../ui/parts';
-import { color, font, size } from '../ui/theme';
+import { Bars, Btn, Card, CardRow, Head, leaveSetup, Logo, Screen } from '../ui/Onboarding';
+import { T } from '../ui/parts';
+import { color, font } from '../ui/theme';
 
-const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
+const ROWS = [
+  { title: 'To your computer', detail: 'Or Agentbox Cloud when your computer is off' },
+  { title: 'To the agent you pick', detail: 'Claude Code by Anthropic or Codex by OpenAI, signed in to your own account' },
+  { title: 'Nowhere else', detail: 'Agentbox shares them with no one' },
+];
 
 export default function AiNotice() {
   const c = useCloud();
-  const inset = useSafeAreaInsets();
-  const answer = (yes: boolean) => { c.answerNotice(yes); leave(); };
-  const para = { fontSize: 15, lineHeight: 23, color: color.dim, marginTop: 14 };
+  const { first } = useLocalSearchParams<{ first?: string }>();
+  const answer = (yes: boolean) => { c.answerNotice(yes); leaveSetup(); };
   return (
-    <Wall>
-      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: inset.top + 48, paddingHorizontal: size.inset + 8, paddingBottom: 24 }}>
-        <T style={{ fontFamily: font.medium, fontSize: 22, lineHeight: 28, letterSpacing: -0.4 }}>Where your messages go</T>
-        <T style={para}>What you write here goes to your computer, or to Agentbox Cloud when your computer is off. Either one hands it to the coding agent you choose for the thread.</T>
-        <T style={para}>That agent is Claude Code, made by Anthropic, or Codex, made by OpenAI, signed in to your own account with them. Your words, the files you attach and the thread they belong to go to that company under its terms.</T>
-        <T style={para}>Nothing goes to them from this phone directly, and Agentbox sends your messages nowhere else. You can turn this off in Settings, under General.</T>
-      </ScrollView>
-      <View style={{ paddingHorizontal: size.inset + 8, paddingBottom: Math.max(16, inset.bottom) + 8, gap: 10 }}>
-        <Pressable onPress={() => answer(true)} accessibilityRole="button"
-          style={({ pressed }) => ({ height: 46, alignItems: 'center', justifyContent: 'center', backgroundColor: color.text, opacity: pressed ? 0.85 : 1 })}>
-          <T style={{ fontSize: 16, fontFamily: font.semibold, color: color.bg }}>Continue</T>
-        </Pressable>
-        <Pressable onPress={() => answer(false)} accessibilityRole="button"
-          style={({ pressed }) => ({ height: 46, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.fill : 'transparent' })}>
-          <T style={{ fontSize: 16, color: color.dim }}>Not now</T>
-        </Pressable>
-      </View>
-    </Wall>
+    <Screen top={first ? 24 : 72} foot={<><Btn kind="primary" label="Allow and continue" onPress={() => answer(true)} /><Btn kind="quiet" label="Not now, I'll just read" onPress={() => answer(false)} /></>}>
+      {first ? <Bars at="messages" /> : null}
+      <Logo />
+      <Head style={{ marginTop: 28 }}>Where your messages go</Head>
+      <Card style={{ marginTop: 26 }}>
+        {ROWS.map((r, i) => (
+          <CardRow key={r.title} first={i === 0} style={{ alignItems: 'flex-start' }}>
+            <View style={{ flex: 1 }}>
+              <T style={{ fontSize: 16, lineHeight: 22, fontFamily: font.medium }}>{r.title}</T>
+              <T style={{ fontSize: 14.5, lineHeight: 21, color: color.dim, marginTop: 2 }}>{r.detail}</T>
+            </View>
+          </CardRow>
+        ))}
+      </Card>
+    </Screen>
   );
 }

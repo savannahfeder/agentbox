@@ -12,6 +12,8 @@ import { useCloud } from '../state/cloud';
 import { footRoom, T } from './parts';
 import { color, font } from './theme';
 
+const FIRST_RUN_SCREENS = new Set(['/sign-in', '/no-account', '/ai-notice', '/alerts']);
+
 // The site's glass is --bg-raised at 62% over a 22px blur. The app has no
 // blur, and paint alone lets the words under it show through, so it is the
 // colour that glass makes over the wall, solid (`color.sunk`). The command's
@@ -129,8 +131,8 @@ export function Approvals() {
   }, [answered]);
 
   const { card, verdict, waiting } = cardOnStage(pending, answered, leaving.current);
-  // The notice's own buttons sit where the card would cover them.
-  if (pathname === '/ai-notice') return null;
+  // The first run's steps keep their buttons where the card would cover them.
+  if (FIRST_RUN_SCREENS.has(pathname)) return null;
   if (!card || c.minimizedApproval === card.id) return null;
   const answer = async (allow: boolean) => {
     setAnswered({ id: card.id, allow });
