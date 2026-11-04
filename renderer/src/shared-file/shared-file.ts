@@ -1,0 +1,115 @@
+// A FILE SHARED BY ITS LINK, as the web app reads it: <site>/f/<token>.
+// The database side is cloud/supabase/migrations/20261105000000_a_file_anyone_with_its_link_can_read.sql.
+
+export type Rpc = (name: string, args: Record<string, unknown>) => Promise<any>;
+export type FileKind = 'markdown' | 'page' | 'image' | 'pdf';
+
+export interface SharedFile {
+  name: string;
+  kind: FileKind;
+  type: string;
+  /** Words for markdown and a page, base64 for an image or a PDF. */
+  body: string;
+  version: number;
+  updatedAt: number;
+  ownerName: string;
+  ownerAvatar: string | null;
+  mine: boolean;
+}
+
+export type Shown = { state: 'file'; file: SharedFile } | { state: 'stopped' } | { state: 'unknown' };
+
+export interface FileComment {
+  id: string;
+  byName: string;
+  byAvatar: string | null;
+  body: string;
+  createdAt: number;
+  mine: boolean;
+  byOwner: boolean;
+}
+
+const PATH = /^\/f\/([A-Za-z0-9_-]{16,64})\/?$/;
+
+/** The token when this address is a shared file on the web app; null anywhere else. */
+export function sharedFileToken(pathname: string, onTheWebApp: boolean): string | null {
+  if (!onTheWebApp) return null;
+  return PATH.exec(pathname)?.[1] ?? null;
+}
+
+const KINDS = new Set<FileKind>(['markdown', 'page', 'image', 'pdf']);
+
+export async function readSharedFile(rpc: Rpc, tok: string): Promise<Shown> {
+  const rows = await rpc('file_link_view', { tok });
+  const r = Array.isArray(rows) ? rows[0] : null;
+  if (r && KINDS.has(r.kind)) {
+    return {
+      state: 'file',
+      file: {
+        name: String(r.name ?? ''), kind: r.kind, type: String(r.type ?? ''), body: String(r.body ?? ''),
+        version: Number(r.version) || 1, updatedAt: Date.parse(r.updated_at) || 0,
+        ownerName: (typeof r.owner_name === 'string' && r.owner_name.trim()) || 'Someone',
+        ownerAvatar: typeof r.owner_avatar === 'string' && /^https:/.test(r.owner_avatar) ? r.owner_avatar : null,
+        mine: r.mine === true,
+      },
+    };
+  }
+  return (await rpc('file_link_stopped', { tok })) === true ? { state: 'stopped' } : { state: 'unknown' };
+}
+
+export async function readComments(rpc: Rpc, tok: string): Promise<FileComment[]> {
+  const rows = await rpc('file_link_comments_of', { tok });
+  return (Array.isArray(rows) ? rows : []).map((r) => ({
+    id: String(r.id), byName: (typeof r.by_name === 'string' && r.by_name.trim()) || 'Someone',
+    byAvatar: typeof r.by_avatar === 'string' && /^https:/.test(r.by_avatar) ? r.by_avatar : null,
+    body: String(r.body ?? ''), createdAt: Date.parse(r.created_at) || 0, mine: r.mine === true, byOwner: r.by_owner === true,
+  }));
+}
+
+export async function postComment(rpc: Rpc, tok: string, words: string): Promise<string> {
+  return String(await rpc('comment_on_file_link', { tok, b: words }));
+}
+
+export async function removeComment(rpc: Rpc, id: string): Promise<void> {
+  await rpc('remove_file_link_comment', { c: id });
+}
+
+/** An image's or a PDF's bytes, from the base64 the link carries. */
+export function fileBytes(file: Pick<SharedFile, 'body'>): Uint8Array {
+  const raw = atob(file.body.replace(/\s+/g, ''));
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+export function initialOf(name: string): string {
+  return (name.trim().match(/\p{L}|\p{N}/u)?.[0] ?? '?').toUpperCase();
+}
+
+export function sharedOn(ts: number, now = Date.now()): string {
+  const d = new Date(ts);
+  const sameYear = d.getFullYear() === new Date(now).getFullYear();
+  return d.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+export function sharedLine(file: Pick<SharedFile, 'ownerName' | 'updatedAt'>, now = Date.now()): string {
+  return file.updatedAt ? `Shared by ${file.ownerName} · ${sharedOn(file.updatedAt, now)}` : `Shared by ${file.ownerName}`;
+}
+
+export function commentWhen(ts: number, now = Date.now()): string {
+  const m = Math.floor(Math.max(0, now - ts) / 60_000);
+  if (m < 1) return 'now';
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const days = Math.floor(h / 24);
+  return days < 7 ? `${days}d` : sharedOn(ts, now);
+}
+
+/** The database's refusals are already plain words; a lost connection is said once, the same way. */
+export function saidOf(err: unknown): string {
+  const words = String((err as Error)?.message ?? err ?? '').trim();
+  if (!words || /failed to fetch|network|load failed|aborted|timed? ?out|the cloud answered 5/i.test(words)) return 'That did not go through. Try again.';
+  const sentences = words.split(/;\s*/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('. ');
+  return /[.!?]$/.test(sentences) ? sentences : `${sentences}.`;
+}

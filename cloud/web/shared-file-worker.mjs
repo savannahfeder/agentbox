@@ -1,0 +1,117 @@
+// THE WEB APP'S ADDRESSES FOR A SHARED FILE, on Cloudflare Pages: /f/<token>.
+//
+// scripts/build-phone-site.mjs writes this file into the site as `_worker.js`,
+// with the cloud's public address, its public key and the site's headers put
+// in for BAKED, and a `_routes.json` that sends only /f/* here; every other
+// address stays a plain file with `_headers`, which Pages does not apply to
+// what a worker answers, so the same headers are set here.
+//
+//   /f/<token>          the app's page, with the file's name in its link-preview tags
+//   /f/<token>/raw      the file itself, a page or picture in an origin of its own
+//   /f/<token>/preview  a shared picture, for a link preview to show
+const BAKED = null;
+
+const PATH = /^\/f\/([A-Za-z0-9_-]{16,64})(?:\/(raw|preview))?\/?$/;
+const DEADLINE_MS = 4000;
+// The page a person shared runs its scripts in an origin of its own, opened
+// framed or on its own, so it never reaches the site's storage and the sign-in kept there.
+const PAGE_CSP = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms; default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'";
+const PICTURE_CSP = "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; frame-ancestors 'self'";
+const TEXT_CSP = "sandbox; default-src 'none'; frame-ancestors 'self'";
+const PDF_CSP = "frame-ancestors 'self'";
+
+const escape = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+function bytesOf(b64) {
+  const raw = atob(String(b64).replace(/\s+/g, ''));
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+const pictureType = (t) => (/^image\/[a-z0-9.+-]{1,60}$/i.test(t ?? '') ? t : 'application/octet-stream');
+
+export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl = (u, i) => fetch(u, i) } = {}) {
+  const base = String(cloud).replace(/\/+$/, '');
+
+  async function view(tok) {
+    const res = await fetchImpl(`${base}/rest/v1/rpc/file_link_view`, {
+      method: 'POST',
+      headers: { apikey: anonKey, authorization: `Bearer ${anonKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ tok }),
+      signal: AbortSignal.timeout(DEADLINE_MS),
+    });
+    if (!res.ok) throw new Error(`the cloud answered ${res.status}`);
+    const rows = await res.json();
+    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+  }
+
+  const plain = (status, words, extra = {}) => new Response(words, {
+    status,
+    headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': TEXT_CSP, 'referrer-policy': 'no-referrer', ...extra },
+  });
+
+  function tagsFor(url, tok, file) {
+    const page = `${url.origin}/f/${tok}`;
+    const picture = file?.kind === 'image';
+    const title = file ? file.name : 'Agentbox';
+    const said = file ? `Shared by ${file.owner_name || 'someone'} on Agentbox` : 'A file shared on Agentbox';
+    const image = picture ? `${page}/preview` : `${url.origin}/phone-icon.png`;
+    return [
+      ['property', 'og:title', title], ['property', 'og:description', said], ['property', 'og:type', 'website'],
+      ['property', 'og:url', page], ['property', 'og:image', image], ['property', 'og:site_name', 'Agentbox'],
+      ['name', 'twitter:card', picture ? 'summary_large_image' : 'summary'], ['name', 'twitter:title', title],
+      ['name', 'twitter:description', said], ['name', 'twitter:image', image], ['name', 'description', said],
+    ].map(([k, n, v]) => `<meta ${k}="${n}" content="${escape(v)}">`).join('\n    ');
+  }
+
+  async function thePage(request, env, url, tok) {
+    let file = null;
+    try { file = await view(tok); } catch { /* the page says what became of it */ }
+    const shell = await env.ASSETS.fetch(new URL('/', url));
+    // The app's files are named from the page's own folder, and this page is two folders down.
+    let html = (await shell.text()).replace(/(\s(?:src|href))="\.\//g, '$1="/');
+    html = html.replace(/<title>[^<]*<\/title>/, `<title>${escape(file ? `${file.name} · Agentbox` : 'Agentbox')}</title>`);
+    html = html.replace('</head>', `  ${tagsFor(url, tok, file)}\n  </head>`);
+    return new Response(request.method === 'HEAD' ? null : html, {
+      status: 200,
+      headers: { ...headers, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+    });
+  }
+
+  async function theFile(tok, preview) {
+    let file;
+    try { file = await view(tok); } catch { return plain(502, 'This file did not load. Try again.'); }
+    if (!file || (preview && file.kind !== 'image')) return plain(404, 'This link does not work.');
+    const shared = { 'cache-control': preview ? 'public, max-age=300' : 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
+    if (file.kind === 'page') return new Response(file.body, { headers: { ...shared, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PAGE_CSP } });
+    if (file.kind === 'markdown') return new Response(file.body, { headers: { ...shared, 'content-type': 'text/plain; charset=utf-8', 'content-security-policy': TEXT_CSP } });
+    let bytes;
+    try { bytes = bytesOf(file.body); } catch { return plain(404, 'This link does not work.'); }
+    if (file.kind === 'pdf') {
+      return new Response(bytes, { headers: { ...shared, 'content-type': 'application/pdf', 'content-security-policy': PDF_CSP, 'content-disposition': `inline; filename="${String(file.name).replace(/[^\w.\- ]+/g, '_')}"` } });
+    }
+    return new Response(bytes, { headers: { ...shared, 'content-type': pictureType(file.type), 'content-security-policy': PICTURE_CSP } });
+  }
+
+  return {
+    async fetch(request, env) {
+      const url = new URL(request.url);
+      const m = PATH.exec(url.pathname);
+      if (!m) return env.ASSETS.fetch(request);
+      if (request.method !== 'GET' && request.method !== 'HEAD') return plain(405, 'Not here.', { allow: 'GET, HEAD' });
+      const [, tok, part] = m;
+      if (!part) return thePage(request, env, url, tok);
+      return theFile(tok, part === 'preview');
+    },
+  };
+}
+
+let made = null;
+export default {
+  fetch(request, env) {
+    if (!BAKED) return new Response('This site was built without its cloud.', { status: 500 });
+    made ??= sharedFileWorker(BAKED);
+    return made.fetch(request, env);
+  },
+};

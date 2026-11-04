@@ -62,14 +62,16 @@ function forwarderFor(given) {
   return `if (location.hostname === ${JSON.stringify(from)}) location.replace(${JSON.stringify(site.origin)} + location.pathname + location.search + location.hash);\n`;
 }
 
-export function buildPhoneSite({ dist = path.join(root, 'renderer', 'dist'), out = path.join(root, 'phone-site'), configFile = teamConfigFile(root), icon = path.join(root, 'main', 'phone-icon.png'), legal = path.join(root, 'phone-legal'), log = console.log, stamp = commitHere() } = {}) {
+// `localCloud` is for scripts/shared-file-stage.mjs alone: a stand-in database on this computer.
+export function buildPhoneSite({ dist = path.join(root, 'renderer', 'dist'), out = path.join(root, 'phone-site'), configFile = teamConfigFile(root), icon = path.join(root, 'main', 'phone-icon.png'), legal = path.join(root, 'phone-legal'), log = console.log, stamp = commitHere(), localCloud = false } = {}) {
   if (!fs.existsSync(path.join(dist, 'index.html'))) throw new Error('build the renderer first: npm run phone:build');
   if (!configFile || !fs.existsSync(configFile)) throw new Error('no team.config.json on this machine (cloud/ or ~/.agentbox/): the phone site needs the team cloud');
   const given = JSON.parse(fs.readFileSync(configFile, 'utf8'));
   const { url, anonKey } = given;
   let origin;
   try { origin = new URL(url); } catch { throw new Error('cloud/team.config.json has no url'); }
-  if (origin.protocol !== 'https:' || origin.pathname.replace(/\/+$/, '') !== '' || origin.search || origin.hash) throw new Error('the cloud url must be a plain https address');
+  const local = localCloud && origin.protocol === 'http:' && origin.hostname === '127.0.0.1';
+  if ((origin.protocol !== 'https:' && !local) || origin.pathname.replace(/\/+$/, '') !== '' || origin.search || origin.hash) throw new Error('the cloud url must be a plain https address');
   if (typeof anonKey !== 'string' || !/^[A-Za-z0-9._-]{20,4000}$/.test(anonKey)) throw new Error('cloud/team.config.json has no public key');
   const forward = forwarderFor(given);
 
@@ -115,16 +117,22 @@ export function buildPhoneSite({ dist = path.join(root, 'renderer', 'dist'), out
     // itself, and Safari holds that copy to this rule too.
     "frame-ancestors 'self'",
   ].join('; ');
-  fs.writeFileSync(path.join(out, '_headers'), [
-    '/*',
-    `  Content-Security-Policy: ${csp}`,
-    '  Referrer-Policy: no-referrer',
-    '  X-Content-Type-Options: nosniff',
-    '  X-Frame-Options: SAMEORIGIN',
+  const headers = {
+    'Content-Security-Policy': csp,
+    'Referrer-Policy': 'no-referrer',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'SAMEORIGIN',
     // The microphone for dictation, on the page itself and nothing it frames.
-    '  Permissions-Policy: camera=(), microphone=(self), geolocation=()',
-    '',
-  ].join('\n'));
+    'Permissions-Policy': 'camera=(), microphone=(self), geolocation=()',
+  };
+  fs.writeFileSync(path.join(out, '_headers'), ['/*', ...Object.entries(headers).map(([k, v]) => `  ${k}: ${v}`), ''].join('\n'));
+  // A shared file's addresses go through cloud/web/shared-file-worker.mjs; a
+  // shared page is framed from the site itself, so that page may frame 'self'.
+  const worker = fs.readFileSync(path.join(root, 'cloud', 'web', 'shared-file-worker.mjs'), 'utf8');
+  if (!worker.includes('const BAKED = null;')) throw new Error('cloud/web/shared-file-worker.mjs has no BAKED line to fill in');
+  const baked = { cloud: origin.origin, anonKey, headers: { ...headers, 'Content-Security-Policy': csp.replace("frame-src blob:", "frame-src 'self' blob:") } };
+  fs.writeFileSync(path.join(out, '_worker.js'), worker.replace('const BAKED = null;', () => `const BAKED = ${JSON.stringify(baked)};`));
+  fs.writeFileSync(path.join(out, '_routes.json'), JSON.stringify({ version: 1, include: ['/f/*'], exclude: [] }));
   return { out, csp, legal: publishLegal(legal, out, given, log) };
 }
 
