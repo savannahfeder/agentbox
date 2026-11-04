@@ -12,6 +12,7 @@ import { withProjectLockSync } from './project-lock.mjs';
 import { projectWritten } from './projects-changed.mjs';
 import { readEnv } from '../../shared/product-name.mjs';
 import { defaultStoreRoot } from './home.mjs';
+import { replaceFileSync } from '../replace-file.mjs';
 
 // The machine-wide root: the store-home variable, else the same default
 // loadConfig uses when a config names no store. This is where device-local
@@ -84,7 +85,7 @@ export function atomicWriteJson(file, obj) {
   const tmp = `${file}.tmp-${crypto.randomBytes(4).toString('hex')}`;
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
-  fs.renameSync(tmp, file);
+  replaceFileSync(tmp, file);
 }
 
 export function readJson(file, fallback = null) {
@@ -346,7 +347,7 @@ export function saveCreation(projectDir, envelope, content) {
   if (typeof body === 'string') {
     const tmp = `${file}.tmp-${crypto.randomBytes(4).toString('hex')}`;
     fs.writeFileSync(tmp, body);
-    fs.renameSync(tmp, file);
+    replaceFileSync(tmp, file);
   } else if (body != null) {
     atomicWriteJson(file, body);
   }
