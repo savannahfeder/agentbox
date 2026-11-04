@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { keysOf, needId, type Need } from '../../../shared/cloud-needs.mjs';
+import { Name } from '../../../shared/product-name.mjs';
 import { keyLabel, keyWords } from '../../../shared/cloud-keys.mjs';
 import { codeLooksWrong, keyLooksWrong } from '../key-asks';
 import { DARK_INK, logoOf } from '../connections/logos';

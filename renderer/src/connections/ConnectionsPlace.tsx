@@ -10,6 +10,7 @@ import type { ConnectionsList, ConnectionTile } from '../types';
 import { cardState, checkResultLine, copyLine, copyNextLine, failureLine, openConnections, pageGroups, peopleOnCard, stateLine, toolWords, whenLine, whoHasIt, whoReadsCopies } from './connections-shown';
 import { DARK_INK, logoOf } from './logos';
 import { SERVICES } from '../../../shared/cloud-needs.mjs';
+import { Name } from '../../../shared/product-name.mjs';
 import { keyLooksWrong } from '../key-asks';
 import { Name } from '../../../shared/product-name.mjs';
 import './connections.css';
