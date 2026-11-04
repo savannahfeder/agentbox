@@ -6,7 +6,7 @@
 // copy and paste in the shape Sheets and Excel use, and rows and columns added
 // and taken away. The screen half was driven in the running app by testers.
 import { describe, it, expect } from 'vitest';
-import { readTable } from '../renderer/src/table-file.ts';
+import { readTable, filterRows } from '../renderer/src/table-file.ts';
 import {
   boxOf, inBox, moved, toClipboard, fromClipboard, pasteInto, writeCells, addRows, dropRows,
   orderAfterDrop, orderAfterAdd, addColumn, dropColumn, renameColumn, showColumnAs, shapeOf, writeTable, learnTag, filterChoices, likeItsColumn,
@@ -206,6 +206,12 @@ describe('the Filter menu offers any column with a short list of values', () => 
     expect(offered.Company).toBeUndefined();
     expect(offered.Employees).toBeUndefined();
     expect(offered.Note).toBeUndefined();
+  });
+  it('offers the empty cells too, and filtering to them finds those rows', () => {
+    const gaps = readTable('Name,Status\nAda,Won\nBo,\nCy,Won\nDi,New\nEd,\n', 'x.csv');
+    const status = filterChoices(gaps).find((f) => f.col === 1);
+    expect(status.values).toEqual(['Won', 'New', '']);
+    expect(filterRows(gaps, '', { 1: [''] }).map((r) => r[0])).toEqual(['Bo', 'Ed']);
   });
   it('leaves out a column with more values than a menu can hold', () => {
     const many = ['Name,City', ...Array.from({ length: 120 }, (_, i) => `P${i},Town ${i % 60}`)].join('\n');

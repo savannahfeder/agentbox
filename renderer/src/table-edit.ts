@@ -195,7 +195,9 @@ export function showColumnAs(table: Table, at: number, kind: ColumnKind): Table 
 export function filterChoices(table: Table, most = 40): Array<{ col: number; values: string[] }> {
   return table.columns.flatMap((c, col) => {
     if (table.ranked && col === 0) return [];
-    if (c.kind === 'tag') return c.values.length ? [{ col, values: c.values }] : [];
+    const blank = table.rows.some((r) => !(r[col] ?? '').trim());
+    // '' stands for the empty cells, which a filter can ask for too.
+    if (c.kind === 'tag') return c.values.length ? [{ col, values: blank ? [...c.values, ''] : c.values }] : [];
     if (c.kind === 'number' || c.kind === 'name') return [];
     const seen = new Map<string, string>();
     let filled = 0;
@@ -207,7 +209,7 @@ export function filterChoices(table: Table, most = 40): Array<{ col: number; val
       if (seen.size > most) return [];
     }
     if (seen.size < 2 || seen.size > filled * 0.6) return [];
-    return [{ col, values: [...seen.values()].sort((a, b) => a.localeCompare(b)) }];
+    return [{ col, values: [...[...seen.values()].sort((a, b) => a.localeCompare(b)), ...(blank ? [''] : [])] }];
   });
 }
 

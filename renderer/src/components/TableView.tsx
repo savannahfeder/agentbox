@@ -257,7 +257,7 @@ function FilterMenu({ table, choices, picked, onToggle, onClear }: {
   const filtering = Object.values(picked).some((v) => v.length);
   const counts = useMemo(() => new Map(choices.map(({ col }) => {
     const n = new Map<string, number>();
-    for (const r of table.rows) { const k = (r[col] ?? '').trim().toLowerCase(); if (k) n.set(k, (n.get(k) ?? 0) + 1); }
+    for (const r of table.rows) { const k = (r[col] ?? '').trim().toLowerCase(); n.set(k, (n.get(k) ?? 0) + 1); }
     return [col, n] as const;
   })), [table, choices]);
   return <>
@@ -273,9 +273,10 @@ function FilterMenu({ table, choices, picked, onToggle, onClear }: {
           const on = (picked[col] ?? []).includes(v);
           return <button key={v} type="button" role="menuitemcheckbox" aria-checked={on} className={`when-row${on ? ' on' : ''}`} onClick={() => onToggle(col, v)}>
             <span className={`tbl-tick${on ? ' on' : ''}`} aria-hidden="true" />
-            {column.kind === 'tag'
-              ? <span className={`tbl-tag tone-${column.tones[v.toLowerCase()]}`}>{v}</span>
-              : <span className="when-row-label">{v}</span>}
+            {!v ? <span className="when-row-label tbl-clear">Empty</span>
+              : column.kind === 'tag'
+                ? <span className={`tbl-tag tone-${column.tones[v.toLowerCase()]}`}>{v}</span>
+                : <span className="when-row-label">{v}</span>}
             <span className="when-row-hint tbl-filter-n">{(counts.get(col)?.get(v.toLowerCase()) ?? 0).toLocaleString()}</span>
           </button>;
         })}
@@ -781,6 +782,15 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     if (meta && (k === 'y' || k === 'Y')) { stop(); redo(); return; }
     if (meta && (k === 'a' || k === 'A')) { stop(); if (order.length) setPick({ a: { r: 0, c: first }, b: { r: order.length - 1, c: last } }); return; }
     if (meta && /^[cxv]$/i.test(k)) { e.stopPropagation(); return; }
+    // Fill down: the top row of the block, copied into every row picked below it.
+    if (meta && /^d$/i.test(k) && sel && editable) {
+      stop();
+      const top = table.rows[order[sel.r0]];
+      const cells: Array<{ r: number; c: number; v: string }> = [];
+      if (top) for (let r = sel.r0 + 1; r <= sel.r1; r++) for (let c = Math.max(sel.c0, first); c <= sel.c1; c++) cells.push({ r, c, v: top[c] ?? '' });
+      writeAt(cells);
+      return;
+    }
     if (!pick) {
       if (/^(Arrow|Tab$|Enter$|Home$|End$|Page)/.test(k) && order.length) { stop(); goTo({ a: { r: 0, c: first }, b: { r: 0, c: first } }); }
       if (k === 'Escape') { stop(); passEscape(); }
