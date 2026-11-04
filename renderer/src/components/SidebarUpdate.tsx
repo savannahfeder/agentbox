@@ -24,7 +24,7 @@
 import type { ReactNode } from 'react';
 import { NAME } from '../../../shared/product-name.mjs';
 import { MOVE_SAY, SAY } from '../update-row';
-import { sayWhere } from '../../../shared/where-it-runs-from.mjs';
+import { sayWhere } from '../../../shared/where-it-runs-from.mts';
 
 export const SIDE_SAY = {
   title: 'New version ready',
@@ -46,7 +46,7 @@ export const SIDE_SAY = {
 // so it can be put away. The Settings row and ⌘K keep the offer after that:
 // unlike a waiting version, nothing else will ever install this one.
 export function SidebarMove({ place, error = null, collapsed, rail = false, onMove, onClose }: {
-  /** Which read-only place this is (shared/where-it-runs-from.mjs). */
+  /** Which read-only place this is (shared/where-it-runs-from.mts). */
   place: string | null;
   /** Why the last move did not work, if it did not. */
   error?: string | null;

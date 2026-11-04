@@ -16,7 +16,7 @@ import { freshEnv, runningAsAFreshUser } from '../shared/fresh-user-home.mjs';
 import { newUserWindow } from '../main/new-user-window.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const main = fs.readFileSync(path.join(root, 'main/main.mjs'), 'utf8');
+const main = fs.readFileSync(path.join(root, 'main/main.mts'), 'utf8');
 
 const screen = { x: 0, y: 0, width: 1920, height: 1080 };
 

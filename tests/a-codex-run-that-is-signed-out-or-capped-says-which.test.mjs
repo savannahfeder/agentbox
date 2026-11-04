@@ -1,6 +1,6 @@
 // TWO CLASSIFIER PATTERN SETS THAT HAD NEVER BEEN MEASURED AGAINST CODEX.
 //
-// `shared/spawn-trouble.mjs` heads `SIGNED_OUT` and `AT_LIMIT` with "the shapes
+// `shared/spawn-trouble.mts` heads `SIGNED_OUT` and `AT_LIMIT` with "the shapes
 // the CLAUDE CLI uses". The `WORKSPACE` set below them was measured against
 // Codex on 2026-08-27 and carries the sentence it measured; these two never
 // were. A miss there is not free: a rate-limited run filed 'unknown' draws "it
@@ -71,9 +71,9 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { troubleCause } from '../shared/spawn-trouble.mjs';
+import { troubleCause } from '../shared/spawn-trouble.mts';
 import { createCodexAppServer } from '../main/codex-app-server.mjs';
-import { createCodexWorker } from '../main/codex-session.mjs';
+import { createCodexWorker } from '../main/codex-session.mts';
 
 /* ===================== (1) the signed-out run, verbatim =================== */
 
@@ -115,7 +115,7 @@ describe('a codex run on a login that is not signed in', () => {
   // A SIGNED-OUT LOGIN LEAVES THE ROTATION ON THE FIRST SIGHTING rather than
   // the third, which is what the classification is for.
   it('is a cause only she can end', async () => {
-    const { needsHerHands } = await import('../shared/spawn-trouble.mjs');
+    const { needsHerHands } = await import('../shared/spawn-trouble.mts');
     expect(needsHerHands(troubleCause(SIGNED_OUT_401))).toBe(true);
   });
 });

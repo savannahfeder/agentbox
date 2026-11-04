@@ -21,8 +21,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { mayRunHere, whatATeammateMaySet } from '../shared/team-rules.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamSync, memorySyncState } from '../main/team/sync.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamSync, memorySyncState } from '../main/team/sync.mts';
 import * as disk from '../main/store/work-items.mjs';
 
 const ME = 'p-me';

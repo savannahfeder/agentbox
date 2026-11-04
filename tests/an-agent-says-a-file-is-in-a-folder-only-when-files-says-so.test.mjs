@@ -217,7 +217,7 @@ describe('the brief of a thread on a team', () => {
     expect(filesFoldersBrief(null, 'Company')).toBeNull();
   });
   it('rides with every run', () => {
-    const src = fs.readFileSync(path.join(import.meta.dirname, '..', 'main/supervisor.mjs'), 'utf8');
+    const src = fs.readFileSync(path.join(import.meta.dirname, '..', 'main/supervisor.mts'), 'utf8');
     expect(src).toMatch(/this\.editedFilesLine\(item\), this\.filesFoldersLine\(item, product\)/);
   });
 });

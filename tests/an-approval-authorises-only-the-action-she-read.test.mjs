@@ -13,7 +13,7 @@
 // `worker-permissions.json` allows Bash broadly -- and a file's NAME and the id
 // inside it can be kept while its CONTENTS are replaced. So:
 //
-//   1. a worker raises `rm -rf ~/Zero`; main/approval-prompt-server.mjs keeps
+//   1. a worker raises `rm -rf ~/Zero`; main/approval-prompt-server.mts keeps
 //      that request in its own memory and waits on the answer file
 //   2. the worker rewrites `<id>.request.json` in place, same id, with
 //      `echo hi`
@@ -41,8 +41,8 @@
 // that flips the file between the harmless body and the real one wins whenever
 // her press lands on a harmless draw and the re-read catches the real body.
 // `listPending` is the only thing that reads a request, every one of its three
-// callers acts on or draws exactly what it returned (main/ipc.mjs's snapshot,
-// and main/main.mjs's ⌘Y chord and Agents menu), so the digest it records IS
+// callers acts on or draws exactly what it returned (main/ipc.mts's snapshot,
+// and main/main.mts's ⌘Y chord and Agents menu), so the digest it records IS
 // the card she is looking at.
 //
 // CANONICALISATION IS THE PART THAT CAN FAIL QUIETLY, and a digest that
@@ -64,9 +64,10 @@ import {
   answer, answerIsHers, approvalPublicKey, cardDigest, cardShown, listPending, spoolDir,
 } from '../main/approvals.mjs';
 import { createCodexApprovals } from '../main/codex-approvals.mjs';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const SERVER = path.join(here, '..', 'main', 'approval-prompt-server.mjs');
+const SERVER = path.join(here, '..', 'main', 'approval-prompt-server.mts');
 
 const roots = [];
 function spool() {
@@ -250,7 +251,7 @@ describe('the founder\'s decision', () => {
 function askAndPlant(root, command, plant) {
   const dir = spoolDir(root);
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [SERVER], {
+    const child = spawn(process.execPath, [...stripTypesFlags(), SERVER], {
       env: {
         ...process.env,
         ZERO_APPROVALS_DIR: dir,
@@ -419,13 +420,13 @@ describe('a codex card rewritten in the shared spool', () => {
 });
 
 /* ==================== and the door really asks the question ============== */
-// main/ipc.mjs imports electron at module scope and cannot be loaded here, so
+// main/ipc.mts imports electron at module scope and cannot be loaded here, so
 // the one door is asserted against its source, the way the other door tests in
 // this suite are (tests/the-menu-answers-a-card-through-the-one-door.test.mjs).
 
 describe('the one door every answer goes through', () => {
-  const door = fs.readFileSync(path.join(here, '..', 'main', 'ipc.mjs'), 'utf8')
-    .match(/const answerApproval = \(id, allow, note\) => \{[\s\S]*?\n {2}\};/)[0];
+  const door = fs.readFileSync(path.join(here, '..', 'main', 'ipc.mts'), 'utf8')
+    .match(/const answerApproval = \(id\b[^)]*\) => \{[\s\S]*?\n {2}\};/)[0];
 
   it('binds her press to the card that was drawn before it records anything', () => {
     expect(door).toMatch(/approvals\.cardShown\(config\.storeRoot, id\)/);

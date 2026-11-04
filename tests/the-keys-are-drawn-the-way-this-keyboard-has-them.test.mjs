@@ -16,7 +16,7 @@ import {
   chordOf,
   everyChord,
   sayTheKeys,
-} from '../shared/key-caps.mjs';
+} from '../shared/key-caps.mts';
 import { MAC } from '../renderer/src/this-keyboard.ts';
 
 describe('a cap says the key this keyboard has', () => {

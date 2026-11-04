@@ -458,7 +458,7 @@ export const fixtureSnapshot: Snapshot = {
 
 /* --------------------------- the working notes --------------------------- */
 // Session traces, in the exact shape the supervisor writes them (main/
-// supervisor.mjs, traceStreamLine): "HH:MM:SS  " and then either the agent's
+// supervisor.mts, traceStreamLine): "HH:MM:SS  " and then either the agent's
 // own sentence or "[Tool] the thing it acted on", a "== RESULT" block at the
 // end, and an exit line. The notes panel reads nothing else, so a fixture in
 // this shape exercises the real parser rather than a stand-in for it.
@@ -898,7 +898,7 @@ export const fixtureSettings = {
     sessionsAtOnce: 3,
     memoryGate: { on: false, slots: null, slotsAuto: 2, slotsMax: 12, now: null },
     leftovers: { on: false, now: 'Right now finished agents have left 40 programs running; turning this on stops them when you close their tasks.' },
-    // COPIES OF A PROJECT NOBODY'S TASK OWNS (main/settings.mjs,
+    // COPIES OF A PROJECT NOBODY'S TASK OWNS (main/settings.mts,
     // `strayFolderSettings`). A fixture because the row is absent whenever there
     // are none, which is most of the time and all of a fresh install: without
     // one there is no way to look at the sentence before it is true for somebody.
@@ -907,7 +907,7 @@ export const fixtureSettings = {
     running: 2,
     model: 'claude-opus-5',
     permission: 'bypassPermissions',
-    // What main sends when the config names none (main/settings.mjs,
+    // What main sends when the config names none (main/settings.mts,
     // `outsideAgentsMode`). Absent, the Running page drew an empty picker over
     // a sentence ending in "undefined".
     outsideAgents: 'off',
@@ -933,7 +933,7 @@ export const fixtureSettings = {
     claudeInstallUrl: 'https://code.claude.com/docs/en/setup',
     // AND THE SAME ONE CODING AGENT THE SNAPSHOT ABOVE REPORTS. Six keys, all
     // of them the answer a Mac with the gate shut really gives (main/
-    // settings.mjs): one choice, so the Coding agent row is not drawn and the
+    // settings.mts): one choice, so the Coding agent row is not drawn and the
     // Model row still speaks for every agent; and `codex` says Codex is not on
     // this Mac, because the Codex page is drawn on every Mac (w-d5d632e503)
     // and a Mac with Codex on it opens the choice. They are written out rather than left
@@ -1059,7 +1059,7 @@ export function fixtureEngineWorld(asked: string | null): FixtureEngineWorld | n
  *
  * Not invented: these are the six that carry `visibility: "list"` in the
  * `models_cache.json` codex-cli maintains, in the CLI's own ascending
- * `priority` order, reduced to `{ id, label }` exactly as main/codex-models.mjs
+ * `priority` order, reduced to `{ id, label }` exactly as main/codex-models.mts
  * reduces them. Measured off a real 198,977-byte cache written by codex-cli
  * 0.148.0, which also carries two hidden models this list correctly drops.
  *
@@ -1107,9 +1107,9 @@ const OFF_THE_WORKSPACE: Record<'claude' | 'codex', Record<string, string>> = {
 // none: it is absent until a figure lands, and adding one would put a pill on
 // every picture ever taken of this app. The two shapes are genuinely different
 // and both are copied from the readers that produce them. Claude Code prints a
-// clock time in a named zone (shared/claude-usage.mjs); Codex prints no clock
+// clock time in a named zone (shared/claude-usage.mts); Codex prints no clock
 // time and names no zone, it hands over the instant, so every text field is
-// null (shared/codex-usage.mjs). The Codex percentages are the ones in that
+// null (shared/codex-usage.mts). The Codex percentages are the ones in that
 // file's own recorded capture.
 const CLAUDE_LIMITS: NonNullable<Snapshot['usage']>['limits'] = [
   {
@@ -1194,7 +1194,7 @@ export function fixtureEngineSettings(world: FixtureEngineWorld | null): Partial
     return {
       claudeFound: false, claudeCertain: true, claudeBin: '/Users/you/.local/bin/claude',
       // THE THREE FLAT KEYS THE WALK'S LAST CARD READS, which no fixture world
-      // had set before. `codexFoundState` in main/settings.mjs sends them
+      // had set before. `codexFoundState` in main/settings.mts sends them
       // alongside the `codex` object below, and App.tsx reads THEM rather than
       // the object -- so a world that set only the object left `codexCertain`
       // undefined, `noCodingAgent` false, and the gate undrawable in fixtures.
@@ -1226,7 +1226,7 @@ export function fixtureEngineSettings(world: FixtureEngineWorld | null): Partial
     // She has set no workspace Codex model, so the row draws her config.toml's
     // own and nothing is sent at spawn. That is what her Mac says today.
     codexModel: null,
-    // Main's own default when the config names no mode (main/settings.mjs),
+    // Main's own default when the config names no mode (main/settings.mts),
     // and the one login a Codex Mac has. Without them the Codex page drew an
     // empty picker and no account.
     codexMode: CODEX_DEFAULT_MODE,
@@ -1299,7 +1299,7 @@ export function fixtureConversation() {
 }
 
 // A plausible set of Claude Code agent files, in the shape
-// main/agent-files.mjs reads them: four of the user's own and four in one
+// main/agent-files.mts reads them: four of the user's own and four in one
 // project. It stands in for the real ones when there is no main process.
 export function fixtureAgentFiles() {
   return {
@@ -1320,7 +1320,7 @@ export function fixtureAgentFiles() {
 }
 
 // A plausible set of Claude Code threads, in the shape
-// main/agent-sessions.mjs reads them.
+// main/agent-sessions.mts reads them.
 //
 // `when` is written as an offset from the moment the fixture is asked for, so
 // the row under each name ("today", "yesterday", "on Monday") stays true rather

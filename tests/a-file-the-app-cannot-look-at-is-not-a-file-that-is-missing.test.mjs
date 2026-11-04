@@ -1,6 +1,6 @@
 // A PATH THE APP CANNOT LOOK AT IS NOT A PATH WITH NOTHING AT IT.
 //
-// FOUND 2026-10-07 reading main/worktree-include.mjs (w-5952e6de3e, with
+// FOUND 2026-10-07 reading main/worktree-include.mts (w-5952e6de3e, with
 // Codex), and carried on w-69d441d38e. Every `lstat` in that file was wrapped
 // in a bare `catch` answering false, and every `readlink` in one answering "it
 // went away". A permission error is neither of those things.
@@ -22,14 +22,14 @@
 // SO ENOENT AND ENOTDIR STAY ABSENCES: the name is not there, or a name on the
 // way to it is a file, and nothing can be at it either way. A repository naming
 // a file nobody has made yet is ordinary and must stay silent. Anything else is
-// this folder failing to be made, which main/supervisor.mjs says on the row.
+// this folder failing to be made, which main/supervisor.mts says on the row.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { carryLocalFiles } from '../main/worktree-include.mjs';
-import { ensureTaskFolder } from '../main/task-folders.mjs';
+import { carryLocalFiles } from '../main/worktree-include.mts';
+import { ensureTaskFolder } from '../main/task-folders.mts';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 

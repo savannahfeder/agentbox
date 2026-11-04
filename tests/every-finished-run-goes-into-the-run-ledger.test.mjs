@@ -1,7 +1,7 @@
 // EVERY FINISHED RUN GOES INTO THE RUN LEDGER (w-3d0fa23ffb, 2026-10-20).
 //
 // A level in Rooms comes from agent hours, and nothing on the Mac remembered
-// a run once it ended: its length went to PostHog (main/analytics.mjs
+// a run once it ended: its length went to PostHog (main/analytics.mts
 // runEndedProps) and the only durable trace was the run's own log,
 // `<home>/projects/<project>/sessions/<item>/<startedAt>.log` (361 of them for
 // one project on the founder's Mac on 2026-10-20, each opening with
@@ -15,9 +15,9 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { appendRun, readRuns, runsFromCloudUsage, backfillRuns, allRuns, runLedgerPath } from '../main/run-ledger.mjs';
+import { appendRun, readRuns, runsFromCloudUsage, backfillRuns, allRuns, runLedgerPath } from '../main/run-ledger.mts';
 import { machineryDir } from '../main/store/home.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const tmp = (p) => fs.mkdtempSync(path.join(os.tmpdir(), p));
 
@@ -178,7 +178,7 @@ describe('the supervisor writes a run when it ends', () => {
   });
 
   it('settleExit records the run', () => {
-    const src = fs.readFileSync(path.join(import.meta.dirname, '..', 'main', 'supervisor.mjs'), 'utf8');
+    const src = fs.readFileSync(path.join(import.meta.dirname, '..', 'main', 'supervisor.mts'), 'utf8');
     const settle = src.slice(src.indexOf('const settleExit = '), src.indexOf('const settleExit = ') + 1500);
     expect(settle).toMatch(/this\._recordRun\(item, session\)/);
   });
@@ -186,7 +186,7 @@ describe('the supervisor writes a run when it ends', () => {
 
 describe('my hours, as my presence row reads them', () => {
   it('the old logs are read once, and the summary follows the ledger as it grows', async () => {
-    const { createRoomHours } = await import('../main/team/room-hours.mjs');
+    const { createRoomHours } = await import('../main/team/room-hours.mts');
     const home = tmp('runs-hours-home-');
     const storeRoot = tmp('runs-hours-store-');
     const productDir = path.join(storeRoot, 'acct', 'northwind');
@@ -212,7 +212,7 @@ describe('whose cloud runs count', () => {
   // Measured 2026-10-20 on three copies run side by side: each read this Mac's
   // own ~/.agentbox/cloud-usage.jsonl and wore its owner's level, 18.
   it('a copy with a home of its own reads the cloud runs in that home, not this Mac’s', async () => {
-    const { roomsSetup } = await import('../main/team/room-setup.mjs');
+    const { roomsSetup } = await import('../main/team/room-setup.mts');
     const { envName } = await import('../shared/product-name.mjs');
     const home = tmp('runs-copy-home-');
     fs.writeFileSync(path.join(home, 'cloud-usage.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), runId: 'r-own', item: 'w-1', wallSeconds: 3600 })}\n`);

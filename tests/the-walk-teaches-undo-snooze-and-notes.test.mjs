@@ -20,9 +20,9 @@ import {
   coach, finishedCleared, laterCleared, laterId, laterIndex, waitingIndex, walkRows,
 } from '../renderer/src/onboarding.ts';
 import { SECTION, fold } from '../renderer/src/agent-import-card.ts';
-import { PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG } from '../shared/first-run-practice.mjs';
-import { NOTE_NAME, readNote } from '../main/rail-note.mjs';
-import { Store } from '../main/store.mjs';
+import { PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG } from '../shared/first-run-practice.mts';
+import { NOTE_NAME, readNote } from '../main/rail-note.mts';
+import { Store } from '../main/store.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -53,7 +53,7 @@ describe('4. the sidebar note, which the practice project really has', () => {
   it('writes the note into the practice project as the real file the panel reads', async () => {
     const { store, account } = await freshStore();
     store.createPractice();
-    // `pinned.md` in the project's own folder, which is what main/rail-note.mjs
+    // `pinned.md` in the project's own folder, which is what main/rail-note.mts
     // reads and writes. Nothing here is special-cased in the renderer: the
     // practice project simply has a note in it already.
     const file = path.join(account, PRACTICE_SLUG, NOTE_NAME);

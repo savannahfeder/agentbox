@@ -1,7 +1,7 @@
 // WHEN A PICTURE DRAWN AS MISSING LOOKS FOR ITS FILE AGAIN (2026-10-14).
 //
 // A teammate's picture can land after the message that names it: the reader's
-// Mac asks the cloud for a missing file once a minute (main/team/sync.mjs).
+// Mac asks the cloud for a missing file once a minute (main/team/sync.mts).
 // The picture used to ask once and then say "missing image" for good, which
 // is how "attachments do not open in threads and DM" reached us. Soon at
 // first, then less often, about twenty minutes in all; pressing the picture

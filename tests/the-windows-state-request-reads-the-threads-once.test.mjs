@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 describe('one state request', () => {
   it('asks the store for its threads once', () => {
@@ -37,7 +37,7 @@ describe('one state request', () => {
 // folders for the last usage figure it wrote down.
 describe('the Codex usage the corner draws, when nothing has pushed one', () => {
   it('is read off Codex\'s log at most every half minute', async () => {
-    const { CodexUsage } = await import('../main/codex-usage.mjs');
+    const { CodexUsage } = await import('../main/codex-usage.mts');
     let now = 1_000_000; let reads = 0;
     const u = new CodexUsage({ home: () => '/h', now: () => now, readLog: () => { reads += 1; return null; } });
     u.read(); u.read(); now += 10_000; u.read();

@@ -1,6 +1,6 @@
 // What broke: nothing yet, then four things Codex found (review of step 1,
 // 2026-10-14). Her phone only worked while the computer was awake (it talked
-// to it directly, main/phone-link.mjs). Step 1 of docs/cloud/PHONE-PLAN.md:
+// to it directly, main/phone-link.mts). Step 1 of docs/cloud/PHONE-PLAN.md:
 // the computer writes a copy of each thread of a project she put on her phone
 // to her own rows online, and takes the replies, new threads, snoozes and
 // closes her phone left there while it was shut. Codex then showed a copy
@@ -15,8 +15,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createPhoneInbox, phoneDevice } from '../main/phone-inbox.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createPhoneInbox, phoneDevice } from '../main/phone-inbox.mts';
 import { threadSnapshot, threadsWorthCarrying, checkCommand, madeHere, bytesOf, hideSecrets, SNAPSHOT_LIMITS } from '../shared/phone-snapshot.mjs';
 
 const DAY = 24 * 3600_000;

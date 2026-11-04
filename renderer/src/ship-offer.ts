@@ -21,7 +21,7 @@
 // all.
 import { offerIsLive, type ParsedOption } from './format';
 
-/** The label the ship queue takes a thread by (main/ship-queue.mjs). */
+/** The label the ship queue takes a thread by (main/ship-queue.mts). */
 export const SHIP_LABEL = 'ship';
 
 export const SHIP_ASK = 'Ship this change?';

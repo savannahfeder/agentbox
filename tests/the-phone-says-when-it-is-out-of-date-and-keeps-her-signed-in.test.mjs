@@ -16,8 +16,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { phoneStatusLine, macSeenOf } from '../renderer/src/cloud-bridge';
 import { cloudClient } from '../renderer/src/cloud-rest';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createPhoneInbox } from '../main/phone-inbox.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createPhoneInbox } from '../main/phone-inbox.mts';
 
 const NOW = Date.parse('2026-10-19T12:00:00Z');
 const MIN = 60_000;

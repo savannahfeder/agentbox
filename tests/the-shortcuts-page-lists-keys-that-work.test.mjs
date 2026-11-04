@@ -43,7 +43,7 @@ const focus = read('renderer/src/components/Focus.tsx');
 // The summary panel owns S in its own capture-phase listener (2026-10-01), so
 // that row's handler is here rather than in App.tsx.
 const summary = read('renderer/src/threads/Summary.tsx');
-const mainProc = read('main/main.mjs');
+const mainProc = read('main/main.mts');
 const css = read('renderer/src/styles.css');
 
 // The window key handler, cut into the three states it actually has. Every
@@ -260,7 +260,7 @@ describe('what the page refuses to say', () => {
 
   it('says out loud, in the file itself, why each of those is missing', () => {
     // The list moved to shared/ so agents are told the same keys (w-7ec8553e23).
-    const src = read('shared/shortcuts.mjs');
+    const src = read('shared/shortcuts.mts');
     expect(src).toContain('WHAT IS DELIBERATELY NOT HERE');
     expect(src).toContain('⌘1..4');
     expect(src).toContain('Y, N and I on a row in the list');
@@ -373,7 +373,7 @@ describe('the page stays a page and not a wall', () => {
     for (const g of SHORTCUTS) {
       expect(Object.keys(g).sort()).toEqual(['keys', 'label']);
     }
-    expect(read('shared/shortcuts.d.mts')).not.toMatch(/^\s*note\?:/m);
+    expect(read('shared/shortcuts.mts')).not.toMatch(/^\s*note\?:/m);
     // Scoped to this pane's own markup: `.set-group-note` is a real class that
     // other panes in Settings still use, so a whole-file search proves nothing.
     const pane = settings.slice(

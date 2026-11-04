@@ -26,7 +26,7 @@
 // and above all that no verdict moved.
 
 import { describe, it, expect } from 'vitest';
-import { CommandHistory } from '../main/memory-gate-history.mjs';
+import { CommandHistory } from '../main/memory-gate-history.mts';
 
 const letters = (map, key) => map.get(key)?.join('') ?? null;
 

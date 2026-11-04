@@ -32,7 +32,7 @@
 // else. The last block asserts the gate on an untouched supervisor.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 
 // A MAC WITH ONE CLAUDE LOGIN ON IT. Since 2026-08-31 the fleet's account list

@@ -60,7 +60,7 @@ describe('the send carries it to the thread before it can start', () => {
   });
 
   it('keeps it on this Mac before the supervisor is woken', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     const at = ipc.indexOf("ipcMain.handle('zero:compose'");
     const body = ipc.slice(at, ipc.indexOf('ipcMain.handle(', at + 1));
     expect(body).toMatch(/\bonMac\b[^}]*\}\) =>/);

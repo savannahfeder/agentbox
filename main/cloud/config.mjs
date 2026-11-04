@@ -3,7 +3,7 @@
 // scripts/cloud-setup.mjs writes ~/.agentbox/cloud.json (the bucket, the
 // runtime, the profile it signs as); it is never in git, because it names an
 // AWS account. Each account's sign-in for the cloud is made and kept in the
-// cloud, never on this Mac (main/cloud/logins.mjs).
+// cloud, never on this Mac (main/cloud/logins.mts).
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -116,5 +116,5 @@ export function writeCloudKey(key, env = process.env, home = os.homedir()) {
 }
 
 // The keychain service the first cloud build kept its own Claude tokens
-// under. Nothing writes it now; main/cloud/logins.mjs deletes what is left.
+// under. Nothing writes it now; main/cloud/logins.mts deletes what is left.
 export const OLD_TOKEN_SERVICE = `${Name} cloud: Claude sign-in`;

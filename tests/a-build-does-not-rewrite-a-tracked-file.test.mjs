@@ -2,7 +2,7 @@
 //
 // MEASURED 2026-10-07 (w-5952e6de3e, then w-6bbb709b1f). `npm run build` ran
 // scripts/read-claude-commands.mjs and scripts/read-claude-models.mjs, and both
-// wrote over TRACKED files: shared/claude-commands.generated.mjs and
+// wrote over TRACKED files: shared/claude-commands.generated.mts and
 // shared/claude-models.generated.mjs. So every folder that had ever run the app
 // reported itself dirty. `releaseTaskFolder` answered "uncommitted" and never
 // reclaimed a folder, `parkTaskFolder` committed nobody's work, `cloneCheckout`
@@ -23,7 +23,7 @@
 //
 // WHY NOT FILTER THE NAME EVERYWHERE instead: reviewed and rejected on
 // w-6bbb709b1f. A filename pattern cannot tell a regenerated timestamp from a
-// real change to the commands, aliases or model ids, and main/task-folders.mjs
+// real change to the commands, aliases or model ids, and main/task-folders.mts
 // runs against arbitrary product repositories where this app's naming
 // convention means nothing.
 //

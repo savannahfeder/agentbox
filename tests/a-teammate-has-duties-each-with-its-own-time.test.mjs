@@ -88,8 +88,8 @@ describe('a teammate given duties', () => {
   let team; let store; let product; let dir; let core;
   beforeEach(async () => {
     const { appHome } = await import('../main/store/home.mjs');
-    const { loadStore } = await import('../main/store-modules.mjs');
-    const { Teammates } = await import('../main/teammates.mjs');
+    const { loadStore } = await import('../main/store-modules.mts');
+    const { Teammates } = await import('../main/teammates.mts');
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = `acct-${Math.random().toString(36).slice(2, 8)}`;
     fs.mkdirSync(path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID), { recursive: true });

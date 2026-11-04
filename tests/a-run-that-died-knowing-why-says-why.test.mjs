@@ -1,6 +1,6 @@
 // A RUN THAT DIED KNOWING WHY MUST SAY WHY.
 //
-// The app already had every word it needed. `shared/spawn-trouble.mjs` knows
+// The app already had every word it needed. `shared/spawn-trouble.mts` knows
 // 'at-limit' from 'signed-out', and `deadRunSentence` writes her a plain
 // sentence for either. What it did not have was a way for those words to reach
 // a row, because two guards each assumed the other one covered the case
@@ -31,8 +31,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor, saidNothingSheCanUse } from '../main/supervisor.mjs';
-import { troubleCause } from '../shared/spawn-trouble.mjs';
+import { Supervisor, saidNothingSheCanUse } from '../main/supervisor.mts';
+import { troubleCause } from '../shared/spawn-trouble.mts';
 import { Name } from '../shared/product-name.mjs';
 
 // Verbatim from her own session logs, 2026-08-28T00:51:59Z.
@@ -91,7 +91,7 @@ describe('the diagnosis arrives in the result, so the result is read', () => {
   });
 
   it('never puts the tool’s own words on her row', () => {
-    // The whole doctrine of shared/spawn-trouble.mjs. She has already read
+    // The whole doctrine of shared/spawn-trouble.mts. She has already read
     // "OAuth session expired" across her inbox once and there is no OAuth in
     // Agentbox.
     const { sup, store } = makeSupervisor(hers());

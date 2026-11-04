@@ -146,6 +146,6 @@ describe('a window whose page dies or freezes comes back', () => {
 
   it('the main window is wired to it', async () => {
     const { readFileSync } = await import('node:fs');
-    expect(readFileSync(new URL('../main/main.mjs', import.meta.url), 'utf8')).toMatch(/keepThePageAlive\(\{\s*window,/);
+    expect(readFileSync(new URL('../main/main.mts', import.meta.url), 'utf8')).toMatch(/keepThePageAlive\(\{\s*window,/);
   });
 });

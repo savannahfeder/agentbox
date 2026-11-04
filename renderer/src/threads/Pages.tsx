@@ -20,6 +20,7 @@ import { PriorityIcon } from '../components/Priority';
 import { asideBesides, notStarted, rowTitle, waitCameBack } from '../list-rules';
 import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mjs';
 import { waitWords } from '../../../shared/thread-waits.mjs';
+import { needsLeft, needsWord } from '../../../shared/cloud-needs.mjs';
 import { closedOverWords, iSpokeLast, isWorkThread } from '../../../shared/team-rules.mjs';
 import { commentLine } from './teammate-thread';
 import { fileNewsFor, fileNewsLine } from '../../../shared/artifact-marks.mjs';
@@ -105,6 +106,8 @@ export function inStep(el: Element | null) {
 export const LiveContext = createContext<Set<string>>(new Set());
 /** The ones of those running in the cloud rather than on this Mac. */
 export const CloudContext = createContext<Set<string>>(new Set());
+/** The sign-ins and keys saved for cloud runs, by variable name: a thread waits only on the rest. */
+export const SavedKeysContext = createContext<readonly string[]>([]);
 /** Runs on this Mac the cloud could take now, and the press that moves one (CloudStatus `movable`). */
 export const MoveToCloudContext = createContext<{ ids: Set<string>; move: (id: string, product: string) => void } | null>(null);
 
@@ -731,6 +734,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const tryAgain = useContext(TryAgainContext);
   const retry = tryAgain && offersTryAgain(item, facts) ? <TryAgainButton onPress={() => tryAgain(item)} /> : undefined;
   const allItems = useContext(ItemsContext);
+  const savedKeys = useContext(SavedKeysContext);
   const waits = team ? waitWords(item, { items: allItems, cards: team.state.cards ?? [], nameOf: (id: string) => team.byId.get(id)?.name ?? 'Someone' }) : null;
   const nameFirst = (id: string) => firstName(team?.byId.get(id) ?? null);
   const inNeedsYou = tab === 'inbox';
@@ -739,7 +743,9 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const worded = waits && !cell.live ? { ...cell, word: waits.word, title: waits.title }
     : peopleWaitOnYou ? { ...cell, word: 'Waiting on you', mark: 'need' as const }
       : team && (cell.word === STATE_WORD.waiting || iSpokeLast(item, product, team.me)) ? { ...cell, word: waitingWord(item, product, team.me, nameFirst, { inNeedsYou: tab === 'inbox' }) } : cell;
-  const shownWord = cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou });
+  // A cloud run that asked for a key is waiting on it, not finished (round one of the key power test).
+  const wants = inNeedsYou && !cell.live && !waits && !peopleWaitOnYou ? needsWord(needsLeft(item, savedKeys)) : null;
+  const shownWord = wants ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou });
   const status = shownWord === null ? undefined : { ...worded, word: shownWord };
   // WHO SEES IT, AT A GLANCE (2026-10-01). One mark after the title, always: the
   // people on a thread the team or chosen people can see, the lock on one only

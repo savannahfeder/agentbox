@@ -67,7 +67,7 @@ describe('a deferred row is scheduled, not in progress', () => {
   });
 
   it('drops a claimed row whose schedule was pushed forward under it', () => {
-    // Scheduling forward stops the session (ipc.mjs), but the claim reads as
+    // Scheduling forward stops the session (ipc.mts), but the claim reads as
     // held until its lease lapses, so this window is real.
     expect(at(hers({ status: 'claimed' }), NOW + HOUR)).toBe(false);
   });

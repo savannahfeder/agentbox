@@ -170,8 +170,8 @@ describe('the sync writes it once', () => {
     expect(run([held(['w-9']), { id: 'w-9', product: 'lumen', status: 'open' }]).wrote).toEqual([]);
   });
   it('the supervisor leaves a person’s wait to it, and the team service runs it', () => {
-    expect(readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8')).toMatch(/resumeFinishedWaits[\s\S]{0,1500}wrote\?\.blockedBy\?\.source === 'founder'/);
-    expect(readFileSync(new URL('../main/team/index.mjs', import.meta.url), 'utf8')).toContain('noticeEndedWaits(');
+    expect(readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8')).toMatch(/resumeFinishedWaits[\s\S]{0,1500}wrote\?\.blockedBy\?\.source === 'founder'/);
+    expect(readFileSync(new URL('../main/team/index.mts', import.meta.url), 'utf8')).toContain('noticeEndedWaits(');
   });
 });
 

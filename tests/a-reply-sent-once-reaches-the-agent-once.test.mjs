@@ -14,8 +14,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { kitCopyPath } from '../main/cloud/kit.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { kitCopyPath } from '../main/cloud/kit.mts';
 import { foldWorkItems } from '../shared/work-items.mjs';
 
 const MIN = 60_000;

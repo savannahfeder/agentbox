@@ -12,7 +12,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, memoryBackend, signUpMemory } from '../main/team/memory-cloud.mjs';
+import { createMemoryCloud, memoryBackend, signUpMemory } from '../main/team/memory-cloud.mts';
 import { versionLine } from '../main/version-line.mjs';
 import { startStandinCloud } from '../cloud/standin/server.mjs';
 import { standinBackend } from '../main/team/standin-backend.mjs';

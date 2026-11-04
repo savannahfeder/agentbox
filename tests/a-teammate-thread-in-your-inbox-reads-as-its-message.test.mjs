@@ -8,7 +8,7 @@
 // teammate runs alone.
 import { describe, it, expect } from 'vitest';
 import { rowTitle } from '../renderer/src/list-rules.ts';
-import { wantsName } from '../main/row-label.mjs';
+import { wantsName } from '../main/row-label.mts';
 
 const run = (over = {}) => ({
   id: 'w-78c2bb668d9d', status: 'open', title: 'Also want to add this too:', label: 'Add new feature',

@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { noteToItsAgent } from '../main/notes-wake.mjs';
 
 let store, dir, thread, woke;
@@ -99,7 +99,7 @@ describe('what starts nothing', () => {
 });
 
 it('both doors a note is written through send it on', () => {
-  const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+  const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
   const handler = (name) => ipc.slice(ipc.indexOf(`'${name}'`), ipc.indexOf('ipcMain.handle(', ipc.indexOf(`'${name}'`) + 1));
   expect(handler('zero:file-mark')).toMatch(/noteToItsAgent\(/);
   expect(handler('zero:files-place-mark')).toMatch(/noteToItsAgent\(/);

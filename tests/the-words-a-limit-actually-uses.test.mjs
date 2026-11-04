@@ -24,7 +24,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   troubleCause, limitResetsAt, deadRunSentence, troubleSentence, troubleRemedy, accountSentence, needsHerHands,
-} from '../shared/spawn-trouble.mjs';
+} from '../shared/spawn-trouble.mts';
 
 // Every one of these is copied out of a real trace log.
 const HER_SESSION_LIMIT = "You've hit your session limit · resets 6pm (America/Los_Angeles)";

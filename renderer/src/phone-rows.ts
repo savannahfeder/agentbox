@@ -3,7 +3,7 @@
 // them, so the phone site (cloud-bridge.ts) and the phone app (mobile/) keep
 // one copy of every rule.
 
-import { REQUEST_CHANNELS } from '../../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS } from '../../shared/bridge-map.mts';
 import { madeHere, phoneChoices, WAIT_STATES } from '../../shared/phone-snapshot.mjs';
 import { runOfClaim } from '../../shared/cloud-kit.mjs';
 import { isCarried } from '../../shared/cloud-carry.mjs';
@@ -50,7 +50,7 @@ export function copyShows(snapshot: any, text: string, at: number) {
 }
 // A run the Mac has not said is still going for this long is not drawn as
 // running: the Mac went to sleep or lost the network mid-run, and its copy
-// online would otherwise say "working" forever (main/phone-inbox.mjs sends it
+// online would otherwise say "working" forever (main/phone-inbox.mts sends it
 // every two minutes while it runs).
 export const LIVE_FOR_MS = 10 * 60_000;
 export const UNDONE = 'refused: taken back on the phone';

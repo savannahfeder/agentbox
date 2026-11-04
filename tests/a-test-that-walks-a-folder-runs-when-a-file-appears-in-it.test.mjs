@@ -59,7 +59,7 @@ describe('a test that walks a folder in the repo', () => {
     'tests/one-file.test.mjs': `fs.${WALKS}(tmp); read(path.join(root, 'briefs', 'worker.md'));`,
     // Joins a folder, but walks nothing: it reads the one file it names.
     'tests/no-walk.test.mjs': "readFileSync(path.join(root, 'renderer', 'src', 'styles.css'), 'utf8');",
-    'tests/unrelated.test.mjs': "read('main', 'supervisor.mjs')",
+    'tests/unrelated.test.mjs': "read('main', 'supervisor.mts')",
   }, ['renderer/src/components', 'renderer/src-old', 'briefs', 'main']);
 
   it('runs for a file that appears in that folder and is named nowhere', () => {
@@ -73,7 +73,7 @@ describe('a test that walks a folder in the repo', () => {
   });
 
   it('does not run for a change outside that folder', () => {
-    expect(testsThatRead(['main/supervisor.mjs'], root))
+    expect(testsThatRead(['main/supervisor.mts'], root))
       .not.toContain('tests/sheets.test.mjs');
   });
 
@@ -93,7 +93,7 @@ describe('a test that walks a folder in the repo', () => {
   });
 
   it('still picks a test that names the file, alongside', () => {
-    expect(testsThatRead(['main/supervisor.mjs'], root).sort())
+    expect(testsThatRead(['main/supervisor.mts'], root).sort())
       .toEqual(['tests/unrelated.test.mjs']);
   });
 

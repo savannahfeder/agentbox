@@ -21,8 +21,8 @@
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { EVENTS, sanitize } from '../shared/analytics-events.mjs';
-import { createDailyCount, runEndedProps } from '../main/analytics.mjs';
+import { EVENTS, sanitize } from '../shared/analytics-events.mts';
+import { createDailyCount, runEndedProps } from '../main/analytics.mts';
 import { setupStepCount, tutorialRun } from '../renderer/src/onboarding.ts';
 
 const read = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
@@ -60,21 +60,21 @@ describe('an agent run', () => {
   });
 
   it('is counted where a session starts and where it exits', () => {
-    const sup = read('main/supervisor.mjs');
+    const sup = read('main/supervisor.mts');
     const born = sup.indexOf('const session = {\n      child, itemId: item.id');
     expect(born).toBeGreaterThan(-1);
     expect(sup.slice(born, born + 2500)).toMatch(/this\.count\?\.\('run_started', \{ engine \}\)/);
     // The exit handler's work is `settleExit` (a stop signal's death waits a
     // moment to be judged: tests/a-worker-stopped-with-the-app-is-not-a-failed-run).
-    const exit = sup.indexOf('const settleExit = (code, signal, how) => {');
-    expect(sup.slice(exit, exit + 600)).toMatch(/this\.count\?\.\('run_finished', runEndedProps\(session, Date\.now\(\)\)\)/);
-    expect(read('main/main.mjs')).toMatch(/supervisor\.count = \(name, props\) => analytics\.track\(name, props\)/);
+    const exit = sup.indexOf('const settleExit = (code');
+    expect(sup.slice(exit, exit + 800)).toMatch(/this\.count\?\.\('run_finished', runEndedProps\(session, Date\.now\(\)\)\)/);
+    expect(read('main/main.mts')).toMatch(/supervisor\.count = \(name, props\) => analytics\.track\(name, props\)/);
   });
 });
 
 describe('a task written', () => {
   it('says whether it was in the practice project', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     const at = ipc.indexOf("ipcMain.handle('zero:compose',");
     const body = ipc.slice(at, ipc.indexOf('return out;', at));
     expect(body).toMatch(/analytics\.track\('task_written', \{ practice: isPractice\(product\) \}\)/);
@@ -104,7 +104,7 @@ describe('used today', () => {
   });
 
   it('is wired to launch and to the window coming forward', () => {
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).toMatch(/const usedToday = createDailyCount\(\(name\) => analytics\.track\(name\)\)/);
     expect(main).toMatch(/window\.on\('focus', \(\) => usedToday\(Date\.now\(\)\)\)/);
   });
@@ -126,6 +126,6 @@ describe('setup steps', () => {
   it('is sent from the app with the number and nothing else', () => {
     expect(read('renderer/src/App.tsx')).toMatch(/window\.zero\?\.track\?\.\('first_run_step', step\)/);
     expect(read('preload.cjs')).toMatch(/track: \(name, count\) => ipcRenderer\.invoke\('zero:track', \{ name, count \}\)/);
-    expect(read('main/ipc.mjs')).toMatch(/analytics\.track\(name, Number\.isFinite\(count\) \? \{ count \} : undefined\)/);
+    expect(read('main/ipc.mts')).toMatch(/analytics\.track\(name, Number\.isFinite\(count\) \? \{ count \} : undefined\)/);
   });
 });

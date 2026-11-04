@@ -229,7 +229,7 @@ There is no run history today (only PostHog counts and per-run trace logs).
   `# exited` footer, else the file's mtime), written with the same keys, and
   every read dedupes by key, so running it twice or racing a live write is
   harmless. Bounded to the last 400 days; unreadable files are skipped.
-- `shared/agent-hours.mjs` (pure): totals (all time, this week from local
+- `shared/agent-hours.mts` (pure): totals (all time, this week from local
   Monday, today), active dates, streak, monthly series, and the level.
   Persisted on my presence row only because other people cannot compute them:
   they read my numbers, never my ledger.
@@ -338,10 +338,10 @@ Rooms paragraph in this work.
 ## Build order (each step lands with its tests)
 
 1. Alpha switch: Settings page, config keys.
-2. Agent hours: `runs.jsonl`, backfill, `shared/agent-hours.mjs`, level.
+2. Agent hours: `runs.jsonl`, backfill, `shared/agent-hours.mts`, level.
 3. Cloud migration and both backends (Supabase and the in-memory stand-in),
    RLS proven in PGlite.
-4. Room service in main (`main/team/rooms.mjs`): my rooms, members, cards,
+4. Room service in main (`main/team/rooms.mts`): my rooms, members, cards,
    messages, links, invites, publish my card, IPC, snapshot `rooms` field.
 5. Sidebar section, tabs, the wall, the chat panel (read and send), invite.
 6. Hover card, profile, ranks, Rooms settings, invisible.
@@ -351,7 +351,7 @@ Rooms paragraph in this work.
 
 ## Testing
 
-- Unit: `shared/agent-hours.mjs` (level boundaries, week edges across DST,
+- Unit: `shared/agent-hours.mts` (level boundaries, week edges across DST,
   streak with a gap, backfill parsing), card building (private thread, outside
   team, switches off, invisible).
 - RLS and grants in PGlite with every migration: `anon` can execute only

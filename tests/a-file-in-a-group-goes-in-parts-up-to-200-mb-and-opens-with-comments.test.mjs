@@ -15,8 +15,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createRooms, roomPrefsFile } from '../main/team/rooms.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
 import { ROOM_PART_BYTES, ROOM_MAX_BYTES, partName, partsOf, readPartList, partList } from '../shared/room-file-parts.mjs';
 import { marksOf } from '../shared/artifact-marks.mjs';
 
@@ -157,7 +157,7 @@ describe('the wiring', () => {
     expect(sql).toMatch(/room_limit\('files', 80, interval '10 minutes'\)/);
   });
   it('the app may call the new room calls', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     for (const op of ['putFileFrom', 'fileOnDisk', 'fileText', 'markFile']) expect(ipc).toMatch(new RegExp(`ROOM_OPS = new Set\\([^)]*'${op}'`));
   });
   it('a file with a path goes from this Mac, and a reviewable file opens in the big viewer', () => {

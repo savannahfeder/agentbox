@@ -13,9 +13,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
-import { CHANGED_HERE, movedAway, movedHere, whatMoves, whyItCannotMove } from '../shared/move-thread.mjs';
-import { SHIP_FAILED } from '../shared/not-shipped.mjs';
+import { Store } from '../main/store.mts';
+import { CHANGED_HERE, movedAway, movedHere, whatMoves, whyItCannotMove } from '../shared/move-thread.mts';
+import { SHIP_FAILED } from '../shared/not-shipped.mts';
 import { belongsInInbox } from '../renderer/src/list-rules.ts';
 
 let store, root;
@@ -98,7 +98,7 @@ describe('the move', () => {
 });
 
 describe('the door it goes through', () => {
-  const ipc = fs.readFileSync(path.join(import.meta.dirname, '..', 'main/ipc.mjs'), 'utf8');
+  const ipc = fs.readFileSync(path.join(import.meta.dirname, '..', 'main/ipc.mts'), 'utf8');
   const handler = ipc.slice(ipc.indexOf("ipcMain.handle('zero:move-item'"), ipc.indexOf("ipcMain.handle('zero:team-route'"));
 
   it('reads the thread’s task folder for code it changed before moving it', () => {

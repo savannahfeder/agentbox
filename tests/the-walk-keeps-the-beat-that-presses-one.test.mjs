@@ -30,7 +30,7 @@ import {
   beatRows, clearIds, closingRefused, finishedCleared, inboxCleared, laterCleared,
   laterIndex, pressAtWrongRow, snoozeRefused, waitingIndex,
 } from '../renderer/src/onboarding.ts';
-import { PRACTICE_ROWS } from '../shared/first-run-practice.mjs';
+import { PRACTICE_ROWS } from '../shared/first-run-practice.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = fs.readFileSync(path.join(root, 'renderer/src/App.tsx'), 'utf8');

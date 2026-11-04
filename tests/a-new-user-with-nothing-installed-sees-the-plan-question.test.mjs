@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { prepareHome, freshEnv } from '../shared/fresh-user-home.mjs';
-import { openFreshUser } from '../main/fresh-user.mjs';
+import { openFreshUser } from '../main/fresh-user.mts';
 
 function fakeRealHome() {
   const real = fs.mkdtempSync(path.join(os.tmpdir(), 'real-home-'));

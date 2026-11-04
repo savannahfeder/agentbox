@@ -959,7 +959,7 @@ body {
      980x600   2.20     980x1200  1.49     980x1400  1.43
 
    1.43 is the unfixed number; it started at 1.40. The app's minimum is 980x600
-   (main/main.mjs), so 980 wide on a tall display is reachable, and anyone
+   (main/main.mts), so 980 wide on a tall display is reachable, and anyone
    running the window down one side of a portrait monitor would have seen no
    fix at all.
 

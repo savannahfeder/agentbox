@@ -19,7 +19,7 @@ import { it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 
 let store, accountRoot, reads;
 const realReadFileSync = fs.readFileSync;

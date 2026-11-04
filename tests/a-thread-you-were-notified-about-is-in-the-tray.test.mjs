@@ -21,9 +21,9 @@ import { describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { newSince } from '../shared/corner-tag.mjs';
+import { newSince } from '../shared/corner-tag.mts';
 import { AWAY_AFTER_MS } from '../shared/notify-rules.mjs';
-import { createNotifier } from '../main/notify.mjs';
+import { createNotifier } from '../main/notify.mts';
 import { cornerTagRig } from './helpers/corner-tag-rig.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -177,7 +177,7 @@ describe('the tray comes up for whatever the banner told you', () => {
   });
 
   it('is handed what the banner told, and the banner wakes the tray when that changes', () => {
-    const main = fs.readFileSync(path.join(root, 'main/main.mjs'), 'utf8');
+    const main = fs.readFileSync(path.join(root, 'main/main.mts'), 'utf8');
     expect(main).toMatch(/told: \(\) => notifier\.told\(\)/);
     expect(main).toMatch(/onChange: \(\) => cornerTag\?\.refresh\(\)/);
   });

@@ -20,8 +20,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { EVENTS, sanitize, WAIT_REASONS } from '../shared/analytics-events.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { EVENTS, sanitize, WAIT_REASONS } from '../shared/analytics-events.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { liveLine, shortWord } from '../renderer/src/live-line.ts';
 
 const task = (id, extra = {}) => ({ id, product: 'sample', status: 'open', kind: 'directive', labels: ['founder'], priority: 5, createdAt: Date.now() - 4_000, updatedAt: 1, ...extra });

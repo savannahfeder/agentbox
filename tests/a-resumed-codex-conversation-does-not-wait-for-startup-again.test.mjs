@@ -2,7 +2,7 @@
 // Codex's lifecycle log confirmed the conversation was already loaded. Its MCP
 // startup signal is a change notification, not a readiness response on resume.
 import { describe, expect, it, vi } from 'vitest';
-import { createCodexWorker } from '../main/codex-session.mjs';
+import { createCodexWorker } from '../main/codex-session.mts';
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
 const tool = { name: 'claim_work_item', inputSchema: {} };

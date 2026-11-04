@@ -18,8 +18,8 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { analyticsKey, createAnalytics, diagnosticsOn } from '../main/analytics.mjs';
-import { EVENTS, EVENT_NAMES, sanitize } from '../shared/analytics-events.mjs';
+import { analyticsKey, createAnalytics, diagnosticsOn } from '../main/analytics.mts';
+import { EVENTS, EVENT_NAMES, sanitize } from '../shared/analytics-events.mts';
 import { Name } from '../shared/product-name.mjs';
 
 const tmpdir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-analytics-'));
@@ -211,7 +211,7 @@ describe('crash reports', () => {
     ts: '2026-08-19T19:00:00.000Z',
     upMs: 4321,
     app: { name: Name, version: '1.2.3' },
-    error: { name: 'Error', code: 'ENOENT', syscall: 'open', message: 'could not read <~+4>', stack: 'app:main/store.mjs:142' },
+    error: { name: 'Error', code: 'ENOENT', syscall: 'open', message: 'could not read <~+4>', stack: 'app:main/store.mts:142' },
   };
 
   it('sends the scrubbed report through the same switch', () => {
@@ -262,7 +262,7 @@ describe('crash reports', () => {
 
 describe('the door the renderer knocks on', () => {
   it('accepts only the approved names', () => {
-    const src = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/ipcMain\.handle\('zero:track'/);
     // The handler checks the name against the shared list before anything else.
     expect(src).toMatch(/if \(!EVENT_NAMES\.includes\(name\)\) return false;/);

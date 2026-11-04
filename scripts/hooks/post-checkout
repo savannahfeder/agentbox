@@ -5,8 +5,8 @@
 # another session's branch with its unsaved work on it.
 #
 # The app runs `npm start` from its primary checkout, so `appDir` in
-# main/main.mjs IS that working tree: the code being run, and the worker brief
-# every agent is handed at spawn (supervisor.mjs buildBrief reads
+# main/main.mts IS that working tree: the code being run, and the worker brief
+# every agent is handed at spawn (supervisor.mts buildBrief reads
 # briefs/worker.md from appDir), are whatever branch that one checkout happens
 # to be standing on. Measured off the HEAD reflog: 57 branch switches in seven
 # days, and the checkout was NOT on main for 47% of the week, every hour of it

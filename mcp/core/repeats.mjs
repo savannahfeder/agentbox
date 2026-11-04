@@ -3,11 +3,11 @@
 //
 // WHICH RUN THE SESSION IS ON COMES FROM THE APP, NOT FROM THE MODEL.
 // `ZERO_ITEM` and `ZERO_PRODUCT` are written into a worker's environment when
-// the app spawns it (main/supervisor.mjs), which is why no argument below names
+// the app spawns it (main/supervisor.mts), which is why no argument below names
 // the task: a session reaches the rule it is standing on or no rule at all.
 //
 // AND ONLY THE WORDS, THOUGH `patchRule` TAKES ANYTHING. The app gates `engine`
-// and `model` at the door (`engineOffered`, `modelOffered` in main/ipc.mjs) so a
+// and `model` at the door (`engineOffered`, `modelOffered` in main/ipc.mts) so a
 // rule cannot be marked for a coding agent the machine never offered; this
 // server cannot ask that question, so it does not accept the answer. The hour
 // and the day stay on the person's own screen.

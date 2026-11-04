@@ -5,7 +5,7 @@
 // WHAT THIS GUARDS, and it is three separate things that can each break alone:
 //
 //   1. A work line that changed a file CARRIES the file, whole. Both readers
-//      have to do it — the Claude Code transcript reader in main/agents.mjs and
+//      have to do it — the Claude Code transcript reader in main/agents.mts and
 //      the trace reader in renderer/src/item-thread.ts — and they are different
 //      files that have drifted before.
 //   2. Only a file the change actually HOLDS becomes a chip. A chip that opens

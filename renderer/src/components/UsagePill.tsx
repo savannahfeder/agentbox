@@ -4,7 +4,7 @@
 //
 // Two faults wore that one sentence. A parse bug had dropped the time beside
 // the number, so a control built to say two things was saying one (see
-// shared/claude-usage.mjs).
+// shared/claude-usage.mts).
 //
 // SIX SHAPES WERE DRAWN AT REAL SIZE for her to pick from
 // (designs//usage-options.html) and this is the one she picked:
@@ -29,7 +29,7 @@
 // about status lines.
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { headlineLimit, limitRows, limitsStillRunning, usageSentence } from '../../../shared/usage.mjs';
+import { headlineLimit, limitRows, limitsStillRunning, usageSentence } from '../../../shared/usage.mts';
 import { agoQuiet } from '../format';
 import type { Usage } from '../types';
 import { engineLabel } from '../../../shared/engines.mjs';
@@ -86,7 +86,7 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, fold
    * agent.
    *
    *  IT IS HANDED OVER, NEVER DERIVED. Which agent the corner is about needs the
-   *  capability gate and the staleness rule, both pinned to main/supervisor.mjs;
+   *  capability gate and the staleness rule, both pinned to main/supervisor.mts;
    *  a corner that worked it out here could name Codex over a Claude Code
    *  reading. App.tsx asks `engineWordFor`, which is the byline's one rule for
    *  this and returns null wherever there is only one agent to name -- so on

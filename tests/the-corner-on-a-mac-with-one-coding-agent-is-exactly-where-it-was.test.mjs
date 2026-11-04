@@ -32,8 +32,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { limitRows, sessionLimit, usageEngine, usageSentence } from '../shared/usage.mjs';
-import { readUsage } from '../shared/claude-usage.mjs';
+import { limitRows, sessionLimit, usageEngine, usageSentence } from '../shared/usage.mts';
+import { readUsage } from '../shared/claude-usage.mts';
 import { UsagePill } from '../renderer/src/components/UsagePill.tsx';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -132,7 +132,7 @@ describe('the reading main sends is still Claude Code\'s', () => {
   // exactly as it always did -- and a Codex-only workflow stops paying for a
   // reading nothing will draw.
   it('asks for the Claude reading only where the corner is about Claude Code', () => {
-    const ipc = readFileSync(join(root, 'main/ipc.mjs'), 'utf8');
+    const ipc = readFileSync(join(root, 'main/ipc.mts'), 'utf8');
     expect(ipc).toContain("usageFor === DEFAULT_ENGINE ? usage.read() : supervisor.codexUsage()");
   });
 });

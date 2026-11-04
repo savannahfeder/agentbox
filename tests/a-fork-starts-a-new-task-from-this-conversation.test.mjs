@@ -21,8 +21,8 @@ import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { taskCommand, forkTitle } from '../main/task-commands.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { taskCommand, forkTitle } from '../main/task-commands.mts';
 
 const dirs = [];
 afterAll(() => { for (const d of dirs) { try { rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } } });

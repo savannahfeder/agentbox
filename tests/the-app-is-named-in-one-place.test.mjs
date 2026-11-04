@@ -52,7 +52,7 @@ describe('the two spellings', () => {
 });
 
 describe('the names this app has had', () => {
-  // main/main.mjs walks WAS to find the data folder an existing install already
+  // main/main.mts walks WAS to find the data folder an existing install already
   // writes to. Losing an entry loses real people their theme, their zoom and
   // their project order, silently, on the release that drops it.
   it('is newest first and never has the current name on it', () => {
@@ -62,7 +62,7 @@ describe('the names this app has had', () => {
   });
 
   it('is what the data folder fallback actually reads', () => {
-    expect(read('main/main.mjs')).toMatch(/for \(const was of WAS\)/);
+    expect(read('main/main.mts')).toMatch(/for \(const was of WAS\)/);
   });
 });
 
@@ -90,7 +90,7 @@ describe('nothing spells a name this app has had', () => {
     'Astral-Agent', 'astral-releases', 'Astral-arm64', 'Astral.app',
     // THE ONE ENVIRONMENT VARIABLE AND THE TWO URL SCHEMES THAT MUST KEEP
     // ANSWERING TO AN OLD NAME. Both are derived rather than typed now
-    // (shared/product-name.mjs and shared/schemes.mjs), and both are still
+    // (shared/product-name.mjs and shared/schemes.mts), and both are still
     // SPOKEN here, because what is on the other end of them is not in this
     // repo: a launchd job exporting the old variable, and a product logo
     // stored months ago as a url on the old scheme.
@@ -253,8 +253,8 @@ describe('the briefs, which are markdown and cannot import it either', () => {
   // on the way into Settings would show her the filled text and save it back
   // with the name baked into her own copy, which is the thing this prevents.
   it('is filled in by the supervisor and not by the settings editor', () => {
-    expect(read('main/supervisor.mjs')).toContain('fillName(');
-    expect(read('main/instruction-settings.mjs')).not.toContain('fillName');
+    expect(read('main/supervisor.mts')).toContain('fillName(');
+    expect(read('main/instruction-settings.mts')).not.toContain('fillName');
   });
 });
 

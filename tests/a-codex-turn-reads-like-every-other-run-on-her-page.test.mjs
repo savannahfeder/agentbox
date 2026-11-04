@@ -3,7 +3,7 @@
 // WHY THIS FILE EXISTS. This file is about the layer above it: the four readers
 // the supervisor already runs over every Claude Code line (`captureStream`,
 // `streamingText`, `traceStreamLine`, `summarizeStreamLine`,
-// main/supervisor.mjs:4085-4290) and the change reader (`changeFromTranscript`,
+// main/supervisor.mts:4085-4290) and the change reader (`changeFromTranscript`,
 // main/code-change.mjs), each given a Codex-shaped twin that produces THE SAME
 // OUTPUT SHAPE. A later slice swaps them per engine; nothing downstream may
 // notice which engine it was.
@@ -451,7 +451,7 @@ describe('the sentence the agent is typing right now', () => {
 
   // Deliberately NOT cleared when the message finishes: the trace is written
   // on one channel and read on another, so clearing here blinks the sentence
-  // off her screen and puts it back. Same rule as supervisor.mjs:4131.
+  // off her screen and puts it back. Same rule as supervisor.mts:4131.
   it('does not clear the live sentence when the message completes', () => {
     const session = {};
     codexStreamingText(session, 'item/agentMessage/delta', delta('half a sen').params);
@@ -900,8 +900,8 @@ describe('Codex readers stay behind the engine and approval boundary', () => {
       .some((m) => join(dirname(f), m[1]) === target));
     expect(importers.sort()).toEqual([
       join(repo, 'main', 'codex-approvals.mjs'),
-      join(repo, 'main', 'harnesses', 'claude-stream.mjs'),
-      join(repo, 'main', 'harnesses', 'codex.mjs'),
+      join(repo, 'main', 'harnesses', 'claude-stream.mts'),
+      join(repo, 'main', 'harnesses', 'codex.mts'),
     ]);
   });
 
@@ -927,7 +927,7 @@ describe('Codex readers stay behind the engine and approval boundary', () => {
   //   for. It was a module-private const in both files for exactly as long as
   //   the reader slice was not allowed to edit the supervisor.
   it('lends the Codex adapter the four readers and both halves of the change', () => {
-    const source = readFileSync(join(repo, 'main', 'harnesses', 'codex.mjs'), 'utf8');
+    const source = readFileSync(join(repo, 'main', 'harnesses', 'codex.mts'), 'utf8');
     // Matched as a BLOCK and not a line: the import is written across several
     // lines now, and a line-at-a-time reader would find no names at all and
     // pass this assertion against an empty list.
@@ -940,10 +940,10 @@ describe('Codex readers stay behind the engine and approval boundary', () => {
     ]);
   });
   it('lends Claude only the cap and keeps raw readers out of the supervisor', () => {
-    const source = readFileSync(join(repo, 'main', 'harnesses', 'claude-stream.mjs'), 'utf8');
+    const source = readFileSync(join(repo, 'main', 'harnesses', 'claude-stream.mts'), 'utf8');
     const block = source.match(/import\s*\{([^}]*)\}\s*from\s+'\.\.\/codex\.mjs'/);
     expect(block).toBeTruthy();
     expect(block[1].split(',').map((n) => n.trim()).filter(Boolean)).toEqual(['SAYING_CAP']);
-    expect(readFileSync(join(repo, 'main', 'supervisor.mjs'), 'utf8')).not.toMatch(/from\s+['"]\.\/codex\.mjs['"]/);
+    expect(readFileSync(join(repo, 'main', 'supervisor.mts'), 'utf8')).not.toMatch(/from\s+['"]\.\/codex\.mjs['"]/);
   });
 });

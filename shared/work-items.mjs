@@ -30,7 +30,7 @@
 // This is what lets the app write an answer while a worker still holds the
 // claim: the answer lands, the worker's own status keeps flowing under its
 // epoch, and neither erases the other. Same rule as beats in
-// shared/dashboard.mjs.
+// shared/dashboard.mts.
 
 import { resolveEdits } from './message-edits.mjs';
 import { cleanVoice } from './agent-voice.mjs';
@@ -60,7 +60,7 @@ export const WORK_ITEM_SOURCES = ['agent', 'founder', 'system'];
 // CLAUDE CODE'S OWN SIX PERMISSION MODES, by its own values. Read off
 // `claude --help` on 2.1.241 and off code.claude.com/docs/en/permission-modes,
 // 2026-08-23, and every one of them handed to the real CLI to check it starts.
-// The renderer, main/settings.mjs and main/answer-modes.mjs each have their own
+// The renderer, main/settings.mts and main/answer-modes.mts each have their own
 // reason to know this list. IT IS NOT A LEDGER FIELD ANY MORE: what one reply is
 // allowed to do moved out of this file entirely; the note further down says
 // why. This list stays here because it is a plain browser-safe constant and
@@ -83,7 +83,7 @@ export const CLAUDE_PERMISSION_MODES = [
 // a scratch ledger, 2026-08-24.
 //
 // So the grant left rather than being guarded harder. It is kept in the app's
-// own storage now, written by main and by nothing else (main/answer-modes.mjs),
+// own storage now, written by main and by nothing else (main/answer-modes.mts),
 // which is the convention Claude Code uses for its standing policy. Everything
 // on the ledger today is a claim about the WORK, and a forged line can still
 // fake the founder's archive or answer, which is true of any append-only log
@@ -450,7 +450,7 @@ function coerceField(field, value) {
     // The written name the list draws. Bounded the same way the title is and no
     // tighter: what a NAME may be (three to seven words, 64 characters) is a
     // rule about how the app writes, and it lives with the writer in
-    // main/row-label.mjs. This module holds no taxonomy, only storage.
+    // main/row-label.mts. This module holds no taxonomy, only storage.
     case 'label': return str(value, MAX_TITLE);
     case 'body': case 'result': case 'note': case 'answer': return str(value, MAX_TEXT_BYTES);
     // kind and product are free strings on purpose: the taxonomy of work is the
@@ -463,7 +463,7 @@ function coerceField(field, value) {
     // Claude Code for any name it does not know, so an unrecognised value is a
     // working session rather than a row that silently never runs. `effort` (HOW
     // HARD IT THINKS) is the same kind of word: the five the CLI takes live in
-    // shared/effort-levels.mjs, and the spawn gates on them, so a value this
+    // shared/effort-levels.mts, and the spawn gates on them, so a value this
     // module does not recognise is a run at Claude Code's own choice rather
     // than a row that never runs.
     case 'kind': case 'product': case 'parent': return str(value, MAX_SHORT);
@@ -886,7 +886,7 @@ const TALK_KEEP = 100;
  * they reopened it since without saying anything (an undo). A reopen that
  * carries their words keeps the moment: speaking is not taking the close back.
  * So does one that follows their words since the close, because sending
- * writes the message and the reopen as two lines (`answerItem`, main/store.mjs).
+ * writes the message and the reopen as two lines (`answerItem`, main/store.mts).
  */
 function settledBy(closes, said = []) {
   const at = {};

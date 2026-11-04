@@ -17,8 +17,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { deadRunSentence, limitResetsAt } from '../shared/spawn-trouble.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { deadRunSentence, limitResetsAt } from '../shared/spawn-trouble.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 // Tuesday Oct 20 2026, 2:30pm, in the zone the tests run in.
 const now = new Date(2026, 9, 20, 14, 30).getTime();

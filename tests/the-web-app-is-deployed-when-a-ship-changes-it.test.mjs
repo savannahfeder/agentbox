@@ -62,7 +62,7 @@ describe('what the web app is built from', () => {
     expect(SITE_PATHS).toContain('renderer/');
   });
   it('is not the computer\'s own code, the tests or the docs', () => {
-    expect(siteChanged(['main/supervisor.mjs', 'tests/x.test.mjs', 'docs/cloud/PLAN.md', 'renderer-notes.md'])).toBe(false);
+    expect(siteChanged(['main/supervisor.mts', 'tests/x.test.mjs', 'docs/cloud/PLAN.md', 'renderer-notes.md'])).toBe(false);
     expect(siteChanged([])).toBe(false);
   });
 });
@@ -103,7 +103,7 @@ describe('after a ship', () => {
   });
 
   it('does nothing when nothing it is built from changed', async () => {
-    const w = world({ changed: ['main/supervisor.mjs'] });
+    const w = world({ changed: ['main/supervisor.mts'] });
     expect(await deployWebApp(w.opts)).toMatchObject({ deployed: false });
     expect(w.ran).toEqual([]);
   });
@@ -141,7 +141,7 @@ describe('after a ship', () => {
     const deploy = ship.indexOf('await deployAfterShip({ root, say, until: SHIP_ENDS_BY })');
     expect(pushed).toBeGreaterThan(0);
     expect(deploy).toBeGreaterThan(pushed);
-    const queueStops = Number(/const SHIP_MS = (\d+) \* 60 \* 1000/.exec(read('main/ship-queue.mjs'))[1]);
+    const queueStops = Number(/const SHIP_MS = (\d+) \* 60 \* 1000/.exec(read('main/ship-queue.mts'))[1]);
     const shipEnds = Number(/SHIP_ENDS_BY = began \+ (\d+) \* 60_000/.exec(ship)[1]);
     expect(shipEnds).toBeLessThan(queueStops);
     expect(read('scripts/lib/web-app-deploy.mjs')).toMatch(/until - Date\.now\(\) < DEPLOY_NEEDS_MS\) return \{ ok: false, why: 'the ship ran long/);

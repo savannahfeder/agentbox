@@ -28,9 +28,9 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun } from '../main/cloud/run.mjs';
-import { readMarker } from '../main/cloud/marker.mjs';
-import { docsToSend, tarDocs, layDocs, docsFolderFor } from '../main/cloud/docs.mjs';
+import { cloudRun } from '../main/cloud/run.mts';
+import { readMarker } from '../main/cloud/marker.mts';
+import { docsToSend, tarDocs, layDocs, docsFolderFor } from '../main/cloud/docs.mts';
 import { waitFor } from './waiting.mjs';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));

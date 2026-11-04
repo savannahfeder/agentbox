@@ -31,7 +31,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { parseListings, LeftoverCleaner } from '../main/leftovers.mjs';
+import { parseListings, LeftoverCleaner } from '../main/leftovers.mts';
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -307,7 +307,7 @@ describe('the app', () => {
   // These need the real Supervisor and settings, imported late so the file's
   // pure tests above do not pay for them.
   async function app(config = {}) {
-    const { Supervisor } = await import('../main/supervisor.mjs');
+    const { Supervisor } = await import('../main/supervisor.mts');
     const { fileURLToPath } = await import('node:url');
     const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-app-'));
@@ -364,7 +364,7 @@ describe('the app', () => {
 
 describe('the Settings page', () => {
   it('turning it on is remembered with the moment it went on, and starts the cleaner now', async () => {
-    const { setWorkspaceSetting, leftoverSettings } = await import('../main/settings.mjs');
+    const { setWorkspaceSetting, leftoverSettings } = await import('../main/settings.mts');
     const { loadConfig } = await import('../main/config.mjs');
     const appDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-settings-'));
     fs.writeFileSync(path.join(appDir, 'zero.config.json'), '{}');
@@ -383,7 +383,7 @@ describe('the Settings page', () => {
   });
 
   it('says what finished agents have left running, and when it goes', async () => {
-    const { leftoverSettings } = await import('../main/settings.mjs');
+    const { leftoverSettings } = await import('../main/settings.mts');
     const now = Date.now();
     const status = {
       leftovers: [
@@ -408,7 +408,7 @@ describe('the Settings page', () => {
 // 24 ms.
 describe('a program that renames itself', () => {
   it('has its real executable read from lsof', async () => {
-    const { applyExecutables } = await import('../main/leftovers.mjs');
+    const { applyExecutables } = await import('../main/leftovers.mts');
     const procs = [{ pid: 97969, exe: 'next-server (e2e' }, { pid: 500, exe: '/usr/bin/caffeinate' }, { pid: 600, exe: 'login' }];
     const lsof = 'p97969\nftxt\nn/Users/x/.nvm/versions/node/v22/bin/node\nftxt\nn/usr/lib/dyld\np600\n';
     applyExecutables(procs, lsof);
@@ -524,7 +524,7 @@ describe('what the code review found', () => {
   });
 
   it('5. while it is off, Settings says what turning it on would stop, including what is running now', async () => {
-    const { leftoverSettings } = await import('../main/settings.mjs');
+    const { leftoverSettings } = await import('../main/settings.mts');
     const status = { leftovers: [{ item: 'w-a', programs: 38, kept: 2, oldest: Date.now() - 3 * 24 * HOUR, stopsAt: null }], survivors: [] };
     const off = leftoverSettings({ config: { cleanupLeftovers: false }, supervisor: { leftoverStatus: () => status } }).now;
     expect(off).toBe('Right now finished agents have left 40 programs running; turning this on stops 38 of them when you close their tasks.');
@@ -537,7 +537,7 @@ describe('what the second review found', () => {
   const p = (pid, ppid, item, extra = {}) => ({ pid, ppid, mb: 50, start: sec(T0 - 5 * HOUR), exe: NODE, item, product: 'demo', keep: false, cmd: 'node', ...extra });
 
   async function supervisor() {
-    const { Supervisor } = await import('../main/supervisor.mjs');
+    const { Supervisor } = await import('../main/supervisor.mts');
     const { fileURLToPath } = await import('node:url');
     const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-review2-'));
@@ -590,7 +590,7 @@ describe('what the second review found', () => {
 
 describe('6. every run is told the rule while it is on', () => {
   it('a resumed conversation too', async () => {
-    const { Supervisor } = await import('../main/supervisor.mjs');
+    const { Supervisor } = await import('../main/supervisor.mts');
     const { fileURLToPath } = await import('node:url');
     const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-brief-'));

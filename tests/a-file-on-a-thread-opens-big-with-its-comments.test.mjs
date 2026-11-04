@@ -10,7 +10,7 @@ import { it, expect, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { reviewKind } from '../shared/artifact-marks.mjs';
-import { REQUEST_CHANNELS } from '../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS } from '../shared/bridge-map.mts';
 
 const root = path.join(import.meta.dirname, '..');
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');

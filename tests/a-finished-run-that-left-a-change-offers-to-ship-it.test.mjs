@@ -93,7 +93,7 @@ describe('the decision a finished run left behind', () => {
   });
 
   it('calls the label what the ship queue calls it', async () => {
-    const { SHIP_LABEL: queue } = await import('../main/ship-queue.mjs');
+    const { SHIP_LABEL: queue } = await import('../main/ship-queue.mts');
     expect(SHIP_LABEL).toBe(queue);
   });
 });

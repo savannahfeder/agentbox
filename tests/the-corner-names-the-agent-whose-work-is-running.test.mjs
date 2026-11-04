@@ -1,7 +1,7 @@
 // THE CORNER MUST SAY WHOSE LIMIT IT IS.
 //
 // The corner meter and its dropdown were built against `claude -p /usage` and
-// nothing else (shared/claude-usage.mjs). They are drawn on every screen,
+// nothing else (shared/claude-usage.mts). They are drawn on every screen,
 // unlabelled, and they describe a Claude Code subscription whether or not the
 // work in front of her is billing one. That is the same defect he caught on the
 // Settings Model row: a control that looks as though it belongs to the coding
@@ -44,8 +44,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { usageEngine, usageSentence } from '../shared/usage.mjs';
-import { readUsage } from '../shared/claude-usage.mjs';
+import { usageEngine, usageSentence } from '../shared/usage.mts';
+import { readUsage } from '../shared/claude-usage.mts';
 import { UsagePill } from '../renderer/src/components/UsagePill.tsx';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -145,7 +145,7 @@ describe('the word the panel puts over the reading', () => {
 
 describe('the corner is handed the answer rather than working it out', () => {
   // The same reason the byline is: whether a choice is real needs the capability
-  // gate and the staleness rule, both pinned to main/supervisor.mjs. A corner
+  // gate and the staleness rule, both pinned to main/supervisor.mts. A corner
   // that derived its own answer could draw "Codex" over a Claude Code reading.
   it('reads the agent off the reading main sent, through the byline\'s own word', () => {
     const app = read('renderer/src/App.tsx');
@@ -165,8 +165,8 @@ describe('the corner is handed the answer rather than working it out', () => {
   // spellings of "which agent is this" is the defect the tester reported in the
   // first place.
   it('has exactly one function that answers which agent the corner is about', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     expect(ipc).toMatch(/usageEngine\(/);
-    expect(read('shared/usage.mjs').match(/export function usageEngine/g)).toHaveLength(1);
+    expect(read('shared/usage.mts').match(/export function usageEngine/g)).toHaveLength(1);
   });
 });

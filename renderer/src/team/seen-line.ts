@@ -1,5 +1,5 @@
 // "Seen by Dev, 1:55pm" under your newest message, from the read marks the
-// others in the conversation left (main/team/index.mjs `seen`).
+// others in the conversation left (main/team/index.mts `seen`).
 import { clock, dayHeading } from '../thread-history';
 
 interface Said { kind?: string; who?: string; by?: string; uid?: string; at: number; pending?: boolean; deleted?: boolean; voice?: unknown }

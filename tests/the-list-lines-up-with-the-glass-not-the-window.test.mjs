@@ -20,7 +20,7 @@
 // So the page reports the GLASS's own rectangle inside its window, and the
 // list is placed against that. Then it cannot matter how big the window is.
 import { describe, expect, it } from 'vitest';
-import { createCornerTag } from '../main/corner-tag.mjs';
+import { createCornerTag } from '../main/corner-tag.mts';
 
 const AREA = { x: 0, y: 0, width: 3413, height: 1920 };
 

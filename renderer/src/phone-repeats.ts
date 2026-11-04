@@ -1,6 +1,6 @@
 // REPEATING TASKS ON A PHONE, for the web app (cloud-bridge.ts) and the phone
 // app alike: each computer's rules from its settings copy
-// (main/phone-inbox.mjs), with what the phone sent and the computer has not
+// (main/phone-inbox.mts), with what the phone sent and the computer has not
 // taken drawn as if it had.
 
 import { phoneSlug, type PhoneRows } from './phone-rows';

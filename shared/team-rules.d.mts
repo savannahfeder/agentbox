@@ -1,6 +1,6 @@
 // Types for shared/team-rules.mjs, read by the renderer.
 type Row = { createdBy?: string | null; assignee?: string; runner?: string; people?: string[]; status?: string };
-type ProductLike = { team?: { projectId?: string; sharedBy?: string | null; direct?: boolean } | null } | null | undefined;
+type ProductLike = { team?: { projectId?: string; sharedBy?: string | null; direct?: unknown } | null } | null | undefined;
 
 export function isShared(product: ProductLike): boolean;
 export function nameIsAPersons(item: { label?: string; wrote?: Record<string, { source?: string } | undefined> } | null | undefined): boolean;
@@ -26,3 +26,8 @@ export interface ThreadWaiting { uid: string; mine: boolean; fresh: number; peop
 /** What in a conversation waits on you; null on a row from before threads. */
 export interface Waits { chat: number; threads: ThreadWaiting[] }
 export function whatWaits(item: Row & { talk?: unknown }, me: string | null): Waits | null;
+/** A line with the fields only the Mac that wrote it may carry taken out. */
+export type PulledLine = Record<string, unknown>;
+export function asPulled(body: Record<string, unknown>, from: { by: string; at: number; me: string | null }): PulledLine;
+export function whatATeammateMaySet(line: unknown, opts?: { direct?: boolean }): { id: unknown; ts: unknown; source: unknown; by: unknown; uid: unknown; patch: Record<string, unknown> } | null;
+export function whatYourOtherCopyMaySet(line: unknown, opts?: { direct?: boolean }): PulledLine | null;

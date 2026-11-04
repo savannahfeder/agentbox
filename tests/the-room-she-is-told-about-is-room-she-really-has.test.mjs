@@ -36,7 +36,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -147,7 +147,7 @@ describe('the docblock over the cap', () => {
   // that the binary alone is what `_engineFor` refuses on, which is how the
   // gate came to be missing from the method underneath it.
   it('no longer claims the binary is the same fact _engineFor refuses on', () => {
-    const src = fs.readFileSync(path.join(root, 'main/supervisor.mjs'), 'utf8');
+    const src = fs.readFileSync(path.join(root, 'main/supervisor.mts'), 'utf8');
     expect(src).not.toContain("`codexBin` is the same fact `_engineFor`");
   });
 });

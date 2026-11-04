@@ -7,7 +7,7 @@
 // light ones: a white track the full height of the pane with a grey thumb in
 // it. That was the report, with a screenshot, on 2026-10-05.
 //
-// THE FILE IS STILL SERVED EXACTLY AS IT WAS WRITTEN (doc-scheme.mjs). What is
+// THE FILE IS STILL SERVED EXACTLY AS IT WAS WRITTEN (doc-scheme.mts). What is
 // added here is the app's own chrome, from outside, once the page's document
 // exists: one adopted stylesheet that touches nothing but scrollbars, inside a
 // cascade layer so a page that styled its own scrollbars keeps them, and two
@@ -18,7 +18,7 @@
 // "Script not run"). The one such frame is the small preview under a message,
 // and that one is told not to scroll at all (ArtifactThumbnail.tsx).
 import type { WebContents, WebFrameMain } from 'electron';
-import { DOC_SCHEMES, isScheme } from '../shared/schemes.mjs';
+import { DOC_SCHEMES, isScheme } from '../shared/schemes.mts';
 import { DOCUMENT_HEIGHT_SCRIPT, wantsDocumentHeight } from './frame-document-height.mts';
 
 const RULES = (thumb: string) => `@layer agentbox-scrollbars {

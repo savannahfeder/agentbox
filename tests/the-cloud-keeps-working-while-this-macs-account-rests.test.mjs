@@ -5,7 +5,7 @@
 // (`_capacityFor` counts the Mac's logins that are not cooling down), and the
 // fleet-wide brake for "no healthy Claude account" stopped cloud starts as
 // well. Both describe this Mac's logins, and the cloud runs on accounts of its
-// own (main/cloud/logins.mjs). Measured that day off the app's saved state:
+// own (main/cloud/logins.mts). Measured that day off the app's saved state:
 // both Mac accounts were benched until midnight, which left the cloud's two
 // accounts with nothing to run.
 //
@@ -15,7 +15,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const dirs = [];
 afterEach(() => { while (dirs.length) fs.rmSync(dirs.pop(), { recursive: true, force: true }); });

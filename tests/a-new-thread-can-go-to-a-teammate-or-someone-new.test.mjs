@@ -8,8 +8,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Teammates } from '../main/teammates.mjs';
-import { loadStore } from '../main/store-modules.mjs';
+import { Teammates } from '../main/teammates.mts';
+import { loadStore } from '../main/store-modules.mts';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 

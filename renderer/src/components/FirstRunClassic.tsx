@@ -17,7 +17,7 @@ import { taskTitle } from '../team/agent-mentions';
 import { projectSwatch } from '../threads/composer-rules';
 import { WhenPicker, WHEN_NOW, type WhenValue } from './When';
 import FolderPicker from './FolderPicker';
-import { checkProjectFolder } from '../../../shared/project-folder-check.mjs';
+import { checkProjectFolder } from '../../../shared/project-folder-check.mts';
 import {
   ENGINE_NAME, chatChoices, chatsHeadline, FIRST_RUN_STEP, firstRunOf, folderChoices, ideasFor, installGate, isSend, listKey, previousScreen, projectsToMake, readyEngines, stepsFor,
   type Engine, type FolderChoice, type Screen, type Step,

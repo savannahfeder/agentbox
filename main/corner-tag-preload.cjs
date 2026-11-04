@@ -1,5 +1,5 @@
 // The corner tag's two pages (the tag, and the list beside it) talk to
-// main/corner-tag.mjs through this, and through nothing else: it is a separate,
+// main/corner-tag.mts through this, and through nothing else: it is a separate,
 // much smaller door than preload.cjs, because a window floating over every
 // other app has no business holding the whole bridge.
 const { contextBridge, ipcRenderer, webFrame } = require('electron');

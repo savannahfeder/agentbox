@@ -39,7 +39,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { findEngine } from '../main/engine-bin.mjs';
-import { codexLaunchEnv } from '../main/codex-launch-env.mjs';
+import { codexLaunchEnv } from '../main/codex-launch-env.mts';
 
 const w = path.win32;
 const HOME = 'C:\\Users\\Some One';

@@ -17,8 +17,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadCloudConfig, teamConfigOnThisMac } from '../main/team/session.mjs';
-import { alphaFeatures, setWorkspaceSetting } from '../main/settings.mjs';
-import { teamForWindow } from '../main/team/index.mjs';
+import { alphaFeatures, setWorkspaceSetting } from '../main/settings.mts';
+import { teamForWindow } from '../main/team/index.mts';
 
 const read = (rel) => fs.readFileSync(path.join(import.meta.dirname, '..', rel), 'utf8');
 const BAKED = { url: 'https://ours.test', anonKey: 'k', phoneSite: 'https://phone.test' };
@@ -115,7 +115,7 @@ describe('what the window is told about the team', () => {
   });
 
   it('the snapshot and the sign-in answers go through it', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     expect(ipc).not.toMatch(/team: team\.state\(\)/);
     expect(ipc).toMatch(/team: team \? teamForWindow\(team\.state\(\), alpha\.multiplayer\) : null/);
   });
@@ -123,11 +123,11 @@ describe('what the window is told about the team', () => {
 
 describe('the keychain', () => {
   it('is asked when a sign-in is read or kept, not when the app opens', () => {
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).not.toMatch(/\.\.\.\(safeStorage\.isEncryptionAvailable\(\)/);
     const calls = [...main.matchAll(/safeStorage\.isEncryptionAvailable\(\)/g)];
     expect(calls.length).toBeGreaterThan(0);
-    for (const c of calls) expect(main.slice(c.index - 30, c.index)).toMatch(/(encrypt|decrypt): \((text|buf)\) => \($/);
+    for (const c of calls) expect(main.slice(c.index - 30, c.index)).toMatch(/(encrypt|decrypt): \((text|buf)(: \w+)?\) => \($/);
   });
 });
 

@@ -23,7 +23,7 @@
 // app-server is spawned with it.)
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { MemoryGateServer } from '../main/memory-gate-server.mjs';
+import { MemoryGateServer } from '../main/memory-gate-server.mts';
 
 const pressure = { level: 1, freePct: 90 };
 const servers = [];

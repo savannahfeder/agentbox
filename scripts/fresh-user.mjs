@@ -4,7 +4,7 @@
 // The problem this solves. Agentbox keeps its state in three places and a
 // packaged app on her Mac inherits two of them:
 //
-//   1. `<appData>/Astral` (or `<appData>/Zero`, see main.mjs:39-43) — the
+//   1. `<appData>/Astral` (or `<appData>/Zero`, see main.mts:39-43) — the
 //      renderer's own settings, which is her theme, her skin, her zoom, her
 //      project order and which rows she has already seen.
 //   2. `zero.config.json` beside it — her store root, her PostHog key, her
@@ -19,7 +19,7 @@
 // unread.
 //
 // WHY THIS DOES NOT KILL HER AGENTS, which is the whole reason it is usable.
-// `main.mjs:415` is `if (!app.requestSingleInstanceLock) app.quit` and the lock
+// `main.mts:415` is `if (!app.requestSingleInstanceLock) app.quit` and the lock
 // is keyed on userData. A throwaway home means a different userData, so the
 // fresh copy takes its own lock and both run side by side. Nothing quits,
 // `before-quit` never fires, `supervisor.killAll` is never reached.
@@ -43,7 +43,7 @@
 // and the same command answers "ok". Without this the fresh copy is something
 // to look at and not something to use, which is not what she asked for.
 //
-// WHAT IS DELIBERATELY NOT LINKED. `~/.claude` itself. `main/agents.mjs` reads
+// WHAT IS DELIBERATELY NOT LINKED. `~/.claude` itself. `main/agents.mts` reads
 // `~/.claude/sessions` and `~/.claude/projects`, so linking it puts her real
 // Claude Code sessions in the fresh inbox: ten rows on the first try, about
 // two outside repos' work from as far back as 14 August. That is CORRECT

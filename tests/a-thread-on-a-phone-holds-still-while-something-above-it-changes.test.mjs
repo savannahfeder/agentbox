@@ -14,7 +14,7 @@
 // - A picture loading on a phone is drawn as a 4:3 box (phone.css) until it
 //   arrives, then at its own shape. A phone screenshot is about 9:19.5, so the
 //   box is a third of its height. Pictures are never served from memory
-//   (main/serve.mjs, no-store), so each time one is drawn again the box comes
+//   (main/serve.mts, no-store), so each time one is drawn again the box comes
 //   back, and everything under it jumps by the difference, then back.
 //
 // Now on a phone the stick puts her paragraph back after every change in

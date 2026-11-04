@@ -50,7 +50,7 @@ describe('a picture named by a version', () => {
 
 describe('the app', () => {
   it('asks Files for a picture the paths could not find', () => {
-    const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+    const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
     expect(ipc).toMatch(/zero:open-artifact[\s\S]{0,1500}pictureNamed/);
   });
 });

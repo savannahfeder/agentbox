@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LATTICE, latticeGrid } from '../shared/corner-tag.mjs';
+import { LATTICE, latticeGrid } from '../shared/corner-tag.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const mark = fs.readFileSync(path.join(root, 'renderer/src/corner-tag/lattice.tsx'), 'utf8');

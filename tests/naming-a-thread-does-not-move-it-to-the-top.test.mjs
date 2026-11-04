@@ -1,7 +1,7 @@
 // NAMING A THREAD IS NOT NEWS ABOUT IT.
 //
 // Found in the 3-hour cloud test, 2026-10-22. The app names every unnamed open
-// thread, one every fifteen seconds (`nameTheRows`, main/supervisor.mjs), and
+// thread, one every fifteen seconds (`nameTheRows`, main/supervisor.mts), and
 // the fold moved `updatedAt` on every line it read, the name included. Lists
 // break ties on `updatedAt` (`byRunningOrder`, renderer/src/list-rules.ts), so
 // threads nobody had touched for days climbed to the top of the inbox reading

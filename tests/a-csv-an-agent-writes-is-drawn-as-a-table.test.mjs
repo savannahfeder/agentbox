@@ -26,12 +26,12 @@ describe('where a table shows', () => {
   it('is previewed in the message that names it, and read in place there', () => {
     expect(messageDocuments({ result: 'The list is leads/fintech.csv.' })).toContain('leads/fintech.csv');
     expect(readsInPlace('leads/fintech.csv')).toBe(true);
-    expect(readsInPlace('main/ipc.mjs')).toBe(false);
+    expect(readsInPlace('main/ipc.mts')).toBe(false);
   });
   it('opens full screen as a table, while a script stays code', () => {
     expect(viewKind('leads/fintech.csv')).toBe('table');
     expect(viewKind('export.tsv')).toBe('table');
-    expect(viewKind('main/ipc.mjs')).toBe('code');
+    expect(viewKind('main/ipc.mts')).toBe('code');
     expect(viewKind('notes.txt')).toBe('code');
   });
   it('is in the brief, so an agent knows to make one', () => {

@@ -60,7 +60,7 @@ the claim `known` with that thread's id, leave the product alone).
    for user-facing surfaces missing from the map; name a concrete source path
    before calling one missing. Also check the two things only this repo has:
    - **The stand-in still speaks Claude Code.** Compare the flags
-     `main/harnesses/claude.mjs` and `main/claude-input.mjs` spawn with against
+     `main/harnesses/claude.mts` and `main/claude-input.mts` spawn with against
      what `scripts/lib/stub-claude-worker.mjs` honours. A new input or output
      contract the stand-in ignores makes every live drive prove the wrong thing
      (this happened once: the stand-in predated streamed input and no answer

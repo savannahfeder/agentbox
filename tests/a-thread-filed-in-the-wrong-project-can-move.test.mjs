@@ -12,10 +12,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
-import { canMove, movedAway, movedHere, MOVE_KEYWORDS, whatMoves, whyItCannotMove } from '../shared/move-thread.mjs';
+import { Store } from '../main/store.mts';
+import { canMove, movedAway, movedHere, MOVE_KEYWORDS, whatMoves, whyItCannotMove } from '../shared/move-thread.mts';
 import { matchesQuery } from '../renderer/src/palette-rows.ts';
-import { REQUEST_CHANNELS } from '../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS } from '../shared/bridge-map.mts';
 
 let store, root;
 

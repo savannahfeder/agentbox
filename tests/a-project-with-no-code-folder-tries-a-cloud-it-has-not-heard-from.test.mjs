@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { imageCaps, imageCapsToTry, noteImageCaps } from '../main/cloud/config.mjs';
 
 const savedConfigEnv = process.env.AGENTBOX_CLOUD_CONFIG;
@@ -124,7 +124,7 @@ describe('what a cloud run is sent with', () => {
   });
 
   it('the run is started with what to try, not only what was heard', () => {
-    const cli = fs.readFileSync(new URL('../main/cloud/run-cli.mjs', import.meta.url), 'utf8');
+    const cli = fs.readFileSync(new URL('../main/cloud/run-cli.mts', import.meta.url), 'utf8');
     expect(cli).toMatch(/imageCaps: imageCapsToTry\(config\)/);
   });
 });

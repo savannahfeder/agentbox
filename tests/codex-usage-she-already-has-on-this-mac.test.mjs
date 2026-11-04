@@ -7,7 +7,7 @@
 //
 //   1. THE FIGURE IS ON THE DISK ALREADY. Codex writes every rate-limit report it
 //      receives into its own session log under CODEX_HOME. Reading it starts no
-//      process and sends nothing anywhere, which is the rule main/codex-usage.mjs
+//      process and sends nothing anywhere, which is the rule main/codex-usage.mts
 //      exists to keep.
 //   2. THE LABELS WERE WRONG FOR SOME ACCOUNTS. `primary` was taken to mean the
 //      five hour window. On some Codex plans every window is 10080 minutes and
@@ -19,10 +19,10 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { codexLimits, windowSpan } from '../shared/codex-usage.mjs';
-import { headlineLimit, sessionLimit, usageSentence } from '../shared/usage.mjs';
-import { loggedCodexLimits, forgetLoggedLimits } from '../main/codex-usage-file.mjs';
-import { CodexUsage } from '../main/codex-usage.mjs';
+import { codexLimits, windowSpan } from '../shared/codex-usage.mts';
+import { headlineLimit, sessionLimit, usageSentence } from '../shared/usage.mts';
+import { loggedCodexLimits, forgetLoggedLimits } from '../main/codex-usage-file.mts';
+import { CodexUsage } from '../main/codex-usage.mts';
 
 /*
  * THE WEEK-ONLY SHAPE, snake_case because that is how the session log spells it.

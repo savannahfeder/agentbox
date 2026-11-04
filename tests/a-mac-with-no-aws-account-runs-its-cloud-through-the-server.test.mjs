@@ -13,7 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { readCloudConfig, cloudConfigPath, readCloudKey, writeCloudKey, cloudKeyPath } from '../main/cloud/config.mjs';
-import { cloudClients } from '../main/cloud/clients.mjs';
+import { cloudClients } from '../main/cloud/clients.mts';
 
 let home; let server; let url; let asked;
 const env = {};
