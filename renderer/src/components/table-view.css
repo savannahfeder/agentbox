@@ -111,8 +111,8 @@
   display: inline-grid; place-items: center; font-size: 10.5px; font-weight: 600;
   color: var(--text-dim); background: var(--bg-raised);
 }
-.tbl-link a { color: var(--text-dim); text-decoration: none; }
-.tbl-link a:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.tbl .tbl-link a { color: var(--text-dim); text-decoration: none; }
+.tbl .tbl-link a:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
 
 .tbl-tag {
   display: inline-flex; align-items: center; gap: 6px;
@@ -140,3 +140,12 @@
 }
 .tbl-showall { margin: 11px 16px 12px; }
 .tbl-showall:hover { color: var(--text); }
+
+/* A markdown table in a message: the same table, in the message's own flow.
+   Every row shows, nothing sticks, and it sits on the message's ground. */
+.tbl-inline { margin: 18px 0; font-size: 14px; }
+.tbl-inline .tbl-scroll { overflow-x: auto; overflow-y: visible; }
+.tbl-inline .tbl-grid { border-left: 1px solid var(--tbl-line); }
+.tbl-inline .tbl-tr > :nth-child(1), .tbl-inline .tbl-tr > :nth-child(2) { position: static; background: transparent; }
+.tbl-inline .tbl-th { position: static; background: transparent; }
+.tbl-inline .tbl-ell { max-width: 300px; }

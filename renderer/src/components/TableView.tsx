@@ -2,7 +2,7 @@
 // screen. The reading is ../table-file.ts; the look is ./table-view.css, as
 // approved in designs/w-690551d7ea/tags-6-colour-on-status-only-v2.png.
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { filterRows, hrefOf, logoFor, readTable, shownLink, sortRows, type Column, type Sort, type Table } from '../table-file';
+import { filterRows, hrefOf, logoFor, readTable, shownLink, sortRows, tableFromGrid, type Column, type Sort, type Table } from '../table-file';
 import './table-view.css';
 
 export type TableMode = 'preview' | 'pane' | 'full';
@@ -53,10 +53,11 @@ function Cell({ table, col, row, value }: { table: Table; col: number; row: stri
   return <div className="tbl-td" title={v.length > 40 ? v : undefined}><span className="tbl-ell">{v}</span></div>;
 }
 
-const Row = memo(function Row({ table, row, n }: { table: Table; row: string[]; n: number }) {
+// A ranked file's own rank stands where the row number goes, so a list is not numbered twice.
+const Row = memo(function Row({ table, row, n }: { table: Table; row: string[]; n: number | null }) {
   return <div className="tbl-tr" role="row">
-    <div className="tbl-td tbl-rn">{n}</div>
-    {row.map((v, i) => <Cell key={i} table={table} col={i} row={row} value={v} />)}
+    {(n !== null || table.ranked) && <div className="tbl-td tbl-rn">{table.ranked ? row[0] : n}</div>}
+    {row.map((v, i) => (table.ranked && i === 0 ? null : <Cell key={i} table={table} col={i} row={row} value={v} />))}
   </div>;
 });
 
@@ -93,7 +94,7 @@ function widths(table: Table, cap: number): string {
   const wide = texts.reduce((best, i) => (best < 0 || longest[i].length > longest[best].length ? i : best), -1);
   const last = table.columns.length - 1;
   return content.map((w, i) => (i === wide ? `minmax(${Math.min(w, 180)}px, ${w}fr)`
-    : wide < 0 && i === last ? `minmax(${w}px, 1fr)` : `${w}px`)).join(' ');
+    : wide < 0 && i === last ? `minmax(${w}px, 1fr)` : `${w}px`)).slice(table.ranked ? 1 : 0).join(' ');
 }
 const sortWords = (c: Column, dir: 'asc' | 'desc') => {
   const [up, down] = c.kind === 'number' ? ['1 to 9', '9 to 1'] : c.kind === 'date' ? ['Oldest first', 'Newest first'] : ['A to Z', 'Z to A'];
@@ -150,8 +151,25 @@ function FilterMenu({ table, cols, picked, onToggle, onClear }: {
 const glyph = (d: string) => <svg viewBox="0 0 16 16" aria-hidden="true"><path d={d} /></svg>;
 const SEARCH = <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>;
 
-export function TableView({ text, path, mode, onShowAll }: { text: string; path: string; mode: TableMode; onShowAll?: () => void }) {
-  const table = useMemo(() => readTable(text, path), [text, path]);
+type Hast = { type: string; tagName?: string; value?: string; children?: Hast[] };
+const textOf = (n: Hast): string => (n.type === 'text' ? n.value ?? '' : (n.children ?? []).map(textOf).join(''));
+const rowsOf = (n: Hast): Hast[] => (n.tagName === 'tr' ? [n] : (n.children ?? []).flatMap(rowsOf));
+
+/** The header row and rows of a markdown table, as react-markdown hands its node over. */
+export function gridFromHast(node: Hast | undefined): string[][] {
+  if (!node) return [];
+  return rowsOf(node).map((tr) => (tr.children ?? []).filter((c) => c.tagName === 'th' || c.tagName === 'td').map((c) => textOf(c).trim()));
+}
+
+/** A markdown table in a message: every row, in the message, no toolbar; a header still sorts. */
+export function InlineTable({ grid }: { grid: string[][] }) {
+  const key = useMemo(() => JSON.stringify(grid), [grid]);
+  return <TableView text="" path={`inline:${key}`} mode="inline" grid={grid} />;
+}
+
+export function TableView({ text, path, mode, onShowAll, grid }: { text: string; path: string; mode: TableMode | 'inline'; onShowAll?: () => void; grid?: string[][] }) {
+  const table = useMemo(() => (grid ? tableFromGrid(grid) : readTable(text, path)), [text, path, grid]);
+  const inline = mode === 'inline';
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<Record<number, string[]>>({});
   const [sort, setSort] = useState<Sort>(null);
@@ -160,11 +178,11 @@ export function TableView({ text, path, mode, onShowAll }: { text: string; path:
   // The box shows each letter at once; the rows catch up when the typing pauses.
   const searched = useDeferredValue(query);
   const rows = useMemo(() => sortRows(table, filterRows(table, searched, picked), sort), [table, searched, picked, sort]);
-  const template = useMemo(() => widths(table, mode === 'full' ? 300 : 220), [table, mode]);
+  const template = useMemo(() => widths(table, mode === 'full' || mode === 'inline' ? 300 : 220), [table, mode]);
   const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ top: 0, height: 900 });
-  const preview = mode === 'preview';
+  const preview = mode === 'preview' || inline;
 
   // A new order or a new search starts from the top.
   useEffect(() => { box.current?.scrollTo({ top: 0 }); }, [searched, picked, sort]);
@@ -204,7 +222,7 @@ export function TableView({ text, path, mode, onShowAll }: { text: string; path:
   if (!table.columns.length) return <div className="tbl-empty">This table has no rows yet.</div>;
 
   const start = preview ? 0 : Math.max(0, Math.floor(view.top / ROW_H) - SPARE);
-  const end = preview ? Math.min(rows.length, PREVIEW_ROWS) : Math.min(rows.length, Math.ceil((view.top + view.height) / ROW_H) + SPARE);
+  const end = inline ? rows.length : preview ? Math.min(rows.length, PREVIEW_ROWS) : Math.min(rows.length, Math.ceil((view.top + view.height) / ROW_H) + SPARE);
   const drawn = rows.slice(start, end);
   const tagCols = table.columns.flatMap((c, i) => (c.kind === 'tag' ? [i] : []));
   const filtering = Object.values(picked).some((v) => v.length);
@@ -250,19 +268,21 @@ export function TableView({ text, path, mode, onShowAll }: { text: string; path:
       )}
       <div className="tbl-frame">
       <div className="tbl-scroll" ref={box}>
-        <div className="tbl-grid" role="table" style={{ gridTemplateColumns: `44px ${template}` }}>
+        <div className="tbl-grid" role="table" style={{ gridTemplateColumns: inline && !table.ranked ? template : `44px ${template}` }}>
           <div className="tbl-tr" role="row">
-            <div className="tbl-th tbl-rn" />
-            {table.columns.map((c, i) => (
+            {table.ranked
+              ? <button type="button" role="columnheader" className={`tbl-th tbl-rn${sort?.col === 0 ? ' sorted' : ''}`} disabled={preview && !inline} onClick={() => sortBy(0)} title={table.columns[0].name}>#</button>
+              : !inline && <div className="tbl-th tbl-rn" />}
+            {table.columns.map((c, i) => table.ranked && i === 0 ? null : (
               <button key={i} type="button" role="columnheader" className={`tbl-th${c.kind === 'number' ? ' tbl-num' : ''}${sort?.col === i ? ' sorted' : ''}`}
                 aria-sort={sort?.col === i ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
-                disabled={preview} onClick={() => sortBy(i)}>
+                disabled={preview && !inline} onClick={() => sortBy(i)}>
                 <span className="tbl-ell">{c.name}</span>{sort?.col === i && <span className="tbl-arrow">{sort.dir === 'asc' ? '↑' : '↓'}</span>}
               </button>
             ))}
           </div>
           {start > 0 && <div className="tbl-gap" style={{ height: start * ROW_H }} />}
-          {drawn.map((r, n) => <Row key={start + n} table={table} row={r} n={start + n + 1} />)}
+          {drawn.map((r, n) => <Row key={start + n} table={table} row={r} n={inline ? null : start + n + 1} />)}
           {!preview && end < rows.length && <div className="tbl-gap" style={{ height: (rows.length - end) * ROW_H }} />}
         </div>
         {!rows.length && <div className="tbl-none">{total ? 'No rows match.' : 'This table has no rows yet.'}</div>}
