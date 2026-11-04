@@ -14,10 +14,14 @@ import type { ThreadCard, WorkItem } from '../types';
 import type { BoardEntry } from './page-rules';
 import type { MixedRow } from './people-rules';
 
-export type Stop = { item: WorkItem; card?: undefined } | { card: ThreadCard; item?: undefined };
+export type Stop = { item: WorkItem; card?: undefined; lead?: undefined } | { card: ThreadCard; item?: undefined; lead?: undefined };
+/** A row above the threads: an invitation or a group. J and K on the page stop on it; a walk from an open thread does not. */
+export type PageStop = Stop | { lead: { key: string }; item?: undefined; card?: undefined };
 
 /** One name per stop: a thread of yours by its id, a card by whose and which thread. */
-export const stopKey = (s: Stop): string => (s.item ? `item/${s.item.product}/${s.item.id}` : `card/${s.card.personId}/${s.card.threadId}`);
+export const stopKey = (s: PageStop): string => (s.lead ? `lead/${s.lead.key}` : s.item ? `item/${s.item.product}/${s.item.id}` : `card/${s.card.personId}/${s.card.threadId}`);
+
+export const leadStops = (rows: readonly { key: string }[]): PageStop[] => rows.map((lead) => ({ lead: { key: lead.key } }));
 
 /** The list's stops: the merged table when a teammate is on it, else your own rows.
  *  A row of yours is a stop only when it is in `items`, as the table draws it. */
@@ -34,7 +38,7 @@ export function boardStops(columns: { rows: BoardEntry[] }[]): Stop[] {
 
 /** The stop one step from `from`, or null at either end. A `from` the page is
  *  not drawing steps from `fallback`, the keyboard's last place in the walk. */
-export function stepStop(stops: Stop[], from: Stop | null, dir: 1 | -1, fallback = -1): Stop | null {
+export function stepStop<S extends PageStop>(stops: S[], from: PageStop | null, dir: 1 | -1, fallback = -1): S | null {
   const key = from ? stopKey(from) : null;
   const at = key ? stops.findIndex((s) => stopKey(s) === key) : -1;
   const next = (at >= 0 ? at : fallback) + dir;

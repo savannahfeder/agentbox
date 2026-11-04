@@ -34,7 +34,7 @@ describe('a message in a room or on the Messages page', () => {
   });
 
   it('keeps the face in its head out of a selection, so its initials are never copied', () => {
-    expect(setTo(rooms, '.rm-cm .rm-pic', 'none')).toBe(true);
+    expect(setTo(rooms, '.rm-cm .tm-av', 'none')).toBe(true);
   });
 });
 

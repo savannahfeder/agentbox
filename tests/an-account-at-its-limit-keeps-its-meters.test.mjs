@@ -83,8 +83,10 @@ describe('the Fable week', () => {
     ]);
   });
 
-  it('reads 0% once its window has reset, like the other two', () => {
-    expect(words([session(10), week(60), fable(100, { resetsAt: at(15) })])).toEqual(['Session 10', 'Week 60', 'Fable 0']);
+  // Since 2026-10-31 a reset window has no number until it is read again
+  // (tests/a-meter-past-its-reset-shows-no-number).
+  it('has no number once its window has reset, like the other two', () => {
+    expect(words([session(10), week(60), fable(100, { resetsAt: at(15) })])).toEqual(['Session 10', 'Week 60', 'Fable null']);
   });
 
   it('must NOT be drawn when the reading has no Fable week, as a cloud reading does not', () => {

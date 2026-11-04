@@ -60,7 +60,7 @@ import type { RunningSession, WhyNotCloud, WorkItem } from './types';
 export type LiveState = 'asking' | 'working' | 'elsewhere' | 'shipping' | 'next' | 'queued' | 'cannot' | 'signin' | 'limit' | 'paused' | 'silent' | 'idle';
 
 export interface CannotStart {
-  why: 'setup' | 'asleep' | 'engine' | 'login' | 'memory' | 'slow-folder' | 'error' | string;
+  why: 'setup' | 'asleep' | 'cloud-carried' | 'engine' | 'login' | 'memory' | 'slow-folder' | 'error' | 'brake' | string;
   /** "Claude Code" or "Codex". */
   tool: string;
 }
@@ -69,6 +69,7 @@ export interface CannotStart {
 export function cannotStartLine({ why, tool }: CannotStart): string | null {
   if (why === 'setup') return 'Agents wait while setup is open. This starts as soon as you finish or skip it.';
   if (why === 'asleep') return 'This computer looks asleep to the app, so nothing starts until it wakes.';
+  if (why === 'cloud-carried') return 'This computer is asleep, so the cloud is starting this. It runs here instead if the cloud cannot.';
   if (why === 'engine') return `${tool} was not found on this computer, so nothing can start. Install it and this starts on its own.`;
   if (why === 'login') {
     return tool === 'Codex'
@@ -78,6 +79,7 @@ export function cannotStartLine({ why, tool }: CannotStart): string | null {
   if (why === 'memory') return 'This computer is short of memory, so this waits for heavier work to finish.';
   if (why === 'slow-folder') return 'Making this thread\'s own copy of the project is taking much longer than it should, so the agent has not started.';
   if (why === 'error') return 'Starting an agent on this failed. The app tries again on its own.';
+  if (why === 'brake') return `${tool}'s last runs stopped before they began, so the app is waiting before it tries again.`;
   return null;
 }
 

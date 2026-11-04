@@ -2,7 +2,7 @@
 // (App.tsx `.approvals`, styles.css and phone.css): one card across the foot,
 // the queue as edges behind it, Allow and Deny big enough for a thumb, and the
 // answered card stamped with what she decided on its way out.
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -68,6 +68,10 @@ function Card({ a, verdict, waiting, answer }: { a: Approval; verdict: 'allow' |
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 9 }}>
           <T style={{ flex: 1, minWidth: 0, fontSize: 13, lineHeight: 18.2, fontFamily: font.semibold }}>{words.lede}</T>
           {words.waiting && <T style={{ ...small, color: color.faint }}>{words.waiting}</T>}
+          {/* Put aside to read what is under it; Review in the top bar brings it back (App.tsx `minimizedApproval`). */}
+          <Pressable onPress={() => c.setMinimizedApproval(a.id)} accessibilityRole="button" hitSlop={8}>
+            <T style={{ ...small, color: color.dim }}>Minimize</T>
+          </Pressable>
         </View>
         {/* The whole command, scrolling past six lines rather than cut. */}
         <ScrollView style={{ maxHeight: 120, backgroundColor: color.film, marginBottom: 10 }} contentContainerStyle={{ paddingVertical: 9, paddingHorizontal: 11 }} nestedScrollEnabled>
@@ -111,6 +115,7 @@ function Card({ a, verdict, waiting, answer }: { a: Approval; verdict: 'allow' |
 export function Approvals() {
   const c = useCloud();
   const inset = useSafeAreaInsets();
+  const pathname = usePathname();
   const pending = c.view.approvals;
   const [answered, setAnswered] = useState<Answered | null>(null);
   // The card that held the stage when she pressed: the phone stops listing it
@@ -124,7 +129,9 @@ export function Approvals() {
   }, [answered]);
 
   const { card, verdict, waiting } = cardOnStage(pending, answered, leaving.current);
-  if (!card) return null;
+  // The notice's own buttons sit where the card would cover them.
+  if (pathname === '/ai-notice') return null;
+  if (!card || c.minimizedApproval === card.id) return null;
   const answer = async (allow: boolean) => {
     setAnswered({ id: card.id, allow });
     try { await c.send({ kind: 'approve', approval: card.id, allow }, null); } catch (err) {

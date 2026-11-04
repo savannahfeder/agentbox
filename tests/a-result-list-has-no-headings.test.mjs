@@ -9,11 +9,15 @@
 // This is a rendering test rather than a source one because the failure it
 // guards is visual: a day label that comes back, a heading that comes back, or
 // an empty label div that draws a band of nothing above the first result.
+//
+// A row prints its short title now (shared/thread-title.mjs), not the whole
+// first sentence, so a row is looked for by rowTitle and in the words alone.
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { List } from '../renderer/src/components/List.tsx';
 import { searchItems } from '../renderer/src/search.ts';
+import { rowTitle } from '../renderer/src/list-rules.ts';
 import { Name } from '../shared/product-name.mjs';
 
 const now = Date.now();
@@ -75,8 +79,9 @@ describe('a ranked list', () => {
 
   it('still draws every row, in match order, with the matches lit', () => {
     const html = draw(searching);
-    for (const item of items) expect(html).toContain(item.title);
-    expect(html.indexOf('How to Work is merged')).toBeLessThan(html.indexOf('Right now we only have'));
+    const words = html.replace(/<[^>]+>/g, '');
+    for (const item of items) expect(words).toContain(rowTitle(item));
+    expect(words.indexOf('How to Work is merged')).toBeLessThan(words.indexOf('Right now we only have'));
     expect(html).toContain('class="hit"');
   });
 

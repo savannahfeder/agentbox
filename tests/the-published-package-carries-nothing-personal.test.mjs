@@ -91,7 +91,7 @@ describe('the tarball npm would publish', () => {
     // Every main/ file that does ship is source, or the tray's glass that
     // `npm pack` compiles from main/native (scripts/build-liquid-glass.mjs).
     for (const f of manifest.files.filter((f) => f.path.startsWith('main/'))) {
-      expect(f.path).toMatch(/\.mjs$|^main\/native\/[\w-]+\/build\/[\w-]+\.node$/);
+      expect(f.path).toMatch(/\.m[jt]s$|^main\/native\/[\w-]+\/build\/[\w-]+\.node$/);
     }
   });
 

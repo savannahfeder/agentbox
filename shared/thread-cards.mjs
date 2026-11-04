@@ -17,6 +17,10 @@
 //                from user research): not a wordless one, not a count.
 
 import { shownPriority } from './rank.mjs';
+import { isTaskRow, taskGiver } from './team-rules.mjs';
+import { deadlineOf } from './team-tasks.mjs';
+import { isShippedNote } from './shipped-note.mjs';
+import { shownTitle, withoutFiles } from './thread-title.mjs';
 
 export const THREAD_STATES = ['waiting', 'running', 'scheduled', 'done'];
 
@@ -69,7 +73,7 @@ const SENTENCE = /^(.+?\w[.!?]["'”’)\]]?)(?=\s+["“'(\[]?[A-Z]|\s*$)/;
 // The first sentence of some prose, without markdown, short enough for a line.
 export function firstSentence(text, max = 240) {
   if (typeof text !== 'string') return '';
-  let plain = text
+  let plain = withoutFiles(text)
     .replace(/^#+\s.*$/gm, '')
     .replace(/^##\s*Options[\s\S]*$/m, '')
     // A blockquote's mark is the one at the start of its line. Elsewhere `>`
@@ -79,7 +83,9 @@ export function firstSentence(text, max = 240) {
   plain = plain.replace(/\s+/g, ' ').trim();
   const m = plain.match(SENTENCE);
   const one = (m ? m[1] : plain).trim();
-  return one.length > max ? `${one.slice(0, max - 1).trimEnd()}…` : one;
+  if (one.length <= max) return one;
+  const cut = one.slice(0, max - 1);
+  return `${(cut.replace(/\s+\S*$/, '') || cut).trimEnd()}…`;
 }
 
 // HOW LONG A SUMMARY LINE AN AGENT WRITES MAY BE (w-b51b2e1c86): about four
@@ -131,6 +137,17 @@ export function summaryOf(item) {
 }
 
 const startOfDay = (now) => { const d = new Date(now); d.setHours(0, 0, 0, 0); return d.getTime(); };
+
+// How long a finished thread stays in the cloud: long enough to list a week's
+// shipped work and to tell someone who was away. Boards still draw only today's.
+const FINISHED_CARDS_KEPT_MS = 7 * 86_400_000;
+
+/** When this thread shipped: a person's word, else the app's own note once its merge lands. An agent saying so does not count. */
+export function shippedAtOf(item) {
+  if (Number.isFinite(item?.shippedAt)) return item.shippedAt > 0 ? item.shippedAt : null;
+  if (isShippedNote(item?.note) && item?.wrote?.note?.source === 'system') return item.wrote.note.ts ?? null;
+  return null;
+}
 
 /**
  * One card per thread worth showing the team: every open thread, and the ones
@@ -214,12 +231,45 @@ export function shownToPeople(item, product = null) {
   return seen.who === 'people' ? seen.people : [];
 }
 
-export function cardsFor({ products, readItems, now = Date.now(), since = null }) {
+// A TASK YOU HOLD COUNTS ON YOUR CARD. With no words unless its giver let the
+// team read it: then its name, level, deadline and block, so anyone can list
+// every task on the team.
+function heldTaskCard(item, now, me) {
+  const seen = item.visibility === 'team' ? null : item.visibility === 'people' ? cleanIds(item.visibleTo) : undefined;
+  if (seen === undefined || (seen && !seen.length)) {
+    return {
+      threadId: item.id, visible: true, title: null, project: null, people: null, state: 'waiting', priority: null,
+      problem: null, progress: null, solution: null, blockedBy: [], blocks: [], updatedAt: item.updatedAt ?? now,
+    };
+  }
+  const due = deadlineOf(item, me);
+  return {
+    threadId: item.id, visible: true, title: shownTitle(item), project: 'Task', people: seen,
+    state: item.status === 'done' ? 'done' : 'waiting', priority: shownPriority(item),
+    problem: null, progress: null, solution: null,
+    blockedBy: (item.blockedBy ?? []).map((id) => ({ id, title: null })), blocks: [], updatedAt: item.updatedAt ?? now,
+    task: { from: taskGiver(item), ...(due ? { dueAt: due.at, clock: due.clock } : {}) },
+  };
+}
+
+export function cardsFor({ products, readItems, now = Date.now(), since = null, me = null, running = [] }) {
+  const live = new Set(running);
   const cards = [];
   const titleOf = new Map();
   const all = [];
   for (const product of products) {
-    if (product.team?.direct) continue;
+    if (product.team?.direct) {
+      for (const item of me ? readItems(product) : []) {
+        if (item.agent || !isTaskRow(item) || item.assignee !== me) continue;
+        if (item.status !== 'done') { cards.push(heldTaskCard(item, now, me)); continue; }
+        // A finished one the team can read stays a week, so a task blocked on it sees it finish.
+        if (item.visibility && item.updatedAt >= startOfDay(now - FINISHED_CARDS_KEPT_MS)) {
+          const card = heldTaskCard(item, now, me);
+          if (card.title != null) cards.push(card);
+        }
+      }
+      continue;
+    }
     for (const item of readItems(product)) {
       if (item.agent) continue;
       // A LINK NAMES A THREAD ONLY IF THAT THREAD IS ITSELF VISIBLE. A public
@@ -231,19 +281,22 @@ export function cardsFor({ products, readItems, now = Date.now(), since = null }
       // blocker shared with two of them would have told a third its title.
       // Only a thread the whole team may read is safe in anybody's links.
       const open = shownToTeam(item, since, product) && !shownToPeople(item, product).length;
-      titleOf.set(item.id, open ? item.label || item.title : null);
+      titleOf.set(item.id, open ? shownTitle(item) : null);
       all.push({ item, product });
     }
   }
   const linked = (ids) => (Array.isArray(ids) ? ids : []).map((id) => ({ id, title: titleOf.get(id) ?? null }));
-  const today = startOfDay(now);
+  const kept = startOfDay(now - FINISHED_CARDS_KEPT_MS);
   for (const { item, product } of all) {
     if (!shownToTeam(item, since, product)) continue;
-    const state = threadState(item, now);
-    if (state === 'done' && !(item.updatedAt >= today)) continue;
+    // A session the folded row cannot show: a personal worker holds no claim,
+    // and its second turn has a result on the row, which reads as waiting.
+    const state = live.has(item.id) ? 'running' : threadState(item, now);
+    if (state === 'done' && !(item.updatedAt >= kept)) continue;
     const s = summaryOf(item);
+    const shippedAt = shippedAtOf(item);
     cards.push({
-      threadId: item.id, visible: true, title: item.label || item.title, project: product.name,
+      threadId: item.id, visible: true, title: shownTitle(item), project: product.name,
       // WHO IT REACHES: the chosen people, or NO LIST AT ALL for the whole
       // team. Never an empty list, which would have to mean both. Both clouds
       // carry it and refuse to show the card to anybody else.
@@ -252,6 +305,7 @@ export function cardsFor({ products, readItems, now = Date.now(), since = null }
       state, priority: shownPriority(item),
       problem: s.problem || null, progress: s.progress || null, solution: s.solution || null,
       blockedBy: linked(item.blockedBy), blocks: linked(item.blocks), updatedAt: item.updatedAt ?? now,
+      ...(shippedAt ? { shippedAt } : {}),
     });
   }
   return cards;

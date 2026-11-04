@@ -92,6 +92,15 @@ export function stoppedByHer(item) {
     && (answerTs(item) <= (status.ts ?? 0) || !!toldBy(item));
 }
 
+// THE PERSON'S OWN WORK: the `founder` tag, unless the ledger says an agent wrote
+// it. An agent can put the tag on any row through the store tools, and an agent
+// may not start its own work, so the queue refuses that tag. The lists read the
+// same rule, or they promise an agent is coming to a thread none will start. A
+// tag with no recorded author predates `wrote` and keeps counting.
+export function filedByThePerson(item) {
+  return (item?.labels ?? []).includes('founder') && item?.wrote?.labels?.source !== 'agent';
+}
+
 // The teammate whose words are this row's newest reply, or null when the
 // newest reply is the person's own.
 export function toldBy(item) {
@@ -106,4 +115,15 @@ export function heldForHer(item) {
   const status = item?.wrote?.status;
   return item?.status === 'blocked' && status?.source === 'system' && !!toldBy(item)
     && answerTs(item) <= (status.ts ?? 0);
+}
+
+// A PERSON'S WORD WRITTEN AFTER THE MOMENT WAS SET, AND NOT YET ACTED ON, RUNS
+// NOW. The moment is for the run it was set for, not for everything said on
+// the thread, and it stays on the row for that run.
+export function wordWaits(item) {
+  const said = item?.wrote?.answer;
+  const set = item?.wrote?.runAt;
+  if (!said || !set || !item.answer || item.answer === '(withdrawn)') return false;
+  if (said.source !== 'founder' && !said.teammate) return false;
+  return said.ts > set.ts && (item.answeredThrough ?? 0) < said.ts;
 }

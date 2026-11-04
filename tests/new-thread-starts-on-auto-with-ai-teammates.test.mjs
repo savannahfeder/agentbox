@@ -65,7 +65,7 @@ describe('the New thread box', () => {
 
   it('sends an Auto thread as a thread carrying the auto label, the model you picked beside it', () => {
     // The tutorial's own task keeps its mark over Auto's.
-    expect(card).toMatch(/\.\.\.\(onAuto \? \{ labels: \[AUTO_LABEL\] \} : \{\}\),\s*\/\/ The tutorial's own task[^\n]*\n\s*\.\.\.\(scripted \? \{ labels: scripted\.labels \} : \{\}\),/);
+    expect(card).toMatch(/\.\.\.\(onAuto \? \[AUTO_LABEL\] : \[\]\),[\s\S]{0,500}\/\/ The tutorial's own task[^\n]*\n\s*\.\.\.\(scripted \? \{ labels: scripted\.labels \} : \{\}\),/);
     // Picking anyone in To leaves Auto.
     expect(card).toMatch(/const chooseMate = \(id: string\) => \{ setAdding\(false\); setAuto\(false\);/);
   });

@@ -2,9 +2,12 @@
 // box means.
 import { instructionOf, isCleanRun } from '../../shared/repeats.mjs';
 import { teammateIdOf } from '../../shared/teammates.mjs';
-import { answerSettled } from '../../shared/answers.mjs';
+import { answerSettled, filedByThePerson } from '../../shared/answers.mjs';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mjs';
 import { notShippedLine } from '../../shared/not-shipped.mjs';
+import { setByPerson } from '../../shared/thread-waits.mjs';
+import { isTaskRow } from '../../shared/team-rules.mjs';
+import { shownTitle } from '../../shared/thread-title.mjs';
 import { firstRealLine, previewText, searchText } from './format';
 import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
@@ -24,6 +27,8 @@ export interface InboxItem {
   answeredThrough?: number;
   runAt?: number;
   snoozedUntil?: number;
+  /** Teammates' comments its owner has not yet dealt with (shared/work-items.mjs). */
+  waitingComments?: { by: string; ts: number; text: string }[];
   /** 'later' while a thread sits in Later, written down and not begun. */
   start?: 'later' | 'now';
   /** The thread this one was filed under: what makes it a proposal. */
@@ -35,7 +40,8 @@ export interface InboxItem {
   wrote?: Record<string, { ts: number; source: string } | undefined>;
 }
 
-const hers = (i: InboxItem) => (i.labels ?? []).includes('founder');
+// The queue's own rule, so In progress never holds a thread it will not start.
+const hers = (i: InboxItem) => filedByThePerson(i);
 const liveAnswer = (i: InboxItem) => (i.answer && i.answer !== '(withdrawn)' ? i.answer : undefined);
 
 /* ------------------- the one thing nothing may take away ------------------ */
@@ -134,9 +140,16 @@ export function parkedByAgent(i: InboxItem, now = Date.now()): boolean {
 // `legacySnooze` is the old localStorage map, still honoured on read and never
 // written. Only the user could set it, so it counts.
 export function hiddenUntil(i: InboxItem, legacySnooze = 0): number {
-  const mine = i.wrote?.runAt?.source === 'founder' ? i.runAt ?? 0 : 0;
+  // Something she said after scheduling it runs now, and its answer is hers to read now.
+  const spokeSince = (i.wrote?.answer?.ts ?? 0) > (i.wrote?.runAt?.ts ?? 0);
+  const mine = i.wrote?.runAt?.source === 'founder' && !spokeSince ? i.runAt ?? 0 : 0;
   const reminder = i.wrote?.snoozedUntil?.source === 'founder' ? i.snoozedUntil ?? 0 : 0;
   return Math.max(mine, reminder, legacySnooze);
+}
+
+/** What a person said this thread waits on has ended, and they have not acted on it since. */
+export function waitCameBack(i: InboxItem & { waitEnded?: { at: number } }): boolean {
+  return !!i.waitEnded && i.status !== 'done' && i.waitEnded.at > herLastWord(i);
 }
 
 // The only copy of the inbox membership rule. Do not duplicate it: call this.
@@ -159,6 +172,9 @@ export function belongsInInbox(
   i: InboxItem,
   { deliveredThrough = 0, hiddenUntil = 0, now = Date.now(), live = false, shipping = false, asking = false, waitingOn = [] as readonly string[], stopped = false } = {},
 ): boolean {
+  // A teammate's words wait for you whatever the thread is doing, a running
+  // agent included (`waitingComments`, shared/work-items.mjs).
+  if (i.waitingComments?.length) return true;
   // In Later and not begun: it waits for a person, not a clock, so it is in
   // Later and nowhere else.
   if (notStarted(i)) return false;
@@ -184,6 +200,7 @@ export function belongsInInbox(
   // when the last thread it names finishes (`resumeFinishedWaits`). Only a wait
   // that can end counts (`waitsThatCanEnd`), so a loop of waits stays here.
   if (waitsInLater(i, waitingOn)) return false;
+  if (waitCameBack(i)) return true;
   if (parkedByAgent(i, now)) return true; // an agent stopped: what happens next is hers
   // The agent finished acting on her answer and left the thread open, as a
   // standing workstream thread does. That is news. The branches below would
@@ -237,6 +254,9 @@ export function isProposal(i: InboxItem): boolean {
  * user. A row the user stopped is never resumed, so it is never hidden here.
  */
 export function waitsInLater(i: InboxItem, waitingOn: readonly string[]): boolean {
+  // A blocked task stays where its people read it, saying what blocks it.
+  if (isTaskRow(i)) return false;
+  if (setByPerson(i)) return true;
   return waitingOn.length > 0 && i.status === 'blocked' && i.wrote?.status?.source !== 'founder';
 }
 
@@ -277,7 +297,8 @@ export const PROPOSAL_PATIENCE = 24 * 3_600_000;
  *
  * A proposal whose parent is not in `items` is skipped. A thread the user
  * closed stays closed, without answering its proposals; reopening it turns
- * the reminder back on.
+ * the reminder back on. A thread the user put in Later stays there until
+ * Later ends.
  *
  * While a reply is on its way to an agent, or an agent is on the thread, the
  * reminder waits: Needs you wins over In progress, so it made the reply look
@@ -295,10 +316,23 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
     const parent = i.parent ? byId.get(i.parent) : undefined;
     if (!parent) continue;
     if (parent.status === 'done' && parent.wrote?.status?.source === 'founder') continue;
+    if (hiddenUntil(parent) > now) continue; // in Later: it comes back when Later ends
     if (parent.status === 'claimed' || (liveAnswer(parent) && !answerSettled(parent))) continue;
     owed.add(parent.id);
   }
   return owed;
+}
+
+/**
+ * Whether an action held for Z starts an agent on the row it holds: a reply, an
+ * approval or a pick on that row. Only those read as In progress while held; a
+ * close starts nothing, and "do it in this thread" starts the parent instead.
+ */
+export function heldRowStarts(
+  row: { product: string; id: string },
+  goes: { product: string; id: string } | null | undefined,
+): boolean {
+  return !!goes && goes.id === row.id && goes.product === row.product;
 }
 
 // In progress promises that a worker is on this row or about to be, so it
@@ -321,6 +355,7 @@ export function belongsInProgress(
   // Nothing will start it, so it is in Needs you (`belongsInInbox`).
   if (stopped) return false;
   if (i.status === 'claimed') return true;
+  if (setByPerson(i)) return false;
   // A session acted on her answer and finished, so nothing is coming and the
   // inbox shows it instead. Both lists read the same fact.
   if (answerSettled(i)) return false;
@@ -395,11 +430,11 @@ export function withdrawReply(statusWhenReplied: string): { answer: string; stat
   return { answer: '(withdrawn)', status: statusWhenReplied };
 }
 
-// A reply clears the schedule, whoever set it, because the supervisor's
-// continuation pass skips an answered row that is not yet due, so the reply
-// would sit unread until then. The undo on the reply puts the old moment back.
+// A reply lifts a reminder, which only hides the row. A moment to run is left
+// alone: the reply runs now anyway (`wordWaits`, shared/work-items.mjs) and the
+// moment stays for the run it was set for.
 export function replyClearsSchedule(i: InboxItem, now = Date.now()): boolean {
-  return Math.max(i.runAt ?? 0, i.snoozedUntil ?? 0) > now;
+  return (i.snoozedUntil ?? 0) > now;
 }
 
 export type ClickTarget = 'row' | 'box';
@@ -452,6 +487,19 @@ export function rowSummary(
 // A title the user wrote after the label is a rename and wins, because the
 // ledger drops empty fields and so cannot erase a label. A whitespace label
 // falls through to the title, so no row is drawn without a name.
+const sameWords = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}']+/gu, ' ').trim();
+
+/** What a row says after its title, unless that only says the title again. */
+export function asideBesides(title: string, aside: string | null | undefined): string | null {
+  if (!aside) return null;
+  const t = sameWords(title);
+  const a = sameWords(aside);
+  if (!t) return aside;
+  if (a === t) return null;
+  if (t.split(' ').length >= 3 && (a.startsWith(`${t} `) || a.endsWith(` ${t}`))) return null;
+  return aside;
+}
+
 export function rowTitle(i: {
   title?: string;
   label?: string;
@@ -462,12 +510,7 @@ export function rowTitle(i: {
   // A teammate's thread reads as its message to you, and before it has said
   // anything, as its own title, never a name guessed from its opening line.
   if (teammateIdOf(i)) return (i.result ?? '').split('\n').map((l) => searchText(l).trim()).find(Boolean) || (i.title ?? '');
-  const label = (i.label ?? '').trim();
-  if (!label) return i.title ?? '';
-  const theirs = i.wrote?.title;
-  const ours = i.wrote?.label;
-  const renamed = !!theirs && !!ours && theirs.source === 'founder' && theirs.ts > ours.ts;
-  return (renamed && (i.title ?? '').trim()) || label;
+  return shownTitle(i);
 }
 
 // The schedule box names a thread the way the list does, not by its raw title

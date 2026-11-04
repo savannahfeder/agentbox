@@ -2,11 +2,13 @@
 // window reads (`TeamView`). Built once per snapshot in App and handed down
 // through `TeamContext`, so no component has to know where the team came from.
 // The pure rules (names, due days, who a row is from) are in ./company.ts.
-import { createContext } from 'react';
+import { createContext, type CSSProperties, type ReactNode } from 'react';
 import type { Person, Product, TeamState, WorkItem } from '../types';
 import { isShared } from '../../../shared/team-rules.mjs';
 import { visibilityOf } from '../../../shared/thread-cards.mjs';
 import { dueWords, firstName, personOf, sentFrom } from './company';
+import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mjs';
+import { initialsOf } from './rooms/room-rules';
 import './team.css';
 
 export { dueWords, firstName, personOf };
@@ -34,13 +36,29 @@ export function teamView(state: TeamState | null | undefined, products: Product[
   };
 }
 
-const initials = (person: Person | undefined | null) => firstName(person).slice(0, 2);
+/** Letter size for a face `px` wide: big enough to read at 16, never shouting at 72. */
+const lettersAt = (px: number) => Math.round(Math.min(px * 0.45, 6 + px * 0.2) * 2) / 2;
 
-/** A square face: their photo when they have one, else their initials. */
-export function Face({ person, me, agent, size }: { person?: Person | null; me?: boolean; agent?: boolean; size?: 'lg' | 'sm' }) {
-  const cls = `tm-av${me ? ' you' : ''}${agent ? ' bot' : ''}${size ? ` ${size}` : ''}`;
-  if (person?.avatarUrl && !agent) return <img className={`${cls} tm-ph`} src={person.avatarUrl} alt="" referrerPolicy="no-referrer" />;
-  return <span className={cls} aria-hidden="true">{initials(person)}</span>;
+/** The one drawing of a person, round: a photo, else two letters. Without a
+ *  numeric `size` the surrounding rule sizes it. */
+export function Face({ person, name, url, me, agent, size, children }: {
+  person?: Person | null;
+  name?: string;
+  url?: string | null;
+  me?: boolean;
+  agent?: boolean;
+  size?: 'lg' | number;
+  /** Drawn in place of the letters, when there is no name to take them from. */
+  children?: ReactNode;
+}) {
+  const cls = `tm-av${me ? ' you' : ''}${agent ? ' bot' : ''}${size === 'lg' ? ' lg' : ''}`;
+  const box: CSSProperties | undefined = typeof size === 'number'
+    ? { width: size, height: size, lineHeight: `${size - 2}px`, fontSize: lettersAt(size) }
+    : undefined;
+  const photo = url ?? person?.avatarUrl;
+  if (photo && !agent) return <img className={`${cls} tm-ph`} src={photo} style={box} alt="" referrerPolicy="no-referrer" />;
+  const letters = name !== undefined ? initialsOf(name) : firstName(person).slice(0, 2);
+  return <span className={cls} style={box} aria-hidden="true">{children ?? letters}</span>;
 }
 
 /** The row end's who-or-where: a teammate's face and name on a row from them,
@@ -50,7 +68,7 @@ export function TeamRowEnd({ item, team }: { item: WorkItem; team: TeamView | nu
   const product = team?.products.get(item.product);
   const sent = team ? sentFrom(item, product, team.me) : null;
   const person = sent ? team!.byId.get(sent.from) : undefined;
-  const due = item.assignee === team?.me ? dueWords(item.due) : null;
+  const due = team ? dueSaid(deadlineOf(item, team.me), Date.now())?.word ?? null : null;
   // Privacy is per thread now (approved 2026-10-01), so the lock follows the
   // thread's own choice, not whether its project is shared.
   // In your personal project that choice is Only you until you make another.

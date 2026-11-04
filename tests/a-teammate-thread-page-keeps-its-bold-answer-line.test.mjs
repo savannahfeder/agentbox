@@ -67,7 +67,7 @@ describe("a teammate's answer", () => {
   });
 
   it('the page hands the summary and the answer the run name, and signs only a teammate run', () => {
-    expect(thread).toMatch(/title=\{pageTitle\(item\)\}/);
+    expect(thread).toMatch(/title=\{(talkName \?\? )?pageTitle\(item\)\}/);
     expect(thread).toMatch(/<QueueAnswer text=\{clean\(newest\.text\)\} md=\{md\} name=\{pageTitle\(item\)\} by=\{signer \? \{ t: signer, at: newest\.at \} : null\} \/>/);
     expect(thread).toMatch(/const signer = teammateId \? teammates\.get\(teammateId\) \?\? null : null;/);
   });

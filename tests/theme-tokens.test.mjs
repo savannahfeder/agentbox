@@ -51,7 +51,7 @@ describe('every token exists in both themes', () => {
     // --tag-radius joined them for a sharper version of the same reason: a tag
     // is square in every theme AND under every skin, so it is declared exactly
     // once and re-declaring it anywhere is the bug.
-    const SHARED = new Set(['--mono', '--radius', '--tag-radius']);
+    const SHARED = new Set(['--mono', '--radius', '--tag-radius', '--mate-corner', '--artifact-corner', '--artifact-corner-small']);
     const missing = [...light].filter((t) => !dark.has(t) && !SHARED.has(t));
     expect(missing).toEqual([]);
   });
@@ -242,7 +242,7 @@ describe('no raw colour outside the token blocks', () => {
       // How tall the approval card is, written onto the page by
       // ../renderer/src/room-for-the-card.ts so the list ends above it.
       // Geometry only the running window knows.
-      '--approval-room',
+      '--approval-room', '--approval-lift',
       '--did-mark', '--did-gap', '--did-hang']);
     expect([...used].filter((t) => !light.has(t) && !local.has(t))).toEqual([]);
   });

@@ -111,9 +111,13 @@ export function wayOut(following: Followed, focused: unknown): 'inbox' | 'stay' 
  * A FOLLOWED ROW STILL TAKES EVERY COPY, unchanged. That case is watching a
  * command answer in four seconds and has never needed a reason to redraw.
  *
+ * Keep-on-this-Mac and a hand-back are laid over the row by the supervisor
+ * without moving `updatedAt`, so a change to either counts too: the Runs on
+ * button reads them (w-bac3eb6bd2).
+ *
  * Returns the copy to take, or null for leave it alone.
  */
-export function freshCopy<T extends { id: string; product: string; updatedAt?: number }>(
+export function freshCopy<T extends { id: string; product: string; updatedAt?: number; onMac?: boolean; needsMac?: string }>(
   items: readonly T[],
   focused: T | null,
   following: Followed,
@@ -122,5 +126,6 @@ export function freshCopy<T extends { id: string; product: string; updatedAt?: n
   const fresh = items.find((i) => i.id === focused.id && i.product === focused.product);
   if (!fresh || fresh === focused) return null;
   if (following) return fresh;
+  if (!!fresh.onMac !== !!focused.onMac || (fresh.needsMac ?? null) !== (focused.needsMac ?? null)) return fresh;
   return (fresh.updatedAt ?? 0) !== (focused.updatedAt ?? 0) ? fresh : null;
 }

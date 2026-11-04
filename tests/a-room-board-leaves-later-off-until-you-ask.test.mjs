@@ -34,23 +34,23 @@ const draw = (props = {}) => renderToStaticMarkup(React.createElement(TeamContex
 const columns = (html) => [...html.matchAll(/class="rm-bcol"[\s\S]*?class="th-col-h">([\s\S]*?)<b>/g)].map((m) => m[1].replace(/<[^>]+>/g, ''));
 
 describe('the room’s board without Later', () => {
-  it('has three columns and none of Later’s threads', () => {
+  it('has two columns and none of Later’s threads', () => {
     const html = draw();
-    expect(columns(html)).toEqual(['Waiting', 'In progress', 'Done today']);
+    expect(columns(html)).toEqual(['In progress', 'Done today']);
     expect(html).not.toContain('App Store screenshots');
-    expect(html).toContain('--cols:3');
+    expect(html).toContain('--cols:2');
   });
-  it('keeps your order of the three', () => {
-    expect(columns(draw({ columnOrder: ['done', 'scheduled', 'running', 'waiting'] }))).toEqual(['Done today', 'In progress', 'Waiting']);
+  it('keeps your order of the two', () => {
+    expect(columns(draw({ columnOrder: ['done', 'scheduled', 'running', 'waiting'] }))).toEqual(['Done today', 'In progress']);
   });
 });
 
 describe('the room’s board with Later', () => {
-  it('has all four columns, Later where your order puts it', () => {
+  it('has all three columns, Later where your order puts it', () => {
     const html = draw({ later: true });
-    expect(columns(html)).toEqual(['Waiting', 'In progress', 'Later', 'Done today']);
+    expect(columns(html)).toEqual(['In progress', 'Later', 'Done today']);
     expect(html).toContain('App Store screenshots');
-    expect(html).toContain('--cols:4');
+    expect(html).toContain('--cols:3');
   });
 });
 

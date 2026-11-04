@@ -48,8 +48,10 @@ describe('a reset is said to the nearest minute', () => {
 const session = (percent, resetsAt, extra = {}) => ({ span: 'session', qualifier: null, name: 'This session', percent, resetsText: null, resetsOn: null, resetsAt, zone: null, ...extra });
 
 describe('a window that has reset', () => {
-  it('the reported case:a session read at 100% that reset since reads 0, with no time', () => {
-    expect(meterPair([session(100, NOW - 60_000)], NOW)[0]).toMatchObject({ percent: 0, resets: null });
+  // Since 2026-10-31 it has no number rather than 0, which nobody read
+  // (tests/a-meter-past-its-reset-shows-no-number).
+  it('the reported case:a session read at 100% that reset since has no number, and says it reset', () => {
+    expect(meterPair([session(100, NOW - 60_000)], NOW)[0]).toMatchObject({ percent: null, resets: 'Reset' });
   });
 
   it('must NOT empty a window that has yet to reset, or one whose reset is not known', () => {

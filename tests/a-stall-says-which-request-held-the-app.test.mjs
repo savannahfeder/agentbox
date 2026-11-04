@@ -6,7 +6,7 @@
 // the main process went without answering, and every request from the window
 // that held it for 100 ms or more, by name.
 import { describe, it, expect } from 'vitest';
-import { stallWatch, SLOW_MS } from '../main/stall-watch.mjs';
+import { stallWatch, SLOW_MS } from '../main/stall-watch.mts';
 
 // A clock that moves only when a handler says it worked.
 function watched() {

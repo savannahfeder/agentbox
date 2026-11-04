@@ -9,6 +9,8 @@
 // and any group, from anywhere, opens as the Groups page. Since 2026-10-24
 // Groups is a row in the narrow sidebar rather than a tab
 // (tests/with-groups-the-sidebar-stays-narrow-and-widens-when-pointed-at).
+// A mention on a group's file also says which file to open on (f3502f31) and
+// still opens through openRoom.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { groupInTab } from '../renderer/src/team/rooms/room-rules.ts';
@@ -38,7 +40,7 @@ describe('every group opens as the Groups page', () => {
     expect(hook).toMatch(/const openRoom = \(id: string\) => \{[^}]*setOpenId\(id\);[^}]*setLastId\(id\); writeRoomTab\(id\);/);
   });
   it('a mention, a chat started from someone’s page, a group joined or started all go through it', () => {
-    expect(hook).toContain('const openMention = (m: RoomMention) => openRoom(m.roomId);');
+    expect(hook).toMatch(/const openMention = \(m: RoomMention\) => \{[^}]*\}\);\s*openRoom\(m\.roomId\);\s*\};/);
     expect(hook).toMatch(/id = res\.value;\s*\}\s*openRoom\(id\);\s*\};/);
     expect(hook.match(/if \(res\.value\) openRoom\(res\.value\);/g)).toHaveLength(2);
   });

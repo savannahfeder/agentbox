@@ -11,7 +11,8 @@ export function hourWords(ts: number): string {
   return `${h % 12 || 12}${m ? `:${String(m).padStart(2, '0')}` : ''}${h < 12 ? 'am' : 'pm'}`;
 }
 
-export interface Meter { key: string; word: string; percent: number; resets: string | null }
+/** `percent` is null for a window that has reset since it was read. */
+export interface Meter { key: string; word: string; percent: number | null; resets: string | null }
 
 /**
  * "6:19pm" today, "Thu 4pm" this week, "Tue Oct 27, 1pm" six or more days out
@@ -37,17 +38,21 @@ export function meterPair(limits: UsageLimit[] | undefined | null, now = Date.no
   const all = limits ?? [];
   const session = all.find((l) => l.span === 'session');
   const week = all.find((l) => l.span === 'week' && (!l.qualifier || /all/i.test(l.qualifier))) ?? all.find((l) => l.span === 'week');
-  // A number read in a window that has since reset belongs to the old window.
-  const percent = (l: UsageLimit) => (l.resetsAt && l.resetsAt <= now ? 0 : Math.round(l.percent));
+  // A window that has reset since it was read: its number belongs to the old
+  // window, and the new one has not been read, so it has none.
+  const meter = (key: string, word: string, l: UsageLimit): Meter => {
+    const over = !!l.resetsAt && l.resetsAt <= now;
+    return { key, word, percent: over ? null : Math.round(l.percent), resets: over ? 'Reset' : resetWords(l, now) };
+  };
   const models = all.filter((l) => l.span === 'week' && l !== week && l.qualifier && Number.isFinite(l.percent));
   return [
-    ...(session && Number.isFinite(session.percent) ? [{ key: 'session', word: 'Session', percent: percent(session), resets: resetWords(session, now) }] : []),
-    ...(week && Number.isFinite(week.percent) ? [{ key: 'week', word: 'Week', percent: percent(week), resets: resetWords(week, now) }] : []),
-    ...models.map((l) => ({ key: `week:${l.qualifier}`, word: l.qualifier!, percent: percent(l), resets: resetWords(l, now) })),
+    ...(session && Number.isFinite(session.percent) ? [meter('session', 'Session', session)] : []),
+    ...(week && Number.isFinite(week.percent) ? [meter('week', 'Week', week)] : []),
+    ...models.map((l) => meter(`week:${l.qualifier}`, l.qualifier!, l)),
     // Codex's other windows (shared/codex-usage.mjs `windowSpan`), which the
     // type does not list: a free plan's month, or one named by its length.
     ...all.filter((l) => ['month', 'window'].includes(l.span) && Number.isFinite(l.percent))
-      .map((l) => ({ key: l.span as string, word: (l.span as string) === 'month' ? 'Month' : l.name, percent: percent(l), resets: resetWords(l, now) })),
+      .map((l) => meter(l.span as string, (l.span as string) === 'month' ? 'Month' : l.name, l)),
   ];
 }
 

@@ -104,6 +104,7 @@ describe('leaving a room', () => {
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     expect(app).toMatch(/if \(e\.key === 'Escape'\) \{ e\.preventDefault\(\); roomsUi\.close\(\); \}/);
     expect(app).toMatch(/const openView = \(next: View\) => \{ roomsUi\.leave\(\);/);
+    expect(app).toMatch(/const openView = [^\n]*setChatsDirect\(null\)/);
     expect(app).toContain('onView={openView}');
     expect(app.match(/onView=\{\(next\) => \{ roomsUi\.leave\(\);/g)).toHaveLength(1);
     expect(app).not.toMatch(/onView=\{\(?next\)? => \{ roomsUi\.close\(\)/);
@@ -114,15 +115,13 @@ describe('the chat looks as approved', () => {
   // The founder, 2026-10-21, with a picture: the invite and full-page buttons
   // sat right after the room's name; round 23 puts them at the panel's right
   // end. `.ic:first-of-type` never matched, because the name is a button too.
-  // And the day labels lose their hairline: "the headers alone are enough".
   const css = fs.readFileSync(new URL('../renderer/src/team/rooms/rooms.css', import.meta.url), 'utf8');
   it('the chat head’s buttons sit at its right end', () => {
     expect(css).toMatch(/\.rm-chat-head \.rm-switch \+ \.ic \{ margin-left: auto; \}/);
     expect(css).not.toMatch(/\.ic:first-of-type/);
   });
-  it('a day label in the chat has no rule beside it', () => {
-    expect(css).not.toMatch(/\.rm-day::after/);
-  });
+  // Undone on 2026-11-01: a group chat's day line now matches a teammate
+  // chat's, between two rules (a-group-chat-reads-as-plainly-as-a-teammate-chat).
 });
 
 describe('the rest of round 23, checked screen by screen on 2026-10-21', () => {
@@ -163,7 +162,8 @@ describe('the rest of round 23, checked screen by screen on 2026-10-21', () => {
   it('a full page has its own title and no state tabs', () => {
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     expect(app).toMatch(/roomShown && roomsUi\.heading \? roomsUi\.heading\.title : <h1 className="workspace-title">Threads<\/h1>/);
-    expect(app).toMatch(/\{search === null && !\(roomShown && roomsUi\.heading\) && \(\s*<StateTabs/);
+    // A place beside the team rail also draws none (2026-10-30), so a further condition may follow.
+    expect(app).toMatch(/\{search === null && !\(roomShown && roomsUi\.heading\) && (?:!\([^)]*\) && )?\(\s*<StateTabs/);
     expect(app).toMatch(/roomShown && roomsUi\.heading\?\.right !== undefined \? roomsUi\.heading\.right : \(?\s*<HeaderActions/);
   });
 });

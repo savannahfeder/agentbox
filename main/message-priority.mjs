@@ -9,6 +9,7 @@
 // writes it onto the row as an agent. A level the person set by hand wins, by
 // the fold's own rule, and this does not ask again after one.
 import { askSmallModel } from './row-label.mjs';
+import { isTaskRow } from '../shared/team-rules.mjs';
 
 /** The four words, onto the app's own values (renderer/src/priority.ts). */
 export const LEVELS = { urgent: 9, high: 7, medium: 5, low: 2 };
@@ -38,7 +39,7 @@ export function latestMessage(item) {
  */
 export function wantsPriority(item, product, me) {
   if (!me || !item || item.agent) return false;
-  if (!product?.team?.direct) return false;
+  if (!product?.team?.direct || isTaskRow(item)) return false;
   if (!LIVE.has(item.status)) return false;
   if (item.assignee !== me) return false;
   const latest = latestMessage(item);

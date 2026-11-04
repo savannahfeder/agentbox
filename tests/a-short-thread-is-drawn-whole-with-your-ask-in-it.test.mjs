@@ -55,13 +55,14 @@ describe('how many messages a thread can hide before the fold is worth it', () =
 
 describe('where the page reads it', () => {
   it('both folds, the newest answer alone and the view from the answer she followed up, ask it', () => {
-    expect(thread).toMatch(/const short = !earlierOpen && drawnWhole\(behind\);/);
-    expect(thread).toMatch(/const from = short \? -1 : stands;/);
-    expect(thread).toMatch(/if \(queue && newest && !earlierOpen && !short && from < 0\)/);
+    // A brought-in chat folds (an-imported-chat-opens-on-the-clean-page).
+    expect(thread).toMatch(/const short = !earlierOpen && drawnWhole\(behind, broughtIn\(item\)\);/);
+    expect(thread).toMatch(/const from = short \|\| earlierOpen \? -1 : start;/);
+    expect(thread).toMatch(/if \(alone && !earlierOpen && !short\)/);
   });
 
   it('and a thread drawn whole offers no fold to open', () => {
     expect(thread).toMatch(/earlier=\{short \? 0 : behind\}/);
-    expect(thread).toMatch(/steps=\{!short && !!newest && /);
+    expect(thread).toMatch(/steps=\{!short && alone && /);
   });
 });

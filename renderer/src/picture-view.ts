@@ -49,6 +49,38 @@ export function fitScale(natural: { w: number; h: number }, box: { w: number; h:
   return Math.min(1, box.w / natural.w, box.h / natural.h);
 }
 
+// Fitted by its height, a picture narrower than this share of the box is a strip nobody can read.
+const STRIP = 0.6;
+// A phone screenshot, 16:9 to 19.5:9 with room for a status bar. Longer is a scrolled page.
+const PHONE_SHORTEST = 1.6;
+const PHONE_TALLEST = 2.4;
+// Drawn this wide, a phone screen's words are near their own size.
+const PHONE_READABLE_PX = 300;
+
+/**
+ * The scale a picture opens at, and the scale that shows all of it. A tall one
+ * fits the width and scrolls, never past its real pixels, unless it is a phone
+ * screen that reads whole.
+ */
+export function pictureFit(natural: { w: number; h: number }, box: { w: number; h: number }): { scale: number; tall: boolean; whole: number } {
+  if (!(natural.w > 0 && natural.h > 0 && box.w > 0 && box.h > 0)) return { scale: 1, tall: false, whole: 1 };
+  const byWidth = Math.min(1, box.w / natural.w);
+  const whole = Math.min(byWidth, box.h / natural.h);
+  const drawn = natural.w * whole;
+  const aspect = natural.h / natural.w;
+  const phone = aspect >= PHONE_SHORTEST && aspect <= PHONE_TALLEST && drawn >= Math.min(natural.w, PHONE_READABLE_PX);
+  const tall = natural.h * byWidth > box.h && drawn < STRIP * box.w && !phone;
+  return { scale: tall ? byWidth : whole, tall, whole };
+}
+
+/** The zoom, counted from the opening scale, that shows the whole picture. */
+export const lowestZoom = (fit: { scale: number; whole: number }) => (fit.scale > 0 ? Math.min(1, fit.whole / fit.scale) : 1);
+
+/** How far a picture drawn at `size` times `zoom` may move from the middle of the box. */
+export function panLimits(size: { w: number; h: number }, zoom: number, box: { w: number; h: number }) {
+  return { x: Math.max(0, (size.w * zoom - box.w) / 2), y: Math.max(0, (size.h * zoom - box.h) / 2) };
+}
+
 /**
  * Where a click takes the zoom. From fitted it goes to the picture's real
  * pixels, which is what a screenshot is opened for; a picture already shown at
@@ -70,8 +102,8 @@ export function panToKeep(at: { x: number; y: number }, pan: { x: number; y: num
   return { x: at.x - (at.x - pan.x) * k, y: at.y - (at.y - pan.y) * k };
 }
 
-export function zoomBy(zoom: number, factor: number): number {
-  return Math.min(MAX_ZOOM, Math.max(1, zoom * factor));
+export function zoomBy(zoom: number, factor: number, floor = 1): number {
+  return Math.min(MAX_ZOOM, Math.max(Math.min(1, floor), zoom * factor));
 }
 
 export function stepTo(index: number, count: number, by: number): number {
@@ -85,8 +117,8 @@ type Point = { x: number; y: number };
  * when the pinch began stays under them as they spread and move together.
  * Points are offsets from the middle of the stage.
  */
-export function pinchTo(start: { distance: number; zoom: number; pan: Point; mid: Point }, distance: number, mid: Point) {
-  const zoom = start.distance > 0 ? zoomBy(start.zoom, distance / start.distance) : start.zoom;
+export function pinchTo(start: { distance: number; zoom: number; pan: Point; mid: Point }, distance: number, mid: Point, floor = 1) {
+  const zoom = start.distance > 0 ? zoomBy(start.zoom, distance / start.distance, floor) : start.zoom;
   const kept = panToKeep(start.mid, start.pan, start.zoom, zoom);
   return { zoom, pan: { x: kept.x + mid.x - start.mid.x, y: kept.y + mid.y - start.mid.y } };
 }

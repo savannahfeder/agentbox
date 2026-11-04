@@ -84,7 +84,7 @@ describe('what the pane does with one', () => {
     expect(docKind('STATE.md')).toBe('markdown');
     expect(docKind('attachments/shot.png')).toBe('image');
     expect(docKind('runs/w-1.change')).toBe('code');
-    expect(docKind('reports/audit.pdf')).toBeNull();
+    expect(docKind('reports/audit.xlsx')).toBeNull();
     // A local app keeps no kind of its own: DocPane falls back to a frame.
     expect(docKind('http://localhost:3006/')).toBeNull();
   });
@@ -151,9 +151,9 @@ describe('the thread hands a web link to the pane', () => {
     expect(read('renderer/src/components/Focus.tsx')).toContain('whereALinkGoes(href, click');
   });
 
-  it('still hands a pdf and a source file to the app that owns them', () => {
-    expect(opensInPane('reports/audit.pdf')).toBe(false);
-    expect(opensInPane('main/ipc.mjs')).toBe(false);
+  it('still hands a spreadsheet to the app that owns it; a script draws in the pane', () => {
+    expect(opensInPane('reports/audit.xlsx')).toBe(false);
+    expect(opensInPane('main/ipc.mjs')).toBe(true);
   });
 });
 

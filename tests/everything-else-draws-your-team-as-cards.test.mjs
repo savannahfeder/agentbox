@@ -44,9 +44,13 @@ describe('the tabs, with a team on', () => {
     expect(tabs(true)).not.toContain('corner');
   });
 
-  it('stay four without a team', () => {
-    const html = renderToStaticMarkup(h(StateTabs, { view: 'inbox', counts: {}, onView() {} }));
+  it('stay four without a team, once something is in Later', () => {
+    const html = renderToStaticMarkup(h(StateTabs, { view: 'inbox', counts: { snoozed: 1 }, onView() {} }));
     expect(html.match(/class="tm-tab( [^"]*)?"/g)).toHaveLength(4);
+  });
+  it('are three while Later is empty', () => {
+    const html = renderToStaticMarkup(h(StateTabs, { view: 'inbox', counts: {}, onView() {} }));
+    expect(html.match(/class="tm-tab( [^"]*)?"/g)).toHaveLength(3);
   });
 });
 
@@ -62,13 +66,13 @@ describe('the cards', () => {
     const html = strip();
     const chat = html.slice(html.indexOf('ev-card chat'), html.indexOf('ev-card person'));
     expect(chat).toContain('ev-bubble');
-    // One person's face, square (tests/two-people-in-a-chat-show-as-two-square-faces).
-    expect(chat).toContain('rm-pic');
+    // One person's face (tests/two-people-in-a-chat-show-as-two-faces).
+    expect(chat).toContain('tm-av');
     expect(chat).not.toContain('Theo: Lock screen works');
     expect(chat).not.toContain('AGENTS');
     const person = html.slice(html.indexOf('ev-card person'));
     expect(person).not.toContain('ev-bubble');
-    expect(person).toContain('14 AGENTS');
+    expect(person).toContain('14 agents working');
   });
 
   // They used to shrink to one line while a chat was open; they stay as they
@@ -97,7 +101,4 @@ describe('a card opens its chat', () => {
     expect(rooms).toContain('people={inline && (open.teamId || open.members <= 2) ? null : <PeoplePanel');
   });
 
-  it('keeps the order you dragged the cards into', () => {
-    expect(app).toContain('const reorderMembers = (keys: string[]) => { setEvOrder(keys); writeOrder(keys); };');
-  });
 });

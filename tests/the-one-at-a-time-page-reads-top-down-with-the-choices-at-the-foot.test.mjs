@@ -86,17 +86,18 @@ describe('a page or a note the answer names is read in place', () => {
   it('tells a note from a page', () => {
     expect(renderToStaticMarkup(h(QueueFile, { product: 'p', path: 'reports/listings.md', md, onOpen: noop }))).toContain('one-file one-note');
   });
-  it('and the thread page draws them in this mode in place of the tiles', () => {
+  it('but the thread page no longer draws them; the answer names them (w-658f249bb9)', () => {
     const focus = read('renderer/src/components/Focus.tsx');
-    expect(focus).toContain('inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && <QueueFile');
+    expect(focus).not.toContain('<QueueFile');
     expect(focus).toContain('{!page && inlineArtifacts && !previewSample && <MessageFiles');
   });
 });
 
 describe('the corner', () => {
-  it('says where you are and steps up and down', () => {
+  // The "2 of 5" beside the arrows went in w-1c1092f465, as clutter.
+  it('steps up and down', () => {
     const html = renderToStaticMarkup(h(QueueNav, { spot: { pos: 2, total: 5, index: 1 }, onStep: noop }));
-    expect(visible(html)).toBe('2 of 5');
+    expect(visible(html)).toBe('');
     expect(html).toContain('aria-label="Previous thread (K)"');
     expect(html).toContain('aria-label="Next thread (J)"');
   });

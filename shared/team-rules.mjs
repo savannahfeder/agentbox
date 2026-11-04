@@ -5,9 +5,33 @@
 //
 // A project is shared when its record carries a team id (main/team/projects.mjs).
 // Everything here leaves a private project exactly as it always was.
-import { pickFields } from './work-items.mjs';
+import { GIVEN_TASK, WORK_THREAD, pickFields } from './work-items.mjs';
+import { blockedOnMe, deadlineOf, isLate } from './team-tasks.mjs';
 
 export const isShared = (product) => !!product?.team?.projectId;
+
+// A thread's label is a person's only when a person wrote it; the row namer
+// writes one from the first message, and a chat with a person is named for them.
+export const nameIsAPersons = (item) => !!String(item?.label ?? '').trim() && item?.wrote?.label?.source !== 'agent';
+
+// The cloud fills a missing name with the part before the @, which tells nobody who it is.
+const ownName = (p) => {
+  const name = String(p?.name ?? '').trim();
+  const local = String(p?.email ?? '').split('@')[0];
+  return name && name !== local ? name : '';
+};
+
+/** The team as it is drawn: each person once, someone with no name of their own by their email. */
+export function teamPeopleShown(people) {
+  const seen = new Set();
+  const out = [];
+  for (const p of people ?? []) {
+    if (!p?.id || seen.has(p.id)) continue;
+    seen.add(p.id);
+    out.push(ownName(p) || !p.email ? p : { ...p, name: p.email });
+  }
+  return out;
+}
 
 // THE PERSON WHOSE MAC RUNS AGENTS ON A ROW: whoever it was handed to, else
 // whoever started it, else (a row from before anyone signed in) whoever shared
@@ -19,8 +43,35 @@ export function runnerOf(item, product) {
 // A row a person has been given waits for that person, not for an agent.
 export const heldByAPerson = (item) => !!item?.assignee && item.assignee !== 'agent';
 
+// A TASK GIVEN TO A PERSON: a row of its own in the record the two of them share
+// for messages, because a project never leaves its Mac and this record does. The
+// mark is what tells it from the conversation beside it, and only the line that
+// makes the row can set it (whatATeammateMaySet).
+export { GIVEN_TASK };
+export const isTaskRow = (item) => (item?.labels ?? []).includes(GIVEN_TASK);
+export const isGivenTask = (item, product) => !!product?.team?.direct && isTaskRow(item);
+
+// A THREAD ABOUT ONE PIECE OF WORK, started with a subject, beside the
+// conversation in the same record. Talk without a subject never lands in one.
+export { WORK_THREAD };
+export const isWorkThread = (item) => (item?.labels ?? []).includes(WORK_THREAD);
+
+export function taskGiver(item) {
+  return (item?.people ?? []).find((p) => p !== item.assignee) ?? item?.createdBy ?? null;
+}
+
+// When a task last had words on it that were not yours; when it was made if none.
+export function taskNewsAt(item, me) {
+  const chat = item?.talk?.chat ?? [];
+  for (let k = chat.length - 1; k >= 0; k -= 1) if (chat[k].by !== me) return chat[k].ts;
+  return item?.createdAt ?? 0;
+}
+
 // May a worker run on this row on this Mac, signed in as `me`?
 export function mayRunHere(item, product, me) {
+  // Before the unshared answer: a person's row in a project of your own is theirs
+  // to do, and answering yes here is how a task to Dev ran on the sender's Mac.
+  if (heldByAPerson(item)) return false;
   if (!isShared(product)) return true;
   if (!me) return false;
   // A MESSAGE BETWEEN TWO PEOPLE NEVER RUNS AN AGENT, on either Mac. Turning
@@ -28,7 +79,6 @@ export function mayRunHere(item, product, me) {
   // thread of your own in the project the mention names; nothing a teammate
   // writes into the shared record can start one here.
   if (product?.team?.direct) return false;
-  if (heldByAPerson(item)) return false;
   // ONLY YOU PUT YOUR MAC IN CHARGE OF A ROW. A runner naming you that somebody
   // else's line wrote is a teammate trying to start an agent on your Mac with
   // their words, so it does not count.
@@ -79,7 +129,9 @@ export function lastSpeaker(item) {
 export function whatWaits(item, me) {
   const talk = item?.talk;
   if (!talk || !me) return null;
-  const settled = talk.settled?.[me] ?? 0;
+  // Your approval of a file answers what was said before it, as a reply would.
+  const approved = Math.max(0, ...(item.artifacts?.approvals ?? []).filter((a) => a.by === me).map((a) => a.ts ?? 0));
+  const settled = Math.max(talk.settled?.[me] ?? 0, approved);
   const since = (list) => { let n = 0; for (let k = list.length - 1; k >= 0 && list[k].by !== me && list[k].ts > settled; k -= 1) n += 1; return n; };
   const threads = [];
   for (const [uid, t] of Object.entries(talk.threads ?? {})) {
@@ -99,7 +151,7 @@ export function whatWaits(item, me) {
   return { chat: since(talk.chat ?? []), threads: threads.map(({ at, ...t }) => t) };
 }
 
-export function inMyInbox(item, product, me) {
+export function inMyInbox(item, product, me, now = Date.now()) {
   if (!isShared(product) || !me) return true;
   // A CONVERSATION NEEDS WHOEVER DID NOT SPEAK LAST (2026-10-01), so a message
   // to three people is in all three inboxes until one of them answers, and the
@@ -108,6 +160,15 @@ export function inMyInbox(item, product, me) {
   // each thread you are in. One row, whichever of them is waiting.
   if (product?.team?.direct) {
     if (item.status === 'done') return false;
+    // What it waited on ended (the person left the team), and you have not
+    // spoken since: it is yours to decide again.
+    if (item.waitEnded?.at > Math.max(0, ...(item.talk?.chat ?? []).filter((s) => s.by === me).map((s) => s.ts ?? 0))) return true;
+    // A task someone gave you that is past its deadline is yours to act on again.
+    if (isTaskRow(item) && item.assignee === me && taskGiver(item) !== me && isLate(deadlineOf(item, me), now)) return true;
+    // A task blocked on you waits on you until you next write on it.
+    if (blockedOnMe(item, me)) return true;
+    // Same for a task: writing back does not hand it over, but once its holder
+    // has answered it waits on them in In progress, not in their Needs you.
     const waits = whatWaits(item, me);
     if (waits) return waits.chat > 0 || waits.threads.length > 0;
     const by = lastSpeaker(item);
@@ -117,13 +178,37 @@ export function inMyInbox(item, product, me) {
   return runnerOf(item, product) === me;
 }
 
-// A CONVERSATION WHERE YOU SPOKE LAST IS DONE FOR YOU (w-57a202a968), until
-// the other person writes again and `inMyInbox` brings it back. Without it a
-// message you answered was on no tab and no column: out of your inbox by the
-// rule above, never In progress, and not Done because its status is not done.
-// Her words: "It's not supposed to leave the board; it's supposed to go in Done."
+// A CLOSED ROW STILL OWES YOU WHAT ITS CLOSER SAID FIRST. The status is shared,
+// so someone answering and then closing would otherwise take their answer off
+// your list before you read it. `seen`: when you last opened the row.
+export function closedOverWords(item, product, me, seen = 0) {
+  if (!me || !product?.team?.direct || item?.status !== 'done') return false;
+  const closer = item.wrote?.status?.by;
+  if (!closer || closer === me) return false;
+  const waits = whatWaits(item, me);
+  if (!waits || (!waits.chat && !waits.threads.length)) return false;
+  const said = [...(item.talk.chat ?? []), ...Object.values(item.talk.threads ?? {}).flatMap((t) => t.replies ?? [])];
+  return said.some((s) => s.by !== me && s.ts > seen);
+}
+
+// A TASK THE OTHER PERSON CLOSED is news to you once: Close task closes it for
+// both, so the one who did not press it would otherwise never hear. Your E on
+// it puts the news away without a close of your own, which would land in
+// theirs. A week on it is old news.
+const CLOSE_NEWS_MS = 7 * 86_400_000;
+export function closedByTheOther(item, product, me, seen = 0, now = Date.now()) {
+  if (!me || !product?.team?.direct || !isTaskRow(item) || item.status !== 'done') return false;
+  const close = item.wrote?.status;
+  if (!close?.by || close.by === me || !(item.people ?? []).includes(close.by)) return false;
+  return close.ts > Math.max(seen, item.talk?.settled?.[me] ?? 0) && now - close.ts < CLOSE_NEWS_MS;
+}
+
+// A CONVERSATION WHERE YOU SPOKE LAST WAITS ON THE OTHERS, in In progress, until
+// one of them writes and `inMyInbox` brings it back. It used to count as Done
+// (w-57a202a968); nothing was finished, and the team could not find what they
+// were waiting on.
 export function iSpokeLast(item, product, me) {
-  if (!me || !product?.team?.direct || item?.status === 'done') return false;
+  if (!me || !product?.team?.direct || item?.status === 'done' || isTaskRow(item)) return false;
   // Done for you means nothing in it waits on you: the chat or any thread.
   const waits = whatWaits(item, me);
   if (waits) return waits.chat === 0 && waits.threads.length === 0;
@@ -134,7 +219,7 @@ export function iSpokeLast(item, product, me) {
 // goes back and forth between two inboxes instead of sitting in both. Returns
 // who it goes to, or null when a reply changes nothing about whose it is.
 export function handedOnByReply(item, product, me) {
-  if (!isShared(product) || !me || !heldByAPerson(item) || item.assignee !== me) return null;
+  if (!isShared(product) || !me || !heldByAPerson(item) || item.assignee !== me || isGivenTask(item, product)) return null;
   const people = Array.isArray(item.people) ? item.people : [];
   return people.find((p) => p !== me) || (item.createdBy && item.createdBy !== me ? item.createdBy : null);
 }
@@ -165,7 +250,18 @@ const A_TEAMMATE_MAY_SET = ['problem', 'progress', 'solution', 'blockedBy', 'blo
 // land in the middle of your chat instead of in the thread.
 // AND AN EDIT OR DELETION OF A MESSAGE, which the fold reads only from that
 // message's own author (shared/message-edits.mjs).
-const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'people', 'status', 'react', 'inReplyTo', 'edit'];
+// AND A TASK'S DUE DAY, which nothing outside this record reads.
+//
+// AND WHAT AN AGENT POSTED: a run writes a note or a result, and on a record that
+// is the message, so its owner read it and nobody else on the record did.
+//
+// AND A COMMENT OR APPROVAL ON A FILE, which is as much the conversation's as a
+// reaction and touches none of `STARTS_A_RUN`.
+//
+// AND WHICH AGENT WROTE A MESSAGE, OR WHICH AI TEAMMATE IT IS FOR, OR WHICH
+// NOTES ON A FILE IT HANDS AN AGENT. All only say how the words are drawn; the
+// owner they name is always the line's own writer.
+const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'note', 'result', 'people', 'status', 'react', 'inReplyTo', 'edit', 'due', 'artifact', 'voice', 'forAgent', 'fromNotes'];
 // AND THE LEVEL THE SENDER PICKED, ON THE OPENING LINE ALONE (w-7ba439c883).
 // A message now carries how urgent its sender thought it was, and that number
 // decides where it sits in the inbox it lands in, so it has to survive the
@@ -182,6 +278,7 @@ const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'people', 'status', 'react
 // opens no row that was closed to them, and nothing outside a conversation is
 // reachable either way.
 const WHEN_A_MESSAGE_OPENS = ['priority'];
+const TASK_AUDIENCE = ['visibility', 'visibleTo'];
 const opensARow = (patch) => 'kind' in patch;
 export function whatATeammateMaySet(line, { direct = false } = {}) {
   if (!line || typeof line !== 'object' || !line.patch || typeof line.patch !== 'object') return null;
@@ -190,6 +287,12 @@ export function whatATeammateMaySet(line, { direct = false } = {}) {
     : A_TEAMMATE_MAY_SET;
   const kept = {};
   for (const field of allowed) if (field in line.patch) kept[field] = line.patch[field];
+  if (direct && opensARow(line.patch) && isTaskRow(line.patch)) {
+    kept.labels = [GIVEN_TASK];
+    // Whether the team may read the task's card, which its holder publishes.
+    for (const field of TASK_AUDIENCE) if (field in line.patch) kept[field] = line.patch[field];
+  }
+  else if (direct && opensARow(line.patch) && isWorkThread(line.patch)) kept.labels = [WORK_THREAD];
   const patch = pickFields(kept);
   if (!patch) return null;
   return { id: line.id, ts: line.ts, source: line.source, by: line.by, uid: line.uid, patch };

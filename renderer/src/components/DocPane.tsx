@@ -35,16 +35,26 @@ import { addressYouTyped, canFrameAWebsite, isWebsiteAddress } from '../../../sh
 // doc-md / doc-html rather than off the theme.
 //
 // THE PANE HAS NO ZOOM OF ITS OWN, and it is not missing.
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api';
-import { crumbParts, docKind, docName, splitFromPointer, OPENING_SPLIT, type DocKind } from '../doc-pane';
+import { CodeFile } from './CodeFile';
+import { TableView } from './TableView';
+import { isTablePath } from '../table-file';
+import { FilmPlayer } from './FilmPlayer';
+import { PdfPages } from './PdfPages';
+import { crumbParts, docKind, docName, isPlainText, splitFromPointer, OPENING_SPLIT, type PaneKind } from '../doc-pane';
 import { pictureUrl } from '../picture';
+import { fetchableFileUrl } from '../phone-files';
 import { DocText } from './DocText';
 import { CodeArtifact } from './CodeArtifact';
 import type { Change } from '../code-artifact';
 import { NAME } from '../../../shared/product-name.mjs';
+import { shownName } from '../../../shared/artifact-marks.mjs';
 import { onPhone } from '../phone-screen';
+import { scrollKey, useKeptScroll } from '../kept-scroll';
+
+const COMING_LOOKS_MS = 3000;
 
 // The app's own icon recipe (SearchIcon.tsx): a 24 grid, a hairline, round
 // caps, no fill. 1.3 here rather than 1.1 because these two sit at 15px.
@@ -83,7 +93,7 @@ const CloseGlyph = () => (
 // and K and pressing the SAME chip again leaves `at` on the value it already
 // had, so nothing downstream would notice and the press would do nothing. This
 // changes on every press and is the whole reason it exists.
-export type OpenDoc = { product: string; src: string; auto?: boolean; at?: string; atFrom?: number };
+export type OpenDoc = { product: string; src: string; auto?: boolean; at?: string; atFrom?: number; readOnly?: boolean };
 
 // A website carries doc-html for what that class means: a card holding a
 // page whose colour the app cannot see into, so the header keeps its own dark
@@ -91,16 +101,24 @@ export type OpenDoc = { product: string; src: string; auto?: boolean; at?: strin
 // `<webview>` is a separate compositing layer and paints over everything the
 // card draws, so the hover-reveal toolbar doc-html normally gets would be
 // painted under the page and could never be pressed.
-function paneKindClass(kind: DocKind): string {
+const Beside = ({ aside, children }: { aside?: ReactNode; children: ReactNode }) =>
+  aside ? <div className="doc-notes-split">{children}{aside}</div> : <>{children}</>;
+
+function paneKindClass(kind: PaneKind): string {
   if (kind === 'html') return 'doc-html';
   if (kind === 'website') return 'doc-html doc-website';
   if (kind === 'code') return 'doc-code';
   if (kind === 'image') return 'doc-image';
+  if (kind === 'table') return 'doc-table';
   return 'doc-md';
 }
 
-export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, onMode, headerTarget, focusControlStyle }: {
+export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, onMode, headerTarget, focusControlStyle, aside, firstMark }: {
   focusControlStyle?: FocusControlStyle;
+  /** Drawn beside a document's words, inside the card: the notes sidebar. */
+  aside?: ReactNode;
+  /** A mark before the pane's own ones in the corner. */
+  firstMark?: ReactNode;
   headerTarget?: HTMLElement | null;
   mode?: ArtifactMode;
   onMode?: (mode: ArtifactMode) => void;
@@ -118,13 +136,15 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   // another link puts it away.
   const [typed, setTyped] = useState<{ from: string; to: string } | null>(null);
   const src = typed?.from === doc.src ? typed.to : doc.src;
-  const kind: DocKind = docKind(src) ?? 'html';
+  const kind: PaneKind = docKind(src) ?? (isTablePath(src) ? 'table' : isPlainText(src) ? 'text' : 'html');
   // Where the pane is standing. A webview keeps its own history, so after one
   // click the thread's address is no longer the page being read, and the bar
   // and the way out follow this rather than `doc.src`.
   const [here, setHere] = useState<Browsing>({ url: src, canBack: false, canForward: false, loading: true });
   const [webFailed, setWebFailed] = useState<string | null>(null);
   const [webReady, setWebReady] = useState(false);
+  const [codeBox, setCodeBox] = useState<HTMLDivElement | null>(null);
+  useKeptScroll(codeBox, scrollKey(doc.product, src));
   // What the bar presses. Filled in by the webview while it is mounted.
   const browsing = useRef<PageControl | null>(null);
   // Asked once: can this page draw a browser of its own.
@@ -152,20 +172,33 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   // Which file inside a change she is standing on, so the mark in this header
   // opens THAT file rather than the change as a whole.
   const [fileAt, setFileAt] = useState<string | null>(null);
+  // A file still on its way from a teammate looks again until it lands.
+  const [looks, setLooks] = useState(0);
+  const lookLater = (r: { coming?: boolean; waits?: boolean }) => { if (r.coming || r.waits) later.current = setTimeout(() => setLooks((n) => n + 1), COMING_LOOKS_MS); };
+  const later = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (later.current) clearTimeout(later.current); }, [doc.src]);
+  const pdfBytes = useCallback(async () => {
+    const res = await fetch(fetchableFileUrl(pictureUrl(resolved as string)));
+    if (!res.ok) throw new Error(`${res.status}`);
+    return new Uint8Array(await res.arrayBuffer());
+  }, [resolved]);
 
   useEffect(() => {
     let live = true;
-    setResolved(null); setText(null); setFailed(null); setMtime(0); setUrl(null); setChange(null);
+    setResolved(null); setText(null); setMtime(0); setUrl(null); setChange(null);
     setHere({ url: src, canBack: false, canForward: false, loading: true });
     setWebFailed(null); setWebReady(false);
     // A website is not looked for on disk: the address is the document.
-    if (kind === 'website') { setResolved(src); setUrl(src); return () => { live = false; }; }
-    if (isLocalPreview(src)) { setResolved(src); setUrl(src); return () => { live = false; }; }
+    if (kind === 'website') { setFailed(null); setResolved(src); setUrl(src); return () => { live = false; }; }
+    if (isLocalPreview(src)) { setFailed(null); setResolved(src); setUrl(src); return () => { live = false; }; }
     api.resolveDoc({ product: doc.product, src: doc.src }).then((r) => {
       if (!live) return;
-      if (!r.ok || !r.opened) { setFailed(r.error ?? 'That file could not be found.'); return; }
+      if (!r.ok || !r.opened) { setFailed(r.error ?? 'That file could not be found.'); lookLater(r); return; }
+      setFailed(null);
       setResolved(r.opened);
       setUrl(r.url ?? null);
+      // No page scheme on this copy (a browser tab): the page is drawn from its text.
+      if (kind === 'html' && !r.url) void api.readDoc({ product: doc.product, src: doc.src }).then((t) => { if (live && t.ok) setText(t.text ?? ''); });
     });
     if (kind === 'code') {
       api.codeChange({ product: doc.product, src: doc.src }).then((r) => {
@@ -174,7 +207,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
         setChange(r.change as Change);
       });
     }
-    if (kind === 'markdown') {
+    if (kind === 'markdown' || kind === 'text' || kind === 'table') {
       api.readDoc({ product: doc.product, src: doc.src }).then((r) => {
         if (!live) return;
         if (!r.ok) { setFailed(r.error ?? 'That file could not be read.'); return; }
@@ -183,7 +216,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
       });
     }
     return () => { live = false; };
-  }, [doc.product, doc.src, src, kind]);
+  }, [doc.product, doc.src, src, kind, looks]);
 
   // FULLY RESIZABLE, hers. The pointer is captured on the divider, so a fast
   // drag over the document's own iframe does not lose the grip — an iframe eats
@@ -264,11 +297,12 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
             {crumb.map((part, i) => (
               <span key={`${part}-${i}`} className="doc-crumb-part">
                 {i > 0 && <span className="doc-crumb-sep">›</span>}
-                <span className={i === crumb.length - 1 ? 'doc-crumb-leaf' : undefined}>{part}</span>
+                <span className={i === crumb.length - 1 ? 'doc-crumb-leaf' : undefined}>{i === crumb.length - 1 ? shownName(resolved ?? doc.src) || part : part}</span>
               </span>
             ))}
           </div>
           <span className="doc-marks">
+            {firstMark}
             {onMode && (focusControlStyle ? <FocusControl style={focusControlStyle} focused={!!headerTarget} onClick={() => onMode(headerTarget ? 'beside' : 'focus')}/> : !headerTarget && <button type="button" className="artifact-expand" aria-label="Expand preview" title="Expand preview to Focus" onClick={() => onMode('focus')}><Glyph><path d="M14 5h5v5M19 5l-6 6M10 19H5v-5M5 19l6-6" /></Glyph><span>Focus</span></button>)}
             {/* The two marks she approved, and nothing beside them. */}
             <button
@@ -344,6 +378,10 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
           resolved
             ? <img className="doc-view doc-picture" src={pictureUrl(resolved)} alt={docName(resolved)} crossOrigin="anonymous" onError={() => setFailed('That picture could not be drawn.')} />
             : <PreviewLoading />
+        ) : kind === 'pdf' ? (
+          resolved ? <PdfPages load={pdfBytes} name={docName(resolved)} /> : <PreviewLoading />
+        ) : kind === 'film' ? (
+          resolved ? <FilmPlayer url={pictureUrl(resolved)} name={docName(resolved)} wide /> : <PreviewLoading />
         ) : kind === 'code' ? (
           change
             ? <CodeArtifact
@@ -383,19 +421,29 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
                 // draws its pictures: they are plain http there, not a scheme.
                 sandbox={app.local ? LOCAL_APP_SANDBOX : onPhone() ? 'allow-scripts' : 'allow-scripts allow-same-origin'} title={crumb.join('/')}
               />}</div>
-            : <div className="doc-missing">Quit and reopen {NAME} to see this page's pictures.</div>) : <PreviewLoading />
+            : text !== null
+              ? <div className="preview-frame"><iframe className="doc-view" srcDoc={text} sandbox="allow-scripts" title={crumb.join('/')} /></div>
+              : <PreviewLoading />) : <PreviewLoading />
         ) : text === null ? (
           <PreviewLoading />
+        ) : kind === 'table' ? (
+          <TableView text={text} path={src} mode="pane" />
+        ) : kind === 'text' ? (
+          <div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div>
         ) : (
-          <DocText
-            key={resolved ?? doc.src}
-            product={doc.product}
-            src={doc.src}
-            text={text}
-            mtime={mtime}
-            onSaved={(at) => setMtime(at)}
-            onNotice={onNotice}
-          />
+          <Beside aside={aside}>
+            <DocText
+              key={resolved ?? doc.src}
+              product={doc.product}
+              src={doc.src}
+              folder={resolved ? resolved.replace(/\/[^/]*$/, '') : null}
+              text={text}
+              mtime={mtime}
+              onSaved={(at) => setMtime(at)}
+              onNotice={onNotice}
+              readOnly={doc.readOnly}
+            />
+          </Beside>
         )}
       </div>
     </aside>

@@ -8,6 +8,6 @@ it('keeps Balanced fixed and uses the body for Beside/Focus',()=>{
  const app=read('App.tsx');
  expect(app).not.toContain('aria-label="Conversation width"');
  expect(app).toContain("const readingWidth = 'balanced'");
- expect(app).toContain('<ArtifactSurface target={artifactBody}>');
+ expect(app).toContain('<ArtifactSurface target={teamShown ? teamBody : artifactBody}>');
  expect(app).toContain('artifactReturnBeside');
 });

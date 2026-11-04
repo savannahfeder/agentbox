@@ -29,6 +29,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { ReactNode } from 'react';
 import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel, UpdateState } from '../types';
 import { onCloudPhone, onPhone, phoneSized } from '../phone-screen';
+import { setSidebarShrinks, useSidebarShrinks } from '../sidebar-shrinks';
 import { computerSays, type PhoneRows } from '../phone-rows';
 import { changesOn, readingOf, type Reading, type SettingsRow } from '../phone-settings-view';
 import { lastAccountAsk, webProjectRow, webSettingsGroups, webSettingsPages } from '../web-settings';
@@ -43,7 +44,7 @@ import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, ty
 import { cloudBilling, planSummary, type PaidPlan } from '../cloud-upgrade';
 import { CloudPlanCards } from './CloudPlanCards';
 import type { CloudPlan } from '../types';
-import { cloudAccountState, meterPair } from '../account-words';
+import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-words';
 import { accountReadingFor, accountsOnce, codexAccountsOnce, type HereLogin, type OneAccount } from '../accounts-once';
 import { LOOKS, lookMeans, SKINS, TUNE_DEFAULT, TUNE_LIMITS, type Look, type SkinId, type SkinTune } from '../skins';
 import { readySkin } from '../look-switch';
@@ -333,6 +334,8 @@ function agentStory(w: WorkspaceSettings, readings: Usage[], engine: 'claude' | 
       signedIn: !!a.email,
       trouble: a.trouble?.note ?? null,
       atLimit: a.trouble?.cause === 'at-limit',
+      limitAt: a.trouble?.at ?? null,
+      limitResetsAt: a.trouble?.resetsAt ?? null,
       dir: a.dir ?? null,
     })),
   };
@@ -390,18 +393,19 @@ export function MiniMeters({ limits, now = Date.now(), none = 'No usage reading 
   return (
     <span className="acct-meters">
       {meters.map((m) => (
-        <span className={`acct-meter${m.percent >= 100 ? ' full' : ''}`} key={m.key}>
+        <span className={`acct-meter${(m.percent ?? 0) >= 100 ? ' full' : ''}`} key={m.key}>
           <span className="acct-meter-word">{m.word}</span>
-          <span className="usage-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, m.percent)}%` }} /></span>
-          <span className="acct-meter-pct">{m.percent}%</span>
-          <span className="acct-meter-when" title={m.resets ? `Resets ${m.resets}` : undefined}>{m.resets ?? ''}</span>
+          <span className="usage-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, m.percent ?? 0)}%` }} /></span>
+          <span className="acct-meter-pct">{m.percent == null ? '–' : `${m.percent}%`}</span>
+          <span className="acct-meter-when" title={m.percent == null ? 'Reset since this was read' : m.resets ? `Resets ${m.resets}` : undefined}>{m.resets ?? ''}</span>
         </span>
       ))}
     </span>
   );
 }
 
-// The header says the newest reading's time; a tile older than this says its own.
+// The header says the newest reading's time; a tile says its own when that
+// reads differently, or once it is this old.
 const OWN_TIME_AFTER_MS = 15 * 60_000;
 
 type Where = 'here' | 'cloud';
@@ -414,6 +418,9 @@ const PLACE_TAG: Record<Where, { word: string; Mark: typeof CloudMark }> = {
  *  beside the address (on the right margin it was missed), and the button
  *  that switches to an account sits in its top right corner. */
 export function PlaceTiles({ accounts, onAdd, now = Date.now() }: { accounts: PlaceAccount[]; onAdd?: () => void; now?: number }) {
+  const headerTime = usageCheckedAt(Math.max(0, ...accounts.map((a) => a.checkedAt ?? 0)) || null, now);
+  const ownTime = (a: PlaceAccount) => !!a.checkedAt
+    && (!!a.usageError || now - a.checkedAt >= OWN_TIME_AFTER_MS || usageCheckedAt(a.checkedAt, now) !== headerTime);
   return (
     <div className="acct-tiles">
       {accounts.map((a) => (
@@ -442,7 +449,7 @@ export function PlaceTiles({ accounts, onAdd, now = Date.now() }: { accounts: Pl
             {(!a.usageError || a.limits?.length) && <MiniMeters limits={a.limits} now={now} none={a.none} />}
             {a.usageError && <div className="acct-tile-trouble" role="status">{a.usageError}</div>}
           </>}
-          {!!a.checkedAt && (a.usageError || now - a.checkedAt >= OWN_TIME_AFTER_MS) && <div className="acct-reading-time">{usageCheckedAt(a.checkedAt, now)}</div>}
+          {ownTime(a) && <div className="acct-reading-time">{usageCheckedAt(a.checkedAt, now)}</div>}
         </div>
       ))}
       {onAdd && <button type="button" className="acct-tile acct-tile-add" onClick={onAdd}>Add account</button>}
@@ -508,10 +515,15 @@ export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, on
   // At its limit, the meters say which limit it is and when it resets.
   const limited = !!h?.trouble && !!h.atLimit && !!a.limits?.length;
   const trouble = limited ? null : h?.trouble ?? null;
+  // A reading taken since the limit was seen is the newer fact, full meter or not.
+  const readSince = !!h?.limitAt && !!a.checkedAt && a.checkedAt >= h.limitAt;
+  const sayLimit = limited && !readSince && !meterPair(a.limits, now).some((m) => (m.percent ?? 0) >= 100);
+  const when = h?.limitResetsAt ? resetWords({ resetsAt: h.limitResetsAt } as UsageLimit, now) : null;
+  const back = !when ? '' : when === hourWords(h!.limitResetsAt!) ? `, back at ${when}` : `, back ${when}`;
   return {
     key: a.key, name: a.name, plan: a.plan,
     about: signingIn ? ['Finish signing in to use it']
-      : limited && !meterPair(a.limits, now).some((m) => m.percent >= 100) ? ['At its limit'] : [],
+      : sayLimit ? [`At its limit${back}`] : [],
     places,
     cloudAct: !cloud || signingIn ? null : broken ? signIn('Sign in to cloud again', c!.key) : h && !c ? signIn('Add to cloud', null) : null,
     // ONE ACCOUNT IS IN USE AND IT SAYS SO (w-dac993a554). This asked `picked`
@@ -1376,8 +1388,8 @@ const CodexCli = (props: EngineConnectionProps) => (
    disk. The words are all ../update-row.ts, shared with ⌘K.
 
    IT WORKS THE SAME ON BOTH KINDS OF COPY. Installed, the check is a release
-   feed (main/updater.mjs); run from a checkout, it is `git fetch` against the
-   branch (main/source-updater.mjs). Both answer the same door and the same
+   feed (main/updater.mts); run from a checkout, it is `git fetch` against the
+   branch (main/source-updater.mts). Both answer the same door and the same
    shape, so there is nothing here that knows which one it is talking to.
 
    NOTHING IS ASSUMED ABOUT THE PRESS. The check's own answer is drawn, and the
@@ -1650,6 +1662,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   roomsPane?: ReactNode;
   onClose: () => void;
 }) {
+  const sidebarShrinks = useSidebarShrinks();
   const [model, setModel] = useState<SettingsModel | null>(null);
   // ?settings=claude, or ?settings=project:kestrel. Anything else (including the
   // bare ?settings=1 that only means "open") lands on General. `startPane` is
@@ -2118,7 +2131,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
         )}
 
         {pane === 'team' && teamPane && (
-          <Page title="Team" lede="Who is on your team, who has been invited, and the team's name. Everyone sees a short summary of your threads unless you mark one private.">
+          <Page title="Team" lede="Who is on your team, who has been invited, and the team's name. Everyone can open and read your threads and their files unless you mark one private.">
             {teamPane}
           </Page>
         )}
@@ -2172,6 +2185,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 desc="Point at something and its keys appear beside it. Off, every key still works."
               >
                 <Switch label="Show keyboard shortcut hints" on={keyHints} onChange={onSetKeyHints} />
+              </Row>
+            </Group>
+            <Group id="sidebar" label="Sidebar">
+              <Row label="Shrink the sidebar to icons">
+                <Switch label="Shrink the sidebar to icons" on={sidebarShrinks} onChange={setSidebarShrinks} />
               </Row>
             </Group>
             {/* THE CORNER TAG (w-dafae58a23). The tag itself only hides for a

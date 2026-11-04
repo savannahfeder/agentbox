@@ -11,25 +11,26 @@
 // Only code was doubled up.
 import { it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { messageDocuments } from '../renderer/src/message-artifacts.ts';
 
 const focus = readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
 
 // The one line that decides what gets a card in the conversation.
 const list = focus.slice(focus.indexOf('const previewPaths ='), focus.indexOf('const showOptions'));
 
+const named = {
+  result: 'Drew designs/w-1/page.html, wrote notes/plan.md, and the code is in runs/w-1/the-change.change.',
+};
+
 it('does not give a change its own card in the conversation', () => {
-  // The real branch, not the fixture-lab ones above it, is the last arm of that
-  // conditional: the set built out of the message's own referenced files.
-  const real = list.slice(list.lastIndexOf('[...new Set('));
-  expect(real).not.toMatch(/changePathFor/);
-  expect(real).not.toMatch(/change\)\$/);
-  expect(real).toMatch(/\\\.\(md\|markdown\)\$/);
+  // The real branch, not the fixture-lab ones above it, is the last arm.
+  expect(list.slice(list.lastIndexOf(': messageDocuments('))).not.toMatch(/changePathFor/);
+  expect(messageDocuments(named)).not.toContain('runs/w-1/the-change.change');
 });
 
 it('still gives a design and a note theirs', () => {
-  const real = list.slice(list.lastIndexOf('[...new Set('));
-  expect(real).toContain('htmlArtifacts');
-  expect(real).toContain('referencedFiles');
+  expect(list).toContain('messageDocuments(item, productDir)');
+  expect(messageDocuments(named)).toEqual(['designs/w-1/page.html', 'notes/plan.md']);
 });
 
 it('keeps the figures as the one way in, now on the menu’s code row', () => {

@@ -65,15 +65,18 @@ describe('a reply in its thread', () => {
     expect(view.waiting[0].cloud).toBeUndefined();
   });
 
-  it('answered in the cloud shows nothing more: the thread\'s copy holds the answer', () => {
-    const view = phoneView(rows([reply({ claimed_at: iso(NOW - 60_000), claimed_by: 'cloud:r1', taken_at: iso(NOW - 1000), outcome: 'Answered in Agentbox Cloud' })]), NOW);
-    expect(view.waiting).toEqual([]);
+  // Only once the copy holds it: a copy without it is the 2026-10-31 loss
+  // (a-message-sent-from-the-phone-stays-until-its-thread-shows-it.test.mjs).
+  it('answered in the cloud shows nothing more once the thread\'s copy holds it', () => {
+    const r = rows([reply({ claimed_at: iso(NOW - 60_000), claimed_by: 'cloud:r1', taken_at: iso(NOW - 1000), outcome: 'Answered in Agentbox Cloud' })]);
+    r.threads[0].snapshot.history.push({ id: 'w-1', ts: NOW - 120_000, source: 'founder', patch: { answer: 'yes, ship it', status: 'open' } });
+    expect(phoneView(r, NOW).waiting).toEqual([]);
   });
 
   it('the thread draws the words for the cloud, and offers no Send now on a reply the cloud has', () => {
     const page = read('mobile/src/app/thread/[product]/[id].tsx');
     expect(page).toMatch(/e\.cloud \? 'Working in Agentbox Cloud'/);
-    expect(page).toMatch(/e\.pending && !e\.refused && !e\.cloud && sendNow/);
+    expect(page).toMatch(/e\.pending && !e\.refused && !e\.cloud && !e\.sent && sendNow/);
   });
 });
 
@@ -139,7 +142,7 @@ describe('on the phone website', () => {
   });
   it('the thread says Working in Agentbox Cloud for it, and waits for the computer otherwise', () => {
     const thread = read('renderer/src/components/Thread.tsx');
-    expect(thread).toMatch(/onCloudPhone\(\) \? \(e\.cloud \? `Working in \$\{Name\} Cloud` : 'Waiting for your computer'\)/);
+    expect(thread).toMatch(/onCloudPhone\(\) \? \(e\.sent \? 'Sent' : e\.cloud \? `Working in \$\{Name\} Cloud` : 'Waiting for your computer'\)/);
     expect(read('renderer/src/App.tsx')).toMatch(/\.\.\.\(w\.cloud \? \{ cloud: true \} : \{\}\)/);
   });
 });

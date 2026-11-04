@@ -7,11 +7,12 @@
 // screenshot showed up as that line of brackets instead of the picture
 // (2026-10-05, tests/a-picture-you-paste-into-a-message-is-drawn.test.mjs).
 //
-// So those lines, and only those, are lifted out to be drawn as markdown:
-//   a picture, `![…](…)`, standing alone on its line;
+// So those lines are lifted out to be drawn as markdown:
+//   a picture, `![…](…)`, standing alone on its line, quoted or not;
+//   a picture from attachments/, anywhere on a line;
 //   a file link, `[…](attachments/…)`, standing alone on its line.
-// The syntax quoted inside a sentence is words, and so is a link a person typed
-// to anywhere else: the app never writes either.
+// The syntax in backticks is words, and so is a link a person typed to anywhere
+// else: the app never writes either.
 
 export type TypedPart = { text: string } | { embed: string };
 
@@ -19,6 +20,8 @@ const PICTURE = /^!\[[^\]\n]*\]\([^)\s]+\)$/;
 const ATTACHED_FILE = /^\[[^\]\n]*\]\((?:attachments\/[^)\s]+|phone-files\/[0-9a-f]{64}\.[a-z0-9]{1,8})\)$/;
 
 const isEmbed = (line: string) => PICTURE.test(line.trim()) || ATTACHED_FILE.test(line.trim());
+const QUOTE_MARK = /^\s*(?:>\s?)+/;
+const ATTACHED_PICTURE = /(?<!`)!\[[^\]\n]*\]\((?:\.\/)?attachments\/[^)\s]+\)(?!`)/g;
 
 // A thread picked with # is the other thing the app writes into a person's
 // words, `[Its name](w-…)` (thread-mentions.ts), and it is drawn as the thread.
@@ -43,6 +46,11 @@ export function threadPieces(text: string): TypedPiece[] {
 /** The words with each thread link down to the thread's name. */
 export const threadWords = (text: string) => text.replace(THREAD_LINK, (_, words: string) => unescaped(words));
 
+/** One line opening with a quote mark quotes nothing; more lines may be a real quotation. */
+export function withoutLoneQuoteMark(text: string): string {
+  return /^(?:>\s*)+(\S.*)$/.exec(text.trim())?.[1].trim() ?? text;
+}
+
 export function typedParts(text: string): TypedPart[] {
   const parts: TypedPart[] = [];
   let words: string[] = [];
@@ -55,12 +63,20 @@ export function typedParts(text: string): TypedPart[] {
     words = [];
   };
   for (const line of text.split('\n')) {
-    if (isEmbed(line)) {
+    const bare = line.replace(QUOTE_MARK, '');
+    if (isEmbed(bare)) {
       flush();
-      parts.push({ embed: line.trim() });
-    } else {
-      words.push(line);
+      parts.push({ embed: bare.trim() });
+      continue;
     }
+    let at = 0;
+    for (const m of line.matchAll(ATTACHED_PICTURE)) {
+      words.push(line.slice(at, m.index).trim());
+      flush();
+      parts.push({ embed: m[0] });
+      at = m.index + m[0].length;
+    }
+    words.push(at ? line.slice(at).trim() : line);
   }
   flush();
   // Nothing attached: the text exactly as it came, trailing breaks and all.
