@@ -21,7 +21,7 @@ import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
-import { resolveArtifact } from '../main/artifact-path.mts';
+import { resolveArtifact } from '../main/artifact-path.mjs';
 
 const MB = 1024 * 1024;
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');

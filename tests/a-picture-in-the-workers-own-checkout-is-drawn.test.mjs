@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pictureRoots } from '../renderer/src/message-folders.ts';
-import { resolveArtifact } from '../main/artifact-path.mts';
+import { resolveArtifact } from '../main/artifact-path.mjs';
 
 const DIR = '/Users/you/Zero/accounts/acct/agentbox-team';
 const REPO = '/Users/you/dev/agentbox';

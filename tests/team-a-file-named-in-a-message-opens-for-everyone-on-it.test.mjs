@@ -21,7 +21,7 @@ import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
-import { resolveArtifact } from '../main/artifact-path.mts';
+import { resolveArtifact } from '../main/artifact-path.mjs';
 import { MAX_MESSAGE_FILE_BYTES } from '../main/team/sync.mts';
 
 async function aMac(cloud, personId, { wrap = (b) => b } = {}) {

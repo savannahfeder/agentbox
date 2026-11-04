@@ -40,7 +40,7 @@ import { feedbackPayload } from '../shared/feedback.mjs';
 import * as approvals from './approvals.mjs';
 import { cardsInFront } from '../shared/which-card-is-in-front.mts';
 import { restartNeeded } from './staleness.mts';
-import { artifactRoots, resolveArtifact } from './artifact-path.mts';
+import { artifactRoots, resolveArtifact } from './artifact-path.mjs';
 import { folderPictures } from './folder-pictures.mts';
 import { docUrl } from './doc-scheme.mts';
 import { readDoc, writeDoc } from './doc-file.mts';
@@ -2341,7 +2341,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // mode 'resolve' returns the found path without opening it, so the renderer
   // can render hrefs that are true (Copy Link must hand out a URL that works).
   //
-  // EVERY GUESS STAYS INSIDE THE CARD'S OWN PRODUCT (main/artifact-path.mts).
+  // EVERY GUESS STAYS INSIDE THE CARD'S OWN PRODUCT (main/artifact-path.mjs).
   // It used to fall through to every other product's folders, which is how nine
   // of eleven chips on one card opened two other products' files (her answer,
   // 2026-08-19). When it finds nothing it now hands back a sentence she can

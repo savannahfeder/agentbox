@@ -10,7 +10,7 @@
 // which stays inside the thread's own project.
 import fs from 'node:fs';
 import path from 'node:path';
-import { resolveArtifact } from './artifact-path.mts';
+import { resolveArtifact } from './artifact-path.mjs';
 import { filesInLines, marksOf, reviewKind, threadFiles } from '../shared/artifact-marks.mjs';
 import { editOfLine, resolveEdits } from '../shared/message-edits.mjs';
 import { firstHit, fold, holds, queryOf, windowAround } from '../shared/word-match.mjs';

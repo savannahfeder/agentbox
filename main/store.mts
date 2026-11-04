@@ -36,7 +36,7 @@ import {
 } from '../shared/codex-import.mts';
 import { buildClaimLine, buildReleaseLine, GIVEN_TASK } from '../shared/work-items.mjs';
 import { isEffortWord } from '../shared/effort-levels.mts';
-import { shippedNote } from '../shared/shipped-note.mts';
+import { shippedNote } from '../shared/shipped-note.mjs';
 import { machineryPath, removeMachinery } from './store/home.mjs';
 import { Teammates } from './teammates.mts';
 import type { WorkItem } from './supervisor.mts';
@@ -737,7 +737,7 @@ export class Store {
   // session exits, because the worker cannot be relied on to close a thread
   // that is still alive: the ordinary and correct end of the loop leaves the
   // row open with her answer still on it, and that state used to be
-  // indistinguishable from a worker that died (shared/answers.mts).
+  // indistinguishable from a worker that died (shared/answers.mjs).
   //
   // Source 'system': it is machinery's record of what happened, not a word
   // anyone said, and it must never hold the field against her. She cannot
@@ -1481,7 +1481,7 @@ export class Store {
     // and no second trace, because the run it did is already on the thread.
     // AND THE REPLY IS SETTLED FIRST, the way the supervisor settles one when a
     // session exits: without it the row reads as an answer still waiting for an
-    // agent and stays in In progress (`answerSettled`, shared/answers.mts).
+    // agent and stays in In progress (`answerSettled`, shared/answers.mjs).
     if (product?.practice && round > 0) {
       const before = this.readItem(slug, id);
       this.settleAnswer(slug, id, before?.wrote?.answer?.ts ?? 0);

@@ -5,7 +5,7 @@
 // from the writers. The agent's last message was written before either, and
 // usually says the work is shipping, so these notes are what has to be shown.
 
-import { isShippedNote } from './shipped-note.mts';
+import { isShippedNote } from './shipped-note.mjs';
 
 export const SHIP_FAILED: string = 'It did not ship, and it went back to its agent: ';
 export const KEPT_ASIDE: string = "This thread's cloud run finished, but its work was not laid into the task folder: ";

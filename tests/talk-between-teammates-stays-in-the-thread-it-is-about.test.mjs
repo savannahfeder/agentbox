@@ -35,7 +35,7 @@ import { Supervisor } from '../main/supervisor.mts';
 import { queuedReplyText } from '../main/live-replies.mts';
 import { planWakes, runIdFor, seenKey, teammateLabel, teammateIdOf, workOf, handOffText, foldChat, DEFAULT_LIMIT, MAX_HOPS } from '../shared/teammates.mjs';
 import { foldWorkItems } from '../shared/work-items.mjs';
-import { toldBy, heldForHer, stoppedByHer } from '../shared/answers.mts';
+import { toldBy, heldForHer, stoppedByHer } from '../shared/answers.mjs';
 import { threadEvents } from '../renderer/src/thread-history';
 import { threadState } from '../shared/thread-cards.mjs';
 

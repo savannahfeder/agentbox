@@ -3,7 +3,7 @@
 // The spinning wheel came up while reading threads, worst on ones full of
 // pictures. Every name in a message that did not resolve straight away (a
 // picture still on its way, a /tmp path, the change record of a run that
-// changed no code) sent main/artifact-path.mts on a by-name hunt: a synchronous
+// changed no code) sent main/artifact-path.mjs on a by-name hunt: a synchronous
 // walk, six levels deep, of the whole project folder and the whole code repo,
 // on the main process. One miss over a 7,700-entry tree took 16 ms on a Linux
 // box with a warm disk (scripts/scratch/time-hunt.mjs). A thread asks once per
@@ -18,7 +18,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { resolveArtifact, HUNT_FRESH_MS } from '../main/artifact-path.mts';
+import { resolveArtifact, HUNT_FRESH_MS } from '../main/artifact-path.mjs';
 
 let root;
 let docs;

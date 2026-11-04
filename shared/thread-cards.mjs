@@ -19,7 +19,7 @@
 import { shownPriority } from './rank.mjs';
 import { isTaskRow, taskGiver } from './team-rules.mjs';
 import { deadlineOf } from './team-tasks.mjs';
-import { isShippedNote } from './shipped-note.mts';
+import { isShippedNote } from './shipped-note.mjs';
 import { shownTitle, withoutFiles } from './thread-title.mjs';
 
 export const THREAD_STATES = ['waiting', 'running', 'scheduled', 'done'];

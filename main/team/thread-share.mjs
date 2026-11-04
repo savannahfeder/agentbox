@@ -19,7 +19,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { artifactRoots, resolveArtifact } from '../artifact-path.mts';
+import { artifactRoots, resolveArtifact } from '../artifact-path.mjs';
 import { bytesOf, hideSecrets } from '../../shared/phone-snapshot.mjs';
 import { isShared, runnerOf } from '../../shared/team-rules.mjs';
 import { cleanMark, editedWords, familyName, fileNewsFor, filesInLines, isBookkeepingMark, marksOf, threadFiles } from '../../shared/artifact-marks.mjs';

@@ -26,7 +26,7 @@ import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { foldWorkItems } from '../shared/work-items.mjs';
-import { resolveArtifact } from '../main/artifact-path.mts';
+import { resolveArtifact } from '../main/artifact-path.mjs';
 import { readDoc } from '../main/doc-file.mts';
 import { referencedFiles } from '../shared/referenced-files.mts';
 import { machineryPath } from '../main/store/home.mjs';

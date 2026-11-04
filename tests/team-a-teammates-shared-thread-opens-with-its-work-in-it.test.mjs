@@ -20,7 +20,7 @@ import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
 import { MAX_THREAD_FILE_BYTES } from '../main/team/thread-share.mjs';
 import { mayRunHere } from '../shared/team-rules.mjs';
-import { resolveArtifact } from '../main/artifact-path.mts';
+import { resolveArtifact } from '../main/artifact-path.mjs';
 
 async function aMac(cloud, personId, storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'shared-thread-'))) {
   const accountRoot = path.join(storeRoot, 'accounts', 'a');

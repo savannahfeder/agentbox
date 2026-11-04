@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { stoppedByHer, toldBy } from '../shared/answers.mts';
+import { stoppedByHer, toldBy } from '../shared/answers.mjs';
 import { MAX_HOPS, HOP_LABEL_PREFIX } from '../shared/teammates.mjs';
 
 let work; let disk; let product; let built = [];

@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { cardsFor, shippedAtOf } from '../shared/thread-cards.mjs';
-import { shippedNote } from '../shared/shipped-note.mts';
+import { shippedNote } from '../shared/shipped-note.mjs';
 import { buildLine, foldWorkItems } from '../shared/work-items.mjs';
 import { shippedThisWeek, shippedWords } from '../renderer/src/team/shipped.ts';
 import { statusCell } from '../renderer/src/status-word.ts';

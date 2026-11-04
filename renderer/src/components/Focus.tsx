@@ -217,7 +217,7 @@ function CodePre({ children }: { children?: ReactNode }) {
 // It opens the way the chip already does, which sends a png to Preview.
 //
 // AND WHEN EVERY ROOT MISSES, IT ASKS MAIN BEFORE IT GIVES UP (2026-10-04).
-// `find` is the same finder a click goes through (main/artifact-path.mts),
+// `find` is the same finder a click goes through (main/artifact-path.mjs),
 // which also hunts the project for the name. A picture a click could open and
 // the window drew as "missing image" was the screenshot on w-7fe215448b.
 /** A picture sent to this message that cannot be fetched: where it would be, by name. */
@@ -1365,7 +1365,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     const findMedia = (src: string) => api.resolveDoc({ product, src, thread: item.id }).then((r) => (r.ok && r.opened ? r.opened : null));
 
     // Clicks resolve in the main process, across the roots a worker might have
-    // meant WITHIN THIS CARD'S OWN PRODUCT (main/artifact-path.mts): a
+    // meant WITHIN THIS CARD'S OWN PRODUCT (main/artifact-path.mjs): a
     // single-root file:// href opened nothing, silently, when the worker wrote
     // it against a different root, and reaching into other products opened the
     // wrong file, which is worse.

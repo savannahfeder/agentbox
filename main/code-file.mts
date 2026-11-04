@@ -20,9 +20,9 @@
 // checkout is the run's and not the app's.
 import fsDefault from 'node:fs';
 import path from 'node:path';
-import { artifactRoots } from './artifact-path.mts';
+import { artifactRoots } from './artifact-path.mjs';
 import { isInside } from './doc-file.mts';
-import type { ArtifactProduct } from './artifact-path.mts';
+import type { ArtifactProduct } from './artifact-path.mjs';
 
 export type CodeFs = Pick<typeof fsDefault, 'statSync' | 'existsSync' | 'readFileSync' | 'writeFileSync'>;
 

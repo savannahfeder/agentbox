@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ensureTaskFolder, taskFolderPath } from '../main/task-folders.mts';
-import { shippedNote } from '../shared/shipped-note.mts';
+import { shippedNote } from '../shared/shipped-note.mjs';
 import { Supervisor } from '../main/supervisor.mts';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();

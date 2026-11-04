@@ -2,7 +2,7 @@
 // box means.
 import { instructionOf, isCleanRun } from '../../shared/repeats.mjs';
 import { teammateIdOf } from '../../shared/teammates.mjs';
-import { answerSettled, filedByThePerson } from '../../shared/answers.mts';
+import { answerSettled, filedByThePerson } from '../../shared/answers.mjs';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import { notShippedLine } from '../../shared/not-shipped.mts';
 import { setByPerson } from '../../shared/thread-waits.mjs';

@@ -27,7 +27,7 @@ import { execFileSync } from 'node:child_process';
 import { Supervisor } from '../main/supervisor.mts';
 import { Store } from '../main/store.mts';
 import { writeMarker } from '../main/cloud/marker.mts';
-import { answerSettled } from '../shared/answers.mts';
+import { answerSettled } from '../shared/answers.mjs';
 
 let tmp; let root; let repo; let folder; let store; let row; let relays; let supervisors;
 

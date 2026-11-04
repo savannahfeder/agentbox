@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { resolveArtifact } from '../main/artifact-path.mts';
+import { resolveArtifact } from '../main/artifact-path.mjs';
 import { noteAgentWrites, noteWrittenElsewhere, writtenElsewhere, writtenFileNamed, writesInClaudeLine } from '../main/store/written-elsewhere.mjs';
 
 let root, own, direct, products;

@@ -94,7 +94,7 @@ import { approvalAnswered, approvalAsker, approvalReads, approvalShown } from '.
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
 import { asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
-import { filedByThePerson, wordWaits } from '../../shared/answers.mts';
+import { filedByThePerson, wordWaits } from '../../shared/answers.mjs';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
@@ -3244,7 +3244,7 @@ export default function App() {
   const [split, setSplit] = useState<number>(() => readSplit(window.localStorage));
   // The folders the open document's own product owns, so the breadcrumb reads
   // "astral › designs ›" and not the account plumbing above it. The same list
-  // main/artifact-path.mts guesses against.
+  // main/artifact-path.mjs guesses against.
   const docRoots = useMemo(() => {
     const prod = snap?.products.find((p) => p.slug === openDoc?.product) ?? null;
     if (!prod) return [];

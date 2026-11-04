@@ -9,13 +9,13 @@
 // coming. Of the 26 open threads in that store, it was the only one whose tag
 // an agent wrote.
 //
-// Now both read one rule (`filedByThePerson` in shared/answers.mts): the thread
+// Now both read one rule (`filedByThePerson` in shared/answers.mjs): the thread
 // is a proposal, in Later under the thread that filed it, or in Needs you when
 // it was filed under none.
 
 import { describe, it, expect } from 'vitest';
 import { belongsInInbox, belongsInProgress, isProposal } from '../renderer/src/list-rules.ts';
-import { filedByThePerson } from '../shared/answers.mts';
+import { filedByThePerson } from '../shared/answers.mjs';
 import { Supervisor } from '../main/supervisor.mts';
 
 const NOW = Date.parse('2026-10-28T21:00:00Z');

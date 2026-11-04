@@ -1,6 +1,6 @@
 // Looking through thread checkouts for a file does not hold the main process.
 //
-// The Files work added a lookup to main/artifact-path.mts for a file a script
+// The Files work added a lookup to main/artifact-path.mjs for a file a script
 // made in a thread's checkout. It ran on the main process with readdirSync and
 // four existsSync per checkout, on every name nothing else found, and for a
 // run's change record, which the open thread asks for on every refresh. Against
@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { resolveArtifact, HUNT_FRESH_MS } from '../main/artifact-path.mts';
+import { resolveArtifact, HUNT_FRESH_MS } from '../main/artifact-path.mjs';
 import { createWorkItem, updateWorkItem } from '../main/store/work-items.mjs';
 
 let root;

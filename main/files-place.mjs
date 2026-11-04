@@ -6,7 +6,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { resolveArtifact } from './artifact-path.mts';
+import { resolveArtifact } from './artifact-path.mjs';
 import { approvalId, baseName, editedWords, familyName, familyOfName, filesInLines, marksOf, MAX_EDIT_BYTES, otherFilesInLines, otherKind, reviewKind, shownName, threadFiles } from '../shared/artifact-marks.mjs';
 import { saveNextVersion } from './file-version.mjs';
 import { versionLine } from './version-line.mjs';

@@ -11,7 +11,7 @@
 //   14:54:15.3  the window closes and the held message is written, AFTER the
 //               stop. A reply on a blocked row reopens it (store.answerItem),
 //               and a reply newer than her stop is what wakes a stopped row
-//               (shared/answers.mts, stoppedByHer).
+//               (shared/answers.mjs, stoppedByHer).
 //   14:56:39    a new worker starts on the row she stopped.
 //
 // The stop never looked at the message in its window. Every other action in
@@ -24,7 +24,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { stoppedByHer } from '../shared/answers.mts';
+import { stoppedByHer } from '../shared/answers.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const app = fs.readFileSync(path.join(here, '..', 'renderer', 'src', 'App.tsx'), 'utf8');

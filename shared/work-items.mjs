@@ -36,7 +36,7 @@ import { resolveEdits } from './message-edits.mjs';
 import { cleanVoice } from './agent-voice.mjs';
 import { cleanMark, isBookkeepingMark, marksOf } from './artifact-marks.mjs';
 import { isContinuedNote } from './thread-continued.mjs';
-import { wordWaits } from './answers.mts';
+import { wordWaits } from './answers.mjs';
 
 export { wordWaits };
 

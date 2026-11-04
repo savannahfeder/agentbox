@@ -84,7 +84,9 @@ describe('what plain Node on the Mac loads stays .mjs for now', () => {
   });
   const named = ['scripts/hooks/pre-push', 'scripts/hooks/pre-commit', 'package.json', '.github/workflows/tests.yml']
     .flatMap((f) => fs.readFileSync(path.join(root, f), 'utf8').match(/scripts\/[\w/.-]+\.mjs/g) ?? []);
-  const roots = [...new Set([...named, ...under('mcp'), ...under('cloud')])].filter((f) => fs.existsSync(path.join(root, f)));
+  // cloud/standin is the stand-in cloud the tests import into vitest, which
+  // loads .mts itself; nothing runs it under plain node.
+  const roots = [...new Set([...named, ...under('mcp'), ...under('cloud').filter((f) => !f.startsWith('cloud/standin/'))])].filter((f) => fs.existsSync(path.join(root, f)));
 
   function reached() {
     const seen = new Set();

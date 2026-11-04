@@ -108,7 +108,7 @@ function whoHasIt(made: { taken?: boolean; reason?: string; heldBy?: number | nu
   if (made?.taken !== false) return '';
   return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
-import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mts';
+import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mjs';
 import { DEFAULT_SESSIONS_AT_ONCE } from './config.mjs';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mjs';
 import type { AccountIdentity } from './account-tooling.mjs';
@@ -3999,7 +3999,7 @@ export class Supervisor {
       // AND WRITE IT ON THE ITEM, not only in here. This memory is invisible to
       // her inbox and is wiped by every resume, so a finished thread read as a
       // stranded one everywhere she could actually see it: out of the inbox,
-      // red in In progress, and respawnable forever (shared/answers.mts).
+      // red in In progress, and respawnable forever (shared/answers.mjs).
       try { this.store.settleAnswer?.(item.product, item.id, carried); }
       catch (e) { console.warn('zero: could not record the settled answer:', (e as Error).message); }
       return 'delivered';

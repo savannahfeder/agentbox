@@ -1,5 +1,5 @@
 // The files a project's agents wrote outside the project's own folders, so a
-// name an agent says in its thread still opens there (main/artifact-path.mts).
+// name an agent says in its thread still opens there (main/artifact-path.mjs).
 // Only what an agent really wrote is listed: a guess into another project could
 // open the wrong file.
 import fsDefault from 'node:fs';

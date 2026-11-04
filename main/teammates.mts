@@ -11,7 +11,7 @@ import {
 import { reachTick } from './teammate-reach.mjs';
 import { filesFoldersBrief } from '../shared/file-folders.mjs';
 import { audienceWords } from '../shared/teammate-reach.mjs';
-import { isShippedNote } from '../shared/shipped-note.mts';
+import { isShippedNote } from '../shared/shipped-note.mjs';
 import { ruleLabel, periodKey } from '../shared/repeats.mjs';
 import {
   teamDir, readTeammates, readChat, writeTeammate, writeChat, newTeammateId, newMemoryId, readPlaybooks,

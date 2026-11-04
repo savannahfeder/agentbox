@@ -18,7 +18,7 @@ import { aTeamWithAgents } from './lib/a-team-with-agents.mjs';
 import { teamTell, teamTask } from '../mcp/core/reach.mjs';
 import { REACH_LABEL, UNDO_HOLD_MS } from '../shared/teammate-reach.mjs';
 import { isTaskRow } from '../shared/team-rules.mjs';
-import { resolveArtifact } from '../main/artifact-path.mts';
+import { resolveArtifact } from '../main/artifact-path.mjs';
 
 let t; let run;
 

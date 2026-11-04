@@ -14,7 +14,7 @@
 import crypto from 'node:crypto';
 import fsDefault from 'node:fs';
 import path from 'node:path';
-import { resolveArtifact } from '../artifact-path.mts';
+import { resolveArtifact } from '../artifact-path.mjs';
 import { MAX_CARRIED_BYTES, MAX_SENT_BYTES, PART_BYTES, filesADocumentDraws, isCarriedKind, namedFiles, plainRef, sizeWords } from '../../shared/carried-files.mjs';
 import { chunkFile, entryKey, partFile, plainPartPath, shelve, shelvedEntries, validEntry } from './carried-shelf.mjs';
 

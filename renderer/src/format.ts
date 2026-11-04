@@ -1,5 +1,5 @@
 import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/repeats.mjs';
-import { isShippedNote } from '../../shared/shipped-note.mts';
+import { isShippedNote } from '../../shared/shipped-note.mjs';
 import { readMoment } from './when-words';
 // Time and grouping, Superhuman-style: terse, scannable, never a full date
 // where "3m" will do.
