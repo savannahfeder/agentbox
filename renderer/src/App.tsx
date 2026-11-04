@@ -825,7 +825,7 @@ export default function App() {
     return () => window.removeEventListener(SIGN_IN_TO_SHARE, open);
   }, []);
   const closeAccountSignIn = useCallback(() => { setPhoneSignInOpen(false); setShareSignInOpen(false); }, []);
-  useEffect(() => { if (snap?.team?.signedIn) setPhoneSignInOpen(false); }, [snap?.team?.signedIn]);
+  useEffect(() => { if (snap?.team?.signedIn) { setPhoneSignInOpen(false); setShareSignInOpen(false); } }, [snap?.team?.signedIn]);
   // The account a cloud sign-in started from Settings is for, so its page can say whom to sign in as.
   const [cloudSignInAs, setCloudSignInAs] = useState<string | null>(null);
   const floatingRef = useRef<OpenOverTheApp>(NOTHING_OVER_THE_APP);

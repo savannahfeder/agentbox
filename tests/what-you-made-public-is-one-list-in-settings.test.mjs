@@ -32,6 +32,16 @@ describe('the list', () => {
   });
 });
 
+// Share's Sign in stayed asked for after signing in some other way, so the next
+// sign-out put the sign-in page straight up (found reading a tester's freeze, 2026-11-04).
+describe('Share\'s sign-in', () => {
+  it('is let go once anyone is signed in, as the phone\'s is', async () => {
+    const fs = await import('node:fs');
+    const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+    expect(app).toContain('useEffect(() => { if (snap?.team?.signedIn) { setPhoneSignInOpen(false); setShareSignInOpen(false); } }, [snap?.team?.signedIn]);');
+  });
+});
+
 // A sharer clicked Connections looking for their public links: both drew the
 // same chain (power test, round 3, 2026-11-04). Share draws a globe.
 describe('the Share mark', () => {
