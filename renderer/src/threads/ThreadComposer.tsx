@@ -292,7 +292,7 @@ export function ThreadComposer({
   };
   // The card is already open, so the remembered slot it read on opening is of
   // no use: the project made from its own menu arrives here.
-  useEffect(() => { if (selectProject) pickProject(selectProject); }, [selectProject]);
+  useEffect(() => { if (selectProject) { pickProject(selectProject); textRef.current?.focus(); } }, [selectProject]);
 
   /* ---------------------------- priority -------------------------------- */
   // Every new thread opens on Medium; only a half-written card keeps its tag

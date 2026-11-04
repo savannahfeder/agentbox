@@ -8770,6 +8770,7 @@ export default function App() {
                 walking: runRef.current !== null,
                 offered: !neverOffered(localStorage),
                 touring: tourRef.current !== null,
+                writing: modalNow.current === 'compose' || clearWriting,
               })) setOffer({ product: slug });
             } catch (err) {
               // Nothing is held open any more, because nothing was typed: the
