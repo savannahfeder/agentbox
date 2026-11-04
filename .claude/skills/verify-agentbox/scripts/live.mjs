@@ -150,6 +150,8 @@ export function copyConfig(state, had = {}) {
     // every run and Codex may be picked from the composer.
     engineChoice: '2026-01-01T00:00:00.000Z',
     maxConcurrentSessions: 2,
+    // A checkout reads a missing switch as Multiplayer on; a download reads it as off.
+    alphaMultiplayer: !!state.teamFile,
     ...(state.teamFile ? { alphaRooms: true } : {}),
     // `up --alpha teammates,rooms`: features still in testing are off for a new person.
     ...Object.fromEntries((state.alpha ?? []).map((f) => [`alpha${f[0].toUpperCase()}${f.slice(1)}`, true])),
