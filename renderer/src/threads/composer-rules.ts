@@ -275,6 +275,20 @@ export function whenToSend(when: SendWhen, now = Date.now()): { runAt?: number; 
   return when.runAt > now ? { runAt: when.runAt } : {};
 }
 
+/** When a reply set for later goes, or 0. Its time and its words are written
+ *  a few milliseconds apart (main/ipc.mjs); a row put off on its own is not one. */
+export function replyWaitsUntil(
+  row: { answer?: string | null; runAt?: number | null; wrote?: Record<string, { ts: number; source: string } | undefined> },
+  now = Date.now(),
+): number {
+  const runAt = row.runAt ?? 0;
+  const set = row.wrote?.runAt;
+  const said = row.wrote?.answer;
+  if (runAt <= now || !set || !said || set.source !== 'founder') return 0;
+  if (!row.answer?.trim() || row.answer === '(withdrawn)') return 0;
+  return Math.abs(said.ts - set.ts) <= 5_000 ? runAt : 0;
+}
+
 /* -------------------------------- message --------------------------------- */
 
 /**

@@ -103,6 +103,8 @@ export interface ThreadEvent {
   words?: string;
   /** When its author last edited the words (item-thread.ts, `withEdits`). */
   edited?: number;
+  /** A reply set for later: when it goes. */
+  sendsAt?: number;
   /** Deleted by its author, kept only because replies hang off it. */
   deleted?: boolean;
   // AN ACTION OF HERS THAT ANSWERED THE AGENT, though it is not a message: a
@@ -167,6 +169,7 @@ export function pickedLine(answer: string): { said: string; words: string } | nu
 // for a slow disk and is still far shorter than anyone bringing a thread back
 // by hand after answering it.
 const REPLY_LIFTS_MS = 60_000;
+const REPLY_SETS_ITS_TIME_MS = 5_000;
 
 // HOW CLOSE A TASK'S BIRTH STAMP AND THE PERSON'S OWN LINE ARE WRITTEN. The
 // composer writes them milliseconds apart; a minute leaves the same room for a
@@ -259,6 +262,9 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   // did. It read "Brought it back" under a teammate's "Working on it" and
   // they could not think why they had (w-2b0cd0f741).
   let replied: { at: number; by: string | undefined } | null = null;
+  // A reply set for later is written as its time and then its words, a few
+  // milliseconds apart (main/ipc.mjs). The time is the reply's, not a move.
+  let putOff: { at: number; by: string | undefined; runAt: number; index: number } | null = null;
   const pinsSoFar = new Map<string, number>();
   // A version is called by its file's one name and its number, as the big view counts them.
   const versionWords = new Map<string, string>();
@@ -449,6 +455,10 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     if (has(patch, 'answer')) {
       const said = words(patch.answer);
       replied = mine && said ? { at, by: markBy } : null;
+      const waits = mine && said && putOff && putOff.by === markBy && at - putOff.at <= REPLY_SETS_ITS_TIME_MS
+        && putOff.index === events.length - 1 ? putOff.runAt : 0;
+      if (waits) { events.pop(); markAt = events.length; }
+      putOff = null;
       // WAS THE LAST THING SHE SENT ONE OF CLAUDE CODE'S COMMANDS. The blocked
       // line below reads differently after one, and this is the only place that
       // can tell: by the time the status arrives, the ledger line carrying
@@ -464,7 +474,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
         continue;
       }
       events.push(said
-        ? { at, who: 'you', said: 'You replied', words: said, message: true, field: 'answer' }
+        ? { at, who: 'you', said: 'You replied', words: said, message: true, field: 'answer', ...(waits ? { sendsAt: waits } : {}) }
         : { at, who: 'you', said: 'You withdrew your reply' });
       continue;
     }
@@ -502,6 +512,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
         if (mine && replied && replied.by === markBy && at - replied.at <= REPLY_LIFTS_MS) continue;
         events.push({ at, who, said: mine ? 'You brought it back' : 'It let this run now' });
       } else {
+        if (mine && has(patch, 'runAt')) putOff = { at, by: markBy, runAt, index: events.length };
         events.push({
           at, who,
           said: mine ? 'You moved it to Later' : 'It paused this',

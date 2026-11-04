@@ -33,7 +33,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { Face, TeamContext, firstName } from '../team/people';
 import { workAudience } from '../threads/page-rules';
 import {
-  allModels, joinNames, moreCount, recentModels, replyBoxAsk, type Harness, type ModelPick,
+  allModels, joinNames, moreCount, recentModels, replyBoxAsk, replyWaitsUntil, type Harness, type ModelPick,
 } from '../threads/composer-rules';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
@@ -2289,10 +2289,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           // "back to inbox" would name a move that does not happen. What
           // clearing an agent's park actually does is let the work start.
           <button className="focus-unschedule" onClick={onUnschedule}>
-            {scheduledByAgent ? 'let it run now' : 'back to inbox'}
+            {replyWaitsUntil(item, Date.now()) ? 'send it now' : scheduledByAgent ? 'let it run now' : 'back to inbox'}
             <span className="dim">
               {' · '}
-              {(item.snoozedUntil ?? 0) > Date.now() ? 'in Later until' : scheduledByAgent ? 'the agent paused this until' : 'scheduled for'} {whenLabel(scheduledUntil!)}
+              {(item.snoozedUntil ?? 0) > Date.now() ? 'in Later until' : replyWaitsUntil(item, Date.now()) ? 'your reply sends' : scheduledByAgent ? 'the agent paused this until' : 'scheduled for'} {whenLabel(scheduledUntil!)}
             </span>
           </button>
         )}

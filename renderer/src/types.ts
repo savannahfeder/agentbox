@@ -1046,6 +1046,8 @@ export interface AgentTurn {
   inReplyTo?: string;
   /** When its author last edited it (shared/message-edits.mjs). */
   edited?: number;
+  /** A reply set for later: when it goes. */
+  sendsAt?: number;
   /** Deleted by its author, drawn only because replies hang off it. */
   deleted?: boolean;
   // A CONTINUATION OF THE BLOCK ABOVE, not a new message. Shape B puts the
