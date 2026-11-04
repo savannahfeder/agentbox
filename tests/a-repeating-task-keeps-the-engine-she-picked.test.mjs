@@ -248,8 +248,8 @@ describe('the whole path from the card to the rule', () => {
     const ipc = read('main/ipc.mts');
     expect(preload).toContain("composeRepeat: (payload) => ipcRenderer.invoke('zero:compose-repeat', payload)");
     expect(api).toMatch(/composeRepeat\(p: \{[^}]*engine\?: string;[^}]*model\?: string;/s);
-    expect(ipc).toMatch(/zero:compose-repeat[\s\S]{0,400}?engine: supervisor\.engineOffered\(engine\)/);
-    expect(ipc).toMatch(/zero:compose-repeat[\s\S]{0,400}?model: supervisor\.modelOffered\(engine, model\)/);
+    expect(ipc).toMatch(/zero:compose-repeat[\s\S]{0,800}?engine: supervisor\.engineOffered\(engine\)/);
+    expect(ipc).toMatch(/zero:compose-repeat[\s\S]{0,800}?model: supervisor\.modelOffered\(engine, model\)/);
   });
 
   // AND THE STORE'S OWN HAND-OFF IS RUN, NOT READ. `composeRepeat` names the

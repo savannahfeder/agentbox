@@ -97,7 +97,7 @@ describe('the way there', () => {
     const ipc = read('main/ipc.mts');
     const handler = ipc.slice(ipc.indexOf("ipcMain.handle('zero:compose-repeat'"), ipc.indexOf("ipcMain.handle('zero:set-repeat'"));
     expect(handler).toMatch(/startsNext/);
-    expect(read('main/store.mts')).toMatch(/composeRepeat\(slug, \{[^}]*startsNext/);
+    expect(read('main/store.mts')).toMatch(/composeRepeat\(slug(?:: string)?, \{[^}]*startsNext/);
   });
 
   it('the app asks for it when the repeat is made from a thread', () => {
