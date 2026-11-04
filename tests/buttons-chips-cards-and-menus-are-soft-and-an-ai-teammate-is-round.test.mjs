@@ -103,12 +103,14 @@ describe('an AI teammate is round, and still told apart by its dashed ring', () 
 
 describe('no control is squared by hand', () => {
   // A zero on these is a decision about a surface that paints no box, sits flush
-  // against the window, or is the phone's full-width sheet.
+  // against the window, is the phone's full-width sheet, or belongs to a table,
+  // which is square inside and in its pane.
   const FLUSH = [
     /^\.tab$/, /^\.rail$/, /list-pane/, /doc-card$/, /doc-view$/, /^\.chat-thread-(panel|line)$/, /video$/, /artifact-thumbnail$/,
     /\.ps-step \+ \.ps-step/, /pre code$/, /did-cmd$/, /kbd$/, /\.idle-(key|field)$/, /usage-(panel|meter)/, /::before$/,
     /\.opt-strip$/, /\.set-plate$/, /\.app-mark$/, /\.tq-from-table$/, /\.ts-rail$/, /\.set-step$/, /\.sent-line$/,
     /\[data-review-style/, /\[data-preview-treatment/, /\.doc-head$/, /\.film-video$/, /\.workspace-find button$/,
+    /\.tbl-menu$/,
   ];
   const CONTROL = /(btn|button|chip|menu|pop|confirm|search|field|input|act|emoji|retry|close|send|caret|cancel|save|more|play|speed|remove|find|back|open|x|tick|picker|card|box|quick|ask)$/;
   it('leaves no button, chip, field, card or menu at 0 outside the phone layout', () => {

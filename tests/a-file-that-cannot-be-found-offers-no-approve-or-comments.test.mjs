@@ -35,6 +35,6 @@ describe('the wiring', () => {
     expect(stage).toMatch(/onFound\?\.\('gone'\)/);
     expect(view).toMatch(/offers\.approve &&/);
     expect(view).toMatch(/offers\.comment &&/);
-    expect(view).toMatch(/onOutside && version && found === 'open'/);
+    expect(view).toMatch(/onOutside && version && foundNow === 'open'/);
   });
 });

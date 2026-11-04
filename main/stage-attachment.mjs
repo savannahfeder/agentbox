@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { turnedName } from '../shared/picture-formats.mjs';
-import { MAX_SENT_BYTES, MAX_SENT_MB } from '../shared/carried-files.mjs';
+import { MAX_SENT_BYTES, MAX_SENT_WORDS } from '../shared/carried-files.mjs';
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 const SIPS_MS = 30_000;
@@ -67,7 +67,7 @@ export function stageAttachmentPart(dir, { id, name, at, dataBase64 } = {}) {
   if (had !== at) throw new Error(`A piece of ${safe} went missing. Attach it again.`);
   if (had + bytes.length > MAX_SENT_BYTES) {
     try { fs.unlinkSync(file); } catch { /* swept within the week */ }
-    throw new Error(`${safe} is over the ${MAX_SENT_MB} MB a message can send.`);
+    throw new Error(`${safe} is over the ${MAX_SENT_WORDS} a message can send.`);
   }
   fs.appendFileSync(file, bytes);
   return { path: file, size: had + bytes.length };

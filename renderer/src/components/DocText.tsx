@@ -27,6 +27,7 @@ import { asksForANewTab } from '../link-click';
 import { pictureUrl } from '../picture';
 import { agoWords } from '../threads/summary-rules';
 import { DocOutline } from './DocOutline';
+import { scrollKey, useKeptScroll } from '../kept-scroll';
 import './doc-reading.css';
 
 const SAVE_DEBOUNCE_MS = 900;
@@ -54,7 +55,6 @@ export interface DocVersions {
   /** Handed the way to read the file with her edit in it right now, null when there is no edit. */
   flush: MutableRefObject<(() => string | null) | null>;
   paint?: (root: HTMLElement) => void;
-  scrollTop?: number;
   /** Words kept from a sitting that never got to save. */
   draft?: string;
   byline?: string | null;
@@ -255,6 +255,7 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   }, [linkPop?.pinned]);
 
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  useKeptScroll(scroller, scrollKey(product, src));
   const [column, setColumn] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -266,9 +267,6 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
       dirty.current = false;
       return md === baseMd.current ? null : patchOriginal(onDisk.current, baseMd.current, md) ?? md;
     };
-    // Up where she was reading, with the caret in the words rather than the page jumping to it.
-    if (scroller && live.scrollTop) scroller.scrollTop = live.scrollTop;
-    editor.view.dom.focus({ preventScroll: true });
     const paint = () => asVersions.current?.paint?.(editor.view.dom);
     let timer: number | null = null;
     const later = () => { if (timer != null) window.clearTimeout(timer); timer = window.setTimeout(paint, 250); };

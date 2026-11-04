@@ -25,7 +25,7 @@ import { isShared, runnerOf } from '../../shared/team-rules.mjs';
 import { cleanMark, editedWords, familyName, fileNewsFor, filesInLines, isBookkeepingMark, marksOf, threadFiles } from '../../shared/artifact-marks.mjs';
 import { saveNextVersion } from '../file-version.mjs';
 import { MAX_MESSAGE_FILE_BYTES } from './sync.mjs';
-import { MAX_SENT_BYTES, PART_BYTES } from '../../shared/carried-files.mjs';
+import { MAX_SHARED_SENT_BYTES as MAX_SENT_BYTES, PART_BYTES } from '../../shared/carried-files.mjs';
 import { findFileToSend, looksSecret, pieceSizes } from './carry-files.mjs';
 
 // What one file call takes. A file over it goes in parts, up to MAX_SENT_BYTES.
@@ -507,7 +507,7 @@ export function createThreadShare({
       if (edit.do === 'edit') {
         // Only words become a file: a path on a teammate's mark is never believed.
         if (!edit.text) continue;
-        const saved = saveNextVersion({ dir: thread.product.dir, threadId: m.threadId, lines: historyOf(thread.product.slug, m.threadId), baseId: edit.file, text: edit.text });
+        const saved = saveNextVersion({ dir: thread.product.dir, threadId: m.threadId, lines: historyOf(thread.product.slug, m.threadId), baseId: edit.file, text: edit.text, by: m.by });
         if (!saved.ok) { log(`team threads: an edit to ${edit.file} was not saved: ${saved.error}`); continue; }
         line.patch.artifact = { do: 'edit', file: saved.file, path: saved.path, ...(saved.over ? { over: saved.over } : {}) };
       }

@@ -11,6 +11,7 @@
 // is there because the file format depends on it, not because a model cannot be
 // trusted to think.
 
+import path from 'node:path';
 import { z } from 'zod';
 import { resolveAccount } from './core/account.mjs';
 import { listProducts, getProduct, createProduct, updateProduct } from './core/products.mjs';
@@ -141,16 +142,20 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
         content: z.string().optional(),
         status: z.enum(['current', 'history', 'exploration']).optional(),
         folder: z.string().optional().describe('a folder in Files to put it in, by name, such as Product specs. Made if there is none. The answer\'s filedIn says it happened; a directory in path is not a folder in Files'),
-        versionOf: z.string().optional().describe('the name of a file someone already has, on this thread or in Files, that this content revises. It is saved as that file\'s next version (-v2, -v3) in this thread\'s folder and opens as the same file, with its comments; no path is needed and nobody has to be sent it. A copy of such a file written under its own name elsewhere is saved this way too'),
+        versionOf: z.string().optional().describe('the name of a file someone already has, on this thread or in Files, that this content revises. It is saved as that file\'s next version (-v2, -v3) in this thread\'s folder and opens as the same file, with its comments; no path is needed and nobody has to be sent it. A copy of such a file written under its own name elsewhere is saved this way too. The newest version is nobody\'s to overwrite: if somebody edited the file since the copy you wrote from, your changes are merged into theirs, and when the same lines changed both ways nothing is saved and the answer names the version to read'),
+        replacesEdits: z.boolean().optional().describe('with versionOf: you mean to undo what someone typed in an earlier version, because they asked. Without it, an edit your version leaves out is merged back in'),
       },
-      run: async ({ product, folder, versionOf, ...doc }) => {
-        const version = doc.content == null ? null : documentVersion({ product, versionOf, path: doc.path ?? null, ownItem });
+      run: async ({ product, folder, versionOf, replacesEdits, ...doc }) => {
+        const version = doc.content == null ? null : documentVersion({ product, versionOf, path: doc.path ?? null, content: replacesEdits ? null : doc.content, ownItem });
         const into = version ? version.product : product;
-        const written = await writeDocument(into, version ? { ...doc, id: undefined, path: version.path, title: doc.title ?? version.title } : doc);
+        // A merge keeps what somebody else saved while this run was writing, so
+        // what lands is the merge, not the words this run arrived with.
+        const written = await writeDocument(into, version ? { ...doc, id: undefined, path: version.path, title: doc.title ?? version.title, ...(version.content != null ? { content: version.content } : {}) } : doc);
         if (doc.content == null) return json(written);
         noteWrittenForRun(into, written.path);
         const named = await nameOnThread(written, { ownItem, update: (id, patch) => claims.update(id, patch), note: version?.note });
-        return json({ ...written, ...named, ...(version ? { versionOf: version.of } : {}), ...fileWrittenDocument({ path: written.path, folder }) });
+        if (replacesEdits && version && named.onThread) await claims.update(ownItem, { artifact: { do: 'reconcile', file: path.basename(written.path), replace: true } });
+        return json({ ...written, ...named, ...(version ? { versionOf: version.of } : {}), ...(version?.merged ? { merged: version.merged, note: version.note } : {}), ...fileWrittenDocument({ path: written.path, folder }) });
       },
     },
 
@@ -465,7 +470,7 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
 
   if (typeof requestCloudResource === 'function') tools.push({
     name: 'request_cloud_resource',
-    description: 'Fetch a missing file, folder or installed skill from this thread’s computer without moving the conversation there. A file or folder is any path under this task checkout or the account’s documents, other products’ folders included: relative with a scope, or written out in full (`~/…` or absolute) with no scope. Skills use their installed name. Delivered resources get a separate scratch path, preserving cloud edits. Returns delivered, folder (its files, to ask for one by one), denied, not_found, too_large, or unavailable, with the reason. A delivered skill includes its scripts and references; read its returned SKILL.md. If the request names what could not be delivered, end the turn with the hand-back line rather than building around a guess; otherwise continue and explain what is missing.',
+    description: 'Fetch a missing file, folder or installed skill from this thread’s computer without moving the conversation there. A file or folder is any path under this task checkout or the account’s documents, other products’ folders included: relative with a scope, or written out in full (`~/…` or absolute) with no scope. Skills use their installed name. Delivered resources get a separate scratch path, preserving cloud edits. Returns delivered, folder (its files, to ask for one by one), denied, not_found, too_large, or unavailable, with the reason. A delivered skill includes its scripts and references; read its returned SKILL.md. If the request names or needs what could not be delivered, by its path or by what it is, end the turn with the hand-back line rather than building around a guess; otherwise continue and explain what is missing.',
     schema: {
       kind: z.enum(['file', 'skill']),
       path: z.string().describe('file or folder path (relative, ~/…, or absolute), or installed skill name'),

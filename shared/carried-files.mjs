@@ -80,22 +80,28 @@ export function filesADocumentDraws(text) {
 }
 
 const MB = 1024 * 1024;
+const GB = 1024 * MB;
 // What one call to the cloud takes (the database refuses a row over 14 MB of
 // base64), and the most one message sends: bigger files go in parts.
 export const MAX_CARRIED_MB = 10;
 export const MAX_CARRIED_BYTES = MAX_CARRIED_MB * MB;
 export const PART_BYTES = 8 * MB;
-export const MAX_SENT_MB = 200;
-export const MAX_SENT_BYTES = MAX_SENT_MB * MB;
+export const MAX_SENT_BYTES = GB;
+export const MAX_SENT_WORDS = '1 GB';
+// Group chats and shared threads still keep their parts as rows, which a
+// 1 GB film would swamp.
+export const MAX_SHARED_SENT_BYTES = 200 * MB;
 
 const nameOf = (ref) => String(ref).split('/').pop() || String(ref);
-export const sizeWords = (bytes) => bytes < MB
-  ? `${Math.max(1, Math.round(bytes / 1024))} KB`
-  : `${(bytes / MB).toFixed(bytes >= 100 * MB ? 0 : 1)} MB`;
+export const sizeWords = (bytes) => {
+  if (bytes < MB) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  if (bytes >= GB) return `${Number((bytes / GB).toFixed(1))} GB`;
+  return `${(bytes / MB).toFixed(bytes >= 100 * MB ? 0 : 1)} MB`;
+};
 
 /** Said in the composer, before anything is sent. */
 export const tooBigToSend = (bytes) => Number(bytes) > MAX_SENT_BYTES;
-export const overTheLimit = (bytes) => `${sizeWords(bytes)} is over the ${MAX_SENT_MB} MB a message can send. Send a smaller copy, or share a link.`;
+export const overTheLimit = (bytes) => `${sizeWords(bytes)} is over the ${MAX_SENT_WORDS} a message can send. Send a smaller copy, or share a link.`;
 
 // Plain reasons a file did not go. `mine` says it to the sender.
 export function whyWords(why, mine = false) {
@@ -107,7 +113,7 @@ export function whyWords(why, mine = false) {
     case 'upload': return mine ? 'the cloud could not be reached' : 'the sender\'s computer could not reach the cloud';
     case 'name': return 'its name has a character a message cannot carry';
     case 'damaged': return 'it arrived damaged';
-    case 'tooBig': return `it is over ${MAX_SENT_MB} MB`;
+    case 'tooBig': return `it is over ${MAX_SENT_WORDS}`;
     default: return mine ? 'it did not go' : 'it did not arrive';
   }
 }
@@ -135,6 +141,6 @@ export function carryLine(carry) {
 // Plain sentences for a click that cannot open the file yet.
 export const carriedWords = {
   coming: (ref) => `${nameOf(ref)} is on its way.`,
-  tooBig: (ref, bytes) => `${nameOf(ref)} is ${sizeWords(bytes)}, over the ${MAX_SENT_MB} MB a message can send.`,
+  tooBig: (ref, bytes) => `${nameOf(ref)} is ${sizeWords(bytes)}, over the ${MAX_SENT_WORDS} a message can send.`,
   cannot: (ref, why, mine) => `${nameOf(ref)} was not delivered: ${whyWords(why, mine)}.`,
 };

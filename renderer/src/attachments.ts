@@ -4,7 +4,7 @@
 // the message view renders them).
 import { useCallback, useState } from 'react';
 import { turnedName } from '../../shared/picture-formats.mjs';
-import { MAX_SENT_MB, sizeWords, tooBigToSend } from '../../shared/carried-files.mjs';
+import { MAX_SENT_WORDS, sizeWords, tooBigToSend } from '../../shared/carried-files.mjs';
 
 export interface PendingAttachment {
   name: string;
@@ -55,7 +55,7 @@ export function attachProblem(list: PendingAttachment[]): string | null {
   const failed = list.find((a) => a.failed);
   if (failed) return failed.failed ?? null;
   const big = list.find((a) => tooBigToSend(a.size ?? 0));
-  if (big) return `${big.name} is ${sizeWords(big.size ?? 0)}, over the ${MAX_SENT_MB} MB a message can send.`;
+  if (big) return `${big.name} is ${sizeWords(big.size ?? 0)}, over the ${MAX_SENT_WORDS} a message can send.`;
   return null;
 }
 

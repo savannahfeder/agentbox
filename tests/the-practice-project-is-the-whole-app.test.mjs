@@ -342,6 +342,9 @@ describe('putting it away at the end', () => {
     expect(store.endPractice().removed).toBe(false);
     expect(store.removePractice().removed).toBe(false);
     expect(fs.existsSync(path.join(theirs, 'their-notes.md'))).toBe(true);
+    // A folder written behind the store's back, as this one is, joins the
+    // project list within a millisecond of being there (Store._productsNow).
+    await new Promise((r) => { setTimeout(r, 5); });
     expect(store.listProducts().map((p) => p.slug)).toContain(PRACTICE_SLUG);
   });
 

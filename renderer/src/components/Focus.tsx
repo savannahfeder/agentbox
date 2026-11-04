@@ -83,9 +83,11 @@ import { embeddedDocuments, isBookkeeping, messageDocuments } from '../message-a
 import { remarkMediaUnderSentences } from '../media-row';
 import { newestOfFamily } from '../../../shared/artifact-marks.mjs';
 import { PictureView, picturesFor, type Picture } from './PictureView';
+import { opensAsPicture } from '../picture-view';
 import { ThreadArtifacts } from './ThreadArtifacts';
 import type { ArtifactOpen } from './ArtifactView';
 import { fileNewsFor, shownName, viewKind } from '../../../shared/artifact-marks.mjs';
+import { opensInTheLargeViewer } from '../artifact-layout';
 import { carryLine, type CarryState } from '../../../shared/carried-files.mjs';
 import { watchScrollGutter } from '../scroll-gutter';
 import { CODE_PATH, artifactUrlTransform, isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
@@ -149,6 +151,7 @@ import { OPEN_WITHIN_MS } from '../opening-wait';
 import { focusAtEnd } from '../focus-at-end';
 import type { Spot } from '../one-thing-at-a-time';
 import { ChoicesFold, ChoicesShow, QueueFile, QueueNav, readsInPlace } from './OneThingAtATime';
+import { InlineTable, gridFromHast } from './TableView';
 import { foldKey, foldedKeys, toggleFold } from '../one-thing-at-a-time';
 
 // A relative product path is an artifact, however the worker wrote it:
@@ -599,7 +602,7 @@ const MessagePlace = createContext<{ roots: string[]; drawsPictures: boolean; di
 // It is drawn as a quiet mention (Mention.tsx): the kind's icon and the name,
 // with the full path in the hover title rather than orange in the sentence.
 export function ArtifactLink({ kind, product, src, fallback, onOpen, children }: {
-  kind: MentionKind; product: string; src?: string; fallback?: string; onOpen: (click: LinkClick) => void; children: ReactNode;
+  kind: MentionKind; product: string; src?: string; fallback?: string; onOpen: (click: LinkClick, from: HTMLElement) => void; children: ReactNode;
 }) {
   const [href, setHref] = useState(fallback);
   useEffect(() => {
@@ -609,7 +612,7 @@ export function ArtifactLink({ kind, product, src, fallback, onOpen, children }:
       .then((r: { ok: boolean; opened?: string }) => { if (r?.ok && r.opened) setHref(`file://${r.opened}`); })
       .catch(() => {});
   }, [product, src]);
-  return <><Mention kind={kind} href={href} title={src} onClick={(e) => { e.preventDefault(); onOpen(e); }}>{children}</Mention></>;
+  return <><Mention kind={kind} href={href} title={src} onClick={(e) => { e.preventDefault(); onOpen(e, e.currentTarget); }}>{children}</Mention></>;
 }
 
 // What a link's own words become. A path or an address the worker wrote out
@@ -707,7 +710,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, queue = null, onePage = false, inChats = false, openAt = null }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -726,6 +729,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onShown?: (shown: { key: string; change: boolean; summary: 'open' | 'closed' | null; ship: ParsedOption[] | null }) => void;
   /** Drawn right above the reply box: where a reply that moved her here went (./SentLine). */
   aboveDock?: ReactNode;
+  /** An AI teammate's questions asked in this thread, at the foot of its turn. */
+  questions?: ReactNode;
   /**
    * A MESSAGE FROM A PERSON IS NOT WORK UNTIL SHE SAYS SO. The one line under
    *  the latest message on a message thread calls this to make it a task for
@@ -1306,9 +1311,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const openPicture = (href: string, from?: HTMLElement) => setPicture(picturesFor(paneRef.current, href, from));
   // A file opened big, with its comments. A phone keeps the picture view its fingers know.
   const [artifact, setArtifact] = useState<ArtifactOpen | null>(null);
-  // A script opens in the pane; a page, like the rest, where it can take comments.
-  const opensBig = (path?: string | null) => !onPhone() && !item.agent && !previewSample && !!viewKind(path) && viewKind(path) !== 'code';
-  const openBig = (path: string) => setArtifact({ path, at: Date.now() });
+  const opensBig = (path?: string | null) => !onPhone() && !item.agent && !previewSample && opensInTheLargeViewer(viewKind(path));
+  // A picture clicked in the thread steps through its own turn's pictures, as the small view does.
+  const openBig = (path: string, from?: HTMLElement) => setArtifact({
+    path, at: Date.now(), ...(from && opensAsPicture(path) ? { steps: picturesFor(paneRef.current, path, from).pictures.map((p) => p.path) } : {}),
+  });
   const openFileMark = useCallback((link: FileMarkLink) => setArtifact({ file: link.file, note: link.id, at: Date.now() }), []);
   const [historyLines, setHistoryLines] = useState<unknown[]>([]);
   useEffect(() => {
@@ -1370,7 +1377,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       // A picture opens large over the thread, a page or a web address opens
       // in the pane, and a ⌘-click sends any of them out (../link-click.ts).
       const goes = whereALinkGoes(href, click, { pane: !!onOpenDoc });
-      if (!asksForANewTab(click) && opensBig(href)) { openBig(href); return; }
+      if (!asksForANewTab(click) && opensBig(href)) { openBig(href, from); return; }
       if (goes === 'picture') { openPicture(href, from); return; }
       if (goes === 'pane') { onOpenDoc?.(href); return; }
       // A reference like cart.mjs:2 is that file; its line number is only a label.
@@ -1384,6 +1391,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     };
 
     const mdComponents = {
+      // A table an agent writes in its message is drawn as a table artifact is.
+      table: ({ node, children }: { node?: Parameters<typeof gridFromHast>[0]; children?: ReactNode }) => {
+        const grid = gridFromHast(node);
+        return grid.length > 1 ? <InlineTable grid={grid} /> : <table>{children}</table>;
+      },
       pre: ({ children }: { children?: ReactNode }) => {
         // A MERMAID CHART IS DRAWN, with its source as the fallback (DiagramBlock).
         const code = (Array.isArray(children) ? children[0] : children) as { props?: { className?: string; children?: ReactNode } } | undefined;
@@ -1395,7 +1407,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       a: ({ href, children, 'data-name-only': nameOnly }: { href?: string; children?: ReactNode; 'data-name-only'?: string }) => {
         const { roots, drawsPictures } = useContext(MessagePlace);
         // The row under the sentence draws this one (../media-row.ts).
-        if (nameOnly && href) return <ArtifactLink kind={mentionKind(href)} product={product} src={href} fallback={resolveSrc(href)} onOpen={(click) => openHref(href, undefined, click)}>{linkLabel(href, children)}</ArtifactLink>;
+        if (nameOnly && href) return <ArtifactLink kind={mentionKind(href)} product={product} src={href} fallback={resolveSrc(href)} onOpen={(click, from) => openHref(href, from, click)}>{linkLabel(href, children)}</ArtifactLink>;
         const ticket = href?.startsWith(TICKET_HREF)
           ? ticketReference(href.slice(TICKET_HREF.length)) : ticketReference(href ?? '');
         if (ticket) return <TicketLink id={ticket}>{children}</TicketLink>;
@@ -1429,7 +1441,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         if (href && isMediaPath(href)) {
           return <ArtifactMedia key={href} src={href} label={textOf(children) ?? undefined} roots={roots} onOpen={openHref} find={findMedia} />;
         }
-        return <ArtifactLink kind={mentionKind(href ?? '')} product={product} src={href} fallback={resolveSrc(href)} onOpen={(click) => openHref(href, undefined, click)}>{href ? linkLabel(href, children) : children}</ArtifactLink>;
+        return <ArtifactLink kind={mentionKind(href ?? '')} product={product} src={href} fallback={resolveSrc(href)} onOpen={(click, from) => openHref(href, from, click)}>{href ? linkLabel(href, children) : children}</ArtifactLink>;
       },
       img: ({ src, alt }: { src?: string; alt?: string }) => {
         const { roots } = useContext(MessagePlace);
@@ -1440,7 +1452,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         const value = String(children ?? '');
         if (!className && ticketReference(value)) return <code>{children}</code>;
         const source = !className && sourceReference(value);
-        if (source) return <ArtifactLink kind="code" product={product} src={source} fallback={resolveSrc(source)} onOpen={(click) => openHref(source, undefined, click)}>{mentionName(value)}</ArtifactLink>;
+        if (source) return <ArtifactLink kind="code" product={product} src={source} fallback={resolveSrc(source)} onOpen={(click, from) => openHref(source, from, click)}>{mentionName(value)}</ArtifactLink>;
         // Written out in full into this product's folder counts as the short
         // path it names, the same rule a full path in a sentence follows.
         const shown = value.trim();
@@ -1452,7 +1464,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           if (isMediaPath(path)) {
             return <ArtifactMedia key={path} src={path} label={shown} roots={roots} onOpen={openHref} find={findMedia} />;
           }
-          return <ArtifactLink kind={mentionKind(path)} product={product} src={path} fallback={resolveSrc(path)} onOpen={(click) => openHref(path, undefined, click)}>{mentionName(path)}</ArtifactLink>;
+          return <ArtifactLink kind={mentionKind(path)} product={product} src={path} fallback={resolveSrc(path)} onOpen={(click, from) => openHref(path, from, click)}>{mentionName(path)}</ArtifactLink>;
         }
         return <code className={className}>{children}</code>;
       },
@@ -2147,6 +2159,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             stripRef={closeAskRef}
           />
         )}
+        {questions}
         {/* One at a time draws them at the foot instead, apart from the reply box. */}
         {offerInPane && (page || closeAsk ? null : (
           <OptionsOffer
@@ -2210,8 +2223,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           only the review lab's sample now. */}
       {/* One thing at a time reads a page or a note in place rather than as a
           tile, and not a second time while it is open on the side. */}
-      {inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && <QueueFile key={path} product={product} path={newestOfFamily(path, item.artifacts?.edits)} md={md}
-        onOpen={() => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'focus'))} onSide={() => onOpenArtifact?.(path, 'beside')} />)}
+      {inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && newestOfFamily(path, item.artifacts?.edits) !== openDoc && <QueueFile key={path} product={product} path={newestOfFamily(path, item.artifacts?.edits)} md={md}
+        onOpen={() => onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'beside')} onFullScreen={() => onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'focus')} />)}
       {/* What the page cannot read in place, a deck or a PDF, is a tile under it. */}
       {page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths.filter((path) => !readsInPlace(path))} revision={item.updatedAt} openDoc={openDoc} onOpen={path => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'beside'))} />}
       {!page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths} revision={item.updatedAt} openDoc={openDoc} onOpen={path => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'beside'))} />}

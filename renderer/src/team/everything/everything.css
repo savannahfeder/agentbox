@@ -123,30 +123,31 @@
 .pl-btn.quiet { border-color: transparent; }
 .pl-btn.quiet:hover { border-color: transparent; }
 .pl-btn:disabled { opacity: .45; cursor: default; }
-.pl-body { flex: 1; min-height: 0; display: flex; gap: 28px; }
+.pl-body { flex: 1; min-height: 0; display: flex; gap: 24px; }
 .pl-chat { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 /* Inside the rounded panel the words and the box share one 24px edge. */
 .pl-chat { --text-x: 24px; }
 .pl-chat .tq-chat .tq-lines { padding-left: 24px; padding-right: 24px; }
 .pl-chat .rm-compose.tq-compose { margin: 8px 24px 24px; }
-.pl-side { width: 330px; flex: none; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; padding-top: 2px; }
-.pl-sec h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font: 11px var(--mono); font-weight: 400; letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.pl-side { width: 272px; flex: none; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; padding-top: 2px; }
+.pl-sec h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--text-dim); }
 .pl-sec h3 b { font-weight: 400; color: var(--text-faint); }
 .pl-link { margin-left: auto; padding: 0; border: 0; background: none; font: 12.5px var(--sans, inherit); letter-spacing: 0; text-transform: none; color: var(--text-faint); cursor: pointer; }
 .pl-link:hover { color: var(--text); }
 .pl-rows { list-style: none; margin: 0 -8px; padding: 0; }
-.pl-row { display: grid; grid-template-columns: 6px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; padding: 7px 8px; border: 0; border-radius: 8px; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.pl-row { display: grid; grid-template-columns: 7px minmax(0, 1fr) auto; align-items: start; column-gap: 10px; row-gap: 1px; width: 100%; box-sizing: border-box; padding: 7px 8px; border: 0; border-radius: 8px; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .pl-row:hover:not(:disabled) { background: var(--wash); }
 .pl-row:disabled { cursor: default; }
-.pl-row i { width: 6px; height: 6px; border-radius: 50%; box-sizing: border-box; background: var(--text-dim); }
-.pl-row.ask i { background: var(--accent); }
-.pl-row.hold i { background: var(--text-faint); }
-.pl-row.done i { background: none; border: 1px solid var(--text-faint); }
-.pl-row.later i { background: none; border: 1px dashed var(--text-faint); }
-.pl-t { font-size: 13.5px; line-height: 18px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-row i { width: 7px; height: 7px; margin-top: 6px; border-radius: 50%; box-sizing: border-box; border: 1.5px solid var(--accent); }
+.pl-row.ask i { border: 0; background: var(--accent); }
+.pl-row.hold i { border-color: var(--text-faint); }
+.pl-row.done i { border: 0; background: var(--text-faint); }
+.pl-row.later i { border: 1.5px dashed var(--text-faint); }
+.pl-t { font-size: 13.5px; line-height: 19px; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .pl-row.done .pl-t { color: var(--text-dim); }
-.pl-w, .pl-at { font-size: 12px; color: var(--text-faint); white-space: nowrap; }
-.pl-at { min-width: 30px; text-align: right; }
+.pl-w, .pl-at { font-size: 12px; line-height: 19px; color: var(--text-faint); white-space: nowrap; }
+.pl-w { grid-column: 2 / -1; line-height: 16px; overflow: hidden; text-overflow: ellipsis; }
+.pl-at { min-width: 24px; text-align: right; }
 .pl-text, .pl-none { margin: 0; font-size: 13.5px; line-height: 20px; color: var(--text-dim); }
 .pl-none { color: var(--text-faint); }
 .pl-box { display: block; width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: none; font: inherit; font-size: 13.5px; line-height: 20px; color: var(--text); resize: vertical; outline: none; }
@@ -170,19 +171,8 @@
   .pl-head { flex-wrap: wrap; }
 }
 
-
-/* The team beside Needs you. Under 1100px the faces row on the tab line stands in for it. */
-.nr-home { display: flex; align-items: flex-start; gap: 24px; padding-right: var(--row-r, 24px); }
-.nr-list { flex: 1; min-width: 0; }
-.nr-rail { position: sticky; top: 16px; flex: none; width: 248px; margin-top: 8px; padding: 12px 8px; display: flex; flex-direction: column; gap: 14px; background: var(--wash); border-radius: var(--artifact-corner); }
-.nr-sec { display: flex; flex-direction: column; gap: 2px; }
-.nr-sec h3 { margin: 0 0 4px; padding: 0 8px; font: 400 11px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
-.nr-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 8px; border: 0; border-radius: var(--artifact-corner-small); background: none; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
-.nr-row:hover, .nr-row.on { background: var(--wash-strong); }
-.nr-t { display: flex; flex-direction: column; min-width: 0; }
-.nr-n { font-size: 13.5px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nr-t .ev-s { justify-content: flex-start; margin-top: 0; }
-.nr-t .ev-s-blank { display: none; }
-.nr-add .nr-n { color: var(--text-dim); }
-@media (max-width: 1099px) { .nr-rail { display: none; } }
-@media (min-width: 1100px) { .ev-faces.nr-narrow-only { display: none; } }
+.pl-empty-chat { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.pl-bubbles { display: flex; flex-direction: column; gap: 8px; width: 180px; }
+.pl-bubble { display: block; height: 30px; border-radius: 14px; background: var(--wash-strong); }
+.pl-bubble.them { width: 70%; border-bottom-left-radius: 4px; }
+.pl-bubble.you { width: 55%; align-self: flex-end; border-bottom-right-radius: 4px; background: var(--wash); }

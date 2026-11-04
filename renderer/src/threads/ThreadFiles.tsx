@@ -22,7 +22,7 @@ export function ThreadFilesButton({ files, onOpen, startOpen = false }: { files:
   if (!files.length) return null;
   return <span className="ts-files-wrap" ref={wrap}>
     <button type="button" className={`ts-done ts-files${open ? ' open' : ''}`} aria-haspopup="dialog" aria-expanded={open}
-      aria-label={`Files in this thread (${files.length})`} title="Files in this thread" onClick={() => setOpen((o) => !o)}>
+      aria-label={`Files in this thread (${files.length})`} data-hint="thread-files" data-hint-align="right" onClick={() => setOpen((o) => !o)}>
       {FILES}<b className="ts-files-n">{files.length}</b>
     </button>
     {open && <div className="th-pop ts-files-pop" role="dialog" aria-label="Files in this thread">
