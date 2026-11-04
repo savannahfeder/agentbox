@@ -9,7 +9,7 @@ import { T } from '../ui/parts';
 import { color, font } from '../ui/theme';
 
 const ROWS = [
-  { title: 'To your computer', detail: 'Or to Agentbox Cloud when your computer is off' },
+  { title: 'To your computer', detail: 'Or Agentbox Cloud when your computer is off' },
   { title: 'To the agent you pick', detail: 'Claude Code by Anthropic or Codex by OpenAI, signed in to your own account' },
   { title: 'Nowhere else', detail: 'Agentbox shares them with no one' },
 ];

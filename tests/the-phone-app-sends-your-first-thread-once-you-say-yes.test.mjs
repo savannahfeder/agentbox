@@ -20,7 +20,8 @@ describe('the permission card', () => {
   it('is not drawn over the notice', () => {
     const cards = read('ui/Approvals.tsx');
     expect(cards).toMatch(/usePathname/);
-    expect(cards).toMatch(/pathname === '\/ai-notice'/);
+    expect(cards).toMatch(/FIRST_RUN_SCREENS = new Set\(\[[^\]]*'\/ai-notice'/);
+    expect(cards).toMatch(/if \(FIRST_RUN_SCREENS\.has\(pathname\)\) return null;/);
   });
 });
 

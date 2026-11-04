@@ -61,6 +61,7 @@ export default function SignIn() {
       {(apple || c.preview) && <Btn label={busy === 'apple' ? 'Signing in…' : 'Continue with Apple'} lead={<AppleMark />} disabled={!!busy} onPress={run('apple', () => appleSignIn(c.cloud!))} />}
       <Btn label={busy === 'google' ? 'Signing in…' : 'Continue with Google'} lead={<GoogleMark />} disabled={!!busy} onPress={run('google', () => googleSignIn(c.cloud!))} />
       <Btn kind="quiet" label="Continue with email" onPress={() => { setByEmail(true); setError(null); }} />
+      <T style={{ fontSize: 13.5, lineHeight: 19, color: color.faint, textAlign: 'center', marginTop: 4 }}>No account yet? Make one in Agentbox on your computer.</T>
     </>
   );
 
@@ -79,8 +80,6 @@ export default function SignIn() {
           </View>
         )}
         {error && <T accessibilityRole="alert" style={{ fontSize: 14, lineHeight: 20, color: color.dim, marginTop: 18 }}>{error}</T>}
-        <View style={{ flex: 1 }} />
-        <T style={{ fontSize: 13.5, lineHeight: 19, color: color.faint, marginTop: 28 }}>No account yet? Make one in Agentbox on your computer.</T>
       </Screen>
     </KeyboardAvoidingView>
   );

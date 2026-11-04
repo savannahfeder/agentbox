@@ -80,6 +80,14 @@ describe('the screens', () => {
     }
   });
 
+  // Walking it in the preview: once the computer joined, a waiting permission
+  // card rose over the alerts step and covered both its buttons.
+  it('a permission card waits until the first run is over', () => {
+    const cards = read('mobile/src/ui/Approvals.tsx');
+    for (const screen of ['/welcome', '/sign-in', '/ai-notice', '/alerts']) expect(cards).toMatch(new RegExp(`FIRST_RUN_SCREENS = new Set\\([^)]*'${screen}'`));
+    expect(cards).toMatch(/if \(FIRST_RUN_SCREENS\.has\(pathname\)\) return null;/);
+  });
+
   it('nothing from the drafts is left: no made-up inbox to try, no pairing code', () => {
     const welcome = read('mobile/src/app/welcome.tsx');
     expect(welcome).not.toMatch(/made up|K7Q4MX|option/);

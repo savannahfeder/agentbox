@@ -33,6 +33,7 @@ import { StatusNotice } from '../ui/StatusNotice';
 import { ComputerWait } from '../ui/Onboarding';
 import { ALERTS_ASKED_KEY, nextSetup, type Setup } from '../lib/first-run';
 import { alertsHere } from '../platform/alerts';
+import { previewWalksFirstRun } from '../lib/preview';
 
 // The desktop's own words for an empty tab (renderer/src/threads/Pages.tsx `EmptyTab`).
 const EMPTY: Record<Exclude<TabId, 'inbox'>, string> = {
@@ -224,9 +225,10 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
 export default function Threads() {
   const c = useCloud();
   // The first run's steps after sign-in, in order (lib/first-run.ts); the computer's is drawn here.
-  const next = c.preview ? null : nextSetup({
+  const walking = c.preview && previewWalksFirstRun();
+  const next = c.preview && !walking ? null : nextSetup({
     signedIn: c.signedIn, started: !c.loading, connect: !!c.connect, noticeAnswered: !!c.notice,
-    alertsOn: !!c.alerts, alertsAsked: !!appStore.getItem(ALERTS_ASKED_KEY), alertsHere,
+    alertsOn: !!c.alerts, alertsAsked: !!appStore.getItem(ALERTS_ASKED_KEY), alertsHere: alertsHere || walking,
   });
   const asked = useRef<Setup | null>(null);
   useEffect(() => {
