@@ -17,8 +17,10 @@ export const shareWords = {
   comments: (n: number) => (n === 1 ? '1 comment' : `${n} comments`),
   stopAsk: (n: number) => (n > 0 ? `Stop, and delete ${n === 1 ? 'its comment' : `its ${n} comments`}` : 'Stop the link'),
   shared: (at: number, now = Date.now()) => (new Date(at).toDateString() === new Date(now).toDateString()
-    ? `Shared today at ${clock(at)}`
-    : `Shared ${new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' })}`),
+    ? `Link updated today at ${clock(at)}`
+    : `Link updated ${new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' })}`),
+  // "Shared" already means a teammate's thread, and a file your agent handed you.
+  live: 'Public link',
 };
 
 /** The kinds a link can draw, as main/file-link.mjs linkKindOf names them. */
@@ -139,8 +141,8 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   return (
     <div className={`av-share${icon ? ' is-mark' : ''}`} ref={box}>
       {icon
-        ? <button type="button" className={`doc-mark${link ? ' is-shared' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : link ? 'Shared' : 'Share'} aria-label={link ? 'Shared' : 'Share'} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="link" /></button>
-        : <button type="button" className={`av-btn${open ? ' is-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : undefined} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="link" />{link ? 'Shared' : 'Share'}</button>}
+        ? <button type="button" className={`doc-mark${link ? ' is-shared' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : link ? shareWords.live : 'Share'} aria-label={link ? shareWords.live : 'Share'} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="link" /></button>
+        : <button type="button" className={`av-btn${open ? ' is-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : undefined} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="link" />{link ? shareWords.live : 'Share'}</button>}
       {open && (
         <div className="av-share-box" role="dialog" aria-label="Share">
           {!state.signedIn ? (

@@ -99,5 +99,24 @@ export function fileForLink(file, { fs = fsDefault } = {}) {
   return { ...kind, body, hash: crypto.createHash('sha256').update(body).digest('hex').slice(0, 40) };
 }
 
+/**
+ * The newest version beside a file: plan-v3.md over plan.md and plan-v2.md in
+ * the same folder. An edit from Files writes the next version, and a link to
+ * the file is meant to carry the newest one, whichever version is on screen.
+ */
+export function newestBeside(file, keyOf, { fs = fsDefault } = {}) {
+  const dir = path.dirname(file);
+  const key = keyOf(file);
+  let best = file;
+  try {
+    for (const name of fs.readdirSync(dir)) {
+      const other = path.join(dir, name);
+      if (other === best || keyOf(other) !== key || path.extname(name).toLowerCase() !== path.extname(file).toLowerCase()) continue;
+      if (versionInName(name) > versionInName(best)) best = other;
+    }
+  } catch { /* the folder went: the file on screen is all there is */ }
+  return best;
+}
+
 /** The version a file's name says (plan-v3.md is 3), as files here are named. */
 export const versionInName = (name) => Number(/-v(\d{1,4})\.[^./]+$/i.exec(String(name ?? ''))?.[1] ?? 1) || 1;

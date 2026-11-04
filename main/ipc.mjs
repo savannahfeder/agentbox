@@ -44,7 +44,7 @@ import { artifactRoots, resolveArtifact } from './artifact-path.mjs';
 import { folderPictures } from './folder-pictures.mjs';
 import { docUrl } from './doc-scheme.mjs';
 import { readDoc, writeDoc } from './doc-file.mjs';
-import { fileForLink, linkSource, versionInName } from './file-link.mjs';
+import { fileForLink, linkSource, newestBeside, versionInName } from './file-link.mjs';
 import { familyKeyOf } from '../shared/artifact-marks.mjs';
 import { readItemHistory } from './store/work-items.mjs';
 import { readChange } from './code-change.mjs';
@@ -2404,9 +2404,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       products: readableProducts(), accountRoot: config.accountRoot, storeRoot: config.storeRoot, nameOf: team?.firstNameOf,
     });
     if (!found.ok) throw new Error(found.error || 'This file is not on this computer.');
-    const file = fileForLink(found.path);
+    const newest = newestBeside(found.path, familyKeyOf);
+    const file = fileForLink(newest);
     if (file.error) throw new Error(file.error);
-    return { ...file, name: path.basename(found.path), version: versionInName(found.path) };
+    return { ...file, name: path.basename(newest), version: versionInName(newest) };
   };
   ipcMain.handle('zero:file-link', linkCall(async (arg) => {
     const now = await fileOnScreen(arg).catch(() => null);

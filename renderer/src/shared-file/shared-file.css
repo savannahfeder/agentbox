@@ -43,7 +43,8 @@
 .sf-pdf { height: calc(100vh - 210px); min-height: 520px; display: flex; }
 .sf-pdf > * { flex: 1; min-width: 0; }
 
-.sf-comments { position: sticky; top: 76px; min-width: 0; }
+/* A long conversation scrolls in its own column, beside a file that stays put. */
+.sf-comments { position: sticky; top: 76px; min-width: 0; max-height: calc(100vh - 100px); overflow-y: auto; }
 .sf-comments h2 {
   display: flex; align-items: center; gap: 8px; margin: 0 0 4px; height: 18px;
   font: 10.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint);
@@ -124,7 +125,7 @@
   .sf-image { padding: 12px; }
   .sf-frame, .sf-pdf { height: calc(100svh - 130px); min-height: 420px; }
   .sf-me, .sf-pitch { display: none; }
-  .sf-comments { position: static; }
+  .sf-comments { position: static; max-height: none; overflow: visible; }
   .sf-sign-in .si-card { width: auto; box-sizing: border-box; padding: 30px 22px 22px; }
   .sf-sign-in { grid-template-columns: minmax(0, 1fr); }
 }

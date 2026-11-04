@@ -9,7 +9,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileForLink, linkKindOf, linkSource, linkAddress, LINK_MAX_BYTES } from '../main/file-link.mjs';
+import { fileForLink, linkKindOf, linkSource, linkAddress, newestBeside, LINK_MAX_BYTES } from '../main/file-link.mjs';
+import { familyKeyOf } from '../shared/artifact-marks.mjs';
 
 let dir, page;
 const write = (rel, data) => { const f = path.join(dir, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, data); return f; };
@@ -76,6 +77,24 @@ describe('what can be shared', () => {
   });
   it('says so when the file has gone', () => {
     expect(fileForLink(path.join(dir, 'gone.md')).error).toMatch(/not on this computer/);
+  });
+});
+
+// An edit from Files wrote investor-update-v2.md and the link never offered it (power test, 2026-11-04).
+describe('the newest version beside a file', () => {
+  it('is the highest -vN of the same file in its folder, whichever version is on screen', () => {
+    const v1 = write('docs/plan.md', 'one');
+    write('docs/plan-v2.md', 'two');
+    const v3 = write('docs/plan-v3.md', 'three');
+    write('docs/plan-v9.txt', 'not the same kind');
+    write('docs/other-v7.md', 'another file');
+    expect(newestBeside(v1, familyKeyOf)).toBe(v3);
+    expect(newestBeside(v3, familyKeyOf)).toBe(v3);
+  });
+  it('is the file itself when it has no other version, or its folder is gone', () => {
+    const only = write('solo/notes.md', 'x');
+    expect(newestBeside(only, familyKeyOf)).toBe(only);
+    expect(newestBeside(path.join(dir, 'gone/x.md'), familyKeyOf)).toBe(path.join(dir, 'gone/x.md'));
   });
 });
 
