@@ -37,8 +37,10 @@ import { DONE } from '../done-word';
 import { onPhone } from '../phone-screen';
 import { PlaceButton, type PlaceFacts } from './PlaceButton';
 import { nameWait } from '../../../shared/thread-waits.mjs';
+import { PriorityIcon } from '../components/Priority';
+import { PRIORITIES, priorityLabelOf, type PriorityId } from '../priority';
 
-export type ThreadMenuRowId = 'run' | 'code' | 'terminal' | 'later' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'close-task' | 'done';
+export type ThreadMenuRowId = 'run' | 'code' | 'terminal' | 'later' | 'priority' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'close-task' | 'done';
 
 /**
  * WHERE THIS THREAD RUNS: in the cloud now (`cloud`), free to go there
@@ -80,7 +82,7 @@ export interface ThreadMenuRow { id: ThreadMenuRowId; label: string; key: string
  * door to one verb; on a phone there was no door at all and the Later tab
  * could not be filled. It names no key for the same reason.
  */
-export function threadMenuRows({ change, terminal, finish, runNow = false, later = false, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, closeTask = false }: {
+export function threadMenuRows({ change, terminal, finish, runNow = false, later = false, priority = null, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, closeTask = false }: {
   /** An open task between people: E only clears it from your Needs you, so closing it is its own row. */
   closeTask?: boolean;
   /** Whether a person has said it shipped, or null where the team would not see that. */
@@ -95,6 +97,8 @@ export function threadMenuRows({ change, terminal, finish, runNow = false, later
   runNow?: boolean;
   /** 'key' on the laptop, where L does it and the row says so. */
   later?: boolean | 'key';
+  /** The level it runs at now, or null where it has none to change. */
+  priority?: PriorityId | null;
   pin?: 'pinned' | 'unpinned' | null;
   give?: boolean;
 }): ThreadMenuRow[] {
@@ -103,6 +107,7 @@ export function threadMenuRows({ change, terminal, finish, runNow = false, later
   if (change) rows.push({ id: 'code', label: 'View code changes', key: null });
   if (terminal) rows.push({ id: 'terminal', label: terminal === 'open' ? 'Hide terminal' : 'Open terminal', key: '⌘J' });
   if (later) rows.push({ id: 'later', label: 'Later', key: later === 'key' ? 'L' : null });
+  if (priority) rows.push({ id: 'priority', label: 'Priority', key: null, detail: priorityLabelOf(priority) });
   if (rename) rows.push({ id: 'rename', label: 'Rename', key: null });
   if (move) rows.push({ id: 'move', label: 'Move to another project', key: null });
   if (pin) rows.push({ id: 'pin', label: pin === 'pinned' ? 'Unpin thread' : 'Pin thread', key: null });
@@ -112,6 +117,11 @@ export function threadMenuRows({ change, terminal, finish, runNow = false, later
   if (closeTask) rows.push({ id: 'close-task', label: 'Close task', key: null, detail: 'For both of you' });
   if (finish) rows.push({ id: 'done', label: 'Mark done', key: 'E' });
   return rows;
+}
+
+/** The four levels the Priority row opens, the one it is at marked. */
+export function priorityLevels(current: PriorityId | null): { id: PriorityId; label: string; on: boolean }[] {
+  return PRIORITIES.map((p) => ({ id: p.id, label: p.label, on: p.id === current }));
 }
 
 /** Done, which the corner draws as its own half, and the rows left for the menu. */
@@ -171,7 +181,7 @@ function RenameMark() {
 function MoveMark() {
   return <svg {...mark}><path d="M3 12h13m-4-4 4 4-4 4" /><path d="M20 4v16" /></svg>;
 }
-const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { run: RunMark, code: CodeMark, terminal: TerminalMark, later: LaterMark, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'close-task': DoneMark, done: DoneMark };
+const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { run: RunMark, code: CodeMark, terminal: TerminalMark, later: LaterMark, priority: () => <PriorityIcon id="medium" />, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'close-task': DoneMark, done: DoneMark };
 
 /** Three square dots, because every shape in this skin is square. */
 function Dots() {
@@ -216,7 +226,7 @@ function BlockWords({ onPick }: { onPick: (id: string) => void }) {
 
 /* ----------------------------------------------------------------- button */
 
-export function ThreadMenu({ change = null, onViewChange, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onReopen = null, onRunNow = null, onLater = null, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
+export function ThreadMenu({ change = null, onViewChange, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onReopen = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
   /** Opens ⌘K on the Move to rows. */
   onMove?: (() => void) | null;
   /** Whether a person has said it shipped, or null where the team would not see that. */
@@ -249,6 +259,9 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
   onRunNow?: (() => void) | null;
   /** Opens the Later picker. Non-null only where there is no keyboard to press L on. */
   onLater?: (() => void) | null;
+  /** The level it runs at now; the row opens the four levels. */
+  priority?: PriorityId | null;
+  onPriority?: (id: PriorityId) => void;
   /** Whether the thread is pinned now, or null where it cannot be. */
   pinned?: boolean | null;
   onPin?: (pin: boolean) => void;
@@ -260,16 +273,18 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
   /** True keeps it on this Mac (moving it here if it is in the cloud). */
   onPlace?: (keep: PlaceAct) => void;
 }) {
-  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', closeTask: !!onCloseTask }));
+  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', closeTask: !!onCloseTask }));
   const [open, setOpen] = useState(false);
   const [giving, setGiving] = useState(false);
   const [waiting, setWaiting] = useState(false);
+  const [leveling, setLeveling] = useState(false);
   const wrap = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const close = useCallback((refocus: boolean) => {
     setOpen(false);
     setGiving(false);
     setWaiting(false);
+    setLeveling(false);
     if (refocus) button.current?.focus();
   }, []);
 
@@ -314,7 +329,7 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
   // The first row takes the focus as the menu opens, so the arrows work at once.
   useEffect(() => {
     if (open) wrap.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
-  }, [open, giving, waiting]);
+  }, [open, giving, waiting, leveling]);
 
   // Enter, Space or the down arrow on the dots opens the menu. Handled here and
   // stopped, because the window reads Enter on a thread as "send the picked
@@ -329,6 +344,7 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
   const pick = (id: ThreadMenuRowId) => {
     if (id === 'give') { setGiving(true); return; }
     if (id === 'wait') { setWaiting(true); return; }
+    if (id === 'priority') { setLeveling(true); return; }
     close(id === 'terminal');
     if (id === 'run') onRunNow?.();
     else if (id === 'code') onViewChange?.();
@@ -389,7 +405,16 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
           {blocks && <BlockWords onPick={(id) => { close(false); onWait?.(id); }} />}
         </div>
       )}
-      {open && !waiting && (giving
+      {open && leveling && (
+        <div className="th-menu ts-more-menu" role="menu" aria-label="Priority">
+          {priorityLevels(priority).map((p) => <button key={p.id} type="button" role="menuitem" aria-current={p.on ? 'true' : undefined} tabIndex={-1} className={`row-i ts-more-row${p.on ? ' on' : ''}`} onClick={() => { close(false); if (!p.on) onPriority?.(p.id); }}>
+            <span className="ico"><PriorityIcon id={p.id} /></span>
+            <span className="ts-more-label">{p.label}</span>
+            {p.on && <svg className="ts-more-tick" {...mark}><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>}
+          </button>)}
+        </div>
+      )}
+      {open && !waiting && !leveling && (giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Give it to">
           <p className="ts-menu-say">A person gets it as a task in their Needs you. An AI teammate starts on it.</p>
           {giveTo.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { close(false); onGive?.(p); }}>
