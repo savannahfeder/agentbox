@@ -11,6 +11,7 @@ import { cardState, checkResultLine, copyLine, copyNextLine, failureLine, openCo
 import { DARK_INK, logoOf } from './logos';
 import { SERVICES } from '../../../shared/cloud-needs.mjs';
 import { keyLooksWrong } from '../key-asks';
+import { Name } from '../../../shared/product-name.mjs';
 import './connections.css';
 
 function Mark({ id, name }: { id: string; name: string }) {
@@ -333,7 +334,7 @@ function CloudSheet({ tile, onClose, onNotice, here }: { tile: CloudTile; onClos
       {tile.mark ? <Mark id={tile.mark} name={tile.name} /> : <span className="cn-mark cn-mark-letter" aria-hidden="true">{tile.name.charAt(0)}</span>}
       <span className="cn-tile-words">
         <span className="cn-sheet-name">{tile.name}</span>
-        <span className="cn-state"><span className="cn-dot cn-dot-good" aria-hidden="true" /><span>Kept encrypted in your Agentbox Cloud</span></span>
+        <span className="cn-state"><span className="cn-dot cn-dot-good" aria-hidden="true" /><span>Kept encrypted in your {Name} Cloud</span></span>
       </span>
     </div>
     <p className="cn-hint">Every cloud thread can use it.{here && <> Agents on this computer need their own: <button type="button" className="cn-inline" onClick={here}>connect {tile.name} here</button>.</>}</p>

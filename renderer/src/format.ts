@@ -455,7 +455,7 @@ function flatten(body: string, headings: 'drop' | 'keep'): string {
     // A cloud run's key ask reads as what it asks for (shared/cloud-keys.mjs).
     // Its other asks are cards in the thread, and machine words anywhere else (round six: search showed them).
     .replace(/^\s*`?AGENTBOX-NEEDS:\s*(sign-in|key|file|code)\s.*$/gim, '')
-    .replace(/^\s*`?AGENTBOX-NEEDS-A-KEY:\s*([A-Z][A-Z0-9_]+)\b[\s:—–-]*(.*?)`?\s*$/gm, (_l, name: string, what: string) => what || name)
+    .replace(/^\s*`?AGENTBOX-NEEDS-A-KEY:\s*([A-Z][A-Z0-9_]+)\b[\s:\u2014\u2013-]*(.*?)`?\s*$/gm, (_l, name: string, what: string) => what || name)
     // An underscore inside a word is part of it (STRIPE_SECRET_KEY), not emphasis.
     .replace(/[*`>#]|(?<![A-Za-z0-9])_+|_+(?![A-Za-z0-9])/g, '')
     .split('\n')
