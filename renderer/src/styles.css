@@ -3213,6 +3213,19 @@ body {
 .opt-row a { pointer-events: none; }
 .opt-rec { font-size: 11.5px; color: var(--text-faint); flex-shrink: 0; padding-left: 8px; }
 
+/* The tasks a close question is about, named so one filed far up the thread
+   can be found. The dot matches the filed list's (threads-made.css). */
+.opt-named { margin: 0 0 6px; }
+.opt-named-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 30px; padding: 0 16px;
+  appearance: none; background: transparent; border: 0; cursor: pointer; text-align: left;
+  font: inherit; font-size: 14px; color: var(--text); transition: background 0.15s;
+}
+.opt-named-row:hover { background: var(--wash); }
+.opt-named-row:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
+.opt-named-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.opt-named-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .reply-dock { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 16px; }
 .reply-dock textarea {
   width: 100%;

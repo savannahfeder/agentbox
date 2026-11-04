@@ -838,7 +838,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
    * thread's own options stand, and the number keys answer it (App.tsx).
    * `raised` counts each close that raised it, so each one scrolls to it.
    */
-  closeAsk?: { ask: string; options: ParsedOption[]; raised: number; onPick: (n: number) => void; keep?: { label: string; onKeep: () => void } } | null;
+  closeAsk?: { ask: string; options: ParsedOption[]; raised: number; onPick: (n: number) => void; keep?: { label: string; onKeep: () => void }; named?: Array<{ id: string; title: string }> } | null;
   // Said out loud when a file a worker named is not in this product. Nothing
   // else on the card can tell her a chip failed.
   onNotice: (text: string) => void;
@@ -2270,6 +2270,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             selectedOption={selectedOption} selRef={selRef}
             onPick={closeAsk.onPick} onOptionEnter={() => {}} onAskEnter={() => {}}
             setPeek={() => {}} setAskPeek={() => {}} keep={closeAsk.keep}
+            named={closeAsk.named && { rows: closeAsk.named, onOpen: openFiled }}
             stripRef={closeAskRef}
           />
         )}
@@ -2502,6 +2503,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               selectedOption={selectedOption} selRef={selRef}
               onPick={closeAsk.onPick} onOptionEnter={() => {}} onAskEnter={() => {}}
               setPeek={() => {}} setAskPeek={() => {}} keep={closeAsk.keep}
+              named={closeAsk.named && { rows: closeAsk.named, onOpen: openFiled }}
               stripRef={closeAskRef}
             />
           )}

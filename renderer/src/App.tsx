@@ -7804,7 +7804,8 @@ export default function App() {
                     // No esc row on the discard question: its option 2 is the
                     // same answer (./discard-asks-first.ts).
                     const keep = closeAskWhy === 'discard' ? undefined : { label: KEEP_OPEN, onKeep: keepThreadOpen };
-                    return asked && { ...asked, raised: closeAskRaised, onPick: (n: number) => answerCloseAsk(focused, n), keep };
+                    const named = closeAskWhy === 'filed' ? waitingFiled(focused).map((i) => ({ id: i.id, title: rowTitle(i) })) : undefined;
+                    return asked && { ...asked, raised: closeAskRaised, onPick: (n: number) => answerCloseAsk(focused, n), keep, named };
                   })()}
                   onNotice={showToast}
                   /*

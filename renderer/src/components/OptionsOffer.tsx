@@ -38,8 +38,11 @@ import type { ParsedOption } from '../format';
 
 export function OptionsOffer({
   ask, askAll, options, peekOption, askPeek,
-  selectedOption, selRef, onPick, onOptionEnter, onAskEnter, setPeek, setAskPeek, keep, stripRef, onOver, bare = false,
+  selectedOption, selRef, onPick, onOptionEnter, onAskEnter, setPeek, setAskPeek, keep, named, stripRef, onOver, bare = false,
 }: {
+  /** The tasks a close question is about, each opening on a click: they may
+   *  have been filed on a turn folded far up the thread. */
+  named?: { rows: Array<{ id: string; title: string }>; onOpen: (id: string) => void };
   stripRef?: React.RefObject<HTMLDivElement>;
   /** Whether the pointer is standing on the strip. A click is refused while
    *  the rows have just moved under it (../pick-settles.ts). */
@@ -115,6 +118,16 @@ export function OptionsOffer({
         <div className="opt-peek">
           <div className="opt-peek-head">The question, in full</div>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{askAll}</ReactMarkdown>
+        </div>
+      )}
+      {named && named.rows.length > 0 && (
+        <div className="opt-named">
+          {named.rows.map((r) => (
+            <button type="button" key={r.id} className="opt-named-row" title={`Open ${r.title}`} onClick={() => named.onOpen(r.id)}>
+              <span className="opt-named-dot" />
+              <span className="opt-named-title">{r.title}</span>
+            </button>
+          ))}
         </div>
       )}
       {options.map((o) => (
