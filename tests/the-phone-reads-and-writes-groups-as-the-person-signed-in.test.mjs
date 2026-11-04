@@ -170,7 +170,7 @@ describe('what the phone writes, and as whom', () => {
 });
 
 describe('a group’s people, and the list with what is unread', () => {
-  it('names everyone, with their level, what they are on and their agents', async () => {
+  it('names everyone, with what they are on and their agents', async () => {
     const c = standIn();
     const got = await groupPeople(c, ['r-1']);
     expect(c.calls.filter((x) => x.kind === 'rpc').map((x) => x.name).sort()).toEqual(['room_names', 'room_people']);
@@ -181,7 +181,8 @@ describe('a group’s people, and the list with what is unread', () => {
     const sam = wall.find((p) => p.id === SAM);
     const kai = wall.find((p) => p.id === KAI);
     expect(sam).toMatchObject({ name: 'Sam R.', agents: 2, workingOn: 'Draw the sign-in screen', teammate: false });
-    expect(sam.level).toBeGreaterThan(1);
+    expect(sam.hoursTotal).toBeGreaterThan(0);
+    expect(sam).not.toHaveProperty('level');
     // A teammate who shows their work to the team only: named from the team's thread cards.
     expect(kai).toMatchObject({ agents: 1, workingOn: 'Fix the login meter', teammate: true });
     expect(wall.find((p) => p.id === ME)).toMatchObject({ me: true });

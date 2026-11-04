@@ -1,4 +1,4 @@
-// AGENT HOURS: the level, the week, the streak (w-3d0fa23ffb).
+// AGENT HOURS: the total, the week, the streak (w-3d0fa23ffb).
 //
 // Pure. A run is `{key, at, start, item, product, engine, seconds, failed,
 // began}`: `at` is when it ended, and a run is counted on the local day it
@@ -27,37 +27,10 @@ export interface AgentHoursSummary {
   streak: number;
   activeDays: string[];
   byMonth: { month: string; hours: number }[];
-  level: number;
 }
 
-export const MASTERY_HOURS = 10_000;
 const MAX_RUN_SECONDS = 24 * 3600;
 const DAY_MS = 86_400_000;
-
-// Up to 99, hours grow as level^2.5: level 2 in minutes, 99 at MASTERY_HOURS.
-// Not RuneScape's curve, which spends half its hours on the last seven levels
-// and so reads 82 after one heavy month. Past 99 there is no ceiling and each
-// level costs 5% more than the last, starting from the curve's pace at 99 so
-// no level ever costs less than the one before.
-const RISE = 2.5;
-const PAST = Math.log(1.05);
-const PACE_AT_99 = (MASTERY_HOURS * RISE) / 98;
-// A level starts at its exact hours, not one float step later.
-const EPS = 1e-10;
-
-export function hoursForLevel(level: unknown): number {
-  const L = Number(level);
-  if (!(L > 1)) return 0;
-  if (L <= 99) return MASTERY_HOURS * ((L - 1) / 98) ** RISE;
-  return MASTERY_HOURS + (PACE_AT_99 * Math.expm1((L - 99) * PAST)) / PAST;
-}
-
-export function levelFor(hours: unknown): number {
-  const h = Number(hours);
-  if (!Number.isFinite(h) || h <= 0) return 1;
-  if (h < MASTERY_HOURS) return 1 + Math.floor(98 * (h / MASTERY_HOURS) ** (1 / RISE) + EPS);
-  return 99 + Math.floor(Math.log1p(((h - MASTERY_HOURS) * PAST) / PACE_AT_99) / PAST + EPS);
-}
 
 const pad = (n: number) => String(n).padStart(2, '0');
 export const localDate = (ms: number): string => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
@@ -141,7 +114,6 @@ export function summarizeRuns(runs: readonly (AgentRun | null | undefined)[] | n
     streak: streakOf(activeDays, now),
     activeDays,
     byMonth: [...months].map(([month, hours]) => ({ month, hours })),
-    level: levelFor(total),
   };
 }
 

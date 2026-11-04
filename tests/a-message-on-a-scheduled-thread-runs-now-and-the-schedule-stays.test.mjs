@@ -58,9 +58,13 @@ it('a moment she set is still hers: an agent cannot move it', () => {
 
 describe('the wiring', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+  // Except the one moment that was a reply's own: a reply set for later that a
+  // second reply, sent at once, took with it (w-54cdf7c768).
   it('a reply no longer clears the moment', () => {
-    const send = app.slice(app.indexOf('landed();'), app.indexOf("pushUndo({ label: 'Reply withdrawn"));
+    const send = app.slice(app.indexOf('landed();'), app.indexOf("pushUndo({ label: 'Reply withdrawn"))
+      .replace('if (waiting) await api.schedule({ product: item.product, id: item.id, runAt: 0 });', '');
     expect(send).not.toMatch(/runAt: 0/);
+    expect(app).toMatch(/const waiting = !later && replyWaitsUntil\(item, Date\.now\(\)\) > 0;/);
   });
   it('run now keeps the moment when a word of hers is what it runs', () => {
     const unsnooze = app.slice(app.indexOf('const unsnooze = useCallback'), app.indexOf('const unsnooze = useCallback') + 2000);

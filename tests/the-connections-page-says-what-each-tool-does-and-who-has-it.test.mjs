@@ -161,7 +161,7 @@ describe('where the page is', () => {
   });
 
   it('in Command K', () => {
-    expect(read('renderer/src/components/Palette.tsx')).toMatch(/id: 'view-connections', label: 'Connections'/);
+    expect(read('renderer/src/components/Palette.tsx')).toMatch(/id: 'view-connections', label: 'Go to Connections'/);
   });
 
   it('every door the window needs is there, on both sides', () => {

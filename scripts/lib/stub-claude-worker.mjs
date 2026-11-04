@@ -283,6 +283,65 @@ const limitOn = directive('stub:limit-on')?.[1];
 const world = argv.includes('-p') ? readWorld(plan.world) : {};
 const turn = worldTurn(world, loginName);
 if (Object.keys(world).length) said = worldAnswer(said, turn, titleIn(promptText), attempt);
+// WHAT ONLY THE PERSON CAN GIVE, ASKED FOR THE WAY A CLOUD RUN IS TOLD TO
+// (main/cloud/run.mjs cloudNote, shared/cloud-needs.mjs), and only by a run that
+// was told it may. The task's own words say what it needs: a service names a
+// sign-in, found in the environment once saved; "the original film" a file;
+// "npm publish" a one-time code; Xcode or the simulator the computer itself.
+const SIGN_INS = [
+  [/supabase/i, 'supabase', 'Supabase', ['SUPABASE_ACCESS_TOKEN'], 'to apply the change to the database'],
+  [/vercel/i, 'vercel', 'Vercel', ['VERCEL_TOKEN'], 'to deploy the site'],
+  [/stripe/i, 'stripe', 'Stripe', ['STRIPE_SECRET_KEY'], 'to run it against Stripe test mode'],
+  [/\bexpo\b|\beas\b/i, 'expo', 'Expo', ['EXPO_TOKEN'], 'to start the build'],
+  [/\baws\b|\bs3\b/i, 'aws', 'AWS', ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'], 'to upload to S3'],
+  [/sentry/i, 'sentry', 'Sentry', ['SENTRY_AUTH_TOKEN'], 'to read the errors'],
+  [/github/i, 'github', 'GitHub', ['GH_TOKEN'], 'to open the pull request'],
+];
+// Round six: testers asking in their own words ("the launch film", "the .mov") got no file card.
+const FILE_ASK = /\b(film|video|footage|recording|\.mov|\.mp4)\b|\bfrom my (movies|desktop|downloads)\b/i;
+const FILM = '~/Movies/launch-film-original.mov';
+const CODE_ASK = /\bnpm\b.*\bpublish|\bpublish\b.*\bnpm\b|one-time|\botp\b|\b2fa\b|verification code/i;
+const COMPUTER_ASK = /\bxcode\b|simulator|testflight/i;
+{
+  const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
+  // Only a cloud run is told it may ask; on the computer the person's own sign-ins and files are there.
+  const inCloud = `${brief}\n${promptText}`.includes('# You are running on a cloud machine');
+  const told = inCloud && `${brief}\n${promptText}`.includes('AGENTBOX-NEEDS:');
+  const task = promptText.match(/^Title: [\s\S]*?(?=\n# |(?![\s\S]))/m)?.[0] ?? '';
+  const asked = promptText.match(/# The founder has answered[\s\S]*?\n> (.*)/)?.[1] ?? '';
+  const title = titleIn(promptText) ?? 'this';
+  const services = SIGN_INS.filter(([re]) => re.test(task));
+  // A file the person named is asked for by name (round eight: a signed pdf was asked for as the launch film).
+  const named = `${task}\n${asked}`.match(/\b([\w-]+\.(pdf|sql|csv|mov|mp4|zip|png|jpe?g|docx?|xlsx?|json|txt))\b/i)?.[1];
+  const file = named ? `~/${/\.(mov|mp4)$/i.test(named) ? 'Movies' : 'Downloads'}/${named}` : FILM;
+  const wantsFile = !!named || FILE_ASK.test(task) || FILE_ASK.test(asked);
+  // The file the person named is on their (stand-in) computer, as it would be, so the card can send it.
+  if (named && process.env.STUB_PERSON_HOME) {
+    const there = path.join(process.env.STUB_PERSON_HOME, file.slice(2));
+    if (!fs.existsSync(there)) { fs.mkdirSync(path.dirname(there), { recursive: true }); fs.writeFileSync(there, `stand-in ${named}\n`); }
+  }
+  const wantsCode = CODE_ASK.test(task) || CODE_ASK.test(asked);
+  // Only the card's own way out, not any reply that mentions the computer (round six).
+  const onComputer = /^do it (from|on) my computer( instead)?\.?$/i.test(asked.trim());
+  if (inCloud && COMPUTER_ASK.test(task)) said = 'AGENTBOX-NEEDS-THE-COMPUTER: Xcode and the iOS simulator';
+  else if (!inCloud && onComputer) said = `Did it on your computer${services.length ? ` with your own ${services.map((x) => x[2]).join(' and ')} sign-in` : ''}. It is done.`;
+  else if (told && onComputer) said = `AGENTBOX-NEEDS-THE-COMPUTER: ${services[0]?.[2] ?? 'your'} sign-in, on your computer`;
+  else if (told && (services.length || wantsFile || wantsCode)) {
+    // Earlier answers on the thread say what the person already gave.
+    const gaveFile = /I sent \S/.test(promptText);
+    const gaveCode = /code is [A-Za-z0-9-]{4,}/.test(promptText);
+    const missingSignIns = services.filter((x) => x[3].some((k) => !process.env[k]));
+    const lines = [
+      ...missingSignIns.map(([, id, , , why]) => `AGENTBOX-NEEDS: sign-in ${id} | ${why}`),
+      ...(wantsFile && !gaveFile ? [`AGENTBOX-NEEDS: file ${file} | ${named ? 'it is on your computer, not in the repository' : 'the cut is made from the original'}`] : []),
+      ...(wantsCode && !gaveCode ? ['AGENTBOX-NEEDS: code npm | the one-time password for npm publish'] : []),
+    ];
+    const what = [...missingSignIns.map((x) => `your ${x[2]} sign-in`), ...(wantsFile && !gaveFile ? [named ? `${named} from your computer` : 'the original film from your computer'] : []), ...(wantsCode && !gaveCode ? ['the npm one-time password'] : [])];
+    said = lines.length
+      ? [`**I need ${what.length > 1 ? `${what.slice(0, -1).join(', ')} and ${what.at(-1)}` : what[0]} to finish.**`, '', 'Everything that does not need it is done.', '', ...lines].join('\n')
+      : `Finished "${title}" with ${[...services.map((x) => `your saved ${x[2]} sign-in`), ...(wantsFile ? [named ? `the ${named} you sent` : 'the film you sent'] : []), ...(wantsCode ? ['the code you sent'] : [])].join(', ')}. It is done.`;
+  }
+}
 const handsOver = directive('stub:file')?.[1];
 if (handsOver) said = `${said}\n\n${handsOver}\n`;
 if (directive('stub:limit') || (directive('stub:limit-first') && attempt === 1) || (limitOn && limitOn === loginName) || turn.limit) {

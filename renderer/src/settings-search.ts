@@ -42,6 +42,7 @@ type Entry = { page: SettingsPageId; label: string; anchor?: string; words?: str
 
 const ENTRIES: Entry[] = [
   { page: 'general', label: 'Your account', anchor: 'account', words: 'signed in sign out log out logout email' },
+  { page: 'general', label: 'Public links', anchor: 'public-links', words: 'share shared sharing link links public web stop' },
   { page: 'general', label: 'Show keyboard shortcut hints', anchor: 'keys', words: 'keys hints' },
   { page: 'general', label: 'Shrink the sidebar to icons', anchor: 'sidebar', words: 'sidebar narrow collapse rail icons' },
   { page: 'general', label: 'Counts and crash reports', anchor: 'privacy', words: 'privacy diagnostics analytics telemetry sends data' },
@@ -68,6 +69,7 @@ const ENTRIES: Entry[] = [
   { page: 'claude', label: 'Usage', anchor: 'usage', words: 'claude code limits plan left remaining quota' },
   { page: 'claude', label: 'Signed in', anchor: 'usage', words: 'claude code account accounts login subscription add email this computer local' },
   { page: 'claude', label: 'Cloud accounts', anchor: 'cloud-accounts', words: 'claude code cloud remote accounts limit' },
+  { page: 'claude', label: 'Keys for cloud threads', anchor: 'cloud-keys', words: 'keys key token tokens secret secrets api saved replace remove supabase stripe vercel sentry expo aws github' },
   { page: 'claude', label: 'Permission mode', anchor: 'permissions', words: 'claude code permissions bypass ask allow plan accept edits' },
   { page: 'codex', label: 'Usage', anchor: 'usage', words: 'codex limits plan left remaining quota' },
   { page: 'codex', label: 'Signed in', anchor: 'usage', words: 'codex account accounts login subscription add email this computer local' },

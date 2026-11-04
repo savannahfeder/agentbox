@@ -8,7 +8,7 @@ import { previewSpeech } from '../lib/preview-speech';
 import { phoneSpeech } from '../platform/speech';
 import { Mic } from './icons';
 import { T } from './parts';
-import { color, font } from './theme';
+import { color, corner, font } from './theme';
 
 const PREVIEW = process.env.EXPO_PUBLIC_PREVIEW === '1';
 
@@ -80,7 +80,7 @@ function Button({ label, a11y, onPress, strong, disabled }: { label: string; a11
   return (
     <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={a11y}
       style={({ pressed }) => ({
-        height: 29, paddingHorizontal: strong ? 16 : 12, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong,
+        height: 29, paddingHorizontal: strong ? 16 : 12, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong,
         backgroundColor: pressed ? color.picked : 'transparent', opacity: disabled ? 0.5 : 1,
       })}>
       <T style={{ fontSize: 13, fontFamily: strong ? font.semibold : font.medium, color: strong ? color.text : color.dim }}>{label}</T>

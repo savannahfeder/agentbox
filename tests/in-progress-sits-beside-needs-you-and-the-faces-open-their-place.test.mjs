@@ -101,7 +101,8 @@ describe('In progress beside Needs you', () => {
     { id: 'a-mates-run', status: 'open', labels: ['teammate:t-1'], updatedAt: 3 },
   ];
 
-  it('counts your own running and waiting-on-others threads, not an AI teammate\'s runs', () => {
+  // Later and Done today; In progress holds your AI teammates' runs too (your-ai-teammates-work-is-in-your-in-progress).
+  it('leaves an AI teammate\'s runs out of your own threads', () => {
     expect(yoursOnly(rows, mateOf).map((i) => i.id)).toEqual(['running', 'waits-on-dev']);
   });
 
@@ -117,7 +118,8 @@ describe('In progress beside Needs you', () => {
 
   it('is the second word on the line, and is the same number the list draws', () => {
     expect(pages).toMatch(/team\?\.progress && <button.*onClick=\{team\.onEverything\}>In progress/);
-    expect(app).toMatch(/progress: !onPhone\(\) \? \{ count: mineShown \? shownCount\(yoursOnly\(progressTab, teammateIdOf\)\) : 0/);
+    expect(app).toMatch(/progress: !onPhone\(\) \? \{ count: mineShown \? shownCount\(progressTab\) : 0/);
+    expect(app).toMatch(/stackRows\(\{ progress: shownAs\(progressTab, 'progress'\)/);
   });
 
   it('is what Tab goes to from Needs you, and Tab comes back', () => {

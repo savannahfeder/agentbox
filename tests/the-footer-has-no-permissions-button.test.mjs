@@ -88,15 +88,16 @@ describe('the permissions chip is off the reply footer', () => {
   // will be called whatever its author calls it. So this counts buttons
   // instead of naming them.
   //
-  // The footer after the wrapping sentence is exactly one button, Send. The
-  // pickers ahead of it are components, not raw elements, so they do not count
-  // here and are not meant to: they are inside the sentence and they wrap with
-  // it, which is the whole difference from the chip that could not.
-  it('leaves the footer as the sentence and one send button, nothing else', () => {
+  // Since w-54cdf7c768 the footer is the new thread card's bar, which she
+  // picked: the pickers as the card's chips in a row that wraps on its own, so
+  // nothing can lie across them, then the card's paperclip and Send. The
+  // pickers are components, not raw elements, so they do not count here.
+  it('leaves the footer as the chips, the paperclip and Send, nothing else', () => {
     const code = stripJs(read('renderer/src/components/Focus.tsx'));
-    const footer = code.slice(code.indexOf('compose-clauses'));
+    const footer = code.slice(code.indexOf('className="dock-chips"'));
     const buttons = [...footer.matchAll(/<button/g)];
-    expect(buttons.length, 'a second control has appeared on the reply footer').toBe(1);
+    expect(buttons.length, 'a third control has appeared on the reply footer').toBe(2);
+    expect(footer).toContain('className="tc-icon dock-clip"');
     expect(footer).toContain('className="dock-send"');
   });
 });

@@ -5,10 +5,9 @@ import { cloudCommands, type CloudMode, type CloudStatus } from '../cloud-menu';
 import { chord } from '../this-keyboard';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { Product, View } from '../types';
-import { DONE } from '../done-word';
 import { commandKeys } from '../palette-keys';
 import { keptPick, namesIt, pointerMoved, titleFirst } from '../palette-pick';
-import { emptyLine, lookRows, matchesQuery, rankMatches } from '../palette-rows';
+import { emptyLine, lookRows, matchesQuery, pageRows, rankMatches } from '../palette-rows';
 import { glyphFor } from '../palette-glyphs';
 import { markedWords } from '../found-inside';
 import { ago } from '../format';
@@ -33,7 +32,7 @@ export interface Command {
 /** What was found inside things, a labelled group of rows each (renderer/src/found-inside.ts). */
 export interface InsideSection { key: string; label: string; rows: Command[] }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -64,6 +63,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   onClearFilter: () => void;
   onEndTutorial?: () => void;
   onView: (view: View) => void;
+  /** The team's tabs, where Later and Done are columns of In progress. */
+  teamLayout?: boolean;
   onPause: (paused: boolean) => void;
   onResume: () => void;
   order?: string[];
@@ -177,18 +178,14 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // Namespaced so they cannot share an id with an item command such as
     // 'done'. Ids become React keys, and a duplicate kept a stale row alive
     // through the filter (../palette-keys).
-    { id: 'view-inbox', label: 'Inbox', run: () => onView('inbox') },
-    { id: 'view-progress', label: 'In progress', run: () => onView('progress') },
-    // The tab this opens says Done, and so does the key, the row's chip and
-    // the button (../done-word). This row said Closed.
-    { id: 'view-done', label: DONE.short, run: () => onView('done') },
+    ...pageRows({ team: teamLayout }).map((r) => ({ id: r.id, label: r.label, keywords: r.keywords, run: () => onView(r.view) })),
     // THE OTHER PAGE, AND EVERY GROUP ON IT (w-326fb83c0e). ⌘K found nothing
     // for "rooms", "groups" or "messages", so the only way onto the page was
     // the top bar's own menu. The old name is in the keywords: this was Rooms
     // until 2026-10-23 and that is what somebody who has used it still types.
     ...(roomsOn && onGroups ? [{
       id: 'view-groups',
-      label: 'Groups',
+      label: 'Go to Groups',
       hint: 'the people you work with, and what they are on',
       keywords: 'rooms room groups group chat channel messages message dm dms direct teammates team people together',
       run: onGroups,
@@ -211,11 +208,11 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       keywords: `files file documents docs pictures images films videos decks slides pdfs designs shared ${l.title}`, run: l.run,
     })),
     ...(onConnections ? [{
-      id: 'view-connections', label: 'Connections', hint: 'the tools your agents can reach',
+      id: 'view-connections', label: 'Go to Connections', hint: 'the tools your agents can reach',
       keywords: 'connections connect tools linear integrations sign in apps', run: onConnections,
     }] : []),
     ...(teammates && onTeammates ? [
-      { id: 'view-teammates', label: 'Teammates', hint: 'the team chat', keywords: 'teammates team chat agents standing jobs', run: () => onTeammates('team') },
+      { id: 'view-teammates', label: 'Go to Teammates', hint: 'the team chat', keywords: 'teammates team chat agents standing jobs', run: () => onTeammates('team') },
       { id: 'new-teammate', label: 'New teammate', hint: 'it asks you what to take on', keywords: 'teammate agent hire add make create start describe', run: () => onTeammates('new') },
       ...teammates.map((t) => ({ id: `teammate-${t.id}`, label: t.name, hint: t.role ?? 'teammate', keywords: `teammate ${t.name} ${t.role ?? ''}`, run: () => onTeammates(t.id) })),
       ...(onPauseTeammate ? teammates.map((t) => ({
@@ -371,7 +368,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onEndTutorial, onImportAgents, cloud, onCloudMode]);
+  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, teamLayout, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onEndTutorial, onImportAgents, cloud, onCloudMode]);
   return open ? <PaletteBox commands={commands} findThreads={findThreads} findChats={findChats} findInside={findInside} onSearchFor={onSearchFor} onClose={onClose} phone={phone} typed={typed} /> : null;
 }
 

@@ -15,7 +15,6 @@ export interface Member {
   /** An AI teammate's letter. */
   letter?: string;
   role?: string | null;
-  level?: number | null;
   /** Agents running now; null when they keep it to themselves. */
   agents: number | null;
   /** A person's: what they have on, agents and waiting threads and tasks they hold. */
@@ -26,6 +25,8 @@ export interface Member {
   starting?: boolean;
   /** Someone else's AI teammate at work, which its owner's card says. */
   running?: boolean;
+  /** Your AI teammate, paused, with no run still going. */
+  paused?: boolean;
   /** What they are on, or the line that says why nothing is running. */
   now: string | null;
   /** A chat's people, its newest line, and whether it holds something you have not read. */
@@ -41,7 +42,7 @@ export interface Member {
 }
 
 type PersonIn = { id: string; name: string; avatarUrl: string | null };
-type CardIn = { id: string; name: string; me: boolean; avatarUrl: string | null; agents: number | null; level: number | null; workingOn: string | null; workingPrivate: boolean; status: string | null; away?: boolean };
+type CardIn = { id: string; name: string; me: boolean; avatarUrl: string | null; agents: number | null; workingOn: string | null; workingPrivate: boolean; status: string | null; away?: boolean };
 type MateIn = { id: string; name: string; letter: string; role: string | null; now: string | null; status: string; paused: boolean; running?: { id: string } | null; waiting?: readonly unknown[] };
 type ChatIn = { key: string; name: string; faces: { name: string; url: string | null }[]; last: string; at: number; unread: boolean; open?: boolean };
 type ThreadIn = { personId: string; state: string; title: string | null; updatedAt: number };
@@ -59,7 +60,7 @@ export function buildMembers({ me, people = [], wall = null, cards = [], tasksHe
   me: PersonIn | null;
   /** The people on your team, you among them. */
   people?: readonly PersonIn[];
-  /** The team room's cards, when Rooms is on: level, agents running and what each is on. */
+  /** The team room's cards, when Rooms is on: agents running and what each is on. */
   wall?: readonly CardIn[] | null;
   /** Teammates' shared threads, which say who is running something when there is no wall. */
   cards?: readonly (ThreadIn & { threadId?: string })[];
@@ -86,7 +87,7 @@ export function buildMembers({ me, people = [], wall = null, cards = [], tasksHe
   const cardOf = new Map((wall ?? []).map((c) => [c.id, c]));
   const meCard = (wall ?? []).find((c) => c.me) ?? (me ? cardOf.get(me.id) : undefined);
   const out: Member[] = [{
-    key: 'me', kind: 'me', name: 'You', faceName: me?.name, avatarUrl: me?.avatarUrl ?? meCard?.avatarUrl ?? null, level: meCard?.level ?? null,
+    key: 'me', kind: 'me', name: 'You', faceName: me?.name, avatarUrl: me?.avatarUrl ?? meCard?.avatarUrl ?? null,
     agents: meCard ? meCard.agents : myAgents, now: meCard ? quietLine(meCard) ?? myNow : myNow,
     inProgress: onThem(me?.id, meCard ? meCard.agents : myAgents), toDo: toDo(me?.id),
   }];
@@ -100,14 +101,15 @@ export function buildMembers({ me, people = [], wall = null, cards = [], tasksHe
     const c = cardOf.get(p.id);
     const running = cards.filter((t) => t.personId === p.id && t.state === 'running').sort((a, b) => b.updatedAt - a.updatedAt);
     out.push(c
-      ? { key: `person:${p.id}`, kind: 'person', name: p.name, avatarUrl: p.avatarUrl ?? c.avatarUrl, level: c.level, agents: c.agents, now: quietLine(c), inProgress: onThem(p.id, c.agents), toDo: toDo(p.id) }
-      : { key: `person:${p.id}`, kind: 'person', name: p.name, avatarUrl: p.avatarUrl, level: null, agents: running.length, now: running[0]?.title ?? null, inProgress: onThem(p.id, running.length), toDo: toDo(p.id) });
+      ? { key: `person:${p.id}`, kind: 'person', name: p.name, avatarUrl: p.avatarUrl ?? c.avatarUrl, agents: c.agents, now: quietLine(c), inProgress: onThem(p.id, c.agents), toDo: toDo(p.id) }
+      : { key: `person:${p.id}`, kind: 'person', name: p.name, avatarUrl: p.avatarUrl, agents: running.length, now: running[0]?.title ?? null, inProgress: onThem(p.id, running.length), toDo: toDo(p.id) });
   }
   for (const t of teammates) {
     const agents = mateAgents.get(t.id) ?? 0;
     // A run under way outranks Paused, which stops nothing already going.
-    const now = t.status === 'draft' && !t.waiting?.length ? 'Setting up' : t.paused && !t.running ? 'Paused' : t.now;
-    out.push({ key: `mate:${t.id}`, kind: 'mate', name: t.name, letter: t.letter || t.name.slice(0, 1), role: t.role, agents, starting: !!t.running && !agents, now });
+    const paused = t.paused && !t.running;
+    const now = t.status === 'draft' && !t.waiting?.length ? 'Setting up' : paused ? 'Paused' : t.now;
+    out.push({ key: `mate:${t.id}`, kind: 'mate', name: t.name, letter: t.letter || t.name.slice(0, 1), role: t.role, agents, starting: !!t.running && !agents, now, ...(paused ? { paused: true } : {}) });
   }
   for (const t of theirMates) {
     const owner = people.find((p) => p.id === t.owner)?.name ?? '';

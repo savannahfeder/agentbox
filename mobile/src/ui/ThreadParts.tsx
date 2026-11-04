@@ -14,10 +14,11 @@ import { FILED_WORDS, waitingWords, type Live } from '../lib/thread-offers';
 import { Chevron as FoldArrow } from './icons';
 import { InlineMarkdown, type MessageFiles } from './Markdown';
 import { T } from './parts';
-import { color, font } from './theme';
+import { color, corner, font } from './theme';
 
 const { DISMISS, DO_HERE, START_NEW } = FILED_WORDS;
 const STOPPED = '#e08a6c';
+const MOVED_HERE = 'Moved here';
 const MONO_CAPS = { fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase' as const };
 
 /** Thread.tsx's chevron, turned a quarter when open. */
@@ -40,7 +41,7 @@ export function ActLine({ act, joined }: { act: any; joined?: boolean }) {
         {words.lead}
         {words.choice ? <T style={{ fontSize: 13, color: color.text }}>{` ${words.choice}`}</T> : null}
       </T>
-      <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.44, color: color.faint }}>{actWhen(act.at)}</T>
+      <T numberOfLines={1} style={{ flexShrink: 0, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.44, color: color.faint }}>{actWhen(act.at)}</T>
     </View>
   );
 }
@@ -73,8 +74,8 @@ export function WorkLine({ work }: { work: any }) {
         style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 }}>
         {head}
       </Pressable>
-      {open && !!whole && <T style={{ marginTop: 6, paddingVertical: 7, paddingHorizontal: 10, borderWidth: 1, borderColor: color.line, backgroundColor: color.fill, fontFamily: font.mono, fontSize: 11.5, lineHeight: 17.8, color: color.faint }}>{whole}</T>}
-      {open && output.length > 0 && <T style={{ marginTop: 6, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: color.line, backgroundColor: color.fill, fontFamily: font.mono, fontSize: 11.5, lineHeight: 17.8, color: color.faint }}>{output.join('\n')}</T>}
+      {open && !!whole && <T style={{ marginTop: 6, paddingVertical: 7, paddingHorizontal: 10, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.fill, fontFamily: font.mono, fontSize: 11.5, lineHeight: 17.8, color: color.faint }}>{whole}</T>}
+      {open && output.length > 0 && <T style={{ marginTop: 6, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.fill, fontFamily: font.mono, fontSize: 11.5, lineHeight: 17.8, color: color.faint }}>{output.join('\n')}</T>}
     </View>
   );
 }
@@ -184,6 +185,44 @@ export function LiveLine({ live }: { live: Live }) {
   );
 }
 
+function Btn({ title, onPress, label, primary = false }: { title: string; onPress: () => void; label: string; primary?: boolean }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label}
+      style={({ pressed }) => ({
+        height: 34, flexGrow: 1, flexBasis: 0, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center', borderRadius: corner.small,
+        borderWidth: 1, borderColor: primary ? 'transparent' : color.line,
+        backgroundColor: primary ? (pressed ? color.dim : color.text) : pressed ? color.picked : color.fill,
+      })}>
+      <T style={{ fontSize: 14, fontFamily: primary ? font.semibold : font.regular, color: primary ? color.bg : color.text }}>{title}</T>
+    </Pressable>
+  );
+}
+
+/** A proposal waiting on you: its title, a cross to dismiss it, and do it here or as its own thread. */
+function ProposalRow({ r, first, open, approve, here, dismiss }: {
+  r: FiledRow; first: boolean; open: (row: FiledRow) => void; approve: (row: FiledRow) => void; here?: (row: FiledRow) => void; dismiss: (row: FiledRow) => void;
+}) {
+  return (
+    <View style={[{ padding: 14, gap: 12 }, first ? null : { borderTopWidth: 1, borderTopColor: color.line }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+        <Pressable onPress={() => open(r)} accessibilityRole="button" style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent, marginTop: 7 }} />
+          <T numberOfLines={3} style={{ flex: 1, fontSize: 15, lineHeight: 21, color: color.text }}>{r.title}</T>
+        </Pressable>
+        {/* The cross's glyph, not its tap area, lines up with the buttons' right edge. */}
+        <Pressable onPress={() => dismiss(r)} accessibilityRole="button" accessibilityLabel={`${DISMISS}: ${r.title}`} hitSlop={8}
+          style={({ pressed }) => ({ width: 26, height: 26, marginTop: -2, marginRight: -7, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: pressed ? color.picked : 'transparent' })}>
+          <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={color.faint} strokeWidth={2} strokeLinecap="round"><Path d="M6 6 18 18M18 6 6 18" /></Svg>
+        </Pressable>
+      </View>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        {here && <Btn title={DO_HERE} label={`Do in this thread: ${r.title}`} onPress={() => here(r)} />}
+        <Btn primary title={START_NEW} label={`Start new thread: ${r.title}`} onPress={() => approve(r)} />
+      </View>
+    </View>
+  );
+}
+
 /** The threads a thread filed, and the presses that answer each (components/ThreadsMade.tsx). */
 export function FiledList({ rows, label, open, approve, here, dismiss, inTurn }: {
   rows: FiledRow[]; label?: string; inTurn?: boolean;
@@ -194,33 +233,20 @@ export function FiledList({ rows, label, open, approve, here, dismiss, inTurn }:
   const waiting = asks.length > 0;
   const shown = waiting ? [...asks, ...rows.filter((r) => !r.approve)] : rows;
   const heading = waiting ? waitingWords(asks.length) : label;
-  const act = (word: string, tint: string, press: () => void, said: string) => (
-    <Pressable onPress={press} accessibilityRole="button" accessibilityLabel={said} hitSlop={4}
-      style={({ pressed }) => ({ height: 26, paddingHorizontal: 9, justifyContent: 'center', backgroundColor: pressed ? color.picked : 'transparent' })}>
-      <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.66, textTransform: 'uppercase', color: tint }}>{word}</T>
-    </Pressable>
-  );
   return (
     <View style={inTurn ? { marginTop: 12 } : { marginTop: 22 }}>
       {!!heading && <T style={{ ...MONO_CAPS, color: color.faint, marginBottom: 8 }}>{heading}</T>}
-      <View style={{ borderWidth: 1, borderColor: color.line }}>
+      <View style={{ borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line }}>
         {shown.map((r, k) => {
           const quiet = waiting && !r.approve;
+          if (r.approve) return <ProposalRow key={r.id} r={r} first={k === 0} open={open} approve={approve} here={here} dismiss={dismiss} />;
           return (
-            <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 40, paddingRight: 10, borderTopWidth: k ? 1 : 0, borderTopColor: color.line }}>
+            <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 40, paddingRight: 14, borderTopWidth: k ? 1 : 0, borderTopColor: color.line }}>
               <Pressable onPress={() => open(r)} accessibilityRole="button"
                 style={({ pressed }) => ({ flex: 1, minWidth: 0, minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 14, paddingLeft: 14, backgroundColor: pressed ? color.fill : 'transparent' })}>
-                {r.approve && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent, marginRight: -4 }} />}
                 <T numberOfLines={1} style={{ flex: 1, fontSize: 14, color: quiet ? color.faint : color.text }}>{r.title}</T>
-                {!r.approve && <T style={{ ...MONO_CAPS, color: quiet || r.state === 'done' || r.state === 'scheduled' ? color.faint : color.dim }}>{stateWord(r.state)}</T>}
+                <T style={{ ...MONO_CAPS, color: quiet || r.state === 'done' || r.state === 'scheduled' ? color.faint : color.dim }}>{r.here ? MOVED_HERE : stateWord(r.state)}</T>
               </Pressable>
-              {r.approve && (
-                <View style={{ flexDirection: 'row', gap: 2, marginLeft: 12, marginRight: -2 }}>
-                  {act(DISMISS, color.faint, () => dismiss(r), `${DISMISS}: ${r.title}`)}
-                  {here && act(DO_HERE, color.dim, () => here(r), `Do in this thread: ${r.title}`)}
-                  {act(START_NEW, color.accent, () => approve(r), `Start new thread: ${r.title}`)}
-                </View>
-              )}
             </View>
           );
         })}
@@ -245,7 +271,7 @@ export function OptionsCard({ ask, options, busy, pick, keep, dir, files, foot =
     </Pressable>
   );
   return (
-    <View style={{ marginTop: foot ? 0 : 22, borderWidth: 1, borderColor: color.line, backgroundColor: foot ? color.card : undefined, paddingTop: foot && !ask ? 6 : 0, paddingBottom: foot ? 4 : 0 }}>
+    <View style={{ marginTop: foot ? 0 : 22, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line, backgroundColor: foot ? color.card : undefined, paddingTop: foot && !ask ? 6 : 0, paddingBottom: foot ? 4 : 0 }}>
       {onFold && (
         <Pressable onPress={onFold} accessibilityRole="button" accessibilityLabel="Fold the choices" hitSlop={8}
           style={{ position: 'absolute', zIndex: 1, top: 4, right: 4, width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
@@ -259,7 +285,7 @@ export function OptionsCard({ ask, options, busy, pick, keep, dir, files, foot =
         </View>
       )}
       {options.map((o) => row(String(o.n), () => pick(o), (
-        <View style={{ borderWidth: 1, borderColor: color.lineStrong, paddingHorizontal: 6, height: 19, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 1 }}>
+        <View style={{ borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, paddingHorizontal: 6, height: 19, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 1 }}>
           <T style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 16, color: color.dim }}>{o.n}</T>
         </View>
       ), (
@@ -278,7 +304,7 @@ export function FocusActions({ actions }: { actions: { label: string; dim?: stri
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 30, paddingTop: 16, borderTopWidth: 1, borderTopColor: color.line }}>
       {actions.map((a) => (
         <Pressable key={a.label} onPress={a.onPress} accessibilityRole="button"
-          style={({ pressed }) => ({ borderWidth: 1, borderColor: pressed ? color.faint : color.line, paddingVertical: 7, paddingHorizontal: 14, flexShrink: 1 })}>
+          style={({ pressed }) => ({ borderWidth: 1, borderRadius: corner.small, borderColor: pressed ? color.faint : color.line, paddingVertical: 7, paddingHorizontal: 14, flexShrink: 1 })}>
           <T style={{ fontSize: 13, color: color.dim }}>
             {a.label}
             {a.dim ? <T style={{ fontSize: 13, color: color.faint }}>{` · ${a.dim}`}</T> : null}

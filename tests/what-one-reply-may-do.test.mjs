@@ -30,6 +30,7 @@ import { machineryPath } from '../main/store/home.mjs';
 import { answerModesFile } from '../main/answer-modes.mts';
 import { buildSessionArgs, parseSessionArgs, permissionMode } from '../main/settings.mts';
 import { nameSlug } from '../shared/product-name.mjs';
+import { DEFAULT_CLAUDE_MODEL } from '../shared/engines.mjs';
 
 let appDir;
 let storeRoot;
@@ -266,10 +267,17 @@ describe('the run that answer starts', () => {
     expect(args.filter((a) => a === '--permission-mode')).toHaveLength(1);
   });
 
-  it('keeps her model and every tool grant she has', () => {
+  // THE MODEL IS NO LONGER ONE OF HER GRANTS. A `--model` in the config stopped
+  // deciding a run on 2026-11-04, because no screen in the app shows it and the
+  // reply box over it was drawing the app's own alias
+  // (tests/a-run-nobody-picked-a-model-for-is-on-the-model-the-card-names). So
+  // the line carries that alias, and a model picked on the row survives a
+  // one-off mode the way her tools do.
+  it('keeps every tool grant she has, and a model picked on the row', () => {
     const { args } = supervisor().spawnPlan(item({ answerMode: 'default' }), acme());
     const parsed = parseSessionArgs(args);
-    expect(parsed.model).toBe('claude-opus-5');
+    expect(parsed.model).toBe(DEFAULT_CLAUDE_MODEL);
+    expect(parseSessionArgs(supervisor().spawnPlan(item({ answerMode: 'default', model: 'sonnet' }), acme()).args).model).toBe('sonnet');
     // Her fixture still names the store server by the word it had before
     // 2026-09-22. Every other grant is hers and comes back untouched; the store
     // one is read as the name that server answers to now, which is the only way
@@ -292,15 +300,18 @@ describe('the run that answer starts', () => {
   });
 
   // A PROJECT OVERRIDE IS STILL THE BASE IT REWRITES. One reply outranks the
-  // project on the mode and on nothing else, so the project's own tools and
-  // model still stand.
+  // project on the mode and on nothing else, so the project's own tools still
+  // stand. Its `--model` does not, and never came from a screen: a project's
+  // args are built out of the workspace's with a permission mode applied
+  // (`setProjectSetting`, case 'permission'), so that flag is a copy of the
+  // fossil the card already overruled.
   it('outranks a project override on the mode and leaves its grants alone', () => {
     const s = supervisor({
       projectSessionArgs: () => ['--model', 'claude-sonnet-5', '--allowedTools', 'Read', '--permission-mode', 'acceptEdits'],
     });
     const parsed = parseSessionArgs(s.spawnPlan(item({ answerMode: 'dontAsk' }), acme()).args);
     expect(parsed.permissionMode).toBe('dontAsk');
-    expect(parsed.model).toBe('claude-sonnet-5');
+    expect(parsed.model).toBe(DEFAULT_CLAUDE_MODEL);
     expect(parsed.allowedTools).toEqual(['Read']);
   });
 });
@@ -645,13 +656,14 @@ describe('the wiring from the reply box is present in the source', () => {
     // still handed on; what follows it is the model pick.
     expect(focus).toContain('repeat, sent, mode,');
     const app = fs.readFileSync('renderer/src/App.tsx', 'utf8');
-    expect(app).toContain('onReplySend={(text, priority, repeat, sent, mode, pick) =>');
+    // A seventh since 2026-10-28: the time a reply set for later goes.
+    expect(app).toContain('onReplySend={(text, priority, repeat, sent, mode, pick, sendAt) =>');
     // THE ENGINE RIDES WITH IT SINCE 2026-09-05, and it is the last argument
     // rather than a sixth thing the box knows: `answerWith` needs it to decide
     // whether a slash command keeps her on the row, and the pane already holds
     // main's answer for the byline. The mode itself is unchanged and still the
     // fifth.
-    expect(app).toContain('answerWith(focused, text, priority, sent, mode, runningEngine, pick)');
+    expect(app).toContain('answerWith(focused, text, priority, sent, mode, runningEngine, pick, sendAt)');
     expect(app).toContain('permissionMode: mode');
   });
 

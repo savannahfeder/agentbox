@@ -161,6 +161,12 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   setWorkspaceSetting: 'zero:settings-set-workspace',
   // The cloud setup's sign-in for one account, made in the cloud (main/cloud/logins.mts).
   cloudSignIn: 'zero:cloud-signin',
+  // A key kept in the cloud for every cloud run (main/cloud/keys.mjs).
+  cloudKey: 'zero:cloud-key',
+  // A file or a one-time code a cloud run asked for (shared/cloud-needs.mjs).
+  cloudSendFile: 'zero:cloud-send-file',
+  cloudSendCode: 'zero:cloud-send-code',
+  cloudFileInfo: 'zero:cloud-file-info',
   // Claude's sign-in code, read from the clipboard while one is waiting for it.
   cloudClipboardCode: 'zero:cloud-clipboard-code',
   // Signing in to Agentbox Cloud itself, on the app's sign-in page (main/cloud/account.mts).
@@ -189,6 +195,12 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   openArtifact: 'zero:open-artifact',
   folderPictures: 'zero:folder-pictures',
   readDoc: 'zero:read-doc',
+  fileLink: 'zero:file-link',
+  fileLinkShare: 'zero:file-link-share',
+  fileLinkStop: 'zero:file-link-stop',
+  fileLinks: 'zero:file-links',
+  fileLinkComments: 'zero:file-link-comments',
+  fileLinkComment: 'zero:file-link-comment',
   codeChange: 'zero:code-change',
   codeFile: 'zero:code-file',
   saveCodeFile: 'zero:save-code-file',

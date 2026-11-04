@@ -903,9 +903,11 @@ export type PhoneChannel = { bivarianceHack(event: { sender: null }, args?: unkn
 const ROUTES: Record<string, (c: RouteCommand) => Route> = {
   reply: (c) => {
     const { unschedule, ...picked } = phoneChoices('reply', c.payload);
+    // A reply set for later sets the row's time itself, so nothing clears it.
+    const later = Number(picked.runAt) > Date.now();
     return ['zero:answer', { product: c.project, id: c.item, answer: c.payload.text, fromPhone: c.id, ...picked },
       // As the window does: a reply brings a thread put off to a time back now.
-      unschedule ? ['zero:schedule', { product: c.project, id: c.item, runAt: 0 }] : null];
+      unschedule && !later ? ['zero:schedule', { product: c.project, id: c.item, runAt: 0 }] : null];
   },
   close: (c) => ['zero:answer', { product: c.project, id: c.item, status: 'done' }],
   snooze: (c) => ['zero:snooze', { product: c.project, id: c.item, snoozedUntil: c.payload.until }],

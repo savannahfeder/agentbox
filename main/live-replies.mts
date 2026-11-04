@@ -73,16 +73,19 @@ export interface ReplyPayload {
   now?: boolean;
   from?: string | null;
   answer?: unknown;
+  /** A reply set for later: written down now, handed to no session. */
+  later?: boolean;
 }
 
 export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, commit: () => Promise<ReplyItem | null | undefined> | ReplyItem | null | undefined) {
-  const { product, id, status, permissionMode, now = false, from = null } = payload;
+  const { product, id, status, permissionMode, now = false, from = null, later = false } = payload;
   const answer = from ? framedTeammate(from, payload.answer) : payload.answer;
   const key = JSON.stringify([product, id]);
   const sends = supervisor._replySends ??= new Map();
   const previous = sends.get(key) ?? Promise.resolve();
   const session = supervisor.sessions?.get(id);
-  const live = session?.product === product && typeof session.child?.steer === 'function'
+  // A reply set for later waits in the ledger for its time, never in a session.
+  const live = !later && session?.product === product && typeof session.child?.steer === 'function'
     && !(from && session.remoteIdle)
     && status !== 'done' && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)';
   // Observe rejections immediately, including when an earlier reply is still

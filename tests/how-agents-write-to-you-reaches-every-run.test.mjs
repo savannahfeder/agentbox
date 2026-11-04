@@ -130,11 +130,16 @@ describe('her copy against the shipped one', () => {
     expect(s.readMessageRules()).toBe('MINE');
   });
 
+  // Nothing of ITS OWN. The flag is still sent, because it carries the one
+  // fact the app states about every run: which model and effort level it is on
+  // (tests/a-run-can-read-which-model-and-effort-it-is-on).
   it('says nothing at all when there is no file anywhere', () => {
     const s = supervisor();
     expect(s.messageRules()).toBe(null);
     expect(s.readMessageRules()).toBe('');
-    expect(injected(s.spawnPlan(item(), product, {}).args)).toBe(undefined);
+    expect(injected(s.spawnPlan(item(), product, {}).args)).toBe(
+      'This run is on Claude Code, Opus 5.5.\nCheck a rule that names a model or an effort level against it, and say in your answer when they do not match rather than working to a standard this run cannot meet.',
+    );
   });
 });
 

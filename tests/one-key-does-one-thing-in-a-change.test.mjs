@@ -91,6 +91,6 @@ describe('the app stands down for them', () => {
   });
 
   it('leaves escape alone, so one step back is still one step back', () => {
-    expect(app).toMatch(/if \(e\.key === 'Escape'\) \{ if \(escapeClosesDoc\(openDoc\)\)/);
+    expect(app).toMatch(/if \(e\.key === 'Escape'\) \{ if \(escapeClosesDoc\(openDoc, fullScreenDoc\)\)/);
   });
 });

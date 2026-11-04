@@ -12,6 +12,7 @@ import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS } from '../../../renderer/src/mod
 import { NAME } from '../../../shared/product-name.mjs';
 import { deleteAccount } from '../../../renderer/src/phone-account';
 import { withDeadline } from '../lib/deadline';
+import { backAt } from '../lib/back-at';
 import { PHONE_LOOKS } from '../lib/look';
 import { alertsHere, sendTestAlert } from '../platform/alerts';
 import { useCloud } from '../state/cloud';
@@ -194,8 +195,9 @@ function Phone() {
   );
 }
 
-type Account = { id: string; email: string | null; name?: string | null; plan: string | null; chosen: boolean; note?: string | null; signedIn?: boolean };
+type Account = { id: string; email: string | null; name?: string | null; plan: string | null; chosen: boolean; note?: string | null; signedIn?: boolean; resetsAt?: number | null };
 function Accounts({ engine, list }: { engine: 'claude' | 'codex'; list: Account[] }) {
+  const c = useCloud();
   const s = useSettings();
   const r = s.reading('workspace', 'activeAccount', null);
   const asked = r.value as { engine: string; account: string | null } | null;
@@ -209,7 +211,7 @@ function Accounts({ engine, list }: { engine: 'claude' | 'codex'; list: Account[
         const live = picked && chosen(a);
         return (
           <Row key={a.id} first={i === 0} label={a.email ?? a.name ?? 'Not signed in'} badge={live ? 'In use' : undefined}
-            desc={a.note ?? (a.signedIn === false ? 'Finish signing in to use it' : a.plan ?? 'Signed in')}
+            desc={backAt(a.resetsAt, c.now) ?? a.note ?? (a.signedIn === false ? 'Finish signing in to use it' : a.plan ?? 'Signed in')}
             reading={mine && live ? r : undefined}
             control={!live && list.length > 1 ? <Button title={picked ? 'Use this one' : 'Use only this one'} onPress={() => void s.change({ scope: 'workspace', key: 'activeAccount', value: { engine, account: a.id } })} /> : undefined} />
         );
@@ -326,13 +328,16 @@ function OutsideAgents() {
   );
 }
 
+// What briefs/adhd-mode.md asks of every agent, in a line.
+export const ADHD_SAYS = 'Agents lead with the thing to do, keep steps to five or fewer, and skip the recap.';
+
 function Instructions() {
   const s = useSettings();
   const w = s.settings?.workspace;
   if (!w) return <Aside>{NOT_YET}</Aside>;
   return (
     <>
-      <Group><SettingSwitch first label="ADHD mode" k="adhdMode" copy={w.adhdMode} /></Group>
+      <Group><SettingSwitch first label="ADHD mode" desc={ADHD_SAYS} k="adhdMode" copy={w.adhdMode} /></Group>
       <Aside>Your instructions are edited on your computer.</Aside>
     </>
   );

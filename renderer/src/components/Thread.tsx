@@ -38,6 +38,7 @@ import { threadPieces, typedParts } from '../typed-message';
 import { TicketLink } from './TicketReference';
 import { MessageKind, FileMarkOpener } from './FileMarkLine';
 import { clock, dayHeading } from '../thread-history';
+import { laterHint } from '../threads/composer-rules';
 import { chatLayout, newestSaid } from '../team/chat-layout';
 import { DecideContext } from '../team/TeamLists';
 import { ChatFold } from '../team/ChatFold';
@@ -47,6 +48,7 @@ import { EDIT_LAST } from '../team/chat-events';
 import { messageMore, withEmbeds, wordsOf } from '../team/message-more';
 import { ThreadLine } from '../team/ThreadPanel';
 import { AgentAnswers } from '../team/ChatAgents';
+import { NeedOlder } from './NeedCard';
 import {
   conversationGap, fileInChange, gapIndex, groupWork, outputCut, runFailures, runOverflow, runSummary,
 } from '../../../shared/agents.mjs';
@@ -324,6 +326,15 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   // message opens what is ../team/chat-layout.ts; a folded run is work to it.
   const slots = chat ? chatLayout(nodes.map((e) => (e.kind === 'run' ? { kind: 'work', at: e.at } : e))) : null;
   const newest = chat ? newestSaid(nodes) : -1;
+  // Only the agent's last word, with nothing said to it since, takes what a card asks for (NeedCard.tsx).
+  const asking = (() => {
+    for (let k = nodes.length - 1; k >= 0; k--) {
+      const x = nodes[k];
+      if (x.kind === 'run' || x.kind === 'work') continue;
+      return x.who === 'you' ? -1 : k;
+    }
+    return -1;
+  })();
   // What a message's head says beside the name, in either layout: sending, the
   // way to cut the agent's step, and which row the words were said on.
   const headFacts = (e: AgentTurn, time: string) => <>
@@ -340,7 +351,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
         the one way to stop waiting (w-f37a34def6). */}
     {e.pending
       ? <span className={`msg-when msg-sending${e.refused ? ' msg-refused' : ''}`}>{e.refused ? `Not sent: ${e.refused}` : e.held ? 'Sending… press Z to undo' : onCloudPhone() ? (e.sent ? 'Sent' : e.cloud ? `Working in ${Name} Cloud` : 'Waiting for your computer') : cutting ? 'Sending now…' : onSendNow ? 'Waiting for its current step' : 'Sending…'}</span>
-      : <span className="msg-when">{time}</span>}
+      : <span className="msg-when">{e.sendsAt && e.sendsAt > Date.now() ? `Sends ${laterHint(e.sendsAt)}` : time}</span>}
     {e.pending && !e.held && !e.sent && !cutting && onSendNow && (
       <button type="button" className="msg-now" onClick={() => { setCutting(true); onSendNow(); }}>
         Send now
@@ -529,7 +540,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                   ? <div className="msg-body typed">{typedParts(e.text ?? '').map((p, k, all) => ('embed' in p
                     ? <div key={k} className="typed-embed">{md(p.embed)}</div>
                     : all.length === 1 ? asTyped(p.text) : <span key={k}>{asTyped(p.text)}</span>))}</div>
-                  : <div className="msg-body">{md(e.text ?? '')}</div>}
+                  : <div className="msg-body"><NeedOlder.Provider value={n !== asking}>{md(e.text ?? '')}</NeedOlder.Provider></div>}
               </div>
             )}
           {/* WHAT THIS TURN CARRIES, under the last thing it said and above

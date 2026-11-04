@@ -32,7 +32,7 @@ describe('the palette', () => {
   it('has one Filter line and no row per project', () => {
     const labels = rows(palette({}));
     expect(labels.filter((l) => l === 'Filter…')).toHaveLength(1);
-    expect(labels.filter((l) => l.startsWith('Go to '))).toEqual([]);
+    expect(labels.filter((l) => l.startsWith('Go to Project'))).toEqual([]);
     expect(labels).not.toContain('All products');
   });
 

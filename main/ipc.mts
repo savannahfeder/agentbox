@@ -46,6 +46,8 @@ import { artifactRoots, resolveArtifact } from './artifact-path.mjs';
 import { folderPictures } from './folder-pictures.mts';
 import { docUrl } from './doc-scheme.mts';
 import { readDoc, writeDoc } from './doc-file.mts';
+import { linkCopyOf, linkSource } from './file-link.mjs';
+import { familyKeyOf } from '../shared/artifact-marks.mjs';
 import { readItemHistory } from './store/work-items.mjs';
 import { readChange } from './code-change.mjs';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
@@ -847,7 +849,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // answered at once (supervisor.sendNow).
   ipcMain.handle('zero:send-now', (_e, { product, id }: { product: string; id: string }) => supervisor.sendNow(product, id));
 
-  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped, putAway }: AnswerInput & { product: string; id: string; now?: unknown; inReplyTo?: unknown; closeUnshipped?: boolean; putAway?: unknown }) => {
+  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped, runAt, putAway }: AnswerInput & { product: string; id: string; now?: unknown; inReplyTo?: unknown; closeUnshipped?: boolean; runAt?: number; putAway?: unknown }) => {
     if (isAgentRow(id)) return { ok: false };
     // Out of your own Needs you, on a task between people: no reply, no close, no run.
     if (typeof putAway === 'boolean' && !answer && !status) {
@@ -911,7 +913,16 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // handing them over in one call and writing the model afterwards would be a
     // race the run usually wins, so she would pick a model and watch the old one
     // take the task. `answerItem` writes both, and it writes the model first.
-    const out = await submitReply(supervisor,{product,id,answer,status,permissionMode,now:!!now},()=>store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone }));
+    // A REPLY SET FOR LATER is these words with the row set for its time. The
+    // time goes in after the words, so it is newer than them: a word said after
+    // a thread's moment runs now (shared/answers.mjs wordWaits), and this one
+    // must wait. Both writes are one synchronous step, so no pass reads between.
+    const later = Number(runAt) > Date.now() && status !== 'done';
+    const out = await submitReply(supervisor,{product,id,answer,status,permissionMode,now:!!now,later},()=>{
+      const said = store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone });
+      if (later) store.scheduleItem(product, id, Number(runAt));
+      return said;
+    });
     // A REPLY ON A ROW A TEAMMATE GAVE YOU HANDS IT BACK TO THEM, so the
     // conversation moves to their inbox instead of sitting in both
     // (shared/team-rules.mjs handedOnByReply). Archiving hands nothing on.
@@ -2122,6 +2133,65 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       return { ok: false, error: String((err as Error).message) };
     }
   });
+  // A saved key carries on every thread that was waiting on it, as if each had been replied to.
+  // `reply` is the person's own words for the thread the key was pasted on, which go instead of the app's.
+  ipcMain.handle('zero:cloud-key', async (_e, { action, name, value, label, reply } = {}) => {
+    try {
+      let { keys, freed } = await supervisor.cloudKey(action, name, value, { label: typeof label === 'string' ? label : null });
+      if (reply?.id && typeof reply.answer === 'string' && reply.answer.trim()) {
+        freed = [...freed.filter((t) => t.id !== reply.id || t.product !== reply.product), { product: reply.product, id: reply.id, answer: reply.answer }];
+      }
+      for (const t of freed) await submitReply(supervisor, { product: t.product, id: t.id, answer: t.answer, status: 'open' }, () => store.answerItem(t.product, t.id, { answer: t.answer, status: 'open' }));
+      if (freed.length) supervisor.wake();
+      push();
+      return { ok: true, keys, freed: freed.map((t) => t.id), cloudOff: supervisor.config.cloudRuns === false };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+  // A FILE A CLOUD RUN ASKED FOR, sent from this computer by the person's press,
+  // or one they chose in the open panel instead. The thread carries on with it.
+  // `hold` keeps the reply back: the file goes with the sign-in still open on the same ask, whose save sends both.
+  ipcMain.handle('zero:cloud-file-info', (_e, { path: asked } = {}) => {
+    try { return supervisor.cloudFileInfo(asked); } catch (err) { return { ok: false, error: String((err as Error).message) }; }
+  });
+  // `also` is what was held for this ask before it, which goes in the same reply.
+  ipcMain.handle('zero:cloud-send-file', async (_e, { product, id, path: asked, choose = false, hold = false, also = '' } = {}) => {
+    try {
+      let file = asked;
+      if (choose) {
+        const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, { title: 'Pick the file to send', buttonLabel: 'Send this file', properties: ['openFile'] });
+        // The browser copy has no file panel (main/serve.mjs).
+        if (r.noDialog) return { ok: false, error: `Choosing a file needs the ${Name} app on this computer.` };
+        if (r.canceled || !r.filePaths?.length) return { ok: true, canceled: true };
+        file = r.filePaths[0];
+      }
+      const sent = supervisor.cloudSendFile(id, file);
+      const home = supervisor.config?.home ?? os.homedir();
+      const shown = sent.path.startsWith(`${home}/`) ? `~${sent.path.slice(home.length)}` : sent.path;
+      const own = `I sent ${shown}. It is at that same path on your machine now.`;
+      if (hold) return { ok: true, path: sent.path, held: true, words: own };
+      const answer = typeof also === 'string' && also.trim() ? `${also.trim()} ${own} Carry on.` : own;
+      await submitReply(supervisor, { product, id, answer, status: 'open' }, () => store.answerItem(product, id, { answer, status: 'open' }));
+      supervisor.wake();
+      push();
+      return { ok: true, path: sent.path };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+  // A ONE-TIME CODE A CLOUD RUN ASKED FOR, sent as the reply that carries it on.
+  ipcMain.handle('zero:cloud-send-code', async (_e, { product, id, about, code, also = '' } = {}) => {
+    const c = String(code ?? '').trim();
+    if (!/^[A-Za-z0-9-]{4,12}$/.test(c)) return { ok: false, error: 'That does not look like a code.' };
+    const own = `The ${String(about ?? '').trim() || 'one-time'} code is ${c}.`;
+    const answer = typeof also === 'string' && also.trim() ? `${also.trim()} ${own} Carry on.` : own;
+    supervisor.sendNextTurnToCloud?.(id);
+    await submitReply(supervisor, { product, id, answer, status: 'open' }, () => store.answerItem(product, id, { answer, status: 'open' }));
+    supervisor.wake();
+    push();
+    return { ok: true };
+  });
   // CLAUDE'S CODE, FROM THE CLIPBOARD, WHEN SHE COMES BACK (2026-10-14: she
   // approved on Claude's page and waited, not seeing that the code it shows
   // has to come back). Answered only while a Claude sign-in is waiting for
@@ -2538,6 +2608,34 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     if (!found.ok) return found;
     return { ...readDoc({ file: found.path }), ...(found.carry ? { carry: found.carry } : {}) };
   });
+
+  // A LINK ANYONE CAN OPEN, to one of this person's files (main/file-link.mjs).
+  // One link per file of a thread, whichever of its versions is on screen.
+  type LinkArg = { product?: string; thread?: unknown; src?: unknown; token?: unknown; text?: unknown };
+  const linkOf = ({ product, thread, src }: LinkArg = {}) => linkSource(product, thread, familyKeyOf(String(src ?? '')));
+  const linkCall = (fn: (arg: LinkArg, team: IpcTeam) => Promise<object>) => async (_e: unknown, arg: LinkArg = {}) => {
+    if (!team?.fileLink) return { ok: false, error: 'This copy has no cloud to share files on.' };
+    try { return { ok: true, ...(await fn(arg, team)) }; } catch (err) { return { ok: false, error: String((err as Error | undefined)?.message ?? err) }; }
+  };
+  const fileOnScreen = async ({ product, src, thread }: LinkArg) => {
+    const found = await resolveArtifact({
+      src, product, thread: typeof thread === 'string' ? thread : null,
+      products: readableProducts(), accountRoot: config.accountRoot, storeRoot: config.storeRoot, nameOf: team?.firstNameOf,
+    });
+    if (!found.ok) throw new Error(found.error || 'This file is not on this computer.');
+    const copy = linkCopyOf(found.path);
+    if (copy.error !== undefined) throw new Error(copy.error);
+    return copy;
+  };
+  ipcMain.handle('zero:file-link', linkCall(async (arg, team) => {
+    const now = await fileOnScreen(arg).catch(() => null);
+    return team.fileLink(linkOf(arg), now?.hash ?? null, now?.version ?? null);
+  }));
+  ipcMain.handle('zero:file-link-share', linkCall(async (arg, team) => team.shareFile({ source: linkOf(arg), ...(await fileOnScreen(arg)) })));
+  ipcMain.handle('zero:file-links', linkCall(async (_arg, team) => team.fileLinks()));
+  ipcMain.handle('zero:file-link-stop', linkCall(async ({ token }, team) => { await team.stopFileLink(String(token ?? '')); return {}; }));
+  ipcMain.handle('zero:file-link-comments', linkCall(async ({ token }, team) => ({ comments: await team.fileLinkComments(String(token ?? '')) })));
+  ipcMain.handle('zero:file-link-comment', linkCall(async ({ token, text }, team) => ({ comments: await team.commentOnFileLink(String(token ?? ''), text) })));
 
   // "Try again" on a file in a conversation that was not delivered.
   ipcMain.handle('zero:retry-file', async (_e, { product, src } = {}) => (team?.retryFile ? team.retryFile({ product, src }) : false));

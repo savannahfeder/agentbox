@@ -35,13 +35,15 @@ import { changesOn, readingOf, type Reading, type SettingsRow } from '../phone-s
 import { lastAccountAsk, webProjectRow, webSettingsGroups, webSettingsPages } from '../web-settings';
 import { whatTakesEscape } from '../settings-escape';
 import { WebAlertsGroup } from './WebAlerts';
-import { api, RESTART_NOTE } from '../api';
+import { api, RESTART_NOTE, type PublicLink } from '../api';
+import { shareWords } from './ShareLink';
 import { updateLook } from '../update-row';
 import { InstructionSettings, sizeLabel } from './InstructionSettings';
 import { EVERY } from '../instruction-scope';
 import type {AccountUsageReading, Usage, UsageLimit, WorkspaceSettings} from '../types';
 import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
 import { cloudBilling, planSummary, type PaidPlan } from '../cloud-upgrade';
+import { keyLooksWrong } from '../key-asks';
 import { CloudPlanCards } from './CloudPlanCards';
 import type { CloudPlan } from '../types';
 import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-words';
@@ -344,6 +346,48 @@ function agentStory(w: WorkspaceSettings, readings: Usage[], engine: 'claude' | 
 type Agent = ReturnType<typeof agentStory>;
 
 /** Whichever of two readings was taken later, either possibly absent. */
+const loadPublicLinks = () => api.fileLinks();
+
+/** One live link's row: its file, when it went up or was updated, and its comments. */
+export function publicLinkLine(l: PublicLink, now = Date.now()): string {
+  const when = shareWords.shared(l, now);
+  return l.comments ? `${when} · ${shareWords.comments(l.comments)}` : when;
+}
+
+/** WHAT THIS PERSON MADE PUBLIC, in one list, so it can be checked and stopped without finding each file. */
+export function PublicLinks({ load = loadPublicLinks, first = null, now = Date.now() }: {
+  load?: () => Promise<{ ok: boolean; links?: PublicLink[] }>; first?: PublicLink[] | null; now?: number;
+}) {
+  const [links, setLinks] = useState<PublicLink[] | null>(first);
+  const [asking, setAsking] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => { let live = true; void load().then((r) => { if (live && r.ok) setLinks(r.links ?? []); }); return () => { live = false; }; }, [load]);
+  if (!links?.length) return null;
+  const stop = async (l: PublicLink) => {
+    if (asking !== l.token) { setAsking(l.token); return; }
+    setAsking(null);
+    const out = await api.fileLinkStop({ token: l.token });
+    if (!out.ok) { setProblem(out.error ?? 'That did not stop.'); return; }
+    setLinks(links.filter((x) => x.token !== l.token));
+  };
+  const copy = async (l: PublicLink) => {
+    try { await navigator.clipboard.writeText(l.url); setCopied(l.token); } catch { setCopied(null); }
+  };
+  return (
+    <Group id="public-links" label="Public links" warn={problem}>
+      {links.map((l) => (
+        <Row key={l.token} label={l.name} desc={publicLinkLine(l, now)}>
+          <button type="button" className="set-ghost" onBlur={() => setCopied(null)} onClick={() => void copy(l)}>{copied === l.token ? 'Copied' : 'Copy link'}</button>
+          <button type="button" className="set-ghost" onBlur={() => setAsking(null)} onClick={() => void stop(l)}>
+            {asking === l.token ? shareWords.stopAsk(l.comments) : 'Stop sharing'}
+          </button>
+        </Row>
+      ))}
+    </Group>
+  );
+}
+
 export function newerReading(a: Usage | null, b: Usage | null): Usage | null {
   if (!a) return b;
   if (!b) return a;
@@ -606,6 +650,48 @@ const Group = ({ id, label, warn, action, bare = false, children }: { id?: strin
     )}
   </div>
 );
+
+/** One key kept in the cloud: replaced in place, or removed once asked twice, since getting it again means a trip to the service. */
+function CloudKeyRow({ name, label, savedAt }: { name: string; label: string | null; savedAt: number | null }) {
+  const [mode, setMode] = useState<'shown' | 'replacing' | 'removing'>('shown');
+  const [value, setValue] = useState('');
+  const [said, setSaid] = useState<string | null>(null);
+  const [warned, setWarned] = useState<string | null>(null);
+  const day = (t: number) => (new Date(t).toDateString() === new Date().toDateString() ? 'today' : new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+  const when = savedAt ? `saved ${day(savedAt)} at ${new Date(savedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : null;
+  const act = async (p: { action: 'save' | 'remove'; name: string; value?: string }) => {
+    const out = await api.cloudKey(p);
+    if (!out.ok) { setSaid(out.error ?? 'The cloud did not answer. Try again.'); return; }
+    setSaid(p.action === 'save' ? `${name}, replaced just now` : null); setValue(''); setMode('shown');
+  };
+  if (mode === 'replacing') {
+    return (
+      <form className="set-row set-key-replace" aria-label={`Replace ${label ?? name}`} onSubmit={(e) => {
+        e.preventDefault();
+        if (!value.trim()) return;
+        const wrong = keyLooksWrong(name, value, label ?? undefined);
+        if (wrong && warned !== value) { setWarned(value); setSaid(wrong); return; }
+        void act({ action: 'save', name, value });
+      }}>
+        <span className="set-key-name">{label ?? name}</span>
+        <input className="set-key-input" type="password" aria-label={name} placeholder="Paste the new key" autoComplete="off" spellCheck={false} autoFocus
+          value={value} onChange={(e) => { setValue(e.target.value); setSaid(null); }} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setMode('shown'); } }} />
+        <span className="set-row-ctl">
+          <button type="submit" className="set-ghost" disabled={!value.trim()}>Save</button>
+          <button type="button" className="set-ghost" onClick={() => { setMode('shown'); setSaid(null); }}>Cancel</button>
+        </span>
+        {said && <span className="set-key-said">{said}</span>}
+      </form>
+    );
+  }
+  return (
+    <Row label={label ?? name} desc={said ?? (mode === 'removing' ? 'Threads that need it will ask again.' : [label ? name : null, when].filter(Boolean).join(', '))}>
+      {mode === 'removing'
+        ? <><button type="button" className="set-ghost" onClick={() => setMode('shown')}>Keep</button><button type="button" className="set-ghost" onClick={() => void act({ action: 'remove', name })}>Remove</button></>
+        : <><button type="button" className="set-ghost" onClick={() => setMode('replacing')}>Replace</button><button type="button" className="set-ghost" onClick={() => setMode('removing')}>Remove</button></>}
+    </Row>
+  );
+}
 
 /**
  * THE MENU BEHIND "How many run at once": Automatic, then every number it could
@@ -1954,6 +2040,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 </Row>
               </Group>
             )}
+            {cloudHere && !!cloudHere.keys?.length && (
+              <Group id="cloud-keys" label="Keys for cloud threads">
+                {cloudHere.keys.map((k) => <CloudKeyRow key={k.name} name={k.name} label={k.label ?? null} savedAt={k.savedAt} />)}
+              </Group>
+            )}
             {/* SIGNING A SECOND ACCOUNT IN, IN THE APP (w-c2904cc8d9). Main
                 makes the folder and registers the login, and the shell below
                 is left with the one part that is genuinely hers, signing in to
@@ -2230,6 +2321,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 "How do i log out" looks for it: "should be at bottom of
                 settings page". Your account menu in the sidebar's corner has
                 it too. */}
+            {account && <PublicLinks />}
             {account && (
               <Group id="account" label="Account">
                 <Row label={`Signed in as ${account.email}`} desc={account.team ? `On the ${account.team} team.` : undefined}>

@@ -33,7 +33,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { Face, TeamContext, firstName } from '../team/people';
 import { workAudience } from '../threads/page-rules';
 import {
-  allModels, joinNames, moreCount, recentModels, replyBoxAsk, type Harness, type ModelPick,
+  allModels, joinNames, moreCount, recentModels, replyBoxAsk, replyWaitsUntil, type Harness, type ModelPick,
 } from '../threads/composer-rules';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
@@ -75,6 +75,10 @@ import { firstFrameSrc, playerShelf } from '../player-shelf';
 import { handleCopyOut, blockCopyText } from '../copy-out';
 import { diagramSource } from '../diagram-fence';
 import { DiagramBlock } from './DiagramBlock';
+import { NeedCard, NeedPlace, HELD, setHeld } from './NeedCard';
+import { NEED_BLOCK, isNewestAnswer, keyFromReply, keyLooksWrong, keySavedWords, needsAsBlocks } from '../key-asks';
+import { connectedReply, needsIn, needId, keysOf, type Need } from '../../../shared/cloud-needs.mjs';
+import { keyLabel, keyWords } from '../../../shared/cloud-keys.mjs';
 import { referencedFiles, isImagePath } from '../referenced-files';
 import { pictureRoots } from '../message-folders';
 import { changePathFor } from '../code-artifact';
@@ -92,7 +96,8 @@ import { carryLine, type CarryState } from '../../../shared/carried-files.mjs';
 import { watchScrollGutter } from '../scroll-gutter';
 import { CODE_PATH, artifactUrlTransform, isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
 import { api } from '../api';
-import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveDraftAttachments, readDraftPick, saveDraftPick, type SentDraft } from '../drafts';
+import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveDraftAttachments, readDraftPick, saveDraftPick, readDraftWhen, saveDraftWhen, type SentDraft } from '../drafts';
+import { ReplyLater } from './ReplyLater';
 import { effortSaid, pickOnTheRow, pickToSend, replyOpensOn } from '../reply-pick';
 import { withQuote } from '../team/chat-quote';
 import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, threadToOpen } from '../team/chat-threads';
@@ -154,6 +159,7 @@ import type { Spot } from '../one-thing-at-a-time';
 import { ChoicesFold, ChoicesShow, QueueNav } from './OneThingAtATime';
 import { InlineTable, gridFromHast } from './TableView';
 import { foldKey, foldedKeys, toggleFold } from '../one-thing-at-a-time';
+const needName = (n: Need) => (n.kind === 'sign-in' ? n.service.name : n.kind === 'key' ? (keyWords(n.what) ? `the ${keyWords(n.what)}` : n.name) : n.kind === 'file' ? (n.path.split('/').pop() ?? n.path) : `the ${n.about} code`);
 
 // A relative product path is an artifact, however the worker wrote it:
 // images render inline, other files become links, and .html demos embed
@@ -712,7 +718,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -720,6 +726,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   previewSample?: string;
   /** A file to open big, and a comment to land on, asked for from a search result. */
   openAt?: ArtifactOpen | null;
+  /** The keys saved for cloud runs, by name; null when this Mac has no cloud. */
+  cloudKeys?: string[] | null;
   /** The repeating task this thread is a run of, drawn in its summary. */
   repeat?: RepeatHandle | null;
   /** A ⌘K row that acts on this thread's own page (../thread-commands.ts):
@@ -877,7 +885,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onCloseTask?: () => void;
   onPick: (n: number) => void;
   onReply: () => void;
-  onReplySend: (text: string, priority?: number, repeat?: RepeatRuleValue | null, sent?: SentDraft, mode?: AnswerMode | null, pick?: ReplyPick) => void;
+  onReplySend: (text: string, priority?: number, repeat?: RepeatRuleValue | null, sent?: SentDraft, mode?: AnswerMode | null, pick?: ReplyPick, sendAt?: number) => void;
   onReplyClose: () => void;
   onStop: () => void;
   // Run now, the three-dot menu's row on a waiting task.
@@ -1404,6 +1412,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         // A MERMAID CHART IS DRAWN, with its source as the fallback (DiagramBlock).
         const code = (Array.isArray(children) ? children[0] : children) as { props?: { className?: string; children?: ReactNode } } | undefined;
         const lang = /language-([\w-]+)/.exec(code?.props?.className ?? '')?.[1];
+        if (lang === NEED_BLOCK) return <NeedCard source={String(code?.props?.children ?? '')} fallback={<CodePre>{children}</CodePre>} />;
         const source = diagramSource(lang, String(code?.props?.children ?? ''));
         if (source) return <DiagramBlock source={source} fallback={<CodePre>{children}</CodePre>} />;
         return <CodePre>{children}</CodePre>;
@@ -1498,11 +1507,112 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     [productDir, direct],
   );
 
-  const md = (text: string) => (
-    <MessagePlace.Provider value={place}>
-      <ReactMarkdown remarkPlugins={mdPlugins} components={mdComponents} urlTransform={artifactUrlTransform}>{text}</ReactMarkdown>
-    </MessagePlace.Provider>
-  );
+  // WHAT A CLOUD RUN ASKED FOR is a card in its message (NeedCard.tsx). A saved
+  // sign-in or key carries on every thread waiting on it (main/ipc.mjs zero:cloud-key);
+  // a file or a code goes back as this thread's reply.
+  const [keysJustSaved, setKeysJustSaved] = useState<string[]>([]);
+  const savedKeys = cloudKeys ? [...new Set([...cloudKeys, ...keysJustSaved])] : null;
+  const latestNeeds = savedKeys ? needsIn(item.result ?? '') : [];
+  const latestAsks = latestNeeds.flatMap(keysOf);
+  // A file sent while a sign-in on the same message was still open waits for it, then both go in one reply (round seven:
+  // the file went alone and the thread came back asking for the sign-in again).
+  const [, setHeldTick] = useState(0);
+  const heldHere = HELD.get(item.id) ?? [];
+  const keyedOpen = (saved: string[]) => latestNeeds.filter((n) => keysOf(n).length && !keysOf(n).every((k) => saved.includes(k)));
+  // What the latest ask still waits on, given these keys saved and these files held. Nothing goes back while it is not empty
+  // (round eight: a held film went back with GitHub while the npm code was still open).
+  const openAfter = (saved: string[], given: string[]) => latestNeeds.filter((n) => (keysOf(n).length ? !keysOf(n).every((k) => saved.includes(k)) : !given.includes(needId(n))));
+  // What went before the last thing given: the sign-ins saved for this ask, which no reply has named yet
+  // (round eleven: the reply after a file and a code never said Sentry was connected), then what was held.
+  const heldWords = () => {
+    const keyed = latestNeeds.filter((n) => keysOf(n).length);
+    const connected = keyed.length ? connectedReply(keyed).replace(/ Carry on\.$/, '') : '';
+    const held = (HELD.get(item.id) ?? []).map((h) => h.words).join(' ');
+    return [connected, held].filter(Boolean).join(' ');
+  };
+  const saveKeys = async (fields: { name: string; value: string; label: string }[], need: Need, words?: string) => {
+    let out: Awaited<ReturnType<typeof api.cloudKey>> = { ok: true };
+    const savedAfter = [...(savedKeys ?? []), ...fields.map((f) => f.name)];
+    const left = openAfter(savedAfter, heldHere.map((h) => h.need));
+    const withHeld = heldHere.length && !left.length
+      ? `${connectedReply(latestNeeds.filter((n) => keysOf(n).length)).replace(/ Carry on\.$/, '')} ${heldWords()}${words ? ` ${words}` : ''} Carry on.`
+      : words;
+    for (const [i, f] of fields.entries()) {
+      const reply = withHeld && i === fields.length - 1 ? { product: item.product, id: item.id, answer: withHeld } : undefined;
+      // Which Stripe key is kept, said where it is listed (round ten).
+      const mode = /^STRIPE_/.test(f.name) ? (/^(sk|rk)_live_/.test(f.value.trim()) ? 'Live ' : /^(sk|rk)_test_/.test(f.value.trim()) ? 'Test-mode ' : '') : '';
+      out = await api.cloudKey({ action: 'save', name: f.name, value: f.value, label: `${mode}${f.label}`, ...(reply ? { reply } : {}) });
+      if (!out.ok) return out.error || 'The cloud did not take the key. Try again.';
+    }
+    if (withHeld !== words) { setHeld(item.id, null); setHeldTick((t) => t + 1); }
+    const names = fields.map((f) => f.name);
+    const saved = [...new Set([...(out.keys ?? []).map((k) => k.name), ...keysJustSaved, ...names])];
+    setKeysJustSaved((was) => [...was, ...names]);
+    const said = need.kind === 'sign-in' ? need.service.name : fields[0].label;
+    onNotice(keySavedWords(said, { asks: latestAsks, saved, freed: out.freed ?? [], thread: item.id, cloudOff: !!out.cloudOff, done: need.kind === 'sign-in' ? 'connected' : 'saved', left: left.map(needName) }));
+    return null;
+  };
+  const sendFile = async (path: string | null, need: Need) => {
+    const waitFor = openAfter(savedKeys ?? [], [...heldHere.map((h) => h.need), needId(need)]);
+    const also = heldWords();
+    const out = await api.cloudSendFile({ product: item.product, id: item.id, ...(path ? { path } : { choose: true }), hold: waitFor.length > 0, ...(also && !waitFor.length ? { also } : {}) });
+    if (out.canceled) return null;
+    if (!out.ok) return out.error || 'The file could not be sent. Try again.';
+    const name = out.path?.split('/').pop();
+    if (out.held && out.words) {
+      setHeld(item.id, [...(HELD.get(item.id) ?? []).filter((h) => h.need !== needId(need)), { need: needId(need), words: out.words }]);
+      setHeldTick((t) => t + 1);
+      onNotice(`${name} is ready. It goes with ${waitFor.map(needName).join(' and ')}.`);
+      return null;
+    }
+    if (also) { setHeld(item.id, null); setHeldTick((t) => t + 1); }
+    onNotice(`Sent ${name}. This thread carries on in the cloud.`);
+    return null;
+  };
+  const sendCode = async (about: string, code: string) => {
+    const also = heldWords();
+    const out = await api.cloudSendCode({ product: item.product, id: item.id, about, code, ...(also ? { also } : {}) });
+    if (!out.ok) return out.error || 'The code could not be sent. Try again.';
+    if (also) { setHeld(item.id, null); setHeldTick((t) => t + 1); }
+    onNotice('Code sent. This thread carries on.');
+    return null;
+  };
+  // A key pasted into the reply box instead of the card is saved, not sent as words.
+  const sendReply: typeof onReplySend = (text, ...rest) => {
+    // A code typed in the reply box goes as the code it asked for (round seven: it went from Needs you into the box, not the card).
+    const codeAsk = latestNeeds.find((n) => n.kind === 'code');
+    if (codeAsk && codeAsk.kind === 'code' && /^\s*\d{4,8}\s*$/.test(text)) {
+      const first = keyedOpen(savedKeys ?? []);
+      // Never as words: a one-time code in the thread is a code in search.
+      if (first.length) { onNotice(`Connect ${first.map(needName).join(' and ')} first, then the code: it runs out in a minute.`); return; }
+      onReplyClose();
+      void sendCode(codeAsk.about, text.trim()).then((said) => { if (said) onNotice(said); });
+      return;
+    }
+    const pasted = keyFromReply(text, latestAsks, savedKeys ?? []);
+    const need = pasted ? latestNeeds.find((n) => keysOf(n).includes(pasted.name)) : null;
+    if (!pasted || !need) { onReplySend(text, ...rest); return; }
+    const label = need.kind === 'sign-in' ? need.service.keys.find((k) => k.name === pasted.name)?.label ?? pasted.name : keyLabel(need.kind === 'key' ? need.what : '') ?? pasted.name;
+    const wrong = keyLooksWrong(pasted.name, pasted.value, label);
+    if (wrong) { onNotice(`${wrong.replace(/ Press Save again.*$/, '')} Nothing was sent or saved; paste it in the card on the thread to keep it anyway.`); return; }
+    if (need.kind === 'sign-in' && need.service.keys.length > 1) { onReplySend(text, ...rest); return; }
+    onReplyClose();
+    const words = pasted.words ? text.replace(pasted.value, `[${label}, saved]`) : undefined;
+    void saveKeys([{ name: pasted.name, value: pasted.value, label }], need, words).then((said) => { if (said) onNotice(said); });
+  };
+  const md = (text: string) => {
+    const needs = needsIn(text);
+    const body = (
+      <MessagePlace.Provider value={place}>
+        <ReactMarkdown remarkPlugins={mdPlugins} components={mdComponents} urlTransform={artifactUrlTransform}>{needs.length ? needsAsBlocks(text) : text}</ReactMarkdown>
+      </MessagePlace.Provider>
+    );
+    if (!needs.length) return body;
+    // Said to since, or running again, it has been answered (round six: a card stayed open under "Do it from my computer.").
+    const spoken = item.answer !== '(withdrawn)' && (item.wrote?.answer?.ts ?? 0) > (item.wrote?.result?.ts ?? 0);
+    const live = isNewestAnswer(text, item.result) && item.status === 'open' && !spoken;
+    return <NeedPlace.Provider value={{ itemId: item.id, given: heldHere.map((h) => h.need), saved: savedKeys, live, needs, saveKeys, sendFile, sendCode, fileInfo: (path) => api.cloudFileInfo({ path }), onComputer: () => onReplySend('Do it from my computer.'), openLink: (href) => openHref(href) }}>{body}</NeedPlace.Provider>;
+  };
 
   // Every design THIS MESSAGE names, embedded live under it. The whole
   // message, not just the ask she opened with: on her own rows the ask is the
@@ -1830,6 +1940,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     ? <><ThreadCrumb from={crumbFrom} name={threadName} audience={audience} onBack={onClose} onRename={rename} threadKey={`${item.product}/${item.id}`} renameAsk={Math.max(pageAsk?.what === 'rename' ? pageAsk.at : 0, renameAt)} onAsked={onAsked} />
       {(direct || summarised) && !cornerHeaderTarget && <ConversationAside item={item} onAddPeople={onAddPeople} />}</>
     : <>{backButton}{bandLine}</>;
+
+  // A closed thread has nothing to bring back, whatever time it still carries.
+  const scheduledHere = item.status !== 'done' && (scheduledUntil ?? 0) > 0;
 
   // ANYTHING ADDED TO THIS ELEMENT RIDES BESIDE THE LITERAL, NEVER INSIDE IT.
   // `the way out of an opened task` finds this element by the literal string
@@ -2269,7 +2382,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
          screen that was measured and the whole 51px.
        */}
       {((item.start === 'later' && !!onUnschedule)
-        || ((scheduledUntil ?? 0) > 0 && !!onUnschedule)
+        || (scheduledHere && !!onUnschedule)
         || (!!agent && !agentTakesReply && !!onReveal)
         || (!agent && item.status === 'blocked' && !session)) && (
       <div className="focus-actions">
@@ -2280,15 +2393,15 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           <><button className="focus-unschedule" onClick={onUnschedule}>Start it now</button>
           <span className="focus-when">Not started yet</span></>
         )}
-        {item.start !== 'later' && (scheduledUntil ?? 0) > 0 && onUnschedule && (
+        {item.start !== 'later' && scheduledHere && onUnschedule && (
           // The two cases want different words because the button does two
           // different things. A row SHE scheduled is somewhere else and comes
           // back; a row an agent parked is already right here in her inbox, so
           // "back to inbox" would name a move that does not happen. What
           // clearing an agent's park actually does is let the work start.
-          <><button className="focus-unschedule" onClick={onUnschedule}>{scheduledByAgent ? 'Let it run now' : 'Back to inbox'}</button>
+          <><button className="focus-unschedule" onClick={onUnschedule}>{replyWaitsUntil(item, Date.now()) ? 'Send it now' : scheduledByAgent ? 'Let it run now' : 'Back to inbox'}</button>
           <span className="focus-when">
-            {(item.snoozedUntil ?? 0) > Date.now() ? 'In Later until' : scheduledByAgent ? 'The agent paused this until' : 'Scheduled for'} {whenLabel(scheduledUntil!)}
+            {(item.snoozedUntil ?? 0) > Date.now() ? 'In Later until' : replyWaitsUntil(item, Date.now()) ? 'Your reply sends' : scheduledByAgent ? 'The agent paused this until' : 'Scheduled for'} {whenLabel(scheduledUntil!)}
           </span></>
         )}
         {/* "E close this task" AND "S remind me later" USED TO SIT HERE. They
@@ -2432,7 +2545,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer key={`${item.product}:${item.id}`} item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} items={items} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} stop={stopButton} />
+            <DockComposer key={`${item.product}:${item.id}`} item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} items={items} onSend={sendReply} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} stop={stopButton} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
@@ -2565,7 +2678,9 @@ function SlashMenu({ rows, at, onPick, onHover }: {
  *  underline, no box and no icon. The menu is `.prio-menu`, the same list the
  *  priority and the engine already open. Nothing new is drawn.
  */
-function ModePicker({ value, options, label, onChange, onEscape }: {
+function ModePicker({ value, options, label, onChange, onEscape, chip = false }: {
+  /** Drawn as the new thread card's chip. */
+  chip?: boolean;
   value: string;
   options: Array<{ value: string; label: string }>;
   label: string;
@@ -2606,7 +2721,7 @@ function ModePicker({ value, options, label, onChange, onEscape }: {
       )}
       <button
         type="button"
-        className={`compose-word set ${open ? 'open' : ''}`}
+        className={`${chip ? 'tc-chip' : 'compose-word set'} ${open ? 'open' : ''}`}
         title={label}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -2654,7 +2769,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
    *  and the new-task card cannot show two different lists. */
   codexModels?: ModelChoice[];
   codexModelDefault?: string | null;
-  onSend: (text: string, priority?: number, repeat?: RepeatRuleValue | null, sent?: SentDraft, mode?: AnswerMode | null, pick?: ReplyPick) => void;
+  onSend: (text: string, priority?: number, repeat?: RepeatRuleValue | null, sent?: SentDraft, mode?: AnswerMode | null, pick?: ReplyPick, sendAt?: number) => void;
   onClose: () => void;
   /**
    * HOW A MODE CHANGE IS ANNOUNCED NOW THAT NOTHING SITS IN THE FOOTER.So the
@@ -2693,10 +2808,24 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   const [text, setText] = useState(() => (talkTo?.length ? dropHalfMention(readDraft(item)) : readDraft(item)));
   const [attachments, setAttachments] = useState<PendingAttachment[]>(() => readDraftAttachments(item));
   const { attaching, collect } = useAttaching();
+  // WHEN IT GOES, 0 for now (w-54cdf7c768). Only a work thread's reply waits:
+  // a message to a person or into a terminal has no row to hold it.
+  const canWait = !item.agent && !talkTo?.length;
+  // A reply already waiting on the thread lends the box its time, so a line
+  // added to it goes with it unless the time is taken off.
+  const [sendAt, setSendAt] = useState(() => readDraftWhen(item) || replyWaitsUntil(item));
+  useEffect(() => { setSendAt(readDraftWhen(item) || replyWaitsUntil(item)); }, [item.product, item.id]);
+  const pickSendAt = (at: number) => { setSendAt(at); saveDraftWhen(item, at); };
   useEffect(() => {
     const restored = (event: Event) => {
       if ((event as CustomEvent).detail !== draftKey(item)) return;
       setText(readDraft(item));
+      setSendAt(readDraftWhen(item));
+      const opens = replyOpensOn(item, readDraftPick(item));
+      setTouched(opens.touched);
+      setModel(opens.pick.model);
+      setEffort(opens.pick.effort);
+      setEngine(opens.pick.engine ?? null);
       const back = readDraftAttachments(item);
       setAttachments(back);
       // A voice note that went with the undone or refused send comes back
@@ -3001,7 +3130,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
     onSend([named.encode(chat.encode(words)), attachedMd].filter(Boolean).join('\n\n'), prio ? priorityValueOf(prio) : undefined, repeat, sent, mode,
       touched
         ? pickToSend({ model, effort }, { engine: engineShown, was: engineNow, engineCount: engineRows.length })
-        : undefined);
+        : undefined,
+      canWait && sendAt > Date.now() ? sendAt : undefined);
   };
   // A note being recorded is a draft: the box stays open round it.
   const hasDraft = !!text.trim() || attachments.length > 0 || recording;
@@ -3429,10 +3559,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           changes is a sentence that moves under her. */}
       {freshNote && <div className="compose-note">{freshNote}</div>}
       {!talk.on && talk.problem && <div className="compose-note">{talk.problem}</div>}
-      {/* ONE text run, ONE size, ONE baseline, and the app's own send button:
-          the new-task card's footer, on the reply box, because they are the same
-          act. See the note at the top of this file for the measurements. */}
-      <div className="compose-sentence">
+      {/* The new thread card's bar: its chips, its paperclip and its split Send
+          (w-54cdf7c768). */}
+      <div className="compose-sentence dock-bar">
         {talk.on ? <Listening talk={talk} /> : <>
         {/* NO PRIORITY AND NO REPEAT ON A MESSAGE TO AN AGENT. Both are
             work-item fields with nowhere to be written, and "Urgent priority.
@@ -3446,80 +3575,12 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             exactly the footer it had. */}
         {talkTo?.length ? <FormatBar box={ref} onChange={changeText} onAttach={pickFiles} onFromFiles={(f) => setAttachments((a) => [...a, f])} onVoice={addVoice} onNotice={onNotice}
           voiceKey={`direct:${item.product}:${item.id}`} voice={voiceCtl} onRecording={setRecording} /> : null}
-        {/* A PHONE HAS NO PASTE OF A FILE AND NO DROP, so a reply to an agent,
-            which takes files only those two ways on the desktop, took none
-            ("I can't upload files in mobile", 2026-10-12). It gets the same
-            picker the chat's + opens. */}
-        {!talkTo?.length && onPhone() ? (
-          <button type="button" className="compose-attach" aria-label="Attach a file or picture" title="Attach a file or picture" onClick={pickFiles}>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l8-8" /></svg>
-          </button>
-        ) : null}
-        {!talkTo?.length && talk.allowed && <MicButton talk={talk} />}
-        <span className="compose-clauses">
-          {/* NOTHING ABOUT WHERE IT GOES (w-140ac855b1, 2026-10-13). This
-              slot read "Goes to Maya's inbox.", put there so the corner was
-              never bare; the formatting bar now sits in that corner, and the
-              person asked for the line to go. The conversation's header
-              already names who it is with. */}
-          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo?.length ? null : <>
-          <PriorityPicker
-            variant="word"
-            value={shown}
-            set={!!prio}
-            onChange={setPrio}
-            // NO KEYS IN HERE, BECAUSE THERE ARE NONE. The twin of the same
-            // line in Compose.tsx; the reasoning is written out there (and
-            // the chord went on, 2026-08-20).
-            title="Priority"
-          />
-          {' priority. '}
-          {/* The same control as the card's clock, opened on its repeats page,
-              because "make this daily" is something she says to a thread as
-              often as she sets it up front. Said on one RUN of a repeating task
-              it moves that task's rule rather than making a second one, and the
-              note above says which of the two is about to happen.
-
-              "RUNS ONCE" IS GONE FROM THE REPLY BOX (w-86dd93ab0d, 2026-09-24):
-              on an ordinary thread it said nothing she needed. The clause only
-              shows once the thread actually repeats, so a daily task still says
-              so and can still be changed here. */}
-          {repeat && (
-            <>
-              <WhenPicker
-                value={{ runAt: 0, repeat }}
-                onChange={(v) => setRepeat(v.repeat)}
-                only="repeat"
-                empty="Runs once"
-              />
-              {'. '}
-            </>
-          )}
-          {/* AND WHICH MODEL PICKS IT UP. The new task card's own drawer, the
-              same component and the same words, because "On Opus." should mean
-              one thing wherever she reads it. It goes LAST in the sentence, so
-              the two clauses she has had here for weeks keep the positions she
-              knows them by. The effort strip comes with the drawer; it is the
-              same one the card draws, and it stays off the line
-              (w-f4d7bb2a73, where A inside the model menu works well).
-
-              AND IT WEARS THE CARD'S PREPOSITION. "On Opus 5." is the whole
-              clause there, so it is the whole clause here too, or one word
-              means two things in two boxes she uses side by side. Measured in
-              the built renderer before this line went in: the footer read
-              "Medium priority. Runs once. Opus 5." */}
-          {/* WHAT IT MAY DO, in whichever engine's words this row speaks. It
-              goes BEFORE the model clause, not after it: "On Opus 5." is the
-              clause that ends this sentence on the new task card too, and two
-              boxes she uses side by side should end the same way. Reads
-              "Urgent priority. Runs once. In auto mode. On Codex's own."
-
-              Hidden on an external agent row for the same reason every other
-              mode control is: the value would be thrown away by the send. */}
-          {canSetMode && (
-            <>
-              {'In '}
+        {item.agent ? <span className="compose-clauses"><span className="dim">Goes straight into {item.agent.name}.</span></span> : talkTo?.length ? null : <span className="dock-chips">
+            <PriorityPicker variant="chip" value={shown} set={!!prio} onChange={setPrio} title="Priority" />
+            {repeat && <WhenPicker value={{ runAt: 0, repeat }} onChange={(v) => setRepeat(v.repeat)} only="repeat" empty="Runs once" />}
+            {canSetMode && (
               <ModePicker
+                chip
                 label="What this message may do"
                 value={running}
                 options={claudeCode
@@ -3529,60 +3590,42 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
                 // ⌘↵ sends from the box, so Escape puts the caret back, as a pick does.
                 onEscape={() => ref.current?.focus()}
               />
-              {' Mode. '}
-            </>
-          )}
-          {/* One span, so the cloud hides "On" and the stop with the model. */}
-          <span className="dock-model">
-          {'On '}
-          <ReplyModel
-            label={engineModelLabel(engineShown, model, modelOpts)}
-            pick={pick}
-            onPick={pickModel}
-            recent={recent}
-            every={every}
-            more={moreCount(recent, every)}
-            labelOf={(p) => engineModelLabel(p.engine, p.model, modelOpts)}
-            engineLabel={(id) => engineRows.find((e) => e.id === id)?.label ?? ENGINES.find((e) => e.id === id)?.label ?? id}
-            // The agent is named beside each model only where there are two of
-            // them; on every other Mac the menu reads as it always did.
-            engineTags={engineRows.length > 1}
-            effortRows={effortRows}
-            effortLit={effortLit}
-            // Toggled against HER pick, not against what is lit, so pressing
-            // the lit default sets it and pressing her own clears it.
-            onEffort={(id) => pickTo({ effort: id === effort ? null : id })}
-            // AND THE BOX TAKES FOCUS BACK WHEN THE DRAWER SHUTS, because every
-            // way of closing it leaves focus on a button that has just been
-            // unmounted, which is the body, and ⌘↵ sends from the box.
-            onOpenChange={(drawer) => {
-              if (drawer) drawerWasOpen.current = true;
-              else if (drawerWasOpen.current) ref.current?.focus();
-            }}
-            // TRUE WHETHER OR NOT A RUN IS UP. On an idle row the reply starts
-            // a run on this model; on a running one the pick lands on the row
-            // and the next run takes it, because a spawned harness cannot
-            // change model mid-flight.
-            title="Which model this conversation runs on"
-            // Open already when she got here by pressing the model word on
-            // the folded box, which is what that word promised.
-            openAtStart={openModel}
-          />
-          {/* AND HOW HARD IT THINKS, WHEN THIS THREAD IS SET TO ANYTHING. The
-              level was readable in one place only, lit inside the drawer, and
-              the drawer is shut while she reads this line and decides to send.
-
-              ONLY WHEN THERE IS SOMETHING TO SAY. A level nobody set is the
-              engine's own choice for the model, which the drawer lights and
-              nothing sends, so the resting sentence is unchanged. It is also
-              why this clause is not on the new task card: that card opens
-              carrying a remembered level every time, so the word would be
-              permanent furniture there, and more words on that line is the one
-              thing she ruled out (./Model.tsx). */}
-          {levelSaid ? `, ${levelSaid}.` : '.'}
-          </span>
-          </>}
-        </span>
+            )}
+            <ReplyModel
+              chip
+              label={`${engineModelLabel(engineShown, model, modelOpts)}${levelSaid ? ` · ${levelSaid}` : ''}`}
+              pick={pick}
+              onPick={pickModel}
+              recent={recent}
+              every={every}
+              more={moreCount(recent, every)}
+              labelOf={(p) => engineModelLabel(p.engine, p.model, modelOpts)}
+              engineLabel={(id) => engineRows.find((e) => e.id === id)?.label ?? ENGINES.find((e) => e.id === id)?.label ?? id}
+              // The agent is named beside each model only where there are two of
+              // them; on every other Mac the menu reads as it always did.
+              engineTags={engineRows.length > 1}
+              effortRows={effortRows}
+              effortLit={effortLit}
+              // Toggled against HER pick, not against what is lit, so pressing
+              // the lit default sets it and pressing her own clears it.
+              onEffort={(id) => pickTo({ effort: id === effort ? null : id })}
+              // AND THE BOX TAKES FOCUS BACK WHEN THE DRAWER SHUTS, because every
+              // way of closing it leaves focus on a button that has just been
+              // unmounted, which is the body, and ⌘↵ sends from the box.
+              onOpenChange={(drawer) => {
+                if (drawer) drawerWasOpen.current = true;
+                else if (drawerWasOpen.current) ref.current?.focus();
+              }}
+              // TRUE WHETHER OR NOT A RUN IS UP. On an idle row the reply starts
+              // a run on this model; on a running one the pick lands on the row
+              // and the next run takes it, because a spawned harness cannot
+              // change model mid-flight.
+              title="Which model this conversation runs on"
+              // Open already when she got here by pressing the model word on
+              // the folded box, which is what that word promised.
+              openAtStart={openModel}
+            />
+          </span>}
         {/* WHAT WAS PHOTOGRAPHED WAS A REAL COLLISION, NOT A PREFERENCE. The
             footer is one flex row and the chip was the widest thing in it at
             184x24; on a narrow reply card the clauses ahead of it ("High
@@ -3622,16 +3665,29 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             rather than sitting side by side. A stop next to a live Send is two
             things to choose between; a stop INSTEAD of a dead Send is one
             thing that is always the thing she can do. */}
-        {stop && !hasDraft ? stop : (<>
+        {!talkTo?.length && (
+          <button type="button" className="tc-icon dock-clip" title="Attach files" aria-label="Attach files" onClick={pickFiles}><ClipGlyph /></button>
+        )}
+        {!talkTo?.length && talk.allowed && <MicButton talk={talk} />}
+        {stop && !hasDraft ? stop : (
+        <span className={`dock-send-pair${canWait ? '' : ' solo'}`}>
         <button
           className="dock-send"
           onClick={() => send()}
           disabled={!hasDraft || saving}
           title={`Send · ${sendKeyFor(enterSends)}`}
         >{saving ? 'Sending…' : <>Send <kbd>{sendKeyFor(enterSends)}</kbd></>}</button>
-        </>)}
+        {canWait && <ReplyLater at={sendAt} onPick={pickSendAt} onClosed={() => ref.current?.focus()} />}
+        </span>
+        )}
         </>}
       </div>
     </>
   );
 }
+
+const ClipGlyph = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+    <path d="m20 11.5-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7" />
+  </svg>
+);

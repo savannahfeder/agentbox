@@ -53,6 +53,7 @@ const sup = {
   _cloudHost: () => '/nonexistent/agentbox-cloud-host.sock',
   _cloudRunPath: () => relay,
   _cloudAccountEnv: () => ({}),
+  _cloudRelayEnv: Supervisor.prototype._cloudRelayEnv,
 };
 const child = Supervisor.prototype._spawnCloudRelay.call(sup, [said], { cwd: process.cwd(), env: process.env, stdio: 'ignore' });
 import('node:fs').then((fs) => fs.writeFileSync(pidFile, String(child.pid)));
