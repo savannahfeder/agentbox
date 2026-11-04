@@ -46,7 +46,7 @@ function SearchGlyph() {
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, onSignIn, onFeedback, onSignOut, update = null, onUpdate, move = null, onMove, invisible = null, inboxLabel = 'Threads', onPalette, rail = false, onHover, groups = null, onGroupsPage = false, onTeammatesPage = false, onFiles, filesPage = false, onConnections, connectionsPage = false, onTasks, tasksPage = false }: {
+export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, statuses = true, onAccount, onSignIn, onFeedback, onSignOut, update = null, onUpdate, move = null, onMove, invisible = null, inboxLabel = 'Threads', onPalette, rail = false, onHover, groups = null, onGroupsPage = false, onTeammatesPage = false, onFiles, filesPage = false, onConnections, connectionsPage = false, onTasks, tasksPage = false }: {
   /** Whether one of the teammates' pages is up, which unlights Threads. */
   onTeammatesPage?: boolean;
   /** The Files place, and whether it is the page. */
@@ -86,7 +86,7 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   // box. It is no longer a row here (w-1b574413db: single-player for launch);
   // your account menu still offers it. `onAccount` is your own row, which
   // opens the same pane without the cursor in the email box.
-  team?: TeamState | null; onInvite?: () => void; onAccount?: () => void; onSignIn?: () => void; onFeedback?: () => void;
+  team?: TeamState | null; onInvite?: () => void; statuses?: boolean; onAccount?: () => void; onSignIn?: () => void; onFeedback?: () => void;
   // The last row of your account menu.
   onSignOut?: () => void;
   // `collapsed` is true while the sidebar is narrow, which is always on a phone.
@@ -151,7 +151,7 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   // `:last-child` rule close the gap under Settings (workspace-navigation.css).
   const corner = me
     ? (onAccount
-      ? <AccountMenu me={me} now={Date.now()} collapsed={collapsed} onAccount={onAccount} onInvite={onInvite} onSettings={onSettings} onSignOut={onSignOut} invisible={invisible} />
+      ? <AccountMenu me={me} now={Date.now()} collapsed={collapsed} onAccount={onAccount} onInvite={onInvite} onSettings={onSettings} onSignOut={onSignOut} invisible={invisible} statuses={statuses} />
       : <><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></>)
     : team?.configured && onTeam
       ? <button type="button" className="th-me-signin" aria-label="Sign in to your team" onClick={onTeam}>Sign in to your team</button>

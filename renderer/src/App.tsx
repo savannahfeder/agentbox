@@ -749,7 +749,7 @@ export default function App() {
     setModal('reply');
   }, []);
   const handToAgent = useCallback((item: WorkItem, message?: AgentTurn) => {
-    const seen = teamView(snap?.team ?? null, snap?.products ?? []);
+    const seen = teamView(snap?.team ?? null, snap?.products ?? [], snap?.alpha?.multiplayer);
     // A task's files sit in the record it rides in, which a new thread cannot
     // read, so they go on the card and the links come out of the words.
     if (isTaskRow(item)) {
@@ -2038,9 +2038,10 @@ export default function App() {
   // which projects are shared. Null when nobody is signed in, and then every
   // list below is exactly the single-person app's.
   const team = useMemo(() => {
-    const view = teamView(snap?.team, snap?.products ?? []);
+    const view = teamView(snap?.team, snap?.products ?? [], snap?.alpha?.multiplayer);
     return view ? { ...view, alsoById: roomMatesById(snap?.team?.rooms?.rooms ?? []) } : view;
-  }, [snap?.team, snap?.products]);
+  }, [snap?.team, snap?.products, snap?.alpha?.multiplayer]);
+  const multiplayer = snap?.alpha?.multiplayer !== false;
   // "Maya", "Maya and Jun": who a message from the new thread card went to.
   const firstNames = (ids: string[]) => joinNames(ids.map((id) => team?.byId.get(id)?.name?.split(/\s+/)[0]).filter(Boolean) as string[]);
   // A SHARED ROW IS IN ONE INBOX AT A TIME (shared/team-rules.mjs). A row given
@@ -7400,7 +7401,8 @@ export default function App() {
           recent={lastUsedEngine(snap)}
         />}
         page={settingsOpen ? 'settings' : null} inboxLabel={roomsUi.live ? 'Inbox' : undefined} invisible={roomsUi.invisible} onSignIn={signInAsked.sidebar ? askToSignIn : undefined} onFeedback={() => setFeedbackOpen(true)} teamPage={teamOpen && !settingsOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
-        onInvite={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
+        onInvite={multiplayer ? () => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); } : undefined}
+        statuses={multiplayer}
         onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onSignOut={() => { void api.teamSignOut().then(() => refresh()); }}
         onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inbox.length + leadCount} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
