@@ -24,7 +24,7 @@
 // that touched the repository writes what it changed as a file, the file lands
 // in the row at the foot of the card like every drawing already does, and
 // clicking it opens the change in the pane.
-const EXT = 'png|jpe?g|gif|webp|svg|html?|pdf|md|markdown|csv|txt|json|ya?ml|sql|sh|css|jsx?|tsx?|mjs|cjs|py|rb|go|rs|toml|change';
+const EXT = 'png|jpe?g|gif|webp|svg|html?|pdf|md|markdown|csv|tsv|txt|json|ya?ml|sql|sh|css|jsx?|tsx?|mjs|cjs|py|rb|go|rs|toml|change';
 
 // A path, as it appears in prose or inside a link's parentheses. Deliberately
 // no leading slash and no scheme: this is a path relative to the product, which

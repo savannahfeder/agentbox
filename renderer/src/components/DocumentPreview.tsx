@@ -7,7 +7,7 @@ export function DocumentPreview({ children, expanded, onExpandedChange, alwaysEx
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   alwaysExpandable?: boolean;
-  /** Opens the document at full size, in place of unfolding it inside the card. */
+  /** Opens the document beside the chat, in place of unfolding it inside the card. */
   onOpen?: () => void;
 }) {
   const id = useId();
@@ -38,7 +38,7 @@ export function DocumentPreview({ children, expanded, onExpandedChange, alwaysEx
         <div ref={content}>{children}</div>
       </div>
       {onOpen ? (
-        <button type="button" className="document-preview-toggle" onClick={onOpen}>Open full size</button>
+        <button type="button" className="document-preview-toggle" onClick={onOpen}>Open on the side</button>
       ) : (overflow || expanded || alwaysExpandable) && (
         <button type="button" className="document-preview-toggle" aria-expanded={expanded} aria-controls={id}
           onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') event.stopPropagation(); }}

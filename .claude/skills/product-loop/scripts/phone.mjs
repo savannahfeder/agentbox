@@ -45,6 +45,12 @@ const LOOK = `(() => {
 })()`;
 
 /** Where to press for thing `n`, or the first thing whose words start with `words`. */
+/** EPERM is a live process this one may not signal, which is every process outside Codex's sandbox. */
+export function isRunning(pid, kill = process.kill.bind(process)) {
+  if (!pid) return false;
+  try { kill(pid, 0); return true; } catch (err) { return err?.code === 'EPERM'; }
+}
+
 export function targetScript(arg) {
   const n = Number(arg);
   const pick = Number.isInteger(n) && n > 0
@@ -70,7 +76,6 @@ if (isMain) {
   const awayMs = verb === 'away' ? Math.min(Math.max(Number(args[0]) || 1, 0.25), 9) * 60_000 : 0;
   setTimeout(() => { console.log('The phone did not respond within 90 seconds. Note it, then try reload.'); process.exit(1); }, awayMs + 90_000).unref();
   const saved = () => { try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { return null; } };
-  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
   const log = (extra = {}) => fs.appendFileSync(path.join(out, 'actions.jsonl'), `${JSON.stringify({ at: Date.now(), verb, args, ...extra })}\n`);
 
   async function launch() {
@@ -88,7 +93,7 @@ if (isMain) {
   }
   async function tab() {
     const b = saved();
-    const t = b && alive(b.pid) ? await connect(b.wsUrl, { targetId: b.targetId, width: IPHONE.width, height: IPHONE.height }).catch(() => null) : null;
+    const t = b && isRunning(b.pid) ? await connect(b.wsUrl, { targetId: b.targetId, width: IPHONE.width, height: IPHONE.height }).catch(() => null) : null;
     if (!t) { if (b) console.log('(The phone had closed, so the app was opened again.)'); return launch(); }
     await asPhone(t);
     return t;
@@ -127,7 +132,7 @@ if (isMain) {
       await new Promise((r) => setTimeout(r, awayMs));
       const t = await tab(); console.log(`You put the phone down for ${Math.round(awayMs / 60_000)} minutes.`); await look(t); t.detach();
     } else if (verb === 'reload') { const t = await tab(); await t.goto(url); await look(t); t.detach(); }
-    else if (verb === 'close') { const b = saved(); if (b && alive(b.pid)) process.kill(b.pid); fs.rmSync(FILE, { force: true }); console.log('Closed.'); }
+    else if (verb === 'close') { const b = saved(); if (b && isRunning(b.pid)) process.kill(b.pid); fs.rmSync(FILE, { force: true }); console.log('Closed.'); }
     else { console.log('usage: phone open | look | tap <n|"words"> | type "<text>" | press <key> | swipe up|down|left|right | shot <name> | away <minutes> | reload | close'); process.exit(2); }
     log();
     process.exit(0);

@@ -213,6 +213,7 @@ export interface ArtifactMark {
   mentions?: string[];
   owner?: string;
   on?: string | string[];
+  wait?: boolean;
 }
 
 export interface FileNote {
@@ -235,6 +236,8 @@ export interface FileNote {
   sent?: boolean;
   /** Someone pressed "Send to the agent" on a note the agent was not sent. */
   toAgent?: boolean;
+  /** Written beside a document: held until Send rather than told at once. */
+  wait?: boolean;
   /** Said on an earlier version and still open: the version it was made on ("v1"). */
   from?: string;
   /** In the Files place, the thread or chat it was written in. */
@@ -276,7 +279,7 @@ export interface FileSentIn {
   title: string;
 }
 
-export type FileKind = 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | 'page' | 'code';
+export type FileKind = 'image' | 'film' | 'pdf' | 'markdown' | 'deck' | 'page' | 'table' | 'code';
 
 /** One file in the Files place, at its newest version. */
 export interface PlacedFile {
@@ -1348,7 +1351,8 @@ export interface AccountSetting {
   // something about from a terminal ('org-blocked' needs an admin of that
   // workspace, which may not be her). `note` is the sentence to print.
   state: 'live' | 'resting' | TroubleCause;
-  trouble: { cause: TroubleCause; since: number; note: string } | null;
+  /** `at` is when it was last seen; `resetsAt` is when a limit said it lets go. */
+  trouble: { cause: TroubleCause; since: number; at?: number | null; resetsAt?: number | null; note: string } | null;
   cooldownUntil: number;
   running: number;
   /**

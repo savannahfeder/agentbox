@@ -320,8 +320,12 @@ describe(`the text ${NAME} ships`, () => {
   // save a new version of a file. An agent asked for "v2 of the same file"
   // answered that it could not, and sent a separate file the comments did not
   // follow.
+  //
+  // Raised from 9000 to 9400 for the rule that a list is a table
+  // (w-690551d7ea). As one bullet among what the app can show, it lost to
+  // "the answer is in this message" and a ranking came back as markdown.
   it('stays small enough to sit on every run', () => {
-    expect(shipped.length).toBeLessThan(9000);
+    expect(shipped.length).toBeLessThan(9400);
   });
 
   // THE SECOND COPY IS NOT ASKED FOR ANY MORE, AND THAT REPLACES THE RULE THAT

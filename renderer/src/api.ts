@@ -1,4 +1,4 @@
-import { artifactSampleChange, artifactSampleNotes, reviewSampleChange } from './artifact-fixtures';
+import { artifactSampleChange, artifactSampleNotes, reviewSampleChange, tableSample, tableSamplePath } from './artifact-fixtures';
 import {updateFixture} from './agent-update-fixture';
 // One seam between the UI and the world. Real mode talks to the preload
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
@@ -222,6 +222,10 @@ if (twoLogins) {
   if (accountTrouble === 'at-limit' && first) {
     first.trouble = { cause: 'at-limit', since: Date.now(), note: accountSentence('at-limit') };
   }
+  // &account=stale-limit: that mark is ten minutes old and the login read since has nothing full.
+  if (accountTrouble === 'stale-limit' && first) {
+    first.trouble = { cause: 'at-limit', since: Date.now() - 600_000, at: Date.now() - 600_000, note: accountSentence('at-limit') };
+  }
 }
 
 function fixtureAccountUsage(): AccountUsageReading[] {
@@ -243,6 +247,7 @@ function fixtureAccountUsage(): AccountUsageReading[] {
   // &fablefull: the first login has room in its session and week and none left on Fable.
   const firstLimits = params.has('fablefull')
     ? [limit('session', 30, '5:09pm', session), limit('week', 60, '11:59am', week, 'all models'), limit('week', 100, '11:59am', week, 'Fable')]
+    : accountTrouble === 'stale-limit' ? [limit('session', 4, '5:09pm', session), limit('week', 13, '11:59am', week, 'all models'), limit('week', 2, '11:59am', week, 'Fable')]
     : [limit('session', twoLogins ? 100 : 42, '5:09pm', session), limit('week', 15, '11:59am', week, 'all models'), limit('week', 24, '11:59am', week, 'Fable')];
   return [
     { profile: first.profile, ...failed, limits: firstLimits },
@@ -697,6 +702,7 @@ export const api = {
   async resolveDoc(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; opened?: string; url?: string; error?: string; coming?: boolean; waits?: boolean; note?: string; carry?: CarryState }> {
     if (useFixtures && ['artifact-layout-sample.change', 'review-bundle.change'].includes(p.src)) return { ok: true, opened: p.src };
     if (useFixtures && p.src === 'artifact-layout-sample.md') return { ok: true, opened: p.src };
+    if (useFixtures && p.src === tableSamplePath) return { ok: true, opened: p.src };
     if (useFixtures && p.product === 'onboard' && ['designs/w-n13/the-first-row.html', '/fixtures/onboard/designs/w-n13/the-first-row.html'].includes(p.src)) return { ok: true, opened: p.src, url: '/fixtures/onboard/designs/w-n13/the-first-row.html' };
     const zero = window.zero as any;
     if (!zero?.openArtifact) return { ok: false, error: `quit and reopen ${NAME} to open documents here` };
@@ -705,6 +711,7 @@ export const api = {
 
   async readDoc(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string; coming?: boolean; waits?: boolean; carry?: CarryState }> {
     if (useFixtures && p.src === 'artifact-layout-sample.md') return {ok:true,text:artifactSampleNotes,mtime:0};
+    if (useFixtures && p.src === tableSamplePath) return { ok: true, text: tableSample, mtime: 0 };
     const zero = window.zero as any;
     if (!zero?.readDoc) return { ok: false, error: `quit and reopen ${NAME} to open documents here` };
     return zero.readDoc(p);
