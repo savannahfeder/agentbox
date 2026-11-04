@@ -37,6 +37,11 @@ describe('a new thread', () => {
   it('while the computer is here, started, as before', () => {
     expect(planFor(press, null, NOW).toast).toBe('Started in Website · Z to undo');
   });
+  it('sent for tomorrow morning from Send later says when, away or not (round 1 of the 2026-11-03 testers)', () => {
+    const at = new Date(NOW); const tomorrow8 = new Date(at.getFullYear(), at.getMonth(), at.getDate() + 1, 8, 0).getTime();
+    expect(planFor({ ...press, choices: { runAt: tomorrow8 } }, null, NOW, away).toast).toBe('Scheduled in Website · tomorrow 8:00am · Z to undo');
+    expect(planFor({ ...press, choices: { runAt: tomorrow8 } }, null, NOW).toast).toBe('Scheduled in Website · tomorrow 8:00am · Z to undo');
+  });
   it('scheduled or added to Later says that whatever the computer is doing', () => {
     expect(planFor({ ...press, when: 'tomorrow 8:00am' }, null, NOW, away).toast).toBe('Scheduled in Website · tomorrow 8:00am · Z to undo');
     expect(planFor({ ...press, choices: { start: 'later' } }, null, NOW, away).toast).toBe('Added to Later in Website · Z to undo');

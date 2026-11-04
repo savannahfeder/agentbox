@@ -224,10 +224,10 @@ export default function TeammateChat() {
             <T selectable style={{ fontSize: 15, lineHeight: 21, color: color.dim }}>{v}</T>
           </View>
         ))}
-        {!t.paused && asked === null && (
-          <Pressable disabled={busy} onPress={() => { setAbout(false); void setPaused(true); }} accessibilityRole="button"
+        {asked === null && (
+          <Pressable disabled={busy} onPress={() => { setAbout(false); void setPaused(!t.paused); }} accessibilityRole="button"
             style={({ pressed }) => ({ alignSelf: 'flex-start', marginHorizontal: 14, marginTop: 10, height: 32, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
-            <T style={{ fontSize: 14, color: color.dim }}>{`Pause ${t.name}`}</T>
+            <T style={{ fontSize: 14, color: t.paused ? color.text : color.dim }}>{`${t.paused ? 'Resume' : 'Pause'} ${t.name}`}</T>
           </Pressable>
         )}
         <T style={{ paddingHorizontal: 14, paddingTop: 8, fontSize: 12.5, lineHeight: 18, color: color.faint }}>Change its job or make it primary on your computer.</T>

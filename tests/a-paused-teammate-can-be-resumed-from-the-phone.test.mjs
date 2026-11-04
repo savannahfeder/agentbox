@@ -48,10 +48,33 @@ describe('a pause or resume the computer has not taken yet', () => {
   it('the newest one wins', () => {
     expect(pauseOnItsWay([cmd(false), { ...cmd(true), id: 'c-2', created_at: new Date(3000).toISOString() }], team, 't-growth0001')).toBe(true);
   });
-  it('once taken, the computer\'s copy speaks for it', () => {
-    expect(pauseOnItsWay([cmd(false, { taken_at: new Date(2500).toISOString() })], team, 't-growth0001')).toBeNull();
+  it('taken, with no copy from the computer since, still counts (round 1 of the 2026-11-03 testers: Resume flipped back)', () => {
+    expect(pauseOnItsWay([cmd(false, { taken_at: new Date(2500).toISOString(), outcome: 'ok' })], team, 't-growth0001')).toBe(false);
+  });
+  it('once the computer sent a copy after taking it, the copy speaks for it', () => {
+    expect(pauseOnItsWay([cmd(false, { taken_at: new Date(900).toISOString(), outcome: 'ok' })], team, 't-growth0001')).toBeNull();
+  });
+  it('refused, the copy speaks for it', () => {
+    expect(pauseOnItsWay([cmd(false, { taken_at: new Date(2500).toISOString(), outcome: 'refused: not a teammate' })], team, 't-growth0001')).toBeNull();
   });
   it('another teammate\'s request is not this one\'s', () => {
     expect(pauseOnItsWay([cmd(false)], team, 't-other0001')).toBeNull();
+  });
+});
+
+import { withPendingPauses } from '../mobile/src/lib/teammates';
+
+describe('the teammate list while a pause or resume is on its way', () => {
+  const team = () => ({ device: 'dev1', copyAt: 1000, view: { list: [{ id: 't-growth0001', name: 'Growth lead', paused: true, now: 'Paused', waiting: [] }], chat: [], runs: [] } });
+  const asked = (paused) => ({ id: 'c-1', device: 'dev1', project: null, item: null, kind: 'setting', payload: { scope: 'teammate', key: 'pause', value: { id: 't-growth0001', paused } }, created_at: new Date(2000).toISOString(), taken_at: null, outcome: null });
+  it('shows a resume at once, as it shows a pause, rather than Paused until the next copy', () => {
+    expect(withPendingPauses(team(), [asked(false)]).view.list[0]).toMatchObject({ paused: false, now: null });
+  });
+  it('shows a pause at once', () => {
+    const t = team(); t.view.list[0] = { ...t.view.list[0], paused: false, now: null };
+    expect(withPendingPauses(t, [asked(true)]).view.list[0]).toMatchObject({ paused: true, now: 'Paused' });
+  });
+  it('with nothing on its way, is the copy', () => {
+    expect(withPendingPauses(team(), []).view.list[0]).toMatchObject({ paused: true, now: 'Paused' });
   });
 });

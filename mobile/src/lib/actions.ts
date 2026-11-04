@@ -15,6 +15,7 @@ import type { PhoneSender } from '../../../renderer/src/phone-send';
 import type { WorkItem } from '../../../renderer/src/types';
 import { ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
 import type { Saved } from './attach';
+import { dayClock } from './back-at';
 
 export interface Choices { priority?: number; permissionMode?: string; model?: string; effort?: string; engine?: string; runAt?: number; start?: 'later' | 'now'; repeat?: RepeatShape; labels?: string[] }
 export interface RuleRef { product: string; id: string; title: string }
@@ -82,11 +83,14 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
         toast: `Repeating: ${ruleLabel(repeat)}`,
       };
     }
+    // Send later's times ride as runAt alone, so their words are made here.
+    const runAt = Number(press.choices?.runAt) || 0;
+    const when = press.when ?? (runAt > now ? dayClock(runAt, now) : null);
     return {
       steps: [{ door: 'compose', payload: { product: press.product, title: message.title, ...(body ? { body } : {}), kind: 'directive', priority: priority ?? 5, ...rest } }],
-      toast: waits && !press.when && press.choices?.start !== 'later'
+      toast: waits && !when && press.choices?.start !== 'later'
         ? `Waiting for your computer in ${press.to ?? ''} · Z to undo`
-        : sentLine({ to: press.to ?? '', when: press.when ?? null, held: press.choices?.start === 'later' }),
+        : sentLine({ to: press.to ?? '', when, held: press.choices?.start === 'later' }),
       undo: (made) => (made?.id ? [{ door: 'answer', payload: { product: made.product, id: made.id, status: 'done' } }] : []),
       undone: (made) => `Withdrawn: ${clipToSentence(made?.title ?? '', TOAST_TITLE)}`,
     };

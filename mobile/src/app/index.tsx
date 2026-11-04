@@ -18,7 +18,7 @@ import { GroupsPlace } from '../ui/Groups';
 import { ChatsPlace, TeammateMark, teammatesWaiting } from '../ui/Teammates';
 import { Face } from '../ui/Groups';
 import { mentionRows } from '../../../renderer/src/team/rooms/room-rules';
-import { mateOf } from '../lib/teammates';
+import { mateOf, questionsForYou } from '../lib/teammates';
 import type { RoomMention as MentionRowData, Teammate } from '../../../renderer/src/types';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
@@ -101,6 +101,30 @@ function MentionRow({ m, first, now, open }: { m: MentionRowData; first: boolean
         <T numberOfLines={1} style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 20, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim, flexShrink: 1 }}>{`# ${m.roomName}`}</T>
         <T style={small}>·</T>
         <T style={small}>{updatedWords(m.at, now)}</T>
+      </View>
+    </Pressable>
+  );
+}
+
+/** An AI teammate asking you something, at the top of Needs you with the mentions, until you answer it. */
+function QuestionRow({ mate, text, at, first, now, open }: { mate: Teammate; text: string; at: number; first: boolean; now: number; open: () => void }) {
+  const small = { fontSize: 11, lineHeight: 20, color: color.faint };
+  return (
+    <Pressable onPress={open} accessibilityLabel={`${mate.name} asks you: ${text}`}
+      style={({ pressed }) => ({ minHeight: 64, paddingTop: 14, paddingBottom: 14, paddingLeft: size.inset, paddingRight: 12, backgroundColor: pressed ? color.fill : 'transparent' })}>
+      {!first && <View style={{ position: 'absolute', top: 0, left: 0, right: 12, height: 1, backgroundColor: color.rowLine }} />}
+      <View style={{ position: 'absolute', left: 5, top: 22, width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent }} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <TeammateMark t={mate} />
+        <T numberOfLines={2} style={{ flexShrink: 1, fontSize: 16, lineHeight: 21.6, letterSpacing: -0.16 }}>
+          <Text style={{ fontFamily: font.medium }}>{`${mate.name}  `}</Text>
+          <Text style={{ color: color.dim }}>{text}</Text>
+        </T>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
+        <T numberOfLines={1} style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 20, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim, flexShrink: 1 }}>Asks you</T>
+        <T style={small}>·</T>
+        <T style={small}>{updatedWords(at, now)}</T>
       </View>
     </Pressable>
   );
@@ -306,10 +330,12 @@ export default function Threads() {
   // Later counts its repeating tasks too, as the desktop's does (App.tsx `scheduledCount`).
   // Messages in your groups that name you lead Needs you, and count in it (App.tsx `MentionRows`).
   const mentions = groups.on ? mentionRows(groups.state.mentions) : [];
+  // A teammate's question waits where you read, not only in Chats.
+  const asks = tab === 'inbox' ? questionsForYou(c.team, c.teamPending) : [];
   const openMention = (m: MentionRowData) => openGroup(m.roomId);
-  const counts = { inbox: shown.rows.inbox.length + mentions.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0) };
+  const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0) };
   const repeatsShown = tab === 'snoozed' && c.repeats.length > 0;
-  const mentionsShown = tab === 'inbox' && mentions.length > 0;
+  const mentionsShown = tab === 'inbox' && (mentions.length > 0 || asks.length > 0);
   const hidden = shown.whole[tab] - shown.rows[tab].length;
   const foot = footRoom(inset);
   const picking = {
@@ -318,16 +344,8 @@ export default function Threads() {
     start: (key: string) => setPicked((p) => new Set([...(p ?? []), key])),
   };
   const closePicked = async () => {
-    const chosen = rows.filter((r) => picked?.has(r.key));
     setClosing(true);
-    let done = 0;
-    try {
-      for (const r of chosen) { await c.send({ kind: 'close' }, r.item, { quiet: true }); done += 1; }
-      c.say(`Closed ${done} ${done === 1 ? 'thread' : 'threads'}`);
-      setPicked(null);
-    } catch (err) {
-      c.say(`Closed ${done} of ${chosen.length}. ${String((err as Error)?.message ?? err)}`);
-    } finally { setClosing(false); }
+    try { await c.closeAll(rows.filter((r) => picked?.has(r.key)).map((r) => r.item)); setPicked(null); } finally { setClosing(false); }
   };
   const clear = () => setDisplay({ ...display, priorities: [], projects: [], updated: 'any', privacy: 'any' });
   // A permission card sits over the corner the pen is in, so the pen moves up to the bar (8fa6c548).
@@ -369,7 +387,10 @@ export default function Threads() {
       refreshControl={<RefreshControl tintColor={color.dim} refreshing={pulling} onRefresh={async () => { setPulling(true); await c.refresh(); setPulling(false); }} />}
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={repeatsShown ? <RepeatRows repeats={c.repeats} items={c.view.items} now={c.now} />
-        : mentionsShown ? <View>{mentions.map((m, i) => <MentionRow key={m.id} m={m} first={i === 0} now={c.now} open={() => openMention(m)} />)}</View> : undefined}
+        : mentionsShown ? <View>
+          {asks.map((q, i) => <QuestionRow key={q.question.id} mate={q.mate} text={q.question.text ?? ''} at={q.question.ts} first={i === 0} now={c.now} open={() => router.push({ pathname: '/teammate/[id]', params: { id: q.mate.id } })} />)}
+          {mentions.map((m, i) => <MentionRow key={m.id} m={m} first={i === 0 && !asks.length} now={c.now} open={() => openMention(m)} />)}
+        </View> : undefined}
       ListEmptyComponent={c.loading ? <Waiting list /> : repeatsShown || mentionsShown ? undefined : hidden > 0 ? <FilteredEmpty tab={tab} hidden={hidden} clear={clear} />
         : tab === 'inbox' ? <InboxClear />
           : <T style={{ paddingHorizontal: size.inset, paddingTop: 28, fontSize: 15, lineHeight: 23, color: color.dim }}>{EMPTY[tab]}</T>}

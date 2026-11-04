@@ -40,23 +40,40 @@ export function teamFrom(rows: readonly { device: string; updated_at?: string; s
   };
 }
 
+/** A command the computer's copy may not reflect yet: not taken, or taken after the copy was made, and not refused. */
+const notInCopy = (c: PhoneRows['commands'][number], copyAt: number) =>
+  !c.outcome?.startsWith('refused') && (!c.taken_at || (Date.parse(c.taken_at) || 0) > copyAt);
+
 /**
- * The computer's copy, with what you answered or closed here since it was made:
- * the copy cannot know, and a teammate went on saying "Waiting on you".
+ * The computer's copy, with what you answered or closed here and it has not
+ * reflected yet: a teammate went on saying "Waiting on you".
  */
-export function withPhoneAnswers(team: PhoneTeam | null, items: readonly { product: string; id: string; status?: string; wrote?: any }[]): PhoneTeam | null {
+export function withPhoneAnswers(team: PhoneTeam | null, commands: PhoneRows['commands']): PhoneTeam | null {
   if (!team) return team;
-  const yoursSince = (w: any) => w?.source === 'founder' && (w.ts ?? 0) > team.copyAt;
-  const settled = new Set(items.filter((i) => yoursSince(i.wrote?.answer) || (i.status === 'done' && yoursSince(i.wrote?.status))).map((i) => `${i.product}/${i.id}`));
+  const settled = new Set(commands
+    .filter((c) => (c.kind === 'reply' || c.kind === 'close') && c.item && c.device === team.device && notInCopy(c, team.copyAt))
+    .map((c) => `${c.project}/${c.item}`));
   if (!settled.size) return team;
-  const isSettled = (product: string, id: string) => settled.has(`${phoneSlug(team.device, product)}/${id}`);
   const list = team.view.list.map((t) => {
-    const waiting = t.waiting.filter((w) => !isSettled(w.product, w.id));
+    const waiting = t.waiting.filter((w) => !settled.has(`${w.product}/${w.id}`));
     if (waiting.length === t.waiting.length) return t;
     return { ...t, waiting, now: !waiting.length && t.now === 'Waiting on you' ? 'Answered' : t.now };
   });
-  const runs = team.view.runs.map((r) => (r.waiting && isSettled(r.product, r.item) ? { ...r, waiting: false, answered: true } : r));
+  const runs = team.view.runs.map((r) => (r.waiting && settled.has(`${r.product}/${r.item}`) ? { ...r, waiting: false, answered: true } : r));
   return { ...team, view: { ...team.view, list, runs } };
+}
+
+/** The copy, with a pause or resume asked here shown at once, as the window shows its own. */
+export function withPendingPauses(team: PhoneTeam | null, commands: PhoneRows['commands']): PhoneTeam | null {
+  if (!team) return team;
+  let changed = false;
+  const list = team.view.list.map((t) => {
+    const asked = pauseOnItsWay(commands, team, t.id);
+    if (asked === null || asked === !!t.paused) return t;
+    changed = true;
+    return { ...t, paused: asked, now: asked ? 'Paused' : t.now === 'Paused' ? null : t.now };
+  });
+  return changed ? { ...team, view: { ...team.view, list } } : team;
 }
 
 /** The teammate a thread belongs to, by its `teammate:<id>` label. */
@@ -118,10 +135,19 @@ export function onTheirWay(commands: PhoneRows['commands'], team: PhoneTeam | nu
 export function pauseOnItsWay(commands: PhoneRows['commands'], team: PhoneTeam | null, id: string): boolean | null {
   if (!team) return null;
   const asked = commands
-    .filter((c) => c.kind === 'setting' && c.device === team.device && !c.taken_at && c.payload?.scope === 'teammate' && c.payload.key === 'pause' && c.payload.value?.id === id)
+    .filter((c) => c.kind === 'setting' && c.device === team.device && notInCopy(c, team.copyAt) && c.payload?.scope === 'teammate' && c.payload.key === 'pause' && c.payload.value?.id === id)
     .sort((a, b) => (Date.parse(a.created_at) || 0) - (Date.parse(b.created_at) || 0))
     .at(-1);
   return asked ? asked.payload.value.paused === true : null;
+}
+
+/** Each teammate asking you something, with its newest open question, for the head of Needs you. */
+export function questionsForYou(team: PhoneTeam | null, pending: readonly Pending[] = []): { mate: Teammate; question: TeamChatLine }[] {
+  if (!team) return [];
+  return team.view.list.flatMap((t) => {
+    const open = openQuestions(team.view, t.id, pending);
+    return open.length ? [{ mate: t, question: open[open.length - 1] }] : [];
+  });
 }
 
 /** Its questions still waiting on you, oldest first. */

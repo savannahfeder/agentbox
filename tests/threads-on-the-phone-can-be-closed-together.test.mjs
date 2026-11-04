@@ -23,12 +23,13 @@ describe('picking threads on the phone', () => {
   it('a tap while picking picks, rather than opening the thread', () => {
     expect(inbox).toMatch(/onPress=\{\(\) => \(picking \? pick\.toggle\(row\.key\) : open\(row\.product, row\.id\)\)\}/);
   });
-  it('closes each with the press Done sends, one toast for all of them', () => {
-    expect(inbox).toMatch(/await c\.send\(\{ kind: 'close' \}, r\.item, \{ quiet: true \}\)/);
-    expect(inbox).toMatch(/c\.say\(`Closed \$\{done\} \$\{done === 1 \? 'thread' : 'threads'\}`\)/);
-    expect(cloud).toMatch(/if \(plan\.toast && !opts\.quiet\)/);
+  it('closes each with the plan Done uses, with one toast and one Undo for all of them (round 1 of the 2026-11-03 testers asked for Undo)', () => {
+    expect(inbox).toMatch(/await c\.closeAll\(rows\.filter\(\(r\) => picked\?\.has\(r\.key\)\)\.map\(\(r\) => r\.item\)\)/);
+    expect(cloud).toMatch(/const plan = planFor\(\{ kind: 'close' \}, item, at,/);
+    expect(cloud).toMatch(/if \(plan\.undo\) undo\.push\(\.\.\.plan\.undo\(made\)\)/);
+    expect(cloud).toMatch(/Closed \$\{done\} \$\{done === 1 \? 'thread' : 'threads'\}\$\{undo\.length \? ' · press Z to undo' : ''\}/);
   });
   it('says how far it got if one fails', () => {
-    expect(inbox).toMatch(/Closed \$\{done\} of \$\{chosen\.length\}/);
+    expect(cloud).toMatch(/Closed \$\{done\} of \$\{items\.length\}/);
   });
 });

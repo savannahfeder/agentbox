@@ -57,7 +57,11 @@ export function targetScript(arg) {
   const pick = Number.isInteger(n) && n > 0
     ? `document.querySelector('[data-phone-ref="${n}"]')`
     : `[...document.querySelectorAll('[data-phone-ref]')].find((el) => (el.getAttribute('aria-label') || el.innerText || '').replace(/\\s+/g, ' ').trim().toLowerCase().startsWith(${JSON.stringify(String(arg).toLowerCase())}))`;
-  return `(() => { const el = ${pick}; if (!el) return null; el.scrollIntoView({ block: 'nearest' }); const r = el.getClientRects()[0] || el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`;
+  // A point of it something else covers is a tap on that something: try a few, and say so when all are covered.
+  return `(() => { const el = ${pick}; if (!el) return null; el.scrollIntoView({ block: 'nearest' }); const r = el.getClientRects()[0] || el.getBoundingClientRect();
+    const at = [[0.5, 0.5], [0.25, 0.5], [0.75, 0.5], [0.5, 0.25], [0.5, 0.75]].map(([fx, fy]) => ({ x: r.left + r.width * fx, y: r.top + r.height * fy }));
+    if (typeof document.elementFromPoint !== 'function') return at[0];
+    return at.find((p) => { const hit = document.elementFromPoint(p.x, p.y); return hit && (hit === el || el.contains(hit)); }) || { covered: true }; })()`;
 }
 
 async function asPhone(t) {
@@ -109,6 +113,7 @@ if (isMain) {
       const t = await tab();
       const at = await t.evaluate(targetScript(args.join(' ')));
       if (!at) { console.log(`Nothing to tap called ${args.join(' ')}. Look again.`); t.detach(); process.exit(1); }
+      if (at.covered) { console.log(`${args.join(' ')} is under something else on the screen. Close what covers it, then tap again.`); t.detach(); process.exit(1); }
       await touch(t, 'touchStart', at.x, at.y); await touch(t, 'touchEnd', at.x, at.y);
       await look(t); t.detach();
     } else if (verb === 'type') { const t = await tab(); await t.type(args.join(' ')); await look(t); t.detach(); }

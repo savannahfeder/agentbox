@@ -31,3 +31,24 @@ describe('where the phone tool taps', () => {
     expect(aimAt(el)).toEqual({ x: 25, y: 25 });
   });
 });
+
+// Round 1 of the 2026-11-03 testers, issue 2: with a thread's More menu open, a
+// tester tapped "1 Go with the quiet one" behind it, the tap landed on the
+// menu's Next week, and the thread was moved to Later. A person cannot tap what
+// is covered; the tool now says it is covered instead of tapping through.
+describe('a target with something on top of it', () => {
+  const rect = (left, top, width, height) => ({ left, top, width, height });
+  const aim = (el, hits) => new Function('document', `return ${targetScript('3')}`)({ querySelector: () => el, querySelectorAll: () => [el], elementFromPoint: hits });
+  const el = { scrollIntoView() {}, getClientRects: () => [rect(0, 100, 200, 40)], getBoundingClientRect: () => rect(0, 100, 200, 40), contains: (x) => x === inner };
+  const inner = {};
+  it('says it is covered, rather than tapping what is on top', () => {
+    expect(aim(el, () => ({ menu: true }))).toEqual({ covered: true });
+  });
+  it('taps where it shows, even when another part of it is covered', () => {
+    let n = 0;
+    expect(aim(el, () => (n++ === 0 ? { menu: true } : inner))).toEqual({ x: 50, y: 120 });
+  });
+  it('taps its middle when nothing covers it', () => {
+    expect(aim(el, () => el)).toEqual({ x: 100, y: 120 });
+  });
+});

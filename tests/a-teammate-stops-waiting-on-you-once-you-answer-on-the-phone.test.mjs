@@ -5,21 +5,25 @@
 // Picked and Queued, but Chats and Quality lead's chat still said "Waiting on
 // you", so both opened the same decision again. A teammate's state comes from
 // the computer's last copy, which cannot know about an answer still waiting for
-// it. The phone now takes its own answers into account until the copy does.
+// it. The first fix went by the answer's time and so gave way to any newer copy,
+// even one made before the computer took the answer: the 2026-11-03 testers saw
+// "Answered" flip back to "Waiting on you" (round 1, issues 14 and 22). It now
+// goes by the command: answered here counts until the computer has taken it and
+// sent a copy after that.
 import { describe, it, expect } from 'vitest';
 import { withPhoneAnswers, nowLine } from '../mobile/src/lib/teammates';
-import { phoneSlug } from '../renderer/src/phone-rows';
 
 const NOW = Date.parse('2026-11-03T20:00:00Z');
 const DEV = 'a1b2c3d4e5f6';
 const COPY = NOW - 600_000;
+const iso = (ms) => new Date(ms).toISOString();
 const mate = { id: 't-quality001', name: 'Quality lead', now: 'Waiting on you', paused: false, status: 'active', waiting: [{ id: 'w-t2', product: 'agentbox', title: 'Sign-up fails on a slow connection' }], works: null };
-const team = () => ({ device: DEV, copyAt: COPY, view: { list: [{ ...mate }], chat: [], runs: [{ id: 'run-1', kind: 'run', teammate: 't-quality001', item: 'w-t2', product: 'agentbox', title: 'Sign-up fails on a slow connection', verb: 'sent', waiting: true, ts: NOW - 900_000 }] } });
-const item = (wrote = {}) => ({ id: 'w-t2', product: phoneSlug(DEV, 'agentbox'), status: 'open', wrote });
+const team = (copyAt = COPY) => ({ device: DEV, copyAt, view: { list: [{ ...mate }], chat: [], runs: [{ id: 'run-1', kind: 'run', teammate: 't-quality001', item: 'w-t2', product: 'agentbox', title: 'Sign-up fails on a slow connection', verb: 'sent', waiting: true, ts: NOW - 900_000 }] } });
+const cmd = (kind, over = {}) => ({ id: `c-${kind}`, device: DEV, project: 'agentbox', item: 'w-t2', kind, payload: kind === 'reply' ? { text: 'Option 2: Show me the steps first' } : {}, created_at: iso(NOW - 60_000), claimed_at: null, taken_at: null, outcome: null, ...over });
 
 describe("a teammate's thread you answered on the phone", () => {
   it('no longer waits on you, in Chats or in its chat', () => {
-    const t = withPhoneAnswers(team(), [item({ answer: { ts: NOW - 60_000, source: 'founder' } })]);
+    const t = withPhoneAnswers(team(), [cmd('reply')]);
     const q = t.view.list[0];
     expect(q.waiting).toEqual([]);
     expect(nowLine(q, t.view, NOW)).toBe('Answered');
@@ -27,23 +31,33 @@ describe("a teammate's thread you answered on the phone", () => {
   });
 
   it('closed on the phone, no longer waits on you either', () => {
-    const t = withPhoneAnswers(team(), [{ ...item({ status: { ts: NOW - 60_000, source: 'founder' } }), status: 'done' }]);
-    expect(t.view.list[0].waiting).toEqual([]);
+    expect(withPhoneAnswers(team(), [cmd('close')]).view.list[0].waiting).toEqual([]);
   });
 
-  it('answered before the copy was made is left to the copy', () => {
-    const t = withPhoneAnswers(team(), [item({ answer: { ts: COPY - 60_000, source: 'founder' } })]);
+  it('stays answered when a newer copy arrives before the computer has taken the answer', () => {
+    expect(withPhoneAnswers(team(NOW - 10_000), [cmd('reply')]).view.list[0].waiting).toEqual([]);
+  });
+
+  it('stays answered while the computer has taken it but sent no copy since', () => {
+    expect(withPhoneAnswers(team(), [cmd('reply', { taken_at: iso(NOW - 30_000), outcome: 'ok' })]).view.list[0].waiting).toEqual([]);
+  });
+
+  it('is left to the copy once the computer sent one after taking it', () => {
+    const t = withPhoneAnswers(team(NOW - 5_000), [cmd('reply', { taken_at: iso(NOW - 30_000), outcome: 'ok' })]);
     expect(t.view.list[0].waiting).toHaveLength(1);
-    expect(nowLine(t.view.list[0], t.view, NOW)).toBe('Waiting on you');
+  });
+
+  it('refused by the computer still waits on you', () => {
+    expect(withPhoneAnswers(team(), [cmd('reply', { taken_at: iso(NOW - 30_000), outcome: 'refused: gone' })]).view.list[0].waiting).toHaveLength(1);
   });
 
   it('not answered still waits on you', () => {
-    const t = withPhoneAnswers(team(), [item()]);
+    const t = withPhoneAnswers(team(), []);
     expect(t.view.list[0].waiting).toHaveLength(1);
     expect(t.view.runs[0].waiting).toBe(true);
   });
 
   it('with no teammates, there is nothing to change', () => {
-    expect(withPhoneAnswers(null, [item()])).toBeNull();
+    expect(withPhoneAnswers(null, [cmd('reply')])).toBeNull();
   });
 });

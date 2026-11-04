@@ -9,8 +9,10 @@ import { TimeBox, TypingSheet } from './Later';
 import { Pin } from './icons';
 import { SheetHead, SheetRow, SheetSep } from './parts';
 
-export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = false, pinned, onPin, onUnread, onLater, onBack, onRunNow, onMoveToCloud, onClose }: {
+export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = false, pinned, onPin, onUnread, onLater, onBack, onRunNow, onMoveToCloud, onClose, closed = false }: {
   open: boolean; close: () => void; now: number;
+  /** Closed already: the lists never put it in Later, so neither Later nor Close is offered. */
+  closed?: boolean;
   /** Already put off: "Now (back to inbox)" comes first. */
   laterNow: boolean;
   runNow: boolean;
@@ -41,6 +43,7 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
   };
   return (
     <TypingSheet open={open} close={done}>
+      {!closed && <>
       <SheetHead>Later</SheetHead>
       <TimeBox value={text} onChange={(t) => { setText(t); setRefused(false); }} placeholder="Try: 30m, 3h, 8am, tomorrow, next week"
         onSubmit={submit} line={typedLine(text, typed, refused)} onLine={submit} />
@@ -48,11 +51,12 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
         <SheetRow key={row.label} label={row.label} aside={row.hint} onPress={() => { done(); if (row.now) onBack(); else onLater(row.ts, row.label); }} />
       ))}
       <SheetSep />
+      </>}
       {moveToCloud && <SheetRow label="Move to cloud" aside="On your computer now" onPress={() => { done(); onMoveToCloud?.(); }} />}
       {runNow && <SheetRow label="Run now" onPress={() => { done(); onRunNow(); }} />}
       {pinned !== null && <SheetRow label={pinned ? 'Unpin thread' : 'Pin thread'} lead={<Pin size={15} />} onPress={() => { done(); onPin(!pinned); }} />}
       {onUnread && <SheetRow label="Mark unread" onPress={() => { done(); onUnread(); }} />}
-      <SheetRow label="Close this thread" onPress={() => { done(); onClose(); }} />
+      {!closed && <SheetRow label="Close this thread" onPress={() => { done(); onClose(); }} />}
     </TypingSheet>
   );
 }
