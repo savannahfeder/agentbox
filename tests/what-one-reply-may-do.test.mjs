@@ -269,7 +269,9 @@ describe('the run that answer starts', () => {
   it('keeps her model and every tool grant she has', () => {
     const { args } = supervisor().spawnPlan(item({ answerMode: 'default' }), acme());
     const parsed = parseSessionArgs(args);
-    expect(parsed.model).toBe('claude-opus-5');
+    // A row naming no model runs on the one the screen names, over the config's
+    // (a-run-with-no-model-picked-runs-on-the-opus-the-screen-names).
+    expect(parsed.model).toBe('opus');
     // Her fixture still names the store server by the word it had before
     // 2026-09-22. Every other grant is hers and comes back untouched; the store
     // one is read as the name that server answers to now, which is the only way
@@ -300,7 +302,7 @@ describe('the run that answer starts', () => {
     });
     const parsed = parseSessionArgs(s.spawnPlan(item({ answerMode: 'dontAsk' }), acme()).args);
     expect(parsed.permissionMode).toBe('dontAsk');
-    expect(parsed.model).toBe('claude-sonnet-5');
+    expect(parsed.model).toBe('opus');
     expect(parsed.allowedTools).toEqual(['Read']);
   });
 });
