@@ -521,6 +521,8 @@ export interface FruitlessRecord {
   saidTs?: number;
   saidWhy?: string;
   saidGaveUp?: boolean;
+  // The `endedAt` of the run the stranded pass read to its end and had nothing to say about.
+  quietAt?: number;
   resetsAt?: string;
   strandedSince?: number;
 }

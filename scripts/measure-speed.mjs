@@ -23,13 +23,10 @@ const root = path.join(os.tmpdir(), 'agentbox-speed');
 const data = path.join(root, 'data');
 const timings = path.join(data, 'timings.jsonl');
 const log = (o) => fs.appendFileSync(timings, `${JSON.stringify({ t: Date.now(), ...o })}\n`);
-// A THREAD WHOSE LAST RUN ENDED AND LEFT IT WHERE IT WAS. A Mac that has been
-// working for months carries thousands of them, each with its newest session log
-// still on disk, and the agents' clock walks the lot every fifteen seconds to
-// see whether any of them needs a sentence. That pass is where the freeze log
-// kept finding the held main thread (w-a20f0430a9, w-55249c1161), and the store
-// below had none of them, so nothing here ever pressed on it.
-const STRANDED_LOG_KB = 200;
+// Threads whose last run ended and left them where they were: the agents' clock
+// walks these every tick. A real store measured 2026-11-04 had 747 of them with
+// logs of 4 KB at the median, so --stranded defaults near that.
+const STRANDED_LOG_KB = 4;
 
 if (args[0] === '--serve') await serve(Number(args[1]));
 else await measure();

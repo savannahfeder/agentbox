@@ -1,17 +1,15 @@
-// Every thread whose last run died without moving it has its newest session log
-// read once, and on the founder's Mac there are thousands of them with logs of
-// hundreds of kilobytes each. Read in one pass that is minutes of held main
-// thread after every restart: measured on a made-up store of 5,000 of them with
-// 200 KB logs, one pass read 1 GB and took 5.8 s on a 2-core Linux box, and the
-// 2026-11-02 freeze log put 348 s of held thread in this pass, the longest hold
-// 224.9 s. So a pass reads what it can inside a budget and the next tick picks
-// up where it left off, and it always reads at least one so it cannot stall.
+// The first pass after this landed has every stuck thread's log to read at once,
+// and how long that takes depends on how many there are and how big they are,
+// which nothing bounds. Made-up store of 5,000 threads with 200 KB logs: one pass
+// read 1 GB and held the thread 5.8 s. So a pass reads what it can inside a
+// budget, the next tick picks up where it left off, and it always reads at least
+// one so it cannot stall.
 import { it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { machineryPath } from '../main/store/home.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { setAppHome, clearAppHome } from './app-home.mjs';
 
 const CLEAN = (id) => `# A thread\n# ${id} · spawned 2026-08-27T22:25:22.807Z\n\n22:25:29  [Bash] npm test\n\n# exited (0) 2026-08-27T22:31:01.414Z\n`;
@@ -50,7 +48,7 @@ afterEach(() => {
 
 it('reads the lot in one pass when they fit in the budget', () => {
   const read = vi.spyOn(fs, 'readFileSync');
-  sup.sayItOnEveryStrandedRow(items);
+  sup.sayItOnEveryStrandedRow(items, Date.now(), { budgetMs: Infinity });
   expect(logReads(read)).toBe(20);
 });
 

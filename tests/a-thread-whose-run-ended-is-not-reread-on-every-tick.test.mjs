@@ -44,10 +44,10 @@ afterEach(() => { vi.restoreAllMocks(); clearAppHome(); });
 const logReads = (spy) => spy.mock.calls.filter(([f]) => String(f).endsWith('.log')).length;
 
 it('reads each log once, and the project list once a pass', () => {
-  sup.sayItOnEveryStrandedRow(items);
+  sup.sayItOnEveryStrandedRow(items, Date.now(), { budgetMs: Infinity });
   const read = vi.spyOn(fs, 'readFileSync');
   lists = 0;
-  sup.sayItOnEveryStrandedRow(items);
+  sup.sayItOnEveryStrandedRow(items, Date.now(), { budgetMs: Infinity });
   expect(logReads(read)).toBe(0);
   expect(lists).toBeLessThanOrEqual(1);
   expect(sup.store.written).toHaveLength(0);
@@ -59,11 +59,11 @@ it('reads each log once, and the project list once a pass', () => {
 // pass no longer looks at a trace it has read to its exit line
 // (the-stranded-pass-reads-no-disk-when-nothing-has-changed).
 it('reads the log of a next run that shows a silent death, and no other', () => {
-  sup.sayItOnEveryStrandedRow(items);
+  sup.sayItOnEveryStrandedRow(items, Date.now(), { budgetMs: Infinity });
   fs.writeFileSync(logOf(ids[7], '1787863999999.log'), DEAD);
   sup._fruitless[`agentbox:${ids[7]}`] = { runs: 2, endedAt: 9000 };
   const read = vi.spyOn(fs, 'readFileSync');
-  sup.sayItOnEveryStrandedRow(items);
+  sup.sayItOnEveryStrandedRow(items, Date.now(), { budgetMs: Infinity });
   expect(logReads(read)).toBe(1);
   expect(sup.store.written.map((w) => w.id)).toEqual([ids[7]]);
 });
@@ -71,6 +71,6 @@ it('reads the log of a next run that shows a silent death, and no other', () => 
 it('a thread that is not open is still left alone', () => {
   items[3] = { ...items[3], status: 'done' };
   fs.writeFileSync(logOf(ids[3]), DEAD);
-  sup.sayItOnEveryStrandedRow(items);
+  sup.sayItOnEveryStrandedRow(items, Date.now(), { budgetMs: Infinity });
   expect(sup.store.written.map((w) => w.id)).not.toContain(ids[3]);
 });
