@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { cloudClient, type CloudClient, type CloudConfig } from '../cloud-rest';
 import { SharedFilePage } from './SharedFilePage';
+import { NO_SUCH_LINK } from './route';
 
 /**
  * Back from Google with a code, or from a new account's email with its sign-in
@@ -28,7 +29,7 @@ export async function finishComingBack(client: Pick<CloudClient, 'finishGoogle' 
 }
 
 export function bootSharedFile(token: string, cfg: CloudConfig) {
-  if (location.pathname !== `/f/${token}`) history.replaceState(history.state, '', `/f/${token}${location.search}${location.hash}`);
+  if (token !== NO_SUCH_LINK && location.pathname !== `/f/${token}`) history.replaceState(history.state, '', `/f/${token}${location.search}${location.hash}`);
   const client = cloudClient(cfg, { storage: localStorage, fetchImpl: (u, i) => fetch(u, { ...i, signal: AbortSignal.timeout(15_000) }) });
   const finishing = finishComingBack(client, location, (to) => history.replaceState(history.state, '', to));
   document.documentElement.dataset.page = 'shared-file';

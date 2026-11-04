@@ -12,8 +12,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { sharedFileToken, titleOf } from '../renderer/src/shared-file/shared-file.ts';
-import { onASharedFilePage } from '../renderer/src/shared-file/route.ts';
+import { sharedFileToken, titleOf, readSharedFile } from '../renderer/src/shared-file/shared-file.ts';
+import { onASharedFilePage, NO_SUCH_LINK } from '../renderer/src/shared-file/route.ts';
 import { FileBody, Comments } from '../renderer/src/shared-file/SharedFilePage.tsx';
 
 const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
@@ -52,6 +52,18 @@ describe('reading it off the page', () => {
     page(`/f/${TOK}`, null);
     expect(onASharedFilePage()).toBeNull();
     page('/', JSON.stringify({ url: 'https://db.example', anonKey: 'k' }));
+    expect(onASharedFilePage()).toBeNull();
+  });
+  // A made-up /f/ link drew a blank white page (power test, round 2, 2026-11-04).
+  it('takes any other address under /f/ as a link that does not work, never the app', async () => {
+    for (const p of ['/f/abc', '/f/', '/f/not a link']) {
+      page(p, JSON.stringify({ url: 'https://db.example', anonKey: 'k' }));
+      expect(onASharedFilePage(), p).toBe(NO_SUCH_LINK);
+    }
+    let asked = false;
+    expect(await readSharedFile(async () => { asked = true; return []; }, NO_SUCH_LINK)).toEqual({ state: 'unknown' });
+    expect(asked).toBe(false);
+    page('/f/abc', null);
     expect(onASharedFilePage()).toBeNull();
   });
 });
