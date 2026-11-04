@@ -96,7 +96,7 @@ export function discoverProfiles({ home = os.homedir() } = {}) {
     const dir = path.join(home, name);
     if (seen.has(dir)) continue;
     seen.add(dir);
-    const id = accountIdentity(dir, { home });
+    const id = accountIdentity(dir === dflt ? null : dir, { home });
     if (!id?.accountUuid) continue;
     out.push({ dir, email: id.email, accountUuid: id.accountUuid });
   }
@@ -156,7 +156,11 @@ export function effectiveProfiles(configured, { home = os.homedir(), shellDir = 
     if (id?.accountUuid) have.add(id.accountUuid);
     list.push(p);
   }
-  if (!list.length) list.push('default');
+  if (!list.length) {
+    list.push('default');
+    const id = idOf('default');
+    if (id?.accountUuid) have.add(id.accountUuid);
+  }
 
   // THE LOGIN THE PERSON'S SHELL PROFILE POINTS AT (w-6d8c543a43). Their
   // terminal's `claude` reads the folder `CLAUDE_CONFIG_DIR` names in .zshrc,

@@ -923,6 +923,12 @@ export class Supervisor {
       trouble.stamp = stamp;
       if (this._profileCooldown) this._profileCooldown[key] = 0;
       if (!key.startsWith('codex:')) this._spawnCooldownUntil = 0;
+      // A thread held for dying on this login gets its next try now. Only one
+      // with a try left, so a sign-in never adds to the 30m/2h/8h ladder.
+      const now = Date.now();
+      for (const held of Object.values(this._heldStarts ?? {})) {
+        if (held?.account === key && !held.trying && held.next > now) held.next = now;
+      }
       lifted = true;
     }
     if (lifted) this._saveState();
@@ -4814,13 +4820,13 @@ export class Supervisor {
    * its mark. A limit mark goes only when nothing in the reading is at 100%.
    * Trouble that is not the account's (an old Claude Code, the network) stays.
    */
-  noteUsageReading(profile, reading) {
+  noteUsageReading(profile, reading, { onlyLimit = false } = {}) {
     const key = this._accountKey(DEFAULT_ENGINE, profile || 'default');
     const trouble = this._profileTrouble?.[key];
     const limits = reading?.limits ?? [];
     if (!trouble || !limits.length) return false;
     if ((reading.at ?? 0) < (trouble.at ?? trouble.since ?? 0)) return false;
-    const proven = ['signed-out', 'org-blocked', 'subscription-ended', 'unknown'].includes(trouble.cause)
+    const proven = (!onlyLimit && ['signed-out', 'org-blocked', 'subscription-ended', 'unknown'].includes(trouble.cause))
       || (trouble.cause === 'at-limit' && limits.every((l) => !(l.percent >= 100)));
     if (!proven) return false;
     this._clearProfileTrouble(key);
@@ -5253,6 +5259,7 @@ export class Supervisor {
    */
   async lookAtCloudLogins({ force = false } = {}) {
     if (!readCloudConfig(process.env, this.config.home)) return;
+    try { this._noteCloudReadings(); } catch (e) { console.warn('zero: could not read the cloud sign-ins for a limit:', e.message); }
     // A Refresh pressed mid-look is kept for when that look ends.
     if (this._cloudLooking) { if (force) this._cloudLookAgain = true; return; }
     const now = Date.now();
@@ -5273,10 +5280,25 @@ export class Supervisor {
     } finally {
       this._cloudLooking = false;
     }
+    try { this._noteCloudReadings(); } catch (e) { console.warn('zero: could not read the cloud sign-ins for a limit:', e.message); }
     if (this._cloudLookAgain) {
       this._cloudLookAgain = false;
       await this.lookAtCloudLogins({ force: true });
     }
+  }
+
+  /**
+   * A cloud reading is the same subscription as the folder it is paired with,
+   * so it can show that folder's limit mark is over. Only a limit: the cloud
+   * signs in with its own login, which says nothing about the one here.
+   */
+  _noteCloudReadings() {
+    let cleared = false;
+    for (const c of this._cloudAccounts()) {
+      if (c.engine !== DEFAULT_ENGINE || !c.profile || !c.limits?.length || !c.readAt) continue;
+      if (this.noteUsageReading(c.profile, { at: c.readAt, limits: c.limits }, { onlyLimit: true })) cleared = true;
+    }
+    return cleared;
   }
 
   // The sign-ins going on, or just ended, for the setup screen to draw.
@@ -5748,11 +5770,13 @@ export class Supervisor {
     }
     const said = (session.tail ?? []).filter((l) => typeof l === 'string' && l.startsWith('stderr:'))
       .flatMap((l) => l.slice('stderr:'.length).split('\n')).map((l) => l.trim()).filter((l) => l && !l.startsWith(CLOUD_SENT)).at(-1) ?? null;
+    // The login that refused it, so a sign-in on it can bring the next try forward (`_noticeSignIns`).
+    const account = refused && !session.cloud ? this._accountKey(session.engine, session.profile || 'default') : null;
     // A try of its own that died at once is held again straight away.
     if (held?.trying) {
       const tries = (held.tries ?? 0) + 1;
       const next = tries < HELD_RETRY_MS.length ? Math.max(held.trying + HELD_RETRY_MS[tries], now + HELD_RETRY_MS[0]) : null;
-      this._heldStarts[key] = { since: now, said: said ?? held.said ?? null, tries, next };
+      this._heldStarts[key] = { since: now, said: said ?? held.said ?? null, tries, next, account };
       delete this._deadStarts[key];
       this._saveState();
       this._sayItStoppedStarting(item, stoppedStartingSentence({ tries, triedAt: held.trying, said: said ?? held.said, next }));
@@ -5764,7 +5788,7 @@ export class Supervisor {
     // Saved every time, so the six are still six across a restart of the app.
     if (starts.length < STORM_STARTS || held) { this._saveState(); return; }
     const next = now + HELD_RETRY_MS[0];
-    this._heldStarts[key] = { since: now, said, tries: 0, next };
+    this._heldStarts[key] = { since: now, said, tries: 0, next, account };
     this._saveState();
     this._sayItStoppedStarting(item, stoppedStartingSentence({ starts: starts.length, minutes: Math.round(STORM_WINDOW_MS / 60_000), said, next }));
   }
