@@ -281,8 +281,7 @@ textarea.tq-field { resize: vertical; border-color: var(--line); margin-left: 0;
 
 /* The Chats page as drawn in round 6 (designs/w-4bd7b5548b/round-6): softer
    than the inbox, only here, so a group's own chat keeps its look. */
-.tq-chats .tq-chat .rm-day { display: flex; align-items: center; gap: 12px; margin: 18px 0 14px; }
-.tq-chats .tq-chat .rm-day::before, .tq-chats .tq-chat .rm-day::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.tq-chats .tq-chat .rm-day { display: flex; justify-content: flex-start; align-items: center; margin: 18px 0 14px; }
 .tq-chats .tq-chat .rm-day .rm-label { font: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--text-faint); }
 .tq-chats .tq-chat .rm-cm.tq-m .h > span { font-weight: 600; }
 .tq-chats .tq-chat .rm-cm.tq-m .h em { font-family: inherit; font-size: 12px; letter-spacing: 0; font-style: normal; color: var(--text-faint); }

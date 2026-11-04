@@ -65,6 +65,18 @@ describe('quoted filenames keep every word', () => {
 // assertion about how fast a Mac is, and a hang is still caught in 90 seconds.
 // The child's cap stays under the test's so a real hang fails with the child's
 // own error rather than an opaque vitest timeout.
+//
+// NEITHER CAP WAS THE ONE THAT FIRED (2026-11-04). The driver waited for the
+// probe in a hundred 50ms turns, about five seconds, and killed a working probe
+// on three macOS runs whose whole suite took 1018s against 393s green. It waits
+// with tests/waiting.mjs now, and says which stage the probe was in.
+//
+// The browser side was the other small wait: it stepped through the regression
+// on fixed 80ms pauses, so a Mac that had not got round to the next render yet
+// read as a Mac that had decided not to. Every step the next one depends on now
+// waits for the thing itself and names itself when it does not come. The two
+// checks that nothing happened keep their fixed wait, where waiting too little
+// can only let them pass.
 it.skipIf(process.platform !== 'darwin')('keeps mounted links and exhausted previews through five parent updates', async () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'inline-links-'));
   try {

@@ -3,6 +3,7 @@
 // things you do with them over both.
 import { useEffect, useState, type ReactNode } from 'react';
 import { agoQuiet } from '../../format';
+import { sendKeyFor } from '../../reply-keys';
 import { MemberFace, MemberWord } from './TeamStrip';
 import type { Member } from './members';
 
@@ -118,10 +119,12 @@ export function SendBox({ placeholder, note, onSend, empty }: {
   return <div className="pl-send">
     <div className="pl-send-empty">{empty}</div>
     {error && <p className="tq-error" role="alert">{error}</p>}
-    <div className="pl-compose">
-      <textarea rows={2} value={text} placeholder={placeholder} aria-label={placeholder} onChange={(e) => setText(e.target.value)}
+    <div className="rm-compose tq-compose pl-first">
+      <textarea className="rm-compose-input" autoFocus rows={1} value={text} placeholder={placeholder} aria-label={placeholder} onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }} />
-      <button type="button" className="pl-btn go" disabled={!text.trim() || busy} onClick={() => { void send(); }}>Send</button>
+      <div className="rm-compose-bar">
+        <button type="button" className="dock-send" disabled={!text.trim() || busy} title={`Send · ${sendKeyFor(true)}`} onClick={() => { void send(); }}>Send <kbd>{sendKeyFor(true)}</kbd></button>
+      </div>
     </div>
     {note && <p className="pl-note">{note}</p>}
   </div>;

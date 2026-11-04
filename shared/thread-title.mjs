@@ -144,5 +144,7 @@ export function shownTitle(i) {
   const theirs = i?.wrote?.title;
   const ours = i?.wrote?.label;
   const renamed = !!theirs && !!ours && theirs.source === 'founder' && theirs.ts > ours.ts;
-  return shortTitle((renamed && title.trim()) || label);
+  if (renamed && title.trim()) return shortTitle(title);
+  // A name the person typed (Rename) is theirs to the letter; only the app's is cut.
+  return ours?.source === 'founder' ? label : shortTitle(label);
 }

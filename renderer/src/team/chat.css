@@ -1,7 +1,7 @@
 /* A CONVERSATION WITH A TEAMMATE (w-2e8aa16f0f, drawing A of round two).
    Slack's structure in the app's own materials: a round face in a column on
-   the left, the full name and the time once per run, a quiet day line, and a
-   rule that is a hairline. The run itself is ./chat-layout.ts. Nothing here
+   the left, the full name and the time once per run, and the day as a quiet
+   word with no rule beside it. The run itself is ./chat-layout.ts. Nothing here
    reaches a thread with an agent: every rule hangs off .chat-msg, .chat-day or
    .is-chat-cont, which only a conversation with a person draws. */
 
@@ -9,7 +9,6 @@
   display: flex; align-items: center; gap: 14px; margin: 4px 0 6px;
   font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint);
 }
-.chat-day::after { content: ''; flex: 1; height: 1px; background: var(--line); opacity: .55; }
 
 .chat-msg { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 14px; }
 .chat-gutter { grid-column: 1; grid-row: 1 / span 3; padding-top: 2px; }

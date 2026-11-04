@@ -129,6 +129,7 @@ import type { PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
 import { useKeepInWindow } from '../keep-in-window';
+import { escapeClosesMenu } from '../menu-escape';
 import { isUpdateRow } from '../update-row';
 import { TeamRouteStrip, TeamSaid, teamHeld } from '../team/TeamFocus';
 import {
@@ -150,7 +151,7 @@ import { lookAgainAfter } from '../picture-looks-again';
 import { OPEN_WITHIN_MS } from '../opening-wait';
 import { focusAtEnd } from '../focus-at-end';
 import type { Spot } from '../one-thing-at-a-time';
-import { ChoicesFold, ChoicesShow, QueueFile, QueueNav, readsInPlace } from './OneThingAtATime';
+import { ChoicesFold, ChoicesShow, QueueNav } from './OneThingAtATime';
 import { InlineTable, gridFromHast } from './TableView';
 import { foldKey, foldedKeys, toggleFold } from '../one-thing-at-a-time';
 
@@ -168,7 +169,8 @@ const PATH_RE = CODE_PATH;
 // "tomorrow 8:00 AM". The same day words the Scheduled list uses, so the row
 // and the open task never name the same moment two different ways.
 function whenLabel(ts: number, now = Date.now()): string {
-  const time = new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const d = new Date(ts);
+  const time = `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}${d.getHours() < 12 ? 'am' : 'pm'}`;
   return `${dayLabel(ts, now).toLowerCase()} ${time}`;
 }
 
@@ -710,7 +712,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -892,6 +894,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onReopen: () => void;
   /** Opens a done thread again. */
   onReopenDone?: () => void;
+  /** Opens ⌘K on its Move to rows. */
+  onMove?: () => void;
   // Putting something off had no button anywhere in the app: S, and only S.
   // Every other verb in this footer is clickable, so the one verb that is not
   // is the one a hand that has never read a shortcut list cannot reach.
@@ -1326,8 +1330,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     return () => { live = false; off?.(); };
   }, [item.product, item.id]);
   const madeHere = useMemo(() => filesMadeHere(historyLines, item.artifacts?.notes ?? []), [historyLines, item.artifacts?.notes]);
-  const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig });
-  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig }; });
+  const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig, edits: item.artifacts?.edits });
+  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig, edits: item.artifacts?.edits }; });
   // A row in Needs you for a comment or an approval opens the file at it.
   const fileNewsMe = teamCtx?.me ?? null;
   useEffect(() => {
@@ -1373,13 +1377,13 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // A miss now SAYS SO.
     const openHref = (href?: string, from?: HTMLElement, click?: LinkClick) => {
       if (!href) return;
-      const { onOpenDoc, onNotice, openPicture, opensBig, openBig } = markdownActions.current;
+      const { onOpenDoc, onNotice, openPicture, opensBig, openBig, edits } = markdownActions.current;
       // A picture opens large over the thread, a page or a web address opens
       // in the pane, and a ⌘-click sends any of them out (../link-click.ts).
       const goes = whereALinkGoes(href, click, { pane: !!onOpenDoc });
       if (!asksForANewTab(click) && opensBig(href)) { openBig(href, from); return; }
       if (goes === 'picture') { openPicture(href, from); return; }
-      if (goes === 'pane') { onOpenDoc?.(href); return; }
+      if (goes === 'pane') { onOpenDoc?.(newestOfFamily(href, edits)); return; }
       // A reference like cart.mjs:2 is that file; its line number is only a label.
       const source = sourceReference(href);
       if (source && !asksForANewTab(click) && whereALinkGoes(source, click, { pane: !!onOpenDoc }) === 'pane') { onOpenDoc?.(source); return; }
@@ -1731,7 +1735,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onCloseTask={canFinish && givenTask ? onCloseTask ?? null : null}
       onReopen={!canFinish && !agent ? onReopenDone ?? null : null}
       onRunNow={waiting && onRunNow ? onRunNow : null}
-      onLater={onPhone() && canFinish ? onSnooze ?? null : null}
+      onLater={canFinish ? onSnooze ?? null : null}
       // A finished thread has nothing to be pinned for.
       pinned={canFinish && onPin ? !!item.pinned : null}
       onPin={onPin}
@@ -1751,7 +1755,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       waitsNow={!!waitNow}
       onWait={onWait}
       blocks={(item.labels ?? []).includes('given-task')}
-      onRename={direct && crumbFrom ? () => setRenameAt(Date.now()) : null}
+      onRename={crumbFrom && !agent ? () => setRenameAt(Date.now()) : null}
+      onMove={canFinish && !agent && !direct ? onMove ?? null : null}
     />
   );
 
@@ -2221,12 +2226,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       {/* THE FILES A MESSAGE NAMES ARE SMALL FRAMED TILES (w-9ed13d72b3), and
           a file nothing can read gets none. The big review card below is
           only the review lab's sample now. */}
-      {/* One thing at a time reads a page or a note in place rather than as a
-          tile, and not a second time while it is open on the side. */}
-      {inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && newestOfFamily(path, item.artifacts?.edits) !== openDoc && <QueueFile key={path} product={product} path={newestOfFamily(path, item.artifacts?.edits)} md={md}
-        onOpen={() => onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'beside')} onFullScreen={() => onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'focus')} />)}
-      {/* What the page cannot read in place, a deck or a PDF, is a tile under it. */}
-      {page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths.filter((path) => !readsInPlace(path))} revision={item.updatedAt} openDoc={openDoc} onOpen={path => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'beside'))} />}
+      {/* An agent thread draws nothing here: a file it wants read is on a line
+          of its own and opens beside, and any other stays a name in its words.
+          A chat between people keeps tiles, which say whether a file arrived. */}
       {!page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths} revision={item.updatedAt} openDoc={openDoc} onOpen={path => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'beside'))} />}
       {inlineArtifacts && previewSample && <div className="artifact-entry-list" aria-label="Attachments">{previewPaths.map(path =>
         <DirectReview key={path} product={product} path={path} revision={item.updatedAt} open={openDoc === path}
@@ -2275,10 +2277,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             the line says the one thing there is to say and the press starts
             it. Same button, same place as the one below. */}
         {item.start === 'later' && onUnschedule && (
-          <button className="focus-unschedule" onClick={onUnschedule}>
-            start it now
-            <span className="dim">{' · '}not started yet</span>
-          </button>
+          <><button className="focus-unschedule" onClick={onUnschedule}>Start it now</button>
+          <span className="focus-when">Not started yet</span></>
         )}
         {item.start !== 'later' && (scheduledUntil ?? 0) > 0 && onUnschedule && (
           // The two cases want different words because the button does two
@@ -2286,13 +2286,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           // back; a row an agent parked is already right here in her inbox, so
           // "back to inbox" would name a move that does not happen. What
           // clearing an agent's park actually does is let the work start.
-          <button className="focus-unschedule" onClick={onUnschedule}>
-            {scheduledByAgent ? 'let it run now' : 'back to inbox'}
-            <span className="dim">
-              {' · '}
-              {(item.snoozedUntil ?? 0) > Date.now() ? 'in Later until' : scheduledByAgent ? 'the agent paused this until' : 'scheduled for'} {whenLabel(scheduledUntil!)}
-            </span>
-          </button>
+          <><button className="focus-unschedule" onClick={onUnschedule}>{scheduledByAgent ? 'Let it run now' : 'Back to inbox'}</button>
+          <span className="focus-when">
+            {(item.snoozedUntil ?? 0) > Date.now() ? 'In Later until' : scheduledByAgent ? 'The agent paused this until' : 'Scheduled for'} {whenLabel(scheduledUntil!)}
+          </span></>
         )}
         {/* "E close this task" AND "S remind me later" USED TO SIT HERE. They
             were the first two of three removed, and they were the two with a
@@ -2331,12 +2328,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             running inside to the front, which is the whole of what is actually
             available. Nothing public focuses one pane inside another app. */}
         {agent && !agentTakesReply && onReveal && (
-          <button className="focus-stop" onClick={onReveal}>
-            take me to it
-            <span className="dim">{' · '}opens the app it is running in</span>
-          </button>
+          <><button className="focus-stop" onClick={onReveal}>Take me to it</button>
+          <span className="focus-when">Opens the app it is running in</span></>
         )}
-        {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}>send back to agent</button>}
+        {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}>Send back to agent</button>}
         {/* "esc back" was the third one removed. Escape still closes the pane
             and so does clicking away from it. */}
       </div>
@@ -2570,11 +2565,13 @@ function SlashMenu({ rows, at, onPick, onHover }: {
  *  underline, no box and no icon. The menu is `.prio-menu`, the same list the
  *  priority and the engine already open. Nothing new is drawn.
  */
-function ModePicker({ value, options, label, onChange }: {
+function ModePicker({ value, options, label, onChange, onEscape }: {
   value: string;
   options: Array<{ value: string; label: string }>;
   label: string;
   onChange: (v: string) => void;
+  /** After Escape closes the menu, which otherwise leaves focus on the word. */
+  onEscape?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLSpanElement | null>(null);
@@ -2587,6 +2584,7 @@ function ModePicker({ value, options, label, onChange }: {
     document.addEventListener('mousedown', away);
     return () => document.removeEventListener('mousedown', away);
   }, [open]);
+  useEffect(() => (open ? escapeClosesMenu(window, () => { setOpen(false); onEscape?.(); }) : undefined), [open]);
   const now = options.find((o) => o.value === value);
   return (
     <span className="compose-word-wrap" ref={wrap}>
@@ -2940,9 +2938,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
     } else if (finishing.current) return;
     if (saving || (!(spoken ?? text).trim() && !attachments.length)) return;
     if (attaching.length) { onNotice(`${attaching[0].name} is still being attached.`); return; }
-    // AN AGENT WITH NO PROJECT DOES NOT GO OUT. The footer already says why;
-    // ⌘↵ says it again rather than doing nothing.
-    if (chat.block) { onNotice(chat.block); return; }
+    // An agent with no project does not go out: its project list opens instead.
+    if (chat.askForProject()) return;
     const originalDraft = text;
     const consumeCommand = () => {
       if (ref.current?.value !== originalDraft) return;
@@ -3008,6 +3005,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   };
   // A note being recorded is a draft: the box stays open round it.
   const hasDraft = !!text.trim() || attachments.length > 0 || recording;
+  useEffect(() => { if (chat.readyToSend) { chat.sent(); void send(); } }, [chat.readyToSend]);
   // THE SLASH MENU, AND THE MODE THAT IS ALWAYS ON THE SCREEN.
   //
   // It does. Claude Code has no backslash TRIGGER: `/` opens its commands and
@@ -3464,9 +3462,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
               never bare; the formatting bar now sits in that corner, and the
               person asked for the line to go. The conversation's header
               already names who it is with. */}
-          {/* AN AGENT IN THE MESSAGE WITH NO PROJECT says so here, and Send
-              waits (w-7b9cb8636a). */}
-          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo?.length ? (chat.block ? <span className="dim">{chat.block}</span> : null) : <>
+          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo?.length ? null : <>
           <PriorityPicker
             variant="word"
             value={shown}
@@ -3530,6 +3526,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
                   ? MODE_ORDER.map((m) => ({ value: m, label: MODE_WORDS[m] }))
                   : CODEX_MODE_ORDER.map((m) => ({ value: m, label: CODEX_MODES[m].label }))}
                 onChange={(v) => pickMode(v as PermissionMode | CodexModeId)}
+                // ⌘↵ sends from the box, so Escape puts the caret back, as a pick does.
+                onEscape={() => ref.current?.focus()}
               />
               {' Mode. '}
             </>
@@ -3628,8 +3626,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
         <button
           className="dock-send"
           onClick={() => send()}
-          disabled={!hasDraft || !!chat.block || saving}
-          title={chat.block ?? `Send · ${sendKeyFor(enterSends)}`}
+          disabled={!hasDraft || saving}
+          title={`Send · ${sendKeyFor(enterSends)}`}
         >{saving ? 'Sending…' : <>Send <kbd>{sendKeyFor(enterSends)}</kbd></>}</button>
         </>)}
         </>}

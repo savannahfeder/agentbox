@@ -13,7 +13,7 @@ import { useRowDrag } from './row-drag';
 import { chord } from '../this-keyboard';
 import type { Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
-import { Face, TeamContext, firstName, personOf } from '../team/people';
+import { Face, TeamContext, dueWords, firstName, personOf } from '../team/people';
 import { taskWords } from '../team/company';
 import { agentSaidLast } from '../team/answers-in-the-chat';
 import { PriorityIcon } from '../components/Priority';
@@ -40,7 +40,7 @@ import { shownToPeople } from '../../../shared/thread-cards.mjs';
 import { Name } from '../../../shared/product-name.mjs';
 import { FleetContext } from '../fleet';
 import { TeammateLead } from '../teammates/row-lead';
-import { factsFor, saysOnCard, statusCell, type StatusCell } from '../status-word';
+import { factsFor, laterCell, saysOnCard, statusCell, type StatusCell } from '../status-word';
 import { offersTryAgain } from '../try-again';
 import { voiceName } from '../../../shared/agent-voice.mjs';
 import { shownPriority } from '../../../shared/rank.mjs';
@@ -727,7 +727,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // only ever true there, which is the gate live-line has always had.
   const fleet = useContext(FleetContext);
   const facts = { ...factsFor(fleet, item.id), inProgress: tab === 'progress', now, practice: !!product?.practice };
-  const cell = statusCell(item, facts);
+  const cell = tab === 'snoozed' ? laterCell(item, facts) : statusCell(item, facts);
   const tryAgain = useContext(TryAgainContext);
   const retry = tryAgain && offersTryAgain(item, facts) ? <TryAgainButton onPress={() => tryAgain(item)} /> : undefined;
   const allItems = useContext(ItemsContext);
@@ -1121,7 +1121,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
               "waiting" chip beside the project with it: Queued is the same
               fact in the place every card now says it. */}
           <div className="m">{e.task
-            ? <span className="s">{e.task.unread && <i className="ev-new" aria-label="New" />}{e.task.word}</span>
+            ? <><span className="s">{e.task.unread && <i className="ev-new" aria-label="New" />}{e.task.word}</span>{e.task && dueWords(e.item?.due) && <span className="p tm-due-word">{dueWords(e.item?.due)}</span>}</>
             : onThem ? <span className="s">{onThem}</span>
             : waitWord ? <span className="s">{waitWord}</span>
             : e.card?.shippedAt ? <span className="s">Shipped</span>

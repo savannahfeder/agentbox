@@ -59,6 +59,13 @@ export interface StatusFacts extends LiveFacts {
 // they wear different marks.
 const WAITING_ITS_TURN = new Set(['queued', 'next', 'shipping']);
 
+/** A row on Later: one word for everything that comes back at the time beside
+ *  it. `null` is a repeating task with no run going. */
+export function laterCell(item: WorkItem | null, facts: StatusFacts = {}): StatusCell {
+  if (!item) return { word: STATE_WORD.scheduled, mark: 'sched', agent: false, live: false, cloud: false };
+  return statusCell(item, { ...facts, state: 'scheduled' });
+}
+
 export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell {
   const now = facts.now ?? Date.now();
   const state = facts.state ?? (threadState(item, now) as ThreadStateWord);

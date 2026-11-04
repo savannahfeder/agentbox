@@ -2301,6 +2301,8 @@ body {
 }
 .focus-actions button:hover { color: var(--text); border-color: var(--text-faint); }
 .focus-actions b { color: var(--text); margin-right: 4px; }
+.focus-actions { align-items: center; }
+.focus-when { font-size: 13px; color: var(--text-faint); }
 /* Where the stopped task goes, said on the button rather than only in the
    toast that follows it. Scoped to this button on purpose: the unschedule
    button beside it writes the same `dim` span and has never had a rule, so a

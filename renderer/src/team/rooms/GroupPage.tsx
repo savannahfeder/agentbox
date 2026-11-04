@@ -5,6 +5,7 @@ import type { Room, RoomCard, RoomMention } from '../../types';
 import { LiveMark } from '../../components/LiveMark';
 import { Face } from '../people';
 import { cardName, peopleHeading } from './room-rules';
+import { Name } from '../../../../shared/product-name.mjs';
 
 /** You first; then working, most agents first; then the rest; people not on yet last. */
 export function inGroupOrder(cards: readonly RoomCard[]): RoomCard[] {
@@ -23,7 +24,7 @@ export function peopleShown(room: Pick<Room, 'members' | 'wall'>): { cards: Room
 }
 
 // Where their thread is kept from you, the line they wrote about themselves.
-const onWords = (c: RoomCard) => c.away ? 'Not on Groups yet' : c.agents ? c.workingOn ?? c.bio ?? 'Private thread' : c.status;
+const onWords = (c: RoomCard) => c.away ? `Hasn’t opened ${Name} yet` : c.agents ? c.workingOn ?? c.bio ?? 'Private thread' : c.status;
 
 export function PeoplePanel({ room, onPerson }: { room: Pick<Room, 'members' | 'wall'> & Partial<Pick<Room, 'teamId' | 'listed'>>; onPerson: (id: string) => void }) {
   const { cards, working, more } = peopleShown(room);
