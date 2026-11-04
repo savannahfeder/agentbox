@@ -6199,7 +6199,7 @@ export default function App() {
         // ESCAPE IS ONE WAY BACK, one step at a time: the document, then the
         // task, then the list. It has always meant "back" all the way out and
         // the pane is one more level in.
-        if (e.key === 'Escape') { if (escapeClosesDoc(openDoc)) closeArtifact(); else setFocused(null); }
+        if (e.key === 'Escape') { if (escapeClosesDoc(openDoc, fullScreenDoc)) closeArtifact(); else setFocused(null); }
         else if (e.key === 'ArrowDown' && opts.length) {
           e.preventDefault();
           setOptionSel((s) => {

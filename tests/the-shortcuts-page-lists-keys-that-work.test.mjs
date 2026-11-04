@@ -85,7 +85,7 @@ const HANDLED = {
   'B': [[list, "case 'b': case 'B':"], [list, 'setInboxDisplay(flipView(inboxDisplay))']],
   'esc': [
     // One step back out: the document, then the task, then the list.
-    [focused, "if (e.key === 'Escape') { if (escapeClosesDoc(openDoc)) closeArtifact(); else setFocused(null); }"],
+    [focused, "if (e.key === 'Escape') { if (escapeClosesDoc(openDoc, fullScreenDoc)) closeArtifact(); else setFocused(null); }"],
   ],
 
   // --- answering an agent ---

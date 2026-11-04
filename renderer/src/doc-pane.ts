@@ -192,8 +192,9 @@ export function writeSplit(store: Pick<Storage, 'setItem'> | null | undefined, f
  * counts 505 of 619), esc-to-leave would cost two presses on nearly every card
  * in her inbox, and she never asked for the pane on any of them.
  */
-export function escapeClosesDoc(doc: { auto?: boolean } | null | undefined): boolean {
-  return !!doc && !doc.auto;
+export function escapeClosesDoc(doc: { auto?: boolean } | null | undefined, fullScreen = false): boolean {
+  // Full screen is a step the person took, so esc takes it back before leaving the task.
+  return !!doc && (!doc.auto || fullScreen);
 }
 
 /**
