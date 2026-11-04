@@ -1,13 +1,13 @@
 // A downloaded Agentbox has Multiplayer off until someone turns it on, but a
 // checkout has it on unless the config says `alphaMultiplayer: false`
-// (main/settings.mjs, alphaFeatures). Test copies run as a checkout and never
+// (main/settings.mts, alphaFeatures). Test copies run as a checkout and never
 // said so, so a power tester asked to try the app "with multiplayer off" was
 // handed the team version. Measured on 2026-11-04: copyConfig({ storeRoot })
 // had no alphaMultiplayer key, and alphaFeatures read that as on.
 import { describe, it, expect } from 'vitest';
 
 const { copyConfig } = await import('../.claude/skills/verify-agentbox/scripts/live.mjs');
-const { alphaFeatures } = await import('../main/settings.mjs');
+const { alphaFeatures } = await import('../main/settings.mts');
 
 const unpackaged = (config) => alphaFeatures(config, { packaged: false });
 
