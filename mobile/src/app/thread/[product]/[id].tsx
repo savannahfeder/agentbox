@@ -12,7 +12,6 @@ import { KEEP_OPEN, type CloseOption } from '../../../../../renderer/src/close-a
 import { foldedReply } from '../../../../../renderer/src/folded-reply';
 import { closesTheTask, type ParsedOption } from '../../../../../renderer/src/format';
 import { MODE_WORDS } from '../../../../../renderer/src/modes';
-import { DEFAULT_MODEL, modelLabelOf } from '../../../../../renderer/src/models';
 import { priorityLabelOf, priorityValueOf } from '../../../../../renderer/src/priority';
 import { clock, dayHeading } from '../../../../../renderer/src/thread-history';
 import { stateWordOf } from '../../../../../renderer/src/threads/summary-rules';
@@ -32,6 +31,8 @@ import { replySender, type ReplyDeps } from '../../../lib/thread-reply';
 import { atEnd, keptPlace } from '../../../lib/thread-scroll';
 import { appStore } from '../../../platform/persist';
 import { useCloud } from '../../../state/cloud';
+import { useComputerAgents } from '../../../state/computer-agents';
+import { replyModel } from '../../../lib/compose';
 import { AttachSheet, Attached } from '../../../ui/Attach';
 import { SentFiles, ThreadFiles, useMessageFiles } from '../../../ui/Files';
 import { Back, Chevron, Clip, DoneMark, More, Panel } from '../../../ui/icons';
@@ -125,7 +126,9 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   const [sheet, setSheet] = useState<'priority' | 'mode' | 'model' | 'attach' | null>(null);
   const ready = !!draft.text.trim() || draft.files.length > 0;
   const priority = picked.priority ?? priorityValueOf(shownLevel(item));
-  const model = picked.model ?? item.model ?? DEFAULT_MODEL;
+  const agents = useComputerAgents();
+  const codex = { codexModels: agents.codexModels, codexDefault: agents.codexDefault };
+  const { engine, model, label: modelLabel } = replyModel(item, picked, codex);
   const mode = picked.permissionMode ?? 'auto';
   const folded = foldedReply(draft.text, draft.files.map((f) => ({ name: f.name, image: isImageName(f.name) })));
   const deps = useRef<ReplyDeps | null>(null);
@@ -150,7 +153,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
           <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel="Reply" style={{ flex: 1, height: '100%', flexDirection: 'row', alignItems: 'center' }}>
             <T numberOfLines={1} style={{ flex: 1, fontSize: 14.5, color: folded.draft ? color.dim : color.faint, paddingHorizontal: 16 }}>{folded.text}</T>
             {!!folded.files && <T style={{ fontSize: 12, color: color.faint, paddingRight: 12 }}>{folded.files}</T>}
-            <T style={{ fontSize: 13, color: color.dim, marginRight: 4, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{modelLabelOf(model)}</T>
+            <T style={{ fontSize: 13, color: color.dim, marginRight: 4, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{modelLabel}</T>
           </Pressable>
           {foldedChoices > 0 && (
             <Pressable onPress={showChoices} accessibilityRole="button" accessibilityLabel={`Show the ${foldedChoices} choices`} hitSlop={6}
@@ -192,7 +195,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
               <Pickable style={{ fontSize: 13, color: color.dim }} onPress={() => setSheet('mode')}>{MODE_WORDS[mode as keyof typeof MODE_WORDS] ?? mode}</Pickable>
               {' Mode. On '}
               {/* A no-break space, so a model's name never splits over two lines. */}
-              <Pickable style={{ fontSize: 13, color: color.dim }} onPress={() => setSheet('model')}>{modelLabelOf(model).replace(/ /g, ' ')}</Pickable>
+              <Pickable style={{ fontSize: 13, color: color.dim }} onPress={() => setSheet('model')}>{modelLabel.replace(/ /g, ' ')}</Pickable>
               {'.'}
             </T>
             {/* One slot: Stop while it is in progress and the box is empty, Send once anything is typed (Focus.tsx). */}
@@ -216,7 +219,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
       <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => { setFailed(null); draft.setFiles((f) => [...f, ...more]); }} fail={setFailed} />
       <PrioritySheet open={sheet === 'priority'} close={() => setSheet(null)} value={priority} pick={(v) => setPicked((p) => ({ ...p, priority: v }))} />
       <ModeSheet open={sheet === 'mode'} close={() => setSheet(null)} value={mode} pick={(v) => setPicked((p) => ({ ...p, permissionMode: v }))} />
-      <ModelSheet open={sheet === 'model'} close={() => setSheet(null)} model={model} effort={picked.effort ?? item.effort ?? null}
+      <ModelSheet open={sheet === 'model'} close={() => setSheet(null)} model={model} effort={picked.effort ?? item.effort ?? null} engine={engine} codex={codex}
         pickModel={(v) => setPicked((p) => ({ ...p, model: v }))} pickEffort={(v) => setPicked((p) => ({ ...p, effort: v }))} />
     </View>
   );
