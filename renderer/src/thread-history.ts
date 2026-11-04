@@ -566,7 +566,33 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   }
   tagWriter();
 
-  return withTitleSaid(theAskComesFirst(events), title, label);
+  return withTitleSaid(theAskComesFirst(waitingReplies(events)), title, label);
+}
+
+// A REPLY SET FOR LATER GOES WITH THE NEXT REPLY OF HERS, at that one's time:
+// the run that carries the newest reply reads the whole conversation. One
+// taken back with Z no longer waits.
+function waitingReplies(events: ThreadEvent[]): ThreadEvent[] {
+  const out = [...events];
+  // Each person's own, on a shared thread.
+  const waiting = new Map<string, number[]>();
+  const at = (k: number, sendsAt: number | undefined) => {
+    const { sendsAt: _was, ...rest } = out[k];
+    out[k] = sendsAt ? { ...rest, sendsAt } : rest;
+  };
+  for (const [k, e] of out.entries()) {
+    if (e.who !== 'you') continue;
+    const theirs = waiting.get(e.by ?? '') ?? [];
+    if (e.said === 'You withdrew your reply') {
+      const undone = theirs.pop();
+      if (undone !== undefined) at(undone, undefined);
+      continue;
+    }
+    if (e.field !== 'answer' || !e.message) continue;
+    for (const w of theirs) at(w, e.sendsAt);
+    waiting.set(e.by ?? '', e.sendsAt ? [...theirs, k] : []);
+  }
+  return out;
 }
 
 // NOTHING HAPPENED ON A THREAD BEFORE YOU ASKED FOR IT.

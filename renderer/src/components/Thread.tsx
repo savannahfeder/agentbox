@@ -38,6 +38,7 @@ import { threadPieces, typedParts } from '../typed-message';
 import { TicketLink } from './TicketReference';
 import { MessageKind, FileMarkOpener } from './FileMarkLine';
 import { clock, dayHeading } from '../thread-history';
+import { laterHint } from '../threads/composer-rules';
 import { chatLayout, newestSaid } from '../team/chat-layout';
 import { DecideContext } from '../team/TeamLists';
 import { ChatFold } from '../team/ChatFold';
@@ -340,7 +341,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
         the one way to stop waiting (w-f37a34def6). */}
     {e.pending
       ? <span className={`msg-when msg-sending${e.refused ? ' msg-refused' : ''}`}>{e.refused ? `Not sent: ${e.refused}` : e.held ? 'Sending… press Z to undo' : onCloudPhone() ? (e.sent ? 'Sent' : e.cloud ? `Working in ${Name} Cloud` : 'Waiting for your computer') : cutting ? 'Sending now…' : onSendNow ? 'Waiting for its current step' : 'Sending…'}</span>
-      : <span className="msg-when">{e.sendsAt && e.sendsAt > Date.now() ? `Sends ${clock(e.sendsAt)}` : time}</span>}
+      : <span className="msg-when">{e.sendsAt && e.sendsAt > Date.now() ? `Sends ${laterHint(e.sendsAt)}` : time}</span>}
     {e.pending && !e.held && !e.sent && !cutting && onSendNow && (
       <button type="button" className="msg-now" onClick={() => { setCutting(true); onSendNow(); }}>
         Send now

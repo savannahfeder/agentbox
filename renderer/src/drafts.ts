@@ -286,6 +286,7 @@ export function restoreDraft(
   attachments: DraftAttachment[] = [],
   store?: DraftStore,
   runAt = 0,
+  pick: DraftPick | null = null,
 ): boolean {
   const words = String(text ?? '').trim();
   const images = (attachments ?? []).filter((a) => a && !!a.name && (!!a.dataBase64 || !!a.srcPath));
@@ -294,6 +295,7 @@ export function restoreDraft(
   if (words) saveDraft(item, words, store);
   if (images.length) saveDraftAttachments(item, images, store);
   saveDraftWhen(item, runAt, store);
+  if (pick) saveDraftPick(item, pick, store);
   return true;
 }
 

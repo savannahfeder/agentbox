@@ -251,3 +251,33 @@ describe('the reply box and the app', () => {
     expect(undo).toMatch(/stopSession\?\.\(\{ product: item\.product, id: item\.id, withdraw: true \}\)/);
   });
 });
+
+// A power tester on 2026-11-04 picked Opus in the reply box, set Fri 9:00,
+// sent, and pressed Z: the words and the time came back, the model did not,
+// and Send would have gone on Sonnet.
+describe('Z after Send brings back the model picked for the reply too', () => {
+  const store = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; };
+  const item = { product: 'p', id: 'w-1' };
+
+  it('keeps the pick with the words', async () => {
+    const { readDraftPick } = await import('../renderer/src/drafts');
+    const s = store();
+    expect(restoreDraft(item, 'redo all three', [], s, 0, { model: 'opus', effort: 'high', engine: 'claude' })).toBe(true);
+    expect(readDraftPick(item, s)).toEqual({ model: 'opus', effort: 'high', engine: 'claude' });
+  });
+
+  it('leaves the pick alone when none was made', async () => {
+    const { readDraftPick } = await import('../renderer/src/drafts');
+    const s = store();
+    restoreDraft(item, 'redo all three', [], s);
+    expect(readDraftPick(item, s)).toBeNull();
+  });
+
+  it('the undo hands the pick over, and an open box reads it back', () => {
+    expect(src('renderer/src/App.tsx')).toMatch(/wordsBackInTheBox\(item, sent\?\.words \?\? text, sent\?\.attachments \?\? \[\], keepsTime, pick\)/);
+    const focus = src('renderer/src/components/Focus.tsx');
+    const from = focus.indexOf('const restored = (event: Event)');
+    const restored = focus.slice(from, focus.indexOf("window.addEventListener('zero:reply-restored'", from));
+    expect(restored).toMatch(/replyOpensOn\(item, readDraftPick\(item\)\)/);
+  });
+});

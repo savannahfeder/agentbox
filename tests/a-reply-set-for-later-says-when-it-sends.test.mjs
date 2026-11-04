@@ -52,7 +52,7 @@ describe('a reply set for later', () => {
   });
 
   it('says "Sends" and the time in the message head, where the time goes', () => {
-    expect(read('renderer/src/components/Thread.tsx')).toMatch(/e\.sendsAt && e\.sendsAt > Date\.now\(\)[\s\S]{0,160}Sends \$\{clock\(e\.sendsAt\)\}/);
+    expect(read('renderer/src/components/Thread.tsx')).toMatch(/e\.sendsAt && e\.sendsAt > Date\.now\(\)[\s\S]{0,160}Sends \$\{laterHint\(e\.sendsAt\)\}/);
   });
 });
 
@@ -107,5 +107,55 @@ describe('the line under the thread while the reply waits', () => {
   it('offers to send it now, never "back to inbox"', () => {
     const focus = read('renderer/src/components/Focus.tsx');
     expect(focus).toMatch(/replyWaitsUntil\(item, Date\.now\(\)\) \? 'send it now'/);
+  });
+});
+
+// Found by the second power tester the same morning: with a reply waiting for
+// Thursday, "Oh, and one more thing for tomorrow" sent with plain Send went at
+// once and started the agent, while the first reply above still said it sent
+// Thursday. The words had both gone; the screen said only one had.
+describe('a second reply while one waits', () => {
+  const second = (ts, extra = []) => [{ id: 'w-1', ts, source: 'founder', patch: { answer: 'And add a P.S.' } }, ...extra];
+  const replies = (events) => events.filter((e) => e.field === 'answer');
+
+  it('sent at once, takes the waiting one with it', () => {
+    const events = threadEvents([...opened, ...later, ...second(T + 60_000)]);
+    expect(replies(events).map((e) => e.sendsAt)).toEqual([undefined, undefined]);
+  });
+
+  it('set for a time, carries the waiting one to that time', () => {
+    const THEN = SENDS + 3_600_000;
+    const events = threadEvents([...opened, ...later, ...second(T + 60_000, [{ id: 'w-1', ts: T + 60_004, source: 'founder', patch: { runAt: THEN } }])]);
+    expect(replies(events).map((e) => e.sendsAt)).toEqual([THEN, THEN]);
+  });
+
+  it('a waiting reply taken back with Z no longer says it sends', () => {
+    const undone = { id: 'w-1', ts: T + 30_000, source: 'founder', patch: { answer: '(withdrawn)' } };
+    const events = threadEvents([...opened, ...later, undone]);
+    expect(reply(events)?.sendsAt).toBeUndefined();
+  });
+
+  it('says the day with the time, as the button does', () => {
+    expect(read('renderer/src/components/Thread.tsx')).toMatch(/Sends \$\{laterHint\(e\.sendsAt\)\}/);
+  });
+
+  it('the reply box opens on the time a reply is already waiting for', () => {
+    const focus = read('renderer/src/components/Focus.tsx');
+    expect(focus).toMatch(/useState\(\(\) => readDraftWhen\(item\) \|\| replyWaitsUntil\(item\)\)/);
+  });
+
+  it('and a reply sent at once while one waits lifts that time, so both go now', () => {
+    const app = read('renderer/src/App.tsx');
+    expect(app).toMatch(/const waiting = !later && replyWaitsUntil\(item, Date\.now\(\)\) > 0;/);
+    expect(app).toMatch(/if \(waiting\) await api\.schedule\(\{ product: item\.product, id: item\.id, runAt: 0 \}\);/);
+  });
+});
+
+describe('on a shared thread', () => {
+  it('a reply set for later by one person waits whatever a teammate says after it', () => {
+    const mine = later.map((l) => ({ ...l, by: 'me' }));
+    const theirs = { id: 'w-1', ts: T + 60_000, source: 'founder', by: 'maya', patch: { answer: 'Looks good to me' } };
+    const events = threadEvents([...opened, ...mine, theirs]);
+    expect(events.find((e) => e.words === 'And make the button go to /start')?.sendsAt).toBe(SENDS);
   });
 });

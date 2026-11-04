@@ -2705,14 +2705,21 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // WHEN IT GOES, 0 for now (w-54cdf7c768). Only a work thread's reply waits:
   // a message to a person or into a terminal has no row to hold it.
   const canWait = !item.agent && !talkTo?.length;
-  const [sendAt, setSendAt] = useState(() => readDraftWhen(item));
-  useEffect(() => { setSendAt(readDraftWhen(item)); }, [item.product, item.id]);
+  // A reply already waiting on the thread lends the box its time, so a line
+  // added to it goes with it unless the time is taken off.
+  const [sendAt, setSendAt] = useState(() => readDraftWhen(item) || replyWaitsUntil(item));
+  useEffect(() => { setSendAt(readDraftWhen(item) || replyWaitsUntil(item)); }, [item.product, item.id]);
   const pickSendAt = (at: number) => { setSendAt(at); saveDraftWhen(item, at); };
   useEffect(() => {
     const restored = (event: Event) => {
       if ((event as CustomEvent).detail !== draftKey(item)) return;
       setText(readDraft(item));
       setSendAt(readDraftWhen(item));
+      const opens = replyOpensOn(item, readDraftPick(item));
+      setTouched(opens.touched);
+      setModel(opens.pick.model);
+      setEffort(opens.pick.effort);
+      setEngine(opens.pick.engine ?? null);
       const back = readDraftAttachments(item);
       setAttachments(back);
       // A voice note that went with the undone or refused send comes back

@@ -55,7 +55,7 @@ import { Rail } from './components/Rail';
 import { ThreadComposer, type ComposeStart } from './threads/ThreadComposer';
 import { continueStart } from './threads/continue-thread';
 import { OpenTeammateThread } from './threads/ContinuedFrom';
-import { handOffStart, joinNames, laterHint, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, teammates } from './threads/composer-rules';
+import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, teammates } from './threads/composer-rules';
 import { keyOnAnOpenThread, keyOnTheList, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople } from '../../shared/thread-cards.mjs';
@@ -4745,8 +4745,8 @@ export default function App() {
 
   // The toast says the words are back in the box, so the box opens with them,
   // and a box already open is told, since it read its draft when it mounted.
-  const wordsBackInTheBox = (item: WorkItem, words: string, attachments: SentDraft['attachments'], runAt = 0): boolean => {
-    if (!restoreDraft(item, words, attachments, undefined, runAt)) return false;
+  const wordsBackInTheBox = (item: WorkItem, words: string, attachments: SentDraft['attachments'], runAt = 0, pick: ReplyPick | null = null): boolean => {
+    if (!restoreDraft(item, words, attachments, undefined, runAt, pick)) return false;
     window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(item) }));
     setModal('reply');
     return true;
@@ -4783,6 +4783,8 @@ export default function App() {
     // its time, so nothing hands it to an agent before then.
     const later = (runAt ?? 0) > Date.now();
     const keepsTime = later ? runAt : 0;
+    // A reply sent at once while one waits takes the waiting one with it.
+    const waiting = !later && replyWaitsUntil(item, Date.now()) > 0;
     // A REPLY THAT DID NOT GET THROUGH COMES BACK TO THE BOX, on every path.
     // NEVER PULL HER BACK. This settles whenever the agent's session does,
     // which can be minutes after she moved on, and it used to switch the
@@ -5011,7 +5013,7 @@ export default function App() {
     const restore = (): Restored => {
       setSending((q) => q.filter((s) => s !== mine));
       landed();
-      return wordsBackInTheBox(item, sent?.words ?? text, sent?.attachments ?? [], keepsTime) ? { item } : null;
+      return wordsBackInTheBox(item, sent?.words ?? text, sent?.attachments ?? [], keepsTime, pick) ? { item } : null;
     };
     // A REPLY IS A CLAIM ON NOW. It runs at once whatever the thread is
     // scheduled for, and the schedule stays; a reminder it lifts (list-rules).
@@ -5056,6 +5058,7 @@ export default function App() {
       }
       landed();
       setTimeout(() => setSending((q) => q.filter((s) => s !== mine)), LANDED_MS);
+      if (waiting) await api.schedule({ product: item.product, id: item.id, runAt: 0 });
       if (wasScheduled && !later) {
         if (priorSnooze > Date.now()) await api.snooze({ product: item.product, id: item.id, snoozedUntil: 0 });
         // The legacy localStorage snooze hides a row on read all by itself, so
@@ -5064,7 +5067,7 @@ export default function App() {
         setSnoozes((s) => { const next = { ...s }; delete next[item.id]; return next; });
       }
       pushUndo({ label: 'Reply withdrawn, back in your inbox', undoes: 'take back that reply and stop the agent', restore, undid, run: async () => {
-        if (later) await api.schedule({ product: item.product, id: item.id, runAt: priorRunAt });
+        if (later || waiting) await api.schedule({ product: item.product, id: item.id, runAt: priorRunAt });
         if (wasScheduled && priorSnooze) await api.snooze({ product: item.product, id: item.id, snoozedUntil: priorSnooze });
         // `withdraw`: on the phone, take back the reply itself if her Mac has not taken it.
         if (!runStays) await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id, withdraw: true });
