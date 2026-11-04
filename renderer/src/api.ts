@@ -751,7 +751,7 @@ export const api = {
     return zero.saveCodeFile(p);
   },
 
-  async writeDoc(p: { product: string; src: string; text: string; mtime: number }): Promise<{ ok: boolean; mtime?: number; error?: string }> {
+  async writeDoc(p: { product: string; src: string; text: string; mtime: number; thread?: string }): Promise<{ ok: boolean; mtime?: number; error?: string; stale?: boolean }> {
     const zero = window.zero as any;
     if (!zero?.writeDoc) return { ok: false, error: `quit and reopen ${NAME} to save this file` };
     return zero.writeDoc(p);

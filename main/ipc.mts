@@ -2598,11 +2598,12 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return writeCodeFile({ file: found.path, change: opened.change, product: opened.prod, text, mtime });
   });
 
-  ipcMain.handle('zero:write-doc', async (_e, { product, src, text, mtime }: { product: string; src?: unknown; text: unknown; mtime?: number }) => {
+  ipcMain.handle('zero:write-doc', async (_e, { product, src, text, mtime, thread }: { product: string; src?: unknown; text: unknown; mtime?: number; thread?: unknown }) => {
     const prod = store.listProducts().find((p) => p.slug === product) ?? null;
     const found = await resolveArtifact({
       src,
       product,
+      thread: typeof thread === 'string' ? thread : null,
       products: store.listProducts(),
       accountRoot: config.accountRoot,
       storeRoot: config.storeRoot,
