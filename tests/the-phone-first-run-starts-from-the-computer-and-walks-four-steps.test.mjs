@@ -69,9 +69,15 @@ describe('the screens', () => {
     const index = read('mobile/src/app/index.tsx');
     expect(index).toMatch(/if \(c\.connect\)/);
     const waiting = read('mobile/src/ui/Onboarding.tsx');
-    expect(waiting).toMatch(/Sign in on your computer/);
+    expect(waiting).toMatch(/Waiting for your computer/);
+    expect(waiting).toMatch(/signed in to the same account/);
     expect(waiting).not.toMatch(/Settings › Phone/);
     expect(waiting).toMatch(/Use another account/);
+  });
+
+  // Two of three testers could not tell what "Not now" declined.
+  it('a no to where your messages go says what it leaves you with', () => {
+    expect(read('mobile/src/app/ai-notice.tsx')).toMatch(/label="Not now, I'll just read"/);
   });
 
   it('every step wears the same four bars', () => {

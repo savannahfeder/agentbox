@@ -274,8 +274,11 @@ export function previewCloud(now = () => Date.now()) {
   const full = { ...rows };
   let signedInAt = 0;
   if (walking) Object.assign(rows, { projects: [], threads: [], commands: [] });
+  // Once joined, the stand-in computer stays online, as a real one sending every few seconds does.
   const joined = () => {
-    if (walking && signedInAt && !rows.projects.length && now() - signedInAt > COMPUTER_JOINS_MS) Object.assign(rows, full);
+    if (!walking || !signedInAt || now() - signedInAt <= COMPUTER_JOINS_MS) return;
+    if (!rows.projects.length) Object.assign(rows, full);
+    rows.projects = rows.projects.map((p) => ({ ...p, updated_at: new Date(now()).toISOString() }));
   };
   // `?scene=clear` draws an empty inbox, `?scene=connect` an account no computer has joined, `?scene=signed-out` the sign-in page.
   const scene = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('scene');

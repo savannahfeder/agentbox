@@ -19,7 +19,7 @@ export default function AiNotice() {
   const { first } = useLocalSearchParams<{ first?: string }>();
   const answer = (yes: boolean) => { c.answerNotice(yes); leaveSetup(); };
   return (
-    <Screen top={first ? 24 : 72} foot={<><Btn kind="primary" label="Continue" onPress={() => answer(true)} /><Btn kind="quiet" label="Not now" onPress={() => answer(false)} /></>}>
+    <Screen top={first ? 24 : 72} foot={<><Btn kind="primary" label="Continue" onPress={() => answer(true)} /><Btn kind="quiet" label="Not now, I'll just read" onPress={() => answer(false)} /></>}>
       {first ? <Bars at="messages" /> : null}
       <Logo />
       <Head style={{ marginTop: 28 }}>Where your messages go</Head>
