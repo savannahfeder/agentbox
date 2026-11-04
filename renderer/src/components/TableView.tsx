@@ -749,6 +749,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
 
   // ---- The mouse. One listener on the grid reads which cell, row number or header was pressed.
   const drag = useRef<null | 'cells' | 'rows' | 'cols'>(null);
+  const linkOpens = useRef(false);
   const atOf = (target: EventTarget | null): { kind: 'cell' | 'row' | 'col'; at: At } | null => {
     const el = (target as HTMLElement | null)?.closest?.('[data-c],[data-rn],[data-hc]') as HTMLElement | null;
     if (!el || !box.current?.contains(el)) return null;
@@ -771,8 +772,11 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     if (editing) endEdit(editing.tag ? null : editing.draft);
     if (hit.kind === 'row' && t.closest('.tbl-open')) { e.preventDefault(); goTo(pickFor('row', hit.at, false)); setSheet(hit.at.r); return; }
     if (hit.kind === 'col' && !order.length) return;
-    // A link's own words still open it; anywhere else in the cell picks the cell.
-    if (!t.closest('a')) e.preventDefault();
+    // A link opens only from a cell already picked, or with ⌘ or Ctrl held; the
+    // first press picks the cell, and a Shift-press never leaves the table.
+    e.preventDefault();
+    const on = !!pick && hit.kind === 'cell' && pick.a.r === hit.at.r && pick.a.c === hit.at.c && cellsIn(boxOf(pick)) === 1;
+    linkOpens.current = !e.shiftKey && (on || e.metaKey || e.ctrlKey);
     setPick(pickFor(hit.kind, hit.at, e.shiftKey));
     drag.current = hit.kind === 'cell' ? 'cells' : hit.kind === 'row' ? 'rows' : 'cols';
     focusKeys();
@@ -962,7 +966,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
           e.target.value = ' ';
           if (typed && pick && editable) startEdit(pick.a, typed);
         }} />}
-      <div className="tbl-scroll" ref={box} onPointerDown={onDown} onDoubleClick={onDouble} onContextMenu={onContext}>
+      <div className="tbl-scroll" ref={box} onPointerDown={onDown} onDoubleClick={onDouble} onContextMenu={onContext}
+        onClickCapture={(e) => { if (hands && (e.target as HTMLElement).closest('.tbl-grid a') && !linkOpens.current) e.preventDefault(); linkOpens.current = false; }}>
         <div className="tbl-grid" role="table" style={{ gridTemplateColumns: inline && !table.ranked ? template : `${RN_W}px ${template}` }}>
           <div className="tbl-tr" role="row">
             {table.ranked
