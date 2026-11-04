@@ -15,7 +15,7 @@ import { COPY } from '../renderer/src/onboarding.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Without its comments, where the question it stopped asking is written up.
-const ipc = fs.readFileSync(path.join(root, 'main/ipc.mjs'), 'utf8')
+const ipc = fs.readFileSync(path.join(root, 'main/ipc.mts'), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 const dialog = ipc.slice(ipc.indexOf("ipcMain.handle('zero:choose-folder'"), ipc.indexOf("ipcMain.handle('zero:choose-folder'") + 600);
 

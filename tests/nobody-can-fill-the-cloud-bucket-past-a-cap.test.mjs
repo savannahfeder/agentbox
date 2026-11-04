@@ -28,8 +28,8 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { managedClients } from '../main/cloud/managed.mjs';
-import { cloudRun, CLOUD_NO_ROOM, refusedForRoom } from '../main/cloud/run.mjs';
+import { managedClients } from '../main/cloud/managed.mts';
+import { cloudRun, CLOUD_NO_ROOM, refusedForRoom } from '../main/cloud/run.mts';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';

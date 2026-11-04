@@ -43,6 +43,6 @@ describe('the bar', () => {
   });
   it('is drawn while threads are ticked, on the list, when no other toast is up', () => {
     const app = fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/App.tsx'), 'utf8');
-    expect(app).toMatch(/multiSel\.size > 0 && !toast && !focused && !modal && \(\s*<TickedBar/);
+    expect(app).toMatch(/multiSel\.size > 0 && !toast && !focused && !modal && [^(]*\(\s*<TickedBar/);
   });
 });

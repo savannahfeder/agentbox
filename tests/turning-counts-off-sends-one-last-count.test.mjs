@@ -16,9 +16,9 @@
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { EVENTS, sanitize } from '../shared/analytics-events.mjs';
-import { createAnalytics } from '../main/analytics.mjs';
-import { countsTurnedOff } from '../main/settings.mjs';
+import { EVENTS, sanitize } from '../shared/analytics-events.mts';
+import { createAnalytics } from '../main/analytics.mts';
+import { countsTurnedOff } from '../main/settings.mts';
 
 const read = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 
@@ -37,7 +37,7 @@ describe('the last count', () => {
   });
 
   it('is sent and flushed before the switch is saved', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     const at = ipc.indexOf("ipcMain.handle('zero:settings-set-workspace',");
     const body = ipc.slice(at, at + 600);
     const told = body.indexOf("if (countsTurnedOff(payload)) { analytics.track('counts_turned_off'); analytics.flush(); }");

@@ -28,7 +28,9 @@ const WITHDRAWN = '(withdrawn)';
 
 const said = (v) => (typeof v === 'string' && v.trim() ? v : null);
 // Read as words: a link is its label, and no mark-up or address is matched or shown.
+// A cloud run's asks are cards in the thread; elsewhere they are machine words.
 const plain = (text) => text
+  .replace(/^\s*`?AGENTBOX-NEEDS:\s*(sign-in|key|file|code)\s.*$/gim, '')
   .replace(/!?\[([^\]\n]*)\]\([^)\s]*\)/g, '$1')
   .replace(/```[^\n]*\n?/g, '')
   .replace(/^\s{0,3}#{1,6}\s+/gm, '')

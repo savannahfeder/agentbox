@@ -28,7 +28,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findAgentFolders, shortPath } from '../main/agent-files.mjs';
+import { findAgentFolders, shortPath } from '../main/agent-files.mts';
 import {
   SECTION, destinations, folderOfProject, projectNameFor, unclaimed,
 } from '../renderer/src/agent-import-card';

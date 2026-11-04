@@ -12,8 +12,8 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { findPrivate, scrubError, scrubStack, scrubText, withoutOurOwnPaths } from '../shared/crash-scrub.mjs';
-import { installCrashReports, report } from '../main/crash-report.mjs';
+import { findPrivate, scrubError, scrubStack, scrubText, withoutOurOwnPaths } from '../shared/crash-scrub.mts';
+import { installCrashReports, report } from '../main/crash-report.mts';
 
 const HOME = '/Users/you';
 const APP = '/Users/you/Desktop/dev/zero';
@@ -28,7 +28,7 @@ describe('the four rules', () => {
   });
 
   it('keeps our own code path, because that is what the report is for', () => {
-    expect(scrubText(`at ${APP}/main/store.mjs:142:11`, ctx)).toContain('app:main/store.mjs:142');
+    expect(scrubText(`at ${APP}/main/store.mts:142:11`, ctx)).toContain('app:main/store.mts:142');
   });
 
   it('names no folder outside the bundle, only how deep it was', () => {
@@ -50,20 +50,20 @@ describe('the four rules', () => {
   it('keeps stack frames inside the bundle and counts the rest', () => {
     const stack = [
       'Error: boom',
-      `    at readItem (${APP}/main/store.mjs:142:11)`,
+      `    at readItem (${APP}/main/store.mts:142:11)`,
       `    at async run (${HOME}/Desktop/dev/acme-teardown/build.mjs:9:3)`,
       '    at node:internal/process/task_queues:95:5',
     ].join('\n');
     const { frames, dropped } = scrubStack(stack, ctx);
     expect(frames).toHaveLength(1);
-    expect(frames[0].at).toBe('app:main/store.mjs');
+    expect(frames[0].at).toBe('app:main/store.mts');
     expect(frames[0].line).toBe(142);
     expect(dropped).toBe(2);
   });
 });
 
 describe('the user\'s own words never leave', () => {
-  // main/store.mjs:142 — `no such product: ${slug}` — where the slug IS the
+  // main/store.mts:142 — `no such product: ${slug}` — where the slug IS the
   // name of the project someone is working on.
   it('redacts a value interpolated after a colon', () => {
     expect(scrubText('no such product: acme-teardown', ctx)).toBe('no such product: <value>');
@@ -90,7 +90,7 @@ describe('the check that runs before anything is written', () => {
 
   it('passes a scrubbed report', () => {
     const err = Object.assign(new Error(`ENOENT: no such file or directory, open '${HOME}/Desktop/dev/acme/notes.md'`), {
-      code: 'ENOENT', syscall: 'open', stack: `Error: x\n    at r (${APP}/main/store.mjs:1:1)`,
+      code: 'ENOENT', syscall: 'open', stack: `Error: x\n    at r (${APP}/main/store.mts:1:1)`,
     });
     expect(findPrivate(scrubError(err, ctx), ctx)).toEqual([]);
   });
@@ -126,13 +126,13 @@ describe('the check that runs before anything is written', () => {
   // The other side of the same coin. Stripping our bundle paths out before the
   // scan must not blind the scan to a leak sitting next to one.
   it('still catches a real leak in a payload that also has our own paths in it', () => {
-    const payload = { site: `app:main/store.mjs:1`, note: `failed under ${HOME}/Desktop` };
+    const payload = { site: `app:main/store.mts:1`, note: `failed under ${HOME}/Desktop` };
     expect(findPrivate(payload, ctx)).not.toHaveLength(0);
   });
 
   it('still catches the username when it is a word of its own, not our path', () => {
     const theirs = { home: '/Users/runner', username: 'runner', appDir: '/Users/runner/Astral.app' };
-    expect(findPrivate({ a: 'app:main/store.mjs', b: 'thrown by runner' }, theirs)).not.toHaveLength(0);
+    expect(findPrivate({ a: 'app:main/store.mts', b: 'thrown by runner' }, theirs)).not.toHaveLength(0);
   });
 });
 
@@ -179,7 +179,7 @@ describe('what actually lands on disk', () => {
   it('sends nothing anywhere until a destination is chosen', async () => {
     // No network client exists in this file. The seam is the only way out and
     // it is empty, which is what "nothing leaves the machine yet" means.
-    const src = fs.readFileSync(new URL('../main/crash-report.mjs', import.meta.url), 'utf8')
+    const src = fs.readFileSync(new URL('../main/crash-report.mts', import.meta.url), 'utf8')
       .replace(/^\s*\/\/.*$/gm, '');   // the comments name the candidates; the code must not
     expect(src).not.toMatch(/https?:\/\//);
     expect(src).not.toMatch(/\bfetch\(|node:https?|posthog|aptabase|sentry/i);

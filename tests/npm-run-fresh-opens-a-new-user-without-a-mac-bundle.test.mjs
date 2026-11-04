@@ -4,7 +4,7 @@
 // ~/Applications and release/" and stopped, because it looked for `Astral.app`
 // bundles and nothing else. There is no bundle to find on Linux: the app is run
 // from the checkout there. The ⌘K row "Open Agentbox as a new user" has always
-// been able to do that — `relaunchCommand` in main/fresh-user.mjs hands the app
+// been able to do that — `relaunchCommand` in main/fresh-user.mts hands the app
 // directory back to Electron for a copy that is not packaged — so the terminal
 // command was the only half that could not.
 //

@@ -16,7 +16,7 @@
 // marks the message as taken.
 import { it, expect, describe } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { attachClaudeInput } from '../main/claude-input.mjs';
+import { attachClaudeInput } from '../main/claude-input.mts';
 
 function fake() {
   const c = new EventEmitter();

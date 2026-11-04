@@ -12,7 +12,7 @@
 //   WE NEVER REWRITE config.toml. Trust goes through the app-server's own
 //   `config/batchWrite`, the call the Codex TUI uses, so Codex edits its file
 //   and every other hook's trust and every unrelated table survives. Measured
-//   live on this Mac 2026-10-04 (see main/codex-memory-gate.mjs).
+//   live on this Mac 2026-10-04 (see main/codex-memory-gate.mts).
 //
 // And one that is about not making things worse: every failure here leaves Codex
 // workers ungated, which is exactly where w-3958c3753d left them. None of it may
@@ -22,7 +22,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { syncCodexMemoryGate, hookIsOurs } from '../main/codex-memory-gate.mjs';
+import { syncCodexMemoryGate, hookIsOurs } from '../main/codex-memory-gate.mts';
 
 const SCRIPT = '/Applications/Agentbox.app/Contents/scripts/memory-gate-hook.sh';
 

@@ -7,7 +7,7 @@
 // IT CANNOT PROMISE EVERYTHING AND MUST NOT PRETEND TO. A chat's name is only
 // known once its transcript has been opened, and the Mac this was written on
 // has 29,703 of them; the existing read already stops at a time budget for
-// exactly that reason (READ_BUDGET_MS, main/agent-sessions.mjs). So the deep
+// exactly that reason (READ_BUDGET_MS, main/agent-sessions.mts). So the deep
 // read goes newest first until its own budget is spent and hands back the
 // moment it got to. "No chat with that name" over a read that gave up in
 // August is the lie this number exists to prevent.
@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readImportableThreads, readSearchableThreads, SEARCH_DAYS } from '../main/importable-threads.mjs';
+import { readImportableThreads, readSearchableThreads, SEARCH_DAYS } from '../main/importable-threads.mts';
 
 const NOW = Date.UTC(2026, 9, 15, 12, 0, 0);
 const DAY = 86400000;

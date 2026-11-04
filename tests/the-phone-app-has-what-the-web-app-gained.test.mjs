@@ -28,9 +28,8 @@ describe('an account no computer has joined', () => {
   it('is drawn in place of the inbox, with a way to another account', () => {
     const src = read('mobile/src/app/index.tsx');
     expect(read('mobile/src/state/cloud.tsx')).toMatch(/phoneConnectState\(\{ signedIn, started: !read\.first/);
-    expect(src).toMatch(/if \(c\.connect\)/);
-    expect(src).toMatch(/Connect your computer/);
-    expect(src).toMatch(/Use another account/);
+    expect(src).toMatch(/if \(c\.connect\) return <ComputerWait email=\{c\.connect\.email\} signOut=\{c\.signOut\} \/>/);
+    expect(read('mobile/src/ui/Onboarding.tsx')).toMatch(/Use another account/);
   });
 });
 
@@ -51,7 +50,7 @@ describe('a permission card over the pen', () => {
     const src = read('mobile/src/app/index.tsx');
     expect(src).toMatch(/const penUp = c\.view\.approvals\.length > 0/);
     expect(src).toMatch(/\{penUp && <IconButton label="New thread"/);
-    expect(src).toMatch(/\{!penUp && /);
+    expect(src).toMatch(/\{!picked && !penUp && /);
   });
 });
 

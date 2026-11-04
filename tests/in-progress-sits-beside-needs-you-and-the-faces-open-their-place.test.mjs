@@ -111,6 +111,7 @@ describe('In progress beside Needs you', () => {
   it('is the second word on the line, and is the same number the list draws', () => {
     expect(pages).toMatch(/team\?\.progress && <button.*onClick=\{team\.onEverything\}>In progress/);
     expect(app).toMatch(/progress: !onPhone\(\) \? \{ count: mineShown \? shownCount\(progressTab\) : 0/);
+    expect(app).toMatch(/stackRows\(\{ progress: shownAs\(progressTab, 'progress'\)/);
   });
 
   it('is what Tab goes to from Needs you, and Tab comes back', () => {

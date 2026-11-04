@@ -4,7 +4,7 @@
 // of the notes off that call are about one card. Two of them are pinned here.
 //
 // 1. A TASK INTO THE PRACTICE PROJECT WAS ACCEPTED AND NEVER RAN.Nothing was
-// broken. main/supervisor.mjs skips practice projects in four separate places
+// broken. main/supervisor.mts skips practice projects in four separate places
 // on purpose — nobody works in one and it points at no folder — and the card
 // did not know, so it took her task, filed it, and left her watching a row
 // that could never move. The status she saw flapping was the same fault from
@@ -34,7 +34,7 @@ const compose = source('../renderer/src/components/Compose.tsx');
 const app = source('../renderer/src/App.tsx');
 const css = source('../renderer/src/styles.css');
 
-// The two shapes the card ever holds, as main/store.mjs really hands them over:
+// The two shapes the card ever holds, as main/store.mts really hands them over:
 // the practice mark is written off project.json, never matched on a name.
 const practice = { name: 'Practice', practice: true };
 const real = { name: 'Kestrel' };

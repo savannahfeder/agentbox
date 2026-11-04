@@ -50,7 +50,7 @@
 // `"maxConcurrentSessions": null` is the whole of what it takes.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const ONE_ACCOUNT_HOME = '/nonexistent-home-with-no-second-account';
 const CODEX_BIN = '/nonexistent/codex/codex';

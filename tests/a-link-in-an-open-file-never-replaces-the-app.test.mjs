@@ -4,7 +4,7 @@
 // caught the click, and the app's own window has no will-navigate guard, so the
 // whole window became that website. There was no bar, no Back and no Close,
 // and you could not get back to your inbox. Measured by reading the code
-// paths: ArtifactStage drew markdown links with no handler, and main/main.mjs
+// paths: ArtifactStage drew markdown links with no handler, and main/main.mts
 // guarded only new windows (setWindowOpenHandler), not the window itself.
 //
 // Now a web link opens in a small browser over the file, with Back, the
@@ -67,7 +67,7 @@ describe('the app window stays on the app', () => {
 
 describe('both are wired in', () => {
   it('the app window stops a link that would leave and sends it to your browser', () => {
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).toMatch(/window\.webContents\.on\('will-navigate'[\s\S]{0,300}leavesTheApp\(/);
   });
 

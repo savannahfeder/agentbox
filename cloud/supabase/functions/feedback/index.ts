@@ -1,6 +1,6 @@
 // FEEDBACK FROM THE APP, FORWARDED BY EMAIL (w-1b574413db, 2026-10-04).
 //
-// The Feedback card posts here (main/feedback.mjs): what the person wrote,
+// The Feedback card posts here (main/feedback.mts): what the person wrote,
 // what they attached, and the app's version. This forwards it as one email
 // through Resend.
 //
@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
 
   const version = String(body.app?.version ?? '').slice(0, 40);
   const os = String(body.app?.os ?? '').slice(0, 80);
-  // The random install id (shared/install-id.mjs), cut to 8 characters: enough
+  // The random install id (shared/install-id.mts), cut to 8 characters: enough
   // to tell whether two emails came from one install.
   const install = String(body.app?.install ?? '').replace(/[^\w-]/g, '').slice(0, 64);
   const first = text.split('\n')[0].slice(0, 70);

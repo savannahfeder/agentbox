@@ -8,7 +8,7 @@ import { LOCAL_APP_SANDBOX, previewShows, previewStatus, useLocalPreview } from 
 import { LocalPreviewStatus } from './LocalPreviewStatus';
 import { WebsitePane, type Browsing, type PageControl } from './WebsitePane';
 import { BrowserChrome, type WebChromeKind } from './BrowserChrome';
-import { addressYouTyped, canFrameAWebsite, isWebsiteAddress } from '../../../shared/websites.mjs';
+import { addressYouTyped, canFrameAWebsite, isWebsiteAddress } from '../../../shared/websites.mts';
 // THE DOCUMENT PANE. The right half of the window is the file itself.
 //
 // The look is settled and is not a question any more.
@@ -35,7 +35,7 @@ import { addressYouTyped, canFrameAWebsite, isWebsiteAddress } from '../../../sh
 // doc-md / doc-html rather than off the theme.
 //
 // THE PANE HAS NO ZOOM OF ITS OWN, and it is not missing.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { CodeFile } from './CodeFile';
@@ -157,7 +157,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   const [failed, setFailed] = useState<string | null>(null);
   // The address the frame points at, minted by main when it resolved the file.
   // An html page is served from its own origin so its pictures load; see
-  // main/doc-scheme.mjs for why file:// could not.
+  // main/doc-scheme.mts for why file:// could not.
   const [url, setUrl] = useState<string | null>(null);
   // A local address is asked whether anything is there before the frame is
   // believed (../local-preview.ts). `attempt` gives the frame a fresh start.
@@ -224,6 +224,20 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   // halfway across the screen.
   const grip = useRef<HTMLDivElement | null>(null);
   const [dragging, setDragging] = useState(false);
+  // The card's inset differs by layout and file kind (12, 14 or 0), so the
+  // divider reads it rather than repeating every margin rule in CSS.
+  const card = useRef<HTMLDivElement | null>(null);
+  const [edge, setEdge] = useState({ x: 0, y: 0, h: 0, r: '0px' });
+  const cardX = edge.x;
+  useLayoutEffect(() => {
+    const el = card.current;
+    if (!el) return;
+    const read = () => setEdge({ x: el.offsetLeft, y: el.offsetTop, h: el.offsetHeight, r: getComputedStyle(el).borderTopLeftRadius || '0px' });
+    read();
+    const watch = new ResizeObserver(read);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, []);
   const onGripDown = (e: React.PointerEvent) => {
     e.preventDefault();
     grip.current?.setPointerCapture(e.pointerId);
@@ -232,7 +246,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   const onGripMove = (e: React.PointerEvent) => {
     if (!dragging) return;
     const body = grip.current?.closest('.body')?.getBoundingClientRect();
-    onSplit(body ? splitFromPointer(e.clientX - body.left, body.width) : splitFromPointer(e.clientX, window.innerWidth));
+    onSplit(body ? splitFromPointer(e.clientX - body.left - cardX, body.width) : splitFromPointer(e.clientX, window.innerWidth));
   };
   const endDrag = (e: React.PointerEvent) => {
     if (!dragging) return;
@@ -325,7 +339,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
       // A local app carries `doc-browsing` too: it has no kind of its own
       // (docKind answers null) and is just as much a page being browsed.
       className={`doc-pane ${paneKindClass(kind)}${browsingKind ? ' doc-browsing' : ''}${dragging ? ' dragging' : ''}`}
-      style={{ flexBasis: `${split * 100}%` }}
+      style={{ flexBasis: `${split * 100}%`, '--doc-card-x': `${cardX}px`, '--doc-card-y': `${edge.y}px`, '--doc-card-h': `${edge.h}px`, '--doc-card-r': edge.r } as React.CSSProperties}
     >
       {/* The divider. It is a 9px reach around a 1px line: a hairline is the
           right thing to see and the wrong thing to have to hit. */}
@@ -345,7 +359,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
         // a fifth position she has to know about.
         onDoubleClick={() => onSplit(OPENING_SPLIT)}
       />
-      <div className="doc-card">
+      <div ref={card} className="doc-card">
         {headerTarget ? createPortal(documentHeader, headerTarget) : documentHeader}
         {failed ? (
           <div className="doc-missing">{failed}</div>
@@ -416,7 +430,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
                 style={{opacity:frameReady ? 1 : 0}}
                 className="doc-view" src={url}
                 // ON A PHONE THE PAGE IS SERVED FROM THE APP'S OWN ADDRESS
-                // (main/serve.mjs answerFile), so same-origin would hand a page
+                // (main/serve.mts answerFile), so same-origin would hand a page
                 // an agent wrote the app's storage and its key. Opaque, it still
                 // draws its pictures: they are plain http there, not a scheme.
                 sandbox={app.local ? LOCAL_APP_SANDBOX : onPhone() ? 'allow-scripts' : 'allow-scripts allow-same-origin'} title={crumb.join('/')}

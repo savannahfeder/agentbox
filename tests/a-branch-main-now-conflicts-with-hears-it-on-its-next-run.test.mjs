@@ -9,8 +9,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ShipQueue, SHIP_LABEL } from '../main/ship-queue.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { ShipQueue, SHIP_LABEL } from '../main/ship-queue.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { conflictingBranches, git, threads } from './helpers/conflicting-branches.mjs';
 
 let repo; let userDir;

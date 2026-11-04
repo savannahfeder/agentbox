@@ -4,7 +4,7 @@
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 
 afterEach(() => vi.restoreAllMocks());
 

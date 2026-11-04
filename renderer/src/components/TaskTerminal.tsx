@@ -2,13 +2,13 @@ import React,{useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {api} from '../api';
 import {MAC} from '../this-keyboard';
-import {commandRunning,whenACommandFinishes} from '../../../shared/terminal-state.mjs';
-import {linksAtRow} from '../../../shared/terminal-links.mjs';
-import {guardInvalidRange} from '../../../shared/xterm-invalid-range.mjs';
-import {inputQueue} from '../../../shared/terminal-input.mjs';
-import {optionWordKey} from '../../../shared/terminal-keys.mjs';
-import {dragSize,readSavedSize,SIZE_KEY} from '../../../shared/terminal-size.mjs';
-import {terminalKeys} from '../../../shared/terminal-focus.mjs';
+import {commandRunning,whenACommandFinishes} from '../../../shared/terminal-state.mts';
+import {linksAtRow} from '../../../shared/terminal-links.mts';
+import {guardInvalidRange} from '../../../shared/xterm-invalid-range.mts';
+import {inputQueue} from '../../../shared/terminal-input.mts';
+import {optionWordKey} from '../../../shared/terminal-keys.mts';
+import {dragSize,readSavedSize,SIZE_KEY} from '../../../shared/terminal-size.mts';
+import {terminalKeys} from '../../../shared/terminal-focus.mts';
 import {CrossIcon} from './CrossIcon';
 import '@xterm/xterm/css/xterm.css';
 import './task-terminal.css';
@@ -30,7 +30,7 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
   /**
    * TOLD EACH TIME A COMMAND FINISHES and the shell is back at its prompt, for
    * Settings' Add account panel, which reloads the accounts when the sign in
-   * returns (shared/terminal-state.mjs, `whenACommandFinishes`). */
+   * returns (shared/terminal-state.mts, `whenACommandFinishes`). */
   onCommandFinished?:()=>void}){
   const key=JSON.stringify({product,id});
   const finished=useRef(onCommandFinished);finished.current=onCommandFinished;
@@ -56,7 +56,7 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
   const dimension=placement==='bottom'?'height':'width';
   // DRAG THE EDGE that faces the page: the top at the bottom, the left at the
   // side. The pointer is captured, so a fast drag that leaves the edge keeps
-  // going, and shared/terminal-size.mjs keeps it from swallowing the page.
+  // going, and shared/terminal-size.mts keeps it from swallowing the page.
   function drag(e:React.PointerEvent<HTMLDivElement>){
     const page=panel.current?.parentElement;if(e.button!==0||!panel.current||!page)return;
     e.preventDefault();
@@ -109,13 +109,13 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
         // AND THE CRASH THAT TREE CAN STILL THROW, now that it is only built
         // for the people using it. xterm's AccessibilityManager throws its own
         // 'invalid range' when a selection maps onto no cells, which three
-        // ordinary selections do; shared/xterm-invalid-range.mjs catches that
+        // ordinary selections do; shared/xterm-invalid-range.mts catches that
         // one message off the instance and clears the selection. Only has
         // anything to wrap when `assistive` is true, and only after open(),
         // which is when the manager exists.
         guardInvalidRange(terminal);
         // A WEB ADDRESS OPENS IN THE BROWSER on click, wrapped over rows or not
-        // (shared/terminal-links.mjs). window.open is the app's one door out:
+        // (shared/terminal-links.mts). window.open is the app's one door out:
         // main's window-open handler hands http(s) to the real browser.
         const buf=()=>terminal.buffer.active;
         const row=(y:number)=>{const line=buf().getLine(y);return line?{text:line.translateToString(!buf().getLine(y+1)?.isWrapped),wrapped:line.isWrapped}:undefined;};
@@ -126,10 +126,10 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
         const resize=()=>{if(!ready||cancelled||!host.current?.clientWidth||!host.current?.clientHeight)return;fit.fit();if(ready)void api.terminal({product,id,action:'resize',cols:Math.max(2,Math.min(500,terminal.cols)),rows:Math.max(2,Math.min(300,terminal.rows))}).catch(report);};
         const observer=new ResizeObserver(resize);observer.observe(host.current);
         // Keys typed while one write travels go out together as the next
-        // (shared/terminal-input.mjs), so holding Delete never builds a queue.
+        // (shared/terminal-input.mts), so holding Delete never builds a queue.
         const input=inputQueue(data=>api.terminal({product,id,action:'write',data}),{onError:report});
         const subscription=terminal.onData(data=>input.push(data));
-        // Option+Left/Right jump a word, as in Mac Terminal (shared/terminal-keys.mjs).
+        // Option+Left/Right jump a word, as in Mac Terminal (shared/terminal-keys.mts).
         const mac=MAC;
         terminal.attachCustomKeyEventHandler(event=>{const sequence=optionWordKey(event,mac);if(sequence===undefined)return true;if(sequence)input.push(sequence);event.preventDefault();return false;});
         dispose=()=>{if(ready)screenCache.set(key,{token,screen:serializer.serialize({scrollback:1000}),offset,cols:terminal.cols,rows:terminal.rows});observer.disconnect();subscription.dispose();terminal.dispose();};
@@ -141,7 +141,7 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
         await consume(initial);ready=true;resize();if(takeKeys)terminal.focus();
         // EACH READ WAITS IN MAIN for the shell's next output and comes back the
         // moment there is some, so an echo is on screen as soon as the shell
-        // prints it (main/task-terminals.mjs, `read`). A main that cannot wait
+        // prints it (main/task-terminals.mts, `read`). A main that cannot wait
         // answers without `live`, and the old 150ms poll carries on.
         const poll=async()=>{try{const state=await api.terminal({product,id,action:'read',offset,wait:1000});await consume(state);if(!cancelled)timer=setTimeout(poll,state.live?0:150);}catch(e){report(e);}};
         timer=setTimeout(poll,0);
@@ -198,7 +198,7 @@ export function TerminalToolbar({cwd,processName,exited,placement,onStop,onEnd,o
     <span className="task-terminal-controls">
       <span className="task-terminal-process">{processName}</span>
       {/* ONE NAMES A COMMAND AND ONE NAMES THE SHELL, and only one of them is
-          usually on screen. See ../../../shared/terminal-state.mjs for her report and the rule. */}
+          usually on screen. See ../../../shared/terminal-state.mts for her report and the rule. */}
       {running&&<button className="task-terminal-word" title={`Stop ${processName} (Ctrl+C). The shell stays open.`} onClick={onStop}>Stop command</button>}
       <button className="task-terminal-word" title="End this shell and everything it started. The terminal closes." onClick={onEnd}>End shell</button>
       <button className="task-terminal-icon" aria-label={placement==='bottom'?'Move terminal to side':'Move terminal to bottom'} title={placement==='bottom'?'Move to side':'Move to bottom'} onClick={onPlacement}>

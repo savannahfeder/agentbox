@@ -18,8 +18,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createServer, newToken, fileKey } from '../main/serve.mjs';
-import { pictureShape } from '../main/picture-shape.mjs';
+import { createServer, newToken, fileKey } from '../main/serve.mts';
+import { pictureShape } from '../main/picture-shape.mts';
 import { askShape, shapeOf } from '../renderer/src/phone-files.ts';
 
 const u16be = (n) => [(n >> 8) & 255, n & 255];

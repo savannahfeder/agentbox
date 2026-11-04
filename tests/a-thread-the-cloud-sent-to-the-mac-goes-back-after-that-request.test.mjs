@@ -16,9 +16,9 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
-import { KEEP_ON_MAC, IMPORT_FAILED } from '../main/cloud/run.mjs';
+import { KEEP_ON_MAC, IMPORT_FAILED } from '../main/cloud/run.mts';
 
 const product = { slug: 'p', dir: '', repoPath: '/r' };
 const dirs = [];
@@ -158,7 +158,7 @@ describe('a supervisor built without its saved state', () => {
 
 describe('the plumbing', () => {
   it('spends the move where every run ends, after the run is judged', () => {
-    const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     const spend = src.indexOf('this._spendMoveToMac(item, session)');
     expect(spend).toBeGreaterThan(src.indexOf('session.exitFailed = !!('));
     expect(spend).toBeGreaterThan(src.indexOf('this._cloudKeptOnMac(item, session, code, signal)'));

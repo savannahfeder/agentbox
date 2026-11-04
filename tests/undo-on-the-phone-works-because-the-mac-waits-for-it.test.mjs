@@ -10,8 +10,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createPhoneInbox } from '../main/phone-inbox.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createPhoneInbox } from '../main/phone-inbox.mts';
 import { heldForUndo, PHONE_UNDO_HOLD_MS, PHONE_UNDO_MS } from '../shared/phone-undo.mjs';
 import { TOAST_GOES_MS } from '../mobile/src/lib/overlays';
 

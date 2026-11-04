@@ -4,7 +4,7 @@
 // assign a particular task to ... Routing should probably just be done
 // automatically." A thread sent To Auto is made at once, carrying the `auto`
 // label, and nothing starts it while it has that label. The supervisor asks the
-// small model one question about it (main/supervisor.mjs `routeTheThreads`):
+// small model one question about it (main/supervisor.mts `routeTheThreads`):
 // which of these teammates does this belong to, or none. The answer only ever
 // changes who the thread is for, by its labels. The person's words go through
 // as written, and nothing writes instructions to the teammate: an agent in the

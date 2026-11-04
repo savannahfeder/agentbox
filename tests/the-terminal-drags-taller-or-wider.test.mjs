@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import postcss from 'postcss';
-import { dragSize, readSavedSize, TERMINAL_MIN } from '../shared/terminal-size.mjs';
+import { dragSize, readSavedSize, TERMINAL_MIN } from '../shared/terminal-size.mts';
 
 describe('dragging the edge', () => {
   it('grows by exactly as far as the edge moved', () => {

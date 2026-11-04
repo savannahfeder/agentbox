@@ -27,11 +27,11 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { CHROME as BROWSER, guard, sweep } from './lib/chrome-guard.mjs';
-import { answerFor } from '../main/first-run.mjs';
-import { EXAMPLES } from '../shared/first-run-examples.mjs';
+import { answerFor } from '../main/first-run.mts';
+import { EXAMPLES } from '../shared/first-run-examples.mts';
 import {
   PRACTICE_ANSWER, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG, PRACTICE_TASK_TRACE,
-} from '../shared/first-run-practice.mjs';
+} from '../shared/first-run-practice.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'renderer', 'dist-fr');
@@ -151,7 +151,7 @@ await call('Page.addScriptToEvaluateOnNewDocument', {
        The log: HH:MM:SS then TWO spaces then the line, which is what
        traceStreamLine writes and what item-thread.ts parses.
        THE CLOCK IS UTC AND IT IS FLOORED TO THE SECOND, for the same two
-       reasons main/store.mjs is: momentOf reads those digits as UTC and puts
+       reasons main/store.mts is: momentOf reads those digits as UTC and puts
        the date back, and it adds a whole day if the line lands even a
        millisecond before the session started. Shot with a local clock on
        2026-08-24 and the pane printed Mon, Aug 24 3:38pm under a result
@@ -171,7 +171,7 @@ await call('Page.addScriptToEvaluateOnNewDocument', {
           // AFTER THE RUN, not one second after the claim: the thread sorts by
           // stamp, so a result written before the last line of the run prints
           // the conclusion in the middle of the work. Same arithmetic as
-          // stagePracticeRows in main/store.mjs.
+          // stagePracticeRows in main/store.mts.
           { id, ts: o.at + 1000 + o.trace.length * 9000 + 1000, source: 'agent', patch: { result: o.result } },
         ],
         sessions: [{
@@ -194,7 +194,7 @@ await call('Page.addScriptToEvaluateOnNewDocument', {
       // that is what she opened on the round three page.
       //
       // A STUB THAT ANSWERS EMPTY IS A HARNESS THAT CANNOT SHOW THE FEATURE.
-      // These now build the exact two files main/store.mjs writes: the ledger
+      // These now build the exact two files main/store.mts writes: the ledger
       // lines (stagePracticeRows) and the session log (writePracticeTrace),
       // off the same shared module. So the pane draws them with the app's own
       // components and nothing here is a mock of a thread.
@@ -285,7 +285,7 @@ await call('Page.addScriptToEvaluateOnNewDocument', {
         // the row is working and nothing about what is drawn.
         await new Promise((r) => setTimeout(r, ${Number(process.env.HOLD ?? 2500)}));
         // THE PRACTICE PROJECT ANSWERS WITH ITS OWN PRE-WRITTEN LINE
-        // (main/store.mjs finishFirstRunTask). The readme read is what a REAL
+        // (main/store.mts finishFirstRunTask). The readme read is what a REAL
         // project's first task gets, and the walk no longer sends one there.
         const line = p.product === ${JSON.stringify(PRACTICE_SLUG)}
           ? ${JSON.stringify(PRACTICE_ANSWER)}
@@ -316,7 +316,7 @@ await call('Page.addScriptToEvaluateOnNewDocument', {
       chooseFolder: async () => ({ path: ${JSON.stringify(folder)} }),
       folderExists: async () => ({ exists: true }),
       // MAKING THE PROJECT COMPOSES A DIRECTIVE, the way the real store does
-      // (main/store.mjs createProduct). That row is the one that started eight
+      // (main/store.mts createProduct). That row is the one that started eight
       // seconds ahead of her example task, and it is the row the list must not
       // show her while the walk is up.
       createProduct: async (p) => {
@@ -334,7 +334,7 @@ await call('Page.addScriptToEvaluateOnNewDocument', {
         };
         return { slug: 'agentbox-v2' };
       },
-      // THE PRACTICE PROJECT, MADE THE WAY main/store.mjs MAKES IT.So the
+      // THE PRACTICE PROJECT, MADE THE WAY main/store.mts MAKES IT.So the
       // harness makes a REAL second product in the snapshot with the three rows
       // already in it, and everything after this beat is the app scoped to it.
       firstRunPractice: async () => {
@@ -378,7 +378,7 @@ await call('Page.addScriptToEvaluateOnNewDocument', {
         return { archived: 1 };
       },
       importAgents: async (p) => { stamp('importAgents', { agents: p.agents }); return { filed: 0 }; },
-      // BEAT NINE'S THREE ROWS, written the way main/store.mjs writes them:
+      // BEAT NINE'S THREE ROWS, written the way main/store.mts writes them:
       // her half at the moment they claim to have landed, the agent's half a
       // second later, which is what puts a row in her inbox at all
       // (answeredHerAsk, renderer/src/list-rules.ts).
@@ -390,7 +390,7 @@ await call('Page.addScriptToEvaluateOnNewDocument', {
         // saying what they used to say. the titles now open with "Example:"
         // and the first shot after that change still showed the old ones. They
         // come off the shared module now, which is the same file
-        // main/store.mjs writes the real rows from.
+        // main/store.mts writes the real rows from.
         const made = ${JSON.stringify(EXAMPLES.map((e, i) => ({
           id: `w-ex${i + 1}`, kind: e.kind, ago: e.agoMs, title: e.title, result: e.result,
         })))}.map((o) => ({
@@ -424,7 +424,7 @@ await call('Page.addScriptToEvaluateOnNewDocument', {
       },
       // SNOOZING, which is what S does and what beat fourteen asks for. The
       // moment goes on the row's runAt, which is where the real one goes
-      // (main/ipc.mjs, schedule), so the row really leaves the inbox by the
+      // (main/ipc.mts, schedule), so the row really leaves the inbox by the
       // app's own rule (belongsInInbox) rather than being hidden by the
       // harness.
       schedule: async (p) => {

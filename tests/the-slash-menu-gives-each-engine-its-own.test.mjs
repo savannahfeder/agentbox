@@ -1,4 +1,4 @@
-import { providerCommands, CODEX_COMMANDS } from '../shared/provider-commands.mjs';
+import { providerCommands, CODEX_COMMANDS } from '../shared/provider-commands.mts';
 // THE MENU WENT ON OFFERING CLAUDE CODE'S COMMANDS AFTER CODEX CAME BACK.
 //
 // `slashRows` took a third argument, `commands`, from the day the eight landed,
@@ -14,7 +14,7 @@ import { providerCommands, CODEX_COMMANDS } from '../shared/provider-commands.mj
 // Measured off the source, 2026-09-04:
 //
 // THE EIGHT COMMANDS. `commandPrompt` is asked with no engine in the question
-// (`main/supervisor.mjs`: `const command = continuation ?
+// (`main/supervisor.mts`: `const command = continuation ?
 // commandPrompt(item.answer): null`), so picking `/context` on a Codex row
 // makes `/context` the whole prompt, and `_spawnCodexWorker` hands
 // `plan.prompt` straight to `turnParams.input`. Codex has no `/context`,
@@ -55,12 +55,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
-import { CLAUDE_COMMANDS } from '../shared/claude-commands.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { CLAUDE_COMMANDS } from '../shared/claude-commands.mts';
 import { DEFAULT_ENGINE } from '../shared/engines.mjs';
 import { slashRows } from '../renderer/src/slash-menu.ts';
 import { MODE_ORDER } from '../renderer/src/modes.ts';
-import { WORKER_APPROVAL_POLICY, WORKER_SANDBOX } from '../main/codex-session.mjs';
+import { WORKER_APPROVAL_POLICY, WORKER_SANDBOX } from '../main/codex-session.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -168,7 +168,7 @@ describe('what reaches the CLI on each engine', () => {
     s.buildBrief = () => 'THE BRIEF';
     s.resumeBrief = () => 'THE RESUME BRIEF';
     s.store = { listProducts: () => [acme()] };
-    // The model check is main/codex-models.mjs's job and has its own file; this
+    // The model check is main/codex-models.mts's job and has its own file; this
     // one is about the mode and the command.
     s.codexModelRefusal = () => null;
     return Object.assign(s, over);

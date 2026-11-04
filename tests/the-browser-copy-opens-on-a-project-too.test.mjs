@@ -6,10 +6,10 @@
 // project menu offers nothing but New project. It is the whole of w-f8d123be62
 // again, on the other front door.
 //
-// `ensurePersonalProject` was put in main/main.mjs so a Mac with no team cloud
+// `ensurePersonalProject` was put in main/main.mts so a Mac with no team cloud
 // got My Workspace too (tests/there-is-always-a-project-to-send-to). The
-// browser copy does not boot through main.mjs: it boots through `bootHeadless`
-// in main/serve.mjs, which never called it. So the call that exists to make
+// browser copy does not boot through main.mts: it boots through `bootHeadless`
+// in main/serve.mts, which never called it. So the call that exists to make
 // "No project" unreachable was on one of the two doors.
 //
 // This boots the real headless app on a throwaway store and reads what is on
@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bootHeadless } from '../main/serve.mjs';
+import { bootHeadless } from '../main/serve.mts';
 import { projectsOffered, startingProject } from '../renderer/src/threads/composer-rules';
 import { noProjectYet } from '../renderer/src/compose-says';
 
@@ -38,7 +38,7 @@ async function freshCopy() {
   return bootHeadless({ dataDir: dir, appDir: repoRoot, userDir: dir });
 }
 
-/** The projects the window reads, as main/ipc.mjs reads them off disk. */
+/** The projects the window reads, as main/ipc.mts reads them off disk. */
 function productsOn(accountRoot) {
   return fs.readdirSync(accountRoot).sort().flatMap((slug) => {
     const file = path.join(accountRoot, slug, 'project.json');
@@ -75,9 +75,9 @@ describe('both front doors make it, and neither waits for the store', () => {
   // THE REGRESSION THIS GUARDS, and why it is read as source. A second door
   // added later is a second place to forget, and the forgetting has no symptom
   // on the door somebody tested. The order matters for the same reason it does
-  // in main.mjs: the store reads the account root as it opens, so a project
+  // in main.mts: the store reads the account root as it opens, so a project
   // made after that is a project the first snapshot does not carry.
-  const serveSrc = fs.readFileSync(path.join(repoRoot, 'main', 'serve.mjs'), 'utf8');
+  const serveSrc = fs.readFileSync(path.join(repoRoot, 'main', 'serve.mts'), 'utf8');
 
   it('is called in bootHeadless, which is how npx starts the app', () => {
     expect(serveSrc).toMatch(/ensurePersonalProject\(/);

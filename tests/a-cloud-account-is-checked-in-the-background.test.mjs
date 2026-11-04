@@ -66,7 +66,7 @@ describe('telling her at the right time, once she has left the setup', () => {
 // one being checked included, and gave that one back instead of a new one.
 describe('another account while one is being checked', () => {
   it('starts, and only one still waiting on her holds a second back', () => {
-    const sup = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const sup = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     const rule = sup.slice(sup.indexOf('// One sign-in at a time per engine'), sup.indexOf('// Taken at once, so a second Start'));
     expect(rule).toMatch(/\['starting', 'needs-code', 'waiting'\]\.includes\(f\.status\(\)\.state\)/);
     expect(rule).not.toMatch(/'saved', 'failed'/);

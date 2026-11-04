@@ -3,7 +3,7 @@
 // unsupported, or timed-out CLI cannot linger or return an invented reading.
 import { expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
-import { runClaudeUsage } from '../main/claude-usage-process.mjs';
+import { runClaudeUsage } from '../main/claude-usage-process.mts';
 
 const fixture = fileURLToPath(new URL('./fixtures/usage-control-cli.mjs', import.meta.url));
 function read(mode = '') {

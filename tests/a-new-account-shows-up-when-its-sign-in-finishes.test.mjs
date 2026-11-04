@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { whenACommandFinishes } from '../shared/terminal-state.mjs';
+import { whenACommandFinishes } from '../shared/terminal-state.mts';
 
 describe('when a command finishes', () => {
   it('fires once, as the sign in hands back to the prompt', () => {

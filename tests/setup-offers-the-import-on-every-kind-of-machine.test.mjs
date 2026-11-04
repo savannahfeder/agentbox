@@ -7,7 +7,7 @@
 // is handed at least one session that is not already in the inbox; otherwise
 // the walk skips it and the person never learns importing exists. Those
 // sessions come from `zero:agent-threads`, which is `readImportableThreads`
-// (main/importable-threads.mjs) plus `markImported`. This file runs that exact
+// (main/importable-threads.mts) plus `markImported`. This file runs that exact
 // chain, start to finish, on one made-up machine per way people actually run
 // their agents, as a brand new user has it: no agent files, nothing imported.
 //
@@ -24,8 +24,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readImportableThreads } from '../main/importable-threads.mjs';
-import { markImported } from '../shared/agent-import.mjs';
+import { readImportableThreads } from '../main/importable-threads.mts';
+import { markImported } from '../shared/agent-import.mts';
 
 const NOW = Date.UTC(2026, 9, 11, 18, 0, 0);
 const DAY = 86400000;
@@ -162,7 +162,7 @@ describe('setup goes straight on, and the card stays off', () => {
 });
 
 // THE TWO GAPS THIS FILE FIRST PINNED, CLOSED on the founder's pick
-// (2026-10-11): main/importable-threads.mjs and main/shell-path.mjs.
+// (2026-10-11): main/importable-threads.mts and main/shell-path.mjs.
 describe('setup also shows the import card', () => {
   it('when the newest session is eleven days old', async () => {
     claudeSession(path.join(home, '.claude'), { when: NOW - 11 * DAY });

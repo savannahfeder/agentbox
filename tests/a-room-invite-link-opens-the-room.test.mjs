@@ -2,7 +2,7 @@
 //
 // Rooms are joined from a link: the web address people share, the app's own
 // scheme that page opens, or the link pasted into Find rooms. Measured on the
-// parsing rule, and on main/main.mjs's text: only the installed app takes the
+// parsing rule, and on main/main.mts's text: only the installed app takes the
 // scheme (run from source it would point every link on the Mac at a
 // checkout's Electron), and a link that arrives before the window is up is
 // held for it rather than dropped.
@@ -39,7 +39,7 @@ describe('what counts as an invite link', () => {
 });
 
 describe('the app takes the link', () => {
-  const main = fs.readFileSync(path.join(import.meta.dirname, '..', 'main', 'main.mjs'), 'utf8');
+  const main = fs.readFileSync(path.join(import.meta.dirname, '..', 'main', 'main.mts'), 'utf8');
   it('only the installed app registers the scheme', () => {
     expect(main).toMatch(/if \(app\.isPackaged\) app\.setAsDefaultProtocolClient\(JOIN_SCHEME\)/);
     expect(main.match(/setAsDefaultProtocolClient/g)).toHaveLength(1);

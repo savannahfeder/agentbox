@@ -5,7 +5,7 @@
 // was to hand the server a database session, and nothing in the app did. This
 // is the app's half. A Google sign-in is traded once for a cloud key, kept at
 // ~/.agentbox/cloud-key; the Mac's cloud.json then names the server, so its
-// runs go there (main/cloud/clients.mjs). The owner's own AWS setup is never
+// runs go there (main/cloud/clients.mts). The owner's own AWS setup is never
 // replaced by it, and signing out lets the key go on the server too.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -13,7 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { cloudAccountConfig, currentCloudTerms, signInToCloud, signOutOfCloud } from '../main/cloud/account.mjs';
+import { cloudAccountConfig, currentCloudTerms, signInToCloud, signOutOfCloud } from '../main/cloud/account.mts';
 import { cloudConfigPath, cloudKeyPath, readCloudConfig, readCloudKey } from '../main/cloud/config.mjs';
 import { CLOUD_ADDRESS } from '../shared/cloud-address.mjs';
 

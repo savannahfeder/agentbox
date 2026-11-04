@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ClaudeUsage, usageCwd } from '../main/claude-usage.mjs';
+import { ClaudeUsage, usageCwd } from '../main/claude-usage.mts';
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (f) => fs.readFileSync(path.join(repo, f), 'utf8');
@@ -62,11 +62,11 @@ describe('the usage reading', () => {
 
 describe('every Claude Code the app starts for itself names its working directory', () => {
   it('the usage reader', () => {
-    expect(read('main/claude-usage.mjs')).toMatch(/cwd:\s*this\._where\(\)/);
+    expect(read('main/claude-usage.mts')).toMatch(/cwd:\s*this\._where\(\)/);
   });
 
   it('the agent list', () => {
-    expect(read('main/agents.mjs')).toMatch(/cwd:\s*os\.tmpdir\(\)/);
+    expect(read('main/agents.mts')).toMatch(/cwd:\s*os\.tmpdir\(\)/);
   });
 
   it('and a worker, which runs in its own project', () => {
@@ -74,10 +74,10 @@ describe('every Claude Code the app starts for itself names its working director
     // boundary so a lost cwd cannot quietly make Claude start at disk root.
     // 2026-10-08: the binary is named by the definition now, not written here.
     // 2026-11-01: a local worker can start through the run host too, and both ways name it.
-    const src = read('main/harnesses/claude.mjs');
-    expect(src).toContain('const bin = sup.config[definition.binKey];');
-    expect(src).toMatch(/return spawn\(bin, argv, \{ cwd,/);
+    const src = read('main/harnesses/claude.mts');
+    expect(src).toMatch(/const bin = sup\.config\[definition\.binKey[^\]]*\];/);
+    expect(src).toMatch(/return spawn\(bin!?, argv, \{ cwd,/);
     expect(src).toMatch(/new HostedRun\(\{[^\n]*start: \{ bin, argv, env: runEnv, cwd,/);
-    expect(read('main/supervisor.mjs')).toMatch(/harness\.spawn\(this, plan, \{ cwd,/);
+    expect(read('main/supervisor.mts')).toMatch(/harness\.spawn\(this, plan, \{ cwd,/);
   });
 });

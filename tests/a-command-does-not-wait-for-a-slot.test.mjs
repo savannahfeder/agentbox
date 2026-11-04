@@ -15,7 +15,7 @@
 // guard, and it is the one that matters if this file ever has to be believed.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 // A MAC WITH ONE CLAUDE LOGIN ON IT. Since 2026-08-31 the fleet's account list
 // is what is signed in on the disk and not only what the config names
@@ -121,7 +121,7 @@ describe('a command sent into a full fleet', () => {
   // A slash mid-sentence is a path or a date, and a word that is not one of the
   // eight is not a command at all. Both are ordinary replies and both queue.
   it('does not open the door to anything that merely starts with a slash', async () => {
-    for (const reply of ['/deploy the branch', 'ship it, see main/supervisor.mjs', '/review']) {
+    for (const reply of ['/deploy the branch', 'ship it, see main/supervisor.mts', '/review']) {
       build([answered('w-not-a-command', reply)], 1);
       fill(1);
       await sup.tick();

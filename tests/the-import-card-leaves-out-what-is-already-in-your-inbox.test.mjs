@@ -14,7 +14,7 @@
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { markImported } from '../shared/agent-import.mjs';
+import { markImported } from '../shared/agent-import.mts';
 import { CARD } from '../renderer/src/agent-import-card';
 
 const t = (id, source = 'codex') => ({ id, source, title: `t ${id}`, folder: '/w', when: 1 });
@@ -54,7 +54,7 @@ describe('which conversations are already in', () => {
 
 describe('the card', () => {
   const card = fs.readFileSync(new URL('../renderer/src/components/ImportAgents.tsx', import.meta.url), 'utf8');
-  const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+  const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
 
   it('is handed the mark by the main process', () => {
     const handler = ipc.slice(ipc.indexOf("ipcMain.handle('zero:agent-threads'"), ipc.indexOf("ipcMain.handle('zero:import-threads'"));

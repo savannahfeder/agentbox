@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Repeats } from '../main/repeats.mjs';
-import { loadStore } from '../main/store-modules.mjs';
+import { loadStore } from '../main/store-modules.mts';
 import { isOwed, nextRunAt } from '../shared/repeats.mjs';
 
 let dir, repeats;
@@ -94,10 +94,10 @@ describe('the way there', () => {
   const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
 
   it('the handler and the store pass it through', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     const handler = ipc.slice(ipc.indexOf("ipcMain.handle('zero:compose-repeat'"), ipc.indexOf("ipcMain.handle('zero:set-repeat'"));
     expect(handler).toMatch(/startsNext/);
-    expect(read('main/store.mjs')).toMatch(/composeRepeat\(slug, \{[^}]*startsNext/);
+    expect(read('main/store.mts')).toMatch(/composeRepeat\(slug(?:: string)?, \{[^}]*startsNext/);
   });
 
   it('the app asks for it when the repeat is made from a thread', () => {

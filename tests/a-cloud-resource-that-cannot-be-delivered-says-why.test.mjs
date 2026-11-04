@@ -13,7 +13,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createResourceRequests } from '../main/cloud/resources.mjs';
+import { createResourceRequests } from '../main/cloud/resources.mts';
 import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
 
 let root; let options; let lines;

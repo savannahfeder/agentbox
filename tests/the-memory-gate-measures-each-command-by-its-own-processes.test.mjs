@@ -18,8 +18,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { MemoryGateServer, etimeSeconds } from '../main/memory-gate-server.mjs';
-import { CommandHistory } from '../main/memory-gate-history.mjs';
+import { MemoryGateServer, etimeSeconds } from '../main/memory-gate-server.mts';
+import { CommandHistory } from '../main/memory-gate-history.mts';
 
 const dirs = [];
 const servers = [];

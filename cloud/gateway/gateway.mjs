@@ -352,6 +352,13 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw bad('no payload');
     const sent = { ...payload };
     if (sent.login && typeof sent.login === 'object') sent.login = { ...sent.login, url: await loginLink(person, sent.login.url, 'get') };
+    // What a run carries besides its own login, each named the same way. One
+    // that names nothing of this person's is left out; the run starts without it.
+    const linked = async (list) => (await Promise.all(list.map(async (x) => {
+      try { return { ...x, url: await loginLink(person, x?.url, 'get') }; } catch { return null; }
+    }))).filter(Boolean);
+    if (Array.isArray(sent.also)) sent.also = await linked(sent.also);
+    if (Array.isArray(sent.keys)) sent.keys = await linked(sent.keys);
     if ('loginUrl' in sent) sent.loginUrl = await loginLink(person, sent.loginUrl, 'get');
     if ('saveUrl' in sent) {
       if (!SAVES_A_SIGNIN.has(sent.action)) throw bad('a sign-in is saved only by a sign-in');
@@ -422,8 +429,11 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (!['get', 'put', 'head'].includes(op)) throw bad('op is get, put or head');
     const scoped = scopedKey(person, key);
     if (!scoped) throw bad('a key is a run\'s or a sign-in\'s, inside your own space');
-    // A sign-in is written only by the sandbox, on a link the server makes.
-    if (op !== 'head' && key.startsWith('logins/')) throw new Refusal(403, 'not-yours-to-touch', 'a sign-in is never read or written from a Mac');
+    // A sign-in is written only by the sandbox, on a link the server makes. A
+    // key saved for cloud runs is written by the Mac it was pasted on, and
+    // read back by nothing but a run.
+    const savesAKey = op === 'put' && /^logins\/keys\/[A-Za-z0-9-]{8,64}\.json$/.test(key);
+    if (op !== 'head' && key.startsWith('logins/') && !savesAKey) throw new Refusal(403, 'not-yours-to-touch', 'a sign-in is never read or written from a Mac');
     const s = Math.min(LINK_MAX_SECONDS, Math.max(60, Number(seconds) || LINK_MAX_SECONDS));
     if (op === 'put') {
       if (!planOf(rec).agents) throw new Refusal(403, 'plan', 'Choose a cloud plan to run agents there.');

@@ -1,5 +1,5 @@
 // Feedback from a phone, the web app's and the phone app's alike: the same
-// server function the Mac's card posts to (main/feedback.mjs), on the cloud
+// server function the Mac's card posts to (main/feedback.mts), on the cloud
 // the phone was built for.
 import { feedbackPayload, sendFeedback } from '../../shared/feedback.mjs';
 

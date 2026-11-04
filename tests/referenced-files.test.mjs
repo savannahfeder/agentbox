@@ -87,7 +87,7 @@ describe('a path written out in full', () => {
   });
 
   it('leaves our own machinery alone: scratch files and source trees', () => {
-    const body = 'I wrote /tmp/zero-restart.sh and edited /Users/you/Desktop/dev/zero/main/ipc.mjs.';
+    const body = 'I wrote /tmp/zero-restart.sh and edited /Users/you/Desktop/dev/zero/main/ipc.mts.';
     expect(referencedFiles(body, { dir: DIR })).toEqual([]);
   });
 

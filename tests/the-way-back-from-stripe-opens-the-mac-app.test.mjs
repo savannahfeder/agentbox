@@ -2,7 +2,7 @@
 //
 // A tester paid for Cloud Pro and pressed "Back to Agentbox" on Stripe's last
 // page, and nothing happened. The button is a link on the app's own scheme,
-// and main.mjs asks macOS to hand that scheme to the app with
+// and main.mts asks macOS to hand that scheme to the app with
 // setAsDefaultProtocolClient. On macOS that call only works for a scheme the
 // app's Info.plist declares (CFBundleURLTypes), and package.json's build block
 // declared none, so the call did nothing and so did every link on the scheme,

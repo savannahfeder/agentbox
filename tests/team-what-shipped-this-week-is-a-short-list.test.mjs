@@ -14,7 +14,7 @@ import { shippedThisWeek, shippedWords } from '../renderer/src/team/shipped.ts';
 import { statusCell } from '../renderer/src/status-word.ts';
 import { threadMenuRows } from '../renderer/src/threads/ThreadMenu.tsx';
 import { threadCommands } from '../renderer/src/thread-commands.ts';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 
 const DAY = 86_400_000;
 const now = new Date(2026, 9, 30, 15).getTime();
@@ -51,9 +51,9 @@ describe('the ledger keeps the mark', () => {
     expect(() => folded(-3)).toThrow();
   });
   it('a person’s edit may set it, and it is never a word to the agent', () => {
-    const store = readFileSync(new URL('../main/store.mjs', import.meta.url), 'utf8');
+    const store = readFileSync(new URL('../main/store.mts', import.meta.url), 'utf8');
     expect(store).toMatch(/const fields = \[[^\]]*'shippedAt'/);
-    const sup = readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const sup = readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     expect(sup).toMatch(/NOT_A_WORD = new Set\(\[[^\]]*'shippedAt'/);
   });
 });

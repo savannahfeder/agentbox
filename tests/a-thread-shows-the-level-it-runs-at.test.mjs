@@ -24,7 +24,7 @@
 // on both, as Medium.
 //
 // A conversation with a person is the one exception: the level on it is the
-// message sorter's (main/message-priority.mjs), written as an agent on
+// message sorter's (main/message-priority.mts), written as an agent on
 // purpose, and a conversation never spawns, so it keeps the number it carries.
 import { describe, it, expect } from 'vitest';
 import { isUrgent, itemPriority, shownPriority } from '../shared/rank.mjs';

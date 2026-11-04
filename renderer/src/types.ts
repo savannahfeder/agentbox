@@ -145,23 +145,23 @@ export interface Product {
   // Null on a project that has never been given one, and that is what makes
   // `ProductMark` draw its burst instead. Resolved by `listProducts` against the
   // file on disk, so a picture she has since deleted goes back to the burst
-  // rather than drawing as a broken image (main/project-identity.mjs).
+  // rather than drawing as a broken image (main/project-identity.mts).
   logo?: string | null;
   // THE PRACTICE PROJECT SAYS SO ABOUT ITSELF. Read off project.json by
-  // `listProducts` (main/store.mjs) rather than matched on a name, because
+  // `listProducts` (main/store.mts) rather than matched on a name, because
   // "Practice" is a name somebody could reasonably give a real project of their
   // own, and what turns on this flag — never running an agent in it, drawing a
   // band over it, never being the project the compose card opens on — must
   // never happen to real work. Optional because every fixture in this repo
   // predates it and none of them is a practice project.
   //
-  // main/store.mjs has written it since; it simply had no mirror on this side,
+  // main/store.mts has written it since; it simply had no mirror on this side,
   // so the renderer could not see the one fact that decides whether a task sent
   // into a project will ever run. The compose card reads it (compose-says.ts),
   // because the supervisor refuses to start a session in a practice project on
   // purpose and the card used to take the task anyway.
   practice?: boolean;
-  // YOUR PERSONAL PROJECT (main/team/projects.mjs, w-b989839656): a thread in
+  // YOUR PERSONAL PROJECT (main/team/projects.mts, w-b989839656): a thread in
   // it with no visibility of its own is Only you, and it is never shared.
   personal?: boolean;
   // WHO SEES THIS PROJECT'S THREADS on the Team page (w-b989839656):
@@ -169,9 +169,9 @@ export interface Product {
   // the team. shared/thread-cards.mjs projectSeenBy is the one reading of it.
   seenBy?: 'private' | 'team' | 'people';
   seenByPeople?: string[];
-  // SHARED OR PRIVATE (main/team/projects.mjs). Null or absent is private.
+  // SHARED OR PRIVATE (main/team/projects.mts). Null or absent is private.
   // `direct` marks the record a message between two people lives in, which is
-  // not a project and holds no work (main/team/projects.mjs makeDirect).
+  // not a project and holds no work (main/team/projects.mts makeDirect).
   team?: { projectId: string; teamId: string | null; visibility: 'team' | 'people'; people: string[]; sharedBy: string | null; direct?: boolean } | null;
 }
 
@@ -436,7 +436,7 @@ export interface ThreadCard {
   task?: { from: string | null; dueAt?: number; clock?: boolean };
 }
 
-/** The team, as the main process sees it (main/team/index.mjs). */
+/** The team, as the main process sees it (main/team/index.mts). */
 export interface TeamInvite {
   teamId: string;
   teamName: string;
@@ -481,11 +481,11 @@ export interface TeamState {
   seen?: Record<string, Record<string, number>>;
   lastSyncAt: number | null;
   error: string | null;
-  /** Rooms (alpha), while switched on in Alpha features (main/team/rooms.mjs). */
+  /** Rooms (alpha), while switched on in Alpha features (main/team/rooms.mts). */
   rooms?: RoomsState | null;
 }
 
-/** One person's card on a room's wall (shared/room-cards.mjs wallCards). */
+/** One person's card on a room's wall (shared/room-cards.mts wallCards). */
 export interface RoomCard {
   id: string;
   me: boolean;
@@ -495,7 +495,6 @@ export interface RoomCard {
   bio: string | null;
   /** Null when they hid it. */
   agents: number | null;
-  level: number | null;
   hoursTotal: number;
   hoursWeek: number;
   hoursToday: number;
@@ -575,6 +574,7 @@ export interface RoomProfile {
   bio: string | null;
   show_working: 'none' | 'team' | 'everyone';
   show_agents: boolean;
+  /** Named for the level it once showed; it hides your agent hours. */
   show_level: boolean;
   show_status: boolean;
   show_activity?: boolean;
@@ -631,7 +631,7 @@ export interface RoomsState {
   error: string | null;
 }
 
-// TEAMMATES (main/teammates.mjs): agents with a standing job, and the one team
+// TEAMMATES (main/teammates.mts): agents with a standing job, and the one team
 // chat they and you write to.
 export interface TeammateMemory { id: string; text: string; from: string | null; at: number; by?: string | null }
 export interface TeammateWorks { every: 'day' | 'weekday' | 'week'; at: string; on?: number }
@@ -703,7 +703,7 @@ export type TeammatesResult<T = unknown> = { ok: true; value: T } | { ok: false;
 export type RoomsResult<T = unknown> ={ ok: true; value: T; rooms: RoomsState } | { ok: false; error: string; rooms?: RoomsState };
 
 /** Why a thread is not in the cloud: running locally, or waiting for the cloud or for this computer.
- *  `why` is one of main/supervisor.mjs `_whyLocal`'s or `_whyWaitingForCloud`'s answers. */
+ *  `why` is one of main/supervisor.mts `_whyLocal`'s or `_whyWaitingForCloud`'s answers. */
 export interface WhyNotCloud {
   at: 'mac' | 'wait-cloud' | 'wait-mac';
   why: string;
@@ -719,7 +719,7 @@ export interface RunningSession {
    *  where `snapshot.engines.byItem` is the supervisor's answer for the NEXT
    *  one, so the byline prefers this while a run is up. Absent on a session
    *  that started before a second engine existed, and every one of those was
-   *  Claude Code, which is the reading `engineOf` makes in main/supervisor.mjs. */
+   *  Claude Code, which is the reading `engineOf` makes in main/supervisor.mts. */
   engine?: string;
   /** On the phone: a run on the computer the cloud could take now (Supervisor#liveFor). */
   movable?: boolean;
@@ -736,7 +736,7 @@ export interface RunningSession {
   /** When that block started being typed, so it sorts against the rest. */
   sayingAt?: number;
   // HELPERS OUT RIGHT NOW, counted off the stream in `countHelpers`
-  // (main/supervisor.mjs). Absent whenever there are none, which is every
+  // (main/supervisor.mts). Absent whenever there are none, which is every
   // ordinary run, so the mark at the foot of a task keeps its one word.
   helpers?: number;
   /** 'cloud' while this run is in a cloud sandbox (docs/cloud/PLAN.md);
@@ -749,7 +749,7 @@ export interface RunningSession {
  *  throwaway folder its whole world lives in, and `notes` are the things that
  *  copy will be missing — no Claude Code, no keychain, no agent files — said
  *  out loud, because a test copy that quietly cannot run an agent is a test
- *  that lies. See main/fresh-user.mjs. */
+ *  that lies. See main/fresh-user.mts. */
 export interface FreshUser {
   ok: boolean;
   home?: string;
@@ -764,7 +764,7 @@ export interface FreshUser {
  *  with an invented studio seeded into its store first, so it opens on rows
  *  instead of on the welcome screen. `rows` and `products` are counted off what
  *  was actually written, never assumed, so the toast can say how much is in
- *  there. See main/demo.mjs. */
+ *  there. See main/demo.mts. */
 export interface DemoOpened {
   ok: boolean;
   home?: string;
@@ -776,10 +776,10 @@ export interface DemoOpened {
 }
 
 /**
- * ONE LIMIT, AS WHICHEVER CODING AGENT REPORTED IT (shared/usage.mjs). Claude
+ * ONE LIMIT, AS WHICHEVER CODING AGENT REPORTED IT (shared/usage.mts). Claude
  *  Code reports three -- the session, the week, and the week for one model
- *  (shared/claude-usage.mjs). Codex reports up to two, a five hour window and a
- *  week, and either of them can be absent (shared/codex-usage.mjs). */
+ *  (shared/claude-usage.mts). Codex reports up to two, a five hour window and a
+ *  week, and either of them can be absent (shared/codex-usage.mts). */
 export interface UsageLimit {
   span: 'session' | 'week';
   /**
@@ -834,7 +834,7 @@ export interface CloudPlan {
 export interface Usage {
   /**
    * WHOSE SUBSCRIPTION THIS IS, resolved by main and never here
-   *  (`usageEngine`, shared/usage.mjs). The corner is about the agent most of
+   *  (`usageEngine`, shared/usage.mts). The corner is about the agent most of
    *  her live work is on, and the workspace's own when nothing is running: the
    *  byline's rule that what is running beats what would run, asked about the
    *  app instead of about a row. It is only ever DRAWN where this Mac has two
@@ -845,7 +845,7 @@ export interface Usage {
   profile?: string;
 }
 
-/** One Claude login's own reading, or why it has none (main/account-usage.mjs). */
+/** One Claude login's own reading, or why it has none (main/account-usage.mts). */
 export interface AccountUsageReading {
   profile: string;
   limits?: UsageLimit[];
@@ -877,7 +877,7 @@ export interface SupervisorStatus {
   atLimit?: Record<string, { tool: string; until: number }>;
   // Queued rows the last pass could not start, id -> why and the tool's name.
   cannotStart?: Record<string, { why: string; tool: string }>;
-  // Rows the app's ship queue still owes a ship (main/ship-queue.mjs). Waiting
+  // Rows the app's ship queue still owes a ship (main/ship-queue.mts). Waiting
   // on the app, not on a person: In progress, reading "Shipping".
   shipping?: string[];
   // Of those, the ones pushed with Run now from the three-dot menu: next to
@@ -887,7 +887,7 @@ export interface SupervisorStatus {
   // user set on purpose.
   scheduled?: string[];
   // ROWS WHOSE LAST RUN ENDED HAVING WRITTEN NOTHING, keyed by item id
-  // (`_silentRows` in main/supervisor.mjs). Not `stalled`, which is a worker
+  // (`_silentRows` in main/supervisor.mts). Not `stalled`, which is a worker
   // that DIED and is red; this is a run that ended perfectly cleanly and simply
   // said nothing, which used to be indistinguishable from a row nobody had
   // touched. The chosen fix: say it on the row.
@@ -914,7 +914,7 @@ export interface SupervisorStatus {
     retryAt: number;
     // The same rows counted PER CAUSE, so a look above the list can say what
     // each failure is instead of only how many there are. Every string is
-    // written once, in shared/spawn-trouble.mjs; nothing here is worded in the
+    // written once, in shared/spawn-trouble.mts; nothing here is worded in the
     // renderer. `act` is null when there is honestly nothing to press, which is
     // true of a limit and of a dropped connection.
     count?: number;
@@ -939,7 +939,7 @@ export interface SupervisorStatus {
 // person in it: no login she can type will end it, and being told to type one
 // can cost an afternoon. 'subscription-ended' is refused in the same words as
 // 'org-blocked', and told apart by the login's own file (refineCause in
-// shared/spawn-trouble.mjs): its owner renews it, no admin is involved.
+// shared/spawn-trouble.mts): its owner renews it, no admin is involved.
 // 'model-not-on-plan' is a Codex login whose plan lacks the model the task asks
 // for; the fix is another model or another login, not this login.
 // 'level-not-offered' is a thinking level the task's model does not offer.
@@ -964,7 +964,7 @@ export interface Approval {
 }
 
 // One live Claude Code session on this machine, as the main process measured
-// it. Not a work item and never in a ledger: `main/agents.mjs` reads these off
+// it. Not a work item and never in a ledger: `main/agents.mts` reads these off
 // `~/.claude/sessions` and `claude agents --json` every couple of seconds.
 export interface AgentSession {
   pid: number;
@@ -982,7 +982,7 @@ export interface AgentSession {
   // WHAT THE SESSION IS ABOUT, so the card is not three lines about a pid.
   // `about` is the one-line title the session wrote for itself, `lastAsked` is
   // the last thing the USER typed into it, `touched` the files it has had its hands
-  // on. All three are read off the transcript tail main/agents.mjs was already
+  // on. All three are read off the transcript tail main/agents.mts was already
   // reading, so none of them costs a model anything.
   about?: string;
   lastAsked?: string;
@@ -996,7 +996,7 @@ export interface AgentSession {
   productName: string | null;
   // The moment the USER chose to come back to it, and when that was set. Set by
   // the user and by nobody else: an agent row has no ledger and no agent can
-  // reach this. Absent or past is "not put off" — main/agent-schedule.mjs drops
+  // reach this. Absent or past is "not put off" — main/agent-schedule.mts drops
   // a moment the instant it stops meaning anything.
   runAt?: number;
   runAtSetAt?: number;
@@ -1186,7 +1186,7 @@ export interface UpdateState {
   behind?: number | null;
   installing?: boolean;
   // WHERE THIS COPY IS RUNNING FROM, when that is a place macOS will not let
-  // it update itself (shared/where-it-runs-from.mjs). `canMove` is the one
+  // it update itself (shared/where-it-runs-from.mts). `canMove` is the one
   // question the screens ask, `place` is which read-only place it is, and
   // `moveError` is why the last move did not work. All absent, and `canMove`
   // false, on every copy that can update itself, which is nearly all of them.
@@ -1207,7 +1207,7 @@ export interface Snapshot {
   phoneConnect?: { email: string | null } | null;
   // On the hosted phone: who it is signed in as, and when a computer of theirs last wrote (0 for never).
   phoneAccount?: { email: string | null; seenAt: number; cloud: boolean; build?: { sha: string; at: number } | null } | null;
-  // The team (main/team/index.mjs). Null or absent on a build with no team
+  // The team (main/team/index.mts). Null or absent on a build with no team
   // cloud, which is the single-person app.
   team?: TeamState | null;
   teammates?: TeammatesView | null;
@@ -1260,7 +1260,7 @@ export interface Snapshot {
    *  Answered whole by `Supervisor#runsOnAccount`, for the reason `engines` is:
    *  which account the fleet spends is `_theOneAccount`'s rule, pinned to that
    *  file. Null, or absent on an older payload, on a Mac where nothing readable
-   *  is signed in, and then nothing is said. The words are shared/runs-on.mjs.
+   *  is signed in, and then nothing is said. The words are shared/runs-on.mts.
    *
    *  NO PLAN RIDES HERE. It did for a few hours, so the sidebar could print a
    *  tier; that row and the tier both came out the same day. What somebody pays
@@ -1438,16 +1438,16 @@ export interface WorkspaceSettings {
     reading?: {
       heavy: number | null; waiting: number | null; pressure: string | null; usedPct: number | null;
       asked: number | null; waited: number | null; refused: number | null;
-      /** New agents are waiting for memory to free up (main/start-hold.mjs). */
+      /** New agents are waiting for memory to free up (main/start-hold.mts). */
       holding?: boolean;
     };
   };
   /**
-   * STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mjs). `now` is one
+   * STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mts). `now` is one
    * sentence about what is left right now, null while it is off. */
   leftovers?: { on: boolean; now: string | null };
   /**
-   * COPIES OF A PROJECT THE APP DID NOT MAKE (main/task-folders.mjs). Null, and
+   * COPIES OF A PROJECT THE APP DID NOT MAKE (main/task-folders.mts). Null, and
    * so no row at all, whenever there are none: the app shows these and never
    * removes one, so there is nothing on the row to decide. */
   strayFolders?: { count: number; now: string } | null;
@@ -1465,7 +1465,7 @@ export interface WorkspaceSettings {
    * What Codex calls its models on THIS Mac, and what its own config.toml runs.
    *  Both empty/null unless there is a choice, because reading them means
    *  parsing the 199KB cache codex-cli keeps and nothing would read the answer.
-   *  See main/codex-models.mjs. */
+   *  See main/codex-models.mts. */
   codexModels?: Array<{ id: string; label: string; levels?: string[]; defaultLevel?: string | null }>;
   codexModelDefault?: string | null;
   /** Set when every Codex login offered is on ChatGPT's free plan; `endedAt` is when the latest paid plan ended. */
@@ -1501,7 +1501,7 @@ export interface WorkspaceSettings {
    *
    *  `account` is who this Mac is signed into Codex as, and every field of it is
    *  independently null: an API-key login has no email and no plan. Null
-   *  altogether when nobody is signed in (main/codex-account.mjs). */
+   *  altogether when nobody is signed in (main/codex-account.mts). */
   codex?: {
     found: boolean; certain: boolean; bin: string; url: string; trouble: string | null;
     /** Whether somebody pointed at this file themselves. See `claudeChosen`. */
@@ -1621,7 +1621,7 @@ export interface RepeatRule {
   lastOccurrence?: string;
 }
 
-/** Which address the phone QR code carries (main/phone-link.mjs). */
+/** Which address the phone QR code carries (main/phone-link.mts). */
 export type PhoneRoute = 'wifi' | 'tailscale';
 export type PhoneDevice = { id: string; name: string; ip: string | null; firstSeen: number; lastSeen: number; live: boolean; alerts: boolean; alertError: string | null };
 export type PhoneLink = {
@@ -1680,10 +1680,10 @@ declare global {
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
       compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem>;
       routeThread?(p: { product: string; id: string; to: string }): Promise<{ ok: true }>;
-      // Feedback to the Agentbox team (main/feedback.mjs). Optional: an older
+      // Feedback to the Agentbox team (main/feedback.mts). Optional: an older
       // main process under a newer window has no such door.
       sendFeedback?(p: { text: string; files: { name: string; type: string; size: number; data: string }[] }): Promise<{ ok: boolean; error?: string }>;
-      // The team version (main/team/index.mjs through main/ipc.mjs).
+      // The team version (main/team/index.mts through main/ipc.mts).
       teamSignIn(): Promise<TeamCallResult>;
       teamSignInCancel(): Promise<TeamCallResult>;
       teamSignInReopen(): Promise<TeamCallResult>;
@@ -1739,7 +1739,7 @@ declare global {
       rooms?(p: { op: string; args?: unknown[] }): Promise<RoomsResult>;
       teammates?(p: { op: string; args?: unknown }): Promise<TeammatesResult>;
       threadEdit(p: { product: string; id: string; patch: ThreadEditPatch }): Promise<{ ok: boolean; error?: string }>;
-      /** Move a thread to another project (shared/move-thread.mjs). Answers
+      /** Move a thread to another project (shared/move-thread.mts). Answers
        *  with the row it became there, or with the reason in words. */
       moveItem(p: { product: string; id: string; to: string }): Promise<{ ok: boolean; error?: string; item?: WorkItem; from?: string; to?: string }>;
       schedule(p: { product: string; id: string; runAt: number }): Promise<WorkItem>;
@@ -1796,7 +1796,7 @@ declare global {
       onEscapeBrowser?(fn: () => void): () => void;
       /**
        * A key the app owns, pressed while the keyboard was inside an open
-       *  file. shared/artifact-keys.mjs says which keys those are. */
+       *  file. shared/artifact-keys.mts says which keys those are. */
       onKeyInTheFile?(fn: (k: { key: string; meta?: boolean; ctrl?: boolean; alt?: boolean; shift?: boolean }) => void): () => void;
       saveAttachments(p: { product: string; files: Array<{ name: string; dataBase64?: string; srcPath?: string }> }): Promise<Array<{ rel: string; name: string; image: boolean }>>;
       pathForFile(file: File): string | null;
@@ -1812,7 +1812,7 @@ declare global {
       // itself, which is the only way the page hears about the chord at all.
       onApprovalAnswered?(fn: (a: { id: string; allow: boolean }) => void): () => void;
       badge?(count: number): Promise<void>;
-      // The corner tag over other apps (main/corner-tag.mjs).
+      // The corner tag over other apps (main/corner-tag.mts).
       cornerTag?(state: {
         ready: { id: string; title: string; says: string; since?: number; open?: string | null }[];
         working: number;
@@ -1840,7 +1840,7 @@ declare global {
       onWriteHeld?(fn: () => Promise<void>): () => void;
       // What arrived. The page does not choose the words and does not choose
       // whether to speak at all; only the main process can see whether she is
-      // looking at the window (main/notify.mjs).
+      // looking at the window (main/notify.mts).
       notify?(arrivals: Array<{
         id: string;
         title: string;
@@ -1876,7 +1876,7 @@ export type FolderListing = {
   unreadable?: string;
 };
 
-/** What a person may change on a thread from its summary (main/store.mjs threadEdit). */
+/** What a person may change on a thread from its summary (main/store.mts threadEdit). */
 export type ThreadEditPatch = Partial<{
   problem: string; progress: string; solution: string;
   /** When a person said it shipped; 0 takes that back. */

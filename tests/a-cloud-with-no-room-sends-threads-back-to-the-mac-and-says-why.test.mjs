@@ -3,7 +3,7 @@
 // What broke (w-6633e825a7, found reading the code before the upgrade prompt
 // was drawn): the cloud server refuses a start for someone with no plan, whose
 // month's hours are spent, whose agents are all running, while the cloud is
-// paused, or before the current terms are accepted. run.mjs ended every such
+// paused, or before the current terms are accepted. run.mts ended every such
 // refusal as exit 1, a failed run: the thread spent an attempt, the cloud
 // counted a fault and rested after three, and after three more the thread
 // was kept on this Mac for good. Someone signed in with no plan would have
@@ -18,8 +18,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { refusedForRoom, CLOUD_NO_ROOM } from '../main/cloud/run.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { refusedForRoom, CLOUD_NO_ROOM } from '../main/cloud/run.mts';
 
 let tmp;
 beforeEach(() => { tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'cloudroom-'))); });

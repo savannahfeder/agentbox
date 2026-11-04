@@ -18,7 +18,7 @@
 // and only when the copy was not handed the real XDG_DATA_HOME.
 //
 // WHY IT DOES NOT KILL HER AGENTS, which is the whole reason it is usable.
-// `main.mjs` quits on `app.requestSingleInstanceLock`, and that lock is keyed
+// `main.mts` quits on `app.requestSingleInstanceLock`, and that lock is keyed
 // on userData. A throwaway home means a different userData, so the fresh copy
 // takes its own lock and both run side by side. Nothing quits, `before-quit`
 // never fires, `supervisor.killAll` is never reached.
@@ -130,7 +130,7 @@ function link(from, to) {
 // keychain at `$HOME/Library/ Keychains`, so redirecting HOME hides it. Link
 // it and the same command answers "ok".
 //
-// `~/.claude` ITSELF IS THE ONE CHOICE. `main/agents.mjs` reads
+// `~/.claude` ITSELF IS THE ONE CHOICE. `main/agents.mts` reads
 // `~/.claude/sessions` and `~/.claude/projects`, so linking it puts the Claude
 // Code sessions already on this Mac into the fresh inbox. It is not starting
 // from absolute zero, so it is a flag rather than a default here and the
@@ -157,7 +157,7 @@ export function prepareHome(home, { withAgents = false, withTools = true, realHo
  * THE VARIABLES THAT POINT AT HER REAL WORLD, AND WHY A FRESH COPY MAY NOT
  * INHERIT ONE OF THEM.
  *
- * This was the whole bug. `main.mjs` writes the store root into its own
+ * This was the whole bug. `main.mts` writes the store root into its own
  * `process.env` at startup so every store module can read it at call time, and
  * `freshEnv` spread that environment straight into the child. So the copy that
  * was supposed to be a stranger got a throwaway HOME, no config file and

@@ -19,9 +19,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
-import { codexLineForTheCloud, codexConfigForTheCloud } from '../main/cloud/run.mjs';
-import { holdUntilHome } from '../main/cloud/codex-cloud.mjs';
-import { TURN_CLOSED } from '../main/claude-input.mjs';
+import { codexLineForTheCloud, codexConfigForTheCloud } from '../main/cloud/run.mts';
+import { holdUntilHome } from '../main/cloud/codex-cloud.mts';
+import { TURN_CLOSED } from '../main/claude-input.mts';
 
 let tmp;
 beforeEach(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-cloud-')); });

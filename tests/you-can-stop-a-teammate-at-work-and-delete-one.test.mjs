@@ -10,8 +10,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { appHome } from '../main/store/home.mjs';
-import { loadStore } from '../main/store-modules.mjs';
-import { Teammates } from '../main/teammates.mjs';
+import { loadStore } from '../main/store-modules.mts';
+import { Teammates } from '../main/teammates.mts';
 import { teammateIdOf, runLines, statusOf } from '../shared/teammates.mjs';
 
 const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
@@ -150,10 +150,10 @@ describe('the buttons', () => {
   });
 
   it('the app stops the agents through the supervisor, for Stop and for Delete', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     expect(ipc).toMatch(/const TEAMMATE_OPS = new Set\(\[[^\]]*'stop'/);
     expect(ipc).toMatch(/op === 'remove'\) value = mates\.remove\(a\.id, \{ kill \}\)/);
     expect(ipc).toMatch(/op === 'stop'\) value = mates\.stop\(a\.id, \{ kill \}\)/);
-    expect(ipc).toMatch(/const kill = \(id\) => supervisor\.stopSession\(id\)/);
+    expect(ipc).toMatch(/const kill = \(id(?:: string)?\) => supervisor\.stopSession\(id\)/);
   });
 });

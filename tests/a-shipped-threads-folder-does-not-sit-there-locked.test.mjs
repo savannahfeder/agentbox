@@ -20,9 +20,9 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ensureTaskFolder, taskFolderPath } from '../main/task-folders.mjs';
+import { ensureTaskFolder, taskFolderPath } from '../main/task-folders.mts';
 import { shippedNote } from '../shared/shipped-note.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 
@@ -98,7 +98,7 @@ describe('the moment the ship lands', () => {
   }, 30_000);
 
   it('is what the ship queue asks for, with the row and the project', async () => {
-    const source = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const source = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     expect(source).toMatch(/afterShip: \(shipped\) => \{[^}]*this\.reclaimShippedFolder\(shipped\)/);
   });
 });
@@ -162,7 +162,7 @@ describe('the sweep, for a ship whose folder outlived the run that made it', () 
 });
 
 // The branch is the one copy of the work that survives the folder, and the
-// whole argument for deleting the folder rests on it (main/task-folders.mjs:
+// whole argument for deleting the folder rests on it (main/task-folders.mts:
 // "Branches are never deleted here").
 describe('what is kept whatever happens', () => {
   it('keeps the thread\'s branch and its commit', async () => {

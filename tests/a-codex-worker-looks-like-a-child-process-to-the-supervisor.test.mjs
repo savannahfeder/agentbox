@@ -1,17 +1,17 @@
 // A CODEX WORKER HAS TO LOOK LIKE A CHILD PROCESS, BECAUSE THE SUPERVISOR HAS
 // ONLY EVER SEEN ONE.
 //
-// Agentbox spawns one child per work item. `main/supervisor.mjs` is 4,299 lines
+// Agentbox spawns one child per work item. `main/supervisor.mts` is 4,299 lines
 // and `session.child` appears in exactly ONE of them (`session.child.kill`),
 // while the local `child` handle inside `spawnWorker` is used in exactly five
 // ways: `once('spawn')`, `stdout.on('data')`, `stderr.on('data')`,
 // `on('exit')`, `kill`. Measured against the file on 2026-09-04 with `grep -n
-// 'session\.child\|child\.' main/supervisor.mjs`.
+// 'session\.child\|child\.' main/supervisor.mts`.
 //
 // A Codex worker has no process of its own. It is one thread inside a shared
 // `codex app-server`, proven the same day by running several concurrently:
 // independent thread ids, interleaved progress, no head-of-line blocking. So
-// main/codex-session.mjs is a facade over one thread that satisfies that
+// main/codex-session.mts is a facade over one thread that satisfies that
 // five-method contract, and this file is the contract written down.
 //
 // THE ONE THAT IS NOT A CONVENIENCE IS THE SIGNAL.
@@ -47,7 +47,7 @@ import {
   codexTranscriptFile,
   WORKER_APPROVAL_POLICY,
   WORKER_SANDBOX,
-} from '../main/codex-session.mjs';
+} from '../main/codex-session.mts';
 import { createCodexAppServer } from '../main/codex-app-server.mjs';
 
 /**
@@ -142,7 +142,7 @@ describe('a codex worker answers every call the supervisor makes on a child', ()
     expect(typeof worker.once).toBe('function');
     expect(typeof worker.kill).toBe('function');
     // NOT faked. The supervisor swaps its readers per session instead; see the
-    // header of main/codex-session.mjs.
+    // header of main/codex-session.mts.
     expect(worker.stdout).toBeUndefined();
   });
 

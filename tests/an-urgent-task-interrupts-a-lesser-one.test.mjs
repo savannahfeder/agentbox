@@ -14,7 +14,7 @@
 // come back, and is it the same session that comes back".
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 // A MAC WITH ONE CLAUDE LOGIN ON IT. Since 2026-08-31 the fleet's account list
 // is what is signed in on the disk and not only what the config names

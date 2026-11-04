@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { slashRows, enterWaitsForWords, commandBeingWritten, holdingHint } from '../renderer/src/slash-menu.ts';
-import { providerCommands } from '../shared/provider-commands.mjs';
+import { providerCommands } from '../shared/provider-commands.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');

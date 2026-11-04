@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { notePath, readNote, writeNote, NOTE_NAME, MAX_NOTE_BYTES } from '../main/rail-note.mjs';
+import { notePath, readNote, writeNote, NOTE_NAME, MAX_NOTE_BYTES } from '../main/rail-note.mts';
 import { getSchema } from '@tiptap/core';
 import { EditorState, TextSelection } from '@tiptap/pm/state';
 import { buildExtensions, unboldHeading } from '../renderer/src/editor/extensions.ts';

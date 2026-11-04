@@ -15,6 +15,7 @@ import type { PhoneSender } from '../../../renderer/src/phone-send';
 import type { WorkItem } from '../../../renderer/src/types';
 import { ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
 import type { Saved } from './attach';
+import { dayClock } from './back-at';
 
 export interface Choices { priority?: number; permissionMode?: string; model?: string; effort?: string; engine?: string; runAt?: number; start?: 'later' | 'now'; repeat?: RepeatShape; labels?: string[] }
 export interface RuleRef { product: string; id: string; title: string }
@@ -24,7 +25,7 @@ export type Press =
   | { kind: 'pick'; option: ParsedOption; choices?: Choices }
   | { kind: 'close' }
   /** `until` 0 brings it back from Later. */
-  | { kind: 'later'; until: number; label?: string }
+  | { kind: 'later'; until: number; label?: string; running?: boolean }
   | { kind: 'new'; product: string; text: string; saved?: Saved[]; choices?: Choices; to?: string; when?: string | null }
   | { kind: 'stop' }
   | { kind: 'run-now' }
@@ -50,14 +51,20 @@ export interface Plan {
   undo?: (made: any) => Step[];
   /** What the toast says once Undo has worked. */
   undone?: (made: any) => string;
+  /** The thread a tap on the toast opens, when it is not the one pressed; null for none. */
+  goes?: { product: string; id: string } | null;
 }
-export interface PressedItem { product: string; id: string; status: string; title?: string; productName?: string; runAt?: number | null; snoozedUntil?: number | null }
+export interface PressedItem { product: string; id: string; status: string; title?: string; productName?: string; runAt?: number | null; snoozedUntil?: number | null; waitsForMac?: boolean; body?: string; priority?: number; start?: string; engine?: string; model?: string; effort?: string }
+/** Where the computer is: away, and whether Agentbox Cloud starts what is sent meanwhile. */
+export interface Reach { away?: boolean; cloud?: boolean }
 
 // App.tsx's TOAST_TITLE.
 const TOAST_TITLE = 48;
 const UNDO = ' · press Z to undo';
 
-export function planFor(press: Press, item: PressedItem | null, now = Date.now()): Plan | null {
+export function planFor(press: Press, item: PressedItem | null, now = Date.now(), reach: Reach = {}): Plan | null {
+  // Nothing starts until the computer is back.
+  const waits = !!reach.away && !reach.cloud;
   if (press.kind === 'repeat-at') {
     return { steps: [{ door: 'setRepeat', payload: { product: press.rule.product, id: press.rule.id, rule: press.to } }], toast: `Now ${ruleLabel(press.to)}` };
   }
@@ -76,9 +83,14 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
         toast: `Repeating: ${ruleLabel(repeat)}`,
       };
     }
+    // Send later's times ride as runAt alone, so their words are made here.
+    const runAt = Number(press.choices?.runAt) || 0;
+    const when = press.when ?? (runAt > now ? dayClock(runAt, now) : null);
     return {
       steps: [{ door: 'compose', payload: { product: press.product, title: message.title, ...(body ? { body } : {}), kind: 'directive', priority: priority ?? 5, ...rest } }],
-      toast: sentLine({ to: press.to ?? '', when: press.when ?? null, held: press.choices?.start === 'later' }),
+      toast: waits && !when && press.choices?.start !== 'later'
+        ? `Waiting for your computer in ${press.to ?? ''} · Z to undo`
+        : sentLine({ to: press.to ?? '', when, held: press.choices?.start === 'later' }),
       undo: (made) => (made?.id ? [{ door: 'answer', payload: { product: made.product, id: made.id, status: 'done' } }] : []),
       undone: (made) => `Withdrawn: ${clipToSentence(made?.title ?? '', TOAST_TITLE)}`,
     };
@@ -107,7 +119,19 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       undone: () => undone,
     };
   };
-  const close = (): Plan => ({
+  // A thread the computer never took is withdrawn, not closed: nothing is left for Undo or Done to show.
+  // Undo sends it again, with what it was sent with: the computer never had the first one.
+  const again = () => [{ door: 'compose' as const, payload: Object.fromEntries(Object.entries({
+    product: item.product, title: item.title ?? '', body: item.body || undefined, kind: 'directive', priority: item.priority ?? 5,
+    runAt: Number(item.runAt) > 0 ? item.runAt : undefined, start: item.start, engine: item.engine, model: item.model, effort: item.effort,
+  }).filter(([, v]) => v !== undefined)) }];
+  const close = (): Plan => (item.waitsForMac ? {
+    steps: [{ door: 'answer', payload: { ...on, status: 'done' } }],
+    toast: `Withdrawn: ${clipToSentence(item.title ?? '', TOAST_TITLE)}. It never reached your computer.${UNDO}`,
+    goes: null,
+    undo: again,
+    undone: () => `Sent again: ${clipToSentence(item.title ?? '', TOAST_TITLE)}`,
+  } : {
     steps: [{ door: 'answer', payload: { ...on, status: 'done' } }],
     toast: `${DONE.verb}: ${clipToSentence(item.title ?? '', TOAST_TITLE)}${UNDO}`,
     undo: () => [{ door: 'answer', payload: { ...on, status: 'open' } }],
@@ -116,7 +140,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
 
   switch (press.kind) {
     case 'reply':
-      return press.text.trim() ? reply(press.text, press.choices ?? {}, to ? `Sent → ${to}` : 'Sent', 'Reply withdrawn, back in your inbox') : null;
+      return press.text.trim() ? reply(press.text, press.choices ?? {}, waits ? `Waiting for your computer${to ? ` → ${to}` : ''}` : to ? `Sent → ${to}` : 'Sent', 'Reply withdrawn, back in your inbox') : null;
     case 'pick':
       // "Close this task" is done, never sent: as a reply it would start a run to close it (App.tsx).
       if (closesTheTask(press.option.text)) return close();
@@ -128,7 +152,8 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       if (press.until > 0) {
         return {
           steps: [{ door: 'snooze', payload: { ...on, snoozedUntil: press.until } }],
-          toast: `Moved to Later.${press.label ? ` Back ${press.label.toLowerCase()}` : ''}${UNDO}`,
+          // A running thread stays In progress until its run ends (tabs.ts, as App.tsx `tabState`).
+          toast: `${press.running ? 'Goes to Later when it finishes' : `Moved to Later.${press.label ? ` Back ${press.label.toLowerCase()}` : ''}`}${UNDO}`,
           undo: () => [{ door: 'snooze', payload: { ...on, snoozedUntil: prior } }],
           undone: () => 'Back in your inbox',
         };
@@ -150,7 +175,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
     case 'stop':
       return { steps: [{ door: 'stopSession', payload: on }], toast: 'Stop sent. Your computer stops the agent when it gets it.' };
     case 'run-now':
-      return { steps: [{ door: 'runNow', payload: on }], toast: 'Up next. It starts as soon as an agent is free.' };
+      return { steps: [{ door: 'runNow', payload: on }], toast: waits ? 'Up next once your computer is back.' : 'Up next. It starts as soon as an agent is free.' };
     case 'move-to-cloud':
       return { steps: [{ door: 'moveToCloud', payload: { ...on, ids: [item.id] } }], toast: 'Moving to the cloud. It keeps working until the cloud has room.' };
     case 'send-back':
@@ -169,6 +194,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       return {
         steps: writes.map((w) => ({ door: 'answer' as const, payload: w })),
         toast: `Doing it in this thread: ${title}${UNDO}`,
+        goes: { product: press.parent.product, id: press.parent.id },
         undo: () => [{ door: 'answer', payload: { product: press.child.product, id: press.child.id, status: 'open' } }],
         undone: () => `Back as its own thread: ${title}. The message already went.`,
       };

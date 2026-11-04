@@ -23,12 +23,12 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const launcher = path.join(repo, 'scripts', 'approval-server.sh');
-const server = path.join(repo, 'main', 'approval-prompt-server.mjs');
+const server = path.join(repo, 'main', 'approval-prompt-server.mts');
 
 const temps = [];
 function tmpdir(tag) {
@@ -108,7 +108,7 @@ describe('the packaged launcher is not touched by any of this', () => {
     const other = stub(path.join(dir, 'Somebody-elses-Electron'), 'wrong-binary');
     const out = run({ HOME: path.join(dir, 'home'), ZERO_APPROVALS_RUNTIME: other },
       path.join(scripts, 'approval-server.sh'));
-    expect(out).toBe(`bundle-binary 1 ${path.join(contents, 'Resources', 'app.asar', 'main', 'approval-prompt-server.mjs')}`);
+    expect(out).toBe(`bundle-binary 1 ${path.join(contents, 'Resources', 'app.asar', 'main', 'approval-prompt-server.mts')}`);
   });
 });
 

@@ -163,7 +163,7 @@ describe('an answer the spool will not take at all', () => {
   // asserted against its source -- the same way
   // tests/the-menu-answers-a-card-through-the-one-door.test.mjs asserts it.
   const door = () => {
-    const ipc = fs.readFileSync(path.join(here, '..', 'main', 'ipc.mjs'), 'utf8');
+    const ipc = fs.readFileSync(path.join(here, '..', 'main', 'ipc.mts'), 'utf8');
     const start = ipc.indexOf('const answerApproval = (');
     expect(start).toBeGreaterThan(-1);
     const end = ipc.indexOf('\n  };', start);
@@ -208,7 +208,7 @@ describe('her own answer, on a Codex card', () => {
       const cards = createCodexApprovals({ storeRoot: root, uuid: () => 'card-1', pollMs: 5 });
       const asked = cards.scope({ product: 'agentbox', item: 'w-1' }).handle(...commandAsk('git push'));
 
-      // Exactly main/ipc.mjs's order, in one breath: the card is drawn, then
+      // Exactly main/ipc.mts's order, in one breath: the card is drawn, then
       // the file, then the door.
       listPending(root);
       expect(answer(root, 'card-1', true, null)).toBe(true);

@@ -6,7 +6,7 @@
 // the computer woke. Now, after each turn, the computer leaves a kit in the
 // cloud (shared/cloud-kit.mjs): the reply run's own pack and command line,
 // with the reply's place marked. Driven here end to end on this machine: the
-// computer's real relay (main/cloud/run.mjs) writes the kit, a stand-in for
+// computer's real relay (main/cloud/run.mts) writes the kit, a stand-in for
 // the cloud server starts the reply from it with nothing but the kit (as
 // cloud/gateway would), the real sandbox runs a stand-in Claude Code with the
 // computer away, and the computer, waking, writes the run's marker from its
@@ -22,10 +22,10 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun } from '../main/cloud/run.mjs';
-import { readMarker, writeMarker } from '../main/cloud/marker.mjs';
-import { markerForCloudRun, readKitCopy } from '../main/cloud/kit.mjs';
-import { kitFrom } from '../main/cloud/run-cli.mjs';
+import { cloudRun } from '../main/cloud/run.mts';
+import { readMarker, writeMarker } from '../main/cloud/marker.mts';
+import { markerForCloudRun, readKitCopy } from '../main/cloud/kit.mts';
+import { kitFrom } from '../main/cloud/run-cli.mts';
 import { REPLY_MARK, kitKey, checkKit, startPayload, replyFrame, replyPrompt, cloudUserLine, cloudSessionId, lastAnswerIn } from '../shared/cloud-kit.mjs';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));

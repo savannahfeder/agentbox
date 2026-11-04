@@ -107,7 +107,7 @@ export const noticeShown = (room: Pick<Room, 'id' | 'listed' | 'teamId'>, seen: 
 const andList = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
 /** What strangers in an open group see of you, as your card's switches have it. */
 export function openGroupWords(me: Pick<RoomProfile, 'show_working' | 'show_level' | 'show_agents'>): string {
-  const seen = ['your name', me.show_level && 'level', me.show_agents && 'how many agents you run'].filter((x): x is string => !!x);
+  const seen = ['your name', me.show_level && 'your agent hours', me.show_agents && 'how many agents you run'].filter((x): x is string => !!x);
   const open = `Anyone on ${Name} can join this group.`;
   return me.show_working === 'everyone'
     ? `${open} They see ${andList([...seen, 'the names of your threads'])}.`

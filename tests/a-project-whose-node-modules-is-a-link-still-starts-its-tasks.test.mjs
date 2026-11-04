@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { carryLocalFiles } from '../main/worktree-include.mjs';
+import { carryLocalFiles } from '../main/worktree-include.mts';
 
 const dirs = [];
 afterEach(() => { while (dirs.length) fs.rmSync(dirs.pop(), { recursive: true, force: true }); });

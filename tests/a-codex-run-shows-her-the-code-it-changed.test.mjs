@@ -101,11 +101,11 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
-import { Supervisor, readersFor } from '../main/supervisor.mjs';
+import { Supervisor, readersFor } from '../main/supervisor.mts';
 import { writeChangeForRun, readChange, changePath } from '../main/code-change.mjs';
 import { changeFromCodexTurn, SAYING_CAP } from '../main/codex.mjs';
 import { machineryPath } from '../main/store/home.mjs';
-import { __gitJobsIdle } from '../main/git-change-offthread.mjs';
+import { __gitJobsIdle } from '../main/git-change-offthread.mts';
 import { foldWorkItems } from '../shared/work-items.mjs';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -398,7 +398,7 @@ describe('the cap on the sentence an agent is typing', () => {
   // the one that goes red the moment a second one is declared.
   it('is declared in one file and read from there by the other', () => {
     // 2026-10-07: the Claude reader moved into its own adapter file.
-    const claudeReader = fs.readFileSync(path.join(repoRoot, 'main', 'harnesses', 'claude-stream.mjs'), 'utf8');
+    const claudeReader = fs.readFileSync(path.join(repoRoot, 'main', 'harnesses', 'claude-stream.mts'), 'utf8');
     expect(claudeReader).not.toMatch(/(const|let|var)\s+SAYING_CAP\s*=/);
     expect(claudeReader).toMatch(/import\s*\{\s*SAYING_CAP\s*\}\s*from\s*['"]\.\.\/codex\.mjs['"]/);
     expect(fs.readFileSync(path.join(repoRoot, 'main', 'codex.mjs'), 'utf8')).toMatch(/export const SAYING_CAP\s*=/);

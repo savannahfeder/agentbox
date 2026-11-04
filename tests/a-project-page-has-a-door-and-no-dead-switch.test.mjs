@@ -27,15 +27,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../main/config.mjs';
-import { readSettings, setProjectSetting } from '../main/settings.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { readSettings, setProjectSetting } from '../main/settings.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const settings = read('renderer/src/components/Settings.tsx');
 const nav = read('renderer/src/components/WorkspaceNavigation.tsx');
 const app = read('renderer/src/App.tsx');
-const supervisorSrc = read('main/supervisor.mjs');
+const supervisorSrc = read('main/supervisor.mts');
 
 // The project page, sliced off its own lede so a match cannot come from the
 // workspace panes above it.

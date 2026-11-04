@@ -5,7 +5,7 @@
 // written with nobody on the other end of that callback, and said so: "the
 // slice that builds the card is the slice that passes a handler". This is that
 // slice, and the handler is joined to the spool Agentbox already has
-// (main/approvals.mjs, main/approval-prompt-server.mjs) rather than to a
+// (main/approvals.mjs, main/approval-prompt-server.mts) rather than to a
 // second one: `{id, at, product, item, tool, input}`, one file per request,
 // and `renderer/src/App.tsx` draws the `<pre>` off `input` without knowing or
 // caring which engine asked.
@@ -18,10 +18,10 @@
 // `additionalDirectories`) and `worker-permissions.json` allows Bash broadly,
 // so a worker on either engine that can run a shell can, in principle, write
 // `<uuid>.answer.json` and approve itself. On the Claude path the reader of
-// that file is a separate process (main/approval-prompt-server.mjs) and there
+// that file is a separate process (main/approval-prompt-server.mts) and there
 // is no other channel; here the reader is Agentbox itself, so there is a better
 // one available and it is used: THE FOUNDER'S ANSWER IS DELIVERED IN PROCESS,
-// from `main/ipc.mjs`'s one answering door, and a Codex approval is never
+// from `main/ipc.mts`'s one answering door, and a Codex approval is never
 // resolved by reading a file at all. A file that appears for a request still
 // waiting was therefore not written by her, and is deleted.
 //
@@ -163,7 +163,7 @@ describe('an approval that reaches the spool', () => {
     const asked = spool.scope({ product: 'agentbox', item: 'w-1' }).handle(COMMAND, askToRun('git push'));
     await tick();
 
-    // The door main/ipc.mjs goes through, in the order it goes through it --
+    // The door main/ipc.mts goes through, in the order it goes through it --
     // and the list comes first there too, because her decision is bound to the
     // card that was drawn rather than to its id
     // (tests/an-approval-authorises-only-the-action-she-read.test.mjs).
@@ -189,7 +189,7 @@ describe('an approval that reaches the spool', () => {
   });
 
   // One audit line per decision and no litter, exactly as
-  // main/approval-prompt-server.mjs `finish` does it for the other engine.
+  // main/approval-prompt-server.mts `finish` does it for the other engine.
   it('leaves the spool empty and the decision in the log', async () => {
     const store = root();
     const spool = createCodexApprovals({ storeRoot: store, uuid: () => 'card-1' });
@@ -259,7 +259,7 @@ describe('an approval that reaches the spool', () => {
 
 /* ======================= the wire from her button ======================== */
 
-// READ OUT OF THE SOURCE, AND THAT IS A DELIBERATE SECOND BEST. `main/ipc.mjs`
+// READ OUT OF THE SOURCE, AND THAT IS A DELIBERATE SECOND BEST. `main/ipc.mts`
 // imports `electron`, nothing in this suite mocks it, and there is no test
 // process that can call `answerApproval`. So the one thing that cannot be
 // proven by running it is pinned the way this repo pins its other unrunnable
@@ -273,7 +273,7 @@ describe('an approval that reaches the spool', () => {
 // card would have LEFT her screen when she pressed the button. Deny-by-default
 // means that failure is safe. It does not mean it is visible.
 describe('the door the founder answers through', () => {
-  const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+  const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
 
   it('tells the codex spool as well as writing the answer file', () => {
     expect(ipc).toMatch(/approvals\.answer\(config\.storeRoot, id, allow, note\)/);

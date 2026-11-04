@@ -16,7 +16,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readRollout, readCodexThreads, readCodexThreadsOffThread } from '../main/codex-threads.mjs';
+import { readRollout, readCodexThreads, readCodexThreadsOffThread } from '../main/codex-threads.mts';
 import { scanCodex, startCodexWatch } from '../main/codex-watch.mts';
 
 let home; let codexDir;
@@ -91,7 +91,7 @@ describe('the watch', () => {
   });
 
   it('is the one the app runs', () => {
-    const main = fs.readFileSync(new URL('../main/main.mjs', import.meta.url), 'utf8');
+    const main = fs.readFileSync(new URL('../main/main.mts', import.meta.url), 'utf8');
     const watch = main.slice(main.indexOf('startCodexWatch({'), main.indexOf('startCodexWatch({') + 400);
     expect(watch).toMatch(/readCodexThreadsOffThread\(/);
   });

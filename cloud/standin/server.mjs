@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { createMemoryCloud, memoryBackend, signUpMemory } from '../../main/team/memory-cloud.mjs';
+import { createMemoryCloud, memoryBackend, signUpMemory } from '../../main/team/memory-cloud.mts';
 
 const BIG = 100_000;
 

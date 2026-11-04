@@ -16,7 +16,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { DEFAULTS } from '../main/config.mjs';
 import { cloudFootLine } from '../renderer/src/cloud-menu.ts';
 
@@ -120,19 +120,19 @@ describe('the cloud menu', () => {
 
 describe('signed in to the cloud at all', () => {
   it('counts an account resting at its limit or renewing its Codex sign-in, not one that must sign in again (Codex\'s review of the diff, finding 6)', async () => {
-    const { cloudLoginState } = await import('../main/cloud/logins.mjs');
+    const { cloudLoginState } = await import('../main/cloud/logins.mts');
     const now = Date.now();
     expect(cloudLoginState({ id: 'a', engine: 'codex', expiresAt: now + 60_000 }, { now })).toBe('renew');
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cloud-signed-'));
     dirs.push(root);
     const sup = new Supervisor({ storeRoot: root, home: root, authProfiles: ['default'], cloudRuns: 'all' }, { listItems: () => [], listProducts: () => [], isDue: () => true }, root);
-    const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/mayRunOn\(state\) \|\| state === 'limited' \|\| state === 'renew'/);
     expect(typeof sup._cloudSignedInAtAll).toBe('function');
   });
 });
 
-// 2026-10-17, later: with every run's relay in one shared host (main/cloud/host.mjs),
+// 2026-10-17, later: with every run's relay in one shared host (main/cloud/host.mts),
 // a run costs this Mac about 11 MB instead of about 110 (measured, 50 runs).
 describe('the cloud\'s cap', () => {
   it('is two hundred through the shared host, twenty without it, and hers when she sets one', () => {

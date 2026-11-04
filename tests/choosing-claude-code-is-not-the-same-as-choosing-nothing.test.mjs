@@ -53,7 +53,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CODEX_BIN = '/nonexistent/codex/codex';
@@ -175,7 +175,7 @@ describe('the composer\'s send', () => {
   });
 
   it('leaves the decision about whether to write it to the door', () => {
-    const ipc = fs.readFileSync(path.join(here, '..', 'main', 'ipc.mjs'), 'utf8');
+    const ipc = fs.readFileSync(path.join(here, '..', 'main', 'ipc.mts'), 'utf8');
     expect(ipc).toMatch(/zero:compose[\s\S]{0,900}?engine: supervisor\.engineOffered\(engine\)/);
     expect(ipc).toMatch(/zero:compose-repeat[\s\S]{0,600}?engine: supervisor\.engineOffered\(engine\)/);
   });

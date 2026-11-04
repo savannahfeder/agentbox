@@ -9,3 +9,4 @@ export function liveStatus(status: PersonStatus | null | undefined, now?: number
 export function hasLapsed(status: PersonStatus | null | undefined, now?: number): boolean;
 export function holdsUntil(until: number | null | undefined, now?: number): string;
 export function holdEnds(id: HoldId | string, now?: number): number | null;
+export function statusEnds(choice?: { hold?: HoldId | string; until?: number | null }, now?: number): number | null;

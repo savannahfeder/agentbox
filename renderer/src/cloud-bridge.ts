@@ -15,7 +15,7 @@
 // in the page (`<meta name="agentbox-cloud">`, scripts/build-phone-site.mjs).
 // The desktop window and the Mac's own phone page never have that.
 
-import { REQUEST_CHANNELS, PUSH_CHANNELS, DESKTOP_ONLY } from '../../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS, PUSH_CHANNELS, DESKTOP_ONLY } from '../../shared/bridge-map.mts';
 import { feedbackAddressOn, sendPhoneFeedback, type FeedbackFiles } from './phone-feedback';
 import { cloudClient, type CloudClient, type CloudConfig } from './cloud-rest';
 import { installPhoneScreen } from './phone-screen';

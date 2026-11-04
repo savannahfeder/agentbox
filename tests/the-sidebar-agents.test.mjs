@@ -39,7 +39,7 @@ describe('only the sessions the clock can still speak of in hours', () => {
 
   // MOST SESSIONS ON A REAL MACHINE WERE THE USER'S OWN TERMINALS sitting at a
   // prompt for days. That, and not finished work, is what made the list far too
-  // long: main/agents.mjs already drops
+  // long: main/agents.mts already drops
   // any record whose process is gone, so nothing finished is ever here.
   it('drops a session that has never said anything and has sat for a week', () => {
     expect(onTheRail(session({ lastActiveAt: 0, startedAt: NOW - 7 * 24 * 3600_000 }), NOW)).toBe(false);

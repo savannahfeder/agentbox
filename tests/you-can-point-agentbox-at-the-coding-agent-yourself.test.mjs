@@ -34,7 +34,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   pointAtEngineBin, searchForEngineBin, claudeState, codexState,
-} from '../main/settings.mjs';
+} from '../main/settings.mts';
 import { forgetClaudeBin } from '../main/claude-bin.mjs';
 import { forgetCodexBin } from '../main/codex-bin.mjs';
 
@@ -82,7 +82,7 @@ describe('pointing the app at the file yourself', () => {
 
   // AND THE FACT THE FLEET ACTUALLY SPAWNS ON MOVES WITH IT, which is the half
   // a write to the file alone would miss. The two engines keep that fact in
-  // different places and both are deliberate (main/settings.mjs, the rechecks):
+  // different places and both are deliberate (main/settings.mts, the rechecks):
   // `claudeFound` is what `Supervisor#_enginesFound` reads, and a null
   // `codexBin` is what `engineFor` reads as "this computer cannot run Codex".
   it('puts the fact the fleet reads in step with the choice, for either one', () => {
@@ -201,7 +201,7 @@ describe('what is refused, with a sentence instead of a broken fleet', () => {
 // that no test renders, and what matters is that both surfaces offer it and
 // that the picker never takes a path from the window.
 describe('the door is on both surfaces, and the picker opens in main', () => {
-  const ipc = read('main/ipc.mjs');
+  const ipc = read('main/ipc.mts');
   const settings = read('renderer/src/components/Settings.tsx');
   const onboarding = read('renderer/src/components/Onboarding.tsx');
 

@@ -23,8 +23,8 @@ import path from 'node:path';
 import http from 'node:http';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { cloudClients } from '../main/cloud/clients.mjs';
-import { cloudPlan, signOutOtherMacs } from '../main/cloud/account.mjs';
+import { cloudClients } from '../main/cloud/clients.mts';
+import { cloudPlan, signOutOtherMacs } from '../main/cloud/account.mts';
 import { cloudConfigPath, readCloudConfig, readCloudKey, writeCloudKey } from '../main/cloud/config.mjs';
 import { adminEvent } from '../scripts/cloud-gateway-admin.mjs';
 

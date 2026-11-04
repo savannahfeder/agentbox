@@ -24,7 +24,7 @@ describe('a thread\'s copy', () => {
   });
 
   it('is read from enough of the ledger that claims and heartbeats do not eat it', () => {
-    const src = fs.readFileSync(new URL('../main/team/index.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/team/index.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/max: all \? Number\.MAX_SAFE_INTEGER : SNAPSHOT_LIMITS\.lines \* 4/);
   });
 });

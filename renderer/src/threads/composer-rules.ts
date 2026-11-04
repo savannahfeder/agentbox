@@ -263,7 +263,7 @@ export function threadMessage(
 /* -------------------------------- projects -------------------------------- */
 
 // `team` is read loosely on purpose: main writes `direct` on a Direct project's
-// team record (main/team/projects.mjs), and the renderer's Product type has not
+// team record (main/team/projects.mts), and the renderer's Product type has not
 // grown the field yet, so the rule asks for it rather than assuming it.
 interface ProjectLike { slug: string; practice?: boolean; team?: object | null }
 const isDirect = (p: ProjectLike) => (p.team as { direct?: unknown } | null | undefined)?.direct === true;

@@ -54,7 +54,7 @@ function rewritten() {
   // same second, hands back the very same commit as the old root.
   const newRoot = r.commit('README.md', '# hello\n', 'add README.md, rewritten');
   expect(newRoot).not.toBe(oldRoot);
-  const newTip = r.commit('main.mjs', 'export const x = 1;\n');
+  const newTip = r.commit('main.mts', 'export const x = 1;\n');
   return { ...r, oldRoot, newRoot, newTip };
 }
 

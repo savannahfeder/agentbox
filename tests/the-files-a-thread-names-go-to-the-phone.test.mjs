@@ -15,8 +15,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { createPhoneUploads, filesNamed, partsOf, keyOf } from '../main/phone-uploads.mjs';
-import { createPhoneInbox } from '../main/phone-inbox.mjs';
+import { createPhoneUploads, filesNamed, partsOf, keyOf } from '../main/phone-uploads.mts';
+import { createPhoneInbox } from '../main/phone-inbox.mts';
 
 const T = Date.UTC(2026, 9, 17, 18, 0);
 let home; let docs; let repo; let outside;

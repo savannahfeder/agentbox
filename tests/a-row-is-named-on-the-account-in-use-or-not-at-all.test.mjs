@@ -76,7 +76,7 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
-const { Supervisor } = await import('../main/supervisor.mjs');
+const { Supervisor } = await import('../main/supervisor.mts');
 
 const SECOND = '/nonexistent-accounts/second';
 const LIMIT = [1, "You've hit your weekly limit · resets Oct 8 at 12pm\n"];

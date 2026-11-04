@@ -14,8 +14,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CLOUD_NOTE, PLAIN_CLOUD_NOTE } from '../main/cloud/run.mjs';
-import { createResourceRequests } from '../main/cloud/resources.mjs';
+import { CLOUD_NOTE, PLAIN_CLOUD_NOTE } from '../main/cloud/run.mts';
+import { createResourceRequests } from '../main/cloud/resources.mts';
 import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
 
 describe('what a cloud run is told about files only the computer has', () => {

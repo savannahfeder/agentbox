@@ -16,9 +16,9 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { scanCodex } from '../main/codex-watch.mts';
-import { codexIdOf, isCodexMirrorRow } from '../shared/codex-import.mjs';
+import { codexIdOf, isCodexMirrorRow } from '../shared/codex-import.mts';
 
 const NOW = Date.parse('2026-10-05T14:00:00-07:00');
 
@@ -74,7 +74,7 @@ describe('importing is something you ask for', () => {
   it('nothing in the main process files rows on its own', () => {
     // The only callers of the store's import doors are the card's IPC handlers.
     const read = (f) => fs.readFileSync(new URL(`../main/${f}`, import.meta.url), 'utf8');
-    for (const f of ['main.mjs', 'supervisor.mjs', 'codex-watch.mts']) {
+    for (const f of ['main.mts', 'supervisor.mts', 'codex-watch.mts']) {
       expect(read(f), f).not.toMatch(/askAboutCodexThreads\(|importThreadRows\(|importCodexThreads\(/);
     }
   });

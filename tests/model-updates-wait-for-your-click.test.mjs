@@ -2,9 +2,9 @@
 // until clicked. Exercise wrong installations, version edges, retries and
 // duplicate clicks without updating the test machine.
 import {it,expect,vi} from 'vitest';
-import {updatePlan,newerVersion,AgentUpdates} from '../main/agent-updates.mjs';
-import {TaskTerminals} from '../main/task-terminals.mjs';
-import {rememberCodexModels,codexModels,codexKnownSlugs,codexModelLevels} from '../main/codex-models.mjs';
+import {updatePlan,newerVersion,AgentUpdates} from '../main/agent-updates.mts';
+import {TaskTerminals} from '../main/task-terminals.mts';
+import {rememberCodexModels,codexModels,codexKnownSlugs,codexModelLevels} from '../main/codex-models.mts';
 const native={engine:'claude',bin:'/home/me/.local/bin/claude',real:'/home/me/.local/share/claude/versions/2.1.1',home:'/home/me'};
 it('targets the actual native agent and does not guess a manager for a custom binary',()=>{
  expect(updatePlan(native)).toMatchObject({file:native.bin,args:['update']});

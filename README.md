@@ -33,7 +33,7 @@
 
 ## Install
 
-There are two ways to run it: in the browser, or as a Mac app. Both need Node 22.13 or newer and Claude Code or Codex installed and signed in.
+There are two ways to run it: in the browser, or as a Mac app. Both need Node 22.18 or newer and Claude Code or Codex installed and signed in.
 
 **As a desktop app.** Build it from this repo. `npm start` is the desktop command on Omarchy and on a Mac:
 
@@ -286,10 +286,10 @@ it, whether an agent's run failed, whether it happened in setup's practice
 project, which coding agent ran it, Claude Code or Codex, and why an agent
 could not start yet, out of eighteen fixed words.
 No file contents, no prompts, no paths, no titles, nothing you typed.
-`shared/analytics-events.mjs` is the whole list, and anything a caller attaches
+`shared/analytics-events.mts` is the whole list, and anything a caller attaches
 beyond those eight is dropped rather than sent, so nobody can widen it by
 accident. Crash reports travel the same way and are scrubbed first
-(`shared/crash-scrub.mjs`).
+(`shared/crash-scrub.mts`).
 
 **The events can be turned off,** and either way is enough on its own:
 

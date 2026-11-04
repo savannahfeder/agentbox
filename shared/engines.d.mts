@@ -7,6 +7,7 @@ export interface Engine {
 export declare const ENGINES: Engine[];
 export declare const ENGINE_IDS: string[];
 export declare const DEFAULT_ENGINE: string;
+export declare const DEFAULT_CLAUDE_MODEL: string;
 // The capability gate. `unique symbol` is what makes TypeScript refuse a
 // boolean or a string here, so an honest caller is stopped at compile time. BE
 // PRECISE ABOUT WHAT THAT BUYS: `any` walks straight through it, as it does
@@ -45,6 +46,7 @@ export declare function engineChoiceOnRowIsStale(
 export declare function isEngine(id: unknown): boolean;
 export declare function engineLabel(id: string | null): string;
 export declare function availableEngines(found?: Record<string, boolean>): Engine[];
+export declare function homeEngine(found?: Record<string, boolean>): string;
 export declare function engineChoiceExists(found?: Record<string, boolean>): boolean;
 export declare function engineFor(
   item: EngineRow | null | undefined,

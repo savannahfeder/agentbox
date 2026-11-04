@@ -2,7 +2,7 @@
 // components/FirstRun.tsx; tests/the-first-run-starts-on-real-work.test.mjs
 // holds what each rule is for.
 
-import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
+import { checkProjectFolder } from '../../shared/project-folder-check.mts';
 import { repeatLabel, type RepeatShape } from '../../shared/repeats.mjs';
 import { projectNameFor } from './agent-import-card';
 

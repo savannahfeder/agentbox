@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { writeReport } from '../.claude/skills/product-loop/scripts/workday.mjs';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const WORKDAY = path.resolve(__dirname, '../.claude/skills/product-loop/scripts/workday.mjs');
 
@@ -86,7 +87,7 @@ describe('a workday that is stopped', () => {
     try {
       fs.mkdirSync(path.join(out, 'founder'));
       fs.writeFileSync(path.join(out, 'founder', 'diary.jsonl'), `${JSON.stringify({ kind: 'issue', severity: 'broken', title: 'Blank screen', shots: [] })}\n`);
-      const child = spawn(process.execPath, [WORKDAY, '--who', 'founder', '--pace', '--hours', '3', '--codex-home', home,
+      const child = spawn(process.execPath, [...stripTypesFlags(), WORKDAY, '--who', 'founder', '--pace', '--hours', '3', '--codex-home', home,
         '--url', 'http://127.0.0.1:9/', '--out', out], { stdio: ['ignore', 'pipe', 'pipe'] });
       let said = '';
       child.stdout.on('data', (d) => { said += d; });

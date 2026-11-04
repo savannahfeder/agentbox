@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { askedInLabel, askedIn, chatTranscript, taskBrief } from '../renderer/src/team/agent-mentions.ts';
 import { agentSaidLast, answersInTheirChat } from '../renderer/src/team/answers-in-the-chat.ts';
-import { namePrompt } from '../main/row-label.mjs';
+import { namePrompt } from '../main/row-label.mts';
 
 const chat = { id: 'w-chat000001', product: 'direct-priya' };
 const task = (over = {}) => ({ id: 'w-task000001', product: 'agentbox-team', labels: ['founder', askedInLabel(chat)], ...over });

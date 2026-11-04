@@ -1,4 +1,4 @@
-// ROOMS ON SUPABASE (w-3d0fa23ffb): the same calls as rooms-memory.mjs, against
+// ROOMS ON SUPABASE (w-3d0fa23ffb): the same calls as rooms-memory.mts, against
 // cloud/supabase/migrations/20261021000000_rooms.sql. Row level security and
 // the functions there are what keep people apart; nothing here is trusted to.
 import { Name } from '../../shared/product-name.mjs';

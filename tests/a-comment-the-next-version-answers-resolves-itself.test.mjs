@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { noteToItsAgent, resolveAnsweredNotes } from '../main/notes-wake.mjs';
 import { answeredNotes, cleanMark, marksOf, resolvedInWords } from '../shared/artifact-marks.mjs';
 
@@ -147,6 +147,6 @@ describe('on a thread in the store', () => {
 });
 
 it('the supervisor sweeps on every tick, with or without a team', () => {
-  const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+  const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
   expect(src).toMatch(/resolveAnsweredNotes\(\{ store: this\.store/);
 });

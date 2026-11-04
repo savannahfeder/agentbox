@@ -7,14 +7,14 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import { COPY, BEAT, N_BEATS, coach, finishCard, forcedStep, walkRows } from '../renderer/src/onboarding.ts';
-import { EXAMPLES } from '../shared/first-run-examples.mjs';
+import { EXAMPLES } from '../shared/first-run-examples.mts';
 
 const css = fs.readFileSync(new URL('../renderer/src/styles.css', import.meta.url), 'utf8');
 const card = fs.readFileSync(new URL('../renderer/src/components/Onboarding.tsx', import.meta.url), 'utf8');
 const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
 // The names the card keeps are saved in main now, so the check that they are
 // still saved at all has to look where they are saved.
-const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
 
 describe('the walk ends by saying it is over', () => {
   it('has a step after the command bar, and it is still beat ten', () => {

@@ -1,7 +1,7 @@
 // CLOUD RUNS FINISHING TOGETHER BRING THEIR WORK HOME TWO AT A TIME.
 //
 // What broke (2026-10-16, her Mac overloaded with every thread set to the
-// cloud): read off main/cloud/run.mjs on 2026-10-17, every cloud run's process
+// cloud): read off main/cloud/run.mts on 2026-10-17, every cloud run's process
 // on this Mac brought its work home on its own as soon as it ended, holding
 // both its commit bundles, every transcript archive and its whole event log in
 // memory, so twenty runs ending together unpacked twenty of each at once.
@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { takeImportSlot } from '../main/cloud/run.mjs';
+import { takeImportSlot } from '../main/cloud/run.mts';
 
 const dirs = [];
 afterEach(() => { while (dirs.length) fs.rmSync(dirs.pop(), { recursive: true, force: true }); });
@@ -59,7 +59,7 @@ describe('bringing cloud work home', () => {
   });
 
   it('frees its slot however the import ends', () => {
-    const src = fs.readFileSync(new URL('../main/cloud/run.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/cloud/run.mts', import.meta.url), 'utf8');
     const at = src.indexOf('const release = await takeImportSlot();');
     const tail = src.slice(at, at + 700);
     expect(tail.indexOf('try {')).toBeLessThan(tail.indexOf('mkdtempSync'));
@@ -67,7 +67,7 @@ describe('bringing cloud work home', () => {
   });
 
   it('downloads its bundles and transcripts to files, not into memory', () => {
-    const src = fs.readFileSync(new URL('../main/cloud/run.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/cloud/run.mts', import.meta.url), 'utf8');
     const home = src.slice(src.indexOf('async function layHome('), src.indexOf('function layArchive('));
     expect(home).toMatch(/fetchToFile\(storage, k\(name\), f\)/);
     expect(home).toMatch(/fetchToFile\(storage, k\(b\.name\), file\)/);

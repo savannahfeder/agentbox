@@ -3,7 +3,7 @@
 //
 // WHY THIS FILE EXISTS. The old build drove one-shot `codex exec`, which has no
 // channel to ask the founder anything, so a Codex worker could not raise the
-// card that main/approval-prompt-server.mjs raises for a Claude Code worker. It
+// card that main/approval-prompt-server.mts raises for a Claude Code worker. It
 // could only run ungated or fail.
 //
 // `codex app-server` solves it: it speaks newline-delimited JSON-RPC 2.0 over
@@ -11,7 +11,7 @@
 // failure somewhere new, and this file is about the new place. An approval is
 // now a request with an id, and a request with an id that nobody answers is a
 // worker parked. So the rule this file pins is the one
-// main/approval-prompt-server.mjs already keeps: DENY IS THE DEFAULT IN EVERY
+// main/approval-prompt-server.mts already keeps: DENY IS THE DEFAULT IN EVERY
 // FAILURE MODE, and a failure is never a silence.
 //
 // A CARD WAITING ON HER IS NOT ONE OF THOSE FAILURE MODES, and the last block
@@ -638,7 +638,7 @@ describe('nothing is left hanging when the process goes', () => {
   // errors this branch reported where a run of `main` reports none. The
   // assertion is the same assertion; it just holds the promise from the moment
   // it exists. The app already knows this rule and writes it down at
-  // `_codexServer` in main/supervisor.mjs, where the handshake is `catch`ed on
+  // `_codexServer` in main/supervisor.mts, where the handshake is `catch`ed on
   // the spot for exactly this reason, so the code under test is not what was
   // wrong here. This was.
   it('closes on purpose: ends the pipe, kills the child, and settles what was open', async () => {

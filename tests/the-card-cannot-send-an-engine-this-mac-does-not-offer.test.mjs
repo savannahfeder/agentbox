@@ -44,11 +44,11 @@ import { fileURLToPath } from 'node:url';
 import { ENGINES } from '../shared/engines.mjs';
 import { engineThisMacOffers, readLastEngine } from '../renderer/src/engines.ts';
 import { Compose } from '../renderer/src/components/Compose.tsx';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
-const ipc = readFileSync(join(ROOT, 'main', 'ipc.mjs'), 'utf8');
+const ipc = readFileSync(join(ROOT, 'main', 'ipc.mts'), 'utf8');
 const compose = readFileSync(join(ROOT, 'renderer', 'src', 'components', 'Compose.tsx'), 'utf8');
 
 const ONE = [ENGINES[0]];
@@ -207,7 +207,7 @@ describe('the door refuses the model of an engine it just refused', () => {
 });
 
 /* ===================== and the two ends are really wired ================= */
-// `main/ipc.mjs` imports electron at module scope and cannot be loaded here, so
+// `main/ipc.mts` imports electron at module scope and cannot be loaded here, so
 // the handler is asserted as source, the way the other door tests are. What is
 // checked is that neither field is handed to the store on the door's own
 // judgement.

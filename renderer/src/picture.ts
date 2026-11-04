@@ -6,14 +6,14 @@
 // settings, the two origins side by side: naturalWidth 788 from file://, 0 from
 // http://. Her Agentbox runs from the dev server, so every pasted thumbnail and
 // every screenshot a worker put in a message drew as a broken image for her,
-// while a packaged build drew them fine. See main/img-scheme.mjs for the whole
+// while a packaged build drew them fine. See main/img-scheme.mts for the whole
 // measurement and for what the app agrees to serve.
 //
 // So nothing in the window builds a file:// url for a picture any more. It asks
 // the app for it, on the app's own scheme, which works from either origin. The
 // scheme is READ rather than typed, out of the one module that names this app,
 // so a rename reaches the window and the main process in one move.
-import { IMG_SCHEME } from '../../shared/schemes.mjs';
+import { IMG_SCHEME } from '../../shared/schemes.mts';
 
 const SCHEME = `${IMG_SCHEME}://file`;
 

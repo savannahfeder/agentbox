@@ -49,8 +49,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ensureTaskFolder, buildingFolderPath, taskFolderPath, listTaskFolders } from '../main/task-folders.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { ensureTaskFolder, buildingFolderPath, taskFolderPath, listTaskFolders } from '../main/task-folders.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 

@@ -22,7 +22,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { snapshotSender, snapshotReader, lightRunning } from '../shared/snapshot-delta.mjs';
-import { bootHeadless } from '../main/serve.mjs';
+import { bootHeadless } from '../main/serve.mts';
 import { encodeProjectPath } from '../main/store/home.mjs';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
