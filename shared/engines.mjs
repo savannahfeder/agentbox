@@ -33,6 +33,18 @@ export const ENGINE_IDS = ENGINES.map((e) => e.id);
 export const DEFAULT_ENGINE = 'claude';
 
 /**
+ * WHAT A CLAUDE CODE RUN IS ON WHEN NO ROW NAMES A MODEL. An alias, so the run
+ * is on whatever Opus is the day it spawns.
+ *
+ * Here because both ends read it: the card draws and sends this word
+ * (renderer/src/models.ts DEFAULT_MODEL) and `spawnPlan` pins it on every other
+ * kind of run. Two constants could drift, and a screen naming one model over a
+ * run on another is the bug that closed
+ * (tests/a-run-nobody-picked-a-model-for-is-on-the-model-the-card-names).
+ */
+export const DEFAULT_CLAUDE_MODEL = 'opus';
+
+/**
  * The capability gate: passing this to `engineFor` says the call site meant to
  * allow a second engine. It blocks serialized data only. Any module here can
  * import it.

@@ -40,20 +40,70 @@ export function teamFrom(rows: readonly { device: string; updated_at?: string; s
   };
 }
 
+/** A command the computer's copy may not reflect yet: not taken, or taken after the copy was made, and not refused. */
+const notInCopy = (c: PhoneRows['commands'][number], copyAt: number) =>
+  !c.outcome?.startsWith('refused') && (!c.taken_at || (Date.parse(c.taken_at) || 0) > copyAt);
+
+/**
+ * The computer's copy, with what you answered or closed here and it has not
+ * reflected yet: a teammate went on saying "Waiting on you".
+ */
+export function withPhoneAnswers(team: PhoneTeam | null, commands: PhoneRows['commands']): PhoneTeam | null {
+  if (!team) return team;
+  const settled = new Set(commands
+    .filter((c) => (c.kind === 'reply' || c.kind === 'close') && c.item && c.device === team.device && notInCopy(c, team.copyAt))
+    .map((c) => `${c.project}/${c.item}`));
+  // A message to one that the copy does not have yet: it has not got your words.
+  const told = new Set(commands
+    .filter((c) => c.kind === 'setting' && c.device === team.device && c.payload?.scope === 'teammate' && c.payload.key === 'post' && notInCopy(c, team.copyAt))
+    .flatMap((c) => (Array.isArray(c.payload.value?.to) ? c.payload.value.to : [])));
+  if (!settled.size && !told.size) return team;
+  const WAITS = 'Waiting for your computer';
+  const list = team.view.list.map((t) => {
+    const waiting = t.waiting.filter((w) => !settled.has(`${w.product}/${w.id}`));
+    const answered = waiting.length !== t.waiting.length;
+    if (!answered && !told.has(t.id)) return t;
+    return { ...t, waiting, now: t.paused ? t.now : (answered && !waiting.length && t.now === 'Waiting on you') || told.has(t.id) ? WAITS : t.now };
+  });
+  const runs = team.view.runs.map((r) => (r.waiting && settled.has(`${r.product}/${r.item}`) ? { ...r, waiting: false, answered: true } : r));
+  return { ...team, view: { ...team.view, list, runs } };
+}
+
+/** A teammate with a pause or resume asked here that the computer has not taken yet. */
+type Asked = Teammate & { pending?: boolean };
+
+/** The copy, with a pause or resume asked here shown at once, as Pausing or Resuming. */
+export function withPendingPauses(team: PhoneTeam | null, commands: PhoneRows['commands']): PhoneTeam | null {
+  if (!team) return team;
+  let changed = false;
+  const list = team.view.list.map((t) => {
+    const asked = pauseOnItsWay(commands, team, t.id);
+    if (asked === null || asked === !!t.paused) return t;
+    changed = true;
+    return { ...t, paused: asked, pending: true };
+  });
+  return changed ? { ...team, view: { ...team.view, list } } : team;
+}
+
 /** The teammate a thread belongs to, by its `teammate:<id>` label. */
 export function mateOf(item: { labels?: string[] } | null | undefined, team: PhoneTeam | null): Teammate | null {
   const id = item ? teammateIdOf(item) : null;
   return (id && team?.view.list.find((t) => t.id === id)) || null;
 }
 
+/** It asks you something you have not answered here yet. */
+const stillAsks = (view: TeammatesView, id: string, pending: readonly Pending[]) =>
+  asksYou(view, id) && !(pending.length && openQuestions(view, id).length > 0 && openQuestions(view, id, pending).length === 0);
+
 /** It has something for you: a thread, a question, or work held for your go-ahead. */
-export function waitsOnYou(t: Teammate, view: TeammatesView): boolean {
-  return t.waiting.length > 0 || asksYou(view, t.id) || !!heldFor(view, t.id);
+export function waitsOnYou(t: Teammate, view: TeammatesView, pending: readonly Pending[] = []): boolean {
+  return t.waiting.length > 0 || stillAsks(view, t.id, pending) || !!heldFor(view, t.id);
 }
 
 /** The line under its name in Chats (TeammatesRail.tsx `nowLine`). */
-export function nowLine(t: Teammate, view: TeammatesView, now = Date.now()): string {
-  if (asksYou(view, t.id)) return 'Has a question for you';
+export function nowLine(t: Teammate, view: TeammatesView, now = Date.now(), pending: readonly Pending[] = []): string {
+  if ((t as Asked).pending) return t.paused ? 'Pausing' : 'Resuming';
+  if (stillAsks(view, t.id, pending)) return 'Has a question for you';
   if (heldFor(view, t.id)) return 'Holding work for your go-ahead';
   if (t.status === 'draft' && !t.waiting.length) return 'Setting up';
   if (t.paused && !t.running) return t.waiting.length ? 'Paused, waiting on you' : 'Paused';
@@ -62,6 +112,7 @@ export function nowLine(t: Teammate, view: TeammatesView, now = Date.now()): str
 
 /** Beside its name at the top: paused, setting up, primary, or its role. */
 export function asideOf(t: Teammate): string {
+  if ((t as Asked).pending) return t.paused ? 'Pausing' : 'Resuming';
   if (t.paused) return 'Paused';
   if (t.status === 'draft') return 'Setting up';
   if (t.primary) return 'Primary';
@@ -93,6 +144,25 @@ export function onTheirWay(commands: PhoneRows['commands'], team: PhoneTeam | nu
     out.push({ id: c.id, kind: 'msg', from: 'you', to: p.value?.to ?? [], text: String(p.value?.text ?? ''), ts: Date.parse(c.created_at) || now, ...(p.value?.answers ? { answers: p.value.answers } : {}), waiting: true, refused });
   }
   return out;
+}
+
+/** A pause (true) or resume (false) you asked for here that the computer has not taken yet, or null. */
+export function pauseOnItsWay(commands: PhoneRows['commands'], team: PhoneTeam | null, id: string): boolean | null {
+  if (!team) return null;
+  const asked = commands
+    .filter((c) => c.kind === 'setting' && c.device === team.device && notInCopy(c, team.copyAt) && c.payload?.scope === 'teammate' && c.payload.key === 'pause' && c.payload.value?.id === id)
+    .sort((a, b) => (Date.parse(a.created_at) || 0) - (Date.parse(b.created_at) || 0))
+    .at(-1);
+  return asked ? asked.payload.value.paused === true : null;
+}
+
+/** Each teammate asking you something, with its newest open question, for the head of Needs you. */
+export function questionsForYou(team: PhoneTeam | null, pending: readonly Pending[] = []): { mate: Teammate; question: TeamChatLine }[] {
+  if (!team) return [];
+  return team.view.list.flatMap((t) => {
+    const open = openQuestions(team.view, t.id, pending);
+    return open.length ? [{ mate: t, question: open[open.length - 1] }] : [];
+  });
 }
 
 /** Its questions still waiting on you, oldest first. */

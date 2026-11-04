@@ -88,7 +88,7 @@ vi.mock('../main/account-tooling.mjs', async (importActual) => {
 
 import { Supervisor } from '../main/supervisor.mts';
 import { foldWorkItems } from '../shared/work-items.mjs';
-import { modelForEngine } from '../shared/engines.mjs';
+import { modelForEngine, DEFAULT_CLAUDE_MODEL } from '../shared/engines.mjs';
 
 const CLAUDE_BIN = '/nonexistent/claude-code/claude';
 const CODEX_BIN = '/nonexistent/codex/codex';
@@ -276,12 +276,17 @@ describe('a legacy phone model on Codex', () => {
 describe('what is not refused', () => {
   // THE FALLBACK ITSELF, WHICH IS CORRECT AND STAYS. A row marked for Codex on
   // her laptop, read on a Mac without it, still gets worked.
+  // It runs on the model the app names, which is what every Claude Code run
+  // with nothing on its row is pinned to since 2026-11-04
+  // (tests/a-run-nobody-picked-a-model-for-is-on-the-model-the-card-names).
+  // There is still no word of hers being swallowed here: this row names a
+  // model for neither engine.
   it('runs a codex row that names no model, on claude code, saying nothing', () => {
     const sup = build();
     sup.spawnWorker(row({ engine: 'codex' }));
 
     expect(claudeArgs()).toHaveLength(1);
-    expect(modelFlag(claudeArgs()[0])).toBe(null);
+    expect(modelFlag(claudeArgs()[0])).toBe(DEFAULT_CLAUDE_MODEL);
     expect(sup.written).toEqual([]);
   });
 

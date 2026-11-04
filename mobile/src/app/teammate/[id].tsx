@@ -8,14 +8,15 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'rea
 import { answersMessage } from '../../../../renderer/src/teammates/chat-lines';
 import type { TeamChatLine, TeamRunLine } from '../../../../renderer/src/types';
 import { screenGate } from '../../lib/thread-gate';
-import { actWords, asideOf, chatRows, clockOf, openQuestions, runningThread, type ChatRow, type PhoneTeam } from '../../lib/teammates';
+import { actWords, asideOf, chatRows, clockOf, openQuestions, pauseOnItsWay, runningThread, type ChatRow, type PhoneTeam } from '../../lib/teammates';
 import { useCloud } from '../../state/cloud';
 import { Back, More } from '../../ui/icons';
 import { Markdown } from '../../ui/Markdown';
 import { IconButton, RunningMark, Sheet, SheetHead, T, TopBar, Wall } from '../../ui/parts';
 import { Chips, DayRule, MateComposer, TeammateMark, YouFace } from '../../ui/Teammates';
-import { color, font, size } from '../../ui/theme';
+import { color, corner, font, size } from '../../ui/theme';
 import { phoneSlug } from '../../../../renderer/src/phone-rows';
+import { rowTitle } from '../../../../renderer/src/list-rules';
 
 const REFUSED = '#e28f82';
 const message = (err: unknown) => String((err as Error)?.message ?? err);
@@ -40,7 +41,7 @@ function Act({ verb, text, onOpen, when, status, children }: { verb: string; tex
 /** Threads it sent you one after another, as rows that open them (`SentCard`). */
 function Sent({ runs, team, items }: { runs: TeamRunLine[]; team: PhoneTeam; items: any[] }) {
   return (
-    <View style={{ marginTop: 14, marginLeft: 44, borderWidth: 1, borderColor: color.line, backgroundColor: color.fill }}>
+    <View style={{ marginTop: 14, marginLeft: 44, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line, backgroundColor: color.fill }}>
       <T style={{ paddingHorizontal: 14, paddingTop: 9, paddingBottom: 7, fontSize: 12.5, color: color.faint, borderBottomWidth: 1, borderBottomColor: color.line }}>{`Sent you · ${clockOf(runs[0].ts)}`}</T>
       {runs.map((r, i) => {
         const product = phoneSlug(team.device, r.product);
@@ -95,6 +96,7 @@ export default function TeammateChat() {
   const open = openQuestions(team.view, t.id, c.teamPending);
   const many = open.length > 1;
   const running = runningThread(t, team);
+  const runningTitle = running ? rowTitle(c.view.items.find((i) => i.product === running.product && i.id === running.id) ?? {}) : '';
 
   const post = async (value: Record<string, unknown>) => {
     setBusy(true); setError(null);
@@ -110,6 +112,16 @@ export default function TeammateChat() {
     setPicks((all) => ({ ...all, [q.id]: all[q.id] === o ? '' : o }));
   };
   const answered = open.filter((q) => picks[q.id]).length;
+  // Paused, or asked here to pause or resume and not yet taken by the computer.
+  const asked = pauseOnItsWay(c.rows.commands, team, t.id);
+  const setPaused = async (paused: boolean) => {
+    setBusy(true); setError(null);
+    try {
+      await c.askTeammate('pause', { id: t.id, paused });
+      c.say(`${paused ? 'Pausing' : 'Resuming'} ${t.name} · press Z to undo`, async () => { await c.askTeammate('pause', { id: t.id, paused: !paused }); c.say(`${paused ? 'Not pausing' : 'Not resuming'} ${t.name}`); });
+    }
+    catch (err) { setError(message(err)); } finally { setBusy(false); }
+  };
 
   const draw = (r: ChatRow) => {
     if (r.kind === 'day') return <DayRule key={r.key} label={r.label} />;
@@ -122,7 +134,7 @@ export default function TeammateChat() {
         <Act key={r.key} verb={w.verb} text={w.text} when={r.e.ts} status={w.status} onOpen={w.open ? () => openThread(w.open!) : undefined}>
           {w.goAhead && (
             <Pressable onPress={() => void c.askTeammate('goAhead', w.goAhead!).then(() => c.say('Going ahead'), (err) => setError(message(err)))} accessibilityRole="button"
-              style={({ pressed }) => ({ height: 26, paddingHorizontal: 10, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : color.fill })}>
+              style={({ pressed }) => ({ height: 26, paddingHorizontal: 10, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : color.fill })}>
               <T style={{ fontSize: 13, color: color.text }}>Go ahead</T>
             </Pressable>
           )}
@@ -164,7 +176,7 @@ export default function TeammateChat() {
     <Wall>
       <TopBar left={<IconButton label="Back" onPress={back}><Back size={18} /></IconButton>} title={name}
         right={<IconButton label={`About ${t.name}`} onPress={() => setAbout(true)}><More /></IconButton>} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1, paddingBottom: c.approvalRoom }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: size.inset, paddingBottom: 16 }} keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
           {rows.length ? rows.map(draw) : <T style={{ paddingTop: 24, fontSize: 14.5, lineHeight: 21, color: color.faint }}>{`Nothing yet. Say hello to ${t.name}.`}</T>}
@@ -172,18 +184,29 @@ export default function TeammateChat() {
             <Pressable onPress={() => openThread(running)} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 16, paddingLeft: 44 }}>
               <RunningMark />
               <T style={{ flex: 1, fontSize: 13.5, lineHeight: 20, color: color.faint }}>
-                {`${t.name} is on `}<T style={{ fontSize: 13.5, color: color.dim, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{t.now && t.now !== 'Waiting on you' && t.now !== 'Paused' ? t.now : 'its next run'}</T>
+                {`${t.name} is on `}<T style={{ fontSize: 13.5, color: color.dim, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{runningTitle || (t.now && t.now !== 'Waiting on you' && t.now !== 'Paused' && t.now !== 'Waiting for your computer' ? t.now : 'a thread')}</T>
               </T>
             </Pressable>
           )}
         </ScrollView>
         {error && <T style={{ paddingHorizontal: size.inset, paddingTop: 6, fontSize: 13, color: color.dim }}>{error}</T>}
+        {t.paused && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44, paddingHorizontal: size.inset, borderTopWidth: 1, borderTopColor: color.line }}>
+            <T style={{ flex: 1, fontSize: 13.5, lineHeight: 20, color: color.dim }}>
+              {asked === true ? 'Pausing when your computer gets this' : 'Your messages wait until you resume it'}
+            </T>
+            <Pressable disabled={busy} onPress={() => void setPaused(false)} accessibilityRole="button"
+              style={({ pressed }) => ({ height: 30, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: busy ? 0.5 : 1 })}>
+              <T style={{ fontSize: 13.5, fontFamily: font.medium }}>Resume</T>
+            </Pressable>
+          </View>
+        )}
         <MateComposer placeholder={t.status === 'draft' ? `Answer ${t.name === 'New teammate' ? 'your new teammate' : t.name}` : `Message ${t.name}`}
           send={(text) => post({ text, to: [t.id] })}
           above={many ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 8 }}>
               <Pressable disabled={!answered || busy} onPress={() => void sendAnswers(picks)} accessibilityRole="button"
-                style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: color.accent, opacity: !answered || busy ? 0.45 : pressed ? 0.85 : 1 })}>
+                style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: color.accent, borderRadius: corner.small, opacity: !answered || busy ? 0.45 : pressed ? 0.85 : 1 })}>
                 <T style={{ fontSize: 15, fontFamily: font.medium, color: '#fff' }}>Send answers</T>
               </Pressable>
               {answered < open.length && <T style={{ fontSize: 13, color: color.faint }}>{`${answered} of ${open.length} answered`}</T>}
@@ -204,7 +227,11 @@ export default function TeammateChat() {
             <T selectable style={{ fontSize: 15, lineHeight: 21, color: color.dim }}>{v}</T>
           </View>
         ))}
-        <T style={{ paddingHorizontal: 14, paddingTop: 8, fontSize: 12.5, lineHeight: 18, color: color.faint }}>Change its job, pause it or make it primary on your computer.</T>
+        <Pressable disabled={busy} onPress={() => { setAbout(false); void setPaused(!t.paused); }} accessibilityRole="button"
+          style={({ pressed }) => ({ alignSelf: 'flex-start', marginHorizontal: 14, marginTop: 10, height: 32, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+          <T style={{ fontSize: 14, color: t.paused ? color.text : color.dim }}>{`${t.paused ? 'Resume' : 'Pause'} ${t.name}`}</T>
+        </Pressable>
+        <T style={{ paddingHorizontal: 14, paddingTop: 8, fontSize: 12.5, lineHeight: 18, color: color.faint }}>Change its job or make it primary on your computer.</T>
       </Sheet>
     </Wall>
   );

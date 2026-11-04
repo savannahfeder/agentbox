@@ -169,7 +169,8 @@ describe('Chats on the phone', () => {
   });
   it('asks your yes before your words go to a teammate, as before any agent', () => {
     // It waits for the answer and goes on a yes (the-phone-app-sends-your-first-thread-once-you-say-yes).
-    expect(read('mobile/src/state/cloud.tsx')).toMatch(/if \(key !== 'goAhead' && !agreed\) await askNotice\(\);/);
+    // A go-ahead or a pause carries no words, so only a post or someone new waits for it.
+    expect(read('mobile/src/state/cloud.tsx')).toMatch(/if \(\(key === 'post' \|\| key === 'describe'\) && !agreed\) await askNotice\(\);/);
   });
 });
 

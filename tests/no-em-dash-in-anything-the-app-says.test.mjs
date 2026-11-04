@@ -99,6 +99,26 @@ const ALLOWED = [
     why: 'shortTitle, which ends a fallback title at the first clause; a dash '
       + 'between words is one of the marks a clause ends on, and is cut off.',
   },
+  {
+    file: 'shared/cloud-keys.mjs',
+    fragment: 'const ASK_LINE',
+    why: "The line a cloud run asks for a key on. The dash is in the class of "
+      + "marks allowed between the key's name and what it is for, so that an "
+      + 'agent that wrote one does not end up with it inside the field label.',
+  },
+  {
+    file: 'shared/cloud-needs.mjs',
+    fragment: 'const tidy',
+    why: 'tidy, which takes the punctuation off the front of what a need says '
+      + 'it is for. A dash is one of the marks it removes.',
+  },
+  {
+    file: 'renderer/src/format.ts',
+    fragment: 'AGENTBOX-NEEDS-A-KEY',
+    why: 'flatten, which rewrites that marked line as the words it asks for. '
+      + 'Same class of marks as the pattern in shared/cloud-keys.mjs, matched '
+      + 'here so the dash never reaches the row.',
+  },
 ];
 
 function files(dir) {

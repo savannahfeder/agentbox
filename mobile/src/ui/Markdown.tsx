@@ -13,7 +13,7 @@ import { inlineSpans, messageBlocks, type Block, type MentionKind, type Span } f
 import { offerLink } from './LinkMenu';
 import { T } from './parts';
 import { Player } from './Player';
-import { color, font } from './theme';
+import { color, corner, font } from './theme';
 
 /** How a message reaches the files it names; the thread screen gives it. */
 export interface MessageFiles {
@@ -122,7 +122,7 @@ function Picture({ src, alt }: { src: string; alt: string }) {
   }, [uri, known?.w, known?.h]);
   if (uri === null || broken) {
     return (
-      <View style={{ alignSelf: 'flex-start', borderWidth: 1, borderStyle: 'dashed', borderColor: color.line, paddingVertical: 2, paddingHorizontal: 8 }}>
+      <View style={{ alignSelf: 'flex-start', borderWidth: 1, borderRadius: corner.small, borderStyle: 'dashed', borderColor: color.line, paddingVertical: 2, paddingHorizontal: 8 }}>
         <T style={{ fontFamily: font.mono, fontSize: 12.5, lineHeight: 18, color: color.faint }}>missing image: {src}</T>
       </View>
     );
@@ -131,7 +131,7 @@ function Picture({ src, alt }: { src: string; alt: string }) {
   if (uri === undefined || !size) return <View style={size ? { width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, backgroundColor: color.raised } : { width: '100%', aspectRatio: 4 / 3, backgroundColor: color.raised }} />;
   const drawn = (
     <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={alt} contentFit="contain" onError={() => setBroken(true)}
-      style={{ width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, borderWidth: 1, borderColor: color.line, backgroundColor: color.raised }} />
+      style={{ width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, backgroundColor: color.raised }} />
   );
   if (/^data:/i.test(src)) return drawn;
   return <Pressable accessibilityRole="imagebutton" accessibilityLabel={alt || src} onPress={() => open(src, files, pictures)} onLongPress={() => hold(src, files)}>{drawn}</Pressable>;
@@ -188,7 +188,7 @@ function Shot({ file, all, width }: { file: string; all: string[]; width: number
   const base = file.split('/').pop() ?? file;
   return (
     <Pressable onPress={() => open(file, files, all)} accessibilityRole="imagebutton" accessibilityLabel={base} style={{ width }}>
-      <View style={{ width: '100%', aspectRatio: 16 / 10, borderWidth: 1, borderColor: color.line, backgroundColor: color.raised, overflow: 'hidden' }}>
+      <View style={{ width: '100%', aspectRatio: 16 / 10, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, backgroundColor: color.raised, overflow: 'hidden' }}>
         {!!uri && (
           <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={base} contentFit="cover" contentPosition="top"
             style={{ width: '100%', height: '100%' }} />
@@ -212,7 +212,7 @@ function Media({ src, label }: { src: string; label: string }) {
         <MentionIcon kind="media" tint={color.faint} />{label}
       </Text>
       {link && (film
-        ? <Player link={link} film style={{ width: '100%', height: 360, backgroundColor: color.raised, borderWidth: 1, borderColor: color.line }} />
+        ? <Player link={link} film style={{ width: '100%', height: 360, backgroundColor: color.raised, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line }} />
         : <Player link={link} film={false} style={{ width: '100%', maxWidth: 420, height: 36 }} />)}
     </View>
   );
@@ -371,7 +371,7 @@ function One({ block: b, tone, depth }: { block: Block; tone?: string; depth: nu
     case 'code':
       return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          style={{ backgroundColor: color.raised, borderWidth: 1, borderColor: color.line }}
+          style={{ backgroundColor: color.raised, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line }}
           contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: 14, flexGrow: 1 }}>
           <T selectable style={{ fontFamily: font.mono, fontSize: 13, lineHeight: 20.8, color: color.text }}>{b.text}</T>
         </ScrollView>

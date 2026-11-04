@@ -6,8 +6,10 @@
 import { itemThread } from '../../../renderer/src/item-thread';
 import { itemOptions, offerIsLive, optionsFrom, stripOptionsSection, type ParsedOption } from '../../../renderer/src/format';
 import { rowTitle } from '../../../renderer/src/list-rules';
+import { pageTitle } from '../../../renderer/src/one-thing-at-a-time';
 import { askLine } from '../../../renderer/src/ask-line';
 import { phoneHistory, type PhoneRows, type phoneView } from '../../../renderer/src/phone-rows';
+import { approvalReads } from '../../../renderer/src/approval-card';
 import { recapFor, resultLeads } from '../../../renderer/src/recap';
 import { withoutTrailingWork } from '../../../renderer/src/trailing-work';
 import { herTurnEnds, herTurnStarts } from '../../../renderer/src/her-turns';
@@ -31,12 +33,23 @@ export function tabStates(tabs: Record<TabId, Row[]>): Map<string, ThreadStateWo
   return state;
 }
 
+/** What she allowed or denied here, until the computer's own copy of the thread says so. */
+function receiptsFor(view: View, product: string, id: string) {
+  return (view.decided ?? []).filter((d) => d.product === product && d.item === id).map((d) => ({
+    at: d.at, verb: d.allow ? 'You allowed' : 'You denied', subject: String(approvalReads(d.input, d.tool).body ?? '').split('\n')[0].slice(0, 160),
+  }));
+}
+
 export function threadOf(rows: PhoneRows, view: View, product: string, id: string, { whole = false, tabs }: { whole?: boolean; tabs?: Record<TabId, Row[]> } = {}) {
   const item = view.items.find((i: any) => i.product === product && i.id === id) ?? null;
   if (!item) return null;
   const { lines } = phoneHistory(rows, product, id, view.aliases);
   const mine = view.waiting.filter((w) => w.product === product && w.id === id);
-  const pending = mine.map((w) => ({ at: w.at, text: w.text, ...(w.refused ? { refused: w.refused } : {}) }));
+  // A thread sent from here that the computer has not taken: its message is the first thing she said,
+  // unless the title on the page already says all of it.
+  const message = String(item.body || item.title || '').trim();
+  const sent = item.waitsForMac && message && message !== pageTitle(item).trim() ? [{ at: item.createdAt ?? 0, text: message }] : [];
+  const pending = [...sent, ...mine.map((w) => ({ at: w.at, text: w.text, ...(w.refused ? { refused: w.refused } : {}) }))];
   // A reply Agentbox Cloud took with the computer away says so (shared/cloud-kit.mjs).
   const inCloud = new Set(mine.filter((w) => w.cloud).map((w) => w.at));
   // Taken, and not in the thread's copy yet: sent, and drawn until the copy has it.
@@ -48,9 +61,17 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   const live = offerIsLive(item);
   const offered = live ? String(item[optionsFrom(item)] ?? '').trim() : null;
   const clean = (text: string) => (live && text.trim() === offered ? stripOptionsSection(text) : text).replace(/^##\s*Gist\s*\n+/i, '');
-  const said = built.events.map((e) => (e.kind === 'work' ? e : { ...e, text: clean(e.text ?? ''), ...(e.pending && !e.refused && inCloud.has(e.at) ? { cloud: true } : {}), ...(e.pending && !e.refused && sentAt.has(e.at) ? { sent: true } : {}) }));
+  // Live in Agentbox Cloud: the cloud takes her replies, not the computer.
+  const cloudRun = session?.where === 'cloud';
+  const said = built.events.map((e) => (e.kind === 'work' ? e : { ...e, text: clean(e.text ?? ''), ...(e.pending && !e.refused && inCloud.has(e.at) ? { cloud: true } : {}), ...(e.pending && !e.refused && sentAt.has(e.at) ? { sent: true } : {}),
+    ...(e.pending && !e.refused && cloudRun && !inCloud.has(e.at) && !sentAt.has(e.at) ? { toCloud: true } : {}) }));
   // While a run is up the live line speaks for its newest steps (ItemThread.tsx).
-  const shown = session ? withoutTrailingWork(said) : said;
+  // Sent for later from here: its message says when, not that it waits.
+  const runAt = Number(item.runAt) || 0;
+  const dated = sent.length && runAt > view.now
+    ? said.map((e) => (e.kind !== 'work' && e.pending && !e.refused && e.at === sent[0].at && e.text === sent[0].text ? { ...e, scheduled: runAt } : e))
+    : said;
+  const shown = session ? withoutTrailingWork(dated) : dated;
 
   const parent = item.parent ? view.items.find((i: any) => i.product === product && i.id === item.parent) ?? null : null;
   const recap = recapFor(item, parent, parent ? phoneHistory(rows, product, parent.id, view.aliases).lines : undefined);
@@ -88,7 +109,7 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
     gapWords: conversationGap(built.omitted),
     // A result an agent finished the thread on leads unlabelled (ItemThread.tsx).
     outcome: outcome && { ...outcome, label: resultLeads(item) && outcome.field === 'result' ? null : outcome.field === 'result' ? 'Result' : 'Latest checkpoint' },
-    after: built.after,
+    after: [...built.after, ...receiptsFor(view, product, id)].sort((a, b) => (a.at ?? 0) - (b.at ?? 0)),
     options: (live ? itemOptions(item) : []) as ParsedOption[],
     // The question the options answer, the options card's heading (OptionsOffer.tsx).
     ask: live ? askLine(item) : '',

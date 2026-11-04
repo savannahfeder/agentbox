@@ -34,6 +34,7 @@
 // A model set by hand outside this list still draws as itself; see modelChoices.
 
 import { CLAUDE_MODELS } from '../../shared/claude-models.generated.mjs';
+import { DEFAULT_CLAUDE_MODEL } from '../../shared/engines.mjs';
 
 export interface ModelChoice {
   /** What the CLI is sent. Always an alias, never a version. */
@@ -122,8 +123,12 @@ export const MODELS: ModelChoice[] = BUILT_MODELS;
  * it has to be the model that runs: Compose sends this constant on a Claude
  * Code card nobody has touched, instead of sending nothing and letting a
  * `--model` flag in zero.config.json answer a question already answered.
+ *
+ * EVERY OTHER KIND OF RUN IS PINNED TO IT TOO, which is why the word comes from
+ * shared/: a reply, a teammate's duty, a hand-off and a fork never pass this
+ * card, and they were the runs still taking that flag.
  */
-export const DEFAULT_MODEL = 'opus';
+export const DEFAULT_MODEL = DEFAULT_CLAUDE_MODEL;
 
 /**
  * A model set by hand that is none of the three is shown AS ITSELF rather than

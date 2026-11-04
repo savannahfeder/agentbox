@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 import { laterRows, typedLater, typedLine, type LaterRow } from '../lib/later';
 import { Sheet, SheetHead, SheetRow, T } from './parts';
-import { color, font } from './theme';
+import { color, corner, font } from './theme';
 
 /** A sheet whose typing box stays above the keyboard. */
 export function TypingSheet({ open, close, children }: { open: boolean; close: () => void; children: React.ReactNode }) {
@@ -31,10 +31,10 @@ export function TimeBox({ value, onChange, placeholder, onSubmit, line, onLine, 
       {lead}
       <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={color.faint}
         returnKeyType="done" onSubmitEditing={onSubmit} autoCorrect={false} autoCapitalize="none" accessibilityLabel="A time, in words"
-        style={[{ flex: 1, height: 40, paddingHorizontal: 10, borderWidth: 1, borderColor: color.line, backgroundColor: color.field, fontFamily: font.regular, fontSize: 15, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
+        style={[{ flex: 1, height: 40, paddingHorizontal: 10, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.field, fontFamily: font.regular, fontSize: 15, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
       {line && (
         <Pressable disabled={!ok || !onLine} onPress={onLine} accessibilityRole={ok ? 'button' : 'text'} hitSlop={8}
-          style={ok ? { height: 32, paddingHorizontal: 10, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong } : undefined}>
+          style={ok ? { height: 32, paddingHorizontal: 10, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong } : undefined}>
           <T style={{ fontFamily: font.mono, fontSize: 12, color: line.tone === 'unread' ? color.faint : ok ? color.text : color.dim, fontStyle: line.tone === 'ok' ? 'normal' : 'italic' }}>{line.text}</T>
         </Pressable>
       )}
