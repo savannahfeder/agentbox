@@ -407,7 +407,7 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
       )}
       {open && leveling && (
         <div className="th-menu ts-more-menu" role="menu" aria-label="Priority">
-          {priorityLevels(priority).map((p) => <button key={p.id} type="button" role="menuitem" aria-current={p.on ? 'true' : undefined} tabIndex={-1} className={`row-i ts-more-row${p.on ? ' on' : ''}`} onClick={() => { close(false); if (!p.on) onPriority?.(p.id); }}>
+          {priorityLevels(priority).map((p) => <button key={p.id} type="button" role="menuitem" aria-current={p.on ? 'true' : undefined} tabIndex={-1} className="row-i ts-more-row" onClick={() => { close(false); if (!p.on) onPriority?.(p.id); }}>
             <span className="ico"><PriorityIcon id={p.id} /></span>
             <span className="ts-more-label">{p.label}</span>
             {p.on && <svg className="ts-more-tick" {...mark}><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>}

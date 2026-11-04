@@ -231,9 +231,9 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, fold
                 <span className="usage-lim-name">{r.name}</span>
                 <span className="usage-lim-used">{r.used == null ? 'Reset' : `${r.used}% used`}</span>
               </div>
-              <span className="usage-meter wide" aria-hidden="true">
-                <i style={{ width: `${r.used ?? 0}%` }} />
-              </span>
+              {r.used != null && <span className="usage-meter wide" aria-hidden="true">
+                <i style={{ width: `${r.used}%` }} />
+              </span>}
               {r.when && <div className="usage-lim-when">{r.when}</div>}
             </div>
           ))}
@@ -246,7 +246,7 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, fold
                   <span className="usage-lim-name">{r.name}</span>
                   <span className="usage-lim-used">{r.used == null ? 'Reset' : `${r.used}% used`}</span>
                 </div>
-                <span className="usage-meter wide" aria-hidden="true"><i style={{ width: `${r.used ?? 0}%` }} /></span>
+                {r.used != null && <span className="usage-meter wide" aria-hidden="true"><i style={{ width: `${r.used}%` }} /></span>}
                 {r.when && <div className="usage-lim-when">{r.when}</div>}
               </div>
             ))}

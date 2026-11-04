@@ -46,6 +46,15 @@ describe('what still reads Nothing running', () => {
     expect(liveLine(thread(1 * SEC), fleet({ paused: true }))?.state).toBe('paused');
   });
 
+  it('a thread an agent has already claimed, a second after it was sent', () => {
+    expect(liveLine(thread(1 * SEC, { epoch: 1, wrote: { title: { ts: NOW - SEC, source: 'founder' }, status: { ts: NOW, source: 'agent' } } }), fleet())?.state).toBe('idle');
+  });
+
+  it('a reply an agent has already answered', () => {
+    const old = thread(3600 * SEC, { epoch: 2, wrote: { answer: { ts: NOW - 5 * SEC, source: 'founder' }, result: { ts: NOW - 2 * SEC, source: 'agent' } } });
+    expect(liveLine(old, fleet())?.state).toBe('idle');
+  });
+
   it('an agent writing on it is not her sending it', () => {
     const old = thread(3600 * SEC, { wrote: { title: { ts: NOW - 3600 * SEC, source: 'founder' }, result: { ts: NOW - 2 * SEC, source: 'agent' } } });
     expect(liveLine(old, fleet())?.state).toBe('idle');
