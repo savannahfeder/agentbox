@@ -266,6 +266,13 @@ function linksThatDoNotHold(root, folder, rel, landsAt, platform) {
   const bad = [];
   for (const link of found) {
     const name = path.relative(folder, link);
+    // Node never looks in a node_modules directly inside another, so this link
+    // is only ever what `ln -s x/node_modules node_modules` leaves behind when
+    // node_modules already exists. The task's copy goes without it.
+    if (path.basename(link) === 'node_modules' && path.basename(path.dirname(link)) === 'node_modules') {
+      fs.rmSync(link, { force: true });
+      continue;
+    }
     const target = linkTarget(link);
     if (target === null) continue; // gone from under us, or no longer a link
     let resolved, sourceSide;

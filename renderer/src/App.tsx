@@ -27,7 +27,7 @@ import { api } from './api';
 import { setClaudeModels, setCodexFreePlan } from './models';
 import { codexFromSettings } from './web-settings';
 import { advanceAfter, advanceLandsHere, pickSentWords, pickStaysPut, replyMovesOn, opensIntoNeedsYou, nextAfterAdvance, sayWhoseBox, sentLineSays, type Advance } from './advance';
-import { spotIn, stepIn } from './one-thing-at-a-time';
+import { arrowRows, spotIn, stepIn } from './one-thing-at-a-time';
 import { AIMED_AT_THE_THREAD_YOU_LEFT, pickLandsHere, type Arrival } from './pick-settles';
 import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
@@ -46,7 +46,7 @@ import { NotesSidebar, NotesToggle } from './components/NotesSidebar';
 import { NOTES_CLOSED_KEY, notesSidebarOpen, rememberNotesSidebar, takesNotesSidebar } from './notes-sidebar';
 import { docKind, EVEN_SPLIT, escapeClosesDoc, escapeInTheFileClosesIt, focusIsInTheFile, readSplit, writeSplit } from './doc-pane';
 import { changeOwnsKey } from './code-keys';
-import { askStillStands, bringsBack, closesAgain, graceUndoneLine, nextUndo, shownAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO, UNDID_CLOSING } from './undo-window';
+import { askStillStands, bringsBack, closesAgain, graceUndoneLine, nextUndo, shownAfterUndo, ticksAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO, UNDID_CLOSING } from './undo-window';
 import { answeredAlready, TOO_LATE_TO_WITHDRAW } from './withdraw-send';
 import { addUndoMark, UNDO_MARKS_EVENT, type UndidSpec } from './undo-marks';
 import { whatTheFileSentUp } from '../../shared/artifact-keys.mjs';
@@ -102,7 +102,9 @@ import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mjs';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
-import { DONE } from './done-word';
+import { DONE, manyOrOne } from './done-word';
+import { listedNow, type OpensWhenListed } from './opens-when-listed';
+import { oneToRepeat, repeatBody } from './repeat-from-thread';
 import { modalAfterLeavingATask } from './modal-scope';
 import { NOTHING_OVER_THE_APP, afterTheWalk, type OpenOverTheApp } from './walk-scope';
 import { splitMessage } from './message-split';
@@ -587,6 +589,9 @@ export default function App() {
   // One name for "she is reading one thing full screen".
   const inFullScreen = !!focused || !!focusedRepeat;
   const [modal, setModal] = useState<Modal>(null);
+  // Words ⌘K opens with, for the one time it was opened to show them.
+  const [paletteTyped, setPaletteTyped] = useState('');
+  useEffect(() => { if (modal !== 'palette') setPaletteTyped(''); }, [modal]);
   // Where the empty inbox wants the New thread box drawn, while it is on screen.
   const [clearSlot, setClearSlot] = useState<HTMLDivElement | null>(null);
   const [clearWriting, setClearWriting] = useState(false);
@@ -981,6 +986,8 @@ export default function App() {
     brings?: WorkItem;
     /** What the thread of each task it touches says once it has run (./undo-marks). */
     undid?: UndidSpec[];
+    /** The ticked rows it acted on, ticked again once it has run (`ticksAfterUndo`). */
+    ticks?: string[];
   };
   const [undoStack, setUndoStack] = useState<Array<Undoable & { at: number }>>([]);
   /**
@@ -2903,7 +2910,7 @@ export default function App() {
     ? teammateRows(cards, { tab: view, picked, me: team?.me ?? null, display: DEFAULT_DISPLAY.inbox, products: snap?.products ?? [], now }).length : 0);
   // THE TABS A PRESS OF TAB MOVES ALONG: the list the bar is drawing, so there
   // is no second copy of the order to fall out of step with it.
-  const stateTabOrder = useMemo(() => INBOX_TABS.map((t) => t.view).filter((v) => v !== 'snoozed' || laterTabShown({ count: snoozed.length, view, walking: !!run })), [snoozed.length, view, run]);
+  const stateTabOrder = useMemo(() => INBOX_TABS.map((t) => t.view).filter((v) => v !== 'snoozed' || laterTabShown({ count: scheduledCount, view, walking: !!run })), [scheduledCount, view, run]);
   // The inbox as she sees it, whichever tab is up: her filter AND her display
   // menu. Finishing a task from inside it advances through THIS, never the
   // whole inbox, or the next task opened can be one she has hidden
@@ -3538,6 +3545,11 @@ export default function App() {
     const newest = Object.entries(seenAt).sort((a, b) => b[1] - a[1]).slice(0, 2000);
     localStorage.setItem(SEEN_AT_KEY, JSON.stringify(Object.fromEntries(newest)));
   }, [seenAt]);
+  // THE NEWEST `seenAt`, FOR A WATCH THAT ASKS LATER. The arrival watch below
+  // waits on a scroll that may be minutes away and has to see a Mark Unread
+  // made since; closed over, it would read a copy from before it.
+  const seenAtNow = useRef(seenAt);
+  useEffect(() => { seenAtNow.current = seenAt; }, [seenAt]);
   useEffect(() => { localStorage.setItem(SNOOZE_KEY, JSON.stringify(snoozes)); }, [snoozes]);
 
   /* -------------------------------- actions ------------------------------- */
@@ -3571,8 +3583,13 @@ export default function App() {
     // `back: window` so coming back from another app belongs to the same watch
     // as scrolling down to it. Nothing else may mark an arrival read: a second
     // place doing it leaves this one armed, and the next scroll then undoes a
-    // Mark Unread.
-    return readWhenTheySeeIt(document, focused.id, () => markSeen(focused), { back: window });
+    // Mark Unread. Every door that OPENS a thread is that second place and has
+    // to be, so `saidUnread` is what keeps the instruction: `markUnseen`
+    // writes 0 and the watch stands down rather than overrule it.
+    return readWhenTheySeeIt(document, focused.id, () => markSeen(focused), {
+      back: window,
+      saidUnread: () => seenAtNow.current[focused.id] === 0,
+    });
   }, [focusedArrival]); // eslint-disable-line react-hooks/exhaustive-deps
   // A message that landed while the window was behind another is seen on the
   // way back to it. The dot is the watch's above; this is the team's "Seen by".
@@ -3615,20 +3632,22 @@ export default function App() {
 
   // One thing at a time (w-65bcefb857): every thread in Needs you opens on it,
   // however it was opened. Its place and its arrows are counted in Needs you,
-  // not in J and K's walk, which takes in teammates' rows.
+  // not in J and K's walk, which takes in teammates' rows; while a search is
+  // up they count the results, which is all J and K walk then.
   const openInQueue = useCallback((item: WorkItem) => {
     setFocused(item); markSeen(item);
     const at = list.indexOf(item);
     if (at >= 0) setSelected(at);
   }, [list, markSeen]);
   const queueSpot = spotIn(shownInbox, focused);
+  const arrowsWalk = arrowRows(shownInbox, search !== null ? list : null, focused);
   // And every thread with an agent is drawn on that page, Needs you or not; a
   // conversation between people keeps its chat.
   const onePage = !!focused && !directSlugs.has(focused.product);
   const stepQueue = useCallback((dir: 1 | -1) => {
-    const to = focused && stepIn(shownInbox, focused, dir);
+    const to = focused && stepIn(arrowsWalk, focused, dir);
     if (to) openInQueue(to);
-  }, [focused, shownInbox, openInQueue]);
+  }, [focused, arrowsWalk, openInQueue]);
 
   // WHERE THE OPEN THREAD SAT, KEPT AFTER IT LEAVES THE LIST (w-0d55a2b160).
   // A reply to a person keeps you on the thread and takes it out of Needs you
@@ -5323,8 +5342,18 @@ export default function App() {
       },
     });
     showToast(`Moved to ${name}${SAYS_UNDO}`, { product: made.product ?? slug, id: made.id });
+    // Left on the old row, now closed, people reopened it and had two copies.
+    if (focusedNow.current?.id === item.id && focusedNow.current?.product === item.product) {
+      opensWhenListed.current = { product: made.product ?? slug, id: made.id, at: Date.now() };
+    }
     await refresh();
   }, [pushUndo, refresh, showToast]);
+  const opensWhenListed = useRef<OpensWhenListed>(null);
+  useEffect(() => {
+    const r = listedNow(opensWhenListed.current, [...inbox, ...progress, ...snoozed, ...done], Date.now());
+    opensWhenListed.current = r.keep;
+    if (r.open) { setSearch(null); setFocused(r.open); markSeen(r.open); }
+  }, [inbox, progress, snoozed, done, markSeen]);
 
   const [snoozeItem, setSnoozeItem] = useState<WorkItem | WorkItem[] | null>(null);
   const [snoozeNote, setSnoozeNote] = useState<string | null>(null);
@@ -5498,15 +5527,17 @@ export default function App() {
       if (item.agent) await api.closeAgent({ key: agentKey(item.agent), through: item.agent.lastActiveAt || item.agent.startedAt || Date.now() });
       else await api.answer({ product: item.product, id: item.id, status: 'done' });
     }
-    pushUndo({ label: `Reopened ${targets.length} items`, undoes: `reopen those ${targets.length} tasks`, brings: bringsBack(targets), undid: targets.filter((i) => !i.agent).map((i) => ({ product: i.product, id: i.id, words: 'Undid closing it' })), run: async () => {
+    const closed = manyOrOne(targets.map((i) => clipToSentence(rowTitle(i), TOAST_TITLE)));
+    const which = targets.length === 1 ? '“' + closed + '”' : 'those ' + closed;
+    pushUndo({ label: `Reopened: ${closed}`, undoes: `reopen ${which}`, brings: bringsBack(targets), ticks: targets.map((i) => i.id), undid: targets.filter((i) => !i.agent).map((i) => ({ product: i.product, id: i.id, words: 'Undid closing it' })), run: async () => {
       for (const item of targets) {
         if (item.agent) await api.closeAgent({ key: agentKey(item.agent), through: 0 });
         else await api.answer({ product: item.product, id: item.id, status: 'open' });
       }
     } });
     showToast((kept.length
-      ? `${DONE.verb}: ${targets.length} items. Still open: ${kept.length}, work never reached main`
-      : `${DONE.verb}: ${targets.length} items`) + SAYS_UNDO);
+      ? `${DONE.verb}: ${closed}. Still open: ${kept.length}, work never reached main`
+      : `${DONE.verb}: ${closed}`) + SAYS_UNDO);
     setMultiSel(new Set(kept.map((i) => i.id)));
     await refresh();
   }, [selectable, refresh, showToast, run, nudgeOnStopped]);
@@ -5774,6 +5805,7 @@ export default function App() {
           : last.label,
     );
     await refresh();
+    setMultiSel((m) => ticksAfterUndo(last.ticks, m));
     // A withdrawn reply reopens where she was writing it, words and all. A
     // withdrawn new task reopens the card instead: there is no thread to go to,
     // and the whole point of the press was to add a sentence to what was written.
@@ -6587,7 +6619,9 @@ export default function App() {
   // A schedule set on a thread. On one RUN of a repeating task it moves that
   // task's rule rather than making a second one; on ordinary work it makes that
   // work repeating, using the item's own words as the brief.
-  const applyRepeat = async (item: WorkItem, rule: RepeatShape) => {
+  // `putOff`: set from Later, so the thread leaves Needs you the way E takes it
+  // out, and Z takes back the close and the repeat together.
+  const applyRepeat = async (item: WorkItem, rule: RepeatShape, { putOff = false }: { putOff?: boolean } = {}) => {
     // AN AGENT ROW IS NOT WORK OF HERS TO CLOSE, DEFER OR RESTART. It stands
     // for a session running outside Agentbox; the only two things that mean
     // anything to it are a reply and being taken to its window.
@@ -6600,25 +6634,49 @@ export default function App() {
     if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
     if (teammateIdOf(item)) { showToast('A teammate keeps its own times. Tell it when in its chat.'); return; }
     const ruleId = ruleIdOf(item);
+    let said: string;
+    let made: RepeatRule | null = null;
     try {
       if (ruleId) {
-        await api.setRepeat({ product: item.product, id: ruleId, rule });
-        showToast(`Now ${ruleLabel(rule)}`);
+        await api.setRepeat({ product: item.product, id: ruleId, rule: { ...rule, startsNext: true } });
+        said = `Now ${ruleLabel(rule)}`;
       } else {
         // AND THE ROW'S OWN ENGINE AND MODEL, because "make this work
         // repeating" means this work, and this work has a harness. Dropping
         // them here would quietly move a Codex task onto the workspace default
         // the moment she scheduled it.
-        await api.composeRepeat({
-          product: item.product, title: item.title, body: item.body, priority: item.priority, rule,
-          engine: item.engine, model: item.model,
+        // `startsNext`: this thread already did the work once, so a run now
+        // would be the same job twice.
+        made = await api.composeRepeat({
+          product: item.product, title: rowTitle(item), body: repeatBody(item), priority: item.priority, rule,
+          engine: item.engine, model: item.model, startsNext: true,
         });
-        showToast(`Repeating: ${ruleLabel(rule)}`);
+        said = `Repeating: ${ruleLabel(rule)}`;
       }
       setRepeats(await api.repeats());
     } catch (err) {
       showToast(`Not set: ${(err as Error).message}`);
+      return;
     }
+    // A thread whose work never reached main, or with filed tasks waiting for
+    // a yes, stays where it is: closing it is E's call, and E asks first.
+    const closes = putOff && item.status !== 'done' && !notShipped(item) && !waitingFiled(item).length
+      && !isGivenTask(item, team?.products.get(item.product)) && !closesAgain(pendingRef.current, item);
+    if (!closes) { showToast(said); return; }
+    const endIt = async () => {
+      if (!made) return;
+      await api.endRepeat({ product: item.product, id: made.id });
+      setRepeats(await api.repeats());
+    };
+    window.dispatchEvent(new CustomEvent(THREAD_CLOSED));
+    const undid = [{ product: item.product, id: item.id, words: UNDID_CLOSING }];
+    await deferCommit(item, async () => {
+      await api.answer({ product: item.product, id: item.id, status: 'done' });
+      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, undid, run: async () => {
+        await endIt();
+        await api.answer({ product: item.product, id: item.id, status: 'open' });
+      } });
+    }, said, () => { void endIt(); return null; }, false, undefined, undid);
   };
 
   // THE SETUP SCREENS WEAR THE PICTURE, AND THEY HAVE TO BE TOLD TO.
@@ -7641,7 +7699,7 @@ export default function App() {
                   waitEndedWords={asideBesides(rowTitle(focused), (waitCameBack(focused) ? focused.waitEnded?.said : null) ?? focused.handedOver?.said)}
                   onWait={(on) => { void waitOn(focused, on); }}
                   onAddPeople={addPeopleOnThread}
-                  queue={queueSpot && !inChats ? { spot: queueSpot, onStep: stepQueue } : null}
+                  queue={queueSpot && !inChats ? { spot: spotIn(arrowsWalk, focused) ?? queueSpot, onStep: stepQueue } : null}
                   inChats={inChats}
                   onePage={onePage}
                   headerTarget={taskHeader}
@@ -7788,6 +7846,7 @@ export default function App() {
                   onSnooze={walking ? undefined : () => openSnooze(focused)}
                   onReopen={() => sendBack(focused)}
                   onReopenDone={() => reopenDone(focused)}
+                  onMove={() => { setPaletteTyped('Move to '); setModal('palette'); }}
                   session={snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null}
                   // WHAT THE FLEET IS DOING ABOUT THIS ROW, through `factsFor`,
                   // which is the builder every row already reads. Written out
@@ -7838,7 +7897,8 @@ export default function App() {
                     counts={{
                       inbox: (mineShown ? shownCount(inbox) : 0) + theirCount('inbox') + leadCount + sharedFileNews.length + followingNews.length,
                       progress: (mineShown ? shownCount(progressTab) : 0) + theirCount('progress'),
-                      snoozed: (mineShown ? shownCount(snoozed) : 0) + theirCount('snoozed'),
+                      // The repeating tasks are rows on Later's page whatever the filters are.
+                      snoozed: (mineShown ? shownCount(snoozed) : 0) + repeats.length + theirCount('snoozed'),
                       done: (mineShown ? shownCount(done) : 0) + theirCount('done'),
                     }}
                     needs={team ? needsWord(picked, team.me) : undefined}
@@ -8024,6 +8084,7 @@ export default function App() {
           products={rankedProducts}
           items={items}
           engines={snap.engines?.choices}
+          workspaceEngine={snap.engines?.workspace}
           codexModels={codexModels}
           codexModelDefault={codexModelDefault}
           // THE TUTORIAL SENDS ITS TASK INTO THE PRACTICE PROJECT, so the card
@@ -8193,6 +8254,7 @@ export default function App() {
         onTutorial={() => startTutorial(comeBackTo(snap.products, productFilter, rememberedProject()))}
         onImportAgents={() => { setModal(null); setImportAgents(true); }}
         products={rankedProducts}
+        typed={paletteTyped}
         supervisorPaused={snap.supervisor.paused}
         batch={multiSel.size > 0}
         look={look}
@@ -9060,8 +9122,8 @@ export default function App() {
              reply box cannot disagree about what "every monday 9am" does. One
              thread only: one rhythm over a dozen ticked rows would be a dozen
              repeating tasks nobody asked for. */
-          onRepeat={!Array.isArray(snoozeItem) && !snoozeItem.agent
-            ? (rule) => { setModal(null); setSnoozeItem(null); void applyRepeat(snoozeItem, rule); }
+          onRepeat={oneToRepeat(snoozeItem)
+            ? (rule) => { const one = oneToRepeat(snoozeItem)!; setModal(null); setSnoozeItem(null); setMultiSel(new Set()); void applyRepeat(one, rule, { putOff: true }); }
             : undefined}
           onNow={(Array.isArray(snoozeItem) ? snoozeItem : [snoozeItem]).some((i) => returnAt(i) > Date.now())
             ? () => unsnooze(snoozeItem)

@@ -177,6 +177,89 @@ describe('reaching a message that landed above the fold', () => {
     page.scrollTo(0);
     expect(read).toBe(1);
   });
+});
+
+// MARK UNREAD IS THE PERSON SPEAKING, AND IT OUTRANKS THE WATCH.
+//
+// The one door left open after the round-two fix, filed as w-987bd73c61 and
+// then asked for here. Every way of OPENING a thread calls `markSeen` itself,
+// and clicking the row of the thread that is ALREADY open is one of them: it
+// marks the thread read without the watch knowing, so the watch stays armed.
+// Mark Unread after that was then undone by the next scroll to the end — one
+// explicit instruction quietly lost.
+//
+// So the watch asks, every time it looks, whether they have said unread since,
+// and stands down rather than marking it read. `seenAt[id] === 0` is the
+// marker: `markUnseen` is the only thing that writes it, and the app already
+// reads it as "they said unread". Opening the thread again is how it comes
+// back, through the same door every other open uses.
+describe('a message the person has said they want unread', () => {
+  const stand = () => { let said = false; return { said: () => said, say: () => { said = true; } }; };
+
+  it('is left unread when they say so after the watch is armed', () => {
+    const page = window({ gap: 301 });
+    const unread = stand();
+    let read = 0;
+    const release = readWhenTheySeeIt(page, ID, () => { read += 1; }, { back: page.back, saidUnread: unread.said });
+    expect(page.watching()).toBe(2);
+    unread.say();                // re-opened the open row, then Mark Unread
+    page.scrollTo(0);            // and read down to the end
+    expect(read).toBe(0);
+    expect(page.watching()).toBe(0);   // stood down, so nothing can undo it later
+    expect(() => release()).not.toThrow();
+  });
+
+  it('is read on that same scroll when they have NOT said so', () => {
+    // The pair of the case above, so the rule is the saying and not the scroll.
+    const page = window({ gap: 301 });
+    let read = 0;
+    readWhenTheySeeIt(page, ID, () => { read += 1; }, { back: page.back, saidUnread: stand().said });
+    page.scrollTo(0);
+    expect(read).toBe(1);
+  });
+
+  it('is left unread on the way back to the window too', () => {
+    const page = window({ gap: 0, front: false });
+    const unread = stand();
+    let read = 0;
+    readWhenTheySeeIt(page, ID, () => { read += 1; }, { back: page.back, saidUnread: unread.said });
+    unread.say();
+    page.comeBack();
+    expect(read).toBe(0);
+    expect(page.watching()).toBe(0);
+  });
+
+  it('is left unread when they said so before the message even arrived', () => {
+    // Said unread, left the thread open at its end, and the next answer lands.
+    // It is still their instruction until they open the thread again.
+    const page = window({ gap: 0 });
+    const unread = stand();
+    unread.say();
+    let read = 0;
+    readWhenTheySeeIt(page, ID, () => { read += 1; }, { back: page.back, saidUnread: unread.said });
+    expect(read).toBe(0);
+    expect(page.watching()).toBe(0);
+  });
+
+  it('changes nothing once the message has already been read', () => {
+    const page = window({ gap: 0 });
+    const unread = stand();
+    let read = 0;
+    readWhenTheySeeIt(page, ID, () => { read += 1; }, { back: page.back, saidUnread: unread.said });
+    expect(read).toBe(1);
+    unread.say();
+    page.scrollTo(0);
+    expect(read).toBe(1);
+  });
+
+  it('reads it as before when nobody passes the question', () => {
+    // Every caller written before this still behaves exactly as it did.
+    const page = window({ gap: 301 });
+    let read = 0;
+    readWhenTheySeeIt(page, ID, () => { read += 1; });
+    page.scrollTo(0);
+    expect(read).toBe(1);
+  });
 
   it('watches nothing when the thread has no pane to watch', () => {
     const page = window({ pane: false });
@@ -206,6 +289,21 @@ describe('App.tsx', () => {
     expect(onFocus, 'the window-focus handler is still in App.tsx').not.toBeNull();
     expect(onFocus[0]).not.toContain('markSeen');
     expect(arrival[0]).toContain('back: window');
+  });
+
+  it('hands the watch the Mark Unread marker, read fresh at every look', () => {
+    // `seenAt` itself cannot be closed over: the effect is keyed on the
+    // answer's time alone, so the watch would ask a copy from before the Mark
+    // Unread. A ref is what makes the question current.
+    expect(arrival[0]).toMatch(/saidUnread: \(\) => \w+\.current\[focused\.id\] === 0/);
+    const ref = /const (\w+) = useRef\(seenAt\);/.exec(src);
+    expect(ref, 'a ref holding the newest seenAt').not.toBeNull();
+    expect(arrival[0]).toContain(`${ref[1]}.current[focused.id] === 0`);
+    expect(src).toContain(`${ref[1]}.current = seenAt;`);
+  });
+
+  it('writes 0 for Mark Unread, which is the marker the watch reads', () => {
+    expect(src).toMatch(/markUnseen = useCallback\(\(item: WorkItem\) => \{[\s\S]*?\[item\.id\]: 0[\s\S]*?\}, \[\]\)/);
   });
 
   it('still tells the team they are there, which is a different question', () => {

@@ -51,12 +51,13 @@ export function isRunning(pid, kill = process.kill.bind(process)) {
   try { kill(pid, 0); return true; } catch (err) { return err?.code === 'EPERM'; }
 }
 
+// A wrapped link's box spans two lines, and its middle can be the next link: aim at its first line, where a person taps.
 export function targetScript(arg) {
   const n = Number(arg);
   const pick = Number.isInteger(n) && n > 0
     ? `document.querySelector('[data-phone-ref="${n}"]')`
     : `[...document.querySelectorAll('[data-phone-ref]')].find((el) => (el.getAttribute('aria-label') || el.innerText || '').replace(/\\s+/g, ' ').trim().toLowerCase().startsWith(${JSON.stringify(String(arg).toLowerCase())}))`;
-  return `(() => { const el = ${pick}; if (!el) return null; el.scrollIntoView({ block: 'nearest' }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`;
+  return `(() => { const el = ${pick}; if (!el) return null; el.scrollIntoView({ block: 'nearest' }); const r = el.getClientRects()[0] || el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`;
 }
 
 async function asPhone(t) {
