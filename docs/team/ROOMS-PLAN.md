@@ -46,6 +46,11 @@ Ranks are weekly, from agent hours. You can go invisible.
 - Names show as "First L." by default; a person can turn on their full name.
 - No levels (2026-11-04): the founder took them out as made-up gamification.
   The `show_level` switch stays, labelled "Your agent hours", and hides those.
+- Groups are only ever your team (2026-11-04). Teams will be paid, so the app
+  offers no way to start, find, join or invite anyone to a group outside it:
+  no New group, Find groups, invite links or email invites, and nobody is put
+  in Coworking. A group chat takes teammates only. Older sections below that
+  describe open groups, links and Coworking are history.
 - Ranks are this week, with Today beside it. Reached from the room menu or any
   rank number. No ranks toggle on the room, no ranked wall.
 - Profile: the header with rank in room, rank on Agentbox, days in a row;

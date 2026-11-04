@@ -8,14 +8,13 @@ import { LiveMark } from '../../components/LiveMark';
 import { I } from './icons';
 import { Face } from '../people';
 import { agentsWords, cardName, invisibleNotice } from './room-rules';
-import { joinLink } from '../../../../shared/room-links.mjs';
 
 /** The wall, the room's ranks, or one person's page. */
 export type RoomPane = 'wall' | 'ranks' | `person:${string}`;
 
-export function RoomPage({ room, rooms, ranks, me, now, pane, link, chat, board = null, picked, onPick, onPane, onComeBack, onMessage, onCopyLink, onRoom, onSaveBio }: {
+export function RoomPage({ room, rooms, ranks, me, now, pane, chat, board = null, picked, onPick, onPane, onComeBack, onMessage, onRoom, onSaveBio }: {
   room: Room; rooms: Room[]; ranks: Record<string, number>;
-  me: RoomProfile | null; now: number; pane: RoomPane; link: string | null;
+  me: RoomProfile | null; now: number; pane: RoomPane;
   /** The chat panel beside the wall: this room's, or a chat switched to. */
   chat: ReactNode;
   /** Their threads as a board, drawn in place of the wall while the room's view is Board. */
@@ -27,7 +26,6 @@ export function RoomPage({ room, rooms, ranks, me, now, pane, link, chat, board 
   onMessage?: (personIds: string[]) => void;
   onPane: (p: RoomPane) => void;
   onComeBack: () => void;
-  onCopyLink: () => void;
 }) {
   const notice = invisibleNotice(me?.invisible_until, now);
   const alone = room.wall.length <= 1 && room.members <= 1;
@@ -40,9 +38,6 @@ export function RoomPage({ room, rooms, ranks, me, now, pane, link, chat, board 
   const person = pane.startsWith('person:') ? room.wall.find((c) => c.id === pane.slice(7)) ?? null : null;
   const justYou = alone && room.kind !== 'group' && <div className="rm-empty">
     <span className="t">It is just you in {room.name}.</span>
-    <span className="s">{room.listed ? 'Anyone on the app can find it and join.' : 'Anyone with the link can join.'}</span>
-    <div className="rm-field"><span className="rm-input">{I.link()}<span className="v">{link ? joinLink(link).replace(/^https:\/\//, '') : 'Making a link…'}</span></span>
-      <button type="button" className="rm-btn" disabled={!link} onClick={onCopyLink}>Copy link</button></div>
   </div>;
   if (person) {
     return <div className="rm-split"><div className="rm-main wide">
