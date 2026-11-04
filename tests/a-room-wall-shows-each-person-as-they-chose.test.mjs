@@ -1,7 +1,7 @@
 // A ROOM WALL SHOWS EACH PERSON AS THEY CHOSE (w-3d0fa23ffb, 2026-10-20).
 //
 // The wall is a card per person: face, "First L." (unless they turned on their
-// full name), level, the short name of what they are working on, how many
+// full name), the short name of what they are working on, how many
 // agents are running. What a card may say is the person's choice, and a
 // private thread is never named. Codex's first review found the gap this
 // pins: turning off "what I'm working on" had to hold for teammates too, who
@@ -79,7 +79,7 @@ describe('two Macs, and a Mac gone quiet', () => {
   it('agents and hours add up across a person’s Macs', () => {
     const w = wallCards({ members: [MAYA], meId: ME, now: NOW, teammates: [], teamCards: [], profiles: [prof(MAYA, 'Maya C.')],
       presence: [pres(MAYA, { device: 'aaaaaaaaaaaa', agents_running: 3, hours_total: 1000, hours_week: 10 }), pres(MAYA, { device: 'bbbbbbbbbbbb', agents_running: 1, hours_total: 240, hours_week: 5 })] });
-    expect(w[0]).toMatchObject({ agents: 4, hoursTotal: 1240, hoursWeek: 15, level: 43 });
+    expect(w[0]).toMatchObject({ agents: 4, hoursTotal: 1240, hoursWeek: 15 });
   });
 
   it('a Mac silent for 15 minutes counts no running agents, but its hours stay', () => {
@@ -123,7 +123,7 @@ describe('what a card shows', () => {
   it('switches off blank their field', () => {
     const w = wallCards({ members: [MAYA], meId: ME, now: NOW, teammates: [], teamCards: [],
       profiles: [prof(MAYA, 'Maya C.', { show_agents: false, show_level: false, show_status: false, status_text: 'Heads down', status_until: null })], presence: [pres(MAYA)] });
-    expect(w[0]).toMatchObject({ agents: null, level: null, status: null });
+    expect(w[0]).toMatchObject({ agents: null, status: null });
   });
   it('a status that has run out is not shown', () => {
     const w = wallCards({ members: [MAYA], meId: ME, now: NOW, teammates: [], teamCards: [],
@@ -134,7 +134,7 @@ describe('what a card shows', () => {
     expect(wallCards({ members: [MAYA, THEO], meId: ME, now: NOW, teammates: [], teamCards: [], profiles: [prof(MAYA, 'Maya C.')], presence: [] }).map((c) => c.id)).toEqual([MAYA]);
   });
   it('a profile with no presence yet is on the wall, not running', () => {
-    expect(wallCards({ members: [MAYA], meId: ME, now: NOW, teammates: [], teamCards: [], profiles: [prof(MAYA, 'Maya C.')], presence: [] })[0]).toMatchObject({ agents: 0, level: 1 });
+    expect(wallCards({ members: [MAYA], meId: ME, now: NOW, teammates: [], teamCards: [], profiles: [prof(MAYA, 'Maya C.')], presence: [] })[0]).toMatchObject({ agents: 0, hoursTotal: 0 });
   });
   it('my own card names my own thread, whatever it shows others', () => {
     const w = wallCards({ members: [ME], meId: ME, now: NOW, teammates: [], teamCards: [], profiles: [prof(ME, 'Sam R.', { show_working: 'none' })],

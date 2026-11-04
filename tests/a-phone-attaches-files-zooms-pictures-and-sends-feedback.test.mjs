@@ -34,12 +34,12 @@ const last = (piece, prop) => {
 describe('on a phone, a reply to an agent', () => {
   it('has a button to attach a file or a picture', () => {
     const focus = read('renderer/src/components/Focus.tsx');
-    expect(focus).toMatch(/!talkTo\?\.length && onPhone\(\) \?/);
-    expect(focus).toMatch(/aria-label="Attach a file or picture"[^>]*onClick=\{pickFiles\}/);
+    // Every reply box has the new thread card's paperclip since w-54cdf7c768.
+    expect(focus).toMatch(/\{!talkTo\?\.length && \(\s*<button type="button" className="tc-icon dock-clip"[^>]*onClick=\{pickFiles\}/);
   });
   it('drawn as an icon like the others, not a white box', () => {
-    expect(last('.compose-attach', 'background')).toBe('none');
-    expect(last('.compose-attach', 'border')).toBe('0');
+    expect(last('.dock-clip', 'background')).toBe('none');
+    expect(last('.dock-clip', 'border')).toBe('0');
   });
   it('and the phone\'s server takes a photo of more than 8 MB', () => {
     const limit = /body\.length > (\d+) \* 1024 \* 1024/.exec(read('main/serve.mts'));

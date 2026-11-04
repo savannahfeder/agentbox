@@ -35,7 +35,8 @@ import { changesOn, readingOf, type Reading, type SettingsRow } from '../phone-s
 import { lastAccountAsk, webProjectRow, webSettingsGroups, webSettingsPages } from '../web-settings';
 import { whatTakesEscape } from '../settings-escape';
 import { WebAlertsGroup } from './WebAlerts';
-import { api, RESTART_NOTE } from '../api';
+import { api, RESTART_NOTE, type PublicLink } from '../api';
+import { shareWords } from './ShareLink';
 import { updateLook } from '../update-row';
 import { InstructionSettings, sizeLabel } from './InstructionSettings';
 import { EVERY } from '../instruction-scope';
@@ -345,6 +346,48 @@ function agentStory(w: WorkspaceSettings, readings: Usage[], engine: 'claude' | 
 type Agent = ReturnType<typeof agentStory>;
 
 /** Whichever of two readings was taken later, either possibly absent. */
+const loadPublicLinks = () => api.fileLinks();
+
+/** One live link's row: its file, when it went up or was updated, and its comments. */
+export function publicLinkLine(l: PublicLink, now = Date.now()): string {
+  const when = shareWords.shared(l, now);
+  return l.comments ? `${when} · ${shareWords.comments(l.comments)}` : when;
+}
+
+/** WHAT THIS PERSON MADE PUBLIC, in one list, so it can be checked and stopped without finding each file. */
+export function PublicLinks({ load = loadPublicLinks, first = null, now = Date.now() }: {
+  load?: () => Promise<{ ok: boolean; links?: PublicLink[] }>; first?: PublicLink[] | null; now?: number;
+}) {
+  const [links, setLinks] = useState<PublicLink[] | null>(first);
+  const [asking, setAsking] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => { let live = true; void load().then((r) => { if (live && r.ok) setLinks(r.links ?? []); }); return () => { live = false; }; }, [load]);
+  if (!links?.length) return null;
+  const stop = async (l: PublicLink) => {
+    if (asking !== l.token) { setAsking(l.token); return; }
+    setAsking(null);
+    const out = await api.fileLinkStop({ token: l.token });
+    if (!out.ok) { setProblem(out.error ?? 'That did not stop.'); return; }
+    setLinks(links.filter((x) => x.token !== l.token));
+  };
+  const copy = async (l: PublicLink) => {
+    try { await navigator.clipboard.writeText(l.url); setCopied(l.token); } catch { setCopied(null); }
+  };
+  return (
+    <Group id="public-links" label="Public links" warn={problem}>
+      {links.map((l) => (
+        <Row key={l.token} label={l.name} desc={publicLinkLine(l, now)}>
+          <button type="button" className="set-ghost" onBlur={() => setCopied(null)} onClick={() => void copy(l)}>{copied === l.token ? 'Copied' : 'Copy link'}</button>
+          <button type="button" className="set-ghost" onBlur={() => setAsking(null)} onClick={() => void stop(l)}>
+            {asking === l.token ? shareWords.stopAsk(l.comments) : 'Stop sharing'}
+          </button>
+        </Row>
+      ))}
+    </Group>
+  );
+}
+
 export function newerReading(a: Usage | null, b: Usage | null): Usage | null {
   if (!a) return b;
   if (!b) return a;
@@ -2278,6 +2321,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 "How do i log out" looks for it: "should be at bottom of
                 settings page". Your account menu in the sidebar's corner has
                 it too. */}
+            {account && <PublicLinks />}
             {account && (
               <Group id="account" label="Account">
                 <Row label={`Signed in as ${account.email}`} desc={account.team ? `On the ${account.team} team.` : undefined}>

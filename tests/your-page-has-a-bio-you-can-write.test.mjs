@@ -66,6 +66,7 @@ describe('saved', () => {
       onChange: () => {},
       timers,
     });
+    await backend.createTeam('Lantern');
     await rooms.tick();
     await rooms.refresh?.();
     const mine = () => rooms.state().rooms.flatMap((r) => r.wall).find((c) => c.me);

@@ -47,10 +47,12 @@ it.each([['claude','/reload-skills'],['codex','/review --base main'],['claude','
  // No picture going up from the phone, and no file still being attached.
  saving:false,attaching:[],setSaving:vi.fn(),
  // No voice note being recorded, and nothing kept to forget.
- attachedNow:[],voiceCtl:{current:null},finishing:{current:false},forgetVoiceDraft:vi.fn(),setAttachments:vi.fn(),addVoice:vi.fn(),markVoiceSent:vi.fn()};
+ attachedNow:[],voiceCtl:{current:null},finishing:{current:false},forgetVoiceDraft:vi.fn(),setAttachments:vi.fn(),addVoice:vi.fn(),markVoiceSent:vi.fn(),
+ // No time picked on the caret beside Send: it goes now.
+ canWait:true,sendAt:0};
  const js=ts.transpile(body+'\nreturn send;', {target:ts.ScriptTarget.ES2022});
  const send=new Function(...Object.keys(context),js)(...Object.values(context));
  await send();
  expect(runCommand).toHaveBeenCalledWith({product:'p',id:'one'},text);
- expect(onSend).toHaveBeenCalledWith(text,undefined,null,{words:text,attachments:[]},null,undefined);
+ expect(onSend).toHaveBeenCalledWith(text,undefined,null,{words:text,attachments:[]},null,undefined,undefined);
 });

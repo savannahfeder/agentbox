@@ -219,6 +219,7 @@ describe('marking a room unread', () => {
   });
 
   it('a room never read has a read point of 0', async () => {
+    await w.jun.backend.createTeam('Elsewhere');
     await w.jun.rooms.tick();
     expect(w.jun.rooms.state().rooms[0]).toMatchObject({ readAt: 0, markedUnread: false });
   });

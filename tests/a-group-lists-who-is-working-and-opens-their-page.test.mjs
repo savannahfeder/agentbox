@@ -76,14 +76,14 @@ describe('the group’s options', () => {
   const items = (props) => [...renderToStaticMarkup(createElement(GroupOptions, {
     named: true, members: 4, muted: false, canLeave: true, board: true, onPick: () => {}, onClose: () => {}, ...props,
   })).matchAll(/<span>([^<]+)<\/span>/g)].map((m) => m[1]);
-  it('on a named group: everyone’s threads, invite, members, mute, leave, then a new group or one to find', () => {
-    expect(items({})).toEqual(['Everyone’s threads', 'Invite people', 'Members', 'Mute', 'Leave group', 'New group', 'Find groups to join']);
+  it('on a named group: everyone’s threads, members, mute, leave', () => {
+    expect(items({})).toEqual(['Everyone’s threads', 'Members', 'Mute', 'Leave group']);
   });
-  it('on a chat with people: no board and no invite, and it is a chat you leave', () => {
-    expect(items({ named: false, board: false })).toEqual(['Members', 'Mute', 'Leave chat', 'New group', 'Find groups to join']);
+  it('on a chat with people: no board, and it is a chat you leave', () => {
+    expect(items({ named: false, board: false })).toEqual(['Members', 'Mute', 'Leave chat']);
   });
   it('your team’s group cannot be left, and a muted one offers Unmute', () => {
-    expect(items({ canLeave: false, muted: true })).toEqual(['Everyone’s threads', 'Invite people', 'Members', 'Unmute', 'New group', 'Find groups to join']);
+    expect(items({ canLeave: false, muted: true })).toEqual(['Everyone’s threads', 'Members', 'Unmute']);
   });
   it('sits in the top bar on a group’s chat, where the View button sits over everyone’s threads', () => {
     expect(hook).toMatch(/: onChat \? <GroupMenuButton/);

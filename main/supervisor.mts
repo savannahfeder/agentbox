@@ -7,7 +7,7 @@ export { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/c
 import { taskRemoteControl } from './task-remote-control.mts';
 import type { BridgeStateEvent } from './task-remote-control.mts';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mts';
-import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor } from './ship-queue.mts';
+import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
@@ -132,7 +132,7 @@ import { machineryPath, storeRootEnv } from './store/home.mjs';
 import { answerModesFile } from './answer-modes.mts';
 import { isInside } from './doc-file.mts';
 import { setModelArg } from './settings.mts';
-import { isEffort, isEffortWord } from '../shared/effort-levels.mts';
+import { effortLabel, isEffort, isEffortWord } from '../shared/effort-levels.mts';
 // THE SECOND ENGINE, AND THIS FILE IS NOW THE ONE PLACE THAT HOLDS THE GATE.
 //
 // It did not used to be. The capability Symbol was deliberately unimported and
@@ -561,6 +561,7 @@ export interface SpawnOptions {
   remoteOnly?: boolean;
   shipFailure?: string | null;
   asked?: boolean;
+  switched?: boolean;
 }
 
 export interface StartSessionOptions {
@@ -900,6 +901,9 @@ export interface CodexServerEntry {
 // carrying both still wrote 1,000 characters.
 const WORKER_REPORT_RULES = /This is about the LAST message you send[\s\S]*?(?=A PICTURE YOU SHOW)/;
 const POLL_MS = 15_000;
+// How often an agent may restart its own thread on a model or effort it chose.
+const SWITCH_RESTARTS = 3;
+const SWITCH_WINDOW_MS = 30 * 60_000;
 // The reasons a queued thread's line names (`status().cannotStart`).
 const SAID_WHY_NOT_STARTED = new Set(['setup', 'asleep', 'cloud-carried', 'engine', 'login', 'memory', 'slow-folder', 'error', 'brake']);
 // Making a thread's folder takes seconds; past this it is said to be slow.
@@ -1335,6 +1339,7 @@ export class Supervisor {
   declare _warnedGrant: boolean | undefined;
   declare _warnedRenamedGrant: boolean | undefined;
   declare _warnedConfigModel: boolean | undefined;
+  declare _switchRestarts: Record<string, number[]> | undefined;
   declare _warnedNoCloudSignIn: Set<string> | undefined;
   declare _unknownCodexRequests: Set<string> | undefined;
 
@@ -5201,7 +5206,11 @@ export class Supervisor {
     if (!cwd || !isPlainMerge(handBackWhat(result))) return null;
     const product = this.store.listProducts?.().find((p) => p.slug === item.product);
     if (product && this.shipsThroughTheApp(product)) return null;
-    const done = mergeHome(cwd).then((merge) => {
+    // A push runs the project's own hooks, so it takes its turn at the memory check as a ship does.
+    const beforePush = () => shipSlot(this._memoryGate?.gate ?? null, item, this.memoryGateScore(item.product, item.id) ?? 0, {
+      onWait: () => { try { this.store.noteItem?.(item.product, item.id, 'Waiting for memory on this computer before pushing.'); } catch { /* the push still waits */ } },
+    });
+    const done = mergeHome(cwd, { beforePush }).then((merge) => {
       this._mergingHome?.delete(item.id);
       if (merge.ok) this._answeredByMerge(item, merge, startedAt);
       else {
@@ -9155,12 +9164,63 @@ export class Supervisor {
       if (current.answer === answerAtSpawn
         && (current.wrote?.answer?.ts ?? 0) === (spawnedItem.wrote?.answer?.ts ?? 0)) return;
       if (current.answer === '(withdrawn)') return; // a cancel, not a reply
+      // A reply set for later waits for its time, and the tick carries it then.
+      // A row the run closed meanwhile is opened again, or nothing would.
+      if (!this.store.isDue(current, Date.now())) {
+        if (current.status === 'done') this.store.answerItem(current.product, current.id, { status: 'open' });
+        return;
+      }
       if (this.sessions.has(current.id)) return;
       if (this._answerDelivered(current)) return;
       this._handledAnswers.add(this._answerKey(current));
       this._saveState();
       this.spawnWorker(current, { continuation: true });
     } catch {}
+  }
+
+  /**
+   * A session cannot change its own model or effort, so an agent that moved its
+   * thread to new ones (a rule such as "video work runs on Opus 5.5 at High")
+   * ends its turn, and the next turn starts here on them, in the same
+   * conversation. Capped per thread, so two rules that disagree cannot restart
+   * it for ever.
+   */
+  _carryOnAfterASwitch(spawnedItem: WorkItem, session: { ranOn?: { model: string | null; effort: string | null }; startedAt?: number }) {
+    try {
+      const ranOn = session?.ranOn;
+      if (!ranOn) return false;
+      const current = this.store.listItems().find((i) => i.product === spawnedItem.product && i.id === spawnedItem.id);
+      if (!current || current.status === 'done' || current.status === 'blocked') return false;
+      if (this.sessions.has(current.id)) return false;
+      const movedByIt = (f: 'model' | 'effort') => (current[f] || null) !== ranOn[f]
+        && current.wrote?.[f]?.source === 'agent' && (current.wrote[f].ts ?? 0) >= (session.startedAt ?? 0);
+      if (!movedByIt('model') && !movedByIt('effort')) return false;
+      const key = `${current.product}:${current.id}`;
+      const now = Date.now();
+      const recent = (this._switchRestarts?.[key] ?? []).filter((t: number) => now - t < SWITCH_WINDOW_MS);
+      if (recent.length >= SWITCH_RESTARTS) {
+        console.warn(`zero: ${current.id} changed its own model or effort ${SWITCH_RESTARTS} times in ${SWITCH_WINDOW_MS / 60_000} minutes; it waits for a reply now`);
+        return false;
+      }
+      (this._switchRestarts ??= {})[key] = [...recent, now];
+      const { answer: _spent, ...wrote } = current.wrote ?? {};
+      this.spawnWorker({ ...current, answer: undefined, wrote }, { continuation: true, switched: true });
+      return true;
+    } catch (error) {
+      console.warn(`zero: could not carry ${spawnedItem?.id} on after it switched model:`, (error as Error).message);
+      return false;
+    }
+  }
+
+  switchedBrief(item: WorkItem) {
+    const model = item?.model ? this._claudeModelLabel(item.model) : null;
+    const effort = item?.effort ? effortLabel(item.effort) ?? item.effort : null;
+    const on = [model, effort && `${effort} effort`].filter(Boolean).join(' at ');
+    return [
+      `You moved this thread to ${on || 'a new model and effort'}, and this turn runs on it.`,
+      'This is the same session, so everything you read and wrote is still here.',
+      'Claim the row again and carry on from where you stopped.',
+    ].join('\n');
   }
 
   /* -------------------------------- spawning ------------------------------ */
@@ -9176,7 +9236,7 @@ export class Supervisor {
   // it did. It is here for the two resume paths only: a session belongs to the
   // harness that wrote it, and a thread id handed to the wrong CLI dies on
   // arrival with "No conversation found with session ID".
-  spawnPlan(item: WorkItem, product: Product, { continuation = false, resumeSessionId = null, engine = DEFAULT_ENGINE, shipFailure = null, movedHere = false }: { continuation?: boolean; resumeSessionId?: string | null; engine?: string; shipFailure?: string | null; movedHere?: boolean } = {}): SpawnPlan {
+  spawnPlan(item: WorkItem, product: Product, { continuation = false, resumeSessionId = null, engine = DEFAULT_ENGINE, shipFailure = null, switched = false, movedHere = false }: { continuation?: boolean; resumeSessionId?: string | null; engine?: string; shipFailure?: string | null; switched?: boolean; movedHere?: boolean } = {}): SpawnPlan {
     // A ROW'S OWN CHAT. Her reply on a row goes back to the session that wrote
     // what she is replying to. Four guards, and each one falls back to the old
     // behaviour rather than to anything worse:
@@ -9191,7 +9251,7 @@ export class Supervisor {
     //   `rowSessionFor` itself, which returns null unless the row, the product,
     //   the folder and the transcript on disk all still agree.
     const rowChat = continuation && !resumeSessionId
-      && item.answer && item.answer !== '(withdrawn)'
+      && ((item.answer && item.answer !== '(withdrawn)') || switched)
       ? this.rowSessionFor(item, product)
       : null;
     // WHICH SESSION THIS IS, if it is not a new one. A worker resumes when the
@@ -9266,7 +9326,7 @@ export class Supervisor {
     // THE TWO KINDS OF RESUME SAY DIFFERENT THINGS, and handing a finished
     // session the interrupted wording would tell it to go looking for a step it
     // never left half-done. `replyBrief` is the one for a chat.
-    if (rowChat) prompt = this.replyBrief(item, { product });
+    if (rowChat) prompt = switched && !item.answer ? this.switchedBrief(item) : this.replyBrief(item, { product });
     // A FORK IS NOT AN INTERRUPTED SESSION AND MUST NOT BE TOLD IT IS. It is
     // the old conversation under a new id, on a new row, and the one thing it
     // cannot work out for itself is that it has moved.
@@ -9483,6 +9543,8 @@ export class Supervisor {
     // so they go above the ranked blocks and the message rules stay last. What
     // the run is ON is a fact of the same kind, and it sits beside them.
     const ranked = [standing, project, teammate, messages, adhd, teammate && howYourRunEnds()];
+    // With the app's own rules, which every real run carries, and above them.
+    if (messages) ranked.splice(ranked.indexOf(messages), 0, this.howAThreadChangesModel());
     const system = fillName([this._connectionsBrief(), this._whatThisRunIsOn(engine, claudeModel, engine === 'claude' ? claudeEffort : effort), ...ranked].filter(Boolean).join('\n\n'));
     // `fork` IS THE FLAG THAT MAKES IT A FORK RATHER THAN A CONTINUATION: the
     // resumed conversation is written on under a NEW id, so the row it came
@@ -9609,6 +9671,22 @@ export class Supervisor {
 
   editedFilesLine(item: WorkItem) {
     try { return editedFilesLine(readItemHistory(this.store.productDir(item.product), item.id)); } catch { return null; }
+  }
+
+  // A session cannot change its own model or effort; `_whatThisRunIsOn` says
+  // what it is on, and this says how the thread moves to something else.
+  howAThreadChangesModel() {
+    return [
+      '# Model and effort',
+      '',
+      'When the person, in this thread or in any instructions you were given, says',
+      'this work or this kind of work runs on a particular model or effort and this',
+      'run is not on it, do not stop to ask and do not only say so. Set model and',
+      'effort on this thread with update_work_item, then end your turn with one line saying',
+      'you switched. The app starts your next turn on them straight away, in this',
+      'same conversation. If they asked for a model this computer does not offer,',
+      'ask them instead.',
+    ].join('\n');
   }
 
   // Only a project holding the team's look hears about it (shared/team-look.mjs).
@@ -11030,7 +11108,7 @@ export class Supervisor {
     }
   }
 
-  spawnWorker(item: WorkItem, { continuation = false, resumeSessionId = null, profile: forcedProfile = null, engine: forcedEngine = null, remoteOnly = false, shipFailure = null, asked = false }: SpawnOptions = {}): void {
+  spawnWorker(item: WorkItem, { continuation = false, resumeSessionId = null, profile: forcedProfile = null, engine: forcedEngine = null, remoteOnly = false, shipFailure = null, asked = false, switched = false }: SpawnOptions = {}): void {
     const refuse = (reason: string, engine: string | null = null) => this._noteNotStarting(item, reason, engine ?? forcedEngine);
     if (this._heldFromStarting(item)) { refuse('held'); return; }
     // The app is merging its branch into main, which takes seconds and ends in
@@ -11074,7 +11152,7 @@ export class Supervisor {
     const hold = this._leftoverCleaner?.holdMs?.(item.id) ?? 0;
     if (hold > 0) {
       this._preparing ??= new Map();
-      const opts = { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, shipFailure, asked };
+      const opts = { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, shipFailure, asked, switched };
       const held = this._preparing.get(item.id);
       if (held) { held.item = item; held.opts = opts; this._saveState(); return; }
       const entry: PreparingEntry = { item, opts, engine };
@@ -11166,7 +11244,7 @@ export class Supervisor {
       refuse('practice', engine);
       return;
     }
-    const startAgain = { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, shipFailure, asked };
+    const startAgain = { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, shipFailure, asked, switched };
     if (this._folderFirst(item, product, engine, startAgain)) return;
     if (this._photoFirst(item, product, engine, startAgain)) return;
 
@@ -11206,7 +11284,7 @@ export class Supervisor {
       return;
     }
 
-    const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine, shipFailure, movedHere: this._toldItMoved(item, where) });
+    const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine, shipFailure, switched, movedHere: this._toldItMoved(item, where) });
     const { args } = plan;
     // Why it runs locally, where a branch below says so rather than `_whyLocal`.
     let whyLocal: WhyLocal | null = null;
@@ -11357,6 +11435,9 @@ export class Supervisor {
       ...(adopted ? { sessionId: adopted.rec.sessionId, idRemembered: true, adopted: true } : {}),
       // Picking up a conversation an earlier run had, so a death says "not finished".
       resumed: !!plan.resumeId,
+      // What the row asked for when this run started, so a switch the agent
+      // makes during it is told from one made before (`_carryOnAfterASwitch`).
+      ranOn: { model: item.model || null, effort: item.effort || null },
       // Which model, so a plan that refuses it strikes that model off this login.
       ...(model ? { model } : {}),
       // AND THE FOLDER IT IS RUNNING IN, which is now the row's own rather than
@@ -11840,6 +11921,7 @@ export class Supervisor {
       if (session.lastLiveReply && session.exitFailed)
         this.redeliverAnswer(session.lastLiveReply, session.lastLiveReply.answer);
       if (!session.stoppedByUs) this.deliverMidflightReply(item, answerAtSpawn);
+      if (!session.stoppedByUs && !session.exitFailed) this._carryOnAfterASwitch(item, session);
       harness.release(this, profile);
       // The item's own status was written by the worker through the MCP; if it
       // died without writing, the lease expires and the next tick re-pulls it.

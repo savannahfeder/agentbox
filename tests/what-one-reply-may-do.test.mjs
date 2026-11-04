@@ -656,13 +656,14 @@ describe('the wiring from the reply box is present in the source', () => {
     // still handed on; what follows it is the model pick.
     expect(focus).toContain('repeat, sent, mode,');
     const app = fs.readFileSync('renderer/src/App.tsx', 'utf8');
-    expect(app).toContain('onReplySend={(text, priority, repeat, sent, mode, pick) =>');
+    // A seventh since 2026-10-28: the time a reply set for later goes.
+    expect(app).toContain('onReplySend={(text, priority, repeat, sent, mode, pick, sendAt) =>');
     // THE ENGINE RIDES WITH IT SINCE 2026-09-05, and it is the last argument
     // rather than a sixth thing the box knows: `answerWith` needs it to decide
     // whether a slash command keeps her on the row, and the pane already holds
     // main's answer for the byline. The mode itself is unchanged and still the
     // fifth.
-    expect(app).toContain('answerWith(focused, text, priority, sent, mode, runningEngine, pick)');
+    expect(app).toContain('answerWith(focused, text, priority, sent, mode, runningEngine, pick, sendAt)');
     expect(app).toContain('permissionMode: mode');
   });
 

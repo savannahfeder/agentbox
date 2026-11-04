@@ -71,6 +71,8 @@ export function installStrayLetters(win: Window = window) {
     const now = Date.now();
     const chord = e.metaKey || e.ctrlKey || e.altKey;
     if (e.key === 'Escape') { strayLetters.reset(); return; }
+    // A table's key box takes arrows and Enter for the table; a letter pressed in it is handed on to the app, not typed.
+    if ((e.target as HTMLElement | null)?.dataset?.keysOnly !== undefined) return;
     if (editable(e.target)) {
       // Plain Enter is a new line in a brief; ⌘↵ sends, so the next letter starts something new.
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { strayLetters.reset(); return; }

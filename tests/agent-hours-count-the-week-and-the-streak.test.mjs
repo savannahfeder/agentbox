@@ -1,7 +1,6 @@
-// AGENT HOURS EARN A LEVEL AND COUNT THE WEEK (w-3d0fa23ffb, 2026-10-20).
+// AGENT HOURS COUNT THE WEEK AND THE STREAK (w-3d0fa23ffb, 2026-10-20).
 //
-// Rooms shows a level from agent hours ("I find agent hours level
-// compelling"), ranks by this week's hours, a streak of days in a row, and a
+// Rooms ranks by this week's hours, a streak of days in a row, and a
 // chart of hours since you started. Nothing in the app kept a history of runs:
 // a run's length went to PostHog and was gone (main/analytics.mts
 // runEndedProps), and the only durable trace of a run was its log file.
@@ -9,8 +8,8 @@
 // These are the rules, measured with fixed clocks in the test time zone
 // (America/Los_Angeles, set in tests/agentbox-home.setup.mjs): the edges of
 // a week and a day, a streak with a gap, runs counted once however often they
-// are written, and a run read back from its trace log. The level curve is
-// tests/a-level-takes-months-to-master-not-weeks.test.mjs.
+// are written, and a run read back from its trace log. Levels were taken out
+// on 2026-11-04 (tests/groups-show-no-levels.test.mjs).
 import { describe, it, expect } from 'vitest';
 import { summarizeRuns, dedupeRuns, runFromTrace } from '../shared/agent-hours.mts';
 
@@ -57,9 +56,9 @@ describe('a week, a day, all time', () => {
     expect(s.today).toBeCloseTo(1);
   });
 
-  it('carries the level of the total', () => {
+  it('adds up every run into the total', () => {
     const five = Array.from({ length: 5 }, (_, i) => run(`2026-10-0${i + 1}T10:00:00-07:00`, 20, { key: `d${i}` }));
-    expect(summarizeRuns(five, { now }).level).toBe(16);
+    expect(summarizeRuns(five, { now }).total).toBeCloseTo(100);
   });
 
   it('one run is never believed past a day', () => {
