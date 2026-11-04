@@ -286,8 +286,9 @@ function TagPicker({ column, value, typed, onPick, onClose }: {
 }
 
 /** A box that grows with what is typed into it, up to a cap, and scrolls past that. */
-function GrowingText({ value, onChange, onKeyDown, onBlur, readOnly, autoFocus, className, caretAtEnd, label }: {
+function GrowingText({ value, onChange, onKeyDown, onBlur, onPaste, readOnly, autoFocus, className, caretAtEnd, label }: {
   value: string; onChange?: (v: string) => void; onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void; onBlur?: () => void;
+  onPaste?: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
   readOnly?: boolean; autoFocus?: boolean; className?: string; caretAtEnd?: boolean; label?: string;
 }) {
   const el = useRef<HTMLTextAreaElement>(null);
@@ -304,7 +305,7 @@ function GrowingText({ value, onChange, onKeyDown, onBlur, readOnly, autoFocus, 
     if (caretAtEnd) t.setSelectionRange(t.value.length, t.value.length);
   }, [autoFocus, caretAtEnd]);
   return <textarea ref={el} className={className} value={value} readOnly={readOnly} rows={1} spellCheck={false} aria-label={label}
-    onChange={(e) => onChange?.(e.target.value)} onKeyDown={onKeyDown} onBlur={onBlur} />;
+    onChange={(e) => onChange?.(e.target.value)} onKeyDown={onKeyDown} onBlur={onBlur} onPaste={onPaste} />;
 }
 
 /** One field in the opened row: its own draft, written when the box is left. */
@@ -1028,6 +1029,14 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             : <div className="tbl-edit" style={{ left: place.left, top: place.top, width: place.w }}>
               <GrowingText className="tbl-edit-box" value={editing.draft} autoFocus caretAtEnd readOnly={!editable} label={table.columns[editing.c].name}
                 onChange={(v) => setEditing((x) => (x ? { ...x, draft: v } : x))}
+                // Rows copied from a spreadsheet into an empty cell go across the table, not into the one cell.
+                onPaste={(e) => {
+                  const text = e.clipboardData.getData('text/plain');
+                  if (!editable || editing.draft !== '' || !/[\t\n]/.test(text.replace(/\r?\n$/, ''))) return;
+                  e.preventDefault();
+                  endEdit(null);
+                  paste(text);
+                }}
                 onBlur={() => endEdit(editable ? editing.draft : null)}
                 onKeyDown={(e) => {
                   e.stopPropagation();
