@@ -1,6 +1,6 @@
 // Search, as the phone site draws it: the field takes the top bar, and every
 // thread in every tab is found, closed ones too (App.tsx `hits`, List.tsx's row).
-import { router } from 'expo-router';
+import { router } from '../lib/router';
 import { useMemo, useState } from 'react';
 import { FlatList, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
