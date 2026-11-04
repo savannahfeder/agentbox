@@ -50,12 +50,9 @@ describe('the saved version reaching the view', () => {
 
 describe('opening a document from its thread', () => {
   const focus = fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/components/Focus.tsx'), 'utf8');
-  const tile = focus.slice(focus.indexOf('<QueueFile key={path}'), focus.indexOf('/>', focus.indexOf('<QueueFile key={path}')));
-  it('opens the version its preview draws, which is the newest edit', () => {
-    expect(tile).toMatch(/path=\{newestOfFamily\(path, item\.artifacts\?\.edits\)\}/);
-    // Beside the chat or full screen, it is the same version either way.
-    expect(tile).toMatch(/onOpen=\{\(\) => onOpenArtifact\?\.\(newestOfFamily\(path, item\.artifacts\?\.edits\), 'beside'\)\}/);
-    expect(tile).toMatch(/onFullScreen=\{\(\) => onOpenArtifact\?\.\(newestOfFamily\(path, item\.artifacts\?\.edits\), 'focus'\)\}/);
+  it('a name pressed in the answer opens the newest edit', () => {
+    expect(focus).toContain("if (goes === 'pane') { onOpenDoc?.(newestOfFamily(href, edits)); return; }");
+    expect(focus).toMatch(/markdownActions\.current = \{[^}]*edits: item\.artifacts\?\.edits/);
   });
   it('a press on a file with no edits opens the file it names', async () => {
     const { newestOfFamily } = await import('../shared/artifact-marks.mjs');
