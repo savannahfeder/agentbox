@@ -1,4 +1,4 @@
-// A FILM UP TO 200 MB ATTACHES IN PIECES, AND THE BOX SAYS WHEN IT CANNOT.
+// A FILM UP TO 1 GB ATTACHES IN PIECES, AND THE BOX SAYS WHEN IT CANNOT.
 //
 // Sofia: 17 and 24 MB films sent; 34, 68 and 75 MB were refused the
 // moment they were attached with "One pasted image is too big to save. Closing
@@ -10,7 +10,7 @@
 // it, and a send dropped it.
 //
 // Now such a file crosses in pieces of 4 MB, in order, and becomes a path like a
-// dropped file's. A file over 200 MB is not read at all, and a box holding one,
+// dropped file's. A file over the limit (1 GB since 2026-11) is not read at all, and a box holding one,
 // or one that failed, says so in words and does not send.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -40,10 +40,16 @@ describe('the computer puts the pieces together', () => {
     expect(() => stageAttachmentPart(dir, { id: 'ffffff0000', name: 'cut.mp4', at: 4, dataBase64: b64('x') })).toThrow(/Attach it again/);
   });
 
-  it('stops at 200 MB and keeps nothing', () => {
+  it('takes a piece that ends exactly at 1 GB', () => {
     const first = stageAttachmentPart(dir, { id: 'abcdef1234', name: 'raw.mov', at: 0, dataBase64: b64('x') });
-    fs.truncateSync(first.path, 200 * MB);
-    expect(() => stageAttachmentPart(dir, { id: 'abcdef1234', name: 'raw.mov', at: 200 * MB, dataBase64: b64('y') })).toThrow(/over the 200 MB/);
+    fs.truncateSync(first.path, 1024 * MB - 1);
+    expect(stageAttachmentPart(dir, { id: 'abcdef1234', name: 'raw.mov', at: 1024 * MB - 1, dataBase64: b64('y') }).size).toBe(1024 * MB);
+  });
+
+  it('stops one byte past 1 GB and keeps nothing', () => {
+    const first = stageAttachmentPart(dir, { id: 'abcdef1234', name: 'raw.mov', at: 0, dataBase64: b64('x') });
+    fs.truncateSync(first.path, 1024 * MB);
+    expect(() => stageAttachmentPart(dir, { id: 'abcdef1234', name: 'raw.mov', at: 1024 * MB, dataBase64: b64('y') })).toThrow(/over the 1 GB/);
     expect(fs.existsSync(first.path)).toBe(false);
   });
 
@@ -92,13 +98,13 @@ describe('a box in a tab, where a file has no path', () => {
     expect(calls.whole).toBe(1);
   });
 
-  it('a file over 200 MB is not read, and the box says why', async () => {
+  it('a file over 1 GB is not read, and the box says why', async () => {
     zero();
-    const huge = { name: 'launch-cut-225mb.mp4', size: 225 * MB, type: 'video/mp4', slice: () => { throw new Error('read'); } };
+    const huge = { name: 'master-1.2gb.mov', size: 1.2 * 1024 * MB, type: 'video/quicktime', slice: () => { throw new Error('read'); } };
     const [got] = await collectFiles([huge]);
     expect(calls.parts).toEqual([]);
     expect(got.srcPath).toBeUndefined();
-    expect(attachProblem([got])).toBe('launch-cut-225mb.mp4 is 225 MB, over the 200 MB a message can send.');
+    expect(attachProblem([got])).toBe('master-1.2gb.mov is 1.2 GB, over the 1 GB a message can send.');
   });
 
   it('a piece the computer refuses leaves the film out and says so', async () => {
@@ -111,6 +117,6 @@ describe('a box in a tab, where a file has no path', () => {
   it('never saves a message without a file it could not attach', async () => {
     zero();
     await expect(persistAttachments('p', [{ name: 'cut.mp4', image: false, size: 5 * MB, failed: 'cut.mp4 could not be attached: no.' }])).rejects.toThrow(/could not be attached/);
-    await expect(persistAttachments('p', [{ name: 'raw.mov', image: false, size: 201 * MB }])).rejects.toThrow(/over the 200 MB/);
+    await expect(persistAttachments('p', [{ name: 'raw.mov', image: false, size: 1024 * MB + 1 }])).rejects.toThrow(/over the 1 GB/);
   });
 });

@@ -435,6 +435,8 @@
 /* Sentences keep a reading measure in the wide column; what is drawn uses all of it. */
 .workspace-layout .focus .markdown :is(p, ul, ol, blockquote, h1, h2, h3, h4):not(:has(img, video, .inline-media, .inline-image)),
 .workspace-layout .focus .msg-body.typed:not(:has(img, video, .inline-media, .inline-image)) { max-width:760px; }
+/* A picture is as wide as the sentences: the whole column was too big to take in at once. */
+.workspace-layout .focus .markdown .inline-image { max-width:min(100%, 760px); }
 .workspace-artifact-header { display:none; min-width:0; flex:1; }
 .workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .workspace-task-header { display:none; }
 .workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .workspace-artifact-header { display:block; }

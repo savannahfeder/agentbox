@@ -397,7 +397,6 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-card .th-msg-who::after { content: none; }
 .th-card .th-msg .tm-av { margin-right: 0; top: 0; }
 .th-card .m { display: flex; align-items: center; font: 11px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); min-width: 0; }
-.th-card-doing { margin-top: 6px; font-size: 12.5px; line-height: 17px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .th-card .m .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* What is happening on the card, on the card's own line, ahead of its project
    and in the ink the row's status cell wears (w-ec2b04d449). */

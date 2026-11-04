@@ -35,10 +35,12 @@ import { addressYouTyped, canFrameAWebsite, isWebsiteAddress } from '../../../sh
 // doc-md / doc-html rather than off the theme.
 //
 // THE PANE HAS NO ZOOM OF ITS OWN, and it is not missing.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { CodeFile } from './CodeFile';
+import { TableView } from './TableView';
+import { isTablePath } from '../table-file';
 import { FilmPlayer } from './FilmPlayer';
 import { PdfPages } from './PdfPages';
 import { crumbParts, docKind, docName, isPlainText, splitFromPointer, OPENING_SPLIT, type PaneKind } from '../doc-pane';
@@ -50,6 +52,7 @@ import type { Change } from '../code-artifact';
 import { NAME } from '../../../shared/product-name.mjs';
 import { shownName } from '../../../shared/artifact-marks.mjs';
 import { onPhone } from '../phone-screen';
+import { scrollKey, useKeptScroll } from '../kept-scroll';
 
 const COMING_LOOKS_MS = 3000;
 
@@ -98,16 +101,24 @@ export type OpenDoc = { product: string; src: string; auto?: boolean; at?: strin
 // `<webview>` is a separate compositing layer and paints over everything the
 // card draws, so the hover-reveal toolbar doc-html normally gets would be
 // painted under the page and could never be pressed.
+const Beside = ({ aside, children }: { aside?: ReactNode; children: ReactNode }) =>
+  aside ? <div className="doc-notes-split">{children}{aside}</div> : <>{children}</>;
+
 function paneKindClass(kind: PaneKind): string {
   if (kind === 'html') return 'doc-html';
   if (kind === 'website') return 'doc-html doc-website';
   if (kind === 'code') return 'doc-code';
   if (kind === 'image') return 'doc-image';
+  if (kind === 'table') return 'doc-table';
   return 'doc-md';
 }
 
-export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, onMode, headerTarget, focusControlStyle }: {
+export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, onMode, headerTarget, focusControlStyle, aside, firstMark }: {
   focusControlStyle?: FocusControlStyle;
+  /** Drawn beside a document's words, inside the card: the notes sidebar. */
+  aside?: ReactNode;
+  /** A mark before the pane's own ones in the corner. */
+  firstMark?: ReactNode;
   headerTarget?: HTMLElement | null;
   mode?: ArtifactMode;
   onMode?: (mode: ArtifactMode) => void;
@@ -125,13 +136,15 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   // another link puts it away.
   const [typed, setTyped] = useState<{ from: string; to: string } | null>(null);
   const src = typed?.from === doc.src ? typed.to : doc.src;
-  const kind: PaneKind = docKind(src) ?? (isPlainText(src) ? 'text' : 'html');
+  const kind: PaneKind = docKind(src) ?? (isTablePath(src) ? 'table' : isPlainText(src) ? 'text' : 'html');
   // Where the pane is standing. A webview keeps its own history, so after one
   // click the thread's address is no longer the page being read, and the bar
   // and the way out follow this rather than `doc.src`.
   const [here, setHere] = useState<Browsing>({ url: src, canBack: false, canForward: false, loading: true });
   const [webFailed, setWebFailed] = useState<string | null>(null);
   const [webReady, setWebReady] = useState(false);
+  const [codeBox, setCodeBox] = useState<HTMLDivElement | null>(null);
+  useKeptScroll(codeBox, scrollKey(doc.product, src));
   // What the bar presses. Filled in by the webview while it is mounted.
   const browsing = useRef<PageControl | null>(null);
   // Asked once: can this page draw a browser of its own.
@@ -194,7 +207,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
         setChange(r.change as Change);
       });
     }
-    if (kind === 'markdown' || kind === 'text') {
+    if (kind === 'markdown' || kind === 'text' || kind === 'table') {
       api.readDoc({ product: doc.product, src: doc.src }).then((r) => {
         if (!live) return;
         if (!r.ok) { setFailed(r.error ?? 'That file could not be read.'); return; }
@@ -289,6 +302,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
             ))}
           </div>
           <span className="doc-marks">
+            {firstMark}
             {onMode && (focusControlStyle ? <FocusControl style={focusControlStyle} focused={!!headerTarget} onClick={() => onMode(headerTarget ? 'beside' : 'focus')}/> : !headerTarget && <button type="button" className="artifact-expand" aria-label="Expand preview" title="Expand preview to Focus" onClick={() => onMode('focus')}><Glyph><path d="M14 5h5v5M19 5l-6 6M10 19H5v-5M5 19l6-6" /></Glyph><span>Focus</span></button>)}
             {/* The two marks she approved, and nothing beside them. */}
             <button
@@ -412,20 +426,24 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
               : <PreviewLoading />) : <PreviewLoading />
         ) : text === null ? (
           <PreviewLoading />
+        ) : kind === 'table' ? (
+          <TableView text={text} path={src} mode="pane" />
         ) : kind === 'text' ? (
-          <div className="code-scroll"><CodeFile text={text} /></div>
+          <div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div>
         ) : (
-          <DocText
-            key={resolved ?? doc.src}
-            product={doc.product}
-            src={doc.src}
-            folder={resolved ? resolved.replace(/\/[^/]*$/, '') : null}
-            text={text}
-            mtime={mtime}
-            onSaved={(at) => setMtime(at)}
-            onNotice={onNotice}
-            readOnly={doc.readOnly}
-          />
+          <Beside aside={aside}>
+            <DocText
+              key={resolved ?? doc.src}
+              product={doc.product}
+              src={doc.src}
+              folder={resolved ? resolved.replace(/\/[^/]*$/, '') : null}
+              text={text}
+              mtime={mtime}
+              onSaved={(at) => setMtime(at)}
+              onNotice={onNotice}
+              readOnly={doc.readOnly}
+            />
+          </Beside>
         )}
       </div>
     </aside>

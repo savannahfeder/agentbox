@@ -241,7 +241,7 @@ it('sends a picture over 10 MB in parts of no more than 10 MB, and still sends t
   await maya.on(() => maya.service.message(theo.personId, `big one\n\n${md}`));
   await maya.service.syncNow();
   await theo.service.syncNow();
-  const sizes = [...cloud.files.values()].map((f) => Buffer.from(f.data, 'base64').length);
+  const sizes = [...cloud.pieces.values()].map((f) => f.bytes.length);
   expect(sizes.length).toBeGreaterThan(1);
   expect(Math.max(...sizes)).toBeLessThanOrEqual(MAX_MESSAGE_FILE_BYTES);
   const row = theo.store.listItems().find((i) => i.product === conversation(theo).slug);

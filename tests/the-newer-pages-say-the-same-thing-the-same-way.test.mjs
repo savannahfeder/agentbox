@@ -44,7 +44,11 @@ describe('the same spacing', () => {
   });
   it('one small label', () => {
     expect(rule(files, '.fp-sent-label')).toMatch(/font: 11px var\(--mono\); letter-spacing: \.08em/);
-    expect(place).toMatch(/\.pl-sec h3 \{[^}]*font: 11px var\(--mono\)[^}]*letter-spacing: \.08em/);
+  });
+  it('a person\'s page labels its lists as the Everyone cards label theirs', () => {
+    const label = /font-size: 12px; font-weight: 500; line-height: 18px; color: var\(--text-dim\)/;
+    expect(rule(place, '.pl-sec h3')).toMatch(label);
+    expect(today).toMatch(new RegExp(`\\.team-page \\.td-label \\{[^}]*${label.source}`));
   });
   it('one empty line', () => {
     for (const r of [rule(files, '.fp-empty'), rule(today, '.td-empty')]) expect(r).toMatch(/font-size: 13\.5px; line-height: 20px; color: var\(--text-faint\)/);

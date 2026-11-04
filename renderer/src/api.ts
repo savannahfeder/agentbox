@@ -1,4 +1,4 @@
-import { artifactSampleChange, artifactSampleNotes, reviewSampleChange } from './artifact-fixtures';
+import { artifactSampleChange, artifactSampleNotes, reviewSampleChange, tableSample, tableSamplePath } from './artifact-fixtures';
 import {updateFixture} from './agent-update-fixture';
 // One seam between the UI and the world. Real mode talks to the preload
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
@@ -697,6 +697,7 @@ export const api = {
   async resolveDoc(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; opened?: string; url?: string; error?: string; coming?: boolean; waits?: boolean; note?: string; carry?: CarryState }> {
     if (useFixtures && ['artifact-layout-sample.change', 'review-bundle.change'].includes(p.src)) return { ok: true, opened: p.src };
     if (useFixtures && p.src === 'artifact-layout-sample.md') return { ok: true, opened: p.src };
+    if (useFixtures && p.src === tableSamplePath) return { ok: true, opened: p.src };
     if (useFixtures && p.product === 'onboard' && ['designs/w-n13/the-first-row.html', '/fixtures/onboard/designs/w-n13/the-first-row.html'].includes(p.src)) return { ok: true, opened: p.src, url: '/fixtures/onboard/designs/w-n13/the-first-row.html' };
     const zero = window.zero as any;
     if (!zero?.openArtifact) return { ok: false, error: `quit and reopen ${NAME} to open documents here` };
@@ -705,6 +706,7 @@ export const api = {
 
   async readDoc(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string; coming?: boolean; waits?: boolean; carry?: CarryState }> {
     if (useFixtures && p.src === 'artifact-layout-sample.md') return {ok:true,text:artifactSampleNotes,mtime:0};
+    if (useFixtures && p.src === tableSamplePath) return { ok: true, text: tableSample, mtime: 0 };
     const zero = window.zero as any;
     if (!zero?.readDoc) return { ok: false, error: `quit and reopen ${NAME} to open documents here` };
     return zero.readDoc(p);
@@ -900,7 +902,7 @@ export const api = {
     if (!window.zero?.fileMark) return { ok: false, error: `quit and reopen ${NAME} to comment here` };
     return window.zero.fileMark(p);
   },
-  async fileNewVersion(p: { product: string; id: string; path: string; text: string }): Promise<{ ok: boolean; path?: string; error?: string }> {
+  async fileNewVersion(p: { product: string; id: string; path: string; text: string; since?: string | null }): Promise<{ ok: boolean; path?: string; error?: string }> {
     if (!window.zero?.fileNewVersion) return { ok: false, error: `quit and reopen ${NAME} to edit here` };
     return window.zero.fileNewVersion(p);
   },
@@ -1017,7 +1019,7 @@ export const api = {
     return out?.moving ?? (out?.ok ? ids.length : 0);
   },
 
-  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem | null> {
+  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem | null> {
     // FIXTURES ANSWER WITH THE TASK, the way the real store does. Returning
     // null here meant the send had nothing to point at, and the caller reads
     // that as "no task was made" and puts no way back on the undo pile — so the

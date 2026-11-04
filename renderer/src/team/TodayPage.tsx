@@ -17,7 +17,7 @@ function Section({ id, picked, label, lines, extra, range, titleOf, onOpen }: {
   const [open, setOpen] = useState(false);
   if (!lines.length && !extra) return null;
   const more = lines.length - SHOWN;
-  return <div className="td-sec">
+  return <div className="td-sec" data-group={id.split('/').pop()}>
     <span className="td-label">{label}</span>
     <ul>
       {(open ? lines : lines.slice(0, SHOWN)).map((l) => <li key={l.key}>
@@ -41,14 +41,14 @@ function Section({ id, picked, label, lines, extra, range, titleOf, onOpen }: {
 // Titles past the first few were never worked out: a week on a big store finishes thousands.
 const titleOf = (l: TodayLine) => l.title || (l.item ? shownTitle(l.item) : '');
 
-function Person({ p, face, picked, range, onOpen }: { p: TodayPerson; face?: Member; picked: string | null; range: TodayRange; onOpen: (l: TodayLine) => void }) {
+function Person({ p, face, picked, range, onOpen, onPerson }: { p: TodayPerson; face?: Member; picked: string | null; range: TodayRange; onOpen: (l: TodayLine) => void; onPerson?: (key: string) => void }) {
   const secret = p.privateDone ? `${p.privateDone} private ${p.privateDone === 1 ? 'thread' : 'threads'}` : null;
   const props = { picked, range, onOpen, titleOf };
   const groups = groupsOf(p);
   return <section className="td-person" aria-label={p.name}>
     <header className="td-who">
       {face && <MemberFace m={face} size={22} />}
-      <h2>{p.name}</h2>
+      <h2>{onPerson && p.key !== 'me' ? <button type="button" className="td-name" onClick={() => onPerson(p.key)}>{p.name}</button> : p.name}</h2>
       {face?.role && <em>{face.role}</em>}
     </header>
     {GROUPS.map((g) => <Section key={g.id} id={`${p.key}/${g.id}`} label={g.label} lines={groups[g.id]}
@@ -56,7 +56,7 @@ function Person({ p, face, picked, range, onOpen }: { p: TodayPerson; face?: Mem
   </section>;
 }
 
-export function TodayPage({ range, onRange, day, faces, picked, onPicked, keys, onOpen, onNeeds }: {
+export function TodayPage({ range, onRange, day, faces, picked, onPicked, keys, onOpen, onNeeds, title, onPerson }: {
   range: TodayRange; onRange: (r: TodayRange) => void;
   day: { people: TodayPerson[]; quiet: string[]; counts: TodayCounts };
   faces: ReadonlyMap<string, Member>;
@@ -66,6 +66,10 @@ export function TodayPage({ range, onRange, day, faces, picked, onPicked, keys, 
   keys: boolean;
   onOpen: (l: TodayLine) => void;
   onNeeds: () => void;
+  /** On the Team page: a heading in place of the line about what needs you. */
+  title?: string;
+  /** A name opens that person's page. */
+  onPerson?: (key: string) => void;
 }) {
   const needs = todayLine(day.counts);
   const shown = shownDay(day);
@@ -98,14 +102,14 @@ export function TodayPage({ range, onRange, day, faces, picked, onPicked, keys, 
   return <div className="td" aria-label="Today" ref={page}>
     <div className="td-col">
       <div className="td-top">
-        {needs && <button type="button" className="td-needs" onClick={onNeeds} title="Open Needs you">{needs}</button>}
+        {title ? <h2 className="td-title">{title}</h2> : needs && <button type="button" className="td-needs" onClick={onNeeds} title="Open Needs you">{needs}</button>}
         <div className="td-range" role="tablist" aria-label="Which days">
           {RANGES.map((r) => <button type="button" role="tab" key={r.id} aria-selected={range === r.id} className={range === r.id ? 'on' : ''} onClick={() => onRange(r.id)}>{r.label}</button>)}
         </div>
       </div>
       {shown.people.length === 0 && <p className="td-empty">{EMPTY[range]}</p>}
       <div className="td-people">
-        {shown.people.map((p) => <Person key={p.key} p={p} face={faces.get(p.key)} picked={picked} range={range} onOpen={onOpen} />)}
+        {shown.people.map((p) => <Person key={p.key} p={p} face={faces.get(p.key)} picked={picked} range={range} onOpen={onOpen} onPerson={onPerson} />)}
       </div>
     </div>
   </div>;

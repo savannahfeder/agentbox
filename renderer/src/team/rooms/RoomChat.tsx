@@ -25,7 +25,7 @@ import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type VoiceControl } fr
 import { createPortal } from 'react-dom';
 import { FileSheet } from '../../components/FileSheet';
 import { FileCover } from '../../components/FileCover';
-import { reviewKind, shownName } from '../../../../shared/artifact-marks.mjs';
+import { opensBigInAGroup, reviewKind, shownName } from '../../../../shared/artifact-marks.mjs';
 import { RoomFileView, type RoomFileOpening, type RoomFiles } from './RoomFileView';
 import { AttachRow } from '../../components/AttachRow';
 import { collectFiles, isImageName, type PendingAttachment } from '../../attachments';
@@ -83,7 +83,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   const [thread, setThread] = useState<string | null>(null);
   const [viewing, setViewing] = useState<RoomFileOpening | null>(null);
   const opensBig = useCallback((name: string) => {
-    if (!calls.files || !reviewKind(name)) return false;
+    if (!calls.files || !opensBigInAGroup(name)) return false;
     setViewing({ name, at: Date.now() });
     return true;
   }, [!!calls.files]);
@@ -239,7 +239,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
                 : <div className="tx">{body(m)}</div>}
             {!headed && m.editedAt && !m.deleted && editing !== m.id && <em className="rm-edited">edited</em>}
             {!m.deleted && marks?.get(m.id) && <em className="rm-decided">{marks.get(m.id)?.priority ? 'This week’s priorities' : 'Decision'}</em>}
-            {!m.deleted && onReact && <Reactions on={m.reactions} me={meId} onReact={(emoji, off) => onReact(m.id, emoji, !off)} />}
+            {!m.deleted && onReact && <Reactions on={m.reactions} me={meId} nameOf={(id) => who(id)?.name} onReact={(emoji, off) => onReact(m.id, emoji, !off)} />}
             {reps.length > 0 && <button type="button" className="rep" onClick={() => setThread(m.id)}>
               {[...new Set(reps.map((r) => r.by))].slice(0, 3).map((id) => <Face key={id ?? 'x'} name={who(id)?.name ?? '?'} url={who(id)?.avatarUrl} size={13} />)}
               <span style={{ marginLeft: 5 }}>{reps.length} {reps.length === 1 ? 'reply' : 'replies'}</span>
