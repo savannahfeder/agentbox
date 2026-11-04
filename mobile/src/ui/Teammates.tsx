@@ -147,7 +147,7 @@ export function ChatsPlace({ tabs, openGroup }: { tabs: ReactNode; openGroup: (i
   return (
     <>
       <TopBar title="Chats" right={<IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>} below={tabs} />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: Math.max(40, c.approvalRoom + 16) }}>
         {team && <Head title="AI teammates" count={mates.length} />}
         {mates.map((t, i) => (
           <ChatRow key={t.id} first={i === 0} lead={<TeammateMark t={t} size={32} />} name={t.name} aside={t.primary && !t.paused && t.status !== 'draft' ? 'Primary' : undefined}

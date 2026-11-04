@@ -129,6 +129,8 @@ export function Approvals() {
   }, [answered]);
 
   const { card, verdict, waiting } = cardOnStage(pending, answered, leaving.current);
+  const shown = !!card && c.minimizedApproval !== card.id && pathname !== '/ai-notice';
+  useEffect(() => { if (!shown) c.setApprovalRoom(0); }, [shown]);
   // The notice's own buttons sit where the card would cover them.
   if (pathname === '/ai-notice') return null;
   if (!card || c.minimizedApproval === card.id) return null;
@@ -144,7 +146,7 @@ export function Approvals() {
   // holds it. It sat above the inbox's tabs until they moved to the top (2026-10-28).
   const foot = footRoom(inset);
   return (
-    <View pointerEvents="box-none" style={{ position: 'absolute', left: 8, right: 8, bottom: 8 + foot }}>
+    <View pointerEvents="box-none" onLayout={(e) => c.setApprovalRoom(Math.ceil(e.nativeEvent.layout.height) + 8 + foot)} style={{ position: 'absolute', left: 8, right: 8, bottom: 8 + foot }}>
       <View>
         {waiting > 1 && <Ghost far />}
         {waiting > 0 && <Ghost />}

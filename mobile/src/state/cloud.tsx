@@ -233,7 +233,7 @@ function useCloudState() {
   // The icon counts what needs you; an alert sets it while the app is shut.
   useEffect(() => { if (signedIn && !read.first) setIconCount(tabs.inbox.length); }, [signedIn, read.first, tabs.inbox.length]);
 
-  const send = useCallback(async (press: Press, item: PressedItem | null, opts: { undone?: () => void } = {}) => {
+  const send = useCallback(async (press: Press, item: PressedItem | null, opts: { undone?: () => void; quiet?: boolean } = {}) => {
     if (!sender) return null;
     if (needsNotice(press.kind) && !agreed) await askNotice();
     const at = Date.now();
@@ -241,7 +241,7 @@ function useCloudState() {
     if (!plan) return null;
     const made = await runSteps(sender, plan.steps);
     if (made && typeof made === 'object' && 'ok' in made && made.ok === false) throw new Error(String((made as { error?: string }).error ?? 'Not sent.'));
-    if (plan.toast) {
+    if (plan.toast && !opts.quiet) {
       const goes = plan.goes ?? (item ? { product: item.product, id: item.id } : made?.id ? { product: made.product, id: made.id } : undefined);
       say(plan.toast, plan.undo ? async () => {
         try {
@@ -258,12 +258,15 @@ function useCloudState() {
   // Where a command in Search sends the inbox page, and a permission card put aside (App.tsx `minimizedApproval`).
   const [wanted, setWanted] = useState<{ place: PlaceId; menu?: boolean; group?: boolean } | null>(null);
   const [minimizedApproval, setMinimizedApproval] = useState<string | null>(null);
+  // How tall the permission card over the foot is, so lists leave room to scroll their last rows above it.
+  const [approvalRoom, setApprovalRoom] = useState(0);
 
   // A message to a teammate, someone new, or a go-ahead, left for the computer
   // that sent the teammates (shared/phone-settings.mjs `teammate`).
-  const askTeammate = useCallback(async (key: 'post' | 'describe' | 'goAhead', value: Record<string, unknown>) => {
+  const askTeammate = useCallback(async (key: 'post' | 'describe' | 'goAhead' | 'pause', value: Record<string, unknown>) => {
     if (!cloud || !team) throw new Error('Your computer has not sent your teammates yet.');
-    if (key !== 'goAhead' && !agreed) await askNotice();
+    // Only words for an agent need the yes; a go-ahead or a pause carries none.
+    if ((key === 'post' || key === 'describe') && !agreed) await askNotice();
     const asked = cloud.generation();
     const row = await cloud.insertCommand(settingCommand(team.device, { scope: 'teammate', key, value }));
     if (cloud.generation() === asked) setRows({ ...rowsNow.current, commands: [...rowsNow.current.commands, row] });
@@ -320,7 +323,7 @@ function useCloudState() {
 
   return {
     cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, now, refresh, send, attach, fileOf, toast, say,
-    team, teamPending, watchTeam, askTeammate, wanted, goTo: setWanted, takeWanted: () => setWanted(null), minimizedApproval, setMinimizedApproval,
+    team, teamPending, watchTeam, askTeammate, wanted, goTo: setWanted, takeWanted: () => setWanted(null), minimizedApproval, setMinimizedApproval, approvalRoom, setApprovalRoom,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
     notice, noticeRead, agreed, answerNotice, withdrawNotice: () => answerNotice(false),
     alerts, turnOnAlerts, turnOffAlerts,

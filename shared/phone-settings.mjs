@@ -123,6 +123,8 @@ const TEAMMATE_ASKS = {
     && (v.fresh === undefined || typeof v.fresh === 'boolean')
     && (v.answers === undefined || (!!v.answers && typeof v.answers === 'object' && !Array.isArray(v.answers)
       && Object.entries(v.answers).length <= 20 && Object.entries(v.answers).every(([q, a]) => /^[\w-]{1,80}$/.test(q) && words(a, 2000)))),
+  // Pause or resume one, the window's own Pause switch.
+  pause: (v) => typeof v.id === 'string' && MATE_ID.test(v.id) && typeof v.paused === 'boolean',
   // Someone new, from one of the starters or your own words, working in one of your projects.
   describe: (v) => (words(v.text, 8000) || (typeof v.starter === 'string' && /^[a-z]{1,40}$/.test(v.starter)))
     && typeof v.product === 'string' && SLUG.test(v.product),
@@ -138,6 +140,7 @@ function checkTeammateAsk(p) {
 function teammateRoute(p) {
   const v = p.value;
   if (p.key === 'post') return ['zero:teammates', { op: 'post', args: { text: v.text, to: v.to, ...(v.fresh ? { fresh: true } : {}), ...(v.answers ? { answers: v.answers } : {}) } }];
+  if (p.key === 'pause') return ['zero:teammates', { op: 'update', args: { id: v.id, patch: { paused: v.paused } } }];
   if (p.key === 'describe') return ['zero:teammates', { op: 'describe', args: { ...(v.starter ? { starter: v.starter } : { text: v.text }), greeted: true, product: v.product } }];
   return ['zero:teammates', { op: 'goAhead', args: { id: v.id, ref: v.ref } }];
 }
@@ -210,7 +213,7 @@ export function phoneSettingsOf(model, { version }) {
       leftovers: { on: !!w.leftovers?.on, now: w.leftovers?.now ?? null },
       accounts: (w.accounts ?? []).map((a) => ({
         id: accountIdOf(a.profile), email: a.email ?? null, chosen: !!a.chosen, state: a.state,
-        note: a.trouble?.note ?? null, plan: a.plan?.label ?? null, running: a.running ?? 0,
+        note: a.trouble?.note ?? null, resetsAt: a.trouble?.resetsAt ?? null, plan: a.plan?.label ?? null, running: a.running ?? 0,
       })),
       codexAccounts: (w.codex?.accounts ?? []).map((a) => ({
         id: accountIdOf(a.profile), email: a.email ?? null, name: a.name ?? null, plan: a.plan ?? null, signedIn: !!a.signedIn, chosen: !!a.chosen,

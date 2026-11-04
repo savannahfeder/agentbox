@@ -206,21 +206,28 @@ export function FiledList({ rows, label, open, approve, here, dismiss, inTurn }:
       <View style={{ borderWidth: 1, borderColor: color.line }}>
         {shown.map((r, k) => {
           const quiet = waiting && !r.approve;
+          // A proposal's title reads whole, over its three answers, rather than cut beside them.
+          if (r.approve) return (
+            <View key={r.id} style={{ paddingBottom: 6, borderTopWidth: k ? 1 : 0, borderTopColor: color.line }}>
+              <Pressable onPress={() => open(r)} accessibilityRole="button"
+                style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingTop: 11, paddingHorizontal: 14, backgroundColor: pressed ? color.fill : 'transparent' })}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent, marginTop: 7 }} />
+                <T numberOfLines={3} style={{ flex: 1, fontSize: 14, lineHeight: 20, color: color.text }}>{r.title}</T>
+              </Pressable>
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 2, paddingTop: 4, paddingRight: 8 }}>
+                {act(DISMISS, color.faint, () => dismiss(r), `${DISMISS}: ${r.title}`)}
+                {here && act(DO_HERE, color.dim, () => here(r), `Do in this thread: ${r.title}`)}
+                {act(START_NEW, color.accent, () => approve(r), `Start new thread: ${r.title}`)}
+              </View>
+            </View>
+          );
           return (
             <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 40, paddingRight: 10, borderTopWidth: k ? 1 : 0, borderTopColor: color.line }}>
               <Pressable onPress={() => open(r)} accessibilityRole="button"
                 style={({ pressed }) => ({ flex: 1, minWidth: 0, minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 14, paddingLeft: 14, backgroundColor: pressed ? color.fill : 'transparent' })}>
-                {r.approve && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent, marginRight: -4 }} />}
                 <T numberOfLines={1} style={{ flex: 1, fontSize: 14, color: quiet ? color.faint : color.text }}>{r.title}</T>
-                {!r.approve && <T style={{ ...MONO_CAPS, color: quiet || r.state === 'done' || r.state === 'scheduled' ? color.faint : color.dim }}>{stateWord(r.state)}</T>}
+                <T style={{ ...MONO_CAPS, color: quiet || r.state === 'done' || r.state === 'scheduled' ? color.faint : color.dim }}>{stateWord(r.state)}</T>
               </Pressable>
-              {r.approve && (
-                <View style={{ flexDirection: 'row', gap: 2, marginLeft: 12, marginRight: -2 }}>
-                  {act(DISMISS, color.faint, () => dismiss(r), `${DISMISS}: ${r.title}`)}
-                  {here && act(DO_HERE, color.dim, () => here(r), `Do in this thread: ${r.title}`)}
-                  {act(START_NEW, color.accent, () => approve(r), `Start new thread: ${r.title}`)}
-                </View>
-              )}
             </View>
           );
         })}

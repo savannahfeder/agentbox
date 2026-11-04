@@ -12,6 +12,8 @@ const agent = (ts: number) => ({ ts, source: 'agent' });
 export function previewRows(now = Date.now()): PhoneRows {
   const at = (m: number) => now - m * MIN;
   const iso = (ms: number) => new Date(ms).toISOString();
+  // No computer is behind the preview to say its runs are still going, so they say it for the whole session.
+  const STILL_GOING = now + 24 * 60 * MIN;
   const thread = (project: string, item: any, history: any[], extra: Record<string, unknown> = {}) => ({
     device: DEV, project, item: item.id, updated_at: iso(item.updatedAt),
     snapshot: { v: 3, item: { kind: 'directive', labels: ['founder'], priority: 0, ...item }, history: history.map((l) => ({ id: item.id, ...l })), olderLines: 0, ...extra },
@@ -53,7 +55,7 @@ export function previewRows(now = Date.now()): PhoneRows {
       thread('agentbox', { id: 'w-4d5e6f7a8b', title: 'Draw the sign-in screen', status: 'claimed', priority: 5, body: 'Draw five sign-in screens on the real app.', createdAt: at(40), updatedAt: at(2), wrote: { body: her(at(40)) } }, [
         { ts: at(40), source: 'founder', patch: { body: 'Draw five sign-in screens on the real app.' } },
       ], {
-        live: { since: at(12), at: at(0.5), where: 'cloud', doing: [{ label: 'Read the sign-in page', startedAt: at(9) }, { label: 'Wrote the five screens', startedAt: at(6) }, { label: 'Ran the screenshot script', startedAt: at(3) }, { label: 'Drawing the third screen', startedAt: at(1) }] },
+        live: { since: at(12), at: STILL_GOING, where: 'cloud', doing: [{ label: 'Read the sign-in page', startedAt: at(9) }, { label: 'Wrote the five screens', startedAt: at(6) }, { label: 'Ran the screenshot script', startedAt: at(3) }, { label: 'Drawing the third screen', startedAt: at(1) }] },
         // A permission it is waiting on, as main/phone-inbox.mjs sends one (shared/phone-snapshot.mjs `phoneApproval`).
         approvals: [{ id: 'ap-preview-1', at: at(1), tool: 'Bash', input: { command: 'npx eas-cli init --non-interactive', description: 'Link this folder to the Expo project' }, card: 'cHJldmlldy1jYXJk' }],
       }),
@@ -86,8 +88,14 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(800), source: 'founder', patch: { body: 'Try a light theme.' } },
       ]),
       // Two runs of the daily report (previewSettings' repeating tasks): one quiet, one with news.
-      thread('agentbox', { id: 'w-r1a2b3c4d5', title: 'Daily report', labels: ['repeat:r-preview-1', 'clean'], status: 'done', priority: 5, body: 'Write the daily report.', result: 'Nothing new since yesterday.', createdAt: at(26 * 60), updatedAt: at(26 * 60 - 6), wrote: { status: agent(at(26 * 60 - 6)) } }, []),
-      thread('agentbox', { id: 'w-r2b3c4d5e6', title: 'Daily report', labels: ['repeat:r-preview-1'], status: 'done', priority: 5, body: 'Write the daily report.', result: 'Two sign-ups failed at the email step. The fix is in its own thread.', createdAt: at(120), updatedAt: at(112), wrote: { status: agent(at(112)) } }, []),
+      thread('agentbox', { id: 'w-r1a2b3c4d5', title: 'Daily report', labels: ['repeat:r-preview-1', 'clean'], status: 'done', priority: 5, body: 'Write the daily report.', result: 'Nothing new since yesterday.', createdAt: at(26 * 60), updatedAt: at(26 * 60 - 6), wrote: { status: agent(at(26 * 60 - 6)) } }, [
+        { ts: at(26 * 60), source: 'system', patch: { title: 'Daily report', body: 'Write the daily report.', status: 'open' } },
+        { ts: at(26 * 60 - 6), source: 'agent', patch: { result: 'Nothing new since yesterday.', status: 'done' } },
+      ]),
+      thread('agentbox', { id: 'w-r2b3c4d5e6', title: 'Daily report', labels: ['repeat:r-preview-1'], status: 'done', priority: 5, body: 'Write the daily report.', result: 'Two sign-ups failed at the email step. The fix is in its own thread.', createdAt: at(120), updatedAt: at(112), wrote: { status: agent(at(112)) } }, [
+        { ts: at(120), source: 'system', patch: { title: 'Daily report', body: 'Write the daily report.', status: 'open' } },
+        { ts: at(112), source: 'agent', patch: { result: 'Two sign-ups failed at the email step. The fix is in its own thread.', status: 'done' } },
+      ]),
       // Two teammates' runs (previewTeammates): one waiting on you, signed; one working.
       thread('agentbox', { id: 'w-t2b3c4d5e6', title: 'Try sign-up the way a new user would', labels: ['founder', 'teammate:t-quality001'], status: 'blocked', priority: 5, body: 'Try sign-up the way a new user would, on a slow connection.', note: qualityNote, createdAt: at(45), updatedAt: at(30), wrote: { body: agent(at(45)), status: agent(at(30)), note: agent(at(30)) } }, [
         { ts: at(45), source: 'agent', patch: { body: 'Try sign-up the way a new user would, on a slow connection.' } },
@@ -95,7 +103,7 @@ export function previewRows(now = Date.now()): PhoneRows {
       ]),
       thread('film', { id: 'w-t1a2b3c4d5', title: 'Cut the launch film to 60 seconds', labels: ['founder', 'teammate:t-launch0001'], status: 'claimed', priority: 5, body: 'Cut the launch film to 60 seconds. Open on the inbox.', createdAt: at(21), updatedAt: at(1), wrote: { body: agent(at(21)) } }, [
         { ts: at(21), source: 'agent', patch: { body: 'Cut the launch film to 60 seconds. Open on the inbox.' } },
-      ], { live: { since: at(20), at: at(0.5), where: 'mac', doing: [{ label: 'Trimmed the middle', startedAt: at(8) }, { label: 'Rendering the 60-second cut', startedAt: at(2) }] } }),
+      ], { live: { since: at(20), at: STILL_GOING, where: 'mac', doing: [{ label: 'Trimmed the middle', startedAt: at(8) }, { label: 'Rendering the 60-second cut', startedAt: at(2) }] } }),
       thread('agentbox', { id: 'w-7a8b9c0d1e', title: 'Rename the Display menu', status: 'done', priority: 0, body: 'Rename it to View.', result: 'Renamed.', createdAt: at(3000), updatedAt: at(1500), wrote: { body: her(at(3000)), result: agent(at(1600)), status: her(at(1500)) } }, [
         { ts: at(3000), source: 'founder', patch: { body: 'Rename it to View.' } },
         { ts: at(1600), source: 'agent', patch: { result: 'Renamed.' } },
@@ -120,7 +128,7 @@ export function previewSettings(now = Date.now()) {
         leftovers: { on: false, now: null },
         accounts: [
           { id: 'default', email: 'you@example.com', chosen: false, state: 'live', note: null, plan: 'Max 20x', running: 2 },
-          { id: '.claude-work', email: 'you@work.example', chosen: false, state: 'limited', note: 'Out of usage until 6:19pm.', plan: 'Max 5x', running: 1 },
+          { id: '.claude-work', email: 'you@work.example', chosen: false, state: 'at-limit', note: 'At its limit. Agents start again on their own when it resets.', resetsAt: now + 19 * 60 * MIN, plan: 'Max 5x', running: 1 },
         ],
         codexAccounts: [{ id: 'default', email: 'you@example.com', name: 'You', plan: 'Plus', signedIn: true, chosen: false }],
       },
@@ -286,6 +294,9 @@ export function previewCloud(now = () => Date.now()) {
         mates.chat.push({ id: `m-${c.id}-r`, kind: 'msg', from: value.to[0], to: ['you'], text: 'Got it. I will tell you when it is done.', ts: now() });
         settings.updated_at = new Date(now()).toISOString();
       }, 4000);
+    } else if (scope === 'teammate' && key === 'pause') {
+      const m = mates.list.find((x: any) => x.id === value.id);
+      if (m) Object.assign(m, { paused: value.paused, now: value.paused ? 'Paused' : null });
     } else if (scope === 'teammate' && key === 'describe') {
       mates.list.push({ id: `t-${c.id}`, name: 'New teammate', letter: 'N', role: null, job: value.text ?? value.starter, primary: false, paused: false, status: 'draft', product: value.product, waiting: [], running: null, duties: [], runsThisWeek: 0 });
     } else if (scope === 'thread') { const t = rows.threads.find((r) => r.project === product && r.item === c.payload.item); if (t) { t.snapshot.item.pinned = value || undefined; t.updated_at = new Date(now() + 1).toISOString(); } }

@@ -72,9 +72,11 @@ const toggle = <V,>(list: V[], v: V) => (list.includes(v) ? list.filter((x) => x
 const WINDOWS: [UpdatedWindow, string][] = [['today', 'Today'], ['week', 'This week'], ['any', 'Any time']];
 
 /** The menu that drops from the sliders, the width of the screen, over the list (phone.css `.th-pop`). */
-export function ViewMenu({ display, onDisplay, products, items, shown, total, tab, close }: {
+export function ViewMenu({ display, onDisplay, products, items, shown, total, tab, close, onSelect }: {
   display: Display; onDisplay: (d: Display) => void; products: { slug: string; name: string }[]; items: any[];
   shown: number; total: number; tab: string; close: () => void;
+  /** Pick threads to close together; absent where there is nothing to pick. */
+  onSelect?: () => void;
 }) {
   const inset = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -92,6 +94,7 @@ export function ViewMenu({ display, onDisplay, products, items, shown, total, ta
         <Line label="View">
           <Choice label="List" on={display.view === 'list'} onPress={() => set({ view: 'list' })} />
           <Choice label="Board" on={display.view === 'board'} onPress={() => set({ view: 'board' })} />
+          {onSelect && <Choice label="Select threads" on={false} onPress={onSelect} />}
         </Line>
         <Line label="Sort by">
           <Choice label="Priority" on={display.sort === 'priority'} onPress={() => set({ sort: 'priority' })} />

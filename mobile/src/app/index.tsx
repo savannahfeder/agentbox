@@ -3,7 +3,7 @@
 // age, and a new thread under the thumb. Or, picked in View and filters, the
 // board: one column a swipe.
 import { Redirect, router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
@@ -41,18 +41,26 @@ const EMPTY: Record<Exclude<TabId, 'inbox'>, string> = {
 
 const open = (product: string, id: string) => router.push({ pathname: '/thread/[product]/[id]', params: { product, id } });
 
+// Picking threads to close together: long-press a row, or Select threads in View.
+const Picking = createContext<{ picked: Set<string> | null; toggle: (key: string) => void; start: (key: string) => void }>({ picked: null, toggle: () => {}, start: () => {} });
+
 function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unread: boolean; mate: Teammate | null }) {
+  const pick = useContext(Picking);
+  const picking = pick.picked !== null;
+  const on = !!pick.picked?.has(row.key);
   // "not started" or "2 tasks to approve", faint after the title (Pages.tsx `RowCells`).
   const aside = row.held ? 'not started' : row.toApprove;
   const small = { fontSize: 11, lineHeight: 20, color: color.faint };
   return (
-    <Pressable onPress={() => open(row.product, row.id)} accessibilityLabel={unread ? `${row.title}, unread` : undefined}
+    <Pressable onPress={() => (picking ? pick.toggle(row.key) : open(row.product, row.id))} onLongPress={() => pick.start(row.key)} delayLongPress={350}
+      accessibilityLabel={picking ? `${row.title}, ${on ? 'selected' : 'not selected'}` : unread ? `${row.title}, unread` : undefined} accessibilityState={picking ? { checked: on } : undefined}
       style={({ pressed }) => ({ minHeight: 64, paddingTop: 14, paddingBottom: 14, paddingLeft: size.inset, paddingRight: 12, backgroundColor: pressed ? color.fill : 'transparent' })}>
       {/* The line over every row but the first, edge to 12px short of the right (`.row + .row::after`). */}
       {!first && <View style={{ position: 'absolute', top: 0, left: 0, right: 12, height: 1, backgroundColor: color.rowLine }} />}
       {/* The unread dot in the margin, level with the title's first line (phone.css `.row.unread::before`). */}
       {unread && <View style={{ position: 'absolute', left: 5, top: 22, width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent }} />}
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {picking && <View style={{ width: 18, height: 18, marginRight: 12, borderWidth: 1.5, borderColor: on ? color.text : color.faint, backgroundColor: on ? color.text : 'transparent', alignItems: 'center', justifyContent: 'center' }}>{on && <Tick size={12} tint={color.bg} />}</View>}
         {row.running && <View style={{ marginRight: row.cloud ? 6 : 8 }}><RunningMark cloud={row.cloud}><Cloud /></RunningMark></View>}
         {/* A thread a teammate's run sent you says whose it is before its title (teammates/row-lead.tsx). */}
         {mate && <View style={{ marginRight: 7 }}><TeammateMark t={mate} /></View>}
@@ -213,12 +221,13 @@ function FilteredEmpty({ tab, hidden, clear }: { tab: TabId; hidden: number; cle
 /** The board: a column a swipe, each scrolling on its own (phone.css `.th-board`). */
 function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phoneBoard>; foot: number; inset?: number }) {
   const { width } = useWindowDimensions();
+  const room = useCloud().approvalRoom;
   const col = Math.round((width - inset * 2) * 0.86);
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={col + 12} decelerationRate="fast"
       contentContainerStyle={{ paddingHorizontal: inset, gap: 12 }} style={{ flex: 1 }}>
       {columns.map((c) => (
-        <ScrollView key={c.state} style={{ width: col }} contentContainerStyle={{ paddingBottom: 88 + foot }} showsVerticalScrollIndicator={false}>
+        <ScrollView key={c.state} style={{ width: col }} contentContainerStyle={{ paddingBottom: Math.max(88 + foot, room + 16) }} showsVerticalScrollIndicator={false}>
           <View style={{ height: 38, paddingTop: 8, flexDirection: 'row', alignItems: 'center' }}>
             <StateGlyph state={c.state} />
             <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase', color: color.dim }}>{c.label}</T>
@@ -287,6 +296,9 @@ export default function Threads() {
   const mineBoard = useMemo(() => (onEverything && evView === 'board'
     ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, display, c.now).filter((col) => col.state !== 'waiting') : null), [onEverything, evView, display, c.view, c.tabs, c.now]);
   const rowOf = useMemo(() => new Map(Object.values(c.tabs).flat().map((r) => [r.key, r])), [c.tabs]);
+  const [picked, setPicked] = useState<Set<string> | null>(null);
+  const [closing, setClosing] = useState(false);
+  useEffect(() => { setPicked(null); }, [place, tab]);
   if (!c.opened) return <Wall><Waiting /></Wall>;
   if (!c.signedIn) return <Redirect href="/sign-in" />;
   // Under your own card, your threads without your AI teammates' runs, which their cards hold.
@@ -300,6 +312,23 @@ export default function Threads() {
   const mentionsShown = tab === 'inbox' && mentions.length > 0;
   const hidden = shown.whole[tab] - shown.rows[tab].length;
   const foot = footRoom(inset);
+  const picking = {
+    picked,
+    toggle: (key: string) => setPicked((p) => { const n = new Set(p ?? []); if (n.has(key)) n.delete(key); else n.add(key); return n; }),
+    start: (key: string) => setPicked((p) => new Set([...(p ?? []), key])),
+  };
+  const closePicked = async () => {
+    const chosen = rows.filter((r) => picked?.has(r.key));
+    setClosing(true);
+    let done = 0;
+    try {
+      for (const r of chosen) { await c.send({ kind: 'close' }, r.item, { quiet: true }); done += 1; }
+      c.say(`Closed ${done} ${done === 1 ? 'thread' : 'threads'}`);
+      setPicked(null);
+    } catch (err) {
+      c.say(`Closed ${done} of ${chosen.length}. ${String((err as Error)?.message ?? err)}`);
+    } finally { setClosing(false); }
+  };
   const clear = () => setDisplay({ ...display, priorities: [], projects: [], updated: 'any', privacy: 'any' });
   // A permission card sits over the corner the pen is in, so the pen moves up to the bar (8fa6c548).
   const penUp = c.view.approvals.length > 0;
@@ -344,7 +373,7 @@ export default function Threads() {
       ListEmptyComponent={c.loading ? <Waiting list /> : repeatsShown || mentionsShown ? undefined : hidden > 0 ? <FilteredEmpty tab={tab} hidden={hidden} clear={clear} />
         : tab === 'inbox' ? <InboxClear />
           : <T style={{ paddingHorizontal: size.inset, paddingTop: 28, fontSize: 15, lineHeight: 23, color: color.dim }}>{EMPTY[tab]}</T>}
-      contentContainerStyle={{ paddingBottom: 96 }}
+      contentContainerStyle={{ paddingBottom: Math.max(picked ? 120 : 96, c.approvalRoom + 16) }}
     />
   );
   // Your card's words for its list; its board's columns already say them.
@@ -358,6 +387,7 @@ export default function Threads() {
     </View>
   ) : undefined;
   return (
+    <Picking.Provider value={picking}>
     <Wall>
       <TopBar title={teamMode ? 'Inbox' : 'Threads'} right={<>
         <IconButton label="Search threads" onPress={() => router.push('/search')}><Magnifier size={18} /></IconButton>
@@ -369,7 +399,19 @@ export default function Threads() {
       {onEverything
         ? <EverythingPlace mine={mineBoard ? <Board columns={mineBoard} foot={foot} inset={size.inset} /> : list} mineTabs={mineTabs} row={threadRow} openGroup={openGroup} />
         : board ? <Board columns={board} foot={foot} /> : list}
-      {!penUp && !(inboxEmpty && !board) && <Pressable accessibilityLabel="New thread" accessibilityRole="button" onPress={() => router.push('/new')}
+      {picked && (
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: foot, paddingTop: 8, paddingHorizontal: size.inset, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: color.bg, borderTopWidth: 1, borderTopColor: color.line }}>
+          <T style={{ flex: 1, fontSize: 14, color: color.dim }}>{picked.size ? `${picked.size} selected` : 'Tap threads to select them'}</T>
+          <Pressable onPress={() => setPicked(null)} accessibilityRole="button" style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: pressed ? color.picked : 'transparent' })}>
+            <T style={{ fontSize: 14, color: color.dim }}>Cancel</T>
+          </Pressable>
+          <Pressable disabled={!picked.size || closing} onPress={() => void closePicked()} accessibilityRole="button"
+            style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: !picked.size || closing ? 0.5 : 1 })}>
+            <T style={{ fontSize: 14, fontFamily: font.semibold }}>{closing ? 'Closing…' : 'Close'}</T>
+          </Pressable>
+        </View>
+      )}
+      {!picked && !penUp && !(inboxEmpty && !board) && <Pressable accessibilityLabel="New thread" accessibilityRole="button" onPress={() => router.push('/new')}
         style={({ pressed }) => ({
           position: 'absolute', right: 20, bottom: foot + 16, width: 56, height: 56, borderRadius: 28,
           alignItems: 'center', justifyContent: 'center', backgroundColor: color.graphite, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
@@ -377,7 +419,9 @@ export default function Threads() {
         })}>
         <Pen />
       </Pressable>}
-      {menu && <ViewMenu display={headerDisplay} onDisplay={onHeaderDisplay} products={c.view.products} items={c.view.items} shown={rows.length} total={shown.whole[tab]} tab={tab} close={() => setMenu(false)} />}
+      {menu && <ViewMenu display={headerDisplay} onDisplay={onHeaderDisplay} products={c.view.products} items={c.view.items} shown={rows.length} total={shown.whole[tab]} tab={tab} close={() => setMenu(false)}
+        onSelect={rows.length && !board ? () => { setMenu(false); setPicked(new Set()); } : undefined} />}
     </Wall>
+    </Picking.Provider>
   );
 }

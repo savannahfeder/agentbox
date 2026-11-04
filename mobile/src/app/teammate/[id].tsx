@@ -8,7 +8,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'rea
 import { answersMessage } from '../../../../renderer/src/teammates/chat-lines';
 import type { TeamChatLine, TeamRunLine } from '../../../../renderer/src/types';
 import { screenGate } from '../../lib/thread-gate';
-import { actWords, asideOf, chatRows, clockOf, openQuestions, runningThread, type ChatRow, type PhoneTeam } from '../../lib/teammates';
+import { actWords, asideOf, chatRows, clockOf, openQuestions, pauseOnItsWay, runningThread, type ChatRow, type PhoneTeam } from '../../lib/teammates';
 import { useCloud } from '../../state/cloud';
 import { Back, More } from '../../ui/icons';
 import { Markdown } from '../../ui/Markdown';
@@ -110,6 +110,13 @@ export default function TeammateChat() {
     setPicks((all) => ({ ...all, [q.id]: all[q.id] === o ? '' : o }));
   };
   const answered = open.filter((q) => picks[q.id]).length;
+  // Paused, or asked here to pause or resume and not yet taken by the computer.
+  const asked = pauseOnItsWay(c.rows.commands, team, t.id);
+  const setPaused = async (paused: boolean) => {
+    setBusy(true); setError(null);
+    try { await c.askTeammate('pause', { id: t.id, paused }); c.say(paused ? `Pausing ${t.name}` : `Resuming ${t.name}`); }
+    catch (err) { setError(message(err)); } finally { setBusy(false); }
+  };
 
   const draw = (r: ChatRow) => {
     if (r.kind === 'day') return <DayRule key={r.key} label={r.label} />;
@@ -178,6 +185,19 @@ export default function TeammateChat() {
           )}
         </ScrollView>
         {error && <T style={{ paddingHorizontal: size.inset, paddingTop: 6, fontSize: 13, color: color.dim }}>{error}</T>}
+        {(t.paused || asked !== null) && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44, paddingHorizontal: size.inset, borderTopWidth: 1, borderTopColor: color.line }}>
+            <T style={{ flex: 1, fontSize: 13.5, lineHeight: 20, color: color.dim }}>
+              {asked === false ? `Resuming when your computer gets this` : asked === true ? `Pausing when your computer gets this` : `${t.name} is paused`}
+            </T>
+            {asked === null && (
+              <Pressable disabled={busy} onPress={() => void setPaused(false)} accessibilityRole="button"
+                style={({ pressed }) => ({ height: 30, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: busy ? 0.5 : 1 })}>
+                <T style={{ fontSize: 13.5, fontFamily: font.medium }}>Resume</T>
+              </Pressable>
+            )}
+          </View>
+        )}
         <MateComposer placeholder={t.status === 'draft' ? `Answer ${t.name === 'New teammate' ? 'your new teammate' : t.name}` : `Message ${t.name}`}
           send={(text) => post({ text, to: [t.id] })}
           above={many ? (
@@ -204,7 +224,13 @@ export default function TeammateChat() {
             <T selectable style={{ fontSize: 15, lineHeight: 21, color: color.dim }}>{v}</T>
           </View>
         ))}
-        <T style={{ paddingHorizontal: 14, paddingTop: 8, fontSize: 12.5, lineHeight: 18, color: color.faint }}>Change its job, pause it or make it primary on your computer.</T>
+        {!t.paused && asked === null && (
+          <Pressable disabled={busy} onPress={() => { setAbout(false); void setPaused(true); }} accessibilityRole="button"
+            style={({ pressed }) => ({ alignSelf: 'flex-start', marginHorizontal: 14, marginTop: 10, height: 32, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+            <T style={{ fontSize: 14, color: color.dim }}>{`Pause ${t.name}`}</T>
+          </Pressable>
+        )}
+        <T style={{ paddingHorizontal: 14, paddingTop: 8, fontSize: 12.5, lineHeight: 18, color: color.faint }}>Change its job or make it primary on your computer.</T>
       </Sheet>
     </Wall>
   );

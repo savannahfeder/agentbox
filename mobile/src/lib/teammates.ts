@@ -114,6 +114,16 @@ export function onTheirWay(commands: PhoneRows['commands'], team: PhoneTeam | nu
   return out;
 }
 
+/** A pause (true) or resume (false) you asked for here that the computer has not taken yet, or null. */
+export function pauseOnItsWay(commands: PhoneRows['commands'], team: PhoneTeam | null, id: string): boolean | null {
+  if (!team) return null;
+  const asked = commands
+    .filter((c) => c.kind === 'setting' && c.device === team.device && !c.taken_at && c.payload?.scope === 'teammate' && c.payload.key === 'pause' && c.payload.value?.id === id)
+    .sort((a, b) => (Date.parse(a.created_at) || 0) - (Date.parse(b.created_at) || 0))
+    .at(-1);
+  return asked ? asked.payload.value.paused === true : null;
+}
+
 /** Its questions still waiting on you, oldest first. */
 export function openQuestions(view: TeammatesView, id: string, pending: readonly Pending[] = []): TeamChatLine[] {
   const answered = new Set(pending.filter((p) => !p.refused).flatMap((p) => Object.keys(p.answers ?? {})));
