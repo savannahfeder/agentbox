@@ -227,7 +227,7 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
       });
     }
   }
-  return { products, items: [...items.values()], waiting, aliases, running, queued, runNow, stalled, shipping, signInNeeded, atLimit, paused, places, approvals, decided, cards };
+  return { now, products, items: [...items.values()], waiting, aliases, running, queued, runNow, stalled, shipping, signInNeeded, atLimit, paused, places, approvals, decided, cards };
 }
 
 /** What one thread's live line is told of the computer's queue, off the view (the phone app's thread page). */

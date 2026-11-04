@@ -68,7 +68,7 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   // While a run is up the live line speaks for its newest steps (ItemThread.tsx).
   // Sent for later from here: its message says when, not that it waits.
   const runAt = Number(item.runAt) || 0;
-  const dated = sent.length && runAt > Date.now()
+  const dated = sent.length && runAt > view.now
     ? said.map((e) => (e.kind !== 'work' && e.pending && !e.refused && e.at === sent[0].at && e.text === sent[0].text ? { ...e, scheduled: runAt } : e))
     : said;
   const shown = session ? withoutTrailingWork(dated) : dated;

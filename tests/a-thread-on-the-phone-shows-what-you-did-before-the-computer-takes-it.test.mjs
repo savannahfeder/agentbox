@@ -7,7 +7,9 @@
 //   trace in its thread, so after an interruption you could not check what you
 //   had decided (issue 26).
 // Both now show at once, drawn from the command waiting for the computer, as
-// replies already were.
+// replies already were. "Scheduled" is judged at the moment the view was drawn,
+// not the real clock: on 2026-11-04 the scheduled case went red at 08:00, when
+// its "tomorrow 8am" passed for real.
 import { describe, it, expect } from 'vitest';
 import { phoneView, phoneSlug } from '../renderer/src/phone-rows';
 import { madeHere } from '../shared/phone-snapshot.mjs';
@@ -46,6 +48,13 @@ describe('a thread sent from the phone', () => {
     const at = new Date(NOW); const tomorrow8 = new Date(at.getFullYear(), at.getMonth(), at.getDate() + 1, 8, 0).getTime();
     const later = cmd({ id: 'c-5', kind: 'new', payload: { title: 'Cold email', body: 'Write the cold email for the design partners, three short versions.', runAt: tomorrow8 } });
     expect(yours(open({ projects, threads: [], commands: [later] }, madeHere(later.id)))).toMatchObject([{ pending: true, scheduled: tomorrow8 }]);
+  });
+
+  it('sent for a time already gone when the view was drawn, is not called scheduled', () => {
+    const gone = cmd({ id: 'c-6', kind: 'new', payload: { title: 'Cold email', body: 'Write the cold email for the design partners, three short versions.', runAt: NOW - 60_000 } });
+    const [mine] = yours(open({ projects, threads: [], commands: [gone] }, madeHere(gone.id)));
+    expect(mine).toMatchObject({ pending: true });
+    expect(mine.scheduled).toBeUndefined();
   });
 
   it('once the computer has its own copy, shows that copy and not a second message', () => {
