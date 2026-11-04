@@ -51,7 +51,7 @@ describe('a permission card over the pen', () => {
     const src = read('mobile/src/app/index.tsx');
     expect(src).toMatch(/const penUp = c\.view\.approvals\.length > 0/);
     expect(src).toMatch(/\{penUp && <IconButton label="New thread"/);
-    expect(src).toMatch(/\{!penUp && /);
+    expect(src).toMatch(/\{!picked && !penUp && /);
   });
 });
 
