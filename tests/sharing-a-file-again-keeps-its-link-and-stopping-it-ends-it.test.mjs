@@ -83,6 +83,18 @@ describe('signed in', () => {
     expect((await maya.fileLink(SOURCE)).link?.token).toBe(first.token);
   });
 
+  // Two testers could not read or answer comments without leaving the app (power test, 2026-11-04).
+  it('reads the comments people left on the page, and answers them as the owner', async () => {
+    const { link } = await maya.shareFile(file(1));
+    const chris = memoryBackend(cloud, signUpMemory(cloud, { email: 'chris@else.test', name: 'Chris Novak' }));
+    await chris.commentOnFileLink(link.token, 'Can you send the Q3 numbers?');
+    expect(await maya.fileLinkComments(link.token)).toMatchObject([{ byName: 'Chris Novak', text: 'Can you send the Q3 numbers?', byOwner: false, mine: false }]);
+    const after = await maya.commentOnFileLink(link.token, '  Adding them now  ');
+    expect(after.map((c) => [c.byName, c.text, c.byOwner])).toEqual([['Chris Novak', 'Can you send the Q3 numbers?', false], ['Maya Chen', 'Adding them now', true]]);
+    expect((await maya.fileLink(SOURCE)).link.comments).toBe(2);
+    await expect(maya.commentOnFileLink(link.token, '   ')).rejects.toThrow(/Write something/);
+  });
+
   it('refuses what a link cannot draw', async () => {
     await expect(maya.shareFile({ ...file(1), kind: 'film' })).rejects.toThrow(/cannot draw/);
   });

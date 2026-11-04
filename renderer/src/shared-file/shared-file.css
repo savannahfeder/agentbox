@@ -16,6 +16,8 @@
 }
 .sf-brand { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--text); text-decoration: none; }
 .sf-brand .app-mark { display: block; }
+.sf-pitch { margin-left: 8px; padding-left: 12px; border-left: 1px solid var(--line-strong); font-size: 13.5px; font-weight: 400; letter-spacing: 0; color: var(--text-faint); }
+.sf-brand:hover .sf-pitch { color: var(--text-dim); }
 .sf-bar-links { display: flex; align-items: center; gap: 20px; }
 .sf-bar-links a, .sf-bar-links button { padding: 0; border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--text-dim); text-decoration: none; cursor: pointer; }
 .sf-bar-links a:hover, .sf-bar-links button:hover { color: var(--text); }
@@ -87,6 +89,9 @@
   background: none; color: var(--text); font: inherit; font-size: 14px; cursor: pointer;
 }
 .sf-join:hover { background: var(--wash); }
+.sf-have { margin: 10px 0 0; text-align: center; font-size: 13px; color: var(--text-faint); }
+.sf-have button { padding: 0; border: 0; background: none; font: inherit; color: var(--text-dim); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.sf-have button:hover { color: var(--text); }
 .sf-error { margin: 12px 0 0; padding: 9px 11px; border-radius: var(--radius); border: 1px solid rgba(245, 168, 148, 0.32); background: rgba(232, 131, 107, 0.1); font-size: 13.5px; line-height: 19px; color: #f5a894; }
 :root[data-theme="light"] .sf-error { border-color: rgba(176, 58, 31, 0.3); background: rgba(176, 58, 31, 0.07); color: #9d3318; }
 .sf-offer { margin: 14px 0 0; font-size: 13px; line-height: 19px; color: var(--text-dim); }
@@ -118,7 +123,7 @@
   .sf-doc { padding: 24px 20px 32px; }
   .sf-image { padding: 12px; }
   .sf-frame, .sf-pdf { height: calc(100svh - 130px); min-height: 420px; }
-  .sf-me { display: none; }
+  .sf-me, .sf-pitch { display: none; }
   .sf-comments { position: static; }
   .sf-sign-in .si-card { width: auto; box-sizing: border-box; padding: 30px 22px 22px; }
   .sf-sign-in { grid-template-columns: minmax(0, 1fr); }

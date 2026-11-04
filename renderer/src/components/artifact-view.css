@@ -239,6 +239,16 @@
 .av-share .is-behind { position: relative; }
 .av-share .is-behind::after { content: ''; position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
 .av-share-stop.is-asking { color: var(--text); }
+.av-share-comments { margin: 2px 0 0; padding: 10px 0 0; list-style: none; border-top: 1px solid var(--line); max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.av-share-who { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
+.av-share-who b { font-weight: 600; color: var(--text); }
+.av-share-who time { font-size: 11.5px; color: var(--text-faint); }
+.av-share-box .av-share-comments p { margin: 2px 0 0; font-size: 13px; line-height: 18px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-dim); }
+.av-share-reply input {
+  width: 100%; height: 30px; box-sizing: border-box; padding: 0 9px;
+  font: inherit; font-size: 13px; color: var(--text); background: none; border: 1px solid var(--line-strong); border-radius: var(--radius); outline: none;
+}
+.av-share-reply input:focus { border-color: var(--text-faint); }
 .av-share-box {
   position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; width: 340px; box-sizing: border-box; padding: 14px;
   display: flex; flex-direction: column; gap: 10px;

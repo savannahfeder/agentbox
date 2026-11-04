@@ -2414,6 +2414,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   }));
   ipcMain.handle('zero:file-link-share', linkCall(async (arg) => team.shareFile({ source: linkOf(arg), ...(await fileOnScreen(arg)) })));
   ipcMain.handle('zero:file-link-stop', linkCall(async ({ token } = {}) => { await team.stopFileLink(String(token ?? '')); return {}; }));
+  ipcMain.handle('zero:file-link-comments', linkCall(async ({ token } = {}) => ({ comments: await team.fileLinkComments(String(token ?? '')) })));
+  ipcMain.handle('zero:file-link-comment', linkCall(async ({ token, text } = {}) => ({ comments: await team.commentOnFileLink(String(token ?? ''), text) })));
 
   // "Try again" on a file in a conversation that was not delivered.
   ipcMain.handle('zero:retry-file', async (_e, { product, src } = {}) => (team?.retryFile ? team.retryFile({ product, src }) : false));

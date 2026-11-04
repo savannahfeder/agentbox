@@ -330,6 +330,17 @@ export function supabaseBackend(client) {
       must(await client.rpc('stop_file_link', { tok: token }), 'stopping the link');
     },
 
+    async fileLinkComments(token) {
+      await myId();
+      const rows = must(await client.rpc('file_link_comments_of', { tok: token }), 'reading the comments');
+      return (rows ?? []).map((c) => ({ id: c.id, byName: c.by_name, byAvatar: c.by_avatar ?? null, text: c.body, at: Date.parse(c.created_at), mine: !!c.mine, byOwner: !!c.by_owner }));
+    },
+
+    async commentOnFileLink(token, text) {
+      await myId();
+      return must(await client.rpc('comment_on_file_link', { tok: token, b: text }), 'sending your comment');
+    },
+
     async getThreadFile(owner, threadId, name) {
       const rows = must(await client.from('thread_work_files').select('data').eq('person_id', owner).eq('thread_id', threadId).eq('name', name).limit(1), 'taking a file from a teammate\'s thread');
       return rows[0]?.data ?? null;

@@ -2,7 +2,7 @@
 // Nothing leaves this computer until Copy link is pressed. Every version of
 // one file shares one link; Update link puts the copy on screen in it.
 import { useEffect, useRef, useState } from 'react';
-import { api, type FileLinkState } from '../api';
+import { api, type FileLinkState, type LinkComment } from '../api';
 import { clock } from '../thread-history';
 import { NoteGlyph } from './NoteGlyphs';
 
@@ -13,6 +13,7 @@ export const shareWords = {
   fresh: 'Anyone with the link can view this file.',
   stopped: 'Stopped. The old link no longer works.',
   behind: 'The link shows an older copy.',
+  newComments: 'New comments on the link',
   comments: (n: number) => (n === 1 ? '1 comment' : `${n} comments`),
   stopAsk: (n: number) => (n > 0 ? `Stop, and delete ${n === 1 ? 'its comment' : `its ${n} comments`}` : 'Stop the link'),
   shared: (at: number, now = Date.now()) => (new Date(at).toDateString() === new Date(now).toDateString()
@@ -28,6 +29,22 @@ export function linkOffer(state: FileLinkState | null) {
   const link = state?.link ?? null;
   return { link, behind: !!link && !link.current };
 }
+
+// How many of a link's comments this computer has shown, so a new one marks the button.
+const SEEN = 'agentbox:link-comments-seen';
+const seenAll = (): Record<string, number> => { try { return JSON.parse(localStorage.getItem(SEEN) || '{}'); } catch { return {}; } };
+export const seenComments = (token: string) => seenAll()[token] ?? 0;
+export function seeComments(token: string, n: number) {
+  try { localStorage.setItem(SEEN, JSON.stringify({ ...seenAll(), [token]: n })); } catch { /* storage full: the dot stays */ }
+}
+
+const whenSaid = (at: number, now = Date.now()) => {
+  const m = Math.floor(Math.max(0, now - at) / 60_000);
+  if (m < 1) return 'now';
+  if (m < 60) return `${m}m`;
+  if (m < 24 * 60) return `${Math.floor(m / 60)}h`;
+  return new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' });
+};
 
 async function copy(text: string) {
   try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
@@ -49,6 +66,9 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   const ask = { product, thread, src };
 
   const [stopAsked, setStopAsked] = useState(false);
+  const [comments, setComments] = useState<LinkComment[] | null>(null);
+  const [answer, setAnswer] = useState('');
+  const [unseen, setUnseen] = useState(false);
   // Read again on every opening: an edit or a comment since is what the panel is opened to see.
   useEffect(() => {
     let live = true;
@@ -65,8 +85,35 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
     return () => { document.removeEventListener('mousedown', away); window.removeEventListener('keydown', esc, true); };
   }, [open]);
 
+  const token = state?.link?.token ?? null;
+  const count = state?.link?.comments ?? 0;
+  useEffect(() => {
+    if (!open || !token) { setComments(null); return; }
+    let live = true;
+    void api.fileLinkComments({ token }).then((r) => {
+      if (!live || !r.ok) return;
+      setComments(r.comments ?? []);
+      seeComments(token, (r.comments ?? []).length);
+      setUnseen(false);
+    });
+    return () => { live = false; };
+  }, [open, token, count]);
+  useEffect(() => { setUnseen(!!token && count > seenComments(token)); }, [token, count]);
+
   if (!state?.ok || !state.site) return null;
   const { link, behind } = linkOffer(state);
+  const reply = async () => {
+    const words = answer.trim();
+    if (!words || !link) return;
+    setBusy(true); setProblem(null);
+    const out = await api.fileLinkComment({ token: link.token, text: words });
+    setBusy(false);
+    if (!out.ok) { setProblem(out.error ?? 'That did not send.'); return; }
+    setAnswer('');
+    setComments(out.comments ?? []);
+    seeComments(link.token, (out.comments ?? []).length);
+  };
+  const flagged = behind || unseen;
 
   const share = async () => {
     setBusy(true); setProblem(null); setSaid(null);
@@ -92,8 +139,8 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   return (
     <div className={`av-share${icon ? ' is-mark' : ''}`} ref={box}>
       {icon
-        ? <button type="button" className={`doc-mark${link ? ' is-shared' : ''}${behind ? ' is-behind' : ''}`} title={behind ? shareWords.behind : link ? 'Shared' : 'Share'} aria-label={link ? 'Shared' : 'Share'} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="link" /></button>
-        : <button type="button" className={`av-btn${open ? ' is-on' : ''}${behind ? ' is-behind' : ''}`} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="link" />{link ? 'Shared' : 'Share'}</button>}
+        ? <button type="button" className={`doc-mark${link ? ' is-shared' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : link ? 'Shared' : 'Share'} aria-label={link ? 'Shared' : 'Share'} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="link" /></button>
+        : <button type="button" className={`av-btn${open ? ' is-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : undefined} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="link" />{link ? 'Shared' : 'Share'}</button>}
       {open && (
         <div className="av-share-box" role="dialog" aria-label="Share">
           {!state.signedIn ? (
@@ -106,20 +153,31 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
           ) : link ? (
             <>
               <input className="av-share-url" readOnly value={link.url} aria-label="Link" onFocus={(e) => e.currentTarget.select()} />
-              <p className="av-share-meta">
-                <span>{behind ? shareWords.behind : shareWords.shared(link.updatedAt)}</span>
-                {link.comments > 0 && <a href={link.url} onClick={(e) => { e.preventDefault(); window.open(link.url, '_blank'); }}>{shareWords.comments(link.comments)}</a>}
-              </p>
+              <p className="av-share-meta"><span>{behind ? shareWords.behind : shareWords.shared(link.updatedAt)}</span></p>
               <div className="av-share-acts">
-                <button type="button" className="av-btn is-on" disabled={busy} onClick={() => void (behind ? share() : copy(link.url).then((ok) => setSaid(ok ? 'Link copied' : null)))}>
-                  {behind ? 'Update link' : 'Copy link'}
-                </button>
-                <button type="button" className="av-btn" disabled={busy} onClick={() => window.open(link.url, '_blank')}>Open</button>
+                {behind && <button type="button" className="av-btn is-on" disabled={busy} onClick={() => void share()}>Update link</button>}
+                <button type="button" className={`av-btn${behind ? '' : ' is-on'}`} disabled={busy} onClick={() => void copy(link.url).then((ok) => setSaid(ok ? 'Link copied' : null))}>Copy link</button>
+                {!behind && <button type="button" className="av-btn" disabled={busy} onClick={() => window.open(link.url, '_blank')}>Open</button>}
                 <span className="av-spring" />
                 <button type="button" className={`av-share-stop${stopAsked ? ' is-asking' : ''}`} disabled={busy} onBlur={() => setStopAsked(false)} onClick={() => void stop()}>
                   {stopAsked ? shareWords.stopAsk(link.comments) : 'Stop sharing'}
                 </button>
               </div>
+              {comments && comments.length > 0 && (
+                <ol className="av-share-comments" aria-label="Comments">
+                  {comments.map((c) => (
+                    <li key={c.id}>
+                      <span className="av-share-who"><b>{c.byOwner ? 'You' : c.byName}</b><time>{whenSaid(c.at)}</time></span>
+                      <p>{c.text}</p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              {comments && comments.length > 0 && (
+                <form className="av-share-reply" onSubmit={(e) => { e.preventDefault(); void reply(); }}>
+                  <input value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Reply on the page" aria-label="Reply on the page" maxLength={4000} disabled={busy} />
+                </form>
+              )}
             </>
           ) : (
             <>

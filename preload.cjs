@@ -270,6 +270,8 @@ contextBridge.exposeInMainWorld('zero', {
   fileLink: (payload) => ipcRenderer.invoke('zero:file-link', payload),
   fileLinkShare: (payload) => ipcRenderer.invoke('zero:file-link-share', payload),
   fileLinkStop: (payload) => ipcRenderer.invoke('zero:file-link-stop', payload),
+  fileLinkComments: (payload) => ipcRenderer.invoke('zero:file-link-comments', payload),
+  fileLinkComment: (payload) => ipcRenderer.invoke('zero:file-link-comment', payload),
   retryFile: (payload) => ipcRenderer.invoke('zero:retry-file', payload),
   // The change a run made, read as a built artifact.
   codeChange: (payload) => ipcRenderer.invoke('zero:code-change', payload),

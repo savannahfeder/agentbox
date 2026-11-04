@@ -109,7 +109,7 @@ export function SharedFilePage({ token, client, finishing = null }: {
           <section className="sf-file" aria-label={load.file.name}><FileBody token={token} file={load.file} /></section>
           <Comments
             file={load.file} comments={comments} signedIn={signedIn}
-            onAsk={() => setAsking('sign-up')}
+            onAsk={setAsking}
             post={async (words) => { await postComment(asMe, token, words); setComments(await readComments(anyone, token)); }}
             remove={async (id) => { await removeComment(asMe, id); setComments(await readComments(anyone, token)); }}
           />
@@ -121,7 +121,7 @@ export function SharedFilePage({ token, client, finishing = null }: {
   return (
     <div className="sf-page">
       <header className="sf-bar">
-        <a className="sf-brand" href={SITE}><AppMark size={14} />agentbox</a>
+        <a className="sf-brand" href={SITE}><AppMark size={14} />agentbox<span className="sf-pitch">Give your agents an inbox</span></a>
         <nav className="sf-bar-links">
           <a href={SITE}>Get Agentbox</a>
           {signedIn && <span className="sf-me" title={client.email() ?? undefined}>{client.email()}</span>}
@@ -158,7 +158,7 @@ export function FileBody({ token, file }: { token: string; file: SharedFile }) {
 }
 
 export function Comments({ file, comments, signedIn, onAsk, post, remove }: {
-  file: SharedFile; comments: FileComment[] | null; signedIn: boolean; onAsk: () => void;
+  file: SharedFile; comments: FileComment[] | null; signedIn: boolean; onAsk: (how: 'sign-in' | 'sign-up') => void;
   post: (words: string) => Promise<void>; remove: (id: string) => Promise<void>;
 }) {
   const [words, setWords] = useState('');
@@ -226,7 +226,10 @@ export function Comments({ file, comments, signedIn, onAsk, post, remove }: {
           </div>
         </form>
       ) : (
-        <button type="button" className="sf-join" onClick={onAsk}>Create an account to comment</button>
+        <>
+          <button type="button" className="sf-join" onClick={() => onAsk('sign-up')}>Create an account to comment</button>
+          <p className="sf-have">Have an account? <button type="button" onClick={() => onAsk('sign-in')}>Sign in</button></p>
+        </>
       )}
       {error && <p className="sf-error" role="alert">{error}</p>}
       {offer && <p className="sf-offer">Agentbox runs your own agents. <a href={DOWNLOAD}>Get Agentbox</a></p>}

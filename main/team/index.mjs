@@ -991,6 +991,18 @@ export function createTeamService({
       if (!backend?.stopFileLink || !state.me) throw new Error('Sign in first.');
       await backend.stopFileLink(token);
     },
+    /** The comments people left on a link's page, and the owner's answer to them. */
+    async fileLinkComments(token) {
+      if (!backend?.fileLinkComments || !state.me) return [];
+      return backend.fileLinkComments(token);
+    },
+    async commentOnFileLink(token, text) {
+      if (!backend?.commentOnFileLink || !state.me) throw new Error('Sign in first.');
+      const words = String(text ?? '').trim();
+      if (!words) throw new Error('Write something first.');
+      await backend.commentOnFileLink(token, words);
+      return backend.fileLinkComments(token);
+    },
     /** A first name for the tile that says whose computer a file waits for. */
     firstNameOf: (id) => (state.people ?? []).find((p) => p.id === id)?.name?.split(/\s+/)[0] ?? null,
     stop: stopLoop,

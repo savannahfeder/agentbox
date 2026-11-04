@@ -18,6 +18,7 @@ import type { CarryState } from '../../shared/carried-files.mjs';
 export interface FileLinkAsk { product: string; thread: string; src: string }
 /** `current`: the link holds the copy of the file on screen now. */
 export interface FileLink { token: string; url: string; version: number; updatedAt: number; comments: number; current: boolean }
+export interface LinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean }
 /** `site` null: this copy's cloud has no website, so there is nothing to share on. */
 export interface FileLinkState { ok: boolean; error?: string; site?: string | null; signedIn?: boolean; link?: FileLink | null }
 import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
@@ -735,6 +736,16 @@ export const api = {
     const zero = window.zero as any;
     if (!zero?.fileLinkStop) return { ok: false, error: `quit and reopen ${NAME} to share files` };
     return zero.fileLinkStop(p);
+  },
+  async fileLinkComments(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinkComments) return { ok: false, error: 'not here' };
+    return zero.fileLinkComments(p);
+  },
+  async fileLinkComment(p: { token: string; text: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinkComment) return { ok: false, error: `quit and reopen ${NAME} to answer comments` };
+    return zero.fileLinkComment(p);
   },
 
   /** "Try again" on a file in a conversation that was not delivered. */
