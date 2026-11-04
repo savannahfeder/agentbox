@@ -2,11 +2,11 @@
 // (renderer/src/threads/ThreadComposer.tsx): which project it opens on and
 // falls back to, the agent, model and level it remembers, and what a send names.
 import { LAST_PRODUCT_KEY } from '../../../renderer/src/compose-project';
-import { DEFAULT_MODEL, defaultModelFor, readLastModel, writeLastModel, type ModelChoice } from '../../../renderer/src/models';
+import { DEFAULT_MODEL, defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type ModelChoice } from '../../../renderer/src/models';
 import { EFFORTS, defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLastEffort, writeLastEffort } from '../../../renderer/src/effort';
 import { readLastEngine, startingEngine, writeLastEngine } from '../../../renderer/src/engines';
 import { priorityValueOf, type PriorityId } from '../../../renderer/src/priority';
-import { harnessFields, projectsOffered, startingProject, type Harness } from '../../../renderer/src/threads/composer-rules';
+import { harnessFields, harnessOf, projectsOffered, startingProject, type Harness } from '../../../renderer/src/threads/composer-rules';
 import { readLastRecipient, writeLastRecipient } from '../../../renderer/src/threads/recipient';
 import type { Engine } from '../../../shared/engines.mjs';
 import type { Choices } from './actions';
@@ -81,6 +81,14 @@ export function newThreadChoices({ priority, engine = 'claude', model, effort, e
     ...(priority ? { priority: priorityValueOf(priority) } : {}),
     ...harnessFields({ engine, model, effort: effortPicked(effort, levels) ? effort : null, engineCount, codexDefault }),
   };
+}
+
+/** The model a thread's reply box shows and lists: that thread's own agent's, not always Claude's. */
+export function replyModel(item: { engine?: string; model?: string }, picked: Pick<Choices, 'model'>, codex: CodexOpts = {}) {
+  const engine: Harness = item.engine === 'codex' || item.engine === 'claude' ? item.engine
+    : item.model ? harnessOf(item.model, codex.codexModels) : 'claude';
+  const model = picked.model ?? item.model ?? defaultModelFor(engine, codex.codexDefault ?? null);
+  return { engine, model, label: engineModelLabel(engine, model, codex) };
 }
 
 /** `fn`, ignoring a call while the last one is still going. */
