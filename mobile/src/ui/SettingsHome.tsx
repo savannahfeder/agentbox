@@ -3,7 +3,7 @@
 // about the Mac's own keys, and Cloud sells plans, which the phone app does not
 // (docs/mobile/PLAN.md, 3.1). Appearance is here, for the phone's own look.
 import Constants from 'expo-constants';
-import { router } from 'expo-router';
+import { router } from '../lib/router';
 import { computerLine, versionLine } from '../lib/computer-line';
 import { PHONE_LOOKS, type PhoneLook } from '../lib/look';
 import { useCloud } from '../state/cloud';

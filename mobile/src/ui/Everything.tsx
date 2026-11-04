@@ -1,7 +1,7 @@
 // Everything else, as the phone layout draws it (team/everything/TeamStrip.tsx,
 // everything.css, phone.css): your team as cards, the bar over whichever is lit,
 // and its work under them. New teammate is the last card.
-import { router } from 'expo-router';
+import { router } from '../lib/router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';

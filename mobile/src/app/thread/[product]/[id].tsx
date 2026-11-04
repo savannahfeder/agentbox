@@ -2,13 +2,14 @@
 // last word, the threads it filed, the options it still offers, and the reply
 // box that opens into the desktop's sentence. A press leaves a command for the
 // Mac and shows at once as waiting for it.
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
+import { router } from '../../../lib/router';
 import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Rect } from 'react-native-svg';
 import { isImageName } from '../../../../../renderer/src/attachments';
-import { KEEP_OPEN, type CloseOption } from '../../../../../renderer/src/close-asks-first';
+import { type CloseOption } from '../../../../../renderer/src/close-asks-first';
 import { foldedReply } from '../../../../../renderer/src/folded-reply';
 import { closesTheTask, type ParsedOption } from '../../../../../renderer/src/format';
 import { MODE_WORDS } from '../../../../../renderer/src/modes';
@@ -359,6 +360,7 @@ export default function ThreadScreen() {
   const close = () => { if (thread.closeAsk) setAsking(true); else void press({ kind: 'close' }, item, back); };
   const answerAsk = async (option: CloseOption) => {
     setAsking(false);
+    if (option.act === 'keep') return;
     if (option.act === 'decide') { scroll.current?.scrollTo({ y: Math.max(0, footList.current - 80), animated: true }); return; }
     for (const kid of thread.waitingFiled) {
       if (!(await press(option.act === 'start' ? { kind: 'approve-filed' } : { kind: 'close' }, kid.item))) return;
@@ -507,8 +509,7 @@ export default function ThreadScreen() {
             <FiledList rows={thread.filedAtFoot} label="Filed from this thread" {...filedPresses} />
           </View>
           {asking && thread.closeAsk ? (
-            <OptionsCard ask={thread.closeAsk.ask} options={thread.closeAsk.options} busy={busy} pick={(o) => void answerAsk(o as CloseOption)}
-              keep={{ label: KEEP_OPEN, onKeep: () => setAsking(false) }} />
+            <OptionsCard ask={thread.closeAsk.ask} options={thread.closeAsk.options} busy={busy} pick={(o) => void answerAsk(o as CloseOption)} />
           ) : null}
           {live && <LiveLine live={live} />}
           <ThreadFiles item={item} product={item.product} />

@@ -51,10 +51,13 @@ export interface CloudAccountSession {
   startReset(email: unknown): Promise<void>;
   waitForReset(): Promise<void>;
   newPassword(password: unknown): Promise<string>;
+  takeSession(): PhoneSession | null;
   cancel(): unknown;
   reopen(): unknown;
   held?: string | null;
 }
+
+export interface PhoneSession { supabaseUrl: string; access_token: string; refresh_token: string }
 
 export interface CloudAccountSessionOptions {
   config: CloudAccountConfig;
@@ -116,8 +119,12 @@ export function cloudAccountSession({ config, openExternal, log = () => {}, crea
       global: { fetch: withDeadline() },
     });
   };
-  const tokenOf = (data: { session?: { access_token?: string } | null } | null | undefined) => {
+  // The last sign-in's database session, kept in memory for the phone side
+  // (main/team/), which needs one of its own; taken once.
+  let handOver: PhoneSession | null = null;
+  const tokenOf = (data: { session?: { access_token?: string; refresh_token?: string } | null } | null | undefined) => {
     if (!data?.session?.access_token) throw new Error('Signing in came back without a session. Try again.');
+    handOver = data.session.refresh_token ? { supabaseUrl: config.supabaseUrl, access_token: data.session.access_token, refresh_token: data.session.refresh_token } : null;
     return data.session.access_token;
   };
   return {
@@ -187,7 +194,8 @@ export function cloudAccountSession({ config, openExternal, log = () => {}, crea
       resetting = null;
       return token;
     },
-    cancel: () => { resetting = null; confirming = null; return cancelGoogleSignIn(); },
+    takeSession: () => { const s = handOver; handOver = null; return s; },
+    cancel: () => { resetting = null; confirming = null; handOver = null; return cancelGoogleSignIn(); },
     reopen: () => (lastUrl ? openExternal(lastUrl) : null),
   };
 }
