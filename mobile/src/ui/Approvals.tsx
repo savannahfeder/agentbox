@@ -10,7 +10,7 @@ import type { Answered } from '../../../renderer/src/approval-stage';
 import { APPROVAL_EXIT_MS, approvalCard, cardOnStage, type Approval } from '../lib/overlays';
 import { useCloud } from '../state/cloud';
 import { footRoom, T } from './parts';
-import { color, font } from './theme';
+import { color, corner, font } from './theme';
 
 // The site's glass is --bg-raised at 62% over a 22px blur. The app has no
 // blur, and paint alone lets the words under it show through, so it is the
@@ -32,7 +32,7 @@ function Ghost({ far }: { far?: boolean }) {
   return (
     <View style={{
       position: 'absolute', left: 0, right: 0, height: 40, top: far ? -13 : -7, transform: [{ scale: far ? 0.93 : 0.965 }], opacity: far ? 0.6 : 1,
-      backgroundColor: color.sunk, borderWidth: 1, borderColor: color.line,
+      backgroundColor: color.sunk, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line,
     }} />
   );
 }
@@ -61,7 +61,7 @@ function Card({ a, verdict, waiting, answer }: { a: Approval; verdict: 'allow' |
   const small = { fontSize: 11.5, lineHeight: 15 };
   return (
     <Animated.View pointerEvents={verdict ? 'none' : 'auto'} style={[{
-      backgroundColor: color.sunk, borderWidth: 1, borderColor: verdict === 'allow' ? color.faint : color.line, paddingVertical: 12, paddingHorizontal: 14,
+      backgroundColor: color.sunk, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: verdict === 'allow' ? color.faint : color.line, paddingVertical: 12, paddingHorizontal: 14,
       shadowColor: '#000', shadowOpacity: color.lift, shadowRadius: 35, shadowOffset: { width: 0, height: 24 }, elevation: 16,
     }, card]}>
       <Animated.View style={recede}>
@@ -93,11 +93,11 @@ function Card({ a, verdict, waiting, answer }: { a: Approval; verdict: 'allow' |
         )}
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable accessibilityRole="button" onPress={() => answer(true)}
-            style={({ pressed }) => ({ flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: color.text, borderWidth: 1, borderColor: 'transparent', opacity: pressed ? 0.88 : 1 })}>
+            style={({ pressed }) => ({ flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: color.text, borderWidth: 1, borderRadius: corner.small, borderColor: 'transparent', opacity: pressed ? 0.88 : 1 })}>
             <T style={{ fontSize: 16, fontFamily: font.semibold, color: color.bg }}>Allow</T>
           </Pressable>
           <Pressable accessibilityRole="button" onPress={() => answer(false)}
-            style={({ pressed }) => ({ flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: color.fill, borderWidth: 1, borderColor: pressed ? color.faint : color.lineStrong })}>
+            style={({ pressed }) => ({ flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: color.fill, borderWidth: 1, borderRadius: corner.small, borderColor: pressed ? color.faint : color.lineStrong })}>
             {({ pressed }) => <T style={{ fontSize: 16, fontFamily: font.semibold, color: pressed ? color.text : color.dim }}>Deny</T>}
           </Pressable>
         </View>

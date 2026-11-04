@@ -29,7 +29,7 @@ import { repeatRow, repeatTag } from '../../../renderer/src/repeat-words';
 import type { PhoneRepeat } from '../../../renderer/src/phone-repeats';
 import { barsFor } from '../ui/Pickers';
 import { footRoom, IconButton, PriorityBars, RunningMark, T, TopBar, Wall } from '../ui/parts';
-import { color, font, size } from '../ui/theme';
+import { color, corner, font, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
 
 // The desktop's own words for an empty tab (renderer/src/threads/Pages.tsx `EmptyTab`).
@@ -60,7 +60,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
       {/* The unread dot in the margin, level with the title's first line (phone.css `.row.unread::before`). */}
       {unread && <View style={{ position: 'absolute', left: 5, top: 22, width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent }} />}
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {picking && <View style={{ width: 18, height: 18, marginRight: 12, borderWidth: 1.5, borderColor: on ? color.text : color.faint, backgroundColor: on ? color.text : 'transparent', alignItems: 'center', justifyContent: 'center' }}>{on && <Tick size={12} tint={color.bg} />}</View>}
+        {picking && <View style={{ width: 18, height: 18, marginRight: 12, borderWidth: 1.5, borderRadius: corner.small, borderColor: on ? color.text : color.faint, backgroundColor: on ? color.text : 'transparent', alignItems: 'center', justifyContent: 'center' }}>{on && <Tick size={12} tint={color.bg} />}</View>}
         {row.running && <View style={{ marginRight: row.cloud ? 6 : 8 }}><RunningMark cloud={row.cloud}><Cloud /></RunningMark></View>}
         {/* A thread a teammate's run sent you says whose it is before its title (teammates/row-lead.tsx). */}
         {mate && <View style={{ marginRight: 7 }}><TeammateMark t={mate} /></View>}
@@ -187,7 +187,7 @@ function Tabs({ on, counts, pick, team }: { on: PlaceId; counts: Record<PlaceId,
 function Outlined({ label, onPress, lead }: { label: string; onPress: () => void; lead?: ReactNode }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button"
-      style={({ pressed }) => ({ alignSelf: 'flex-start', height: 32, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+      style={({ pressed }) => ({ alignSelf: 'flex-start', height: 32, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
       {lead}
       <T style={{ fontSize: 14, color: color.text }}>{label}</T>
     </Pressable>
@@ -260,7 +260,7 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
           {c.rows.length === 0 && <T style={{ fontSize: 13, color: color.faint, paddingVertical: 4, paddingHorizontal: 2 }}>Nothing here.</T>}
           {c.rows.map((e) => (
             <Pressable key={e.key} onPress={() => e.item && open(e.item.product, e.item.id)}
-              style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill })}>
+              style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill })}>
               <T numberOfLines={3} style={{ fontSize: 14, lineHeight: 20, marginBottom: 14 }}>{e.title}</T>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
@@ -427,7 +427,7 @@ export default function Threads() {
             <T style={{ fontSize: 14, color: color.dim }}>Cancel</T>
           </Pressable>
           <Pressable disabled={!picked.size || closing} onPress={() => void closePicked()} accessibilityRole="button"
-            style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: !picked.size || closing ? 0.5 : 1 })}>
+            style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: !picked.size || closing ? 0.5 : 1 })}>
             <T style={{ fontSize: 14, fontFamily: font.semibold }}>{closing ? 'Closing…' : 'Close'}</T>
           </Pressable>
         </View>

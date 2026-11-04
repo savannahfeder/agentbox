@@ -28,7 +28,7 @@ import { Caret, Clip, Clock, Repeat } from './icons';
 import { TimeBox, TypingSheet } from './Later';
 import { Pickable, PriorityBars, Sheet, SheetHead, SheetRow, SheetSep, T } from './parts';
 import { ModelSheet, PrioritySheet, barsFor } from './Pickers';
-import { color, font, size } from './theme';
+import { color, corner, font, size } from './theme';
 
 const Swatch = ({ slug }: { slug: string }) => <View style={{ width: 9, height: 9, backgroundColor: projectSwatch(slug) }} />;
 
@@ -135,13 +135,13 @@ export function SendButtons({ form }: { form: NewThread }) {
   return (
     <View style={{ flexDirection: 'row', opacity: canSend ? 1 : 0.45 }}>
       <Pressable disabled={!canSend} onPress={() => (talk.on ? talk.send() : void send())} accessibilityRole="button" accessibilityLabel="Send"
-        style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: color.accent, opacity: pressed ? 0.85 : 1 })}>
+        style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: color.accent, borderTopLeftRadius: corner.small, borderBottomLeftRadius: corner.small, opacity: pressed ? 0.85 : 1 })}>
         <T style={{ fontSize: 15, fontFamily: font.medium, color: '#fff' }}>{busy ? 'Sending…' : 'Send'}</T>
       </Pressable>
       {/* A message to a teammate goes now; it has no later. */}
       {!form.mate && (
         <Pressable disabled={!canSend} onPress={() => setSheet('later')} accessibilityRole="button" accessibilityLabel="Send later"
-          style={({ pressed }) => ({ width: 32, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: color.accent, borderLeftWidth: 1, borderLeftColor: 'rgba(26, 24, 23, 0.28)', opacity: pressed ? 0.85 : 1 })}>
+          style={({ pressed }) => ({ width: 32, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: color.accent, borderLeftWidth: 1, borderLeftColor: 'rgba(26, 24, 23, 0.28)', borderTopRightRadius: corner.small, borderBottomRightRadius: corner.small, opacity: pressed ? 0.85 : 1 })}>
           <Caret />
         </Pressable>
       )}
@@ -285,7 +285,7 @@ export function InboxComposer() {
   text.current = form.draft.text;
   useEffect(() => () => { if (typing.current && text.current.trim()) router.push('/new'); }, []);
   return (
-    <View style={{ borderWidth: 1, borderColor: color.lineStrong, backgroundColor: color.card }}>
+    <View style={{ borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.lineStrong, backgroundColor: color.card }}>
       <NewThreadFields form={form} inline onFocus={() => { typing.current = true; }} onBlur={() => { typing.current = false; }} />
       <NewThreadFoot form={form} send={<SendButtons form={form} />} />
       <NewThreadSheets form={form} now={c.now} />

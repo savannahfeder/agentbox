@@ -11,7 +11,7 @@ import { appleAvailable, appleSignIn, googleSignIn } from '../platform/sign-in';
 import { useCloud } from '../state/cloud';
 import { AppleMark, AppMark, GoogleMark } from '../ui/icons';
 import { T, Wall } from '../ui/parts';
-import { color, font } from '../ui/theme';
+import { color, corner, font } from '../ui/theme';
 
 // Where a new account's email link lands: the phone website, which signs you in there.
 const phoneSite: string | undefined = Constants.expoConfig?.extra?.cloud?.phoneSite ?? undefined;
@@ -29,7 +29,7 @@ function Field({ label, secureTextEntry, ...rest }: { label: string } & React.Co
       <View style={{ justifyContent: 'center' }}>
         <TextInput placeholderTextColor={color.faint} autoCapitalize="none" autoCorrect={false} {...rest} secureTextEntry={secureTextEntry && !shown}
           onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          style={[{ height: 38, paddingLeft: 11, paddingRight: secureTextEntry ? 60 : 11, borderWidth: 1, borderColor: focused ? color.accent : color.lineStrong, backgroundColor: color.field, fontFamily: font.regular, fontSize: 14, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
+          style={[{ height: 38, paddingLeft: 11, paddingRight: secureTextEntry ? 60 : 11, borderWidth: 1, borderRadius: corner.small, borderColor: focused ? color.accent : color.lineStrong, backgroundColor: color.field, fontFamily: font.regular, fontSize: 14, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
         {secureTextEntry && (
           <Pressable onPress={() => setShown(!shown)} accessibilityRole="button" accessibilityLabel={shown ? 'Hide password' : 'Show password'} hitSlop={6}
             style={{ position: 'absolute', right: 0, height: 38, paddingHorizontal: 11, justifyContent: 'center' }}>
@@ -44,7 +44,7 @@ function Field({ label, secureTextEntry, ...rest }: { label: string } & React.Co
 function Provider({ mark, label, onPress, disabled }: { mark: React.ReactNode; label: string; onPress: () => void; disabled?: boolean }) {
   return (
     <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button"
-      style={({ pressed }) => ({ height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.fill : 'transparent', opacity: disabled ? 0.5 : 1 })}>
+      style={({ pressed }) => ({ height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.fill : 'transparent', opacity: disabled ? 0.5 : 1 })}>
       {mark}
       <T style={{ fontSize: 14 }}>{label}</T>
     </Pressable>
@@ -86,13 +86,13 @@ export default function SignIn() {
     <Wall>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 22, paddingTop: inset.top + 40, paddingBottom: inset.bottom + 22 }} keyboardShouldPersistTaps="handled">
-          <View style={{ backgroundColor: color.card, borderWidth: 1, borderColor: color.lineStrong, paddingTop: 30, paddingHorizontal: 22, paddingBottom: 22 }}>
+          <View style={{ backgroundColor: color.card, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.lineStrong, paddingTop: 30, paddingHorizontal: 22, paddingBottom: 22 }}>
             <View style={{ marginBottom: 20 }} accessible accessibilityRole="image" accessibilityLabel={Name}><AppMark size={28} /></View>
             <T style={{ fontFamily: font.medium, fontSize: 20, lineHeight: 26, letterSpacing: -0.3, marginBottom: 8 }}>{heading}</T>
             <T style={{ fontSize: 13.5, lineHeight: 20, color: color.dim, marginBottom: 24 }}>{lede}</T>
             {!c.cloud && !c.preview && <T style={{ fontSize: 13, color: color.dim, marginBottom: 16 }}>This build was made without the cloud's address, so it cannot sign in.</T>}
             {mode === 'check-email' ? (
-              <Pressable onPress={() => { setMode('sign-in'); setPassword(''); }} style={{ height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: color.accent }}>
+              <Pressable onPress={() => { setMode('sign-in'); setPassword(''); }} style={{ height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: color.accent, borderRadius: corner.small }}>
                 <T style={{ fontSize: 14, fontFamily: font.medium, color: color.bg }}>Back to sign in</T>
               </Pressable>
             ) : (
@@ -113,7 +113,7 @@ export default function SignIn() {
                 </View>
                 <Pressable disabled={!canSubmit} accessibilityRole="button"
                   onPress={mode === 'sign-up' ? run('email', signUp) : run('email', () => c.cloud!.signInWithPassword(email.trim(), password))}
-                  style={({ pressed }) => ({ height: 40, marginTop: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: color.accent, opacity: !canSubmit ? 0.5 : pressed ? 0.85 : 1 })}>
+                  style={({ pressed }) => ({ height: 40, marginTop: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: color.accent, borderRadius: corner.small, opacity: !canSubmit ? 0.5 : pressed ? 0.85 : 1 })}>
                   <T style={{ fontSize: 14, fontFamily: font.medium, color: color.bg }}>
                     {busy === 'email' ? (mode === 'sign-up' ? 'Creating…' : 'Signing in…') : mode === 'sign-up' ? 'Create account' : 'Sign in'}
                   </T>

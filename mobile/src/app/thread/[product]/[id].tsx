@@ -44,7 +44,7 @@ import { ModelSheet, ModeSheet, PrioritySheet, barsFor } from '../../../ui/Picke
 import { ThreadMenu } from '../../../ui/ThreadMenu';
 import { DictationProblem, Listening, MicButton, useDictation } from '../../../ui/Dictation';
 import { ActLine, FiledList, FocusActions, LiveLine, OptionsCard, RunLine, WorkLine } from '../../../ui/ThreadParts';
-import { color, font, size } from '../../../ui/theme';
+import { color, corner, font, size } from '../../../ui/theme';
 
 const when = (at: number) => (at ? `${dayHeading(at)} ${clock(at)}` : '');
 // The dark look's `--code-minus`, which a message her Mac refused says why in.
@@ -146,7 +146,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   // A box that only listened, and heard nothing, folds away as an empty one does on blur.
   useEffect(() => { if (!talk.on && !talk.problem && !ready && !sheet && !typing.current?.isFocused()) setOpen(false); }, [talk.on]);
   const foot = footRoom(inset);
-  const card = { borderWidth: 1, backgroundColor: color.fill };
+  const card = { borderWidth: 1, borderRadius: corner.small, backgroundColor: color.fill };
   return (
     <View style={{ paddingHorizontal: 12, paddingBottom: 16 + foot, paddingTop: 8 }}>
       {!open ? (
@@ -202,13 +202,13 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
             {/* One slot: Stop while it is in progress and the box is empty, Send once anything is typed (Focus.tsx). */}
             {offers.stop && !ready ? (
               <Pressable onPress={stop} accessibilityRole="button" accessibilityLabel={thread.running ? 'Stop this agent' : 'Stop this task'}
-                style={({ pressed }) => ({ height: 29, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+                style={({ pressed }) => ({ height: 29, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
                 <StopMark />
                 <T style={{ fontSize: 13, fontFamily: font.medium, color: color.dim }}>Stop</T>
               </Pressable>
             ) : (
               <Pressable disabled={busy || !ready} accessibilityRole="button" onPress={() => void send(picked)}
-                style={({ pressed }) => ({ height: 29, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: busy || !ready ? 0.5 : 1 })}>
+                style={({ pressed }) => ({ height: 29, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: busy || !ready ? 0.5 : 1 })}>
                 <T style={{ fontSize: 13, fontFamily: font.semibold }}>{busy ? 'Sending…' : 'Send'}</T>
               </Pressable>
             )}
@@ -424,7 +424,7 @@ export default function ThreadScreen() {
           {/* Done in a box of its own, left of the dots, as the desktop draws it (threads/ThreadMenu.tsx). */}
           {threadState(item) !== 'done' && (
             <Pressable onPress={close} disabled={busy} accessibilityRole="button" accessibilityLabel="Mark done"
-              style={({ pressed }) => ({ height: 30, flexDirection: 'row', alignItems: 'center', gap: 7, paddingLeft: 9, paddingRight: 12, marginRight: 4, borderWidth: 1, borderColor: pressed ? color.lineStrong : color.line, backgroundColor: pressed ? color.picked : 'transparent' })}>
+              style={({ pressed }) => ({ height: 30, flexDirection: 'row', alignItems: 'center', gap: 7, paddingLeft: 9, paddingRight: 12, marginRight: 4, borderWidth: 1, borderRadius: corner.small, borderColor: pressed ? color.lineStrong : color.line, backgroundColor: pressed ? color.picked : 'transparent' })}>
               <DoneMark />
               <T style={{ fontSize: 13, color: color.dim }}>Done</T>
             </Pressable>

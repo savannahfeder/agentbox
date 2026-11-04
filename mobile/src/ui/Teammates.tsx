@@ -14,7 +14,7 @@ import { useGroups } from '../state/groups';
 import { Face } from './Groups';
 import { Gear } from './icons';
 import { IconButton, T, TopBar } from './parts';
-import { color, font, size } from './theme';
+import { color, corner, font, size } from './theme';
 
 /** The corner of an AI teammate's dashed mark, as `--mate-corner` is on the web: round, like a person. */
 export const mateCorner = (s: number) => s / 2;
@@ -94,7 +94,7 @@ export function Chips({ options, on, disabled, tap }: { options: string[]; on: s
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
       {options.map((o) => (
         <Pressable key={o} disabled={disabled || !tap} onPress={() => tap?.(o)} accessibilityRole="button" accessibilityState={{ selected: on === o }}
-          style={({ pressed }) => ({ minHeight: 34, paddingHorizontal: 12, paddingVertical: 7, justifyContent: 'center', borderWidth: 1,
+          style={({ pressed }) => ({ minHeight: 34, paddingHorizontal: 12, paddingVertical: 7, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small,
             borderColor: on === o ? color.accent : color.lineStrong, backgroundColor: on === o ? 'rgba(238, 96, 24, 0.12)' : pressed ? color.picked : color.fill })}>
           <T style={{ fontSize: 14, lineHeight: 19, color: on === o ? color.text : color.dim }}>{o}</T>
         </Pressable>
@@ -122,7 +122,7 @@ export function MateComposer({ placeholder, send, above }: { placeholder: string
   return (
     <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 }}>
       {above}
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', borderWidth: 1, borderColor: text ? color.lineStrong : color.line, backgroundColor: color.field }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', borderWidth: 1, borderRadius: corner.small, borderColor: text ? color.lineStrong : color.line, backgroundColor: color.field }}>
         <TextInput value={text} onChangeText={setText} multiline placeholder={placeholder} placeholderTextColor={color.faint} editable={!busy}
           style={[{ flex: 1, minHeight: 42, maxHeight: 140, paddingTop: 10, paddingBottom: 10, paddingHorizontal: 14, fontFamily: font.regular, fontSize: 15.5, lineHeight: 22, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
         {!!text.trim() && <IconButton label="Send" onPress={() => void go()}><SendGlyph tint={color.accent} /></IconButton>}

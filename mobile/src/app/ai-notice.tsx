@@ -5,7 +5,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCloud } from '../state/cloud';
 import { T, Wall } from '../ui/parts';
-import { color, font, size } from '../ui/theme';
+import { color, corner, font, size } from '../ui/theme';
 
 const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
@@ -24,11 +24,11 @@ export default function AiNotice() {
       </ScrollView>
       <View style={{ paddingHorizontal: size.inset + 8, paddingBottom: Math.max(16, inset.bottom) + 8, gap: 10 }}>
         <Pressable onPress={() => answer(true)} accessibilityRole="button"
-          style={({ pressed }) => ({ height: 46, alignItems: 'center', justifyContent: 'center', backgroundColor: color.text, opacity: pressed ? 0.85 : 1 })}>
+          style={({ pressed }) => ({ height: 46, alignItems: 'center', justifyContent: 'center', backgroundColor: color.text, borderRadius: corner.small, opacity: pressed ? 0.85 : 1 })}>
           <T style={{ fontSize: 16, fontFamily: font.semibold, color: color.bg }}>Continue</T>
         </Pressable>
         <Pressable onPress={() => answer(false)} accessibilityRole="button"
-          style={({ pressed }) => ({ height: 46, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.fill : 'transparent' })}>
+          style={({ pressed }) => ({ height: 46, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.fill : 'transparent' })}>
           <T style={{ fontSize: 16, color: color.dim }}>Not now</T>
         </Pressable>
       </View>
