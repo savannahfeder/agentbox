@@ -296,6 +296,7 @@ export default function ThreadScreen() {
   useEffect(() => { setWhole(false); setAsking(false); setCutting(false); setEarlierOpen(false); setContextWhole(false); }, [product, id]);
   const thread = useMemo(() => threadOf(c.rows, c.view, String(product), String(id), { whole, tabs: c.tabs }), [c.rows, c.view, c.tabs, product, id, whole]);
   const { dir, files } = useMessageFiles(String(product), String(id));
+  const inset = useSafeAreaInsets();
   const waiting = !!thread?.events.some((e: any) => e.kind !== 'work' && e.pending);
   useEffect(() => { if (!waiting) setCutting(false); }, [waiting]);
   // Read once opened, and again when an answer lands while it is open (App.tsx `focusedArrival`).
@@ -429,8 +430,8 @@ export default function ThreadScreen() {
           <View style={{ width: 16 }} />
         </>}
       />
-      {/* The permission card floats over the foot: the reply box and the choices sit above it. */}
-      <KeyboardAvoidingView style={{ flex: 1, paddingBottom: c.approvalRoom }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* The permission card floats over the foot: the reply box and the choices sit 8pt above it, the reply box's own foot room spent. */}
+      <KeyboardAvoidingView style={{ flex: 1, paddingBottom: c.approvalRoom ? Math.max(0, c.approvalRoom - 8 - footRoom(inset)) : 0 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: size.inset, paddingTop: 8, paddingBottom: 24 }}
           scrollEventThrottle={32}
           onScroll={(e) => {

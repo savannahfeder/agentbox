@@ -54,7 +54,7 @@ export interface Plan {
   /** The thread a tap on the toast opens, when it is not the one pressed; null for none. */
   goes?: { product: string; id: string } | null;
 }
-export interface PressedItem { product: string; id: string; status: string; title?: string; productName?: string; runAt?: number | null; snoozedUntil?: number | null; waitsForMac?: boolean }
+export interface PressedItem { product: string; id: string; status: string; title?: string; productName?: string; runAt?: number | null; snoozedUntil?: number | null; waitsForMac?: boolean; body?: string; priority?: number; start?: string; engine?: string; model?: string; effort?: string }
 /** Where the computer is: away, and whether Agentbox Cloud starts what is sent meanwhile. */
 export interface Reach { away?: boolean; cloud?: boolean }
 
@@ -120,10 +120,17 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
     };
   };
   // A thread the computer never took is withdrawn, not closed: nothing is left for Undo or Done to show.
+  // Undo sends it again, with what it was sent with: the computer never had the first one.
+  const again = () => [{ door: 'compose' as const, payload: Object.fromEntries(Object.entries({
+    product: item.product, title: item.title ?? '', body: item.body || undefined, kind: 'directive', priority: item.priority ?? 5,
+    runAt: Number(item.runAt) > 0 ? item.runAt : undefined, start: item.start, engine: item.engine, model: item.model, effort: item.effort,
+  }).filter(([, v]) => v !== undefined)) }];
   const close = (): Plan => (item.waitsForMac ? {
     steps: [{ door: 'answer', payload: { ...on, status: 'done' } }],
-    toast: `Withdrawn: ${clipToSentence(item.title ?? '', TOAST_TITLE)}. It never reached your computer.`,
+    toast: `Withdrawn: ${clipToSentence(item.title ?? '', TOAST_TITLE)}. It never reached your computer.${UNDO}`,
     goes: null,
+    undo: again,
+    undone: () => `Sent again: ${clipToSentence(item.title ?? '', TOAST_TITLE)}`,
   } : {
     steps: [{ door: 'answer', payload: { ...on, status: 'done' } }],
     toast: `${DONE.verb}: ${clipToSentence(item.title ?? '', TOAST_TITLE)}${UNDO}`,
@@ -133,7 +140,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
 
   switch (press.kind) {
     case 'reply':
-      return press.text.trim() ? reply(press.text, press.choices ?? {}, to ? `Sent → ${to}` : 'Sent', 'Reply withdrawn, back in your inbox') : null;
+      return press.text.trim() ? reply(press.text, press.choices ?? {}, waits ? `Waiting for your computer${to ? ` → ${to}` : ''}` : to ? `Sent → ${to}` : 'Sent', 'Reply withdrawn, back in your inbox') : null;
     case 'pick':
       // "Close this task" is done, never sent: as a reply it would start a run to close it (App.tsx).
       if (closesTheTask(press.option.text)) return close();

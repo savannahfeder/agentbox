@@ -294,7 +294,7 @@ export function previewCloud(now = () => Date.now()) {
       }, 4000);
     } else if (scope === 'teammate' && key === 'pause') {
       const m = mates.list.find((x: any) => x.id === value.id);
-      if (m) Object.assign(m, { paused: value.paused, now: value.paused ? 'Paused' : null });
+      if (m) Object.assign(m, { paused: value.paused, now: value.paused ? 'Paused' : m.nowBeforePause ?? null, nowBeforePause: value.paused ? m.now : undefined });
     } else if (scope === 'teammate' && key === 'describe') {
       mates.list.push({ id: `t-${c.id}`, name: 'New teammate', letter: 'N', role: null, job: value.text ?? value.starter, primary: false, paused: false, status: 'draft', product: value.product, waiting: [], running: null, duties: [], runsThisWeek: 0 });
     } else if (scope === 'thread') { const t = rows.threads.find((r) => r.project === product && r.item === c.payload.item); if (t) { t.snapshot.item.pinned = value || undefined; t.updated_at = new Date(now() + 1).toISOString(); } }

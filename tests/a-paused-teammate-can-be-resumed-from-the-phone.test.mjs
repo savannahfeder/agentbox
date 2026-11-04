@@ -78,3 +78,11 @@ describe('the teammate list while a pause or resume is on its way', () => {
     expect(withPendingPauses(team(), []).view.list[0]).toMatchObject({ paused: true, now: 'Paused' });
   });
 });
+
+describe("a teammate's running line", () => {
+  it('names the thread it is on, not "its next run", when it is paused (round 3, issues 13, 20, 21)', async () => {
+    const page = (await import('node:fs')).readFileSync('mobile/src/app/teammate/[id].tsx', 'utf8');
+    expect(page).toMatch(/const runningTitle = running \? rowTitle\(c\.view\.items\.find\(\(i\) => i\.product === running\.product && i\.id === running\.id\) \?\? \{\}\) : ''/);
+    expect(page).not.toMatch(/'its next run'/);
+  });
+});

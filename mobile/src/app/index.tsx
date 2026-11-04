@@ -330,8 +330,8 @@ export default function Threads() {
   // Later counts its repeating tasks too, as the desktop's does (App.tsx `scheduledCount`).
   // Messages in your groups that name you lead Needs you, and count in it (App.tsx `MentionRows`).
   const mentions = groups.on ? mentionRows(groups.state.mentions) : [];
-  // A teammate's question waits where you read, not only in Chats.
-  const asks = tab === 'inbox' ? questionsForYou(c.team, c.teamPending) : [];
+  // A teammate's question waits where you read, not only in Chats; counted on every tab.
+  const asks = questionsForYou(c.team, c.teamPending);
   const openMention = (m: MentionRowData) => openGroup(m.roomId);
   const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0) };
   const repeatsShown = tab === 'snoozed' && c.repeats.length > 0;

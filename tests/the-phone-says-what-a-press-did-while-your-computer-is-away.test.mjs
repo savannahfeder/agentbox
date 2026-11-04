@@ -51,10 +51,13 @@ describe('a new thread', () => {
 describe('closing', () => {
   it('a thread the computer never took says it was withdrawn, with no Undo to promise', () => {
     const plan = planFor({ kind: 'close' }, { ...item, waitsForMac: true }, NOW, away);
-    expect(plan.toast).toBe('Withdrawn: Rate limiter. It never reached your computer.');
-    expect(plan.undo).toBeUndefined();
+    expect(plan.toast).toBe('Withdrawn: Rate limiter. It never reached your computer. · press Z to undo');
     // Names no thread, since there is none to open, so the toast wraps whole rather than cut to one line.
     expect(plan.goes).toBeNull();
+  });
+  it('a withdrawn thread comes back with Undo, sent again with what it had (round 3, issue 3)', () => {
+    const plan = planFor({ kind: 'close' }, { ...item, waitsForMac: true, body: 'Add a rate limiter to the login handler.', runAt: NOW + 3600_000, priority: 3 }, NOW, away);
+    expect(plan.undo({ ok: true })).toEqual([{ door: 'compose', payload: { product: 'site@dev', title: 'Rate limiter', body: 'Add a rate limiter to the login handler.', kind: 'directive', priority: 3, runAt: NOW + 3600_000 } }]);
   });
   it('a thread the computer has says Done, with Undo, as before', () => {
     const plan = planFor({ kind: 'close' }, item, NOW, away);
@@ -68,5 +71,14 @@ describe('Do here', () => {
     const child = { id: 'w-2', product: 'site@dev', title: 'Add a report button', parent: 'w-1' };
     const plan = planFor({ kind: 'do-here', child, parent: { id: 'w-1', product: 'site@dev', status: 'open' } }, { ...child, status: 'open' }, NOW);
     expect(plan.goes).toEqual({ product: 'site@dev', id: 'w-1' });
+  });
+});
+
+describe('a reply', () => {
+  it('while the computer is away, says it waits for it rather than that it was sent (round 3, issue 8)', () => {
+    expect(planFor({ kind: 'reply', text: 'Use a token bucket' }, item, NOW, away).toast).toMatch(/^Waiting for your computer → Website/);
+  });
+  it('while the computer is here, Sent, as before', () => {
+    expect(planFor({ kind: 'reply', text: 'Use a token bucket' }, item, NOW).toast).toMatch(/^Sent → Website/);
   });
 });

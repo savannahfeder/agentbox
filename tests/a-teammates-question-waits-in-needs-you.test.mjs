@@ -38,8 +38,18 @@ describe('what Needs you shows of your teammates', () => {
   });
   it('heads Needs you and counts in it, opening the teammate', () => {
     const inbox = fs.readFileSync('mobile/src/app/index.tsx', 'utf8');
-    expect(inbox).toMatch(/const asks = tab === 'inbox' \? questionsForYou\(c\.team, c\.teamPending\) : \[\]/);
+    // Counted on every tab, so the Needs you number does not change with the tab you are on (round 3, issue 17).
+    expect(inbox).toMatch(/const asks = questionsForYou\(c\.team, c\.teamPending\)/);
+    expect(inbox).toMatch(/const mentionsShown = tab === 'inbox' && \(mentions\.length > 0 \|\| asks\.length > 0\)/);
     expect(inbox).toMatch(/inbox: shown\.rows\.inbox\.length \+ mentions\.length \+ asks\.length/);
     expect(inbox).toMatch(/router\.push\(\{ pathname: '\/teammate\/\[id\]', params: \{ id: q\.mate\.id \} \}\)/);
+  });
+  it('in Chats, a teammate you answered here no longer says it has a question for you (round 3, issue 10)', async () => {
+    const { nowLine, waitsOnYou } = await import('../mobile/src/lib/teammates');
+    const chief = team.view.list[0];
+    const answered = [{ id: 'c-1', kind: 'msg', from: 'you', to: ['t-chief00001'], text: 'The inbox', answers: { 'm-1': 'The inbox' }, ts: 3000, waiting: true, refused: null }];
+    expect(nowLine(chief, team.view, 5000)).toBe('Has a question for you');
+    expect(nowLine(chief, team.view, 5000, answered)).not.toBe('Has a question for you');
+    expect(waitsOnYou(chief, team.view, answered)).toBe(false);
   });
 });

@@ -51,6 +51,25 @@ export function isRunning(pid, kill = process.kill.bind(process)) {
   try { kill(pid, 0); return true; } catch (err) { return err?.code === 'EPERM'; }
 }
 
+/** Where a swipe starts and ends: up and down in the middle of the page's scrolling area, sized to it. */
+export function swipeFrom(scroller, dir) {
+  const cx = IPHONE.width / 2; const cy = IPHONE.height / 2;
+  if ((dir === 'up' || dir === 'down') && scroller) {
+    const x = scroller.left + scroller.width / 2; const mid = scroller.top + scroller.height / 2;
+    const dist = Math.min(300, scroller.height * 0.6); const sign = dir === 'up' ? 1 : -1;
+    return { from: [x, mid + (sign * dist) / 2], to: [x, mid - (sign * dist) / 2] };
+  }
+  const d = { up: [0, -300], down: [0, 300], left: [-250, 0], right: [250, 0] }[dir];
+  return { from: [cx - d[0] / 2, cy - d[1] / 2], to: [cx + d[0] / 2, cy + d[1] / 2] };
+}
+
+// The biggest area on screen that scrolls up and down, or null.
+const SCROLLER = `(() => { let best = null; for (const el of document.querySelectorAll('*')) {
+  if (el.scrollHeight <= el.clientHeight + 4) continue; const s = getComputedStyle(el); if (!/(auto|scroll)/.test(s.overflowY)) continue;
+  const r = el.getBoundingClientRect(); const top = Math.max(0, r.top), bottom = Math.min(innerHeight, r.bottom); if (bottom - top < 60) continue;
+  const area = (bottom - top) * r.width; if (!best || area > best.area) best = { area, left: r.left, top, width: r.width, height: bottom - top }; }
+  return best; })()`;
+
 // A wrapped link's box spans two lines, and its middle can be the next link: aim at its first line, where a person taps.
 export function targetScript(arg) {
   const n = Number(arg);
@@ -120,13 +139,11 @@ if (isMain) {
     else if (verb === 'press') { const t = await tab(); await t.press(args[0]); await look(t); t.detach(); }
     else if (verb === 'swipe') {
       const t = await tab();
-      const cx = IPHONE.width / 2; const cy = IPHONE.height / 2;
-      const d = { up: [0, -300], down: [0, 300], left: [-250, 0], right: [250, 0] }[args[0]];
-      if (!d) { console.log('swipe up, down, left or right.'); t.detach(); process.exit(2); }
-      const from = [cx - d[0] / 2, cy - d[1] / 2];
+      if (!['up', 'down', 'left', 'right'].includes(args[0])) { console.log('swipe up, down, left or right.'); t.detach(); process.exit(2); }
+      const { from, to } = swipeFrom(await t.evaluate(SCROLLER), args[0]);
       await touch(t, 'touchStart', ...from);
-      for (let i = 1; i <= 8; i++) await touch(t, 'touchMove', from[0] + (d[0] * i) / 8, from[1] + (d[1] * i) / 8);
-      await touch(t, 'touchEnd', from[0] + d[0], from[1] + d[1]);
+      for (let i = 1; i <= 8; i++) await touch(t, 'touchMove', from[0] + ((to[0] - from[0]) * i) / 8, from[1] + ((to[1] - from[1]) * i) / 8);
+      await touch(t, 'touchEnd', ...to);
       await look(t); t.detach();
     } else if (verb === 'shot') {
       const t = await tab();

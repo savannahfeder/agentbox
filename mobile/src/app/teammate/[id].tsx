@@ -16,6 +16,7 @@ import { IconButton, RunningMark, Sheet, SheetHead, T, TopBar, Wall } from '../.
 import { Chips, DayRule, MateComposer, TeammateMark, YouFace } from '../../ui/Teammates';
 import { color, font, size } from '../../ui/theme';
 import { phoneSlug } from '../../../../renderer/src/phone-rows';
+import { rowTitle } from '../../../../renderer/src/list-rules';
 
 const REFUSED = '#e28f82';
 const message = (err: unknown) => String((err as Error)?.message ?? err);
@@ -95,6 +96,7 @@ export default function TeammateChat() {
   const open = openQuestions(team.view, t.id, c.teamPending);
   const many = open.length > 1;
   const running = runningThread(t, team);
+  const runningTitle = running ? rowTitle(c.view.items.find((i) => i.product === running.product && i.id === running.id) ?? {}) : '';
 
   const post = async (value: Record<string, unknown>) => {
     setBusy(true); setError(null);
@@ -182,7 +184,7 @@ export default function TeammateChat() {
             <Pressable onPress={() => openThread(running)} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 16, paddingLeft: 44 }}>
               <RunningMark />
               <T style={{ flex: 1, fontSize: 13.5, lineHeight: 20, color: color.faint }}>
-                {`${t.name} is on `}<T style={{ fontSize: 13.5, color: color.dim, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{t.now && t.now !== 'Waiting on you' && t.now !== 'Paused' ? t.now : 'its next run'}</T>
+                {`${t.name} is on `}<T style={{ fontSize: 13.5, color: color.dim, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{runningTitle || (t.now && t.now !== 'Waiting on you' && t.now !== 'Paused' && t.now !== 'Waiting for your computer' ? t.now : 'a thread')}</T>
               </T>
             </Pressable>
           )}

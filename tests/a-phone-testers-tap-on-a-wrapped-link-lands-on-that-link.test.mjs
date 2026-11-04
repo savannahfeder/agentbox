@@ -63,3 +63,21 @@ describe('what look lists', () => {
     expect(src).toMatch(/\.filter\(\(el, i, all\) => el\.matches\('\[role="button"\], button, a\[href\]'\) \|\| !all\.some/);
   });
 });
+
+// Round 3 of the 2026-11-03 testers, issue 2: on a thread with a permission card,
+// its choices and the reply box, the page scrolls in a short band, and swipe
+// always started at the middle of the screen, which was inside the choices
+// card, so the proposal under it could never be reached. Swipe now starts in
+// the middle of the biggest scrolling area on screen.
+import { swipeFrom } from '../.claude/skills/product-loop/scripts/phone.mjs';
+describe('where a swipe starts', () => {
+  it('in the middle of the scrolling area, sized to it', () => {
+    expect(swipeFrom({ left: 0, top: 140, width: 393, height: 300 }, 'up')).toEqual({ from: [196.5, 380], to: [196.5, 200] });
+  });
+  it('the middle of the screen when nothing scrolls', () => {
+    expect(swipeFrom(null, 'up')).toEqual({ from: [196.5, 576], to: [196.5, 276] });
+  });
+  it('sideways in the middle of the screen, as before', () => {
+    expect(swipeFrom(null, 'left')).toEqual({ from: [321.5, 426], to: [71.5, 426] });
+  });
+});

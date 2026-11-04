@@ -32,4 +32,8 @@ describe('the preview', () => {
     const src = (await import('node:fs')).readFileSync('mobile/src/lib/preview.ts', 'utf8');
     expect(src).toMatch(/if \(!mates\.list\.find\(\(x: any\) => x\.id === value\.to\[0\]\)\?\.paused\) setTimeout\(/);
   });
+  it('a resumed teammate goes back to what it was doing, not Idle (round 3, issue 9)', async () => {
+    const src = (await import('node:fs')).readFileSync('mobile/src/lib/preview.ts', 'utf8');
+    expect(src).toMatch(/now: value\.paused \? 'Paused' : m\.nowBeforePause \?\? null, nowBeforePause: value\.paused \? m\.now : undefined/);
+  });
 });

@@ -134,7 +134,7 @@ export function MateComposer({ placeholder, send, above }: { placeholder: string
 /** How many of your teammates wait on you, for the Chats tab's count. */
 export function teammatesWaiting(c: ReturnType<typeof useCloud>): number {
   const team = c.team;
-  return team ? team.view.list.filter((t) => waitsOnYou(t, team.view)).length : 0;
+  return team ? team.view.list.filter((t) => waitsOnYou(t, team.view, c.teamPending)).length : 0;
 }
 
 /** The Chats tab: your AI teammates, then your groups. `tabs` are the inbox's, drawn under the bar. */
@@ -151,7 +151,7 @@ export function ChatsPlace({ tabs, openGroup }: { tabs: ReactNode; openGroup: (i
         {team && <Head title="AI teammates" count={mates.length} />}
         {mates.map((t, i) => (
           <ChatRow key={t.id} first={i === 0} lead={<TeammateMark t={t} size={32} />} name={t.name} aside={t.primary && !t.paused && t.status !== 'draft' ? 'Primary' : undefined}
-            line={team ? nowLine(t, team.view, c.now) : undefined} need={!!team && waitsOnYou(t, team.view)} label={t.name}
+            line={team ? nowLine(t, team.view, c.now, c.teamPending) : undefined} need={!!team && waitsOnYou(t, team.view, c.teamPending)} label={t.name}
             onPress={() => router.push({ pathname: '/teammate/[id]', params: { id: t.id } })} />
         ))}
         {team && <ChatRow first={mates.length === 0} lead={<TeammateMark t={null} size={32} />} name="New teammate" onPress={() => router.push('/teammate/new')} />}

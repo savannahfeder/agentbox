@@ -88,14 +88,18 @@ export function mateOf(item: { labels?: string[] } | null | undefined, team: Pho
   return (id && team?.view.list.find((t) => t.id === id)) || null;
 }
 
+/** It asks you something you have not answered here yet. */
+const stillAsks = (view: TeammatesView, id: string, pending: readonly Pending[]) =>
+  asksYou(view, id) && !(pending.length && openQuestions(view, id).length > 0 && openQuestions(view, id, pending).length === 0);
+
 /** It has something for you: a thread, a question, or work held for your go-ahead. */
-export function waitsOnYou(t: Teammate, view: TeammatesView): boolean {
-  return t.waiting.length > 0 || asksYou(view, t.id) || !!heldFor(view, t.id);
+export function waitsOnYou(t: Teammate, view: TeammatesView, pending: readonly Pending[] = []): boolean {
+  return t.waiting.length > 0 || stillAsks(view, t.id, pending) || !!heldFor(view, t.id);
 }
 
 /** The line under its name in Chats (TeammatesRail.tsx `nowLine`). */
-export function nowLine(t: Teammate, view: TeammatesView, now = Date.now()): string {
-  if (asksYou(view, t.id)) return 'Has a question for you';
+export function nowLine(t: Teammate, view: TeammatesView, now = Date.now(), pending: readonly Pending[] = []): string {
+  if (stillAsks(view, t.id, pending)) return 'Has a question for you';
   if (heldFor(view, t.id)) return 'Holding work for your go-ahead';
   if (t.status === 'draft' && !t.waiting.length) return 'Setting up';
   if (t.paused && !t.running) return t.waiting.length ? 'Paused, waiting on you' : 'Paused';
