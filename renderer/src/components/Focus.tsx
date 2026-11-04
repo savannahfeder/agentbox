@@ -1673,10 +1673,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // first, and work that has been thrown away is not asked about at all.
   const shipAsk = shipOfferLive(item, { change: !!figures, running: !!session || !!agent }) ? shipOfferFor(standing, onlyNamedFiles(changed, referencedFiles(item.result, item.note, item.body, item.answer, { dir: productDir }), productDir)) : null;
   const shipOffer = !!shipAsk;
-  const offerShown = showOptions || shipOffer;
+  const stripShown = showOptions || shipOffer;
   // A pick is held a few seconds for Z before it is written, and the card it
   // answered stayed up all that time, as if nothing had been taken (F-170).
-  const stripShown = offerShown && !answerOnItsWay(sending);
+  const answered = answerOnItsWay(sending);
   // Whatever the pane is leading with, not the ask alone: on a row the user
   // wrote, the ask is the one field a worker cannot answer in (format.ts says
   // why). The agent's own offer wins wherever there is one.
@@ -2286,7 +2286,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         )}
         {questions}
         {/* One at a time draws them at the foot instead, apart from the reply box. */}
-        {offerInPane && (page || closeAsk ? null : (
+        {offerInPane && (page || closeAsk || answered ? null : (
           <OptionsOffer
             ask={ask} askAll={askAll} options={options}
             peekOption={peekOption} askPeek={askPeek}
@@ -2475,7 +2475,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             something the page does not: there was nothing over "Ship it
             (recommended)" saying the change had never been committed (F-79,
             ../ship-offer.ts). */}
-        {page && stripShown && !fullScreenDoc && !closeAsk && (
+        {page && stripShown && !fullScreenDoc && !closeAsk && !answered && (
           <div className={`one-choices${choicesFolded ? ' one-choices-folded' : ''}`}>
             <OptionsOffer
               ask={ask} askAll={askAll} options={options}
@@ -2494,7 +2494,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           {/* A TASK A TEAMMATE GAVE YOU: to an agent, keep it, or hand it back.
               Unless they wrote options of their own, which are the better
               answers to their question and are drawn instead. */}
-          {!offerShown && <TeamRouteStrip item={item} onHandToAgent={onHandToAgent} items={items} onOpenItem={onOpenItem} />}
+          {!stripShown && <TeamRouteStrip item={item} onHandToAgent={onHandToAgent} items={items} onOpenItem={onOpenItem} />}
           {/* THE OPTIONS ARE NOT DOWN HERE ANY MORE, EXCEPT IN FULL SCREEN
               (w-560647d4db). They are drawn in the pane, at the foot of the turn
               that offered them, and the note at that call site says why.
@@ -2516,7 +2516,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               stripRef={closeAskRef}
             />
           )}
-          {offerInDock && (closeAsk ? null : (
+          {offerInDock && (closeAsk || answered ? null : (
             <OptionsOffer
               ask={ask} askAll={askAll} options={options}
               peekOption={peekOption} askPeek={askPeek}
@@ -2579,7 +2579,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                 >{modelWord}</span>
               )}
               <span className="dock-pill-key"><kbd>R</kbd></span>
-              {choicesFolded && page && stripShown && !fullScreenDoc && !closeAsk && <ChoicesShow count={options.length} onShow={foldChoices} />}
+              {choicesFolded && page && stripShown && !fullScreenDoc && !closeAsk && !answered && <ChoicesShow count={options.length} onShow={foldChoices} />}
             </button>
           )}
         </div>

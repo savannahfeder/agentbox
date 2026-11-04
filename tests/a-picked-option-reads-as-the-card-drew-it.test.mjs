@@ -11,6 +11,7 @@ import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ActLine } from '../renderer/src/components/Thread.tsx';
 import { answerOnItsWay } from '../renderer/src/item-thread.ts';
+import { pickedLine } from '../renderer/src/thread-history.ts';
 
 const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
 const line = (verb, subject) => renderToStaticMarkup(h(ActLine, { act: { kind: 'act', verb, subject, at: Date.now() } }));
@@ -28,6 +29,12 @@ describe('the line a pick leaves in the thread', () => {
     const html = line('You picked option 2', 'Split every [capital](https://example.com)');
     expect(html).not.toMatch(/<p>|<a |<ul>|<ol>/);
     expect(html).toContain('Split every capital');
+  });
+
+  it('drops "(recommended)" wherever it sits, as the card does', () => {
+    expect(pickedLine('Option 1: **Throw a `RangeError` (recommended).** It throws.').words).toBe('**Throw a `RangeError`.** It throws.');
+    expect(pickedLine('Option 2: Binary units (recommended)').words).toBe('Binary units');
+    expect(pickedLine('Option 2: Binary units').words).toBe('Binary units');
   });
 
   it('leaves plain words as they are', () => {
@@ -52,8 +59,10 @@ describe('the card a pick answered', () => {
     expect(answerOnItsWay([{ at: 1, text: 'Option 1: x', refused: 'offline' }])).toBe(false);
   });
 
-  it('is the strip the pane draws, and the team route still reads the offer itself', () => {
-    expect(focus).toContain('const stripShown = offerShown && !answerOnItsWay(sending);');
-    expect(focus).toContain('{!offerShown && <TeamRouteStrip');
+  it('is left out wherever the pane draws the card', () => {
+    expect(focus).toContain('const answered = answerOnItsWay(sending);');
+    expect(focus).toContain('{offerInPane && (page || closeAsk || answered ? null : (');
+    expect(focus).toContain('{page && stripShown && !fullScreenDoc && !closeAsk && !answered && (');
+    expect(focus).toContain('{offerInDock && (closeAsk || answered ? null : (');
   });
 });
