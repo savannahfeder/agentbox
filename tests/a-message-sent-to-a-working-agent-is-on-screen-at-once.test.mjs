@@ -2,10 +2,10 @@
 //
 // WHERE THE DELAY WAS, measured in the code that causes it. A reply typed while
 // a worker is up does not go to the row first. `submitReply`
-// (main/live-replies.mjs) hands it to the running session and writes the ledger
+// (main/live-replies.mts) hands it to the running session and writes the ledger
 // only once the provider has acknowledged it. Claude acknowledges by replaying
 // the message back, which it does at its next break, and `attachClaudeInput`
-// (main/claude-input.mjs) waits for it for as long as the session lives. The
+// (main/claude-input.mts) waits for it for as long as the session lives. The
 // conversation is drawn off the ledger. the reply box had closed
 // behind them and the thread had never heard of them.
 //
@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { itemThread } from '../renderer/src/item-thread.ts';
-import { attachClaudeInput } from '../main/claude-input.mjs';
+import { attachClaudeInput } from '../main/claude-input.mts';
 import { EventEmitter } from 'node:events';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -158,7 +158,7 @@ describe('what the wait actually is', () => {
   // back to the row and made her re-send a message the agent then took twice
   // (w-d92559b84f). The wait now ends only when the session does.
   it('has no clock of its own to give up on', () => {
-    expect(read('main/claude-input.mjs')).not.toContain('ackMs');
+    expect(read('main/claude-input.mts')).not.toContain('ackMs');
   });
   it('never switches her to the row when a live reply fails', () => {
     const app = read('renderer/src/App.tsx');

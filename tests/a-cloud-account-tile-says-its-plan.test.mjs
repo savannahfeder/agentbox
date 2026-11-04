@@ -12,8 +12,8 @@ import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { recordCloudLogin } from '../main/cloud/logins.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { recordCloudLogin } from '../main/cloud/logins.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { PlaceTiles, accountTile } from '../renderer/src/components/Settings';
 import { accountsOnce } from '../renderer/src/accounts-once.ts';
 

@@ -52,7 +52,7 @@ export function approvalPublicKey() {
 // a worker can rewrite its request file in place while the waiting process
 // still holds the original. So `answer` signs a digest of the card Agentbox
 // last showed her, and each engine compares it with the request it holds
-// (approval-prompt-server.mjs its `request`, codex-approvals.mjs its `open`
+// (approval-prompt-server.mts its `request`, codex-approvals.mjs its `open`
 // entry). A mismatch is a deny.
 //
 // The digest is of what was displayed, not of the file at answer time: a
@@ -90,7 +90,7 @@ export function answerIsHers(id, answer, publicKey = approvalPublicKey()) {
  * a dead worker's leftover leave this way, and they are the only two things
  * that should: a card still being waited on is kept here by whoever is waiting,
  * which is a beat of main/codex-approvals.mjs `tend` and of
- * approval-prompt-core.mjs's own loop. Neither gives up on a clock any more
+ * approval-prompt-core.mts's own loop. Neither gives up on a clock any more
  * (w-4b00022acb), so this is no longer a deadline shadowing theirs.
  */
 export const REQUEST_TTL_MS = 16 * 60_000;
@@ -219,7 +219,7 @@ const REQUEST_SUFFIX = '.request.json';
  *
  * Remembered by id rather than deleted once, because an orphan that outlived a
  * crash puts its own request back every two seconds
- * (approval-prompt-core.mjs).
+ * (approval-prompt-core.mts).
  */
 const fromTheLastRun = new Set();
 

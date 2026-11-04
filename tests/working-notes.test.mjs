@@ -4,7 +4,7 @@
 // is pinned here.
 //
 // The fixtures below are the supervisor's real output shape (traceStreamLine in
-// main/supervisor.mjs), including the two lines that actually broke earlier
+// main/supervisor.mts), including the two lines that actually broke earlier
 // readings: a sign-off that repeats the result verbatim, and an "API Error"
 // that is the only thing a turned-away run ever says.
 

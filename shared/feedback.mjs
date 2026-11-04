@@ -47,7 +47,7 @@ export function feedbackPayload({ text = '', files = [], app = {} } = {}) {
 
 // Answers { ok: true } or { ok: false, error } with the error as a sentence.
 // It never throws, so the card always has something to say. The Mac sends
-// through it (main/feedback.mjs) and so does the phone website (cloud-bridge.ts).
+// through it (main/feedback.mts) and so does the phone website (cloud-bridge.ts).
 export async function sendFeedback({ url, payload, fetchImpl = globalThis.fetch, timeoutMs = 60_000 }) {
   if (!url) return { ok: false, error: `Feedback is not set up in this copy of ${Name}.` };
   // Checked again here, off the bytes that would actually travel, since the

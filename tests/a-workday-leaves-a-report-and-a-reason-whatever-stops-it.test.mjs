@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { detachedEnv, stretchMayStart } from '../.claude/skills/product-loop/scripts/workday.mjs';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const WORKDAY = path.resolve(__dirname, '../.claude/skills/product-loop/scripts/workday.mjs');
 
@@ -42,7 +43,7 @@ describe('a workday stopped mid-day', () => {
     // A Claude Code that never answers, so the day is still asking for its usage when the signal lands.
     fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\nexec sleep 20\n', { mode: 0o755 });
     try {
-      const child = spawn(process.execPath, [WORKDAY, '--who', 'founder', '--engine', 'claude', '--pace', '--hours', '1',
+      const child = spawn(process.execPath, [...stripTypesFlags(), WORKDAY, '--who', 'founder', '--engine', 'claude', '--pace', '--hours', '1',
         '--url', 'http://127.0.0.1:9/', '--out', out], { env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } });
       let said = '';
       child.stdout.on('data', (d) => { said += d; });

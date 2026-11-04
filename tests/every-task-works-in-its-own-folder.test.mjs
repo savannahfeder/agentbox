@@ -36,8 +36,8 @@ import path from 'node:path';
 import {
   taskFolderPath, ensureTaskFolder, releaseTaskFolder, listTaskFolders,
   parkTaskFolder, restoreTaskFolder,
-} from '../main/task-folders.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+} from '../main/task-folders.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { waitFor } from './waiting.mjs';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
@@ -251,7 +251,7 @@ describe('the folder a task works in', () => {
 /* ================= and the supervisor standing in it ===================== */
 // The half that makes any of it true for her: a session has to actually RUN
 // there. Everything downstream follows that one word. The snapshot the review
-// card is built from is taken of the session's cwd (main/supervisor.mjs, at the
+// card is built from is taken of the session's cwd (main/supervisor.mts, at the
 // spawn), the built-in terminal resolves a live session's own folder before the
 // product's, and /diff runs where the session runs.
 

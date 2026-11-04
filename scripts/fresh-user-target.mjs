@@ -5,7 +5,7 @@
 // and release/" and stopped (QA, 2026-10-23). There is no bundle to find on
 // Linux: the app is run from the checkout there, and the ⌘K row "Open Agentbox
 // as a new user" has always been able to do that, because `relaunchCommand` in
-// `main/fresh-user.mjs` hands the app directory back to Electron when the copy
+// `main/fresh-user.mts` hands the app directory back to Electron when the copy
 // it is relaunching is not packaged.
 //
 // So the terminal gets the same two ways in, in the same order: a PACKAGED

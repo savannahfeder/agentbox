@@ -5,3 +5,6 @@ export const HAND_BACK: string;
 
 /** Whether a reply hands its thread back: the marked line, at a line's start. */
 export function handsBack(result: string | null | undefined): boolean;
+
+/** What the run said it was missing, cut to fit a card; null when it said nothing. */
+export function handBackWhat(result: string | null | undefined, max?: number): string | null;

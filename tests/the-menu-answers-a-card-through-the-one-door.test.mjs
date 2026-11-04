@@ -9,7 +9,7 @@
 //
 // ON A CLAUDE CODE CARD that difference is invisible: the file IS the answer,
 // because the thing waiting for it is a separate process
-// (main/approval-prompt-server.mjs) and a file is the only channel it has.
+// (main/approval-prompt-server.mts) and a file is the only channel it has.
 //
 // ON A CODEX CARD IT IS THE WHOLE OF THE BEHAVIOUR, and what it produces is the
 // app accusing her of forging her own approval. The thing waiting is Agentbox
@@ -43,9 +43,9 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (...p) => fs.readFileSync(path.join(here, '..', ...p), 'utf8');
-const main = read('main', 'main.mjs');
+const main = read('main', 'main.mts');
 const menu = read('main', 'menu.mts');
-const ipc = read('main', 'ipc.mjs');
+const ipc = read('main', 'ipc.mts');
 
 /** The block that wires the application menu up. */
 function installMenuCall() {
@@ -94,13 +94,13 @@ describe('the Allow/Deny items in the Agents menu', () => {
 });
 
 describe('the one answering door', () => {
-  // The comment in main/ipc.mjs claimed to be the only place an approval is
+  // The comment in main/ipc.mts claimed to be the only place an approval is
   // answered while the menu was answering somewhere else. It is true now, and
   // the claim is worth keeping only while it is.
   it('is the only place in main/ that writes an answer file', () => {
-    const writers = ['main.mjs', 'ipc.mjs', 'menu.mts']
+    const writers = ['main.mts', 'ipc.mts', 'menu.mts']
       .filter((f) => /approvals\.answer\(/.test(read('main', f)));
-    expect(writers).toEqual(['ipc.mjs']);
+    expect(writers).toEqual(['ipc.mts']);
   });
 
   it('tells a Codex worker directly, because nothing on that path reads a file', () => {

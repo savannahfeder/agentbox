@@ -1,6 +1,6 @@
 // A WINDOW ONTO A HUB, AND NOTHING ELSE.
 //
-// The hub is a headless copy of the app (main/serve.mjs) on a machine of its own.
+// The hub is a headless copy of the app (main/serve.mts) on a machine of its own.
 // This process loads the same screen from it and runs no store, no supervisor and
 // no agent, so what it costs this Mac does not change with how many agents the
 // hub is running (tests/a-window-can-be-a-client-of-a-hub-and-runs-no-agents).
@@ -8,7 +8,7 @@
 import { app, BrowserWindow, Notification, dialog, ipcMain, nativeImage, powerMonitor, shell } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { installNotifier } from './notify.mjs';
+import { installNotifier } from './notify.mts';
 import { mayOpenOutside, sameHub } from './hub-rules.mjs';
 import { NAME } from '../shared/product-name.mjs';
 
@@ -76,7 +76,7 @@ export function startHubClient(hub) {
     return true;
   });
   app.on('second-instance', () => { if (window) { if (window.isMinimized()) window.restore(); window.focus(); } });
-  // Quits like the whole app (main/main.mjs): with no window there is nothing to
+  // Quits like the whole app (main/main.mts): with no window there is nothing to
   // alert from, and a window opened twice would register its handlers twice.
   app.on('window-all-closed', () => app.quit());
   app.whenReady().then(open);

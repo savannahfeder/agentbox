@@ -3,11 +3,11 @@
 // What broke: she wants agents that "work when your Mac is closed"
 // (2026-10-17). A cloud run stopped at its next tool call while the Mac slept,
 // and one that finished its turn sat idle until the Mac woke to close its
-// input. Driven here end to end: this Mac's real relay (main/cloud/run.mjs)
+// input. Driven here end to end: this Mac's real relay (main/cloud/run.mts)
 // against the real sandbox server on this machine, with every call the relay
 // makes to the cloud held while the Mac "sleeps" (as a frozen process is), a
 // stand-in for Claude Code that calls the app's store and commits, and the
-// app's own input reader (main/claude-input.mjs) on the relay's output.
+// app's own input reader (main/claude-input.mts) on the relay's output.
 //
 // The run's tool calls are answered in the cloud ("not made"), never reach the
 // store, its turn ends there, and when the Mac wakes its commit comes home and
@@ -22,9 +22,9 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun, INPUT_CLOSED_IN_CLOUD } from '../main/cloud/run.mjs';
-import { attachClaudeInput } from '../main/claude-input.mjs';
-import { readMarker } from '../main/cloud/marker.mjs';
+import { cloudRun, INPUT_CLOSED_IN_CLOUD } from '../main/cloud/run.mts';
+import { attachClaudeInput } from '../main/claude-input.mts';
+import { readMarker } from '../main/cloud/marker.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');
@@ -129,7 +129,7 @@ describe('a cloud run while this Mac sleeps', () => {
 
 describe('the app\'s input reader', () => {
   it('knows the line the relay writes when the cloud closed a run\'s input', () => {
-    const src = fs.readFileSync(new URL('../main/claude-input.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/claude-input.mts', import.meta.url), 'utf8');
     expect(src).toContain(`event.subtype === '${INPUT_CLOSED_IN_CLOUD}'`);
   });
 });

@@ -15,9 +15,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { startDecision, STALE_MS, MAX_HOLD_MS, SETTLE_MS } from '../main/start-hold.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { memoryReading } from '../main/settings.mjs';
+import { startDecision, STALE_MS, MAX_HOLD_MS, SETTLE_MS } from '../main/start-hold.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { memoryReading } from '../main/settings.mts';
 
 const NOW = 1_800_000_000_000;
 const read = (freePct, { level = 1, age = 0 } = {}) => ({ level, freePct, at: NOW - age });

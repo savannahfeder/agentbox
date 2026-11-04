@@ -131,7 +131,7 @@ Finish the authorized objective, not merely the current step.
   with the shell stays right and stays faster. Writing does not.
 - NAME EACH STEP IN A SENTENCE THEY WOULD USE, out loud, before you take it.
   One plain line, no jargon and no tool names: "Now the IPC handlers and the
-  bridge", not "Running Edit on main/ipc.mjs". Those sentences are what they
+  bridge", not "Running Edit on main/ipc.mts". Those sentences are what they
   actually read about your run: the app shows the newest while you work and keeps
   the rest as the record, everything you typed folded behind them. A session that
   narrates nothing leaves a thread saying it did nothing.
@@ -177,7 +177,7 @@ Finish the authorized objective, not merely the current step.
   make a second one or delete this one. Your branch keeps the commits.
 - NAME EACH STEP IN A SENTENCE THEY WOULD USE, out loud, before you take it.
   One plain line, no jargon and no tool names: "Now the IPC handlers and the
-  bridge", not "Running Edit on main/ipc.mjs". Those sentences are what they
+  bridge", not "Running Edit on main/ipc.mts". Those sentences are what they
   actually read about your run, and the only progress they see before you finish,
   so say one before every real step.
   THEIR WORDS AND NOT OURS, here and in every message: never "work item", "row",

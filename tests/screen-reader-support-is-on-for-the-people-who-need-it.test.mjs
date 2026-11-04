@@ -44,10 +44,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Store } from '../main/store.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { registerIpc } from '../main/ipc.mjs';
-import { collectingIpcMain, broadcastingWindow, nodeHost } from '../main/serve.mjs';
+import { Store } from '../main/store.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { registerIpc } from '../main/ipc.mts';
+import { collectingIpcMain, broadcastingWindow, nodeHost } from '../main/serve.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -124,7 +124,7 @@ describe('the terminal asks before it turns the accessibility tree on', () => {
   const terminal = read('renderer/src/components/TaskTerminal.tsx');
   const preload = read('preload.cjs');
   const api = read('renderer/src/api.ts');
-  const ipc = read('main/ipc.mjs');
+  const ipc = read('main/ipc.mts');
 
   // THE REPORTED ONE: this is the line that gave every install an
   // accessibility tree, and the crash in it.

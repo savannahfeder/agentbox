@@ -21,8 +21,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bootHeadless } from '../main/serve.mjs';
-import { createAnalytics } from '../main/analytics.mjs';
+import { bootHeadless } from '../main/serve.mts';
+import { createAnalytics } from '../main/analytics.mts';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const version = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).version;

@@ -7,7 +7,7 @@
 // The three items were menu accelerators and nothing else. This suite already
 // carries the reason that is not enough, twice over: see
 // tests/reload-chord-reaches-the-main-process.test.mjs and the ⌘Y/⌘N note in
-// main.mjs. Menu accelerators in this app have not reliably arrived, and the
+// main.mts. Menu accelerators in this app have not reliably arrived, and the
 // fix that worked both times was before-input-event in the main process.
 //
 // The key mapping below is executed for real. The wiring is asserted against
@@ -22,7 +22,7 @@ import { zoomDeltaFor, zoomTarget } from '../main/zoom-keys.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (...p) => fs.readFileSync(path.join(here, '..', ...p), 'utf8');
-const main = read('main', 'main.mjs');
+const main = read('main', 'main.mts');
 const menu = read('main', 'menu.mts');
 
 const down = (over) => ({ type: 'keyDown', meta: true, control: false, alt: false, shift: false, ...over });
@@ -73,7 +73,7 @@ describe('the zoom chords', () => {
   it('are handled in the main process, not only by a menu accelerator', () => {
     const handler = inputHandler();
     expect(handler).toMatch(/zoomDeltaFor\(input\)/);
-    expect(handler).toMatch(/applyZoom\(zoomDelta, window\.webContents\)/);
+    expect(handler).toMatch(/applyZoom\(zoomDelta, window!?\.webContents\)/);
   });
 
   it('are swallowed, so the page never also acts on them', () => {

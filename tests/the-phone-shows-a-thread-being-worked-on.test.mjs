@@ -16,9 +16,9 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createPhoneInbox } from '../main/phone-inbox.mjs';
+import { createPhoneInbox } from '../main/phone-inbox.mts';
 import { phoneView } from '../renderer/src/cloud-bridge.ts';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const T = Date.UTC(2026, 9, 17, 18, 0);
 const row = (id) => ({ id, title: `thread ${id}`, status: 'claimed', createdAt: T - 60_000, updatedAt: T - 60_000 });

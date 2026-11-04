@@ -29,7 +29,7 @@
 // that is set, and at the home folder when it is not. Agentbox's default account
 // runs with nothing set, so its file is `~/.claude.json`; a second account runs
 // with CLAUDE_CONFIG_DIR pointing at a folder, so its file is inside that
-// folder (main/supervisor.mjs sets exactly that per spawn). Both are verified
+// folder (main/supervisor.mts sets exactly that per spawn). Both are verified
 // above. Note that a `~/.claude/.claude.json` can also exist and be days
 // STALE — it is what a run with CLAUDE_CONFIG_DIR=~/.claude left behind.
 // It is not read for the default account, and that is deliberate: the rule here
@@ -192,7 +192,7 @@ export function readPlans(profiles, { home = os.homedir() } = {}) {
  *  plan. Then it is one at a time.
  *
  *  WHY THE SMALLEST ACCOUNT DECIDES. The cap is ONE number applied per account
- *  (main/supervisor.mjs multiplies it by the live accounts), so there is no way
+ *  (main/supervisor.mts multiplies it by the live accounts), so there is no way
  *  here to give a Max account three and a smaller one fewer. Between over- and
  *  under-running somebody's allowance, the under-run is the one that still
  *  leaves them a working app, and the number is a stepper on the Agents page

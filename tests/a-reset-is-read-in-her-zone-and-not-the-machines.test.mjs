@@ -34,8 +34,8 @@
 // date back through the process's own clock.
 
 import { describe, it, expect } from 'vitest';
-import { pillText, readUsage, resetAt } from '../shared/claude-usage.mjs';
-import { limitRows } from '../shared/usage.mjs';
+import { pillText, readUsage, resetAt } from '../shared/claude-usage.mts';
+import { limitRows } from '../shared/usage.mts';
 
 // Her reading, 2026-09-01 13:46 America/Los_Angeles, as an INSTANT.
 const NOW = Date.parse('2026-09-01T13:46:00-07:00');

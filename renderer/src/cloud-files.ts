@@ -1,7 +1,7 @@
 // PICTURES, FILMS, SOUNDS AND PAGES ON THE PHONE WITH THE MAC SHUT.
 //
 // Her Mac lists, in each thread's copy, the files the thread names and their
-// names in her private bucket (main/phone-uploads.mjs), keyed by where each is
+// names in her private bucket (main/phone-uploads.mts), keyed by where each is
 // on the Mac: relative to the project's documents folder, or `@repo/` and
 // relative to its code. The screens find a file the way they do on the Mac,
 // from a folder and a path, so each project here gets a stand-in folder of its
@@ -9,7 +9,7 @@
 // make under it is turned back into a key and from there into a link signed
 // for an hour. A path written in full from her home (`~/…`) lands inside the
 // stand-in too, since the stand-in is the Mac's folder under a home of its own.
-import { DOC_SCHEMES, IMG_SCHEMES } from '../../shared/schemes.mjs';
+import { DOC_SCHEMES, IMG_SCHEMES } from '../../shared/schemes.mts';
 
 export interface FileEntry { n?: string; s: number; big?: boolean; w?: number; h?: number }
 export interface Place { device: string; dir: string; repo: string; files: Map<string, FileEntry>; folders: Map<string, string[]> }
@@ -124,7 +124,7 @@ export function pathOfUrl(url: string): { file: string; kind: 'doc' | 'img' } | 
 }
 
 // WHAT A PAGE DRAWS FROM BESIDE IT, the same reading as the Mac's
-// (main/phone-uploads.mjs partsOf), so each is pointed at its own link.
+// (main/phone-uploads.mts partsOf), so each is pointed at its own link.
 const REFS = /(\b(?:src|href|poster|data-src)\s*=\s*["'])([^"'#?]+)([^"']*["'])|(\bsrcset\s*=\s*["'])([^"']+)(["'])|(url\(\s*["']?)([^"')#?]+)([^"')]*["']?\s*\))/gi;
 const OUTSIDE = /^(?:[a-z][a-z0-9+.-]*:|\/\/|\/|#)/i;
 

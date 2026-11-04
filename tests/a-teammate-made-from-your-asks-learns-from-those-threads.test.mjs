@@ -33,8 +33,8 @@ describe('the offer of a teammate', () => {
 
 describe('making a teammate from the offer', () => {
   it('hands its setup run what was said in every thread behind it, and tells it to learn from that first', async () => {
-    const { loadStore } = await import('../main/store-modules.mjs');
-    const { Teammates } = await import('../main/teammates.mjs');
+    const { loadStore } = await import('../main/store-modules.mts');
+    const { Teammates } = await import('../main/teammates.mts');
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-offer-learn-'));
     const mods = await loadStore();
     const w = mods.workItemsDisk;

@@ -20,7 +20,7 @@
 // WHAT IT REALLY DOES, and this is the part that is not pretend:
 //
 //   IT ANSWERS ON THE REAL STDOUT CONTRACT. `session_id` on its first line and
-//   a `type: "result"` frame at the end are exactly what main/supervisor.mjs's
+//   a `type: "result"` frame at the end are exactly what main/supervisor.mts's
 //   `captureStream` reads, and they are what make a run resumable and readable.
 //
 //   IT RAISES A REAL APPROVAL. Given `approval` in its plan it reads the
@@ -31,7 +31,7 @@
 //   Nothing about the gate is simulated; only the reason for asking is.
 //
 //   IT DIES LIKE THE REAL ONE. The CLI traps SIGTERM and exits 143 under its
-//   own power, which is why main/supervisor.mjs's `_kill` writes the intent
+//   own power, which is why main/supervisor.mts's `_kill` writes the intent
 //   down instead of reading a signal. This does the same, so a proof about a
 //   kill is a proof about the same numbers.
 //
@@ -74,7 +74,7 @@ if (plan.receipts) {
 say({ type: 'system', subtype: 'init', session_id: sessionId, tools: [], model: 'stub' });
 
 // OUR OWN KILL, ANSWERED THE WAY THE REAL CLI ANSWERS IT. 143 and not a signal:
-// see the note at the top, and main/supervisor.mjs `_kill`.
+// see the note at the top, and main/supervisor.mts `_kill`.
 let stopping = false;
 process.on('SIGTERM', () => { stopping = true; process.exit(143); });
 process.on('SIGINT', () => { stopping = true; process.exit(143); });
@@ -82,7 +82,7 @@ process.on('SIGINT', () => { stopping = true; process.exit(143); });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // THE INPUT PROTOCOL, WHEN AGENTBOX SPEAKS IT. A worker spawned with
-// `--input-format stream-json --replay-user-messages` (main/claude-input.mjs)
+// `--input-format stream-json --replay-user-messages` (main/claude-input.mts)
 // gets its prompt as a `user` line on stdin, and Agentbox waits for Claude Code
 // to replay that line, by uuid, before it will treat a result as the end of the
 // run. A stand-in that never replayed it left every run "unfinished": the app
@@ -244,7 +244,7 @@ async function actFromPlan({ calls = [], say: words }) {
 //   [[stub:work-then-die]] run a tool, then die with no answer
 //
 // The words a limit is reported in are the CLI's own ("You've hit your session
-// limit · resets …"), which is what shared/spawn-trouble.mjs reads.
+// limit · resets …"), which is what shared/spawn-trouble.mts reads.
 const promptText = (() => {
   const c = firstUserLine?.message?.content;
   const fromStdin = typeof c === 'string' ? c : Array.isArray(c) ? c.map((b) => b?.text ?? '').join('\n') : '';

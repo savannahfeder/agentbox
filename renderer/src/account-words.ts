@@ -1,7 +1,7 @@
 // WHAT AN ACCOUNT ROW SAYS ABOUT ITS OWN ROOM, on this computer and in the cloud.
 import type { CloudAccount, CloudStatus } from './cloud-menu';
 import type { UsageLimit } from './types';
-import { resetDay, toMinute } from '../../shared/usage.mjs';
+import { resetDay, toMinute } from '../../shared/usage.mts';
 
 /** "5:10pm", "8pm": the clock as the usage rows already print it. */
 export function hourWords(ts: number): string {
@@ -49,7 +49,7 @@ export function meterPair(limits: UsageLimit[] | undefined | null, now = Date.no
     ...(session && Number.isFinite(session.percent) ? [meter('session', 'Session', session)] : []),
     ...(week && Number.isFinite(week.percent) ? [meter('week', 'Week', week)] : []),
     ...models.map((l) => meter(`week:${l.qualifier}`, l.qualifier!, l)),
-    // Codex's other windows (shared/codex-usage.mjs `windowSpan`), which the
+    // Codex's other windows (shared/codex-usage.mts `windowSpan`), which the
     // type does not list: a free plan's month, or one named by its length.
     ...all.filter((l) => ['month', 'window'].includes(l.span) && Number.isFinite(l.percent))
       .map((l) => meter(l.span as string, (l.span as string) === 'month' ? 'Month' : l.name, l)),

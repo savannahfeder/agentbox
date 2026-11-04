@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 let tmp;
 beforeEach(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-hung-reply-')); });

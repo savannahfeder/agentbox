@@ -3,7 +3,7 @@
 // own card in renderer/src/onboarding.ts.
 
 import type { AgentFile } from './onboarding';
-import { titleFromFileName } from '../../shared/name-words.mjs';
+import { titleFromFileName } from '../../shared/name-words.mts';
 import { Name } from '../../shared/product-name.mjs';
 
 export interface Project { slug: string; name: string; repoPath: string | null }
@@ -78,7 +78,7 @@ export const CARD = {
 
 /**
  * A folder with agents of its own that no project points at, found by
- * `findAgentFolders` in main/agent-files.mjs. `short` is the path folded to `~`,
+ * `findAgentFolders` in main/agent-files.mts. `short` is the path folded to `~`,
  * and `agents` is read by `readFolderAgents`. */
 export interface AgentFolder {
   folder: string;
@@ -113,7 +113,7 @@ export interface Destination {
 
 /**
  * A Claude Code or Codex conversation the user started. `readSessionThreads` in
- * main/agent-sessions.mjs decides what counts. `title` is the first prompt,
+ * main/agent-sessions.mts decides what counts. `title` is the first prompt,
  * because a transcript has no title. Everything on the card is ticked by `path`. */
 export interface SessionThread {
   id: string;
@@ -257,7 +257,7 @@ export const SECTION = {
 /**
  * The toast after the press. New rows and rows that already existed are counted
  * apart, because `importAgentRows` files nothing for an agent that has a row
- * (`agentsNeedingRows`, shared/agent-import.mjs). `inboxes` and `made` cover a
+ * (`agentsNeedingRows`, shared/agent-import.mts). `inboxes` and `made` cover a
  * press that files into several projects and makes some of them. */
 export function importedLine(
   {
@@ -352,7 +352,7 @@ export function projectNameFor(folder: { name?: string } | null, taken: string[]
 }
 
 /**
- * The store's slug rule (`createProduct`, main/store.mjs), repeated so the card
+ * The store's slug rule (`createProduct`, main/store.mts), repeated so the card
  * knows before the press that two names make one slug. */
 export function slugFor(name: string): string {
   return (name ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
@@ -461,7 +461,7 @@ export function pressLine(dests: Destination[], picked: string[]): string {
 export const LIST = {
   head: 'Bring in your recent agents',
   line: 'From the last 10 days. Untick any you want to leave out.',
-  // When the last ten days held nothing and main/importable-threads.mjs reached
+  // When the last ten days held nothing and main/importable-threads.mts reached
   // back for the newest older conversations.
   lineOlder: 'Nothing from the last 10 days, so here are your most recent. Untick any you want to leave out.',
   // AND ONCE A SEARCH HAS PUT SOMETHING ON THIS LIST (w-6418318cd5). Keeping a
@@ -647,7 +647,7 @@ export function searchLines(lines: ImportLine[], query: string): ImportLine[] {
  *  There are 29,703 transcripts on the Mac this was written on, and a name is
  *  only known once the file has been opened, so a search cannot promise every
  *  chat that ever happened. The read goes newest first until its budget is
- *  spent (`readSearchableThreads`, main/importable-threads.mjs) and hands back
+ *  spent (`readSearchableThreads`, main/importable-threads.mts) and hands back
  *  the moment it stopped at. A card that printed "No chat with that name" over
  *  a read that gave up in August would be lying by omission, which is the same
  *  silence the zero-pixel scrollbar was keeping. */

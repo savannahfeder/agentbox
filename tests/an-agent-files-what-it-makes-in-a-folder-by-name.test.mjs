@@ -96,6 +96,6 @@ describe('team_read', () => {
 });
 
 it('the brief tells an agent, in one line, to file what it makes', () => {
-  const source = fs.readFileSync(new URL('../main/teammates.mjs', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../main/teammates.mts', import.meta.url), 'utf8');
   expect(source.match(/File what you make/g)).toHaveLength(1);
 });

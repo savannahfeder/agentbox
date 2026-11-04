@@ -7,7 +7,7 @@
 // unprompted and nobody had given the page a way to ask for a newer one.
 //
 // WHAT REFRESH DOES AND DOES NOT DO. It does not ask OpenAI anything:
-// main/codex-usage.mjs holds the measurement and the reason an explicit
+// main/codex-usage.mts holds the measurement and the reason an explicit
 // rate-limits read is deliberately absent. It walks Codex's own session log
 // again, which is the case that matters — Codex run in its own app, where the
 // newest figure on the computer is one Codex itself wrote down and the app is
@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CodexUsage } from '../main/codex-usage.mjs';
+import { CodexUsage } from '../main/codex-usage.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -62,7 +62,7 @@ describe('asking Codex for its figure again', () => {
   // NOTHING IS SPAWNED AND NOTHING LEAVES THE COMPUTER. The whole reason the
   // Codex reader exists in the shape it does.
   it('starts no process and makes no request', () => {
-    const src = read('main/codex-usage.mjs');
+    const src = read('main/codex-usage.mts');
     expect(src).not.toMatch(/spawn|exec|fetch\(/);
   });
 });
@@ -81,7 +81,7 @@ describe('the control the page offers', () => {
   // The press reaches the Codex reader and not Claude Code's.
   it('asks for the Codex engine by name', () => {
     expect(settings).toContain("api.refreshUsage('codex')");
-    expect(read('main/ipc.mjs')).toContain('supervisor.refreshCodexUsage()');
+    expect(read('main/ipc.mts')).toContain('supervisor.refreshCodexUsage()');
   });
 
   // AND THE EMPTY LINE SAYS WHY IT IS EMPTY, which is the other half of what

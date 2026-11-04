@@ -3,7 +3,7 @@
 // format for both engines, and a file change goes on the same card as a command.
 //
 // The founder's answer never comes off the disk on this path. It arrives
-// through main/ipc.mjs and reaches `settle` in process. The spool is inside the
+// through main/ipc.mts and reaches `settle` in process. The spool is inside the
 // store root, which workers can write, so any `<id>.answer.json` that appears
 // for a waiting request is a forgery, and the poll deletes it.
 //
@@ -400,7 +400,7 @@ export function createCodexApprovals({
 
     /**
      * The founder's answer, and the only way a Codex card is approved. Called by
-     * main/ipc.mjs beside `approvals.answer`. Returns false for anything that is
+     * main/ipc.mts beside `approvals.answer`. Returns false for anything that is
      * not an open Codex card, so a late click on a timed-out card approves nothing.
      */
     settle: (id, allow, note) => open.get(String(id))?.decide(allow, note) ?? false,

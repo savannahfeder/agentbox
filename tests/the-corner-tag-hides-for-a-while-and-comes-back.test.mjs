@@ -1,5 +1,5 @@
-// THE CORNER TAG'S WINDOWS (w-dafae58a23). The rules in shared/corner-tag.mjs
-// are only half of it; this pins the live half in main/corner-tag.mjs against
+// THE CORNER TAG'S WINDOWS (w-dafae58a23). The rules in shared/corner-tag.mts
+// are only half of it; this pins the live half in main/corner-tag.mts against
 // pretend windows, a pretend screen and a pretend cursor. What broke without
 // it: nothing outside the app said an agent was waiting, so agents sat idle.
 // What it must not become: a nag you close once and never see again, a tag
@@ -19,8 +19,8 @@
 // showed a press on a window that could not take focus pulled the app's main
 // window to the front, and the reworked version passed 12 of 12 real checks.
 import { describe, expect, it } from 'vitest';
-import { createCornerTag, CLOSE_AFTER_MS, DRAG_FROM_PX, OPEN_AFTER_MS } from '../main/corner-tag.mjs';
-import { EDGE_SLACK } from '../shared/corner-tag.mjs';
+import { createCornerTag, CLOSE_AFTER_MS, DRAG_FROM_PX, OPEN_AFTER_MS } from '../main/corner-tag.mts';
+import { EDGE_SLACK } from '../shared/corner-tag.mts';
 
 function rig({ config = {}, focused = false, at = 1_000_000 } = {}) {
   const handlers = {};

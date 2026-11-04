@@ -3,7 +3,7 @@ import { cloudSessionId } from '../../shared/cloud-kit.mjs';
 const segment = (v) => typeof v === 'string' && /^[A-Za-z0-9_-]{1,120}$/.test(v);
 const address = (p) => p && /^[0-9a-f]{12}$/.test(p.device ?? '') && segment(p.project) && segment(p.item);
 
-// Which helpers are out, by the events the Mac counts them from (main/harnesses/claude-stream.mjs `countHelpers`).
+// Which helpers are out, by the events the Mac counts them from (main/harnesses/claude-stream.mts `countHelpers`).
 function countHelpers(r, msg) {
   if (msg.type !== 'system' || !msg.task_id) return;
   const out = r.helpers.filter((id) => id !== msg.task_id);

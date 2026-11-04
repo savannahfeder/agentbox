@@ -6,7 +6,7 @@
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 
-// The exact line the cloud run is told to end on (main/cloud/run.mjs). One that
+// The exact line the cloud run is told to end on (main/cloud/run.mts). One that
 // asks for more than the merge is an agent's.
 const PLAIN = /^merging into main$/i;
 export const isPlainMerge = (what) => PLAIN.test(String(what ?? '').trim());

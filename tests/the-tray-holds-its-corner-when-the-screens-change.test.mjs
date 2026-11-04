@@ -8,7 +8,7 @@
 // she was not looking at. A corner and a gap mean the same thing on any
 // screen, so that is what is remembered now.
 import { describe, expect, it } from 'vitest';
-import { EDGE_SLACK, MARGIN, cornerPlace, restingSpot, spotFor } from '../shared/corner-tag.mjs';
+import { EDGE_SLACK, MARGIN, cornerPlace, restingSpot, spotFor } from '../shared/corner-tag.mts';
 
 const laptop = { x: 0, y: 0, width: 1728, height: 1080 };
 // a 32" to the right of the laptop, as macOS lays them out

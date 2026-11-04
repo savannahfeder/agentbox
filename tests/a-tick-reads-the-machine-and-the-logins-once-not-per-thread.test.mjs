@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { machineSlots, autoAgents } from '../main/machine.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 

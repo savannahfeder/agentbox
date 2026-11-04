@@ -5,10 +5,10 @@
 // only the instant of each reset. The sidebar panel words a reset from
 // `resetsText`, and without it fell back to Codex's countdown, so "Resets
 // 6:19pm" would have become "Resets in 3h 49m" and the week "Resets in 2d 1h",
-// against the decision recorded on `limitRows` in shared/usage.mjs.
+// against the decision recorded on `limitRows` in shared/usage.mts.
 import { describe, expect, it } from 'vitest';
-import { readUsageReport } from '../shared/claude-usage.mjs';
-import { limitRows } from '../shared/usage.mjs';
+import { readUsageReport } from '../shared/claude-usage.mts';
+import { limitRows } from '../shared/usage.mts';
 
 const now = new Date(2026, 9, 20, 14, 30).getTime();
 const iso = (day, h, m = 0) => new Date(2026, 9, day, h, m).toISOString();

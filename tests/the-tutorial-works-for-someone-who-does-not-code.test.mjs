@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import {
   ANCHOR, COPY, FLOOR_OF, START, TEAM_TABS, TEAM_TAB_NAMES, advance, coach, teamTab,
 } from '../renderer/src/onboarding.ts';
-import { PRACTICE_ANSWER, PRACTICE_ROWS, PRACTICE_TASK, PRACTICE_TASK_TRACE } from '../shared/first-run-practice.mjs';
+import { PRACTICE_ANSWER, PRACTICE_ROWS, PRACTICE_TASK, PRACTICE_TASK_TRACE } from '../shared/first-run-practice.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');

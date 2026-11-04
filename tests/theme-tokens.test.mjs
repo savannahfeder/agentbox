@@ -243,6 +243,9 @@ describe('no raw colour outside the token blocks', () => {
       // ../renderer/src/room-for-the-card.ts so the list ends above it.
       // Geometry only the running window knows.
       '--approval-room', '--approval-lift',
+      // Where the open file's card sits in its pane, written by
+      // ../renderer/src/components/DocPane.tsx so the divider lands on its edge.
+      '--doc-card-x', '--doc-card-y', '--doc-card-h', '--doc-card-r',
       '--did-mark', '--did-gap', '--did-hang']);
     expect([...used].filter((t) => !light.has(t) && !local.has(t))).toEqual([]);
   });

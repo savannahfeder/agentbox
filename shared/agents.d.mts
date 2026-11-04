@@ -19,7 +19,7 @@ export interface AgentLike {
   saidAt?: number;
   // The session's own one-line title of itself, the last thing the user typed into
   // it, and the files it has had its hands on. Read off the transcript tail
-  // that main/agents.mjs was already reading.
+  // that main/agents.mts was already reading.
   about?: string;
   lastAsked?: string;
   touched?: string[];
@@ -31,7 +31,7 @@ export interface AgentLike {
   productName?: string | null;
   startedByZero?: boolean;
   // The moment the user said they would come back to it, and when they said so.
-  // Set by the founder alone; main/agent-schedule.mjs keeps it.
+  // Set by the founder alone; main/agent-schedule.mts keeps it.
   runAt?: number;
   runAtSetAt?: number;
   // The agent's own last activity at the moment she closed the row. It comes

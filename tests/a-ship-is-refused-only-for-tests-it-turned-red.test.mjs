@@ -6,7 +6,7 @@
 // hook with a stand-in vitest whose only red file was one main is known red
 // on: the hook refused the push.
 //
-// The app knows which tests are red on main (main/main-went-red.mjs keeps
+// The app knows which tests are red on main (main/main-went-red.mts keeps
 // them, and a thread is already fixing them), so the ship queue hands that
 // list to the hook, and the hook leaves those out of its refusal. Anything
 // else still red refuses the push as before, and with no list nothing changes.
@@ -115,7 +115,7 @@ describe('the ship queue', () => {
   });
 
   async function shipOnce() {
-    const { ShipQueue } = await import('../main/ship-queue.mjs');
+    const { ShipQueue } = await import('../main/ship-queue.mts');
     const folders = path.join(dir, 'folders');
     fs.mkdirSync(path.join(folders, 'w-a'), { recursive: true });
     fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });

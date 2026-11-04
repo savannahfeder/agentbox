@@ -1,6 +1,6 @@
 // A TASK FOLDER HAS ONE OWNER AT A TIME, AND TAKING IT IS AN ANSWER.
 //
-// FOUND 2026-10-07 reading main/task-folders.mjs (w-5952e6de3e, with Codex).
+// FOUND 2026-10-07 reading main/task-folders.mts (w-5952e6de3e, with Codex).
 // Nothing in that file actually OWNED a folder: taking one could not fail, and
 // the owner written into the lock was never replaced.
 //
@@ -39,7 +39,7 @@ import path from 'node:path';
 import {
   ensureTaskFolder, releaseTaskFolder, parkTaskFolder, listTaskFolders,
   taskFolderPath, buildingFolderPath,
-} from '../main/task-folders.mjs';
+} from '../main/task-folders.mts';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 

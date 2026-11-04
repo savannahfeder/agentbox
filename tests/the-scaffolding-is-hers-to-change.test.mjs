@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 // The real briefs, because the thing being tested is what the shipped files do.
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -176,7 +176,7 @@ describe('the folders a worker may touch', () => {
   });
 
   it('hands the spawn a settings file it generated, not the one in the bundle', () => {
-    const sup = fs.readFileSync(path.join(REPO, 'main', 'supervisor.mjs'), 'utf8');
+    const sup = fs.readFileSync(path.join(REPO, 'main', 'supervisor.mts'), 'utf8');
     // Named by the run since P2, so two spawns with different connector rules
     // never share one file; still generated, never the bundle's.
     expect(sup).toContain("const rules = this.writeWorkerSettings(product, runId);");

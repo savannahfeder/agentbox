@@ -15,7 +15,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { whyWords } from '../renderer/src/where-why.ts';
 import { statusCell } from '../renderer/src/status-word.ts';
 import { threadPlace, cloudMoveLine } from '../renderer/src/cloud-menu.ts';
@@ -188,11 +188,11 @@ describe('with the cloud on "when this Mac is full"', () => {
 
 describe('the plumbing', () => {
   it('reaches the supervisor from the menus', () => {
-    expect(read('shared/bridge-map.mjs')).toMatch(/moveToCloud: 'zero:move-to-cloud'/);
-    expect(read('main/ipc.mjs')).toMatch(/ipcMain\.handle\('zero:move-to-cloud'[\s\S]{0,120}supervisor\.moveToCloud\(/);
+    expect(read('shared/bridge-map.mts')).toMatch(/moveToCloud: 'zero:move-to-cloud'/);
+    expect(read('main/ipc.mts')).toMatch(/ipcMain\.handle\('zero:move-to-cloud'[\s\S]{0,120}supervisor\.moveToCloud\(/);
     expect(read('preload.cjs')).toMatch(/moveToCloud: \(payload\) => ipcRenderer\.invoke\('zero:move-to-cloud', payload\)/);
     expect(read('renderer/src/api.ts')).toMatch(/async moveToCloud\(/);
     // Every tick moves what may move.
-    expect(read('main/supervisor.mjs')).toMatch(/this\._moveRunsToTheCloud\(items\)/);
+    expect(read('main/supervisor.mts')).toMatch(/this\._moveRunsToTheCloud\(items\)/);
   });
 });

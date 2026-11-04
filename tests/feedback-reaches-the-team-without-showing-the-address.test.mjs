@@ -27,7 +27,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, it, expect, vi } from 'vitest';
 import { FEEDBACK_LIMITS, checkFeedback, feedbackPayload, totalBytes } from '../shared/feedback.mjs';
-import { feedbackUrl, sendFeedback } from '../main/feedback.mjs';
+import { feedbackUrl, sendFeedback } from '../main/feedback.mts';
 import { FeedbackCard } from '../renderer/src/components/FeedbackCard';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -152,7 +152,7 @@ describe('the address is nowhere in the app', () => {
   const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z.]{2,}/;
   const files = [
     'shared/feedback.mjs',
-    'main/feedback.mjs',
+    'main/feedback.mts',
     'renderer/src/components/FeedbackCard.tsx',
     'cloud/supabase/functions/feedback/index.ts',
   ];

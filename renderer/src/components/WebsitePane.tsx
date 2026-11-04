@@ -10,7 +10,7 @@
 // iframe, which many sites will refuse; the way out to your own browser is
 // always in the bar above.
 import { useEffect, useRef } from 'react';
-import { WEBSITE_PARTITION } from '../../../shared/websites.mjs';
+import { WEBSITE_PARTITION } from '../../../shared/websites.mts';
 
 // `<webview>` is Electron's own element, so React has no type for it.
 declare module 'react' {
@@ -133,7 +133,7 @@ export function WebsitePane({ url, webview, ready = true, control, onNavigate, o
 
   // Opaque on purpose: `allow-same-origin` beside `allow-scripts` lets a page
   // escape its own sandbox, and on the phone door the app is served from this
-  // very origin (main/serve.mjs).
+  // very origin (main/serve.mts).
   return <iframe
     className="doc-view doc-website-view"
     style={{ opacity: ready ? 1 : 0 }}

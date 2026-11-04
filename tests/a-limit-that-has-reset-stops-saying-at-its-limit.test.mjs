@@ -17,7 +17,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const ONE_ACCOUNT_HOME = '/nonexistent-home-with-no-second-account';
 const WEEKLY = "You've hit your weekly limit · resets 12pm (America/Los_Angeles)";

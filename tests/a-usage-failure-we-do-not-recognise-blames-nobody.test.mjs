@@ -8,9 +8,9 @@
 // causes (an ended subscription, an admin's block) keep their own sentences.
 
 import { describe, it, expect } from 'vitest';
-import { ClaudeUsage } from '../main/claude-usage.mjs';
-import { USAGE_UNREADABLE } from '../shared/usage.mjs';
-import { accountSentence } from '../shared/spawn-trouble.mjs';
+import { ClaudeUsage } from '../main/claude-usage.mts';
+import { USAGE_UNREADABLE } from '../shared/usage.mts';
+import { accountSentence } from '../shared/spawn-trouble.mts';
 
 // What `claude -p /usage` printed for the lapsed login, minus the breakdown.
 const NO_LIMITS = "You are currently using your subscription to power your Claude Code usage\n\nWhat's contributing to your limits usage?\n";

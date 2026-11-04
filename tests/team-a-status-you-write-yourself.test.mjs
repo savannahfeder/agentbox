@@ -20,8 +20,8 @@ import { it, expect, describe, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamService } from '../main/team/index.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
 import { cleanStatus, holdEnds, holdsUntil, hasLapsed, liveStatus, STATUS_MAX } from '../shared/team-status.mjs';
 

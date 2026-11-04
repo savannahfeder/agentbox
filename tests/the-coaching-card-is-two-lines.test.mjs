@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import {
   COACHED, COPY, KEY_NAMES, coach, keyName,
 } from '../renderer/src/onboarding.ts';
-import { PRACTICE_ANSWER, PRACTICE_ROWS, PRACTICE_TASK } from '../shared/first-run-practice.mjs';
+import { PRACTICE_ANSWER, PRACTICE_ROWS, PRACTICE_TASK } from '../shared/first-run-practice.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

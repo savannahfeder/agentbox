@@ -1,6 +1,6 @@
 // 2026-10-08: the engine boundary (9ca39d6) made names, paths and login flags
 // into data, but the line that actually STARTS a worker stayed written into
-// main/supervisor.mjs: `['-p', prompt, '--output-format', 'stream-json',
+// main/supervisor.mts: `['-p', prompt, '--output-format', 'stream-json',
 // '--verbose', '--include-partial-messages', ...]`, `--effort`,
 // `--append-system-prompt`, `--resume` and `--fork-session`. A user proved what
 // that costs (github.com/savannahfeder/agentbox/issues/21): Grok Build emits
@@ -13,10 +13,10 @@
 // engine is a definition and nothing else, and an engine with no command line
 // at all (Codex, which is driven over RPC) is handed none.
 import { describe, it, expect } from 'vitest';
-import { workerArgsFrom, definitionMethods } from '../main/harnesses/common.mjs';
+import { workerArgsFrom, definitionMethods } from '../main/harnesses/common.mts';
 import { harnessDefinition } from '../shared/harness-definitions.mjs';
-import { harnessFor } from '../main/harnesses.mjs';
-import { streamInputArgs } from '../main/claude-input.mjs';
+import { harnessFor } from '../main/harnesses.mts';
+import { streamInputArgs } from '../main/claude-input.mts';
 
 const claude = harnessDefinition('claude');
 

@@ -19,7 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { SETUP, menuSetupLine, activeSignIn, signInView, anyReady, WHERE_ROWS } from '../renderer/src/cloud-setup';
-import { looksLikeClaudeCode } from '../shared/claude-code-shape.mjs';
+import { looksLikeClaudeCode } from '../shared/claude-code-shape.mts';
 
 const status = (accounts = [], signIns = []) => ({ setUp: true, mode: 'full', running: 0, month: { runs: 0, agentHours: 0, estimatedCost: 0, costPerAgentHour: null }, accounts, signIns });
 const acct = (extra) => ({ engine: 'claude', key: 'acct-1', name: null, ready: true, state: 'ready', ...extra });
@@ -79,7 +79,7 @@ describe('Claude\'s code from the clipboard', () => {
   });
 
   it('is read only while a Claude sign-in is waiting for it', () => {
-    const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+    const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
     const handler = ipc.slice(ipc.indexOf("'zero:cloud-clipboard-code'"), ipc.indexOf("'zero:settings-set-workspace'"));
     expect(handler).toMatch(/s\.engine === 'claude' && s\.state === 'needs-code'/);
     expect(handler.indexOf('waiting')).toBeLessThan(handler.indexOf('readClipboardText'));

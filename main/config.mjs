@@ -71,7 +71,7 @@ export const DEFAULTS = {
   agentsAtOnce: null,
   // HOLD HEAVY WORK WHEN MEMORY IS SHORT (w-3958c3753d). Off until somebody
   // turns it on from the Agents page. With it on, every shell command a worker
-  // runs asks main/memory-gate-server.mjs first, and heavy ones wait their turn
+  // runs asks main/memory-gate-server.mts first, and heavy ones wait their turn
   // while the Mac is short of memory. `memoryGateSlots` is how many heavy
   // commands may run at once; null is Auto, one per 8 GB.
   memoryGate: false,
@@ -86,7 +86,7 @@ export const DEFAULTS = {
   // 20 where each run needs a relay of its own (about 110 MB a run).
   cloudRuns: null,
   maxCloudSessions: null,
-  // STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mjs). Its own
+  // STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mts). Its own
   // switch, off until somebody turns it on; `cleanupLeftoversSince` is the
   // moment they did, so nothing is stopped sooner than the idle time after it.
   cleanupLeftovers: false,
@@ -123,7 +123,7 @@ export const DEFAULTS = {
   // before this key existed. There is no Settings row and no picker. This is a
   // line somebody writes in zero.config.json on purpose, which is the point of
   // it -- it is the config half of the capability gate in shared/engines.mjs,
-  // and `main/supervisor.mjs#_engineFor` is the one place that reads it and
+  // and `main/supervisor.mts#_engineFor` is the one place that reads it and
   // hands the gate's token over.
   //
   // IT IS THE MOMENT SHE OPENED IT AND NOT A `true`. The reasoning is in
@@ -157,7 +157,7 @@ export function loadConfig(appDir, { home = os.homedir() } = {}) {
   // NOTHING DECIDES A DEFAULT ON THIS ANY MORE. It used to pick the
   // `outsideAgents` default, and that split was the bug: the same machine got
   // two different answers about the same setting depending on whether a file
-  // happened to exist. There is one default now, in main/settings.mjs. This
+  // happened to exist. There is one default now, in main/settings.mts. This
   // stays as a plain fact about the machine, read by nobody today, because the
   // next thing that wants it will want it honest.
   let fresh = false;
@@ -222,7 +222,7 @@ export function loadConfig(appDir, { home = os.homedir() } = {}) {
     ? overrides.claudeBin
     : null;
   // ONE LOGIN SHELL FOR BOTH ENGINES, ASKED BEFORE EITHER SEARCH RUNS. This is
-  // on the boot path -- main/main.mjs calls loadConfig inside createWindow and
+  // on the boot path -- main/main.mts calls loadConfig inside createWindow and
   // before the window exists -- and a login shell costs about 0.7 s to start
   // whether it is asked about one program or six. Measured on this Mac
   // 2026-10-11, the two searches together took 1.4 s cold and the shell was all
@@ -422,7 +422,7 @@ export function saveConfig(config, patch) {
   // default flipped from "only the ones asking" to "every session" the moment a
   // config file existed, and a stranger who had never opened the setting would
   // have been flipped by it. There is one default now for every install, `off`
-  // in main/settings.mjs, so there is no flip left to guard against and no
+  // in main/settings.mts, so there is no flip left to guard against and no
   // setting to write on somebody's behalf.
   for (const [key, value] of Object.entries(patch)) {
     // An explicit undefined REMOVES the key, which is how a per-project

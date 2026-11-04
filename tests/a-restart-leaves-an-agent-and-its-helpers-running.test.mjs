@@ -17,7 +17,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { serveRuns, spoolFiles } from '../main/run-host.mjs';
 import { HostedRun, HOST_LOST } from '../main/hosted-run.mjs';
-import { attachClaudeInput } from '../main/claude-input.mjs';
+import { attachClaudeInput } from '../main/claude-input.mts';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, ms = 7000) {

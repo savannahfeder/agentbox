@@ -9,8 +9,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createRooms, roomPrefsFile } from '../main/team/rooms.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
 import { groupFileRow } from '../shared/room-needs-you.mjs';
 
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');

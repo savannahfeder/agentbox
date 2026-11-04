@@ -9,7 +9,7 @@ import { it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readTranscriptTail } from '../main/agent-sessions.mjs';
+import { readTranscriptTail } from '../main/agent-sessions.mts';
 
 let dir;
 beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chat-end-')); });

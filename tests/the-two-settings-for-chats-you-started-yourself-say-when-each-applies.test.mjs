@@ -23,7 +23,7 @@ describe('chats you started yourself, in Settings', () => {
   });
 
   // Both testers turned it on and looked for their chats a few minutes later.
-  // A chat comes in after ten quiet minutes (QUIET_MS, main/new-chats-watch.mjs).
+  // A chat comes in after ten quiet minutes (QUIET_MS, main/new-chats-watch.mts).
   it('says how long a chat is still before it comes in', () => {
     expect(group).toMatch(/after ten quiet minutes/);
   });

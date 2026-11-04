@@ -32,7 +32,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 // The bookkeeping this file is about lives on the instance and needs no store,
 // no config file and no spawning. Built bare on purpose: a test that has to

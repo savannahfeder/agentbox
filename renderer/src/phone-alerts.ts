@@ -1,6 +1,6 @@
 // ALERTS AND THE ICON COUNT, ON A PHONE.
 //
-// The computer sends each alert (main/phone-link.mjs); this is the phone's
+// The computer sends each alert (main/phone-link.mts); this is the phone's
 // half. It registers the worker that shows alerts while the app is closed
 // (main/phone-sw.js), asks to turn them on when somebody taps for it, keeps the
 // icon's count while the app is open, and opens the thread an alert was about.

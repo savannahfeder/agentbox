@@ -8,14 +8,14 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { scanCodex } from '../main/codex-watch.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 import {
   CODEX_IMPORT_LABEL, CODEX_MIRROR_LABEL, IMPORT_KIND, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow,
   codexMirrorPatch, importChoice, isCodexImportRow, isCodexMirrorRow, isNotImportedRow, productsForThread,
   plainQuote, threadFactsLine, threadsNeedingRows, whereThreadLands,
-} from '../shared/codex-import.mjs';
+} from '../shared/codex-import.mts';
 
 const NOW = Date.parse('2026-09-14T19:30:00-07:00');
 

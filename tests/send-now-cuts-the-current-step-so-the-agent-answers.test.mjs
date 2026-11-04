@@ -16,9 +16,9 @@
 // the run.
 import { it, expect, describe } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { attachClaudeInput } from '../main/claude-input.mjs';
-import { submitReply } from '../main/live-replies.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { attachClaudeInput } from '../main/claude-input.mts';
+import { submitReply } from '../main/live-replies.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 function fake() {
   const c = new EventEmitter();

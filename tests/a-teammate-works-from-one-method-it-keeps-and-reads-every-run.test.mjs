@@ -16,8 +16,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { appHome } from '../main/store/home.mjs';
-import { loadStore } from '../main/store-modules.mjs';
-import { Teammates } from '../main/teammates.mjs';
+import { loadStore } from '../main/store-modules.mts';
+import { Teammates } from '../main/teammates.mts';
 import { methodFile, sourcesDir, writeTeammate } from '../main/store/teammates-files.mjs';
 import { METHOD_CAP, sourceText } from '../shared/teammates.mjs';
 
@@ -73,7 +73,7 @@ describe('a teammate method', () => {
     writeMethod(t, '## Turned down\n- x\n');
     expect(team.method(t.id).text).toBe('## Turned down\n- x\n');
     expect(() => team.method('t-000000')).toThrow(/No such teammate/);
-    const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+    const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
     expect(ipc).toMatch(/const TEAMMATE_OPS = new Set\(\[[^\]]*'method'/);
     const page = fs.readFileSync(new URL('../renderer/src/teammates/TeammatesPage.tsx', import.meta.url), 'utf8');
     expect(page).toMatch(/api\.teammates\('method', \{ id: t\.id \}\)/);

@@ -107,7 +107,7 @@ export function instanceProcesses(state, table = processTable()) {
   };
 }
 
-const isCloudRun = (c) => /scripts\/cloud-shim\.pl\s|main\/cloud\/run-cli\.mjs\s/.test(c);
+const isCloudRun = (c) => /scripts\/cloud-shim\.pl\s|main\/cloud\/run-cli\.mts\s/.test(c);
 
 /**
  * What a sleeping Mac stops: the copy, everything it started, everything that
@@ -130,7 +130,7 @@ export function sleepTargets(state, table = processTable()) {
   return [...pids];
 }
 
-/** Whether a run's session log carries a result its engine did not mark ERROR (main/codex.mjs, harnesses/claude-stream.mjs). */
+/** Whether a run's session log carries a result its engine did not mark ERROR (main/codex.mjs, harnesses/claude-stream.mts). */
 export function answeredRun(log) {
   return /== RESULT \((?![^)]*\bERROR\b)[^)]*\) ==/.test(log);
 }

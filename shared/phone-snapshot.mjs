@@ -96,7 +96,7 @@ export function hideSecrets(text, { home = null } = {}) {
   for (const re of SECRETS) out = out.replace(re, (m, bearer) => (typeof bearer === 'string' && /^(Bearer|Basic)/i.test(bearer) ? `${bearer}[hidden]` : '[hidden]'));
   out = hideNamed(out);
   out = hideKeyLike(out);
-  // Her home folder is ~ online, as it is in a crash report (shared/crash-scrub.mjs).
+  // Her home folder is ~ online, as it is in a crash report (shared/crash-scrub.mts).
   if (home && home.length > 1) out = out.split(home).join('~');
   return out;
 }
@@ -138,7 +138,7 @@ export function phoneRepeatsOf(rules, slugs, { home = null } = {}) {
     .map((r) => ({ product: r.product, ...pick(r, REPEAT_FIELDS, 4000, { home }) }));
 }
 
-// YOUR AI TEAMMATES, AND YOUR CHAT WITH THEM (main/teammates.mjs `view`),
+// YOUR AI TEAMMATES, AND YOUR CHAT WITH THEM (main/teammates.mts `view`),
 // riding with the settings copy as the repeating tasks do. Named fields only;
 // the method, memory and playbooks stay on the computer.
 const MATE_FIELDS = ['id', 'name', 'letter', 'role', 'job', 'primary', 'paused', 'status', 'product', 'engine', 'model', 'now', 'queued', 'runsThisWeek', 'worksLabel', 'createdAt'];
@@ -270,7 +270,7 @@ export function withPhoneAll(saved, personId, on, every = []) {
 
 // A NEW THREAD STARTED ON THE PHONE has a row there before the Mac makes it,
 // under this id, and a reply to it before then is a reply to this id. The Mac
-// remembers which real row it became (main/phone-inbox.mjs) (Codex's review of
+// remembers which real row it became (main/phone-inbox.mts) (Codex's review of
 // step 1, finding 8). Shaped like a row id, so every screen takes it.
 export const madeHere = (commandId) => `w-${String(commandId).replace(/[^0-9a-f]/gi, '').slice(0, 10).toLowerCase()}`;
 
@@ -350,7 +350,7 @@ export function phoneApproval(request, card, ctx = {}) {
 }
 
 // WHAT SHE PICKED WITH A REPLY OR A NEW THREAD, as the window's own handlers
-// take it (main/ipc.mjs zero:answer, zero:compose): only these fields, each
+// take it (main/ipc.mts zero:answer, zero:compose): only these fields, each
 // only in its right shape. Null on a reply clears a choice, as in the window.
 const WORD = /^[A-Za-z][\w.:-]{0,79}$/;
 const word = (v, n = 80) => typeof v === 'string' && v.length <= n && WORD.test(v);
@@ -398,7 +398,7 @@ export function checkCommand(cmd, { projects, hasItem }) {
 // A TURN THE CLOUD TOOK WITH THE COMPUTER SHUT, written into the thread's copy
 // by the cloud server (cloud/gateway/phone.mjs), as the computer would have
 // written it: her reply, the agent's answer and the row waiting on her
-// (main/store.mjs recordSessionResult). The computer's own copy replaces this
+// (main/store.mts recordSessionResult). The computer's own copy replaces this
 // one once it is back and has brought the run home.
 export function withCloudTurn(snapshot, { reply, answer, repliedAt, answeredAt, status = 'blocked' }, limits = SNAPSHOT_LIMITS) {
   if (!snapshot || typeof snapshot !== 'object' || !snapshot.item?.id) return null;

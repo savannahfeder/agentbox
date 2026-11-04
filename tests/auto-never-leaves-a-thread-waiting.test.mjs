@@ -32,7 +32,7 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
-const { Supervisor } = await import('../main/supervisor.mjs');
+const { Supervisor } = await import('../main/supervisor.mts');
 const { AUTO_LABEL, AGENT_WHY, NOBODY_WHY, FAILED_WHY } = await import('../shared/auto-route.mjs');
 
 const video = { id: 't-video', name: 'Video producer', role: null, job: 'Makes the clips.', status: 'active', paused: false, duties: [] };
@@ -144,4 +144,4 @@ describe('a thread sent to Auto', () => {
   });
 });
 
-const source = (await import('node:fs')).readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+const source = (await import('node:fs')).readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');

@@ -5,7 +5,7 @@
 // app, press N, type a task, ⌘↵, open it, and its history began "An agent
 // opened this".
 //
-// Why. Sending a task writes two lines (main/store.mjs composeItem): the app's
+// Why. Sending a task writes two lines (main/store.mts composeItem): the app's
 // birth stamp (source 'system', the title) and, a few milliseconds later, the
 // person's own line (source 'founder', the same title, plus body and model).
 // The rule that hands the stamp to the person only fired when both lines

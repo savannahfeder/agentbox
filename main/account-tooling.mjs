@@ -270,7 +270,7 @@ export function isCloudLoginOf({ org, email }, identity, identities) {
  *  two folders holding one subscription, not two folders showing one address.
  *
  * AND IT NO LONGER CLAIMS THEY ADD NO CAPACITY, because that is not what the
- * app does. `_capacity` in main/supervisor.mjs is `maxConcurrentSessions *
+ * app does. `_capacity` in main/supervisor.mts is `maxConcurrentSessions *
  * liveProfiles.length`, which counts FOLDERS. So a duplicated machine is told
  * it can run double and really does start double, all of it against one
  * subscription. The old sentence described what we intended; this one describes

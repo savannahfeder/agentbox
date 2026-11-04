@@ -10,10 +10,10 @@
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { failureNote } from '../main/ship-queue.mjs';
+import { failureNote } from '../main/ship-queue.mts';
 import {
   KEPT_ASIDE, CLOSED_UNSHIPPED, notShipped, notShippedLine, closeRefusal, closedAnywayNote, shipItAsk,
-} from '../shared/not-shipped.mjs';
+} from '../shared/not-shipped.mts';
 import { rowSummary } from '../renderer/src/list-rules';
 import { liveOption } from '../renderer/src/format';
 import { unshippedAsk } from '../renderer/src/close-asks-first';
@@ -38,7 +38,7 @@ describe('reading whether the work reached main', () => {
   });
 
   it('the cloud run writes its note from the same words', () => {
-    const run = fs.readFileSync(new URL('../main/cloud/run.mjs', import.meta.url), 'utf8');
+    const run = fs.readFileSync(new URL('../main/cloud/run.mts', import.meta.url), 'utf8');
     expect(run).toMatch(/const note = `\$\{KEPT_ASIDE\}\$\{why\}\. Nothing is lost\./);
   });
 
@@ -120,7 +120,7 @@ describe('closing it', () => {
   });
 
   it('is refused in the handler every close goes through, before anything is stopped', () => {
-    const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+    const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
     const handler = ipc.slice(ipc.indexOf("ipcMain.handle('zero:answer'"));
     const refusal = handler.indexOf('closeRefusal(row, { closeUnshipped })');
     expect(refusal).toBeGreaterThan(0);

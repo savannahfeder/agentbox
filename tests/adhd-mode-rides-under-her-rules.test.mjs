@@ -7,8 +7,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
-import { readInstruction, writeInstruction } from '../main/instruction-settings.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { readInstruction, writeInstruction } from '../main/instruction-settings.mts';
 
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(REPO, p), 'utf8');
@@ -56,7 +56,7 @@ describe('ADHD mode rides under her rules only while it is on', () => {
   });
 
   it('goes into the system prompt directly after the message rules', () => {
-    const src = read('main/supervisor.mjs');
+    const src = read('main/supervisor.mts');
     expect(src).toContain('[standing, project, teammate, messages, adhd');
   });
 

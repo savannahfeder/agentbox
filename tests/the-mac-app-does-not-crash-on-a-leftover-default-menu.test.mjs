@@ -11,7 +11,7 @@
 // the same address and top seven frames; default menu suppressed, survived 2 of 2.
 //
 // Electron only runs an ES module's imports before `ready`, so the suppression
-// has to be the side effect of an import, not a line in the body of main.mjs.
+// has to be the side effect of an import, not a line in the body of main.mts.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -29,7 +29,7 @@ async function loadOn(platform) {
   Object.defineProperty(process, 'platform', { value: platform });
   vi.resetModules();
   setApplicationMenu.mockClear();
-  await import('../main/no-default-menu.mjs');
+  await import('../main/no-default-menu.mts');
 }
 
 describe('the mac app does not crash on a leftover default menu', () => {
@@ -48,14 +48,14 @@ describe('the mac app does not crash on a leftover default menu', () => {
   });
 
   it('runs before any other module of ours', () => {
-    const imports = [...read('main', 'main.mjs').matchAll(/^import .*?from '([^']+)'|^import '([^']+)'/gm)]
+    const imports = [...read('main', 'main.mts').matchAll(/^import .*?from '([^']+)'|^import '([^']+)'/gm)]
       .map((m) => m[1] ?? m[2]);
     expect(imports[0]).toBe('electron');
-    expect(imports[1]).toBe('./no-default-menu.mjs');
+    expect(imports[1]).toBe('./no-default-menu.mts');
   });
 
   it('still installs the real menu, once', () => {
-    const calls = read('main', 'main.mjs').match(/^\s*installMenu\(\{/gm) ?? [];
+    const calls = read('main', 'main.mts').match(/^\s*installMenu\(\{/gm) ?? [];
     expect(calls).toHaveLength(1);
     expect(read('main', 'menu.mts')).toMatch(/Menu\.setApplicationMenu\(Menu\.buildFromTemplate/);
   });

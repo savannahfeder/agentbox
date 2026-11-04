@@ -2,7 +2,7 @@
 //
 // With the computer shut, the cloud server left every reply or new thread
 // that carried a file from the phone to the computer: only the computer took
-// files down (main/phone-inbox.mjs withPhoneFiles). A screenshot of a bug is
+// files down (main/phone-inbox.mts withPhoneFiles). A screenshot of a bug is
 // how a lot of threads start on a phone. The founder, 2026-10-24: "these are
 // all very important to be viable on mobile".
 //
@@ -48,7 +48,7 @@ describe('where a file from the phone goes', () => {
   });
 
   it('the computer saves it under that same name', () => {
-    const inbox = fs.readFileSync(new URL('../main/phone-inbox.mjs', import.meta.url), 'utf8');
+    const inbox = fs.readFileSync(new URL('../main/phone-inbox.mts', import.meta.url), 'utf8');
     expect(inbox).toMatch(/phoneAttachmentRel\(f\)/);
   });
 });
@@ -241,8 +241,8 @@ describe('the cloud server and a new thread with a file', () => {
 
 describe('the computer, waking to a cloud run that took a file', () => {
   async function inboxWorld() {
-    const { createMemoryCloud, signUpMemory, memoryBackend, claimForTheCloud } = await import('../main/team/memory-cloud.mjs');
-    const { createPhoneInbox } = await import('../main/phone-inbox.mjs');
+    const { createMemoryCloud, signUpMemory, memoryBackend, claimForTheCloud } = await import('../main/team/memory-cloud.mts');
+    const { createPhoneInbox } = await import('../main/phone-inbox.mts');
     const cloud = createMemoryCloud();
     let clock = Date.parse('2026-10-24T12:00:00Z');
     cloud.now = () => clock;

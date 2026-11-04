@@ -8,7 +8,7 @@
 // comes from its agent, which only speaks once the cloud machine is up, a
 // minute or more after the start. Only then was the run written to
 // `_liveSessions`, the record a restart rejoins. A quit before that left the
-// run going in the cloud (SIGHUP, main/cloud/run.mjs) with nothing on this Mac
+// run going in the cloud (SIGHUP, main/cloud/run.mts) with nothing on this Mac
 // pointing at it: the reply stayed marked delivered, the startup sweep had no
 // record to follow, and the row was `stalled`, which the list draws as Stopped.
 //
@@ -24,9 +24,9 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
-import { Supervisor } from '../main/supervisor.mjs';
-import { Store } from '../main/store.mjs';
-import { writeMarker } from '../main/cloud/marker.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { Store } from '../main/store.mts';
+import { writeMarker } from '../main/cloud/marker.mts';
 import { answerSettled } from '../shared/answers.mjs';
 
 let tmp; let root; let repo; let folder; let store; let row; let relays; let supervisors;

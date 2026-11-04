@@ -12,10 +12,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { failureNote } from '../main/ship-queue.mjs';
-import { CLOSED_UNSHIPPED, closedAnywayNote } from '../shared/not-shipped.mjs';
+import { Store } from '../main/store.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { failureNote } from '../main/ship-queue.mts';
+import { CLOSED_UNSHIPPED, closedAnywayNote } from '../shared/not-shipped.mts';
 
 let tmp; let store; let sup;
 beforeEach(async () => {
@@ -81,7 +81,7 @@ describe('the sweep', () => {
   });
 
   it('runs on the supervisor\'s tick, over the rows it already read', () => {
-    const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/const items = this\.store\.listItems\(now\);\n\s*this\.bringBackWhatNeverShipped\(items\);/);
   });
 });

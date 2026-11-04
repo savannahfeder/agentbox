@@ -15,3 +15,17 @@ export interface SnapshotSender {
 }
 
 export declare function snapshotSender(options?: { keep?: number }): SnapshotSender;
+
+export interface LightRunningRow {
+  itemId?: string | null;
+  product?: string | null;
+  tail?: unknown[];
+  activity?: unknown[];
+  saying?: string;
+  sayingAt?: number;
+}
+
+export declare function lightRunning<T extends LightRunningRow>(
+  running: readonly T[] | null | undefined,
+  open: { id?: string | null; product?: string | null } | null | undefined,
+): T[];

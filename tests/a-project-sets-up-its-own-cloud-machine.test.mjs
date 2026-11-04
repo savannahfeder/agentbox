@@ -18,7 +18,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { createSandbox, SETUP_LOG } from '../cloud/sandbox/server.mjs';
-import { CLOUD_NOTE } from '../main/cloud/run.mjs';
+import { CLOUD_NOTE } from '../main/cloud/run.mts';
 
 let tmp; let sandbox; let fileServer;
 afterEach(async () => {

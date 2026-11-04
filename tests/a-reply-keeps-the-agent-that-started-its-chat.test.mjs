@@ -7,7 +7,7 @@
 // in a map of its own. Personal projects are deleted (w-d19d6d387c,
 // 2026-09-22), so every case here reads the one map, `_rowSessions`.
 import {expect,it} from 'vitest';
-import {Supervisor} from '../main/supervisor.mjs';
+import {Supervisor} from '../main/supervisor.mts';
 function setup(workspace='codex'){
  const s=Object.create(Supervisor.prototype);
  s.config={engine:workspace,engineChoice:'2026-09-01T00:00:00Z',codexBin:'/codex'};

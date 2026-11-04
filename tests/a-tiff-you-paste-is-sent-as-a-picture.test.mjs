@@ -9,7 +9,7 @@
 // 156.0.8078.4: the 40x30 TIFF below (Pillow reads it) fails to load in an
 // <img>, and the same picture as a PNG loads. A TIFF can also be uncompressed:
 // 2000x2000 RGBA is 16 MB, past the 10 MB a file may be to reach a teammate
-// (main/team/sync.mjs), which then never sends it.
+// (main/team/sync.mts), which then never sends it.
 //
 // So a TIFF or HEIC is turned into a PNG or JPEG the moment it enters a reply
 // box, by the Mac's own `sips`. Where that cannot happen (not a Mac, sips
@@ -22,9 +22,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { turnedName } from '../shared/picture-formats.mjs';
-import { stageAttachment, turnIntoPicture } from '../main/stage-attachment.mjs';
-import { saveAttachments } from '../main/save-attachments.mjs';
+import { turnedName } from '../shared/picture-formats.mts';
+import { stageAttachment, turnIntoPicture } from '../main/stage-attachment.mts';
+import { saveAttachments } from '../main/save-attachments.mts';
 import { collectFiles } from '../renderer/src/attachments';
 import { tinyTiff } from './helpers/tiny-tiff.mjs';
 

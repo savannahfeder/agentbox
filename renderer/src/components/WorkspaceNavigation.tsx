@@ -68,7 +68,7 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   // `version` is what its × closes, until a newer one arrives.
   update?: { installing: boolean; version?: string | null; changes?: string[]; behind?: number | null; error?: string | null } | null; onUpdate?: () => void;
   // OR A COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS (SidebarMove, and
-  // shared/where-it-runs-from.mjs). Null on every copy that can, which is
+  // shared/where-it-runs-from.mts). Null on every copy that can, which is
   // nearly all of them. `place` is what its × closes.
   move?: { place: string | null; error?: string | null } | null; onMove?: () => void;
   page?: string | null; inboxCount?: number; scheduledCount?: number; usage?: ReactNode; onSettings?: () => void; onInstructions?: () => void;

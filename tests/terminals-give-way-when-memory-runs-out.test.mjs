@@ -10,7 +10,7 @@
 // for ten minutes, plus the one running something that was looked at least
 // recently. Never one looked at inside those ten minutes.
 import { describe, it, expect, vi } from 'vitest';
-import { TaskTerminals, ENDED } from '../main/task-terminals.mjs';
+import { TaskTerminals, ENDED } from '../main/task-terminals.mts';
 
 const MIN = 60_000;
 

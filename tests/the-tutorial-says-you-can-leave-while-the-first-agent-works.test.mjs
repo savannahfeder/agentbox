@@ -18,8 +18,8 @@
 // you; and the banner says the same word.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { createNotifier } from '../main/notify.mjs';
-import { REQUEST_CHANNELS as CHANNELS } from '../shared/bridge-map.mjs';
+import { createNotifier } from '../main/notify.mts';
+import { REQUEST_CHANNELS as CHANNELS } from '../shared/bridge-map.mts';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
@@ -45,7 +45,7 @@ describe('the sample banner', () => {
   it('is a channel the window and a browser tab both answer', () => {
     expect(CHANNELS.notifyTest).toBe('zero:notify-test');
     expect(read('preload.cjs')).toContain("notifyTest: () => ipcRenderer.invoke('zero:notify-test'),");
-    expect(read('main/serve.mjs')).toContain("ipcMain.handle('zero:notify-test', () => null);");
+    expect(read('main/serve.mts')).toContain("ipcMain.handle('zero:notify-test', () => null);");
   });
   it('shows one banner promising what the tip promised', () => {
     const shown = [];

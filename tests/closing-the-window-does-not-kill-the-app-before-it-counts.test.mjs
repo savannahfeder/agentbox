@@ -3,18 +3,18 @@
 //
 // Three crash reports arrived from 0.1.13 installs, all of them the same stack:
 //
-//   main/main.mjs:1190  window-all-closed -> app.quit()
-//   main/main.mjs:761   before-quit -> phone.close()
-//   main/phone-link.mjs:525  close() -> relay.stop()
+//   main/main.mts:1190  window-all-closed -> app.quit()
+//   main/main.mts:761   before-quit -> phone.close()
+//   main/phone-link.mts:525  close() -> relay.stop()
 //   main/relay-client.mjs:236  stop() -> onChange()
-//   main/main.mjs:750   onChange -> window.isDestroyed()
+//   main/main.mts:750   onChange -> window.isDestroyed()
 //   TypeError: Cannot read properties of null (reading 'isDestroyed')
 //
 // Closing the main window runs its `closed` handler, which sets `window = null`,
 // and THEN `window-all-closed` quits. By the time `phone.close()` tells the
 // relay to stop, and the relay reports the change back, there is no window left
 // to ask. Measured on an Electron harness (scripts/scratch, one-off): the throw
-// aborts the rest of the `before-quit` listeners, `main/crash-report.mjs`
+// aborts the rest of the `before-quit` listeners, `main/crash-report.mts`
 // rethrows it as designed, and the process dies fatally. `updater.stop()` never
 // ran, `will-quit` never fired, and so `analytics.flush()` NEVER RAN.
 //
@@ -34,7 +34,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
-import { createAnalytics } from '../main/analytics.mjs';
+import { createAnalytics } from '../main/analytics.mts';
 import { quitStep, flushBeforeQuit, FLUSH_DEADLINE_MS } from '../main/quit-sequence.mts';
 
 /** Electron's `app`, as far as quitting goes: before-quit, then will-quit, then quit. */
@@ -183,7 +183,7 @@ describe('a flush the quit now waits for still honours the switch', () => {
 });
 
 describe('and the app is wired that way', () => {
-  const main = fs.readFileSync(new URL('../main/main.mjs', import.meta.url), 'utf8');
+  const main = fs.readFileSync(new URL('../main/main.mts', import.meta.url), 'utf8');
 
   it('every quit step goes through the wrapper, and the flush holds the quit', () => {
     expect(main).toMatch(/import \{[^}]*flushBeforeQuit[^}]*\} from '\.\/quit-sequence\.mts'/);

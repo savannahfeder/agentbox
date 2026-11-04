@@ -14,8 +14,8 @@ import path from 'node:path';
 import { appHome } from '../main/store/home.mjs';
 import { belongsInInbox } from '../renderer/src/list-rules';
 import { isCleanRun } from '../shared/repeats.mjs';
-import { loadStore } from '../main/store-modules.mjs';
-import { Teammates } from '../main/teammates.mjs';
+import { loadStore } from '../main/store-modules.mts';
+import { Teammates } from '../main/teammates.mts';
 
 const ASK = '**Is the draft ready to share?**\n\n1. Share it now (recommended)\n2. Send me the revenue and shipped items first';
 const routed = { to: 'mate:t-chief12345', why: 'Investor updates are the chief of staff\'s work.', at: 1, by: 'auto' };

@@ -43,7 +43,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 // A MAC WITH ONE CLAUDE LOGIN, for the reason
 // tests/a-dead-account-is-not-a-dead-app.test.mjs gives: a developer running

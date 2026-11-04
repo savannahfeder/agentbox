@@ -21,8 +21,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cornerTagRig } from './helpers/corner-tag-rig.mjs';
-import { TONE_EVERY_MS } from '../main/corner-tag.mjs';
-import { loadLiquidGlass } from '../main/liquid-glass.mjs';
+import { TONE_EVERY_MS } from '../main/corner-tag.mts';
+import { loadLiquidGlass } from '../main/liquid-glass.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const css = fs.readFileSync(path.join(root, 'renderer/src/corner-tag/corner-tag.css'), 'utf8');

@@ -1,7 +1,7 @@
 // WHICH REQUEST HELD THE APP. A spinning wheel on a Mac is the main process
 // not answering, and nothing used to record what it was doing instead. This
 // times every request the window makes and keeps the longest freeze; the
-// memory log writes both into its minute line (main/memory-log.mjs).
+// memory log writes both into its minute line (main/memory-log.mts).
 //
 // Only the synchronous part of a handler is timed. That is the part that holds
 // the process: once a handler waits on a promise the window is free again.
@@ -34,7 +34,7 @@ export function stallWatch(
   let slow = new Map<string, SlowRequest>();
   let freezes: Freeze[] = [];
   return {
-    /** A freeze main/freeze-recorder.mjs caught, with the function that held it. */
+    /** A freeze main/freeze-recorder.mts caught, with the function that held it. */
     noteFreeze({ ms, where }: Freeze) {
       freezes.push({ ms, where });
     },
