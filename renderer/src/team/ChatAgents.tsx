@@ -14,7 +14,7 @@ import { clock } from '../thread-history';
 import { defaultModelFor, engineModelChoices, engineModelLabel, readLastModel, type ModelChoice } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortLabelOf, readLastEffort } from '../effort';
 import {
-  CHAT_AGENTS, agentLinks, encodeMentions, findMentions, matchesQuery, mentionQuery, mentionText, sendBlock, withProject,
+  CHAT_AGENTS, agentLinks, encodeMentions, findMentions, matchesQuery, mentionQuery, looseMention, mentionText, withProject,
   type AgentLink, type Mention, type MentionPick, type Project,
 } from './agent-mentions';
 import './chat.css';
@@ -128,24 +128,42 @@ export function useChatMentions({ on, where, text, setText, input, people }: {
     setCaret(el.selectionStart);
     if (layer.current) layer.current.scrollTop = el.scrollTop;
   };
-  const click = (el: HTMLTextAreaElement) => {
-    track(el);
-    const at = el.selectionStart;
-    const hit = mentions.findIndex((m) => at > m.start && at <= m.end);
-    if (hit < 0) { setCardFor(null); return; }
+  const openCard = (hit: number, el: HTMLElement | null) => {
     // In the chat's editor the chip is drawn on the words themselves
     // (./chat-editor.ts), so it is found in the card rather than in the layer.
     // A thread's box (./ThreadPanel.tsx) is the card there.
-    const host = el.closest('.dock-card, .chat-thread-box');
+    const host = el?.closest('.dock-card, .chat-thread-box');
     const chip = (layer.current ?? host)?.querySelector<HTMLElement>(`[data-mention="${hit}"]`);
     const card = host?.getBoundingClientRect();
     setCardX(chip && card ? Math.max(0, chip.getBoundingClientRect().left - card.left - 4) : 12);
     setCardFor(hit);
   };
+  const click = (el: HTMLTextAreaElement) => {
+    track(el);
+    const at = el.selectionStart;
+    const hit = mentions.findIndex((m) => at > m.start && at <= m.end);
+    if (hit < 0) { setCardFor(null); setSendOnPick(false); return; }
+    openCard(hit, el);
+  };
+
+  // SEND ON AN AGENT WITH NO PROJECT opens that agent's project list, and the
+  // pick sends. The box sends from its own effect on `readyToSend`, because its
+  // send reads the text, which the pick has only just rewritten.
+  const [sendOnPick, setSendOnPick] = useState(false);
+  const loose = live ? looseMention(mentions) : -1;
+  const askForProject = () => {
+    if (loose < 0) return false;
+    openCard(loose, input.current);
+    setSendOnPick(true);
+    return true;
+  };
+  const readyToSend = sendOnPick && loose < 0;
+  const sent = () => setSendOnPick(false);
+  const closeCard = () => { setCardFor(null); setSendOnPick(false); };
 
   /** The keys, while the menu or the card is up. True means the key was taken. */
   const keyDown = (e: KeyboardEvent<HTMLTextAreaElement>): boolean => {
-    if (cardFor !== null && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setCardFor(null); return true; }
+    if (cardFor !== null && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeCard(); return true; }
     if (!rows.length) return false;
     if (e.key === 'ArrowDown') { e.preventDefault(); setMenuAt((i) => (i + 1) % rows.length); return true; }
     if (e.key === 'ArrowUp') { e.preventDefault(); setMenuAt((i) => (i - 1 + rows.length) % rows.length); return true; }
@@ -196,17 +214,24 @@ export function useChatMentions({ on, where, text, setText, input, people }: {
 
   const card = cardFor !== null && mentions[cardFor] && ctx && (
     <MentionCard
+      key={cardFor}
       x={cardX}
       mention={mentions[cardFor]}
       pick={pickOf(cardFor)}
       ctx={ctx}
-      onProject={(p) => { setText(withProject(text, mentions[cardFor], p)); }}
+      onProject={(p) => {
+        const next = withProject(text, mentions[cardFor], p);
+        setText(next);
+        // A second agent with no project is asked about next, before anything goes.
+        const after = sendOnPick ? looseMention(findMentions(next, projects)) : -1;
+        if (after >= 0) openCard(after, input.current);
+      }}
       onPick={(next) => setPicks((was) => { const out = mentions.map((_, i) => was[i] ?? pickOf(i)); out[cardFor] = next; return out; })}
-      onClose={() => setCardFor(null)}
+      onClose={closeCard}
     />
   );
 
-  return { live, mentions, block: live ? sendBlock(mentions) : null, menu, chips, card, keyDown, track, click, encode };
+  return { live, mentions, askForProject, readyToSend, sent, menu, chips, card, keyDown, track, click, encode };
 }
 
 /** THE MENTION'S CARD: the project, the model and the effort it runs with. */

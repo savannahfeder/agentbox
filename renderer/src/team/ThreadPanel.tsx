@@ -179,8 +179,8 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
     const words = draft.trim();
     if (!words && !files.length) return;
     if (attaching.length) { setNotice(`${attaching[0].name} is still being attached.`); return; }
-    // An agent with no project does not go out; the line under the box says why.
-    if (chat.block) { setNotice(chat.block); return; }
+    // An agent with no project does not go out: its project list opens instead.
+    if (chat.askForProject()) return;
     const putBack = (why: string) => {
       restoreFailedDraft(draftItem, words, files);
       setNotice(`Not sent: ${why} Your message is still in the box.`);
@@ -211,6 +211,7 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
     await sendTurnedBack(voiceKey, files.map((a) => a.draftId));
     putBack('the reply could not be saved.');
   };
+  useEffect(() => { if (chat.readyToSend) { chat.sent(); void send(); } }, [chat.readyToSend]);
   const ready = !!draft.trim() || attachments.length > 0 || recording;
   const yours = (e: AgentTurn) => !!me && (e.by ?? me) === me;
   // Reply quotes into this box: a reply to a reply would be a thread in a thread.
@@ -385,9 +386,7 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
           {tooBig > 0 && <div className="compose-note" role="alert">{tooBig === 1
             ? 'One pasted image is too big to save. Closing the box loses it.'
             : `${tooBig} pasted images are too big to save. Closing the box loses them.`}</div>}
-          {notice
-            ? <div className="compose-note" role="alert">{notice}</div>
-            : chat.block && <div className="compose-note">{chat.block}</div>}
+          {notice && <div className="compose-note" role="alert">{notice}</div>}
           <input
             ref={filePicker}
             type="file"
