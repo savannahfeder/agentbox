@@ -2151,7 +2151,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       if (choose) {
         const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, { title: 'Pick the file to send', buttonLabel: 'Send this file', properties: ['openFile'] });
         // The browser copy has no file panel (main/serve.mjs).
-        if (r.noDialog) return { ok: false, error: 'Choosing a file needs the Agentbox app on this computer.' };
+        if (r.noDialog) return { ok: false, error: `Choosing a file needs the ${Name} app on this computer.` };
         if (r.canceled || !r.filePaths?.length) return { ok: true, canceled: true };
         file = r.filePaths[0];
       }
