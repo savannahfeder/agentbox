@@ -35,7 +35,7 @@ export function SharedSignIn({ client, startOn, error: startError = null, onNew,
   const emailField = useRef<HTMLInputElement | null>(null);
   const pwField = useRef<HTMLInputElement | null>(null);
   const fieldOf = { name: nameField, email: emailField, password: pwField };
-  const back = location.origin + location.pathname;
+  const back = () => location.origin + location.pathname;
 
   useEffect(() => { setMissing(null); (mode === 'sign-up' ? nameField : emailField).current?.focus(); }, [mode]);
   useEffect(() => {
@@ -48,7 +48,7 @@ export function SharedSignIn({ client, startOn, error: startError = null, onNew,
     setBusy('google'); setError(null);
     try {
       if (mode === 'sign-up') onNew();
-      location.assign(await client.googleUrl(back));
+      location.assign(await client.googleUrl(back()));
     } catch (err) { setBusy(null); setError(saidOf(err)); }
   };
 
@@ -61,7 +61,7 @@ export function SharedSignIn({ client, startOn, error: startError = null, onNew,
     try {
       if (mode === 'sign-up') {
         onNew();
-        const { confirm } = await client.signUp(name.trim(), email.trim(), password, back);
+        const { confirm } = await client.signUp(name.trim(), email.trim(), password, back());
         if (confirm) { setBusy(null); setMode('check-email'); return; }
       } else {
         await client.signInWithPassword(email.trim(), password);
@@ -74,7 +74,7 @@ export function SharedSignIn({ client, startOn, error: startError = null, onNew,
     <button type="button" role="tab" aria-selected={mode === to} className={mode === to ? 'on' : ''}
       onClick={() => { setMode(to); setPassword(''); setError(null); }}>{words}</button>
   );
-  const heading = mode === 'sign-up' ? 'Create your account' : mode === 'check-email' ? 'Check your email' : 'Sign in to Agentbox';
+  const heading = mode === 'sign-up' ? 'Create an account to comment' : mode === 'check-email' ? 'Check your email' : 'Sign in to comment';
 
   return (
     <div className="si-page sf-sign-in" role="dialog" aria-modal="true" aria-label={heading}

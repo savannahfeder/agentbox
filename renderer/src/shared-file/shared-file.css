@@ -109,6 +109,7 @@
 @keyframes sf-dot { 0%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
 
 .sf-sign-in { -webkit-app-region: no-drag; }
+:root .si-page.sf-sign-in { background: rgba(18, 17, 16, 0.72); backdrop-filter: blur(4px); }
 .sf-close {
   position: fixed; top: 12px; right: 14px; width: 32px; height: 32px; padding: 0;
   display: grid; place-items: center; border: 0; border-radius: var(--radius); background: none; color: var(--text-dim); cursor: pointer;
