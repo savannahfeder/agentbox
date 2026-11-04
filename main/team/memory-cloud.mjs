@@ -401,6 +401,14 @@ export function memoryBackend(cloud, personId) {
       });
     },
 
+    async newLinkComments(since) {
+      return cloud.fileLinkComments
+        .filter((c) => c.at > since && c.by !== personId)
+        .map((c) => ({ c, l: cloud.fileLinks.get(c.token) }))
+        .filter(({ l }) => l && l.owner === personId && !l.stoppedAt)
+        .map(({ c, l }) => ({ token: c.token, source: l.source, name: l.name, byName: cloud.people.get(c.by)?.name || 'Someone', text: c.text, at: c.at }));
+    },
+
     async commentOnFileLink(token, text) {
       const l = cloud.fileLinks.get(token);
       if (!l || l.stoppedAt) refuse('comment on a stopped link');

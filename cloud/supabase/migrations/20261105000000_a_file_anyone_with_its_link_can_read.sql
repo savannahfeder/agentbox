@@ -117,6 +117,20 @@ language sql stable security definer set search_path = public as $$
   limit 500
 $$;
 
+-- Others' comments on this person's live links since a time, so their computer
+-- can put each on the thread the file came from (main/team/link-comments.mjs).
+create or replace function public.new_comments_on_my_links(since timestamptz)
+returns table (token text, source text, name text, by_name text, body text, created_at timestamptz)
+language sql stable security definer set search_path = public as $$
+  select l.token, l.source, l.name, coalesce(nullif(p.name, ''), 'Someone'), c.body, c.created_at
+  from public.file_link_comments c
+  join public.file_links l on l.token = c.token and l.stopped_at is null
+  join public.people p on p.id = c.by_person
+  where l.owner = auth.uid() and c.by_person <> l.owner and c.created_at > since
+  order by c.created_at, c.id
+  limit 100
+$$;
+
 create or replace function public.comment_on_file_link(tok text, b text)
 returns uuid
 language plpgsql security definer set search_path = public as $$
@@ -152,10 +166,12 @@ grant select on public.file_links to authenticated;
 
 revoke execute on function public.share_file(text, text, text, text, text, int, text), public.my_file_link(text),
   public.stop_file_link(text), public.file_link_view(text), public.file_link_stopped(text),
-  public.file_link_comments_of(text), public.comment_on_file_link(text, text), public.remove_file_link_comment(uuid)
+  public.file_link_comments_of(text), public.comment_on_file_link(text, text), public.remove_file_link_comment(uuid),
+  public.new_comments_on_my_links(timestamptz)
   from public, anon, authenticated;
 grant execute on function public.share_file(text, text, text, text, text, int, text), public.my_file_link(text),
-  public.stop_file_link(text), public.comment_on_file_link(text, text), public.remove_file_link_comment(uuid)
+  public.stop_file_link(text), public.comment_on_file_link(text, text), public.remove_file_link_comment(uuid),
+  public.new_comments_on_my_links(timestamptz)
   to authenticated;
 grant execute on function public.file_link_view(text), public.file_link_stopped(text), public.file_link_comments_of(text)
   to anon, authenticated;

@@ -191,6 +191,44 @@ describe('a stopped link', () => {
   });
 });
 
+// A comment on a link reached its owner only as a dot on the file's Share mark,
+// which both sharers missed (power test, round 3, 2026-11-04).
+describe('the comments new to the owner', () => {
+  const since = (who, at) => rows(who, `select * from public.new_comments_on_my_links($1)`, [at]);
+  const ANA = '55555555-5555-5555-5555-555555555555';
+  const SAM = '66666666-6666-6666-6666-666666666666';
+  beforeAll(async () => {
+    for (const [id, email, name] of [[ANA, 'ana@else.test', 'Ana'], [SAM, 'sam@else.test', 'Sam']]) {
+      await db.query(`insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values ($1, $2, now(), $3)`, [id, email, { full_name: name }]);
+    }
+  });
+  it('are the others\' comments on the owner\'s live links after a time, with the file they are on, oldest first', async () => {
+    const tok = await share(MAYA, 'agentbox-team/w-7/notes/roadmap', '# Roadmap', { name: 'roadmap.md' });
+    const before = new Date(Date.now() - 1000).toISOString();
+    await comment(ANA, tok, 'First');
+    await comment(MAYA, tok, 'My own answer');
+    await comment(SAM, tok, 'Second');
+    const seen = (await since(MAYA, before)).filter((c) => c.token === tok);
+    expect(seen.map((c) => [c.source, c.name, c.by_name, c.body])).toEqual([
+      ['agentbox-team/w-7/notes/roadmap', 'roadmap.md', 'Ana', 'First'],
+      ['agentbox-team/w-7/notes/roadmap', 'roadmap.md', 'Sam', 'Second'],
+    ]);
+    expect(await since(MAYA, new Date(Date.now() + 60_000).toISOString())).toEqual([]);
+  });
+  it('are nobody else\'s to read, and nothing to someone signed out', async () => {
+    const before = new Date(Date.now() - 60_000).toISOString();
+    expect((await since(ANA, before)).filter((c) => c.source.includes('w-7'))).toEqual([]);
+    expect(await refused(null, `select * from public.new_comments_on_my_links($1)`, [before], 'anon')).toBe(true);
+  });
+  it('end with the link: a stopped link brings none', async () => {
+    const tok = await share(MAYA, 'agentbox-team/w-8/notes/old', '# Old', { name: 'old.md' });
+    const before = new Date(Date.now() - 1000).toISOString();
+    await comment(ANA, tok, 'Late');
+    await as(MAYA, `select public.stop_file_link($1)`, [tok]);
+    expect((await since(MAYA, before)).filter((c) => c.source.includes('w-8'))).toEqual([]);
+  });
+});
+
 describe('what a link will hold', () => {
   it('refuses a kind it cannot draw, and a file over its size', async () => {
     expect(await refused(MAYA, `select public.share_file('a', 'a.mov', 'film', 'video/mp4', 'x', 1, '')`)).toBe(true);

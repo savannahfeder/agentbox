@@ -126,6 +126,9 @@ export function fileSyncState(file, fs) {
     // What this copy already moved for someone who left (main/team/departures.mjs).
     handedOver: () => data.handedOver ?? [],
     markHandedOver: (key) => { data.handedOver = [...(data.handedOver ?? []), key]; save(); },
+    // The newest comment on this person's shared links already put on a thread (main/team/link-comments.mjs).
+    getLinkComments: (personId) => data.linkComments?.[personId] ?? null,
+    setLinkComments: (personId, at) => { data.linkComments = { ...(data.linkComments || {}), [personId]: at }; save(); },
   };
 }
 

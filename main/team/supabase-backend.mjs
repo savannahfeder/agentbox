@@ -336,6 +336,12 @@ export function supabaseBackend(client) {
       return (rows ?? []).map((c) => ({ id: c.id, byName: c.by_name, byAvatar: c.by_avatar ?? null, text: c.body, at: Date.parse(c.created_at), mine: !!c.mine, byOwner: !!c.by_owner }));
     },
 
+    async newLinkComments(since) {
+      await myId();
+      const rows = must(await client.rpc('new_comments_on_my_links', { since: new Date(since).toISOString() }), 'reading new comments on your links');
+      return (rows ?? []).map((c) => ({ token: c.token, source: c.source, name: c.name, byName: c.by_name, text: c.body, at: Date.parse(c.created_at) }));
+    },
+
     async commentOnFileLink(token, text) {
       await myId();
       return must(await client.rpc('comment_on_file_link', { tok: token, b: text }), 'sending your comment');

@@ -37,6 +37,9 @@ import { noticeEndedWaits } from './waits.mjs';
 import { handOverDepartures } from './departures.mjs';
 import { mateCard, splitCards } from '../../shared/mate-cards.mjs';
 import { linkAddress, linkSiteFor } from '../file-link.mjs';
+import { noticeLinkComments } from './link-comments.mjs';
+
+const LINK_COMMENTS_EVERY_MS = 60_000;
 
 // `signingIn` is { url } while a Google sign-in waits on the browser, so the
 // page can offer that link again rather than a button that does nothing.
@@ -281,10 +284,33 @@ export function createTeamService({
         // nor her phone the team.
         await phoneOnce();
         await rooms?.tick().catch((err) => log(`rooms: ${err.message}`));
+        await linkCommentsOnce();
         pending = null;
       }
     });
     return pending;
+  }
+
+  // Comments on this person's shared links, once a minute, as notes on the
+  // threads the files came from (main/team/link-comments.mjs).
+  let linkCommentsAt = 0;
+  async function linkCommentsOnce() {
+    if (!state.me || !backend?.newLinkComments || now() - linkCommentsAt < LINK_COMMENTS_EVERY_MS) return;
+    linkCommentsAt = now();
+    const me = state.me.id;
+    try {
+      const wrote = await noticeLinkComments({
+        backend, now, log,
+        cursor: () => kept().getLinkComments(me),
+        setCursor: (at) => kept().setLinkComments(me, at),
+        readItem: ({ product, thread }) => {
+          const p = products().find((x) => x.slug === product);
+          return p ? disk.readWorkItems(p.dir).find((i) => i.id === thread) ?? null : null;
+        },
+        write: ({ product, thread }, note) => store.commentOnASharedFile(product, thread, note),
+      });
+      if (wrote) onChange();
+    } catch (err) { log(`link comments: ${err.message}`); }
   }
 
   async function handOverWhatLeft(cards, people) {
