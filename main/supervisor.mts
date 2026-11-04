@@ -9163,6 +9163,12 @@ export class Supervisor {
       if (current.answer === answerAtSpawn
         && (current.wrote?.answer?.ts ?? 0) === (spawnedItem.wrote?.answer?.ts ?? 0)) return;
       if (current.answer === '(withdrawn)') return; // a cancel, not a reply
+      // A reply set for later waits for its time, and the tick carries it then.
+      // A row the run closed meanwhile is opened again, or nothing would.
+      if (!this.store.isDue(current, Date.now())) {
+        if (current.status === 'done') this.store.answerItem(current.product, current.id, { status: 'open' });
+        return;
+      }
       if (this.sessions.has(current.id)) return;
       if (this._answerDelivered(current)) return;
       this._handledAnswers.add(this._answerKey(current));

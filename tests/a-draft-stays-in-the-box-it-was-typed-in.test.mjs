@@ -86,7 +86,7 @@ describe('the reply box belongs to one thread', () => {
 describe('undo puts the words in the box that says so', () => {
   const app = read('renderer/src/App.tsx');
   it('both undo paths open the box and tell a box already open', () => {
-    expect(app.match(/wordsBackInTheBox\(item, sent\?\.words \?\? text, sent\?\.attachments \?\? \[\]\)/g)).toHaveLength(2);
+    expect(app.match(/wordsBackInTheBox\(item, sent\?\.words \?\? text, sent\?\.attachments \?\? \[\](, keepsTime, pick)?\)/g)).toHaveLength(2);
     const fn = app.slice(app.indexOf('const wordsBackInTheBox'));
     expect(fn.slice(0, 400)).toContain('zero:reply-restored');
     expect(fn.slice(0, 400)).toContain("setModal('reply')");

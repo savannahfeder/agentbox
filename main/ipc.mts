@@ -46,6 +46,8 @@ import { artifactRoots, resolveArtifact } from './artifact-path.mjs';
 import { folderPictures } from './folder-pictures.mts';
 import { docUrl } from './doc-scheme.mts';
 import { readDoc, writeDoc } from './doc-file.mts';
+import { linkCopyOf, linkSource } from './file-link.mjs';
+import { familyKeyOf } from '../shared/artifact-marks.mjs';
 import { readItemHistory } from './store/work-items.mjs';
 import { readChange } from './code-change.mjs';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
@@ -847,7 +849,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // answered at once (supervisor.sendNow).
   ipcMain.handle('zero:send-now', (_e, { product, id }: { product: string; id: string }) => supervisor.sendNow(product, id));
 
-  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped, putAway }: AnswerInput & { product: string; id: string; now?: unknown; inReplyTo?: unknown; closeUnshipped?: boolean; putAway?: unknown }) => {
+  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped, runAt, putAway }: AnswerInput & { product: string; id: string; now?: unknown; inReplyTo?: unknown; closeUnshipped?: boolean; runAt?: number; putAway?: unknown }) => {
     if (isAgentRow(id)) return { ok: false };
     // Out of your own Needs you, on a task between people: no reply, no close, no run.
     if (typeof putAway === 'boolean' && !answer && !status) {
@@ -911,7 +913,16 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // handing them over in one call and writing the model afterwards would be a
     // race the run usually wins, so she would pick a model and watch the old one
     // take the task. `answerItem` writes both, and it writes the model first.
-    const out = await submitReply(supervisor,{product,id,answer,status,permissionMode,now:!!now},()=>store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone }));
+    // A REPLY SET FOR LATER is these words with the row set for its time. The
+    // time goes in after the words, so it is newer than them: a word said after
+    // a thread's moment runs now (shared/answers.mjs wordWaits), and this one
+    // must wait. Both writes are one synchronous step, so no pass reads between.
+    const later = Number(runAt) > Date.now() && status !== 'done';
+    const out = await submitReply(supervisor,{product,id,answer,status,permissionMode,now:!!now,later},()=>{
+      const said = store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone });
+      if (later) store.scheduleItem(product, id, Number(runAt));
+      return said;
+    });
     // A REPLY ON A ROW A TEAMMATE GAVE YOU HANDS IT BACK TO THEM, so the
     // conversation moves to their inbox instead of sitting in both
     // (shared/team-rules.mjs handedOnByReply). Archiving hands nothing on.
@@ -2597,6 +2608,34 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     if (!found.ok) return found;
     return { ...readDoc({ file: found.path }), ...(found.carry ? { carry: found.carry } : {}) };
   });
+
+  // A LINK ANYONE CAN OPEN, to one of this person's files (main/file-link.mjs).
+  // One link per file of a thread, whichever of its versions is on screen.
+  type LinkArg = { product?: string; thread?: unknown; src?: unknown; token?: unknown; text?: unknown };
+  const linkOf = ({ product, thread, src }: LinkArg = {}) => linkSource(product, thread, familyKeyOf(String(src ?? '')));
+  const linkCall = (fn: (arg: LinkArg, team: IpcTeam) => Promise<object>) => async (_e: unknown, arg: LinkArg = {}) => {
+    if (!team?.fileLink) return { ok: false, error: 'This copy has no cloud to share files on.' };
+    try { return { ok: true, ...(await fn(arg, team)) }; } catch (err) { return { ok: false, error: String((err as Error | undefined)?.message ?? err) }; }
+  };
+  const fileOnScreen = async ({ product, src, thread }: LinkArg) => {
+    const found = await resolveArtifact({
+      src, product, thread: typeof thread === 'string' ? thread : null,
+      products: readableProducts(), accountRoot: config.accountRoot, storeRoot: config.storeRoot, nameOf: team?.firstNameOf,
+    });
+    if (!found.ok) throw new Error(found.error || 'This file is not on this computer.');
+    const copy = linkCopyOf(found.path);
+    if (copy.error !== undefined) throw new Error(copy.error);
+    return copy;
+  };
+  ipcMain.handle('zero:file-link', linkCall(async (arg, team) => {
+    const now = await fileOnScreen(arg).catch(() => null);
+    return team.fileLink(linkOf(arg), now?.hash ?? null, now?.version ?? null);
+  }));
+  ipcMain.handle('zero:file-link-share', linkCall(async (arg, team) => team.shareFile({ source: linkOf(arg), ...(await fileOnScreen(arg)) })));
+  ipcMain.handle('zero:file-links', linkCall(async (_arg, team) => team.fileLinks()));
+  ipcMain.handle('zero:file-link-stop', linkCall(async ({ token }, team) => { await team.stopFileLink(String(token ?? '')); return {}; }));
+  ipcMain.handle('zero:file-link-comments', linkCall(async ({ token }, team) => ({ comments: await team.fileLinkComments(String(token ?? '')) })));
+  ipcMain.handle('zero:file-link-comment', linkCall(async ({ token, text }, team) => ({ comments: await team.commentOnFileLink(String(token ?? ''), text) })));
 
   // "Try again" on a file in a conversation that was not delivered.
   ipcMain.handle('zero:retry-file', async (_e, { product, src } = {}) => (team?.retryFile ? team.retryFile({ product, src }) : false));

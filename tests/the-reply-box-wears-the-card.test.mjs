@@ -7,6 +7,10 @@
 // the card's answer is the law in styles.css: one size, one baseline, two
 // inks, no icons.
 //
+// On w-54cdf7c768 the founder moved both boxes one step further: the reply
+// box now wears the new thread card's bar, its chips and its split Send
+// (tests/the-reply-box-wears-the-new-thread-cards-bar.test.mjs).
+//
 // So these tests hold the reply footer to that answer, and to the one thing
 // that must NOT be shared with the card: a reply cannot set a start time.
 // A runAt written under the user's own name is a SNOOZE, and it hides the
@@ -26,16 +30,16 @@ const css = fs.readFileSync(path.join(root, 'renderer/src/styles.css'), 'utf8');
 const dock = focus.slice(focus.indexOf('function DockComposer'));
 
 describe('the reply footer is the card\'s footer', () => {
-  it('is one sentence, not a row of pills', () => {
-    expect(dock).toMatch(/className="compose-sentence"/);
-    expect(dock).toMatch(/className="compose-clauses"/);
+  it('is the card\'s bar of chips', () => {
+    expect(dock).toMatch(/className="compose-sentence dock-bar"/);
+    expect(dock).toMatch(/className="dock-chips"/);
     // The row it replaces, and the two hints that sat in it.
     expect(dock).not.toMatch(/dock-foot/);
     expect(dock).not.toMatch(/paste or drop files to attach/);
   });
 
-  it('draws priority as a word, which is the variant that carries no icon', () => {
-    expect(dock).toMatch(/variant="word"/);
+  it('draws priority as the card\'s chip, bars and all', () => {
+    expect(dock).toMatch(/<PriorityPicker variant="chip"/);
   });
 
   it('uses the card\'s own clock control rather than a second schedule list', () => {

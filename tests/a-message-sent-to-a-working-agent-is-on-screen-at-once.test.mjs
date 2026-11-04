@@ -189,7 +189,8 @@ describe('the pane it is drawn in', () => {
     expect(failed.slice(0, 400)).toContain('setSending((q) => q.filter((s) => s !== mine && s !== gone))');
     expect(failed.slice(0, 400)).toContain('putBack(error)');
     const putBack = app.slice(app.indexOf('    const putBack = (error: unknown) => {'));
-    expect(putBack.slice(0, 300)).toContain('restoreFailedDraft(item, sent?.words ?? text, sent?.attachments ?? [])');
+    // With the time a reply set for later had, so it comes back set for it.
+    expect(putBack.slice(0, 300)).toContain('restoreFailedDraft(item, sent?.words ?? text, sent?.attachments ?? [], undefined, keepsTime)');
   });
 
   // THE CONVERSATION IS NOT EMPTIED UNDER HER WHEN THE ROW IS WRITTEN TO.
