@@ -17,6 +17,7 @@ import './shared-file.css';
 
 export const SITE = 'https://agentbox.ac';
 export const DOWNLOAD = 'https://agentbox.ac/download';
+export const WHAT_AGENTBOX_IS = 'Agentbox is an inbox for your Claude Code and Codex agents.';
 // Whoever made their account from this page, for the one line offering the Mac app.
 const NEW_HERE = 'agentbox-new-here';
 
@@ -232,7 +233,7 @@ export function Comments({ file, comments, signedIn, onAsk, post, remove }: {
         </>
       )}
       {error && <p className="sf-error" role="alert">{error}</p>}
-      {offer && <p className="sf-offer">Agentbox runs your own agents. <a href={DOWNLOAD}>Get Agentbox</a></p>}
+      {offer && <p className="sf-offer">{WHAT_AGENTBOX_IS} <a href={DOWNLOAD}>Get Agentbox</a></p>}
     </aside>
   );
 }

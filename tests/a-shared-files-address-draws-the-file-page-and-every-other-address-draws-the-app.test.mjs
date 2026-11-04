@@ -14,7 +14,7 @@ import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { sharedFileToken, titleOf, readSharedFile } from '../renderer/src/shared-file/shared-file.ts';
 import { onASharedFilePage, NO_SUCH_LINK } from '../renderer/src/shared-file/route.ts';
-import { FileBody, Comments } from '../renderer/src/shared-file/SharedFilePage.tsx';
+import { FileBody, Comments, WHAT_AGENTBOX_IS } from '../renderer/src/shared-file/SharedFilePage.tsx';
 
 const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const TOK = '0123456789abcdef0123456789abcdef01234567';
@@ -127,6 +127,10 @@ describe('the comments', () => {
     expect(html).toContain('>Comment</button>');
     expect(html).not.toContain('Create an account to comment');
     expect(html.match(/sf-remove/g)).toHaveLength(1);
+  });
+  // "Agentbox runs your own agents. Runs agents? On what?" (power test, round 3, 2026-11-04).
+  it('after a new account\'s first comment, says what Agentbox is in words a stranger can place', () => {
+    expect(WHAT_AGENTBOX_IS).toBe('Agentbox is an inbox for your Claude Code and Codex agents.');
   });
   it('lets the owner remove any comment', () => {
     expect(draw({ signedIn: true, file: file('markdown', '', { mine: true }) }).match(/sf-remove/g)).toHaveLength(2);
