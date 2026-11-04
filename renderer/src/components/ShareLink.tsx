@@ -150,8 +150,8 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   return (
     <div className={`av-share${icon ? ' is-mark' : ''}`} ref={box}>
       {icon
-        ? <button type="button" className={`doc-mark${link ? ' is-shared' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : link ? shareWords.live : 'Share'} aria-label={link ? shareWords.live : 'Share'} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="link" /></button>
-        : <button type="button" className={`av-btn${open ? ' is-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : undefined} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="link" />{link ? shareWords.live : 'Share'}</button>}
+        ? <button type="button" className={`doc-mark${link ? ' is-shared' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : link ? shareWords.live : 'Share'} aria-label={link ? shareWords.live : 'Share'} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" /></button>
+        : <button type="button" className={`av-btn${open ? ' is-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : undefined} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" />{link ? shareWords.live : 'Share'}</button>}
       {open && (
         <div className="av-share-box" role="dialog" aria-label="Share">
           {!state.signedIn ? (

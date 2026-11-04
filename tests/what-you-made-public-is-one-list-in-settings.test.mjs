@@ -31,3 +31,14 @@ describe('the list', () => {
     expect(publicLinkLine(link({ updatedAt: now - 60_000, comments: 1 }), now)).toMatch(/^Updated today at .* · 1 comment$/);
   });
 });
+
+// A sharer clicked Connections looking for their public links: both drew the
+// same chain (power test, round 3, 2026-11-04). Share draws a globe.
+describe('the Share mark', () => {
+  it('is a globe, not the chain Connections wears', async () => {
+    const fs = await import('node:fs');
+    const src = fs.readFileSync(new URL('../renderer/src/components/ShareLink.tsx', import.meta.url), 'utf8');
+    expect(src.match(/<NoteGlyph name="globe" \/>/g)).toHaveLength(2);
+    expect(src).not.toContain('<NoteGlyph name="link" />');
+  });
+});
