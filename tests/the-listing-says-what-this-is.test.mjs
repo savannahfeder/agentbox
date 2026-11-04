@@ -67,7 +67,9 @@ describe('the npm listing', () => {
     // the npm page shows no Repository link and no Issues link at all.
     const REPO = 'https://github.com/savannahfeder/agentbox';
     expect(pkg.repository.url).toBe(`git+${REPO}.git`);
-    expect(pkg.homepage).toBe(`${REPO}#readme`);
+    // The homepage is the website since w-32efa85cd6
+    // (tests/the-readme-and-the-npm-page-send-people-to-agentbox-ac).
+    expect(pkg.homepage).toBe('https://agentbox.ac');
     expect(pkg.bugs.url).toBe(`${REPO}/issues`);
     // The old private repo must never be where a stranger is SENT. Since
     // 2026-10-05 it is not the update channel either: `build.publish` names the
