@@ -25,6 +25,8 @@
 // folded is a failure.
 
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Face, TeamContext, firstName } from '../team/people';
 import { Name } from '../../../shared/product-name.mjs';
 import { LINE_MISSING } from '../reveal-line';
@@ -806,6 +808,9 @@ function WorkLine({ work, state, onStep, code }: {
  * seeing it. The first build was a grey sentence with a long time after it and
  * was turned down as ugly; this is the drawing chosen after (round4-single).
  */
+// A pick sits on one line, so a paragraph or a link in it is drawn as its words.
+const INLINE = ['strong', 'em', 'code', 'del'];
+
 export function ActLine({ act }: { act: AgentWork }) {
   // A TEAMMATE'S ACTION is theirs: their first name where "You" would be.
   const team = useContext(TeamContext);
@@ -818,7 +823,13 @@ export function ActLine({ act }: { act: AgentWork }) {
         {act.fileMark && openFile
           ? <button type="button" className="act-file-link" onClick={() => openFile(act.fileMark!)}>{words.lead}</button>
           : words.lead}
-        {words.choice && <span className="act-choice"> {words.choice}</span>}
+        {/* Drawn as the options card drew it, not as the markdown it was written in (F-170). */}
+        {words.choice && (
+          <span className="act-choice">
+            {' '}
+            <ReactMarkdown remarkPlugins={[remarkGfm]} allowedElements={INLINE} unwrapDisallowed>{words.choice}</ReactMarkdown>
+          </span>
+        )}
       </span>
       <span className="act-when">{actWhen(act.at)}</span>
     </div>

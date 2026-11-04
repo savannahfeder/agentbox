@@ -130,7 +130,7 @@ import { SidebarIcon } from './SidebarIcon';
 import { Byline, ConversationAside } from './Byline';
 import { ItemThread } from './ItemThread';
 import { ContinuedFrom } from '../threads/ContinuedFrom';
-import type { PendingSaid } from '../item-thread';
+import { answerOnItsWay, type PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
 import { useKeepInWindow } from '../keep-in-window';
@@ -1673,7 +1673,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // first, and work that has been thrown away is not asked about at all.
   const shipAsk = shipOfferLive(item, { change: !!figures, running: !!session || !!agent }) ? shipOfferFor(standing, onlyNamedFiles(changed, referencedFiles(item.result, item.note, item.body, item.answer, { dir: productDir }), productDir)) : null;
   const shipOffer = !!shipAsk;
-  const stripShown = showOptions || shipOffer;
+  const offerShown = showOptions || shipOffer;
+  // A pick is held a few seconds for Z before it is written, and the card it
+  // answered stayed up all that time, as if nothing had been taken (F-170).
+  const stripShown = offerShown && !answerOnItsWay(sending);
   // Whatever the pane is leading with, not the ask alone: on a row the user
   // wrote, the ask is the one field a worker cannot answer in (format.ts says
   // why). The agent's own offer wins wherever there is one.
@@ -2491,7 +2494,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           {/* A TASK A TEAMMATE GAVE YOU: to an agent, keep it, or hand it back.
               Unless they wrote options of their own, which are the better
               answers to their question and are drawn instead. */}
-          {!stripShown && <TeamRouteStrip item={item} onHandToAgent={onHandToAgent} items={items} onOpenItem={onOpenItem} />}
+          {!offerShown && <TeamRouteStrip item={item} onHandToAgent={onHandToAgent} items={items} onOpenItem={onOpenItem} />}
           {/* THE OPTIONS ARE NOT DOWN HERE ANY MORE, EXCEPT IN FULL SCREEN
               (w-560647d4db). They are drawn in the pane, at the foot of the turn
               that offered them, and the note at that call site says why.
