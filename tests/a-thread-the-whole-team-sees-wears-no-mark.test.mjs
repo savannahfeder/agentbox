@@ -12,8 +12,7 @@
 //   - only you can see it: the lock;
 //   - a few chosen people can see it: the people mark with their count, since
 //     that is not the default either, and the count needs something to sit by.
-// Hovering a row still offers Share / Unshare, with its own small mark inside
-// the button, so the way to change it is unchanged.
+// The way to change it is the thread's Visible to.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
@@ -49,8 +48,8 @@ describe('the row', () => {
   it('the same for an old thread shared by hand', () => {
     expect(title(row(item({ createdAt: SINCE - DAY, visibility: 'team' })))).toBe('Task prioritization in queue');
   });
-  it('still offers Unshare on hover', () => {
-    expect(row(item())).toMatch(/<button[^>]*class="th-row-act"[^>]*>.*Unshare<\/button>/);
+  it('offers no Unshare on the row, which moved to the thread', () => {
+    expect(row(item())).not.toContain('Unshare');
   });
   it('draws the lock, and only the lock, on a thread only you can see', () => {
     const t = title(row(item({ visibility: 'private' })));

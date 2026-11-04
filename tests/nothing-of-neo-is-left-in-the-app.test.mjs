@@ -44,8 +44,8 @@ describe('Neo is gone from the code', () => {
   });
 
   it('the microphone helper voice notes use is still there', () => {
-    expect(fs.existsSync(path.join(root, 'main/mic.mjs'))).toBe(true);
-    expect(fs.readFileSync(path.join(root, 'main/main.mjs'), 'utf8')).toMatch(/import \{ getMic \} from '\.\/mic\.mjs'/);
+    expect(fs.existsSync(path.join(root, 'main/mic.mts'))).toBe(true);
+    expect(fs.readFileSync(path.join(root, 'main/main.mjs'), 'utf8')).toMatch(/import \{ getMic \} from '\.\/mic\.mts'/);
   });
 
   it('no bridge channel is about it', () => {

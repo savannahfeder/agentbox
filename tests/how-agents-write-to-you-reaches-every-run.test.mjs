@@ -315,8 +315,17 @@ describe(`the text ${NAME} ships`, () => {
   // designs to choose between. Measured on her store that day: 8 of 23 open
   // answers offered no choices, most of them steps she had to take, so the
   // one-at-a-time page drew an empty reply box where a number would have done.
+  //
+  // Raised from 8700 to 9000 for 251 characters: how to
+  // save a new version of a file. An agent asked for "v2 of the same file"
+  // answered that it could not, and sent a separate file the comments did not
+  // follow.
+  //
+  // Raised from 9000 to 9400 for the rule that a list is a table
+  // (w-690551d7ea). As one bullet among what the app can show, it lost to
+  // "the answer is in this message" and a ranking came back as markdown.
   it('stays small enough to sit on every run', () => {
-    expect(shipped.length).toBeLessThan(8700);
+    expect(shipped.length).toBeLessThan(9400);
   });
 
   // THE SECOND COPY IS NOT ASKED FOR ANY MORE, AND THAT REPLACES THE RULE THAT

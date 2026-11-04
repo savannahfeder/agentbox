@@ -75,7 +75,7 @@ describe('the three screens say it', () => {
   it('the conversation, which otherwise reads as still loading for ever', () => {
     expect(itemThread).toMatch(/<ThreadWaiting head="Reading this conversation…" \/>/);
     expect(thread).toMatch(/NOT_ANSWERING_MS/);
-    expect(thread).toMatch(/\{late \? NOT_ANSWERING : head\}/);
+    expect(thread).toMatch(/\{words \?\? head\}/);
   });
 
   it('the send, which otherwise closes the card and goes quiet', () => {

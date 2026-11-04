@@ -30,7 +30,7 @@
 //
 // Until today a release was ONE FILE: a dmg, clobbered onto a single rolling
 // v0.1.0 tag. Somebody who already had Agentbox had no way to learn a new one
-// existed. The app now asks GitHub on its own (main/updater.mjs), and for that
+// existed. The app now asks GitHub on its own (main/updater.mts), and for that
 // to answer anything a release has to carry THREE things, together:
 //
 //   Agentbox.dmg                  what the website hands a stranger, under the

@@ -5,13 +5,14 @@
 // was started for (`ZERO_ITEM`) carries `teammate:<id>`, so no argument names
 // who is speaking and no session can speak as another teammate.
 import fs from 'node:fs';
-import { readWorkItem } from '../../main/store/work-items.mjs';
+import path from 'node:path';
+import { readWorkItem, updateWorkItem } from '../../main/store/work-items.mjs';
 import { listProjects, legacyRoot } from '../../main/store/project.mjs';
 import {
   teamDir, readTeammates, readChat, writeTeammate, writeChat, newMemoryId, newTeammateId,
   readPlaybooks, writePlaybook, newPlaybookId, newLessonId, newDutyId, methodFile, sourcesDir, writeMethod,
 } from '../../main/store/teammates-files.mjs';
-import { teammateIdOf, hopOf, workOf, mentionsIn, isWorks, letterFor, cleanDuty, dutyStart, isDate, METHOD_CAP, YOU } from '../../shared/teammates.mjs';
+import { teammateIdOf, hopOf, workOf, setupTitle, isSetupTitle, mentionsIn, isWorks, letterFor, cleanDuty, dutyStart, isDate, tooLongForAChat, METHOD_CAP, VOICES, YOU, MAX_HOPS, HOP_LABEL_PREFIX } from '../../shared/teammates.mjs';
 import { periodKey } from '../../shared/repeats.mjs';
 import { resolveProduct, resolveAccount } from './account.mjs';
 
@@ -62,13 +63,27 @@ function idsFor(names, team, me) {
   return out;
 }
 
-export function teamPost({ text, to = [], options } = {}, ctx = {}) {
-  const { dir, me, team, hop, writtenIn } = teammateContext({ ...ctx, outsider: true });
+// A document on a chat line opens from a card, and only from the thread's project.
+function documentOf(rel, project) {
+  const asked = String(rel).trim();
+  const file = path.resolve(project.dir, asked);
+  if (path.isAbsolute(asked) || !file.startsWith(project.dir + path.sep)) throw new Error(`${asked} is outside this project. Write the document in the project, then send it.`);
+  if (!fs.existsSync(file)) throw new Error(`${asked} is not there. Write the document first, then send it.`);
+  const src = path.relative(project.dir, file);
+  return { product: project.id, src, name: path.basename(file) };
+}
+
+export function teamPost({ text, to = [], options, document } = {}, ctx = {}) {
+  const { dir, me, team, hop, writtenIn, project } = teammateContext({ ...ctx, outsider: true });
   const words = String(text ?? '').trim();
   if (!words) throw new Error('nothing to post');
+  // Without a teammate this is the person's own words, passed on.
+  const tooLong = me ? tooLongForAChat(words) : null;
+  if (tooLong) throw new Error(tooLong);
+  const doc = document ? documentOf(document, project) : null;
   const ids = new Set([...idsFor(to, team, me), ...mentionsIn(words, team).filter((x) => x !== me?.id)]);
   const opts = me && Array.isArray(options) ? options.map(plain).filter(Boolean).slice(0, 4) : null;
-  const m = writeChat(dir, { kind: 'msg', from: me?.id ?? YOU, to: [...ids], text: words.slice(0, 4000), hop, ...writtenIn, ...(opts?.length ? { options: opts } : {}) }, ctx.now);
+  const m = writeChat(dir, { kind: 'msg', from: me?.id ?? YOU, to: [...ids], text: words.slice(0, 4000), hop, ...writtenIn, ...(opts?.length ? { options: opts } : {}), ...(doc ? { doc } : {}) }, ctx.now);
   const note = !ids.size ? 'Posted. Nobody was named, so nobody is woken by it.'
     : me ? 'Posted. The teammates named read it on their next turn; it wakes nobody. To have one act on it, hand it over with team_pass.'
       : 'Posted. The teammates named will wake to read it.';
@@ -153,6 +168,7 @@ const SAID = {
   name: 'its name', role: 'its role', job: 'its job', goal: 'its goal', counted: 'how it counts its goal',
   asksFirst: 'what needs your yes first', works: 'when it works', duties: 'what it does on its own',
   handoffsNeedYes: 'whether work from teammates waits for your yes', pausedUntil: 'when it is paused until',
+  readsMessages: 'whether it reads your direct messages', voice: 'how it writes', voiceText: 'how it writes',
 };
 
 // Made from your threads and has written its method from them: the threads
@@ -183,8 +199,8 @@ function dutiesFrom(list, me, now) {
   return { duties: out, served };
 }
 
-export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at, on, duties, runsOn, handoffsNeedYes, pausedUntil, ready } = {}, ctx = {}) {
-  const { dir, me, team, item } = teammateContext(ctx);
+export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at, on, duties, runsOn, handoffsNeedYes, pausedUntil, readsMessages, voice, voiceWords, ready } = {}, ctx = {}) {
+  const { dir, me, team, item, project } = teammateContext(ctx);
   const now = ctx.now ?? Date.now();
   if (typeof asksFirst === 'string' && /\?\s*$/.test(asksFirst)) {
     throw new Error('asksFirst is what needs the person\'s yes before you do it, said as a statement ("Anything that goes out in public"). Ask a question with team_post instead.');
@@ -225,6 +241,17 @@ export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at
     if (pausedUntil !== null && !isDate(pausedUntil)) throw new Error('pausedUntil is a date, YYYY-MM-DD, or null to stop pausing');
     patch.pausedUntil = pausedUntil;
   }
+  if (readsMessages !== undefined) {
+    if (typeof readsMessages !== 'boolean') throw new Error('readsMessages is true or false');
+    if (!answeredSince(dir, me.id) && !answeredInThread(item)) throw new Error('reading direct messages is the person\'s to choose: ask them first, with options, and save what they said');
+    patch.readsMessages = readsMessages;
+  }
+  if (voice !== undefined) {
+    if (!VOICES.some((v) => v.id === voice)) throw new Error(`voice is one of ${VOICES.map((v) => v.id).join(', ')}, or send voiceWords`);
+    patch.voice = voice;
+    patch.voiceText = null;
+  }
+  if (typeof voiceWords === 'string' && voiceWords.trim()) patch.voiceText = voiceWords.trim();
   // A new teammate asks before it starts, so ready waits for the person's
   // own words to it after the ask that made it, unless their threads answered.
   if (ready === true && me.status === 'draft' && !answeredSince(dir, me.id) && !answeredInThread(item) && !learnedFromThreads(dir, me.id)) {
@@ -232,6 +259,9 @@ export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at
   }
   if (ready === true) patch.status = 'active';
   writeTeammate(dir, me.id, patch, now);
+  if (patch.name && me.status === 'draft' && isSetupTitle(item.title)) {
+    try { updateWorkItem(project.dir, item.id, { title: setupTitle(patch.name) }, { source: 'system', now }); } catch { /* the old title stands */ }
+  }
   if (ready === true && me.status === 'draft') writeChat(dir, { kind: 'act', from: me.id, verb: 'started' }, now);
   const changed = Object.keys(SAID).filter((k) => k in patch && JSON.stringify(patch[k]) !== JSON.stringify(me[k] ?? null));
   if (me.status === 'active' && changed.length) {
@@ -300,5 +330,45 @@ export function teamRoster(ctx = {}) {
     you: me?.name ?? null,
     team: team.map((t) => ({ name: t.name, role: t.role, job: t.job, paused: t.paused, status: t.status })),
     recent: messages.filter((m) => m.kind === 'msg' || m.kind === 'pass').slice(-20).map((m) => ({ from: nameOf(m.from), to: m.kind === 'pass' ? [nameOf(m.to)] : (m.to ?? []).map(nameOf), text: m.kind === 'pass' ? `passed: ${m.title}` : m.text, at: new Date(m.ts).toISOString() })),
+  };
+}
+
+// WORDS ONE AGENT LEAVES ON ANOTHER AGENT'S STOPPED THREAD go there as a
+// teammate's reply, which the supervisor takes as a turn, as it does a person's
+// reply: her own stop or close outranks it, and so does the hand-off count.
+// Null when this is not that, and the ordinary write goes ahead.
+export function noteToAnotherThread(id, patch, { ownItem, now = Date.now() } = {}) {
+  if (!ownItem || !id || id === ownItem) return null;
+  const keys = Object.keys(patch ?? {}).filter((k) => patch[k] !== undefined);
+  if (!keys.length || keys.some((k) => k !== 'note' && k !== 'result')) return null;
+  const words = String(patch.note ?? patch.result ?? '').trim();
+  if (!words) return null;
+  let target; let writer;
+  try {
+    target = projectOf(id, null);
+    writer = projectOf(ownItem, null);
+  } catch { return null; }
+  const item = readWorkItem(target.dir, id, now);
+  const from = readWorkItem(writer.dir, ownItem, now);
+  // A thread an agent has spoken on and that nobody is on now; a proposal is
+  // not started on another agent's word.
+  if (!item || !from || item.status === 'claimed' || !item.wrote?.result || !(item.labels ?? []).includes('founder')) return null;
+  const tid = teammateIdOf(from);
+  const me = tid ? readTeammates(teamDir(legacyRoot(), resolveAccount().accountId), now).find((t) => t.id === tid) : null;
+  const name = me?.name ?? `The agent on "${plain(from.label || from.title).slice(0, 60)}"`;
+  const hop = (from.wrote?.answer?.source === 'founder' ? 0 : hopOf(from)) + 1;
+  let after = updateWorkItem(target.dir, id, { answer: words.slice(0, 8000), from: { teammate: tid ?? 'agent', name } }, { source: 'system', now });
+  const herWord = after.wrote?.status?.source === 'founder' && (after.status === 'done' || after.status === 'blocked');
+  const tooMany = hop > MAX_HOPS;
+  const woke = !herWord && !tooMany;
+  if (woke) {
+    const labels = [...(after.labels ?? []).filter((l) => l !== 'clean' && !l.startsWith(HOP_LABEL_PREFIX)), `${HOP_LABEL_PREFIX}${hop}`];
+    after = updateWorkItem(target.dir, id, { labels, ...(after.status === 'done' || after.status === 'blocked' ? { status: 'open' } : {}) }, { source: 'system', now });
+  }
+  return {
+    told: id, woke,
+    note: woke ? `It is on "${plain(item.label || item.title)}" as your words, and its agent starts a turn on it.`
+      : tooMany ? `It is on that thread, but it wakes nobody: ${MAX_HOPS} hand-offs in a row with no person between is the most. Say so in your answer.`
+        : 'It is on that thread, but its owner stopped it, so it waits for them.',
   };
 }

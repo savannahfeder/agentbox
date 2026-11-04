@@ -49,7 +49,7 @@ function listWatched(appDir) {
     let entries = [];
     try { entries = fs.readdirSync(path.join(appDir, dir), { withFileTypes: true }); } catch { continue; }
     for (const e of entries) {
-      if (!e.isFile() || !/\.(mjs|cjs|js)$/.test(e.name)) continue;
+      if (!e.isFile() || !/\.(mjs|mts|cjs|js)$/.test(e.name)) continue;
       try {
         found.push({ name: `${dir}/${e.name}`, mtimeMs: fs.statSync(path.join(appDir, dir, e.name)).mtimeMs });
       } catch {}

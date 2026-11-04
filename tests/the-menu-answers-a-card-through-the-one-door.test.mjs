@@ -44,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (...p) => fs.readFileSync(path.join(here, '..', ...p), 'utf8');
 const main = read('main', 'main.mjs');
-const menu = read('main', 'menu.mjs');
+const menu = read('main', 'menu.mts');
 const ipc = read('main', 'ipc.mjs');
 
 /** The block that wires the application menu up. */
@@ -85,7 +85,9 @@ describe('the Allow/Deny items in the Agents menu', () => {
     expect(at).toBeGreaterThan(-1);
     // Filled in immediately after the IPC surface is built, and before anything
     // else can be pressed.
-    expect(main.slice(at, at + 400)).toMatch(/answerApproval = ipc\.answerApproval/);
+    const after = main.slice(main.indexOf('\n  });\n', at) + '\n  });\n'.length);
+    const firstStatement = after.split('\n').find((line) => line.trim() && !line.trim().startsWith('//'));
+    expect(firstStatement.trim()).toBe('answerApproval = ipc.answerApproval;');
     // And the menu is still installed early, where it only needs the config.
     expect(main.indexOf('installMenu({')).toBeLessThan(at);
   });
@@ -96,7 +98,7 @@ describe('the one answering door', () => {
   // answered while the menu was answering somewhere else. It is true now, and
   // the claim is worth keeping only while it is.
   it('is the only place in main/ that writes an answer file', () => {
-    const writers = ['main.mjs', 'ipc.mjs', 'menu.mjs']
+    const writers = ['main.mjs', 'ipc.mjs', 'menu.mts']
       .filter((f) => /approvals\.answer\(/.test(read('main', f)));
     expect(writers).toEqual(['ipc.mjs']);
   });

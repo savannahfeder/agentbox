@@ -26,6 +26,7 @@
 
 /** On the row while it is asking. */
 import { Name } from '../shared/product-name.mjs';
+import { CATCH_UP_LABEL } from './agent-import.mjs';
 export const CODEX_IMPORT_LABEL = 'codex-import';
 /** On the row once it is hers to read. */
 export const CODEX_MIRROR_LABEL = 'codex';
@@ -183,7 +184,10 @@ export function codexMirrorPatch(thread) {
     body: prompt || String(thread?.title ?? '').trim(),
     result: last || 'Codex has not answered yet.',
     kind: 'directive',
-    labels: [CODEX_MIRROR_LABEL, codexLabel(thread?.id)],
+    // Written up the way every thread reads once it lands (main/catch-up.mjs).
+    labels: [CODEX_MIRROR_LABEL, codexLabel(thread?.id), CATCH_UP_LABEL],
+    // Carried on with the agent it was with, not the app's default.
+    engine: 'codex',
   };
 }
 

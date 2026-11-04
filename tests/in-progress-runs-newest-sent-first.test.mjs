@@ -89,7 +89,7 @@ describe('the app around it', () => {
     expect(menu('inbox')).not.toContain('runs newest sent first');
   });
   it('a teammate’s rows merge in by time on In Progress', () => {
-    expect(src('App.tsx')).toMatch(/mergeRows\(displayedBox, theirRows, view === 'done' \? 'done' : view === 'progress' \? 'updated' : inboxDisplay\.sort[,)]/);
+    expect(src('App.tsx')).toMatch(/mergeRows\(heldBox\.rows, theirRows, view === 'done' \? 'done' : view === 'progress' \? 'updated' : inboxDisplay\.sort[,)]/);
   });
   it('dragging sets no place in In Progress, in the list or on the board', () => {
     const app = src('App.tsx');

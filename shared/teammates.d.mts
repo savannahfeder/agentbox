@@ -1,4 +1,5 @@
 export const YOU: 'you';
+export function isSetupTitle(title: string | null | undefined): boolean;
 export const TEAMMATE_LABEL_PREFIX: 'teammate:';
 export function teammateIdOf(item: { labels?: string[] } | null | undefined): string | null;
 export function passedFromOf(item: { labels?: string[] } | null | undefined): string | null;
@@ -16,5 +17,8 @@ export const MAX_HOPS: number;
 export function yesFirst(asksFirst: string | null | undefined): string | null;
 export const TEAMMATE_EFFORT: 'high';
 export const GREETING: string;
+export const VOICES: { id: string; label: string; says: string; sample: string }[];
+export const VOICE_WORDS_MOST: number;
+export function voiceOf(t: { id?: string; voice?: string | null; voiceText?: string | null } | null | undefined): { id: string; label: string; says: string; sample?: string };
 export function starterAsks(team?: Array<{ starter?: string | null; name: string }>): Array<{ starter: string; ask: string; name: string; role: string }>;
 export function teammatesOn(config: { alphaTeammates?: unknown } | null | undefined): boolean;

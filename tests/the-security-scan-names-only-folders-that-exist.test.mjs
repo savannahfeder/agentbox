@@ -1,60 +1,42 @@
 // THE SECURITY SCAN NAMES ONLY FOLDERS THAT EXIST.
 //
-// w-2351330171, 2026-11-01. b1d25e0d deleted the phone relay, `relay/`, but
-// security.yml still passed `relay` to semgrep as a folder to scan. Semgrep
-// stops with `Invalid scanning root: relay` and exit 2 before reading a file,
-// so every push to main from then on showed a red cross with nothing wrong in
-// the code. Measured by running the workflow's command with semgrep 1.182.1:
-// exit 2 with `relay` in the list, exit 0 and 0 findings without it.
+// w-9844544e9038, 2026-11-02. `relay/` went with the phone relay in b1d25e0d,
+// and this workflow still handed `relay` to semgrep, which answers a path it
+// cannot find with "[ERROR] Invalid scanning root: relay" and exit 2. So the
+// security check failed on 55 pushes to main over two days without a rule ever
+// running: the scan never started.
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 
 const workflow = fs.readFileSync('.github/workflows/security.yml', 'utf8');
 
-const TAKES_A_VALUE = new Set(['--config', '--exclude', '--metrics', '--include', '--exclude-rule']);
+// The command is a folded block, so it ends at the next YAML key or list item.
+const lines = workflow.split('\n');
+const first = lines.findIndex((l) => l.includes('semgrep scan'));
+const rest = lines.slice(first).findIndex((l, i) => i > 0 && /^\s*(-\s|\S+:)/.test(l));
+const command = lines
+  .slice(first, rest === -1 ? undefined : first + rest)
+  .join(' ')
+  .trim()
+  .split(/\s+/);
 
-function scanRoots(yml) {
-  const lines = yml.split('\n');
-  const start = lines.findIndex((l, i) => /^\s*- run: >-?\s*$/.test(l) && /semgrep scan/.test(lines[i + 1] ?? ''));
-  if (start < 0) return null;
-  const indent = lines[start + 1].match(/^\s*/)[0].length;
-  const block = [];
-  for (const l of lines.slice(start + 1)) {
-    if (l.trim() && l.match(/^\s*/)[0].length < indent) break;
-    block.push(l.trim());
-  }
-  const words = block.join(' ').split(/\s+/).filter(Boolean);
-  const roots = [];
-  for (let i = words.indexOf('scan') + 1; i < words.length; i++) {
-    if (words[i].startsWith('--')) {
-      if (TAKES_A_VALUE.has(words[i])) i++;
-      continue;
-    }
-    roots.push(words[i]);
-  }
-  return roots;
+const takesAValue = new Set(['--config', '--exclude', '--include', '--metrics', '--severity']);
+const roots = [];
+for (let i = 2; i < command.length; i += 1) {
+  if (takesAValue.has(command[i])) i += 1;
+  else if (!command[i].startsWith('-')) roots.push(command[i]);
 }
 
-describe('the security scan', () => {
-  const roots = scanRoots(workflow);
-
-  it('is found in the workflow, with the folders it scans', () => {
-    expect(roots).toEqual(expect.arrayContaining(['main', 'shared']));
+describe('the security workflow', () => {
+  it('hands semgrep the code that ships', () => {
+    expect(roots).toContain('main');
+    expect(roots).toContain('shared');
+    expect(roots).toContain('renderer/src');
+    expect(roots.length).toBeGreaterThan(5);
   });
 
-  it('names only folders and files that are in the repository', () => {
-    expect(roots.filter((r) => !fs.existsSync(r))).toEqual([]);
-  });
-
-  it('reads an option value as an option, not as a folder', () => {
-    expect(roots).not.toContain('p/javascript');
-    expect(roots).not.toContain('off');
-    expect(roots).not.toContain('node_modules');
-  });
-
-  it('would catch a folder that is gone', () => {
-    const gone = workflow.replace(' preload.cjs', ' preload.cjs no-such-folder');
-    expect(scanRoots(gone).filter((r) => !fs.existsSync(r))).toEqual(['no-such-folder']);
+  it.each(roots)('scans %s, which is in the repository', (root) => {
+    expect(fs.existsSync(root)).toBe(true);
   });
 });

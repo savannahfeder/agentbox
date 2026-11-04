@@ -3,7 +3,7 @@ import { expect, it } from 'vitest';
 import fs from 'node:fs';
 import { lessonPosition } from '../renderer/src/lesson-position';
 
-const first = fs.readFileSync(new URL('../renderer/src/components/FirstRun.tsx', import.meta.url), 'utf8');
+const first = fs.readFileSync(new URL('../renderer/src/components/FirstRunClassic.tsx', import.meta.url), 'utf8');
 const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
 
 it('sends the complete body for single-line and multiline tasks, including repeats', () => {

@@ -1,0 +1,13 @@
+{
+  "approved": "2026-11-02",
+  "pictures": "designs/w-dd540cfe80 in the product's documents: 2-after-dark.png and light-1-page.png to light-7-lightmac-after.png",
+  "parts": {
+    "the tray page styles (renderer/src/corner-tag/corner-tag.css)": "5668ba229082b283",
+    "the tray page (renderer/src/corner-tag/main.tsx)": "195ebfde641cc54a",
+    "the nine dots (renderer/src/corner-tag/lattice.tsx)": "c661ad2f59484f33",
+    "the corner picker (renderer/src/corner-tag/place.tsx)": "b3b06e9fecc7941f",
+    "the Mac's glass (main/native/liquid-glass/liquid-glass.mm)": "353a22d9e6e35208",
+    "how the tray holds its glass light or dark (main/corner-tag.mjs readTone, dress, make)": "d783e1acb3d8af9c",
+    "where light turns to dark (shared/corner-tag.mjs toneFromLuma)": "78a1afc8b12a4354"
+  }
+}

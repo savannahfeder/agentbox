@@ -132,7 +132,7 @@ describe('nothing spells a name this app has had', () => {
     for (const e of fs.readdirSync(path.join(repo, dir), { withFileTypes: true })) {
       const rel = `${dir}/${e.name}`;
       if (e.isDirectory()) walk(rel, out);
-      else if (/\.(ts|tsx|mjs|cjs)$/.test(e.name)) out.push(rel);
+      else if (/\.(ts|tsx|mjs|mts|cjs)$/.test(e.name)) out.push(rel);
     }
     return out;
   };

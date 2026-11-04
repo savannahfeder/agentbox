@@ -9,12 +9,13 @@
 // whatever that message was. It is an action ON a message — this is the one you
 // want work made of — so it belongs on the message, which is what the drawing
 // shows and what this moves it to.
-import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useContext, useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { EMOJI_GROUPS, findEmoji } from './emoji-list';
 import { chipPressed, onArrival, quickRow, readRecent, rememberEmoji } from './recent-emoji';
 import { searchKey } from './picker-keys';
 import { MoreMenu, type MoreItem } from './MessageMore';
+import { TeamContext } from './people';
 import './chat.css';
 
 // How many of your emoji sit on the bar itself, one press from a reaction.
@@ -214,12 +215,26 @@ export function EveryEmoji({ onPick, at, boxRef, recent = [], typed: given, onTy
  * you. The count is the people, so a chip never reads 0: the store drops an
  * emoji nobody is left on (shared/work-items.mjs).
  */
-export function Reactions({ on, me, onReact }: {
+export function whoReacted(emoji: string, who: string[], me: string | null, nameOf: (id: string) => string | null | undefined) {
+  // A press written with no person on it (the one-person app) is filed as 'you'.
+  const names = who.map((id, i) => {
+    const you = id === me || id === 'you';
+    return you ? (i === 0 ? 'You' : 'you') : nameOf(id) || 'A teammate';
+  });
+  const list = names.length < 2 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return `${list} reacted with ${emoji}`;
+}
+
+export function Reactions({ on, me, onReact, nameOf }: {
   /** emoji -> the people on it, oldest press first. */
   on: Record<string, string[]> | undefined;
   me: string | null;
   onReact: (emoji: string, off: boolean) => void;
+  /** A person's name; without it, the team's. */
+  nameOf?: (id: string) => string | null | undefined;
 }) {
+  const team = useContext(TeamContext);
+  const named = nameOf ?? ((id: string) => team?.byId.get(id)?.name);
   const chips = Object.entries(on ?? {}).filter(([, who]) => who.length);
   if (!chips.length) return null;
   return (
@@ -232,7 +247,7 @@ export function Reactions({ on, me, onReact }: {
             type="button"
             className={`chat-chip${mine ? ' mine' : ''}`}
             aria-pressed={mine}
-            title={mine ? `You and ${who.length - 1} other${who.length === 2 ? '' : 's'}` : `${who.length}`}
+            title={whoReacted(emoji, who, me, named)}
             onClick={() => { chipPressed(emoji, mine); onReact(emoji, mine); }}
           >
             <span className="chat-chip-emoji">{emoji}</span>

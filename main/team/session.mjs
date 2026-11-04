@@ -13,6 +13,7 @@ import { nameSlug } from '../../shared/product-name.mjs';
 import { CLOUD_ADDRESS, PHONE_SITE } from '../../shared/cloud-address.mjs';
 import { runningAsAFreshUser } from '../../shared/fresh-user-home.mjs';
 import { supabaseBackend } from './supabase-backend.mjs';
+import { standinSession } from './standin-backend.mjs';
 import { signInWithGoogle, cancelGoogleSignIn } from './sign-in.mjs';
 import { plainAuthError } from './auth-words.mjs';
 
@@ -146,6 +147,7 @@ export const withDeadline = (ms = DATABASE_DEADLINE_MS) => (url, init = {}) =>
 export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decrypt = null, openExternal, packaged = isPackagedElectron(), testLogin = process.env.AGENTBOX_TEAM_TEST_LOGIN }) {
   const configured = !!cloudConfig;
   if (packaged) testLogin = null;
+  if (cloudConfig?.standin && !packaged) return standinSession({ cloudConfig, testLogin });
   let client = null;
 
   async function getClient() {
@@ -258,7 +260,7 @@ function configHome({ home, env }) {
   return given && path.isAbsolute(given) ? given : path.join(home, '.config');
 }
 
-function sessionFileOutsideStore({ dir, name, storeRoot, home = os.homedir(), env = process.env }) {
+export function sessionFileOutsideStore({ dir, name, storeRoot, home = os.homedir(), env = process.env }) {
   let file = path.join(dir, name);
   if (isInside(file, storeRoot)) {
     const tag = crypto.createHash('sha256').update(path.resolve(storeRoot)).digest('hex').slice(0, 16);

@@ -69,7 +69,8 @@ describe('the cards a Mac publishes', () => {
     expect(cards.find((x) => x.threadId === 'w-b')).toBeUndefined();
     expect(cards.every((c) => c.visible === true)).toBe(true);
   });
-  it('never cards a message between two people, or work finished before today', () => {
-    expect(cards.map((c) => c.threadId).sort()).toEqual(['w-a']);
+  // Finished work stays a week so a week can be listed; boards still draw only today's.
+  it('never cards a message between two people, or work finished over a week ago', () => {
+    expect(cards.map((c) => c.threadId).sort()).toEqual(['w-a', 'w-c', 'w-old']);
   });
 });

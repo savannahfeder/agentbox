@@ -15,6 +15,10 @@
 // state machine and only ever looks at two places: inside a string literal,
 // and in the plain text between JSX tags. Comments are skipped, which is the
 // whole point, and they stay free to use the character as much as they like.
+//
+// 2026-10-31: the search fold table moved from renderer/src/search.ts to
+// shared/word-match.mjs, and shared/thread-title.mjs cuts a title at a dash,
+// so both are named in ALLOWED as strippers.
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -30,7 +34,7 @@ const EM_DASH = '—';
 // by another name. `fixtures.ts` IS included, because she never runs on
 // fixtures but every screenshot an agent sends her is drawn from them.
 const ROOTS = ['renderer/src', 'main', 'shared'];
-const EXTS = new Set(['.ts', '.tsx', '.mjs', '.js']);
+const EXTS = new Set(['.ts', '.tsx', '.mjs', '.mts', '.js']);
 
 // THE ONES THAT STAY, EACH A DECISION AND NOT AN OVERSIGHT. Matched on the
 // fragment rather than a line number, so the allowance cannot drift onto some
@@ -78,16 +82,22 @@ const ALLOWED = [
       + 'A dash is one of the marks it removes.',
   },
   {
-    file: 'renderer/src/search.ts',
+    file: 'shared/word-match.mjs',
     fragment: "'—': '-'",
     why: "The fold table, so a search for a hyphen still finds a row somebody "
       + 'else typed with a dash in it. Removing this would make search worse, '
       + 'not cleaner.',
   },
   {
-    file: 'renderer/src/search.ts',
+    file: 'shared/word-match.mjs',
     fragment: 'toLowerCase',
     why: 'The character class the fold table is applied through. Same reason.',
+  },
+  {
+    file: 'shared/thread-title.mjs',
+    fragment: 't = t.split(',
+    why: 'shortTitle, which ends a fallback title at the first clause; a dash '
+      + 'between words is one of the marks a clause ends on, and is cut off.',
   },
 ];
 

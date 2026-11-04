@@ -162,7 +162,7 @@ else
       full_because="what this push changes cannot be told from here"
       break
     fi
-    if [ -n "$(git diff --name-only --diff-filter=D "$base" "$local_sha" | grep -E '\.(mjs|cjs|js|jsx|ts|tsx)$')" ]; then
+    if [ -n "$(git diff --name-only --diff-filter=D "$base" "$local_sha" | grep -E '\.(mjs|mts|cjs|js|jsx|ts|tsx)$')" ]; then
       full_because="it deletes code something else may import"
       break
     fi
@@ -176,7 +176,7 @@ changed=$(printf '%s\n' "$changed" | sed '/^$/d' | sort -u)
 if [ -z "$full_because" ] && printf '%s\n' "$changed" | grep -qE '^(package(-lock)?\.json|vitest\.config\.mjs|tests/agentbox-home\.setup\.mjs|tests/app-home\.mjs|scripts/hooks/)'; then
   full_because="it changes what every test depends on"
 fi
-code=$(printf '%s\n' "$changed" | grep -E '\.(mjs|cjs|js|jsx|ts|tsx|json|css|html)$' || true)
+code=$(printf '%s\n' "$changed" | grep -E '\.(mjs|mts|cjs|js|jsx|ts|tsx|json|css|html)$' || true)
 
 if [ -n "$full_because" ]; then
   runargs="run"

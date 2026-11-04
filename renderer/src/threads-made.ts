@@ -3,6 +3,7 @@
 // and meant for the agent that answers in a chat with the tasks it opened.
 import type { ThreadStateWord, WorkItem } from './types';
 import { notStarted, statusForReply } from './list-rules';
+import { filedByThePerson } from '../../shared/answers.mjs';
 
 type Row = Pick<WorkItem, 'id' | 'product' | 'createdAt'> & { parent?: string };
 
@@ -83,7 +84,7 @@ export const toApproveWords = (n: number | undefined): string => (n ? `${n} task
  * in Needs you is not waiting on a press, whatever its fields say yet.
  */
 export function approvableFiled(
-  i: Pick<WorkItem, 'status' | 'kind' | 'labels' | 'answer'> & { start?: 'later' | 'now' },
+  i: Pick<WorkItem, 'status' | 'kind' | 'labels' | 'answer' | 'wrote'> & { start?: 'later' | 'now' },
   state: ThreadStateWord | null,
 ): boolean {
   // WAITING OR LATER, since w-9cf2b43110's second half: a proposal is no
@@ -93,7 +94,7 @@ export function approvableFiled(
   if (state !== 'waiting' && state !== 'scheduled') return false;
   if (i.status !== 'open') return false;
   if (i.kind === 'question' || i.kind === 'review') return false;
-  if ((i.labels ?? []).includes('founder')) return false;
+  if (filedByThePerson(i)) return false;
   if (notStarted(i)) return false;
   return !(i.answer && i.answer !== '(withdrawn)');
 }

@@ -22,6 +22,7 @@ import { CHAT_KEYS } from './chat-editor';
 import type { RichBox } from './RichReply';
 import './chat.css';
 import { chord } from '../this-keyboard';
+import { FromFiles, type FromFilesPick } from '../files/FromFiles';
 
 // EACH BUTTON SAYS ITS KEY when pointed at, the way Slack's do, so the keys
 // are found from the bar rather than from somebody else telling you.
@@ -100,12 +101,14 @@ const marksWereOut = () => { try { return localStorage.getItem(MARKS_KEY) === '1
 // A note longer than this asks once before the cross throws it away.
 const ASK_BEFORE_DISCARD_MS = 5000;
 
-export function FormatBar({ box, onChange, onAttach, onVoice, onNotice, voiceKey = '', voice: control, onRecording }: {
+export function FormatBar({ box, onChange, onAttach, onFromFiles, onVoice, onNotice, voiceKey = '', voice: control, onRecording }: {
   /** The reply box itself: the bar works on the selection that is in it. */
   box: { current: HTMLTextAreaElement | null };
   onChange: (text: string) => void;
   /** Open the file picker. Absent where there is nothing to attach to. */
   onAttach?: () => void;
+  /** A file picked from Files, which the clip then offers beside the disk. */
+  onFromFiles?: (picked: FromFilesPick) => void;
   /** A voice note for the box. Absent where one cannot be sent. */
   onVoice?: (note: Recorded, how: Arrival) => void;
   /** Say something, such as the microphone being refused. */
@@ -118,6 +121,16 @@ export function FormatBar({ box, onChange, onAttach, onVoice, onNotice, voiceKey
   onRecording?: (on: boolean) => void;
 }) {
   const [picking, setPicking] = useState(false);
+  const [attachFrom, setAttachFrom] = useState<'menu' | 'files' | null>(null);
+  const attachWrap = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (attachFrom !== 'menu') return undefined;
+    const down = (e: MouseEvent) => { if (!attachWrap.current?.contains(e.target as Node)) setAttachFrom(null); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setAttachFrom(null); } };
+    document.addEventListener('mousedown', down);
+    window.addEventListener('keydown', key, true);
+    return () => { document.removeEventListener('mousedown', down); window.removeEventListener('keydown', key, true); };
+  }, [attachFrom]);
   const [marks, setMarks] = useState(marksWereOut);
   const canVoice = !!onVoice && !!voiceKey;
   const voice = useVoiceRecorder({
@@ -240,10 +253,22 @@ export function FormatBar({ box, onChange, onAttach, onVoice, onNotice, voiceKey
         <span className="fmt-letter">@</span>
       </button>
       {onAttach && (
-        <button type="button" className="fmt-btn" title="Attach a file" aria-label="Attach a file"
-          onMouseDown={hold} onClick={onAttach}>
-          <ClipGlyph />
-        </button>
+        <span className="fmt-emoji-wrap" ref={attachWrap}>
+          <button type="button" className="fmt-btn" title="Attach a file" aria-label="Attach a file" aria-expanded={onFromFiles ? !!attachFrom : undefined}
+            onMouseDown={hold} onClick={() => (onFromFiles ? setAttachFrom((was) => (was ? null : 'menu')) : onAttach())}>
+            <ClipGlyph />
+          </button>
+          {attachFrom === 'menu' && (
+            <span className="fmt-attach-menu" role="menu" aria-label="Attach">
+              <button type="button" role="menuitem" onClick={() => { setAttachFrom(null); onAttach(); }}>From this computer</button>
+              <button type="button" role="menuitem" onClick={() => setAttachFrom('files')}>From Files</button>
+            </span>
+          )}
+          {attachFrom === 'files' && onFromFiles && (
+            <FromFiles onClose={() => { setAttachFrom(null); box.current?.focus(); }}
+              onPick={(f) => { setAttachFrom(null); onFromFiles(f); box.current?.focus(); }} />
+          )}
+        </span>
       )}
       {canVoice && (
         <button type="button" className="fmt-btn" title="Record a voice note" aria-label="Record a voice note"

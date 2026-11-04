@@ -46,7 +46,12 @@ const SHIP_ENDS_BY = began + 18 * 60_000;
 const say = (msg) => console.log(`ship: ${msg}`);
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 const gitSoft = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' });
-const stop = (msg) => { console.error(`\nship: ${msg}\n`); process.exit(1); };
+// process.exit drops whatever a pipe has not yet taken, and the ship queue
+// reads this script through one: the end of the hook's output, where the
+// failing test is named, was what got dropped. Exits once both have drained.
+const drained = (stream) => new Promise((resolve) => stream.write('', resolve));
+const exit = async (code) => { await drained(process.stdout); await drained(process.stderr); process.exit(code); };
+const stop = (msg) => { console.error(`\nship: ${msg}\n`); return exit(1); };
 
 const gitDir = git('rev-parse', '--absolute-git-dir');
 const commonDir = git('rev-parse', '--path-format=absolute', '--git-common-dir');
@@ -60,28 +65,30 @@ const why = notReadyToShip({
   onMain: branch === 'main',
   hasCommits: git('rev-list', '--count', `${PUBLIC}/main..HEAD`) !== '0',
 });
-if (why) stop(why);
+if (why) await stop(why);
 
-function mergeWhatMoved() {
+async function mergeWhatMoved() {
   if (git('rev-list', '--count', `HEAD..${PUBLIC}/main`) === '0') return;
   say(`${PUBLIC}/main has moved. Merging it in.`);
   const merged = gitSoft('merge', `${PUBLIC}/main`, '-m', `Merge ${PUBLIC}/main into ${branch}`);
   if (merged.status !== 0) {
     gitSoft('merge', '--abort');
-    stop(`${PUBLIC}/main and this branch disagree and the merge was left for you:\n\n${merged.stdout}${merged.stderr}\n`
+    await stop(`${PUBLIC}/main and this branch disagree and the merge was left for you:\n\n${merged.stdout}${merged.stderr}\n`
       + `  git merge ${PUBLIC}/main   # then fix the conflicts, commit, and run npm run ship again`);
   }
 }
 
 for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
-  mergeWhatMoved();
+  await mergeWhatMoved();
   say(`pushing to ${PUBLIC} main (attempt ${attempt} of ${ATTEMPTS}). The hook runs the tests and the public check now.`);
   // ROOM FOR THE WHOLE TEST RUN TO COME BACK THROUGH HERE. The only test run a
   // ship has is the hook's, inside this push, so this buffer now carries every
   // failure anybody will read: node's default is a megabyte, and a truncated
   // one returns no status at all and would be read as a refusal with no reason.
   const pushed = spawnSync('git', ['push', PUBLIC, 'HEAD:main'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  // In that order, so git's own refusal and this script's come after the test run.
   process.stdout.write(pushed.stdout ?? '');
+  await drained(process.stdout);
   process.stderr.write(pushed.stderr ?? '');
   if (pushed.status === 0) {
     const sha = git('rev-parse', '--short', 'HEAD');
@@ -90,13 +97,13 @@ for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
     say(`check the run: gh run list -R savannahfeder/agentbox -L 3`);
     // Shipped whatever happens here; a deploy that did not work says so.
     try { await deployAfterShip({ root, say, until: SHIP_ENDS_BY }); } catch (err) { say(`the web app was not updated: ${err?.message ?? err}. Put it up with: npm run phone:deploy`); }
-    process.exit(0);
+    await exit(0);
   }
   if (!racedWithAnotherPush(`${pushed.stdout ?? ''}${pushed.stderr ?? ''}`)) {
-    stop('that push was refused rather than raced, so nothing was retried. The reason is above.');
+    await stop('that push was refused rather than raced, so nothing was retried. The reason is above.');
   }
   say('somebody pushed first. Fetching what they did and going round again.');
   git('fetch', PUBLIC, '--quiet');
 }
 
-stop(`${ATTEMPTS} attempts and main moved every time. Something is pushing constantly; try again in a minute.`);
+await stop(`${ATTEMPTS} attempts and main moved every time. Something is pushing constantly; try again in a minute.`);

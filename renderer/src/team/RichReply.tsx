@@ -189,7 +189,8 @@ export function RichReply({ value, onChange, onPlain, placeholder, className, bo
         const d = ed.state.doc;
         ed.view.dispatch(ed.state.tr.setSelection(TextSelection.create(d, posAt(d, from), posAt(d, to))));
       } },
-      focus: { configurable: true, value: () => { editorOf.current?.commands.focus(); } },
+      // At once: a key redirected here inside its keydown lands only if the caret already has.
+      focus: { configurable: true, value: () => { const ed = editorOf.current; if (!ed) return; ed.view.focus(); ed.commands.focus(); } },
       blur: { configurable: true, value: () => { editorOf.current?.commands.blur(); } },
       rich: { configurable: true, get: () => control },
     });

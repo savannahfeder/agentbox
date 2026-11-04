@@ -74,7 +74,7 @@ describe('its look', () => {
     expect(css).toContain('@media(max-width:700px) { .workspace-usage { display: none; } }');
   });
   it('opens its limits above it, as wide as the sidebar', () => {
-    expect(rule('.workspace-navigation .workspace-usage .usage-panel')).toContain('left: 0; right: 0; width: auto;');
+    expect(rule('.workspace-navigation .workspace-usage .usage-panel')).toContain('left: 0; right: auto; width: 268px;');
   });
 });
 

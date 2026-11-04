@@ -8,6 +8,7 @@
 // So this answers for ANY row, in or out of In progress, by asking live-line
 // first and falling back to the thread's own state word. One function, because
 // three surfaces were going to answer it three ways.
+import { catchUpDue } from '../../shared/agent-import.mjs';
 import { liveLine, shortWord, type LiveFacts } from './live-line';
 import { STATE_WORD, stateWordOf } from './threads/summary-rules';
 import { threadState } from '../../shared/thread-cards.mjs';
@@ -67,13 +68,15 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
   // Said over "Waiting" and "Done", which do not tell a shipped thread from
   // one that never shipped (shared/not-shipped.mjs).
   const ship = shippedAs(item);
-  const shipped = ship ? says('Shipped', 'done', false, ship.sha ? `Shipped to main as ${ship.sha}` : 'Shipped to main') : null;
+  const shipped = (item.shippedAt ?? 0) > 0 ? says('Shipped', 'done', false, 'Marked as shipped')
+    : ship && item.shippedAt !== 0 ? says('Shipped', 'done', false, ship.sha ? `Shipped to main as ${ship.sha}` : 'Shipped to main') : null;
 
   if (state === 'done') {
     if (shipped) return shipped;
     if (closedUnshipped(item)) return says('Not shipped', 'done', false, 'Closed without its work reaching main');
     return plain(stateWordOf(item, state), 'done');
   }
+  if (catchUpDue(item)) return says('Getting ready', 'queued', false, 'This chat is being summarized so you can answer it.');
   // Sent to Auto and not given to anyone yet (shared/auto-route.mjs). Ahead of
   // Stopped: a thread that asks her is on the supervisor's stalled list, and no
   // agent died on it.
@@ -138,8 +141,8 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
  * the Status cell says: a hole in the column would read as a thread nothing
  * knows anything about.
  */
-export function cardStatus(state: ThreadStateWord): StatusCell {
-  return { word: STATE_WORD[state], mark: state === 'running' ? 'queued' : state === 'waiting' ? 'need' : state === 'scheduled' ? 'sched' : 'done', agent: false, live: false, cloud: false };
+export function cardStatus(state: ThreadStateWord, whose?: string | null): StatusCell {
+  return { word: state === 'waiting' && whose ? `Waiting on ${whose}` : STATE_WORD[state], mark: state === 'running' ? 'queued' : state === 'waiting' ? 'need' : state === 'scheduled' ? 'sched' : 'done', agent: false, live: false, cloud: false };
 }
 
 /** One thread's facts, read off the fleet by id and nothing else. */

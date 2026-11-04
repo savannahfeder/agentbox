@@ -9,15 +9,16 @@ import type { ThreadStateWord, WorkItem } from '../types';
 import { AgentFace } from '../components/AgentFace';
 import { ThreadsMade } from '../components/ThreadsMade';
 import { ChatFold } from './ChatFold';
-import { TeamContext } from './people';
+import { Face, TeamContext } from './people';
 import { clock } from '../thread-history';
 import { defaultModelFor, engineModelChoices, engineModelLabel, readLastModel, type ModelChoice } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortLabelOf, readLastEffort } from '../effort';
 import {
-  CHAT_AGENTS, agentLinks, encodeMentions, findMentions, matchesQuery, mentionQuery, mentionText, sendBlock, withProject,
+  CHAT_AGENTS, agentLinks, encodeMentions, findMentions, matchesQuery, mentionQuery, looseMention, mentionText, withProject,
   type AgentLink, type Mention, type MentionPick, type Project,
 } from './agent-mentions';
 import './chat.css';
+import { shownTitle } from '../../../shared/thread-title.mjs';
 
 /** What a conversation needs from the app to bring an agent in and to draw
  *  its answer. Provided once, in App, beside TeamContext. */
@@ -55,7 +56,7 @@ const readLastProject = (where: { product: string; id: string }, projects: Proje
   try { const slug = globalThis.localStorage?.getItem(lastProjectKey(where)); return projects.find((p) => p.slug === slug) ?? null; } catch { return null; }
 };
 
-type MenuRow = { kind: 'person'; label: string; insert: string } | { kind: 'agent'; label: string; engine: string; hint: string };
+type MenuRow = { kind: 'person'; label: string; insert: string } | { kind: 'add'; label: string } | { kind: 'agent'; label: string; engine: string; hint: string };
 
 /**
  * THE REPLY BOX'S AGENT PARTS, as one hook so the box itself only wires them.
@@ -66,6 +67,9 @@ export function useChatMentions({ on, where, text, setText, input, people }: {
   input: RefObject<HTMLTextAreaElement>; people: string[];
 }) {
   const ctx = useContext(ChatAgentsContext);
+  const team = useContext(TeamContext);
+  // A message only reaches who is on it, so someone else can't just be named here.
+  const notHere = (team?.state.people ?? []).filter((p) => p.id !== team?.me).map((p) => p.name.split(/\s+/)[0]).filter((n) => n && !people.includes(n));
   const live = on && !!ctx;
   const projects = ctx?.projects ?? [];
   const mentions = useMemo(() => (live ? findMentions(text, projects) : []), [live, text, projects]);
@@ -85,6 +89,7 @@ export function useChatMentions({ on, where, text, setText, input, people }: {
   const inMention = mentions.some((m) => caret > m.start && caret <= m.end);
   const rows: MenuRow[] = !query || shut === text || inMention || cardFor !== null ? [] : [
     ...people.filter((p) => matchesQuery(p, query.query)).map((p): MenuRow => ({ kind: 'person', label: p, insert: `@${p.split(/\s+/)[0]} ` })),
+    ...notHere.filter((p) => matchesQuery(p, query.query)).map((p): MenuRow => ({ kind: 'add', label: p })),
     ...CHAT_AGENTS.filter((a) => matchesQuery(a.label, query.query)).map((a): MenuRow => ({ kind: 'agent', label: a.label, engine: a.engine, hint: ctx ? pickWords(a.engine, startingPick(a.engine, ctx), ctx) : '' })),
   ];
   useEffect(() => { setMenuAt(0); }, [query?.query, rows.length]);
@@ -104,6 +109,11 @@ export function useChatMentions({ on, where, text, setText, input, people }: {
   const pickRow = (row: MenuRow) => {
     if (!query) return;
     const before = text.slice(0, query.start);
+    if (row.kind === 'add') {
+      setText(before + text.slice(caret));
+      window.dispatchEvent(new Event('zero:add-people'));
+      return;
+    }
     const words = row.kind === 'person' ? row.insert : `${mentionText(row.label, readLastProject(where, projects))} `;
     setText(before + words + text.slice(caret));
     if (row.kind === 'agent' && ctx) {
@@ -118,24 +128,42 @@ export function useChatMentions({ on, where, text, setText, input, people }: {
     setCaret(el.selectionStart);
     if (layer.current) layer.current.scrollTop = el.scrollTop;
   };
-  const click = (el: HTMLTextAreaElement) => {
-    track(el);
-    const at = el.selectionStart;
-    const hit = mentions.findIndex((m) => at > m.start && at <= m.end);
-    if (hit < 0) { setCardFor(null); return; }
+  const openCard = (hit: number, el: HTMLElement | null) => {
     // In the chat's editor the chip is drawn on the words themselves
     // (./chat-editor.ts), so it is found in the card rather than in the layer.
     // A thread's box (./ThreadPanel.tsx) is the card there.
-    const host = el.closest('.dock-card, .chat-thread-box');
+    const host = el?.closest('.dock-card, .chat-thread-box');
     const chip = (layer.current ?? host)?.querySelector<HTMLElement>(`[data-mention="${hit}"]`);
     const card = host?.getBoundingClientRect();
     setCardX(chip && card ? Math.max(0, chip.getBoundingClientRect().left - card.left - 4) : 12);
     setCardFor(hit);
   };
+  const click = (el: HTMLTextAreaElement) => {
+    track(el);
+    const at = el.selectionStart;
+    const hit = mentions.findIndex((m) => at > m.start && at <= m.end);
+    if (hit < 0) { setCardFor(null); setSendOnPick(false); return; }
+    openCard(hit, el);
+  };
+
+  // SEND ON AN AGENT WITH NO PROJECT opens that agent's project list, and the
+  // pick sends. The box sends from its own effect on `readyToSend`, because its
+  // send reads the text, which the pick has only just rewritten.
+  const [sendOnPick, setSendOnPick] = useState(false);
+  const loose = live ? looseMention(mentions) : -1;
+  const askForProject = () => {
+    if (loose < 0) return false;
+    openCard(loose, input.current);
+    setSendOnPick(true);
+    return true;
+  };
+  const readyToSend = sendOnPick && loose < 0;
+  const sent = () => setSendOnPick(false);
+  const closeCard = () => { setCardFor(null); setSendOnPick(false); };
 
   /** The keys, while the menu or the card is up. True means the key was taken. */
   const keyDown = (e: KeyboardEvent<HTMLTextAreaElement>): boolean => {
-    if (cardFor !== null && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setCardFor(null); return true; }
+    if (cardFor !== null && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeCard(); return true; }
     if (!rows.length) return false;
     if (e.key === 'ArrowDown') { e.preventDefault(); setMenuAt((i) => (i + 1) % rows.length); return true; }
     if (e.key === 'ArrowUp') { e.preventDefault(); setMenuAt((i) => (i - 1 + rows.length) % rows.length); return true; }
@@ -157,14 +185,14 @@ export function useChatMentions({ on, where, text, setText, input, people }: {
 
   const menu = rows.length > 0 && (
     <div className="mention-menu" role="listbox">
-      {rows.some((r) => r.kind === 'person') && <div className="mention-head">People</div>}
+      {rows.some((r) => r.kind !== 'agent') && <div className="mention-head">People</div>}
       {rows.map((r, i) => (
         <div key={`${r.kind}:${r.label}`}>
           {r.kind === 'agent' && rows[i - 1]?.kind !== 'agent' && <div className="mention-head">Agents</div>}
           <button type="button" className={`mention-row${i === menuAt ? ' cursor' : ''}`} onMouseDown={(e) => { e.preventDefault(); pickRow(r); }} onMouseEnter={() => setMenuAt(i)}>
-            {r.kind === 'agent' ? <AgentFace /> : <span className="tm-av">{r.label.slice(0, 2)}</span>}
+            {r.kind === 'agent' ? <AgentFace /> : <Face name={r.label} />}
             <span className="mention-name">{r.label}</span>
-            <span className="mention-hint">{r.kind === 'agent' ? r.hint : 'in this chat'}</span>
+            <span className="mention-hint">{r.kind === 'agent' ? r.hint : r.kind === 'add' ? 'not on this thread: add' : 'in this chat'}</span>
           </button>
         </div>
       ))}
@@ -186,17 +214,24 @@ export function useChatMentions({ on, where, text, setText, input, people }: {
 
   const card = cardFor !== null && mentions[cardFor] && ctx && (
     <MentionCard
+      key={cardFor}
       x={cardX}
       mention={mentions[cardFor]}
       pick={pickOf(cardFor)}
       ctx={ctx}
-      onProject={(p) => { setText(withProject(text, mentions[cardFor], p)); }}
+      onProject={(p) => {
+        const next = withProject(text, mentions[cardFor], p);
+        setText(next);
+        // A second agent with no project is asked about next, before anything goes.
+        const after = sendOnPick ? looseMention(findMentions(next, projects)) : -1;
+        if (after >= 0) openCard(after, input.current);
+      }}
       onPick={(next) => setPicks((was) => { const out = mentions.map((_, i) => was[i] ?? pickOf(i)); out[cardFor] = next; return out; })}
-      onClose={() => setCardFor(null)}
+      onClose={closeCard}
     />
   );
 
-  return { live, mentions, block: live ? sendBlock(mentions) : null, menu, chips, card, keyDown, track, click, encode };
+  return { live, mentions, askForProject, readyToSend, sent, menu, chips, card, keyDown, track, click, encode };
 }
 
 /** THE MENTION'S CARD: the project, the model and the effort it runs with. */
@@ -269,7 +304,7 @@ function AgentAnswer({ link, md, newest }: { link: AgentLink; md: (t: string) =>
   const meta = [where, engineModelLabel(link.engine, link.model, opts), effortLabelOf(link.effort, effortChoicesFor(link.engine, link.model, opts))].filter(Boolean).join(' · ');
   const at = task?.wrote?.result?.ts ?? task?.updatedAt ?? card?.updatedAt ?? null;
   const filed = task ? ctx!.filed(task) : [];
-  const rows = (filed.length ? filed : task ? [task] : []).map((i) => ({ id: i.id, title: i.label || i.title, state: ctx!.stateOf(i) }));
+  const rows = (filed.length ? filed : task ? [task] : []).map((i) => ({ id: i.id, title: shownTitle(i), state: ctx!.stateOf(i) }));
   const said = task?.result
     ? <ChatFold newest={newest}>{md(task.result)}</ChatFold>
     : <div className="msg-body chat-agent-state">{

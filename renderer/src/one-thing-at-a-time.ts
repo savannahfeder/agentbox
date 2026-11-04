@@ -5,6 +5,7 @@
 import type { AgentEvent, AgentTurn } from './types';
 import type { ItemOutcome } from './item-thread';
 import { optionsFrom } from './format';
+import { instructionOf } from '../../shared/repeats.mjs';
 import { rowTitle } from './list-rules';
 import { teammateIdOf } from '../../shared/teammates.mjs';
 
@@ -54,10 +55,30 @@ export function earlierCount(events: AgentEvent[], outcome: ItemOutcome | null, 
 /** Fewer messages than this behind the fold, and the fold would hide her own ask to save a line or two. */
 const FOLD_FROM = 3;
 
-/** Whether the page draws the whole conversation rather than folding `behind` messages away. None behind is a fold of steps only, which still helps. */
-export function drawnWhole(behind: number): boolean {
-  return behind > 0 && behind < FOLD_FROM;
+/** Whether the page draws the whole conversation rather than folding `behind` messages away. None behind is a fold of steps only, which still helps.
+ *  A chat brought in from Claude Code or Codex is always folded: its first look is the agent's answer, not the ask it started from. */
+export function drawnWhole(behind: number, imported = false): boolean {
+  return !imported && behind > 0 && behind < FOLD_FROM;
 }
+
+/** The line under the title while an agent works: the first paragraph of what you asked, unless the title already says it. */
+export function askLine(ask: string, title = ''): string | null {
+  const first = instructionOf(ask).trim().split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
+  const named = title.replace(/\s+/g, ' ').trim().toLowerCase();
+  // A repeating run's title is its ask with the day after it.
+  if (!first || named === first.toLowerCase() || named.startsWith(`${first.toLowerCase()} · `)) return null;
+  return `You asked: ${/[.!?]$/.test(first) ? first : `${first}.`}`;
+}
+
+/** The line under a working thread's title: your ask, and its schedule if it repeats. */
+export function workingContext(ask: string, title: string, repeats: string | null): string | null {
+  const said = [askLine(ask, title), repeats && `${repeats}.`].filter(Boolean).join(' ');
+  return said || null;
+}
+
+/** A thread brought in from a Claude Code or Codex chat. */
+export const broughtIn = (item: { labels?: string[] }): boolean =>
+  (item.labels ?? []).some((l) => l === 'thread-import' || l.startsWith('codex:'));
 
 /**
  * Where the page starts on a thread that has been answered since its newest

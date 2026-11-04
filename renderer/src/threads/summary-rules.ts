@@ -8,6 +8,8 @@
 // shared/thread-cards.mjs and are only read here.
 import type { Person, ThreadStateWord, WorkItem } from '../types';
 import { shownToPeople, shownToTeam } from '../../../shared/thread-cards.mjs';
+import { waitParts } from '../../../shared/thread-waits.mjs';
+import { shownTitle } from '../../../shared/thread-title.mjs';
 
 export const SUMMARY_FIELDS = ['problem', 'progress', 'solution'] as const;
 export type SummaryField = (typeof SUMMARY_FIELDS)[number];
@@ -137,6 +139,17 @@ export function updatedWord(
 /** What an id this Mac does not hold reads as: a teammate's private thread, or one since deleted. */
 export const UNSEEN_THREAD = 'A thread you cannot see';
 
+/** A link on a card that names a person or their thread (shared/thread-waits.mjs), by first name. */
+export function linkPerson(id: string, byId?: ReadonlyMap<string, Person>): string | null {
+  const w = waitParts(id);
+  if (w.kind === 'thread') return null;
+  if (w.kind === 'name') return w.name;
+  return (byId?.get(w.person)?.name ?? 'Someone').trim().split(/\s+/)[0];
+}
+
+/** Who a card waits on, where a person set it on a person or their thread. An agent's link to a thread stays under Blocked by. */
+export const linkWords = (links: readonly { id: string }[] | undefined, byId?: ReadonlyMap<string, Person>) => (links?.length ? linkPerson(links[0].id, byId) : null);
+
 /** Linked ids as the titles the list shows for them. */
 export function linkedThreads(
   ids: unknown,
@@ -147,7 +160,7 @@ export function linkedThreads(
   return ids.filter((id): id is string => typeof id === 'string').map((id) => {
     const found = items.find((i) => i.id === id && i.product === product) ?? items.find((i) => i.id === id);
     return found
-      ? { id, title: found.label || found.title, known: true }
+      ? { id, title: shownTitle(found), known: true }
       : { id, title: UNSEEN_THREAD, known: false };
   });
 }
