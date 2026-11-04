@@ -85,9 +85,9 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name 
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 3, flexWrap: 'wrap' }}>
           <T style={yours ? { fontSize: 14, lineHeight: 22.4, fontFamily: font.semibold } : { fontSize: 14, lineHeight: 22.4, color: color.dim }}>{yours ? 'You' : name ?? 'The agent'}</T>
           <T style={{ fontSize: 12.5, lineHeight: 20, color: e.refused ? REFUSED : e.pending ? color.dim : color.faint, flexShrink: 1 }} numberOfLines={2}>
-            {e.refused ? `Not sent: ${e.refused}` : e.pending ? (e.sent ? 'Sent' : e.cloud ? 'Working in Agentbox Cloud' : 'Waiting for your computer') : when(e.at)}
+            {e.refused ? `Not sent: ${e.refused}` : e.pending ? (e.sent ? 'Sent' : e.cloud ? 'Working in Agentbox Cloud' : e.toCloud ? 'Waiting for Agentbox Cloud' : 'Waiting for your computer') : when(e.at)}
           </T>
-          {e.pending && !e.refused && !e.cloud && !e.sent && sendNow && (
+          {e.pending && !e.refused && !e.cloud && !e.toCloud && !e.sent && sendNow && (
             <T onPress={sendNow} suppressHighlighting accessibilityRole="button"
               style={{ fontSize: 12.5, lineHeight: 20, color: color.dim, textDecorationLine: 'underline' }}>Send now</T>
           )}

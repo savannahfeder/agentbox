@@ -50,14 +50,20 @@ export interface Plan {
   undo?: (made: any) => Step[];
   /** What the toast says once Undo has worked. */
   undone?: (made: any) => string;
+  /** The thread a tap on the toast opens, when it is not the one pressed. */
+  goes?: { product: string; id: string };
 }
-export interface PressedItem { product: string; id: string; status: string; title?: string; productName?: string; runAt?: number | null; snoozedUntil?: number | null }
+export interface PressedItem { product: string; id: string; status: string; title?: string; productName?: string; runAt?: number | null; snoozedUntil?: number | null; waitsForMac?: boolean }
+/** Where the computer is: away, and whether Agentbox Cloud starts what is sent meanwhile. */
+export interface Reach { away?: boolean; cloud?: boolean }
 
 // App.tsx's TOAST_TITLE.
 const TOAST_TITLE = 48;
 const UNDO = ' · press Z to undo';
 
-export function planFor(press: Press, item: PressedItem | null, now = Date.now()): Plan | null {
+export function planFor(press: Press, item: PressedItem | null, now = Date.now(), reach: Reach = {}): Plan | null {
+  // Nothing starts until the computer is back.
+  const waits = !!reach.away && !reach.cloud;
   if (press.kind === 'repeat-at') {
     return { steps: [{ door: 'setRepeat', payload: { product: press.rule.product, id: press.rule.id, rule: press.to } }], toast: `Now ${ruleLabel(press.to)}` };
   }
@@ -78,7 +84,9 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
     }
     return {
       steps: [{ door: 'compose', payload: { product: press.product, title: message.title, ...(body ? { body } : {}), kind: 'directive', priority: priority ?? 5, ...rest } }],
-      toast: sentLine({ to: press.to ?? '', when: press.when ?? null, held: press.choices?.start === 'later' }),
+      toast: waits && !press.when && press.choices?.start !== 'later'
+        ? `Waiting for your computer in ${press.to ?? ''} · Z to undo`
+        : sentLine({ to: press.to ?? '', when: press.when ?? null, held: press.choices?.start === 'later' }),
       undo: (made) => (made?.id ? [{ door: 'answer', payload: { product: made.product, id: made.id, status: 'done' } }] : []),
       undone: (made) => `Withdrawn: ${clipToSentence(made?.title ?? '', TOAST_TITLE)}`,
     };
@@ -107,7 +115,11 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       undone: () => undone,
     };
   };
-  const close = (): Plan => ({
+  // A thread the computer never took is withdrawn, not closed: nothing is left for Undo or Done to show.
+  const close = (): Plan => (item.waitsForMac ? {
+    steps: [{ door: 'answer', payload: { ...on, status: 'done' } }],
+    toast: `Withdrawn: ${clipToSentence(item.title ?? '', TOAST_TITLE)}. It never reached your computer.`,
+  } : {
     steps: [{ door: 'answer', payload: { ...on, status: 'done' } }],
     toast: `${DONE.verb}: ${clipToSentence(item.title ?? '', TOAST_TITLE)}${UNDO}`,
     undo: () => [{ door: 'answer', payload: { ...on, status: 'open' } }],
@@ -150,7 +162,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
     case 'stop':
       return { steps: [{ door: 'stopSession', payload: on }], toast: 'Stop sent. Your computer stops the agent when it gets it.' };
     case 'run-now':
-      return { steps: [{ door: 'runNow', payload: on }], toast: 'Up next. It starts as soon as an agent is free.' };
+      return { steps: [{ door: 'runNow', payload: on }], toast: waits ? 'Up next. It starts as soon as your computer is back.' : 'Up next. It starts as soon as an agent is free.' };
     case 'move-to-cloud':
       return { steps: [{ door: 'moveToCloud', payload: { ...on, ids: [item.id] } }], toast: 'Moving to the cloud. It keeps working until the cloud has room.' };
     case 'send-back':
@@ -169,6 +181,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       return {
         steps: writes.map((w) => ({ door: 'answer' as const, payload: w })),
         toast: `Doing it in this thread: ${title}${UNDO}`,
+        goes: { product: press.parent.product, id: press.parent.id },
         undo: () => [{ door: 'answer', payload: { product: press.child.product, id: press.child.id, status: 'open' } }],
         undone: () => `Back as its own thread: ${title}. The message already went.`,
       };

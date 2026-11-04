@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
 import { cloudClient, type CloudClient } from '../../../renderer/src/cloud-rest';
-import { PROJECTS_SELECT, cloudCarriesOn, macSeenOf, phoneConnectState, phoneSlug, phoneStatusLine, phoneView, readCommands, readSettingsRows, readThreads, settingCommand, splitSlug, type PhoneRows } from '../../../renderer/src/phone-rows';
+import { PROJECTS_SELECT, cloudCarriesOn, macAway, macSeenOf, phoneConnectState, phoneSlug, phoneStatusLine, phoneView, readCommands, readSettingsRows, readThreads, settingCommand, splitSlug, type PhoneRows } from '../../../renderer/src/phone-rows';
 import { phoneRepeats, type RepeatSettingsRow } from '../../../renderer/src/phone-repeats';
 import { sendPhoneFeedback, type FeedbackFiles } from '../../../renderer/src/phone-feedback';
 import { phoneSender } from '../../../renderer/src/phone-send';
@@ -28,7 +28,7 @@ import { previewCloud } from '../lib/preview';
 import { ALERTS_KEY, leaveAddress, readAlerts, takeAddressBack, type KeptAlerts } from '../lib/push-device';
 import type { PlaceId } from '../lib/groups';
 import { phoneTabs } from '../lib/tabs';
-import { onTheirWay, teamFrom } from '../lib/teammates';
+import { onTheirWay, teamFrom, withPhoneAnswers } from '../lib/teammates';
 import { isUnread, markSeen as markSeenIn, markUnseen as markUnseenIn, readSeen } from '../lib/unread';
 import { alertToken, alertTokenIfAllowed, setIconCount } from '../platform/alerts';
 import { appStore, persist } from '../platform/persist';
@@ -128,7 +128,7 @@ function useCloudState() {
   const view = useMemo(() => phoneView(rows, now), [rows, now]);
   const tabs = useMemo(() => phoneTabs(view, now), [view, now]);
   const repeats = useMemo(() => phoneRepeats(settingsRows, rows.commands, rows.projects, now), [settingsRows, rows.commands, rows.projects, now]);
-  const team = useMemo(() => teamFrom(settingsRows), [settingsRows]);
+  const team = useMemo(() => withPhoneAnswers(teamFrom(settingsRows), view.items), [settingsRows, view.items]);
   const teamPending = useMemo(() => onTheirWay(rows.commands, team, now), [rows.commands, team, now]);
   /** A chat with a teammate is on screen until the returned function runs. */
   const watchTeam = useCallback(() => {
@@ -236,12 +236,13 @@ function useCloudState() {
   const send = useCallback(async (press: Press, item: PressedItem | null, opts: { undone?: () => void } = {}) => {
     if (!sender) return null;
     if (needsNotice(press.kind) && !agreed) await askNotice();
-    const plan = planFor(press, item, Date.now());
+    const at = Date.now();
+    const plan = planFor(press, item, at, { away: macAway(macSeenOf(rowsNow.current.projects), at), cloud: cloudCarriesOn(rowsNow.current.projects) });
     if (!plan) return null;
     const made = await runSteps(sender, plan.steps);
     if (made && typeof made === 'object' && 'ok' in made && made.ok === false) throw new Error(String((made as { error?: string }).error ?? 'Not sent.'));
     if (plan.toast) {
-      const goes = item ? { product: item.product, id: item.id } : made?.id ? { product: made.product, id: made.id } : undefined;
+      const goes = plan.goes ?? (item ? { product: item.product, id: item.id } : made?.id ? { product: made.product, id: made.id } : undefined);
       say(plan.toast, plan.undo ? async () => {
         try {
           await runSteps(sender, plan.undo!(made));

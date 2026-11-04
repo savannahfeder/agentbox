@@ -40,6 +40,25 @@ export function teamFrom(rows: readonly { device: string; updated_at?: string; s
   };
 }
 
+/**
+ * The computer's copy, with what you answered or closed here since it was made:
+ * the copy cannot know, and a teammate went on saying "Waiting on you".
+ */
+export function withPhoneAnswers(team: PhoneTeam | null, items: readonly { product: string; id: string; status?: string; wrote?: any }[]): PhoneTeam | null {
+  if (!team) return team;
+  const yoursSince = (w: any) => w?.source === 'founder' && (w.ts ?? 0) > team.copyAt;
+  const settled = new Set(items.filter((i) => yoursSince(i.wrote?.answer) || (i.status === 'done' && yoursSince(i.wrote?.status))).map((i) => `${i.product}/${i.id}`));
+  if (!settled.size) return team;
+  const isSettled = (product: string, id: string) => settled.has(`${phoneSlug(team.device, product)}/${id}`);
+  const list = team.view.list.map((t) => {
+    const waiting = t.waiting.filter((w) => !isSettled(w.product, w.id));
+    if (waiting.length === t.waiting.length) return t;
+    return { ...t, waiting, now: !waiting.length && t.now === 'Waiting on you' ? 'Answered' : t.now };
+  });
+  const runs = team.view.runs.map((r) => (r.waiting && isSettled(r.product, r.item) ? { ...r, waiting: false, answered: true } : r));
+  return { ...team, view: { ...team.view, list, runs } };
+}
+
 /** The teammate a thread belongs to, by its `teammate:<id>` label. */
 export function mateOf(item: { labels?: string[] } | null | undefined, team: PhoneTeam | null): Teammate | null {
   const id = item ? teammateIdOf(item) : null;
