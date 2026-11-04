@@ -19,7 +19,7 @@
 // Their terminal says the same about the same file ("Error loading
 // config.toml: ..."), so the sentence points there.
 import { describe, it, expect } from 'vitest';
-import { troubleCause, deadRunSentence, needsHerHands, engineTroubleNote } from '../shared/spawn-trouble.mjs';
+import { troubleCause, deadRunSentence, needsHerHands, engineTroubleNote } from '../shared/spawn-trouble.mts';
 
 const SYNTAX = 'codex app-server refused config/read: failed to read configuration layers: /tmp/h/.codex/config.toml:5:17: invalid basic string, expected `"`';
 const LEGACY = 'codex app-server refused config/read: failed to resolve feature override precedence: legacy `profile = "work"` config is no longer supported; use `--profile work` with `work.config.toml` instead';

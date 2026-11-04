@@ -28,7 +28,7 @@
 // again on its own.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { answerSettled } from '../shared/answers.mjs';
 import { belongsInInbox, belongsInProgress } from '../renderer/src/list-rules';
 

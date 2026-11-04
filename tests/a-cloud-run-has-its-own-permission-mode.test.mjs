@@ -3,7 +3,7 @@
 // What was asked (2026-10-16): "the permissions look like they're generalized
 // to all types of accounts, whether in the cloud or on this computer...
 // wouldn't it be logical for that to differ by setup". It was one setting:
-// main/harnesses/claude.mjs handed a cloud run exactly the arguments a run on
+// main/harnesses/claude.mts handed a cloud run exactly the arguments a run on
 // this computer gets, --permission-mode included. A cloud run works on a
 // throwaway copy with nobody there to approve anything, so it may want a
 // looser mode than this computer.
@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { cloudPermissionArgs, setWorkspaceSetting } from '../main/settings.mjs';
+import { cloudPermissionArgs, setWorkspaceSetting } from '../main/settings.mts';
 
 const RUN = ['-p', '--output-format', 'stream-json', '--allowedTools', 'mcp__agentbox', 'Bash(git fetch:*)', '--permission-mode', 'auto', '--model', 'opus'];
 
@@ -68,9 +68,9 @@ describe('saving it', () => {
 
 describe('a cloud run', () => {
   it('is spawned with the cloud’s flag, and a run here is not', () => {
-    const src = fs.readFileSync(new URL('../main/harnesses/claude.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/harnesses/claude.mts', import.meta.url), 'utf8');
     // Made in one place (`cloudLaunch`), which a kit for the phone shares.
-    const launch = src.slice(src.indexOf('cloudLaunch(sup, plan'), src.indexOf('  spawn(sup, plan'));
+    const launch = src.slice(src.indexOf('cloudLaunch(sup'), src.indexOf('  spawn(sup'));
     expect(launch).toContain('cloudPermissionArgs(plan.args, cloudClaudeMode(sup.config.cloudPermission, plan.answerMode))');
     const cloud = src.slice(src.indexOf('if (cloud) {'), src.indexOf('// The binary is the one this definition names'));
     expect(cloud).toContain('claudeHarness.cloudLaunch(sup, plan');

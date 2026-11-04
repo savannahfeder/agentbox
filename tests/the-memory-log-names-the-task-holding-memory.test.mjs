@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { summarizeMemory, MemoryLog } from '../main/memory-log.mjs';
+import { summarizeMemory, MemoryLog } from '../main/memory-log.mts';
 
 const MB = (n) => n;
 const proc = (pid, ppid, mb, exe, extra = {}) => ({ pid, ppid, mb: MB(mb), exe, item: null, product: null, ...extra });

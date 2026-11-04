@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WorkspaceNavigation } from '../renderer/src/components/WorkspaceNavigation';
-import { everyKey, keysForAgents } from '../shared/shortcuts.mjs';
+import { everyKey, keysForAgents } from '../shared/shortcuts.mts';
 import { HINTS } from '../renderer/src/hint-plate';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -65,7 +65,7 @@ describe('without Groups it holds Threads, Feedback and Settings', () => {
   });
 
   it('puts no Groups row under Threads unless Groups is on, and Chats only for teammates', () => {
-    expect(app).toContain(`groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />`);
+    expect(app).toContain(`groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />`);
   });
 
   it('names the first row and the page Threads without Groups, and Inbox with them', () => {

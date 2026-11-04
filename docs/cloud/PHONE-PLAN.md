@@ -8,7 +8,7 @@ Everything should work from your mobile app with your computer completely
 closed." So:
 - After each turn of a Claude Code thread on the phone, a computer on the
   managed cloud leaves a KIT in the person's storage (shared/cloud-kit.mjs,
-  main/cloud/kit.mjs): the reply run's own arguments with the reply's place
+  main/cloud/kit.mts): the reply run's own arguments with the reply's place
   marked, the folder's bundle, the files a run takes, the sign-in by name.
 - The cloud server (cloud/gateway/phone.mjs), every minute, starts a reply
   the computer has not claimed within a minute from that kit, claims the
@@ -16,7 +16,7 @@ closed." So:
   When the run ends it writes the agent's answer into the phone's copy of
   the thread and sends the alert.
 - The computer, waking, joins the run or brings it home
-  (main/cloud/run.mjs `joining`), with her reply on the row.
+  (main/cloud/run.mts `joining`), with her reply on the row.
 - New threads, files from the phone, Codex threads and permission cards also
   carry on with the computer shut. A Claude Code run's approvals server is
   held by the cloud machine; a Codex run asks on its output, so the server
@@ -37,7 +37,7 @@ Still not on the phone: repeating tasks, pins and dragging a row to a place,
 team pages and teammates' names on their lines, and anything with the Mac shut
 beyond queueing (step 2, the scheduler in docs/cloud/PLAN.md "Next" step 4).
 2026-10-17: a thread's copy also carries whether an agent is running on it (`live`)
-and the files it names, uploaded to a private bucket (main/phone-uploads.mjs,
+and the files it names, uploaded to a private bucket (main/phone-uploads.mts,
 renderer/src/cloud-files.ts, migration 20261017000000_phone_files.sql).
 
 ## What she asked for
@@ -57,12 +57,12 @@ with the Mac shut.
 - **Accounts and a hosted database**, from the team version: Supabase (Postgres,
   Auth, Realtime), Google or email sign-in (main/team/sign-in.mjs, session.mjs),
   row-level security on every table, and a two-way sync of a project's ledger
-  lines (`lines`, main/team/sync.mjs: push by byte offset, pull by `seq`, every
+  lines (`lines`, main/team/sync.mts: push by byte offset, pull by `seq`, every
   5 s and on Realtime). A work item online is exactly its ledger lines, and the
   browser-safe `foldWorkItems` rebuilds rows from them anywhere.
 - **The phone screen**: the app's own renderer with a phone layout
   (renderer/src/phone.css, browser-bridge.ts), served BY the Mac over Wi-Fi,
-  Tailscale or the Cloudflare relay (main/phone-link.mjs, relay/). Dead when
+  Tailscale or the Cloudflare relay (main/phone-link.mts, relay/). Dead when
   the Mac sleeps.
 - **Cloud runs** (docs/cloud/PLAN.md): every run is proxied by a process on the
   Mac, which also serves the agent's store tools and approvals.

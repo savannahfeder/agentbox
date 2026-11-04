@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Repeats, OCCURRENCE_PROTOCOL } from '../main/repeats.mjs';
-import { loadStore } from '../main/store-modules.mjs';
+import { loadStore } from '../main/store-modules.mts';
 
 let dir, repeats, mods;
 

@@ -87,10 +87,10 @@ describe('the shortcuts are off the screen and the verbs are not', () => {
     // in the chat message, so it is on the reply card now, and the three tests
     // below hold it there.
     const row = focus.slice(focus.indexOf('<div className="focus-actions">'), focus.indexOf('focus-dock'));
-    expect(row).toContain('back to inbox');
-    expect(row).toContain('let it run now');
-    expect(row).toContain('take me to it');
-    expect(row).toContain('send back to agent');
+    expect(row).toContain('Back to inbox');
+    expect(row).toContain('Let it run now');
+    expect(row).toContain('Take me to it');
+    expect(row).toContain('Send back to agent');
   });
 
   it('does not draw an empty row on a finished task', () => {
@@ -306,7 +306,7 @@ describe('the Done button says its key the way its plate did', () => {
     expect(focus).not.toContain('data-hint="done"');
     expect(menu).toContain('data-hint="done"');
     expect(plate).toContain("done: [{ key: 'E', what: 'Mark done' }],");
-    // `chord` draws the key in this keyboard's own glyphs (shared/key-caps.mjs);
+    // `chord` draws the key in this keyboard's own glyphs (shared/key-caps.mts);
     // the row still prints its key beside its words, which is what this guards.
     expect(menu).toContain('<kbd>{chord(row.key)}</kbd>');
   });

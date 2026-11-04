@@ -9,7 +9,7 @@
 //            clipboard by itself, Codex's code is shown to type on OpenAI's
 //            page; every wait wears a moving mark;
 //   where    where new threads should start.
-// The sign-in itself happens in the cloud (main/cloud/logins.mjs).
+// The sign-in itself happens in the cloud (main/cloud/logins.mts).
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { AppMark } from './AppMark';

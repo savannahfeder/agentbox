@@ -13,7 +13,7 @@
 
 import { describe, it, expect } from 'vitest';
 import os from 'node:os';
-import { TerminalHosts } from '../main/terminal-hosts.mjs';
+import { TerminalHosts } from '../main/terminal-hosts.mts';
 
 const hosts = (platform) => {
   const opened = [];

@@ -40,8 +40,10 @@ describe('each person says at most three things', () => {
   });
   const me = groupsOf(of(day.people, 'me'));
 
-  it('working on holds open tasks and threads that moved', () => {
-    expect(titles(me.working)).toEqual(['Read the contract', 'Seat picker']);
+  it('working on holds threads that moved, and to do holds open tasks', () => {
+    // A task given to someone is theirs to do; nothing says they have started it.
+    expect(titles(me.working)).toEqual(['Seat picker']);
+    expect(titles(me.todo)).toEqual(['Read the contract']);
   });
   it('done holds shipped, finished and decided, newest first, each saying which it was only when not plain done', () => {
     expect(titles(me.done)).toEqual(['Group bookings v1', 'Pricing page copy', 'Per-clinic passwords']);
@@ -55,7 +57,7 @@ describe('each person says at most three things', () => {
     expect(linesToStep(day.people).map((s) => s.line.title)).not.toContain('My agent asks');
   });
   it('the groups are named in sentence case, in standup order', () => {
-    expect(GROUPS.map((g) => g.label)).toEqual(['Working on', 'Done', 'Blocked']);
+    expect(GROUPS.map((g) => g.label)).toEqual(['Working on', 'To do', 'Done', 'Blocked']);
   });
 });
 
@@ -69,10 +71,10 @@ describe('a blocked task is blocked, not being worked on', () => {
     cards: [], needs: [],
   });
   const dev = groupsOf(of(day.people, 'person:p-dev'));
-  it('goes under Blocked with whom it waits on, and its free sibling stays under Working on', () => {
+  it('goes under Blocked with whom it waits on, and its free sibling stays under To do', () => {
     expect(titles(dev.blocked)).toEqual(['Move in']);
     expect(dev.blocked[0].on).toBe('the landlord');
-    expect(titles(dev.working)).toEqual(['Sign the lease']);
+    expect(titles(dev.todo)).toEqual(['Sign the lease']);
   });
 });
 

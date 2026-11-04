@@ -10,7 +10,7 @@ import { it, expect, describe, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { markShared, readTeam, joinSharedProject, listSharedProjects, teamOf } from '../main/team/projects.mjs';
+import { markShared, readTeam, joinSharedProject, listSharedProjects, teamOf } from '../main/team/projects.mts';
 
 let root;
 const project = (slug, extra = {}) => {
@@ -48,7 +48,7 @@ describe('sharing', () => {
   });
 
   it('is what the store says about each project', async () => {
-    const { Store } = await import('../main/store.mjs');
+    const { Store } = await import('../main/store.mts');
     const accountRoot = path.join(root, 'accounts', 'a');
     fs.mkdirSync(accountRoot, { recursive: true });
     const s = await new Store({ storeRoot: root, accountId: 'a', accountRoot, products: [] }).init();

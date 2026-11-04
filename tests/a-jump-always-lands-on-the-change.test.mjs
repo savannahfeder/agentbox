@@ -6,7 +6,7 @@
 //   second ] skipped the changed call entirely. ] aimed at the top of each
 //   hunk's BLOCK, and the opened lines sit at the top of that block. It aims at
 //   the hunk's own rows now.
-// - On a 64-file change, End then Home in the tree marked index.mjs while the
+// - On a 64-file change, End then Home in the tree marked index.mts while the
 //   code stayed at 83,231, twice. A scroll that had not been processed yet was
 //   queued in the same render as the jump; its update marks the move as "she
 //   scrolled there herself", so the jump effect stood down. A jump she asked

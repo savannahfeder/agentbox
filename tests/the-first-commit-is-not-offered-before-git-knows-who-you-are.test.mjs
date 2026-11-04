@@ -25,7 +25,7 @@ import { snapshotRepo, changeFromRepo, gitKnowsYou } from '../main/git-change.mj
 import { writeChangeForRun, knowsYouAcross } from '../main/code-change.mjs';
 import { machineryPath } from '../main/store/home.mjs';
 import { changePath } from '../main/code-change.mjs';
-import { COMMIT_IDENTITY_CHECK, workerGitBrief } from '../main/worker-git.mjs';
+import { COMMIT_IDENTITY_CHECK, workerGitBrief } from '../main/worker-git.mts';
 import {
   COMMIT_FIRST_OFFER, NAME_YOURSELF_ASK, NAME_YOURSELF_OFFER, NOT_COMMITTED_ASK, SHIP_OFFER,
   shipOfferFor, standingFrom, UNREAD,

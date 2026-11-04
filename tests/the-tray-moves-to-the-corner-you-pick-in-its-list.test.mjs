@@ -11,8 +11,8 @@
 // list moves the tag's glass to that corner of the screen it is on, the usual
 // gap in, remembers it the way a drag is remembered, and shuts the list.
 import { describe, expect, it } from 'vitest';
-import { createCornerTag } from '../main/corner-tag.mjs';
-import { MARGIN } from '../shared/corner-tag.mjs';
+import { createCornerTag } from '../main/corner-tag.mts';
+import { MARGIN } from '../shared/corner-tag.mts';
 
 const LAPTOP = { x: 0, y: 0, width: 1728, height: 1080 };
 const BIG = { x: 1728, y: 0, width: 3413, height: 1920 };

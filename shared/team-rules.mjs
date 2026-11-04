@@ -3,7 +3,7 @@
 // before it puts a row in somebody's inbox, so the two can never disagree about
 // whose a row is.
 //
-// A project is shared when its record carries a team id (main/team/projects.mjs).
+// A project is shared when its record carries a team id (main/team/projects.mts).
 // Everything here leaves a private project exactly as it always was.
 import { GIVEN_TASK, WORK_THREAD, pickFields } from './work-items.mjs';
 import { blockedOnMe, deadlineOf, isLate } from './team-tasks.mjs';

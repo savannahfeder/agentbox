@@ -1,6 +1,6 @@
 // ALERTS ON HER PHONE'S LOCK SCREEN, SENT BY THIS MAC.
 //
-// The arrivals are the desktop banner's (main/notify.mjs, from App.tsx's
+// The arrivals are the desktop banner's (main/notify.mts, from App.tsx's
 // inbox), and so are the rules (shared/notify-rules.mjs): nothing while she
 // has used this Mac in the last five minutes, once per stretch away, once
 // more for a permission card. They go out from the phone pass, after it has

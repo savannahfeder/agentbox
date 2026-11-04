@@ -10,7 +10,7 @@
 //
 // Nothing is faked about the card itself. The snapshot is her real store, read
 // the way every other shot script reads it, with one approval added pointing at
-// a row that is really in it: `item` is a field main/approval-prompt-server.mjs
+// a row that is really in it: `item` is a field main/approval-prompt-server.mts
 // has always stamped, so this is the shape a real ask arrives in.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -68,7 +68,7 @@ const SAID = {
   item: row.id,
   tool: 'Bash',
   input: {
-    command: '/tmp/ab-serve/main/main.mjs',
+    command: '/tmp/ab-serve/main/main.mts',
     description: 'Start the store server so the worker can read the ledger',
     cwd: '/tmp/ab-serve',
   },
@@ -79,7 +79,7 @@ const BARE = {
   product: row.product,
   item: row.id,
   tool: 'Bash',
-  input: { command: '/tmp/ab-serve/main/main.mjs', cwd: '/tmp/ab-serve' },
+  input: { command: '/tmp/ab-serve/main/main.mts', cwd: '/tmp/ab-serve' },
 };
 const QUEUE = [
   { id: 'shot-2', at: at + 1, product: row.product, item: row.id, tool: 'Bash', input: { command: 'npm test' } },

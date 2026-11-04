@@ -18,7 +18,7 @@
 //     is one reading, so they now hold ONE slot between them. A command the
 //     history knows is heavy still holds its own, as any heavy command does.
 //
-//   - Codex has no PostToolUseFailure (main/codex-memory-gate.mjs), so a
+//   - Codex has no PostToolUseFailure (main/codex-memory-gate.mts), so a
 //     Codex command that FAILS never sends its "after" report, and its grant
 //     outlives it. 230da50 lets such a grant go after twenty minutes. A
 //     thread's turn ending is a firmer signal and a much earlier one: nothing
@@ -31,9 +31,9 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { MemoryGateServer } from '../main/memory-gate-server.mjs';
-import { CommandHistory } from '../main/memory-gate-history.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { MemoryGateServer } from '../main/memory-gate-server.mts';
+import { CommandHistory } from '../main/memory-gate-history.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 const dirs = [];
 const servers = [];
@@ -185,10 +185,10 @@ describe('a Codex turn that ends', () => {
   });
 
   it('the worker\'s exit handler is where it is told', () => {
-    const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     // The exit handler's work is `settleExit` since a stop signal's death waits
     // a moment to be judged (tests/a-worker-stopped-with-the-app-is-not-a-failed-run).
-    const exit = src.slice(src.indexOf('const settleExit = (code, signal, how) => {'));
+    const exit = src.slice(src.indexOf('const settleExit = (code'));
     expect(exit.slice(0, 1500)).toContain('this.memoryGateTurnEnded(session)');
   });
 });

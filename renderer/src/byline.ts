@@ -91,7 +91,7 @@ export const WHERE_LINE: Record<Where, string> = {
 //   1. THE READING IS TAKEN OFF THE `wrote` MAP, NOT OFF `updatedAt`. The fold
 //      records who last set each field and when, and a heartbeat sets no field,
 //      so the newest stamp in that map is the last time the row ACTUALLY
-//      changed. `lastFounderWrite` in main/supervisor.mjs already reads the map
+//      changed. `lastFounderWrite` in main/supervisor.mts already reads the map
 //      this way for the resting rule; this is the same move with the source
 //      filter taken off. It is right on a quiet row too, where a live claim
 //      held by another Agentbox was making an untouched row look freshly moved.

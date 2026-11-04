@@ -9,7 +9,7 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { unpacked } from '../main/supervisor.mjs';
+import { unpacked } from '../main/supervisor.mts';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -27,7 +27,7 @@ describe('the app a stranger downloads is called Powerup', () => {
     // build. It reads the name now rather than holding one, and since a
     // throwaway copy's window says so in its own title (main/new-user-window.mts)
     // the name is handed there rather than written on the window.
-    const main = fs.readFileSync(path.join(repo, 'main', 'main.mjs'), 'utf8');
+    const main = fs.readFileSync(path.join(repo, 'main', 'main.mts'), 'utf8');
     expect(main).toMatch(/name: NAME,/);
     expect(main).not.toMatch(/title: 'Zero'/);
     for (const was of WAS) expect(main).not.toContain(`title: '${was}'`);
@@ -170,7 +170,7 @@ describe('what actually goes in the bundle', () => {
     // server itself. Neither is Node, so neither can see inside app.asar.
     expect(pkg.build.asarUnpack).toContain('worker-permissions.json');
     expect(pkg.build.asarUnpack).toContain('scripts/approval-server.sh');
-    const sup = fs.readFileSync(path.join(repo, 'main', 'supervisor.mjs'), 'utf8');
+    const sup = fs.readFileSync(path.join(repo, 'main', 'supervisor.mts'), 'utf8');
     expect(sup).toMatch(/unpacked\(path\.join\(this\.appDir, 'worker-permissions\.json'\)\)/);
     expect(sup).toMatch(/unpacked\(path\.join\(this\.appDir, 'scripts', 'approval-server\.sh'\)\)/);
   });
@@ -178,7 +178,7 @@ describe('what actually goes in the bundle', () => {
   // THE ONE THAT COST A MORNING. Unpacking the launcher is not enough: the
   // launcher then has to find the SERVER, and the server is not unpacked with
   // it. The old line asked for
-  // app.asar.unpacked/main/approval-prompt-server.mjs, node threw
+  // app.asar.unpacked/main/approval-prompt-server.mts, node threw
   // MODULE_NOT_FOUND, the MCP server never started, and the Claude CLI would
   // not run a session at all because the tool named by --permission-prompt-tool
   // was missing. Every agent in every packaged build stopped after four
@@ -203,7 +203,7 @@ describe('what actually goes in the bundle', () => {
     const out = execFileSync('bash', [path.join(scripts, 'approval-server.sh')], { encoding: 'utf8' }).trim();
     // Electron, run as node, against the server inside the archive: nothing is
     // asked of app.asar.unpacked/main and no node on the machine is needed.
-    expect(out).toBe(`1 ${path.join(contents, 'Resources', 'app.asar', 'main', 'approval-prompt-server.mjs')}`);
+    expect(out).toBe(`1 ${path.join(contents, 'Resources', 'app.asar', 'main', 'approval-prompt-server.mts')}`);
     fs.rmSync(root, { recursive: true, force: true });
   });
 
@@ -224,19 +224,19 @@ describe('the founder’s own writing does not go inside a signed bundle', () =>
     //
     // userDir rather than dataDir since w-3dc46f3a67: dataDir IS the checkout
     // when the app runs from source, which is the developer's own machine.
-    const sup = fs.readFileSync(path.join(repo, 'main', 'supervisor.mjs'), 'utf8');
+    const sup = fs.readFileSync(path.join(repo, 'main', 'supervisor.mts'), 'utf8');
     expect(sup).toMatch(/standingFile\(\)\s*\{\s*return path\.join\(this\.userDir, 'briefs', 'founder\.md'\)/);
   });
 
   it('reads the config from the writable folder and the shipped brief from the bundle', () => {
-    const main = fs.readFileSync(path.join(repo, 'main', 'main.mjs'), 'utf8');
+    const main = fs.readFileSync(path.join(repo, 'main', 'main.mts'), 'utf8');
     // THE RULE MOVED INTO `configDir` ON 2026-09-27, because a third case had
     // to go into it: a throwaway copy reads the user data folder whatever it
     // was started from, or a fresh user on a source-run app reads the
     // developer's config and opens on the developer's inbox. What is pinned here is unchanged, that
-    // main.mjs asks for the writable folder and hands it to loadConfig; the
+    // main.mts asks for the writable folder and hands it to loadConfig; the
     // three answers are pinned in tests/a-brand-new-user-opens-beside-her-own.
-    expect(main).toContain('configDir({ appDir, userData: app.getPath(\'userData\'), packaged: app.isPackaged })');
+    expect(main).toContain('configDir({ appDir, userData: app.getPath(\'userData\'), packaged: app.isPackaged }');
     expect(main).toContain('loadConfig(dataDir)');
     // And her own folder, which is the data folder whether or not the app is
     // packaged, because the checkout is not a place to keep what the user typed.
@@ -244,7 +244,7 @@ describe('the founder’s own writing does not go inside a signed bundle', () =>
     // briefs/worker.md ships with the app and is never written to, so it stays
     // on appDir. All three are handed to the supervisor, in that order.
     expect(main).toContain('new Supervisor(config, store, appDir, dataDir, userDir)');
-    const sup = fs.readFileSync(path.join(repo, 'main', 'supervisor.mjs'), 'utf8');
+    const sup = fs.readFileSync(path.join(repo, 'main', 'supervisor.mts'), 'utf8');
     expect(sup).toContain('readSystemTemplate(this.appDir, this.userDir)');
   });
 
@@ -264,7 +264,7 @@ describe('the founder’s own writing does not go inside a signed bundle', () =>
     // finishing rules were a second box. Her copy is on userDir and the shipped
     // default stays in the bundle on appDir, which is what lets a later release
     // change the default for anyone who has not written their own.
-    const sup = fs.readFileSync(path.join(repo, 'main', 'supervisor.mjs'), 'utf8');
+    const sup = fs.readFileSync(path.join(repo, 'main', 'supervisor.mts'), 'utf8');
     expect(sup).toMatch(/path\.join\(this\.userDir, 'briefs', 'message-rules\.md'\)/);
     expect(sup).toMatch(/path\.join\(this\.appDir, 'briefs', 'message-rules\.md'\)/);
     expect(sup).not.toMatch(/path\.join\(this\.dataDir, 'briefs', 'message-rules\.md'\)/);
@@ -287,7 +287,7 @@ describe('the founder’s own writing does not go inside a signed bundle', () =>
     // since. So this pins the BEHAVIOUR: there is a list of former names, it is
     // tried only when the current folder does not exist, and every name this
     // app has shipped under is on it.
-    const main = fs.readFileSync(path.join(repo, 'main', 'main.mjs'), 'utf8');
+    const main = fs.readFileSync(path.join(repo, 'main', 'main.mts'), 'utf8');
     expect(main).toContain("app.setPath('userData', legacy)");
     expect(main).toMatch(/!fs\.existsSync\(named\)/);
     expect(main).toMatch(/fs\.existsSync\(legacy\)/);

@@ -10,7 +10,7 @@
 // run that said S.
 //
 // So every run is now handed the app's keys, read off the same list the
-// Settings page draws (shared/shortcuts.mjs), with a line saying a remembered
+// Settings page draws (shared/shortcuts.mts), with a line saying a remembered
 // key that disagrees is out of date. One list, so the next key that moves
 // reaches the agents the moment it reaches the page.
 
@@ -18,8 +18,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { SHORTCUTS, keysForAgents } from '../shared/shortcuts.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { SHORTCUTS, keysForAgents } from '../shared/shortcuts.mts';
 
 let appDir;
 let dataDir;

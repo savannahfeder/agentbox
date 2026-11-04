@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { commandRunning } from '../shared/terminal-state.mjs';
+import { commandRunning } from '../shared/terminal-state.mts';
 
 describe('whether there is a command to stop', () => {
   it('is no at an idle prompt, however the shell reports its name', () => {

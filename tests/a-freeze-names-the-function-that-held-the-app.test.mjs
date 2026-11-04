@@ -20,8 +20,9 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { freezeFrom, writeFreeze, dayOf } from '../main/freeze-recorder.mjs';
+import { freezeFrom, writeFreeze, dayOf } from '../main/freeze-recorder.mts';
 import { stallWatch } from '../main/stall-watch.mts';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dirs = [];
@@ -37,7 +38,7 @@ describe('an app whose main thread stops answering', () => {
     const script = path.join(dir, 'freezes.mjs');
     fs.writeFileSync(script, `
       import { execFileSync } from 'node:child_process';
-      import { startFreezeRecorder } from ${JSON.stringify(path.join(ROOT, 'main', 'freeze-recorder.mjs'))};
+      import { startFreezeRecorder } from ${JSON.stringify(path.join(ROOT, 'main', 'freeze-recorder.mts'))};
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       function holdsTheThreadInALoop(ms) { const end = Date.now() + ms; let x = 0; while (Date.now() < end) x += Math.sqrt(x + 1); return x; }
       function holdsTheThreadOnAProgram() { execFileSync('sleep', ['1']); }
@@ -51,7 +52,7 @@ describe('an app whose main thread stops answering', () => {
       await wait(1500);
       rec.stop();
     `);
-    await promisify(execFile)(process.execPath, [script], { timeout: 30_000 });
+    await promisify(execFile)(process.execPath, [...stripTypesFlags(), script], { timeout: 30_000 });
     const lines = fs.readdirSync(path.join(dir, 'log'))
       .flatMap((f) => fs.readFileSync(path.join(dir, 'log', f), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)));
     expect(lines.map((l) => l.where)).toEqual([
@@ -88,7 +89,7 @@ function aProfile(stacks, { stepUs = 10_000 } = {}) {
 
 describe('reading what held it off the profile', () => {
   const app = '/Applications/Agentbox.app/Contents/Resources/app';
-  const git = [['settleExit', `file://${app}/main/supervisor.mjs`, 8990], ['changeFromRepo', `file://${app}/main/git-change.mjs`, 262], ['execFileSync', 'node:child_process', 941], ['spawn']];
+  const git = [['settleExit', `file://${app}/main/supervisor.mts`, 8990], ['changeFromRepo', `file://${app}/main/git-change.mjs`, 262], ['execFileSync', 'node:child_process', 941], ['spawn']];
 
   it('names our own deepest function, not the native call under it', () => {
     const read = freezeFrom([{ profile: aProfile(Array(50).fill(git)) }], { fromUs: 0, toUs: 1e9, appDir: app });

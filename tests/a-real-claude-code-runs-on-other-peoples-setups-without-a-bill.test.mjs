@@ -283,12 +283,12 @@ describe('the Codex stand-in, and Codex homes laid out like a person\'s', () => 
 describe('the setups run before a deploy', () => {
   const run = (files, opts) => layersFor(files, opts).setups;
   it('any change a person runs gets the setups', () => {
-    expect(run(['main/supervisor.mjs']).run).toBe(true);
+    expect(run(['main/supervisor.mts']).run).toBe(true);
     expect(run(['scripts/lib/claude-stub-model.mjs']).run).toBe(true);
   });
   it('a docs change does not, and --quick or --no-setups drops them and says so', () => {
     expect(run(['docs/team/PLAN.md']).run).toBe(false);
-    expect(run(['main/supervisor.mjs'], { quick: true })).toEqual({ run: false, why: '--quick' });
-    expect(run(['main/supervisor.mjs'], { setups: false })).toEqual({ run: false, why: '--no-setups' });
+    expect(run(['main/supervisor.mts'], { quick: true })).toEqual({ run: false, why: '--quick' });
+    expect(run(['main/supervisor.mts'], { setups: false })).toEqual({ run: false, why: '--no-setups' });
   });
 });

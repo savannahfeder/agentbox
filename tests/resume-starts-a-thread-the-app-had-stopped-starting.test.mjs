@@ -20,7 +20,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const T0 = Date.parse('2026-10-23T22:20:00Z');
 const realNow = Date.now;
@@ -134,7 +134,7 @@ describe('a thread held after six dead starts', () => {
     sup.spawnWorker(items[0]);
     expect(pastTheDoor).toEqual(['w-held']);
 
-    const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+    const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
     const handler = (name) => {
       const from = ipc.indexOf(`ipcMain.handle('${name}'`);
       return ipc.slice(from, ipc.indexOf('ipcMain.handle(', from + 10));

@@ -2,7 +2,7 @@
 // resumes, while keeping Read only and explicit reviewer overrides intact.
 import { describe, expect, it } from 'vitest';
 import { codexPosture } from '../shared/codex-modes.mjs';
-import { workerThreadParams, resumeThreadParams, createCodexWorker } from '../main/codex-session.mjs';
+import { workerThreadParams, resumeThreadParams, createCodexWorker } from '../main/codex-session.mts';
 
 describe('Codex Auto reviews extra access', () => {
   it.each([undefined, null, 'auto', 'old-mode'])('uses automatic review for %s', mode => {

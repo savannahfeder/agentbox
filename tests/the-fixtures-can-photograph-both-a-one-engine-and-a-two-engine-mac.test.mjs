@@ -49,7 +49,7 @@ import { fileURLToPath } from 'node:url';
 
 import { EnginePicker } from '../renderer/src/components/EnginePicker.tsx';
 import { ENGINES } from '../shared/engines.mjs';
-import { codexModels as readCodexModels } from '../main/codex-models.mjs';
+import { codexModels as readCodexModels } from '../main/codex-models.mts';
 import { engineModelChoices } from '../renderer/src/models.ts';
 import {
   fixtureSnapshot,
@@ -270,7 +270,7 @@ describe('the words are read off the app rather than typed here twice', () => {
     expect(source('renderer/src/fixtures.ts')).toContain("from '../../shared/engines.mjs'");
   });
 
-  // The models are the shapes main/codex-models.mjs really produces: the six
+  // The models are the shapes main/codex-models.mts really produces: the six
   // marked `visibility: "list"`, in the CLI's own ascending `priority` order,
   // as `{ id, label }` and nothing else.
   //
@@ -280,7 +280,7 @@ describe('the words are read off the app rather than typed here twice', () => {
   // the priorities as it really numbers them (6, 7, 8, 12, 16, 23, which are not
   // 1..6). A hand-typed list cannot pass this: it would have to guess the order
   // and drop exactly the two the reader drops.
-  it('holds what main/codex-models.mjs would read off her Mac', () => {
+  it('holds what main/codex-models.mts would read off her Mac', () => {
     const cache = JSON.parse(source('tests/fixtures/codex-models-cache.json'));
     const read = readCodexModels({ home: '/nowhere', read: () => cache })
       .map(({ id, label }) => ({ id, label }));

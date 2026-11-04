@@ -9,10 +9,8 @@ import { Platform, Pressable, TextInput, View } from 'react-native';
 import { readRule, repeatPresets } from '../../../renderer/src/format';
 import { engineModelLabel } from '../../../renderer/src/models';
 import { ruleLabel } from '../../../shared/repeats.mjs';
-import { readSettingsRows } from '../../../renderer/src/phone-rows';
 import { priorityIdOf, priorityLabelOf, priorityValueOf } from '../../../renderer/src/priority';
 import { agentChoices, agentWordFor, autoOffered, laterHint, momentFromWords, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
-import { computerAgents } from '../../../renderer/src/web-settings';
 import { splitSlug } from '../../../renderer/src/phone-rows';
 import { AUTO_LABEL } from '../../../shared/auto-route.mjs';
 import type { Choices } from '../lib/actions';
@@ -21,9 +19,9 @@ import { AutoMark, TeammateMark } from './Teammates';
 import { roleOf } from '../lib/teammates';
 import type { Teammate } from '../../../renderer/src/types';
 import { useDraft } from '../lib/drafts';
-import { computerOf } from '../lib/settings-view';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
+import { useComputerAgents } from '../state/computer-agents';
 import { AttachSheet, Attached } from './Attach';
 import { DictationProblem, Listening, MicButton, useDictation } from './Dictation';
 import { Caret, Clip, Clock, Repeat } from './icons';
@@ -53,19 +51,7 @@ export function useNewThread(sent: () => void) {
   const [opening] = useState(() => openingChoices(projects, appStore));
   const [picked, setPicked] = useState<string | null>(null);
   const product = projectNow(projects, picked, appStore) ?? '';
-  // WHICH CODING AGENTS THE COMPUTER OFFERS, off its settings copy
-  // (w-24119e8784): To read "Agent" and every thread went to Claude Code,
-  // whatever the computer had. Claude Code alone until the copy is read.
-  const [agents, setAgents] = useState(() => computerAgents(null));
-  useEffect(() => {
-    const cloud = c.cloud;
-    if (!cloud?.signedIn()) return;
-    let gone = false;
-    readSettingsRows((t, q) => cloud.select(t, q))
-      .then((rows) => { if (!gone) setAgents(computerAgents(computerOf(rows))); })
-      .catch(() => { /* Claude Code alone, as before */ });
-    return () => { gone = true; };
-  }, [c.cloud]);
+  const agents = useComputerAgents();
   const codex = { codexModels: agents.codexModels, codexDefault: agents.codexDefault };
   const offered = agentChoices(agents.engines);
   const [pickedEngine, setPickedEngine] = useState<Harness | null>(null);

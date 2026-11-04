@@ -17,7 +17,7 @@
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { terminalKeys } from '../shared/terminal-focus.mjs';
+import { terminalKeys } from '../shared/terminal-focus.mts';
 
 describe('when a terminal is built, who gets the keyboard', () => {
   it('stays with the page on coming back to a thread whose terminal was open', () => {

@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { HOMES, existingHomes, freshEnv, makeHome, prepareHome } from '../shared/fresh-user-home.mjs';
-import { openFreshUser, relaunchCommand } from '../main/fresh-user.mjs';
+import { openFreshUser, relaunchCommand } from '../main/fresh-user.mts';
 import { configDir } from '../main/config.mjs';
 import { DEMO_ENV } from '../shared/demo-world.mjs';
 import { NAME, Name, envNames } from '../shared/product-name.mjs';
@@ -94,7 +94,7 @@ describe('the environment a fresh copy is launched with', () => {
     expect(env.PATH).toBe('/usr/bin');
   });
 
-  // AND THE ONE THAT WAS WRONG THE WHOLE TIME. `main.mjs` writes the store root
+  // AND THE ONE THAT WAS WRONG THE WHOLE TIME. `main.mts` writes the store root
   // into its own environment so the store modules can read it at call time, and
   // this spread that straight into the child. The copy that was meant to be a
   // stranger got a throwaway home, no config file and the defaults, and then

@@ -208,7 +208,7 @@ export function updateItem(id, patch, { product = null, epoch = null, source = '
  * quoted in `closeBecause` and found in what they wrote on the row. Without
  * them the rest of the write lands and the row stays open: the answer reaches
  * the inbox as an answer (`answeredHerAsk`, list-rules.ts), and `awaitingHer`
- * (supervisor.mjs) keeps a second worker off it until the user speaks. The
+ * (supervisor.mts) keeps a second worker off it until the user speaks. The
  * quote is checked for being the user's, not for meaning close; that judgement
  * is the worker's, and the quote is what makes it one it has to make on purpose.
  *

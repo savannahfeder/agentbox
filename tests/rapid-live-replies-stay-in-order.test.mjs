@@ -1,6 +1,6 @@
 // Two corrections sent rapidly must reach the active worker and ledger in order.
 // Failed/ambiguous delivery must reject before writing a successful reply record.
-import {it,expect} from 'vitest';import {submitReply} from '../main/live-replies.mjs';
+import {it,expect} from 'vitest';import {submitReply} from '../main/live-replies.mts';
 function setup(steer){const session={product:'p',child:{steer}};const s={sessions:new Map([['w',session]]),_handledAnswers:new Set(),_answerKey:i=>i.answer,_saveState(){}};return {s,session};}
 // Their words reach a running session inside `liveReplyBrief` (w-ac7f0c0cbb),
 // so the order is read off the words themselves rather than off the whole frame.

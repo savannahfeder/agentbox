@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { loadPty, NO_TERMINAL, ptyIsHere } from '../main/pty.mjs';
+import { loadPty, NO_TERMINAL, ptyIsHere } from '../main/pty.mts';
 
 const repo = path.join(path.dirname(new URL(import.meta.url).pathname), '..');
 const read = (file) => fs.readFileSync(path.join(repo, file), 'utf8');

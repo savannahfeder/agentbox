@@ -4,9 +4,9 @@ import {it, expect, vi} from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {refreshAgentModels} from '../main/refresh-agent-models.mjs';
-import {codexAccount, codexFreePlan, rememberCodexAccount} from '../main/codex-account.mjs';
-import {codexModels} from '../main/codex-models.mjs';
+import {refreshAgentModels} from '../main/refresh-agent-models.mts';
+import {codexAccount, codexFreePlan, rememberCodexAccount} from '../main/codex-account.mts';
+import {codexModels} from '../main/codex-models.mts';
 
 it('refreshes the account before models and uses the live plan until the login changes', async()=>{
  const home=fs.mkdtempSync(path.join(os.tmpdir(),'codex-plan-refresh-'));

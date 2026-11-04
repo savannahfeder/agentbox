@@ -5,7 +5,7 @@
 // thread's reply to the cloud (`carryWhileAsleep`), and kept it in `carried`
 // in .zero-supervisor.json. On waking, the phone pass joins the cloud's run
 // and says the run is of a carried reply (`carried: true`), but the wiring in
-// main/main.mjs passed only project, item, runId and replies on, so
+// main/main.mts passed only project, item, runId and replies on, so
 // `adoptCloudRun` never cleared the hold. With the phone pass seen every
 // minute, `_carriedHolds` then kept the row from starting here for good.
 // The supervisor and the phone pass each have tests; the line between them
@@ -19,15 +19,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { CARRIED } from '../shared/cloud-carry.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend, claimForTheCloud } from '../main/team/memory-cloud.mjs';
-import { createPhoneInbox } from '../main/phone-inbox.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend, claimForTheCloud } from '../main/team/memory-cloud.mts';
+import { createPhoneInbox } from '../main/phone-inbox.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
-const main = fs.readFileSync(new URL('../main/main.mjs', import.meta.url), 'utf8');
+const main = fs.readFileSync(new URL('../main/main.mts', import.meta.url), 'utf8');
 
 function wiring(name) {
   const m = main.match(new RegExp(`^\\s*${name}: (\\(\\{[^\\n]*\\}\\) => supervisor\\.\\w+\\([^\\n]*\\)),$`, 'm'));
-  if (!m) throw new Error(`no ${name} wiring found in main/main.mjs`);
+  if (!m) throw new Error(`no ${name} wiring found in main/main.mts`);
   const calls = [];
   const supervisor = new Proxy({}, { get: (_, method) => (arg) => { calls.push({ method, arg }); return 'adopted'; } });
   // eslint-disable-next-line no-new-func
@@ -58,7 +58,7 @@ describe('joining the cloud\'s run of a reply the Mac handed over', () => {
 describe('the wiring hands the phone pass the supervisor\'s release', () => {
   it('in the app and in the team version', () => {
     expect(main).toMatch(/^\s*carriedFinished: \(commands\) => supervisor\.carriedFinished\(commands\),$/m);
-    const team = fs.readFileSync(new URL('../main/team/index.mjs', import.meta.url), 'utf8');
+    const team = fs.readFileSync(new URL('../main/team/index.mts', import.meta.url), 'utf8');
     expect(team).toContain('carriedFinished: phone.carriedFinished ?? (() => {}),');
   });
 });

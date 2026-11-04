@@ -117,7 +117,7 @@ describe('how many agents this Mac is offered', () => {
 });
 
 describe('the suggestion stops nobody', () => {
-  const settings = fs.readFileSync(path.join(root, 'main/settings.mjs'), 'utf8');
+  const settings = fs.readFileSync(path.join(root, 'main/settings.mts'), 'utf8');
   const pane = fs.readFileSync(path.join(root, 'renderer/src/components/Settings.tsx'), 'utf8');
 
   // THE CORRECTION, HELD IN THREE PLACES.

@@ -2,7 +2,7 @@
 //
 // 2026-09-24, 15:14: she launched Agentbox and got an empty dark window, and
 // it stayed empty. The crash report said `ReferenceError: Cannot access
-// '<str>' before initialization` at main/main.mjs:563, 165 ms after launch.
+// '<str>' before initialization` at main/main.mts:563, 165 ms after launch.
 // Commit 3ef1d54a had started handing `ipcMain` to registerIpc on line 563,
 // but createWindow also said `const { ipcMain } = await import('electron')`
 // on line 726. That second line re-declares the name for the whole function,
@@ -12,7 +12,7 @@
 //
 // Asserted against the source: the main process is not something this suite
 // can boot. The rule is that a name imported from 'electron' at the top of
-// main.mjs is never declared again inside it, because a re-declaration shadows
+// main.mts is never declared again inside it, because a re-declaration shadows
 // the import for its whole scope, lines above it included.
 
 import { describe, it, expect } from 'vitest';
@@ -21,7 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const main = fs.readFileSync(path.join(here, '..', 'main', 'main.mjs'), 'utf8');
+const main = fs.readFileSync(path.join(here, '..', 'main', 'main.mts'), 'utf8');
 
 function topElectronImports(src) {
   const m = src.match(/^import\s*\{([^}]*)\}\s*from\s*'electron';/m);
@@ -45,7 +45,7 @@ function redeclared(src) {
 }
 
 describe('the window draws when the app starts', () => {
-  it('main.mjs never re-declares a name it imported from electron', () => {
+  it('main.mts never re-declares a name it imported from electron', () => {
     expect(topElectronImports(main)).toContain('ipcMain');
     expect(redeclared(main)).toEqual([]);
   });

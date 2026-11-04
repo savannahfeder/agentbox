@@ -19,13 +19,13 @@ import {
 import { type AgentFolder, type Project, type SessionThread } from '../agent-import-card';
 import { ImportAgents } from './ImportAgents';
 import FolderPicker from './FolderPicker';
-import { PRACTICE_NAME, PRACTICE_ROWS, PRACTICE_TASK } from '../../../shared/first-run-practice.mjs';
+import { PRACTICE_NAME, PRACTICE_ROWS, PRACTICE_TASK } from '../../../shared/first-run-practice.mts';
 import { AppMark } from './AppMark';
 import { SidebarIcon } from './SidebarIcon';
 import { AskList, PlanQuestion, PlanSetupCard } from './PlanSetup';
 import { afterCheck, type EngineSetupState, type Plan } from '../plan-setup';
 import { NAME, Name } from '../../../shared/product-name.mjs';
-import { foundOnThisComputer, type RunsOn } from '../../../shared/runs-on.mjs';
+import { foundOnThisComputer, type RunsOn } from '../../../shared/runs-on.mts';
 import { chord, sayKeys } from '../this-keyboard';
 
 /** What the walk knows about each coding agent on this computer. */
@@ -765,7 +765,7 @@ function Finished({
   };
   // "Show me where it is" opens a file panel in the main process and applies
   // the choice there in the same call, so no path crosses the bridge
-  // (`zero:engine-bin` in main/ipc.mjs).
+  // (`zero:engine-bin` in main/ipc.mts).
   const [pointing, setPointing] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
   const point = async () => {
@@ -819,7 +819,7 @@ function Finished({
           <h1 className="fr-page">{card.head}</h1>
           <p className="fr-lede">{card.line}</p>
           {/* Check again drops the cached shell answer first and really
-              searches (`recheckClaude` in main/settings.mjs). */}
+              searches (`recheckClaude` in main/settings.mts). */}
           <AskList
             rows={gateRows(claude.url, { checking, pointing })}
             label={card.head}

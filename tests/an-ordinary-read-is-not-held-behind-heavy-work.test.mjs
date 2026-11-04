@@ -8,7 +8,7 @@
 // against the engine. It was this gate.
 //
 // Every command a worker runs asks the gate first
-// (main/memory-gate-server.mjs), a command that is not LIGHT needs one of
+// (main/memory-gate-server.mts), a command that is not LIGHT needs one of
 // `slots` (two on a 16 GB machine), and the queue is one queue for every agent
 // running. So an ordinary read that comes out `unknown` queues behind whatever
 // build or test suite holds the slots, and after `maxWaitMs` it is refused.
@@ -41,8 +41,8 @@
 // computer that is genuinely short are different things to be told.
 
 import { describe, it, expect } from 'vitest';
-import { CommandHistory } from '../main/memory-gate-history.mjs';
-import { MemoryGate } from '../main/memory-gate.mjs';
+import { CommandHistory } from '../main/memory-gate-history.mts';
+import { MemoryGate } from '../main/memory-gate.mts';
 
 /**
  * A history in which `cat` has been measured light often enough to lend that to

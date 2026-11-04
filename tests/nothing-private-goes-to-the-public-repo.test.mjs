@@ -71,7 +71,7 @@ describe('a file the push adds', () => {
   });
 
   it('passes ordinary files and example configs', () => {
-    for (const p of ['.env.example', 'README.md', 'main/main.mjs', 'renderer/src/App.tsx', 'tests/fixtures/x.jsonl']) {
+    for (const p of ['.env.example', 'README.md', 'main/main.mts', 'renderer/src/App.tsx', 'tests/fixtures/x.jsonl']) {
       expect(checkPath(p), p).toEqual([]);
     }
   });
@@ -114,7 +114,7 @@ describe('the check, run by hand over a range', () => {
   it('refuses a range that adds a key and passes one that does not', () => {
     const { dir, commit } = repo();
     const base = commit('README.md', '# hello\n');
-    const clean = commit('main.mjs', 'export const x = 1;\n');
+    const clean = commit('main.mts', 'export const x = 1;\n');
     const dirty = commit('config.mjs', `export const key = '${KEY}';\n`);
     expect(runCheck(dir, ['--range', `${base}..${clean}`]).status).toBe(0);
     const r = runCheck(dir, ['--range', `${clean}..${dirty}`]);
@@ -203,7 +203,7 @@ describe('the pre-push hook', () => {
   it('lets a clean push through to the suite', () => {
     const { dir, commit } = repo();
     const base = commit('package.json', PKG);
-    const head = commit('main.mjs', 'export const x = 1;\n');
+    const head = commit('main.mts', 'export const x = 1;\n');
     fakeVitest(dir);
     const r = push(dir, base, head);
     expect(r.status).toBe(0);

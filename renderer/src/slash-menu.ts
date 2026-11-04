@@ -1,6 +1,6 @@
 // 2026-09-15: Codex now offers /compact through its own IPC operation.
 // The historical notes below describe why the remaining Claude rows stay gated.
-import { providerCommands } from '../../shared/provider-commands.mjs';
+import { providerCommands } from '../../shared/provider-commands.mts';
 import { SEND } from './this-keyboard';
 // THE ONE LIST BEHIND THE "/" MENU, NOW THAT IT HOLDS TWO DIFFERENT VERBS.
 //
@@ -25,7 +25,7 @@ import { SEND } from './this-keyboard';
 // a blank line and a real question returned the context table and nothing else,
 // 142 lines with zero mentions of the question. A command eats the message it
 // is attached to, so it cannot be a modifier the way a permission mode is.
-// shared/claude-commands.mjs carries that measurement in full.
+// shared/claude-commands.mts carries that measurement in full.
 //
 // The mode rows lost their second column to get there, because a list cannot
 // read as one list while half of it has three columns and half of it has two.
@@ -38,9 +38,9 @@ import { SEND } from './this-keyboard';
 
 import type { CodexModeId, PermissionMode } from './types';
 import { CLEAR_COMMAND, CLEAR_HINT, MODE_COMMAND, MODE_HINT, menuRowsFor } from './modes';
-import { CLAUDE_COMMANDS, commandHint, commandMatches } from '../../shared/claude-commands.mjs';
+import { CLAUDE_COMMANDS, commandHint, commandMatches } from '../../shared/claude-commands.mts';
 import { CODEX_MODE_COMMAND, CODEX_MODE_HINT, codexMenuRowsFor } from '../../shared/codex-modes.mjs';
-import type { ClaudeCommand } from '../../shared/claude-commands.mjs';
+import type { ClaudeCommand } from '../../shared/claude-commands.mts';
 
 export type SlashRow =
   /**
@@ -93,7 +93,7 @@ export function rowKey(row: SlashRow): string {
  *
  * AND NO CODEX EQUIVALENT IS INVENTED FOR EITHER. A Codex worker runs on one
  * posture, `untrusted` + `workspace-write`, chosen by measurement and held
- * deliberately (main/codex-session.mjs); the other two approval policies were
+ * deliberately (main/codex-session.mts); the other two approval policies were
  * measured the same day and neither gates anything, so there is nothing on this
  * engine for six choices to choose between. Which of the six would stand for
  * which Codex setting is a judgement about what an agent may do on the user's

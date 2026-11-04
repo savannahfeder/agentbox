@@ -16,17 +16,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamService } from '../main/team/index.mjs';
+import { Store } from '../main/store.mts';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
 import { cardsFor } from '../shared/thread-cards.mjs';
-import { wantsPriority } from '../main/message-priority.mjs';
+import { wantsPriority } from '../main/message-priority.mts';
 import { GIVEN_TASK, handedOnByReply, heldByAPerson, iSpokeLast, inMyInbox, isGivenTask, mayRunHere, taskGiver, taskNewsAt, whatATeammateMaySet } from '../shared/team-rules.mjs';
 import { messageLine, conversationWith, teamEntries, boardColumns, DEFAULT_DISPLAY } from '../renderer/src/threads/page-rules.ts';
 import { directConversations } from '../renderer/src/team/rooms/conversations.ts';
 import { buildMembers } from '../renderer/src/team/everything/members.ts';
-import { statusWord } from '../renderer/src/team/everything/place.ts';
+import { isBusy, statusWord } from '../renderer/src/team/everything/place.ts';
 import { teamRouteChoices } from '../renderer/src/team/TeamFocus.tsx';
 import { namedCards, taskWords } from '../renderer/src/team/company.ts';
 import { isUnread } from '../renderer/src/unread.ts';
@@ -448,13 +448,17 @@ describe('a person\'s card', () => {
   const card = (over) => ({ threadId: 't', personId: 'dev', state: 'waiting', title: null, updatedAt: 1, ...over });
   const devCard = (args) => buildMembers({ me: people[0], people, ...args }).find((m) => m.key === 'person:dev');
 
-  it('counts what they hold and what waits on them, once each', () => {
+  // Then: a tester read "4 in progress" over a list with two In progress rows,
+  // and Everyone had put the tasks under To do. A task not under way is to do.
+  it('counts what is under way as in progress, and a task held but not under way as to do, once each', () => {
     const m = devCard({
       cards: [card({ threadId: 'a' }), card({ threadId: 'b', state: 'running' }), card({ threadId: 'c', state: 'done' }), card({ threadId: 'd', state: 'scheduled' })],
       tasksHeld: new Map([['dev', ['a', 'e']]]),
     });
-    expect(m.inProgress).toBe(3);
-    expect(statusWord(m)).toBe('3 in progress');
+    expect(m.inProgress).toBe(2);
+    expect(m.toDo).toBe(1);
+    expect(statusWord(m)).toBe('2 in progress · 1 to do');
+    expect(statusWord(devCard({ tasksHeld: new Map([['dev', ['e']]]) }))).toBe('1 to do');
   });
 
   // Found on screen: the card published no title, so it drew as an empty box.
@@ -476,9 +480,11 @@ describe('a person\'s card', () => {
 
   const onWall = (agents) => ({ id: 'dev', name: 'Dev', me: false, avatarUrl: null, agents, level: null, workingOn: null, workingPrivate: false, status: null });
 
-  it('still says agents when agents are all of it, and counts a task on top', () => {
+  it('still says agents when agents are all of it, and the tasks they hold beside it', () => {
     expect(statusWord(devCard({ wall: [onWall(2)] }))).toBe('2 agents working');
-    expect(statusWord(devCard({ wall: [onWall(2)], tasksHeld: new Map([['dev', ['a', 'b', 'c']]]) }))).toBe('3 in progress');
+    expect(statusWord(devCard({ wall: [onWall(2)], tasksHeld: new Map([['dev', ['a', 'b', 'c']]]) }))).toBe('2 agents working · 3 to do');
+    expect(isBusy('2 agents working · 3 to do')).toBe(true);
+    expect(isBusy('2 in progress · 1 to do')).toBe(false);
   });
 
   it('draws a teammate\'s waiting thread under In progress where the board has no Waiting column', () => {

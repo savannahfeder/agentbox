@@ -92,7 +92,7 @@ function useCloudState() {
         ]);
         if (cloud.generation() !== asked) { cache.current.clear(); return; }
         setRows({ projects, threads, commands });
-        // The computer's settings copy carries its repeating tasks (main/phone-inbox.mjs); it changes far less often.
+        // The computer's settings copy carries its repeating tasks (main/phone-inbox.mts); it changes far less often.
         if (Date.now() - settingsAt.current > (teamWatched.current > 0 ? TEAM_WATCHED_MS : SETTINGS_EVERY_MS)) {
           settingsAt.current = Date.now();
           void readSettingsRows(select).then((got) => { if (cloud.generation() === asked) setSettingsRows(got); }, () => { settingsAt.current = -Infinity; });

@@ -17,18 +17,18 @@
 // AND IT IS NOT ON THE LEDGER. It used to be a field on `work-items.jsonl`,
 // guarded so that only a line claiming to be hers could carry one. `source` is
 // a plain string nothing checks, so a worker with Bash could write that line.
-// The field moved to main/answer-modes.mjs instead, and the forged-line test
+// The field moved to main/answer-modes.mts instead, and the forged-line test
 // below is the one that could not be written before.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { buildLine, foldWorkItems, normalizeLine, pickFields, CLAUDE_PERMISSION_MODES } from '../shared/work-items.mjs';
 import { machineryPath } from '../main/store/home.mjs';
-import { answerModesFile } from '../main/answer-modes.mjs';
-import { buildSessionArgs, parseSessionArgs, permissionMode } from '../main/settings.mjs';
+import { answerModesFile } from '../main/answer-modes.mts';
+import { buildSessionArgs, parseSessionArgs, permissionMode } from '../main/settings.mts';
 import { nameSlug } from '../shared/product-name.mjs';
 
 let appDir;
@@ -126,7 +126,7 @@ describe('a forged ledger line cannot grant a permission', () => {
     fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify({
       schemaVersion: 2, id: 'forgeprod', name: 'Forge Product',
     }));
-    const { Store } = await import('../main/store.mjs');
+    const { Store } = await import('../main/store.mts');
     store = await new Store({ storeRoot: tmp, accountId: 'test-account', accountRoot, products: [] }).init();
     slug = store.listProducts()[0].slug;
   });
@@ -332,7 +332,7 @@ describe('clearing a mode puts the row back on the project setting', () => {
     fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify({
       schemaVersion: 1, id: 'spendprod', name: 'Spend Product',
     }));
-    const { Store } = await import('../main/store.mjs');
+    const { Store } = await import('../main/store.mts');
     store = await new Store({ storeRoot: tmp, accountId: 'test-account', accountRoot, products: [] }).init();
     slug = store.listProducts()[0].slug;
   });
@@ -438,7 +438,7 @@ describe('clearing a mode puts the row back on the project setting', () => {
       fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify({
         schemaVersion: 1, id: 'e2eprod', name: 'E2E Product',
       }));
-      const { Store } = await import('../main/store.mjs');
+      const { Store } = await import('../main/store.mts');
       const realStore = await new Store({
         storeRoot: tmp2, accountId: 'test-account', accountRoot, products: [],
       }).init();
@@ -682,12 +682,12 @@ describe('the wiring from the reply box is present in the source', () => {
   });
 
   it('carries it through the bridge and into the store', () => {
-    const ipc = fs.readFileSync('main/ipc.mjs', 'utf8');
+    const ipc = fs.readFileSync('main/ipc.mts', 'utf8');
     expect(ipc).toMatch(/zero:answer'[^)]*permissionMode/s);
     // `inReplyTo` rides beside it since threads (w-920461cbe6): a reply in a
     // thread is still this one call, naming the message it answers.
     // And `fromPhone` since the phone with the computer closed: the id of the
-    // phone command a reply came from (main/phone-inbox.mjs).
+    // phone command a reply came from (main/phone-inbox.mts).
     expect(ipc).toContain('store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone })');
   });
 });

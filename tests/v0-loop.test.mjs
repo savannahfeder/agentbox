@@ -23,7 +23,7 @@ beforeAll(async () => {
     schemaVersion: 1, id: 'testprod', name: 'Test Product',
   }));
 
-  ({ Store } = await import('../main/store.mjs'));
+  ({ Store } = await import('../main/store.mts'));
   disk = await import('../main/store/work-items.mjs');
 
   const config = {

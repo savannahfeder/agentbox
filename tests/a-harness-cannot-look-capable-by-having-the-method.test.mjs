@@ -12,7 +12,7 @@
 // says it lacks it: the inbox draws the control, the person presses it, and the
 // failure arrives later and somewhere else.
 import { describe, it, expect, vi } from 'vitest';
-import { createHarnessRegistry, harnessFor } from '../main/harnesses.mjs';
+import { createHarnessRegistry, harnessFor } from '../main/harnesses.mts';
 
 describe('what a harness can do is what it says, not what it has a method for', () => {
   it('believes an adapter that declares an operation unavailable', () => {

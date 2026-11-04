@@ -400,7 +400,7 @@ export function readWorkItem(projectDir, id, now = Date.now()) {
  * ONE THREAD'S LINES, OLDEST FIRST, without the lease lines (heartbeats and
  * releases), the last `max` of them.
  *
- * The phone pass (main/phone-inbox.mjs) asks this for every thread of a
+ * The phone pass (main/phone-inbox.mts) asks this for every thread of a
  * project, up to 300, and each ask used to read and parse the whole ledger:
  * 20,929 ms of blocked main thread on the real 17,797-line agentbox-team
  * ledger, against 101 ms for one read (2026-10-14, the endless beachball). So

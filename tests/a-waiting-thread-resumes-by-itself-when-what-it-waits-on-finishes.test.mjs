@@ -18,7 +18,7 @@
 // would start 7 workers nobody asked for), a row she stopped, and the same
 // finish twice.
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const ONE_ACCOUNT_HOME = '/nonexistent-home-with-no-second-account';
 const T = 1_786_000_000_000;

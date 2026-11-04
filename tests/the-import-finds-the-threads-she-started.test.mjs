@@ -20,7 +20,7 @@ import { NAME } from '../shared/product-name.mjs';
 import {
   RECENT_DAYS, isScratchFolder, readSessionThreads, readTranscriptHead,
   startedByHand, threadTitle, threadsByFolder,
-} from '../main/agent-sessions.mjs';
+} from '../main/agent-sessions.mts';
 
 const NOW = Date.UTC(2026, 7, 29, 3, 40, 0);
 const ago = (mins) => NOW - mins * 60 * 1000;

@@ -24,7 +24,7 @@
 // being read.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor, awaitingHer } from '../main/supervisor.mjs';
+import { Supervisor, awaitingHer } from '../main/supervisor.mts';
 
 const NOW = 1_788_218_369_484; // 2026-08-31 16:19:29, the third claim on w-d3056d8467
 

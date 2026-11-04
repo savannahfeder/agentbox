@@ -14,12 +14,12 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { machineryPath } from '../main/store/home.mjs';
 import { traceLines } from '../renderer/src/terminal.ts';
 import {
   PRACTICE_ANSWER, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_ROWS, PRACTICE_SLUG, PRACTICE_TASK,
-} from '../shared/first-run-practice.mjs';
+} from '../shared/first-run-practice.mts';
 import {
   BREATHE_AFTER_MS, BEAT, IN_PRACTICE, INTRO, N_BEATS, SLAB_OF, START, STEPS, WRONG_MS,
   COPY, advance, keyToken, practising, pressCounts, walkRows, wrongPress,
@@ -96,7 +96,7 @@ describe('what is already waiting in it', () => {
       // THE AGENT'S HALF HAS TO BE LATER THAN HERS or the row is real and
       // simply never drawn: `answeredHerAsk` in renderer/src/list-rules.ts is
       // what puts a row in an inbox. Same trick as the old three; see
-      // shared/first-run-examples.mjs.
+      // shared/first-run-examples.mts.
       expect(row.wrote.result.source).toBe('agent');
       expect(row.wrote.result.ts).toBeGreaterThan(row.wrote.title.ts);
       // The walk's own label, which is what stops the supervisor treating any
@@ -147,7 +147,7 @@ describe('what is already waiting in it', () => {
   });
 
   // THE TRACE LINE SHAPE IS LOAD BEARING. `traceStreamLine` in
-  // main/supervisor.mjs writes `HH:MM:SS` then TWO spaces then either
+  // main/supervisor.mts writes `HH:MM:SS` then TWO spaces then either
   // `[Tool] argument` or the agent talking, and renderer/src/item-thread.ts
   // parses the two apart on exactly that. A line written any other way draws as
   // a sentence with a clock printed inside it.
@@ -269,21 +269,21 @@ describe('nothing ever runs in it', () => {
     const { store } = await freshStore();
     store.createPractice();
     store.stagePracticeRows(PRACTICE_SLUG);
-    const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     // IT IS ONE RULE NOW, NOT FOUR COPIES OF ONE. `worksHere` is the whole of
     // it, and the place it matters is `spawnWorker`: every other path in that
     // file — the fresh-work pass, continuations, resumeItems, resumeStopped,
     // the interrupted-session recovery, a mid-flight reply, the digest and the
     // drive — funnels into it, so a fifth caller added tomorrow is refused
     // without anybody remembering to add a skip.
-    expect(src).toMatch(/worksHere\(product\) \{/);
+    expect(src).toMatch(/worksHere\(product(: [^)]*)?\) \{/);
     expect(src).toMatch(/const noWorkHere = new Set\(/);
     // And no copy of the rule left anywhere, spelled out by hand.
     expect(src).not.toMatch(/if \(product\.practice\) continue;/);
     // The refusal is inside spawnWorker and it is BEFORE the plan is built,
     // because a plan built for a practice project is already a working
     // directory pointed at a folder that does not exist.
-    const spawn = src.slice(src.indexOf('  spawnWorker(item, {'));
+    const spawn = src.slice(src.indexOf('  spawnWorker(item'));
     const refusal = spawn.indexOf('if (!this.worksHere(product))');
     expect(refusal).toBeGreaterThan(-1);
     expect(refusal).toBeLessThan(spawn.indexOf('const plan = this.spawnPlan('));
@@ -698,7 +698,7 @@ describe('the wire between the two halves', () => {
   it('carries the same two names all the way from the renderer to the store', () => {
     const api = read('../renderer/src/api.ts');
     const preload = read('../preload.cjs');
-    const ipc = read('../main/ipc.mjs');
+    const ipc = read('../main/ipc.mts');
     for (const [fn, channel, method] of [
       ['firstRunPractice', 'zero:first-run-practice', 'createPractice'],
       ['firstRunPracticeEnd', 'zero:first-run-practice-end', 'sweepPractice'],

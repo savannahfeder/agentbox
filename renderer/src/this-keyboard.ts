@@ -1,8 +1,8 @@
 // Which keyboard is in front of the window, asked once. The glyphs come out of
-// shared/key-caps.mjs; this is the one answer that file is handed.
+// shared/key-caps.mts; this is the one answer that file is handed.
 //
 // `navigator` rather than the bridge, because the same page is served to a
-// browser tab and to a phone (main/serve.mjs), where there is no preload.
+// browser tab and to a phone (main/serve.mts), where there is no preload.
 //
 // A Mac is the answer where there is no window at all, which is every test
 // here; one that wants the other keyboard passes `false` itself. The question
@@ -10,7 +10,7 @@
 // own and answers `platform` with the machine node is on, which drew a
 // different key on each machine from the same source.
 
-import { capNameOf, capsOf, chordOf, everyChord, sayTheKeys } from '../../shared/key-caps.mjs';
+import { capNameOf, capsOf, chordOf, everyChord, sayTheKeys } from '../../shared/key-caps.mts';
 
 /** Whether this keyboard has a Command key. */
 export const MAC: boolean = typeof document === 'undefined' || typeof navigator === 'undefined'

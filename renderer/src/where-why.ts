@@ -1,7 +1,7 @@
 // WHY A THREAD IS NOT IN THE CLOUD, in words (w-de59f3ff12). With the cloud on
 // Everything, a thread that needs this computer still runs locally and others
 // queue for their turn; the Status cell says "Working locally" or "Queued" and
-// its card says why. The reasons come from main/supervisor.mjs `_whyLocal`
+// its card says why. The reasons come from main/supervisor.mts `_whyLocal`
 // and `_whyWaitingForCloud`.
 import type { WhyNotCloud } from './types';
 
@@ -14,7 +14,7 @@ function local(why: string, detail: WhyNotCloud['detail']): string {
   switch (why) {
     case 'kept': return 'You chose to keep this thread on this computer.';
     case 'handed-back':
-      // The cloud brief's own words for a run that has to merge (main/cloud/run.mjs).
+      // The cloud brief's own words for a run that has to merge (main/cloud/run.mts).
       if (/^merging into main\b/i.test(String(detail ?? ''))) return 'Merging into main happens on this computer.';
       return detail ? `Its cloud run needed ${detail}, which only this computer has.` : 'Its cloud run needed something only this computer has.';
     case 'cloud-refused': return 'The cloud couldn’t start it, so it runs here instead.';

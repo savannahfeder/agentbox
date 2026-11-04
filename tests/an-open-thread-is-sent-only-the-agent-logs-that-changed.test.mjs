@@ -17,7 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { traceReader } from '../shared/trace-delta.mjs';
 import { withRuns } from '../renderer/src/thread-history';
-import { bootHeadless } from '../main/serve.mjs';
+import { bootHeadless } from '../main/serve.mts';
 import { encodeProjectPath, machineryPath } from '../main/store/home.mjs';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');

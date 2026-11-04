@@ -14,7 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { rolePolicy, signerPolicy, signerKeyPlan, withDoneNotice, bundle, FUNCTION_SECONDS } from '../scripts/cloud-gateway-setup.mjs';
-import { CALL_MS } from '../main/cloud/managed.mjs';
+import { CALL_MS } from '../main/cloud/managed.mts';
 import { runtimeRolePolicy } from '../scripts/cloud-setup.mjs';
 
 const where = { bucket: 'agentbox-cloud-x', runtimeArn: 'arn:aws:bedrock-agentcore:us-east-1:000000000000:runtime/agentbox_sandbox-x', region: 'us-east-1', account: '000000000000' };
@@ -129,8 +129,8 @@ describe('the bundle', () => {
       expect(fs.statSync(zip).size).toBeGreaterThan(1000);
       // Loaded from a folder with no node_modules anywhere above it.
       const alone = fs.mkdtempSync(path.join(os.tmpdir(), 'gateway-alone-'));
-      fs.copyFileSync(path.join(out, 'index.mjs'), path.join(alone, 'index.mjs'));
-      const mod = await import(pathToFileURL(path.join(alone, 'index.mjs')).href);
+      fs.copyFileSync(path.join(out, 'index.mts'), path.join(alone, 'index.mts'));
+      const mod = await import(pathToFileURL(path.join(alone, 'index.mts')).href);
       await expect(mod.handler({ rawPath: '/v1/me', headers: {}, requestContext: { http: { method: 'GET' } } })).rejects.toThrow(/missing REGION/);
       fs.rmSync(alone, { recursive: true, force: true });
     } finally {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
-import { COMPACTION_COPY } from '../../../shared/codex-commands.mjs';
+import { COMPACTION_COPY } from '../../../shared/codex-commands.mts';
 export type CompactionState = { state: string; at: number; text?: string; name?: string };
 type Task = { product: string; id: string };
 const listeners = new Set<(task: Task, value: CompactionState) => void>();

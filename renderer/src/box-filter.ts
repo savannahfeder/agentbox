@@ -41,7 +41,7 @@ const CODEX_LABELS = new Set(['codex', 'codex-import', 'not-imported']);
  * WHICH AGENT A ROW BELONGS TO. Measured on her store 2026-09-28: 11 rows carry
  * `engine: codex` and about 50 carry a codex label instead (brought in from
  * Codex), and nothing else names Codex at all. Everything unmarked was Claude
- * Code, which is the reading `engineOf` makes in main/supervisor.mjs too.
+ * Code, which is the reading `engineOf` makes in main/supervisor.mts too.
  */
 export function harnessOf(item: Pick<WorkItem, 'labels'> & { engine?: string | null }): Harness {
   if (item.engine === 'codex') return 'codex';

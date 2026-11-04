@@ -9,7 +9,7 @@
 //
 // Written 2026-10-11 off "test it thoroughly".
 //
-// It also walks every refusal the way main/ipc.mjs hits it, because a path that
+// It also walks every refusal the way main/ipc.mts hits it, because a path that
 // is written and later refused by `spawn` is a fleet that dies once per row,
 // naming a file nobody meant to name.
 
@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadConfig } from '../main/config.mjs';
-import { pointAtEngineBin, searchForEngineBin, claudeState, codexState } from '../main/settings.mjs';
+import { pointAtEngineBin, searchForEngineBin, claudeState, codexState } from '../main/settings.mts';
 import { forgetClaudeBin } from '../main/claude-bin.mjs';
 import { forgetCodexBin } from '../main/codex-bin.mjs';
 

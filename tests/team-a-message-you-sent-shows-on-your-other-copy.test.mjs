@@ -13,7 +13,7 @@
 // and 1,814 bytes, with no line for what had just been written, while its pull
 // cursor had already moved past it. So that copy READ its own person's four
 // lines out of the cloud and threw all four away: `pullProject` in
-// main/team/sync.mjs skipped every line whose writer was you, on the reasoning
+// main/team/sync.mts skipped every line whose writer was you, on the reasoning
 // that a line you wrote is "already here". That is true of the copy that wrote
 // it and false of every other copy you own, and a conversation that is missing
 // your own half is a conversation that looks like it never sent.
@@ -30,9 +30,9 @@ import os from 'node:os';
 import path from 'node:path';
 
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamService } from '../main/team/index.mjs';
+import { Store } from '../main/store.mts';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
 
 // ONE COPY OF THE APP: its own store folder, its own sync cursors. Two copies

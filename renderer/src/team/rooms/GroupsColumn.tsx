@@ -41,9 +41,11 @@ export function GroupsColumn({ rows, current, now, onOpen }: { rows: GroupChoice
 
 /** The top bar over both: Groups and the finder's button over the column, the open group's name over its chat. */
 export function GroupsHead({ current, onFind }: { current: GroupChoice | undefined; onFind: () => void }) {
-  const chats = !!useContext(ChatsContext);
+  const ctx = useContext(ChatsContext);
+  const chats = !!ctx;
+  const team = !!ctx?.onTeam;
   return <div className="gc-head">
-    <div className="gc-head-col"><span className="workspace-title gc-col-title">{chats ? 'Chats' : 'Groups'}</span>
+    <div className="gc-head-col"><span className="workspace-title gc-col-title">{chats ? (team ? 'Team' : 'Chats') : 'Groups'}</span>
       {/* In Chats the list's own box is the search. */}
       {!chats && <button type="button" className="gc-find" aria-label="Find a group" title="Find a group (G)" onClick={onFind}>{I.search()}<kbd>G</kbd></button>}</div>
     <h1 className="workspace-title gc-head-group">

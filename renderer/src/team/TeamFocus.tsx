@@ -62,7 +62,7 @@ export function TeamPeople({ item }: { item: WorkItem }) {
  * asked for: adding someone makes the group's conversation and the old one
  * stays exactly as it was. So this opens New thread with everyone already here
  * in To, and the composer's own group rule takes it from there: one
- * conversation per exact group (main/team/index.mjs directWith), already
+ * conversation per exact group (main/team/index.mts directWith), already
  * started or new.
  *
  * An agent thread is not a conversation: there it is a small menu, and the

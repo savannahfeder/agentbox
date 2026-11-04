@@ -34,7 +34,7 @@ import { OPENS_A_TEXT_FIELD } from '../renderer/src/keys.ts';
 import { SHORTCUTS, everyKey } from '../renderer/src/shortcuts.ts';
 import { rowKeys } from '../renderer/src/list-rules.ts';
 import { closingRefused, coach, laterIndex, waitingIndex } from '../renderer/src/onboarding.ts';
-import { PRACTICE_ROWS } from '../shared/first-run-practice.mjs';
+import { PRACTICE_ROWS } from '../shared/first-run-practice.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');

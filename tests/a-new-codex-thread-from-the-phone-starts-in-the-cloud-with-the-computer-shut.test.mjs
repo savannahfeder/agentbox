@@ -29,12 +29,12 @@ import { madeHere } from '../shared/phone-snapshot.mjs';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { kitFrom } from '../main/cloud/run-cli.mjs';
-import { codexKitOpen } from '../main/cloud/run.mjs';
-import { kitCopyPath } from '../main/cloud/kit.mjs';
-import { readMarker } from '../main/cloud/marker.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { Store } from '../main/store.mjs';
+import { kitFrom } from '../main/cloud/run-cli.mts';
+import { codexKitOpen } from '../main/cloud/run.mts';
+import { kitCopyPath } from '../main/cloud/kit.mts';
+import { readMarker } from '../main/cloud/marker.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { Store } from '../main/store.mts';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const DEVICE = 'a1b2c3d4e5f6';

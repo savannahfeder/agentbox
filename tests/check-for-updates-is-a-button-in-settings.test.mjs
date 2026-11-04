@@ -5,7 +5,7 @@
 //
 // Measured before this change, on 2026-10-07: a manual check already existed
 // the whole way down the stack and nothing on screen reached it.
-// `zero:update-check` calls `updater.check({ manual: true })` (main/ipc.mjs:1824)
+// `zero:update-check` calls `updater.check({ manual: true })` (main/ipc.mts:1824)
 // and `api.updateCheck()` is in renderer/src/api.ts, but `grep -rn updateCheck
 // renderer/src` found one caller, api.ts itself. So the installed app checked
 // every 6 hours (main/updater.mts EVERY_MS), a copy run from a checkout every

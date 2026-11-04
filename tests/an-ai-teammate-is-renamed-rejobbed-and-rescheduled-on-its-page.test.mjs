@@ -11,8 +11,8 @@ import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { appHome } from '../main/store/home.mjs';
-import { loadStore } from '../main/store-modules.mjs';
-import { Teammates } from '../main/teammates.mjs';
+import { loadStore } from '../main/store-modules.mts';
+import { Teammates } from '../main/teammates.mts';
 import { STARTERS, dutySlot } from '../shared/teammates.mjs';
 
 let team; let store;

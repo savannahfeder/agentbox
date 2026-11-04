@@ -160,7 +160,7 @@ describe('where the two lists read it', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
 
   it('Later holds the proposals, beside what you parked yourself', () => {
-    expect(app).toMatch(/notStarted\(i\) \|\| isProposal\(i\) \|\| hiddenAt\(i\) > now/);
+    expect(app).toMatch(/notStarted\(i\) \|\| isProposal\(i\)\s*\|\| \(\(hiddenAt\(i\) > now/);
   });
 
   it('the inbox lets a thread back in when it is owed an answer', () => {

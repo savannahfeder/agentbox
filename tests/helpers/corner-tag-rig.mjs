@@ -1,6 +1,6 @@
-// A pretend app around main/corner-tag.mjs: windows, a screen, a clock, the
+// A pretend app around main/corner-tag.mts: windows, a screen, a clock, the
 // app's own window gaining and losing focus, and the store of settings.
-import { createCornerTag } from '../../main/corner-tag.mjs';
+import { createCornerTag } from '../../main/corner-tag.mts';
 
 export function cornerTagRig({ config = {}, focused = false, at = 1_000_000_000, glass = null, told = () => [] } = {}) {
   const handlers = {};

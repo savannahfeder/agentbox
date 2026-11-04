@@ -8,8 +8,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { alphaFeatures } from '../main/settings.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { alphaFeatures } from '../main/settings.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { teammatesOn } from '../shared/teammates.mjs';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
@@ -25,7 +25,7 @@ describe('the switch', () => {
 
   it('sits in Settings, Alpha features, and the phone may set it too', () => {
     expect(read('renderer/src/components/Settings.tsx')).toMatch(/<Switch label="Teammates" on=\{!!w\.alpha\?\.teammates\} onChange=\{\(v\) => setWorkspace\('alphaTeammates', v\)\} \/>/);
-    expect(read('main/settings.mjs')).toMatch(/case 'alphaTeammates':\n\s+saveConfig\(config, \{ alphaTeammates: !!value \}\);/);
+    expect(read('main/settings.mts')).toMatch(/case 'alphaTeammates':\n\s+saveConfig\(config, \{ alphaTeammates: !!value \}\);/);
     expect(read('shared/phone-settings.mjs')).toMatch(/alphaTeammates: bool,/);
   });
 });
@@ -54,7 +54,7 @@ describe('with the switch off', () => {
   });
 
   it('the screen gets no teammates and its calls are refused', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     expect(ipc).toMatch(/teammates: alpha\.teammates \? \(\(\) => \{ try \{ return store\.teammatesView\(items, now\); \}/);
     expect(ipc).toMatch(/if \(!alphaFeatures\(config\)\.teammates\) return \{ ok: false, error: 'Teammates are an alpha feature\. Turn them on in Settings, Alpha features\.' \};/);
   });

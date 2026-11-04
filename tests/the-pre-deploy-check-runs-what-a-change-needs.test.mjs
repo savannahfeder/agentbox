@@ -38,7 +38,7 @@ describe('which layers a branch gets', () => {
   });
 
   it('every file that decides how a tool is found or started counts', () => {
-    for (const f of ['main/shell-path.mjs', 'main/claude-bin.mjs', 'main/codex-launch-env.mjs', 'main/harnesses/common.mjs', 'main/harnesses.mjs', 'main/config.mjs', 'package.json']) {
+    for (const f of ['main/shell-path.mjs', 'main/claude-bin.mjs', 'main/codex-launch-env.mts', 'main/harnesses/common.mts', 'main/harnesses.mts', 'main/config.mjs', 'package.json']) {
       expect(runs([f]).machines, f).toBe(true);
     }
   });
@@ -48,14 +48,14 @@ describe('which layers a branch gets', () => {
   });
 
   it('--quick keeps the stand-in drives and drops the slow, billed layers', () => {
-    expect(runs(['main/supervisor.mjs'], { quick: true })).toEqual({ 'this-machine': true, machines: false, live: true, setups: false, real: false, installed: false, breaker: false });
+    expect(runs(['main/supervisor.mts'], { quick: true })).toEqual({ 'this-machine': true, machines: false, live: true, setups: false, real: false, installed: false, breaker: false });
   });
 
   it('each slow layer can be dropped on its own, and says why it was', () => {
-    expect(runs(['main/supervisor.mjs'], { real: false })).toMatchObject({ live: true, real: false, installed: true, breaker: true });
-    expect(runs(['main/supervisor.mjs'], { installed: false })).toMatchObject({ real: true, installed: false, breaker: true });
-    expect(runs(['main/supervisor.mjs'], { breaker: false })).toMatchObject({ real: true, installed: true, breaker: false });
-    expect(layersFor(['main/supervisor.mjs'], { real: false }).real.why).toBe('--no-real');
+    expect(runs(['main/supervisor.mts'], { real: false })).toMatchObject({ live: true, real: false, installed: true, breaker: true });
+    expect(runs(['main/supervisor.mts'], { installed: false })).toMatchObject({ real: true, installed: false, breaker: true });
+    expect(runs(['main/supervisor.mts'], { breaker: false })).toMatchObject({ real: true, installed: true, breaker: false });
+    expect(layersFor(['main/supervisor.mts'], { real: false }).real.why).toBe('--no-real');
   });
 
   it('a change to the stand-in worker or the skill re-proves the drive', () => {

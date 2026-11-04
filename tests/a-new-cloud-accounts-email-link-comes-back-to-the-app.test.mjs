@@ -23,7 +23,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
-import { cloudAccountSession, cloudSignIn, waitForEmailConfirmation } from '../main/cloud/account.mjs';
+import { cloudAccountSession, cloudSignIn, waitForEmailConfirmation } from '../main/cloud/account.mts';
 import { readCloudKey } from '../main/cloud/config.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -107,7 +107,7 @@ describe('where the confirmation email\'s link goes', () => {
     expect(new URL(returnUrl).pathname).toBe('/auth/callback');
     const toml = read('cloud/supabase/config.toml');
     expect(toml).toContain('additional_redirect_urls = ["http://127.0.0.1:54783/auth/callback"]');
-    expect(read('main/cloud/account.mjs')).toContain("const RETURN_URL = 'http://127.0.0.1:54783/auth/callback'");
+    expect(read('main/cloud/account.mts')).toContain("const RETURN_URL = 'http://127.0.0.1:54783/auth/callback'");
   });
 });
 

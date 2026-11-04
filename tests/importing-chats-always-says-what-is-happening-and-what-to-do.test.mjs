@@ -97,7 +97,7 @@ describe('the page', () => {
 
 describe('a write-up that fails', () => {
   it('tries again within a minute, not ten', () => {
-    const sup = read('main/supervisor.mjs');
+    const sup = read('main/supervisor.mts');
     expect(sup).toContain('const CATCH_UP_RETRY_MS = 60_000;');
     expect(sup).toContain("now - (this._catchUpMisses.get(key(i))?.at ?? -Infinity) < CATCH_UP_RETRY_MS");
   });

@@ -15,14 +15,14 @@
 // the one thing in the app that already knows a person's Codex conversations,
 // and it reads them on a timer rather than on the snapshot, which is what makes
 // it the right place: see `noticeCodexAgents` below.
-import { readCodexThreads } from './codex-threads.mjs';
+import { readCodexThreads } from './codex-threads.mts';
 
 export const CODEX_POLL_MS = 60_000;
 
 export interface CodexThread {
-  id?: unknown;
-  lastActive?: unknown;
-  live?: unknown;
+  id?: string;
+  lastActive?: number;
+  live?: boolean;
 }
 
 type Count = (event: string, props: { engine: string }) => void;
@@ -45,7 +45,7 @@ const isPending = (value: unknown): value is PromiseLike<{ threads: CodexThread[
  * HOW LONG AFTER ITS LAST WRITE A CODEX THREAD IS STILL AN AGENT THAT WAS SEEN.
  *
  *  A Claude Code session is a process, so `agent_seen` catches one that has sat
- *  open since earlier in the sitting (main/ipc.mjs, liveAgents). A Codex thread
+ *  open since earlier in the sitting (main/ipc.mts, liveAgents). A Codex thread
  *  leaves no process behind: `isLive` is two minutes of file mtime, so counting
  *  only live threads would notice a Codex user ONLY when this watch's minute
  *  happened to land while they were typing. An hour is one sitting, which is

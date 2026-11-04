@@ -12,7 +12,7 @@
 //   19:41:47  a second reply asks whether it answered, and the same thing happens
 //
 // So the message arrived and the agent did the work. What went wrong is what
-// she SAW: `herTurnRaw` in main/agents.mjs drops every `isMeta` user line, and
+// she SAW: `herTurnRaw` in main/agents.mts drops every `isMeta` user line, and
 // it is right to — that flag is also on every tool result and system reminder,
 // and quoting those back to her as her own words is worse than the blank.
 //
@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { agentRow, herWords } from '../shared/agents.mjs';
-import { AgentSchedule } from '../main/agent-schedule.mjs';
+import { AgentSchedule } from '../main/agent-schedule.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 let dir;
@@ -170,7 +170,7 @@ describe('the record of what she said', () => {
   });
 
   it('keeps nothing for a send that never landed', () => {
-    // `replied` is only reached on a delivered message (main/ipc.mjs), and a
+    // `replied` is only reached on a delivered message (main/ipc.mts), and a
     // call with no text must not leave an empty quote on the card.
     const s = new AgentSchedule(dir);
     s.replied('session:abc', 1787020877000, 1787020877000, '   ');

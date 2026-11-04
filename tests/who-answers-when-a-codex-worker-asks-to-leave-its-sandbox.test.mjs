@@ -2,7 +2,7 @@
 // Auto reviews extra access automatically; Read only asks the person.
 import { describe, expect, it } from 'vitest';
 import { CODEX_DEFAULT_MODE, CODEX_MODES, CODEX_MODE_ORDER, codexPosture, CODEX_REVIEWERS, ASKS_THE_PERSON } from '../shared/codex-modes.mjs';
-import { workerThreadParams, resumeThreadParams, WORKER_APPROVAL_POLICY, WORKER_SANDBOX } from '../main/codex-session.mjs';
+import { workerThreadParams, resumeThreadParams, WORKER_APPROVAL_POLICY, WORKER_SANDBOX } from '../main/codex-session.mts';
 import { APPROVAL_DECISIONS, ELICITATION_ACTIONS } from '../main/codex-app-server.mjs';
 
 describe('who reviews extra access', () => {

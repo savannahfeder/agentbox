@@ -46,7 +46,7 @@ import { mkdtempSync, writeFileSync, rmSync, copyFileSync, readFileSync } from '
 import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { codexHome, codexModels, codexKnownSlugs, codexDefaultModel } from '../main/codex-models.mjs';
+import { codexHome, codexModels, codexKnownSlugs, codexDefaultModel } from '../main/codex-models.mts';
 
 const FIXTURE = fileURLToPath(new URL('./fixtures/codex-models-cache.json', import.meta.url));
 const dirs = [];

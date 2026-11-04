@@ -8,7 +8,7 @@
 // `crashed`, `oom`, `launch-failed`, `integrity-failure`) and carries nothing
 // of anyone's. `report` scrubs them and writes them to disk.
 //
-// And then `crashTransport` in main/analytics.mjs listed the five properties it
+// And then `crashTransport` in main/analytics.mts listed the five properties it
 // sends by hand, and those were not among them. Measured in PostHog on
 // 2026-10-08 by listing the keys on every `renderer-gone` event since the Oct 6
 // launch: app_version, crash_kind, error, happened_at, os_*, report_version,
@@ -25,7 +25,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createAnalytics } from '../main/analytics.mjs';
+import { createAnalytics } from '../main/analytics.mts';
 
 let dir;
 beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-why-died-')); });
@@ -43,7 +43,7 @@ const windowGone = (extra) => ({
   ts: '2026-10-07T03:09:21.920Z',
   upMs: 13_543_000,
   app: { name: 'Agentbox', version: '0.1.11' },
-  error: { name: 'Error', code: null, syscall: null, message: 'render process gone', site: 'app:main/crash-report.mjs:140', frames: [], framesDropped: 0 },
+  error: { name: 'Error', code: null, syscall: null, message: 'render process gone', site: 'app:main/crash-report.mts:140', frames: [], framesDropped: 0 },
   ...extra,
 });
 

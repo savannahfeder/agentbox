@@ -27,7 +27,7 @@
 //    TMPDIR, USER and __CF_USER_TEXT_ENCODING. Nothing else of the app-server's
 //    environment reaches it. A Claude Code worker gets STORE_ACCOUNT_ID and
 //    ASTRAL_HOME on the MCP server and ZERO_PRODUCT / ZERO_ITEM inherited
-//    from its own process (supervisor.mjs, `mcpServers` and the spawn env);
+//    from its own process (supervisor.mts, `mcpServers` and the spawn env);
 //    there is no per-item process here, so all four are named on the server.
 //
 // 3. A STORE SERVER THAT FAILS TO START FAILS IN SILENCE. Pointed at a command
@@ -76,7 +76,7 @@ import { storeRootEnv } from '../main/store/home.mjs';
 import { join } from 'node:path';
 
 // The one seam, the same one tests/the-supervisor-can-run-a-codex-worker uses:
-// `main/supervisor.mjs` imports `spawn` at module scope, so this is where a
+// `main/supervisor.mts` imports `spawn` at module scope, so this is where a
 // test can stand between the app's choice of executable and a real process.
 // The app-server it hands back answers its own protocol, so everything from
 // `spawnWorker` down to the wire is the shipping code.
@@ -148,8 +148,8 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
-import { Supervisor } from '../main/supervisor.mjs';
-import { workerThreadParams, resumeThreadParams } from '../main/codex-session.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { workerThreadParams, resumeThreadParams } from '../main/codex-session.mts';
 import { foldWorkItems } from '../shared/work-items.mjs';
 // The store server answers to the app's own name since 2026-09-22. This file
 // spelled it 'agentbox' throughout, which is the name it carried while it lived

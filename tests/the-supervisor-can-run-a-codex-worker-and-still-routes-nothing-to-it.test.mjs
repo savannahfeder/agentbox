@@ -2,7 +2,7 @@
 //
 // This is the slice that makes `spawnWorker` able to run the second engine:
 // one branch at the top picks the readers, the child handle is a facade over a
-// `codex app-server` thread (main/codex-session.mjs), and everything after it
+// `codex app-server` thread (main/codex-session.mts), and everything after it
 // is the code that already existed. It is also the slice with the most
 // regression risk so far, because it edits the one file every row goes
 // through, so the file below is written in two halves:
@@ -59,7 +59,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // The one seam, exactly as tests/a-codex-row-from-august-still-runs-on-claude
-// uses it: `main/supervisor.mjs` imports `spawn` at module scope, so this is
+// uses it: `main/supervisor.mts` imports `spawn` at module scope, so this is
 // the only place a test can stand between the app's choice of executable and a
 // real process. A Codex spawn returns a scripted app-server rather than a stub,
 // so the whole transport runs for real.
@@ -140,9 +140,9 @@ vi.mock('../main/account-tooling.mjs', async (importActual) => {
   };
 });
 
-import { Supervisor, readersFor } from '../main/supervisor.mjs';
+import { Supervisor, readersFor } from '../main/supervisor.mts';
 import { captureCodexEvent, codexStreamingText, summarizeCodexEvent, traceCodexEvent } from '../main/codex.mjs';
-import { troubleCause, deadRunSentence } from '../shared/spawn-trouble.mjs';
+import { troubleCause, deadRunSentence } from '../shared/spawn-trouble.mts';
 import { foldWorkItems } from '../shared/work-items.mjs';
 import { NAME } from '../shared/product-name.mjs';
 

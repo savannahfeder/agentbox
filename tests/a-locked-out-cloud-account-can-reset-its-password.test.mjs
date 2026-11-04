@@ -19,7 +19,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
-import { cloudAccountSession, cloudSignIn } from '../main/cloud/account.mjs';
+import { cloudAccountSession, cloudSignIn } from '../main/cloud/account.mts';
 import { readCloudKey } from '../main/cloud/config.mjs';
 import { sendPasswordReset, cancelGoogleSignIn, signInWithGoogle } from '../main/team/sign-in.mjs';
 import { plainAuthError } from '../main/team/session.mjs';
@@ -220,9 +220,9 @@ describe('the sign-in card', () => {
   });
 
   it('the main process has the three doors the card presses', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     expect(ipc).toContain("ipcMain.handle('zero:cloud-account-sign-in'");
-    const account = read('main/cloud/account.mjs');
+    const account = read('main/cloud/account.mts');
     for (const m of ["method === 'reset'", "method === 'reset-wait'", "method === 'new-password'"]) expect(account).toContain(m);
   });
 });

@@ -17,7 +17,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 let appDir;
@@ -357,7 +357,7 @@ describe(`the text ${NAME} ships`, () => {
   // Its first round on the same row did the same. A rule asking a Claude Code
   // session not to end on its answer asks it to stop being one. So the rule
   // now points the other way: the last message IS the answer, and the app
-  // writes it onto the row (`closingMessageIsTheAnswer`, main/supervisor.mjs),
+  // writes it onto the row (`closingMessageIsTheAnswer`, main/supervisor.mts),
   // which is how a copy with no store tools has always worked.
   it('makes the last message the answer and asks for no second copy on the row', () => {
     expect(shipped).toContain('THE ANSWER IS WRITTEN ONCE, AND THIS MESSAGE IS IT');

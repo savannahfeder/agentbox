@@ -17,12 +17,12 @@ import os from 'node:os';
 import path from 'node:path';
 
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamService } from '../main/team/index.mjs';
+import { Store } from '../main/store.mts';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
 import { resolveArtifact } from '../main/artifact-path.mjs';
-import { MAX_MESSAGE_FILE_BYTES } from '../main/team/sync.mjs';
+import { MAX_MESSAGE_FILE_BYTES } from '../main/team/sync.mts';
 
 async function aMac(cloud, personId, { wrap = (b) => b } = {}) {
   const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'carry-'));

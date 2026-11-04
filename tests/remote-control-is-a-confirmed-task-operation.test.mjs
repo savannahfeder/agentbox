@@ -4,9 +4,9 @@
 // and find it had stopped at a card asking again. Typing it now turns remote
 // control on, or off when it is already on, with nothing left to press.
 import {it,expect} from 'vitest';
-import {providerCommand} from '../shared/provider-commands.mjs';
-import {remoteSessionUrl,taskRemoteControl} from '../main/task-remote-control.mjs';
-import {taskCommand} from '../main/task-commands.mjs';
+import {providerCommand} from '../shared/provider-commands.mts';
+import {remoteSessionUrl,taskRemoteControl} from '../main/task-remote-control.mts';
+import {taskCommand} from '../main/task-commands.mts';
 it('routes only the exact Claude command and alias locally',()=>{for(const word of ['/remote-control','/rc'])expect(providerCommand(word,'claude').route).toBe('remote');expect(providerCommand('/rc','codex').route).toBe('unavailable');expect(providerCommand('/rc-extra','claude').route).toBe('unavailable');});
 it('accepts only a provider session link',()=>{expect(remoteSessionUrl('https://claude.ai/code/session_123')).toBe('https://claude.ai/code/session_123');for(const url of ['https://claude.ai.evil/code/session_123','javascript:alert(1)','https://user@claude.ai/code/session_123','https://claude.ai/code/session_123?next=evil'])expect(remoteSessionUrl(url)).toBe(null);});
 it('refuses Codex before creating a bridge',async()=>{const sup={store:{readItem:()=>({id:'x'})},_engineFor:()=> 'codex'};await expect(taskRemoteControl(sup,'p','x','enable')).rejects.toThrow('Claude Code');});

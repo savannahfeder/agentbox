@@ -14,7 +14,7 @@
 // it. That is a bug you cannot hit on the machine that made it.
 //
 // So this reads the runtime code and demands the two lists agree. The subtlety
-// worth keeping: main/analytics.mjs and main/updater.mts load theirs with a
+// worth keeping: main/analytics.mts and main/updater.mts load theirs with a
 // `require()` at the moment of use, not with an import at the top, so a search
 // for import statements finds neither. The scan below covers both shapes, and
 // posthog-node is the package that proved it needs to.
@@ -66,7 +66,7 @@ function packageOf(spec) {
 
 /**
  * COMMENTS COME OUT FIRST, and this file is heavily commented so that matters.
- * `* from "opus" to a Codex slug` in main/supervisor.mjs is prose about a model
+ * `* from "opus" to a Codex slug` in main/supervisor.mts is prose about a model
  * alias, and it read as a package called opus.
  *
  * Only whole comment lines are dropped, never a `//` found mid-line: that would
@@ -95,7 +95,7 @@ for (const file of files) {
 
 // Electron is the one package the runtime names and must NOT depend on. The
 // desktop app is started BY Electron, which supplies it; the browser door never
-// loads main/main.mjs at all. Making it a dependency would put 297 MB into
+// loads main/main.mts at all. Making it a dependency would put 297 MB into
 // every `npx` run to satisfy a file that run never opens.
 const SUPPLIED_BY_THE_HOST = new Set(['electron']);
 

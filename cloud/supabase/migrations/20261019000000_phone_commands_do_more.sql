@@ -1,4 +1,4 @@
--- WHAT ELSE HER PHONE MAY ASK HER COMPUTER TO DO (main/phone-inbox.mjs ROUTES):
+-- WHAT ELSE HER PHONE MAY ASK HER COMPUTER TO DO (main/phone-inbox.mts ROUTES):
 -- stop an agent, run a thread now, send a waiting message now, reopen a
 -- stopped thread, put a thread off to a moment, and answer a permission card
 -- (with the fingerprint of the card she read, which her computer checks). Her computer checks each

@@ -35,7 +35,7 @@
 //    in its own words: "JSON has no per-key write times, and `engine` sits in
 //    the same file as this, so opening that file to write the moment is the same
 //    act as reading the line above it." JSON has no per-key write times; the APP
-//    does. `main/settings.mjs` is the only thing that writes `engine`, and
+//    does. `main/settings.mts` is the only thing that writes `engine`, and
 //    `saveConfig` takes a patch of several keys, so the stamp rides in the same
 //    write.
 //
@@ -63,7 +63,7 @@ import {
   engineFor, engineChoiceOnRowIsStale, engineDefaultIsStale,
 } from '../shared/engines.mjs';
 import { loadConfig } from '../main/config.mjs';
-import { setWorkspaceSetting } from '../main/settings.mjs';
+import { setWorkspaceSetting } from '../main/settings.mts';
 
 const OPEN = { enabled: ENGINE_CHOICE_ENABLED };
 const BOTH = { codex: true };

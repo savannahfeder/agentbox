@@ -3,7 +3,7 @@
 // Everything below the screen, for real: two stores (two "Macs"), each signed
 // in through the app's own session code (main/team/session.mjs) to the hosted
 // agentbox-team project, each running the app's own team service
-// (main/team/index.mjs). Maya starts a team and invites Theo; Theo says yes,
+// (main/team/index.mts). Maya starts a team and invites Theo; Theo says yes,
 // his Mac joins the project Maya shares, Maya's message lands in his inbox,
 // he answers it, and the answer comes back to Maya's inbox. Private work does
 // not reach the other Mac at all.
@@ -18,9 +18,9 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import * as disk from '../main/store/work-items.mjs';
-import { createTeamService } from '../main/team/index.mjs';
+import { createTeamService } from '../main/team/index.mts';
 import { supabaseSession } from '../main/team/session.mjs';
 import { inMyInbox, handedOnByReply } from '../shared/team-rules.mjs';
 

@@ -23,8 +23,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { writeMarker } from '../main/cloud/marker.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { writeMarker } from '../main/cloud/marker.mts';
 
 /** The bare stand-in the suite builds when it wants one method, and no state. */
 const noStateYet = (over = {}) => Object.assign(Object.create(Supervisor.prototype), {

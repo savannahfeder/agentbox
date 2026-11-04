@@ -70,7 +70,7 @@ describe('is the keyboard inside the page', () => {
 });
 
 describe('the key really gets out of the page', () => {
-  const main = read('main/main.mjs');
+  const main = read('main/main.mts');
   const app = read('renderer/src/App.tsx');
 
   it('says it came from a guest, so the focus check does not refuse it', () => {

@@ -25,8 +25,8 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun, tarOf } from '../main/cloud/run.mjs';
-import { tarDocs } from '../main/cloud/docs.mjs';
+import { cloudRun, tarOf } from '../main/cloud/run.mts';
+import { tarDocs } from '../main/cloud/docs.mts';
 import { checkKit, kitKey, startPayload } from '../shared/cloud-kit.mjs';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));

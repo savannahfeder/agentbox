@@ -10,7 +10,7 @@
 //
 // A writer that forgets this line is a stale project list, so there are few of
 // them: patchProjectAt and createProject here in the store, writeProject in
-// main/team/projects.mjs, and the store's own writes, which call
+// main/team/projects.mts, and the store's own writes, which call
 // Store.forgetProducts.
 let writes = 0;
 

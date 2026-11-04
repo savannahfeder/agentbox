@@ -47,15 +47,15 @@ const ALLOWED = [
       + 'cannot be misread as a zero. Not punctuation in a sentence.',
   },
   {
-    file: 'shared/claude-commands.generated.mjs',
+    file: 'shared/claude-commands.generated.mts',
     fragment: 'Set a goal',
     why: "Claude Code's own words, read out of the installed binary by the build "
       + '(w-23a7b3f568). Editing it here is undone by the next build and makes '
       + 'the record stop matching the binary. Stripped at the render boundary '
-      + 'instead, by commandHint in shared/claude-commands.mjs.',
+      + 'instead, by commandHint in shared/claude-commands.mts.',
   },
   {
-    file: 'main/main.mjs',
+    file: 'main/main.mts',
     fragment: 'recovery',
     why: 'A console.log to the terminal. She never sees it.',
   },
@@ -63,13 +63,13 @@ const ALLOWED = [
   // reads, and every one exists to TAKE the character out. A guard that made
   // them give up their dash would be a guard that switched the strippers off.
   {
-    file: 'shared/claude-commands.mjs',
+    file: 'shared/claude-commands.mts',
     fragment: 'menuDescription',
     why: 'commandHint, which is what takes the dash out of the slash menu as it '
       + 'draws each line. The dash in it is the thing being removed.',
   },
   {
-    file: 'shared/dashboard.mjs',
+    file: 'shared/dashboard.mts',
     fragment: '.replace(',
     why: 'The same removal on the dashboard side. The dash in it is the pattern, '
       + 'not a word.',

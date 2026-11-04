@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const LIMIT = "You've hit your session limit · resets 6:50pm";
 let tmp;
@@ -184,7 +184,7 @@ describe('what does not lose it', () => {
 });
 
 describe('where the run marks and clears it', () => {
-  const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+  const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
   it('marks it right after its account is judged', () => {
     expect(src).toMatch(/this\.noteExitForBackoff\(session, \{ onLine \}\);\s*\n\s*this\._noteStoppedByAccount\(item, session\);/);
   });

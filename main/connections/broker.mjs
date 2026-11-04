@@ -14,7 +14,7 @@ import crypto from 'node:crypto';
 import { PassThrough } from 'node:stream';
 import { connectionServerName, downWords, STATES, stateWords } from '../../shared/connections-catalog.mjs';
 import { approvalPublicKey, spoolDir } from '../approvals.mjs';
-import { serveApprovals } from '../approval-prompt-core.mjs';
+import { serveApprovals } from '../approval-prompt-core.mts';
 import { stateOfError } from './talk.mjs';
 import { Name } from '../../shared/product-name.mjs';
 

@@ -18,12 +18,12 @@
 // exactly as `item.agent` is checked today.
 //
 // NONE OF THE WORDS BELOW ARE CHOSEN HERE. Every sentence comes off
-// shared/spawn-trouble.mjs, which is the one place this app is allowed to word
+// shared/spawn-trouble.mts, which is the one place this app is allowed to word
 // a failure, so the row and the pane and the digest cannot drift into three
 // vocabularies.
 
 import type { Snapshot, TroubleCause, WorkItem } from './types';
-import { strandedTitle } from '../../shared/spawn-trouble.mjs';
+import { strandedTitle } from '../../shared/spawn-trouble.mts';
 import { Name } from '../../shared/product-name.mjs';
 
 type Trouble = NonNullable<NonNullable<Snapshot['supervisor']>['spawnTrouble']>;
@@ -39,7 +39,7 @@ export function isTroubleRow(i: { id?: string } | null | undefined): boolean {
 /**
  * WHAT HAPPENS NEXT, IN AS FEW WORDS AS ONE LINE OF A ROW HOLDS.
  *
- *  `causeNext` in spawn-trouble.mjs is a whole sentence, which is right in the
+ *  `causeNext` in spawn-trouble.mts is a whole sentence, which is right in the
  *  pane and too long on the row: three causes of it overflow `.preview`, which
  *  clamps to one line, and the third one is lost. Measured 2026-08-28. So the
  *  row gets the fragment and the pane gets the sentence, and both come from the
@@ -79,7 +79,7 @@ export function troubleCount(t: Trouble): number {
 
 /**
  * The row's title, which is also the pane's heading. Worded in
- *  shared/spawn-trouble.mjs with everything else this app says about a stopped
+ *  shared/spawn-trouble.mts with everything else this app says about a stopped
  *  task, so the row and the sentence it came from count the same way. */
 export function troubleTitle(t: Trouble): string {
   return strandedTitle(troubleCount(t));

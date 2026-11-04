@@ -8,7 +8,7 @@
 // same process, and hands back the same kind of absolute path. It also does
 // one thing the Mac's dialog cannot: it says, on the folder she is standing in,
 // whether choosing it would be turned down, so she never presses the button and
-// is told no afterwards. See main/folders.mjs for why a tab can do this at all.
+// is told no afterwards. See main/folders.mts for why a tab can do this at all.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
