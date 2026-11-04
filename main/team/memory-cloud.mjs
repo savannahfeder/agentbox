@@ -370,13 +370,13 @@ export function memoryBackend(cloud, personId) {
       const fields = { name, kind, type, body, version: Math.max(1, version | 0), hash: String(hash ?? ''), updatedAt: cloud.now() };
       if (live) { Object.assign(live, fields); return live.token; }
       const token = crypto.randomBytes(20).toString('hex');
-      cloud.fileLinks.set(token, { token, owner: personId, source, ...fields, stoppedAt: null });
+      cloud.fileLinks.set(token, { token, owner: personId, source, ...fields, createdAt: fields.updatedAt, stoppedAt: null });
       return token;
     },
 
     async fileLinkFor(source) {
       const l = [...cloud.fileLinks.values()].find((x) => x.owner === personId && x.source === source && !x.stoppedAt);
-      return l ? { token: l.token, version: l.version, hash: l.hash ?? '', updatedAt: l.updatedAt, comments: cloud.fileLinkComments.filter((c) => c.token === l.token).length } : null;
+      return l ? { token: l.token, version: l.version, hash: l.hash ?? '', createdAt: l.createdAt ?? l.updatedAt, updatedAt: l.updatedAt, comments: cloud.fileLinkComments.filter((c) => c.token === l.token).length } : null;
     },
 
     async stopFileLink(token) {

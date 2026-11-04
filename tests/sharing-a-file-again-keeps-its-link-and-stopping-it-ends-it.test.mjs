@@ -20,7 +20,8 @@ import { memorySession } from '../main/team/session.mjs';
 import { linkSiteFor, versionInName } from '../main/file-link.mjs';
 import { familyKeyOf } from '../shared/artifact-marks.mjs';
 import { PHONE_SITE } from '../shared/cloud-address.mjs';
-import { linkOffer, canShareFile } from '../renderer/src/components/ShareLink.tsx';
+import { linkOffer, canShareFile, shareWords } from '../renderer/src/components/ShareLink.tsx';
+import { clock } from '../renderer/src/thread-history.ts';
 
 async function aMac(cloud, personId, site = 'https://app.agentbox.ac') {
   const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'file-link-'));
@@ -59,6 +60,21 @@ describe('signed in', () => {
     expect(second.url).toBe(first.url);
     expect(second.version).toBe(3);
     expect([...cloud.fileLinks.values()][0].body).toBe('# Plan v3');
+  });
+
+  // A link made a minute ago said "Link updated" (power test, round 3, 2026-11-04).
+  it('says when the link was made, and when it was last given a newer copy', async () => {
+    let now = Date.parse('2026-11-04T09:00:00Z');
+    cloud.now = () => now;
+    const made = (await maya.shareFile(file(1))).link;
+    expect(made.createdAt).toBe(made.updatedAt);
+    expect(shareWords.shared(made, now)).toBe(`Shared today at ${clock(now)}`);
+    now += 3_600_000;
+    const later = (await maya.shareFile(file(2))).link;
+    expect(later.createdAt).toBe(made.createdAt);
+    expect(later.updatedAt).toBe(now);
+    expect(shareWords.shared(later, now)).toBe(`Updated today at ${clock(now)}`);
+    expect(shareWords.shared(later, now + 2 * 86_400_000)).toBe('Updated Nov 4');
   });
 
   it('says whether the link holds the copy on screen', async () => {

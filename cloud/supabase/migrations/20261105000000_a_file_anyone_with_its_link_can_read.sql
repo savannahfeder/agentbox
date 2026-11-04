@@ -68,9 +68,9 @@ end $$;
 
 -- The owner's own live link for a file, with how many comments it has.
 create or replace function public.my_file_link(src text)
-returns table (token text, version int, hash text, updated_at timestamptz, comments int)
+returns table (token text, version int, hash text, created_at timestamptz, updated_at timestamptz, comments int)
 language sql stable security definer set search_path = public as $$
-  select l.token, l.version, l.hash, l.updated_at,
+  select l.token, l.version, l.hash, l.created_at, l.updated_at,
          (select count(*)::int from public.file_link_comments c where c.token = l.token)
   from public.file_links l
   where l.owner = auth.uid() and l.source = src and l.stopped_at is null

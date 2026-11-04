@@ -31,10 +31,22 @@ function bytesOf(b64) {
   return out;
 }
 
-// As the page heads it (renderer/src/shared-file/shared-file.ts titleOf): a document by its first heading.
-const titleOf = (file) => (file.kind === 'markdown'
-  ? (/^\s*#[ \t]+(.+?)[ \t]*#*[ \t]*(?:\r?\n|$)/.exec(file.body ?? '')?.[1] ?? String(file.name).replace(/\.(md|markdown)$/i, ''))
-  : file.name);
+// As the page heads it (renderer/src/shared-file/shared-file.ts titleOf and
+// pageTitle): a document by its first heading, a page by its own title.
+const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+function pageTitle(html) {
+  const raw = /<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(String(html ?? '').replace(/<svg\b[\s\S]*?<\/svg>/gi, ''))?.[1] ?? '';
+  return raw.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, e) => {
+    if (e[0] !== '#') return ENTITIES[e.toLowerCase()] ?? whole;
+    const n = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1));
+    return n > 0 && n < 0x110000 ? String.fromCodePoint(n) : whole;
+  }).replace(/\s+/g, ' ').trim().slice(0, 120);
+}
+const titleOf = (file) => {
+  if (file.kind === 'markdown') return /^\s*#[ \t]+(.+?)[ \t]*#*[ \t]*(?:\r?\n|$)/.exec(file.body ?? '')?.[1] ?? String(file.name).replace(/\.(md|markdown)$/i, '');
+  if (file.kind === 'page') return pageTitle(file.body) || file.name;
+  return file.name;
+};
 
 const pictureType = (t) => (/^image\/[a-z0-9.+-]{1,60}$/i.test(t ?? '') ? t : 'application/octet-stream');
 

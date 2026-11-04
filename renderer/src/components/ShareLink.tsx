@@ -10,15 +10,18 @@ export const SIGN_IN_TO_SHARE = 'agentbox:sign-in-to-share';
 
 export const shareWords = {
   signedOut: 'Sign in to share a link to this file.',
-  fresh: 'Anyone with the link can view this file.',
+  fresh: 'Make a link anyone can open, without an account.',
   stopped: 'Stopped. The old link no longer works.',
   behind: 'The link shows an older copy.',
   newComments: 'New comments on the link',
   comments: (n: number) => (n === 1 ? '1 comment' : `${n} comments`),
   stopAsk: (n: number) => (n > 0 ? `Stop, and delete ${n === 1 ? 'its comment' : `its ${n} comments`}` : 'Stop the link'),
-  shared: (at: number, now = Date.now()) => (new Date(at).toDateString() === new Date(now).toDateString()
-    ? `Link updated today at ${clock(at)}`
-    : `Link updated ${new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' })}`),
+  shared: ({ createdAt, updatedAt }: { createdAt: number; updatedAt: number }, now = Date.now()) => {
+    const what = updatedAt - createdAt > 1000 ? 'Updated' : 'Shared';
+    return new Date(updatedAt).toDateString() === new Date(now).toDateString()
+      ? `${what} today at ${clock(updatedAt)}`
+      : `${what} ${new Date(updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+  },
   // "Shared" already means a teammate's thread, and a file your agent handed you.
   live: 'Public link',
 };
@@ -155,7 +158,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
           ) : link ? (
             <>
               <input className="av-share-url" readOnly value={link.url} aria-label="Link" onFocus={(e) => e.currentTarget.select()} />
-              <p className="av-share-meta"><span>{behind ? shareWords.behind : shareWords.shared(link.updatedAt)}</span></p>
+              <p className="av-share-meta"><span>{behind ? shareWords.behind : shareWords.shared(link)}</span></p>
               <div className="av-share-acts">
                 {behind && <button type="button" className="av-btn is-on" disabled={busy} onClick={() => void share()}>Update link</button>}
                 <button type="button" className={`av-btn${behind ? '' : ' is-on'}`} disabled={busy} onClick={() => void copy(link.url).then((ok) => setSaid(ok ? 'Link copied' : null))}>Copy link</button>
@@ -185,7 +188,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
             <>
               <p>{shareWords.fresh}</p>
               <div className="av-share-acts">
-                <button type="button" className="av-btn is-on" disabled={busy} onClick={() => void share()}>{busy ? 'Sharing' : 'Copy link'}</button>
+                <button type="button" className="av-btn is-on" disabled={busy} onClick={() => void share()}>{busy ? 'Making the link' : 'Make link'}</button>
               </div>
             </>
           )}

@@ -144,4 +144,26 @@ describe('the words over the file', () => {
     expect(titleOf({ name: 'deck.pdf', kind: 'pdf', body: 'x' }).title).toBe('deck.pdf');
     expect(titleOf({ name: 'a.md', kind: 'markdown', body: '## Second level' }).title).toBe('a');
   });
+  // A designer was sent "index.html" for a page titled "Pricing" (power test, round 3, 2026-11-04).
+  it('are a page\'s own title, with its entities read, and its name when the title is empty or missing', () => {
+    const page = (body) => titleOf({ name: 'index.html', kind: 'page', body }).title;
+    expect(page('<!doctype html><html><head><title>\n  Pricing &amp; plans </title></head>')).toBe('Pricing & plans');
+    expect(page('<TITLE>Clinicly: scheduling</TITLE>')).toBe('Clinicly: scheduling');
+    expect(page('<title>  </title>')).toBe('index.html');
+    expect(page('<h1>No title here</h1>')).toBe('index.html');
+    expect(page('<svg><title>An icon</title></svg>')).toBe('index.html');
+    expect(page(`<title>${'x'.repeat(300)}</title>`)).toHaveLength(120);
+  });
+});
+
+describe('the words in a link preview', () => {
+  it('head a page by the same title the page itself shows', async () => {
+    const { sharedFileWorker } = await import('../cloud/web/shared-file-worker.mjs');
+    const row = { name: 'index.html', kind: 'page', type: 'text/html', body: '<html><head><title>Pricing &amp; plans</title></head></html>', owner_name: 'Maya' };
+    const w = sharedFileWorker({ cloud: 'https://db.example', anonKey: 'k' }, { fetchImpl: async () => new Response(JSON.stringify([row])) });
+    const env = { ASSETS: { fetch: async () => new Response('<html><head><title>Agentbox</title></head><body></body></html>') } };
+    const html = await (await w.fetch(new Request('https://app.example/f/pR3nY0q7Lw2Xc9Vb5Tz1'), env)).text();
+    expect(html).toContain('<meta property="og:title" content="Pricing &amp; plans">');
+    expect(html).toContain('<title>Pricing &amp; plans · Agentbox</title>');
+  });
 });

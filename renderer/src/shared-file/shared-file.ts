@@ -110,7 +110,19 @@ export function titleOf(file: Pick<SharedFile, 'name' | 'kind' | 'body'>): { tit
     if (m) return { title: m[1], body: file.body.slice(m[0].length) };
     return { title: file.name.replace(/\.(md|markdown)$/i, ''), body: file.body };
   }
+  if (file.kind === 'page') return { title: pageTitle(file.body) || file.name, body: file.body };
   return { title: file.name, body: file.body };
+}
+
+// Kept the same in cloud/web/shared-file-worker.mjs, which heads the link preview with it.
+const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+export function pageTitle(html: string): string {
+  const raw = /<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(String(html ?? '').replace(/<svg\b[\s\S]*?<\/svg>/gi, ''))?.[1] ?? '';
+  return raw.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, e: string) => {
+    if (e[0] !== '#') return ENTITIES[e.toLowerCase()] ?? whole;
+    const n = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1));
+    return n > 0 && n < 0x110000 ? String.fromCodePoint(n) : whole;
+  }).replace(/\s+/g, ' ').trim().slice(0, 120);
 }
 
 export function commentWhen(ts: number, now = Date.now()): string {

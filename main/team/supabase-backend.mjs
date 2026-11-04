@@ -322,7 +322,7 @@ export function supabaseBackend(client) {
       await myId();
       const rows = must(await client.rpc('my_file_link', { src: source }), 'asking for the file\'s link');
       const r = rows?.[0];
-      return r ? { token: r.token, version: r.version, hash: r.hash ?? '', updatedAt: Date.parse(r.updated_at), comments: r.comments } : null;
+      return r ? { token: r.token, version: r.version, hash: r.hash ?? '', createdAt: Date.parse(r.created_at ?? r.updated_at), updatedAt: Date.parse(r.updated_at), comments: r.comments } : null;
     },
 
     async stopFileLink(token) {
