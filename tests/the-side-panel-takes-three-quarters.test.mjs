@@ -50,15 +50,13 @@ describe('three quarters, and no line down the middle', () => {
     expect(css).toMatch(/\.doc-grip:hover::before \{ background: var\(--text-faint\); \}/)
   })
 
-  it('keeps the reach and the handle that make the divider findable', () => {
-    // is her second sentence, and the two things that make the drag reachable
-    // are hers from 2026-08-21: a 9 point hit area over a 1 point line, and a
-    // capsule handle on hover.
+  it('keeps the reach that makes the divider findable', () => {
+    // A 9 point hit area over a 1 point line, from 2026-08-21. The capsule
+    // that sat on it went on 2026-11-04 when the line moved onto the file's
+    // own edge (the-divider-sits-on-the-files-own-edge).
     const grip = css.match(/\n\.doc-grip \{[^}]*\}/)
     expect(grip[0]).toContain('width: 9px')
     expect(grip[0]).toContain('cursor: col-resize')
-    expect(css).toContain('.doc-grip::after')
-    expect(css).toMatch(/\.doc-grip:hover::after, \.doc-pane\.dragging \.doc-grip::after \{ opacity: 1; \}/)
   })
 
   it('leaves the travel in both directions exactly where it was', () => {
