@@ -69,6 +69,7 @@ describe('somebody with the link and no account', () => {
     expect(tok).toMatch(/^[a-f0-9]{40}$/);
     const [v] = await view(tok);
     expect(v).toMatchObject({ name: 'plan.md', kind: 'markdown', type: 'text/markdown', body: '# The plan', version: 1, owner_name: 'Maya Chen', mine: false });
+    expect(v.created_at).toBeTruthy();
     expect(JSON.stringify(v)).not.toContain('maya@nw.test');
   });
 

@@ -11,6 +11,7 @@ export interface SharedFile {
   /** Words for markdown and a page, base64 for an image or a PDF. */
   body: string;
   version: number;
+  createdAt: number;
   updatedAt: number;
   ownerName: string;
   ownerAvatar: string | null;
@@ -49,7 +50,8 @@ export async function readSharedFile(rpc: Rpc, tok: string): Promise<Shown> {
       state: 'file',
       file: {
         name: String(r.name ?? ''), kind: r.kind, type: String(r.type ?? ''), body: String(r.body ?? ''),
-        version: Number(r.version) || 1, updatedAt: Date.parse(r.updated_at) || 0,
+        version: Number(r.version) || 1,
+        createdAt: Date.parse(r.created_at) || Date.parse(r.updated_at) || 0, updatedAt: Date.parse(r.updated_at) || 0,
         ownerName: (typeof r.owner_name === 'string' && r.owner_name.trim()) || 'Someone',
         ownerAvatar: typeof r.owner_avatar === 'string' && /^https:/.test(r.owner_avatar) ? r.owner_avatar : null,
         mine: r.mine === true,
@@ -96,9 +98,11 @@ export function sharedOn(ts: number, now = Date.now()): string {
   return d.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function sharedLine(file: Pick<SharedFile, 'ownerName' | 'updatedAt'>, now = Date.now()): string {
+export function sharedLine(file: Pick<SharedFile, 'ownerName' | 'updatedAt'> & { createdAt?: number }, now = Date.now()): string {
   const who = file.ownerName.length > 60 ? `${file.ownerName.slice(0, 59)}…` : file.ownerName;
-  return file.updatedAt ? `Shared by ${who} · ${sharedOn(file.updatedAt, now)}` : `Shared by ${who}`;
+  if (!file.updatedAt) return `Shared by ${who}`;
+  const updated = !!file.createdAt && file.updatedAt - file.createdAt > 1000;
+  return `Shared by ${who} · ${updated ? 'updated ' : ''}${sharedOn(file.updatedAt, now)}`;
 }
 
 /**

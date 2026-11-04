@@ -89,9 +89,9 @@ end $$;
 
 -- What anyone with the link sees. Nothing for a stopped or unknown link.
 create or replace function public.file_link_view(tok text)
-returns table (name text, kind text, type text, body text, version int, updated_at timestamptz, owner_name text, owner_avatar text, mine boolean)
+returns table (name text, kind text, type text, body text, version int, created_at timestamptz, updated_at timestamptz, owner_name text, owner_avatar text, mine boolean)
 language sql stable security definer set search_path = public as $$
-  select l.name, l.kind, l.type, l.body, l.version, l.updated_at,
+  select l.name, l.kind, l.type, l.body, l.version, l.created_at, l.updated_at,
          nullif(p.name, ''), p.avatar_url, coalesce(l.owner = auth.uid(), false)
   from public.file_links l join public.people p on p.id = l.owner
   where l.token = tok and l.stopped_at is null

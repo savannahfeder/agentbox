@@ -27,7 +27,7 @@ describe('reading the link', () => {
   it('is the file when the link is live, and asks nothing more', async () => {
     const { rpc, asked } = rpcOf({ file_link_view: [ROW] });
     const shown = await readSharedFile(rpc, TOK);
-    expect(shown).toEqual({ state: 'file', file: { name: 'plan.md', kind: 'markdown', type: 'text/markdown', body: '# Plan', version: 2, updatedAt: Date.parse('2026-11-04T10:00:00Z'), ownerName: 'Maya Chen', ownerAvatar: null, mine: false } });
+    expect(shown).toEqual({ state: 'file', file: { name: 'plan.md', kind: 'markdown', type: 'text/markdown', body: '# Plan', version: 2, createdAt: Date.parse('2026-11-04T10:00:00Z'), updatedAt: Date.parse('2026-11-04T10:00:00Z'), ownerName: 'Maya Chen', ownerAvatar: null, mine: false } });
     expect(asked).toEqual([['file_link_view', { tok: TOK }]]);
   });
   it('says stopped for a link that was stopped, and does not work for one that never was', async () => {
@@ -66,6 +66,17 @@ describe('the words on the page', () => {
     // A 400-character name ran off the edge of the page (power test, round 3).
     expect(sharedLine({ ownerName: `Z${'z'.repeat(400)}`, updatedAt: 0 })).toBe(`Shared by Z${'z'.repeat(58)}…`);
     expect(sharedLine({ ownerName: 'Maya Chen', updatedAt: Date.parse('2025-06-02T10:00:00Z') }, now)).toBe('Shared by Maya Chen · Jun 2, 2025');
+  });
+  // After Update link the page still read "Shared by Maya · today at 8:49am", and
+  // a reader who had commented could not tell it had changed (power test, round 3).
+  it('say the file was updated, and when, once the owner put a newer copy in the link', () => {
+    const now = Date.parse('2026-11-04T12:00:00Z');
+    expect(sharedLine({ ownerName: 'Maya Chen', createdAt: Date.parse('2026-11-02T10:00:00Z'), updatedAt: Date.parse('2026-11-03T10:00:00Z') }, now)).toBe('Shared by Maya Chen · updated Nov 3');
+    expect(sharedLine({ ownerName: 'Maya Chen', createdAt: Date.parse('2026-11-02T10:00:00Z'), updatedAt: Date.parse('2026-11-02T10:00:00Z') }, now)).toBe('Shared by Maya Chen · Nov 2');
+  });
+  it('read when the link was made off the database row', async () => {
+    const { file } = await readSharedFile(rpcOf({ file_link_view: [{ ...ROW, created_at: '2026-11-03T10:00:00Z' }] }).rpc, TOK);
+    expect(file.createdAt).toBe(Date.parse('2026-11-03T10:00:00Z'));
   });
   it('give a comment\'s time the way the app does', () => {
     const now = Date.parse('2026-11-04T12:00:00Z');

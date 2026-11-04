@@ -20,7 +20,7 @@ import { memorySession } from '../main/team/session.mjs';
 import { linkSiteFor, versionInName } from '../main/file-link.mjs';
 import { familyKeyOf } from '../shared/artifact-marks.mjs';
 import { PHONE_SITE } from '../shared/cloud-address.mjs';
-import { linkOffer, canShareFile, shareWords } from '../renderer/src/components/ShareLink.tsx';
+import { linkOffer, canShareFile, shareWords, afterSharing } from '../renderer/src/components/ShareLink.tsx';
 import { clock } from '../renderer/src/thread-history.ts';
 
 async function aMac(cloud, personId, site = 'https://app.agentbox.ac') {
@@ -146,6 +146,16 @@ it('takes a site on this computer over plain http, and no other plain http', () 
   expect(linkSiteFor('http://127.0.0.1.evil.test:8788')).toBeNull();
   expect(linkSiteFor('http://localhost.evil.test')).toBeNull();
   expect(linkSiteFor('http://10.0.0.5:8788')).toBeNull();
+});
+
+// "Update link also silently copied the link to my clipboard" (power test, round 3, 2026-11-04).
+it('copies a new link, and leaves the clipboard alone when it updates one', async () => {
+  let copied = 0;
+  const copyIt = async () => { copied += 1; return true; };
+  expect(await afterSharing(false, copyIt)).toBe('Link copied');
+  expect(await afterSharing(true, copyIt)).toBe('Link updated');
+  expect(copied).toBe(1);
+  expect(await afterSharing(false, async () => false)).toBeNull();
 });
 
 it('the panel offers Update link when the link holds another copy', () => {

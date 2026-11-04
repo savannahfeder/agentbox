@@ -26,6 +26,12 @@ export const shareWords = {
   live: 'Public link',
 };
 
+/** A new link goes on the clipboard; updating one already sent leaves the clipboard alone. */
+export async function afterSharing(hadLink: boolean, copyIt: () => Promise<boolean>): Promise<string | null> {
+  if (hadLink) return 'Link updated';
+  return (await copyIt()) ? 'Link copied' : null;
+}
+
 /** The kinds a link can draw, as main/file-link.mjs linkKindOf names them. */
 export const canShareFile = (src: string) => /\.(md|markdown|html?|png|jpe?g|gif|webp|svg|pdf)$/i.test(String(src ?? '').split(/[?#]/)[0]);
 
@@ -126,7 +132,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
     setBusy(false);
     if (!out.ok || !out.link) { setProblem(out.error ?? 'That did not share.'); return; }
     setState(out);
-    setSaid((await copy(out.link.url)) ? 'Link copied' : null);
+    setSaid(await afterSharing(!!link, () => copy(out.link!.url)));
   };
   const stop = async () => {
     if (!link) return;

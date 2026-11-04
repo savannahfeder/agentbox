@@ -389,7 +389,7 @@ export function memoryBackend(cloud, personId) {
       const l = cloud.fileLinks.get(token);
       if (!l || l.stoppedAt) return { stopped: !!l, file: null };
       const owner = cloud.people.get(l.owner);
-      return { stopped: false, file: { name: l.name, kind: l.kind, type: l.type, body: l.body, version: l.version, updatedAt: l.updatedAt, ownerName: owner?.name || null, ownerAvatar: owner?.avatarUrl ?? null, mine: l.owner === personId } };
+      return { stopped: false, file: { name: l.name, kind: l.kind, type: l.type, body: l.body, version: l.version, createdAt: l.createdAt ?? l.updatedAt, updatedAt: l.updatedAt, ownerName: owner?.name || null, ownerAvatar: owner?.avatarUrl ?? null, mine: l.owner === personId } };
     },
 
     async fileLinkComments(token) {
