@@ -8,8 +8,9 @@
 // the reply waits on the row for its time (main/ipc.mjs writes the time, then
 // the words). Only the drawing said otherwise.
 //
-// Measured off the tester's own ledger: a founder `runAt` line, then a founder
-// `answer` line a few milliseconds later.
+// Measured off the tester's own ledger. The reply's words and its time are
+// two founder lines a few milliseconds apart, the words first since the same
+// day's fix (tests/a-reply-can-wait-for-a-time.test.mjs).
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -28,8 +29,8 @@ const opened = [
   { id: 'w-1', ts: T - 60_000, source: 'agent', patch: { status: 'blocked', result: 'Done the first screen.' } },
 ];
 const later = [
-  { id: 'w-1', ts: T, source: 'founder', patch: { runAt: SENDS } },
-  { id: 'w-1', ts: T + 4, source: 'founder', patch: { answer: 'And make the button go to /start', status: 'open' } },
+  { id: 'w-1', ts: T, source: 'founder', patch: { answer: 'And make the button go to /start', status: 'open' } },
+  { id: 'w-1', ts: T + 4, source: 'founder', patch: { runAt: SENDS } },
 ];
 const reply = (events) => events.find((e) => e.field === 'answer');
 
@@ -56,22 +57,29 @@ describe('a reply set for later', () => {
 });
 
 describe('what stays as it was', () => {
-  it('a thread put off and answered later is two things you did', () => {
+  it('a reply and then the thread put off later on are two things you did', () => {
     const apart = [later[0], { ...later[1], ts: T + 10 * 60_000 }];
     const events = threadEvents([...opened, ...apart]);
     expect(events.some((e) => e.said === 'You moved it to Later')).toBe(true);
     expect(reply(events)?.sendsAt).toBeUndefined();
   });
 
-  it('an agent pausing the thread before your reply is the agent\'s', () => {
-    const paused = [{ ...later[0], source: 'agent' }, later[1]];
+  it('a thread put off and then answered is two things too', () => {
+    const before = [{ ...later[1], ts: T - 10 * 60_000 }, later[0]];
+    const events = threadEvents([...opened, ...before]);
+    expect(events.some((e) => e.said === 'You moved it to Later')).toBe(true);
+    expect(reply(events)?.sendsAt).toBeUndefined();
+  });
+
+  it('an agent pausing the thread after your reply is the agent\'s', () => {
+    const paused = [later[0], { ...later[1], source: 'agent' }];
     const events = threadEvents([...opened, ...paused]);
     expect(events.some((e) => e.said === 'It paused this')).toBe(true);
     expect(reply(events)?.sendsAt).toBeUndefined();
   });
 
   it('a plain reply has no send time', () => {
-    const events = threadEvents([...opened, later[1]]);
+    const events = threadEvents([...opened, later[0]]);
     expect(reply(events)?.sendsAt).toBeUndefined();
   });
 });
@@ -79,7 +87,7 @@ describe('what stays as it was', () => {
 describe('the line under the thread while the reply waits', () => {
   const row = (over = {}) => ({
     product: 'p', id: 'w-1', status: 'open', answer: 'And make the button go to /start', runAt: SENDS,
-    wrote: { runAt: { ts: T, source: 'founder' }, answer: { ts: T + 4, source: 'founder' } },
+    wrote: { answer: { ts: T, source: 'founder' }, runAt: { ts: T + 4, source: 'founder' } },
     ...over,
   });
 

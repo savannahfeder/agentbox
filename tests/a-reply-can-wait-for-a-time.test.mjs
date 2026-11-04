@@ -102,11 +102,29 @@ describe('the window\'s handler', () => {
     expect(handler).toMatch(/runAt[,\s}]/);
   });
 
-  it('sets the row for that time before it writes the words, so no pass sees the words alone', () => {
-    const commit = handler.slice(handler.indexOf('submitReply('));
-    const schedule = commit.indexOf('store.scheduleItem(product, id, runAt)');
-    expect(schedule).toBeGreaterThan(-1);
-    expect(schedule).toBeLessThan(commit.indexOf('store.answerItem('));
+  // Two power testers on 2026-11-04 set a reply for later and watched the
+  // agent start on it at once. Main had learned that a word said after a
+  // thread's moment runs now (shared/answers.mjs, wordWaits), and this handler
+  // wrote the moment first and the words after it. The reply's own time is
+  // written after its words now, in the same synchronous step.
+  it('writes the words, then their time, with nothing between them', () => {
+    const commit = handler.slice(handler.indexOf('submitReply('), handler.indexOf('\n    });', handler.indexOf('submitReply(')));
+    const words = commit.indexOf('store.answerItem(');
+    const time = commit.indexOf('store.scheduleItem(product, id, runAt)');
+    expect(words).toBeGreaterThan(-1);
+    expect(time).toBeGreaterThan(words);
+    expect(commit.slice(words, time)).not.toMatch(/await/);
+  });
+
+  it('so a reply with its own time waits, and a word said after a moment still runs now', () => {
+    const ahead = Date.now() + 3_600_000;
+    const row = (answerTs, runAtTs) => ({
+      status: 'open', answer: 'carry on tomorrow', runAt: ahead,
+      wrote: { answer: { ts: answerTs, source: 'founder' }, runAt: { ts: runAtTs, source: 'founder' } },
+    });
+    expect(isDue(row(1_000, 1_001))).toBe(false);
+    expect(isDue(row(1_000, 1_000))).toBe(false);
+    expect(isDue(row(61_000, 1_000))).toBe(true);
   });
 
   it('tells the live path to leave it alone', () => {

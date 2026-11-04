@@ -773,11 +773,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // race the run usually wins, so she would pick a model and watch the old one
     // take the task. `answerItem` writes both, and it writes the model first.
     // A REPLY SET FOR LATER is these words with the row set for its time. The
-    // time goes in first, so no pass ever reads the words on a row that is due.
+    // time goes in after the words, so it is newer than them: a word said after
+    // a thread's moment runs now (shared/answers.mjs wordWaits), and this one
+    // must wait. Both writes are one synchronous step, so no pass reads between.
     const later = Number(runAt) > Date.now() && status !== 'done';
     const out = await submitReply(supervisor,{product,id,answer,status,permissionMode,now:!!now,later},()=>{
+      const said = store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone });
       if (later) store.scheduleItem(product, id, runAt);
-      return store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone });
+      return said;
     });
     // A REPLY ON A ROW A TEAMMATE GAVE YOU HANDS IT BACK TO THEM, so the
     // conversation moves to their inbox instead of sitting in both
