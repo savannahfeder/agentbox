@@ -129,7 +129,11 @@ function forkTask(sup: TaskCommandSupervisor, productSlug: string, id: string, i
     kind: 'directive',
     priority: item.priority ?? 0,
     labels: [`fork:${id}`],
+    // What the thread was picked to run on goes with it, or the fork falls to
+    // the default (tests/a-fork-runs-on-the-model-its-thread-was-on).
     ...(item.engine ? { engine: item.engine } : {}),
+    ...(item.model ? { model: item.model } : {}),
+    ...(item.effort ? { effort: item.effort } : {}),
   });
   if (!made?.id) return publish('failed', 'The fork could not be created. Your draft has been kept.', op.name);
   sup.onChange?.();

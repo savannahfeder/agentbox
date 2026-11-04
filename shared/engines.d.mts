@@ -7,6 +7,7 @@ export interface Engine {
 export declare const ENGINES: Engine[];
 export declare const ENGINE_IDS: string[];
 export declare const DEFAULT_ENGINE: string;
+export declare const DEFAULT_CLAUDE_MODEL: string;
 // The capability gate. `unique symbol` is what makes TypeScript refuse a
 // boolean or a string here, so an honest caller is stopped at compile time. BE
 // PRECISE ABOUT WHAT THAT BUYS: `any` walks straight through it, as it does

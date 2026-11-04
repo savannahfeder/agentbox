@@ -97,9 +97,14 @@ describe('who is told', () => {
     expect(lineFor(injected(args), 'L')).toMatch(/off until/);
   });
 
-  // The keys ride with the app's own rules and never on their own, so the
-  // standing rule that an empty instruction adds no flag at all still holds.
+  // The keys ride with the app's own rules and never on their own. The flag
+  // itself is no longer the measure of that: since 2026-11-04 it also carries
+  // which model and effort level the run is on
+  // (tests/a-run-can-read-which-model-and-effort-it-is-on), so what is asked is
+  // that no key reaches a session when there are no rules to carry them.
   it('nobody, when the app ships no rules at all', () => {
-    expect(supervisor().spawnPlan(item(), product, {}).args).not.toContain('--append-system-prompt');
+    const text = injected(supervisor().spawnPlan(item(), product, {}).args) ?? '';
+    expect(text.startsWith('This run is on Claude Code, Opus 5.5.')).toBe(true);
+    expect(text).not.toMatch(/key/i);
   });
 });

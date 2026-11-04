@@ -77,9 +77,9 @@ describe('every team sign-up names the phone website', () => {
     expect(bridge).toMatch(/client\.finishEmailLink\(/);
   });
 
-  it('the phone app names the website its settings carry', () => {
-    expect(fs.readFileSync('mobile/app.config.ts', 'utf8')).toMatch(/phoneSite/);
-    expect(fs.readFileSync('mobile/src/app/sign-in.tsx', 'utf8')).toMatch(/signUp\(name\.trim\(\), email\.trim\(\), password, phoneSite\)/);
+  // Accounts are made on the computer now, so the phone app sends no sign-up and no link.
+  it('the phone app makes no account, so it sends no link', () => {
+    expect(fs.readFileSync('mobile/src/app/sign-in.tsx', 'utf8')).not.toMatch(/signUp\(/);
   });
 
   it('the desktop names the website its team settings carry', () => {

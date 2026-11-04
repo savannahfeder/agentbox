@@ -17,7 +17,7 @@ import { useCloud } from '../state/cloud';
 import { useGroups } from '../state/groups';
 import { Back, Caret, Clip } from './icons';
 import { IconButton, RunningMark, Sheet, SheetHead, SheetRow, T, TopBar } from './parts';
-import { color, font, size } from './theme';
+import { color, corner, font, size } from './theme';
 
 /** A round face: two letters in mono on one grey ground for everyone (renderer/src/team/people.tsx). */
 export function Face({ name, size: s }: { name: string; size: number }) {
@@ -87,7 +87,7 @@ function RoomFile({ roomId, name, label }: { roomId: string; name: string; label
     } catch (err) { c.say(String((err as Error)?.message ?? err)); } finally { setBusy(false); }
   };
   return (
-    <Pressable onPress={() => void open()} disabled={busy} accessibilityRole="button" style={({ pressed }) => ({ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, height: 34, paddingHorizontal: 11, borderWidth: 1, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: busy ? 0.6 : 1 })}>
+    <Pressable onPress={() => void open()} disabled={busy} accessibilityRole="button" style={({ pressed }) => ({ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, height: 34, paddingHorizontal: 11, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: busy ? 0.6 : 1 })}>
       <Clip size={14} />
       <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 13.5, color: color.dim }}>{label}</T>
     </Pressable>
@@ -155,7 +155,6 @@ function PeopleSheet({ room, open, close }: { room: Room; open: boolean; close: 
           <View style={{ flex: 1, minWidth: 0 }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 7 }}>
               <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 15.5, lineHeight: 21 }}>{cardName(c)}</T>
-              {c.level != null && <T style={{ fontFamily: font.mono, fontSize: 11, color: color.faint }}>{c.level}</T>}
             </View>
             <T numberOfLines={1} style={{ fontSize: 13, lineHeight: 19, color: c.agents ? color.dim : color.faint }}>{onWords(c)}</T>
           </View>
@@ -282,7 +281,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
         </ScrollView>
         <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10 }}>
           {failed && <T style={{ fontSize: 13, color: color.dim, paddingHorizontal: 4, paddingBottom: 6 }}>{failed}</T>}
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', borderWidth: 1, borderColor: text ? color.lineStrong : color.line, backgroundColor: color.field }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', borderWidth: 1, borderRadius: corner.small, borderColor: text ? color.lineStrong : color.line, backgroundColor: color.field }}>
             <TextInput value={text} onChangeText={setText} multiline placeholder={root ? 'Reply in thread' : `Message ${groupName(room)}`} placeholderTextColor={color.faint}
               style={[{ flex: 1, minHeight: 42, maxHeight: 140, paddingTop: 10, paddingBottom: 10, paddingHorizontal: 14, fontFamily: font.regular, fontSize: 15.5, lineHeight: 22, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
             {!!text.trim() && <IconButton label="Send" onPress={() => void send()}><SendGlyph tint={color.accent} /></IconButton>}

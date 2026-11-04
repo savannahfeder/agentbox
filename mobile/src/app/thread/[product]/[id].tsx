@@ -17,6 +17,7 @@ import { clock, dayHeading } from '../../../../../renderer/src/thread-history';
 import { stateWordOf } from '../../../../../renderer/src/threads/summary-rules';
 import { summaryOf, threadState } from '../../../../../shared/thread-cards.mjs';
 import { arrivedAt } from '../../../../../renderer/src/unread';
+import { dayClock } from '../../../lib/back-at';
 import type { Choices, Press } from '../../../lib/actions';
 import { useDraft } from '../../../lib/drafts';
 import { typedWords } from '../../../lib/files';
@@ -43,7 +44,7 @@ import { ModelSheet, ModeSheet, PrioritySheet, barsFor } from '../../../ui/Picke
 import { ThreadMenu } from '../../../ui/ThreadMenu';
 import { DictationProblem, Listening, MicButton, useDictation } from '../../../ui/Dictation';
 import { ActLine, FiledList, FocusActions, LiveLine, OptionsCard, RunLine, WorkLine } from '../../../ui/ThreadParts';
-import { color, font, size } from '../../../ui/theme';
+import { color, corner, font, size } from '../../../ui/theme';
 
 const when = (at: number) => (at ? `${dayHeading(at)} ${clock(at)}` : '');
 // The dark look's `--code-minus`, which a message her Mac refused says why in.
@@ -86,9 +87,9 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name 
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 3, flexWrap: 'wrap' }}>
           <T style={yours ? { fontSize: 14, lineHeight: 22.4, fontFamily: font.semibold } : { fontSize: 14, lineHeight: 22.4, color: color.dim }}>{yours ? 'You' : name ?? 'The agent'}</T>
           <T style={{ fontSize: 12.5, lineHeight: 20, color: e.refused ? REFUSED : e.pending ? color.dim : color.faint, flexShrink: 1 }} numberOfLines={2}>
-            {e.refused ? `Not sent: ${e.refused}` : e.pending ? (e.sent ? 'Sent' : e.cloud ? 'Working in Agentbox Cloud' : 'Waiting for your computer') : when(e.at)}
+            {e.refused ? `Not sent: ${e.refused}` : e.pending ? (e.sent ? 'Sent' : e.cloud ? 'Working in Agentbox Cloud' : e.toCloud ? 'Waiting for Agentbox Cloud' : e.scheduled ? `Scheduled for ${dayClock(e.scheduled)}` : 'Waiting for your computer') : when(e.at)}
           </T>
-          {e.pending && !e.refused && !e.cloud && !e.sent && sendNow && (
+          {e.pending && !e.refused && !e.cloud && !e.toCloud && !e.scheduled && !e.sent && sendNow && (
             <T onPress={sendNow} suppressHighlighting accessibilityRole="button"
               style={{ fontSize: 12.5, lineHeight: 20, color: color.dim, textDecorationLine: 'underline' }}>Send now</T>
           )}
@@ -145,7 +146,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   // A box that only listened, and heard nothing, folds away as an empty one does on blur.
   useEffect(() => { if (!talk.on && !talk.problem && !ready && !sheet && !typing.current?.isFocused()) setOpen(false); }, [talk.on]);
   const foot = footRoom(inset);
-  const card = { borderWidth: 1, backgroundColor: color.fill };
+  const card = { borderWidth: 1, borderRadius: corner.small, backgroundColor: color.fill };
   return (
     <View style={{ paddingHorizontal: 12, paddingBottom: 16 + foot, paddingTop: 8 }}>
       {!open ? (
@@ -201,13 +202,13 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
             {/* One slot: Stop while it is in progress and the box is empty, Send once anything is typed (Focus.tsx). */}
             {offers.stop && !ready ? (
               <Pressable onPress={stop} accessibilityRole="button" accessibilityLabel={thread.running ? 'Stop this agent' : 'Stop this task'}
-                style={({ pressed }) => ({ height: 29, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+                style={({ pressed }) => ({ height: 29, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
                 <StopMark />
                 <T style={{ fontSize: 13, fontFamily: font.medium, color: color.dim }}>Stop</T>
               </Pressable>
             ) : (
               <Pressable disabled={busy || !ready} accessibilityRole="button" onPress={() => void send(picked)}
-                style={({ pressed }) => ({ height: 29, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: busy || !ready ? 0.5 : 1 })}>
+                style={({ pressed }) => ({ height: 29, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: busy || !ready ? 0.5 : 1 })}>
                 <T style={{ fontSize: 13, fontFamily: font.semibold }}>{busy ? 'Sending…' : 'Send'}</T>
               </Pressable>
             )}
@@ -298,6 +299,7 @@ export default function ThreadScreen() {
   useEffect(() => { setWhole(false); setAsking(false); setCutting(false); setEarlierOpen(false); setContextWhole(false); }, [product, id]);
   const thread = useMemo(() => threadOf(c.rows, c.view, String(product), String(id), { whole, tabs: c.tabs }), [c.rows, c.view, c.tabs, product, id, whole]);
   const { dir, files } = useMessageFiles(String(product), String(id));
+  const inset = useSafeAreaInsets();
   const waiting = !!thread?.events.some((e: any) => e.kind !== 'work' && e.pending);
   useEffect(() => { if (!waiting) setCutting(false); }, [waiting]);
   // Read once opened, and again when an answer lands while it is open (App.tsx `focusedArrival`).
@@ -422,7 +424,7 @@ export default function ThreadScreen() {
           {/* Done in a box of its own, left of the dots, as the desktop draws it (threads/ThreadMenu.tsx). */}
           {threadState(item) !== 'done' && (
             <Pressable onPress={close} disabled={busy} accessibilityRole="button" accessibilityLabel="Mark done"
-              style={({ pressed }) => ({ height: 30, flexDirection: 'row', alignItems: 'center', gap: 7, paddingLeft: 9, paddingRight: 12, marginRight: 4, borderWidth: 1, borderColor: pressed ? color.lineStrong : color.line, backgroundColor: pressed ? color.picked : 'transparent' })}>
+              style={({ pressed }) => ({ height: 30, flexDirection: 'row', alignItems: 'center', gap: 7, paddingLeft: 9, paddingRight: 12, marginRight: 4, borderWidth: 1, borderRadius: corner.small, borderColor: pressed ? color.lineStrong : color.line, backgroundColor: pressed ? color.picked : 'transparent' })}>
               <DoneMark />
               <T style={{ fontSize: 13, color: color.dim }}>Done</T>
             </Pressable>
@@ -431,7 +433,8 @@ export default function ThreadScreen() {
           <View style={{ width: 16 }} />
         </>}
       />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* The permission card floats over the foot: the reply box sits 8pt above it and the queued cards' edges (14pt), its own foot room spent. */}
+      <KeyboardAvoidingView style={{ flex: 1, paddingBottom: c.approvalRoom ? Math.max(0, c.approvalRoom + 6 - footRoom(inset)) : 0 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: size.inset, paddingTop: 8, paddingBottom: 24 }}
           scrollEventThrottle={32}
           onScroll={(e) => {
@@ -522,14 +525,14 @@ export default function ThreadScreen() {
           foldedChoices={thread.options.length > 0 && !asking && choicesFolded ? thread.options.length : 0} showChoices={foldChoices} />
       </KeyboardAvoidingView>
       <ThreadMenu open={menu} close={() => setMenu(false)} now={c.now} laterNow={offers.laterNow} runNow={offers.runNow} moveToCloud={offers.moveToCloud}
-        onLater={(until, label) => void press({ kind: 'later', until, label }, item, back)}
+        onLater={(until, label) => void press({ kind: 'later', until, label, running: !!thread.running }, item, back)}
         onBack={() => void press({ kind: 'later', until: 0 })}
         onRunNow={() => void press({ kind: 'run-now' })}
         onMoveToCloud={() => void press({ kind: 'move-to-cloud' })}
         pinned={item.status === 'done' || item.waitsForMac ? null : !!item.pinned}
         onPin={(pin) => void press({ kind: 'pin', pinned: pin })}
         onUnread={() => { c.markUnseen(item); back(); }}
-        onClose={close} />
+        onClose={close} closed={threadState(item) === 'done'} />
       {summary && <Summary thread={thread} now={c.now} close={() => setSummary(false)} />}
     </Wall>
   );

@@ -71,7 +71,7 @@ import { hostSocketPath, perlRunsTheShim, HOST_ALREADY_THERE } from './cloud/hos
 import { runHostSocket, spoolFiles, HOST_ALREADY_THERE as RUN_HOST_ALREADY_THERE } from './run-host.mjs';
 import { HostedRun, HOST_LOST } from './hosted-run.mjs';
 import { readCloudUsage, summarizeCloudUsage } from './cloud/usage.mts';
-import { buildSessionArgs, CLAUDE_MODES, permissionMode } from './settings.mts';
+import { buildSessionArgs, CLAUDE_MODES, parseSessionArgs, permissionMode } from './settings.mts';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -151,10 +151,11 @@ import { isEffort, isEffortWord } from '../shared/effort-levels.mts';
 import {
   engineFor, engineLabel, engineChoiceSince, engineChoiceOnRowIsStale,
   availableEngines, isEngine, modelForEngine, homeEngine,
-  ENGINE_CHOICE_ENABLED, DEFAULT_ENGINE, ENGINE_IDS,
+  ENGINE_CHOICE_ENABLED, DEFAULT_ENGINE, DEFAULT_CLAUDE_MODEL, ENGINE_IDS,
 } from '../shared/engines.mjs';
 import { createCodexAppServer } from './codex-app-server.mjs';
 import { CLAUDE_MODELS } from '../shared/claude-models.generated.mjs';
+import { claudeModelRows } from './claude-models.mjs';
 import { codexLaunchEnv } from './codex-launch-env.mts';
 import { CodexUsage, codexAccountReadings } from './codex-usage.mts';
 import { createCodexWorker, mcpServerNames, resumeThreadParams, workerThreadParams } from './codex-session.mts';
@@ -1333,6 +1334,7 @@ export class Supervisor {
   declare _movableSeen: { at: number; ids: Set<string> } | undefined;
   declare _warnedGrant: boolean | undefined;
   declare _warnedRenamedGrant: boolean | undefined;
+  declare _warnedConfigModel: boolean | undefined;
   declare _warnedNoCloudSignIn: Set<string> | undefined;
   declare _unknownCodexRequests: Set<string> | undefined;
 
@@ -9392,7 +9394,20 @@ export class Supervisor {
     const model = modelForEngine(item, engine);
     // A model on the task rewrites the `--model` already in her session args
     // rather than being appended beside it: two `--model` flags is a coin flip.
-    const claudeGrants = model ? setModelArg(grants, model) : grants;
+    //
+    // AND A RUN NO ROW NAMED A MODEL FOR IS PINNED TO THE APP'S OWN ALIAS
+    // rather than to whatever `--model` the config carries, which no screen in
+    // this app draws and no control changes. The new task card already sends
+    // that word; every other kind of run took the flag, and the reply box drew
+    // the alias over all of them (tests/a-run-nobody-picked-a-model-for-is-on-
+    // the-model-the-card-names).
+    //
+    // CLAUDE CODE ONLY: `opus` is an alias ITS CLI resolves at spawn, Codex has
+    // no aliases and no command line, and a Claude alias reaching a Codex run
+    // is refused outright (`codexModelRefusal`).
+    const claudeModel = engine === 'claude' ? model ?? DEFAULT_CLAUDE_MODEL : model;
+    const claudeGrants = claudeModel ? setModelArg(grants, claudeModel) : grants;
+    if (engine === 'claude' && !model) this._sayTheConfigsModelIsNotUsed(grants);
     // HOW HARD IT THINKS. A level named on the task rides beside the model: as
     // `--effort` for Claude Code, as `turn/start`'s `effort` for Codex
     // (`codexTurnParamsFor`). Nothing named sends nothing, and the engine
@@ -9468,9 +9483,10 @@ export class Supervisor {
     try { teammate = this.store.teammates?.briefFor(item) ?? null; } catch { teammate = null; }
     const messages = this.messageRules({ teammate: !!teammate });
     // The connections say what this run can reach rather than how to behave,
-    // so they go above the ranked blocks and the message rules stay last.
+    // so they go above the ranked blocks and the message rules stay last. What
+    // the run is ON is a fact of the same kind, and it sits beside them.
     const ranked = [standing, project, teammate, messages, adhd, teammate && howYourRunEnds()];
-    const system = fillName([this._connectionsBrief(), ...ranked].filter(Boolean).join('\n\n'));
+    const system = fillName([this._connectionsBrief(), this._whatThisRunIsOn(engine, claudeModel, engine === 'claude' ? claudeEffort : effort), ...ranked].filter(Boolean).join('\n\n'));
     // `fork` IS THE FLAG THAT MAKES IT A FORK RATHER THAN A CONTINUATION: the
     // resumed conversation is written on under a NEW id, so the row it came
     // from keeps its own thread untouched (MP-08). The builder drops it when
@@ -12962,6 +12978,52 @@ export class Supervisor {
       plan.connectionServers = run.servers;
       spawnFiles.push(run.close);
     } catch (err) { console.warn('zero: could not hand this run its connections:', (err as Error | null)?.message ?? err); }
+  }
+
+  /**
+   * WHICH MODEL AND WHICH EFFORT LEVEL THIS RUN IS REALLY ON, told to the run,
+   * so a rule naming either can be checked by the run it binds. Claude Code's
+   * own system prompt names its model and never the level.
+   *
+   * ONLY WHAT IS KNOWN: with no level on the row the engine runs the model at
+   * its own default, which the app does not get to name. The model is named as
+   * the picker names it, off this Mac's own Claude Code, and a version pinned by
+   * hand draws as itself, so a label cannot make an older model look newer
+   * (tests/a-run-can-read-which-model-and-effort-it-is-on).
+   */
+  _whatThisRunIsOn(engine: string, model: string | null, effort: string | null) {
+    const word = engine === 'claude' ? model : this._codexModelWord({ model } as SpawnPlan);
+    const named = engine === 'claude' && word ? this._claudeModelLabel(word) : word;
+    const parts = [engineLabel(engine), named, effort ? `at ${effort} effort` : null].filter(Boolean);
+    if (parts.length < 2) return null;
+    return [
+      `This run is on ${parts.join(', ')}.`,
+      'Check a rule that names a model or an effort level against it, and say in your answer when they do not match rather than working to a standard this run cannot meet.',
+    ].join('\n');
+  }
+
+  /**
+   * Said once: a `--model` in sessionArgs no longer decides a run, and what
+   * does instead. A config quietly overruled is a behaviour nobody can account
+   * for later, which is the rule the warnings in `defaultSessionArgs` follow.
+   */
+  _sayTheConfigsModelIsNotUsed(grants: string[]) {
+    if (this._warnedConfigModel) return;
+    const pinned = parseSessionArgs(grants).model;
+    if (!pinned || pinned === DEFAULT_CLAUDE_MODEL) return;
+    this._warnedConfigModel = true;
+    console.warn(
+      `${NAME}: sessionArgs pins --model ${pinned}, which no screen in this app shows and nothing here reads any more. ` +
+      `A task that names no model runs on ${DEFAULT_CLAUDE_MODEL}, the model the new task card draws. ` +
+      'Pick the model on the card or in the reply box to run a task on something else.'
+    );
+  }
+
+  /** Claude Code's own name for an alias or a version, off this Mac, else the word itself. */
+  _claudeModelLabel(word: string) {
+    let rows: readonly { alias?: string; id?: string; label?: string }[] = CLAUDE_MODELS;
+    try { rows = claudeModelRows({ bin: this.config.claudeBin as never }) ?? CLAUDE_MODELS; } catch { rows = CLAUDE_MODELS; }
+    return rows.find((m) => m.alias === word || m.id === word)?.label ?? word;
   }
 
   _connectionsBrief() {

@@ -71,19 +71,28 @@ afterEach(() => {
   fs.rmSync(storeRoot, { recursive: true, force: true });
 });
 
+// THE FLAG ITSELF IS NO LONGER THE MEASURE (2026-11-04): it also carries the
+// one fact the app states about every run, which model and effort level it is
+// really on (tests/a-run-can-read-which-model-and-effort-it-is-on). So "briefed
+// as it was" is measured as no instruction block of anybody's, which is what
+// these cases were always about.
+const NOBODYS_WORDS = 'This run is on Claude Code, Opus 5.5.';
+const onlyTheRunsOwnFacts = (args) => injected(args).startsWith(NOBODYS_WORDS) && !/instructions/i.test(injected(args));
+
 describe('a project without instructions', () => {
   // The migration story is that there is no migration. Every project on the
   // day this shipped had no file, and every one of them had to behave exactly
   // as it did the day before.
   it('is briefed exactly as it was before this existed', () => {
     const { args } = supervisor().spawnPlan(item(), acme(), {});
-    expect(args).not.toContain('--append-system-prompt');
+    expect(onlyTheRunsOwnFacts(args)).toBe(true);
   });
 
-  it('still gets her standing instructions, alone', () => {
+  it('still gets her standing instructions, and no project block', () => {
     writeStanding('Never guess at a number.');
     const { args } = supervisor().spawnPlan(item(), acme(), {});
-    expect(injected(args)).toBe('Never guess at a number.');
+    expect(injected(args)).toContain('Never guess at a number.');
+    expect(injected(args)).not.toMatch(/Standing instructions for Acme/);
   });
 
   // An emptied box is the same state as a file that was never written, so the
@@ -93,7 +102,7 @@ describe('a project without instructions', () => {
     s.writeProjectInstructions('acme', 'a rule');
     s.writeProjectInstructions('acme', '   \n\n ');
     expect(fs.existsSync(path.join(productDir('acme'), 'instructions.md'))).toBe(false);
-    expect(s.spawnPlan(item(), acme(), {}).args).not.toContain('--append-system-prompt');
+    expect(onlyTheRunsOwnFacts(s.spawnPlan(item(), acme(), {}).args)).toBe(true);
   });
 });
 
@@ -110,7 +119,8 @@ describe('a project with instructions', () => {
     supervisor().writeProjectInstructions('acme', 'Never restart the app to test a change.');
     const other = { slug: 'personal', name: 'Personal', dir: productDir('personal'), repoPath: null };
     const { args } = supervisor().spawnPlan(item({ product: 'personal' }), other, {});
-    expect(args).not.toContain('--append-system-prompt');
+    expect(injected(args)).not.toContain('Never restart the app to test a change.');
+    expect(onlyTheRunsOwnFacts(args)).toBe(true);
   });
 
   // Two blocks in one flag, hers first. A model handed both with no ordering

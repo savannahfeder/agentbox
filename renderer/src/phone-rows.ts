@@ -98,6 +98,8 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
   const screenId = new Map<string, string>();
   const aliases: Aliases = {};
   const approvals: { id: string; at: number; product: string; item: string; tool: string; input: Record<string, unknown> }[] = [];
+  // Cards answered here that the computer has not taken yet, so their thread can say what she decided.
+  const decided: { at: number; product: string; item: string; allow: boolean; tool: string; input: Record<string, unknown> }[] = [];
   const cards: Cards = {};
   // Every real id, and every id a new thread waiting on the phone shows under,
   // is spoken for before any stand-in is made, and a stand-in is never one of
@@ -121,7 +123,12 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
     items.set(`${slug}/${t.item}`, { ...t.snapshot.item, id, product: slug, productName: names.get(slug) });
     // Its permission cards, but not one she has answered here already.
     for (const a of Array.isArray(t.snapshot.approvals) ? t.snapshot.approvals : []) {
-      if (!a?.id || !a.card || rows.commands.some((c) => c.kind === 'approve' && c.payload?.approval === a.id && !c.taken_at)) continue;
+      if (!a?.id || !a.card) continue;
+      const answer = rows.commands.find((c) => c.kind === 'approve' && c.payload?.approval === a.id && !c.taken_at);
+      if (answer) {
+        decided.push({ at: Date.parse(answer.created_at) || now, product: slug, item: id, allow: answer.payload?.allow === true, tool: String(a.tool ?? 'unknown'), input: a.input ?? {} });
+        continue;
+      }
       approvals.push({ id: String(a.id), at: Number(a.at) || 0, product: slug, item: id, tool: String(a.tool ?? 'unknown'), input: a.input ?? {} });
       cards[a.id] = { device: t.device, project: t.project, item: t.item, card: String(a.card) };
     }
@@ -220,7 +227,7 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
       });
     }
   }
-  return { products, items: [...items.values()], waiting, aliases, running, queued, runNow, stalled, shipping, signInNeeded, atLimit, paused, places, approvals, cards };
+  return { now, products, items: [...items.values()], waiting, aliases, running, queued, runNow, stalled, shipping, signInNeeded, atLimit, paused, places, approvals, decided, cards };
 }
 
 /** What one thread's live line is told of the computer's queue, off the view (the phone app's thread page). */
@@ -354,10 +361,12 @@ export const ago = (ms: number) => {
 };
 // Allow missed heartbeats before declaring the computer away.
 const MAC_AWAY_MS = 90_000;
+/** Whether the computer has missed enough heartbeats to count as away. */
+export const macAway = (macSeen: number, now = Date.now()) => !!macSeen && now - macSeen > MAC_AWAY_MS;
 /** The line over her inbox when what it shows may be out of date, or null. */
 export function phoneStatusLine({ error, fetchedAt, macSeen, cloud = false }: { error: string | null; fetchedAt: number; macSeen: number; cloud?: boolean }, now = Date.now()): string | null {
   if (error) return `Can't reach your inbox online.${fetchedAt ? ` This is how it was ${ago(now - fetchedAt)}.` : ''}`;
-  if (macSeen && now - macSeen > MAC_AWAY_MS) return cloud ? `Your computer is off. Replies carry on in ${Name} Cloud.` : `Your computer was last online ${ago(now - macSeen)}. What you send waits for it.`;
+  if (macAway(macSeen, now)) return cloud ? `Your computer is off. Replies carry on in ${Name} Cloud.` : `Your computer was last online ${ago(now - macSeen)}. What you send waits for it.`;
   return null;
 }
 /**

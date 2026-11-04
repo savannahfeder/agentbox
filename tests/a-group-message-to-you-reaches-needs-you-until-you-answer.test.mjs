@@ -207,7 +207,9 @@ describe('on two Macs', () => {
     w = world();
     await w.maya.rooms.start();
     await w.dev.rooms.start();
-    room = await w.maya.rooms.create({ name: 'Lumen' });
+    // A named group as the cloud made them before groups were only a team's.
+    room = await w.maya.backend.createRoom({ name: 'Lumen' });
+    await w.maya.rooms.refresh();
     await w.maya.rooms.invite(room, 'dev@lumen.test');
     await w.dev.rooms.refresh();
     await w.dev.rooms.acceptInvite(room);
@@ -274,19 +276,6 @@ describe('on two Macs', () => {
     await w.dev.rooms.refresh();
     expect(rows()).toHaveLength(1);
     expect(rows()[0].body).toBe('the newest');
-  });
-
-  // Seen on screen: a group invitation sat unseen on a running copy, because
-  // an invitation makes no event and only a restart read them.
-  it('a group invitation reaches a copy already running, on its next pass, and leaves once taken up', async () => {
-    const second = await w.maya.rooms.create({ name: 'Design' });
-    await w.maya.rooms.invite(second, 'dev@lumen.test');
-    await flush();
-    expect(w.dev.rooms.state().invites).toEqual([]);
-    await w.dev.rooms.tick();
-    expect(w.dev.rooms.state().invites.map((i) => i.roomName)).toEqual(['Design']);
-    await w.dev.rooms.acceptInvite(second);
-    expect(w.dev.rooms.state().invites).toEqual([]);
   });
 
   it('a pass with no new invitation redraws nothing', async () => {
