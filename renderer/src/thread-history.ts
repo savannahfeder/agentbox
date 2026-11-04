@@ -502,6 +502,13 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     if (has(patch, 'snoozedUntil') || has(patch, 'runAt')) {
       const runAt = Number(has(patch, 'snoozedUntil') ? patch.snoozedUntil : patch.runAt) || 0;
       if (!runAt) {
+        // Her waiting reply's time taken off: it goes now, and says so itself.
+        const waited = mine && replied && replied.by === markBy && replied.index !== undefined ? replied.index : -1;
+        if (events[waited]?.sendsAt) {
+          const { sendsAt: _went, ...now } = events[waited];
+          events[waited] = now;
+          continue;
+        }
         if (mine && replied && replied.by === markBy && at - replied.at <= REPLY_LIFTS_MS) continue;
         events.push({ at, who, said: mine ? 'You brought it back' : 'It let this run now' });
       } else {

@@ -181,3 +181,22 @@ describe('the button under a waiting reply', () => {
     expect(focus).not.toMatch(/\(scheduledUntil \?\? 0\) > 0 && (!!)?onUnschedule/);
   });
 });
+
+// Driven in a live copy on 2026-11-04: "send it now" ran the reply, and the
+// reply above still said "Sends Thu 8:00".
+describe('a waiting reply sent now from under the thread', () => {
+  it('no longer says it sends later, at any distance from the reply', () => {
+    for (const gap of [30_000, 10 * 60_000]) {
+      const now = { id: 'w-1', ts: T + gap, source: 'founder', patch: { runAt: 0 } };
+      const events = threadEvents([...opened, ...later, now]);
+      expect(reply(events)?.sendsAt).toBeUndefined();
+      expect(events.some((e) => e.said === 'You brought it back')).toBe(false);
+    }
+  });
+
+  it('a thread brought back with no reply waiting still says so', () => {
+    const put = { id: 'w-1', ts: T, source: 'founder', patch: { runAt: SENDS } };
+    const back = { id: 'w-1', ts: T + 10 * 60_000, source: 'founder', patch: { runAt: 0 } };
+    expect(threadEvents([...opened, put, back]).some((e) => e.said === 'You brought it back')).toBe(true);
+  });
+});
