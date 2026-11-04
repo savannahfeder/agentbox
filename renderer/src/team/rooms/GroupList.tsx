@@ -65,7 +65,7 @@ export function GroupMark({ g, size = 20, row = false }: { g: GroupChoice; size?
   </span>;
 }
 
-export type GroupMenuAction = 'board' | 'decisions' | 'invite' | 'members' | 'mute' | 'unmute' | 'leave' | 'new' | 'find';
+export type GroupMenuAction = 'board' | 'decisions' | 'members' | 'mute' | 'unmute' | 'leave';
 
 /** The group's own button in the top bar, where the Inbox keeps its filters: everything else a group does. */
 export function GroupMenuButton({ named, members, muted, canLeave, board, decisions, onPick }: {
@@ -97,14 +97,10 @@ export function GroupOptions({ named, members, muted, canLeave, board, decisions
   return <div ref={ref} className="rm-pop gr-optmenu" role="menu">
     {board && row('board', BOARD, 'Everyone’s threads')}
     {decisions != null && row('decisions', DECISION, 'Decisions', decisions || undefined)}
-    {named && row('invite', I.invite(), 'Invite people')}
     {row('members', I.people(), 'Members', members)}
     <div className="rule" />
     {muted ? row('unmute', I.bell(), 'Unmute') : row('mute', I.bell(), 'Mute')}
     {canLeave && row('leave', I.out(), named ? 'Leave group' : 'Leave chat')}
-    <div className="rule" />
-    {row('new', I.plus(), 'New group')}
-    {row('find', I.search(), 'Find groups to join')}
   </div>;
 }
 

@@ -10,14 +10,14 @@ import { describe, it, expect } from 'vitest';
 import { buildMembers, orderMembers, moveMember, readOrder, writeOrder } from '../renderer/src/team/everything/members.ts';
 
 const person = (id, name, extra = {}) => ({ id, name, email: `${id}@x`, avatarUrl: null, ...extra });
-const card = (id, name, extra = {}) => ({ id, name, me: false, avatarUrl: null, agents: 0, level: 10, workingOn: null, workingPrivate: false, status: null, away: false, ...extra });
+const card = (id, name, extra = {}) => ({ id, name, me: false, avatarUrl: null, agents: 0, workingOn: null, workingPrivate: false, status: null, away: false, ...extra });
 const mate = (id, name, extra = {}) => ({ id, name, letter: name[0], role: 'Maintainer', now: null, status: 'active', paused: false, ...extra });
 const chat = (key, name, extra = {}) => ({ key, name, faces: [], last: '', at: 0, unread: false, pinned: false, ...extra });
 
 const BASE = {
   me: { id: 'p-me', name: 'Sam Rivera', avatarUrl: null },
   people: [person('p-me', 'Sam Rivera'), person('p-theo', 'Theo Brandt'), person('p-maya', 'Maya Costa')],
-  wall: [card('p-me', 'Sam Rivera', { me: true, agents: 2, workingOn: 'Signup flow' }), card('p-maya', 'Maya Costa', { agents: 14, workingOn: 'Billing page', level: 80 }),
+  wall: [card('p-me', 'Sam Rivera', { me: true, agents: 2, workingOn: 'Signup flow' }), card('p-maya', 'Maya Costa', { agents: 14, workingOn: 'Billing page' }),
     card('p-theo', 'Theo Brandt', { agents: 0, status: 'In meetings until 3' })],
   teammates: [mate('t-ada', 'Ada'), mate('t-rex', 'Rex', { role: 'Release notes' })],
   mateAgents: new Map([['t-ada', 6]]),
@@ -35,7 +35,7 @@ describe('the cards over Everything else', () => {
   it('say how many agents each one is running, and what a quiet one is doing instead', () => {
     const byKey = new Map(buildMembers(BASE).map((m) => [m.key, m]));
     expect(byKey.get('me')).toMatchObject({ kind: 'me', agents: 2, now: 'Signup flow' });
-    expect(byKey.get('person:p-maya')).toMatchObject({ kind: 'person', agents: 14, now: 'Billing page', level: 80 });
+    expect(byKey.get('person:p-maya')).toMatchObject({ kind: 'person', agents: 14, now: 'Billing page' });
     expect(byKey.get('person:p-theo')).toMatchObject({ agents: 0, now: 'In meetings until 3' });
     expect(byKey.get('mate:t-ada')).toMatchObject({ kind: 'mate', agents: 6, role: 'Maintainer' });
     expect(byKey.get('mate:t-rex')).toMatchObject({ agents: 0 });

@@ -54,7 +54,6 @@ function Card({ m, on, pick }: { m: Member; on: boolean; pick: () => void }) {
       <View style={{ gap: 5, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
           <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 14, lineHeight: 19 }}>{m.name}</T>
-          {m.level != null && <T style={{ fontFamily: font.mono, fontSize: 11, color: color.faint }}>{m.level}</T>}
         </View>
         {chat ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>

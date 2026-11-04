@@ -43,7 +43,7 @@ describe('everybody in the room is on the wall', () => {
 
   it('a member who has not turned Rooms on is on it, named, and says so', () => {
     const w = wallCards({ ...base, profiles: [prof(ANA, 'Ana L.')], presence: [] });
-    expect(w.find((c) => c.id === TEO)).toMatchObject({ name: 'Teo P.', avatarUrl: 'https://x.test/t.png', away: true, agents: null, level: null, workingOn: null });
+    expect(w.find((c) => c.id === TEO)).toMatchObject({ name: 'Teo P.', avatarUrl: 'https://x.test/t.png', away: true, agents: null, workingOn: null });
   });
 
   it('a member who is invisible is not: they have a card nobody may read', () => {
