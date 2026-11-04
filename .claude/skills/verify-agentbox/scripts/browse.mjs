@@ -137,11 +137,12 @@ async function thingAt(t, which, clickIfCovered, scroll = true) {
     const el = /^\\d+$/.test(w) ? document.querySelector('[data-breaker-ref="' + w + '"]')
       : [...document.querySelectorAll('[data-breaker-ref]')].find((e) => (e.getAttribute('aria-label') || e.innerText || e.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase().startsWith(w.toLowerCase()));
     if (!el) return null;
+    const at = () => { const r = el.getBoundingClientRect(); const x = r.left + r.width / 2; const y = r.top + r.height / 2;
+      const top = document.elementFromPoint(x, y); return { r, x, y, reachable: !!top && (top === el || el.contains(top) || top.contains(el)) }; };
     if (${scroll}) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    const r = el.getBoundingClientRect();
-    const x = r.left + r.width / 2; const y = r.top + r.height / 2;
-    const top = document.elementFromPoint(x, y);
-    const reachable = !!top && (top === el || el.contains(top) || top.contains(el));
+    // Scrolled only to the nearest edge, a cell can sit under a table's frozen first column; a person would scroll it clear.
+    let { r, x, y, reachable } = at();
+    if (!reachable && ${scroll}) { el.scrollIntoView({ block: 'center', inline: 'center' }); ({ r, x, y, reachable } = at()); }
     if (!reachable && ${clickIfCovered}) el.click();
     if (el.matches('input, textarea, select, [contenteditable]')) el.focus();
     return { x, y, right: r.right, reachable, words: (el.getAttribute('aria-label') || el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 60) };

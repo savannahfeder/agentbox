@@ -229,6 +229,11 @@ function FilterMenu({ table, choices, picked, onToggle, onClear }: {
   const many = choices.reduce((n, c) => n + c.values.length, 0) > 12;
   const q = find.trim().toLowerCase();
   const filtering = Object.values(picked).some((v) => v.length);
+  const counts = useMemo(() => new Map(choices.map(({ col }) => {
+    const n = new Map<string, number>();
+    for (const r of table.rows) { const k = (r[col] ?? '').trim().toLowerCase(); if (k) n.set(k, (n.get(k) ?? 0) + 1); }
+    return [col, n] as const;
+  })), [table, choices]);
   return <>
     {many && <div className="when-type-row"><input className="when-type" autoFocus placeholder="Find a value" value={find} onChange={(e) => setFind(e.target.value)} /></div>}
     {filtering && <button type="button" className="when-row tbl-clear" onClick={onClear}>Show every row</button>}
@@ -245,6 +250,7 @@ function FilterMenu({ table, choices, picked, onToggle, onClear }: {
             {column.kind === 'tag'
               ? <span className={`tbl-tag tone-${column.tones[v.toLowerCase()]}`}>{v}</span>
               : <span className="when-row-label">{v}</span>}
+            <span className="when-row-hint tbl-filter-n">{(counts.get(col)?.get(v.toLowerCase()) ?? 0).toLocaleString()}</span>
           </button>;
         })}
       </div>;
@@ -671,11 +677,12 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     const r = Math.min(sel.r0, next.order.length - 1);
     setPick(r >= 0 ? { a: { r, c: pick?.a.c ?? first }, b: { r, c: pick?.a.c ?? first } } : null);
   };
-  const changeColumns = (t: Table) => {
+  /** A change to the columns; `at` is the column to stand on after it, at the top, so typing never lands elsewhere. */
+  const changeColumns = (t: Table, at?: number) => {
     const d = docRef.current;
-    if (t === d.table) return;
-    commit({ ...d, table: t });
-    setPick(null);
+    if (t !== d.table) commit({ ...d, table: t });
+    const c = at === undefined ? -1 : Math.max(t.ranked ? 1 : 0, Math.min(at, t.columns.length - 1));
+    setPick(c >= 0 && d.order.length ? { a: { r: 0, c }, b: { r: 0, c } } : null);
   };
 
   // ---- Editing a cell. The ref says whether an edit is still open, so the
@@ -765,6 +772,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   // ---- The mouse. One listener on the grid reads which cell, row number or header was pressed.
   const drag = useRef<null | 'cells' | 'rows' | 'cols'>(null);
   const linkOpens = useRef(false);
+  const pressed = useRef(false);
   const atOf = (target: EventTarget | null): { kind: 'cell' | 'row' | 'col'; at: At } | null => {
     const el = (target as HTMLElement | null)?.closest?.('[data-c],[data-rn],[data-hc]') as HTMLElement | null;
     if (!el || !box.current?.contains(el)) return null;
@@ -784,6 +792,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     if (t.closest('.tbl-edit, .tbl-pick, .tbl-resize, .tbl-th-menu, .tbl-th input, .tbl-add')) return;
     const hit = atOf(t);
     if (!hit) return;
+    pressed.current = true;
     if (editing) endEdit(editing.tag ? null : editing.draft);
     if (hit.kind === 'row' && t.closest('.tbl-open')) { e.preventDefault(); goTo(pickFor('row', hit.at, false)); setSheet(hit.at.r); return; }
     if (hit.kind === 'col' && !order.length) return;
@@ -982,7 +991,13 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
           if (typed && pick && editable) startEdit(pick.a, typed);
         }} />}
       <div className="tbl-scroll" ref={box} onPointerDown={onDown} onDoubleClick={onDouble} onContextMenu={onContext}
-        onClickCapture={(e) => { if (hands && (e.target as HTMLElement).closest('.tbl-grid a') && !linkOpens.current) e.preventDefault(); linkOpens.current = false; }}>
+        onClickCapture={(e) => {
+          if (hands && (e.target as HTMLElement).closest('.tbl-grid a') && !linkOpens.current) e.preventDefault();
+          linkOpens.current = false;
+          // A click that came with no press first (a screen reader, a script) still picks its cell.
+          if (hands && !pressed.current) { const hit = atOf(e.target); if (hit && hit.kind === 'cell') { setPick(pickFor('cell', hit.at, e.shiftKey)); focusKeys(); } }
+          pressed.current = false;
+        }}>
         <div className="tbl-grid" role="table" style={{ gridTemplateColumns: inline && !table.ranked ? template : `${RN_W}px ${template}` }}>
           <div className="tbl-tr" role="row">
             {table.ranked
@@ -1009,7 +1024,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
                       if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
                       if (e.key === 'Escape') { e.preventDefault(); (e.target as HTMLInputElement).value = c.name; (e.target as HTMLInputElement).blur(); }
                     }}
-                    onBlur={(e) => { setRenaming(null); changeColumns(renameColumn(docRef.current.table, i, e.target.value)); requestAnimationFrame(focusKeys); }} />
+                    onBlur={(e) => { setRenaming(null); changeColumns(renameColumn(docRef.current.table, i, e.target.value), i); requestAnimationFrame(focusKeys); }} />
                   : <><span className="tbl-ell">{c.name}</span>{arrow}</>}
                 <button type="button" className="tbl-th-menu" tabIndex={-1} aria-label={`${c.name} column`} onPointerDown={(e) => e.preventDefault()}
                   onClick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setFloat({ x: r.left, y: r.bottom + 4, col: i }); }}>{CARET}</button>
@@ -1075,10 +1090,10 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
           {editable && <>
             <span className="when-sep" />
             <MenuRow label="Rename" onClick={() => { setRenaming(float.col!); closeFloat(); }} />
-            <MenuRow label="Insert column left" onClick={() => { const at = Math.max(first, float.col!); changeColumns(addColumn(docRef.current.table, at)); setRenaming(at); closeFloat(); }} />
-            <MenuRow label="Insert column right" onClick={() => { const at = float.col! + 1; changeColumns(addColumn(docRef.current.table, at)); setRenaming(at); closeFloat(); }} />
+            <MenuRow label="Insert column left" onClick={() => { const at = Math.max(first, float.col!); changeColumns(addColumn(docRef.current.table, at), at); setRenaming(at); closeFloat(); }} />
+            <MenuRow label="Insert column right" onClick={() => { const at = float.col! + 1; changeColumns(addColumn(docRef.current.table, at), at); setRenaming(at); closeFloat(); }} />
             {(floatCol.kind === 'text' || floatCol.kind === 'tag') && (
-              <MenuRow label={floatCol.kind === 'tag' ? 'Show as text' : 'Show as tags'} onClick={() => { changeColumns(showColumnAs(docRef.current.table, float.col!, floatCol.kind === 'tag' ? 'text' : 'tag')); closeFloat(); }} />
+              <MenuRow label={floatCol.kind === 'tag' ? 'Show as text' : 'Show as tags'} onClick={() => { changeColumns(showColumnAs(docRef.current.table, float.col!, floatCol.kind === 'tag' ? 'text' : 'tag'), float.col!); closeFloat(); }} />
             )}
             <MenuRow label="Fit to its contents" onClick={() => { fitColumn(float.col!); closeFloat(); }} />
             <span className="when-sep" />
