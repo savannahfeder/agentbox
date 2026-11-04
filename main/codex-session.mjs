@@ -65,7 +65,9 @@ export const MCP_READY_MS = 30_000;
  * The store server is written last, so it wins over a server of the user's
  * with the same name.
  */
-export function mcpIsolation(names = [], storeServer = null) {
+const CONNECTION_TOOL_TIMEOUT_SEC = 8 * 60 * 60;
+
+export function mcpIsolation(names = [], storeServer = null, connectionServers = null) {
   // Null prototype, because a server may be named `__proto__`. On a plain
   // object that key hits the prototype setter, is never serialised, and the
   // server would stay on.
@@ -79,6 +81,11 @@ export function mcpIsolation(names = [], storeServer = null) {
     // starts and never completes its handshake, so pass them when given.
     if (Array.isArray(storeServer.args) && storeServer.args.length) entry.args = [...storeServer.args];
     mcp_servers[storeServer.name] = entry;
+  }
+  // Codex gives up on a tool call after 60 seconds by default, and a write here
+  // waits for a person's yes. A give-up would read as a failure and draw a retry.
+  for (const [name, server] of Object.entries(connectionServers ?? {})) {
+    mcp_servers[name] = { command: server.command, args: [...server.args], env: server.env, tool_timeout_sec: CONNECTION_TOOL_TIMEOUT_SEC };
   }
   return mcp_servers;
 }
@@ -143,7 +150,7 @@ const plainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
  * while signed out, so `createCodexWorker` also reports any server that starts
  * unasked (`sayUnasked`).
  */
-export function workerThreadParams({ cwd, model = null, instructions = null, mcpServers = [], storeServer = null, mode = null, reviewer = null } = {}) {
+export function workerThreadParams({ cwd, model = null, instructions = null, mcpServers = [], storeServer = null, connectionServers = null, mode = null, reviewer = null } = {}) {
   const posture = codexPosture(mode, { reviewer });
   const params = {
     cwd,
@@ -153,7 +160,7 @@ export function workerThreadParams({ cwd, model = null, instructions = null, mcp
     // Omission inherits the account's reviewer, so every mode names its own.
     approvalsReviewer: posture.approvalsReviewer,
     config: {
-      mcp_servers: mcpIsolation(mcpServers, storeServer),
+      mcp_servers: mcpIsolation(mcpServers, storeServer, connectionServers),
       projects: projectIsolation(cwd),
       // Plugins can contribute MCP servers outside config.mcp_servers.
       // Keep this worker on the same explicit integration boundary.
@@ -244,6 +251,7 @@ export function createCodexWorker({
   resumeThreadId = null,
   onApproval = null,
   requireMcpServer = null,
+  askedMcpServers = [],
   mcpReadyMs = MCP_READY_MS,
 } = {}) {
   if (!server) throw new Error('createCodexWorker needs a codex app-server client');
@@ -291,7 +299,7 @@ export function createCodexWorker({
   const spoken = new Set();
   const sayUnasked = (params) => {
     const name = typeof params?.name === 'string' ? params.name : '';
-    if (!name || name === requireMcpServer) return;
+    if (!name || name === requireMcpServer || askedMcpServers.includes(name)) return;
     if (params.status !== 'starting' && params.status !== 'ready') return;
     if (spoken.has(name)) return;
     spoken.add(name);

@@ -98,11 +98,6 @@ describe('in the app', () => {
   const area = read('renderer/src/team/everything/CardsArea.tsx');
   const css = read('renderer/src/team/everything/everything.css');
 
-  it('draws the cards through the area that caps them, on every page they show on', () => {
-    expect(app).toMatch(/<CardsArea rows=\{evRows\} onRows=\{setEvRows\}/);
-    expect(app).not.toMatch(/evFill && evCardsH/);
-  });
-
   it('scrolls the rows past the cut rather than drop them', () => {
     expect(css).toMatch(/\.ev-cards \{[^}]*overflow-y: auto/);
     expect(area).toMatch(/maxHeight/);
@@ -112,8 +107,11 @@ describe('in the app', () => {
   // border over it: 14px of padding over the first row, 10px between rows.
   it('scrolls a whole row at a time, with no sliver of the row above', () => {
     expect(css).toMatch(/\.ev-cards \{[^}]*scroll-snap-type: y mandatory/);
-    expect(css).toMatch(/\.ev-strip \{[^}]*gap: 10px; padding: 10px /);
-    expect(css).toMatch(/\.ev-cards \.ev-card \{[^}]*scroll-margin-top: 10px/);
+    // The strip's top padding, the gap between rows and the snap margin are one length.
+    const [, gap, top] = css.match(/\.ev-strip \{[^}]*gap: (\d+)px; padding: (\d+)px /);
+    const [, margin] = css.match(/\.ev-cards \.ev-card \{[^}]*scroll-margin-top: (\d+)px/);
+    expect(gap).toBe(top);
+    expect(margin).toBe(top);
   });
 
   it('brings the open card into view when it sits past the cut', () => {

@@ -72,9 +72,72 @@ const FIELDS = [
   'pausedUntil',
   // The one you talk to: takes what Auto cannot place, and checks in.
   'primary',
+  // Its owner's choices, off until said: it may read their direct messages; and
+  // anyone on the team may give it work, rather than asking its owner.
+  'readsMessages', 'openToTeam',
+  'voice', 'voiceText',
 ];
 
 export const STATUSES = ['draft', 'active'];
+
+// How each teammate sounds, so a team of them does not read as one writer. Every
+// sample says the same thing, so picking between them shows the difference.
+export const VOICES = [
+  { id: 'blunt', label: 'Blunt', says: 'Blunt. The point in your first words, then stop. Fragments are fine. No warm-up, no softening, no sign-off, no "I".', sample: 'Deploy failed. Bad migration. Fixing it now.' },
+  { id: 'warm', label: 'Warm', says: 'Warm and easy, like a friend at work. Use their first name, say "hey", give credit when it is earned, write the way you talk. Never gushing.', sample: 'Hey Maya, small snag with the deploy. I\'m on it, nothing you need to do.' },
+  { id: 'dry', label: 'Dry', says: 'Dry. Short flat statements, names and numbers, no reassurance, and a straight-faced aside about the absurd part of the situation. Never "I think", never an exclamation mark.', sample: 'The deploy failed, third time today. Same migration. It has commitment.' },
+  { id: 'careful', label: 'Careful', says: 'Careful. Say what you know, then what you do not, and how sure you are. Hedge only with a reason, and never claim more than you checked.', sample: 'The deploy failed. It looks like the migration, but I haven\'t confirmed that yet.' },
+  { id: 'curious', label: 'Curious', says: 'Curious. Say what you noticed, then ask the one question that matters. You sound interested, and you end on the question when there is one.', sample: 'The deploy failed on a migration nobody touched since June. Who ran it last?' },
+];
+
+export const VOICE_WORDS_MOST = 300;
+
+export function voiceOf(t) {
+  const own = typeof t?.voiceText === 'string' ? t.voiceText.trim() : '';
+  if (own) return { id: 'own', label: 'Your own', says: own };
+  const given = VOICES.find((v) => v.id === t?.voice);
+  if (given) return given;
+  let h = 0;
+  for (const c of String(t?.id ?? '')) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return VOICES[h % VOICES.length];
+}
+
+// Over this a chat message is refused. Real ones ran to 291 before any limit.
+export const CHAT_MOST = 500;
+
+export function tooLongForAChat(words) {
+  const n = String(words ?? '').length;
+  return n > CHAT_MOST
+    ? `That is ${n} characters, and a chat message stops at ${CHAT_MOST}. Nothing was sent. Say it in a line or two, or several short messages, or put it in a document and send one sentence with it attached.`
+    : null;
+}
+
+/** The part of a teammate's brief on how it writes to people. */
+export function howYouWrite(t) {
+  return [
+    '## How you write',
+    '- In a chat (team_post, team_tell) write the way a good colleague writes in Slack: a line or two, then stop. One or two short sentences, usually under 150 characters.',
+    '- Answer what was asked with the smallest true answer. Leave out what they already know and anything they did not ask.',
+    '- Several short messages beat one long one. Two separate things are two calls, and only if each is worth a ping.',
+    '- Ask one thing at a time. Lead with the news or the ask. Do not restate what you were asked, and do not end by offering more help.',
+    '- No headings, bold or lists in a chat, and no labels like "Status:". Plain sentences, contractions, the words you would say out loud.',
+    `- A long answer (a plan, a draft, a table, more than about three facts) goes in a document: write it, then send one sentence saying what it is or what you need, with the document attached (\`document\` on team_post, \`files\` on team_tell). It shows as a card. A chat message over ${CHAT_MOST} characters is refused.`,
+    '- When there is more they did not ask for, offer it in a few words ("want the full list?") rather than writing it.',
+    `- Your voice: ${voiceOf(t).says}${voiceOf(t).sample ? ` Told a deploy failed, you would say: "${voiceOf(t).sample}"` : ''} Your first words and your rhythm should sound like this every time. Another teammate given the same news would not write your sentence.`,
+  ].join('\n');
+}
+
+/** A teammate's last message, in place of the worker's rules for one, and last in its system prompt so nothing outranks it by position. */
+export function howYourRunEnds() {
+  return [
+    '## Your last message on this thread',
+    'The message that ends your run is a chat message, written once: the app puts it on this thread, options and all. This holds even when you were asked a question or asked for detail.',
+    '- A line or two, then stop: one or two short sentences, usually under 150 characters, the news or the ask first, in your voice. No bold line, no heading, no list, no labels, no recap of what you did.',
+    '- When there is more (a plan, a draft, a table, a list, more than about three facts), write it in a document first with write_document, then say in one sentence what it is or what you need, naming the file, like launch-plan.md. That name draws as a card under your message. A person asking for ten lines or the details gets them in that document. Do not write a document for an answer that fits in a line or two.',
+    '- A decision still ends with the `## Options` section, under your one line, so they can answer in a tap.',
+    '- Never give a number you did not measure. "I don\'t know" is an answer. Something you could not do is said in those same few words.',
+  ].join('\n');
+}
 
 export const isDate = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00`));
 
@@ -175,8 +238,10 @@ function coerce(field, value) {
     case 'product': case 'engine': case 'model': case 'effort': case 'starter': return cleanText(value, 120);
     case 'works': return value === null ? null : isWorks(value) ? { every: value.every, at: value.at, ...(value.every === 'week' ? { on: value.on } : {}) } : undefined;
     case 'limit': return Number.isInteger(value) && value >= 1 && value <= 500 ? value : undefined;
-    case 'paused': case 'handoffsNeedYes': case 'primary': return !!value;
+    case 'paused': case 'handoffsNeedYes': case 'primary': case 'readsMessages': case 'openToTeam': return !!value;
     case 'status': return STATUSES.includes(value) ? value : undefined;
+    case 'voice': return value === null ? null : VOICES.some((v) => v.id === value) ? value : undefined;
+    case 'voiceText': return value === null ? null : cleanText(value, VOICE_WORDS_MOST);
     case 'endedAt': case 'createdAt': return Number.isFinite(value) ? value : value === null ? null : undefined;
     case 'served': return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
     case 'pausedUntil': return value === null ? null : isDate(value) ? value : undefined;
@@ -427,12 +492,19 @@ function clip(text, max) {
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
 }
 
+// Named, because the Team view and Today list runs with no teammate beside them.
+export function setupTitle(name) {
+  const n = String(name ?? '').trim();
+  return !n || n === 'New teammate' ? 'Set up a new teammate' : `Set up ${n}`;
+}
+
+export const isSetupTitle = (title) => title === 'Set up its job' || /^Set up /.test(String(title ?? ''));
+
 export function runTitle(trigger, teammate) {
   if (trigger.kind === 'schedule') return trigger.label === 'week' ? "This week's round" : "Today's round";
   if (trigger.kind === 'duty') return clip(trigger.what, 120);
   if (trigger.kind === 'pass') return clip(trigger.title || 'Work passed on', 120);
-  // Inbox rows lead with the teammate's name, so a title never repeats it.
-  if (trigger.opening === 'setup') return 'Set up its job';
+  if (trigger.opening === 'setup') return setupTitle(teammate?.name);
   if (trigger.opening === 'start') return 'Introduce itself and begin';
   const said = partFor(trigger.text, teammate.name) || firstLine(trigger.text) || 'A message';
   return clip(trigger.fromName ? `From ${trigger.fromName}: ${said}` : said, 120);
@@ -554,7 +626,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       const origin = { ...(m.product ? { product: m.product } : {}), ...(m.via ? { via: m.via, viaProduct: m.viaProduct ?? null } : {}) };
       const work = fromYou ? m.via ?? null : m.work ?? null;
       const trigger = m.kind === 'pass'
-        ? { kind: 'pass', from: m.from, title: m.title, details: m.details, msg: m.id, hop, ...origin, ...(work ? { work } : {}), ...(hold ? { hold } : {}) }
+        ? { kind: 'pass', from: m.from, ...(m.fromName ? { fromName: m.fromName } : {}), title: m.title, details: m.details, msg: m.id, hop, ...origin, ...(work ? { work } : {}), ...(hold ? { hold } : {}) }
         : { kind: 'message', from: m.from, text: m.text, msg: m.id, hop, ...origin, ...(work ? { work } : {}), ...(fromYou && m.start ? { opening: 'start' } : fromYou && m.setup ? { opening: 'setup' } : {}) };
       const id = newRun(t, trigger, `${m.id}>${tid}`, { fromYou, hold });
       if (id) {
@@ -704,7 +776,7 @@ export const TEAMMATE_EFFORT = 'high';
 
 export const STARTERS = [
   {
-    starter: 'chief', name: 'Chief of staff', role: 'Chief of staff', primary: true,
+    starter: 'chief', name: 'Chief of staff', role: 'Chief of staff', primary: true, voice: 'careful',
     ask: 'Be the one I talk to',
     outcome: 'Takes anything you send, gets it to the right teammate, and checks in with only what needs you',
     sends: 'One check-in a weekday with what needs you',
@@ -715,18 +787,18 @@ export const STARTERS = [
     works: { every: 'weekday', at: '09:00' },
   },
   {
-    starter: 'quality', name: 'Quality lead', role: 'Quality lead',
+    starter: 'quality', name: 'Quality lead', role: 'Quality lead', voice: 'blunt',
     ask: 'Find bugs before your users do',
     outcome: 'Finds bugs before your users do',
     sends: 'A bug, with the steps to make it happen',
-    job: 'Use the project the way a new user would, every weekday morning. Try the main flows on a phone-sized window and a slow connection. File anything broken with the exact steps to make it happen, and pass fixable bugs to whoever fixes things on the team.',
+    job: 'Find bugs before your users do. Every weekday morning look at what changed, run the project\'s own tests, and use the main flows the way a user would, on a phone-sized window and a slow connection too. File anything broken with the exact steps to make it happen, and pass fixable bugs to whoever fixes things on the team.',
     goal: 'Nothing broken reaches a user',
     counted: 'Bugs users report that you did not find first',
     asksFirst: 'Before paying with a real card or signing in as a real person',
     works: { every: 'weekday', at: '09:00' },
   },
   {
-    starter: 'maintainer', name: 'Maintainer', role: 'Maintainer',
+    starter: 'maintainer', name: 'Maintainer', role: 'Maintainer', voice: 'dry',
     ask: 'Fix what gets filed',
     outcome: 'Fixes what gets filed, and asks you before shipping',
     sends: 'A fix that is ready to ship',
@@ -737,7 +809,7 @@ export const STARTERS = [
     works: null,
   },
   {
-    starter: 'marketing', name: 'Marketing lead', role: 'Marketing lead',
+    starter: 'marketing', name: 'Marketing lead', role: 'Marketing lead', voice: 'curious',
     ask: 'Post about what we build',
     outcome: 'Brings you posts and clips about what you build, then makes the ones you pick',
     sends: 'Posts and clips ready for your yes',
@@ -748,7 +820,7 @@ export const STARTERS = [
     works: { every: 'week', on: 1, at: '09:00' },
   },
   {
-    starter: 'support', name: 'Support lead', role: 'Support lead',
+    starter: 'support', name: 'Support lead', role: 'Support lead', voice: 'warm',
     ask: 'Answer user emails',
     outcome: 'Answers user emails, and asks you before any refund',
     sends: 'A refund or a tricky reply to approve',
@@ -759,7 +831,7 @@ export const STARTERS = [
     works: { every: 'weekday', at: '10:00' },
   },
   {
-    starter: 'growth', name: 'Growth lead', role: 'Growth lead',
+    starter: 'growth', name: 'Growth lead', role: 'Growth lead', voice: 'dry',
     ask: 'Tell me what moved signups',
     outcome: 'Tells you what moved signups, and what to try next',
     sends: 'What moved signups this week',
@@ -770,7 +842,7 @@ export const STARTERS = [
     works: { every: 'week', on: 5, at: '15:00' },
   },
   {
-    starter: 'fundraising', name: 'Fundraiser', role: 'Fundraiser',
+    starter: 'fundraising', name: 'Fundraiser', role: 'Fundraiser', voice: 'warm',
     ask: 'Find investors who fit',
     outcome: 'Finds investors who fit, and drafts intros from you',
     sends: 'Intro emails ready for your yes',

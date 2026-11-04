@@ -30,8 +30,8 @@ describe('the cards over an open chat', () => {
     for (const picked of ['me', 'room:r-team', 'person:p-maya']) {
       const html = renderToStaticMarkup(h(TeamStrip, { members, picked, onPick() {}, onMove() {} }));
       expect(html).toContain('class="ev-strip"');
-      expect(html.match(/class="ev-t"/g)).toHaveLength(3);
-      expect(html).toContain('14 AGENTS');
+      expect(html.match(/class="ev-n"/g)).toHaveLength(3);
+      expect(html).toContain('14 agents working');
     }
   });
 

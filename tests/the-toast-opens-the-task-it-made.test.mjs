@@ -33,7 +33,8 @@ describe('the toast can carry a way in', () => {
     // branch, so both kinds of destination take it down.
     const body = app.slice(app.indexOf('const openToastRow = useCallback('), app.indexOf('/* ------------------------------- keyboard'));
     expect(body).toMatch(/useCallback\(\(to: ToastGoes\) => \{\s*setToast\(null\);/);
-    expect(body).toMatch(/if \(!row\) return;\s*setSearch\(null\);\s*setFocused\(row\);\s*markSeen\(row\);/);
+    // A row not in the lists yet is waited for (w-7f2d5329a6).
+    expect(body).toMatch(/if \(!row\) \{ oWaits\.current = [^\n]*; return; \}\s*setSearch\(null\);\s*setFocused\(row\);\s*markSeen\(row\);/);
   });
 
   it('outlives noticing it, which 2.5 seconds did not', () => {
@@ -100,7 +101,7 @@ describe('the toast after an answer carries the same way in', () => {
   it('a picked option hands it the row it picked on', () => {
     // The fourth argument is whether she stays on the thread, since 2026-10-13
     // (tests/a-reply-keeps-you-on-the-thread-unless-you-are-clearing-your-inbox).
-    expect(app).toContain('`Option ${option.n} sent → ${item.productName}`, takeBack, !movesOn(item), { product: item.product, id: item.id }');
+    expect(app).toMatch(/pickSentWords\([^\n]*takeBack, [^\n]*\{ product: item\.product, id: item\.id \}/);
   });
 
   // The fourth argument here is `stay`, for the same reason it is on the

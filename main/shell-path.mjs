@@ -1,11 +1,13 @@
 // Finder launches inherit launchd's PATH rather than the user's shell tools.
 // Read only named variables: importing a profile's whole environment would
 // import keys and login overrides too. PATH, the two folders below, and the
-// network and locale names under NETWORK and LOCALE are all that is ever read,
-// and workers still pass through their billing scrub.
+// network and locale names under NETWORK and LOCALE are all that is ever read
+// from a shell, and workers still pass through their billing scrub. On Windows
+// the terminal's shell comes from PATH, SystemRoot or windir, and ComSpec.
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { envValue } from './engine-bin.mjs';
 
 // The shell a person actually has. `$SHELL` when that file exists, then zsh,
 // bash, and sh. A machine with no zsh used to spawn `/bin/zsh`: the terminal
@@ -17,6 +19,23 @@ export function loginShell(env = process.env, exists = fs.existsSync) {
     if (exists(candidate)) return candidate;
   }
   return preferred || '/bin/sh';
+}
+
+// Only drive-rooted paths, so nothing resolves against the terminal's folder.
+const rooted = (p) => (/^[A-Za-z]:[\\/]/.test(p ?? '') ? p : null);
+const windowsValue = (env, name) => rooted(envValue(env, name, 'win32'));
+export const windowsRoot = (env = process.env) => windowsValue(env, 'SystemRoot') ?? windowsValue(env, 'windir') ?? 'C:\\Windows';
+
+// Windows has no login shell and no -l: PowerShell reads -l as a command.
+export function terminalShell(env = process.env, exists = fs.existsSync, platform = process.platform) {
+  if (platform !== 'win32') return { file: loginShell(env, exists), args: ['-l'] };
+  const w = path.win32;
+  const root = windowsRoot(env);
+  const found = [
+    ...String(envValue(env, 'PATH', platform) ?? '').split(';').map((d) => d.replace(/"/g, '')).filter(rooted).map((d) => w.join(d, 'pwsh.exe')),
+    w.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+  ].find((p) => exists(p));
+  return { file: found ?? windowsValue(env, 'ComSpec') ?? w.join(root, 'System32', 'cmd.exe'), args: [] };
 }
 
 const MARKER = '\0agentbox-path\0';
@@ -108,8 +127,8 @@ const DIRS = ['CLAUDE_CONFIG_DIR', 'CODEX_HOME'];
  *  has is left alone, and the proxies are one setting: if any proxy name is
  *  already set, none is added.
  */
-const PROXIES = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy', 'NO_PROXY', 'no_proxy'];
-const CERTIFICATES = ['NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'REQUESTS_CA_BUNDLE', 'CURL_CA_BUNDLE'];
+export const PROXIES = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy', 'NO_PROXY', 'no_proxy'];
+export const CERTIFICATES = ['NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'REQUESTS_CA_BUNDLE', 'CURL_CA_BUNDLE'];
 
 /**
  * THE LANGUAGE SETTING A DOCK LAUNCH DOES NOT HAVE (2026-10-15).
@@ -129,7 +148,7 @@ const CERTIFICATES = ['NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'R
  *  Mac only, en_US.UTF-8, which exists on every macOS and is what Terminal
  *  sets for most people. Linux sessions set their own.
  */
-const LOCALE = ['LANG', 'LC_ALL', 'LC_CTYPE'];
+export const LOCALE = ['LANG', 'LC_ALL', 'LC_CTYPE'];
 const MAC_LOCALE = 'en_US.UTF-8';
 
 const SETTINGS = [...DIRS, ...PROXIES, ...CERTIFICATES, ...LOCALE];

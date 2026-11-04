@@ -127,8 +127,9 @@ export class TerminalHosts {
     startMs = 8_000,
     now = () => Date.now(),
     log = () => {},
+    platform = process.platform,
   }) {
-    Object.assign(this, { local, stamp, dir, uid, launch, connect, logFile, startMs, now, log });
+    Object.assign(this, { local, stamp, dir, uid, launch, connect, logFile, startMs, now, log, platform });
     this.ownPath = terminalHostSocket({ stamp, dir, uid });
     this.conns = new Map();
     this.where = new Map();
@@ -195,6 +196,12 @@ export class TerminalHosts {
   }
 
   async open(key, place) {
+    // Windows refuses the host's socket path, so its terminals live in the app.
+    if (this.platform === 'win32') {
+      const state = this.local.open(key, place);
+      this.where.set(key, this.inApp);
+      return state;
+    }
     await this.ready();
     const at = this.where.get(key);
     if (at && !at.closed && (!at.local || this.local.sessions.has(key))) {

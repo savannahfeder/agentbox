@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { showsOpenLesson } from '../renderer/src/first-run';
+import { showsOpenLesson } from '../renderer/src/first-run-classic';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const at = { lessons: ['open', 'pick'], focused: false, fresh: false, view: 'inbox', modal: null };

@@ -16,6 +16,9 @@ import { assertInside, deniesGitOrEnvPath, deniesMachineryPath } from '../../mai
 import { AGENT_CREATION_KINDS, SCHEMA_VERSION } from '../../shared/contracts.mjs';
 import { libraryFolderOf } from '../../shared/library-folder.mjs';
 import { resolveProduct } from './account.mjs';
+import { noteWrittenElsewhere } from '../../main/store/written-elsewhere.mjs';
+import { readItemHistory, readWorkItem } from '../../main/store/work-items.mjs';
+import { familyOfName, filesInLines } from '../../shared/artifact-marks.mjs';
 
 const MAX_CONTENT_BYTES = 2 * 1024 * 1024;
 
@@ -149,13 +152,34 @@ export function readDocument(ref, { id = null, path: relPath = null } = {}) {
     } catch {
       throw new Error(`no document at path ${relPath} in ${project.name} (list_documents shows what exists)`);
     }
-    return { ...fileView(project.dir, relPath), content };
+    return withEditsRead(project.dir, relPath, { ...fileView(project.dir, relPath), content });
   }
   if (envelope.dir) {
     throw new Error(`"${envelope.title}" is folder-backed, which this server does not serve; its files live at ${path.join(project.dir, envelope.dir)}`);
   }
 
-  return { ...envelopeView(envelope), content: readCreationContent(project.dir, envelope) };
+  return withEditsRead(project.dir, envelope.path, { ...envelopeView(envelope), content: readCreationContent(project.dir, envelope) });
+}
+
+// A person's edit is a new file under designs/<thread>/, so the path an agent
+// remembers still holds the old words, and it would quote them as current.
+function withEditsRead(root, rel, doc) {
+  if (!rel || !/\.(?:md|markdown)$/i.test(rel) || rel.startsWith('designs/')) return doc;
+  const family = familyOfName(rel);
+  let best = null;
+  let bestAt = 0;
+  try { bestAt = fs.statSync(path.join(root, rel)).mtimeMs; } catch { return doc; }
+  let threads = [];
+  try { threads = fs.readdirSync(path.join(root, 'designs'), { withFileTypes: true }).filter((d) => d.isDirectory()); } catch { return doc; }
+  for (const t of threads) {
+    for (const name of fs.readdirSync(path.join(root, 'designs', t.name))) {
+      if (familyOfName(name) !== family) continue;
+      const at = fs.statSync(path.join(root, 'designs', t.name, name)).mtimeMs;
+      if (at > bestAt) { bestAt = at; best = `designs/${t.name}/${name}`; }
+    }
+  }
+  if (!best) return doc;
+  return { ...doc, content: fs.readFileSync(path.join(root, best), 'utf8'), newestVersion: best, note: `These are the newest words of this file, from ${best}. ${rel} holds an older version.` };
 }
 
 /**
@@ -237,4 +261,37 @@ export async function writeDocument(ref, { id = null, path: relPath = null, titl
 
     return { ...envelopeView(readIndex(project.dir).creations.find((c) => c.id === envelope.id)), created: !existing, moved: moved ? existing.path : null };
   });
+}
+
+/**
+ * Files and a shared thread's copy list only the files a thread's words name,
+ * and an agent often calls its document by title alone, so the thread names
+ * what its agent writes, once. `update` is the session's own write to its row.
+ */
+export async function nameOnThread(written, { ownItem, update, env = process.env, note = null }) {
+  const link = `[${written.title}](${written.path})`;
+  const unnamed = (why) => ({ onThread: false, say: `${why}, so it is not in Files: name it as ${link} when you tell them about it.` });
+  if (!ownItem) return unnamed('This session is not on a thread');
+  try {
+    const mine = resolveProduct(String(env.ZERO_PRODUCT ?? '').trim());
+    if (readWorkItem(mine.dir, ownItem)?.status === 'done') return unnamed('This thread is closed');
+    const lines = readItemHistory(mine.dir, ownItem, { max: Number.MAX_SAFE_INTEGER });
+    if (filesInLines(lines).some((f) => f.path === written.path)) return { onThread: true };
+  } catch { /* no own project to read: name it anyway */ }
+  try {
+    await update(ownItem, { note: note ?? `Saved ${link}` });
+    return { onThread: true };
+  } catch (err) {
+    return unnamed(`It is saved, but it could not be put on this thread (${err?.message ?? err})`);
+  }
+}
+
+/** A document a thread's agent wrote into another project is listed on the thread's own, so the name it says there opens. */
+export function noteWrittenForRun(targetRef, rel, { env = process.env } = {}) {
+  const own = String(env.ZERO_PRODUCT ?? '').trim();
+  if (!own || typeof rel !== 'string' || !rel) return;
+  let mine; let target;
+  try { mine = resolveProduct(own); target = resolveProduct(targetRef); } catch { return; }
+  if (!mine?.dir || !target?.dir || path.resolve(mine.dir) === path.resolve(target.dir)) return;
+  try { noteWrittenElsewhere(mine.dir, { run: String(env.ZERO_ITEM ?? '').trim() || null, file: path.join(target.dir, rel) }); } catch { /* the write itself stands */ }
 }

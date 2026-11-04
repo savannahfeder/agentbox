@@ -91,9 +91,9 @@ describe('the tabs on the web app on a phone', () => {
     expect(tabs).toMatch(/--phone-tabs:\s*0px/);
   });
   it('paint one line at their foot, and the picked one\'s mark is the foot of its box', () => {
-    // A shadow and not a border, so the bar stays the wall's own colour and
-    // has no border for the tab's mark to sit above.
-    expect(last('.list-pane > .th-bar', 'background')).toBe('var(--bg)');
+    // A shadow and not a border, so the bar shows the wall and has no border
+    // for the tab's mark to sit above.
+    expect(last('.list-pane > .th-bar', 'background')).toBe('transparent');
     expect(last('.list-pane > .th-bar', 'box-shadow')).toBe('inset 0 -1px var(--line)');
     expect(last('.list-pane > .th-bar', 'border-bottom')).toBe('0');
     expect(last('.tm-tab', 'height')).toBe('100%');
@@ -118,9 +118,9 @@ describe('the tabs on the phone app', () => {
 
   it('are drawn inside the top bar, above its one line, and only there', () => {
     expect(between(parts, 'export function TopBar(')).toMatch(/\{below\}/);
-    expect(inbox).toMatch(/below=\{board \? undefined : <Tabs on=\{tab\} counts=\{counts\} pick=\{setPlace\} groups=\{groups\.on\} \/>\}/);
-    // And under Groups' own bar while Groups is open, never along the foot.
-    expect(inbox).toMatch(/<GroupsPlace tabs=\{<Tabs on="groups"/);
+    expect(inbox).toMatch(/below=\{board \? undefined : <Tabs on=\{onEverything \? 'everything' : tab\} counts=\{counts\} pick=\{setPlace\} team=\{teamMode\} \/>\}/);
+    // And under Chats' own bar while it is open, never along the foot.
+    expect(inbox).toMatch(/<ChatsPlace tabs=\{<Tabs on="chats"/);
     expect(inbox.match(/<Tabs /g)).toHaveLength(2);
   });
   it('draw no line of their own; the picked word is underlined, as at the bottom', () => {

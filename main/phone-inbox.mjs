@@ -34,7 +34,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import os from 'node:os';
-import { threadSnapshot, threadsWorthCarrying, snapshotKey, checkCommand, madeHere, hideSecrets, bytesOf, phoneChoices, phoneApproval, phoneRepeatsOf, SNAPSHOT_LIMITS } from '../shared/phone-snapshot.mjs';
+import { threadSnapshot, threadsWorthCarrying, snapshotKey, checkCommand, madeHere, hideSecrets, bytesOf, phoneChoices, phoneApproval, phoneRepeatsOf, phoneTeammatesOf, SNAPSHOT_LIMITS, TEAMMATES_LIMITS } from '../shared/phone-snapshot.mjs';
 import { phoneSettingsOf, settingRoute } from '../shared/phone-settings.mjs';
 import { createPhoneUploads, UPLOAD_LIMITS } from './phone-uploads.mjs';
 import { createPhoneAlerts } from './phone-alerts.mjs';
@@ -47,6 +47,8 @@ import { heldForUndo } from '../shared/phone-undo.mjs';
 export { phoneFilesIn };
 const HEARTBEAT_MS = 30_000;
 const SETTINGS_HEARTBEAT_MS = 5 * 60_000;
+// Under phone_settings' own check (20261023000000_phone_settings.sql), with room for the row's JSON to differ.
+const SETTINGS_MAX_BYTES = 190_000;
 class Refused extends Error {}
 
 // How long a thread started on the phone is remembered as the row it became:
@@ -65,6 +67,9 @@ const SWEEP_EVERY_MS = 3600_000;
 const ADOPT_WITHIN_MS = 7 * 24 * 3600_000;
 const ADOPTED_KEPT_MS = 8 * 24 * 3600_000;
 const ADOPT_TRIES = 3;
+// A thread the cloud answered while its run is not home keeps the cloud's copy
+// this long at most, so a run that never comes home cannot freeze it.
+const CLOUD_COPY_HELD_MS = 12 * 3600_000;
 // Reading the settings parses Codex's model cache (199KB) on a Mac with both agents.
 const SETTINGS_EVERY_MS = 60_000;
 
@@ -104,6 +109,8 @@ export function createPhoneInbox({
   pinsOf = () => ({}),
   // () -> every project's repeating tasks (store.listRepeats); they ride with the settings.
   repeatsOf = null,
+  // () -> the teammates view (main/teammates.mjs `view`) while they are on, else null; it rides with the settings too.
+  teammatesOf = null,
   version = '',
   // This computer as her phone names it.
   name = os.hostname().replace(/\.local$/i, ''),
@@ -237,6 +244,8 @@ export function createPhoneInbox({
         if (here.size && here.size % THREADS_PER_TURN === 0) await breathe();
         here.add(item.id);
         const sk = `${p.slug}:${item.id}`;
+        // The cloud's copy holds her reply and its answer, which this ledger does not yet.
+        if (cloudCopies.has(sk)) continue;
         const history = historyOf(p.slug, item.id);
         const inputs = inputsOf(item, history);
         const live = liveNow(sk, p.slug, item.id);
@@ -308,6 +317,14 @@ export function createPhoneInbox({
     if (!carried) return false;
     if (repeatsOf) {
       try { carried = { ...carried, repeats: phoneRepeatsOf(repeatsOf(), projects().map((p) => p.slug), { home }) }; } catch (err) { troubled('read the repeating tasks for', err); }
+    }
+    if (teammatesOf) {
+      try {
+        // Only the room the rest leaves under the cloud's 200KB check, so they can never cost the settings their copy.
+        const room = Math.min(TEAMMATES_LIMITS.bytes, SETTINGS_MAX_BYTES - bytesOf(carried));
+        const mates = room > 0 ? phoneTeammatesOf(teammatesOf(), { home, limits: { ...TEAMMATES_LIMITS, bytes: room } }) : null;
+        if (mates && bytesOf(mates) <= room) carried = { ...carried, teammates: mates };
+      } catch (err) { troubled('read the teammates for', err); }
     }
     const key = JSON.stringify(carried);
     if (key === settings.key && now() - settings.sentAt < SETTINGS_HEARTBEAT_MS) return false;
@@ -489,7 +506,15 @@ export function createPhoneInbox({
   // cannot be made its own after a few tries is said once and let go.
   const adoptTrouble = new Set();
   const sayOnce = (kind, line) => { if (!adoptTrouble.has(kind)) log(line); adoptTrouble.add(kind); };
+  // THE THREADS WHOSE COPY ONLINE IS THE CLOUD'S FOR NOW (2026-10-31,
+  // w-3e955eadb4). The cloud server writes her reply and its answer into the
+  // thread's copy (cloud/gateway/phone.mjs relayTurn). Until the run is home,
+  // this computer's ledger has neither, and a copy sent from here would write
+  // over both: that is how a message she sent at 11:41 was nowhere for hours.
+  // Filled by every adoptCloudRuns pass, read by the publish that follows it.
+  let cloudCopies = new Set();
   async function adoptCloudRuns() {
+    cloudCopies = new Set();
     if (!adopt || !backend.cloudPhoneCommands) return 0;
     still();
     const claimed = (await backend.cloudPhoneCommands(device, new Date(now() - ADOPT_WITHIN_MS).toISOString()))
@@ -529,7 +554,9 @@ export function createPhoneInbox({
           // Its files saved here where the cloud put them, so the row links them.
           let body = String(p.body ?? '');
           try { body = (await withPhoneFiles({ ...started, kind: 'new' })).payload.body ?? body; } catch (err) { if (err instanceof SignedOut) throw err; }
-          try { out = await adoptNew({ project, item, runId, title, body, command: started.id, replies, choices: phoneChoices('new', p) }); } catch (err) {
+          // An agent in the cloud already took it, so Auto has nobody left to pick.
+          const { labels: _auto, ...choices } = phoneChoices('new', p);
+          try { out = await adoptNew({ project, item, runId, title, body, command: started.id, replies, choices }); } catch (err) {
             out = 'failed';
             sayOnce(`adopt:${err?.message}`, `phone: could not take in the new thread the cloud started (${item}): ${err?.message ?? err}`);
           }
@@ -547,7 +574,11 @@ export function createPhoneInbox({
             sayOnce(`adopt:${err?.message}`, `phone: could not join the cloud's run for ${item}: ${err?.message ?? err}`);
           }
         }
-        if (out === 'busy') { sayOnce(`busy:${runId}`, `phone: the cloud's run for ${item} waits for other cloud work to come home first`); continue; }
+        if (out === 'busy') {
+          sayOnce(`busy:${runId}`, `phone: the cloud's run for ${item} waits for other cloud work to come home first`);
+          holdCopy(project, item, cmds);
+          continue;
+        }
         rec.tries += 1;
         if (out === 'failed' && rec.tries < ADOPT_TRIES) { state.adopted[runId] = rec; save(); continue; }
         if (out === 'no-kit') sayOnce(`kit:${runId}`, `phone: no kit here for ${item}, so her reply runs on this computer`);
@@ -563,6 +594,7 @@ export function createPhoneInbox({
       if (!rec.home) {
         try { rec.home = !runHome || !!runHome({ project, item, runId }); } catch { rec.home = false; }
       }
+      if (!rec.home) holdCopy(project, item, cmds);
       if (rec.home) {
         for (const c of cmds) {
           if (c.takenAt || rec.marked.includes(c.id)) continue;
@@ -580,6 +612,13 @@ export function createPhoneInbox({
     return n;
   }
 
+  // A reply the cloud took into this run, sent within CLOUD_COPY_HELD_MS, leaves the thread's copy to the cloud.
+  function holdCopy(project, item, cmds) {
+    if (!project || !item) return;
+    const newest = Math.max(...cmds.filter((c) => c.kind === 'reply' && !isCarried(c)).map((c) => Date.parse(c.createdAt ?? c.created_at ?? '') || 0), 0);
+    if (newest && now() - newest < CLOUD_COPY_HELD_MS) cloudCopies.add(`${project}:${item}`);
+  }
+
   // EACH ROW A SLEEPING MAC WOULD HAVE STARTED, written as its own command for
   // the cloud server to start (shared/cloud-carry.mjs). The supervisor is told
   // before the write, so a pass meanwhile cannot write it twice, and told it
@@ -593,7 +632,9 @@ export function createPhoneInbox({
       if (replaces) {
         try {
           const claim = await backend.claimPhoneCommand(replaces, owner);
-          if (claim === 'cloud') continue;
+          // The cloud is running it: said again, so the hand-over is not
+          // offered afresh, and claimed again, at every wake from here on.
+          if (claim === 'cloud') { handedOver({ ...c, command: replaces }); continue; }
           // Already taken, maybe as a run the cloud did: let go rather than hand over twice.
           if (claim === 'gone') { takenBack({ ...c, command: replaces }); continue; }
           await backend.markPhoneCommand(replaces, 'done', owner);

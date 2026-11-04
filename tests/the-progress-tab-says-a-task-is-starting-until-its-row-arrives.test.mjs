@@ -52,7 +52,7 @@ describe('when the inbox knows a task is on its way', () => {
     expect(sending).toMatch(/setJustSent\(true\)/);
   });
 
-  it('draws it off that as well as off the first run’s landing', () => {
+  it('draws it off that, the tutorial’s first task included', () => {
     const line = app.split('\n').find((l) => l.includes('<EmptyTab'));
     expect(line).toMatch(/starting=\{!!landOn \|\| justSent\}/);
   });

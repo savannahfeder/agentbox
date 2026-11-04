@@ -37,6 +37,10 @@ const RUN_ID = /^[A-Za-z0-9._-]{1,120}$/;
 const DONE_LOOK_AFTER_MS = 2 * 60_000;
 // A stop that fails this many sweeps running (an hour) is given up, and said.
 const STOP_TRIES = 12;
+// A plan the database has refused for this many sweeps (an hour) is said as
+// behind. The sweep keeps offering it: a reporting copy that gave up would
+// leave the owner reading a plan nobody is on.
+const PLAN_TELL_TRIES = 12;
 // A session that has ended takes no new start for this long: far past the
 // function's own 90 s, so no late answer or late stop can reach a new run.
 const RETIRED_MS = 60 * 60_000;
@@ -119,13 +123,23 @@ export function memoryObjects() {
 
 export function createGateway({ agentcore, links, removeObject, objects, whoIs, stripe = null, now = Date.now, plans = PLANS, termsVersion = TERMS_VERSION, storageBytes = STORAGE_BYTES, log = () => {},
   // The phone's replies with the computer shut (./phone.mjs): { db, runFiles, sendPush }.
-  phone = null }) {
+  phone = null,
+  // The database (./phone.mjs supabaseRest), where who is subscribed is read
+  // by the people it is about. Without it the cloud runs as it always has.
+  db = null }) {
   const termsRefusal = () => new Refusal(403, 'terms', `accept the terms of ${termsVersion} first`, { terms: termsVersion });
   const personKey = (person) => `ledger/people/${person}.json`;
   const deviceKey = (key) => `ledger/devices/${sha256(key)}.json`;
   const SWITCH = 'ledger/switch.json';
   const fresh = () => ({ plan: 'none', live: {}, used: {}, stopping: [], unrecorded: [] });
   const planOf = (rec) => plans[rec.plan] || plans.none;
+  const revOf = (rec) => rec.planRev ?? 0;
+  // A plan set by hand has no subscription behind it, so nothing to change or
+  // cancel on Stripe; no plan is nobody's to bill.
+  const whoBills = (rec) => (PAYING.has(rec.stripe?.status) ? 'stripe' : planOf(rec).agents ? 'given' : null);
+  // A record written before the database held plans has no revision, so the
+  // first sweep after this shipped puts every plan there.
+  const behindTheDatabase = (rec) => !!db && (rec.planWrote?.rev ?? -1) !== revOf(rec);
   const readJson = async (key) => { const o = await objects.get(key); return o ? JSON.parse(o.body) : null; };
   const recOf = async (person) => ({ ...fresh(), ...(await readJson(personKey(person))) });
 
@@ -168,7 +182,12 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       const cur = await objects.get(personKey(person));
       const rec = { ...fresh(), ...(cur ? JSON.parse(cur.body) : {}) };
       const ctx = { ended: [], person };
+      const was = rec.plan;
       const out = change(rec, ctx);
+      // Every plan change counts, wherever it came from, so the database is
+      // told about all of them and never about a write that lost its race.
+      const moved = rec.plan !== was;
+      if (moved) rec.planRev = revOf(rec) + 1;
       try {
         await objects.put(personKey(person), JSON.stringify(rec), cur ? { ifMatch: cur.etag } : { ifNoneMatch: '*' });
       } catch (err) {
@@ -176,9 +195,53 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
         throw err;
       }
       if (ctx.ended.length) await settleOwed(person, rec, ctx.ended);
+      if (moved) await tellTheDatabase(person, rec);
       return out;
     }
     throw new Error('the ledger kept changing under this write');
+  }
+
+  // WHO IS SUBSCRIBED, WHERE THE PERSON IT IS ABOUT CAN READ IT. The ledger
+  // above is still the one a run start reads, in the write that counts the
+  // runs against the plan, so nothing a run needs waits on the database. This
+  // copy carries the plan's own revision, and the sweep writes it again while
+  // the two disagree, so a write the database refused is not lost.
+  async function tellTheDatabase(person, rec) {
+    if (!db) return;
+    const rev = revOf(rec);
+    try {
+      await db.writePlan(person, { plan: rec.plan, source: whoBills(rec), rev, at: now() });
+      await update(person, (r) => { if (revOf(r) === rev) r.planWrote = { rev, at: now() }; });
+    } catch (err) {
+      const tries = await update(person, (r) => {
+        const n = (r.planWrote?.tries ?? 0) + 1;
+        r.planWrote = { rev: r.planWrote?.rev ?? -1, tries: n, at: now() };
+        return n;
+      }).catch(() => null);
+      log(`the database has not taken ${person}'s plan of ${rec.plan}${tries ? ` (try ${tries}${tries >= PLAN_TELL_TRIES ? ', behind for an hour now' : ''})` : ''}: ${err?.message || err}`);
+    }
+  }
+
+  // A plan the owner asked for in the database (`cloud_plans.give`), taken up
+  // here so giving someone a plan needs no AWS sign-in. One that is no plan is
+  // said and cleared, so it is not read again every sweep.
+  async function takeTheGiven() {
+    if (!db) return;
+    for (const row of (await db.plansGiven()) ?? []) {
+      const person = String(row?.person || '').toLowerCase();
+      const give = String(row?.give ?? '');
+      try {
+        if (!PERSON.test(person)) { log(`the database asks for ${give} for ${row?.person}, who is nobody`); continue; }
+        if (!Object.hasOwn(plans, give) || plans[give].hoursPerMonth == null) {
+          log(`the database asks for ${give} for ${person}, which is no plan`);
+        } else if (await update(person, (rec) => { const was = rec.plan; rec.plan = give; return rec.plan !== was; })) {
+          log(`${person} is on ${give}, as the database asked`);
+        }
+        await db.takeGive(person, give);
+      } catch (err) {
+        log(`could not give ${person} ${give}: ${err?.message || err}`);
+      }
+    }
   }
 
   // Make the stops and write the records a write owed, then let go of the
@@ -220,8 +283,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const plan = planOf(rec);
     return {
       plan: plans[rec.plan] ? rec.plan : 'none', unlimited: !!plan.unlimited, agents: plan.unlimited ? null : plan.agents, hoursPerMonth: plan.hoursPerMonth, running: live(rec, 'run').length, usedSeconds: rec.used[month(t)] || 0, month: month(t),
-      // A plan set by hand has no subscription behind it, so nothing to change or cancel on Stripe.
-      billing: PAYING.has(rec.stripe?.status) ? 'stripe' : plan.agents ? 'given' : null,
+      billing: whoBills(rec),
       terms: { accepted: rec.terms?.version ?? null, current: termsVersion },
     };
   }
@@ -675,19 +737,22 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   async function sweep() {
     const t = now();
     let swept = 0;
+    let behind = 0;
+    try { await takeTheGiven(); } catch (err) { log(`could not read the plans the database asks for: ${err?.message || err}`); }
     const people = (await objects.list('ledger/people/')).map((k) => k.slice('ledger/people/'.length, -'.json'.length)).filter((p) => PERSON.test(p));
     for (let i = 0; i < people.length; i += SWEEP_AT_ONCE) {
       await Promise.all(people.slice(i, i + SWEEP_AT_ONCE).map(async (person) => {
         try {
           const rec = await sweepOne(person, t, await recOf(person));
           await weighStorage(person, t, rec);
+          if (behindTheDatabase(rec)) { behind += 1; await tellTheDatabase(person, rec); }
           swept += 1;
         } catch (err) {
           log(`could not sweep ${person}: ${err?.message || err}`);
         }
       }));
     }
-    return { people: people.length, swept };
+    return { people: people.length, swept, ...(behind ? { behind } : {}) };
   }
 
   // What the owner does by hand (scripts/cloud-gateway-admin.mjs). A plan

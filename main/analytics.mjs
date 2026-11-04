@@ -2,7 +2,7 @@
 // process, and a list of seven counts it will refuse to grow past.
 //
 // IT IS NOT THE ONLY TRAFFIC ANY MORE, and the header said so until 2026-08-29.
-// `main/updater.mjs` asks github.com a few times a day whether a newer Agentbox
+// `main/updater.mts` asks github.com a few times a day whether a newer Agentbox
 // has been released, which reaches us not at all and is nothing to do with this
 // file. `legal/privacy.html` 5.5 is where that is written down.
 //
@@ -38,6 +38,7 @@ import { createRequire } from 'node:module';
 import { sanitize } from '../shared/analytics-events.mjs';
 import { findPrivate } from '../shared/crash-scrub.mjs';
 import { readInstallId } from '../shared/install-id.mjs';
+import { armFor, readArm } from '../shared/onboarding-arm.mjs';
 import { readEnv } from '../shared/product-name.mjs';
 
 // PostHog's own default host. Kept here rather than left to the config so a
@@ -116,6 +117,9 @@ export function createAnalytics({ config, version, dir, client, env = process.en
     username: (() => { try { return os.userInfo().username; } catch { return null; } })(),
   };
 
+  // Which first run this install was shown, for the test of the two (shared/onboarding-arm.mjs). Set here, never by a caller.
+  let armWord = dir ? readArm(dir) : null;
+  const arm = () => armWord;
   let posthog = client ?? null;
   const load = () => {
     if (posthog) return posthog;
@@ -136,7 +140,7 @@ export function createAnalytics({ config, version, dir, client, env = process.en
     const ph = load();
     if (!ph) return false;
     try {
-      ph.capture({ distinctId: installId, event, properties: { ...base, ...properties } });
+      ph.capture({ distinctId: installId, event, properties: { ...base, ...(arm() ? { onboarding: arm() } : {}), ...properties } });
       return true;
     } catch (err) {
       // A failed send is never allowed to be a failed app.
@@ -146,6 +150,11 @@ export function createAnalytics({ config, version, dir, client, env = process.en
   };
 
   return {
+    /** Draws this install's first run the first time one starts, and every count after carries it. */
+    onboardingArm({ random } = {}) {
+      armWord = armFor(dir, { env, ...(random ? { random } : {}) });
+      return armWord;
+    },
     get enabled() { return on(); },
     // A whole phrase, verb and all: the line that prints it reads
     // `diagnostics ${reason}`, and a reason with no verb of its own made that
@@ -270,7 +279,7 @@ export function createDailyCount(track) {
 export function runEndedProps(session, now) {
   return {
     seconds: Math.round((now - (session.startedAt ?? now)) / 1000),
-    failed: !!session.exitFailed,
+    failed: !!session.exitFailed && !session.cutOffByQuit,
     engine: session.engine,
   };
 }

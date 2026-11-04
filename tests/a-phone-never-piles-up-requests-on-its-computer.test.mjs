@@ -5,9 +5,9 @@
 // right now it says too many request at once ... since yesterday the
 // performance has gone down dramatically."
 //
-// "Too many requests at once" is the relay's room turning a phone away when 64
-// of its requests are still unanswered (relay/room.mjs). Read in the code, how
-// a phone got there:
+// "Too many requests at once" was the relay's room turning a phone away when 64
+// of its requests were still unanswered. Read in the code, how a phone got
+// there:
 // - An open thread asks three things (its lines, its trace, its change) on
 //   every "something changed" from the computer, which reaches a phone every
 //   2 s while any agent anywhere is writing (renderer/src/phone-polls.ts). It
@@ -20,34 +20,17 @@
 //   every request a phone made, not only replies. So the pile no longer cleared
 //   itself at 30 s, and reached 64.
 //
-// Now only a reply asks to be waited for, a read in flight is never asked
-// again on top of itself (one more follows it if something changed meanwhile),
-// and the room has more room.
+// Now a read in flight is never asked again on top of itself (one more follows
+// it if something changed meanwhile). The relay's half of this went with the
+// relay (2026-11-01).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { waitsForAgent } from '../relay/phone/tunnel.mjs';
 import { oneAtATime } from '../renderer/src/phone-polls.ts';
-import { Room } from '../relay/room.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const src = (...p) => fs.readFileSync(path.join(here, '..', ...p), 'utf8');
-
-describe('which requests may be waited on past 30 s', () => {
-  it('a reply, which an agent takes at its next break', () => {
-    expect(waitsForAgent('POST', '/api/zero:answer')).toBe(true);
-  });
-  it('nothing else: a read the computer has not started on in 30 s is given up, as before', () => {
-    expect(waitsForAgent('POST', '/api/zero:item-history')).toBe(false);
-    expect(waitsForAgent('POST', '/api/zero:snapshot')).toBe(false);
-    expect(waitsForAgent('GET', '/api/zero:answer')).toBe(false);
-    expect(waitsForAgent('POST', '/api/zero:answer-later')).toBe(false);
-  });
-  it('the phone asks for it only then', () => {
-    expect(src('relay', 'phone', 'tunnel.mjs')).toMatch(/\{ wait = waitsForAgent\(request\.method, new URL\(request\.url\)\.pathname\) \} = \{\}/);
-  });
-});
 
 describe('one read at a time', () => {
   it('a push while a read is out asks once more when it is back, not once per push', async () => {
@@ -77,11 +60,5 @@ describe('one read at a time', () => {
   it('the thread and its live steps read that way', () => {
     expect(src('renderer', 'src', 'components', 'ItemThread.tsx')).toMatch(/const read = oneAtATime\(\(\) => Promise\.allSettled\(\[/);
     expect(src('renderer', 'src', 'components', 'Live.tsx')).toMatch(/const read = oneAtATime\(\(\) => api\.sessionTrace/);
-  });
-});
-
-describe('the room', () => {
-  it('holds 256 unanswered requests before it turns one away', () => {
-    expect(new Room().maxPending).toBe(256);
   });
 });

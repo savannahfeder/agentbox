@@ -157,7 +157,7 @@ describe('a maintainer\'s tool, not a feature', () => {
   it('is imported by nothing in the app', () => {
     const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
     for (const dir of ['main', 'shared', 'renderer/src', 'mcp', 'bin']) {
-      for (const file of walk(path.join(root, dir)).filter((f) => /\.(mjs|cjs|js|ts|tsx)$/.test(f))) {
+      for (const file of walk(path.join(root, dir)).filter((f) => /\.(mjs|mts|cjs|js|ts|tsx)$/.test(f))) {
         expect(fs.readFileSync(file, 'utf8'), file).not.toContain('review-pull-requests');
       }
     }

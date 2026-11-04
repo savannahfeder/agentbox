@@ -25,6 +25,7 @@ export function previewRows(now = Date.now()): PhoneRows {
   const stuckAsk = 'Threads stuck on a Codex limit should land in Needs you.';
   const stuckNote = 'I found where a run that hits its limit is put back. Two ways to fix it:\n\n- Mark it stopped, so it shows in Needs you with the reason.\n- Retry on another account first, and only then show it.\n\n## Options\n1. Mark it stopped (recommended)\n2. Retry on another account first';
   const meterResult = 'Shipped. Each account meter now ends with its reset time, like 6:19pm.\n\n## Options\n1. Close this task';
+  const qualityNote = '**Sign-up fails on a slow connection.**\n\nOn a throttled connection the email step gives up after 10 seconds and the form clears what you typed. The fix keeps your words and waits 30 seconds.\n\n## Options\n1. Ship the fix (recommended)\n2. Show me the steps first';
   return {
     projects: [
       { device: DEV, project: 'agentbox', name: 'Agentbox', updated_at: iso(at(1)) },
@@ -87,6 +88,14 @@ export function previewRows(now = Date.now()): PhoneRows {
       // Two runs of the daily report (previewSettings' repeating tasks): one quiet, one with news.
       thread('agentbox', { id: 'w-r1a2b3c4d5', title: 'Daily report', labels: ['repeat:r-preview-1', 'clean'], status: 'done', priority: 5, body: 'Write the daily report.', result: 'Nothing new since yesterday.', createdAt: at(26 * 60), updatedAt: at(26 * 60 - 6), wrote: { status: agent(at(26 * 60 - 6)) } }, []),
       thread('agentbox', { id: 'w-r2b3c4d5e6', title: 'Daily report', labels: ['repeat:r-preview-1'], status: 'done', priority: 5, body: 'Write the daily report.', result: 'Two sign-ups failed at the email step. The fix is in its own thread.', createdAt: at(120), updatedAt: at(112), wrote: { status: agent(at(112)) } }, []),
+      // Two teammates' runs (previewTeammates): one waiting on you, signed; one working.
+      thread('agentbox', { id: 'w-t2b3c4d5e6', title: 'Try sign-up the way a new user would', labels: ['founder', 'teammate:t-quality001'], status: 'blocked', priority: 5, body: 'Try sign-up the way a new user would, on a slow connection.', note: qualityNote, createdAt: at(45), updatedAt: at(30), wrote: { body: agent(at(45)), status: agent(at(30)), note: agent(at(30)) } }, [
+        { ts: at(45), source: 'agent', patch: { body: 'Try sign-up the way a new user would, on a slow connection.' } },
+        { ts: at(30), source: 'agent', patch: { status: 'blocked', note: qualityNote } },
+      ]),
+      thread('film', { id: 'w-t1a2b3c4d5', title: 'Cut the launch film to 60 seconds', labels: ['founder', 'teammate:t-launch0001'], status: 'claimed', priority: 5, body: 'Cut the launch film to 60 seconds. Open on the inbox.', createdAt: at(21), updatedAt: at(1), wrote: { body: agent(at(21)) } }, [
+        { ts: at(21), source: 'agent', patch: { body: 'Cut the launch film to 60 seconds. Open on the inbox.' } },
+      ], { live: { since: at(20), at: at(0.5), where: 'mac', doing: [{ label: 'Trimmed the middle', startedAt: at(8) }, { label: 'Rendering the 60-second cut', startedAt: at(2) }] } }),
       thread('agentbox', { id: 'w-7a8b9c0d1e', title: 'Rename the Display menu', status: 'done', priority: 0, body: 'Rename it to View.', result: 'Renamed.', createdAt: at(3000), updatedAt: at(1500), wrote: { body: her(at(3000)), result: agent(at(1600)), status: her(at(1500)) } }, [
         { ts: at(3000), source: 'founder', patch: { body: 'Rename it to View.' } },
         { ts: at(1600), source: 'agent', patch: { result: 'Renamed.' } },
@@ -104,7 +113,7 @@ export function previewSettings(now = Date.now()) {
     settings: {
       v: 1, version: '0.9.4',
       workspace: {
-        cornerTag: true, diagnostics: true, adhdMode: true, alpha: { rooms: true }, outsideAgents: 'waiting',
+        cornerTag: true, diagnostics: true, adhdMode: true, alpha: { rooms: true, teammates: true }, outsideAgents: 'waiting',
         permission: 'auto', codexMode: 'auto', engines: ['claude', 'codex'], claude: { found: true }, codex: { found: true },
         agentsAuto: true, sessionsAtOnce: 4, agentsTotal: 6, agentsAutoTotal: 6, agentsNudge: 0, slotsMax: 12, slotsSuggested: 6, running: 3,
         memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 8, now: 'Memory is fine. Nothing heavy running.' },
@@ -125,7 +134,42 @@ export function previewSettings(now = Date.now()) {
         { product: 'agentbox', id: 'r-preview-1', title: 'Daily report', body: 'Write the daily report: sign-ups, failed runs, and anything that needs me. Say "nothing new" if nothing changed.', priority: 5, every: 'weekday', at: '09:00', createdAt: now - 9 * 24 * 60 * MIN, served: '', lastOccurrence: 'w-r2b3c4d5e6' },
         { product: 'site', id: 'r-preview-2', title: 'Check the launch page numbers', body: 'Check the launch page numbers and tell me what moved.', priority: 5, every: 'week', on: 4, at: '08:00', createdAt: now - 20 * 24 * 60 * MIN, served: '' },
       ],
+      teammates: previewTeammates(now),
     },
+  };
+}
+
+/** Your AI teammates as a Mac sends them (shared/phone-snapshot.mjs phoneTeammatesOf). Every name is made up. */
+export function previewTeammates(now = Date.now()) {
+  const at = (m: number) => now - m * MIN;
+  const morning = new Date(now).setHours(9, 0, 0, 0);
+  const mate = (id: string, name: string, letter: string, more: Record<string, unknown> = {}) => ({
+    id, name, letter, role: null, job: null, primary: false, paused: false, status: 'active', product: 'agentbox', engine: 'claude', model: 'opus',
+    now: null, queued: 0, runsThisWeek: 3, worksLabel: null, createdAt: at(14 * 24 * 60), running: null, waiting: [], duties: [], ...more,
+  });
+  return {
+    list: [
+      mate('t-chief00001', 'Chief of staff', 'C', {
+        primary: true, runsThisWeek: 6, job: 'Be the one I talk to. Take whatever I send, hand it to the teammate whose job it is, and check in each weekday with what needs me.',
+        duties: [{ id: 'd-1', what: 'Check in with what needs you', when: 'Weekdays at 9am' }],
+      }),
+      mate('t-launch0001', 'Launch lead', 'L', { product: 'film', now: 'Cut the launch film to 60 seconds', running: { id: 'w-t1a2b3c4d5', product: 'film', title: '' } }),
+      mate('t-quality001', 'Quality lead', 'Q', { now: 'Waiting on you', waiting: [{ id: 'w-t2b3c4d5e6', product: 'agentbox', title: 'Sign-up fails on a slow connection' }] }),
+      mate('t-growth0001', 'Growth lead', 'G', { paused: true, product: 'site', runsThisWeek: 0 }),
+    ],
+    chat: [
+      { id: 'm-p1', kind: 'msg', from: 'you', to: ['t-chief00001'], text: 'Keep an eye on the launch and tell me only what needs me.', ts: at(26 * 60) },
+      { id: 'm-p2', kind: 'msg', from: 't-chief00001', to: ['you'], text: 'Will do. I will check in each weekday at 9 with what is waiting on you, most urgent first.', ts: at(26 * 60 - 1) },
+      { id: 'm-p3', kind: 'act', from: 't-chief00001', verb: 'learned', text: 'Keeps check-ins short', ts: at(26 * 60 - 2) },
+      { id: 'm-p4', kind: 'pass', from: 't-chief00001', to: 't-launch0001', title: 'Cut the launch film to 60 seconds', ts: Math.min(morning + 2 * MIN, at(40)) },
+      { id: 'm-p5', kind: 'msg', from: 't-chief00001', to: ['you'], text: 'Morning check-in.\n\n- **Quality lead** found sign-ups failing on a slow connection. The fix needs your yes.\n- **Launch lead** is cutting the film to 60 seconds.\n\nNothing else needs you.', ts: Math.min(morning, at(42)) },
+      { id: 'm-p6', kind: 'msg', from: 't-chief00001', to: ['you'], text: 'One question for the film: should it open on the inbox or on the phone?', options: ['The inbox', 'The phone'], ts: at(12) },
+    ],
+    runs: [
+      { id: 'run-p1', kind: 'run', teammate: 't-chief00001', item: 'w-t3c4d5e6f7', product: 'agentbox', title: 'Write the morning check-in', verb: 'finished', ts: Math.min(morning + MIN, at(41)) },
+      { id: 'run-p2', kind: 'run', teammate: 't-quality001', item: 'w-t2b3c4d5e6', product: 'agentbox', title: 'Sign-up fails on a slow connection', verb: 'sent', waiting: true, ts: at(30) },
+      { id: 'run-p3', kind: 'run', teammate: 't-launch0001', item: 'w-t1a2b3c4d5', product: 'film', title: 'Cut the launch film to 60 seconds', verb: 'picked', ts: at(20) },
+    ],
   };
 }
 
@@ -177,7 +221,11 @@ export function previewGroups(now = Date.now()) {
   messages.push(msg('r-team', 'p-2', at(47), 'Checked: it says 6:19pm, which is right.', { in_reply_to: sentence.id }));
   messages.push(msg('r-team', 'p-3', at(46), 'Thanks.', { in_reply_to: sentence.id }));
   const reads = [{ room_id: 'r-team', read_at: at(20) }, { room_id: 'r-launch', read_at: at(100) }, { room_id: 'r-maya', read_at: at(130) }];
-  const cards = [{ person_id: 'p-3', title: 'Fix the login meter', state: 'running', visible: true, updated_at: at(10) }];
+  messages.push(msg('r-launch', 'p-4', at(16), 'Here is the frame I mean. ![The opening frame](attachments/opening-frame.png)\n\nThe notes are in [cut-notes.pdf](attachments/cut-notes.pdf).'));
+  const cards = [
+    { person_id: 'p-3', thread_id: 'w-card-1', title: 'Fix the login meter', project: 'Agentbox', state: 'running', priority: 5, problem: 'The meter shows the wrong reset time on Max accounts.', progress: 'Found where the time is read.', solution: null, visible: true, updated_at: at(10) },
+    { person_id: 'p-2', thread_id: 'w-card-2', title: 'Pick the sign-in screen', project: 'Website', state: 'waiting', priority: 5, problem: 'Two sign-in screens are left.', progress: null, solution: null, visible: true, updated_at: at(25) },
+  ];
   const names: Record<string, string> = { preview: 'Ada Lovelace', 'p-2': 'Sam Rivera', 'p-3': 'Kai Ito', 'p-4': 'Maya Chen', 'p-5': 'Lee Park' };
   return {
     rpc(name: string, args: Record<string, any>) {
@@ -193,6 +241,8 @@ export function previewGroups(now = Date.now()) {
       if (table === 'room_presence') return presence;
       if (table === 'room_reads') return reads;
       if (table === 'thread_cards') return cards;
+      // A small drawing of a screen, as a stored file comes back.
+      if (table === 'room_files') return [{ data: 'iVBORw0KGgoAAAANSUhEUgAAADAAAAAkCAIAAABAJy5dAAAAXElEQVR42u3VsQ0AEBBAUWNYQcRORlGoLKqQsIJGIdpDJH7y68srLnfKWfNUChAgQIBGreSjAQIEiDsESApKMQibp1WvlwBtB+0N0AWQfIfmAF0A8ToAAQL0K6gDciTequifOckAAAAASUVORK5CYII=' }];
       if (table !== 'room_messages') return null;
       let rows = [...messages];
       const room = q.get('room_id')?.slice(3);
@@ -228,7 +278,17 @@ export function previewCloud(now = () => Date.now()) {
     const { scope, key, value, product } = c.payload ?? {};
     const w: any = settings.settings.workspace;
     const repeats: any[] = (settings.settings as any).repeats;
-    if (scope === 'thread') { const t = rows.threads.find((r) => r.project === product && r.item === c.payload.item); if (t) { t.snapshot.item.pinned = value || undefined; t.updated_at = new Date(now() + 1).toISOString(); } }
+    const mates: any = (settings.settings as any).teammates;
+    if (scope === 'teammate' && key === 'post') {
+      mates.chat.push({ id: `m-${c.id}`, kind: 'msg', from: 'you', to: value.to, text: value.text, ...(value.answers ? { answers: value.answers } : {}), ts: now() });
+      // The teammate answers a moment later, as a run of it would.
+      setTimeout(() => {
+        mates.chat.push({ id: `m-${c.id}-r`, kind: 'msg', from: value.to[0], to: ['you'], text: 'Got it. I will tell you when it is done.', ts: now() });
+        settings.updated_at = new Date(now()).toISOString();
+      }, 4000);
+    } else if (scope === 'teammate' && key === 'describe') {
+      mates.list.push({ id: `t-${c.id}`, name: 'New teammate', letter: 'N', role: null, job: value.text ?? value.starter, primary: false, paused: false, status: 'draft', product: value.product, waiting: [], running: null, duties: [], runsThisWeek: 0 });
+    } else if (scope === 'thread') { const t = rows.threads.find((r) => r.project === product && r.item === c.payload.item); if (t) { t.snapshot.item.pinned = value || undefined; t.updated_at = new Date(now() + 1).toISOString(); } }
     else if (scope === 'repeat' && key === 'end') (settings.settings as any).repeats = repeats.filter((r) => !(r.product === product && r.id === c.payload.id));
     else if (scope === 'repeat' && key === 'change') Object.assign(repeats.find((r) => r.product === product && r.id === c.payload.id) ?? {}, value);
     else if (scope === 'repeat' && key === 'new') repeats.push({ product, id: `r-${c.id}`, priority: 5, createdAt: now(), served: '', ...value });

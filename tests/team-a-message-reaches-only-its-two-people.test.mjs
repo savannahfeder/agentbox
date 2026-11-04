@@ -60,7 +60,7 @@ it('lands in the recipient\'s inbox and nobody else\'s', async () => {
   await theo.service.syncNow();
   await jun.service.syncNow();
   const got = inbox(theo);
-  expect(got.map((i) => i.title)).toEqual(['Can you take the Acme call on Thursday?']);
+  expect(got.map((i) => i.title)).toEqual(['Take the Acme call on Thursday']);
   expect(got[0].wrote.body.by).toBe(maya.personId);
   expect(jun.store.listProducts().filter((p) => p.team?.direct)).toEqual([]);
   expect(inbox(maya)).toEqual([]);

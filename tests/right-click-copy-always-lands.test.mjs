@@ -2,7 +2,7 @@
 // The page's own copy did not land in the real app, so the words she clicked on
 // are written directly when it does not.
 import { describe, it, expect } from 'vitest';
-import { copySelection } from '../main/copy-selection.mjs';
+import { copySelection } from '../main/copy-selection.mts';
 
 function fakeClipboard(start = 'what she copied an hour ago') {
   let text = start;

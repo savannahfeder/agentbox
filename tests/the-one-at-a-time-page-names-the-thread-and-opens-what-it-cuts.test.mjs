@@ -39,7 +39,7 @@ describe('the thread\'s name', () => {
     expect(draw({ title: '', context: 'c', you: null })).not.toContain('one-title');
   });
   it('and the thread page hands the summary the name', () => {
-    expect(read('renderer/src/components/ItemThread.tsx')).toMatch(/<QueueSummary[^>]*title=\{rowTitle\(item\)\}/);
+    expect(read('renderer/src/components/ItemThread.tsx')).toMatch(/<QueueSummary[^>]*title=\{(talkName \?\? )?pageTitle\(item\)\}/);
   });
 });
 
@@ -86,6 +86,7 @@ describe('a page or a note read in place', () => {
   it('and the fold keeps the way to open it full screen', () => {
     const tsx = read('renderer/src/components/OneThingAtATime.tsx');
     expect(tsx).toMatch(/\{!folded && page && url &&/);
-    expect(tsx).toMatch(/\{!folded && !page && text != null &&/);
+    expect(tsx).toMatch(/\{!folded && table && text != null &&/);
+    expect(tsx).toMatch(/\{!folded && !page && !table && text != null &&/);
   });
 });

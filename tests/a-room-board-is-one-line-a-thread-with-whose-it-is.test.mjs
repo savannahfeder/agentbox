@@ -37,14 +37,14 @@ const columns = (html) => [...html.matchAll(/class="rm-bcol"[\s\S]*?class="th-co
 
 describe('a room’s board', () => {
   it('has In progress among its columns, in your order', () => {
-    expect(columns(draw({ later: true }))).toEqual(['Waiting', 'In progress', 'Later', 'Done today']);
-    expect(columns(draw({ later: true, columnOrder: ['running', 'waiting', 'scheduled', 'done'] }))).toEqual(['In progress', 'Waiting', 'Later', 'Done today']);
+    expect(columns(draw({ later: true }))).toEqual(['In progress', 'Later', 'Done today']);
+    expect(columns(draw({ later: true, columnOrder: ['scheduled', 'running', 'waiting', 'done'] }))).toEqual(['Later', 'In progress', 'Done today']);
   });
 
   it('draws each thread with whose it is by name', () => {
     const html = draw();
     expect(html).toMatch(/class="rm-brow running"[\s\S]*?class="who">Maya<\/span><span class="t">Stripe webhook retries/);
-    expect(html).toMatch(/class="rm-brow waiting"[\s\S]*?class="who">You<\/span><span class="t">Pricing page copy/);
+    expect(html).toMatch(/class="rm-brow running"[\s\S]*?class="who">You<\/span><span class="t">Pricing page copy/);
   });
 
   it('shows no project and no card boxes', () => {

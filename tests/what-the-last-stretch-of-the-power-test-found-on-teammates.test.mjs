@@ -20,9 +20,9 @@ describe('answers to tap, once you have answered', () => {
 });
 
 describe('Escape on a teammate\'s page', () => {
-  it('goes back one step: from About, its Log or a playbook to its chat, and from the chat out of Chats', () => {
+  it('goes back one step: from About, its sheet, its Log or a playbook to its chat, and from the chat out of Chats', () => {
     expect(read('renderer/src/App.tsx')).toMatch(/if \(e\.key === 'Escape'\) \{ e\.preventDefault\(\); teammatesUi\.back\(\); \}/);
-    expect(read('renderer/src/teammates/useTeammates.tsx')).toMatch(/back: \(\) => \(shown && \(shown\.kind === 'about' \|\| shown\.kind === 'log' \|\| shown\.kind === 'book'\) \? go\(shown\.id\) : leave\(\)\)/);
+    expect(read('renderer/src/teammates/useTeammates.tsx')).toMatch(/back: \(\) => \(shown && \(shown\.kind === 'about' \|\| shown\.kind === 'sheet' \|\| shown\.kind === 'log' \|\| shown\.kind === 'book'\) \? go\(shown\.id\) : leave\(\)\)/);
   });
 });
 

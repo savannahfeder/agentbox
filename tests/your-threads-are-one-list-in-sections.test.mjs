@@ -91,7 +91,8 @@ describe('in the app', () => {
   });
 
   it('walks the stacked rows with the keyboard, and keys a row by its own section', () => {
-    expect(app).toMatch(/: stacked \? stacked\.rows : boardOrder \?\? displayedBox;/);
+    // Needs you's own parts by who is waiting come second (2026-10-30).
+    expect(app).toMatch(/: stacked \? stacked\.rows : (needsStacked \? needsStacked\.rows : )?boardOrder \?\? heldBox\.rows;/);
     expect(app).toMatch(/const keyTab = stacked && pointed \? stacked\.tabOf\(pointed\) : view;/);
   });
 });

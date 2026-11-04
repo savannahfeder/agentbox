@@ -46,8 +46,10 @@ export function standingInstruction(rule) {
 // and reaches her, including a run that died without saying anything: this
 // predicate exists to hide, never to show, so it fails open by construction.
 export function isCleanRun(item) {
+  // A thread she sent to a teammate is her ask, never its quiet run.
+  if (item?.routed) return false;
   const labels = item?.labels ?? [];
-  const aRun = !!ruleIdOf(item) || labels.some((l) => typeof l === 'string' && (l.startsWith('teammate:') || l === 'teammate-offer'));
+  const aRun = !!ruleIdOf(item) || labels.some((l) => typeof l === 'string' && (l.startsWith('teammate:') || l === 'teammate-offer' || l === 'teammate-asks-to-write'));
   return aRun && labels.includes(CLEAN_LABEL);
 }
 

@@ -6,9 +6,9 @@
 // onboarding as a new user, 2026-10-29.
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { previousScreen, stepsFor } from '../renderer/src/first-run';
+import { previousScreen, stepsFor } from '../renderer/src/first-run-classic';
 
-const source = fs.readFileSync(new URL('../renderer/src/components/FirstRun.tsx', import.meta.url), 'utf8');
+const source = fs.readFileSync(new URL('../renderer/src/components/FirstRunClassic.tsx', import.meta.url), 'utf8');
 const between = (from, to) => source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from)));
 
 describe('the steps', () => {
@@ -63,7 +63,7 @@ describe('the project screen', () => {
 });
 
 describe('the schedule chip on the task screen', () => {
-  const css = fs.readFileSync(new URL('../renderer/src/components/first-run.css', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../renderer/src/components/first-run-classic.css', import.meta.url), 'utf8');
 
   it('drops its menu from the chip’s left edge, not from the time inside it', () => {
     expect(css).toContain('.first-run .ob-repeat { position: relative; }');

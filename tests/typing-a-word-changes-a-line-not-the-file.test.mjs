@@ -64,24 +64,15 @@ describe('her edit, and nothing else, reaches the file', () => {
     expect(saved).toBe('| a | b |\n|---|---|\n| 1 | 2 |\n\nThe line typed into.\n');
   });
 
-  it('says nothing rather than guessing when the edit cannot be placed', () => {
+  it('keeps a loose list loose when one of its items changes', () => {
     // A list written loose comes back tight, so the blank lines vanish from
-    // between the items and the edited line has drifted with no unchanged line
-    // between it and the drift. There is no honest place to put the boundary.
-    // The caller then writes the editor's own markdown and TELLS the user the
-    // file was reformatted; what it never does is invent a position or drop
-    // what was typed.
-    //
-    // THIS USED TO BE THE BLANK-LINE CASE, and it is not any more: a run of
-    // blank lines survives the editor now, because gaps typed in the sidebar
-    // note were being lost. Measured across every markdown file in a real
-    // store, one word changed in each: the same files refused before the change
-    // and after it, so nothing the doc pane does to existing files moved. What changed is that one shape stopped needing to be
-    // refused, and the test below is that shape.
+    // between the items. This used to be refused, and the whole file was
+    // reformatted. Its lines are matched by their words now, so the item lands
+    // where it was and the blank lines stay.
     const original = '- one\n\n- The line to type into.\n\n- two\n';
     const base = roundTrip(original);
     expect(base).toBe('- one\n- The line to type into.\n- two\n');
-    expect(patchOriginal(original, base, base.replace('to type into', 'typed into'))).toBeNull();
+    expect(patchOriginal(original, base, base.replace('to type into', 'typed into'))).toBe('- one\n\n- The line typed into.\n\n- two\n');
   });
 
   it('now splices into a file with blank lines in it instead of refusing', () => {

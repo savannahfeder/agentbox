@@ -12,6 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { buildMembers } from '../renderer/src/team/everything/members.ts';
+import { isBusy, statusWord } from '../renderer/src/team/everything/place.ts';
 import { liveLine, pendingAsk } from '../renderer/src/teammates/chat-lines.ts';
 import { nowLine } from '../renderer/src/teammates/TeammatesRail.tsx';
 
@@ -49,7 +50,7 @@ describe('the line under your message while it works', () => {
   });
 
   it('is the line the chat draws', () => {
-    expect(read('renderer/src/teammates/TeammatesPage.tsx')).toMatch(/const line = liveLine\(t, session, now, asked\);/);
+    expect(read('renderer/src/teammates/TeammatesPage.tsx')).toMatch(/const line = liveLine\(t, session, now, asked, \{ answered, queued: [^}]*queued\.includes\(t\.running\.id\) \}\);/);
     // Every line about it, not only the ones its chat draws, which hide queued and finished.
     expect(read('renderer/src/teammates/TeammatesPage.tsx')).toMatch(/asked=\{pendingAsk\(chatEntries\(view, t\.id\), t\.id\)\}/);
   });
@@ -115,10 +116,14 @@ describe('the card and the bar over the chat', () => {
   });
 
   it('draw Starting, moving, where Not running was', () => {
+    // 2026-10-30: in plain case, and Free rather than Not running, which read as broken.
+    expect(statusWord(card(mate({ running: up, now: 'Tell me what moved signups' })))).toBe('Starting');
+    expect(statusWord(card(mate({ running: up }), new Map([['t-aaaaaaaaaa', 1]])))).toBe('Working');
+    expect(statusWord(card(mate()))).toBe('Free');
+    expect(isBusy('Starting') && isBusy('Working') && !isBusy('Free')).toBe(true);
     const strip = read('renderer/src/team/everything/TeamStrip.tsx');
-    expect(strip).toMatch(/<LiveMark still=\{!m\.agents && !m\.starting\} \/>\{m\.agents \? agentsShort\(m\.agents\)\.toUpperCase\(\) : m\.starting \? 'STARTING' : 'NOT RUNNING'\}/);
     expect(strip).toMatch(/export function AgentsLine\(\{ n, still, starting = false \}/);
-    expect(read('renderer/src/App.tsx')).toMatch(/<AgentsLine n=\{evMember\.agents\} starting=\{evMember\.starting\} \/>/);
+    expect(read('renderer/src/App.tsx')).toMatch(/<AgentsLine n=\{evMember\.agents\} starting=\{evMember\.starting\}/);
   });
 
   it('say what it is on when it was paused mid-run, and Paused once it is idle', () => {

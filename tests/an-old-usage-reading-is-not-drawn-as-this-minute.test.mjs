@@ -123,7 +123,7 @@ describe('the panel does not eat the click under it', () => {
     expect(pill).toContain('className={`usage-panel ${pinned ? \'is-pinned\' : \'\'}`}');
     // The bar, not the whole box: a press on the panel used to count as inside
     // and left the panel standing with nothing happening at all.
-    expect(pill).toContain('if (!bar.current?.contains(e.target as Node)) setPinned(false);');
+    expect(pill).toContain('if (!bar.current?.contains(e.target as Node)) { setPinned(false); setHovering(false); }');
     expect(pill).toContain("if (e.key !== 'Escape') return;");
   });
 });

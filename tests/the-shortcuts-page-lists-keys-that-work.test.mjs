@@ -93,7 +93,7 @@ const HANDLED = {
   // The send chord lives in the two boxes she types in, not on the window.
   '⌘↵': [
     [compose, "if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') send();"],
-    [focus, "if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') send();"],
+    [focus, "if (pressed === 'send') { e.preventDefault(); send(); return; }"],
   ],
   // The number picks AND sends, except in the 800ms after the app itself put a
   // new thread in front of you, where it is held and says so rather than

@@ -73,7 +73,8 @@ describe('what the card does with a list, which is nothing special', () => {
   });
 
   it('sends one row from one Send, whatever was typed', () => {
-    expect(card).toMatch(/const send = \(\) => \(person && sendAs === 'message' \? sendMessage\(\) : sendTask\(whenToSend\(when\)\)\);/);
+    // A picked Send later time, or a picked suggestion's schedule (w-31c71743b5); still one row.
+    expect(card).toMatch(/const send = \(\) => \(person \? sendMessage\(\) : sendTask\(when \? whenToSend\(when\) : ideaRule \? \{ repeat: ideaRule \} : \{\}\)\);/);
     expect(card.match(/await api\.compose\(/g)).toHaveLength(1);
   });
 

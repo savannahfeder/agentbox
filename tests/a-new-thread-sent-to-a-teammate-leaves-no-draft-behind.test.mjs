@@ -13,7 +13,7 @@ const send = card.slice(card.indexOf('const sendToTeammate = async () => {'), ca
 
 describe('a New thread to a teammate', () => {
   it('drops the saved draft once the send stands, as a task or a message does', () => {
-    expect(send).toMatch(/const taken = markComposeDraftSending\(\);/);
-    expect(send).toMatch(/if \(err\) \{ restoreComposeDraft\(taken\); setError\(err\); \}\s*else \{ dropComposeDraft\(taken\); setText\(''\); onClose\(\); \}/);
+    expect(send).toMatch(/const taken = takeTheDraft\(\);/);
+    expect(send).toMatch(/if \(err\) \{ restoreComposeDraft\(taken, undefined, place\); setError\(err\); \}\s*else \{ dropComposeDraft\(taken, undefined, place\); setText\(''\); onClose\(\); \}/);
   });
 });

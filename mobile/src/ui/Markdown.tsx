@@ -4,9 +4,11 @@
 // lib/markdown.ts; this only draws it.
 import { Geist_400Regular_Italic, Geist_600SemiBold_Italic, useFonts } from '@expo-google-fonts/geist';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Image, Linking, Pressable, ScrollView, Text, View, type TextStyle } from 'react-native';
+import { Image } from 'expo-image';
+import { Linking, Pressable, ScrollView, Text, View, type TextStyle } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { isImagePath, referencedFiles } from '../../../renderer/src/referenced-files';
+import { pictureSource } from '../lib/files';
 import { inlineSpans, messageBlocks, type Block, type MentionKind, type Span } from '../lib/markdown';
 import { offerLink } from './LinkMenu';
 import { T } from './parts';
@@ -115,7 +117,7 @@ function Picture({ src, alt }: { src: string; alt: string }) {
     setSize(known); setBroken(false);
     if (!uri || known) return;
     let live = true;
-    Image.getSize(uri, (w, h) => { if (live && w && h) setSize({ w, h }); }, () => { if (live) setBroken(true); });
+    Image.loadAsync(pictureSource(uri)).then(({ width: w, height: h }) => { if (live && w && h) setSize({ w, h }); }, () => { if (live) setBroken(true); });
     return () => { live = false; };
   }, [uri, known?.w, known?.h]);
   if (uri === null || broken) {
@@ -128,7 +130,7 @@ function Picture({ src, alt }: { src: string; alt: string }) {
   // Holds the picture's place while it is looked for: at its own shape when its computer listed one, else the site's 4:3 box.
   if (uri === undefined || !size) return <View style={size ? { width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, backgroundColor: color.raised } : { width: '100%', aspectRatio: 4 / 3, backgroundColor: color.raised }} />;
   const drawn = (
-    <Image source={{ uri }} accessibilityLabel={alt} resizeMode="contain" onError={() => setBroken(true)}
+    <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={alt} contentFit="contain" onError={() => setBroken(true)}
       style={{ width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, borderWidth: 1, borderColor: color.line, backgroundColor: color.raised }} />
   );
   if (/^data:/i.test(src)) return drawn;
@@ -184,15 +186,12 @@ function Shot({ file, all, width }: { file: string; all: string[]; width: number
   const { files } = useContext(Draw);
   const uri = files?.picture(file);
   const base = file.split('/').pop() ?? file;
-  const [ratio, setRatio] = useState(0);
-  const tall = ratio > 0 && ratio < 16 / 10;
   return (
     <Pressable onPress={() => open(file, files, all)} accessibilityRole="imagebutton" accessibilityLabel={base} style={{ width }}>
       <View style={{ width: '100%', aspectRatio: 16 / 10, borderWidth: 1, borderColor: color.line, backgroundColor: color.raised, overflow: 'hidden' }}>
         {!!uri && (
-          <Image source={{ uri }} accessibilityLabel={base} resizeMode="cover"
-            onLoad={(e) => { const { width: w = 0, height: h = 0 } = e.nativeEvent?.source ?? {}; if (w && h) setRatio(w / h); }}
-            style={tall ? { position: 'absolute', top: 0, left: 0, width: '100%', aspectRatio: ratio } : { width: '100%', height: '100%' }} />
+          <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={base} contentFit="cover" contentPosition="top"
+            style={{ width: '100%', height: '100%' }} />
         )}
       </View>
       <T numberOfLines={1} style={{ marginTop: 4, fontSize: 13.12, lineHeight: 21, color: color.faint }}>{base}</T>

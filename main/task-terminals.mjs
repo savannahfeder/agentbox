@@ -1,14 +1,16 @@
 // User-owned shells. Never provider tool calls; no transcript or analytics writes.
 import fs from 'node:fs';
+import path from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {execFileSync} from 'node:child_process';
+import {execFile,execFileSync} from 'node:child_process';
 import {commandRunning} from '../shared/terminal-state.mjs';
-import {loginShell} from './shell-path.mjs';
+import {terminalShell,windowsRoot} from './shell-path.mjs';
 import {loadPty} from './pty.mjs';
 const LIMIT=262144;
 export function terminalEnv(source=process.env){
   const env={...source,TERM:'xterm-256color',COLORTERM:'truecolor'};
-  for(const key of Object.keys(env)) if(/^(ANTHROPIC_|OPENAI_API_KEY$|CLAUDE_CODE_|CLAUDECODE$|CLAUDE_PID$|CLAUDE_EFFORT$|ELECTRON_|NODE_OPTIONS$)/.test(key)) delete env[key];
+  // CLAUDE_SECURESTORAGE_CONFIG_DIR would save a sign-in typed here into another account's keychain slot.
+  for(const key of Object.keys(env)) if(/^(ANTHROPIC_|OPENAI_API_KEY$|CLAUDE_CODE_|CLAUDECODE$|CLAUDE_PID$|CLAUDE_EFFORT$|CLAUDE_SECURESTORAGE_CONFIG_DIR$|ELECTRON_|NODE_OPTIONS$)/.test(key)) delete env[key];
   // NPM'S STAND-IN EDITOR IS NOBODY'S CHOICE. `npm start` gives everything it
   // runs EDITOR=vi when neither EDITOR nor VISUAL is set, and zsh reads "vi"
   // there as a request for vi keys: Option+Left deleted and Option+Delete
@@ -39,7 +41,15 @@ export function terminalPlace({store,supervisor,product,id,agent}){
 export function terminalFolder(args){return terminalPlace(args).cwd;}
 // Enumerate only descendants of our own shell, including background process
 // groups. Kill children before shell; closing a pane never calls this.
-export function disposeTerminalProcess(pty){
+export function disposeTerminalProcess(pty,platform=process.platform,run=execFile){
+  // node-pty on Windows throws on any signal, and its kill misses a child with
+  // a console of its own. taskkill by full path, never from the shell's folder,
+  // and without holding the window. The shell goes last, or its tree is lost.
+  if(platform==='win32'){
+    const kill=()=>{try{pty.kill();}catch{}};
+    try{run(path.win32.join(windowsRoot(),'System32','taskkill.exe'),['/T','/F','/PID',String(pty.pid)],{windowsHide:true,timeout:5000},kill);}catch{kill();}
+    return;
+  }
   const descendants=[];
   try{
     const rows=execFileSync('/bin/ps',['-axo','pid=,ppid='],{encoding:'utf8',timeout:2000}).trim().split('\n').map(s=>s.trim().split(/\s+/).map(Number));
@@ -121,7 +131,7 @@ export const ENDED={
 // While memory is critical, a terminal looked at this recently is still in use.
 const WATCHED_MS=600000;
 export class TaskTerminals {
-  constructor({spawn,resolve,disposeProcess=disposeTerminalProcess,env=terminalEnv(),shell=loginShell(),idleMs=IDLE_MS,sweepMs=SWEEP_MS,now=()=>Date.now(),readPressure=null,watchedMs=WATCHED_MS}={}){
+  constructor({spawn,resolve,disposeProcess=disposeTerminalProcess,env=terminalEnv(),shell=terminalShell(),idleMs=IDLE_MS,sweepMs=SWEEP_MS,now=()=>Date.now(),readPressure=null,watchedMs=WATCHED_MS}={}){
     this.spawn=spawn??((...args)=>loadPty().spawn(...args));this.resolve=resolve;this.disposeProcess=disposeProcess;this.env=env;this.shell=shell;this.sessions=new Map();
     this.idleMs=idleMs;this.now=now;this.readPressure=readPressure;this.watchedMs=watchedMs;
     // Keys whose shell this class ended on its own, and WHY. The next open on
@@ -225,7 +235,7 @@ export class TaskTerminals {
     const place=given??this.resolve(key);
     const cwd=typeof place==='string'?place:place.cwd;
     const command=place?.command;
-    const pty=this.spawn(command?.file??place?.shell??this.shell,command?.args??['-l'],{cwd,env:{...(place?.env??this.env),...command?.env},cols:80,rows:24,name:'xterm-256color'});
+    const pty=this.spawn(command?.file??place?.shell??this.shell.file,command?.args??this.shell.args,{cwd,env:{...(place?.env??this.env),...command?.env},cols:80,rows:24,name:'xterm-256color'});
     let resolveExit;const exitPromise=new Promise(resolve=>{resolveExit=resolve;});
     const session={token:randomUUID(),pty,cwd,buffer:'',offset:0,exitCode:null,exited:false,exitPromise,lastReadAt:this.now(),waiters:new Set()};this.sessions.set(key,session);
     /*

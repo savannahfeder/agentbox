@@ -14,6 +14,27 @@ const now = Date.now();
 const min = 60_000;
 const hr = 3_600_000;
 
+// An answer with its list written as a markdown table, the way agents write
+// one in a message. Invented figures.
+const TABLE_IN_A_MESSAGE = [
+  '**Stripe is the biggest by volume, about twice the next one.**',
+  '',
+  'Figures are each company\'s own latest yearly number, so treat close ones as tied.',
+  '',
+  '| # | Company | What they do | Volume per year | Stage | Website |',
+  '|---|---|---|---|---|---|',
+  '| 1 | Stripe | Online payments | ~$1.4T | Private | stripe.com |',
+  '| 2 | Adyen | Payments for large merchants | ~$1.2T | Public | adyen.com |',
+  '| 3 | Block | Square and Cash App | ~$240B | Public | block.xyz |',
+  '| 4 | Wise | Money sent abroad | ~$150B | Public | wise.com |',
+  '| 5 | Ramp | Corporate cards | ~$55B | Private | ramp.com |',
+  '| 6 | Brex | Corporate cards | ~$40B | Private | brex.com |',
+  '| 7 | Mercury | Business banking | ~$30B | Private | mercury.com |',
+  '| 8 | Plaid | Bank connections | $10B+ | Private | plaid.com |',
+  '',
+  'Just outside the list are Rippling and Deel, which move payroll rather than payments.',
+].join('\n');
+
 export const fixtureSnapshot: Snapshot = {
   products: [
     { slug: 'kestrel', dir: '/fixtures/kestrel', name: 'Kestrel', oneLiner: 'Collectible card games, made beautiful', repoPath: '/Users/you/Desktop/dev/kestrel' },
@@ -253,6 +274,23 @@ export const fixtureSnapshot: Snapshot = {
       createdAt: now - 52 * min, updatedAt: now - 12 * min,
       problem: 'Making a new project used to start an agent straight away, before you had said anything. Now its first row waits for your reply, and the linked page shows that row before and after.',
       progress: 'First row waits for your reply\nTests pass\nOn its branch, ready to merge',
+    },
+    {
+      // A TABLE WRITTEN IN THE MESSAGE, as markdown, which is drawn as one too.
+      id: 'w-t2', product: 'onboard', productName: 'Onboard', status: 'open', kind: 'question',
+      title: 'Biggest payment companies by volume',
+      body: TABLE_IN_A_MESSAGE,
+      labels: [], priority: 5, epoch: 1, claim: null,
+      createdAt: now - 40 * min, updatedAt: now - 9 * min,
+    },
+    {
+      // A TABLE: a lead list as a csv on a line of its own (w-690551d7ea).
+      id: 'w-t1', product: 'onboard', productName: 'Onboard', status: 'open', kind: 'question',
+      title: 'Fintech companies to reach out to',
+      body: '**Pick who I write to first, or tell me who to drop.**\n\nI put 16 fintech companies in a table with a note and a status for each. Two already have a meeting booked and two replied. I would start with the five marked New.\n\nleads/fintech-leads.csv',
+      labels: [], priority: 5, epoch: 1, claim: null,
+      createdAt: now - 30 * min, updatedAt: now - 5 * min,
+      problem: 'Building a list of fintech companies to reach out to. 16 so far, waiting on which to contact first.',
     },
     {
       // STOPPED: she answered, a worker took it, and that worker died without
@@ -528,6 +566,19 @@ export const fixtureHistory: Record<string, Array<Record<string, any>>> = {
         title: 'The first row a new project makes is fixed and needs your yes',
         status: 'open', kind: 'review', priority: 5,
         body: '**Merge the first row change, or pick different words for it.**\n\nMaking a project used to compose a row the fleet took as work, so an agent started before you had said anything. It asks now, and nothing runs until you reply.\n\nThe page shows the row before and after:\n\n/fixtures/onboard/designs/w-n13/the-first-row.html',
+      },
+    },
+  ],
+  'w-t2': [
+    { id: 'w-t2', ts: now - 9 * min, source: 'agent', patch: { title: 'Biggest payment companies by volume', status: 'open', kind: 'question', priority: 5, body: TABLE_IN_A_MESSAGE } },
+  ],
+  'w-t1': [
+    {
+      id: 'w-t1', ts: now - 5 * min, source: 'agent',
+      patch: {
+        title: 'Fintech companies to reach out to',
+        status: 'open', kind: 'question', priority: 5,
+        body: '**Pick who I write to first, or tell me who to drop.**\n\nI put 16 fintech companies in a table with a note and a status for each. Two already have a meeting booked and two replied. I would start with the five marked New.\n\nleads/fintech-leads.csv',
       },
     },
   ],

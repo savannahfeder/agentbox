@@ -19,7 +19,6 @@
 // people in it.
 //
 // What is pinned here:
-//   - the control is on conversation pages ONLY, and nowhere else;
 //   - it is gone when the company holds nobody who is not already in this
 //     conversation;
 //   - it hands over everyone in the conversation but you, in To, so the
@@ -113,7 +112,7 @@ describe('the control at the top of a conversation', () => {
   const team = teamOf(COMPANY);
   const draw = (product, t = team) => renderToStaticMarkup(
     React.createElement(TeamContext.Provider, { value: t },
-      React.createElement(AddPeople, { product, onAdd: () => {} })),
+      React.createElement(AddPeople, { item: { id: 'w', product: product.slug }, product, onAdd: () => {} })),
   );
 
   it('is there on a conversation', () => {
@@ -125,8 +124,10 @@ describe('the control at the top of a conversation', () => {
     expect(draw(group)).toContain('Add people');
   });
 
-  it('is not on a task page', () => {
-    expect(draw(project)).toBe('');
+  // There it is a small menu that adds in place
+  // (tests/add-people-makes-a-new-group-from-a-conversation-and-adds-in-place-on-an-agent-thread).
+  it('is on an agent thread too', () => {
+    expect(draw(project)).toContain('Add people');
   });
 
   it('is not there in a company of two', () => {

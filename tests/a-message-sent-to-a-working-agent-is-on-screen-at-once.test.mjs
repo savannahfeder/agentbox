@@ -66,7 +66,7 @@ describe('a message sent to a working agent', () => {
     // a chat's head calls as well, so the line is matched without its indent.
     // (And on the phone with the computer closed, that it waits for the
     // computer, or why the computer turned it down: renderer/src/cloud-bridge.ts.)
-    expect(src).toMatch(/e\.pending\n\s+\? <span className=\{`msg-when msg-sending\$\{e\.refused \? ' msg-refused' : ''\}`\}>\{e\.refused \? `Not sent: \$\{e\.refused\}` : e\.held \? 'Sending… press Z to undo' : onCloudPhone\(\) \? \(e\.cloud \? `Working in \$\{Name\} Cloud` : 'Waiting for your computer'\) : cutting \? 'Sending now…' : onSendNow \? 'Waiting for its current step' : 'Sending…'\}<\/span>/);
+    expect(src).toMatch(/e\.pending\n\s+\? <span className=\{`msg-when msg-sending\$\{e\.refused \? ' msg-refused' : ''\}`\}>\{e\.refused \? `Not sent: \$\{e\.refused\}` : e\.held \? 'Sending… press Z to undo' : onCloudPhone\(\) \? \(e\.sent \? 'Sent' : e\.cloud \? `Working in \$\{Name\} Cloud` : 'Waiting for your computer'\) : cutting \? 'Sending now…' : onSendNow \? 'Waiting for its current step' : 'Sending…'\}<\/span>/);
   });
 
   it('keeps three of them apart, in the order she sent them', () => {

@@ -28,6 +28,6 @@ describe('Escape on the usage panel', () => {
     expect(onKey).toMatch(/e\.stopPropagation\(\)/);
   });
   it('is drawn while either way of opening it is on, which is why both must go', () => {
-    expect(pill).toMatch(/const open = pinned \|\| hovering;/);
+    expect(pill).toMatch(/const open = !folded && \(pinned \|\| hovering\);/);
   });
 });

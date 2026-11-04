@@ -28,7 +28,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import {
   quitThenExit, flushBeforeQuit, EXIT_DEADLINE_MS, FLUSH_DEADLINE_MS,
-} from '../main/quit-sequence.mjs';
+} from '../main/quit-sequence.mts';
 
 const repo = path.join(path.dirname(new URL(import.meta.url).pathname), '..');
 
