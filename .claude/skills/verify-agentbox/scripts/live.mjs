@@ -33,7 +33,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { rerunWithStripTypes } from '../../../../scripts/lib/rerun-with-strip-types.mjs';
 
+rerunWithStripTypes(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const REPO = path.resolve(here, '../../../..');
 // VERIFY_ROOT: a long-lived copy that must survive a restart, which empties /tmp.
@@ -41,6 +43,7 @@ export const ROOT = process.env.VERIFY_ROOT || '/tmp/agentbox-verify';
 export const RUNS = path.join(ROOT, 'runs');
 const { FRESH_USER_ENV } = await import(path.join(REPO, 'shared', 'fresh-user-home.mjs'));
 const { listCloudLogins } = await import(path.join(REPO, 'main', 'cloud', 'logins.mts'));
+const { stripTypesFlags } = await import(path.join(REPO, 'main', 'strip-types.mts'));
 const { accountIdentity, nameForOrganization } = await import(path.join(REPO, 'main', 'account-tooling.mjs'));
 const KEY = crypto.createHash('sha1').update(REPO).digest('hex').slice(0, 8);
 /** One copy per checkout, or per name within it (`VERIFY_INSTANCE`), so a power test can run one copy per tester. */
@@ -462,7 +465,7 @@ async function start(state) {
 
   const fd = fs.openSync(state.log, 'a');
   const before = fs.existsSync(state.log) ? fs.statSync(state.log).size : 0;
-  const child = spawn(process.execPath, [path.join(REPO, 'bin', 'agentbox.mjs'), '--dir', state.data, '--no-open'], {
+  const child = spawn(process.execPath, [...stripTypesFlags(), path.join(REPO, 'bin', 'agentbox.mjs'), '--dir', state.data, '--no-open'], {
     cwd: REPO, detached: true, stdio: ['ignore', fd, fd], env,
   });
   child.unref();

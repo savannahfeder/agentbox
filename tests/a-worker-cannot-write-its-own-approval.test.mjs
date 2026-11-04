@@ -68,6 +68,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { answer, approvalPublicKey, answerIsHers, listPending, spoolDir } from '../main/approvals.mjs';
 import { NAME } from '../shared/product-name.mjs';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SERVER = path.join(here, '..', 'main', 'approval-prompt-server.mts');
@@ -219,7 +220,7 @@ function askAndPlant(root, plant, { publicKey = approvalPublicKey() } = {}) {
     const env = { ...process.env, ZERO_APPROVALS_DIR: dir, ZERO_PRODUCT: 'agentbox', ZERO_ITEM: 'w-1' };
     if (publicKey === null) delete env.ZERO_APPROVALS_PUBKEY;
     else env.ZERO_APPROVALS_PUBKEY = publicKey;
-    const child = spawn(process.execPath, [SERVER], { env, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, [...stripTypesFlags(), SERVER], { env, stdio: ['pipe', 'pipe', 'pipe'] });
     const fail = (why) => { try { child.kill('SIGKILL'); } catch { /* gone */ } reject(new Error(why)); };
     const giveUp = setTimeout(() => fail('the approvals server never answered'), 25_000);
     let out = '';

@@ -19,6 +19,7 @@ import { spawnSync } from 'node:child_process';
 import { readHubAddress, whichApp } from '../main/hub-address.mjs';
 import { withDesktopShell, onPhoneDoor } from '../renderer/src/browser-bridge';
 import { mayOpenOutside, sameHub } from '../main/hub-rules.mjs';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const home = () => fs.mkdtempSync(path.join(os.tmpdir(), 'hub-'));
@@ -76,7 +77,7 @@ describe('whether this Mac has a hub', () => {
     const env = { ...process.env, HOME: dir };
     for (const k of Object.keys(env)) if (/^(AGENTBOX_|ZERO_|STORE_|ASTRAL_|XDG_)/.test(k)) delete env[k];
     const data = path.join(dir, 'data');
-    const ran = spawnSync(process.execPath, [path.join(root, 'bin', 'agentbox.mjs'), '--dir', data, '--no-open'], { env, encoding: 'utf8', timeout: 20_000 });
+    const ran = spawnSync(process.execPath, [...stripTypesFlags(), path.join(root, 'bin', 'agentbox.mjs'), '--dir', data, '--no-open'], { env, encoding: 'utf8', timeout: 20_000 });
     expect(ran.status).toBe(1);
     expect(ran.stderr).toMatch(/hub/);
     expect(fs.existsSync(path.join(data, 'zero.config.json'))).toBe(false);

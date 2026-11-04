@@ -210,7 +210,7 @@ describe('the supervisor', () => {
     sup.config.cloudHost = false;
     const relay = sup._spawnCloudRelay(['--x'], { cwd: tmp, env: { ...process.env } });
     expect(relay.spawnfile).toBe(process.execPath);
-    expect(relay.spawnargs[1]).toMatch(/main\/cloud\/run-cli\.mts$/);
+    expect(relay.spawnargs.slice(1).find((a) => !a.startsWith('-'))).toMatch(/main\/cloud\/run-cli\.mts$/);
     relay.kill();
   });
 

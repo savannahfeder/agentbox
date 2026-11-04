@@ -22,6 +22,7 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { freezeFrom, writeFreeze, dayOf } from '../main/freeze-recorder.mts';
 import { stallWatch } from '../main/stall-watch.mts';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dirs = [];
@@ -51,7 +52,7 @@ describe('an app whose main thread stops answering', () => {
       await wait(1500);
       rec.stop();
     `);
-    await promisify(execFile)(process.execPath, [script], { timeout: 30_000 });
+    await promisify(execFile)(process.execPath, [...stripTypesFlags(), script], { timeout: 30_000 });
     const lines = fs.readdirSync(path.join(dir, 'log'))
       .flatMap((f) => fs.readFileSync(path.join(dir, 'log', f), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)));
     expect(lines.map((l) => l.where)).toEqual([

@@ -64,6 +64,7 @@ import {
   answer, answerIsHers, approvalPublicKey, cardDigest, cardShown, listPending, spoolDir,
 } from '../main/approvals.mjs';
 import { createCodexApprovals } from '../main/codex-approvals.mjs';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SERVER = path.join(here, '..', 'main', 'approval-prompt-server.mts');
@@ -250,7 +251,7 @@ describe('the founder\'s decision', () => {
 function askAndPlant(root, command, plant) {
   const dir = spoolDir(root);
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [SERVER], {
+    const child = spawn(process.execPath, [...stripTypesFlags(), SERVER], {
       env: {
         ...process.env,
         ZERO_APPROVALS_DIR: dir,

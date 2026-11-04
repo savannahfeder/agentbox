@@ -41,6 +41,7 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { createCodexApprovals } from '../main/codex-approvals.mjs';
 import { answer, approvalPublicKey, listPending, spoolDir } from '../main/approvals.mjs';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ORIGINAL = '# Standing instructions\n\nBe careful with her files.\n';
@@ -138,7 +139,7 @@ describe('a Codex decision, with log.jsonl symlinked at a file of hers', () => {
 function decideOnce(root, allow) {
   const dir = spoolDir(root);
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [path.join(here, '..', 'main', 'approval-prompt-server.mts')], {
+    const child = spawn(process.execPath, [...stripTypesFlags(), path.join(here, '..', 'main', 'approval-prompt-server.mts')], {
       // The public key rides here exactly as `mcpServers` sends it: without one
       // the server refuses everything rather than believing a file it cannot
       // check (tests/a-worker-cannot-write-its-own-approval), and this test is

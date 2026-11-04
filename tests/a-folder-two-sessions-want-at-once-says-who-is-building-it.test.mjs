@@ -48,6 +48,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   ensureTaskFolder, buildingFolderPath, taskFolderPath, somebodyIsBuilding, whoEndedUpInTheLock,
 } from '../main/task-folders.mts';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const git = (dir, ...args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
 
@@ -316,7 +317,7 @@ describe('six sessions wanting the same folder at once', () => {
         } catch (err) { out = { threw: String(err.message) }; }
         process.send(out);
       `;
-      const p = fork('--input-type=module', [], { execArgv: ['--input-type=module'], stdio: ['pipe', 'ignore', 'ignore', 'ipc'] });
+      const p = fork('--input-type=module', [], { execArgv: [...stripTypesFlags(), '--input-type=module'], stdio: ['pipe', 'ignore', 'ignore', 'ipc'] });
       let said = null;
       p.on('message', (m) => { said = m; });
       p.on('exit', () => resolve(said ?? { crashed: true }));
