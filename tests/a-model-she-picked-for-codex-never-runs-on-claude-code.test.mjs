@@ -281,7 +281,9 @@ describe('what is not refused', () => {
     sup.spawnWorker(row({ engine: 'codex' }));
 
     expect(claudeArgs()).toHaveLength(1);
-    expect(modelFlag(claudeArgs()[0])).toBe(null);
+    // No model on the row runs on the one the screen names for it
+    // (a-run-with-no-model-picked-runs-on-the-opus-the-screen-names).
+    expect(modelFlag(claudeArgs()[0])).toBe('opus');
     expect(sup.written).toEqual([]);
   });
 
