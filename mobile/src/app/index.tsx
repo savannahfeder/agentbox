@@ -17,7 +17,8 @@ import { useGroups } from '../state/groups';
 import { GroupsPlace } from '../ui/Groups';
 import { ChatsPlace, TeammateMark, teammatesWaiting } from '../ui/Teammates';
 import { Face } from '../ui/Groups';
-import { mentionRows, type MentionRow as MentionRowData } from '../../../renderer/src/team/rooms/room-rules';
+import { mentionRows } from '../../../renderer/src/team/rooms/room-rules';
+import type { RoomMention as MentionRowData } from '../../../renderer/src/types';
 import { mateOf } from '../lib/teammates';
 import type { Teammate } from '../../../renderer/src/types';
 import { appStore } from '../platform/persist';
@@ -86,7 +87,7 @@ function MentionRow({ m, first, now, open }: { m: MentionRowData; first: boolean
         <Face name={m.byName || 'Someone'} size={20} />
         <T numberOfLines={2} style={{ flexShrink: 1, fontSize: 16, lineHeight: 21.6, letterSpacing: -0.16 }}>
           <Text style={{ fontFamily: font.medium }}>{`${m.byName || 'Someone'}  `}</Text>
-          <Text style={{ color: color.dim }}>{m.count > 1 ? `sent you ${m.count} messages` : m.body}</Text>
+          <Text style={{ color: color.dim }}>{m.body}</Text>
         </T>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
