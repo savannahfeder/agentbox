@@ -72,7 +72,7 @@ import { Palette } from './components/Palette';
 import { Standing, STANDING } from './components/Standing';
 import { Settings } from './components/Settings';
 import { Snooze } from './components/Snooze';
-import { LATER_KEYWORDS } from './palette-rows';
+import { LATER_KEYWORDS, REOPEN_KEYWORDS } from './palette-rows';
 /* The line, the toast and the dot on the cog were the other three drawn for that round and
  are gone; their copy is in decisions.md and their photographs on
  `astral/w-86452550e5-looks`.
@@ -8422,7 +8422,9 @@ export default function App() {
               inProgress: belongsInProgress(target, { deferredUntil: dueAt(target), now, live: liveIds.has(target.id), stopped: stalledIds.has(target.id) }),
             }, () => { setModal(null); void runNow(target); }),
             // "Mark done" is what the thread's own menu calls this (threads/ThreadMenu).
-            { id: 'done', label: target.agent ? DONE.verb : `Mark ${DONE.verb.toLowerCase()}`, keyHint: 'E', run: () => { setModal(null); markDone(target); } },
+            target.status === 'done' && !target.agent
+              ? { id: 'reopen', label: 'Reopen', keywords: REOPEN_KEYWORDS, run: () => { setModal(null); void reopenDone(target); } }
+              : { id: 'done', label: target.agent ? DONE.verb : `Mark ${DONE.verb.toLowerCase()}`, keyHint: 'E', run: () => { setModal(null); markDone(target); } },
             ...(target.status !== 'done' && isGivenTask(target, team?.products.get(target.product)) ? [{ id: 'close-task', label: 'Close task', run: () => { setModal(null); void markDone(target, { closeTask: true }); } }] : []),
             { id: 'reply', label: 'Reply', keyHint: 'R', run: () => { open(); setModal('reply'); } },
             // Carry on with this row. Offered on ANY status a worker is not
@@ -8559,7 +8561,8 @@ export default function App() {
         onOpenFilter={() => setModal('filter')}
         onClearFilter={() => { setBoxFilter(NO_FILTER); setModal(null); }}
         onEndTutorial={tourLive(tour) ? () => { setTour(skipTour(tour!)); setModal(null); } : undefined}
-        onView={(v) => { setView(v); setModal(null); setSelected(0); }}
+        onView={(v) => { setModal(null); openView(v); }}
+        teamLayout={!!teamTabs}
         onPause={async (paused) => { await api.pauseSupervisor(paused); setModal(null); await refresh(); }}
         order={snap.supervisor.productOrder ?? []}
         onRankFirst={async (slug) => {
@@ -8588,7 +8591,7 @@ export default function App() {
           ...roomsUi.decisionLists.map((l) => ({ id: l.id, title: l.title, run: () => { setModal(null); l.open(); } })),
         ] : undefined}
         filePages={[
-          { id: 'all', title: 'Files', hint: 'every file you can see', run: () => { setModal(null); openFiles(null); } },
+          { id: 'all', title: 'Go to Files', hint: 'every file you can see', run: () => { setModal(null); openFiles(null); } },
           ...(filesForPalette?.projects ?? []).map((p) => ({ id: `project-${p}`, title: `Files in ${p}`, run: () => { setModal(null); openFiles(p); } })),
         ]}
         onConnections={() => { setModal(null); openConnectionsPage(null); }}
