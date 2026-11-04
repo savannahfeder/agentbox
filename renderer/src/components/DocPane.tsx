@@ -442,7 +442,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
         ) : text === null ? (
           <PreviewLoading />
         ) : kind === 'table' ? (
-          <TableView text={text} path={src} mode="pane" onSave={doc.readOnly ? undefined : saveTable} onReload={() => setLooks((n) => n + 1)} />
+          <TableView text={text} path={src} mode="pane" onSave={doc.readOnly ? undefined : saveTable} onReload={() => setLooks((n) => n + 1)} onNotice={onNotice} />
         ) : kind === 'text' ? (
           <div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div>
         ) : (

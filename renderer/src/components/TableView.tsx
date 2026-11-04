@@ -452,7 +452,7 @@ type Doc = { from: Table; table: Table; order: number[] };
 type Editing = { r: number; c: number; draft: string; typed: boolean; tag: boolean };
 type Float = { x: number; y: number; col?: number };
 
-export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload, onComment }: {
+export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload, onComment, onNotice }: {
   text: string; path: string; mode: TableMode | 'inline'; onShowAll?: () => void; grid?: string[][];
   /** Given, the table can be edited, and every change is written through it. */
   onSave?: TableSave;
@@ -460,6 +460,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   onReload?: () => void;
   /** Comments on a cell's words, where the view takes comments. */
   onComment?: (quote: string) => void;
+  /** Says a save failed after the table was closed, when there is no table left to say it. */
+  onNotice?: (text: string) => void;
 }) {
   const base = useMemo(() => (grid ? tableFromGrid(grid) : readTable(text, path)), [text, path, grid]);
   const shape = useMemo(() => shapeOf(text, path), [text, path]);
@@ -528,6 +530,10 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   // ---- Saving. A change is written a moment after the last one; a failure says so and keeps the edit.
   const saveRef = useRef(onSave);
   saveRef.current = onSave;
+  const noticeRef = useRef(onNotice);
+  noticeRef.current = onNotice;
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const unsaved = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flush = useCallback(async (force = false) => {
@@ -539,6 +545,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     const r = await save(out, force).catch((e: Error) => ({ ok: false, error: String(e?.message ?? e), stale: false }));
     if (r.ok) { setProblem(null); return; }
     unsaved.current ??= out;
+    if (!alive.current) { noticeRef.current?.(`Your last edit to ${path.split('/').pop()} was not saved. ${r.error ?? ''}`.trim()); return; }
     setProblem({ error: r.stale ? 'This file changed on disk since it opened, so your edit is not saved yet.' : (r.error ?? 'That could not be saved.'), stale: r.stale });
   }, []);
   useEffect(() => () => { void flush(); }, [flush, base]);
@@ -961,6 +968,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   const end = inline ? order.length : preview ? Math.min(order.length, PREVIEW_ROWS) : Math.min(order.length, Math.ceil((view.top + view.height) / ROW_H) + SPARE);
   const choices = filterChoices(table);
   const filtering = Object.values(picked).some((v) => v.length);
+  const filteredBy = Object.entries(picked).filter(([, v]) => v.length).map(([c]) => table.columns[Number(c)]?.name).filter(Boolean);
+  const filterLabel = !filteredBy.length ? 'Filter' : `Filtered by ${filteredBy.slice(0, 2).join(' and ')}${filteredBy.length > 2 ? ` and ${filteredBy.length - 2} more` : ''}`;
   const total = table.rows.length;
   const count = order.length === total ? rowsWord(total) : `${order.length.toLocaleString()} of ${rowsWord(total)}`;
   const toggle = (col: number, value: string) => setPicked((p) => {
@@ -1002,11 +1011,11 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
               onKeyDown={(e) => { if (e.key === 'Escape' && !query) { e.preventDefault(); rest(); } }} />
           </label>
           {choices.length > 0 && (
-            <Menu label="Filter" on={filtering} icon={glyph('M2.5 4h11M4.5 8h7M6.5 12h3')}>
+            <Menu label={filterLabel} on={filtering} icon={glyph('M2.5 4h11M4.5 8h7M6.5 12h3')}>
               {() => <FilterMenu table={table} choices={choices} picked={picked} onToggle={toggle} onClear={() => setPicked({})} />}
             </Menu>
           )}
-          <Menu label="Sort" on={!!sort} icon={glyph('M5 3v10M2.5 10.5L5 13l2.5-2.5M11 13V3M8.5 5.5L11 3l2.5 2.5')}>
+          <Menu label={sort && table.columns[sort.col] ? `Sorted by ${table.columns[sort.col].name}` : 'Sort'} on={!!sort} icon={glyph('M5 3v10M2.5 10.5L5 13l2.5-2.5M11 13V3M8.5 5.5L11 3l2.5 2.5')}>
             {(close) => <>
               <button type="button" className={`when-row${!sort ? ' on' : ''}`} onClick={() => { setSort(null); close(); }}><span className="when-row-label">As the file has it</span></button>
               {table.columns.map((c, i) => <button key={i} type="button" className={`when-row${sort?.col === i ? ' on' : ''}`} onClick={() => { sortBy(i); if (sort?.col !== i) close(); }}>
