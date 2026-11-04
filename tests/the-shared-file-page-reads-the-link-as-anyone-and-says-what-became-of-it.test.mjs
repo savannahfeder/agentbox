@@ -63,6 +63,8 @@ describe('the words on the page', () => {
     const today = new Date(Date.parse('2026-11-04T10:05:00Z'));
     expect(sharedLine({ ownerName: 'Maya Chen', updatedAt: today.getTime() }, today.getTime() + 60_000)).toMatch(/^Shared by Maya Chen · today at \d{1,2}:05(am|pm)$/);
     expect(sharedLine({ ownerName: 'Maya Chen', updatedAt: Date.parse('2026-11-02T10:00:00Z') }, now)).toBe('Shared by Maya Chen · Nov 2');
+    // A 400-character name ran off the edge of the page (power test, round 3).
+    expect(sharedLine({ ownerName: `Z${'z'.repeat(400)}`, updatedAt: 0 })).toBe(`Shared by Z${'z'.repeat(58)}…`);
     expect(sharedLine({ ownerName: 'Maya Chen', updatedAt: Date.parse('2025-06-02T10:00:00Z') }, now)).toBe('Shared by Maya Chen · Jun 2, 2025');
   });
   it('give a comment\'s time the way the app does', () => {

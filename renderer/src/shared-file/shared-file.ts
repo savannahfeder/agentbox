@@ -97,7 +97,8 @@ export function sharedOn(ts: number, now = Date.now()): string {
 }
 
 export function sharedLine(file: Pick<SharedFile, 'ownerName' | 'updatedAt'>, now = Date.now()): string {
-  return file.updatedAt ? `Shared by ${file.ownerName} · ${sharedOn(file.updatedAt, now)}` : `Shared by ${file.ownerName}`;
+  const who = file.ownerName.length > 60 ? `${file.ownerName.slice(0, 59)}…` : file.ownerName;
+  return file.updatedAt ? `Shared by ${who} · ${sharedOn(file.updatedAt, now)}` : `Shared by ${who}`;
 }
 
 /**

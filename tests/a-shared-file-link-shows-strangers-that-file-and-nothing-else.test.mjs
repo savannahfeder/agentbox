@@ -196,6 +196,12 @@ describe('what a link will hold', () => {
     expect(await refused(MAYA, `select public.share_file('b', 'b.png', 'image', 'image/png', repeat('A', 8400001), 1, '')`)).toBe(true);
     expect(await share(MAYA, 'c', 'A'.repeat(8_000_000), { name: 'c.png', kind: 'image', type: 'image/png' })).toMatch(/^[a-f0-9]{40}$/);
   });
+  // A picture link holding words, not base64, blanked the page for whoever opened it (power test, round 3, 2026-11-04).
+  it('refuses a picture or a PDF whose body is not base64, and takes one that is', async () => {
+    expect(await refused(MAYA, `select public.share_file('d', 'd.png', 'image', 'image/png', 'not a picture!', 1, '')`)).toBe(true);
+    expect(await refused(MAYA, `select public.share_file('e', 'e.pdf', 'pdf', 'application/pdf', '<html>', 1, '')`)).toBe(true);
+    expect(await share(MAYA, 'f', 'iVBORw0K\nGgo=', { name: 'f.png', kind: 'image', type: 'image/png' })).toMatch(/^[a-f0-9]{40}$/);
+  });
 });
 
 describe('deleting an account', () => {

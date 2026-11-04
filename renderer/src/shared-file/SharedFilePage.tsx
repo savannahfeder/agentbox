@@ -145,13 +145,19 @@ export function SharedFilePage({ token, client, finishing = null }: {
 }
 
 export function FileBody({ token, file }: { token: string; file: SharedFile }) {
-  const url = useMemo(() => (file.kind === 'image' ? URL.createObjectURL(new Blob([fileBytes(file) as BlobPart], { type: file.type })) : null), [file]);
+  const bytes = useMemo(() => {
+    if (file.kind !== 'image' && file.kind !== 'pdf') return null;
+    try { return fileBytes(file); } catch { return null; }
+  }, [file]);
+  const url = useMemo(() => (file.kind === 'image' && bytes ? URL.createObjectURL(new Blob([bytes as BlobPart], { type: file.type })) : null), [file, bytes]);
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
-  const pdf = useCallback(async () => fileBytes(file), [file]);
+  const [unreadable, setUnreadable] = useState(false);
+  const pdf = useCallback(async () => bytes ?? new Uint8Array(), [bytes]);
   if (file.kind === 'markdown') {
     return <div className="sf-doc"><div className="markdown doc-prose"><ReactMarkdown remarkPlugins={MD_PLUGINS} components={MD_PARTS}>{titleOf(file).body}</ReactMarkdown></div></div>;
   }
-  if (file.kind === 'image') return <div className="sf-image"><img src={url ?? undefined} alt={file.name} /></div>;
+  if ((file.kind === 'image' || file.kind === 'pdf') && (!bytes || unreadable)) return <div className="sf-state"><p>This file did not load.</p></div>;
+  if (file.kind === 'image') return <div className="sf-image"><img src={url ?? undefined} alt={file.name} onError={() => setUnreadable(true)} /></div>;
   if (file.kind === 'pdf') return <div className="sf-pdf"><PdfPages load={pdf} name={file.name} /></div>;
   // No allow-same-origin: this page holds the viewer's sign-in, and the page shared runs its own scripts.
   return <iframe className="sf-frame" title={file.name} src={`/f/${token}/raw?at=${file.updatedAt}`}

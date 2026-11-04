@@ -92,6 +92,13 @@ describe('each kind of file', () => {
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).toContain('href="https://example.com" target="_blank" rel="noopener noreferrer"');
   });
+  // A picture link holding words, not base64, blanked the whole page (power test, round 3, 2026-11-04).
+  it('says a picture or a PDF did not load when its bytes cannot be read, rather than failing the page', () => {
+    for (const kind of ['image', 'pdf']) {
+      const html = renderToStaticMarkup(h(FileBody, { token: TOK, file: file(kind, 'not base64 at all!', { name: 'x.png', type: 'image/png' }) }));
+      expect(html, kind).toContain('This file did not load.');
+    }
+  });
   it('frames a page from its own address, sandboxed without the page\'s origin', () => {
     const html = renderToStaticMarkup(h(FileBody, { token: TOK, file: file('page', '<p>hi</p>', { name: 'p.html', type: 'text/html' }) }));
     expect(html).toContain(`src="/f/${TOK}/raw?at=0"`);

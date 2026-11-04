@@ -53,6 +53,7 @@ language plpgsql security definer set search_path = public as $$
 declare me uuid := auth.uid(); tok text; used int;
 begin
   if me is null then raise exception 'sign in to share a file'; end if;
+  if k in ('image', 'pdf') and b !~ '^[A-Za-z0-9+/=\s]*$' then raise exception 'a picture or a PDF goes up as base64'; end if;
   select count(*) into used from public.file_links where owner = me and updated_at > now() - interval '10 minutes';
   if used >= 60 then raise exception 'too many shares for now; try again later'; end if;
   update public.file_links set name = nm, kind = k, type = typ, body = b, version = greatest(coalesce(v, 1), 1), hash = coalesce(h, ''), updated_at = now()
