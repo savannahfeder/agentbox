@@ -17,7 +17,8 @@ const PUNCTUATED = /^\/f\/([A-Za-z0-9_-]{16,64})\/?(?:[.,;:!?)\]}>'"]|%20|%29|%5
 const DEADLINE_MS = 4000;
 // The page a person shared runs its scripts in an origin of its own, opened
 // framed or on its own, so it never reaches the site's storage and the sign-in kept there.
-const PAGE_CSP = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms; default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'";
+// It may not call a server or post a form: a fake sign-in box inside our page could send what is typed.
+const PAGE_CSP = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms; default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; form-action 'none'; frame-ancestors 'self'";
 const PICTURE_CSP = "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; frame-ancestors 'self'";
 const TEXT_CSP = "sandbox; default-src 'none'; frame-ancestors 'self'";
 const PDF_CSP = "frame-ancestors 'self'";
@@ -74,7 +75,8 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
     const page = `${url.origin}/f/${tok}`;
     const picture = file?.kind === 'image';
     const title = file ? titleOf(file) : 'Agentbox';
-    const said = file ? `Shared by ${file.owner_name || 'someone'} on Agentbox` : 'A file shared on Agentbox';
+    const name = String(file?.owner_name || 'someone').replace(/\s+/g, ' ').trim();
+    const said = file ? `Shared by ${name.length > 60 ? `${name.slice(0, 59)}…` : name} on Agentbox` : 'A file shared on Agentbox';
     const image = picture ? `${page}/preview` : `${url.origin}/phone-icon.png`;
     return [
       ['property', 'og:title', title], ['property', 'og:description', said], ['property', 'og:type', 'website'],

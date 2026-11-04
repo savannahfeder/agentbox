@@ -135,6 +135,18 @@ describe('comments', () => {
   it('are refused when empty', async () => {
     expect(await refused(JUN, `select public.comment_on_file_link($1, '   ')`, [tok])).toBe(true);
   });
+  // A zero-width space went up as a blank comment, and 4001 characters came back
+  // as the database's own words (power test, round 3, 2026-11-04).
+  it('are refused when they hold only characters nobody can see, and kept when a word stands among them', async () => {
+    const other = await share(MAYA, 'notes/w-9/invisible');
+    expect(await refused(JUN, `select public.comment_on_file_link($1, $2)`, [other, '​ ‍﻿⁠'])).toBe(true);
+    expect(await comment(JUN, other, '​ok')).toHaveLength(1);
+  });
+  it('over 4000 characters are refused in words a person can read', async () => {
+    const other = await share(MAYA, 'notes/w-9/long');
+    await expect(as(JUN, `select public.comment_on_file_link($1, $2)`, [other, 'x'.repeat(4001)])).rejects.toThrow(/^a comment is 4000 characters at most$/);
+    expect(await comment(JUN, other, 'x'.repeat(4000))).toHaveLength(1);
+  });
   it('are counted for the owner, beside their link', async () => {
     const [mine] = await rows(MAYA, `select * from public.my_file_link('notes/w-4/plan')`);
     expect(mine).toMatchObject({ token: tok, version: 1, hash: 'h-6', comments: 2 });

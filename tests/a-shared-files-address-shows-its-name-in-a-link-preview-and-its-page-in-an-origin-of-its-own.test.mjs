@@ -59,6 +59,15 @@ describe('the page at /f/<token>', () => {
     expect(asked[0].init.signal).toBeInstanceOf(AbortSignal);
   });
 
+  // A 442-character name made a preview read "Shared by Anthropic IT Security…" (power test, round 3).
+  it('keeps the sharer\'s name in the preview to sixty characters', async () => {
+    files['n'.repeat(40)] = { ...files[TOK], owner_name: `IT Security ${'x'.repeat(400)}` };
+    const html = await (await get(`/f/${'n'.repeat(40)}`)).text();
+    const said = /og:description" content="Shared by ([^"]*) on Agentbox"/.exec(html)?.[1];
+    expect(said).toHaveLength(60);
+    expect(said.endsWith('…')).toBe(true);
+  });
+
   it('loads the app from the site root, since the page is two folders down', async () => {
     const html = await (await get(`/f/${TOK}`)).text();
     expect(html).toContain('src="/assets/main.js"');
@@ -105,6 +114,14 @@ describe('the file itself at /f/<token>/raw', () => {
     expect(csp).toContain("frame-ancestors 'self'");
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
     expect(res.headers.get('cache-control')).toBe('no-store');
+  });
+
+  // A shared page with a fake "sign in to view" box sent what was typed to
+  // another server with fetch (power test, round 3, 2026-11-04).
+  it('lets a shared page call no server and post no form anywhere', async () => {
+    const csp = (await get(`/f/${'p'.repeat(40)}/raw`)).headers.get('content-security-policy');
+    expect(csp).toContain("connect-src 'none'");
+    expect(csp).toContain("form-action 'none'");
   });
 
   it('serves a picture and a PDF as their bytes, and a document as plain text', async () => {
