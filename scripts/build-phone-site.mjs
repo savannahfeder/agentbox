@@ -132,7 +132,7 @@ export function buildPhoneSite({ dist = path.join(root, 'renderer', 'dist'), out
   if (!worker.includes('const BAKED = null;')) throw new Error('cloud/web/shared-file-worker.mjs has no BAKED line to fill in');
   const baked = { cloud: origin.origin, anonKey, headers: { ...headers, 'Content-Security-Policy': csp.replace("frame-src blob:", "frame-src 'self' blob:") } };
   fs.writeFileSync(path.join(out, '_worker.js'), worker.replace('const BAKED = null;', () => `const BAKED = ${JSON.stringify(baked)};`));
-  fs.writeFileSync(path.join(out, '_routes.json'), JSON.stringify({ version: 1, include: ['/f/*'], exclude: [] }));
+  fs.writeFileSync(path.join(out, '_routes.json'), JSON.stringify({ version: 1, include: ['/f/*', '/F/*'], exclude: [] }));
   return { out, csp, legal: publishLegal(legal, out, given, log) };
 }
 

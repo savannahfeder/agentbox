@@ -36,7 +36,7 @@ const PATH = /^\/f\/([A-Za-z0-9_-]{16,64})\/?(?:[.,;:!?)\]}>'"\s]|%20|%29|%5D|%2
 /** The token when this address is a shared file on the web app; null anywhere else. */
 export function sharedFileToken(pathname: string, onTheWebApp: boolean): string | null {
   if (!onTheWebApp) return null;
-  return PATH.exec(pathname)?.[1] ?? null;
+  return PATH.exec(pathname.replace(/^\/F\//, '/f/'))?.[1] ?? null;
 }
 
 const KINDS = new Set<FileKind>(['markdown', 'page', 'image', 'pdf']);

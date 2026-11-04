@@ -123,6 +123,7 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
   return {
     async fetch(request, env) {
       const url = new URL(request.url);
+      if (url.pathname.startsWith('/F/')) return new Response(null, { status: 301, headers: { location: `${url.origin}/f/${url.pathname.slice(3)}`, 'cache-control': 'no-store' } });
       const p = PUNCTUATED.exec(url.pathname);
       if (p) return new Response(null, { status: 301, headers: { location: `${url.origin}/f/${p[1]}`, 'cache-control': 'no-store' } });
       const m = PATH.exec(url.pathname);

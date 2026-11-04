@@ -10,5 +10,5 @@ export function onASharedFilePage(): string | null {
   const onTheWebApp = !!readCloudConfig(document);
   const token = sharedFileToken(location.pathname, onTheWebApp);
   if (token) return token;
-  return onTheWebApp && location.pathname.startsWith('/f/') ? NO_SUCH_LINK : null;
+  return onTheWebApp && /^\/f\//i.test(location.pathname) ? NO_SUCH_LINK : null;
 }

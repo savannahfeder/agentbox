@@ -66,6 +66,13 @@ describe('reading it off the page', () => {
     page('/f/abc', null);
     expect(onASharedFilePage()).toBeNull();
   });
+  // A link typed with /F/ drew a blank page (power test, round 3, 2026-11-04).
+  it('reads /F/ as /f/', () => {
+    page(`/F/${TOK}`, JSON.stringify({ url: 'https://db.example', anonKey: 'k' }));
+    expect(onASharedFilePage()).toBe(TOK);
+    page('/F/nope', JSON.stringify({ url: 'https://db.example', anonKey: 'k' }));
+    expect(onASharedFilePage()).toBe(NO_SUCH_LINK);
+  });
 });
 
 describe('the boot', () => {

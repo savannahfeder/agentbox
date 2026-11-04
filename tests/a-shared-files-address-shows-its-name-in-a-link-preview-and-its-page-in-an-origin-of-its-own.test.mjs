@@ -179,6 +179,12 @@ describe('a link pasted at the end of a sentence', () => {
   it('is not stretched to anything with more after it', async () => {
     expect((await get(`/f/${TOK}.html`)).status).not.toBe(301);
   });
+  // A link typed with /F/ drew a blank page (power test, round 3, 2026-11-04).
+  it('goes from /F/ to /f/', async () => {
+    const res = await get(`/F/${TOK}`);
+    expect(res.status).toBe(301);
+    expect(res.headers.get('location')).toBe(`https://app.example/f/${TOK}`);
+  });
 });
 
 describe('the preview picture at /f/<token>/preview', () => {
@@ -220,7 +226,7 @@ describe('the site as built for Pages', () => {
 
   it('sends only /f/* through the worker, which has the cloud and the site headers in it', async () => {
     build('https://abc.supabase.co');
-    expect(JSON.parse(fs.readFileSync(path.join(out, '_routes.json'), 'utf8'))).toEqual({ version: 1, include: ['/f/*'], exclude: [] });
+    expect(JSON.parse(fs.readFileSync(path.join(out, '_routes.json'), 'utf8'))).toEqual({ version: 1, include: ['/f/*', '/F/*'], exclude: [] });
     const source = fs.readFileSync(path.join(out, '_worker.js'), 'utf8');
     expect(source).not.toContain('const BAKED = null;');
     expect(source).toContain('"cloud":"https://abc.supabase.co"');
