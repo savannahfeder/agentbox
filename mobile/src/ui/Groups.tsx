@@ -155,7 +155,6 @@ function PeopleSheet({ room, open, close }: { room: Room; open: boolean; close: 
           <View style={{ flex: 1, minWidth: 0 }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 7 }}>
               <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 15.5, lineHeight: 21 }}>{cardName(c)}</T>
-              {c.level != null && <T style={{ fontFamily: font.mono, fontSize: 11, color: color.faint }}>{c.level}</T>}
             </View>
             <T numberOfLines={1} style={{ fontSize: 13, lineHeight: 19, color: c.agents ? color.dim : color.faint }}>{onWords(c)}</T>
           </View>

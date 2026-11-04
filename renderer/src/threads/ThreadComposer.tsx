@@ -68,8 +68,10 @@ import {
   sharingFields, cardProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
   dueChoices, dueWords, headRows, NOT_BLOCKED, keyOnTheNewThreadCard, messageSubject, toSections, findInvited, type ToSection,
   agentOnThisWork, atOffers, atWordAt, cardDraftPlace, cardDraftToKeep, handedFromLabel, withoutAtWord,
-  type AtOffer, type HandFrom, type Harness, type Keyboard, type ModelPick, type SendAs, type Visibility,
+  startingWhen, whenOnDraft, whenToSend, whenWords,
+  type AtOffer, type HandFrom, type Harness, type Keyboard, type ModelPick, type SendAs, type SendWhen, type Visibility,
 } from './composer-rules';
+import { sameRule } from '../../../shared/repeats.mjs';
 import { heldKeyThatOpenedTheBox } from '../reply-keys';
 import './thread-composer.css';
 import { TeammateMark } from '../teammates/TeammatesRail';
@@ -299,6 +301,11 @@ export function ThreadComposer({
   const prioShown: PriorityId = prio ?? 'medium';
   const pickPrio = (id: PriorityId) => { setPrio(id); };
 
+  /* ---------------------------- send later ------------------------------ */
+  // A row of Send later sets when it goes, and Send sends it, so there is still
+  // room to add a line after picking a time (w-54cdf7c768).
+  const [when, setWhen] = useState<SendWhen>(() => startingWhen(opened.current.when));
+
   /* --------------------------- visibility ------------------------------- */
   // A NEW THREAD STARTS WHERE ITS PROJECT IS, AND WHO SEES IT IS STILL CHOSEN
   // FOR THAT THREAD (w-b989839656, approved 2026-10-05). The project's
@@ -462,7 +469,7 @@ export function ThreadComposer({
   /* ------------------------------ draft --------------------------------- */
   // On every keystroke, every paste, every pick, the same draft the old card
   // kept, so an Escape or a reload never takes her words or her pictures.
-  const whatTheCardHolds = () => ({ text, attachments, priority: prio, when: { runAt: 0, repeat: null }, dropped: 0 });
+  const whatTheCardHolds = () => ({ text, attachments, priority: prio, when: whenOnDraft(when), dropped: 0 });
   useEffect(() => {
     const kept = cardDraftToKeep(text, initial);
     const unchanged = seeded && !kept && attachments.length === (initial?.attachments?.length ?? 0);
@@ -472,7 +479,7 @@ export function ThreadComposer({
     if (composeDraftIsEmpty(draft) && readComposeDraft(undefined, place).sendingAt) return;
     const stored = saveComposeDraft(draft, undefined, place);
     setDropped(stored.dropped);
-  }, [text, attachments, prio]);
+  }, [text, attachments, prio, when]);
   // What is sent is written down first, even a hand-off nobody changed, so a
   // send that fails still has its words to give back.
   const takeTheDraft = () => {
@@ -588,7 +595,7 @@ export function ThreadComposer({
   // the keyboard, the next N typed an "n" and the next task went to them.
   const emptyForTheNext = () => {
     const next = readLastRecipient(others, agentMates, !!onToTeammate);
-    setText(''); setAttachments([]); setSending(false);
+    setText(''); setAttachments([]); setWhen(null); setSending(false);
     setTo(next.to); setMate(next.mate); setAuto(next.auto); setAlso([]); setSendAs('message'); setDue(null); setSubject('');
     textRef.current?.blur();
   };
@@ -732,7 +739,7 @@ export function ThreadComposer({
   // A picked suggestion that keeps a schedule sends as that repeating task, while its words are unchanged.
   const [idea, setIdea] = useState<Idea | null>(null);
   const ideaRule = idea?.repeat && text.trim() === idea.text ? (({ short: _s, label: _l, ...rule }) => rule)(idea.repeat) : null;
-  const send = () => (person ? sendMessage() : sendTask(ideaRule ? { repeat: ideaRule } : {}));
+  const send = () => (person ? sendMessage() : sendTask(when ? whenToSend(when) : ideaRule ? { repeat: ideaRule } : {}));
   const ideaList = useRef<HTMLDivElement>(null);
   const takeIdea = (i: Idea) => {
     setIdea(i);
@@ -1100,17 +1107,24 @@ export function ThreadComposer({
   const monday = mondayMorning(now);
   const typedAt = momentFromWords(laterText, now);
   const typedRule = readRule(repeatText);
+  const pickWhen = (w: SendWhen) => { setWhen(w); close('text'); };
+  const isAt = (ts: number) => !!when && 'runAt' in when && when.runAt === ts;
   const laterMenu = (
     <div className="tc-menu tc-rise tc-right tc-wide" role="menu" aria-label="Send later" onKeyDown={menuKeys}>
       {laterPage === 'list' ? (<>
         <span className="tc-menu-head">Send later</span>
-        <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => sendTask({ start: 'later' })}>
+        {when && (
+          <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => pickWhen(null)}>
+            <ClearIcon /><span className="tc-row-label">Remove the time</span>
+          </button>
+        )}
+        <button type="button" data-item className={`tc-row ${when && 'start' in when ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pickWhen({ start: 'later' })}>
           <ClockIcon /><span className="tc-row-label">Add it to Later</span>
         </button>
-        <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => sendTask({ runAt: tomorrow })}>
+        <button type="button" data-item className={`tc-row ${isAt(tomorrow) ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pickWhen({ runAt: tomorrow })}>
           <ClockIcon /><span className="tc-row-label">Tomorrow morning</span><small>{laterHint(tomorrow)}</small>
         </button>
-        <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => sendTask({ runAt: monday })}>
+        <button type="button" data-item className={`tc-row ${isAt(monday) ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pickWhen({ runAt: monday })}>
           <ClockIcon /><span className="tc-row-label">Monday morning</span><small>{laterHint(monday)}</small>
         </button>
         {/* A TIME IN WORDS, where a browser date field used to be: the same
@@ -1125,10 +1139,10 @@ export function ThreadComposer({
             aria-label="Send at a time you type"
             value={laterText}
             onChange={(e) => setLaterText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && typedAt) { e.preventDefault(); sendTask({ runAt: typedAt.ts }); } }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && typedAt) { e.preventDefault(); pickWhen({ runAt: typedAt.ts }); } }}
           />
           {laterText.trim() && (typedAt
-            ? <button type="button" data-item className="tc-schedule" onClick={() => sendTask({ runAt: typedAt.ts })}>{typedAt.hint}</button>
+            ? <button type="button" data-item className="tc-schedule" onClick={() => pickWhen({ runAt: typedAt.ts })}>{typedAt.hint}</button>
             : <small className="tc-when-no">Not a time yet</small>)}
         </span>
         <span className="tc-sep" />
@@ -1142,7 +1156,7 @@ export function ThreadComposer({
         <span className="tc-sep" />
         <span className="tc-menu-head">Repeat it</span>
         {repeatPresets(now).filter((r) => r.rule).map((r) => (
-          <button key={r.label} type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => sendTask({ repeat: r.rule! })}>
+          <button key={r.label} type="button" data-item className={`tc-row ${when && 'repeat' in when && sameRule(when.repeat, r.rule) ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pickWhen({ repeat: r.rule! })}>
             <RepeatIcon /><span className="tc-row-label">{r.label}</span>
           </button>
         ))}
@@ -1159,11 +1173,11 @@ export function ThreadComposer({
             value={repeatText}
             onChange={(e) => setRepeatText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && typedRule && 'rule' in typedRule) { e.preventDefault(); sendTask({ repeat: typedRule.rule }); }
+              if (e.key === 'Enter' && typedRule && 'rule' in typedRule) { e.preventDefault(); pickWhen({ repeat: typedRule.rule }); }
             }}
           />
           {repeatText.trim() && (typedRule && 'rule' in typedRule
-            ? <button type="button" data-item className="tc-schedule" onClick={() => sendTask({ repeat: typedRule.rule })}>{typedRule.label[0].toUpperCase() + typedRule.label.slice(1)}</button>
+            ? <button type="button" data-item className="tc-schedule" onClick={() => pickWhen({ repeat: typedRule.rule })}>{typedRule.label[0].toUpperCase() + typedRule.label.slice(1)}</button>
             : <small className="tc-when-no">{typedRule ? 'Can’t repeat that' : 'Not a repeat yet'}</small>)}
         </span>
       </>)}
@@ -1476,8 +1490,11 @@ export function ThreadComposer({
               <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title={refusal ?? stopper?.reason ?? `Send · ${SEND}`}>
                 Send <kbd>{SEND}</kbd>
               </button>
-              <button type="button" data-trigger className="tc-send-caret" disabled={!canSend} aria-label="Send later"
+              {/* A picked time is said here, on the half that changes it. */}
+              <button type="button" data-trigger className={`tc-send-caret${when ? ' set' : ''}`} disabled={sending}
+                aria-label={when ? `Sends ${whenWords(when)}. Change when` : 'Send later'} title={when ? 'Change when it sends' : 'Send later'}
                 aria-haspopup="menu" aria-expanded={open === 'later'} onClick={() => toggle('later')} onKeyDown={triggerKeys('later')}>
+                {when && <span className="tc-send-when">{whenWords(when)}</span>}
                 <CaretIcon />
               </button>
               {open === 'later' && laterMenu}
@@ -1524,6 +1541,9 @@ const CaretIcon = () => (
 // lines up with the names above it rather than stepping sideways.
 const PlusIcon = () => (
   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+);
+const ClearIcon = () => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
 );
 const ClockIcon = () => (
   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 8v4.5l3 2" /></svg>

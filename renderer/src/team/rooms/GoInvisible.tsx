@@ -10,7 +10,7 @@ export function GoInvisible({ now, onGo }: { now: number; onGo: (minutes: number
     <div className="t">{I.ghost()}Go invisible</div>
     <ul>
       <li>{I.eyeOff()}Your card leaves every room</li>
-      <li>{I.lock()}Nobody sees your threads, status or level</li>
+      <li>{I.lock()}Nobody sees your threads, status or agent hours</li>
       <li>{I.chat()}You can still read every room</li>
     </ul>
     <div className="rule" />

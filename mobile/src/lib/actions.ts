@@ -25,7 +25,7 @@ export type Press =
   | { kind: 'pick'; option: ParsedOption; choices?: Choices }
   | { kind: 'close' }
   /** `until` 0 brings it back from Later. */
-  | { kind: 'later'; until: number; label?: string }
+  | { kind: 'later'; until: number; label?: string; running?: boolean }
   | { kind: 'new'; product: string; text: string; saved?: Saved[]; choices?: Choices; to?: string; when?: string | null }
   | { kind: 'stop' }
   | { kind: 'run-now' }
@@ -152,7 +152,8 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       if (press.until > 0) {
         return {
           steps: [{ door: 'snooze', payload: { ...on, snoozedUntil: press.until } }],
-          toast: `Moved to Later.${press.label ? ` Back ${press.label.toLowerCase()}` : ''}${UNDO}`,
+          // A running thread stays In progress until its run ends (tabs.ts, as App.tsx `tabState`).
+          toast: `${press.running ? 'Goes to Later when it finishes' : `Moved to Later.${press.label ? ` Back ${press.label.toLowerCase()}` : ''}`}${UNDO}`,
           undo: () => [{ door: 'snooze', payload: { ...on, snoozedUntil: prior } }],
           undone: () => 'Back in your inbox',
         };

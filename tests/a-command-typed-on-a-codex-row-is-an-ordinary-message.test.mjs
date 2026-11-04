@@ -104,7 +104,7 @@ describe('staying on the row a command runs on', () => {
     // Handed in rather than read off the item: `item.engine` is what she MARKED
     // and may be an August row the gate refuses, while `runningEngine` is what
     // will really pick it up.
-    expect(app).toContain('answerWith(focused, text, priority, sent, mode, runningEngine, pick)');
+    expect(app).toContain('answerWith(focused, text, priority, sent, mode, runningEngine, pick, sendAt)');
     expect(app.match(/staysOnTheTask\(/g)).toHaveLength(1);
   });
 });

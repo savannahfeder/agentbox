@@ -1,4 +1,4 @@
-// Pointing at someone, and their page (round 23): level, rank in the room,
+// Pointing at someone, and their page (round 23): rank in the room,
 // days in a row, and Progress (agent hours since they started). Never their
 // threads: nobody could tell who else saw them.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -20,7 +20,6 @@ export function PersonHover({ card, room, at, onMessage, onProfile, onRanks, onC
       <div className="w"><span className="rm-nm"><span className="n">{cardName(card)}</span></span>{card.headline && <span className="rl">{card.headline}</span>}</div></div>
     {card.bio && <div className="bio">{card.bio}</div>}
     <div className="nums">
-      {card.level != null && <div><b>{card.level}</b><span>Level</span></div>}
       <div><button type="button" className="lnk" onClick={onRanks}>#{weekRank(room.wall, card.id)}</button><span>This week</span></div>
       <div><b>{hoursWords(card.hoursTotal)}</b><span>Agent hours</span></div>
     </div>
@@ -52,7 +51,6 @@ export function ProfilePage({ card, room, rooms, rank, onMessage, onRanks, onRoo
         {onMessage && !card.me && <div className="acts"><button type="button" className="rm-btn" onClick={onMessage}>{I.chat()}Message</button></div>}
       </div>
       <div className="rm-stats">
-        {card.level != null && <div><b>{card.level}</b><span className="rm-label">Level</span></div>}
         <div><button type="button" className="lnk" onClick={onRanks}>#{weekRank(room.wall, card.id)}</button><span className="rm-label">In {room.name} this week</span></div>
         {rank != null && <div><b>#{rank}</b><span className="rm-label">On {Name} all time</span></div>}
         <div><b>{I.flame()}{card.streak}</b><span className="rm-label">Days in a row</span></div>

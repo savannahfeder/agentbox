@@ -16,6 +16,7 @@ import { parseWhen } from '../format';
 import { firstName } from '../team/company';
 import type { Person } from '../types';
 import { projectSeenBy } from '../../../shared/thread-cards.mjs';
+import { isRepeatRule, ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
 import { clockWords, dayDeadline } from '../../../shared/team-tasks.mjs';
 
 export type Harness = 'claude' | 'codex';
@@ -237,6 +238,55 @@ export function momentFromWords(text: string, now = Date.now()): { ts: number; h
   const when = parseWhen(text ?? '', now);
   if (!when || when.ts <= now) return null;
   return { ts: when.ts, hint: laterHint(when.ts) };
+}
+
+/** What a row of Send later sets. Picking one sets it; only Send sends. */
+export type SendWhen = { runAt: number } | { start: 'later' } | { repeat: RepeatShape } | null;
+
+type DraftWhen = { runAt: number; repeat: unknown; later?: boolean };
+
+/** The pick a saved card opens on. A moment gone by while it was closed is dropped. */
+export function startingWhen(when: DraftWhen | undefined, now = Date.now()): SendWhen {
+  if (!when) return null;
+  if (when.later) return { start: 'later' };
+  if (isRepeatRule(when.repeat)) return { repeat: when.repeat as RepeatShape };
+  return when.runAt > now ? { runAt: when.runAt } : null;
+}
+
+export function whenOnDraft(when: SendWhen): DraftWhen {
+  if (when && 'start' in when) return { runAt: 0, repeat: null, later: true };
+  if (when && 'repeat' in when) return { runAt: 0, repeat: when.repeat };
+  return { runAt: when && 'runAt' in when ? when.runAt : 0, repeat: null };
+}
+
+/** The pick in the words its menu row uses, or null when there is none. */
+export function whenWords(when: SendWhen): string | null {
+  if (!when) return null;
+  if ('start' in when) return 'Later';
+  if ('repeat' in when) { const s = ruleLabel(when.repeat); return s[0].toUpperCase() + s.slice(1); }
+  return laterHint(when.runAt);
+}
+
+/** What Send carries. A moment that went by while the card sat open starts now. */
+export function whenToSend(when: SendWhen, now = Date.now()): { runAt?: number; start?: 'later'; repeat?: RepeatShape } {
+  if (!when) return {};
+  if ('start' in when) return { start: 'later' };
+  if ('repeat' in when) return { repeat: when.repeat };
+  return when.runAt > now ? { runAt: when.runAt } : {};
+}
+
+/** When a reply set for later goes, or 0. Its time and its words are written
+ *  a few milliseconds apart (main/ipc.mts); a row put off on its own is not one. */
+export function replyWaitsUntil(
+  row: { answer?: string | null; runAt?: number | null; wrote?: Record<string, { ts: number; source: string } | undefined> },
+  now = Date.now(),
+): number {
+  const runAt = row.runAt ?? 0;
+  const set = row.wrote?.runAt;
+  const said = row.wrote?.answer;
+  if (runAt <= now || !set || !said || set.source !== 'founder') return 0;
+  if (!row.answer?.trim() || row.answer === '(withdrawn)') return 0;
+  return Math.abs(said.ts - set.ts) <= 5_000 ? runAt : 0;
 }
 
 /* -------------------------------- message --------------------------------- */

@@ -3,7 +3,7 @@
 import type { Person, Room, RoomCard } from '../../types';
 
 const blank = (p: Pick<Person, 'id' | 'name' | 'avatarUrl'>, me: boolean): RoomCard => ({
-  id: p.id, me, name: p.name, avatarUrl: p.avatarUrl, headline: null, bio: null, agents: 0, level: null,
+  id: p.id, me, name: p.name, avatarUrl: p.avatarUrl, headline: null, bio: null, agents: 0,
   hoursTotal: 0, hoursWeek: 0, hoursToday: 0, streak: 0, byMonth: [], teammate: true, showActivity: false,
   activity: null, away: !me, status: null, workingOn: null, workingPrivate: false,
 });

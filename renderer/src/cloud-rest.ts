@@ -37,10 +37,19 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
     try { if (s) storage.setItem(SESSION_KEY, JSON.stringify(s)); else storage.removeItem(SESSION_KEY); } catch { /* private mode: this tab only */ }
   };
 
-  async function call(path: string, init: RequestInit & { auth?: boolean } = {}, again = true): Promise<any> {
+  // `anyone`: asked as whoever is signed in, and as nobody when nobody is.
+  async function call(path: string, init: RequestInit & { auth?: boolean | 'anyone' } = {}, again = true): Promise<any> {
+    // A sign-in the database refuses is let go, and a call for anyone is still answered, as nobody.
+    if (init.auth === 'anyone' && session) {
+      try { return await call(path, { ...init, auth: true }, again); } catch (err) {
+        if (session) throw err;
+        return call(path, init, false);
+      }
+    }
     const mine = gen;
     const headers: Record<string, string> = { apikey: cfg.anonKey, 'content-type': 'application/json', ...(init.headers as Record<string, string> | undefined) };
-    if (init.auth !== false) headers.authorization = `Bearer ${await token()}`;
+    if (init.auth === 'anyone' && !session) headers.authorization = `Bearer ${cfg.anonKey}`;
+    else if (init.auth !== false) headers.authorization = `Bearer ${await token()}`;
     const res = await fetchImpl(`${base}${path}`, { ...init, headers });
     const text = await res.text();
     const body = text ? (() => { try { return JSON.parse(text); } catch { return text; } })() : null;
@@ -113,6 +122,7 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
   return {
     session: () => session,
     signedIn: () => !!session,
+    email: () => session?.user?.email ?? null,
     /** Moves on at every sign-in and sign-out; a read begun under an older one is stale. */
     generation: () => gen,
 
@@ -191,8 +201,8 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
     async remove(table: string, query: string) {
       return (await call(`/rest/v1/${table}?${query}`, { method: 'DELETE', headers: { prefer: 'return=representation' } })) ?? [];
     },
-    async rpc(name: string, args: Record<string, unknown> = {}) {
-      return call(`/rest/v1/rpc/${name}`, { method: 'POST', body: JSON.stringify(args) });
+    async rpc(name: string, args: Record<string, unknown> = {}, { anyone = false }: { anyone?: boolean } = {}) {
+      return call(`/rest/v1/rpc/${name}`, { method: 'POST', body: JSON.stringify(args), ...(anyone ? { auth: 'anyone' as const } : {}) });
     },
     /**
      * A command for her computer, named here so that the same command sent

@@ -15,7 +15,7 @@ import { agreedHere, rememberAgreed } from './cloud-agreed';
 import { whatIsMissing, type Missing } from './what-is-missing';
 import './sign-in.css';
 
-const GoogleMark = () => (
+export const GoogleMark = () => (
   <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
     <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
     <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
@@ -60,10 +60,10 @@ const TermsLinks = () => <>the <a href={TERMS_URL} onClick={(e) => { e.preventDe
 
 export function SignInPage({ onSkip, signedOut = false, error: startError = null, waitingUrl = null, purpose = 'team', startOn = 'sign-in', onClose, onSignedIn }: {
   onSkip?: () => void; signedOut?: boolean; error?: string | null; waitingUrl?: string | null;
-  purpose?: 'team' | 'cloud' | 'phone'; startOn?: 'sign-in' | 'sign-up'; onClose?: () => void; onSignedIn?: () => void;
+  purpose?: 'team' | 'cloud' | 'phone' | 'share'; startOn?: 'sign-in' | 'sign-up'; onClose?: () => void; onSignedIn?: () => void;
 }) {
   const cloud = purpose === 'cloud';
-  const closable = cloud || purpose === 'phone';
+  const closable = cloud || purpose === 'phone' || purpose === 'share';
   const [mode, setMode] = useState<Mode>(startOn);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -218,7 +218,7 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
     // NO LINE UNDER THE HEADING ON THE CLOUD'S CARD (2026-10-26): "it just
     // feels a little cluttered with text". The heading says what the card is
     // for, and the two tabs keep the same height without it.
-    : cloud ? null
+    : cloud || purpose === 'share' ? null
       : purpose === 'phone' ? 'Then your phone can read and reply to your threads, even with this computer closed.'
       : mode === 'sign-up' ? 'Your teammates will see this name beside your threads and messages.'
       : signedOut ? 'Sign in again to get back to your inbox and your team.'

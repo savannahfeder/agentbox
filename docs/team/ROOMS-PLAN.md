@@ -10,16 +10,16 @@ Everything in it is the target; this file says how to build it and in what order
 
 A room is a place where people who work with agents can see each other working.
 It is a page of its own, reached from the Rooms page: a wall of cards, one per person
-(face, name, level, the short name of what they are working on, how many agents
+(face, name, the short name of what they are working on, how many agents
 are running), with the room's chat beside it. Your team is a room. You can be in
 other rooms too, including public ones like General, and invite friends by link.
 Every chat you open full page (a room's, a group's, a direct one) opens on one
 messages page: your conversations listed on the left, the open one beside them.
-Your level comes from agent hours. Ranks are weekly. You can go invisible.
+Ranks are weekly, from agent hours. You can go invisible.
 
 ## Decisions already made by the founder (do not reopen)
 
-- The wall: four across, 64px face, name with a faint level number, one line of
+- The wall: four across, 64px face, name, one line of
   work cut with "…", the "N agents working" lattice line. One shared grid, every
   line drawn once. Nobody greys out. Initials on one grey tile for everyone.
 - The chat panel: faces in the name line, no header above messages beyond the
@@ -44,11 +44,16 @@ Your level comes from agent hours. Ranks are weekly. You can go invisible.
 - Invite: on the room row, in the room menu, and in the chat panel header. The
   invite dialog is the plain one (who is here, invite link, email).
 - Names show as "First L." by default; a person can turn on their full name.
-- Level is earned from agent hours, cumulative, shown on the card and as a stat
-  beside the ranks on a profile. No bar to the next level.
+- No levels (2026-11-04): the founder took them out as made-up gamification.
+  The `show_level` switch stays, labelled "Your agent hours", and hides those.
+- Groups are only ever your team (2026-11-04). Teams will be paid, so the app
+  offers no way to start, find, join or invite anyone to a group outside it:
+  no New group, Find groups, invite links or email invites, and nobody is put
+  in Coworking. A group chat takes teammates only. Older sections below that
+  describe open groups, links and Coworking are history.
 - Ranks are this week, with Today beside it. Reached from the room menu or any
   rank number. No ranks toggle on the room, no ranked wall.
-- Profile: the header with level, rank in room, rank on Agentbox, days in a row;
+- Profile: the header with rank in room, rank on Agentbox, days in a row;
   Progress tab (cumulative agent hours chart, the old header style) and
   Activity tab (waiting on them, running, done today).
 - Invisible: explains itself before it happens, has a duration, and leaves a
@@ -230,15 +235,9 @@ There is no run history today (only PostHog counts and per-run trace logs).
   every read dedupes by key, so running it twice or racing a live write is
   harmless. Bounded to the last 400 days; unreadable files are skipped.
 - `shared/agent-hours.mts` (pure): totals (all time, this week from local
-  Monday, today), active dates, streak, monthly series, and the level.
+  Monday, today), active dates, streak, and monthly series.
   Persisted on my presence row only because other people cannot compute them:
   they read my numbers, never my ledger.
-- Level (quick early, each level slower than the last, 99 at 10,000 hours,
-  no ceiling): up to 99, `level(h) = 1 + floor(98 * (h / 10000) ^ 0.4)`; past
-  99 each level costs 5% more hours than the one before. 1h is 3, 12h is 7,
-  100h is 16, 1,945h is 51, 10,000h is 99. At about 65 agent hours a day
-  that is the middle after a month, 99 after five, and about 125 after a
-  year. A person's level comes from the sum of their Macs' hours.
 - Streak across Macs: the union of each Mac's `active_days`, counted back from
   today (or yesterday, if today has no run yet).
 
@@ -262,7 +261,7 @@ team sync loop upserts it when its hash changes (at most every 5s):
   the Rooms settings page says so in one line.
 - `agents_running`: this Mac's `status().running.length` minus remote-idle and
   followed-home cloud runs already counted by the cloud Mac.
-- Switches off (agents, level, status) blank those fields on my rows.
+- Switches off (agents, agent hours, status) blank those fields on my rows.
 - Invisible sets `invisible_until` on my profile; the policies hide my profile
   and presence rows from everyone else until then. Coming back republishes.
 
@@ -338,7 +337,7 @@ Rooms paragraph in this work.
 ## Build order (each step lands with its tests)
 
 1. Alpha switch: Settings page, config keys.
-2. Agent hours: `runs.jsonl`, backfill, `shared/agent-hours.mts`, level.
+2. Agent hours: `runs.jsonl`, backfill, `shared/agent-hours.mts`.
 3. Cloud migration and both backends (Supabase and the in-memory stand-in),
    RLS proven in PGlite.
 4. Room service in main (`main/team/rooms.mts`): my rooms, members, cards,
@@ -351,7 +350,7 @@ Rooms paragraph in this work.
 
 ## Testing
 
-- Unit: `shared/agent-hours.mts` (level boundaries, week edges across DST,
+- Unit: `shared/agent-hours.mts` (week edges across DST,
   streak with a gap, backfill parsing), card building (private thread, outside
   team, switches off, invisible).
 - RLS and grants in PGlite with every migration: `anon` can execute only
@@ -484,7 +483,7 @@ Rooms and Messages were two places for one idea. They are one, called Groups:
   first with a # and a border, then a rule, then chats by first name with their
   faces, then More (`GroupList.tsx`). Every chat is its own entry, a
   teammate's direct record among them. The chat fills the page with faces hung
-  beside the words; down the right, People: face, name, level, what they are
+  beside the words; down the right, People: face, name, what they are
   on, their agents. A group over twelve lists only who is working.
 - A person in that list opens their page, which opens on Today's activity (their
   threads as a board) with Progress second.
@@ -503,8 +502,8 @@ Rooms and Messages were two places for one idea. They are one, called Groups:
 Someone with no team lands in General, and with `everyone` as the default
 the whole of General got their thread names, old ones included. Agreed:
 
-- A new card starts on `team`. People outside your team see your name, level
-  and agent count, and your bio where a thread name was. Cards made before
+- A new card starts on `team`. People outside your team see your name, agent
+  hours and agent count, and your bio where a thread name was. Cards made before
   keep what they had.
 - A group anyone can join (`listed`) shows one line the first time it is
   opened on a Mac: who can join and what they see, with Leave group and OK,
