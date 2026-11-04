@@ -363,11 +363,11 @@ export function memoryBackend(cloud, personId) {
 
     // A FILE ANYONE WITH ITS LINK CAN READ, as
     // 20261105000000_a_file_anyone_with_its_link_can_read.sql keeps it.
-    async shareFile({ source, name, kind, type, body, version = 1 }) {
+    async shareFile({ source, name, kind, type, body, version = 1, hash = '' }) {
       if (!LINK_KINDS.has(kind)) refuse('a link to a file it cannot draw');
       if (String(body ?? '').length > MAX_LINK_BODY) refuse('a link to a file that big');
       const live = [...cloud.fileLinks.values()].find((l) => l.owner === personId && l.source === source && !l.stoppedAt);
-      const fields = { name, kind, type, body, version: Math.max(1, version | 0), updatedAt: cloud.now() };
+      const fields = { name, kind, type, body, version: Math.max(1, version | 0), hash: String(hash ?? ''), updatedAt: cloud.now() };
       if (live) { Object.assign(live, fields); return live.token; }
       const token = crypto.randomBytes(20).toString('hex');
       cloud.fileLinks.set(token, { token, owner: personId, source, ...fields, stoppedAt: null });
@@ -376,7 +376,7 @@ export function memoryBackend(cloud, personId) {
 
     async fileLinkFor(source) {
       const l = [...cloud.fileLinks.values()].find((x) => x.owner === personId && x.source === source && !x.stoppedAt);
-      return l ? { token: l.token, version: l.version, updatedAt: l.updatedAt, comments: cloud.fileLinkComments.filter((c) => c.token === l.token).length } : null;
+      return l ? { token: l.token, version: l.version, hash: l.hash ?? '', updatedAt: l.updatedAt, comments: cloud.fileLinkComments.filter((c) => c.token === l.token).length } : null;
     },
 
     async stopFileLink(token) {

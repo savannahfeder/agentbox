@@ -233,7 +233,7 @@ import { revealLine } from './reveal-line';
 import { FoundInside } from './components/FoundInside';
 import type { PlaceAct } from './threads/ThreadMenu';
 import { SignInPage } from './team/SignInPage';
-import { SIGN_IN_TO_SHARE } from './components/ShareLink';
+import { SIGN_IN_TO_SHARE, ShareLink, canShareFile } from './components/ShareLink';
 import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
 import { inboxEveryone, mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 import { boardStops, leadStops, listStops, stepFromPlace, stepStop, stopKey, type PageStop, type Stop } from './threads/walk-rules';
@@ -7993,7 +7993,10 @@ export default function App() {
                 onClose={closeArtifact}
                 onNotice={showToast}
                 aside={notesShown && focused ? <NotesSidebar key={`${focused.id}\n${openDoc.src}`} item={focused} src={openDoc.src} /> : undefined}
-                firstMark={notesHere && focused ? <NotesToggle open={notesOpen} waiting={(focused.artifacts?.notes ?? []).filter((n) => !n.resolved && stillWaiting(n)).length} onToggle={toggleNotes} /> : undefined}
+                firstMark={<>
+                  {focused && focused.product === openDoc.product && canShareFile(openDoc.src) && <ShareLink icon product={openDoc.product} thread={focused.id} src={openDoc.src} signedIn={!!snap?.team?.signedIn} />}
+                  {notesHere && focused && <NotesToggle open={notesOpen} waiting={(focused.artifacts?.notes ?? []).filter((n) => !n.resolved && stillWaiting(n)).length} onToggle={toggleNotes} />}
+                </>}
               /></ArtifactSurface>
             )}
       </div>

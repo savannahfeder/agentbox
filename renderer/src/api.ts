@@ -15,8 +15,9 @@ import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import type { CarryState } from '../../shared/carried-files.mjs';
 
-export interface FileLinkAsk { product: string; thread: string; family: string }
-export interface FileLink { token: string; url: string; version: number; updatedAt: number; comments: number }
+export interface FileLinkAsk { product: string; thread: string; src: string }
+/** `current`: the link holds the copy of the file on screen now. */
+export interface FileLink { token: string; url: string; version: number; updatedAt: number; comments: number; current: boolean }
 /** `site` null: this copy's cloud has no website, so there is nothing to share on. */
 export interface FileLinkState { ok: boolean; error?: string; site?: string | null; signedIn?: boolean; link?: FileLink | null }
 import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
@@ -725,7 +726,7 @@ export const api = {
     if (!zero?.fileLink) return { ok: false, error: 'not here' };
     return zero.fileLink(p);
   },
-  async fileLinkShare(p: FileLinkAsk & { src: string; version: number }): Promise<FileLinkState> {
+  async fileLinkShare(p: FileLinkAsk): Promise<FileLinkState> {
     const zero = window.zero as any;
     if (!zero?.fileLinkShare) return { ok: false, error: `quit and reopen ${NAME} to share files` };
     return zero.fileLinkShare(p);

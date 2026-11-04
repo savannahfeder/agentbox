@@ -973,18 +973,19 @@ export function createTeamService({
       return true;
     },
     /** This person's live link for one of their files, or why there is none. */
-    async fileLink(source) {
+    async fileLink(source, hashNow = null) {
       if (!linkSite) return { site: null, signedIn: !!state.me, link: null };
       if (!backend?.fileLinkFor || !state.me) return { site: linkSite, signedIn: false, link: null };
       const l = await backend.fileLinkFor(source);
-      return { site: linkSite, signedIn: true, link: l ? { ...l, url: linkAddress(linkSite, l.token) } : null };
+      // `current`: the link holds the very copy on screen (hashNow, main/file-link.mjs).
+      return { site: linkSite, signedIn: true, link: l ? { ...l, url: linkAddress(linkSite, l.token), current: hashNow == null || l.hash === hashNow } : null };
     },
     /** Shares the file, or puts this copy of it in its live link. */
-    async shareFile({ source, name, kind, type, body, version }) {
+    async shareFile({ source, name, kind, type, body, version, hash }) {
       if (!linkSite) throw new Error('This cloud has no website to share files on.');
       if (!backend?.shareFile || !state.me) throw new Error('Sign in to share a link.');
-      await backend.shareFile({ source, name, kind, type, body, version });
-      return this.fileLink(source);
+      await backend.shareFile({ source, name, kind, type, body, version, hash });
+      return this.fileLink(source, hash);
     },
     async stopFileLink(token) {
       if (!backend?.stopFileLink || !state.me) throw new Error('Sign in first.');

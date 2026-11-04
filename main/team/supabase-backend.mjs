@@ -313,16 +313,16 @@ export function supabaseBackend(client) {
 
     // A FILE ANYONE WITH ITS LINK CAN READ: only through the functions in
     // 20261105000000_a_file_anyone_with_its_link_can_read.sql.
-    async shareFile({ source, name, kind, type, body, version = 1 }) {
+    async shareFile({ source, name, kind, type, body, version = 1, hash = '' }) {
       await myId();
-      return must(await client.rpc('share_file', { src: source, nm: name, k: kind, typ: type, b: body, v: version }), 'sharing the file');
+      return must(await client.rpc('share_file', { src: source, nm: name, k: kind, typ: type, b: body, v: version, h: hash }), 'sharing the file');
     },
 
     async fileLinkFor(source) {
       await myId();
       const rows = must(await client.rpc('my_file_link', { src: source }), 'asking for the file\'s link');
       const r = rows?.[0];
-      return r ? { token: r.token, version: r.version, updatedAt: Date.parse(r.updated_at), comments: r.comments } : null;
+      return r ? { token: r.token, version: r.version, hash: r.hash ?? '', updatedAt: Date.parse(r.updated_at), comments: r.comments } : null;
     },
 
     async stopFileLink(token) {

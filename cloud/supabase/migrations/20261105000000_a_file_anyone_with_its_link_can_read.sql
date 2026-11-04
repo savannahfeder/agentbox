@@ -20,6 +20,8 @@ create table if not exists public.file_links (
   type text not null check (char_length(type) between 1 and 100),
   body text not null,
   version int not null default 1 check (version >= 1),
+  -- The owner's computer compares it with the file on screen, to offer the newer copy.
+  hash text not null default '' check (char_length(hash) <= 128),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   stopped_at timestamptz,
@@ -45,7 +47,7 @@ drop policy if exists file_links_own on public.file_links;
 create policy file_links_own on public.file_links for select using (owner = auth.uid());
 
 -- Shares the file, or puts the newer copy in its live link. Answers the token.
-create or replace function public.share_file(src text, nm text, k text, typ text, b text, v int)
+create or replace function public.share_file(src text, nm text, k text, typ text, b text, v int, h text)
 returns text
 language plpgsql security definer set search_path = public as $$
 declare me uuid := auth.uid(); tok text; used int;
@@ -53,22 +55,22 @@ begin
   if me is null then raise exception 'sign in to share a file'; end if;
   select count(*) into used from public.file_links where owner = me and updated_at > now() - interval '10 minutes';
   if used >= 60 then raise exception 'too many shares for now; try again later'; end if;
-  update public.file_links set name = nm, kind = k, type = typ, body = b, version = greatest(coalesce(v, 1), 1), updated_at = now()
+  update public.file_links set name = nm, kind = k, type = typ, body = b, version = greatest(coalesce(v, 1), 1), hash = coalesce(h, ''), updated_at = now()
     where owner = me and source = src and stopped_at is null
     returning token into tok;
   if tok is null then
     tok := replace(gen_random_uuid()::text, '-', '') || left(replace(gen_random_uuid()::text, '-', ''), 8);
-    insert into public.file_links (token, owner, source, name, kind, type, body, version)
-      values (tok, me, src, nm, k, typ, b, greatest(coalesce(v, 1), 1));
+    insert into public.file_links (token, owner, source, name, kind, type, body, version, hash)
+      values (tok, me, src, nm, k, typ, b, greatest(coalesce(v, 1), 1), coalesce(h, ''));
   end if;
   return tok;
 end $$;
 
 -- The owner's own live link for a file, with how many comments it has.
 create or replace function public.my_file_link(src text)
-returns table (token text, version int, updated_at timestamptz, comments int)
+returns table (token text, version int, hash text, updated_at timestamptz, comments int)
 language sql stable security definer set search_path = public as $$
-  select l.token, l.version, l.updated_at,
+  select l.token, l.version, l.hash, l.updated_at,
          (select count(*)::int from public.file_link_comments c where c.token = l.token)
   from public.file_links l
   where l.owner = auth.uid() and l.source = src and l.stopped_at is null
@@ -146,11 +148,11 @@ end $$;
 revoke all on public.file_links, public.file_link_comments from anon, authenticated, public;
 grant select on public.file_links to authenticated;
 
-revoke execute on function public.share_file(text, text, text, text, text, int), public.my_file_link(text),
+revoke execute on function public.share_file(text, text, text, text, text, int, text), public.my_file_link(text),
   public.stop_file_link(text), public.file_link_view(text), public.file_link_stopped(text),
   public.file_link_comments_of(text), public.comment_on_file_link(text, text), public.remove_file_link_comment(uuid)
   from public, anon, authenticated;
-grant execute on function public.share_file(text, text, text, text, text, int), public.my_file_link(text),
+grant execute on function public.share_file(text, text, text, text, text, int, text), public.my_file_link(text),
   public.stop_file_link(text), public.comment_on_file_link(text, text), public.remove_file_link_comment(uuid)
   to authenticated;
 grant execute on function public.file_link_view(text), public.file_link_stopped(text), public.file_link_comments_of(text)

@@ -17,9 +17,10 @@ import { Store } from '../main/store.mjs';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
 import { createTeamService } from '../main/team/index.mjs';
 import { memorySession } from '../main/team/session.mjs';
-import { linkSiteFor } from '../main/file-link.mjs';
+import { linkSiteFor, versionInName } from '../main/file-link.mjs';
+import { familyKeyOf } from '../shared/artifact-marks.mjs';
 import { PHONE_SITE } from '../shared/cloud-address.mjs';
-import { linkOffer } from '../renderer/src/components/ShareLink.tsx';
+import { linkOffer, canShareFile } from '../renderer/src/components/ShareLink.tsx';
 
 async function aMac(cloud, personId, site = 'https://app.agentbox.ac') {
   const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'file-link-'));
@@ -33,7 +34,7 @@ async function aMac(cloud, personId, site = 'https://app.agentbox.ac') {
   });
 }
 const SOURCE = 'agentbox-team/w-1/plan.md';
-const file = (v, body = `# Plan v${v}`) => ({ source: SOURCE, name: 'plan.md', kind: 'markdown', type: 'text/markdown', body, version: v });
+const file = (v, body = `# Plan v${v}`) => ({ source: SOURCE, name: 'plan.md', kind: 'markdown', type: 'text/markdown', body, version: v, hash: `h${v}` });
 
 let cloud, maya;
 beforeEach(async () => {
@@ -58,6 +59,13 @@ describe('signed in', () => {
     expect(second.url).toBe(first.url);
     expect(second.version).toBe(3);
     expect([...cloud.fileLinks.values()][0].body).toBe('# Plan v3');
+  });
+
+  it('says whether the link holds the copy on screen', async () => {
+    await maya.shareFile(file(1));
+    expect((await maya.fileLink(SOURCE, 'h1')).link.current).toBe(true);
+    expect((await maya.fileLink(SOURCE, 'h2')).link.current).toBe(false);
+    expect((await maya.fileLink(SOURCE, null)).link.current).toBe(true);
   });
 
   it('stopping ends the link, and sharing again makes a new one', async () => {
@@ -98,11 +106,23 @@ it('links on our cloud read as app.agentbox.ac, whichever address the phone site
   expect(linkSiteFor('https://app.agentbox.ac/')).toBe('https://app.agentbox.ac');
   expect(linkSiteFor('https://phone.other-team.test')).toBe('https://phone.other-team.test');
   expect(linkSiteFor(null)).toBeNull();
+  expect(linkSiteFor('http://phone.other-team.test')).toBeNull();
+  expect(linkSiteFor('https://x.test/some/path')).toBeNull();
 });
 
-it('the panel offers the version on screen when the link holds another', () => {
-  const link = { token: 't', url: 'u', version: 2, updatedAt: 0, comments: 0 };
-  expect(linkOffer({ ok: true, link }, 2)).toEqual({ link, behind: false });
-  expect(linkOffer({ ok: true, link }, 3)).toEqual({ link, behind: true });
-  expect(linkOffer({ ok: true, link: null }, 3)).toEqual({ link: null, behind: false });
+it('the panel offers Update link when the link holds another copy', () => {
+  const link = { token: 't', url: 'u', version: 2, updatedAt: 0, comments: 0, current: true };
+  expect(linkOffer({ ok: true, link })).toEqual({ link, behind: false });
+  expect(linkOffer({ ok: true, link: { ...link, current: false } }).behind).toBe(true);
+  expect(linkOffer({ ok: true, link: null })).toEqual({ link: null, behind: false });
+});
+
+it('every version of a file is one link, and only kinds a link can draw are offered', () => {
+  expect(familyKeyOf('designs/w-1/plan-v3.md')).toBe(familyKeyOf('designs/w-1/plan.md'));
+  expect(familyKeyOf('designs/w-1/plan.md')).not.toContain('\0');
+  expect(familyKeyOf('designs/w-1/other.md')).not.toBe(familyKeyOf('designs/w-1/plan.md'));
+  expect(versionInName('plan-v3.md')).toBe(3);
+  expect(versionInName('plan.md')).toBe(1);
+  for (const yes of ['a.md', 'b.HTML', 'c.png', 'd.jpeg', 'e.pdf', 'f.svg']) expect(canShareFile(yes), yes).toBe(true);
+  for (const no of ['a.mp4', 'b.csv', 'c.ts', 'd']) expect(canShareFile(no), no).toBe(false);
 });

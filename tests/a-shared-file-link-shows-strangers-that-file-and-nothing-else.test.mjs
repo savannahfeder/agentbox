@@ -44,8 +44,8 @@ async function as(person, sql, params = [], role = 'authenticated') {
 const rows = async (person, sql, params, role) => (await as(person, sql, params, role)).rows;
 const anon = (sql, params) => rows(null, sql, params, 'anon');
 const refused = async (person, sql, params, role) => { try { await as(person, sql, params, role); return false; } catch { return true; } };
-const share = async (who, src, body = '# Plan', { name = 'plan.md', kind = 'markdown', type = 'text/markdown', v = 1 } = {}) =>
-  (await rows(who, `select public.share_file($1, $2, $3, $4, $5, $6) as t`, [src, name, kind, type, body, v]))[0].t;
+const share = async (who, src, body = '# Plan', { name = 'plan.md', kind = 'markdown', type = 'text/markdown', v = 1, h = `h-${body.length}` } = {}) =>
+  (await rows(who, `select public.share_file($1, $2, $3, $4, $5, $6, $7) as t`, [src, name, kind, type, body, v, h]))[0].t;
 const view = (tok, who = null) => (who ? rows(who, `select * from public.file_link_view($1)`, [tok]) : anon(`select * from public.file_link_view($1)`, [tok]));
 const comments = (tok, who = null) => (who ? rows(who, `select * from public.file_link_comments_of($1)`, [tok]) : anon(`select * from public.file_link_comments_of($1)`, [tok]));
 const comment = (who, tok, body = 'Looks good') => rows(who, `select public.comment_on_file_link($1, $2) as id`, [tok, body]);
@@ -75,7 +75,7 @@ describe('somebody with the link and no account', () => {
   it('reads no table at all, and cannot share, comment or stop', async () => {
     expect(await refused(null, `select * from public.file_links`, [], 'anon')).toBe(true);
     expect(await refused(null, `select * from public.file_link_comments`, [], 'anon')).toBe(true);
-    expect(await refused(null, `select public.share_file('x', 'a.md', 'markdown', 'text/markdown', 'hi', 1)`, [], 'anon')).toBe(true);
+    expect(await refused(null, `select public.share_file('x', 'a.md', 'markdown', 'text/markdown', 'hi', 1, '')`, [], 'anon')).toBe(true);
     expect(await refused(null, `select public.comment_on_file_link($1, 'hi')`, [tok], 'anon')).toBe(true);
     expect(await refused(null, `select public.stop_file_link($1)`, [tok], 'anon')).toBe(true);
     expect(await view(tok)).toHaveLength(1);
@@ -137,7 +137,7 @@ describe('comments', () => {
   });
   it('are counted for the owner, beside their link', async () => {
     const [mine] = await rows(MAYA, `select * from public.my_file_link('notes/w-4/plan')`);
-    expect(mine).toMatchObject({ token: tok, version: 1, comments: 2 });
+    expect(mine).toMatchObject({ token: tok, version: 1, hash: 'h-6', comments: 2 });
   });
   it('are taken back by whoever wrote them or by the owner, and by nobody else', async () => {
     const [{ id }] = await comment(JUN, tok, 'One more');
@@ -180,8 +180,8 @@ describe('a stopped link', () => {
 
 describe('what a link will hold', () => {
   it('refuses a kind it cannot draw, and a file over its size', async () => {
-    expect(await refused(MAYA, `select public.share_file('a', 'a.mov', 'film', 'video/mp4', 'x', 1)`)).toBe(true);
-    expect(await refused(MAYA, `select public.share_file('b', 'b.png', 'image', 'image/png', repeat('A', 8400001), 1)`)).toBe(true);
+    expect(await refused(MAYA, `select public.share_file('a', 'a.mov', 'film', 'video/mp4', 'x', 1, '')`)).toBe(true);
+    expect(await refused(MAYA, `select public.share_file('b', 'b.png', 'image', 'image/png', repeat('A', 8400001), 1, '')`)).toBe(true);
     expect(await share(MAYA, 'c', 'A'.repeat(8_000_000), { name: 'c.png', kind: 'image', type: 'image/png' })).toMatch(/^[a-f0-9]{40}$/);
   });
 });

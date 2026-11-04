@@ -5,6 +5,7 @@
 // copy on the web has no folder beside it. Only files in the page's own
 // folder or below go in: a page that names ../../.ssh/id_rsa must not put a
 // key on a public page.
+import crypto from 'node:crypto';
 import fsDefault from 'node:fs';
 import path from 'node:path';
 import { PHONE_SITE } from '../shared/cloud-address.mjs';
@@ -41,7 +42,11 @@ export const linkAddress = (site, token) => `${String(site).replace(/\/+$/, '')}
 // Our cloud's web app answers on both addresses; a link people pass around
 // reads as ours.
 const OUR_SITE = 'https://app.agentbox.ac';
-export const linkSiteFor = (site) => (!site ? null : site.replace(/\/+$/, '') === PHONE_SITE ? OUR_SITE : site.replace(/\/+$/, ''));
+export function linkSiteFor(site) {
+  if (typeof site !== 'string' || !/^https:\/\/[^\s/]+\/*$/.test(site)) return null;
+  const s = site.replace(/\/+$/, '');
+  return s === PHONE_SITE ? OUR_SITE : s;
+}
 
 const outside = (ref) => !ref || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#|\/)/i.test(ref);
 
@@ -91,5 +96,8 @@ export function fileForLink(file, { fs = fsDefault } = {}) {
   else if (kind.kind === 'page') body = pageWithItsFiles(bytes.toString('utf8'), file, fs);
   else body = bytes.toString('base64');
   if (body.length > MAX_BODY_CHARS) return { error: 'This file is too big to share as a link.' };
-  return { ...kind, body };
+  return { ...kind, body, hash: crypto.createHash('sha256').update(body).digest('hex').slice(0, 40) };
 }
+
+/** The version a file's name says (plan-v3.md is 3), as files here are named. */
+export const versionInName = (name) => Number(/-v(\d{1,4})\.[^./]+$/i.exec(String(name ?? ''))?.[1] ?? 1) || 1;
