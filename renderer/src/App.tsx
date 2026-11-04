@@ -195,7 +195,8 @@ import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, askedInLabel, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { answersInTheirChat } from './team/answers-in-the-chat';
 import type { LedgerLine } from './thread-history';
-import { ruleIdOf, ruleLabel, runToOpen } from '../../shared/repeats.mjs';
+import { dateKey, ruleIdOf, ruleLabel, runToOpen } from '../../shared/repeats.mjs';
+import { lastUsedByMate, readMateOrder, settleMateOrder, writeMateOrder, type MateOrder } from './team/everything/mate-order';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { NOT_ANSWERING, NOT_ANSWERING_MS, RESTART_IT, RESTART_IT_MS, SEND_NOT_TAKEN } from './not-answering';
 import { TEAM_WAIT_MS } from './boot-waits';
@@ -2433,6 +2434,10 @@ export default function App() {
   // the way `tabState` below has it for the board and `done` for the archive.
   // The rule above is untouched; only what the tab draws and counts is this.
   const progressTab = useMemo(() => inProgressTab(progress, inbox), [progress, inbox]);
+  const inProgressNow = useMemo(() => {
+    const ids = new Set(progressTab.map((i) => `${i.product}/${i.id}`));
+    return (i: WorkItem) => ids.has(`${i.product}/${i.id}`);
+  }, [progressTab]);
 
   const queuedIds = useMemo(() => new Set(snap?.supervisor.queued ?? []), [snap?.supervisor.queued]);
   // AGENTBOX CLOUD OFFERS ITSELF WHERE THE FOUNDER PUT IT (2026-10-13,
@@ -2966,9 +2971,9 @@ export default function App() {
   // The columns themselves are kept too, for the left and right arrows
   // (`boardSideways`), and they come in the order you dragged them to.
   const boardArgs = useMemo(
-    () => ({ items: evBoard ? boardItems(items, evBoard, teammateIdOf) : items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards,
+    () => ({ items: evBoard ? boardItems(items, evBoard, teammateIdOf, inProgressNow) : items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards,
       picked: evBoard ? evBoard.picked : team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: liveIds, projectOrder, waitingIsInProgress: !!evBoard && !evBoard.mate && !evBoard.mineOnly && evBoard.picked.length > 1 }),
-    [items, evBoard, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds, projectOrder],
+    [items, evBoard, inProgressNow, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds, projectOrder],
   );
   const boardCols = useMemo(
     () => (onBoard ? boardColumns({ ...boardArgs, order: teamMode ? evColumns(columnOrder) : columnOrder }) : null),
@@ -2981,11 +2986,11 @@ export default function App() {
   const shownAs = useCallback((rows: WorkItem[], tab: View) => (mineShown
     ? sortedByDisplay(filterBox(rows, boxFilter, directSlugs).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i), directSlugs)), inboxDisplay, tab, projectOrder, directSlugs)
     : []), [mineShown, boxFilter, directSlugs, inboxDisplay, now, seenOf, projectOrder]);
-  // Your AI teammates' runs are on their own cards, as on the board (whose-board.ts).
+  // Your AI teammates' runs under way are in your In progress; their Later and Done stay on their own place.
   const stacked = useMemo(() => {
     if (!(teamMode && view !== 'inbox' && search === null && !onBoard)) return null;
     const yours = (rows: WorkItem[]) => yoursOnly(rows, teammateIdOf);
-    return stackRows({ progress: shownAs(yours(progressTab), 'progress'), later: shownAs(yours(snoozed), 'snoozed'), done: shownAs(yours(done), 'done'),
+    return stackRows({ progress: shownAs(progressTab, 'progress'), later: shownAs(yours(snoozed), 'snoozed'), done: shownAs(yours(done), 'done'),
       dayStart: new Date(now).setHours(0, 0, 0, 0), folded: stackFolded, laterRules: repeats.length,
       isChat: (i) => directSlugs.has(i.product) && !isTaskRow(i) });
   }, [teamMode, view, search, onBoard, shownAs, progressTab, snoozed, done, now, stackFolded, repeats.length, directSlugs]);
@@ -4174,6 +4179,8 @@ export default function App() {
   };
 
   const [evOrder] = useState<string[] | null>(() => readOrder());
+  const [mateOrder, setMateOrder] = useState<MateOrder | null>(() => readMateOrder());
+  const today = dateKey(now);
   const teamRoom = roomsUi.live ? (snap?.team?.rooms?.rooms ?? []).find((r) => r.teamId) ?? null : null;
   // A teammate's one-to-one chat in Groups, which their card opens.
   const personChats = useMemo(() => {
@@ -4185,8 +4192,8 @@ export default function App() {
     }
     return out;
   }, [roomsUi.live, team, snap?.team?.rooms?.rooms]);
-  const members = useMemo(() => {
-    if (!teamMode) return [];
+  const settled = useMemo(() => {
+    if (!teamMode) return { members: [] as Member[], saved: mateOrder };
     const mateAgents = new Map<string, number>();
     let mine = 0;
     let myNow: string | null = null;
@@ -4209,9 +4216,16 @@ export default function App() {
       myAgents: mine, myNow,
     });
     // Your own count is your In progress column's, so the card and the board under it agree.
-    const yours = yoursOnly(progressTab, teammateIdOf).length;
-    return orderMembers(built.map((m) => (m.kind === 'me' ? { ...m, inProgress: yours } : m)), evOrder);
-  }, [teamMode, runningRows, items, team, teamRoom, cards, teammatesUi.list, teamMates, roomsUi.live, roomsUi.groups, personChats, evOrder, progressTab]);
+    const yours = progressTab.length;
+    const ordered = orderMembers(built.map((m) => (m.kind === 'me' ? { ...m, inProgress: yours } : m)), evOrder);
+    return settleMateOrder(ordered, { lastUsed: lastUsedByMate(items, teammateIdOf), saved: mateOrder, day: today });
+  }, [teamMode, runningRows, items, team, teamRoom, cards, teammatesUi.list, teamMates, roomsUi.live, roomsUi.groups, personChats, evOrder, progressTab, mateOrder, today]);
+  const members = settled.members;
+  useEffect(() => {
+    if (settled.saved === mateOrder || !settled.saved?.keys.length) return;
+    writeMateOrder(settled.saved);
+    setMateOrder(settled.saved);
+  }, [settled.saved, mateOrder]);
   const directWith = (personId: string) => directs.find((d) => d.people.length === 1 && d.people[0] === personId) ?? null;
   const personDirect = (personId: string) => {
     const direct = directWith(personId);
@@ -7141,7 +7155,7 @@ export default function App() {
     // w-33511040d7).
     corner: onPhone() ? null
       : <NeedsFaces members={evSplit.shown} picked={evOn ? evKey : null} waits={waits} onPick={(key) => pickMember(key)} onAdd={teammatesUi.live ? teammatesUi.onNew : undefined} />,
-    progress: !onPhone() ? { count: mineShown ? shownCount(yoursOnly(progressTab, teammateIdOf)) : 0, on: view !== 'done' && evOn && evKey === 'me' } : undefined,
+    progress: !onPhone() ? { count: mineShown ? shownCount(progressTab) : 0, on: view !== 'done' && evOn && evKey === 'me' } : undefined,
     today: homeLayout === 'list' && !onPhone() ? { on: todayOn, onToday: () => { goNeedsYou(); setTodayOn(true); } } : undefined,
     tasks: homeLayout === 'list' && !onPhone() ? { on: tasksOn, onTasks: () => { goNeedsYou(); setTasksOn(true); } } : undefined,
   } : null;
