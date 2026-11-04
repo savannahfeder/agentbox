@@ -42,6 +42,7 @@ import { EVERY } from '../instruction-scope';
 import type {AccountUsageReading, Usage, UsageLimit, WorkspaceSettings} from '../types';
 import { accountLabel, cloudAccountInUse, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
 import { cloudBilling, planSummary, type PaidPlan } from '../cloud-upgrade';
+import { keyLooksWrong } from '../key-asks';
 import { CloudPlanCards } from './CloudPlanCards';
 import type { CloudPlan } from '../types';
 import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-words';
@@ -606,6 +607,48 @@ const Group = ({ id, label, warn, action, bare = false, children }: { id?: strin
     )}
   </div>
 );
+
+/** One key kept in the cloud: replaced in place, or removed once asked twice, since getting it again means a trip to the service. */
+function CloudKeyRow({ name, label, savedAt }: { name: string; label: string | null; savedAt: number | null }) {
+  const [mode, setMode] = useState<'shown' | 'replacing' | 'removing'>('shown');
+  const [value, setValue] = useState('');
+  const [said, setSaid] = useState<string | null>(null);
+  const [warned, setWarned] = useState<string | null>(null);
+  const day = (t: number) => (new Date(t).toDateString() === new Date().toDateString() ? 'today' : new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+  const when = savedAt ? `saved ${day(savedAt)} at ${new Date(savedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : null;
+  const act = async (p: { action: 'save' | 'remove'; name: string; value?: string }) => {
+    const out = await api.cloudKey(p);
+    if (!out.ok) { setSaid(out.error ?? 'The cloud did not answer. Try again.'); return; }
+    setSaid(p.action === 'save' ? `${name}, replaced just now` : null); setValue(''); setMode('shown');
+  };
+  if (mode === 'replacing') {
+    return (
+      <form className="set-row set-key-replace" aria-label={`Replace ${label ?? name}`} onSubmit={(e) => {
+        e.preventDefault();
+        if (!value.trim()) return;
+        const wrong = keyLooksWrong(name, value, label ?? undefined);
+        if (wrong && warned !== value) { setWarned(value); setSaid(wrong); return; }
+        void act({ action: 'save', name, value });
+      }}>
+        <span className="set-key-name">{label ?? name}</span>
+        <input className="set-key-input" type="password" aria-label={name} placeholder="Paste the new key" autoComplete="off" spellCheck={false} autoFocus
+          value={value} onChange={(e) => { setValue(e.target.value); setSaid(null); }} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setMode('shown'); } }} />
+        <span className="set-row-ctl">
+          <button type="submit" className="set-ghost" disabled={!value.trim()}>Save</button>
+          <button type="button" className="set-ghost" onClick={() => { setMode('shown'); setSaid(null); }}>Cancel</button>
+        </span>
+        {said && <span className="set-key-said">{said}</span>}
+      </form>
+    );
+  }
+  return (
+    <Row label={label ?? name} desc={said ?? (mode === 'removing' ? 'Threads that need it will ask again.' : [label ? name : null, when].filter(Boolean).join(', '))}>
+      {mode === 'removing'
+        ? <><button type="button" className="set-ghost" onClick={() => setMode('shown')}>Keep</button><button type="button" className="set-ghost" onClick={() => void act({ action: 'remove', name })}>Remove</button></>
+        : <><button type="button" className="set-ghost" onClick={() => setMode('replacing')}>Replace</button><button type="button" className="set-ghost" onClick={() => setMode('removing')}>Remove</button></>}
+    </Row>
+  );
+}
 
 /**
  * THE MENU BEHIND "How many run at once": Automatic, then every number it could
@@ -1952,6 +1995,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                     onChange={() => void write(api.setWorkspaceSetting({ key: 'cloudRuns', value: cloudToggleTarget(cloudHere) }))}
                   />
                 </Row>
+              </Group>
+            )}
+            {cloudHere && !!cloudHere.keys?.length && (
+              <Group id="cloud-keys" label="Keys for cloud threads">
+                {cloudHere.keys.map((k) => <CloudKeyRow key={k.name} name={k.name} label={k.label ?? null} savedAt={k.savedAt} />)}
               </Group>
             )}
             {/* SIGNING A SECOND ACCOUNT IN, IN THE APP (w-c2904cc8d9). Main

@@ -59,6 +59,9 @@ import { handBackWhat, handsBack } from '../shared/cloud-hand-back.mjs';
 import { CLOUD_SENT, readSent } from '../shared/cloud-start.mts';
 import { readCloudConfig, cloudAccountConfig, OLD_TOKEN_SERVICE, imageCapsToTry } from './cloud/config.mjs';
 import { cloudVersionGaps } from '../shared/cloud-versions.mts';
+import { saveCloudKey, removeCloudKey, cloudKeyNames } from './cloud/keys.mjs';
+import { threadsKeysFree } from '../shared/cloud-needs.mjs';
+import { fileToSend } from '../shared/cloud-sent-files.mjs';
 import { cloudLoginState, mayRunOn, startCloudSignIn, renewCloudCodexLogin, sweepRetiredLogins, forgetOldCloudTokens, listCloudLogins, removeCloudLogin, newCloudAccountKey, lookAtCloudLogin, cloudLimits, markCloudLogin, cloudLoginInUse, cloudAccountsFrom, CLOUD_ACCOUNT_ENV } from './cloud/logins.mts';
 import type { CloudLimitReading } from './cloud/logins.mts';
 import type { TickInput } from './teammates.mts';
@@ -1233,6 +1236,9 @@ export class Supervisor {
   declare _compactionJobs: Map<string, { threadId: string | null | undefined; profile: string | null | undefined }>;
   declare _preparing: Map<string, PreparingEntry>;
   declare _madeFolders: Map<string, string>;
+  // Threads whose next turn goes to the cloud (a key saved or a file sent for it), and the files each sends.
+  declare _cloudForKey: Set<string> | undefined;
+  declare _filesForCloud: Map<string, string[]> | undefined;
   declare _photos: Map<string, ReturnType<typeof snapshotRepo> | null> | undefined;
   declare _firstRunUntil: number;
   declare _startBudget: StartBudget;
@@ -6104,6 +6110,7 @@ export class Supervisor {
       // What C turns the cloud back on to (main/settings.mts cloudWhenOn).
       whenOn: this.config.cloudWhenOn === 'all' ? 'all' : 'full',
       accounts: setUp ? this._cloudAccounts() : [],
+      keys: setUp ? cloudKeyNames({ home: this.config.home }) : [],
       notInCloud: setUp ? this._cloudNotSignedInHere(now) : [],
       signIns: setUp ? this._cloudSignInsNow() : [],
       projects: setUp ? (this.store.listProducts?.() ?? []).filter((p) => this._cloudTakesProject(p)).map((p) => p.slug) : [],
@@ -6214,6 +6221,44 @@ export class Supervisor {
     if (!config) throw new Error('the cloud is not set up here');
     const { cloudClients } = await import('./cloud/clients.mts');
     return cloudClients(config, { home: this.config.home });
+  }
+
+  // A KEY SAVED FOR CLOUD RUNS (main/cloud/keys.mjs): pasted where a cloud
+  // run asked for it, or in Settings, and given to every cloud run after.
+  // Saving answers with the threads it frees (shared/cloud-keys.mjs
+  // threadsKeysFree), for the caller to reply to; each one's next turn goes
+  // to the cloud, where the key is, even when this Mac has room for it.
+  // With the cloud off nothing is freed: its threads run here, where no key is.
+  async cloudKey(action: 'save' | 'remove', name: string, value: string | undefined, { label = null }: { label?: string | null } = {}) {
+    const { storage } = await this._cloudClients();
+    let freed: { product: string; id: string; answer: string }[] = [];
+    if (action === 'save') {
+      await saveCloudKey(name, value ?? '', { storage, home: this.config.home, label });
+      if (this.config.cloudRuns !== false) freed = threadsKeysFree(this.store.listItems(Date.now()), cloudKeyNames({ home: this.config.home }).map((k) => k.name));
+      for (const t of freed) (this._cloudForKey ??= new Set()).add(t.id);
+    } else if (action === 'remove') await removeCloudKey(name, { storage, home: this.config.home });
+    else throw new Error('a key is saved or removed');
+    this.onChange?.();
+    return { keys: cloudKeyNames({ home: this.config.home }), freed };
+  }
+
+  sendNextTurnToCloud(itemId: string) { (this._cloudForKey ??= new Set()).add(itemId); }
+
+  /** Whether the file a cloud run asked for is here to send, and how big, before anyone presses Send. */
+  cloudFileInfo(asked: string) {
+    const file = fileToSend(asked, { home: this.config.home });
+    return file.error ? { ok: false, error: file.error } : { ok: true, size: file.size };
+  }
+
+  // A FILE SENT FROM THIS COMPUTER to a thread's next cloud turn, once.
+  cloudSendFile(itemId: string, asked: string) {
+    const file = fileToSend(asked, { home: this.config.home });
+    if (file.error) throw new Error(file.error);
+    const sent = { path: file.path!, size: file.size! };
+    const files = (this._filesForCloud ??= new Map());
+    files.set(itemId, [...new Set([...(files.get(itemId) ?? []), sent.path])]);
+    (this._cloudForKey ??= new Set()).add(itemId);
+    return sent;
   }
 
   // THE CLOUD SETUP'S SIGN-IN. `start` adds a new account of an engine (or,
@@ -6867,6 +6912,7 @@ export class Supervisor {
     const cloudOk = () => this._mayRunInCloud(item, product, cwd, { remoteOnly }) && this._cloudSlotFor(engine);
     // Paused on this Mac to move to the cloud (`_moveRunsToTheCloud`).
     if (item?.id && this._toCloud?.delete(item.id) && cloudOk()) return 'cloud';
+    if (item?.id && this._cloudForKey?.delete(item.id) && cloudOk()) return 'cloud';
     if (this._cloudFirst() && cloudOk()) return 'cloud';
     if (this._waitsForCloud(item, engine) && this._mayRunInCloud(item, product, cwd, { remoteOnly })) return 'cloud-wait';
     if (!localFull && this._localSlotFor(engine)) return 'local';
@@ -6928,10 +6974,7 @@ export class Supervisor {
   // whole group, and a relay takes SIGINT as Stop, so the run was cancelled
   // before the app's quit could leave it going. It hears only the app.
   _spawnCloudRelay(args: string[], { cwd, env: given, stdio = ['pipe', 'pipe', 'pipe'] }: { cwd?: string; env: NodeJS.ProcessEnv; stdio?: ChildSpawnOptions['stdio'] }): ChildProcess {
-    const { [CLOUD_ACCOUNT_ENV.claude]: _claude, [CLOUD_ACCOUNT_ENV.codex]: _codex, ...rest } = given;
-    const env: NodeJS.ProcessEnv = { ...rest, ...this._cloudAccountEnv(),
-      ...(this._phoneCarries?.slugs.has(given.ZERO_PRODUCT) ? { AGENTBOX_PHONE_DEVICE: this._phoneCarries.device } : {}),
-    };
+    const env = this._cloudRelayEnv(given);
     const shim = unpacked(path.join(this.appDir, 'scripts', 'cloud-shim.pl'));
     const sock = this._cloudHostAvailable() ? this._cloudHost() : null;
     if (sock) {
@@ -6942,6 +6985,18 @@ export class Supervisor {
       return child;
     }
     return spawn(process.execPath, [...stripTypesFlags(), this._cloudRunPath(), ...args], { cwd, env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, stdio, detached: true });
+  }
+
+  // A cloud run's environment: this Mac's cloud accounts, the phone it reports
+  // to, and the files the person sent its thread, which go with this run only.
+  _cloudRelayEnv(given: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+    const { [CLOUD_ACCOUNT_ENV.claude]: _claude, [CLOUD_ACCOUNT_ENV.codex]: _codex, ...rest } = given;
+    const env: NodeJS.ProcessEnv = { ...rest, ...this._cloudAccountEnv(),
+      ...(this._phoneCarries?.slugs.has(given.ZERO_PRODUCT) ? { AGENTBOX_PHONE_DEVICE: this._phoneCarries.device } : {}),
+    };
+    const sent = given.ZERO_ITEM ? this._filesForCloud?.get(given.ZERO_ITEM) : null;
+    if (sent?.length && given.ZERO_ITEM) { env.AGENTBOX_SEND_FILES = JSON.stringify(sent); this._filesForCloud?.delete(given.ZERO_ITEM); }
+    return env;
   }
 
   // The host's socket, starting the host if none of this app's is running. It

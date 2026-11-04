@@ -85,7 +85,7 @@ describe('what must not change', () => {
   });
 
   it('escape with the box folded still closes the page, one step back', () => {
-    expect(inAThread).toContain("if (e.key === 'Escape') { if (escapeClosesDoc(openDoc)) closeArtifact(); else setFocused(null); }");
+    expect(inAThread).toContain("if (e.key === 'Escape') { if (escapeClosesDoc(openDoc, fullScreenDoc)) closeArtifact(); else setFocused(null); }");
   });
 
   it('clicking into a full screen page folds the box and keeps the page', () => {

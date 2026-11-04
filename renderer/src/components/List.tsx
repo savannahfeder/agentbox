@@ -3,6 +3,8 @@
 // end, on the title's line, the things that are not the message: priority, the
 // product, and when (or that an agent is on it, or that one stopped).
 
+import { NeedsWaiting } from '../threads/NeedsWaiting';
+import './need-card.css';
 import { useContext, useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { Product, RepeatRule, RunningSession, ThreadCard, View, WorkItem } from '../types';
 import { ago, dayAndTime, dayLabel, stamp } from '../format';
@@ -365,6 +367,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
 
   return (
     <div className={`list${table ? ' th-table' : ''}`} ref={drag.listRef} {...pointer}>
+      {view === 'inbox' && <NeedsWaiting items={items} onOpen={onOpen} />}
       {table && (!stack || stack.sections.every((x) => x.bare)) && <TableHead person={withPerson} tab={view} />}
       {!leadIn && lead}
       {/* Repeating tasks sit above the deferred rows, in the tab that already

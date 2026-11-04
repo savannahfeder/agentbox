@@ -4,6 +4,7 @@
 //   node .claude/skills/verify-agentbox/scripts/live.mjs up [--real-claude] [--alpha teammates,rooms]
 //        [--projects "Payments API,Web app"], and on stand-ins [--logins 1-4] [--no-codex]
 //   ... up --real --cloud: every thread to this Mac's cloud, through a relay of the copy's own
+//   ... up --stand-in-cloud: every thread to a stand-in Agentbox Cloud of its own (stub-cloud-server.mjs)
 //   VERIFY_INSTANCE=<name> before any verb: a second copy from the same checkout
 //   node .claude/skills/verify-agentbox/scripts/live.mjs doctor
 //   node .claude/skills/verify-agentbox/scripts/live.mjs drive <name> [--out <dir>]
@@ -153,10 +154,12 @@ export function copyConfig(state, had = {}) {
     // every run and Codex may be picked from the composer.
     engineChoice: '2026-01-01T00:00:00.000Z',
     maxConcurrentSessions: 2,
+    // A checkout reads a missing switch as Multiplayer on; a download reads it as off.
+    alphaMultiplayer: !!state.teamFile,
     ...(state.teamFile ? { alphaRooms: true } : {}),
     // `up --alpha teammates,rooms`: features still in testing are off for a new person.
     ...Object.fromEntries((state.alpha ?? []).map((f) => [`alpha${f[0].toUpperCase()}${f.slice(1)}`, true])),
-    ...(state.cloud && !('cloudRuns' in had) ? { cloudRuns: 'all', cloudWhenOn: 'all' } : {}),
+    ...((state.cloud || state.standInCloud) && !('cloudRuns' in had) ? { cloudRuns: 'all', cloudWhenOn: 'all' } : {}),
   };
 }
 
@@ -456,6 +459,7 @@ async function start(state) {
   // `up --tool-standins <file>`: real tiles on the stand-ins in scripts/standin-tools.mjs.
   if (state.toolStandins) Object.assign(env, { AGENTBOX_TOOLS_STANDINS: fs.readFileSync(state.toolStandins, 'utf8'), AGENTBOX_TOOLS_FIXTURE_OPEN: path.join(INSTANCE, 'oauth-url.txt') });
   if (state.cloudTmp) { fs.mkdirSync(state.cloudTmp, { recursive: true, mode: 0o700 }); env.TMPDIR = state.cloudTmp; }
+  if (state.standInCloud) await startStandInCloud(state);
   if (state.cloudAccounts) env.AGENTBOX_CLOUD_ACCOUNTS = state.cloudAccounts;
   // The app writes its account id back into this file, so keep what it added.
   const file = path.join(state.data, 'zero.config.json');
@@ -485,6 +489,35 @@ async function start(state) {
   return next;
 }
 
+// `up --stand-in-cloud`: Agentbox Cloud's own server and sandbox, here, with
+// the stand-in Claude in the sandbox (stub-cloud-server.mjs). It outlives a
+// restart of the copy, as the cloud does, and goes at `down`.
+const STUB_CLOUD = () => path.join(INSTANCE, 'stub-cloud.json');
+async function startStandInCloud(state) {
+  // The film the stand-in asks for when a task wants "the original film", there to send.
+  const film = path.join(state.home, 'Movies', 'launch-film-original.mov');
+  if (!fs.existsSync(film)) { fs.mkdirSync(path.dirname(film), { recursive: true }); fs.writeFileSync(film, Buffer.alloc(3 * 1024 * 1024, 7)); }
+  // Kept only if it answers: a killed server whose parent went first stays a zombie that kill(pid, 0) calls alive,
+  // and three copies once ran a whole round against two of those, with no cloud at all.
+  try {
+    const was = JSON.parse(fs.readFileSync(STUB_CLOUD(), 'utf8'));
+    if (alive(was.pid) && await fetch(was.url, { signal: AbortSignal.timeout(2000) }).then(() => true, () => false)) return;
+  } catch { /* not up */ }
+  fs.rmSync(STUB_CLOUD(), { force: true });
+  const log = fs.openSync(path.join(INSTANCE, 'stub-cloud.log'), 'a');
+  const server = spawn(process.execPath, [path.join(here, 'stub-cloud-server.mjs')], {
+    detached: true, stdio: ['ignore', log, log],
+    env: { ...cleanEnv(), STUB_CLOUD_INSTANCE: INSTANCE, STUB_CLOUD_HOME: state.home, STUB_CLAUDE_PLAN: state.plan },
+  });
+  server.unref();
+  const deadline = Date.now() + 20_000;
+  while (!fs.existsSync(STUB_CLOUD()) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
+  if (!fs.existsSync(STUB_CLOUD())) stop(`the stand-in cloud did not start: ${fs.readFileSync(path.join(INSTANCE, 'stub-cloud.log'), 'utf8').slice(-2000)}`);
+}
+function stopStandInCloud() {
+  try { process.kill(JSON.parse(fs.readFileSync(STUB_CLOUD(), 'utf8')).pid, 'SIGTERM'); } catch { /* not up */ }
+}
+
 async function up(args) {
   const state = readState();
   if (state && alive(state.pid)) { say(`already up: ${state.url}`); return; }
@@ -506,6 +539,8 @@ async function up(args) {
   if (teamFile && installed) stop('--team runs the browser copy; an installed build never joins a team.');
   if (teamFile) { try { teamEnv(teamFile); } catch (err) { stop(err.message); } }
   if (setupName && (real || installed)) stop('--setup runs the browser copy on its own home; it cannot be combined with --real or --installed.');
+  const standInCloud = args.includes('--stand-in-cloud');
+  if (standInCloud && (real || installed || setupName)) stop('--stand-in-cloud runs the stand-ins on the browser copy.');
   const cloud = args.includes('--cloud');
   if (cloud && !real) stop('--cloud runs real agents on this Mac\'s cloud setup: add --real.');
   if (cloud) {
@@ -534,7 +569,7 @@ async function up(args) {
   const alpha = value('alpha');
   const toolsFixture = value('tools-fixture');
   const toolStandins = value('tool-standins');
-  const prepared = { ...(await prepare(real, setupName, shape)), teamFile, ...(toolsFixture ? { toolsFixture } : {}), ...(toolStandins ? { toolStandins } : {}), ...(alpha ? { alpha: alpha.split(',').map((f) => f.trim()).filter(Boolean) } : {}), ...(cloud ? { cloud: true, cloudTmp: cloudTmpFor(INSTANCE), cloudAccounts } : {}) };
+  const prepared = { ...(await prepare(real, setupName, shape)), teamFile, ...(toolsFixture ? { toolsFixture } : {}), ...(toolStandins ? { toolStandins } : {}), ...(alpha ? { alpha: alpha.split(',').map((f) => f.trim()).filter(Boolean) } : {}), ...(cloud ? { cloud: true, cloudTmp: cloudTmpFor(INSTANCE), cloudAccounts } : {}), ...(standInCloud ? { standInCloud: true, cloudTmp: cloudTmpFor(INSTANCE) } : {}) };
   const next = await start(installed ? { ...prepared, installed: true } : prepared);
   say(installed ? `up: the installed app, pid ${next.pid}, window on debugging port ${next.cdpPort}` : `up: ${next.url}`);
   say(setupName
@@ -675,6 +710,7 @@ export function straysToStop(table, instance, { keepBrowser = false, self = [] }
 
 async function down() {
   const state = readState();
+  stopStandInCloud();
   const strays = await stopProcesses(state);
   fs.rmSync(INSTANCE, { recursive: true, force: true });
   say(state

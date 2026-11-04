@@ -8,7 +8,7 @@ export type EvTab = 'messages' | 'agents';
 export interface WhoseBoard {
   picked: string[];
   mate: string | null;
-  /** Your own threads without your AI teammates' runs, which their cards hold. */
+  /** Your own threads, with only the runs of your AI teammates that are in progress. */
   mineOnly: boolean;
 }
 
@@ -40,9 +40,9 @@ export function cardOpens(key: string, { team, shares, hasChat }: { team: string
   return 'messages';
 }
 
-export function boardItems<T>(items: readonly T[], board: WhoseBoard, mateOf: (item: T) => string | null): T[] {
+export function boardItems<T>(items: readonly T[], board: WhoseBoard, mateOf: (item: T) => string | null, inProgress: (item: T) => boolean = () => false): T[] {
   if (board.mate) return items.filter((i) => mateOf(i) === board.mate);
-  if (board.mineOnly) return items.filter((i) => !mateOf(i));
+  if (board.mineOnly) return items.filter((i) => !mateOf(i) || inProgress(i));
   return [...items];
 }
 

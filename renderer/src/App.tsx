@@ -56,7 +56,7 @@ import { ThreadComposer, type ComposeStart } from './threads/ThreadComposer';
 import { continueStart } from './threads/continue-thread';
 import { OpenTeammateThread } from './threads/ContinuedFrom';
 import { handOffStart, joinNames, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, teammates } from './threads/composer-rules';
-import { keyOnAnOpenThread, keyOnTheList, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
+import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople } from '../../shared/thread-cards.mjs';
 import { changePathFor } from './code-artifact';
@@ -195,7 +195,8 @@ import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, askedInLabel, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { answersInTheirChat } from './team/answers-in-the-chat';
 import type { LedgerLine } from './thread-history';
-import { ruleIdOf, ruleLabel, runToOpen } from '../../shared/repeats.mjs';
+import { dateKey, ruleIdOf, ruleLabel, runToOpen } from '../../shared/repeats.mjs';
+import { lastUsedByMate, readMateOrder, settleMateOrder, writeMateOrder, type MateOrder } from './team/everything/mate-order';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { NOT_ANSWERING, NOT_ANSWERING_MS, RESTART_IT, RESTART_IT_MS, SEND_NOT_TAKEN } from './not-answering';
 import { TEAM_WAIT_MS } from './boot-waits';
@@ -207,7 +208,7 @@ import { namedCards } from './team/company';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
-import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, LiveContext, CloudContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
+import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, LiveContext, CloudContext, SavedKeysContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
 import { offersTryAgain, tryAgainWords } from './try-again';
 import { cloudOffer, type OfferGo } from './cloud-upgrade';
 import { FleetContext, queuedWithHeld, type Fleet } from './fleet';
@@ -749,7 +750,7 @@ export default function App() {
     setModal('reply');
   }, []);
   const handToAgent = useCallback((item: WorkItem, message?: AgentTurn) => {
-    const seen = teamView(snap?.team ?? null, snap?.products ?? []);
+    const seen = teamView(snap?.team ?? null, snap?.products ?? [], snap?.alpha?.multiplayer);
     // A task's files sit in the record it rides in, which a new thread cannot
     // read, so they go on the card and the links come out of the words.
     if (isTaskRow(item)) {
@@ -2038,9 +2039,10 @@ export default function App() {
   // which projects are shared. Null when nobody is signed in, and then every
   // list below is exactly the single-person app's.
   const team = useMemo(() => {
-    const view = teamView(snap?.team, snap?.products ?? []);
+    const view = teamView(snap?.team, snap?.products ?? [], snap?.alpha?.multiplayer);
     return view ? { ...view, alsoById: roomMatesById(snap?.team?.rooms?.rooms ?? []) } : view;
-  }, [snap?.team, snap?.products]);
+  }, [snap?.team, snap?.products, snap?.alpha?.multiplayer]);
+  const multiplayer = snap?.alpha?.multiplayer !== false;
   // "Maya", "Maya and Jun": who a message from the new thread card went to.
   const firstNames = (ids: string[]) => joinNames(ids.map((id) => team?.byId.get(id)?.name?.split(/\s+/)[0]).filter(Boolean) as string[]);
   // A SHARED ROW IS IN ONE INBOX AT A TIME (shared/team-rules.mjs). A row given
@@ -2143,6 +2145,8 @@ export default function App() {
     asking: [...askingIds],
     whyNotCloud: snap?.supervisor.whyNotCloud,
   }), [runningRows, snap?.supervisor, heldAnswer, pendingIds, askingIds]);
+  const savedCloudKeyList = snap?.cloud?.setUp ? snap.cloud.keys : null;
+  const savedCloudKeys = useMemo(() => (savedCloudKeyList ?? []).map((k) => k.name), [savedCloudKeyList]);
   const cloudIds = useMemo(() => new Set(runningRows.filter((r) => r.where === 'cloud').map((r) => r.itemId)), [runningRows]);
   // THE THREADS THE APP STILL HAS TO SHIP (w-0c1ba766eb). Waiting on the app,
   // not on her, so In progress reading "Shipping" and out of Needs you until
@@ -2433,6 +2437,10 @@ export default function App() {
   // the way `tabState` below has it for the board and `done` for the archive.
   // The rule above is untouched; only what the tab draws and counts is this.
   const progressTab = useMemo(() => inProgressTab(progress, inbox), [progress, inbox]);
+  const inProgressNow = useMemo(() => {
+    const ids = new Set(progressTab.map((i) => `${i.product}/${i.id}`));
+    return (i: WorkItem) => ids.has(`${i.product}/${i.id}`);
+  }, [progressTab]);
 
   const queuedIds = useMemo(() => new Set(snap?.supervisor.queued ?? []), [snap?.supervisor.queued]);
   // AGENTBOX CLOUD OFFERS ITSELF WHERE THE FOUNDER PUT IT (2026-10-13,
@@ -2506,9 +2514,9 @@ export default function App() {
   // the inbox, which is the whole point: "I only see things that need me."
   const snoozed = useMemo(() => [
     // AND A FIFTH (w-5244c90c33): a thread waiting on another one, unless a
-    // session or the ship queue has it, which is In progress.
-    ...items.filter((i) => !queuedTeammateRun(i) && (notStarted(i) || isProposal(i) || hiddenAt(i) > now
-        || (waitsInLater(i, waitingOn(i)) && !liveIds.has(i.id) && !shippingIds.has(i.id)))
+    // session or the ship queue has it, which is In progress. A put-off one too.
+    ...items.filter((i) => !queuedTeammateRun(i) && (notStarted(i) || isProposal(i)
+        || ((hiddenAt(i) > now || waitsInLater(i, waitingOn(i))) && !liveIds.has(i.id) && !shippingIds.has(i.id)))
       && (i.status !== 'done' || i.wrote?.status?.source !== 'founder')
       && (!scope || i.product === scope)),
     ...agentList.filter((r) => (r.runAt ?? 0) > now),
@@ -2966,9 +2974,9 @@ export default function App() {
   // The columns themselves are kept too, for the left and right arrows
   // (`boardSideways`), and they come in the order you dragged them to.
   const boardArgs = useMemo(
-    () => ({ items: evBoard ? boardItems(items, evBoard, teammateIdOf) : items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards,
+    () => ({ items: evBoard ? boardItems(items, evBoard, teammateIdOf, inProgressNow) : items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards,
       picked: evBoard ? evBoard.picked : team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: liveIds, projectOrder, waitingIsInProgress: !!evBoard && !evBoard.mate && !evBoard.mineOnly && evBoard.picked.length > 1 }),
-    [items, evBoard, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds, projectOrder],
+    [items, evBoard, inProgressNow, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds, projectOrder],
   );
   const boardCols = useMemo(
     () => (onBoard ? boardColumns({ ...boardArgs, order: teamMode ? evColumns(columnOrder) : columnOrder }) : null),
@@ -2981,11 +2989,11 @@ export default function App() {
   const shownAs = useCallback((rows: WorkItem[], tab: View) => (mineShown
     ? sortedByDisplay(filterBox(rows, boxFilter, directSlugs).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i), directSlugs)), inboxDisplay, tab, projectOrder, directSlugs)
     : []), [mineShown, boxFilter, directSlugs, inboxDisplay, now, seenOf, projectOrder]);
-  // Your AI teammates' runs are on their own cards, as on the board (whose-board.ts).
+  // Your AI teammates' runs under way are in your In progress; their Later and Done stay on their own place.
   const stacked = useMemo(() => {
     if (!(teamMode && view !== 'inbox' && search === null && !onBoard)) return null;
     const yours = (rows: WorkItem[]) => yoursOnly(rows, teammateIdOf);
-    return stackRows({ progress: shownAs(yours(progressTab), 'progress'), later: shownAs(yours(snoozed), 'snoozed'), done: shownAs(yours(done), 'done'),
+    return stackRows({ progress: shownAs(progressTab, 'progress'), later: shownAs(yours(snoozed), 'snoozed'), done: shownAs(yours(done), 'done'),
       dayStart: new Date(now).setHours(0, 0, 0, 0), folded: stackFolded, laterRules: repeats.length,
       isChat: (i) => directSlugs.has(i.product) && !isTaskRow(i) });
   }, [teamMode, view, search, onBoard, shownAs, progressTab, snoozed, done, now, stackFolded, repeats.length, directSlugs]);
@@ -3091,6 +3099,8 @@ export default function App() {
   const pointed: WorkItem | undefined = walkOwn
     ?? (hoveredId && !multiSel.size ? list.find((i) => i.id === hoveredId) : undefined) ?? (keyCard || keyLeadPicked ? undefined : current);
   const keyTab = stacked && pointed ? stacked.tabOf(pointed) : view;
+  // No row, card or tick on the list, so a row's keys are words for its box.
+  const nothingToActOn = !focused && !pointed && !multiSel.size && !keyLead && !stops.length;
 
   /* ------------------------- a panel with a panel in it -------------------- */
   // NO HAIRLINE WITHOUT A SIDEBAR BEHIND IT.
@@ -4174,6 +4184,8 @@ export default function App() {
   };
 
   const [evOrder] = useState<string[] | null>(() => readOrder());
+  const [mateOrder, setMateOrder] = useState<MateOrder | null>(() => readMateOrder());
+  const today = dateKey(now);
   const teamRoom = roomsUi.live ? (snap?.team?.rooms?.rooms ?? []).find((r) => r.teamId) ?? null : null;
   // A teammate's one-to-one chat in Groups, which their card opens.
   const personChats = useMemo(() => {
@@ -4185,8 +4197,8 @@ export default function App() {
     }
     return out;
   }, [roomsUi.live, team, snap?.team?.rooms?.rooms]);
-  const members = useMemo(() => {
-    if (!teamMode) return [];
+  const settled = useMemo(() => {
+    if (!teamMode) return { members: [] as Member[], saved: mateOrder };
     const mateAgents = new Map<string, number>();
     let mine = 0;
     let myNow: string | null = null;
@@ -4209,9 +4221,16 @@ export default function App() {
       myAgents: mine, myNow,
     });
     // Your own count is your In progress column's, so the card and the board under it agree.
-    const yours = yoursOnly(progressTab, teammateIdOf).length;
-    return orderMembers(built.map((m) => (m.kind === 'me' ? { ...m, inProgress: yours } : m)), evOrder);
-  }, [teamMode, runningRows, items, team, teamRoom, cards, teammatesUi.list, teamMates, roomsUi.live, roomsUi.groups, personChats, evOrder, progressTab]);
+    const yours = progressTab.length;
+    const ordered = orderMembers(built.map((m) => (m.kind === 'me' ? { ...m, inProgress: yours } : m)), evOrder);
+    return settleMateOrder(ordered, { lastUsed: lastUsedByMate(items, teammateIdOf), saved: mateOrder, day: today });
+  }, [teamMode, runningRows, items, team, teamRoom, cards, teammatesUi.list, teamMates, roomsUi.live, roomsUi.groups, personChats, evOrder, progressTab, mateOrder, today]);
+  const members = settled.members;
+  useEffect(() => {
+    if (settled.saved === mateOrder || !settled.saved?.keys.length) return;
+    writeMateOrder(settled.saved);
+    setMateOrder(settled.saved);
+  }, [settled.saved, mateOrder]);
   const directWith = (personId: string) => directs.find((d) => d.people.length === 1 && d.people[0] === personId) ?? null;
   const personDirect = (personId: string) => {
     const direct = directWith(personId);
@@ -6083,7 +6102,7 @@ export default function App() {
       // that opens a text field swallows its own keystroke HERE, once, ahead of
       // every branch that could open one. Doing it per branch is what let S
       // through in two places at once (renderer/src/keys.ts carries the story).
-      if (opensATextField(e.key)) e.preventDefault();
+      if (opensATextField(e.key) && !(nothingToActOn && actsOnARow(e.key))) e.preventDefault();
       // And the hand is back on the keys, so the pointer stops owning a row
       // (keys.ts). Here, above the split, because Escape leaves a thread in
       // one branch and the list in another and both hand the list back.
@@ -6198,7 +6217,7 @@ export default function App() {
         // ESCAPE IS ONE WAY BACK, one step at a time: the document, then the
         // task, then the list. It has always meant "back" all the way out and
         // the pane is one more level in.
-        if (e.key === 'Escape') { if (escapeClosesDoc(openDoc)) closeArtifact(); else setFocused(null); }
+        if (e.key === 'Escape') { if (escapeClosesDoc(openDoc, fullScreenDoc)) closeArtifact(); else setFocused(null); }
         else if (e.key === 'ArrowDown' && opts.length) {
           e.preventDefault();
           setOptionSel((s) => {
@@ -6286,7 +6305,7 @@ export default function App() {
         // On Your threads a row's keys are its own section's, the way its tab's were (./threads/stack-rules).
         const view = keyTab;
         if (!e.defaultPrevented && !runRef.current) {
-          const means = keyOnTheList({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()) });
+          const means = keyOnTheList({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), nothingToActOn });
           if (means === 'held') { showToast(HELD_AFTER_A_CHANGE); return; }
           if (means === 'nowhere') {
             const box = clearSlot?.querySelector('textarea');
@@ -7141,7 +7160,7 @@ export default function App() {
     // w-33511040d7).
     corner: onPhone() ? null
       : <NeedsFaces members={evSplit.shown} picked={evOn ? evKey : null} waits={waits} onPick={(key) => pickMember(key)} onAdd={teammatesUi.live ? teammatesUi.onNew : undefined} />,
-    progress: !onPhone() ? { count: mineShown ? shownCount(yoursOnly(progressTab, teammateIdOf)) : 0, on: view !== 'done' && evOn && evKey === 'me' } : undefined,
+    progress: !onPhone() ? { count: mineShown ? shownCount(progressTab) : 0, on: view !== 'done' && evOn && evKey === 'me' } : undefined,
     today: homeLayout === 'list' && !onPhone() ? { on: todayOn, onToday: () => { goNeedsYou(); setTodayOn(true); } } : undefined,
     tasks: homeLayout === 'list' && !onPhone() ? { on: tasksOn, onTasks: () => { goNeedsYou(); setTasksOn(true); } } : undefined,
   } : null;
@@ -7326,6 +7345,7 @@ export default function App() {
     <ChatAgentsContext.Provider value={chatAgents}>
     <LiveContext.Provider value={liveIds}>
     <CloudContext.Provider value={cloudIds}>
+    <SavedKeysContext.Provider value={savedCloudKeys}>
     <MoveToCloudContext.Provider value={mover}>
     <FleetContext.Provider value={fleet}>
     <WaitingContext.Provider value={waitingByThread}>
@@ -7400,7 +7420,8 @@ export default function App() {
           recent={lastUsedEngine(snap)}
         />}
         page={settingsOpen ? 'settings' : null} inboxLabel={roomsUi.live ? 'Inbox' : undefined} invisible={roomsUi.invisible} onSignIn={signInAsked.sidebar ? askToSignIn : undefined} onFeedback={() => setFeedbackOpen(true)} teamPage={teamOpen && !settingsOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
-        onInvite={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
+        onInvite={multiplayer ? () => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); } : undefined}
+        statuses={multiplayer}
         onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onSignOut={() => { void api.teamSignOut().then(() => refresh()); }}
         onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inbox.length + leadCount} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
@@ -7653,7 +7674,7 @@ export default function App() {
               {planWords && !snap.supervisor.running?.length && !run && !focused && !focusedRepeat && !teammatesShown && <PlanBar words={planWords} onSetup={setSetupPlan} />}
               {chatsPlaceShown ? <ChatsFrame current={chatsListKey}>{chatsPlace === 'team' ? <div className="team-page">{todayPage('Everyone', homeLayout === 'chats' ? (key) => openChatsPlace(key) : undefined)}</div> : placeEl}</ChatsFrame>
               : connectionsShown ? (
-                <ConnectionsPlace now={now} focus={connectionsPage!.focus} onNotice={showToast} corner={connectionsCorner} />
+                <ConnectionsPlace now={now} focus={connectionsPage!.focus} onNotice={showToast} corner={connectionsCorner} cloudKeys={savedCloudKeyList} />
               ) : filesShown ? (
                 <FilesPlace project={filesPage!.project} onProject={(project) => setFilesPage({ project })} now={now} onNotice={showToast}
                   onPlace={(p) => {
@@ -7698,6 +7719,7 @@ export default function App() {
                 <TicketItems.Provider value={items}>
                 <ChatsFrame current={inChats ? chatsDirectKey(focused.id) : null}>
                 <Focus
+                  cloudKeys={snap.cloud?.setUp ? (snap.cloud.keys ?? []).map((k) => k.name) : null}
                   // A run of a repeating task carries its rule into the
                   // summary: what every run is told, and Stop repeating.
                   repeat={focusedRule ? {
@@ -8327,8 +8349,9 @@ export default function App() {
           // A cmd-A (or shift-J/K) selection turns the palette into batch
           // mode: every command it offers acts on the whole selection, and
           // single-item commands (Reply, Approve) drop out rather than
-          // silently acting on one row of a many-row selection.
-          if (multiSel.size) {
+          // silently acting on one row of a many-row selection. Only on the
+          // list: with a thread open, the ticks are nowhere on screen.
+          if (multiSel.size && !focused) {
             const sel = selectable.filter((i) => multiSel.has(i.id));
             const n = sel.length;
             const moves = readMoves(sel, seenAt, unreadSince);
@@ -9164,7 +9187,7 @@ export default function App() {
           AND IT NAMES THE TASK: the row's own title is the card's first line,
           and the sentence ("Started in Agentbox Team") the quiet one under it,
           picked out of fourteen drawings over four rounds. */}
-      {multiSel.size > 0 && !toast && !focused && !modal && (
+      {multiSel.size > 0 && !toast && !focused && !modal && !settingsOpen && !filesShown && !connectionsShown && (
         <TickedBar count={multiSel.size} view={view} onKey={(does) => {
           const sel = selectable.filter((i) => multiSel.has(i.id));
           if (does === 'clear') setMultiSel(new Set());
@@ -9262,6 +9285,7 @@ export default function App() {
     </WaitingContext.Provider>
     </FleetContext.Provider>
     </MoveToCloudContext.Provider>
+    </SavedKeysContext.Provider>
     </CloudContext.Provider>
     </LiveContext.Provider>
     </ChatAgentsContext.Provider>

@@ -87,6 +87,8 @@ export interface CloudStatus {
   plan?: string | null;
   /** Runs on this Mac the cloud could take now (supervisor `_movableToCloud`). */
   movable?: string[];
+  /** The keys saved for cloud runs, by name only (main/cloud/keys.mjs). */
+  keys?: { name: string; savedAt: number | null; label?: string | null }[];
 }
 
 const agentName = (engine: 'claude' | 'codex') => (engine === 'codex' ? 'Codex' : 'Claude Code');

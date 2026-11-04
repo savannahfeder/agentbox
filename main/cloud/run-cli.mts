@@ -19,6 +19,7 @@ import { cloudClients } from './clients.mts';
 import type { CloudConfig } from './clients.mts';
 import { readCloudConfig, readCloudKey, imageCapsToTry, noteImageCaps } from './config.mjs';
 import { pickCloudLogin, markCloudLogin, loginObjectKey, cloudAccountsFrom, cloudAccountFrom, cloudLoginInUse, noCloudAccountSentence } from './logins.mts';
+import { keysCarried } from './keys.mjs';
 
 // SIGNED AS THE CLOUD RUNS' OWN USER AND NOBODY ELSE. AWS's libraries read
 // keys from the environment before they read a named profile, so an app
@@ -110,6 +111,7 @@ export async function cloudRunFromArgs({ args, env, cwd, stdin, stdout, stderr, 
     engine,
     login: rec ? { engine, id: rec.id, key: loginObjectKey(engine, rec.id) } : null,
     also: rec ? loginsCarriedBy(engine, { only: cloudAccountsFrom(env), prefer: cloudAccountFrom(env, 'codex') }) : [],
+    keys: keysCarried(),
     // A missing or refused login is marked so the menu asks for a new sign-in;
     // an expired Codex one is left for the supervisor to renew.
     onLoginTrouble: ({ state, id }) => {

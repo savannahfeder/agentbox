@@ -5554,6 +5554,16 @@ img.product-mark { object-fit: cover; opacity: 1; }
   padding: 6px 12px; font: 13.5px inherit; font-family: inherit; color: var(--text); cursor: pointer;
 }
 a.set-ghost { text-decoration: none; display: inline-block; }
+.set-row.set-key-replace { display: flex; align-items: center; gap: 9px; }
+.set-key-input {
+  flex-grow: 1; min-width: 0; height: 32px; padding: 0 10px; box-sizing: border-box; background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: var(--radius); outline: 0; font: inherit; font-size: 13px; color: var(--text);
+}
+.set-key-input:focus { border-color: var(--text-faint); }
+.set-key-replace { flex-wrap: wrap; }
+.set-key-name { flex-basis: 100%; font-size: 14px; color: var(--text); }
+.set-key-said { flex-basis: 100%; font-size: 12.5px; line-height: 17px; color: var(--text-dim); }
+.set-key-input::placeholder { color: var(--text-faint); }
 .set-ghost:hover { background: var(--bg-hover); }
 .set-ghost:disabled { color: var(--text-faint); cursor: default; }
 

@@ -2122,6 +2122,65 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       return { ok: false, error: String((err as Error).message) };
     }
   });
+  // A saved key carries on every thread that was waiting on it, as if each had been replied to.
+  // `reply` is the person's own words for the thread the key was pasted on, which go instead of the app's.
+  ipcMain.handle('zero:cloud-key', async (_e, { action, name, value, label, reply } = {}) => {
+    try {
+      let { keys, freed } = await supervisor.cloudKey(action, name, value, { label: typeof label === 'string' ? label : null });
+      if (reply?.id && typeof reply.answer === 'string' && reply.answer.trim()) {
+        freed = [...freed.filter((t) => t.id !== reply.id || t.product !== reply.product), { product: reply.product, id: reply.id, answer: reply.answer }];
+      }
+      for (const t of freed) await submitReply(supervisor, { product: t.product, id: t.id, answer: t.answer, status: 'open' }, () => store.answerItem(t.product, t.id, { answer: t.answer, status: 'open' }));
+      if (freed.length) supervisor.wake();
+      push();
+      return { ok: true, keys, freed: freed.map((t) => t.id), cloudOff: supervisor.config.cloudRuns === false };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+  // A FILE A CLOUD RUN ASKED FOR, sent from this computer by the person's press,
+  // or one they chose in the open panel instead. The thread carries on with it.
+  // `hold` keeps the reply back: the file goes with the sign-in still open on the same ask, whose save sends both.
+  ipcMain.handle('zero:cloud-file-info', (_e, { path: asked } = {}) => {
+    try { return supervisor.cloudFileInfo(asked); } catch (err) { return { ok: false, error: String((err as Error).message) }; }
+  });
+  // `also` is what was held for this ask before it, which goes in the same reply.
+  ipcMain.handle('zero:cloud-send-file', async (_e, { product, id, path: asked, choose = false, hold = false, also = '' } = {}) => {
+    try {
+      let file = asked;
+      if (choose) {
+        const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, { title: 'Pick the file to send', buttonLabel: 'Send this file', properties: ['openFile'] });
+        // The browser copy has no file panel (main/serve.mjs).
+        if (r.noDialog) return { ok: false, error: 'Choosing a file needs the Agentbox app on this computer.' };
+        if (r.canceled || !r.filePaths?.length) return { ok: true, canceled: true };
+        file = r.filePaths[0];
+      }
+      const sent = supervisor.cloudSendFile(id, file);
+      const home = supervisor.config?.home ?? os.homedir();
+      const shown = sent.path.startsWith(`${home}/`) ? `~${sent.path.slice(home.length)}` : sent.path;
+      const own = `I sent ${shown}. It is at that same path on your machine now.`;
+      if (hold) return { ok: true, path: sent.path, held: true, words: own };
+      const answer = typeof also === 'string' && also.trim() ? `${also.trim()} ${own} Carry on.` : own;
+      await submitReply(supervisor, { product, id, answer, status: 'open' }, () => store.answerItem(product, id, { answer, status: 'open' }));
+      supervisor.wake();
+      push();
+      return { ok: true, path: sent.path };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+  // A ONE-TIME CODE A CLOUD RUN ASKED FOR, sent as the reply that carries it on.
+  ipcMain.handle('zero:cloud-send-code', async (_e, { product, id, about, code, also = '' } = {}) => {
+    const c = String(code ?? '').trim();
+    if (!/^[A-Za-z0-9-]{4,12}$/.test(c)) return { ok: false, error: 'That does not look like a code.' };
+    const own = `The ${String(about ?? '').trim() || 'one-time'} code is ${c}.`;
+    const answer = typeof also === 'string' && also.trim() ? `${also.trim()} ${own} Carry on.` : own;
+    supervisor.sendNextTurnToCloud?.(id);
+    await submitReply(supervisor, { product, id, answer, status: 'open' }, () => store.answerItem(product, id, { answer, status: 'open' }));
+    supervisor.wake();
+    push();
+    return { ok: true };
+  });
   // CLAUDE'S CODE, FROM THE CLIPBOARD, WHEN SHE COMES BACK (2026-10-14: she
   // approved on Claude's page and waited, not seeing that the code it shows
   // has to come back). Answered only while a Claude sign-in is waiting for
