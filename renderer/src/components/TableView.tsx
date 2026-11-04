@@ -672,6 +672,12 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   /** The keys to the table itself, which is no text box, so the app's own Escape and letters work again. */
   const rest = () => root.current?.focus({ preventScroll: true });
   // The app's own Escape steps aside for a text box, and the keys were in one: hand this Escape on from the table itself.
+  // The keys sit in a hidden text box, and the app's own letters step aside for a
+  // text box: the keys move to the table itself, and the letter goes on from there.
+  const passKey = (e: React.KeyboardEvent) => {
+    rest();
+    root.current?.dispatchEvent(new KeyboardEvent('keydown', { key: e.key, code: e.nativeEvent.code, shiftKey: e.shiftKey, bubbles: true, cancelable: true }));
+  };
   const passEscape = () => { rest(); root.current?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); };
 
   // ---- Changing cells.
@@ -826,7 +832,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     if (k === 'F2') { stop(); startEdit(pick.a); return; }
     if (k === ' ' && !meta) { stop(); setSheet(pick.a.r); return; }
     if (k === 'Backspace' || k === 'Delete') { stop(); clearPicked(); return; }
-    if (k.length === 1 && !meta && !e.altKey && editable) { stop(); startEdit(pick.a, k); }
+    // A letter is the app's (R replies, E closes), not the cell's: Enter, F2 or a double click edits.
+    if (k.length === 1 && !meta && !e.altKey) { stop(); passKey(e); }
   };
   const onCopy = (e: React.ClipboardEvent, cut = false) => {
     if (!sel) return;
@@ -1010,6 +1017,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     const meta = e.metaKey || e.ctrlKey;
     if (meta && /^z$/i.test(e.key)) { e.preventDefault(); e.stopPropagation(); if (e.shiftKey) redo(); else undo(); focusKeys(); }
     else if (meta && /^y$/i.test(e.key)) { e.preventDefault(); e.stopPropagation(); redo(); focusKeys(); }
+    else if (/^(Arrow|Tab$|Home$|End$|Page|Enter$|F2$|Delete$|Backspace$)/.test(e.key) && pick) { focusKeys(); onKeys(e as React.KeyboardEvent<HTMLTextAreaElement>); }
     else if (/^(Arrow|Tab$|Home$|End$|Page)/.test(e.key) && order.length) {
       e.preventDefault(); e.stopPropagation();
       goTo({ a: { r: 0, c: first }, b: { r: 0, c: first } }); focusKeys();
@@ -1058,14 +1066,9 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
         </div>
       )}
       <div className="tbl-frame">
-      {hands && <textarea ref={keys} className="tbl-keys" aria-label="Table" inputMode="none" tabIndex={0} defaultValue=" "
+      {hands && <textarea ref={keys} className="tbl-keys" aria-label="Table" inputMode="none" tabIndex={0} defaultValue=" " data-keys-only=""
         onKeyDown={onKeys} onCopy={(e) => onCopy(e)} onCut={(e) => (editable ? onCopy(e, true) : onCopy(e))} onPaste={onPaste}
-        onChange={(e) => {
-          // Text that came with no key press (dictation, the emoji picker, a pasted word list) starts an edit as typing would.
-          const typed = e.target.value.trim();
-          e.target.value = ' ';
-          if (typed && pick && editable) startEdit(pick.a, typed);
-        }} />}
+        onChange={(e) => { e.target.value = ' '; }} />}
       <div className="tbl-scroll" ref={box} style={{ ['--tbl-stuck' as string]: `${stuckAt}px`, ['--tbl-rn-w' as string]: `${rnW}px` }} onPointerDown={onDown} onDoubleClick={onDouble} onContextMenu={onContext}
         onClickCapture={(e) => {
           if (hands && (e.target as HTMLElement).closest('.tbl-grid a') && !linkOpens.current) e.preventDefault();
