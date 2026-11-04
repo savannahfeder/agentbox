@@ -153,14 +153,16 @@
 .tbl-inline .tbl-ell { max-width: 300px; }
 
 /* ---- Working the table: beside the message and full screen. ---- */
+/* The pick is the table's own blue (its Contacted tag's dot), not a white or
+   black ring, which read as a hard box drawn over the table. */
 .tbl {
-  --tbl-sel: rgba(17, 25, 48, 0.055);
-  --tbl-at: rgba(17, 25, 48, 0.72);
+  --tbl-sel: rgba(76, 127, 214, 0.08);
+  --tbl-at: rgba(76, 127, 214, 0.85);
 }
 :root[data-theme="dark"] .tbl,
 :root[data-skin]:where(:not([data-theme="light"])) .tbl {
-  --tbl-sel: rgba(255, 255, 255, 0.07);
-  --tbl-at: rgba(255, 255, 255, 0.78);
+  --tbl-sel: rgba(110, 150, 225, 0.1);
+  --tbl-at: rgba(110, 150, 225, 0.7);
 }
 .tbl-scroll { position: relative; }
 .tbl-pane .tbl-grid, .tbl-full .tbl-grid { user-select: none; -webkit-user-select: none; }
