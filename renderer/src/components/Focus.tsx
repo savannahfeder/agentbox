@@ -839,7 +839,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
    * thread's own options stand, and the number keys answer it (App.tsx).
    * `raised` counts each close that raised it, so each one scrolls to it.
    */
-  closeAsk?: { ask: string; options: ParsedOption[]; raised: number; onPick: (n: number) => void; keep?: { label: string; onKeep: () => void } } | null;
+  closeAsk?: { ask: string; options: ParsedOption[]; raised: number; onPick: (n: number) => void; named?: Array<{ id: string; title: string }> } | null;
   // Said out loud when a file a worker named is not in this product. Nothing
   // else on the card can tell her a chip failed.
   onNotice: (text: string) => void;
@@ -1697,6 +1697,22 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const fullScreenDoc = artifactView === 'focus';
   const offerInPane = stripShown && !fullScreenDoc;
   const offerInDock = stripShown && fullScreenDoc && replyOpen;
+  // THE CLOSE QUESTION ABOUT FILED TASKS STANDS UNDER THEIR ROWS, which can be
+  // on a turn folded far up the thread (w-66748120f2), so the conversation
+  // places it. Full screen has no conversation on screen, so there the
+  // question names the tasks itself.
+  const askAtTask = !!closeAsk?.named?.length && !made && !agent && !fullScreenDoc;
+  const closeAskStrip = (naming: boolean) => closeAsk && (
+    <OptionsOffer
+      ask={closeAsk.ask} askAll={closeAsk.ask} options={closeAsk.options}
+      peekOption={null} askPeek={false}
+      selectedOption={selectedOption} selRef={selRef}
+      onPick={closeAsk.onPick} onOptionEnter={() => {}} onAskEnter={() => {}}
+      setPeek={() => {}} setAskPeek={() => {}}
+      named={naming && closeAsk.named ? { rows: closeAsk.named, onOpen: openFiled } : undefined}
+      stripRef={closeAskRef}
+    />
+  );
   // The strip already draws the list, so the field that carried it prints
   // without it. Only that field: a result offering a pick must not silently
   // eat an "## Options" heading left behind in an older body.
@@ -2206,6 +2222,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                  conversation places them now, by the moment each was created,
                  and they scroll away with the turn that came back with them. */
               filed={filed.map((r) => ({ ...r, at: r.item.createdAt ?? 0 }))}
+              closeAsk={askAtTask && closeAsk ? { strip: closeAskStrip(false), raised: closeAsk.raised } : null}
               onOpenFiled={openFiled}
               onApproveFiled={onApproveFiled && approveFiled}
               onHereFiled={onHereFiled && hereFiled}
@@ -2267,16 +2284,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         {/* AND WHILE A CLOSE IS ASKING ABOUT THE TASKS STILL WAITING, ITS
             QUESTION STANDS HERE INSTEAD (w-d2744c6daa), on any row, offer or
             not, because the close is what raised it. */}
-        {closeAsk && !fullScreenDoc && (
-          <OptionsOffer
-            ask={closeAsk.ask} askAll={closeAsk.ask} options={closeAsk.options}
-            peekOption={null} askPeek={false}
-            selectedOption={selectedOption} selRef={selRef}
-            onPick={closeAsk.onPick} onOptionEnter={() => {}} onAskEnter={() => {}}
-            setPeek={() => {}} setAskPeek={() => {}} keep={closeAsk.keep}
-            stripRef={closeAskRef}
-          />
-        )}
+        {!fullScreenDoc && !askAtTask && closeAskStrip(false)}
         {questions}
         {/* One at a time draws them at the foot instead, apart from the reply box. */}
         {offerInPane && (page || closeAsk ? null : (
@@ -2499,16 +2507,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               its old terms: it comes up with the box and goes when the box
               folds. It follows nobody down a page, because in that mode there
               is no page of conversation on the screen. */}
-          {closeAsk && fullScreenDoc && (
-            <OptionsOffer
-              ask={closeAsk.ask} askAll={closeAsk.ask} options={closeAsk.options}
-              peekOption={null} askPeek={false}
-              selectedOption={selectedOption} selRef={selRef}
-              onPick={closeAsk.onPick} onOptionEnter={() => {}} onAskEnter={() => {}}
-              setPeek={() => {}} setAskPeek={() => {}} keep={closeAsk.keep}
-              stripRef={closeAskRef}
-            />
-          )}
+          {fullScreenDoc && closeAskStrip(true)}
           {offerInDock && (closeAsk ? null : (
             <OptionsOffer
               ask={ask} askAll={askAll} options={options}
