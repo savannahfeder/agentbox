@@ -149,7 +149,7 @@ language plpgsql security definer set search_path = public as $$
 declare me uuid := auth.uid(); out_id uuid; used int; words text := btrim(coalesce(b, ''));
 begin
   if me is null then raise exception 'sign in to comment'; end if;
-  if regexp_replace(words, '[\s​-‍⁠﻿]+', '', 'g') = '' then raise exception 'write something first'; end if;
+  if regexp_replace(words, '[\s ­ᅟᅠ᠎ -‏ -  -⁤⠀　ㅤ﻿ﾠ]+', '', 'g') = '' then raise exception 'write something first'; end if;
   if char_length(words) > 4000 then raise exception 'a comment is 4000 characters at most'; end if;
   if not exists (select 1 from public.file_links where token = tok and stopped_at is null) then
     raise exception 'this link was stopped';

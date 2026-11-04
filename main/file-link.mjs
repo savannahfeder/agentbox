@@ -102,38 +102,15 @@ export function fileForLink(file, { fs = fsDefault } = {}) {
 }
 
 /**
- * The newest version beside a file: plan-v3.md over plan.md and plan-v2.md in
- * the same folder. An edit from Files writes the next version, and a link to
- * the file is meant to carry the newest one, whichever version is on screen.
+ * The file on screen as its link carries it. The link only ever carries what
+ * was on screen when Share was pressed: a version nobody opened must not go
+ * out on its own.
  */
-export function newestBeside(file, keyOf, { fs = fsDefault } = {}) {
-  const dir = path.dirname(file);
-  const key = keyOf(file);
-  let best = file;
-  try {
-    for (const name of fs.readdirSync(dir)) {
-      const other = path.join(dir, name);
-      if (other === best || keyOf(other) !== key || path.extname(name).toLowerCase() !== path.extname(file).toLowerCase()) continue;
-      if (versionInName(name) > versionInName(best)) best = other;
-    }
-  } catch { /* the folder went: the file on screen is all there is */ }
-  return best;
-}
-
-/**
- * The file on screen as its link carries it, with the name of a newer version
- * beside it. The link only ever carries what was on screen when Share was
- * pressed: a version nobody opened must not go out on its own.
- */
-export function linkCopyOf(file, keyOf, { fs = fsDefault } = {}) {
+export function linkCopyOf(file, { fs = fsDefault } = {}) {
   const made = fileForLink(file, { fs });
   if (made.error) return made;
-  const newest = newestBeside(file, keyOf, { fs });
-  return { ...made, name: path.basename(file), version: versionInName(file), newer: newest !== file ? path.basename(newest) : null };
+  return { ...made, name: path.basename(file), version: versionInName(file) };
 }
-
-/** That newer version's name, while the link holds neither it nor one after it. */
-export const newerNotInLink = (copy, link) => (copy?.newer && !(link && link.version >= versionInName(copy.newer)) ? copy.newer : null);
 
 /** The version a file's name says (plan-v3.md is 3), as files here are named. */
 export const versionInName = (name) => Number(/-v(\d{1,4})\.[^./]+$/i.exec(String(name ?? ''))?.[1] ?? 1) || 1;

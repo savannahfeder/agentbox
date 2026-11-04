@@ -10,12 +10,10 @@ export const SIGN_IN_TO_SHARE = 'agentbox:sign-in-to-share';
 
 export const shareWords = {
   signedOut: 'Sign in to share this file or see its link.',
-  fresh: 'Make a link anyone can open, without an account.',
+  fresh: 'Make a link anyone can open, without an account. Its comments are public too.',
   stopped: 'Stopped. The old link no longer works.',
   behind: 'The link shows an older copy.',
   ahead: (v: number) => `The link shows version ${v}, newer than this one.`,
-  // The link carries the file on screen; a version nobody opened goes out only from its own Share.
-  newer: (name: string) => `${name} is newer. Open it to share that one.`,
   newComments: 'New comments on the link',
   comments: (n: number) => (n === 1 ? '1 comment' : `${n} comments`),
   stopAsk: (n: number) => (n > 0 ? `Stop, and delete ${n === 1 ? 'its comment' : `its ${n} comments`}` : 'Stop the link'),
@@ -168,7 +166,6 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
             <>
               <input className="av-share-url" readOnly value={link.url} aria-label="Link" onFocus={(e) => e.currentTarget.select()} />
               <p className="av-share-meta"><span>{behind ? shareWords.behind : link.ahead ? shareWords.ahead(link.version) : shareWords.shared(link)}</span></p>
-              {state.newer && <p className="av-share-said">{shareWords.newer(state.newer)}</p>}
               <div className="av-share-acts">
                 {behind && <button type="button" className="av-btn is-on" disabled={busy} onClick={() => void share()}>Update link</button>}
                 <button type="button" className={`av-btn${behind ? '' : ' is-on'}`} disabled={busy} onClick={() => void copy(link.url).then((ok) => setSaid(ok ? 'Link copied' : null))}>Copy link</button>
@@ -197,7 +194,6 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
           ) : (
             <>
               <p>{shareWords.fresh}</p>
-              {state.newer && <p className="av-share-said">{shareWords.newer(state.newer)}</p>}
               <div className="av-share-acts">
                 <button type="button" className="av-btn is-on" disabled={busy} onClick={() => void share()}>{busy ? 'Making the link' : 'Make link'}</button>
               </div>

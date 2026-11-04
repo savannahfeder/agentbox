@@ -141,6 +141,10 @@ describe('comments', () => {
   it('are refused when they hold only characters nobody can see, and kept when a word stands among them', async () => {
     const other = await share(MAYA, 'notes/w-9/invisible');
     expect(await refused(JUN, `select public.comment_on_file_link($1, $2)`, [other, '​ ‍﻿⁠'])).toBe(true);
+    // The next round got blank comments in with these (round 4).
+    for (const blank of [' ', 'ㅤ', 'ᅟᅠ', '⠀', 'ﾠ', '᠎', '­']) {
+      expect(await refused(JUN, `select public.comment_on_file_link($1, $2)`, [other, blank]), JSON.stringify(blank)).toBe(true);
+    }
     expect(await comment(JUN, other, '​ok')).toHaveLength(1);
   });
   it('over 4000 characters are refused in words a person can read', async () => {

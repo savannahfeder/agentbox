@@ -44,7 +44,7 @@ import { artifactRoots, resolveArtifact } from './artifact-path.mjs';
 import { folderPictures } from './folder-pictures.mjs';
 import { docUrl } from './doc-scheme.mjs';
 import { readDoc, writeDoc } from './doc-file.mjs';
-import { linkCopyOf, linkSource, newerNotInLink } from './file-link.mjs';
+import { linkCopyOf, linkSource } from './file-link.mjs';
 import { familyKeyOf } from '../shared/artifact-marks.mjs';
 import { readItemHistory } from './store/work-items.mjs';
 import { readChange } from './code-change.mjs';
@@ -2404,19 +2404,15 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       products: readableProducts(), accountRoot: config.accountRoot, storeRoot: config.storeRoot, nameOf: team?.firstNameOf,
     });
     if (!found.ok) throw new Error(found.error || 'This file is not on this computer.');
-    const copy = linkCopyOf(found.path, familyKeyOf);
+    const copy = linkCopyOf(found.path);
     if (copy.error) throw new Error(copy.error);
     return copy;
   };
   ipcMain.handle('zero:file-link', linkCall(async (arg) => {
     const now = await fileOnScreen(arg).catch(() => null);
-    const state = await team.fileLink(linkOf(arg), now?.hash ?? null, now?.version ?? null);
-    return { ...state, newer: newerNotInLink(now, state.link) };
+    return team.fileLink(linkOf(arg), now?.hash ?? null, now?.version ?? null);
   }));
-  ipcMain.handle('zero:file-link-share', linkCall(async (arg) => {
-    const { newer: _newer, ...copy } = await fileOnScreen(arg);
-    return team.shareFile({ source: linkOf(arg), ...copy });
-  }));
+  ipcMain.handle('zero:file-link-share', linkCall(async (arg) => team.shareFile({ source: linkOf(arg), ...(await fileOnScreen(arg)) })));
   ipcMain.handle('zero:file-links', linkCall(async () => team.fileLinks()));
   ipcMain.handle('zero:file-link-stop', linkCall(async ({ token } = {}) => { await team.stopFileLink(String(token ?? '')); return {}; }));
   ipcMain.handle('zero:file-link-comments', linkCall(async ({ token } = {}) => ({ comments: await team.fileLinkComments(String(token ?? '')) })));

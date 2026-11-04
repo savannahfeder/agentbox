@@ -39,6 +39,13 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
 
   // `anyone`: asked as whoever is signed in, and as nobody when nobody is.
   async function call(path: string, init: RequestInit & { auth?: boolean | 'anyone' } = {}, again = true): Promise<any> {
+    // A sign-in the database refuses is let go, and a call for anyone is still answered, as nobody.
+    if (init.auth === 'anyone' && session) {
+      try { return await call(path, { ...init, auth: true }, again); } catch (err) {
+        if (session) throw err;
+        return call(path, init, false);
+      }
+    }
     const mine = gen;
     const headers: Record<string, string> = { apikey: cfg.anonKey, 'content-type': 'application/json', ...(init.headers as Record<string, string> | undefined) };
     if (init.auth === 'anyone' && !session) headers.authorization = `Bearer ${cfg.anonKey}`;

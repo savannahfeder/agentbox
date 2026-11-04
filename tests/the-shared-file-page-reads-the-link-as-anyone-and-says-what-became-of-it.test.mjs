@@ -122,6 +122,29 @@ describe('the database client', () => {
     await client.rpc('file_link_comments_of', { tok: 't' }, { anyone: true });
     expect(calls.at(-1).init.headers.authorization).toBe('Bearer mine');
   });
+  // A good link opened as "This file did not load" in a browser holding a
+  // sign-in the database no longer took (power test, round 4, 2026-11-04).
+  it('asks again as nobody when the sign-in it holds is refused, and lets that sign-in go', async () => {
+    const calls = [];
+    const fetchImpl = async (url, init) => {
+      calls.push(init.headers.authorization);
+      if (url.includes('/auth/v1/token')) return new Response('{"error":"invalid refresh token"}', { status: 400 });
+      return init.headers.authorization === 'Bearer anon' ? new Response('[{"name":"plan.md"}]', { status: 200 }) : new Response('{"message":"JWT expired"}', { status: 401 });
+    };
+    const kept = new Map([['agentbox-cloud-session', JSON.stringify({ access_token: 'old', refresh_token: 'r', expires_at: Date.now() + 3_600_000, user: { id: 'u1', email: 'a@b.c' } })]]);
+    const storage = { getItem: (k) => kept.get(k) ?? null, setItem: (k, v) => kept.set(k, v), removeItem: (k) => kept.delete(k) };
+    const client = cloudClient({ url: 'https://db.example', anonKey: 'anon' }, { storage, fetchImpl });
+    expect(client.signedIn()).toBe(true);
+    expect(await client.rpc('file_link_view', { tok: 't' }, { anyone: true })).toEqual([{ name: 'plan.md' }]);
+    expect(client.signedIn()).toBe(false);
+    expect(calls.at(-1)).toBe('Bearer anon');
+  });
+  it('lets a lost connection through on a call for anyone, rather than asking again', async () => {
+    const fetchImpl = async () => { throw new TypeError('Failed to fetch'); };
+    const store = new Map();
+    const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: (k) => store.delete(k) };
+    await expect(cloudClient({ url: 'https://db.example', anonKey: 'anon' }, { storage, fetchImpl }).rpc('file_link_view', { tok: 't' }, { anyone: true })).rejects.toThrow(/Failed to fetch/);
+  });
   it('still refuses a call that is not for anyone without a sign-in', async () => {
     const { calls, client } = fake();
     await expect(client.rpc('comment_on_file_link', { tok: 't', b: 'x' })).rejects.toThrow(/not signed in/);

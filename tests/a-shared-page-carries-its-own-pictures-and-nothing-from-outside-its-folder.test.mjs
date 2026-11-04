@@ -9,8 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileForLink, linkKindOf, linkSource, linkAddress, newestBeside, linkCopyOf, newerNotInLink, LINK_MAX_BYTES } from '../main/file-link.mjs';
-import { familyKeyOf } from '../shared/artifact-marks.mjs';
+import { fileForLink, linkKindOf, linkSource, linkAddress, linkCopyOf, LINK_MAX_BYTES } from '../main/file-link.mjs';
 
 let dir, page;
 const write = (rel, data) => { const f = path.join(dir, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, data); return f; };
@@ -80,38 +79,14 @@ describe('what can be shared', () => {
   });
 });
 
-// An edit from Files wrote investor-update-v2.md and the link never offered it (power test, 2026-11-04).
-describe('the newest version beside a file', () => {
-  it('is the highest -vN of the same file in its folder, whichever version is on screen', () => {
-    const v1 = write('docs/plan.md', 'one');
-    write('docs/plan-v2.md', 'two');
-    const v3 = write('docs/plan-v3.md', 'three');
-    write('docs/plan-v9.txt', 'not the same kind');
-    write('docs/other-v7.md', 'another file');
-    expect(newestBeside(v1, familyKeyOf)).toBe(v3);
-    expect(newestBeside(v3, familyKeyOf)).toBe(v3);
-  });
-  // Update link on q1-roadmap.md put q1-roadmap-v2.md, which she had never
-  // opened, on an investor's page (power test, round 3, 2026-11-04).
-  it('is named beside the file on screen, which is the copy a link carries', () => {
+// Update link on q1-roadmap.md put q1-roadmap-v2.md, which she had never
+// opened, on an investor's page (power test, round 3, 2026-11-04).
+describe('the copy a link carries', () => {
+  it('is the file on screen, by its own name and version, whatever newer version sits beside it', () => {
     const v1 = write('deck/plan.md', 'one');
     write('deck/plan-v2.md', 'two');
-    const copy = linkCopyOf(v1, familyKeyOf);
-    expect(copy).toMatchObject({ name: 'plan.md', version: 1, body: 'one', newer: 'plan-v2.md' });
-    expect(linkCopyOf(path.join(dir, 'deck/plan-v2.md'), familyKeyOf)).toMatchObject({ name: 'plan-v2.md', version: 2, body: 'two', newer: null });
-  });
-  it('is said only while the link does not already hold it or one after it', () => {
-    const copy = { newer: 'plan-v2.md' };
-    expect(newerNotInLink(copy, null)).toBe('plan-v2.md');
-    expect(newerNotInLink(copy, { version: 1 })).toBe('plan-v2.md');
-    expect(newerNotInLink(copy, { version: 2 })).toBeNull();
-    expect(newerNotInLink(copy, { version: 3 })).toBeNull();
-    expect(newerNotInLink({ newer: null }, { version: 1 })).toBeNull();
-  });
-  it('is the file itself when it has no other version, or its folder is gone', () => {
-    const only = write('solo/notes.md', 'x');
-    expect(newestBeside(only, familyKeyOf)).toBe(only);
-    expect(newestBeside(path.join(dir, 'gone/x.md'), familyKeyOf)).toBe(path.join(dir, 'gone/x.md'));
+    expect(linkCopyOf(v1)).toMatchObject({ name: 'plan.md', version: 1, body: 'one' });
+    expect(linkCopyOf(path.join(dir, 'deck/plan-v2.md'))).toMatchObject({ name: 'plan-v2.md', version: 2, body: 'two' });
   });
 });
 
