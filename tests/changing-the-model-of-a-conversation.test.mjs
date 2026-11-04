@@ -85,12 +85,9 @@ describe('the wiring from the reply box is present in the source', () => {
     expect(reply).toContain("import { ModelMenu } from '../threads/ModelMenu';");
   });
 
-  it("reads as the card's own clause, preposition and all", () => {
-    // Measured in the built renderer on 2026-09-18 with the preposition
-    // missing: the footer read "Medium priority. Runs once. Opus 5.", where
-    // the card beside it says "On Opus 5." One word cannot mean two things in
-    // two boxes she uses together.
-    expect(focus).toMatch(/\{'On '\}\s*\n\s*<ReplyModel/);
+  it("is drawn as the new thread card's chip", () => {
+    // The sentence ("On Opus 5.") gave way to the card's bar on w-54cdf7c768.
+    expect(focus).toMatch(/<ReplyModel\s+chip\b/);
   });
 
   it("shows the row's own model rather than a default", () => {

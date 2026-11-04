@@ -6,18 +6,12 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { fitMenu } from '../keep-in-window';
 import { laterHint, momentFromWords, mondayMorning, tomorrowMorning } from '../threads/composer-rules';
 
-/** How the menu is opened. Five are drawn for review (w-54cdf7c768); one stays. */
-export type LaterLook = 'caret' | 'word' | 'clock' | 'words';
-
-export function ReplyLater({ at, onPick, onClosed, look = 'caret', saysTime = true }: {
+export function ReplyLater({ at, onPick, onClosed }: {
   /** The moment the reply is set for, or 0 for now. */
   at: number;
   onPick: (at: number) => void;
   /** The menu shut, so the box can take the keyboard back. */
   onClosed?: () => void;
-  look?: LaterLook;
-  /** Whether the trigger says the picked time itself. */
-  saysTime?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState('');
@@ -75,35 +69,21 @@ export function ReplyLater({ at, onPick, onClosed, look = 'caret', saysTime = tr
     if (document.activeElement !== e.currentTarget) e.currentTarget.focus({ preventScroll: true });
   };
 
-  const toggle = () => setOpen((o) => !o);
   const said = at > 0 ? laterHint(at) : null;
-  const named = {
-    'aria-haspopup': 'menu' as const,
-    'aria-expanded': open,
-    'aria-label': said ? `Sends ${said}. Change when` : 'Send later',
-    title: said ? 'Change when it sends' : 'Send later',
-  };
-  const trigger = look === 'word' ? (
-    <button type="button" data-trigger className={`compose-word${open ? ' open' : ''}`} {...named} onClick={toggle}>{said ?? 'now'}</button>
-  ) : look === 'clock' ? (
-    <button type="button" data-trigger className={`reply-later-clock${at ? ' set' : ''}`} {...named} onClick={toggle}>
-      <ClockIcon />{saysTime && said && <span>{said}</span>}
-    </button>
-  ) : look === 'words' ? (
-    <button type="button" data-trigger className={`reply-later-words${at ? ' set' : ''}`} {...named} onClick={toggle}>
-      {said ? `Sends ${said}` : 'Send later'}
-    </button>
-  ) : (
-    <button type="button" data-trigger className={`dock-send-later${saysTime && at ? ' set' : ''}`} {...named} onClick={toggle}>
-      {saysTime && said && <span className="dock-send-when">{said}</span>}
+  const trigger = (
+    <button type="button" data-trigger className={`dock-send-later${at ? ' set' : ''}`}
+      aria-haspopup="menu" aria-expanded={open}
+      aria-label={said ? `Sends ${said}. Change when` : 'Send later'} title={said ? 'Change when it sends' : 'Send later'}
+      onClick={() => setOpen((o) => !o)}>
+      {said && <span className="dock-send-when">{said}</span>}
       <CaretIcon />
     </button>
   );
 
   return (
-    <span className={`reply-later reply-later-${look}`} ref={wrap}>
+    <span className="reply-later" ref={wrap}>
       {open && (
-        <div className={`tc-menu tc-rise tc-wide${look === 'word' ? '' : ' tc-right'}`} role="menu" aria-label="Send later" onKeyDown={menuKeys}>
+        <div className="tc-menu tc-rise tc-wide tc-right" role="menu" aria-label="Send later" onKeyDown={menuKeys}>
           <span className="tc-menu-head">Send later</span>
           {at > 0 && (
             <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => pick(0)}>

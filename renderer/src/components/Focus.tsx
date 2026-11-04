@@ -130,6 +130,7 @@ import type { PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
 import { useKeepInWindow } from '../keep-in-window';
+import { escapeClosesMenu } from '../menu-escape';
 import { isUpdateRow } from '../update-row';
 import { TeamRouteStrip, TeamSaid, teamHeld } from '../team/TeamFocus';
 import {
@@ -151,7 +152,7 @@ import { lookAgainAfter } from '../picture-looks-again';
 import { OPEN_WITHIN_MS } from '../opening-wait';
 import { focusAtEnd } from '../focus-at-end';
 import type { Spot } from '../one-thing-at-a-time';
-import { ChoicesFold, ChoicesShow, QueueFile, QueueNav, readsInPlace } from './OneThingAtATime';
+import { ChoicesFold, ChoicesShow, QueueNav } from './OneThingAtATime';
 import { InlineTable, gridFromHast } from './TableView';
 import { foldKey, foldedKeys, toggleFold } from '../one-thing-at-a-time';
 
@@ -711,7 +712,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -893,6 +894,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onReopen: () => void;
   /** Opens a done thread again. */
   onReopenDone?: () => void;
+  /** Opens ⌘K on its Move to rows. */
+  onMove?: () => void;
   // Putting something off had no button anywhere in the app: S, and only S.
   // Every other verb in this footer is clickable, so the one verb that is not
   // is the one a hand that has never read a shortcut list cannot reach.
@@ -1327,8 +1330,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     return () => { live = false; off?.(); };
   }, [item.product, item.id]);
   const madeHere = useMemo(() => filesMadeHere(historyLines, item.artifacts?.notes ?? []), [historyLines, item.artifacts?.notes]);
-  const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig });
-  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig }; });
+  const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig, edits: item.artifacts?.edits });
+  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig, edits: item.artifacts?.edits }; });
   // A row in Needs you for a comment or an approval opens the file at it.
   const fileNewsMe = teamCtx?.me ?? null;
   useEffect(() => {
@@ -1374,13 +1377,13 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // A miss now SAYS SO.
     const openHref = (href?: string, from?: HTMLElement, click?: LinkClick) => {
       if (!href) return;
-      const { onOpenDoc, onNotice, openPicture, opensBig, openBig } = markdownActions.current;
+      const { onOpenDoc, onNotice, openPicture, opensBig, openBig, edits } = markdownActions.current;
       // A picture opens large over the thread, a page or a web address opens
       // in the pane, and a ⌘-click sends any of them out (../link-click.ts).
       const goes = whereALinkGoes(href, click, { pane: !!onOpenDoc });
       if (!asksForANewTab(click) && opensBig(href)) { openBig(href, from); return; }
       if (goes === 'picture') { openPicture(href, from); return; }
-      if (goes === 'pane') { onOpenDoc?.(href); return; }
+      if (goes === 'pane') { onOpenDoc?.(newestOfFamily(href, edits)); return; }
       // A reference like cart.mjs:2 is that file; its line number is only a label.
       const source = sourceReference(href);
       if (source && !asksForANewTab(click) && whereALinkGoes(source, click, { pane: !!onOpenDoc }) === 'pane') { onOpenDoc?.(source); return; }
@@ -1752,7 +1755,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       waitsNow={!!waitNow}
       onWait={onWait}
       blocks={(item.labels ?? []).includes('given-task')}
-      onRename={direct && crumbFrom ? () => setRenameAt(Date.now()) : null}
+      onRename={crumbFrom && !agent ? () => setRenameAt(Date.now()) : null}
+      onMove={canFinish && !agent && !direct ? onMove ?? null : null}
     />
   );
 
@@ -2222,12 +2226,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       {/* THE FILES A MESSAGE NAMES ARE SMALL FRAMED TILES (w-9ed13d72b3), and
           a file nothing can read gets none. The big review card below is
           only the review lab's sample now. */}
-      {/* One thing at a time reads a page or a note in place rather than as a
-          tile, and not a second time while it is open on the side. */}
-      {inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && newestOfFamily(path, item.artifacts?.edits) !== openDoc && <QueueFile key={path} product={product} path={newestOfFamily(path, item.artifacts?.edits)} md={md}
-        onOpen={() => onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'beside')} onFullScreen={() => onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'focus')} />)}
-      {/* What the page cannot read in place, a deck or a PDF, is a tile under it. */}
-      {page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths.filter((path) => !readsInPlace(path))} revision={item.updatedAt} openDoc={openDoc} onOpen={path => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'beside'))} />}
+      {/* An agent thread draws nothing here: a file it wants read is on a line
+          of its own and opens beside, and any other stays a name in its words.
+          A chat between people keeps tiles, which say whether a file arrived. */}
       {!page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths} revision={item.updatedAt} openDoc={openDoc} onOpen={path => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'beside'))} />}
       {inlineArtifacts && previewSample && <div className="artifact-entry-list" aria-label="Attachments">{previewPaths.map(path =>
         <DirectReview key={path} product={product} path={path} revision={item.updatedAt} open={openDoc === path}
@@ -2571,13 +2572,15 @@ function SlashMenu({ rows, at, onPick, onHover }: {
  *  underline, no box and no icon. The menu is `.prio-menu`, the same list the
  *  priority and the engine already open. Nothing new is drawn.
  */
-function ModePicker({ value, options, label, onChange, chip }: {
-  /** Drawn as the new thread card's chip, this glyph beside the word. */
-  chip?: ReactNode;
+function ModePicker({ value, options, label, onChange, onEscape, chip = false }: {
+  /** Drawn as the new thread card's chip. */
+  chip?: boolean;
   value: string;
   options: Array<{ value: string; label: string }>;
   label: string;
   onChange: (v: string) => void;
+  /** After Escape closes the menu, which otherwise leaves focus on the word. */
+  onEscape?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLSpanElement | null>(null);
@@ -2590,6 +2593,7 @@ function ModePicker({ value, options, label, onChange, chip }: {
     document.addEventListener('mousedown', away);
     return () => document.removeEventListener('mousedown', away);
   }, [open]);
+  useEffect(() => (open ? escapeClosesMenu(window, () => { setOpen(false); onEscape?.(); }) : undefined), [open]);
   const now = options.find((o) => o.value === value);
   return (
     <span className="compose-word-wrap" ref={wrap}>
@@ -2617,7 +2621,6 @@ function ModePicker({ value, options, label, onChange, chip }: {
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
-        {chip}
         {/* TITLE CASE, with "Mode" after it capitalised too: "In Auto Mode."
             Settled on w-86dd93ab0d. */}
         {(now?.label ?? value).replace(/(^|\s)\S/g, (c) => c.toUpperCase())}
@@ -3298,56 +3301,6 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
       else onClose();
     }
   };
-  // REVIEW ONLY (w-54cdf7c768): ?replyLook=1..5 draws each of the five looks
-  // drawn for this round. The four not picked go once one is.
-  const look = REPLY_LOOK;
-  const modelWord = (chip?: ReactNode) => (
-    <ReplyModel
-      chip={chip}
-      label={`${engineModelLabel(engineShown, model, modelOpts)}${chip && levelSaid ? ` · ${levelSaid}` : ''}`}
-      pick={pick}
-      onPick={pickModel}
-      recent={recent}
-      every={every}
-      more={moreCount(recent, every)}
-      labelOf={(p) => engineModelLabel(p.engine, p.model, modelOpts)}
-      engineLabel={(id) => engineRows.find((e) => e.id === id)?.label ?? ENGINES.find((e) => e.id === id)?.label ?? id}
-      // The agent is named beside each model only where there are two of
-      // them; on every other Mac the menu reads as it always did.
-      engineTags={engineRows.length > 1}
-      effortRows={effortRows}
-      effortLit={effortLit}
-      // Toggled against HER pick, not against what is lit, so pressing
-      // the lit default sets it and pressing her own clears it.
-      onEffort={(id) => pickTo({ effort: id === effort ? null : id })}
-      // AND THE BOX TAKES FOCUS BACK WHEN THE DRAWER SHUTS, because every
-      // way of closing it leaves focus on a button that has just been
-      // unmounted, which is the body, and ⌘↵ sends from the box.
-      onOpenChange={(drawer) => {
-        if (drawer) drawerWasOpen.current = true;
-        else if (drawerWasOpen.current) ref.current?.focus();
-      }}
-      // TRUE WHETHER OR NOT A RUN IS UP. On an idle row the reply starts
-      // a run on this model; on a running one the pick lands on the row
-      // and the next run takes it, because a spawned harness cannot
-      // change model mid-flight.
-      title="Which model this conversation runs on"
-      // Open already when she got here by pressing the model word on
-      // the folded box, which is what that word promised.
-      openAtStart={openModel}
-    />
-  );
-  const modeWord = (chip?: ReactNode) => (
-    <ModePicker
-      chip={chip}
-      label="What this message may do"
-      value={running}
-      options={claudeCode
-        ? MODE_ORDER.map((m) => ({ value: m, label: MODE_WORDS[m] }))
-        : CODEX_MODE_ORDER.map((m) => ({ value: m, label: CODEX_MODES[m].label }))}
-      onChange={(v) => pickMode(v as PermissionMode | CodexModeId)}
-    />
-  );
   return (
     <>
       {/* THE MENU RIDES ON THE CARD, NOT ON THE BOX, and it opens upward for
@@ -3382,12 +3335,6 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           <span>{to.words}</span>
         </div>;
       })()}
-      {look === 2 && !item.agent && !talkTo?.length && (
-        <div className="dock-head">
-          <span className="tc-label">Model</span>{modelWord()}
-          {canSetMode && <><span className="tc-label dock-head-gap">Mode</span>{modeWord()}</>}
-        </div>
-      )}
       {richBox ? (
         // The editor draws a mention's chip on its own words; the layer of
         // chips behind a text field has no text field to sit behind.
@@ -3499,10 +3446,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           changes is a sentence that moves under her. */}
       {freshNote && <div className="compose-note">{freshNote}</div>}
       {!talk.on && talk.problem && <div className="compose-note">{talk.problem}</div>}
-      {/* ONE text run, ONE size, ONE baseline, and the app's own send button:
-          the new-task card's footer, on the reply box, because they are the same
-          act. See the note at the top of this file for the measurements. */}
-      <div className={`compose-sentence dock-bar look-${look}`}>
+      {/* The new thread card's bar: its chips, its paperclip and its split Send
+          (w-54cdf7c768). */}
+      <div className="compose-sentence dock-bar">
         {talk.on ? <Listening talk={talk} /> : <>
         {/* NO PRIORITY AND NO REPEAT ON A MESSAGE TO AN AGENT. Both are
             work-item fields with nowhere to be written, and "Urgent priority.
@@ -3516,110 +3462,57 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             exactly the footer it had. */}
         {talkTo?.length ? <FormatBar box={ref} onChange={changeText} onAttach={pickFiles} onFromFiles={(f) => setAttachments((a) => [...a, f])} onVoice={addVoice} onNotice={onNotice}
           voiceKey={`direct:${item.product}:${item.id}`} voice={voiceCtl} onRecording={setRecording} /> : null}
-        {/* A PHONE HAS NO PASTE OF A FILE AND NO DROP, so a reply to an agent,
-            which takes files only those two ways on the desktop, took none
-            ("I can't upload files in mobile", 2026-10-12). It gets the same
-            picker the chat's + opens. */}
-        {!talkTo?.length && onPhone() && look === 4 ? (
-          <button type="button" className="compose-attach" aria-label="Attach a file or picture" title="Attach a file or picture" onClick={pickFiles}>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l8-8" /></svg>
-          </button>
-        ) : null}
-        {!talkTo?.length && talk.allowed && <MicButton talk={talk} />}
-        {look !== 4 && (item.agent ? <span className="compose-clauses"><span className="dim">Goes straight into {item.agent.name}.</span></span> : talkTo?.length ? null : (
-          <span className="dock-chips">
+        {item.agent ? <span className="compose-clauses"><span className="dim">Goes straight into {item.agent.name}.</span></span> : talkTo?.length ? null : <span className="dock-chips">
             <PriorityPicker variant="chip" value={shown} set={!!prio} onChange={setPrio} title="Priority" />
             {repeat && <WhenPicker value={{ runAt: 0, repeat }} onChange={(v) => setRepeat(v.repeat)} only="repeat" empty="Runs once" />}
-            {look !== 2 && canSetMode && modeWord(<ModeGlyph />)}
-            {look !== 2 && <span className="dock-model">{modelWord(<ModelGlyph />)}</span>}
-          </span>
-        ))}
-        {look === 4 && <span className="compose-clauses">
-          {/* NOTHING ABOUT WHERE IT GOES (w-140ac855b1, 2026-10-13). This
-              slot read "Goes to Maya's inbox.", put there so the corner was
-              never bare; the formatting bar now sits in that corner, and the
-              person asked for the line to go. The conversation's header
-              already names who it is with. */}
-          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo?.length ? null : <>
-          <PriorityPicker
-            variant="word"
-            value={shown}
-            set={!!prio}
-            onChange={setPrio}
-            // NO KEYS IN HERE, BECAUSE THERE ARE NONE. The twin of the same
-            // line in Compose.tsx; the reasoning is written out there (and
-            // the chord went on, 2026-08-20).
-            title="Priority"
-          />
-          {' priority. '}
-          {/* The same control as the card's clock, opened on its repeats page,
-              because "make this daily" is something she says to a thread as
-              often as she sets it up front. Said on one RUN of a repeating task
-              it moves that task's rule rather than making a second one, and the
-              note above says which of the two is about to happen.
-
-              "RUNS ONCE" IS GONE FROM THE REPLY BOX (w-86dd93ab0d, 2026-09-24):
-              on an ordinary thread it said nothing she needed. The clause only
-              shows once the thread actually repeats, so a daily task still says
-              so and can still be changed here. */}
-          {repeat && (
-            <>
-              <WhenPicker
-                value={{ runAt: 0, repeat }}
-                onChange={(v) => setRepeat(v.repeat)}
-                only="repeat"
-                empty="Runs once"
+            {canSetMode && (
+              <ModePicker
+                chip
+                label="What this message may do"
+                value={running}
+                options={claudeCode
+                  ? MODE_ORDER.map((m) => ({ value: m, label: MODE_WORDS[m] }))
+                  : CODEX_MODE_ORDER.map((m) => ({ value: m, label: CODEX_MODES[m].label }))}
+                onChange={(v) => pickMode(v as PermissionMode | CodexModeId)}
+                // ⌘↵ sends from the box, so Escape puts the caret back, as a pick does.
+                onEscape={() => ref.current?.focus()}
               />
-              {'. '}
-            </>
-          )}
-          {/* AND WHICH MODEL PICKS IT UP. The new task card's own drawer, the
-              same component and the same words, because "On Opus." should mean
-              one thing wherever she reads it. It goes LAST in the sentence, so
-              the two clauses she has had here for weeks keep the positions she
-              knows them by. The effort strip comes with the drawer; it is the
-              same one the card draws, and it stays off the line
-              (w-f4d7bb2a73, where A inside the model menu works well).
-
-              AND IT WEARS THE CARD'S PREPOSITION. "On Opus 5." is the whole
-              clause there, so it is the whole clause here too, or one word
-              means two things in two boxes she uses side by side. Measured in
-              the built renderer before this line went in: the footer read
-              "Medium priority. Runs once. Opus 5." */}
-          {/* WHAT IT MAY DO, in whichever engine's words this row speaks. It
-              goes BEFORE the model clause, not after it: "On Opus 5." is the
-              clause that ends this sentence on the new task card too, and two
-              boxes she uses side by side should end the same way. Reads
-              "Urgent priority. Runs once. In auto mode. On Codex's own."
-
-              Hidden on an external agent row for the same reason every other
-              mode control is: the value would be thrown away by the send. */}
-          {canSetMode && (
-            <>
-              {'In '}
-              {modeWord()}
-              {' Mode. '}
-            </>
-          )}
-          {/* One span, so the cloud hides "On" and the stop with the model. */}
-          <span className="dock-model">
-          {'On '}
-          {modelWord()}
-          {/* AND HOW HARD IT THINKS, WHEN THIS THREAD IS SET TO ANYTHING. The
-              level was readable in one place only, lit inside the drawer, and
-              the drawer is shut while she reads this line and decides to send.
-
-              ONLY WHEN THERE IS SOMETHING TO SAY. A level nobody set is the
-              engine's own choice for the model, which the drawer lights and
-              nothing sends, so the resting sentence is unchanged. It is also
-              why this clause is not on the new task card: that card opens
-              carrying a remembered level every time, so the word would be
-              permanent furniture there, and more words on that line is the one
-              thing she ruled out (./Model.tsx). */}
-          {levelSaid ? `, ${levelSaid}.` : '.'}
-          </span>
-          </>}
-        </span>}
+            )}
+            <ReplyModel
+              chip
+              label={`${engineModelLabel(engineShown, model, modelOpts)}${levelSaid ? ` · ${levelSaid}` : ''}`}
+              pick={pick}
+              onPick={pickModel}
+              recent={recent}
+              every={every}
+              more={moreCount(recent, every)}
+              labelOf={(p) => engineModelLabel(p.engine, p.model, modelOpts)}
+              engineLabel={(id) => engineRows.find((e) => e.id === id)?.label ?? ENGINES.find((e) => e.id === id)?.label ?? id}
+              // The agent is named beside each model only where there are two of
+              // them; on every other Mac the menu reads as it always did.
+              engineTags={engineRows.length > 1}
+              effortRows={effortRows}
+              effortLit={effortLit}
+              // Toggled against HER pick, not against what is lit, so pressing
+              // the lit default sets it and pressing her own clears it.
+              onEffort={(id) => pickTo({ effort: id === effort ? null : id })}
+              // AND THE BOX TAKES FOCUS BACK WHEN THE DRAWER SHUTS, because every
+              // way of closing it leaves focus on a button that has just been
+              // unmounted, which is the body, and ⌘↵ sends from the box.
+              onOpenChange={(drawer) => {
+                if (drawer) drawerWasOpen.current = true;
+                else if (drawerWasOpen.current) ref.current?.focus();
+              }}
+              // TRUE WHETHER OR NOT A RUN IS UP. On an idle row the reply starts
+              // a run on this model; on a running one the pick lands on the row
+              // and the next run takes it, because a spawned harness cannot
+              // change model mid-flight.
+              title="Which model this conversation runs on"
+              // Open already when she got here by pressing the model word on
+              // the folded box, which is what that word promised.
+              openAtStart={openModel}
+            />
+          </span>}
         {/* WHAT WAS PHOTOGRAPHED WAS A REAL COLLISION, NOT A PREFERENCE. The
             footer is one flex row and the chip was the widest thing in it at
             184x24; on a narrow reply card the clauses ahead of it ("High
@@ -3659,9 +3552,10 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             rather than sitting side by side. A stop next to a live Send is two
             things to choose between; a stop INSTEAD of a dead Send is one
             thing that is always the thing she can do. */}
-        {!talkTo?.length && !(onPhone() && look === 4) && (
+        {!talkTo?.length && (
           <button type="button" className="tc-icon dock-clip" title="Attach files" aria-label="Attach files" onClick={pickFiles}><ClipGlyph /></button>
         )}
+        {!talkTo?.length && talk.allowed && <MicButton talk={talk} />}
         {stop && !hasDraft ? stop : (
         <span className={`dock-send-pair${canWait ? '' : ' solo'}`}>
         <button
@@ -3679,23 +3573,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   );
 }
 
-const REPLY_LOOK = (() => {
-  const n = Number(new URLSearchParams(typeof location === 'undefined' ? '' : location.search).get('replyLook'));
-  return n >= 1 && n <= 5 ? n : 1;
-})();
-
 const ClipGlyph = () => (
   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
     <path d="m20 11.5-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7" />
-  </svg>
-);
-const ModeGlyph = () => (
-  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-    <path d="M12 3.5 5 6.3v5.2c0 4.3 3 7.6 7 9 4-1.4 7-4.7 7-9V6.3z" />
-  </svg>
-);
-const ModelGlyph = () => (
-  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-    <path d="M12 3.5c.7 4.6 2.6 6.6 7.5 8.5-4.9 1.9-6.8 3.9-7.5 8.5-.7-4.6-2.6-6.6-7.5-8.5 4.9-1.9 6.8-3.9 7.5-8.5z" strokeLinejoin="round" />
   </svg>
 );

@@ -16,10 +16,10 @@ import type { EffortChoice } from '../effort';
 
 export function ReplyModel({
   label, pick, onPick, recent, every, more, labelOf, engineLabel, engineTags = false,
-  effortRows, effortLit, onEffort, title, openAtStart = false, onOpenChange, chip,
+  effortRows, effortLit, onEffort, title, openAtStart = false, onOpenChange, chip = false,
 }: {
-  /** Drawn as the new thread card's chip, this glyph beside the word. */
-  chip?: React.ReactNode;
+  /** Drawn as the new thread card's chip. */
+  chip?: boolean;
   /** The word on the line, the model's own name. */
   label: string;
   pick: ModelPick;
@@ -129,7 +129,7 @@ export function ReplyModel({
             wrap.current?.querySelector<HTMLElement>('[data-item].on, [data-item]')?.focus();
           }
         }}
-      >{chip}{label}</button>
+      >{label}</button>
     </span>
   );
 }

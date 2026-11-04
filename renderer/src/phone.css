@@ -383,9 +383,9 @@
   :root:root:root .doc-picture { touch-action: none; transform-origin: center center; transition: transform .05s linear; }
   /* A picture's box while it loads is at the foot of this file, outside this
      block, because the phone link in a computer's browser is wider than this. */
-  /* The reply box's attach button, an icon like the box's others. */
-  :root:root:root .compose-attach {
-    flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; margin: 0 4px 0 -6px;
+  /* The reply box's paperclip at a finger's size. */
+  :root:root:root .dock-clip {
+    flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0;
     border: 0; background: none; color: var(--text-dim); box-shadow: none;
   }
   /* The microphone beside it (WebDictation.tsx), the phone app's size. */

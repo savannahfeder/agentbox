@@ -362,7 +362,9 @@
 }
 .compose-sentence.dock-bar { gap: 8px; padding: 12px 12px 12px 16px; }
 .dock-chips { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.dock-chips .compose-word-wrap, .dock-chips .dock-model { display: inline-flex; }
+.dock-chips .compose-word-wrap { display: inline-flex; }
+/* A chip's menu rises from the chip and starts on its left edge, as the card's do. */
+.dock-chips .compose-word-wrap .prio-menu.model-menu, .dock-chips .model-pick .tc-drop { left: 0; right: auto; }
 .dock-bar .dock-clip { margin-left: auto; }
 .dock-bar .dock-chips + .dock-clip, .dock-bar .compose-clauses + .dock-clip { margin-left: 0; }
 .dock-send-pair { margin-left: 0; display: inline-flex; height: 32px; flex: none; position: relative; }
@@ -385,19 +387,3 @@
 .compose-sentence .dock-send-pair > .dock-send:disabled, .compose-sentence .dock-send-pair > .dock-send:disabled:hover { opacity: 0.45; background: var(--send-fill); }
 .dock-send-pair .dock-send kbd { font: 11px var(--mono); color: inherit; opacity: 0.75; background: none; border: 0; padding: 0; margin: 0; line-height: 1; }
 .reply-later { position: relative; display: inline-flex; }
-
-/* Review looks (w-54cdf7c768): 2 has the card's labelled rows on top, 3 is
-   one surface with quiet chips, 4 keeps the sentence, 5 shows the chips only
-   under the pointer. */
-.dock-head { display: flex; align-items: center; height: 40px; padding: 0 16px; border-bottom: 1px solid var(--line); font-size: 14px; }
-.dock-head .tc-label { width: 62px; }
-.dock-head .dock-head-gap { margin-left: 36px; }
-.dock-head .compose-word { color: var(--text); }
-.compose-sentence.look-3, .compose-sentence.look-5 { border-top: 0; padding-top: 6px; }
-.compose-sentence.look-3 { padding-left: 8px; }
-.compose-sentence.look-3 .tc-chip { border-color: transparent; background: none; padding: 0 8px; }
-.compose-sentence.look-3 .tc-chip:hover, .compose-sentence.look-3 .tc-chip.open { border-color: var(--line); }
-.compose-sentence.look-5 .dock-chips { visibility: hidden; opacity: 0; transition: opacity 0.2s ease, visibility 0s linear 0.2s; }
-.compose-sentence.look-5:hover .dock-chips, .compose-sentence.look-5 .dock-chips:has([aria-expanded='true']) {
-  visibility: visible; opacity: 1; transition: opacity 0.34s cubic-bezier(0.33, 0, 0.2, 1) 0.09s, visibility 0s linear 0.09s;
-}

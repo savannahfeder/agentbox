@@ -35,7 +35,7 @@ describe('which clicks open the floating view', () => {
     const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
     const open = focus.slice(focus.indexOf('const openHref'));
     expect(open.indexOf("goes === 'picture'")).toBeGreaterThan(-1);
-    expect(open.indexOf("goes === 'picture'")).toBeLessThan(open.indexOf('onOpenDoc?.(href)'));
+    expect(open.indexOf("goes === 'picture'")).toBeLessThan(open.indexOf("goes === 'pane'"));
   });
 });
 
