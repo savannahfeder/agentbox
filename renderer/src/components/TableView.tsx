@@ -192,7 +192,21 @@ function FloatMenu({ x, y, onClose, children }: { x: number; y: number; onClose:
   }, [x, y]);
   useEffect(() => {
     const away = (e: PointerEvent) => { if (!el.current?.contains(e.target as Node)) onClose(); };
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopImmediatePropagation(); e.preventDefault(); onClose(); } };
+    // The menu takes the arrows and Enter while it is open, so the table behind it stays still.
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopImmediatePropagation(); e.preventDefault(); onClose(); return; }
+      const rows = [...(el.current?.querySelectorAll<HTMLButtonElement>('button.when-row:not(:disabled)') ?? [])];
+      if (!rows.length) return;
+      const now = rows.indexOf(document.activeElement as HTMLButtonElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.stopImmediatePropagation(); e.preventDefault();
+        const step = e.key === 'ArrowDown' ? 1 : -1;
+        rows[now < 0 ? (step > 0 ? 0 : rows.length - 1) : (now + step + rows.length) % rows.length].focus();
+      } else if (e.key === 'Enter' && now >= 0) {
+        e.stopImmediatePropagation(); e.preventDefault();
+        rows[now].click();
+      }
+    };
     document.addEventListener('pointerdown', away, true);
     window.addEventListener('keydown', key, true);
     window.addEventListener('blur', onClose);
@@ -997,7 +1011,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
                     }}
                     onBlur={(e) => { setRenaming(null); changeColumns(renameColumn(docRef.current.table, i, e.target.value)); requestAnimationFrame(focusKeys); }} />
                   : <><span className="tbl-ell">{c.name}</span>{arrow}</>}
-                <button type="button" className="tbl-th-menu" tabIndex={-1} aria-label={`${c.name} column`}
+                <button type="button" className="tbl-th-menu" tabIndex={-1} aria-label={`${c.name} column`} onPointerDown={(e) => e.preventDefault()}
                   onClick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setFloat({ x: r.left, y: r.bottom + 4, col: i }); }}>{CARET}</button>
                 <span className="tbl-resize" aria-hidden="true" onPointerDown={(e) => onGrip(e, i)} onDoubleClick={(e) => { e.stopPropagation(); fitColumn(i); }} />
               </div>;

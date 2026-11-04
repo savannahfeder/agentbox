@@ -151,6 +151,15 @@ describe('rows and columns added and taken away', () => {
     expect(next.rows[1]).toEqual(['', '', '', '']);
     expect(next.rows[2]).toBe(t.rows[1]);
   });
+  it('keeps a ranked list counting 1, 2, 3 when a row is put in or taken out', () => {
+    const ranked = readTable('#,Candidate,Stage\n1,Ada,Offer\n2,Bo,Screening\n3,Cy,Applied\n', 'x.csv');
+    expect(addRows(ranked, 1).rows.map((r) => r[0] + r[1])).toEqual(['1Ada', '2', '3Bo', '4Cy']);
+    expect(dropRows(ranked, new Set([0])).rows.map((r) => r[0] + r[1])).toEqual(['1Bo', '2Cy']);
+  });
+  it('leaves ranks alone that are not a plain count', () => {
+    const own = readTable('#,Candidate\n3,Ada\n1,Bo\n2,Cy\n', 'x.csv');
+    expect(addRows(own, 3).rows.map((r) => r[0])).toEqual(['3', '1', '2', '']);
+  });
   it('keeps the view\'s order true after rows go', () => {
     // The view shows file rows 3, 0, 2, 1; rows 0 and 2 are deleted.
     expect(orderAfterDrop([3, 0, 2, 1], new Set([0, 2]))).toEqual([1, 0]);

@@ -108,17 +108,23 @@ export function writeCells(table: Table, writes: Array<{ i: number; c: number; v
   return { ...table, rows, columns };
 }
 
+// A ranked file whose ranks run 1, 2, 3 in file order keeps them running after
+// rows come and go; ranks in any other order are the file's own and stay.
+const countsUp = (t: Table) => t.ranked && t.rows.every((r, i) => (r[0] ?? '').trim().replace(/\.$/, '') === String(i + 1));
+const renumbered = (rows: string[][]) => rows.map((r, i) => (r[0] === String(i + 1) ? r : [String(i + 1), ...r.slice(1)]));
+
 /** Blank rows put in at `at` in the file. */
 export function addRows(table: Table, at: number, n = 1): Table {
   const width = table.columns.length;
   const blank = Array.from({ length: n }, () => Array.from({ length: width }, () => ''));
   const rows = table.rows.slice();
   rows.splice(clamp(at, 0, rows.length), 0, ...blank);
-  return { ...table, rows };
+  return { ...table, rows: countsUp(table) ? renumbered(rows) : rows };
 }
 
 export function dropRows(table: Table, gone: Set<number>): Table {
-  return { ...table, rows: table.rows.filter((_, i) => !gone.has(i)) };
+  const rows = table.rows.filter((_, i) => !gone.has(i));
+  return { ...table, rows: countsUp(table) ? renumbered(rows) : rows };
 }
 
 /** The view's order after rows were taken out of the file: theirs gone, the rest renumbered. */

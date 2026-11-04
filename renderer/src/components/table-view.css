@@ -164,8 +164,7 @@
 }
 .tbl-scroll { position: relative; }
 .tbl-pane .tbl-grid, .tbl-full .tbl-grid { user-select: none; -webkit-user-select: none; }
-.tbl-pane .tbl-th, .tbl-full .tbl-th { cursor: default; padding-right: 30px; }
-.tbl-pane .tbl-th.tbl-rn, .tbl-full .tbl-th.tbl-rn { padding-right: 12px; }
+.tbl-pane .tbl-th, .tbl-full .tbl-th { cursor: default; }
 .tbl-th.sel { color: var(--text); }
 
 /* The keys go to this box while the table holds them, so every shortcut in the
@@ -193,9 +192,10 @@
 .tbl-tr:hover .tbl-open { display: flex; }
 .tbl-tr:hover .tbl-rn-n { visibility: hidden; }
 
-/* A header's menu and its edge. Both stay out of sight until the header is under the pointer. */
+/* A header's menu and its edge. Both stay out of sight until the header is
+   under the pointer. The menu sits by the name, so a wide column's is in view. */
 .tbl-th-menu {
-  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  flex: none; margin: -4px 0 -4px -2px;
   width: 20px; height: 20px; display: grid; place-items: center; padding: 0;
   background: none; border: 0; color: var(--text-faint); cursor: pointer; opacity: 0;
 }
