@@ -12,7 +12,6 @@ import { DARK_INK, logoOf } from './logos';
 import { SERVICES } from '../../../shared/cloud-needs.mjs';
 import { Name } from '../../../shared/product-name.mjs';
 import { keyLooksWrong } from '../key-asks';
-import { Name } from '../../../shared/product-name.mjs';
 import './connections.css';
 
 function Mark({ id, name }: { id: string; name: string }) {
