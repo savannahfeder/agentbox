@@ -234,7 +234,7 @@
 
 /* Share: a link anyone can open (ShareLink.tsx). */
 .av-share { position: relative; flex: none; }
-.av-share .doc-mark.is-shared { color: var(--text); }
+.av-share .doc-mark.is-shared { color: var(--text); background: var(--doc-wash); }
 /* The link holds an older copy than the file on screen. */
 .av-share .is-behind { position: relative; }
 .av-share .is-behind::after { content: ''; position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }

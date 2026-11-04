@@ -164,3 +164,10 @@ it('every version of a file is one link, and only kinds a link can draw are offe
   for (const yes of ['a.md', 'b.HTML', 'c.png', 'd.jpeg', 'e.pdf', 'f.svg']) expect(canShareFile(yes), yes).toBe(true);
   for (const no of ['a.mp4', 'b.csv', 'c.ts', 'd']) expect(canShareFile(no), no).toBe(false);
 });
+
+// A tester could not tell which files were public: the mark only turned a shade brighter (power test, round 3, 2026-11-04).
+it('a file with a live link keeps its mark washed, as a toggle that is on', () => {
+  const css = fs.readFileSync(new URL('../renderer/src/components/artifact-view.css', import.meta.url), 'utf8');
+  const rule = /\.av-share \.doc-mark\.is-shared\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+  expect(rule).toMatch(/background:\s*var\(--doc-wash\)/);
+});
