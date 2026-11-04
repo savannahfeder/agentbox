@@ -200,6 +200,14 @@ describe('what the run is told', () => {
     expect(system).toMatch(/This run is on Claude Code, Opus 5\.5, at high effort\.[\s\S]*update_work_item[\s\S]*THE MESSAGE RULES/);
   });
 
+  // "For some tasks people will prompt, 'This should always run on this
+  // particular model'": a request in the thread itself counts, not only a rule.
+  it('switches on a request in the thread as well as a standing rule, rather than only reporting it', () => {
+    const note = supervisor().howAThreadChangesModel();
+    expect(note).toMatch(/in this thread or in any instructions/);
+    expect(note).toMatch(/do not only say so/);
+  });
+
   it('says it once', () => {
     const s = supervisor({ messageRules: () => 'THE MESSAGE RULES' });
     const system = systemOf(s.spawnPlan({ id: 'w-1', product: 'acme', title: 'Demo video', model: 'opus', effort: 'high' }, acme()).args);

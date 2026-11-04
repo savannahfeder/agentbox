@@ -9678,9 +9678,10 @@ export class Supervisor {
     return [
       '# Model and effort',
       '',
-      'When the person\'s instructions say a kind of work uses a particular model or',
-      'effort and this thread is not on it, do not stop to ask. Set model and effort',
-      'on this thread with update_work_item, then end your turn with one line saying',
+      'When the person, in this thread or in any instructions you were given, says',
+      'this work or this kind of work runs on a particular model or effort and this',
+      'run is not on it, do not stop to ask and do not only say so. Set model and',
+      'effort on this thread with update_work_item, then end your turn with one line saying',
       'you switched. The app starts your next turn on them straight away, in this',
       'same conversation. If they asked for a model this computer does not offer,',
       'ask them instead.',
