@@ -8704,7 +8704,6 @@ export class Supervisor {
     try { return editedFilesLine(readItemHistory(this.store.productDir(item.product), item.id)); } catch { return null; }
   }
 
-  // Only a project holding the team's look hears about it (shared/team-look.mjs).
   // A session is not told its effort by the CLI, and cannot change its own
   // model or effort; this says both, and how the thread moves to others.
   modelAndEffortLine({ model = null, effort = null, engine = DEFAULT_ENGINE } = {}) {
@@ -8726,6 +8725,7 @@ export class Supervisor {
     ].join('\n');
   }
 
+  // Only a project holding the team's look hears about it (shared/team-look.mjs).
   teamLookLine(slug, product = null) {
     const dir = product?.dir ?? this.store.listProducts().find((p) => p.slug === slug)?.dir;
     return dir && fs.existsSync(path.join(dir, TEAM_LOOK)) ? TEAM_LOOK_LINE : null;
