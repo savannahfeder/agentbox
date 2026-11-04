@@ -430,8 +430,8 @@ export default function ThreadScreen() {
           <View style={{ width: 16 }} />
         </>}
       />
-      {/* The permission card floats over the foot: the reply box and the choices sit 8pt above it, the reply box's own foot room spent. */}
-      <KeyboardAvoidingView style={{ flex: 1, paddingBottom: c.approvalRoom ? Math.max(0, c.approvalRoom - 8 - footRoom(inset)) : 0 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* The permission card floats over the foot: the reply box sits 8pt above it and the queued cards' edges (14pt), its own foot room spent. */}
+      <KeyboardAvoidingView style={{ flex: 1, paddingBottom: c.approvalRoom ? Math.max(0, c.approvalRoom + 6 - footRoom(inset)) : 0 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: size.inset, paddingTop: 8, paddingBottom: 24 }}
           scrollEventThrottle={32}
           onScroll={(e) => {

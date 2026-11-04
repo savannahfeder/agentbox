@@ -69,7 +69,10 @@ export function withPhoneAnswers(team: PhoneTeam | null, commands: PhoneRows['co
   return { ...team, view: { ...team.view, list, runs } };
 }
 
-/** The copy, with a pause or resume asked here shown at once, as the window shows its own. */
+/** A teammate with a pause or resume asked here that the computer has not taken yet. */
+type Asked = Teammate & { pending?: boolean };
+
+/** The copy, with a pause or resume asked here shown at once, as Pausing or Resuming. */
 export function withPendingPauses(team: PhoneTeam | null, commands: PhoneRows['commands']): PhoneTeam | null {
   if (!team) return team;
   let changed = false;
@@ -77,7 +80,7 @@ export function withPendingPauses(team: PhoneTeam | null, commands: PhoneRows['c
     const asked = pauseOnItsWay(commands, team, t.id);
     if (asked === null || asked === !!t.paused) return t;
     changed = true;
-    return { ...t, paused: asked, now: asked ? 'Paused' : t.now === 'Paused' ? null : t.now };
+    return { ...t, paused: asked, pending: true };
   });
   return changed ? { ...team, view: { ...team.view, list } } : team;
 }
@@ -99,6 +102,7 @@ export function waitsOnYou(t: Teammate, view: TeammatesView, pending: readonly P
 
 /** The line under its name in Chats (TeammatesRail.tsx `nowLine`). */
 export function nowLine(t: Teammate, view: TeammatesView, now = Date.now(), pending: readonly Pending[] = []): string {
+  if ((t as Asked).pending) return t.paused ? 'Pausing' : 'Resuming';
   if (stillAsks(view, t.id, pending)) return 'Has a question for you';
   if (heldFor(view, t.id)) return 'Holding work for your go-ahead';
   if (t.status === 'draft' && !t.waiting.length) return 'Setting up';
@@ -108,6 +112,7 @@ export function nowLine(t: Teammate, view: TeammatesView, now = Date.now(), pend
 
 /** Beside its name at the top: paused, setting up, primary, or its role. */
 export function asideOf(t: Teammate): string {
+  if ((t as Asked).pending) return t.paused ? 'Pausing' : 'Resuming';
   if (t.paused) return 'Paused';
   if (t.status === 'draft') return 'Setting up';
   if (t.primary) return 'Primary';

@@ -36,4 +36,8 @@ describe('the preview', () => {
     const src = (await import('node:fs')).readFileSync('mobile/src/lib/preview.ts', 'utf8');
     expect(src).toMatch(/now: value\.paused \? 'Paused' : m\.nowBeforePause \?\? null, nowBeforePause: value\.paused \? m\.now : undefined/);
   });
+  it('its computer takes nothing while it counts as away, as its own banner says (round 4, issues 6 and 18)', async () => {
+    const src = (await import('node:fs')).readFileSync('mobile/src/lib/preview.ts', 'utf8');
+    expect(src).toMatch(/if \(scope === 'teammate' && macAway\(macSeenOf\(rows\.projects\), now\(\)\)\) return;/);
+  });
 });

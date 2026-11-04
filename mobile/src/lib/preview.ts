@@ -1,6 +1,7 @@
 // THE APP WITH NO ACCOUNT BEHIND IT, for drawing its screens in a browser
 // (EXPO_PUBLIC_PREVIEW=1). Made-up threads in the shape a Mac sends, and a
 // stand-in for the cloud that keeps what the phone sends in memory.
+import { macAway, macSeenOf } from '../../../renderer/src/phone-rows';
 import type { PhoneRows } from '../../../renderer/src/phone-rows';
 import { PREVIEW_ATTACHED, previewLink } from './preview-files.mjs';
 
@@ -282,6 +283,8 @@ export function previewCloud(now = () => Date.now()) {
   // The Mac takes a change a moment later and sends its settings again.
   const takeSetting = (c: PhoneRows['commands'][number]) => setTimeout(() => {
     const { scope, key, value, product } = c.payload ?? {};
+    // Away, as the banner says it is: a teammate does not get what you sent, as it would not from a real computer.
+    if (scope === 'teammate' && macAway(macSeenOf(rows.projects), now())) return;
     const w: any = settings.settings.workspace;
     const repeats: any[] = (settings.settings as any).repeats;
     const mates: any = (settings.settings as any).teammates;
