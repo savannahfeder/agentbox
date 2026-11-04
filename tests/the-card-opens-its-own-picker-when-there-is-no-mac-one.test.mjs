@@ -89,7 +89,7 @@ describe('the answer the screen is reading', () => {
   });
 
   it('is on both doors, because the map both doors read has the channel', async () => {
-    const { REQUEST_CHANNELS } = await import('../shared/bridge-map.mjs');
+    const { REQUEST_CHANNELS } = await import('../shared/bridge-map.mts');
     expect(REQUEST_CHANNELS.listFolders).toBe('zero:list-folders');
   });
 });

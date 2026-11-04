@@ -66,7 +66,7 @@ export const MODE_STATUS: Record<PermissionMode, string> = {
  *
  * Their table does not cover plan in a session that also has bypass
  * available. That cannot happen to a session Agentbox puts in a mode, because
- * `buildSessionArgs` (main/settings.mjs) lifts both bypass flags out and
+ * `buildSessionArgs` (main/settings.mts) lifts both bypass flags out and
  * passes the picked mode as the only permission flag. Only a hand-written
  * `sessionArgs` that pairs plan with `--allow-dangerously-skip-permissions`
  * can create it. If that rebuild ever stops, the plan sentence has to change.

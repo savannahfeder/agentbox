@@ -19,7 +19,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlaceTiles, accountTile } from '../renderer/src/components/Settings';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const NOW = new Date(2026, 10, 1, 15, 30).getTime();
 const MIN = 60_000;

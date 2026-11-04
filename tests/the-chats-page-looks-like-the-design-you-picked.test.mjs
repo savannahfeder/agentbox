@@ -22,7 +22,8 @@ describe('a teammate\'s chat', () => {
     expect(rule('.tq-chats .tq-chat .rm-day')).toMatch(/display: flex/);
     expect(rule('.tq-chats .tq-chat .rm-day .rm-label')).toMatch(/text-transform: none/);
     expect(rule('.tq-chats .tq-chat .rm-day .rm-label')).toMatch(/font: inherit/);
-    expect(css).toMatch(/\.tq-chats \.tq-chat \.rm-day::before, \.tq-chats \.tq-chat \.rm-day::after \{[^}]*background: var\(--line\)/);
+    // The day is a word with no line either side (a-chat-draws-its-day-as-a-word-not-a-line).
+    expect(css).not.toMatch(/\.tq-chats \.tq-chat \.rm-day::before/);
   });
 
   it('draws names in the heavier weight, times in the body face, and faces a size up', () => {

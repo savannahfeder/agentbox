@@ -141,8 +141,8 @@ describe('a way to ask again', () => {
   it('the recheck really does throw the remembered answer away', () => {
     // renderer side: it goes to the main process rather than re-reading settings
     expect(api).toContain("if (!zero?.claudeRecheck) return { found: false, certain: false, url };");
-    // main side: forgetClaudeBin before the search (main/settings.mjs)
-    expect(read('main/settings.mjs')).toContain('export function recheckClaude(config) {\n  forgetClaudeBin();');
+    // main side: forgetClaudeBin before the search (main/settings.mts)
+    expect(read('main/settings.mts')).toContain('export function recheckClaude(config: SettingsConfig) {\n  forgetClaudeBin();');
   });
 });
 

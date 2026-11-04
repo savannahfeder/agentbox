@@ -9,7 +9,7 @@
 // tests) when run again, so the note pointed at nothing real.
 
 import { describe, it, expect } from 'vitest';
-import { failureNote } from '../main/ship-queue.mjs';
+import { failureNote } from '../main/ship-queue.mts';
 
 const WARNING = 'Agentbox: sessionArgs grants mcp__agentbox but no storeMcpCommand is configured, so spawned workers will have NO store tools.';
 const why = (out) => failureNote(out).replace('It did not ship, and it went back to its agent: ', '');

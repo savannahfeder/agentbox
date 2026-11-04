@@ -10,7 +10,7 @@
 // it should hear nothing about it.
 import { it, expect } from 'vitest';
 import os from 'node:os';
-import { refreshAgentModels } from '../main/refresh-agent-models.mjs';
+import { refreshAgentModels } from '../main/refresh-agent-models.mts';
 
 it('refreshing Codex on a Mac without Codex is quietly nothing', async () => {
   await expect(refreshAgentModels('codex', { codexBin: null, home: os.tmpdir() }, os.tmpdir())).resolves.toBeUndefined();

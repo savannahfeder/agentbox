@@ -8,7 +8,7 @@
 // anything... Check that your Claude plan is active at claude.ai", and the
 // founder went looking at a plan that was fine. Both are now a run cut off.
 import { describe, it, expect } from 'vitest';
-import { troubleCause, deadRunSentence } from '../shared/spawn-trouble.mjs';
+import { troubleCause, deadRunSentence } from '../shared/spawn-trouble.mts';
 
 const TIMEOUT = 'agentbox cloud: stopped: The operation was aborted due to timeout';
 const FETCH = 'agentbox cloud: stopped: fetch failed';

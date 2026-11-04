@@ -4,7 +4,7 @@
 // the script sits in, with no check whether that checkout is the person's
 // primary one. A worker that ran `npm install` in its task folder (a linked
 // git worktree) rewrote ~/.local/bin/agentbox to exec that folder's electron
-// on that folder, and main.mjs then refreshed it to the running appDir on
+// on that folder, and main.mts then refreshed it to the running appDir on
 // every from-source Linux launch, so the next launch ran unreviewed branch
 // code as the full app. A linked worktree is told apart from a primary
 // checkout without a subprocess: its `.git` is a FILE, not a directory.

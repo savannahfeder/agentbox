@@ -8,11 +8,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamService } from '../main/team/index.mjs';
+import { Store } from '../main/store.mts';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamService } from '../main/team/index.mts';
 import { memorySession, plainAuthError } from '../main/team/session.mjs';
-import { REQUEST_CHANNELS } from '../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS } from '../shared/bridge-map.mts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');

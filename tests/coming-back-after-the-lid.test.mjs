@@ -21,8 +21,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { recoveryToast } from '../shared/recovery.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { recoveryToast } from '../shared/recovery.mts';
 import { Name } from '../shared/product-name.mjs';
 
 // A MAC WITH ONE CLAUDE LOGIN ON IT. Since 2026-08-31 the fleet's account list

@@ -14,7 +14,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { waitFor } from './waiting.mjs';
 
 const FAILURE = 'Agentbox tried to ship your branch and it did not go out. It went red: 1 test failed.';

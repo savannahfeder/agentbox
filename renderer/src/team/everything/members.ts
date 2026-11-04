@@ -20,6 +20,8 @@ export interface Member {
   agents: number | null;
   /** A person's: what they have on, agents and waiting threads and tasks they hold. */
   inProgress?: number;
+  /** Tasks they hold that nothing shows is under way. */
+  toDo?: number;
   /** An AI teammate whose run is up and has no agent yet. */
   starting?: boolean;
   /** Someone else's AI teammate at work, which its owner's card says. */
@@ -74,18 +76,19 @@ export function buildMembers({ me, people = [], wall = null, cards = [], tasksHe
   /** This Mac's own count and newest thread, when there is no wall to say. */
   myAgents?: number; myNow?: string | null;
 }): Member[] {
-  const onThem = (id: string | undefined, agents: number | null) => {
-    if (!id) return agents ?? 0;
-    const ids = new Set<string>(tasksHeld.get(id) ?? []);
-    for (const t of cards) if (t.personId === id && (t.state === 'running' || t.state === 'waiting')) ids.add(t.threadId ?? `${t.title}/${t.updatedAt}`);
-    return Math.max(agents ?? 0, ids.size);
+  const under = (id: string) => new Set(cards.filter((t) => t.personId === id && (t.state === 'running' || t.state === 'waiting')).map((t) => t.threadId ?? `${t.title}/${t.updatedAt}`));
+  const onThem = (id: string | undefined, agents: number | null) => (id ? Math.max(agents ?? 0, under(id).size) : agents ?? 0);
+  const toDo = (id: string | undefined) => {
+    if (!id) return 0;
+    const going = under(id);
+    return new Set((tasksHeld.get(id) ?? []).filter((t) => !going.has(t))).size;
   };
   const cardOf = new Map((wall ?? []).map((c) => [c.id, c]));
   const meCard = (wall ?? []).find((c) => c.me) ?? (me ? cardOf.get(me.id) : undefined);
   const out: Member[] = [{
     key: 'me', kind: 'me', name: 'You', faceName: me?.name, avatarUrl: me?.avatarUrl ?? meCard?.avatarUrl ?? null, level: meCard?.level ?? null,
     agents: meCard ? meCard.agents : myAgents, now: meCard ? quietLine(meCard) ?? myNow : myNow,
-    inProgress: onThem(me?.id, meCard ? meCard.agents : myAgents),
+    inProgress: onThem(me?.id, meCard ? meCard.agents : myAgents), toDo: toDo(me?.id),
   }];
   const team = teamRoomId ? chats.find((c) => c.key === `room:${teamRoomId}`) : undefined;
   const humans = [...new Map(people.filter((p) => p.id !== me?.id).map((p) => [p.id, p])).values()].sort(byName);
@@ -97,8 +100,8 @@ export function buildMembers({ me, people = [], wall = null, cards = [], tasksHe
     const c = cardOf.get(p.id);
     const running = cards.filter((t) => t.personId === p.id && t.state === 'running').sort((a, b) => b.updatedAt - a.updatedAt);
     out.push(c
-      ? { key: `person:${p.id}`, kind: 'person', name: p.name, avatarUrl: p.avatarUrl ?? c.avatarUrl, level: c.level, agents: c.agents, now: quietLine(c), inProgress: onThem(p.id, c.agents) }
-      : { key: `person:${p.id}`, kind: 'person', name: p.name, avatarUrl: p.avatarUrl, level: null, agents: running.length, now: running[0]?.title ?? null, inProgress: onThem(p.id, running.length) });
+      ? { key: `person:${p.id}`, kind: 'person', name: p.name, avatarUrl: p.avatarUrl ?? c.avatarUrl, level: c.level, agents: c.agents, now: quietLine(c), inProgress: onThem(p.id, c.agents), toDo: toDo(p.id) }
+      : { key: `person:${p.id}`, kind: 'person', name: p.name, avatarUrl: p.avatarUrl, level: null, agents: running.length, now: running[0]?.title ?? null, inProgress: onThem(p.id, running.length), toDo: toDo(p.id) });
   }
   for (const t of teammates) {
     const agents = mateAgents.get(t.id) ?? 0;

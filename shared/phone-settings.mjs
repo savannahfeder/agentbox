@@ -1,5 +1,5 @@
 // YOUR COMPUTER'S SETTINGS ON YOUR PHONE: the copy the Mac sends, and the
-// changes the phone may ask for. The Mac's own handlers (main/settings.mjs)
+// changes the phone may ask for. The Mac's own handlers (main/settings.mts)
 // still decide every value. This keeps paths and instruction text out of the
 // cloud, and refuses any key the phone has no page for.
 import { CLAUDE_PERMISSION_MODES } from './work-items.mjs';
@@ -50,7 +50,7 @@ const PROJECT = {
   account: (v) => v === 'any' || accountId(v),
 };
 
-// A pin is one person's list on one computer (main/supervisor.mjs
+// A pin is one person's list on one computer (main/supervisor.mts
 // threadPins), so it travels as a setting of that computer, not a thread command.
 const THREAD = { pinned: bool };
 const THREAD_ID = /^[\w-]{1,120}$/;
@@ -68,7 +68,7 @@ export function checkSetting(p) {
 }
 
 // A REPEATING TASK MADE, CHANGED OR ENDED ON A PHONE, handed to the window's
-// own three handlers (main/ipc.mjs), which still gate the engine and model.
+// own three handlers (main/ipc.mts), which still gate the engine and model.
 const REPEAT_ID = /^[\w-]{1,120}$/;
 const REPEAT_FIELDS = {
   title: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 500,
@@ -113,7 +113,7 @@ function repeatRoute(p) {
 }
 
 // WHAT THE PHONE MAY ASK OF YOUR AI TEAMMATES, handed to the window's own door
-// (main/ipc.mjs `zero:teammates`), which still refuses with teammates off. It
+// (main/ipc.mts `zero:teammates`), which still refuses with teammates off. It
 // rides as a setting so the cloud's command table needs no new kind.
 const MATE_ID = /^t-[\w-]{1,60}$/;
 const words = (v, n) => typeof v === 'string' && v.trim().length > 0 && v.length <= n;

@@ -1,6 +1,6 @@
 // HER THREADS ARRIVE AS TASKS.
 //
-// `main/agent-sessions.mjs` found them; the tests for the finding are in
+// `main/agent-sessions.mts` found them; the tests for the finding are in
 // tests/the-import-finds-the-threads-she-started.test.mjs. This file is the
 // other half, which is what happens on the card and after the press, and it was
 // hers to decide.
@@ -21,11 +21,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { Name } from '../shared/product-name.mjs';
 import {
   THREAD_LABEL, startedIn, threadImportRow, threadLabel, threadsNeedingRows, whenWords,
-} from '../shared/agent-import.mjs';
+} from '../shared/agent-import.mts';
 import {
   allPicked, bringAllLine, canBring, countKinds, destinations, goLine, kindPhrase,
   picksOf, pressLine, sectionState, toggleSection, togglePicked, totalLine, willMake,
@@ -240,7 +240,7 @@ describe('what the imported row says to her', () => {
 
   it('waits for her rather than starting on its own', () => {
     // A question is what the supervisor never spawns fresh work on (`isFresh`,
-    // main/supervisor.mjs), which is what makes the row an ask and not a job.
+    // main/supervisor.mts), which is what makes the row an ask and not a job.
     expect(row.kind).toBe('question');
     expect(row.labels).toContain(THREAD_LABEL);
     expect(row.labels).toContain(threadLabel('t1'));
@@ -328,7 +328,7 @@ describe('the store files them, and the second press does not move it', () => {
 describe('the wiring the card needs is really there', () => {
   const card = read('renderer/src/components/ImportAgents.tsx');
   const api = read('renderer/src/api.ts');
-  const ipc = read('main/ipc.mjs');
+  const ipc = read('main/ipc.mts');
   const preload = read('preload.cjs');
   const logic = read('renderer/src/agent-import-card.ts');
 

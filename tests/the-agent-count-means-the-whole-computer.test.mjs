@@ -13,8 +13,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { setWorkspaceSetting } from '../main/settings.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { setWorkspaceSetting } from '../main/settings.mts';
 import { loadConfig } from '../main/config.mjs';
 import { agentCountOptions } from '../renderer/src/components/Settings.tsx';
 

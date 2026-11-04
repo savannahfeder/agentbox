@@ -16,7 +16,7 @@ import { folderTitle, mentionKind, mentionLabel, mentionName, type MentionKind }
 import { TaskTerminal } from './TaskTerminal';
 import { asksForANewTab, whereALinkGoes, type LinkClick } from '../link-click';
 import { watchCommandCatalog } from '../command-catalog';
-import { providerCommand } from '../../../shared/provider-commands.mjs';
+import { providerCommand } from '../../../shared/provider-commands.mts';
 // Focus mode: the whole interruption, rendered to be decidable in seconds.
 //
 // THE MESSAGE IS A CONVERSATION, ON EVERY ROW.An imported Claude Code session
@@ -57,9 +57,9 @@ import {
  * THE ROW'S TWO WORDS COME FROM `rowSays` NOW, not from six constants pulled
    apart here. One list, one row shape (w-23a7b3f568, 2026-08-27). */
 import { commandBeingWritten, enterWaitsForWords, holdingHint, rowKey, rowSays, slashRows, type SlashRow } from '../slash-menu';
-import { commandDraft } from '../../../shared/claude-commands.mjs';
+import { commandDraft } from '../../../shared/claude-commands.mts';
 import { CompactionResult, runCompaction, runCommand } from './CompactionResult';
-import { codexCommand, COMPACTION_COPY } from '../../../shared/codex-commands.mjs';
+import { codexCommand, COMPACTION_COPY } from '../../../shared/codex-commands.mts';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mjs';
 import { dayLabel, itemOptions, offerIsLive, optionsFrom, parseOptions, parseRepeat, repeatsLine, stripOptionsSection, type ParsedOption } from '../format';
 import { ruleIdOf } from '../../../shared/repeats.mjs';
@@ -169,7 +169,8 @@ const PATH_RE = CODE_PATH;
 // "tomorrow 8:00 AM". The same day words the Scheduled list uses, so the row
 // and the open task never name the same moment two different ways.
 function whenLabel(ts: number, now = Date.now()): string {
-  const time = new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const d = new Date(ts);
+  const time = `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}${d.getHours() < 12 ? 'am' : 'pm'}`;
   return `${dayLabel(ts, now).toLowerCase()} ${time}`;
 }
 
@@ -290,7 +291,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
   // A picture pasted straight into a message carries its own bytes, so there is
   // no file anywhere for a click to open and it stays a picture and nothing else.
   if (/^data:/.test(src)) return <img src={src} alt={alt ?? ''} className="inline-image" />;
-  // `data-copy-file` is what a right click reads (main/main.mjs), so the
+  // `data-copy-file` is what a right click reads (main/main.mts), so the
   // picture itself offers the file. The chips at the foot used to carry it too
   // and they are gone, so this is now the only one in the message: a right
   // click on the drawing is how she copies the file out.
@@ -350,7 +351,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
 // listening, so the player is the link: the name above it still opens the file
 // in the app that owns it, and the player tries every root the way a picture
 // does. The file comes on the app's own scheme, which serves sound and film
-// from the folders the app owns (main/img-scheme.mjs), because her window is
+// from the folders the app owns (main/img-scheme.mts), because her window is
 // served over http and may not load a file:// url.
 //
 // ITS NAME IS A MENTION LIKE ANY OTHER FILE'S (w-a3a7d1a1ec, 2026-10-12). The
@@ -778,7 +779,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // WHETHER THIS MAC OFFERS A CHOICE OF CODING AGENT, and which one this row
   // runs on. Both off the snapshot and both answered by main: the byline may
   // name an engine only where there is one to name, and the two rules that
-  // decide that are pinned to main/supervisor.mjs. False and absent on every
+  // decide that are pinned to main/supervisor.mts. False and absent on every
   // Mac until the gate is opened, and the line is then the one already chosen,
   // unchanged.
   engineChoice?: boolean;
@@ -983,7 +984,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // the conversation, folded to a rail when closed (w-a3482b8c2c).
   //
   // NOT ON A MESSAGE FROM A PERSON. A message between two people lives in a
-  // record of its own (main/team/projects.mjs makeDirect), is not work, and is
+  // record of its own (main/team/projects.mts makeDirect), is not work, and is
   // never carded for the team, so it has no state to report and nothing to
   // summarise. Not on the rows with no ledger behind them either: a running
   // agent's row, the trouble row and the update row have no fields to keep.
@@ -1734,7 +1735,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onCloseTask={canFinish && givenTask ? onCloseTask ?? null : null}
       onReopen={!canFinish && !agent ? onReopenDone ?? null : null}
       onRunNow={waiting && onRunNow ? onRunNow : null}
-      onLater={onPhone() && canFinish ? onSnooze ?? null : null}
+      onLater={canFinish ? onSnooze ?? null : null}
       // A finished thread has nothing to be pinned for.
       pinned={canFinish && onPin ? !!item.pinned : null}
       onPin={onPin}
@@ -2276,10 +2277,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             the line says the one thing there is to say and the press starts
             it. Same button, same place as the one below. */}
         {item.start === 'later' && onUnschedule && (
-          <button className="focus-unschedule" onClick={onUnschedule}>
-            start it now
-            <span className="dim">{' · '}not started yet</span>
-          </button>
+          <><button className="focus-unschedule" onClick={onUnschedule}>Start it now</button>
+          <span className="focus-when">Not started yet</span></>
         )}
         {item.start !== 'later' && (scheduledUntil ?? 0) > 0 && onUnschedule && (
           // The two cases want different words because the button does two
@@ -2287,13 +2286,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           // back; a row an agent parked is already right here in her inbox, so
           // "back to inbox" would name a move that does not happen. What
           // clearing an agent's park actually does is let the work start.
-          <button className="focus-unschedule" onClick={onUnschedule}>
-            {scheduledByAgent ? 'let it run now' : 'back to inbox'}
-            <span className="dim">
-              {' · '}
-              {(item.snoozedUntil ?? 0) > Date.now() ? 'in Later until' : scheduledByAgent ? 'the agent paused this until' : 'scheduled for'} {whenLabel(scheduledUntil!)}
-            </span>
-          </button>
+          <><button className="focus-unschedule" onClick={onUnschedule}>{scheduledByAgent ? 'Let it run now' : 'Back to inbox'}</button>
+          <span className="focus-when">
+            {(item.snoozedUntil ?? 0) > Date.now() ? 'In Later until' : scheduledByAgent ? 'The agent paused this until' : 'Scheduled for'} {whenLabel(scheduledUntil!)}
+          </span></>
         )}
         {/* "E close this task" AND "S remind me later" USED TO SIT HERE. They
             were the first two of three removed, and they were the two with a
@@ -2309,7 +2305,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
 
             That is the whole reasoning and it is not only convention. Stopping
             is something she says TO the agent, and a reply already reaches a
-            running session mid-run (`session.child.steer`, main/live-replies.mjs),
+            running session mid-run (`session.child.steer`, main/live-replies.mts),
             so the box she says things in is where the verb belongs. What was
             here was a 290 point sentence on a bordered button, under a rule of
             the same weight as the rules between messages, in the one strip of
@@ -2332,12 +2328,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             running inside to the front, which is the whole of what is actually
             available. Nothing public focuses one pane inside another app. */}
         {agent && !agentTakesReply && onReveal && (
-          <button className="focus-stop" onClick={onReveal}>
-            take me to it
-            <span className="dim">{' · '}opens the app it is running in</span>
-          </button>
+          <><button className="focus-stop" onClick={onReveal}>Take me to it</button>
+          <span className="focus-when">Opens the app it is running in</span></>
         )}
-        {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}>send back to agent</button>}
+        {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}>Send back to agent</button>}
         {/* "esc back" was the third one removed. Escape still closes the pane
             and so does clicking away from it. */}
       </div>
@@ -3054,7 +3048,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   //
   // AND NOTHING IS DRAWN IN ITS PLACE. A Codex worker runs one posture,
   // `untrusted` + `workspace-write`, and the other two approval policies were
-  // measured on 2026-09-04 and neither gates anything (main/codex-session.mjs).
+  // measured on 2026-09-04 and neither gates anything (main/codex-session.mts).
   // Which of the six would stand for which Codex setting is a judgement about
   // what an agent may do on her Mac, and it is hers to make with an approval
   // path built for it. Until then the honest control is no control.

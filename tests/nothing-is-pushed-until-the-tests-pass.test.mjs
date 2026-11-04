@@ -341,7 +341,7 @@ describe('a push tests what it changed', () => {
 
   // AND IT STOPS SHORT OF WHAT A SHIP CANNOT WAIT FOR (w-9e4d3f3cc1,
   // 2026-10-19). `related` on a core file here reaches most of the suite: 216
-  // of 1,207 test files name main/supervisor.mjs, and running them cost 12
+  // of 1,207 test files name main/supervisor.mts, and running them cost 12
   // minutes on a busy Mac. Over the cap the hook runs the files that are most
   // about the change and says who runs the rest
   // (scripts/lib/tests-the-push-runs.mjs).
@@ -464,7 +464,7 @@ describe('the hook is switched on without anyone remembering to', () => {
 // with a stranger's commits, including folders that are not repositories at all.
 describe('the first task s sentence is about the folder, not about wherever we were started from', () => {
   it('says a folder that is not a repository was last touched, whatever GIT_DIR says', async () => {
-    const { lastCommit } = await import('../main/first-run.mjs');
+    const { lastCommit } = await import('../main/first-run.mts');
     const notARepo = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-notarepo-'));
     fs.writeFileSync(path.join(notARepo, 'main.py'), 'print(1)\n');
 
@@ -479,7 +479,7 @@ describe('the first task s sentence is about the folder, not about wherever we w
   });
 
   it('still gives git s own answer for a folder that really is a repository', async () => {
-    const { lastCommit } = await import('../main/first-run.mjs');
+    const { lastCommit } = await import('../main/first-run.mts');
     const repo = tmpRepo('realrepo');
     fs.writeFileSync(path.join(repo, 'a.txt'), 'hello\n');
     execFileSync('git', ['add', '-A'], { cwd: repo });

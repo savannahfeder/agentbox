@@ -11,7 +11,7 @@
 // Whatever the cause next time, a page that cannot tell which of two equal
 // readings is real shows neither, says so, and reads both again next time.
 import { describe, it, expect } from 'vitest';
-import { AccountUsage } from '../main/account-usage.mjs';
+import { AccountUsage } from '../main/account-usage.mts';
 
 const T = Date.parse('2026-10-30T21:42:00Z');
 const at = (iso) => `2026-${iso}:00.5+00:00`;

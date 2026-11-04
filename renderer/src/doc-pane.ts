@@ -3,7 +3,7 @@
 // The look of the pane is settled and lives in styles.css and DocPane.tsx. This
 // file is the arithmetic and the naming, kept out of the component so it can be
 // tested without a window.
-import { isWebsiteAddress } from '../../shared/websites.mjs';
+import { isWebsiteAddress } from '../../shared/websites.mts';
 
 /**
  * The kinds of file the pane draws, and nothing else.
@@ -19,7 +19,7 @@ import { isWebsiteAddress } from '../../shared/websites.mjs';
  * https link in a thread used to leave the app for the browser; it now draws
  * in the pane where the file would have been, in a browser of its own
  * (WebsitePane.tsx), with one mark that hands it to the browser you use.
- * shared/websites.mjs decides which addresses those are, and a local app is
+ * shared/websites.mts decides which addresses those are, and a local app is
  * NOT one of them: it already has its own way through here.
  */
 export type DocKind = 'html' | 'markdown' | 'code' | 'image' | 'website' | 'pdf' | 'film';
@@ -55,7 +55,7 @@ export function docKind(path: string | undefined | null): DocKind | null {
 
 /** Is this a file the pane can open at all. */
 /** A script or text file handed to the pane anyway, as Files does: shown as its text. */
-export const isPlainText = (path: string) => /\.(py|ipynb|js|mjs|ts|tsx|jsx|rb|go|rs|sh|sql|css|txt|csv|tsv|json|ya?ml|xml)$/i.test(path.split(/[?#]/)[0]);
+export const isPlainText = (path: string) => /\.(py|ipynb|js|mjs|cjs|ts|mts|cts|tsx|jsx|rb|go|rs|sh|sql|css|txt|csv|tsv|json|ya?ml|xml)$/i.test(path.split(/[?#]/)[0]);
 
 export function opensInPane(path: string | undefined | null): boolean {
   return docKind(path) !== null || (!!path && isPlainText(path));
@@ -203,7 +203,7 @@ export function escapeClosesDoc(doc: { auto?: boolean } | null | undefined): boo
  * crosses a document boundary: the page in the frame is its own document, in
  * its own origin, so once her click lands inside it the app's own window
  * listener stops hearing the key entirely. Main forwards it instead
- * (before-input-event in main/main.mjs), and this decides what it means when it
+ * (before-input-event in main/main.mts), and this decides what it means when it
  * arrives.
  *
  * It is the FILE, always, including one the card opened by itself. The rule

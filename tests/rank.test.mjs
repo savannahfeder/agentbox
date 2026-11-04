@@ -14,7 +14,7 @@ import {
   RANK_STEP, DEFAULT_PRIORITY, itemPriority,
   normalizeOrder, productRankScore, orderFromTiers, moveProduct, landingIndex,
 } from '../shared/rank.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 describe('the order itself', () => {
   it('drops blanks, non-strings and duplicates', () => {

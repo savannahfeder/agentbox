@@ -1,0 +1,201 @@
+// A PROJECT ON THIS MAC, SEEN AS SHARED OR PRIVATE.
+//
+// A shared project is an ordinary local project whose project.json carries a
+// `team` record: the project's id in the cloud, the team, and who can see it.
+// That id is the same on every teammate's Mac; the folder, its name on disk and
+// the code it points at are each person's own. A project without `team` is
+// private, and private projects never leave the Mac (only the title-free
+// activity below does).
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { projectWritten } from '../store/projects-changed.mjs';
+
+const PROJECT_FILE = 'project.json';
+
+/** The `team` record of a shared project, cleaned. */
+export interface TeamRecord {
+  projectId: string;
+  teamId: string | null;
+  visibility: 'people' | 'team';
+  people: string[];
+  sharedBy: string | null;
+  direct: boolean;
+}
+
+/** project.json as this file reads and writes it; other keys pass through. */
+export interface ProjectJson {
+  [key: string]: unknown;
+  name?: string;
+  team?: Partial<TeamRecord>;
+}
+
+/** A shared project as sync wants it. */
+export interface SharedProjectRef {
+  projectId: string;
+  dir: string;
+  name: string;
+  slug: string;
+  direct: boolean;
+}
+
+/** A project as the cloud describes it. */
+export interface CloudProject {
+  id: string;
+  name: string;
+  teamId?: string | null;
+  visibility?: string;
+  people?: string[];
+  createdBy?: string | null;
+  direct?: boolean;
+}
+
+function readProject(dir: string): ProjectJson | null {
+  try { return JSON.parse(fs.readFileSync(path.join(dir, PROJECT_FILE), 'utf8')); } catch { return null; }
+}
+
+function writeProject(dir: string, project: ProjectJson) {
+  const file = path.join(dir, PROJECT_FILE);
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(project, null, 2));
+  fs.renameSync(tmp, file);
+  projectWritten();
+}
+
+// The `team` record, cleaned, or null for a private project.
+export function teamOf(project: { team?: Record<string, unknown> } | null | undefined): TeamRecord | null {
+  const t = project?.team;
+  if (!t || typeof t !== 'object' || typeof t.projectId !== 'string' || !t.projectId) return null;
+  return {
+    projectId: t.projectId,
+    teamId: typeof t.teamId === 'string' ? t.teamId : null,
+    visibility: t.visibility === 'people' ? 'people' : 'team',
+    people: Array.isArray(t.people) ? t.people.filter((p) => typeof p === 'string') : [],
+    // Who shared it. Runs the rows written before anyone signed in
+    // (shared/team-rules.mjs runnerOf).
+    sharedBy: typeof t.sharedBy === 'string' ? t.sharedBy : null,
+    // A MESSAGE THREAD between two people (approved 2026-10-01): a shared
+    // record the two of them only can see, kept out of every project list.
+    direct: t.direct === true,
+  };
+}
+
+export function readTeam(dir: string) {
+  return teamOf(readProject(dir));
+}
+
+// Every shared project on this Mac, as sync wants them.
+export function listSharedProjects(products: { team?: { projectId: string; direct?: boolean } | null; dir: string; name: string; slug: string }[]): SharedProjectRef[] {
+  return products
+    .filter((p) => p.team?.projectId)
+    .map((p) => ({ projectId: p.team!.projectId, dir: p.dir, name: p.name, slug: p.slug, direct: p.team!.direct === true }));
+}
+
+// YOUR PERSONAL PROJECT (w-b989839656): one per person, made when they sign
+// in, where a thread with no visibility of its own is Only you
+// (shared/thread-cards.mjs visibilityOf). It says so about itself in
+// project.json rather than by its name, because "personal" is a name somebody
+// may already have given a project of their own, and that one must stay as it
+// is. Never shared, never remade once it exists, archived or not.
+export const PERSONAL_FLAG = 'personal';
+// CALLED MY WORKSPACE, in title case: the founder's pick on 2026-10-04. It is
+// a workspace of your own rather than a label for private things, and every
+// word of a project's name is capitalised.
+const PERSONAL_NAME = 'My Workspace';
+const PERSONAL_SLUG = 'my-workspace';
+// What it was called when it first shipped (9e2a626). One still carrying it
+// takes the new name; a name the person gave it is theirs.
+const FIRST_NAME = 'Personal';
+
+export function ensurePersonalProject(accountRoot: string) {
+  let entries: string[] = [];
+  try { entries = fs.readdirSync(accountRoot); } catch { entries = []; }
+  for (const slug of entries.sort()) {
+    const dir = path.join(accountRoot, slug);
+    const project = readProject(dir);
+    if (project?.[PERSONAL_FLAG] !== true) continue;
+    if (project.name === FIRST_NAME) writeProject(dir, { ...project, name: PERSONAL_NAME });
+    return { slug, made: false };
+  }
+  let slug = PERSONAL_SLUG;
+  for (let n = 2; fs.existsSync(path.join(accountRoot, slug)); n += 1) slug = `${PERSONAL_SLUG}-${n}`;
+  const dir = path.join(accountRoot, slug);
+  fs.mkdirSync(dir, { recursive: true });
+  writeProject(dir, {
+    schemaVersion: 1,
+    id: slug,
+    name: PERSONAL_NAME,
+    createdAt: new Date().toISOString(),
+    [PERSONAL_FLAG]: true,
+  });
+  return { slug, made: true };
+}
+
+// Mark a local project shared. Its cloud id is minted the first time and kept
+// for good, so sharing, unsharing to specific people and sharing again is one
+// project in the cloud, not three.
+export function markShared(dir: string, { teamId, visibility = 'team', people = [], sharedBy = null }: { teamId: string | null; visibility?: string; people?: string[]; sharedBy?: string | null }) {
+  const project = readProject(dir);
+  if (!project) throw new Error(`no project.json in ${dir}`);
+  // Sharing it would put every line of it in the cloud, which is the one thing
+  // this project exists to make hard. A thread in it is shared one at a time.
+  if (project[PERSONAL_FLAG] === true) throw new Error(`${PERSONAL_NAME} stays on this computer. Share a thread in it instead.`);
+  const projectId = project.team?.projectId || crypto.randomUUID();
+  project.team = {
+    projectId, teamId, visibility: visibility === 'people' ? 'people' : 'team', people: [...new Set(people)],
+    sharedBy: project.team?.sharedBy || sharedBy,
+  };
+  writeProject(dir, project);
+  return teamOf(project);
+}
+
+// A project a teammate shared, made into a project here. Its folder is named
+// from the project's name, and a name already taken on this Mac gets -2, -3.
+export function joinSharedProject(accountRoot: string, cloudProject: CloudProject): SharedProjectRef {
+  const base = cloudProject.direct ? `direct-${String(cloudProject.id).slice(0, 8)}` : String(cloudProject.name || 'shared').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'shared';
+  let slug = base;
+  for (let n = 2; fs.existsSync(path.join(accountRoot, slug)); n += 1) {
+    // The same project joined before (a folder that already carries its id) is
+    // not joined twice.
+    if (readTeam(path.join(accountRoot, slug))?.projectId === cloudProject.id) {
+      return { projectId: cloudProject.id, dir: path.join(accountRoot, slug), name: cloudProject.name, slug, direct: readTeam(path.join(accountRoot, slug))?.direct === true };
+    }
+    slug = `${base}-${n}`;
+  }
+  const dir = path.join(accountRoot, slug);
+  fs.mkdirSync(dir, { recursive: true });
+  writeProject(dir, {
+    schemaVersion: 1,
+    id: slug,
+    name: cloudProject.name,
+    createdAt: new Date().toISOString(),
+    team: {
+      projectId: cloudProject.id,
+      teamId: cloudProject.teamId ?? null,
+      visibility: cloudProject.visibility === 'people' ? 'people' : 'team',
+      people: cloudProject.people ?? [],
+      sharedBy: cloudProject.createdBy ?? null,
+      ...(cloudProject.direct ? { direct: true } : {}),
+    },
+  });
+  return { projectId: cloudProject.id, dir, name: cloudProject.name, slug, direct: cloudProject.direct === true };
+}
+
+// THE RECORD A MESSAGE BETWEEN TWO PEOPLE LIVES IN, made on the sender's Mac
+// the first time they write to that person. Its folder is named for nobody, so
+// it can never collide with a project, and both people are on it from the
+// start; the other Mac joins it like any shared record.
+export function makeDirect(accountRoot: string, { teamId, me, other, others = other ? [other] : [] }: { teamId: string | null; me: string; other?: string; others?: string[] }) {
+  const projectId = crypto.randomUUID();
+  const slug = `direct-${projectId.slice(0, 8)}`;
+  const dir = path.join(accountRoot, slug);
+  fs.mkdirSync(dir, { recursive: true });
+  writeProject(dir, {
+    schemaVersion: 1,
+    id: slug,
+    name: 'Direct',
+    createdAt: new Date().toISOString(),
+    team: { projectId, teamId, visibility: 'people', people: [me, ...others], sharedBy: me, direct: true },
+  });
+  return { projectId, dir, slug };
+}

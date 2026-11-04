@@ -11,7 +11,7 @@
 // ends on a question, or on a question followed by the choices it offers.
 
 import { describe, it, expect } from 'vitest';
-import { howTheChatEnded } from '../shared/agent-import.mjs';
+import { howTheChatEnded } from '../shared/agent-import.mts';
 
 describe('how a chat ended', () => {
   it('ends on a question, so it is waiting and the question is what it asks', () => {

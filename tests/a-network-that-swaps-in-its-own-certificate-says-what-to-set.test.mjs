@@ -25,7 +25,7 @@ import {
   troubleCause, troubleSentence, troubleRemedy, accountSentence, engineTroubleNote,
   deadRunSentence, deadRunCause, runStoppedLine, causeWord, causeWhat, causeNext,
   causeBreakdown, needsHerHands,
-} from '../shared/spawn-trouble.mjs';
+} from '../shared/spawn-trouble.mts';
 
 const MEASURED = "API Error: Unable to connect to API: Self-signed certificate detected (DEPTH_ZERO_SELF_SIGNED_CERT). The certificate comes from an authority Claude Code doesn't trust, usually a TLS-inspecting corporate proxy or a gateway signed by a private CA: set NODE_EXTRA_CA_CERTS to that CA bundle, or add it to the system certificate store · see https://code.claude.com/docs/en/network-config";
 

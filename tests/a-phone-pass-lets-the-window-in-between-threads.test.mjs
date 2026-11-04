@@ -2,7 +2,7 @@
 //
 // What broke (2026-10-19): typing in the app hitched every minute or so. A
 // ten-minute CPU profile of the running app had 11 stretches of 400 to 560 ms
-// with no idle in them, all in `publish` (main/phone-inbox.mjs): for each of
+// with no idle in them, all in `publish` (main/phone-inbox.mts): for each of
 // up to 300 threads of a project it read the history, hashed it and looked
 // for the files the thread names, and only waited for the window between
 // projects. One big project was one block.
@@ -13,8 +13,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createPhoneInbox } from '../main/phone-inbox.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createPhoneInbox } from '../main/phone-inbox.mts';
 
 const dirs = [];
 afterEach(() => { while (dirs.length) fs.rmSync(dirs.pop(), { recursive: true, force: true }); });

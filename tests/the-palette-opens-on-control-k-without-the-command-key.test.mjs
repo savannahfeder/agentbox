@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { whatTheFileSentUp } from '../shared/artifact-keys.mjs';
+import { whatTheFileSentUp } from '../shared/artifact-keys.mts';
 
 const app = fs.readFileSync(
   path.join(path.dirname(fileURLToPath(import.meta.url)), '../renderer/src/App.tsx'),

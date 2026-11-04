@@ -6,7 +6,7 @@
 // the two list rules it depends on: the row reaches her inbox, and the line
 // the inbox prints under the title carries the whole question.
 import { describe, it, expect } from 'vitest';
-import { codexImportRow, codexMirrorPatch, whenPhrase } from '../shared/codex-import.mjs';
+import { codexImportRow, codexMirrorPatch, whenPhrase } from '../shared/codex-import.mts';
 import { IMPORT_KEYS, NOT_IMPORTED_HEADING, NOT_IMPORTED_KEYS, importAnswer, isCodexRow, isImportRow, isNotImportedRow } from '../renderer/src/import-row';
 import { belongsInInbox, belongsInProgress, rowSummary, SUMMARY_BUDGET } from '../renderer/src/list-rules';
 import { itemOptions, offerIsLive } from '../renderer/src/format';

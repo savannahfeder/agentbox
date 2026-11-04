@@ -12,7 +12,7 @@
 // carrying the app's own limit note was never fresh work again.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const ONE_ACCOUNT_HOME = '/nonexistent-home-with-no-second-account';
 const NOW = Date.now();

@@ -28,8 +28,8 @@ beforeAll(async () => {
     cp[n] = function (...a) { if (a[0] === 'git') started.push(a[1]); return o.apply(this, a); };
   }
   syncBuiltinESMExports();
-  marker = await import('../main/cloud/marker.mjs');
-  run = await import('../main/cloud/run.mjs');
+  marker = await import('../main/cloud/marker.mts');
+  run = await import('../main/cloud/run.mts');
 });
 
 const dirs = [];

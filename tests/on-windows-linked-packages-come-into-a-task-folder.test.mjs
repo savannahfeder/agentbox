@@ -18,7 +18,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { carryLocalFiles } from '../main/worktree-include.mjs';
+import { carryLocalFiles } from '../main/worktree-include.mts';
 
 let dir, root, staging, landsAt;
 const git = (cwd, ...args) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, stdio: 'pipe' });

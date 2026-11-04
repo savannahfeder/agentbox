@@ -94,7 +94,7 @@ describe('a Codex conversation brought in by the store', () => {
     const fs = await import('node:fs');
     const os = await import('node:os');
     const path = await import('node:path');
-    const { Store } = await import('../main/store.mjs');
+    const { Store } = await import('../main/store.mts');
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-codex-history-'));
     const accountRoot = path.join(root, 'accounts', 'test-account');
     fs.mkdirSync(accountRoot, { recursive: true });

@@ -6,7 +6,7 @@
 // lines above the app's own note that nothing had been done.
 //
 // Why. When a run dies before doing anything, the app writes its own sentence
-// as the result (main/supervisor.mjs, `sayTheRunDied`) and then puts the row back
+// as the result (main/supervisor.mts, `sayTheRunDied`) and then puts the row back
 // to open with a system line. thread-history drew that system 'open' as the
 // agent handing the thread back, once per attempt. Nobody handed anything back:
 // it is the app delivering its own note, the same pair the 'blocked' branch

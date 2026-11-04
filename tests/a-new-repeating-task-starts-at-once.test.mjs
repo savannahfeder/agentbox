@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const ipc = fs.readFileSync(path.join(root, 'main/ipc.mjs'), 'utf8');
+const ipc = fs.readFileSync(path.join(root, 'main/ipc.mts'), 'utf8');
 
 function handler(name) {
   const at = ipc.indexOf(`ipcMain.handle('${name}'`);

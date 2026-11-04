@@ -25,7 +25,7 @@
 // gets the next free slot first.
 
 import { describe, it, expect } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const ONE_ACCOUNT_HOME = '/nonexistent-home-with-no-second-account';
 const NOW = 1_787_600_000_000;

@@ -25,9 +25,9 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun, IMPORT_FAILED, toolVariables } from '../main/cloud/run.mjs';
-import { readMarker } from '../main/cloud/marker.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { cloudRun, IMPORT_FAILED, toolVariables } from '../main/cloud/run.mts';
+import { readMarker } from '../main/cloud/marker.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');
@@ -116,7 +116,7 @@ function launch(message, extra = {}) {
 }
 
 // What the supervisor starts when the app opens again: no prompt, no stream,
-// and none of the worker's own variables (main/supervisor.mjs _bringCloudHome).
+// and none of the worker's own variables (main/supervisor.mts _bringCloudHome).
 function bringHome(extraEnv = {}) {
   const stderr = new PassThrough();
   const stdout = new PassThrough();
@@ -247,7 +247,7 @@ describe('when the app quits with a run in the cloud', () => {
   });
 
   // THE SHARED HOST CRASHING (2026-10-17): every cloud run's relay now lives
-  // in one process on the Mac (main/cloud/host.mjs). When it dies without a
+  // in one process on the Mac (main/cloud/host.mts). When it dies without a
   // word, each run's marker still says running, for a stand-in that is gone,
   // and bringing the folder home sent the run SIGTERM: one crash would cancel
   // fifty runs mid-turn. Such a run is now joined, as one the app left going.
@@ -273,7 +273,7 @@ describe('when the app quits with a run in the cloud', () => {
   // cloud, wrote its answer at 11:51 and came home at 12:00, and the joined
   // process dropped every line of it. The thread said "Nothing running", its
   // steps stopped at 11:45, and the answer never reached the row. The joined
-  // stream now goes to whoever brought it home (main/supervisor.mjs
+  // stream now goes to whoever brought it home (main/supervisor.mts
   // `_followComingHome`), from where the last process stopped.
   it('passes on what the run says after the app came back, and nothing said before', async () => {
     const run = launch('LATE please');
@@ -360,8 +360,8 @@ describe('the variables a joined run gives its tools', () => {
 });
 
 describe('the app', () => {
-  const sup = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
-  const claude = fs.readFileSync(new URL('../main/harnesses/claude.mjs', import.meta.url), 'utf8');
+  const sup = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
+  const claude = fs.readFileSync(new URL('../main/harnesses/claude.mts', import.meta.url), 'utf8');
   it('quits a Claude cloud run with SIGHUP, and everything else as before', () => {
     const quit = sup.slice(sup.indexOf('  killAll() {'), sup.indexOf('  killAll() {') + 800);
     expect(quit).toMatch(/this\._kill\(session, session\.cloud && session\.engine !== 'codex' \? 'SIGHUP' : undefined\)/);
@@ -394,7 +394,7 @@ describe('the app', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
   it('hands the process that brings a run home its tool servers as they are now', () => {
-    const home = sup.slice(sup.indexOf('  _bringCloudHome(place) {'), sup.indexOf('  _bringCloudHome(place) {') + 2500);
+    const home = sup.slice(sup.indexOf('  _bringCloudHome(place'), sup.indexOf('  _bringCloudHome(place') + 2500);
     expect(home).toMatch(/this\.writeMcpConfig\(\)/);
     expect(home).toMatch(/AGENTBOX_MCP_CONFIG: mcp/);
   });

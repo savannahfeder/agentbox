@@ -23,7 +23,7 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun, hooksForTheCloud } from '../main/cloud/run.mjs';
+import { cloudRun, hooksForTheCloud } from '../main/cloud/run.mts';
 
 const HOME = '/Users/someone';
 const HOOKS = `${HOME}/.claude/hooks`;

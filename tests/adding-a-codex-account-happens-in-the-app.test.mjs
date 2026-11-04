@@ -18,8 +18,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { codexLoginCommand, makeCodexHome } from '../main/codex-account.mjs';
-import { SETTINGS_TERMINAL } from '../shared/settings-terminal.mjs';
+import { codexLoginCommand, makeCodexHome } from '../main/codex-account.mts';
+import { SETTINGS_TERMINAL } from '../shared/settings-terminal.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -93,7 +93,7 @@ describe('it is the app doing it, not a command she has to run', () => {
   });
 
   it('registers the login before the sign in, so an abandoned one is visible', () => {
-    const main = read('main/settings.mjs');
+    const main = read('main/settings.mts');
     expect(main).toContain('export function addCodexAccount(');
     const fn = main.slice(main.indexOf('export function addCodexAccount('));
     const body = fn.slice(0, fn.indexOf('\\n}'));
@@ -106,8 +106,8 @@ describe('the reserved terminal key', () => {
   // A KEY THE RENDERER CANNOT AIM. Every other shell resolves through a work
   // item that has to exist; this one resolves to the folder main just made.
   it('is shared by both sides rather than spelled twice', () => {
-    expect(read('main/ipc.mjs')).toContain("import {SETTINGS_TERMINAL} from '../shared/settings-terminal.mjs';");
-    expect(read('renderer/src/components/Settings.tsx')).toContain("import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mjs';");
+    expect(read('main/ipc.mts')).toContain("import {SETTINGS_TERMINAL} from '../shared/settings-terminal.mts';");
+    expect(read('renderer/src/components/Settings.tsx')).toContain("import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mts';");
   });
 
   // A COLON, SO NO PROJECT CAN COLLIDE WITH IT. A product here is a slug taken
@@ -117,7 +117,7 @@ describe('the reserved terminal key', () => {
   });
 
   it('never reaches the resolver that demands a task', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     const resolve = ipc.slice(ipc.indexOf('const terminals=new TaskTerminals('), ipc.indexOf('let terminalQuitPending'));
     // The reserved key returns before `terminalPlace` is ever consulted.
     expect(resolve.indexOf('terminalPlace({store')).toBeGreaterThan(-1);
@@ -129,7 +129,7 @@ describe('the reserved terminal key', () => {
   });
 
   it('ends the previous sign-in shell, so it cannot be holding the old folder', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     const handler = ipc.slice(
       ipc.indexOf("ipcMain.handle('zero:codex-add-account'"),
       ipc.indexOf("ipcMain.handle('zero:settings-set-project'"),

@@ -2301,6 +2301,8 @@ body {
 }
 .focus-actions button:hover { color: var(--text); border-color: var(--text-faint); }
 .focus-actions b { color: var(--text); margin-right: 4px; }
+.focus-actions { align-items: center; }
+.focus-when { font-size: 13px; color: var(--text-faint); }
 /* Where the stopped task goes, said on the button rather than only in the
    toast that follows it. Scoped to this button on purpose: the unschedule
    button beside it writes the same `dim` span and has never had a rule, so a
@@ -5185,7 +5187,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 }
 
 /* The gutter only bites under a 920 window: the nav is a fixed 236px and the
-   column 620, and the window goes down to 720 (main/main.mjs), where the pane
+   column 620, and the window goes down to 720 (main/main.mts), where the pane
    is 483 and the words would otherwise touch the nav. */
 .set-pane { flex: 1; min-width: 0; overflow-y: auto; background: var(--bg); position: relative; padding: 0 32px; }
 /* The screen is the ground here and nothing inside it paints a second one, or
@@ -7011,7 +7013,7 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
    `100vw - 260px`, so whatever it holds it always leaves at least 130px of
    clear strip on each side of it. This sits 16px in from the right edge and is
    one short word wide. The narrowest window the app will open is 980
-   (main/main.mjs), and 130 > 16 + a word at every width above that. NOT
+   (main/main.mts), and 130 > 16 + a word at every width above that. NOT
    DRAGGABLE, AND THAT WAS NEVER ENOUGH ON ITS OWN. `-webkit-app-region:
    no-drag` here does say "a press of this is a press", and in Electron it was
    overruled anyway: the band's own drag rectangle was reported to the window
@@ -7059,7 +7061,7 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
    ways, option 1 was chosen, and then it was reduced to the mark alone the same
    evening: a small icon with no esc text. AND THE WHOLE ROW SITS UNDER THE
    WINDOW BUTTONS, NOT BESIDE THEM. The reason is worth writing down. The window is `titleBarStyle: 'hiddenInset'`
-   (main/main.mjs), so the red, amber and green buttons own the very corner, and
+   (main/main.mts), so the red, amber and green buttons own the very corner, and
    `.fr-brand`'s 64px looks like it is there to clear them. It is not: at top 44
    this row is already well BELOW them, so there was never anything to the left
    of it to avoid, and the arrow inherited a gutter that had no reason behind
@@ -7459,36 +7461,26 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
    a drag is under way the whole window takes the cursor, or crossing the
    document's own iframe changes it back halfway. THE LINE IS GONE, CHOSEN
    2026-08-22: three quarters, and no line down the middle.
-   Only the always-on 1px went. The 9 point reach stays, so the divider is
-   dragged exactly where it was dragged before, and the line comes back under
-   the pointer, because a divider with no state at all cannot be found by feel.
-   The capsule handle below stays for the same reason and was chosen on
-   2026-08-21.
+   The grip covers the file card's own left border (measured by DocPane), so
+   the edge you see is the edge you drag. A divider with no state at all cannot
+   be found by feel, so the pointer finds a faint pill centred on that border,
+   chosen 2026-11-04; the border itself does not change. The pill stays for
+   the whole drag, or it vanishes under the pointer the moment it is used.
+   A code file's card has no border, so ::before draws its hairline, stopping
+   where the corners curve.
 */
-.doc-grip { position: absolute; left: -4px; top: 0; bottom: 0; width: 9px; z-index: 6; cursor: col-resize; }
-.doc-grip::before { content: ''; position: absolute; left: 4px; top: 0; bottom: 0; width: 1px; background: transparent; }
-.doc-grip:hover::before { background: var(--text-faint); }
-/* THE HANDLE IN THE MIDDLE OF THE LINE.A brightening hairline was all there
-   was, and a hairline that goes from rgba(255,255,255,0.19) to #979ca6 is not a
-   thing you notice at the edge of your eye. So the common one: a small capsule
-   centred on the line, in the same ink the line brightens to, so the whole
-   hover state is one colour. It is 7 wide over a 1px line, hence left 1px
-   inside a grip that starts 4px left of it, it takes the app's one corner like
-   every other box, and it appears with no fade, like everything else in this
-   app. It stays lit for the whole drag, or the handle vanishes under the
-   pointer the moment it is used.
-*/
+.doc-grip { position: absolute; left: calc(var(--doc-card-x, 0px) - 4px); top: var(--doc-card-y, 0px); height: var(--doc-card-h, 100%); width: 9px; z-index: 6; cursor: col-resize; }
+.doc-grip::before { content: ''; position: absolute; left: 4px; top: var(--doc-card-r, 0px); bottom: var(--doc-card-r, 0px); width: 1px; background: transparent; }
 .doc-grip::after {
   content: '';
   position: absolute;
   left: 1px; top: 50%;
   width: 7px; height: 30px; margin-top: -15px;
   border-radius: var(--radius);
-  background: var(--text-faint);
+  background: var(--line-strong);
   opacity: 0;
 }
 .doc-grip:hover::after, .doc-pane.dragging .doc-grip::after { opacity: 1; }
-.doc-pane.dragging .doc-grip::before { background: var(--text-faint); }
 .doc-pane.dragging { user-select: none; }
 .doc-pane.dragging .doc-view { pointer-events: none; }
 

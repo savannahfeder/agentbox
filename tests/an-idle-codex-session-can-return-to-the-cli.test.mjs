@@ -1,7 +1,7 @@
 // Native resume failed with "already active writer" after a completed app turn.
 // Release only idle account servers; other workers and compactions must survive.
 import { it, expect, vi } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 function setup() {
   const s = Object.create(Supervisor.prototype);
   s.sessions = new Map(); s._compactionJobs = new Map();

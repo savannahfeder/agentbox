@@ -4,7 +4,7 @@
 // agent worktrees brittle. This one is ours and it is the worst kind: it ends
 // with two agents editing the same files and nothing on screen saying so.
 //
-// THE SEQUENCE, read out of main/task-folders.mjs.
+// THE SEQUENCE, read out of main/task-folders.mts.
 //
 //   1. A task has no branch yet, so `branchExists` is read as false, once.
 //   2. The fast path runs. Its FIRST act is `worktree add --no-checkout -b`,
@@ -14,7 +14,7 @@
 //   4. The ordinary path runs with the branchExists it read in step 1, which is
 //      now stale, and asks git for `worktree add -b <branch>` a second time.
 //      Git refuses: a branch of that name already exists.
-//   5. `ensureTaskFolder` throws. main/supervisor.mjs catches it in two places
+//   5. `ensureTaskFolder` throws. main/supervisor.mts catches it in two places
 //      and both answer the same way: `console.warn('... is running in the
 //      shared checkout')`, and hand the session the shared checkout.
 //
@@ -45,7 +45,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ensureTaskFolder, taskFolderPath, taskBranch } from '../main/task-folders.mjs';
+import { ensureTaskFolder, taskFolderPath, taskBranch } from '../main/task-folders.mts';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 

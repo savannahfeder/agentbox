@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import http from 'node:http';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { ROOMY_PLANS } from './fixtures/cloud-plans.mjs';
-import { managedClients } from '../main/cloud/managed.mjs';
+import { managedClients } from '../main/cloud/managed.mts';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 
 const ACCEPTED = JSON.stringify({ acceptedTerms: TERMS_VERSION });
@@ -149,7 +149,7 @@ describe('a refusal the Mac gets back', () => {
     } finally { s.closeAllConnections(); await new Promise((r) => s.close(r)); }
   });
 
-  // Second review, 2026-10-20: a 401 was thrown, and run.mjs polls for ever
+  // Second review, 2026-10-20: a 401 was thrown, and run.mts polls for ever
   // on a throw, so a revoked key asked every 30 s for good.
   it('a key the server no longer knows, or a person turned off, is an answer too', async () => {
     for (const [status, error] of [[401, 'signed-out'], [403, 'disabled']]) {

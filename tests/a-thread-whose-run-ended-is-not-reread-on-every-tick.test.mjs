@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { machineryPath } from '../main/store/home.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { setAppHome, clearAppHome } from './app-home.mjs';
 
 const LIVE = (n) => `# A thread\n# w-x · spawned 2026-08-27T22:25:22.807Z\n\n22:25:29  Working on ${n}.\n22:31:00  == RESULT (ok · 10 out, 30 in) ==\n\n# exited (0) 2026-08-27T22:31:01.414Z\n`;

@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { CLOUD_KEY, cloudChord, cloudCommands } from '../renderer/src/cloud-menu';
 import { HINTS } from '../renderer/src/hint-plate';
-import { SHORTCUTS } from '../shared/shortcuts.mjs';
+import { SHORTCUTS } from '../shared/shortcuts.mts';
 
 const read = (p) => fs.readFileSync(new URL(p, import.meta.url), 'utf8');
 const key = (k, mods = {}) => ({ key: k, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...mods });

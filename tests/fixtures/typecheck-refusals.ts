@@ -12,10 +12,10 @@
 // No tsconfig includes this file but the test's own, so its errors never reach
 // the renderer's typecheck.
 import { unleaked } from '../../shared/agents.mjs';
-import { REQUEST_CHANNELS } from '../../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS } from '../../shared/bridge-map.mts';
 import { checkKit, runOfClaim } from '../../shared/cloud-kit.mjs';
 import { CODEX_DEFAULT_MODE, codexModeWords } from '../../shared/codex-modes.mjs';
-import { ALL_SCHEMES, IMG_SCHEME } from '../../shared/schemes.mjs';
+import { ALL_SCHEMES, IMG_SCHEME } from '../../shared/schemes.mts';
 import type { AgentEvent } from '../../renderer/src/types';
 
 // THE FOUR SHARED MODULES CARRY REAL TYPES, not an implicit `any`. A string put

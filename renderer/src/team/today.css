@@ -62,6 +62,7 @@
 .team-page .td-line { align-items: center; padding: 6px 8px; }
 .team-page .td-line::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; box-sizing: border-box; }
 .team-page .td-sec[data-group="working"] .td-line::before { border: 1.5px solid var(--accent); }
+.team-page .td-sec[data-group="todo"] .td-line::before { border: 1.5px dashed var(--text-faint); }
 .team-page .td-sec[data-group="done"] .td-line::before { background: var(--text-faint); }
 .team-page .td-sec[data-group="blocked"] .td-line::before { background: var(--accent); }
 .team-page .td-t { font-size: 14px; }

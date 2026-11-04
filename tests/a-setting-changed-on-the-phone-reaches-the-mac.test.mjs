@@ -2,7 +2,7 @@
 //
 // The phone app's Settings had two rows (2026-10-21): nothing of the Mac's
 // settings was in the account the phone reads, and the Mac took only thread
-// commands (main/phone-inbox.mjs ROUTES, ten kinds, each naming a project).
+// commands (main/phone-inbox.mts ROUTES, ten kinds, each naming a project).
 // Now each pass sends the Mac's settings as one row for this computer
 // (shared/phone-settings.mjs, no paths), and a `setting` command goes through
 // the window's own handler, as every other phone command does. Measured here
@@ -11,8 +11,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createPhoneInbox, applyThrough } from '../main/phone-inbox.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createPhoneInbox, applyThrough } from '../main/phone-inbox.mts';
 import { checkCommand } from '../shared/phone-snapshot.mjs';
 
 const NOW = Date.parse('2026-10-21T12:00:00Z');

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (...p) => fs.readFileSync(path.join(here, '..', ...p), 'utf8');
-const main = read('main', 'main.mjs');
+const main = read('main', 'main.mts');
 const menu = read('main', 'menu.mts');
 
 function windowConstruction() {

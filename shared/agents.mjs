@@ -1,5 +1,5 @@
 // Pure rules for the user's own Claude Code agents as rows: which ones Agentbox
-// shows, which reach the inbox, and what each says. main/agents.mjs reads the
+// shows, which reach the inbox, and what each says. main/agents.mts reads the
 // machine; nothing here touches a process, a socket or a file. The rules live
 // apart from the reader because a row missing from a list has no symptom.
 
@@ -44,7 +44,7 @@ export function replyReaches(agent) {
 
 // The only agent a reply cannot reach is one stopped on a permission prompt.
 // An idle session at its prompt does read a line written to its socket.
-// `reply` in main/agents.mjs refuses the same case.
+// `reply` in main/agents.mts refuses the same case.
 export function replyIsSwallowed(agent) {
   return agent?.waitingFor === 'permission prompt';
 }
@@ -197,7 +197,7 @@ export function agentTitle(agent, now = Date.now()) {
 // setting.
 
 // The user's messages, opening first, then the rest by time. `asked` comes from
-// the transcript. `spoke` is what main/agent-schedule.mjs recorded as delivered
+// the transcript. `spoke` is what main/agent-schedule.mts recorded as delivered
 // from Agentbox, because a peer message in the transcript cannot be told apart
 // from the user's. Deduped on text in case the session also recorded it.
 //
@@ -344,7 +344,7 @@ export function listed(agent) {
 
 // The sidebar shows sessions active in the last day, the point where the
 // app's clock (`format.ts`) switches from hours to `1d`. Finished sessions
-// never appear, because main/agents.mjs drops records whose process is gone.
+// never appear, because main/agents.mts drops records whose process is gone.
 export const RAIL_CUT_MS = 24 * 60 * 60 * 1000;
 
 export function onTheRail(agent, now = Date.now()) {

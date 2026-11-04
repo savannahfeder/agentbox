@@ -49,7 +49,7 @@ import { changeOwnsKey } from './code-keys';
 import { askStillStands, bringsBack, closesAgain, graceUndoneLine, nextUndo, shownAfterUndo, ticksAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO, UNDID_CLOSING } from './undo-window';
 import { answeredAlready, TOO_LATE_TO_WITHDRAW } from './withdraw-send';
 import { addUndoMark, UNDO_MARKS_EVENT, type UndidSpec } from './undo-marks';
-import { whatTheFileSentUp } from '../../shared/artifact-keys.mjs';
+import { whatTheFileSentUp } from '../../shared/artifact-keys.mts';
 import { ALIVE_EVERY_MS, markWindowAlive, type Place, placeIsSomewhere, readPlace, windowWasJustHere, writePlace, writeScroll } from './where-she-was';
 import { Rail } from './components/Rail';
 import { ThreadComposer, type ComposeStart } from './threads/ThreadComposer';
@@ -100,7 +100,7 @@ import { focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
 import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { modelCommands } from './thread-model-commands';
-import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mjs';
+import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
 import { DONE, manyOrOne } from './done-word';
 import { listedNow, type OpensWhenListed } from './opens-when-listed';
@@ -157,7 +157,7 @@ import { CloudSetup } from './components/CloudSetup';
 import { SETUP, newlyFailedSignIns } from './cloud-setup';
 import { AppMark } from './components/AppMark';
 import { planBar, type BarWords, type Plan } from './plan-setup';
-import { PRACTICE_REPLY, PRACTICE_ROWS, PRACTICE_SLUG } from '../../shared/first-run-practice.mjs';
+import { PRACTICE_REPLY, PRACTICE_ROWS, PRACTICE_SLUG } from '../../shared/first-run-practice.mts';
 import { ModeScreen, isModeVariant } from './components/ModeScreen';
 import { practiceRemembered, rememberProject, rememberedProject } from './compose-project';
 import { needsStaging, walkStageKey } from './walk-staging';
@@ -190,7 +190,7 @@ import { rankProducts } from './project-priority';
 import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT } from './threads-made';
 import { waitingCounts } from './threads-made';
 import { closeAsk, closeAskOwnsKey, KEEP_OPEN, unshippedAsk } from './close-asks-first';
-import { notShipped, shipItAsk } from '../../shared/not-shipped.mjs';
+import { notShipped, shipItAsk } from '../../shared/not-shipped.mts';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, askedInLabel, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { answersInTheirChat } from './team/answers-in-the-chat';
@@ -244,12 +244,13 @@ import { InviteRows } from './threads/InviteRows';
 import { mentionRows } from './team/rooms/room-rules';
 import { SAYS_UNDO, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
+import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
 import { reachAudienceOf } from '../../shared/teammate-reach.mjs';
 
 const FIRST_IDEAS = ideasFor();
 
-/** Which first run this install shows, half each (shared/onboarding-arm.mjs). */
+/** Which first run this install shows, half each (shared/onboarding-arm.mts). */
 type Arm = 'tour' | 'classic';
 const ARM_WAIT_MS = 3000;
 async function armNow(): Promise<Arm> {
@@ -774,7 +775,7 @@ export default function App() {
   // ADD PEOPLE on an open conversation: New thread, with everyone already in
   // that conversation in To. Nothing is written to the conversation on screen,
   // because adding somebody makes the group's conversation and leaves this one
-  // as it was; sending is what makes it (main/team/index.mjs directWith).
+  // as it was; sending is what makes it (main/team/index.mts directWith).
   const addPeopleToConversation = useCallback((who: { to: string; also: string[] }) => {
     setComposeInitial({ to: who.to, also: who.also });
     setModal('compose');
@@ -1214,7 +1215,7 @@ export default function App() {
 
   // WHAT CODEX CALLS ITS MODELS ON THIS MAC, and what its own config.toml
   // runs. Both stay empty on every Mac with one coding agent, because
-  // main/settings.mjs does not even open Codex's cache there, and the
+  // main/settings.mts does not even open Codex's cache there, and the
   // composer's model drawer then behaves exactly as it always has. Filled by
   // the settings read below, which is a trip this component was already
   // making.
@@ -1480,7 +1481,7 @@ export default function App() {
   //
   // AND IT IS ANSWERED IN THE PRACTICE PROJECT, which points at no folder at
   // all. The readme read above cannot run there and would have nothing honest
-  // to say if it did, so main/store.mjs writes the pre-written answer instead.
+  // to say if it did, so main/store.mts writes the pre-written answer instead.
   // Same row, same ledger, same two seconds.
   //
   // AND A REPLY IS ANSWERED THE SAME WAY (2026-10-06). `round` is how many
@@ -2018,7 +2019,7 @@ export default function App() {
   //
   // NONE IS THE DEFAULT NOW: a session started in a terminal is kept separate
   // from the inbox unless the setting says otherwise. The real default is
-  // decided once, in main/settings.mjs; this fallback only covers the moment
+  // decided once, in main/settings.mts; this fallback only covers the moment
   // before the first snapshot arrives, and it agrees with it so the inbox
   // cannot flash a row it is about to drop.
   const agentMode = snap?.config?.outsideAgents ?? 'off';
@@ -3042,10 +3043,18 @@ export default function App() {
   // On a lead row by J and K, or the only thing left to be on.
   const keyLeadPicked = cardSel?.startsWith('lead/') ? allLeads.find((l) => `lead/${l.key}` === cardSel) ?? null : null;
   const keyLead = keyLeadPicked ?? (view === 'inbox' && search === null && !current && !keyCard ? heldLeads.rows[0] ?? null : null);
+  // The row above the threads is first in the walk, so the mark starts there.
+  const firstLead = view === 'inbox' && search === null && !focused ? heldLeads.rows[0] ?? null : null;
   // Anything else that moves the keyboard takes it off their row. The people
   // by name, since the list of them is a new array on every refresh.
   const pickedKey = picked.join(',');
   useEffect(() => { setCardSel(null); }, [selected, view, search, inboxDisplay.view, pickedKey]);
+  // After the line above, so on arrival the mark lands on the top row rather than being cleared off it.
+  const leadStartedOn = useRef<string | null>(null);
+  useEffect(() => {
+    if (firstLead && firstLead.key !== leadStartedOn.current && cardSel === null && selected === 0) setCardSel(`lead/${firstLead.key}`);
+    leadStartedOn.current = firstLead?.key ?? null;
+  }, [firstLead?.key]); // eslint-disable-line react-hooks/exhaustive-deps
   // A DROPPED COLUMN LEAVES THE KEYBOARD ON THE SAME THREAD. `selected` is a
   // place in the walk, and moving a column moves every place after it, so the
   // highlight jumped to another card on the drop (photographed 2026-10-02).
@@ -3269,7 +3278,7 @@ export default function App() {
   // The key never reaches the window listener below from inside the pane: the
   // page there is its own document in its own origin, and a keydown does not
   // cross that line. Main hears it under the page and hands it here
-  // (before-input-event, main/main.mjs).
+  // (before-input-event, main/main.mts).
   //
   // ANSWERED ONCE, NEVER TWICE. Main forwards only from a frame, and this
   // refuses anything that arrives while the app's own page holds the keyboard,
@@ -3387,7 +3396,7 @@ export default function App() {
   // WHAT ARRIVED, not what to say about it. This page owns the definition of
   // "news" (it is the only place that knows what the inbox is), and it owns
   // nothing else about the banner: whether she is looking at the window is a
-  // fact only the main process can see, so main/notify.mjs decides whether to
+  // fact only the main process can see, so main/notify.mts decides whether to
   // speak, rolls a burst into one line, and takes it down when she comes back.
   //
   // A frozen worker travels the same road. An approval card is an agent
@@ -3404,7 +3413,7 @@ export default function App() {
 
     // THE CORNER TAG (w-dafae58a23) gets everything in Needs you with the
     // moment each started waiting, and how many are working; it shows only
-    // what started after you last left the app (main/corner-tag.mjs).
+    // what started after you last left the app (main/corner-tag.mts).
     const productName = (slug: string) => snap.products.find((p) => p.slug === slug)?.name ?? slug;
     window.zero?.cornerTag?.({
       ready: [
@@ -3481,7 +3490,7 @@ export default function App() {
   }, []);
   // AND THE OPEN THREAD'S OWN CARD IS THE ONE IN FRONT. The order is decided in
   // the main process, because ⌘Y is answered there, ahead of this page; all
-  // this says is which thread is being read (shared/which-card-is-in-front.mjs).
+  // this says is which thread is being read (shared/which-card-is-in-front.mts).
   useEffect(() => {
     void api.lookingAt(focused ? { product: focused.product, id: focused.id } : null);
   }, [focused?.product, focused?.id]);
@@ -4042,6 +4051,8 @@ export default function App() {
   const filesShown = !!filesPage && !teammatesShown && !roomShown && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
   const connectionsShown = !!connectionsPage && !filesShown && !teammatesShown && !roomShown && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
   const chatsPlaceShown = !!chatsPlace && homeLayout === 'chats' && !connectionsShown && !filesShown && !teammatesShown && !roomShown && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
+  // A teammate's thread opened from a page in Team is still in Team.
+  const cardFromPlace = homeLayout === 'chats' && !!chatsPlace && !!openCard;
   useEffect(() => { if (roomsUi.openId || teammatesUi.open) { setFilesPage(null); setConnectionsPage(null); } }, [roomsUi.openId, teammatesUi.open]);
   const openFiles = (project: string | null) => {
     roomsUi.leave(); teammatesUi.leave(); setChatsPlace(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null);
@@ -4087,11 +4098,18 @@ export default function App() {
   // Command K's chats: a group or chat by name or people, an AI teammate.
   const findChats = useCallback((q: string) => {
     const found = chatsFound({ groups: roomsUi.live ? roomsUi.groups : [], teammates: teammatesUi.live ? teammatesUi.list : [], query: q });
-    return found.map((f) => ({
-      id: `chat-${f.kind}-${f.key}`, label: f.label, hint: f.hint,
-      run: () => { setModal(null); if (f.kind === 'teammate') teammatesUi.go(f.key); else roomsUi.pickGroup(f.key); },
-    }));
-  }, [roomsUi, teammatesUi]);
+    const persons = (chatsValue?.persons ?? []).filter((p) => p.name.toLowerCase().split(/\s+/).some((w) => w.startsWith(q.toLowerCase())));
+    return [
+      ...persons.map((p) => ({
+        id: `chat-person-${p.id}`, label: p.name, hint: 'Their page in Team',
+        run: () => { setModal(null); openChatsPlace(`person:${p.id}`); },
+      })),
+      ...found.filter((f) => !persons.some((p) => p.name === f.label)).map((f) => ({
+        id: `chat-${f.kind}-${f.key}`, label: f.label, hint: f.hint,
+        run: () => { setModal(null); if (f.kind === 'teammate') teammatesUi.go(f.key); else roomsUi.pickGroup(f.key); },
+      })),
+    ];
+  }, [roomsUi, teammatesUi, chatsValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // LINES, FILES, COMMENTS AND DECISIONS (./found-inside). Threads, conversations
   // and teammates' shared threads are searched in main; groups and decisions are
@@ -4545,7 +4563,7 @@ export default function App() {
     // is the one place the question can stand between a close and the tasks it
     // would skip. From the list it opens the thread, which is where they are.
     // And before that, a thread whose work never reached main
-    // (shared/not-shipped.mjs), whose last word may still say it ships.
+    // (shared/not-shipped.mts), whose last word may still say it ships.
     const unshipped = !unshippedOk && !!notShipped(item);
     if (unshipped || (!force && waitingFiled(item).length)) {
       if (focused?.id !== item.id || focused?.product !== item.product) { setFocused(item); markSeen(item); }
@@ -4825,7 +4843,7 @@ export default function App() {
     //
     // AFTER THE WINDOW IT REALLY IS UNREACHABLE, and no wording can soften
     // that: `steer` writes the message onto the session's stdin in the same tick
-    // (main/claude-input.mjs), where the CLI takes them at its next break.
+    // (main/claude-input.mts), where the CLI takes them at its next break.
     // What the promise waits on is the acknowledgement, not the handing over.
     // So the message says "press Z to undo" for exactly as long as that is
     // true and stops saying it the moment it stops being true.
@@ -5037,7 +5055,7 @@ export default function App() {
           // AND WHICH MODEL PICKS THE ROW UP. Absent unless she opened the
           // drawer; the store writes it onto the item BEFORE the answer, so the
           // run this reply starts reads the model she just chose rather than the
-          // one it was on (main/store.mjs, answerItem).
+          // one it was on (main/store.mts, answerItem).
           ...(pick ?? {}),
         });
       } catch (error) {
@@ -5286,7 +5304,7 @@ export default function App() {
   // withdraw. Holding the write for three seconds would have meant a task that
   // is in no view at all while she looks for it, and "did that actually send?"
   // is the one question this card must never make her ask. The withdraw stops
-  // the worker as well as closing the row: main/ipc.mjs kills the session on any
+  // the worker as well as closing the row: main/ipc.mts kills the session on any
   // archive, and her archive outranks whatever a straggler writes afterwards.
   const noteNewTask = useCallback((label: string, undoes: string, sent: ComposeDraft, withdraw: Undoable['run'], undid?: UndidSpec[]) => {
     pushUndo({
@@ -5305,7 +5323,7 @@ export default function App() {
   const retag = useCallback(async (targets: WorkItem[], value: number) => {
     if (!targets.length) return;
     const word = priorityLabelOf(priorityIdOf(value)).toLowerCase();
-    // A level picked clears a dragged place (main/ipc.mjs), so stop waiting for one.
+    // A level picked clears a dragged place (main/ipc.mts), so stop waiting for one.
     for (const i of targets) delete unsavedPlaces.current[i.id];
     await Promise.all(targets.map((i) => api.answer({ product: i.product, id: i.id, priority: value })));
     showToast(targets.length > 1 ? `${targets.length} set to ${word}` : `Priority: ${word}`);
@@ -5321,7 +5339,7 @@ export default function App() {
     await refresh();
   }, [refresh, showToast]);
 
-  // MOVE A THREAD TO ANOTHER PROJECT (shared/move-thread.mjs). The move is one
+  // MOVE A THREAD TO ANOTHER PROJECT (shared/move-thread.mts). The move is one
   // write on each side, both in main, so there is one place that can refuse it
   // and one answer to show when it does.
   const moveToProject = useCallback(async (item: WorkItem, slug: string, name: string) => {
@@ -7361,7 +7379,7 @@ export default function App() {
         update={announcesUpdate(snap?.update, { walking, closed: '' }) ? { installing: !!snap?.update?.installing, version: snap?.update?.newVersion, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
         onUpdate={() => { void api.updateInstall(); }}
         /* AND THE COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS
-           (shared/where-it-runs-from.mjs): the same card, in the same place,
+           (shared/where-it-runs-from.mts): the same card, in the same place,
            offering the move. Null on every copy that can. */
         move={announcesMove(snap?.update, { walking, closed: '' }) ? { place: snap?.update?.place ?? null, error: snap?.update?.moveError ?? null } : null}
         onMove={() => { void api.updateMove(); }}
@@ -7388,7 +7406,7 @@ export default function App() {
         onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inbox.length + leadCount} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
         onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} tasksPage={tasksShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomShown || directOpen}
         /* Without Groups the one row under Threads is Chats, and only while there are teammates. */
-        groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />
+        groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
           only part of our own document lying over the file, so a pointer
           brought up there wakes the marks that a pointer moving across the
@@ -7459,7 +7477,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? (inChats ? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">{homeLayout === 'chats' ? 'Team' : 'Chats'}</span></div><div className="workspace-task-header cx-task-header" ref={setTaskHeader} /></div><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (filesShown ? <h1 className="workspace-title">Files</h1> : connectionsShown ? <h1 className="workspace-title">Connections</h1> : chatsPlaceShown ? <h1 className="workspace-title">Team</h1> : teamShown ? <h1 className="workspace-title">{openCard ? 'Threads' : 'Team'}</h1> : evOn ? <h1 className="workspace-title">{roomsUi.live ? 'Inbox' : 'Threads'}</h1> : teammatesShown ? teammatesUi.title : roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Threads</h1>))}
+        ) : (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? (inChats ? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">{homeLayout === 'chats' ? 'Team' : 'Chats'}</span></div><div className="workspace-task-header cx-task-header" ref={setTaskHeader} /></div><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (filesShown ? <h1 className="workspace-title">Files</h1> : connectionsShown ? <h1 className="workspace-title">Connections</h1> : chatsPlaceShown ? <h1 className="workspace-title">Team</h1> : teamShown ? <h1 className="workspace-title">{openCard ? (cardFromPlace ? 'Team' : 'Threads') : 'Team'}</h1> : evOn ? <h1 className="workspace-title">{roomsUi.live ? 'Inbox' : 'Threads'}</h1> : teammatesShown ? teammatesUi.title : roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Threads</h1>))}
         {/* THE PLUS, THE COMMAND MARK AND THE COG STEP OFF WHILE SHE IS
             SEARCHING, and that is the half of the chosen design that is not the
             cross. It is forced, not chosen: .topbar and .body carry the same 22px
@@ -7610,7 +7628,7 @@ export default function App() {
                     was opened from. */}
                 <TeammateThread card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now}
                   syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
-                  backLabel={roomsUi.roomName ?? 'Threads'}
+                  backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Everyone' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Threads')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
                   onContinue={() => continueTeammateThread(openCard)}
                   onMessage={() => {
@@ -8456,7 +8474,7 @@ export default function App() {
             // WHEN IT CANNOT MOVE, THE WORD STILL FINDS SOMETHING THAT SAYS SO,
             // and the reason is the row's own hint rather than a sentence you
             // have to press for. Only a thread nothing has run on can go
-            // (shared/move-thread.mjs), and a "move" that matched nothing is
+            // (shared/move-thread.mts), and a "move" that matched nothing is
             // the complaint this answers. The press says it again because a
             // narrow window cuts the hint and not the toast.
             ...(moveRefusal
@@ -9146,6 +9164,15 @@ export default function App() {
           AND IT NAMES THE TASK: the row's own title is the card's first line,
           and the sentence ("Started in Agentbox Team") the quiet one under it,
           picked out of fourteen drawings over four rounds. */}
+      {multiSel.size > 0 && !toast && !focused && !modal && (
+        <TickedBar count={multiSel.size} view={view} onKey={(does) => {
+          const sel = selectable.filter((i) => multiSel.has(i.id));
+          if (does === 'clear') setMultiSel(new Set());
+          else if (does === 'l') openSnooze(sel);
+          else if (view === 'snoozed') unsnooze(sel);
+          else void batchDone(multiSel);
+        }} />
+      )}
       {toast && (() => {
         // Said above the reply box instead, or about to be: the frame between
         // leaving the answered thread and opening the next one.

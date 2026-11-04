@@ -65,8 +65,8 @@ describe('walking the files moves the code and nothing else', () => {
   });
 
   // AND IT KEEPS PUTTING IT THERE UNTIL THE COLUMN STOPS MOVING.Measured on her
-  // seventeen-file change before this existed: clicking main.mjs left the tree
-  // marking main.mjs while working-from-your-phone.html was the file actually
+  // seventeen-file change before this existed: clicking main.mts left the tree
+  // marking main.mts while working-from-your-phone.html was the file actually
   // at the top of the screen, 1 landing in 17 wrong. The cause is
   // `content-visibility` resolving guessed hunk heights AFTER the jump has
   // landed, so everything below it slides out from under her.

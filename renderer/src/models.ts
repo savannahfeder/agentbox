@@ -44,8 +44,8 @@ export interface ModelChoice {
   model?: string;
   /**
    * A CODEX MODEL'S OWN REASONING LEVELS, read off this Mac beside its name
-   *  (main/codex-models.mjs). Absent on every Claude Code row, whose levels are
-   *  the CLI's five for any model (../../shared/effort-levels.mjs). */
+   *  (main/codex-models.mts). Absent on every Claude Code row, whose levels are
+   *  the CLI's five for any model (../../shared/effort-levels.mts). */
   levels?: string[];
   defaultLevel?: string | null;
 }
@@ -149,12 +149,12 @@ export function modelLabelOf(id: string | null): string {
 // CLI resolves at spawn; Codex has no aliases and `thread/start`'s `model`
 // wants an exact slug (`gpt-5.6-sol`). So "On Opus. With Codex." was not merely
 // a card that read wrong -- since 2026-09-04 it is a row that cannot run at
-// all, because `codexModelRefusal` in main/supervisor.mjs stops a Codex run
+// all, because `codexModelRefusal` in main/supervisor.mts stops a Codex run
 // whose model this Mac's Codex does not know rather than picking a stand-in.
 //
 // CODEX'S LIST IS NOT IN THIS FILE ON PURPOSE. It is read off the Mac, out of
 // the cache codex-cli itself maintains, and arrives here through settings
-// (main/codex-models.mjs says why a hardcoded one is wrong the week after it is
+// (main/codex-models.mts says why a hardcoded one is wrong the week after it is
 // written and a generated one wrong the week after the build). This module
 // holds the RULE about which list is which; neither list is invented here.
 
@@ -165,7 +165,7 @@ export function modelLabelOf(id: string | null): string {
  * `codexDefaultModel` answers null and the app genuinely does not know the word.
  *
  * Both alternatives are worse. Printing the first row of the offer list would
- * print OUR sort order as her default, which main/codex-models.mjs refuses by
+ * print OUR sort order as her default, which main/codex-models.mts refuses by
  * name. Printing `opus` would be the Claude alias on a Codex card that this
  * whole section exists to stop. Her rejection of "the default model" on was of
  * a row whose job was to explain that the picker might not be picking anything;

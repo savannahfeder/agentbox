@@ -53,7 +53,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   updateReady?: string | null;
   onInstallUpdate?: () => void;
   /** Whether this copy is somewhere it cannot update itself from, which is
-   *  what the move row answers (shared/where-it-runs-from.mjs). */
+   *  what the move row answers (shared/where-it-runs-from.mts). */
   moveToApplications?: boolean;
   onMoveToApplications?: () => void;
   /** Look for a new version now. Answers in a toast. */
@@ -154,7 +154,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: onOpenProjects,
     }] : []),
     // MY WORKSPACE SAYS WHAT IT IS (w-04e8d6d6e6). The app makes it at launch
-    // so that a thread always has somewhere to go (main/main.mjs), and a new
+    // so that a thread always has somewhere to go (main/main.mts), and a new
     // user meets it here as a project they never made, with nothing on the row
     // to say so. Its hint says what it is until it is ranked, after which
     // where it stands is the more useful thing to say.
@@ -244,7 +244,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     }] : []),
     // A copy run from the disk image, or from a copy macOS made, can never
     // update itself. This row is here as well as on the sidebar card because
-    // that card can be closed (shared/where-it-runs-from.mjs).
+    // that card can be closed (shared/where-it-runs-from.mts).
     ...(moveToApplications ? [{
       id: 'update-move',
       label: MOVE_SAY.button,
@@ -402,8 +402,13 @@ export const NOT_ON_A_PHONE = ['search', 'keyhints', 'shortcuts', 'stale', 'upda
 // must not reach them.
 const ASKED_FOR_BY_NAME = new Set(['first-run']);
 
-export function paletteOrder(all: Command[], threads: Command[], phone = false, query = ''): { rows: Command[]; labels: Map<number, string> } {
+export function paletteOrder(all: Command[], threads: Command[], phone = false, query = '', chats = 0): { rows: Command[]; labels: Map<number, string> } {
   const labels = new Map<number, string>();
+  // The people and groups found lead the found rows, under their own heading.
+  const found = (at: number) => {
+    if (chats > 0) labels.set(at, 'People and groups');
+    if (threads.length > chats) labels.set(at + chats, 'Threads');
+  };
   // Ahead of the threads only when the words start words of its name: "sum up"
   // is not "reSUMe interrUPted agents".
   const named = (c: Command) => namesIt(query, c.label);
@@ -419,15 +424,15 @@ export function paletteOrder(all: Command[], threads: Command[], phone = false, 
     if (threads.length && query.trim()) {
       const first = matched.filter(ahead);
       const after = matched.filter((c) => !ahead(c));
-      labels.set(first.length, 'Threads');
+      found(first.length);
       if (after.length) labels.set(first.length + threads.length, 'Commands');
       return { rows: [...first, ...threads, ...after], labels };
     }
-    if (threads.length) labels.set(matched.length, 'Threads');
+    if (threads.length) found(matched.length);
     return { rows: [...matched, ...threads], labels };
   }
   if (threads.length) {
-    labels.set(0, 'Threads');
+    found(0);
     if (matched.length) labels.set(threads.length, 'Commands');
   }
   return { rows: [...threads, ...matched], labels };
@@ -452,10 +457,8 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
     // (../palette-rows).
     return rankMatches(q, offered.filter((c) => matchesQuery(q, c)));
   }, [offered, query]);
-  const threads = useMemo(() => {
-    const chats = query.trim() && findChats ? findChats(query.trim()) : [];
-    return [...chats, ...titleFirst(threadRows(query, findThreads, onSearchFor), query)];
-  }, [query, findThreads, findChats, onSearchFor]);
+  const chats = useMemo(() => (query.trim() && findChats ? findChats(query.trim()) : []), [query, findChats]);
+  const threads = useMemo(() => [...chats, ...titleFirst(threadRows(query, findThreads, onSearchFor), query)], [chats, query, findThreads, onSearchFor]);
   // Found inside things comes from main a moment after the words are typed. The
   // last answer stays up until the next lands, so the list does not blink.
   const [inside, setInside] = useState<InsideSection[]>([]);
@@ -468,7 +471,7 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
     const timer = setTimeout(() => { void askInside.current?.(q).then((got) => { if (live) setInside(got); }).catch(() => {}); }, 90);
     return () => { live = false; clearTimeout(timer); };
   }, [query]);
-  const { rows: found, labels: foundLabels } = useMemo(() => paletteOrder(matched, threads, phone, query), [matched, threads, phone, query]);
+  const { rows: found, labels: foundLabels } = useMemo(() => paletteOrder(matched, threads, phone, query, chats.length), [matched, threads, phone, query, chats.length]);
   const filtered = useMemo(() => [...found, ...inside.flatMap((s) => s.rows)], [found, inside]);
   const labels = useMemo(() => {
     const all = new Map(foundLabels);

@@ -11,8 +11,8 @@
 // kept the old number while the tile said Ready.
 import { describe, expect, it } from 'vitest';
 import { hourWords, meterPair } from '../renderer/src/account-words.ts';
-import { readUsageReport } from '../shared/claude-usage.mjs';
-import { resetDay } from '../shared/usage.mjs';
+import { readUsageReport } from '../shared/claude-usage.mts';
+import { resetDay } from '../shared/usage.mts';
 
 const at = (d, h, m = 0, s = 0, ms = 0) => new Date(2026, 9, d, h, m, s, ms).getTime();
 const NOW = at(21, 15, 0);

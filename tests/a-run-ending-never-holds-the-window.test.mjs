@@ -9,7 +9,7 @@
 //   changed. E on a thread with a live session kills it, so E paid for it too.
 // - The Claude harness looked for a transcript that was not at its slug path
 //   in every folder of ~/.claude/projects, one existsSync each: 10,429 folders,
-//   1.4 s, measured 2026-10-19 for the copy in main/agents.mjs. A cloud run's
+//   1.4 s, measured 2026-10-19 for the copy in main/agents.mts. A cloud run's
 //   transcript is in the cloud, so every cloud session missed, at its exit and
 //   on each 15 s recovery pass while the slots were full.
 //
@@ -25,13 +25,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { gitJob } from '../main/git-change-offthread.mjs';
+import { gitJob } from '../main/git-change-offthread.mts';
 import { snapshotRepo } from '../main/git-change.mjs';
 import { changePath, readChange } from '../main/code-change.mjs';
 import { machineryPath } from '../main/store/home.mjs';
-import { harnessFor } from '../main/harnesses.mjs';
-import { findTranscript, transcriptSearch } from '../main/transcript-search.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { harnessFor } from '../main/harnesses.mts';
+import { findTranscript, transcriptSearch } from '../main/transcript-search.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dirs = [];
@@ -80,8 +80,8 @@ describe('what a run changed', () => {
   });
 
   it('is handed to the git thread by the exit, which reads no repository itself', () => {
-    const src = fs.readFileSync(path.join(ROOT, 'main', 'supervisor.mjs'), 'utf8');
-    const exit = src.slice(src.indexOf('const settleExit = (code, signal, how) => {'));
+    const src = fs.readFileSync(path.join(ROOT, 'main', 'supervisor.mts'), 'utf8');
+    const exit = src.slice(src.indexOf('const settleExit = (code'));
     const body = exit.slice(0, exit.indexOf('this.removeSpawnFiles(session);'));
     expect(body).toContain("gitJob('saveRunChange'");
     expect(body).not.toMatch(/changeFromRepo\(|writeChangeForRun\(/);

@@ -1,7 +1,7 @@
 // MP-04: corrections must use the running turn, not wait for worker exit.
 // Assert accepted turn identity, stale/ended rejection and transport failure.
 import {it,expect} from 'vitest';
-import {createCodexWorker} from '../main/codex-session.mjs';
+import {createCodexWorker} from '../main/codex-session.mts';
 async function setup(){let handlers;const calls=[];const server={startThread:async(p,h)=>{handlers=h;return {threadId:'thread'};},startTurn:async()=>({turn:{id:'turn'}}),unwatch(){},steerTurn:async(...args)=>{calls.push(args);return {turnId:'turn'};}};
  const worker=createCodexWorker({server});worker.stderr.on('data',()=>{});await new Promise(r=>setImmediate(r));return {worker,server,calls,notify:(m,p)=>handlers.onNotification(m,p)};}
 it('delivers a correction to exactly the active turn',async()=>{const s=await setup();await s.worker.steer('change direction');expect(s.calls).toEqual([['thread','turn','change direction',[]]]);});

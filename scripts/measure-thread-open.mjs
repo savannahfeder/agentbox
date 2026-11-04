@@ -2,7 +2,7 @@
 //
 // Her report: the pane is blank for a moment with no loading state, and when it
 // does arrive it is not at the bottom. Both halves are measured here against
-// the REAL reader over her REAL sessions: main/agents.mjs is timed on this
+// the REAL reader over her REAL sessions: main/agents.mts is timed on this
 // machine, and the browser's fake IPC waits exactly that long before answering,
 // so the blank window on the clock is the blank window she sees.
 //
@@ -13,8 +13,8 @@ import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { foldWorkItems } from '../shared/work-items.mjs';
-import * as reader from '../main/agents.mjs';
-import { AgentSchedule } from '../main/agent-schedule.mjs';
+import * as reader from '../main/agents.mts';
+import { AgentSchedule } from '../main/agent-schedule.mts';
 import { agentKey } from '../shared/agents.mjs';
 import { guard, sweep } from './lib/chrome-guard.mjs';
 import { HOME, STORE_ROOT } from './lib/machine-paths.mjs';

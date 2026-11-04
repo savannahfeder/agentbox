@@ -2,7 +2,7 @@
 import { ago } from '../../../renderer/src/phone-rows';
 import { Name } from '../../../shared/product-name.mjs';
 
-// The computer sends its copy at least every five minutes (main/phone-inbox.mjs).
+// The computer sends its copy at least every five minutes (main/phone-inbox.mts).
 const AWAY_MS = 15 * 60_000;
 
 type Computer = { computer: { name: string; updated_at: string } | null; loaded: boolean; error: unknown };

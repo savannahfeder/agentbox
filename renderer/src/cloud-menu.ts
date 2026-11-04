@@ -2,7 +2,7 @@
 // The button and the menu are drawn in threads/Pages.tsx, beside the filters
 // button and built like its menu; what they say lives here.
 import type { UsageLimit } from './types';
-import { accountName } from '../../shared/account-names.mjs';
+import { accountName } from '../../shared/account-names.mts';
 import { teammateIdOf } from '../../shared/teammates.mjs';
 
 export type CloudMode = 'mac' | 'full' | 'all';
@@ -14,7 +14,7 @@ export interface CloudMonth {
   costPerAgentHour: number | null;
 }
 
-// A sign-in going on in the cloud (main/cloud/logins.mjs). Claude: its page
+// A sign-in going on in the cloud (main/cloud/logins.mts). Claude: its page
 // opens, she copies the code it shows. Codex: OpenAI's page opens, she types
 // the code shown here, and it finishes by itself.
 export interface CloudSignIn {
@@ -106,7 +106,7 @@ export function pageToOpen(s: CloudSignIn | null): { key: string; url: string } 
 // What an account is called: its email, or, when the vendor would not say,
 // "Claude account 2", counted among that engine's accounts. The rule itself is
 // shared, because the sentence a thread gets when a login runs out names one
-// too (shared/account-names.mjs).
+// too (shared/account-names.mts).
 export function accountLabel(a: CloudAccount, all: CloudAccount[]): string {
   const same = all.filter((x) => x.engine === a.engine);
   return accountName({ email: a.name, engine: a.engine, index: same.indexOf(a), total: same.length });
@@ -150,7 +150,7 @@ export const countedAccounts = (accounts: CloudAccount[]) => accounts.filter((a)
 
 /**
  * THE ONE ACCOUNT THE CLOUD RUNS ON, as the app marks it. The rule is
- * `pickCloudLogin`'s (main/cloud/logins.mjs) and it starts from this Mac's own
+ * `pickCloudLogin`'s (main/cloud/logins.mts) and it starts from this Mac's own
  * account, which the screen's copy of the cloud accounts cannot see. One at
  * its usage limit is still the account, and the cloud waits for it.
  */

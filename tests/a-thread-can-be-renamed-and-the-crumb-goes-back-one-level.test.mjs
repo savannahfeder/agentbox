@@ -21,7 +21,7 @@ import os from 'node:os';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { rowTitle } from '../renderer/src/list-rules.ts';
 import { ThreadCrumb, SummaryPanel } from '../renderer/src/threads/Summary.tsx';
 import { renameTo } from '../renderer/src/threads/crumb-rules.ts';

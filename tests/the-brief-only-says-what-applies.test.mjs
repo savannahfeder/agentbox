@@ -4,7 +4,7 @@
 // store months ago, which mean nothing on a Mac that installed Agentbox
 // yesterday. One was the checkpoint rule, which she corrected us on: the pane
 // already shows what a session is doing, live, off the run's own trace
-// (main/supervisor.mjs traceStreamLine, renderer/src/item-thread.ts), so the
+// (main/supervisor.mts traceStreamLine, renderer/src/item-thread.ts), so the
 // note was never what made progress visible.
 //
 // And the repeating-task section is 1,103 characters about how to finish one
@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 

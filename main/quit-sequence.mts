@@ -7,8 +7,8 @@
 // ONE STEP THAT THROWS ENDED THE WHOLE QUIT. On 0.1.13 the phone step did:
 // closing the main window nulls `window`, and `phone.close()` makes the relay
 // report the change back to a handler that asked the window whether it was
-// destroyed (main/main.mjs, the `zero:phone-changed` line). An EventEmitter
-// stops calling listeners at the first one that throws, `main/crash-report.mjs`
+// destroyed (main/main.mts, the `zero:phone-changed` line). An EventEmitter
+// stops calling listeners at the first one that throws, `main/crash-report.mts`
 // rethrows an uncaught main error on purpose, and the process then dies
 // fatally. Measured on an Electron harness: `updater.stop()` never ran,
 // `will-quit` never fired, `analytics.flush()` never ran, and `quit` never

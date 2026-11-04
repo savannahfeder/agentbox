@@ -48,9 +48,9 @@ const REPO = path.resolve(here, '../../../..');
  * scripts cannot, so a branch of only those runs the cheap layer alone.
  */
 export const MACHINE_FILES = [
-  /^main\/(shell-path|claude-bin|codex-bin|codex-launch-env|config|harnesses|claude-input)(\.mjs|\/)/,
+  /^main\/(shell-path|claude-bin|codex-bin|codex-launch-env|config|harnesses|claude-input)(\.m[jt]s|\/)/,
   /^main\/harnesses\//,
-  /^shared\/(engines|fresh-user-home|product-name)\.mjs$/,
+  /^shared\/(engines|fresh-user-home|product-name)\.m[jt]s$/,
   /^package(-lock)?\.json$/,
   /^\.claude\/skills\/verify-agentbox\/scripts\/(machines|check-machines|check-this-machine)\.mjs$/,
 ];

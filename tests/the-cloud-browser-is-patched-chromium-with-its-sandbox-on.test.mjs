@@ -72,7 +72,7 @@ describe('the browser on the cloud machine', () => {
   // revision, which the image never had, so the agent would download the
   // bundled one and run it with --no-sandbox (Codex review, 2026-11-03).
   it('is what both cloud briefs tell a project\'s own Playwright to launch', () => {
-    const run = fs.readFileSync(fileURLToPath(new URL('../main/cloud/run.mjs', import.meta.url)), 'utf8');
+    const run = fs.readFileSync(fileURLToPath(new URL('../main/cloud/run.mts', import.meta.url)), 'utf8');
     const told = run.match(/executablePath: \\'\/opt\/agentbox\/chromium\.sh\\'/g) || [];
     expect(told.length).toBe(2);
   });

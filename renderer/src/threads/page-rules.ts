@@ -664,7 +664,7 @@ export function waitingWord(item: Pick<WorkItem, 'assignee' | 'people' | 'wrote'
 /**
  * A MESSAGE'S PRIORITY, once anyone has set one. A message is made with 0 by
  * the system, which would read as Low on every row; the sorter
- * (main/message-priority.mjs) or the person setting it is what makes it real.
+ * (main/message-priority.mts) or the person setting it is what makes it real.
  */
 export function messagePriority(item: WorkItem): number | null {
   const set = item.wrote?.priority;
@@ -755,7 +755,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
         const state = stateOf?.(item);
         if (!state || (state === 'done' && !(item.updatedAt >= today))) continue;
         out.push({
-          key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: shownTitle(item), project: null,
+          key: `mine/${item.product}/${item.id}`, ownerId: item.assignee && item.assignee !== 'agent' ? item.assignee : me, state, title: shownTitle(item), project: null,
           projectSlug: product.slug, priority: shownPriority(item), updatedAt: item.updatedAt, item, card: null, task,
         });
         continue;
@@ -967,7 +967,7 @@ export function conversationWith(personIds: string | string[], { products, items
   const want = new Set([...[].concat(personIds as never), ...(me ? [me] : [])] as string[]);
   const on = (t: NonNullable<Product['team']>) => [...new Set([...t.people, ...(t.sharedBy ? [t.sharedBy] : [])])];
   const exactly = (t: NonNullable<Product['team']>) => on(t).length === want.size && on(t).every((p) => want.has(p));
-  // The record both Macs settle on: the lowest id (main/team/index.mjs, directWith).
+  // The record both Macs settle on: the lowest id (main/team/index.mts, directWith).
   const record = products
     .filter((p) => p.team?.direct && exactly(p.team))
     .sort((a, b) => String(a.team!.projectId).localeCompare(String(b.team!.projectId)))[0];

@@ -6,7 +6,7 @@
 // tests/a-stuck-thread-offers-try-again.test.mjs
 
 import { liveLine, type LiveFacts } from './live-line';
-import { saysARunGotNowhere } from '../../shared/spawn-trouble.mjs';
+import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import type { WorkItem } from './types';
 
 // Queued, Up next and Shipping come on their own. Signed out waits for a

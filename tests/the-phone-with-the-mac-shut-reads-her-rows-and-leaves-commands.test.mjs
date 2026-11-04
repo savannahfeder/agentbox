@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { phoneView, phoneHistory, commandFor, readCloudConfig, phoneSlug, splitSlug, closeToTakeBack, UNDONE } from '../renderer/src/cloud-bridge';
-import { REQUEST_CHANNELS } from '../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS } from '../shared/bridge-map.mts';
 import { cloudClient } from '../renderer/src/cloud-rest';
 
 const NOW = Date.parse('2026-10-14T12:00:00Z');

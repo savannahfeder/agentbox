@@ -10,8 +10,8 @@
 // folder, a fresh one is reused rather than read again, and every reading that
 // lands is handed on so a stale mark can be dropped.
 import { describe, it, expect } from 'vitest';
-import { AccountUsage } from '../main/account-usage.mjs';
-import { STALE_MS } from '../main/claude-usage.mjs';
+import { AccountUsage } from '../main/account-usage.mts';
+import { STALE_MS } from '../main/claude-usage.mts';
 
 const answers = {
   default: JSON.stringify({ rate_limits_available: true, rate_limits: { five_hour: { utilization: 100 } } }),

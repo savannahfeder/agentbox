@@ -37,7 +37,7 @@
 //   now carries a note pointing here. `esc` and a bare arrow are one key
 //   whatever their length, so only a real chord splits.
 
-import { capNameOf, capsOf } from '../../shared/key-caps.mjs';
+import { capNameOf, capsOf } from '../../shared/key-caps.mts';
 import { MAC } from './this-keyboard';
 
 /** One line of a plate: the caps to draw, and the fragment beside them. */
@@ -55,7 +55,7 @@ export interface HintLine {
  *  however many characters it is written with, which is what keeps `esc` from
  *  being drawn as three caps.
  *
- *  THE GLYPHS ARE THIS KEYBOARD'S (shared/key-caps.mjs): ⌘↵ on a Mac, Ctrl and
+ *  THE GLYPHS ARE THIS KEYBOARD'S (shared/key-caps.mts): ⌘↵ on a Mac, Ctrl and
  *  Enter where there is no Command key.
  */
 export function capsFor(key: string, mac: boolean = MAC): string[] {
@@ -134,6 +134,7 @@ export const HINTS: Record<string, HintLine[]> = {
   // thread's dots. It prints only its word, so E goes here, in
   // the row plate's own wording.
   done: [{ key: 'E', what: 'Mark done' }],
+  'close-task': [{ key: '', what: 'Close the task for both of you' }],
   // The Summary button printed its S on its face until w-5984544441; the key
   // is said here now, the same as every other button in the corner. Since
   // w-a3482b8c2c it hangs from the summary's rail and the icon that closes it.

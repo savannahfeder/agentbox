@@ -26,7 +26,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fromTheApp } from '../main/agents.mjs';
+import { fromTheApp } from '../main/agents.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 let home;
@@ -64,7 +64,7 @@ describe('a message the session held is not a message it got', () => {
     const sizeBefore = fs.statSync(file).size;
     fs.appendFileSync(file, `${HOLD}\n`);
 
-    const { __heldNotice } = await readerWithHome(() => import('../main/agents.mjs'));
+    const { __heldNotice } = await readerWithHome(() => import('../main/agents.mts'));
     const said = __heldNotice({ name: 'session-67', transcript: file }, sizeBefore, MESSAGE);
     expect(said).toBe('session-67 held your message for approval in its own window, so it has not read it yet.');
   });
@@ -77,7 +77,7 @@ describe('a message the session held is not a message it got', () => {
     const sizeBefore = fs.statSync(file).size;
     fs.appendFileSync(file, `${JSON.stringify({ type: 'user', isMeta: true, message: { role: 'user', content: MESSAGE } })}\n`);
 
-    const { __heldNotice } = await readerWithHome(() => import('../main/agents.mjs'));
+    const { __heldNotice } = await readerWithHome(() => import('../main/agents.mts'));
     expect(__heldNotice({ name: 'session-67', transcript: file }, sizeBefore, MESSAGE)).toBe(null);
   });
 
@@ -87,14 +87,14 @@ describe('a message the session held is not a message it got', () => {
     const sizeBefore = fs.statSync(file).size;
     fs.appendFileSync(file, `${HOLD.replace(MESSAGE, 'some other session asking about the build')}\n`);
 
-    const { __heldNotice } = await readerWithHome(() => import('../main/agents.mjs'));
+    const { __heldNotice } = await readerWithHome(() => import('../main/agents.mts'));
     expect(__heldNotice({ name: 'session-67', transcript: file }, sizeBefore, MESSAGE)).toBe(null);
   });
 
   it('a session with no transcript is not claimed to be holding anything', async () => {
     // BEST EFFORT IN ONE DIRECTION ONLY. A hold that is not found is not a
     // promise there was none, and this must not start inventing one.
-    const { __heldNotice } = await readerWithHome(() => import('../main/agents.mjs'));
+    const { __heldNotice } = await readerWithHome(() => import('../main/agents.mts'));
     expect(__heldNotice({ name: 'session-67' }, 0, MESSAGE)).toBe(null);
   });
 
@@ -109,7 +109,7 @@ describe('a message the session held is not a message it got', () => {
       message: { role: 'user', content: `Another Claude session sent a message:\n${MESSAGE}` },
     })}\n`);
 
-    const { __heldNotice } = await readerWithHome(() => import('../main/agents.mjs'));
+    const { __heldNotice } = await readerWithHome(() => import('../main/agents.mts'));
     expect(__heldNotice({ name: 'session-67', transcript: file }, sizeBefore, MESSAGE)).toBe(null);
   });
 });

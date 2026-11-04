@@ -14,7 +14,7 @@
 // prompted > Login successful.") is a new line, not a continuation.
 
 import { describe, expect, it } from 'vitest';
-import { linksAtRow } from '../shared/terminal-links.mjs';
+import { linksAtRow } from '../shared/terminal-links.mts';
 
 /** A fake xterm buffer: one entry per row, `wrapped` meaning the row continues
  *  the one above it, which is what xterm's `isWrapped` says. */

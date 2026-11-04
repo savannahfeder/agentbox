@@ -8,7 +8,7 @@ import { Image } from 'expo-image';
 import { Linking, Pressable, ScrollView, Text, View, type TextStyle } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { isImagePath, referencedFiles } from '../../../renderer/src/referenced-files';
-import { pictureSource } from '../lib/files';
+import { pictureSource, shapeOfDrawn } from '../lib/files';
 import { inlineSpans, messageBlocks, type Block, type MentionKind, type Span } from '../lib/markdown';
 import { offerLink } from './LinkMenu';
 import { T } from './parts';
@@ -117,7 +117,7 @@ function Picture({ src, alt }: { src: string; alt: string }) {
     setSize(known); setBroken(false);
     if (!uri || known) return;
     let live = true;
-    Image.loadAsync(pictureSource(uri)).then(({ width: w, height: h }) => { if (live && w && h) setSize({ w, h }); }, () => { if (live) setBroken(true); });
+    shapeOfDrawn(() => Image.loadAsync(pictureSource(uri))).then(({ w, h }) => { if (live && w && h) setSize({ w, h }); }, () => { if (live) setBroken(true); });
     return () => { live = false; };
   }, [uri, known?.w, known?.h]);
   if (uri === null || broken) {

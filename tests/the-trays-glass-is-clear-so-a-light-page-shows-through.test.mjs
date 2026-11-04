@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cornerTagRig } from './helpers/corner-tag-rig.mjs';
-import { loadLiquidGlass } from '../main/liquid-glass.mjs';
+import { loadLiquidGlass } from '../main/liquid-glass.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const T = 1_000_000_000;

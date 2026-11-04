@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { findClaudeBin } from '../main/claude-bin.mjs';
-import { claudeState, recheckClaude } from '../main/settings.mjs';
+import { claudeState, recheckClaude } from '../main/settings.mts';
 import { forgetClaudeBin } from '../main/claude-bin.mjs';
 import { Onboarding } from '../renderer/src/components/Onboarding.tsx';
 import { COPY, RUN_START, finishCard, mayOpenInbox } from '../renderer/src/onboarding.ts';
@@ -279,7 +279,7 @@ describe('check again really looks again', () => {
     // thirty seconds must be answered by a search, not by a memory. This is the
     // same promise the settings screen makes and the reason `forgetClaudeBin`
     // exists at all.
-    const settings = strip(read('main/settings.mjs'));
+    const settings = strip(read('main/settings.mts'));
     const fn = settings.slice(settings.indexOf('export function recheckClaude'));
     expect(fn).toMatch(/forgetClaudeBin\(\)/);
     expect(fn.indexOf('forgetClaudeBin')).toBeLessThan(fn.indexOf('claudeState(config)'));
@@ -311,7 +311,7 @@ describe('check again really looks again', () => {
     // OPENS the gate rather than shutting it.
     expect(fn).toMatch(/if \(!zero\?\.claudeRecheck\) return \{ found: false, certain: false/);
     expect(read('preload.cjs')).toMatch(/claudeRecheck: \(\) => ipcRenderer\.invoke\('zero:claude-recheck'\)/);
-    expect(read('main/ipc.mjs')).toMatch(/ipcMain\.handle\('zero:claude-recheck'/);
+    expect(read('main/ipc.mts')).toMatch(/ipcMain\.handle\('zero:claude-recheck'/);
   });
 
   // THE GATE IS A QUESTION SCREEN SINCE 2026-10-09 (w-ce8c1a9275), wearing

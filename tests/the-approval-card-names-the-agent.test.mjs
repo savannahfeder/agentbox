@@ -20,7 +20,7 @@ const read = (p) => fs.readFileSync(new URL(`../renderer/src/${p}`, import.meta.
 
 it('draws the asking row title, and only when the row is there', () => {
   const app = read('App.tsx');
-  // The id was on the request all along (main/approval-prompt-server.mjs
+  // The id was on the request all along (main/approval-prompt-server.mts
   // stamps it off ZERO_ITEM); the card simply never read it.
   expect(app).toContain('const row = approvalRow(a.item);');
   expect(app).toContain('className="approval-task"');

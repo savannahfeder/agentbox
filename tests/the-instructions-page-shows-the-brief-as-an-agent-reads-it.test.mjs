@@ -17,7 +17,7 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 const worker = read('briefs/worker.md');
 const defaults = JSON.parse(read('shared/instruction-defaults.json'));
 const page = read('renderer/src/components/InstructionSettings.tsx');
-const ipc = read('main/ipc.mjs');
+const ipc = read('main/ipc.mts');
 
 describe('the brief on the Instructions page reads as an agent gets it', () => {
   for (const storeTools of [true, false]) {

@@ -1,7 +1,7 @@
 // A SETTING CHANGED ON THE PHONE SHOWS AT ONCE, AND SAYS IT IS WAITING FOR THE COMPUTER.
 //
 // A change from the phone is a command its computer carries out on its next
-// pass (main/phone-inbox.mjs), up to five seconds later with the Mac awake and
+// pass (main/phone-inbox.mts), up to five seconds later with the Mac awake and
 // whenever it next wakes otherwise. Its copy of its settings comes back after
 // that. Read straight from the copy, a switch flipped on the phone would flip
 // back until then. So the page draws the phone's own value while the command

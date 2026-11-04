@@ -12,31 +12,31 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { changedSinceBoot, restartNeeded, _resetCacheForTests } from '../main/staleness.mjs';
+import { changedSinceBoot, restartNeeded, _resetCacheForTests } from '../main/staleness.mts';
 
 const BOOT = 1_786_000_000_000;
 
 describe('the rule', () => {
   it('names a main-process file written after the process read it', () => {
     expect(changedSinceBoot(BOOT, [
-      { name: 'main/supervisor.mjs', mtimeMs: BOOT + 60_000 },
-      { name: 'main/ipc.mjs', mtimeMs: BOOT - 60_000 },
-    ])).toEqual(['main/supervisor.mjs']);
+      { name: 'main/supervisor.mts', mtimeMs: BOOT + 60_000 },
+      { name: 'main/ipc.mts', mtimeMs: BOOT - 60_000 },
+    ])).toEqual(['main/supervisor.mts']);
   });
 
   it('says nothing when the running app IS the app on disk', () => {
     expect(changedSinceBoot(BOOT, [
-      { name: 'main/supervisor.mjs', mtimeMs: BOOT - 1 },
+      { name: 'main/supervisor.mts', mtimeMs: BOOT - 1 },
       { name: 'preload.cjs', mtimeMs: BOOT - 90_000 },
     ])).toEqual([]);
   });
 
   it('puts the most recently changed file first, so the list leads with the news', () => {
     expect(changedSinceBoot(BOOT, [
-      { name: 'main/ipc.mjs', mtimeMs: BOOT + 10 },
+      { name: 'main/ipc.mts', mtimeMs: BOOT + 10 },
       { name: 'preload.cjs', mtimeMs: BOOT + 9_000 },
-      { name: 'main/supervisor.mjs', mtimeMs: BOOT + 500 },
-    ])).toEqual(['preload.cjs', 'main/supervisor.mjs', 'main/ipc.mjs']);
+      { name: 'main/supervisor.mts', mtimeMs: BOOT + 500 },
+    ])).toEqual(['preload.cjs', 'main/supervisor.mts', 'main/ipc.mts']);
   });
 
   it('ignores a file whose mtime cannot be read rather than calling it stale', () => {
@@ -51,7 +51,7 @@ describe('against a real directory', () => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-stale-'));
     fs.mkdirSync(path.join(dir, 'main'), { recursive: true });
     fs.mkdirSync(path.join(dir, 'shared'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'main', 'supervisor.mjs'), '// code');
+    fs.writeFileSync(path.join(dir, 'main', 'supervisor.mts'), '// code');
     fs.writeFileSync(path.join(dir, 'preload.cjs'), '// bridge');
   });
 
@@ -64,7 +64,7 @@ describe('against a real directory', () => {
     const bootedAt = Date.now() - 60_000; // the files were written after boot
     const verdict = restartNeeded(dir, bootedAt);
     expect(verdict).not.toBeNull();
-    expect(verdict.files).toContain('main/supervisor.mjs');
+    expect(verdict.files).toContain('main/supervisor.mts');
     expect(verdict.files).toContain('preload.cjs');
     expect(verdict.since).toBe(bootedAt);
   });

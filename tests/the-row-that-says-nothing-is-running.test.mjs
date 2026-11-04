@@ -17,7 +17,7 @@ import {
   TROUBLE_ID, isTroubleRow, troubleBody, troubleRow, troubleSummary, troubleTitle,
 } from '../renderer/src/trouble-row.ts';
 import { rowSummary, SUMMARY_BUDGET } from '../renderer/src/list-rules.ts';
-import { causeBreakdown, strandedSentence, strandedRemedy } from '../shared/spawn-trouble.mjs';
+import { causeBreakdown, strandedSentence, strandedRemedy } from '../shared/spawn-trouble.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 // HER OWN NIGHT, and the numbers are the ones measured off her store: seven

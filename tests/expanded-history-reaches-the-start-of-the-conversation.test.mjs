@@ -4,9 +4,10 @@ import { it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { stripTypeScriptTypes } from 'node:module';
 import { readItemHistory, _internals } from '../main/store/work-items.mjs';
 
-const source = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+const source = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
 const start = source.indexOf("  ipcMain.handle('zero:item-history'");
 const end = source.indexOf('\n  });', start) + '\n  });'.length;
 
@@ -21,7 +22,7 @@ it.each([399, 400, 401, 900])('returns all %i updates, including the opening mes
     })).join('\n')+'\n');
     let handler;
     const store = {readHistory: (_product, id, options) => readItemHistory(root, id, options)};
-    new Function('ipcMain', 'store', source.slice(start, end))({handle: (_name, fn) => {handler = fn;}}, store);
+    new Function('ipcMain', 'store', stripTypeScriptTypes(source.slice(start, end), { mode: 'strip' }))({handle: (_name, fn) => {handler = fn;}}, store);
     const result = await handler(null, {product:'sample', id:'w-long'});
     expect(result.ok).toBe(true);
     expect(result.lines).toHaveLength(count);

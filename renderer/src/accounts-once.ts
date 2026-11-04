@@ -6,7 +6,7 @@
 // twice with two numbers (tests/an-account-shows-one-reading-wherever-it-is-signed-in).
 import { accountLabel, type CloudAccount } from './cloud-menu';
 import type { AccountUsageReading, Usage, UsageLimit } from './types';
-import { readingsDisagree } from '../../shared/usage.mjs';
+import { readingsDisagree } from '../../shared/usage.mts';
 
 /** A login on this computer, as the Claude Code page reads it. */
 export type HereLogin = {

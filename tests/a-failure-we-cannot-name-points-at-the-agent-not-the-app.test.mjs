@@ -10,7 +10,7 @@
 // The first sentence stays word for word, because rows already carrying it are
 // read back by `deadRunCause` and counted as stranded.
 import { describe, it, expect } from 'vitest';
-import { deadRunSentence, deadRunCause } from '../shared/spawn-trouble.mjs';
+import { deadRunSentence, deadRunCause } from '../shared/spawn-trouble.mts';
 import { Name } from '../shared/product-name.mjs';
 
 describe('the line for a failure we cannot name', () => {

@@ -8,8 +8,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, mkdtempSync, writeFileSync, existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { GENERAL_ROOM } from '../main/team/rooms-memory.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { GENERAL_ROOM } from '../main/team/rooms-memory.mts';
 import { decisionsDoc, writeDecisionDocs } from '../main/team/decisions-doc.mjs';
 import { decisionsOf, decisionRows } from '../renderer/src/team/decisions.ts';
 import { messageMore } from '../renderer/src/team/message-more.ts';
@@ -76,7 +76,7 @@ describe('marking', () => {
   });
   // Only seen on screen: every test here passed while the window's call was refused.
   it('the window is allowed to make the call', () => {
-    expect(readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8')).toMatch(/ROOM_OPS = new Set\(\[[^\]]*'decide'/);
+    expect(readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8')).toMatch(/ROOM_OPS = new Set\(\[[^\]]*'decide'/);
   });
   it('the hosted cloud has the table, the rule and a way to read it', () => {
     const sql = readFileSync(new URL('../cloud/supabase/migrations/20261031000100_a_group_keeps_its_decisions.sql', import.meta.url), 'utf8');

@@ -1,6 +1,6 @@
 // ROOMS ON A MAC SHOW REACTIONS, EDITS, DELETES AND A ROOM MARKED UNREAD (2026-10-21).
 //
-// The rooms service (main/team/rooms.mjs) handed the app plain messages only:
+// The rooms service (main/team/rooms.mts) handed the app plain messages only:
 // no reactions on them, no sign one was edited or deleted, no way to mark a
 // room unread from a message, and no file to play a voice note from. This
 // measures the state the app reads, with Maya and Theo on Northwind and Jun on
@@ -9,8 +9,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createRooms, roomPrefsFile } from '../main/team/rooms.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
 
 const T0 = Date.parse('2026-10-22T15:00:00-07:00');
 const flush = async () => { for (let i = 0; i < 20; i += 1) await new Promise((r) => setImmediate(r)); };

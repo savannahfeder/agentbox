@@ -36,7 +36,7 @@ describe('the card carries code the agent did not type into a tool', () => {
     run(dir, 'git', ['config', 'user.email', 'agent@agentbox.local']);
     run(dir, 'git', ['config', 'user.name', Name]);
     fs.mkdirSync(path.join(dir, 'main'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'main', 'ipc.mjs'), lines(12));
+    fs.writeFileSync(path.join(dir, 'main', 'ipc.mts'), lines(12));
     run(dir, 'git', ['add', '-A']);
     run(dir, 'git', ['commit', '-qm', 'base']);
   });
@@ -46,9 +46,9 @@ describe('the card carries code the agent did not type into a tool', () => {
     const before = snapshotRepo(dir);
     // The way a worker actually writes a file today, and the reason the card
     // was empty: nothing about this reaches the agent's own transcript.
-    sedInPlace(dir, 's/line 4/line four/', 'main/ipc.mjs');
+    sedInPlace(dir, 's/line 4/line four/', 'main/ipc.mts');
     const change = changeFromRepo(before);
-    expect(change.files.map((f) => f.path)).toEqual(['main/ipc.mjs']);
+    expect(change.files.map((f) => f.path)).toEqual(['main/ipc.mts']);
     expect(change.plus).toBe(1);
     expect(change.minus).toBe(1);
     const rows = change.files[0].hunks[0].rows;
@@ -59,12 +59,12 @@ describe('the card carries code the agent did not type into a tool', () => {
   });
 
   it('does not credit this run with work that was already in the checkout', () => {
-    fs.appendFileSync(path.join(dir, 'main', 'ipc.mjs'), 'somebody else was here\n');
+    fs.appendFileSync(path.join(dir, 'main', 'ipc.mts'), 'somebody else was here\n');
     fs.writeFileSync(path.join(dir, 'main', 'theirs.mjs'), 'not mine\n');
     const before = snapshotRepo(dir);
-    sedInPlace(dir, 's/line 2/line two/', 'main/ipc.mjs');
+    sedInPlace(dir, 's/line 2/line two/', 'main/ipc.mts');
     const change = changeFromRepo(before);
-    expect(change.files.map((f) => f.path)).toEqual(['main/ipc.mjs']);
+    expect(change.files.map((f) => f.path)).toEqual(['main/ipc.mts']);
     // The other agent's line is context here, not a green line of ours.
     const rows = change.files[0].hunks.flatMap((h) => h.rows);
     expect(rows.filter((r) => r[0] === '+')).toEqual([['+', 'line two']]);
@@ -74,7 +74,7 @@ describe('the card carries code the agent did not type into a tool', () => {
   it('shows a file the run made and a file it deleted, commits and all', () => {
     const before = snapshotRepo(dir);
     fs.writeFileSync(path.join(dir, 'main', 'new.mjs'), 'export const one = 1;\nexport const two = 2;\n');
-    run(dir, 'git', ['rm', '-q', 'main/ipc.mjs']);
+    run(dir, 'git', ['rm', '-q', 'main/ipc.mts']);
     // A worker commits as it goes; the photograph is of a commit, so this is
     // still inside the window.
     run(dir, 'git', ['add', '-A']);
@@ -83,8 +83,8 @@ describe('the card carries code the agent did not type into a tool', () => {
     const byPath = Object.fromEntries(change.files.map((f) => [f.path, f]));
     expect(byPath['main/new.mjs'].plus).toBe(2);
     expect(byPath['main/new.mjs'].minus).toBe(0);
-    expect(byPath['main/ipc.mjs'].plus).toBe(0);
-    expect(byPath['main/ipc.mjs'].minus).toBe(12);
+    expect(byPath['main/ipc.mts'].plus).toBe(0);
+    expect(byPath['main/ipc.mts'].minus).toBe(12);
   });
 
   it('leaves a picture and a huge file alone, because nobody reads a diff of one', () => {
@@ -108,7 +108,7 @@ describe('the card carries code the agent did not type into a tool', () => {
     const transcript = changeFromTranscript(
       turn('2026-08-24T20:00:00Z', [
         { type: 'text', text: 'Now the header.' },
-        edit(path.join(dir, 'main/ipc.mjs'), 'line 1\n', 'line one\n'),
+        edit(path.join(dir, 'main/ipc.mts'), 'line 1\n', 'line one\n'),
       ]) + '\n' + turn('2026-08-24T20:01:00Z', [
         { type: 'text', text: 'And her report.' },
         edit('/docs/reports/what-i-found.html', '', '<h1>hi</h1>\n'),
@@ -118,14 +118,14 @@ describe('the card carries code the agent did not type into a tool', () => {
     const repo = {
       root: dir,
       at: 1,
-      files: [{ path: 'main/ipc.mjs', hunks: [{ rows: [['-', 'line 1'], ['+', 'line one']], plus: 1, minus: 1 }], plus: 1, minus: 1 }],
+      files: [{ path: 'main/ipc.mts', hunks: [{ rows: [['-', 'line 1'], ['+', 'line one']], plus: 1, minus: 1 }], plus: 1, minus: 1 }],
     };
     const merged = mergeChange(transcript, [repo], { roots: [dir, '/docs'] });
     const byPath = Object.fromEntries(merged.files.map((f) => [f.path, f]));
     // The file both of them have comes off the disk...
-    expect(byPath['main/ipc.mjs'].fromDisk).toBe(true);
+    expect(byPath['main/ipc.mts'].fromDisk).toBe(true);
     // ...carrying the agent's own words, which only the conversation has.
-    expect(byPath['main/ipc.mjs'].hunks[0].said).toBe('Now the header.');
+    expect(byPath['main/ipc.mts'].hunks[0].said).toBe('Now the header.');
     // And the report she reads is not in any checkout, so it survives.
     expect(byPath['reports/what-i-found.html']).toBeTruthy();
     expect(merged.fromDisk).toBe(1);
@@ -137,13 +137,13 @@ describe('the card carries code the agent did not type into a tool', () => {
       const transcript = path.join(docs, 'session.jsonl');
       fs.writeFileSync(transcript, turn('2026-08-24T20:00:00Z', [{ type: 'text', text: 'Running a script.' }]));
       const before = snapshotRepo(dir);
-      sedInPlace(dir, 's/line 6/line six/', 'main/ipc.mjs');
+      sedInPlace(dir, 's/line 6/line six/', 'main/ipc.mts');
       const repos = [changeFromRepo(before)];
       // Without the disk this is the empty card a tester was clicking.
       expect(writeChangeForRun({ transcript, docsDir: docs, itemId: 'w-none', roots: [dir] })).toBeNull();
       const out = writeChangeForRun({ transcript, docsDir: docs, itemId: 'w-sed', roots: [dir], repos });
       const written = JSON.parse(fs.readFileSync(out, 'utf8'));
-      expect(written.files.map((f) => f.path)).toEqual(['main/ipc.mjs']);
+      expect(written.files.map((f) => f.path)).toEqual(['main/ipc.mts']);
       expect(written.plus).toBe(1);
       expect(written.startedAt).toBeTruthy();
     } finally { fs.rmSync(docs, { recursive: true, force: true }); }
@@ -169,15 +169,15 @@ describe('the card carries code the agent did not type into a tool', () => {
   it('photographs the checkout when the worker spawns, not when it exits', () => {
     // At the exit there is nothing left to compare against, so the order here
     // is the whole mechanism rather than a detail of it.
-    const src = fs.readFileSync(path.join(ROOT, 'main', 'supervisor.mjs'), 'utf8');
+    const src = fs.readFileSync(path.join(ROOT, 'main', 'supervisor.mts'), 'utf8');
     expect(src.indexOf('snapshotRepo(cwd)')).toBeGreaterThan(-1);
     // The exit handler's work is `settleExit` (a stop signal's death waits a
     // moment to be judged: tests/a-worker-stopped-with-the-app-is-not-a-failed-run).
-    const at = src.indexOf('const settleExit = (code, signal, how) => {');
+    const at = src.indexOf('const settleExit = (code');
     expect(src.indexOf('snapshotRepo(cwd)')).toBeLessThan(at);
     const exitHandler = src.slice(at);
-    // Read back on the git thread (main/run-change.mjs).
+    // Read back on the git thread (main/run-change.mts).
     expect(exitHandler).toContain('repoBefore: session.repoBefore');
-    expect(fs.readFileSync(path.join(ROOT, 'main', 'run-change.mjs'), 'utf8')).toContain('changeFromRepo(repoBefore)');
+    expect(fs.readFileSync(path.join(ROOT, 'main', 'run-change.mts'), 'utf8')).toContain('changeFromRepo(repoBefore)');
   });
 });

@@ -10,7 +10,7 @@
 // So the ones that remain are listed here with when they run, and a new one
 // fails this test. Turning one into an async call means lowering its number.
 // It counts places, not callers: the 10-22 freeze was an old place reached
-// from a new timer, which only the freeze log (main/freeze-recorder.mjs) shows.
+// from a new timer, which only the freeze log (main/freeze-recorder.mts) shows.
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
@@ -22,19 +22,19 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ALLOWED = {
   'main/engine-bin.mjs': [1, 'at launch, and when someone undoes a file they picked; every other look is in the background'],
   'main/source-updater.mts': [1, 'at launch'],
-  'main/first-run.mjs': [1, 'once, during the walk'],
-  'main/supervisor.mjs': [1, 'once per Mac, behind a flag file'],
-  'main/start-hold.mjs': [1, 'sysctl once before a restart brings agents back, two second deadline'],
-  'main/task-folders.mjs': [2, 'when a task folder is made or put away'],
-  'main/worktree-include.mjs': [3, 'when a task folder is made'],
-  'main/harnesses/instructions-file.mjs': [1, 'when a run starts'],
-  'main/task-terminals.mjs': [1, "when a task's terminal closes, two second deadline"],
+  'main/first-run.mts': [1, 'once, during the walk'],
+  'main/supervisor.mts': [1, 'once per Mac, behind a flag file'],
+  'main/start-hold.mts': [1, 'sysctl once before a restart brings agents back, two second deadline'],
+  'main/task-folders.mts': [2, 'when a task folder is made or put away'],
+  'main/worktree-include.mts': [3, 'when a task folder is made'],
+  'main/harnesses/instructions-file.mts': [1, 'when a run starts'],
+  'main/task-terminals.mts': [1, "when a task's terminal closes, two second deadline"],
   'main/git-change.mjs': [1, 'a change card reading git; 0.8 s seen in the freeze log, next to move'],
-  'main/cloud/org.mjs': [1, "reading the cloud account's settings repository"],
-  'main/cloud/host.mjs': [1, 'runs in its own process, not the window\'s'],
+  'main/cloud/org.mts': [1, "reading the cloud account's settings repository"],
+  'main/cloud/host.mts': [1, 'runs in its own process, not the window\'s'],
   'scripts/brand-electron.mjs': [1, 'codesign, just before the app restarts itself from source'],
 };
-// Scripts the app's own process imports (main/main.mjs, main/source-updater.mts).
+// Scripts the app's own process imports (main/main.mts, main/source-updater.mts).
 const IMPORTED_SCRIPTS = ['scripts/brand-electron.mjs', 'scripts/linux-launcher.mjs'];
 
 function files(dir) {

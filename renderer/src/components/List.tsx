@@ -32,7 +32,7 @@ import { toApproveWords } from '../threads-made';
 import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mjs';
-import { catchUpDue } from '../../../shared/agent-import.mjs';
+import { catchUpDue } from '../../../shared/agent-import.mts';
 
 /**
  * THE AGENT A ROW WITH NOTHING RUNNING WOULD RUN ON.

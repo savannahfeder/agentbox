@@ -1,7 +1,7 @@
 // A CLOUD RUN BRINGS THE AGENT'S WORK HOME, AND THE APP CANNOT TELL IT FROM A
 // LOCAL ONE.
 //
-// main/cloud/run.mjs stands in for `claude` when a thread runs in the cloud
+// main/cloud/run.mts stands in for `claude` when a thread runs in the cloud
 // (docs/cloud/PLAN.md). The supervisor reads its stdout as the agent's stream,
 // writes the prompt to its stdin, and when it exits expects the task folder to
 // hold the agent's work, because the change card, the ship queue and the next
@@ -26,8 +26,8 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun, IMPORT_FAILED } from '../main/cloud/run.mjs';
-import { readMarker, writeMarker, cloudWorkPending } from '../main/cloud/marker.mjs';
+import { cloudRun, IMPORT_FAILED } from '../main/cloud/run.mts';
+import { readMarker, writeMarker, cloudWorkPending } from '../main/cloud/marker.mts';
 import { waitFor } from './waiting.mjs';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
@@ -50,7 +50,7 @@ beforeEach(async () => {
   await new Promise((r) => s3.listen(0, '127.0.0.1', r));
   s3Url = `http://127.0.0.1:${s3.address().port}`;
   sandbox = createSandbox({ workRoot: path.join(tmp, 'vm-work'), pathRoot: path.join(tmp, 'vm'), bridgeSocket: path.join(tmp, 'bridge.sock') });
-  // The account's Claude sign-in, kept in the cloud (main/cloud/logins.mjs).
+  // The account's Claude sign-in, kept in the cloud (main/cloud/logins.mts).
   macReads = [];
   objects.set(LOGIN.key, Buffer.from(JSON.stringify({ engine: 'claude', token: 'tok-123-cloud-signin-only' })));
   const addr = await sandbox.listen(0, '127.0.0.1');

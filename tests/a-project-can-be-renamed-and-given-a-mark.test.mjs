@@ -14,9 +14,9 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { Name } from '../shared/product-name.mjs';
-import { IMG_SCHEME } from '../shared/schemes.mjs';
+import { IMG_SCHEME } from '../shared/schemes.mts';
 import {
   cleanName,
   clearProjectIcon,
@@ -24,7 +24,7 @@ import {
   iconPathFor,
   setProjectIcon,
   setProjectName,
-} from '../main/project-identity.mjs';
+} from '../main/project-identity.mts';
 
 // The same shape every other Store test uses: a throwaway root, one project
 // written by hand, because none of this needs the work-item machinery.
@@ -103,7 +103,7 @@ describe('the mark beside the name', () => {
   });
 
   // COPIED IN, NOT POINTED AT. Her suggestion was a pointer at wherever the
-  // picture already sits; main/project-identity.mjs says why this copies instead.
+  // picture already sits; main/project-identity.mts says why this copies instead.
   // Nothing about it leaves the Mac either way, which was her actual constraint.
   it('copies the picture into the project folder and draws it from there', () => {
     const { store: s, dir } = store();

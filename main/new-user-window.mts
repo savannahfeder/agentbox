@@ -1,6 +1,6 @@
 // A throwaway copy's window says so, and stands where you can see both.
 //
-// "Open Agentbox as a new user" (main/fresh-user.mjs) launches the app again
+// "Open Agentbox as a new user" (main/fresh-user.mts) launches the app again
 // inside a throwaway home, beside the one it was opened from. The offset is a
 // window's shoulder rather than a tile: the point is to see there are two, with
 // the real one still readable behind. A copy that cannot fit the offset is left

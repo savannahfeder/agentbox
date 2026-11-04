@@ -12,13 +12,13 @@
 // opening of a thread on 2026-10-22 shows 39 downloads for its 12 pictures.
 //
 // Now the Mac writes each picture's width and height into the thread's list
-// of files, read off the file's first bytes (main/picture-shape.mjs), and the
+// of files, read off the file's first bytes (main/picture-shape.mts), and the
 // app draws the picture's box at that shape at once and fetches it once.
 import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createPhoneUploads } from '../main/phone-uploads.mjs';
+import { createPhoneUploads } from '../main/phone-uploads.mts';
 import { cloudPlaces } from '../renderer/src/cloud-files';
 import { pictureShapeOf } from '../mobile/src/lib/files';
 

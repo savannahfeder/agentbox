@@ -24,7 +24,7 @@
 // That was the fail-open bug: an empty override is a deep merge that turns
 // nothing off, so it ran every server she has.
 //
-//   supervisor.mjs said the Mac's aggregate ceiling was an unreachable conjunct
+//   supervisor.mts said the Mac's aggregate ceiling was an unreachable conjunct
 //   -- a cooldown shrinking capacity under live sessions reaches it -- and said
 //   `codexBin` "is not written by main/config.mjs at all yet", which is now the
 //   second thing main/config.mjs resolves.
@@ -47,12 +47,12 @@ describe('the transport header', () => {
   });
 
   it('names what does import it, so the next reader is not left grepping', () => {
-    expect(source).toMatch(/main\/supervisor\.mjs/);
+    expect(source).toMatch(/main\/supervisor\.mts/);
   });
 
   // AND IT IS REALLY IMPORTED, which is the fact the header now has to match.
   it('is really imported by the supervisor', () => {
-    expect(read('main/supervisor.mjs')).toMatch(/from '\.\/codex-app-server\.mjs'/);
+    expect(read('main/supervisor.mts')).toMatch(/from '\.\/codex-app-server\.mjs'/);
   });
 });
 
@@ -103,7 +103,7 @@ describe('the engine-choice header', () => {
 });
 
 describe('the worker-facade header', () => {
-  const source = read('main/codex-session.mjs');
+  const source = read('main/codex-session.mts');
 
   it('no longer calls an unreadable isolation list correct', () => {
     expect(source).not.toMatch(/An empty or unreadable list yields an empty override, which is correct/i);
@@ -115,7 +115,7 @@ describe('the worker-facade header', () => {
 });
 
 describe('the supervisor comments the last two reviews contradicted', () => {
-  const source = read('main/supervisor.mjs');
+  const source = read('main/supervisor.mts');
 
   it('no longer calls the Mac ceiling unreachable', () => {
     expect(source).not.toMatch(/the second half was unreachable/i);
@@ -129,7 +129,7 @@ describe('the supervisor comments the last two reviews contradicted', () => {
 
   // THE SIXTH. `codexThreadParamsFor` said a row with a model on it "runs on
   // the engine's own default and the run SAYS what was dropped". Neither half
-  // survived main/codex-models.mjs: a word Codex knows is now carried rather
+  // survived main/codex-models.mts: a word Codex knows is now carried rather
   // than dropped, a word it does not know stops the run rather than running it
   // on the default, and the sentence it claimed to SAY was being emitted on a
   // stderr with no listener attached to it yet.
@@ -139,19 +139,19 @@ describe('the supervisor comments the last two reviews contradicted', () => {
   });
 
   it('says what happens to the model instead, and names where the list comes from', () => {
-    expect(source).toMatch(/codex-models\.mjs/);
+    expect(source).toMatch(/codex-models\.mts/);
     expect(source).toMatch(/models_cache\.json/);
   });
 
   // AND IT IS REALLY WIRED, which is the fact those sentences now have to match.
   it('really reads the list before it starts a thread', () => {
-    expect(source).toMatch(/from '\.\/codex-models\.mjs'/);
+    expect(source).toMatch(/from '\.\/codex-models\.mts'/);
     expect(source).toMatch(/codexKnownSlugs\(/);
   });
 });
 
 describe('the header on the module that reads the list', () => {
-  const source = read('main/codex-models.mjs');
+  const source = read('main/codex-models.mts');
 
   // The one thing this file must never go back to claiming, because it is what
   // the deleted 2026-08 original claimed and it is why `gpt-5.6-sol` was thrown
