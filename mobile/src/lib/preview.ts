@@ -287,8 +287,8 @@ export function previewCloud(now = () => Date.now()) {
     const mates: any = (settings.settings as any).teammates;
     if (scope === 'teammate' && key === 'post') {
       mates.chat.push({ id: `m-${c.id}`, kind: 'msg', from: 'you', to: value.to, text: value.text, ...(value.answers ? { answers: value.answers } : {}), ts: now() });
-      // The teammate answers a moment later, as a run of it would.
-      setTimeout(() => {
+      // The teammate answers a moment later, as a run of it would; a paused one does not.
+      if (!mates.list.find((x: any) => x.id === value.to[0])?.paused) setTimeout(() => {
         mates.chat.push({ id: `m-${c.id}-r`, kind: 'msg', from: value.to[0], to: ['you'], text: 'Got it. I will tell you when it is done.', ts: now() });
         settings.updated_at = new Date(now()).toISOString();
       }, 4000);

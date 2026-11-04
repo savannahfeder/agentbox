@@ -114,7 +114,10 @@ export default function TeammateChat() {
   const asked = pauseOnItsWay(c.rows.commands, team, t.id);
   const setPaused = async (paused: boolean) => {
     setBusy(true); setError(null);
-    try { await c.askTeammate('pause', { id: t.id, paused }); c.say(paused ? `Pausing ${t.name}` : `Resuming ${t.name}`); }
+    try {
+      await c.askTeammate('pause', { id: t.id, paused });
+      c.say(`${paused ? 'Pausing' : 'Resuming'} ${t.name} · press Z to undo`, async () => { await c.askTeammate('pause', { id: t.id, paused: !paused }); c.say(`${paused ? 'Not pausing' : 'Not resuming'} ${t.name}`); });
+    }
     catch (err) { setError(message(err)); } finally { setBusy(false); }
   };
 
@@ -171,7 +174,7 @@ export default function TeammateChat() {
     <Wall>
       <TopBar left={<IconButton label="Back" onPress={back}><Back size={18} /></IconButton>} title={name}
         right={<IconButton label={`About ${t.name}`} onPress={() => setAbout(true)}><More /></IconButton>} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1, paddingBottom: c.approvalRoom }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: size.inset, paddingBottom: 16 }} keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
           {rows.length ? rows.map(draw) : <T style={{ paddingTop: 24, fontSize: 14.5, lineHeight: 21, color: color.faint }}>{`Nothing yet. Say hello to ${t.name}.`}</T>}
@@ -185,17 +188,15 @@ export default function TeammateChat() {
           )}
         </ScrollView>
         {error && <T style={{ paddingHorizontal: size.inset, paddingTop: 6, fontSize: 13, color: color.dim }}>{error}</T>}
-        {(t.paused || asked !== null) && (
+        {t.paused && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44, paddingHorizontal: size.inset, borderTopWidth: 1, borderTopColor: color.line }}>
             <T style={{ flex: 1, fontSize: 13.5, lineHeight: 20, color: color.dim }}>
-              {asked === false ? 'Resuming when your computer gets this' : asked === true ? 'Pausing when your computer gets this' : 'Your messages wait until you resume it'}
+              {asked === true ? 'Pausing when your computer gets this' : 'Your messages wait until you resume it'}
             </T>
-            {asked === null && (
-              <Pressable disabled={busy} onPress={() => void setPaused(false)} accessibilityRole="button"
-                style={({ pressed }) => ({ height: 30, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: busy ? 0.5 : 1 })}>
-                <T style={{ fontSize: 13.5, fontFamily: font.medium }}>Resume</T>
-              </Pressable>
-            )}
+            <Pressable disabled={busy} onPress={() => void setPaused(false)} accessibilityRole="button"
+              style={({ pressed }) => ({ height: 30, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: busy ? 0.5 : 1 })}>
+              <T style={{ fontSize: 13.5, fontFamily: font.medium }}>Resume</T>
+            </Pressable>
           </View>
         )}
         <MateComposer placeholder={t.status === 'draft' ? `Answer ${t.name === 'New teammate' ? 'your new teammate' : t.name}` : `Message ${t.name}`}
@@ -224,12 +225,10 @@ export default function TeammateChat() {
             <T selectable style={{ fontSize: 15, lineHeight: 21, color: color.dim }}>{v}</T>
           </View>
         ))}
-        {asked === null && (
-          <Pressable disabled={busy} onPress={() => { setAbout(false); void setPaused(!t.paused); }} accessibilityRole="button"
-            style={({ pressed }) => ({ alignSelf: 'flex-start', marginHorizontal: 14, marginTop: 10, height: 32, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
-            <T style={{ fontSize: 14, color: t.paused ? color.text : color.dim }}>{`${t.paused ? 'Resume' : 'Pause'} ${t.name}`}</T>
-          </Pressable>
-        )}
+        <Pressable disabled={busy} onPress={() => { setAbout(false); void setPaused(!t.paused); }} accessibilityRole="button"
+          style={({ pressed }) => ({ alignSelf: 'flex-start', marginHorizontal: 14, marginTop: 10, height: 32, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+          <T style={{ fontSize: 14, color: t.paused ? color.text : color.dim }}>{`${t.paused ? 'Resume' : 'Pause'} ${t.name}`}</T>
+        </Pressable>
         <T style={{ paddingHorizontal: 14, paddingTop: 8, fontSize: 12.5, lineHeight: 18, color: color.faint }}>Change its job or make it primary on your computer.</T>
       </Sheet>
     </Wall>

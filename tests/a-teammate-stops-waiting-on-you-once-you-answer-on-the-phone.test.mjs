@@ -26,7 +26,9 @@ describe("a teammate's thread you answered on the phone", () => {
     const t = withPhoneAnswers(team(), [cmd('reply')]);
     const q = t.view.list[0];
     expect(q.waiting).toEqual([]);
-    expect(nowLine(q, t.view, NOW)).toBe('Answered');
+    // Round 2 of the 2026-11-03 testers (issues 7, 10): "Answered" read as the teammate having answered,
+    // and nothing said the words had not reached it. Until the copy has them, that is what it says.
+    expect(nowLine(q, t.view, NOW)).toBe('Waiting for your computer');
     expect(t.view.runs[0]).toMatchObject({ waiting: false, answered: true });
   });
 

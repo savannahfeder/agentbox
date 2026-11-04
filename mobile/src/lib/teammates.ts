@@ -53,11 +53,17 @@ export function withPhoneAnswers(team: PhoneTeam | null, commands: PhoneRows['co
   const settled = new Set(commands
     .filter((c) => (c.kind === 'reply' || c.kind === 'close') && c.item && c.device === team.device && notInCopy(c, team.copyAt))
     .map((c) => `${c.project}/${c.item}`));
-  if (!settled.size) return team;
+  // A message to one that the copy does not have yet: it has not got your words.
+  const told = new Set(commands
+    .filter((c) => c.kind === 'setting' && c.device === team.device && c.payload?.scope === 'teammate' && c.payload.key === 'post' && notInCopy(c, team.copyAt))
+    .flatMap((c) => (Array.isArray(c.payload.value?.to) ? c.payload.value.to : [])));
+  if (!settled.size && !told.size) return team;
+  const WAITS = 'Waiting for your computer';
   const list = team.view.list.map((t) => {
     const waiting = t.waiting.filter((w) => !settled.has(`${w.product}/${w.id}`));
-    if (waiting.length === t.waiting.length) return t;
-    return { ...t, waiting, now: !waiting.length && t.now === 'Waiting on you' ? 'Answered' : t.now };
+    const answered = waiting.length !== t.waiting.length;
+    if (!answered && !told.has(t.id)) return t;
+    return { ...t, waiting, now: t.paused ? t.now : (answered && !waiting.length && t.now === 'Waiting on you') || told.has(t.id) ? WAITS : t.now };
   });
   const runs = team.view.runs.map((r) => (r.waiting && settled.has(`${r.product}/${r.item}`) ? { ...r, waiting: false, answered: true } : r));
   return { ...team, view: { ...team.view, list, runs } };

@@ -21,4 +21,8 @@ describe('the permission card and the lists under it', () => {
     expect(read('mobile/src/app/index.tsx')).toMatch(/paddingBottom: Math\.max\(88 \+ foot, room \+ 16\)/);
     expect(read('mobile/src/ui/Teammates.tsx')).toMatch(/paddingBottom: Math\.max\(40, c\.approvalRoom \+ 16\)/);
   });
+  it('a thread, a teammate and a group lift their reply box and buttons above it (round 2 of the 2026-11-03 testers, issues 11 and 12)', () => {
+    expect(read('mobile/src/app/thread/[product]/[id].tsx')).toMatch(/<KeyboardAvoidingView style=\{\{ flex: 1, paddingBottom: c\.approvalRoom \}\}/);
+    expect(read('mobile/src/app/teammate/[id].tsx')).toMatch(/<KeyboardAvoidingView style=\{\{ flex: 1, paddingBottom: c\.approvalRoom \}\}/);
+  });
 });

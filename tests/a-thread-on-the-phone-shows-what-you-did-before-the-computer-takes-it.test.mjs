@@ -42,6 +42,12 @@ describe('a thread sent from the phone', () => {
     expect(yours(open({ projects, threads: [], commands: [short] }, madeHere(short.id)))).toEqual([]);
   });
 
+  it('sent for later, says when it is scheduled rather than that it waits for the computer (round 2 of the 2026-11-03 testers)', () => {
+    const at = new Date(NOW); const tomorrow8 = new Date(at.getFullYear(), at.getMonth(), at.getDate() + 1, 8, 0).getTime();
+    const later = cmd({ id: 'c-5', kind: 'new', payload: { title: 'Cold email', body: 'Write the cold email for the design partners, three short versions.', runAt: tomorrow8 } });
+    expect(yours(open({ projects, threads: [], commands: [later] }, madeHere(later.id)))).toMatchObject([{ pending: true, scheduled: tomorrow8 }]);
+  });
+
   it('once the computer has its own copy, shows that copy and not a second message', () => {
     const taken = { ...sent, taken_at: iso(NOW - 30_000), outcome: 'ok' };
     const id = madeHere(sent.id);

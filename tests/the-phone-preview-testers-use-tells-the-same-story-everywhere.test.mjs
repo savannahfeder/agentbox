@@ -28,4 +28,8 @@ describe('the preview', () => {
     const view = phoneView(rows, later);
     expect(view.running.some((r) => r.itemId === 'w-t1a2b3c4d5')).toBe(true);
   });
+  it('a paused teammate does not answer a message (round 2 of the 2026-11-03 testers, issue 8)', async () => {
+    const src = (await import('node:fs')).readFileSync('mobile/src/lib/preview.ts', 'utf8');
+    expect(src).toMatch(/if \(!mates\.list\.find\(\(x: any\) => x\.id === value\.to\[0\]\)\?\.paused\) setTimeout\(/);
+  });
 });

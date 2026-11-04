@@ -18,6 +18,7 @@ import { clock, dayHeading } from '../../../../../renderer/src/thread-history';
 import { stateWordOf } from '../../../../../renderer/src/threads/summary-rules';
 import { summaryOf, threadState } from '../../../../../shared/thread-cards.mjs';
 import { arrivedAt } from '../../../../../renderer/src/unread';
+import { dayClock } from '../../../lib/back-at';
 import type { Choices, Press } from '../../../lib/actions';
 import { useDraft } from '../../../lib/drafts';
 import { typedWords } from '../../../lib/files';
@@ -85,9 +86,9 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name 
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 3, flexWrap: 'wrap' }}>
           <T style={yours ? { fontSize: 14, lineHeight: 22.4, fontFamily: font.semibold } : { fontSize: 14, lineHeight: 22.4, color: color.dim }}>{yours ? 'You' : name ?? 'The agent'}</T>
           <T style={{ fontSize: 12.5, lineHeight: 20, color: e.refused ? REFUSED : e.pending ? color.dim : color.faint, flexShrink: 1 }} numberOfLines={2}>
-            {e.refused ? `Not sent: ${e.refused}` : e.pending ? (e.sent ? 'Sent' : e.cloud ? 'Working in Agentbox Cloud' : e.toCloud ? 'Waiting for Agentbox Cloud' : 'Waiting for your computer') : when(e.at)}
+            {e.refused ? `Not sent: ${e.refused}` : e.pending ? (e.sent ? 'Sent' : e.cloud ? 'Working in Agentbox Cloud' : e.toCloud ? 'Waiting for Agentbox Cloud' : e.scheduled ? `Scheduled for ${dayClock(e.scheduled)}` : 'Waiting for your computer') : when(e.at)}
           </T>
-          {e.pending && !e.refused && !e.cloud && !e.toCloud && !e.sent && sendNow && (
+          {e.pending && !e.refused && !e.cloud && !e.toCloud && !e.scheduled && !e.sent && sendNow && (
             <T onPress={sendNow} suppressHighlighting accessibilityRole="button"
               style={{ fontSize: 12.5, lineHeight: 20, color: color.dim, textDecorationLine: 'underline' }}>Send now</T>
           )}
@@ -428,7 +429,8 @@ export default function ThreadScreen() {
           <View style={{ width: 16 }} />
         </>}
       />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* The permission card floats over the foot: the reply box and the choices sit above it. */}
+      <KeyboardAvoidingView style={{ flex: 1, paddingBottom: c.approvalRoom }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: size.inset, paddingTop: 8, paddingBottom: 24 }}
           scrollEventThrottle={32}
           onScroll={(e) => {

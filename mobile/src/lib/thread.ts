@@ -66,7 +66,12 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   const said = built.events.map((e) => (e.kind === 'work' ? e : { ...e, text: clean(e.text ?? ''), ...(e.pending && !e.refused && inCloud.has(e.at) ? { cloud: true } : {}), ...(e.pending && !e.refused && sentAt.has(e.at) ? { sent: true } : {}),
     ...(e.pending && !e.refused && cloudRun && !inCloud.has(e.at) && !sentAt.has(e.at) ? { toCloud: true } : {}) }));
   // While a run is up the live line speaks for its newest steps (ItemThread.tsx).
-  const shown = session ? withoutTrailingWork(said) : said;
+  // Sent for later from here: its message says when, not that it waits.
+  const runAt = Number(item.runAt) || 0;
+  const dated = sent.length && runAt > Date.now()
+    ? said.map((e) => (e.kind !== 'work' && e.pending && !e.refused && e.at === sent[0].at && e.text === sent[0].text ? { ...e, scheduled: runAt } : e))
+    : said;
+  const shown = session ? withoutTrailingWork(dated) : dated;
 
   const parent = item.parent ? view.items.find((i: any) => i.product === product && i.id === item.parent) ?? null : null;
   const recap = recapFor(item, parent, parent ? phoneHistory(rows, product, parent.id, view.aliases).lines : undefined);
