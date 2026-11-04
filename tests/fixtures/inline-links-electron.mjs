@@ -2,6 +2,7 @@
 import { app, BrowserWindow } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import { waitFor } from '../waiting.mjs';
 const dir = process.argv[2];
 app.setPath('userData', path.join(dir, 'profile'));
 app.commandLine.appendSwitch('disable-gpu');
@@ -15,15 +16,18 @@ app.whenReady().then(async () => {
       onChanged: () => () => {}, commandCatalog: async () => ({commands:[]}), compactionStatus: async () => null
     }; void 0;`);
     await win.webContents.executeJavaScript(fs.readFileSync(path.join(dir, 'probe.js'), 'utf8'));
-    // 60s, under the 90s this child gets, so a probe that hangs still fails
-    // with its own words. It was 5s, the smallest budget in a chain of 5s, 90s
-    // and 120s, and it is the probe's wait rather than a measure of this Mac.
-    const until = Date.now() + 60_000;
-    while (Date.now() < until) {
-      await new Promise(r => setTimeout(r, 50));
-      const result = await win.webContents.executeJavaScript('window.regression');
-      if (result) { console.log('LINK_RESULT=' + JSON.stringify(result)); app.exit(0); return; }
+    // The wait is on the probe, not on a count of turns of a loop: a hundred
+    // 50ms turns came to about five seconds of a quiet machine, and the probe's
+    // own waits are a second of that, so a machine a few times slow killed a
+    // probe that was working.
+    let result;
+    try {
+      result = await waitFor('the link probe to finish', () => win.webContents.executeJavaScript('window.regression'), { every: 50 });
+    } catch (slow) {
+      const step = await win.webContents.executeJavaScript('window.step ?? null');
+      throw new Error(`${slow.message}: it was waiting on ${step}`);
     }
-    throw new Error('Link probe timed out after 60s');
+    console.log('LINK_RESULT=' + JSON.stringify(result));
+    app.exit(0);
   } catch (error) { console.error(error); app.exit(1); }
 });

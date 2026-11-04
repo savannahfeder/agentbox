@@ -66,15 +66,17 @@ describe('quoted filenames keep every word', () => {
 // The child's cap stays under the test's so a real hang fails with the child's
 // own error rather than an opaque vitest timeout.
 //
-// THE PROBE'S OWN WAITS WERE THE SMALL ONES (2026-11-04, w-5ec8fa4e55). This
-// file alone reddened main on five macOS runs in a row, green on the run before
-// and the one after, with its code and everything it reads unchanged across all
-// seven; those five suites took 14 to 19 minutes against the green one's 6.5.
-// The log needs admin rights, so the fault was not read. What is mended is the
-// two waits that measured the Mac rather than the code: the driver polled 5s
-// for the result, a twentieth of the caps around it, and the browser side
-// stepped through on fixed 80ms waits. Each step the next one needs now waits
-// for the thing itself and names itself when it does not come.
+// NEITHER CAP WAS THE ONE THAT FIRED (2026-11-04). The driver waited for the
+// probe in a hundred 50ms turns, about five seconds, and killed a working probe
+// on three macOS runs whose whole suite took 1018s against 393s green. It waits
+// with tests/waiting.mjs now, and says which stage the probe was in.
+//
+// The browser side was the other small wait: it stepped through the regression
+// on fixed 80ms pauses, so a Mac that had not got round to the next render yet
+// read as a Mac that had decided not to. Every step the next one depends on now
+// waits for the thing itself and names itself when it does not come. The two
+// checks that nothing happened keep their fixed wait, where waiting too little
+// can only let them pass.
 it.skipIf(process.platform !== 'darwin')('keeps mounted links and exhausted previews through five parent updates', async () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'inline-links-'));
   try {

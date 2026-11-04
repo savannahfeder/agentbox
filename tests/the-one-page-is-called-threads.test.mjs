@@ -56,9 +56,9 @@ describe('the page says Threads too', () => {
   });
   // Opened from a room's board, the way back names the room instead.
   it('on the way back from a teammate’s card, and in the heading over it', () => {
-    expect(app).toContain("backLabel={roomsUi.roomName ?? 'Threads'}");
+    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Everyone' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Threads')}");
     expect(fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8')).toContain('<span aria-hidden="true">←</span>{backLabel}</button>');
-    expect(app).toContain("openCard ? 'Threads' : 'Team'");
+    expect(app).toContain("openCard ? (cardFromPlace ? 'Team' : 'Threads') : 'Team'");
   });
   it('and the first tab still says Needs you, where the inbox meaning is true', () => {
     expect(INBOX_TABS[0]).toMatchObject({ view: 'inbox', label: 'Needs you' });

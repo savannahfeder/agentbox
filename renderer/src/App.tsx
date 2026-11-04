@@ -244,6 +244,7 @@ import { InviteRows } from './threads/InviteRows';
 import { mentionRows } from './team/rooms/room-rules';
 import { SAYS_UNDO, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
+import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
 import { reachAudienceOf } from '../../shared/teammate-reach.mjs';
 
@@ -3042,10 +3043,18 @@ export default function App() {
   // On a lead row by J and K, or the only thing left to be on.
   const keyLeadPicked = cardSel?.startsWith('lead/') ? allLeads.find((l) => `lead/${l.key}` === cardSel) ?? null : null;
   const keyLead = keyLeadPicked ?? (view === 'inbox' && search === null && !current && !keyCard ? heldLeads.rows[0] ?? null : null);
+  // The row above the threads is first in the walk, so the mark starts there.
+  const firstLead = view === 'inbox' && search === null && !focused ? heldLeads.rows[0] ?? null : null;
   // Anything else that moves the keyboard takes it off their row. The people
   // by name, since the list of them is a new array on every refresh.
   const pickedKey = picked.join(',');
   useEffect(() => { setCardSel(null); }, [selected, view, search, inboxDisplay.view, pickedKey]);
+  // After the line above, so on arrival the mark lands on the top row rather than being cleared off it.
+  const leadStartedOn = useRef<string | null>(null);
+  useEffect(() => {
+    if (firstLead && firstLead.key !== leadStartedOn.current && cardSel === null && selected === 0) setCardSel(`lead/${firstLead.key}`);
+    leadStartedOn.current = firstLead?.key ?? null;
+  }, [firstLead?.key]); // eslint-disable-line react-hooks/exhaustive-deps
   // A DROPPED COLUMN LEAVES THE KEYBOARD ON THE SAME THREAD. `selected` is a
   // place in the walk, and moving a column moves every place after it, so the
   // highlight jumped to another card on the drop (photographed 2026-10-02).
@@ -4042,6 +4051,8 @@ export default function App() {
   const filesShown = !!filesPage && !teammatesShown && !roomShown && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
   const connectionsShown = !!connectionsPage && !filesShown && !teammatesShown && !roomShown && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
   const chatsPlaceShown = !!chatsPlace && homeLayout === 'chats' && !connectionsShown && !filesShown && !teammatesShown && !roomShown && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
+  // A teammate's thread opened from a page in Team is still in Team.
+  const cardFromPlace = homeLayout === 'chats' && !!chatsPlace && !!openCard;
   useEffect(() => { if (roomsUi.openId || teammatesUi.open) { setFilesPage(null); setConnectionsPage(null); } }, [roomsUi.openId, teammatesUi.open]);
   const openFiles = (project: string | null) => {
     roomsUi.leave(); teammatesUi.leave(); setChatsPlace(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null);
@@ -4087,11 +4098,18 @@ export default function App() {
   // Command K's chats: a group or chat by name or people, an AI teammate.
   const findChats = useCallback((q: string) => {
     const found = chatsFound({ groups: roomsUi.live ? roomsUi.groups : [], teammates: teammatesUi.live ? teammatesUi.list : [], query: q });
-    return found.map((f) => ({
-      id: `chat-${f.kind}-${f.key}`, label: f.label, hint: f.hint,
-      run: () => { setModal(null); if (f.kind === 'teammate') teammatesUi.go(f.key); else roomsUi.pickGroup(f.key); },
-    }));
-  }, [roomsUi, teammatesUi]);
+    const persons = (chatsValue?.persons ?? []).filter((p) => p.name.toLowerCase().split(/\s+/).some((w) => w.startsWith(q.toLowerCase())));
+    return [
+      ...persons.map((p) => ({
+        id: `chat-person-${p.id}`, label: p.name, hint: 'Their page in Team',
+        run: () => { setModal(null); openChatsPlace(`person:${p.id}`); },
+      })),
+      ...found.filter((f) => !persons.some((p) => p.name === f.label)).map((f) => ({
+        id: `chat-${f.kind}-${f.key}`, label: f.label, hint: f.hint,
+        run: () => { setModal(null); if (f.kind === 'teammate') teammatesUi.go(f.key); else roomsUi.pickGroup(f.key); },
+      })),
+    ];
+  }, [roomsUi, teammatesUi, chatsValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // LINES, FILES, COMMENTS AND DECISIONS (./found-inside). Threads, conversations
   // and teammates' shared threads are searched in main; groups and decisions are
@@ -7388,7 +7406,7 @@ export default function App() {
         onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inbox.length + leadCount} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
         onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} tasksPage={tasksShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomShown || directOpen}
         /* Without Groups the one row under Threads is Chats, and only while there are teammates. */
-        groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />
+        groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
           only part of our own document lying over the file, so a pointer
           brought up there wakes the marks that a pointer moving across the
@@ -7459,7 +7477,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? (inChats ? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">{homeLayout === 'chats' ? 'Team' : 'Chats'}</span></div><div className="workspace-task-header cx-task-header" ref={setTaskHeader} /></div><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (filesShown ? <h1 className="workspace-title">Files</h1> : connectionsShown ? <h1 className="workspace-title">Connections</h1> : chatsPlaceShown ? <h1 className="workspace-title">Team</h1> : teamShown ? <h1 className="workspace-title">{openCard ? 'Threads' : 'Team'}</h1> : evOn ? <h1 className="workspace-title">{roomsUi.live ? 'Inbox' : 'Threads'}</h1> : teammatesShown ? teammatesUi.title : roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Threads</h1>))}
+        ) : (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? (inChats ? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">{homeLayout === 'chats' ? 'Team' : 'Chats'}</span></div><div className="workspace-task-header cx-task-header" ref={setTaskHeader} /></div><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (filesShown ? <h1 className="workspace-title">Files</h1> : connectionsShown ? <h1 className="workspace-title">Connections</h1> : chatsPlaceShown ? <h1 className="workspace-title">Team</h1> : teamShown ? <h1 className="workspace-title">{openCard ? (cardFromPlace ? 'Team' : 'Threads') : 'Team'}</h1> : evOn ? <h1 className="workspace-title">{roomsUi.live ? 'Inbox' : 'Threads'}</h1> : teammatesShown ? teammatesUi.title : roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Threads</h1>))}
         {/* THE PLUS, THE COMMAND MARK AND THE COG STEP OFF WHILE SHE IS
             SEARCHING, and that is the half of the chosen design that is not the
             cross. It is forced, not chosen: .topbar and .body carry the same 22px
@@ -7610,7 +7628,7 @@ export default function App() {
                     was opened from. */}
                 <TeammateThread card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now}
                   syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
-                  backLabel={roomsUi.roomName ?? 'Threads'}
+                  backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Everyone' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Threads')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
                   onContinue={() => continueTeammateThread(openCard)}
                   onMessage={() => {
@@ -9146,6 +9164,15 @@ export default function App() {
           AND IT NAMES THE TASK: the row's own title is the card's first line,
           and the sentence ("Started in Agentbox Team") the quiet one under it,
           picked out of fourteen drawings over four rounds. */}
+      {multiSel.size > 0 && !toast && !focused && !modal && (
+        <TickedBar count={multiSel.size} view={view} onKey={(does) => {
+          const sel = selectable.filter((i) => multiSel.has(i.id));
+          if (does === 'clear') setMultiSel(new Set());
+          else if (does === 'l') openSnooze(sel);
+          else if (view === 'snoozed') unsnooze(sel);
+          else void batchDone(multiSel);
+        }} />
+      )}
       {toast && (() => {
         // Said above the reply box instead, or about to be: the frame between
         // leaving the answered thread and opening the next one.
