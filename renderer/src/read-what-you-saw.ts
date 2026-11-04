@@ -62,27 +62,38 @@ export type Returning = {
  * message read ONCE, letting go of everything as it does. A second place
  * marking it read behind this watch's back left the watch armed, and the next
  * scroll then undid a Mark Unread (Codex, round two).
+ *
+ * `saidUnread` IS THE PERSON SPEAKING, AND IT OUTRANKS ALL OF THAT. Opening a
+ * thread marks it read through its own door, and clicking the row of the
+ * thread already open is one of those doors: it marks it read without this
+ * watch knowing, so the watch stays armed, and a Mark Unread after that was
+ * undone by the next scroll (w-987bd73c61). Asked at every look rather than
+ * closed over, because the answer changes while the watch waits.
  */
 export function readWhenTheySeeIt(
   page: Looking,
   id: string,
   markRead: () => void,
-  { back = null, slack = LEAVE_SLACK }: { back?: Returning | null; slack?: number } = {},
+  { back = null, slack = LEAVE_SLACK, saidUnread = null }: { back?: Returning | null; slack?: number; saidUnread?: (() => boolean) | null } = {},
 ): () => void {
-  let already = false;
+  let over = false;
   const box = page.querySelector(threadPane(id));
   const release = () => {
     box?.removeEventListener('scroll', watch);
     back?.removeEventListener('focus', watch);
   };
   function watch() {
-    if (already || !sawWhatLanded(page, id, slack)) return;
-    already = true;
+    if (over) return;
+    // Stood down rather than marked read: their word stands until they open
+    // the thread again, and nothing here may take it back.
+    if (saidUnread?.()) { over = true; release(); return; }
+    if (!sawWhatLanded(page, id, slack)) return;
+    over = true;
     release();
     markRead();
   }
   watch();
-  if (already || !box) return release;
+  if (over || !box) return release;
   box.addEventListener('scroll', watch, { passive: true });
   back?.addEventListener('focus', watch);
   return release;

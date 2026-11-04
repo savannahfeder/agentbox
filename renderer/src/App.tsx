@@ -3528,6 +3528,11 @@ export default function App() {
     const newest = Object.entries(seenAt).sort((a, b) => b[1] - a[1]).slice(0, 2000);
     localStorage.setItem(SEEN_AT_KEY, JSON.stringify(Object.fromEntries(newest)));
   }, [seenAt]);
+  // THE NEWEST `seenAt`, FOR A WATCH THAT ASKS LATER. The arrival watch below
+  // waits on a scroll that may be minutes away and has to see a Mark Unread
+  // made since; closed over, it would read a copy from before it.
+  const seenAtNow = useRef(seenAt);
+  useEffect(() => { seenAtNow.current = seenAt; }, [seenAt]);
   useEffect(() => { localStorage.setItem(SNOOZE_KEY, JSON.stringify(snoozes)); }, [snoozes]);
 
   /* -------------------------------- actions ------------------------------- */
@@ -3561,8 +3566,13 @@ export default function App() {
     // `back: window` so coming back from another app belongs to the same watch
     // as scrolling down to it. Nothing else may mark an arrival read: a second
     // place doing it leaves this one armed, and the next scroll then undoes a
-    // Mark Unread.
-    return readWhenTheySeeIt(document, focused.id, () => markSeen(focused), { back: window });
+    // Mark Unread. Every door that OPENS a thread is that second place and has
+    // to be, so `saidUnread` is what keeps the instruction: `markUnseen`
+    // writes 0 and the watch stands down rather than overrule it.
+    return readWhenTheySeeIt(document, focused.id, () => markSeen(focused), {
+      back: window,
+      saidUnread: () => seenAtNow.current[focused.id] === 0,
+    });
   }, [focusedArrival]); // eslint-disable-line react-hooks/exhaustive-deps
   // A message that landed while the window was behind another is seen on the
   // way back to it. The dot is the watch's above; this is the team's "Seen by".
