@@ -1,4 +1,4 @@
-// THE PHONE'S ALERT WORKER (main/phone-link.mjs serves it at /phone-sw.js).
+// THE PHONE'S ALERT WORKER (main/phone-link.mts serves it at /phone-sw.js).
 //
 // It runs on the phone, not here, and only for the app on the home screen. It
 // does two things when an alert arrives from the computer, even while the app

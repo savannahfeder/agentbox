@@ -9,7 +9,7 @@ import path from 'node:path';
 import { filesInLines, reviewKind, threadFiles } from '../shared/artifact-marks.mjs';
 import { changes, changeSize, mergeText } from '../shared/text-merge.mjs';
 import { saveNextVersion } from './file-version.mjs';
-import { isInside, MAX_DOC_BYTES } from './doc-file.mjs';
+import { isInside, MAX_DOC_BYTES } from './doc-file.mts';
 
 // A chain this long has plenty of versions nobody would have copied from.
 const LOOK_BACK = 30;

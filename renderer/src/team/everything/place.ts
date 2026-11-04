@@ -89,13 +89,13 @@ export function nowAndFinished<T>(rows: readonly T[], { done, at, now }: { done:
   return { now: on, finished };
 }
 
-/** You, the team's chat, people, then AI teammates (yours, then everyone else's). Nobody to show when you are alone. */
+/** You, the team's chat, people, then AI teammates (yours, less paused ones, then everyone else's). Nobody to show when you are alone. */
 export function faceRow(members: readonly Member[]): Member[] {
   const row = [
     ...members.filter((m) => m.kind === 'me'),
     ...members.filter((m) => m.kind === 'chat' && m.team),
     ...members.filter((m) => m.kind === 'person'),
-    ...members.filter((m) => m.key.startsWith('mate:')),
+    ...members.filter((m) => m.key.startsWith('mate:') && !m.paused),
     ...members.filter((m) => m.key.startsWith('theirmate:')),
   ];
   return row.some((m) => m.kind !== 'me') ? row : [];

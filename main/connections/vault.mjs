@@ -10,7 +10,7 @@ import { Name } from '../../shared/product-name.mjs';
 export const CANNOT_ENCRYPT = `This computer cannot encrypt a sign-in right now, so ${Name} will not keep one. Nothing was saved.`;
 
 export function connectionVault({ file, cipher }) {
-  // A cipher without `available` (the app's own, main/main.mjs) learns it by
+  // A cipher without `available` (the app's own, main/main.mts) learns it by
   // sealing, which asks the Mac's keychain, so only keeping a sign-in asks:
   // `can` probes, `mayBe` is what the page shows before anyone presses Connect.
   const mayBe = () => { try { return cipher?.available ? !!cipher.available() : !!cipher?.encrypt; } catch { return false; } };

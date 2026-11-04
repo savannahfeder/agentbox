@@ -26,7 +26,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ensureTaskFolder, fromGit } from '../main/task-folders.mjs';
+import { ensureTaskFolder, fromGit } from '../main/task-folders.mts';
 
 describe('a path git lists', () => {
   it('is read in the backslashes the app builds with on Windows', () => {

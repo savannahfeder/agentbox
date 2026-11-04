@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import {
   IMPORT_LABEL,
   agentImportRow,
@@ -21,7 +21,7 @@ import {
   importedAgentBrief,
   importedAgentName,
   shortenHome,
-} from '../shared/agent-import.mjs';
+} from '../shared/agent-import.mts';
 import { belongsInInbox } from '../renderer/src/list-rules.ts';
 
 const HOME = '/Users/someone';
@@ -131,7 +131,7 @@ describe('the rows in a real store', () => {
     expect(rows).toHaveLength(2);
     for (const row of rows) {
       // A QUESTION IS WHAT MAKES IT WAIT. The supervisor never spawns fresh
-      // work on a question (isFresh, main/supervisor.mjs), so nothing starts
+      // work on a question (isFresh, main/supervisor.mts), so nothing starts
       // until they say what the agent should do, and their reply spawns a
       // worker the ordinary way. No new mechanism anywhere.
       expect(row.kind).toBe('question');

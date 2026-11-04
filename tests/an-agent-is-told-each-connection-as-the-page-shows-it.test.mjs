@@ -21,7 +21,7 @@ import path from 'node:path';
 import { startToolsFixture } from '../cloud/standin/tools-mcp.mjs';
 import { createConnections } from '../main/connections/index.mjs';
 import { createBroker } from '../main/connections/broker.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { catalogFor, clockAt } from '../shared/connections-catalog.mjs';
 
 const key = crypto.randomBytes(32);

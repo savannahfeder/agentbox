@@ -1,6 +1,6 @@
 // A CLOUD RUN THROUGH THE SHARED HOST BRINGS ITS WORK HOME.
 //
-// The host (main/cloud/host.mjs) carries many cloud runs in one process, each
+// The host (main/cloud/host.mts) carries many cloud runs in one process, each
 // held by the supervisor as a small stand-in (scripts/cloud-shim.pl), so 50 to
 // 100 runs no longer cost a whole runtime each on her Mac (about 75 MB each,
 // measured 2026-10-17). Driven here end to end: the real stand-in, the real
@@ -17,11 +17,11 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun, INPUT_CLOSED_IN_CLOUD } from '../main/cloud/run.mjs';
-import { attachClaudeInput } from '../main/claude-input.mjs';
-import { startCloudHost } from '../main/cloud/host.mjs';
+import { cloudRun, INPUT_CLOSED_IN_CLOUD } from '../main/cloud/run.mts';
+import { attachClaudeInput } from '../main/claude-input.mts';
+import { startCloudHost } from '../main/cloud/host.mts';
 import { spawn } from 'node:child_process';
-import { readMarker } from '../main/cloud/marker.mjs';
+import { readMarker } from '../main/cloud/marker.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');

@@ -9,14 +9,14 @@
 // the counting (CLAUDE.md: THE SIDEBAR CARRIES THE LAST FEW THINGS, NOT A
 // LEDGER).
 //
-// The rule is shared/notify-rules.mjs and the lifetime is main/notify.mjs.
+// The rule is shared/notify-rules.mjs and the lifetime is main/notify.mts.
 // Both are pinned here, because the expensive half of this feature is what it
 // does NOT do, and a notification that fails to be suppressed has no symptom
 // anyone would notice in a screenshot.
 
 import { describe, it, expect, vi } from 'vitest';
 import { atTheApp, banner, clip, shouldSpeak, AWAY_AFTER_MS } from '../shared/notify-rules.mjs';
-import { createNotifier } from '../main/notify.mjs';
+import { createNotifier } from '../main/notify.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 /* --------------------------- a fake macOS banner ------------------------- */
@@ -256,7 +256,7 @@ describe('a frozen worker outranks a finished one', () => {
   });
 
   it('an approval may break the silence once, because it expires', () => {
-    // main/approval-prompt-server.mjs denies automatically after fifteen
+    // main/approval-prompt-server.mts denies automatically after fifteen
     // minutes. A finished agent waits as long as it takes; a frozen worker
     // does not, so under the one-banner rule this is the single exception.
     vi.useFakeTimers();

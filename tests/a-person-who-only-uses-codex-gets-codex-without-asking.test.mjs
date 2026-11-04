@@ -28,10 +28,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../main/config.mjs';
-import { readSettings, recheckCodex } from '../main/settings.mjs';
+import { readSettings, recheckCodex } from '../main/settings.mts';
 import { forgetCodexBin, appCopyPaths } from '../main/codex-bin.mjs';
-import { createEngineSetup } from '../main/engine-setup.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { createEngineSetup } from '../main/engine-setup.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { engineChoiceSince, engineChoiceOnRowIsStale } from '../shared/engines.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -197,7 +197,7 @@ describe('the sign-in check tells the app what it found', () => {
   });
 
   it('is asked at launch and its answer lands on the config', () => {
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     expect(ipc).toMatch(/onSignIn: \(engine, signedIn\) => \{[\s\S]{0,120}config\[`\$\{engine\}SignedIn`\] = signedIn/);
     expect(ipc).toContain('void engineSetup.signedInNow(');
   });

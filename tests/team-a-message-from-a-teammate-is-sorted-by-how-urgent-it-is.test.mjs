@@ -19,8 +19,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { foldWorkItems } from '../shared/work-items.mjs';
-import { wantsPriority, latestMessage, cleanPriority, priorityPrompt, sortMessage, LEVELS } from '../main/message-priority.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { wantsPriority, latestMessage, cleanPriority, priorityPrompt, sortMessage, LEVELS } from '../main/message-priority.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 const ME = 'p-me';
 const RILEY = 'p-riley';
@@ -183,7 +183,7 @@ describe('the supervisor sorts one message at a time', () => {
   });
 
   it('is wired into the tick, beside the namer', () => {
-    const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/this\.sortTheMessages\(items, process\.env\.AGENTBOX_PERSON_ID\)/);
   });
 });

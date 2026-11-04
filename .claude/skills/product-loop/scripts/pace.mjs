@@ -12,6 +12,9 @@
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { rerunWithStripTypes } from '../../../../scripts/lib/rerun-with-strip-types.mjs';
+
+rerunWithStripTypes(import.meta.url);
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 const WEEK = 7 * 24 * 3600_000;
@@ -68,10 +71,10 @@ export function claudeProfile(home, homeDir = os.homedir()) {
 
 /** That login's limits, asked of Claude Code the way the app's meter asks, or null. */
 export async function readClaudeLimits(home, { run = null, env = process.env, now = Date.now(), bin = 'claude' } = {}) {
-  const { usageEnv, usageCwd } = await import(path.join(REPO, 'main/claude-usage.mjs'));
-  const { readUsageReport } = await import(path.join(REPO, 'shared/claude-usage.mjs'));
-  const { NO_METERED_KEY } = await import(path.join(REPO, 'main/harnesses/claude.mjs'));
-  const runUsage = run ?? (await import(path.join(REPO, 'main/claude-usage-process.mjs'))).runClaudeUsage;
+  const { usageEnv, usageCwd } = await import(path.join(REPO, 'main/claude-usage.mts'));
+  const { readUsageReport } = await import(path.join(REPO, 'shared/claude-usage.mts'));
+  const { NO_METERED_KEY } = await import(path.join(REPO, 'main/harnesses/claude.mts'));
+  const runUsage = run ?? (await import(path.join(REPO, 'main/claude-usage-process.mts'))).runClaudeUsage;
   const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
     '--no-session-persistence', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--tools', '',
     '--settings', JSON.stringify({ ...NO_METERED_KEY, disableAllHooks: true })];
@@ -88,8 +91,8 @@ export async function readClaudeLimits(home, { run = null, env = process.env, no
 /** The reading the pacer works from, for either engine. */
 export async function readingFor(engine, home) {
   if (engine === 'claude') return readingFromLimits(await readClaudeLimits(home));
-  const { loggedCodexLimits } = await import(path.join(REPO, 'main/codex-usage-file.mjs'));
-  const { codexLimits } = await import(path.join(REPO, 'shared/codex-usage.mjs'));
+  const { loggedCodexLimits } = await import(path.join(REPO, 'main/codex-usage-file.mts'));
+  const { codexLimits } = await import(path.join(REPO, 'shared/codex-usage.mts'));
   const logged = loggedCodexLimits(home);
   return logged ? readingFromLimits(codexLimits(logged.snapshot)) : null;
 }

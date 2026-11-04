@@ -1,12 +1,12 @@
 // PICTURES AND DESIGN PAGES ON A PHONE.
 //
 // The desktop draws them from two addresses only its own window can open
-// (main/img-scheme.mjs, main/doc-scheme.mjs). A phone cannot open either, so
+// (main/img-scheme.mts, main/doc-scheme.mts). A phone cannot open either, so
 // they came up blank on a real iPhone (2026-10-11). The phone's server hands
-// the same files out under /f/<file key>/ (main/serve.mjs), and this points
+// the same files out under /f/<file key>/ (main/serve.mts), and this points
 // every such address the screen draws at it, in one place rather than in each
 // of the components that draw a picture, a page, a sound or a film.
-import { DOC_SCHEMES, IMG_SCHEMES } from '../../shared/schemes.mjs';
+import { DOC_SCHEMES, IMG_SCHEMES } from '../../shared/schemes.mts';
 
 const KINDS: [readonly string[], 'doc' | 'img'][] = [[DOC_SCHEMES, 'doc'], [IMG_SCHEMES, 'img']];
 
@@ -36,7 +36,7 @@ type PictureLike = Pick<HTMLImageElement, 'complete' | 'naturalWidth' | 'setAttr
 const watched = new WeakSet<object>();
 
 // THE SHAPE EACH PICTURE HAD, by address, for as long as the page is open. A
-// picture is never served from memory (main/serve.mjs), so one drawn again
+// picture is never served from memory (main/serve.mts), so one drawn again
 // loads again, and its 4:3 box was a third the height of a phone screenshot:
 // everything under it jumped down and back each time (2026-10-13,
 // tests/a-thread-on-a-phone-holds-still-while-something-above-it-changes).
@@ -69,7 +69,7 @@ export const shapeOf = (src: string) => shapes.get(fileOf(src)) ?? null;
 // A PICTURE NEVER SEEN ASKS THE COMPUTER FOR ITS SHAPE (2026-10-14). WebKit
 // gives a picture no size until its last byte, so a phone screenshot stayed a
 // 4:3 box and then grew 514px under the words. Its width and height come off
-// the file's first bytes (main/picture-shape.mjs) in a few bytes of answer,
+// the file's first bytes (main/picture-shape.mts) in a few bytes of answer,
 // long before the picture's megabyte (tests/a-picture-the-phone-has-never-
 // seen-gets-its-shape-before-it-arrives).
 type ShapeAsked = Pick<HTMLImageElement, 'complete' | 'getAttribute'> & { style?: { aspectRatio?: string } };

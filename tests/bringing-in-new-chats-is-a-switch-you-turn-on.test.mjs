@@ -2,7 +2,7 @@
 //
 // The tick on setup's last screen (w-62228098e6, R1) and the switch in
 // Settings write the same two keys: `importNew`, and `importNewSince`, the
-// moment it went on. The watch (main/new-chats-watch.mjs) only brings in chats
+// moment it went on. The watch (main/new-chats-watch.mts) only brings in chats
 // started after that moment, so the chats you left unticked at setup never
 // arrive later on their own. Turning it on again while it is already on must
 // not move the moment, or the chats started in between would be skipped.
@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { setWorkspaceSetting } from '../main/settings.mjs';
+import { setWorkspaceSetting } from '../main/settings.mts';
 
 const world = () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'new-chats-switch-'));

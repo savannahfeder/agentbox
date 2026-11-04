@@ -25,8 +25,8 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox, DEFAULT_DEADLINE_MS } from '../cloud/sandbox/server.mjs';
-import { cloudRun, CLOUD_NOTE, PLAIN_CLOUD_NOTE, RUN_LIMIT_MS, howLongWords, IMPORT_FAILED } from '../main/cloud/run.mjs';
-import { takeCloudNews } from '../main/cloud/marker.mjs';
+import { cloudRun, CLOUD_NOTE, PLAIN_CLOUD_NOTE, RUN_LIMIT_MS, howLongWords, IMPORT_FAILED } from '../main/cloud/run.mts';
+import { takeCloudNews } from '../main/cloud/marker.mts';
 import { waitFor } from './waiting.mjs';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));

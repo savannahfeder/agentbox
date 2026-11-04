@@ -6,7 +6,7 @@
 //
 // The agent rows had already hit this and fixed it on their own — "Leon Okafor
 // Qa" is not what she called the file — and kept a list of the words that stay
-// shouted in main/agent-files.mjs. Project names never saw that list, so the
+// shouted in main/agent-files.mts. Project names never saw that list, so the
 // same app wrote "Leon Okafor QA" on one row and "Greet Js" on another. There
 // is one list now, and all three namers read it.
 //
@@ -14,10 +14,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { SHOUTED, titleFromFileName } from '../shared/name-words.mjs';
+import { SHOUTED, titleFromFileName } from '../shared/name-words.mts';
 import { nameFromFolder } from '../renderer/src/onboarding.ts';
 import { projectNameFor } from '../renderer/src/agent-import-card.ts';
-import { agentTitle } from '../main/agent-files.mjs';
+import { agentTitle } from '../main/agent-files.mts';
 
 describe('1. the words that stay shouted', () => {
   it('shouts the ones a repository folder actually ends in', () => {

@@ -8,7 +8,7 @@ import { LOCAL_APP_SANDBOX, previewShows, previewStatus, useLocalPreview } from 
 import { LocalPreviewStatus } from './LocalPreviewStatus';
 import { WebsitePane, type Browsing, type PageControl } from './WebsitePane';
 import { BrowserChrome, type WebChromeKind } from './BrowserChrome';
-import { addressYouTyped, canFrameAWebsite, isWebsiteAddress } from '../../../shared/websites.mjs';
+import { addressYouTyped, canFrameAWebsite, isWebsiteAddress } from '../../../shared/websites.mts';
 // THE DOCUMENT PANE. The right half of the window is the file itself.
 //
 // The look is settled and is not a question any more.
@@ -157,7 +157,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   const [failed, setFailed] = useState<string | null>(null);
   // The address the frame points at, minted by main when it resolved the file.
   // An html page is served from its own origin so its pictures load; see
-  // main/doc-scheme.mjs for why file:// could not.
+  // main/doc-scheme.mts for why file:// could not.
   const [url, setUrl] = useState<string | null>(null);
   // A local address is asked whether anything is there before the frame is
   // believed (../local-preview.ts). `attempt` gives the frame a fresh start.
@@ -430,7 +430,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
                 style={{opacity:frameReady ? 1 : 0}}
                 className="doc-view" src={url}
                 // ON A PHONE THE PAGE IS SERVED FROM THE APP'S OWN ADDRESS
-                // (main/serve.mjs answerFile), so same-origin would hand a page
+                // (main/serve.mts answerFile), so same-origin would hand a page
                 // an agent wrote the app's storage and its key. Opaque, it still
                 // draws its pictures: they are plain http there, not a scheme.
                 sandbox={app.local ? LOCAL_APP_SANDBOX : onPhone() ? 'allow-scripts' : 'allow-scripts allow-same-origin'} title={crumb.join('/')}

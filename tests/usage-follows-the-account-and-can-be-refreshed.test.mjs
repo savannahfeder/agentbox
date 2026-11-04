@@ -2,7 +2,7 @@
 // account. The reader had zero account selectors and Settings zero refresh
 // controls. These invented readings reproduce the mismatch without a CLI run.
 import { describe, expect, it, vi } from 'vitest';
-import { ClaudeUsage, STALE_MS } from '../main/claude-usage.mjs';
+import { ClaudeUsage, STALE_MS } from '../main/claude-usage.mts';
 
 const output = percent => JSON.stringify({ rate_limits_available: true, rate_limits: { five_hour: { utilization: 0 }, seven_day: { utilization: percent } } });
 function setup(profile = 'default') {

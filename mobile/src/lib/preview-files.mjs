@@ -1,5 +1,5 @@
 // THE FILES THE PREVIEW'S THREADS NAME, as the list a Mac sends in a thread's
-// copy (main/phone-uploads.mjs), each with a link a browser loads by itself:
+// copy (main/phone-uploads.mts), each with a link a browser loads by itself:
 // the preview has no storage behind it.
 
 const nameOf = (seed, ext) => `${seed.repeat(64 / seed.length)}.${ext}`;

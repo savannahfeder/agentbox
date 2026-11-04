@@ -1,7 +1,7 @@
 // AN AGENT STARTED BY THE BROWSER COPY CAN REACH ITS OWN WORK ITEM.
 //
 // Measured 2026-10-01 on the team build, by two testers on two separate copies
-// started headless (`bootHeadless` in main/serve.mjs). Every store call the
+// started headless (`bootHeadless` in main/serve.mts). Every store call the
 // agent made came back "no work item w-9c0ff9eac7 in any product", so it could
 // not claim its row, could not write a summary, and told the person "This
 // message is the only copy."
@@ -9,7 +9,7 @@
 // Why. The store keeps its ledgers under the app's home, which it reads from
 // the app's home variable at call time (main/store/home.mjs). The desktop door
 // points that variable at `storeRoot` from zero.config.json before it opens the
-// store (main/main.mjs). The headless door never did. So the copy wrote its
+// store (main/main.mts). The headless door never did. So the copy wrote its
 // ledgers wherever the variable it inherited happened to point (on the test
 // Mac that was the founder's own store, carried in from the agent session that
 // started the copy; for `npx agentbox-app` with nothing set it is
@@ -31,7 +31,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { bootHeadless } from '../main/serve.mjs';
+import { bootHeadless } from '../main/serve.mts';
 import { createWorkItem } from '../main/store/work-items.mjs';
 import { setAppHome } from './app-home.mjs';
 import { nameSlug, envNames } from '../shared/product-name.mjs';

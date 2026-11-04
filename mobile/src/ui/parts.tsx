@@ -5,7 +5,7 @@ import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDime
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useCloud } from '../state/cloud';
-import { color, font, size } from './theme';
+import { color, corner, font, size } from './theme';
 
 /** Ember Grid's wall, the dot grid and the orange glow, under everything, the status bar included. */
 export function Wall({ children, style }: { children: ReactNode; style?: ViewStyle }) {
@@ -47,7 +47,7 @@ export function TopBar({ left, title, right, below }: { left?: ReactNode; title?
         </View>
         {aside && (
           <Pressable onPress={() => setMinimizedApproval(null)} accessibilityRole="button" accessibilityLabel="Review permission" hitSlop={4}
-            style={({ pressed }) => ({ height: 30, paddingHorizontal: 10, marginRight: 6, justifyContent: 'center', borderWidth: 1, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : color.fill })}>
+            style={({ pressed }) => ({ height: 30, paddingHorizontal: 10, marginRight: 6, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : color.fill })}>
             <T style={{ fontSize: 13, color: color.text }}>{`Review (${view.approvals.length})`}</T>
           </Pressable>
         )}
@@ -71,7 +71,7 @@ export function IconButton({ onPress, label, children, width = 40 }: { onPress: 
 export function Ghost({ title, onPress, disabled }: { title: string; onPress: () => void; disabled?: boolean }) {
   return (
     <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button"
-      style={({ pressed }) => ({ height: 28, paddingHorizontal: 11, justifyContent: 'center', borderWidth: 1, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: disabled ? 0.5 : 1 })}>
+      style={({ pressed }) => ({ height: 28, paddingHorizontal: 11, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: disabled ? 0.5 : 1 })}>
       <T style={{ fontSize: 13, color: color.dim }}>{title}</T>
     </Pressable>
   );
@@ -84,7 +84,7 @@ export function Sheet({ open, close, onGone, children }: { open: boolean; close:
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={close} onDismiss={onGone}>
       <Pressable style={{ flex: 1, backgroundColor: color.scrim }} onPress={close} accessibilityLabel="Close" />
-      <View style={{ maxHeight: height * 0.72, backgroundColor: color.pop, borderTopWidth: 1, borderTopColor: color.lineStrong }}>
+      <View style={{ maxHeight: height * 0.72, backgroundColor: color.pop, borderTopWidth: 1, borderTopColor: color.lineStrong, borderTopLeftRadius: corner.card, borderTopRightRadius: corner.card, overflow: 'hidden' }}>
         <ScrollView style={{ flexGrow: 0 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 10, paddingHorizontal: 8, paddingBottom: 16 + inset.bottom, gap: 1 }}>
           {children}
         </ScrollView>

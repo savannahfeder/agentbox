@@ -21,7 +21,7 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 const exists = (p) => fs.existsSync(new URL(`../${p}`, import.meta.url));
 
 describe('the computer', () => {
-  const main = read('main/main.mjs');
+  const main = read('main/main.mts');
 
   it('opens no door of its own for phones, and no link to the relay', () => {
     expect(main).not.toMatch(/createPhoneLink|phone-link\.m[jt]s/);
@@ -63,7 +63,7 @@ describe('the Cloudflare relay', () => {
   });
 
   it('leaves nothing waiting for it in the phone door or the phone page', () => {
-    expect(read('main/phone-link.mjs')).not.toMatch(/relay|'anywhere'/i);
+    expect(read('main/phone-link.mts')).not.toMatch(/relay|'anywhere'/i);
     expect(read('renderer/src/phone-alerts.ts')).not.toMatch(/relay-sw/);
     expect(read('renderer/src/browser-bridge.ts')).not.toMatch(/k=\(/);
   });

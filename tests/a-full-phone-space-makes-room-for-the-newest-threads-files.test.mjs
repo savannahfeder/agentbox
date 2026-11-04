@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { createPhoneUploads, UPLOAD_LIMITS } from '../main/phone-uploads.mjs';
+import { createPhoneUploads, UPLOAD_LIMITS } from '../main/phone-uploads.mts';
 
 const T = Date.UTC(2026, 9, 22, 18, 0);
 const MIN = 60_000;

@@ -190,7 +190,7 @@ describe('a press that opens Settings always lands on the tab it asked for', () 
 
   for (const door of ['onAccount', 'onInvite', 'onSettings']) {
     it(`counts a new visit from ${door}`, () => {
-      const at = app.indexOf(`${door}={() => {`);
+      const at = app.search(new RegExp(`${door}=\\{(multiplayer \\? )?\\(\\) => \\{`));
       expect(at).toBeGreaterThan(-1);
       expect(app.slice(at, app.indexOf('}}', at))).toContain('setSettingsVisit(');
     });

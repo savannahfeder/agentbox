@@ -93,7 +93,7 @@ vi.mock('../main/account-tooling.mjs', async (importActual) => ({
   linkAccountTooling: () => null,
 }));
 
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 const dirs = [];

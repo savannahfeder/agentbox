@@ -1,7 +1,7 @@
 // Real PTY integration: literal quoting, interactive stdin, shell failures,
 // resize, task isolation and descendant cleanup must work without an agent.
 import {it,expect} from 'vitest';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
-import {TaskTerminals,terminalEnv} from '../main/task-terminals.mjs';
+import {TaskTerminals,terminalEnv} from '../main/task-terminals.mts';
 async function until(fn){const end=Date.now()+7000;while(Date.now()<end){if(fn())return;await new Promise(r=>setTimeout(r,30));}throw Error('Timed out waiting for terminal output');}
 it('runs literal, interactive and failing commands in a directory with spaces',async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'real terminal '));const m=new TaskTerminals({resolve:()=>dir,env:{...terminalEnv(),HOME:dir}});

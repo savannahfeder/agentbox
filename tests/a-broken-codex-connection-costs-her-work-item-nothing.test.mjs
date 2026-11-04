@@ -47,9 +47,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createCodexAppServer } from '../main/codex-app-server.mjs';
-import { createCodexWorker } from '../main/codex-session.mjs';
+import { createCodexWorker } from '../main/codex-session.mts';
 import { rememberCodexChange, CHANGE_FRAME_CAP, CHANGE_BYTE_CAP } from '../main/codex.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 
 /**

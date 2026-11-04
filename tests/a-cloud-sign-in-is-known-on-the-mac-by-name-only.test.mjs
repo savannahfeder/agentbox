@@ -33,9 +33,9 @@ import {
   renewCloudCodexLogin, sweepRetiredLogins, loginObjectKey, readCloudLogins, forgetOldCloudTokens,
   listCloudLogins, pickCloudLogin, removeCloudLogin,
   CODEX_RENEW_BEFORE_MS, CODEX_RUN_NEEDS_MS,
-} from '../main/cloud/logins.mjs';
-import { cloudRun, LOGIN_TROUBLE } from '../main/cloud/run.mjs';
-import { loginsCarriedBy } from '../main/cloud/run-cli.mjs';
+} from '../main/cloud/logins.mts';
+import { cloudRun, LOGIN_TROUBLE } from '../main/cloud/run.mts';
+import { loginsCarriedBy } from '../main/cloud/run-cli.mts';
 
 const FAKE = fileURLToPath(new URL('./fixtures/cloud/fake-vendor-cli.mjs', import.meta.url));
 const git = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim();
@@ -381,7 +381,7 @@ describe('what the review found', () => {
     git(mac, 'add', '.');
     git(mac, 'commit', '-q', '-m', 'first');
     git(mac, 'checkout', '-q', '-b', 'agentbox/w-2');
-    const { writeMarker } = await import('../main/cloud/marker.mjs');
+    const { writeMarker } = await import('../main/cloud/marker.mts');
     writeMarker(mac, { runId: 'r-earlier', sessionId: 'agentbox-w-2-r-earlier-xxxxxxxxxxxxxxxx', branch: 'agentbox/w-2', startSha: git(mac, 'rev-parse', 'HEAD'), pid: null, state: 'running', engine: 'claude', bringDirs: [] });
     objects.set('runs/r-earlier/done.json', Buffer.from(JSON.stringify({ ok: true, commits: 0, uncommitted: false, brought: [], exitCode: 1 })));
     objects.set('runs/r-earlier/events.jsonl', Buffer.from(`${JSON.stringify({ seq: 1, kind: 'login', state: 'refused', engine: 'claude', id: 'L-old' })}\n`));

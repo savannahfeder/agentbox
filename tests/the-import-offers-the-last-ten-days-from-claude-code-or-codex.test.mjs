@@ -22,9 +22,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { RECENT_DAYS, readSessionThreads } from '../main/agent-sessions.mjs';
-import { CODEX_RECENT_DAYS, readCodexThreads } from '../main/codex-threads.mjs';
-import { whenWords } from '../shared/agent-import.mjs';
+import { RECENT_DAYS, readSessionThreads } from '../main/agent-sessions.mts';
+import { CODEX_RECENT_DAYS, readCodexThreads } from '../main/codex-threads.mts';
+import { whenWords } from '../shared/agent-import.mts';
 import { Palette } from '../renderer/src/components/Palette';
 
 const DAY = 86400e3;

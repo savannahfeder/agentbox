@@ -28,8 +28,8 @@ import { fileURLToPath } from 'node:url';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as words from '../shared/runs-on.mjs';
-import { forgetRunsOn, runsOn } from '../main/runs-on.mjs';
+import * as words from '../shared/runs-on.mts';
+import { forgetRunsOn, runsOn } from '../main/runs-on.mts';
 import { WorkspaceNavigation } from '../renderer/src/components/WorkspaceNavigation';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -45,7 +45,7 @@ const layClaude = (account) => {
 
 /**
  * A Codex login, with the one claim its id_token really carries. Signed with
- *  nothing: main/codex-account.mjs verifies no signature and says why.
+ *  nothing: main/codex-account.mts verifies no signature and says why.
  */
 const layCodex = (plan) => {
   const dir = path.join(home, '.codex');

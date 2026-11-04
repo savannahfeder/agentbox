@@ -23,7 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { itemOptions, offerIsLive } from '../renderer/src/format';
 
 const offer = (...options) => ['## Options', ...options.map((o, i) => `${i + 1}. ${o}`)].join('\n');

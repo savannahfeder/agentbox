@@ -112,7 +112,7 @@ describe('Settings has the Team pane, and the shared screen holds no team code',
 
 describe('Invite people, from the account menu, routes into Settings', () => {
   it('opens Settings on the Team pane with the cursor in the email box', () => {
-    expect(app).toContain("onInvite={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}");
+    expect(app).toContain("onInvite={multiplayer ? () => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); } : undefined}");
   });
 
   it('opens the same pane from your own row, without the cursor', () => {

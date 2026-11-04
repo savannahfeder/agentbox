@@ -5,7 +5,7 @@
 //
 // The partition is deliberately left alone. It says WHERE a page's sign-ins
 // go rather than what the page may reach, and flattening it would merge the
-// website pane's store into the default one (shared/websites.mjs).
+// website pane's store into the default one (shared/websites.mts).
 //
 // Pinned by tests/a-website-in-the-pane-cannot-reach-the-app.test.mjs.
 
@@ -41,7 +41,7 @@ export function hardenAttachedWebview(
   if (params) {
     // A window the guest opens for itself would be a window with none of the
     // above. Links that want one go out to the real browser instead
-    // (setWindowOpenHandler in main/main.mjs).
+    // (setWindowOpenHandler in main/main.mts).
     params.allowpopups = false;
     params.nodeintegration = false;
     params.nodeintegrationinsubframes = false;

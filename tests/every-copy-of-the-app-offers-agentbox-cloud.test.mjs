@@ -14,7 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { cloudAccountConfig } from '../main/cloud/config.mjs';
 import { CLOUD_ADDRESS } from '../shared/cloud-address.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { loadCloudConfig } from '../main/team/session.mjs';
 
 let home; let app; let setUpFile;

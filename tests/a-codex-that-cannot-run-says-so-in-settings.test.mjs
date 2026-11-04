@@ -5,7 +5,7 @@
 // login 'default' -- so a Codex failure lands under `codex:default` and cannot
 // strike a Claude subscription (one account's fact applied to another). `status` then exports
 // that book verbatim as `accountTrouble`, and the only reader in the app is
-// main/settings.mjs, which indexes it by a bare CLAUDE folder name:
+// main/settings.mts, which indexes it by a bare CLAUDE folder name:
 //
 //     const trouble = troubles[profile] ?? null;
 //
@@ -50,10 +50,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readSettings } from '../main/settings.mjs';
+import { readSettings } from '../main/settings.mts';
 import { forgetCodexBin } from '../main/codex-bin.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { engineTroubleNote } from '../shared/spawn-trouble.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { engineTroubleNote } from '../shared/spawn-trouble.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const settingsTsx = fs.readFileSync(path.join(root, 'renderer/src/components/Settings.tsx'), 'utf8');

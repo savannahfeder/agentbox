@@ -167,7 +167,7 @@ export function whereTheWorkStands(root) {
 /**
  * WHETHER GIT HERE CAN NAME AN AUTHOR, read when the run ends.
  *
- * Deliberately the same strict form of the question main/worker-git.mjs makes
+ * Deliberately the same strict form of the question main/worker-git.mts makes
  * every worker ask: `user.useConfigOnly` turns off the identity git makes up
  * out of the account and the host name, so a yes here means the worker gets a
  * yes too. A looser reading would leave the app recommending a commit the

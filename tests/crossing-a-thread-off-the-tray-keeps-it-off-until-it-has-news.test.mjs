@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { notDismissed } from '../shared/corner-tag.mjs';
+import { notDismissed } from '../shared/corner-tag.mts';
 import { cornerTagRig } from './helpers/corner-tag-rig.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

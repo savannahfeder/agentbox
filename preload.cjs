@@ -41,7 +41,7 @@ contextBridge.exposeInMainWorld('zero', {
   agentUpdate: (payload) => ipcRenderer.invoke('zero:agent-update', payload),
   snapshot: (ask) => ipcRenderer.invoke('zero:snapshot', ask),
   // Which thread is on screen, so the approval card in front is its own and
-  // ⌘Y answers the card being read (shared/which-card-is-in-front.mjs).
+  // ⌘Y answers the card being read (shared/which-card-is-in-front.mts).
   looking: (payload) => ipcRenderer.invoke('zero:looking', payload),
   refreshUsage: (p) => ipcRenderer.invoke('zero:refresh-usage', p),
   accountUsage: (payload) => ipcRenderer.invoke('zero:account-usage', payload),
@@ -137,15 +137,15 @@ contextBridge.exposeInMainWorld('zero', {
   firstRunPracticeEnd: () => ipcRenderer.invoke('zero:first-run-practice-end'),
   firstRunWalking: (payload) => ipcRenderer.invoke('zero:first-run-walking', payload),
   // A second Agentbox, in a throwaway home, as somebody who has never opened it.
-  // It adds a window; it removes nothing (main/fresh-user.mjs).
+  // It adds a window; it removes nothing (main/fresh-user.mts).
   openFreshUser: (payload) => ipcRenderer.invoke('zero:open-fresh-user', payload ?? {}),
   // The same again, on an invented studio's inbox instead of an empty one, so a
-  // demo does not have to be her own screen (main/demo.mjs).
+  // demo does not have to be her own screen (main/demo.mts).
   openDemo: () => ipcRenderer.invoke('zero:open-demo'),
   // The Mac's own folder chooser, for the new project card's "Where's its code?"
   chooseFolder: (payload) => ipcRenderer.invoke('zero:choose-folder', payload ?? {}),
   // The picker the app draws itself, when there is no Mac dialog to open. It
-  // walks this machine's disk a folder at a time (main/folders.mjs).
+  // walks this machine's disk a folder at a time (main/folders.mts).
   listFolders: (payload) => ipcRenderer.invoke('zero:list-folders', payload ?? {}),
   folderExists: (payload) => ipcRenderer.invoke('zero:folder-exists', payload ?? {}),
   agentFiles: (payload) => ipcRenderer.invoke('zero:agent-files', payload ?? {}),
@@ -163,7 +163,7 @@ contextBridge.exposeInMainWorld('zero', {
   importThreads: (payload) => ipcRenderer.invoke('zero:import-threads', payload ?? {}),
   badge: (count) => ipcRenderer.invoke('zero:badge', count),
   // What the corner tag says when she is in another app: what is ready for
-  // her, and how many are working (main/corner-tag.mjs).
+  // her, and how many are working (main/corner-tag.mts).
   cornerTag: (state) => ipcRenderer.invoke('zero:corner-tag', state),
   // Whether this page came up from ⌘R, and which build it is running.
   bootInfo: () => ipcRenderer.invoke('zero:boot-info'),
@@ -176,7 +176,7 @@ contextBridge.exposeInMainWorld('zero', {
   updateMove: () => ipcRenderer.invoke('zero:update-move'),
   // What just arrived, not what to say about it. Whether she is looking at the
   // window is a fact only the main process holds, so the page reports and does
-  // not decide (main/notify.mjs).
+  // not decide (main/notify.mts).
   notify: (arrivals, needsYou) => ipcRenderer.invoke('zero:notify', { arrivals, needsYou }),
   notifyTest: () => ipcRenderer.invoke('zero:notify-test'),
   stopSession: (payload) => ipcRenderer.invoke('zero:stop-session', payload),
@@ -220,6 +220,10 @@ contextBridge.exposeInMainWorld('zero', {
   setProjectSetting: (payload) => ipcRenderer.invoke('zero:settings-set-project', payload),
   setWorkspaceSetting: (payload) => ipcRenderer.invoke('zero:settings-set-workspace', payload),
   cloudSignIn: (payload) => ipcRenderer.invoke('zero:cloud-signin', payload),
+  cloudKey: (payload) => ipcRenderer.invoke('zero:cloud-key', payload),
+  cloudSendFile: (payload) => ipcRenderer.invoke('zero:cloud-send-file', payload),
+  cloudSendCode: (payload) => ipcRenderer.invoke('zero:cloud-send-code', payload),
+  cloudFileInfo: (payload) => ipcRenderer.invoke('zero:cloud-file-info', payload),
   cloudAccountSignIn: (payload) => ipcRenderer.invoke('zero:cloud-account-sign-in', payload),
   cloudAccountCancel: () => ipcRenderer.invoke('zero:cloud-account-cancel'),
   cloudAccountReopen: () => ipcRenderer.invoke('zero:cloud-account-reopen'),
@@ -261,10 +265,10 @@ contextBridge.exposeInMainWorld('zero', {
   // Everything that happened on one task, as the ledger lines it happened as.
   itemHistory: (payload) => ipcRenderer.invoke('zero:item-history', payload),
   openArtifact: (payload) => ipcRenderer.invoke('zero:open-artifact', payload),
-  // The pictures in a folder a message names on its own line (main/folder-pictures.mjs).
+  // The pictures in a folder a message names on its own line (main/folder-pictures.mts).
   folderPictures: (payload) => ipcRenderer.invoke('zero:folder-pictures', payload),
   // The document pane's own two: the text of a file it has open, and her edit
-  // going back onto disk. Markdown only on the way back (main/doc-file.mjs).
+  // going back onto disk. Markdown only on the way back (main/doc-file.mts).
   readDoc: (payload) => ipcRenderer.invoke('zero:read-doc', payload),
   retryFile: (payload) => ipcRenderer.invoke('zero:retry-file', payload),
   // The change a run made, read as a built artifact.
@@ -295,7 +299,7 @@ contextBridge.exposeInMainWorld('zero', {
   moveToCloud: (payload) => ipcRenderer.invoke('zero:move-to-cloud', payload),
   setProductHidden: (payload) => ipcRenderer.invoke('zero:set-product-hidden', payload),
   approve: (payload) => ipcRenderer.invoke('zero:approve', payload),
-  // The phone door (main/phone-link.mjs): { action: 'status' | 'on' | 'off' | 'reset' | 'via', via }.
+  // The phone door (main/phone-link.mts): { action: 'status' | 'on' | 'off' | 'reset' | 'via', via }.
   phoneLink: (payload) => ipcRenderer.invoke('zero:phone-link', payload),
   onPhoneChanged: (fn) => {
     const handler = () => fn();
@@ -382,7 +386,7 @@ contextBridge.exposeInMainWorld('zero', {
   //
   // It carried Escape alone until 2026-08-24, which is why ⌘K was dead inside
   // an open page and she reported it. It carries the press now and
-  // shared/artifact-keys.mjs decides what the app does with it.
+  // shared/artifact-keys.mts decides what the app does with it.
   onKeyInTheFile: (fn) => {
     const handler = (_e, payload) => fn(payload ?? {});
     ipcRenderer.on('zero:key-in-the-file', handler);

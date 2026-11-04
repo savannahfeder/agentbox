@@ -24,11 +24,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import {
   carryHerBriefsAcross, joinMessageRules, listVersions, readInstruction, readVersion,
   setAsideShippedMessageRules, writeInstruction,
-} from '../main/instruction-settings.mjs';
+} from '../main/instruction-settings.mts';
 
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const shipped = (name) => fs.readFileSync(path.join(REPO, 'briefs', name), 'utf8');

@@ -17,8 +17,8 @@
 //   3. The account is benched until the hour it named, nothing else is reached
 //      for, and the chat stays where it is.
 import { describe, it, expect } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
-import { limitResetMoment, troubleCause } from '../shared/spawn-trouble.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { limitResetMoment, troubleCause } from '../shared/spawn-trouble.mts';
 
 // The line Codex prints, copied off a real run log.
 const CODEX_LIMIT = "You've hit your usage limit. Visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at Sep 28th, 2026 1:05 PM.";

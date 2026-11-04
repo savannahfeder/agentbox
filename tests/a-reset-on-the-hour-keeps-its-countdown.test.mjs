@@ -31,8 +31,8 @@
 // twelve hours out.
 
 import { describe, it, expect } from 'vitest';
-import { pillText, readUsage, resetAt } from '../shared/claude-usage.mjs';
-import { usageSentence } from '../shared/usage.mjs';
+import { pillText, readUsage, resetAt } from '../shared/claude-usage.mts';
+import { usageSentence } from '../shared/usage.mts';
 
 // VERBATIM off her Mac, 2026-09-01 13:46 America/Los_Angeles. Kept whole, with
 // the paragraphs the command prints around the three numbers, because the risk

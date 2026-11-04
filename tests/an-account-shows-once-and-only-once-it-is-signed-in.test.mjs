@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { effectiveProfiles, forgetDiscovery } from '../main/account-discovery.mjs';
-import { addClaudeAccount } from '../main/settings.mjs';
+import { addClaudeAccount } from '../main/settings.mts';
 
 let home;
 

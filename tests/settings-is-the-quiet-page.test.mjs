@@ -31,10 +31,10 @@ describe('the instructions are the field, not a button', () => {
   });
 
   it('names the file under each box, because the box is the file', () => {
-    expect(read('main/instruction-settings.mjs')).toContain("rules:'founder.md'");
+    expect(read('main/instruction-settings.mts')).toContain("rules:'founder.md'");
     // One document since w-3dc46f3a67, where the writing rules and the
     // finishing rules were two boxes and two files.
-    expect(read('main/instruction-settings.mjs')).toContain("messages:'message-rules.md'");
+    expect(read('main/instruction-settings.mts')).toContain("messages:'message-rules.md'");
   });
 
   it('saves as she types, with no Apply button between her and the fleet', () => {

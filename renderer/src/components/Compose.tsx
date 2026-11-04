@@ -304,7 +304,7 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
       // The caller sends a repeat down a different path, because a repeating
       // task is not a work item.
       ...(repeat ? { repeat } : {}),
-      // Sent with the content because main/store.mjs#composeItem writes it in
+      // Sent with the content because main/store.mts#composeItem writes it in
       // the same write, so the item never exists already running.
       ...(when.runAt && !repeat && !givenTo ? { runAt: when.runAt } : {}),
       // A task given to a person goes to them with its due day, and no agent

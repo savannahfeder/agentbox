@@ -22,9 +22,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { Supervisor } from '../main/supervisor.mjs';
-import { writeMarker, clearMarker } from '../main/cloud/marker.mjs';
-import { taskFolderPath } from '../main/task-folders.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { writeMarker, clearMarker } from '../main/cloud/marker.mts';
+import { taskFolderPath } from '../main/task-folders.mts';
 
 const ONE_ACCOUNT_HOME = '/nonexistent-home-with-no-second-account';
 let tmp; let repo; let folder; let product; let sup;

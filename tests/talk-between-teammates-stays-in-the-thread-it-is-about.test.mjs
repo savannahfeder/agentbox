@@ -29,10 +29,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { appHome } from '../main/store/home.mjs';
-import { loadStore } from '../main/store-modules.mjs';
-import { Teammates } from '../main/teammates.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { queuedReplyText } from '../main/live-replies.mjs';
+import { loadStore } from '../main/store-modules.mts';
+import { Teammates } from '../main/teammates.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { queuedReplyText } from '../main/live-replies.mts';
 import { planWakes, runIdFor, seenKey, teammateLabel, teammateIdOf, workOf, handOffText, foldChat, DEFAULT_LIMIT, MAX_HOPS } from '../shared/teammates.mjs';
 import { foldWorkItems } from '../shared/work-items.mjs';
 import { toldBy, heldForHer, stoppedByHer } from '../shared/answers.mjs';
@@ -367,7 +367,7 @@ describe('through the store', () => {
   // The real store's tell, without a supervisor to steer a live session.
   const tellInto = (calls) => async (p, id, args) => {
     calls.push({ id, ...args });
-    const { Store } = await import('../main/store.mjs');
+    const { Store } = await import('../main/store.mts');
     return Store.prototype.tellItem.call({ modules: mods, productDir: () => dir }, p, id, args);
   };
   const tick = (now, calls = []) => team.tick({ items: store.listItems(now), now, deliver: async () => {}, tell: tellInto(calls) });

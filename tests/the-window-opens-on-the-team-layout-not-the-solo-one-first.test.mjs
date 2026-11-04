@@ -1,7 +1,7 @@
 // "When I first load it it uses like an older version of the app (semi diff
 // UI) then a few secs later it starts loading the new version" (2026-10-25).
 // It was one build drawn twice. The team sign-in is restored over the network
-// after the window is up (main/team/index.mjs `start`), and until it lands the
+// after the window is up (main/team/index.mts `start`), and until it lands the
 // snapshot says signedIn: false, so the window drew the single-person app:
 // no faces, no people, no team filter. Then the team arrived and it redrew.
 // Measured with the service on an in-memory cloud: every state change before
@@ -14,9 +14,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamService, teamForWindow } from '../main/team/index.mjs';
+import { Store } from '../main/store.mts';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamService, teamForWindow } from '../main/team/index.mts';
 import { TEAM_WAIT_MS } from '../renderer/src/boot-waits.ts';
 import { NOT_ANSWERING_MS } from '../renderer/src/not-answering.ts';
 

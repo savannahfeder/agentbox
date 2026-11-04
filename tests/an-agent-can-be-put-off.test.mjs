@@ -28,7 +28,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { agentKey, putOff, putAway, listed, reachesInbox } from '../shared/agents.mjs';
-import { AgentSchedule } from '../main/agent-schedule.mjs';
+import { AgentSchedule } from '../main/agent-schedule.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 const NOW = Date.parse('2026-08-16T23:40:00Z');

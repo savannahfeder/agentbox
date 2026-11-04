@@ -1,5 +1,5 @@
 // THE APP SPUN ITS BEACHBALL WITHOUT STOPPING once a project was put on the
-// phone (2026-10-14). The phone pass (main/phone-inbox.mjs) builds a copy of
+// phone (2026-10-14). The phone pass (main/phone-inbox.mts) builds a copy of
 // every thread worth carrying, up to 300 a project, and asked
 // `store.readHistory` for each one. That read the project's whole ledger off
 // disk and parsed every line, so a pass read the same file 300 times. Measured
@@ -16,10 +16,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import * as disk from '../main/store/work-items.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createPhoneInbox } from '../main/phone-inbox.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createPhoneInbox } from '../main/phone-inbox.mts';
 import { threadSnapshot } from '../shared/phone-snapshot.mjs';
 
 let root, store, ids;

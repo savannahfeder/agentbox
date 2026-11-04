@@ -40,7 +40,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { NAME, Name } from '../shared/product-name.mjs';
 
-// The one seam: main/supervisor.mjs imports `spawn` at module scope, so this is
+// The one seam: main/supervisor.mts imports `spawn` at module scope, so this is
 // where a test stands between the app's choice of executable and a real
 // process. A Codex spawn is left inert on purpose -- if the fix regresses, the
 // assertion below names the binary rather than dying inside the transport.
@@ -67,7 +67,7 @@ vi.mock('../main/account-tooling.mjs', async (importActual) => ({
   linkAccountTooling: () => null,
 }));
 
-const { Supervisor } = await import('../main/supervisor.mjs');
+const { Supervisor } = await import('../main/supervisor.mts');
 
 const CLAUDE_BIN = '/nonexistent/claude-code/claude';
 const CODEX_BIN = '/nonexistent/codex/codex';

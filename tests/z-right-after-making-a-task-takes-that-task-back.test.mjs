@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 

@@ -55,7 +55,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-// The one seam, as in the sibling files: `main/supervisor.mjs` imports `spawn`
+// The one seam, as in the sibling files: `main/supervisor.mts` imports `spawn`
 // at module scope, so this is the only place between the app's choice of
 // executable and a real process.
 const spawns = vi.hoisted(() => []);
@@ -73,7 +73,7 @@ vi.mock('node:child_process', async (importActual) => {
 import { engineChoiceSince, engineChoiceOnRowIsStale, engineFor, ENGINE_CHOICE_ENABLED } from '../shared/engines.mjs';
 import { foldWorkItems } from '../shared/work-items.mjs';
 import { loadConfig } from '../main/config.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const AUGUST = Date.parse('2026-08-26T11:00:00Z');
 const OPENED = '2026-09-04T00:00:00Z';

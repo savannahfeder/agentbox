@@ -26,8 +26,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { signInFiles, signInStamp } from '../main/sign-in-files.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { signInFiles, signInStamp } from '../main/sign-in-files.mts';
 import { liveLine, shortWord } from '../renderer/src/live-line.ts';
 
 const SIGNED_OUT = 'Failed to authenticate: OAuth session expired and could not be refreshed';

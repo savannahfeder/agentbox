@@ -12,7 +12,7 @@
 // her on In progress, which is the tab she opened it from, would show her a list
 // the row is no longer in. That is the exception she names.
 
-import { commandPrompt } from '../../shared/claude-commands.mjs';
+import { commandPrompt } from '../../shared/claude-commands.mts';
 import { DEFAULT_ENGINE } from '../../shared/engines.mjs';
 
 /**

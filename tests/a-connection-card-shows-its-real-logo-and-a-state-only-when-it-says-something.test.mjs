@@ -36,7 +36,7 @@ describe('the logos', () => {
   });
 
   it('is in colour, apart from the marks that are black', () => {
-    expect([...DARK_INK].sort()).toEqual(['github', 'intercom', 'sentry', 'vercel']);
+    expect([...DARK_INK].sort()).toEqual(['expo', 'github', 'intercom', 'sentry', 'vercel']);
     // Notion's own mark is black on white, which reads on either ground.
     for (const id of ids.filter((i) => !DARK_INK.has(i) && i !== 'notion')) {
       expect(colours(read(`${LOGOS}/${id}.svg`)).some((c) => !grey(c)), id).toBe(true);

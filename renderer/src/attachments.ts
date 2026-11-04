@@ -3,7 +3,7 @@
 // the body as markdown (relative paths: workers read them through the MCP,
 // the message view renders them).
 import { useCallback, useState } from 'react';
-import { turnedName } from '../../shared/picture-formats.mjs';
+import { turnedName } from '../../shared/picture-formats.mts';
 import { MAX_SENT_WORDS, sizeWords, tooBigToSend } from '../../shared/carried-files.mjs';
 
 export interface PendingAttachment {
@@ -25,7 +25,7 @@ export interface PendingAttachment {
 export type Attaching = { key: string; name: string; size: number; done: number };
 
 // A tab's file has no path and one request carries 32 MB at most
-// (main/serve.mjs), so a bigger file crosses in pieces.
+// (main/serve.mts), so a bigger file crosses in pieces.
 export const PIECE_BYTES = 4 * 1024 * 1024;
 
 async function base64Of(blob: Blob): Promise<string> {

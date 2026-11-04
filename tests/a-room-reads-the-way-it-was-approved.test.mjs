@@ -195,7 +195,7 @@ describe('getting to a room, and keys on it', () => {
   it('N starts a new thread from a room, as it does everywhere else', () => {
     expect(app).toMatch(/if \(roomShown && e\.key !== 'Tab' && e\.key !== 'n' && e\.key !== 'N'( && e\.key !== '\\\\')?\) \{/);
     const branch = app.indexOf("if ((e.key === 'n' || e.key === 'N') && !roomsUi.dialogOpen) setModal('compose');");
-    expect(branch).toBeGreaterThan(app.indexOf('if (opensATextField(e.key)) e.preventDefault();'));
+    expect(branch).toBeGreaterThan(app.indexOf('if (opensATextField(e.key) && !(nothingToActOn && actsOnARow(e.key))) e.preventDefault();'));
   });
 });
 

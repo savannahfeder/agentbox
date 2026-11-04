@@ -48,6 +48,7 @@ import { EDIT_LAST } from '../team/chat-events';
 import { messageMore, withEmbeds, wordsOf } from '../team/message-more';
 import { ThreadLine } from '../team/ThreadPanel';
 import { AgentAnswers } from '../team/ChatAgents';
+import { NeedOlder } from './NeedCard';
 import {
   conversationGap, fileInChange, gapIndex, groupWork, outputCut, runFailures, runOverflow, runSummary,
 } from '../../../shared/agents.mjs';
@@ -325,6 +326,15 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   // message opens what is ../team/chat-layout.ts; a folded run is work to it.
   const slots = chat ? chatLayout(nodes.map((e) => (e.kind === 'run' ? { kind: 'work', at: e.at } : e))) : null;
   const newest = chat ? newestSaid(nodes) : -1;
+  // Only the agent's last word, with nothing said to it since, takes what a card asks for (NeedCard.tsx).
+  const asking = (() => {
+    for (let k = nodes.length - 1; k >= 0; k--) {
+      const x = nodes[k];
+      if (x.kind === 'run' || x.kind === 'work') continue;
+      return x.who === 'you' ? -1 : k;
+    }
+    return -1;
+  })();
   // What a message's head says beside the name, in either layout: sending, the
   // way to cut the agent's step, and which row the words were said on.
   const headFacts = (e: AgentTurn, time: string) => <>
@@ -530,7 +540,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                   ? <div className="msg-body typed">{typedParts(e.text ?? '').map((p, k, all) => ('embed' in p
                     ? <div key={k} className="typed-embed">{md(p.embed)}</div>
                     : all.length === 1 ? asTyped(p.text) : <span key={k}>{asTyped(p.text)}</span>))}</div>
-                  : <div className="msg-body">{md(e.text ?? '')}</div>}
+                  : <div className="msg-body"><NeedOlder.Provider value={n !== asking}>{md(e.text ?? '')}</NeedOlder.Provider></div>}
               </div>
             )}
           {/* WHAT THIS TURN CARRIES, under the last thing it said and above

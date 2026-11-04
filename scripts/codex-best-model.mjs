@@ -5,7 +5,10 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { codexHome, codexModels } from '../main/codex-models.mjs';
+import { rerunWithStripTypes } from './lib/rerun-with-strip-types.mjs';
+
+rerunWithStripTypes(import.meta.url);
+const { codexHome, codexModels } = await import('../main/codex-models.mts');
 
 export function bestCodexModel({ home = codexHome(), read } = {}) {
   return codexModels(read ? { home, read } : { home })[0]?.id ?? null;

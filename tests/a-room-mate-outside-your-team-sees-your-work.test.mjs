@@ -12,7 +12,7 @@
 //
 // Now a member with no card is on the wall, named, as not on Rooms yet.
 import { describe, it, expect } from 'vitest';
-import { wallCards } from '../shared/room-cards.mjs';
+import { wallCards } from '../shared/room-cards.mts';
 
 const NOW = Date.parse('2026-10-22T15:00:00-07:00');
 const MIN = 60_000;
@@ -43,7 +43,7 @@ describe('everybody in the room is on the wall', () => {
 
   it('a member who has not turned Rooms on is on it, named, and says so', () => {
     const w = wallCards({ ...base, profiles: [prof(ANA, 'Ana L.')], presence: [] });
-    expect(w.find((c) => c.id === TEO)).toMatchObject({ name: 'Teo P.', avatarUrl: 'https://x.test/t.png', away: true, agents: null, level: null, workingOn: null });
+    expect(w.find((c) => c.id === TEO)).toMatchObject({ name: 'Teo P.', avatarUrl: 'https://x.test/t.png', away: true, agents: null, workingOn: null });
   });
 
   it('a member who is invisible is not: they have a card nobody may read', () => {

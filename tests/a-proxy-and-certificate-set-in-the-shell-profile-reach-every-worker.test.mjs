@@ -30,7 +30,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { learnShellDataDirs, launchAdditions, readShellSettings } from '../main/shell-path.mjs';
-import { harnessFor } from '../main/harnesses.mjs';
+import { harnessFor } from '../main/harnesses.mts';
 
 const hasZsh = fs.existsSync('/bin/zsh');
 const DOCK = '/usr/bin:/bin:/usr/sbin:/sbin';

@@ -7,7 +7,7 @@
 // Two things were wrong and both are held here.
 //
 // MY WORKSPACE WAS MADE ONLY WHEN SOMEBODY SIGNED IN. `ensurePersonalProject`
-// had exactly one caller, inside `signedIn()` in main/team/index.mjs, so a Mac
+// had exactly one caller, inside `signedIn()` in main/team/index.mts, so a Mac
 // with no team cloud at all — the single-person app — never called it and
 // opened on no projects whatsoever. Approved 2026-10-05: My Workspace exists
 // for everyone, so there is never a "No project" state. It is made at boot now,
@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ensurePersonalProject } from '../main/team/projects.mjs';
+import { ensurePersonalProject } from '../main/team/projects.mts';
 import { projectsOffered, startingProject } from '../renderer/src/threads/composer-rules';
 import { noProjectYet, NO_PROJECT_REASON, NO_PROJECT_ACTION } from '../renderer/src/compose-says';
 
@@ -35,7 +35,7 @@ function freshAccount() {
   return dir;
 }
 
-// What main.mjs hands the window: the projects on disk, as the card reads them.
+// What main.mts hands the window: the projects on disk, as the card reads them.
 function productsOn(accountRoot) {
   return fs.readdirSync(accountRoot).sort().flatMap((slug) => {
     const file = path.join(accountRoot, slug, 'project.json');
@@ -96,9 +96,9 @@ describe('the card says why Send is off when there is still no project', () => {
 });
 
 describe('My Workspace is made at boot, not behind signing in', () => {
-  const mainSrc = fs.readFileSync(path.join(root, 'main', 'main.mjs'), 'utf8');
+  const mainSrc = fs.readFileSync(path.join(root, 'main', 'main.mts'), 'utf8');
 
-  it('is called in main.mjs, so a Mac with no team cloud gets one too', () => {
+  it('is called in main.mts, so a Mac with no team cloud gets one too', () => {
     expect(mainSrc).toMatch(/ensurePersonalProject\(/);
   });
 
@@ -114,7 +114,7 @@ describe('My Workspace is made at boot, not behind signing in', () => {
   });
 
   it('is not called from the team service any more', () => {
-    const teamSrc = fs.readFileSync(path.join(root, 'main', 'team', 'index.mjs'), 'utf8');
+    const teamSrc = fs.readFileSync(path.join(root, 'main', 'team', 'index.mts'), 'utf8');
     expect(teamSrc).not.toMatch(/ensurePersonalProject\(/);
   });
 });

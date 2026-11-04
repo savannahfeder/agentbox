@@ -18,7 +18,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const T0 = Date.parse('2026-10-19T10:00:00Z');
 let now; let said; let root;
@@ -152,9 +152,9 @@ describe('the door every run starts through', () => {
 });
 
 describe('where it sits', () => {
-  const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+  const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
   it('every run starts through the one door that asks it', () => {
-    const door = src.slice(src.indexOf('  spawnWorker(item, {'), src.indexOf('  spawnWorker(item, {') + 400);
+    const door = src.slice(src.indexOf('  spawnWorker(item'), src.indexOf('  spawnWorker(item') + 500);
     expect(door).toMatch(/if \(this\._heldFromStarting\(item\)\) (return;|\{ refuse\('held'\); return; \})/);
   });
   it('every run that ends is counted, before anything else is decided about it', () => {

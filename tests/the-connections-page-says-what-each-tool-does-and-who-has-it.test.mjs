@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { connectionLinkOf, keepConnectionLinks, stateLine, toolWords, whoHasIt } from '../renderer/src/connections/connections-shown';
 import { artifactUrlTransform } from '../renderer/src/remark-artifact-paths';
-import { createMemoryCloud, memoryBackend, signUpMemory } from '../main/team/memory-cloud.mjs';
+import { createMemoryCloud, memoryBackend, signUpMemory } from '../main/team/memory-cloud.mts';
 import { cleanConnections, MAX_CONNECTIONS } from '../shared/team-connections.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -166,7 +166,7 @@ describe('where the page is', () => {
 
   it('every door the window needs is there, on both sides', () => {
     const preload = read('preload.cjs');
-    const ipc = read('main/ipc.mjs');
+    const ipc = read('main/ipc.mts');
     for (const c of ['connections', 'connections-connect', 'connections-cancel', 'connections-check', 'connections-disconnect', 'connections-accept']) {
       expect(preload).toContain(`'zero:${c}'`);
       expect(ipc).toContain(`'zero:${c}'`);

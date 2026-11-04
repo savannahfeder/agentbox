@@ -18,8 +18,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
-const SUPERVISOR = fileURLToPath(new URL('../main/supervisor.mjs', import.meta.url));
+const SUPERVISOR = fileURLToPath(new URL('../main/supervisor.mts', import.meta.url));
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
@@ -52,6 +53,7 @@ const sup = {
   _cloudHost: () => '/nonexistent/agentbox-cloud-host.sock',
   _cloudRunPath: () => relay,
   _cloudAccountEnv: () => ({}),
+  _cloudRelayEnv: Supervisor.prototype._cloudRelayEnv,
 };
 const child = Supervisor.prototype._spawnCloudRelay.call(sup, [said], { cwd: process.cwd(), env: process.env, stdio: 'ignore' });
 import('node:fs').then((fs) => fs.writeFileSync(pidFile, String(child.pid)));
@@ -66,7 +68,7 @@ async function startApp({ host = false } = {}) {
   const app = path.join(tmp, 'app.mjs');
   fs.writeFileSync(relay, RELAY);
   fs.writeFileSync(app, APP(host));
-  const child = spawn(process.execPath, [app, relay, said, pidFile], { cwd: tmp, detached: true, stdio: 'ignore' });
+  const child = spawn(process.execPath, [...stripTypesFlags(), app, relay, said, pidFile], { cwd: tmp, detached: true, stdio: 'ignore' });
   pids.push(child.pid);
   const end = Date.now() + 10_000;
   while (!fs.existsSync(pidFile) && Date.now() < end) await wait(50);

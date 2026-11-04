@@ -10,7 +10,7 @@ import {
   clampSplit, splitFromPointer, readSplit, writeSplit,
   MIN_SPLIT, MAX_SPLIT, EVEN_SPLIT, OPENING_SPLIT, SPLIT_KEY,
 } from '../renderer/src/doc-pane.ts';
-import { canWrite, writeDoc, readDoc, isInside, MAX_DOC_BYTES } from '../main/doc-file.mjs';
+import { canWrite, writeDoc, readDoc, isInside, MAX_DOC_BYTES } from '../main/doc-file.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 describe('what the pane opens', () => {
@@ -38,7 +38,7 @@ describe('what the pane opens', () => {
       expect(docKind(p), p).toBeNull();
       expect(opensInPane(p), p).toBe(false);
     }
-    for (const p of ['main/ipc.mjs', 'data.csv']) {
+    for (const p of ['main/ipc.mts', 'data.csv']) {
       expect(docKind(p), p).toBeNull();
       expect(opensInPane(p), p).toBe(true);
     }

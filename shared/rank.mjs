@@ -103,7 +103,7 @@ export function itemPriority(item) {
  * now counts (above); an untagged row reads Medium here as it runs.
  *
  * A CONVERSATION keeps the number it carries: its level is the message
- * sorter's (main/message-priority.mjs), written as an agent on purpose, and a
+ * sorter's (main/message-priority.mts), written as an agent on purpose, and a
  * conversation never spawns, so there is no running order for it to disagree
  * with. `conversation` is the caller's to say, since only it knows the product.
  */

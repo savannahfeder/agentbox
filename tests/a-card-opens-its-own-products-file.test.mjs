@@ -28,7 +28,7 @@ function store() {
     fs.mkdirSync(d, { recursive: true });
   }
   fs.writeFileSync(path.join(theirs, 'reports', 'week-32.md'), 'their report');
-  fs.writeFileSync(path.join(theirRepo, 'main', 'ipc.mjs'), 'their code');
+  fs.writeFileSync(path.join(theirRepo, 'main', 'ipc.mts'), 'their code');
   const products = [
     { slug: 'agentbox', dir: ours, name: NAME, repoPath: null },
     { slug: 'harbour', dir: theirs, name: 'Harbour', repoPath: theirRepo },
@@ -51,7 +51,7 @@ describe('a card never opens another product\'s file', () => {
     const s = store();
     // The by-name hunt is the last resort and the widest net. It walks our
     // trees only, so a file that exists ONLY under the app stays unfound.
-    const out = await find(s,'main/ipc.mjs');
+    const out = await find(s,'main/ipc.mts');
     expect(out.ok).toBe(false);
   });
 
@@ -101,7 +101,7 @@ describe('when it cannot find one, it says so', () => {
 
   it('never returns a bare code or an empty error', async () => {
     const s = store();
-    for (const src of ['reports/week-32.md', 'main/ipc.mjs', '/nowhere/at/all.md']) {
+    for (const src of ['reports/week-32.md', 'main/ipc.mts', '/nowhere/at/all.md']) {
       const out = await find(s,src);
       expect(out.ok).toBe(false);
       expect(out.error.length).toBeGreaterThan(20);

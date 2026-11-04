@@ -25,6 +25,9 @@ import crypto from 'node:crypto';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readDiary } from '../../power-test/scripts/diary.mjs';
+import { rerunWithStripTypes } from '../../../../scripts/lib/rerun-with-strip-types.mjs';
+
+rerunWithStripTypes(import.meta.url);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(here, '../../../..');
@@ -162,7 +165,8 @@ if (isMain) {
   const say = (s) => console.log(`[${new Date().toTimeString().slice(0, 8)}] ${s}`);
   const { readPeople, pickPeople } = await import(path.resolve(here, '../../power-test/scripts/plan.mjs'));
   const { paceFor, readingFor, claudeProfile } = await import(path.join(here, 'pace.mjs'));
-  const { readMacPressureWord } = await import(path.join(REPO, 'main/leftovers.mjs'));
+  const { readMacPressureWord } = await import(path.join(REPO, 'main/leftovers.mts'));
+  const { stripTypesFlags } = await import(path.join(REPO, 'main/strip-types.mts'));
   const people = pickPeople(opt('who', 'random:2'), readPeople(path.resolve(here, '../../power-test/people')));
   const engine = opt('engine', 'codex');
   const minutes = Number(opt('minutes', 30));
@@ -177,7 +181,7 @@ if (isMain) {
   // A session of its own, so ending the run that started it does not end the day.
   if (args.includes('--detach')) {
     const log = fs.openSync(path.join(root, 'workday.log'), 'a');
-    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), ...detachedArgv(args, root)], { detached: true, stdio: ['ignore', log, log], env: detachedEnv(process.env) });
+    const child = spawn(process.execPath, [...stripTypesFlags(), fileURLToPath(import.meta.url), ...detachedArgv(args, root)], { detached: true, stdio: ['ignore', log, log], env: detachedEnv(process.env) });
     child.unref();
     console.log(`workday started, pid ${child.pid}. Log: ${path.join(root, 'workday.log')}. Report when it ends: ${path.join(root, 'report.md')}`);
     process.exit(0);

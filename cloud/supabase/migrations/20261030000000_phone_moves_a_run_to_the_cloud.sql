@@ -1,5 +1,5 @@
 -- The phone's "Move to cloud" on a thread running on the computer
--- (main/phone-inbox.mjs ROUTES 'move-to-cloud'). The kind check is replaced
+-- (main/phone-inbox.mts ROUTES 'move-to-cloud'). The kind check is replaced
 -- whole, as 20261023000000_phone_settings.sql did, and the setting rule that
 -- also names `kind` goes back as it was.
 do $$

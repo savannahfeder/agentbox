@@ -4,7 +4,7 @@
 // (.claude/skills/verify-agentbox): a thread run by scripts/lib/stub-claude-worker.mjs
 // finished, exited 0 with its answer, and the answer never reached the row.
 // Workers are spawned with `--input-format stream-json --replay-user-messages`
-// (main/claude-input.mjs): the prompt arrives as a `user` line on stdin, and the
+// (main/claude-input.mts): the prompt arrives as a `user` line on stdin, and the
 // app only counts a result as the end of the run once Claude Code has replayed
 // that line by uuid and the app has closed its input. The stand-in predated
 // that: it never read stdin, never replayed, and exited at its result. Measured:
@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { attachClaudeInput } from '../main/claude-input.mjs';
+import { attachClaudeInput } from '../main/claude-input.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STUB = path.join(root, 'scripts', 'lib', 'stub-claude-worker.mjs');

@@ -1,0 +1,56 @@
+/* A cloud run's ask, drawn where it asked (NeedCard.tsx): the approved
+   round-2 card, design 1's place with design 3's facts. */
+.need { margin: 16px 0 6px; max-width: 640px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--bg-raised); box-shadow: var(--shadow-sm); }
+.need + .need { margin-top: 10px; }
+.need-body { display: flex; gap: 16px; align-items: flex-start; padding: 16px 22px; }
+.need-mark { flex: none; width: 40px; height: 40px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: rgba(255,255,255,.04); display: flex; align-items: center; justify-content: center; padding: 9px; box-sizing: border-box; color: var(--text-dim); }
+.need-mark img { width: 100%; height: 100%; object-fit: contain; }
+:root[data-theme="dark"] .need-mark-ink img, :root[data-skin]:where(:not([data-theme="light"])) .need-mark-ink img { filter: brightness(0) invert(.94); }
+.need-col { flex: 1; min-width: 0; }
+.need-title { font-size: 15px; font-weight: 500; line-height: 22px; letter-spacing: -0.006em; color: var(--text); }
+.need-why { margin-top: 3px; font-size: 13.5px; line-height: 20px; color: var(--text-dim); }
+.need .need-why a, .need .need-facts a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; cursor: default; }
+.need-facts { margin-top: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; gap: 7px; font-size: 13px; line-height: 18px; color: var(--text-dim); }
+.need-facts > div { display: flex; gap: 10px; align-items: center; }
+.need-facts svg { flex: none; color: var(--text-faint); }
+.need-form { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.need-row { display: flex; gap: 8px; }
+.need-code-row { margin-top: 14px; }
+.need-acts { margin-top: 14px; display: flex; gap: 8px; }
+.need-input {
+  flex-grow: 1; min-width: 0; height: 34px; padding: 0 11px; box-sizing: border-box; background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: var(--radius); outline: 0; font: inherit; font-size: 13px; color: var(--text);
+}
+.need-input:focus { border-color: var(--text-faint); }
+.need-input::placeholder { color: var(--text-faint); }
+.need-code { flex-grow: 0; width: 150px; font-size: 16px; letter-spacing: .18em; }
+.need-btn { flex: none; height: 34px; padding: 0 15px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: transparent; font: inherit; font-size: 13px; color: var(--text); white-space: nowrap; cursor: default; }
+.need-btn:hover:not(:disabled) { background: var(--wash); }
+.need-btn:disabled { opacity: .5; }
+.need-main { background: var(--text); border-color: var(--text); color: var(--bg-raised); font-weight: 500; }
+.need-main:hover:not(:disabled) { background: var(--text); opacity: .88; }
+.need-also { margin-top: 6px; }
+.need-said { margin: 8px 0 0; font-size: 12.5px; line-height: 17px; color: var(--text-dim); }
+.need-foot { display: flex; width: 100%; align-items: center; gap: 8px; padding: 10px 22px 10px 78px; border: 0; border-top: 1px solid var(--line); background: none; font: inherit; font-size: 13px; color: var(--text-dim); text-align: left; cursor: default; }
+.need-foot:hover { color: var(--text); }
+.need-foot-mark { width: 14px; height: 14px; display: inline-flex; color: var(--text-faint); }
+.need-foot-arrow { display: inline-flex; color: var(--text-faint); margin-left: 2px; }
+.need-done .need-body { align-items: center; }
+.need-done .need-why { margin-top: 1px; font-size: 13px; }
+.need-link { flex: none; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--text-dim); text-decoration: underline; text-underline-offset: 3px; cursor: default; }
+.need-link:hover { color: var(--text); }
+
+/* What Needs you waits on, above its list (threads/NeedsWaiting.tsx), on the rows' own edges. */
+.nw { margin: 6px var(--row-r, 24px) 22px var(--text-x, 32px); }
+.nw-label { font-size: 12.5px; color: var(--text-faint); margin-bottom: 10px; }
+.nw-box { border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--bg-raised); }
+.nw-row { display: flex; align-items: center; gap: 14px; padding: 12px 16px; cursor: default; }
+.nw-row + .nw-row { border-top: 1px solid var(--line); }
+.nw-row:hover { background: var(--wash); }
+.nw-more { display: block; width: 100%; padding: 10px 16px 10px 58px; border: 0; border-top: 1px solid var(--line); background: none; font: inherit; font-size: 13px; color: var(--text-dim); text-align: left; cursor: default; }
+.nw-more:hover { color: var(--text); background: var(--wash); }
+.nw-mark { flex: none; width: 28px; height: 28px; border-radius: var(--radius); border: 1px solid var(--line); background: rgba(255,255,255,.04); display: flex; align-items: center; justify-content: center; padding: 6px; box-sizing: border-box; color: var(--text-dim); }
+.nw-mark img { width: 100%; height: 100%; object-fit: contain; }
+.nw-what { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nw-t { font-size: 14px; color: var(--text); }
+.nw-s { font-size: 12.5px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

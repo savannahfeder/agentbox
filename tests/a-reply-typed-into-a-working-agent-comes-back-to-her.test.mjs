@@ -5,7 +5,7 @@
 // reached the inbox, and it was found only by going and looking for it.
 //
 // What happened, replayed off her own ledger. A reply typed at a session that
-// is RUNNING is steered straight into it (live-replies.mjs) and marked
+// is RUNNING is steered straight into it (live-replies.mts) and marked
 // delivered on the spot. The worker reads it, acts on it, writes its result and
 // exits. The exit path then writes down which answer was settled, and the item
 // it holds is the snapshot taken at SPAWN, so it wrote down the answer BEFORE
@@ -20,7 +20,7 @@
 // One row did it three rounds running in a single evening.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { answerSettled } from '../shared/answers.mjs';
 import { belongsInInbox } from '../renderer/src/list-rules';
 

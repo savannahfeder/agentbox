@@ -16,7 +16,7 @@
 // 2.1.8 and 2.0.43) and then `--include-partial-messages` (unknown on 1.0.90).
 // So 2.1.71, released 2026-03-06, is the oldest Claude Code the line runs on.
 //
-// None of those words matched anything in shared/spawn-trouble.mjs, so the
+// None of those words matched anything in shared/spawn-trouble.mts, so the
 // cause was 'unknown': the row read "stopped before it did anything ... it will
 // keep failing the same way until this is fixed" without saying what "this"
 // was, the Accounts page blamed the account's plan, and each of her replies
@@ -31,9 +31,9 @@ import path from 'node:path';
 import {
   troubleCause, needsHerHands, troubleSentence, troubleRemedy, accountSentence,
   deadRunSentence, deadRunCause, runStoppedLine, causeWord, causeWhat, causeNext, causeAct, causeBreakdown,
-} from '../shared/spawn-trouble.mjs';
+} from '../shared/spawn-trouble.mts';
 import { harnessDefinition } from '../shared/harness-definitions.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 
 // Byte for byte what each release printed on stderr, from the runs above.

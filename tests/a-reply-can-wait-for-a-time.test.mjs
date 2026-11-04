@@ -19,10 +19,10 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { submitReply } from '../main/live-replies.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { submitReply } from '../main/live-replies.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { isDue } from '../shared/work-items.mjs';
-import { applyThrough } from '../main/phone-inbox.mjs';
+import { applyThrough } from '../main/phone-inbox.mts';
 import { commandFor, phoneSlug } from '../renderer/src/phone-rows';
 import { phoneChoices } from '../shared/phone-snapshot.mjs';
 import { clearDraft, readDraftWhen, restoreDraft, saveDraft, saveDraftWhen, readDraft } from '../renderer/src/drafts';
@@ -95,7 +95,7 @@ describe('the run before it ending does not start it early', () => {
 });
 
 describe('the window\'s handler', () => {
-  const ipc = src('main/ipc.mjs');
+  const ipc = src('main/ipc.mts');
   const handler = ipc.slice(ipc.indexOf("ipcMain.handle('zero:answer'"), ipc.indexOf('ipcMain.handle(', ipc.indexOf("ipcMain.handle('zero:answer'") + 10));
 
   it('takes a time with the reply', () => {
@@ -110,7 +110,7 @@ describe('the window\'s handler', () => {
   it('writes the words, then their time, with nothing between them', () => {
     const commit = handler.slice(handler.indexOf('submitReply('), handler.indexOf('\n    });', handler.indexOf('submitReply(')));
     const words = commit.indexOf('store.answerItem(');
-    const time = commit.indexOf('store.scheduleItem(product, id, runAt)');
+    const time = commit.indexOf('store.scheduleItem(product, id, Number(runAt))');
     expect(words).toBeGreaterThan(-1);
     expect(time).toBeGreaterThan(words);
     expect(commit.slice(words, time)).not.toMatch(/await/);

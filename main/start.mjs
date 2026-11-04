@@ -5,7 +5,7 @@ import { readHubAddress, whichApp } from './hub-address.mjs';
 
 const hub = readHubAddress();
 const which = whichApp(hub);
-if (which === 'whole') await import('./main.mjs');
+if (which === 'whole') await import('./main.mts');
 else {
   const client = await import('./hub-client.mjs');
   if (which === 'client') client.startHubClient(hub);

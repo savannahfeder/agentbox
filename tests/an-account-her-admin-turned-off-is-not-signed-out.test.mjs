@@ -31,7 +31,7 @@ import { describe, it, expect } from 'vitest';
 import {
   troubleCause, needsHerHands, troubleSentence, troubleRemedy, accountSentence,
   deadRunSentence, deadRunCause, causeWord, causeWhat, causeNext, causeAct, causeBreakdown,
-} from '../shared/spawn-trouble.mjs';
+} from '../shared/spawn-trouble.mts';
 
 // The line the CLI actually prints, byte for byte.
 const HERS = 'Your organization has disabled Claude subscription access for Claude Code · Use an Anthropic API key instead, or ask your admin to enable access';

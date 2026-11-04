@@ -2,7 +2,7 @@
 //
 // Second review of the cloud server, 2026-10-20 (w-6633e825a7): a run that
 // failed in the sandbox (a sign-in gone, a bundle that would not download)
-// writes no done.json, and main/cloud/run.mjs only cleared its marker and
+// writes no done.json, and main/cloud/run.mts only cleared its marker and
 // returned. The server counts a run until done.json lands, it is stopped, or
 // 8 hours pass, so one failed start used a free plan's whole 5 hours and held
 // an agent for 8. A run that came home also left its machine idle until
@@ -20,7 +20,7 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun } from '../main/cloud/run.mjs';
+import { cloudRun } from '../main/cloud/run.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');

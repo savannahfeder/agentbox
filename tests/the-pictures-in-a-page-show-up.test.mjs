@@ -9,14 +9,14 @@
 //
 // Simply allowing it on file:// would have put an agent-written page in the
 // SAME ORIGIN AS THE APP, because the app's own window is a file:// page
-// (loadFile, main/main.mjs). So the page is served from a scheme of its own
+// (loadFile, main/main.mts). So the page is served from a scheme of its own
 // instead. What is pinned here is the part with no picture: which addresses
 // that scheme understands, and what it will and will not hand out.
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { DOC_SCHEME, DocGrants, docUrl, docPath } from '../main/doc-scheme.mjs';
+import { DOC_SCHEME, DocGrants, docUrl, docPath } from '../main/doc-scheme.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -124,14 +124,14 @@ describe('what that scheme may hand out', () => {
 // nothing puts a listener back into a page she reads.
 describe('a page is served exactly as it was written', () => {
   it('has no listener to inject, at either end', async () => {
-    const scheme = await import('../main/doc-scheme.mjs');
+    const scheme = await import('../main/doc-scheme.mts');
     expect(scheme.injectZoomBridge).toBeUndefined();
     expect(scheme.zoomBridge).toBeUndefined();
     expect(scheme.ZOOM_MESSAGE).toBeUndefined();
   });
 
   it('reads the file off disk and hands it over untouched', () => {
-    const main = fs.readFileSync(path.join(here, '..', 'main', 'main.mjs'), 'utf8');
+    const main = fs.readFileSync(path.join(here, '..', 'main', 'main.mts'), 'utf8');
     // The handler's own code, with its comments taken out: the comments say
     // what used to be injected here, which is exactly the word being looked for.
     const serve = main

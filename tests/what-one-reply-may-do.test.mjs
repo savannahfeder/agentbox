@@ -17,19 +17,20 @@
 // AND IT IS NOT ON THE LEDGER. It used to be a field on `work-items.jsonl`,
 // guarded so that only a line claiming to be hers could carry one. `source` is
 // a plain string nothing checks, so a worker with Bash could write that line.
-// The field moved to main/answer-modes.mjs instead, and the forged-line test
+// The field moved to main/answer-modes.mts instead, and the forged-line test
 // below is the one that could not be written before.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { buildLine, foldWorkItems, normalizeLine, pickFields, CLAUDE_PERMISSION_MODES } from '../shared/work-items.mjs';
 import { machineryPath } from '../main/store/home.mjs';
-import { answerModesFile } from '../main/answer-modes.mjs';
-import { buildSessionArgs, parseSessionArgs, permissionMode } from '../main/settings.mjs';
+import { answerModesFile } from '../main/answer-modes.mts';
+import { buildSessionArgs, parseSessionArgs, permissionMode } from '../main/settings.mts';
 import { nameSlug } from '../shared/product-name.mjs';
+import { DEFAULT_CLAUDE_MODEL } from '../shared/engines.mjs';
 
 let appDir;
 let storeRoot;
@@ -126,7 +127,7 @@ describe('a forged ledger line cannot grant a permission', () => {
     fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify({
       schemaVersion: 2, id: 'forgeprod', name: 'Forge Product',
     }));
-    const { Store } = await import('../main/store.mjs');
+    const { Store } = await import('../main/store.mts');
     store = await new Store({ storeRoot: tmp, accountId: 'test-account', accountRoot, products: [] }).init();
     slug = store.listProducts()[0].slug;
   });
@@ -266,10 +267,17 @@ describe('the run that answer starts', () => {
     expect(args.filter((a) => a === '--permission-mode')).toHaveLength(1);
   });
 
-  it('keeps her model and every tool grant she has', () => {
+  // THE MODEL IS NO LONGER ONE OF HER GRANTS. A `--model` in the config stopped
+  // deciding a run on 2026-11-04, because no screen in the app shows it and the
+  // reply box over it was drawing the app's own alias
+  // (tests/a-run-nobody-picked-a-model-for-is-on-the-model-the-card-names). So
+  // the line carries that alias, and a model picked on the row survives a
+  // one-off mode the way her tools do.
+  it('keeps every tool grant she has, and a model picked on the row', () => {
     const { args } = supervisor().spawnPlan(item({ answerMode: 'default' }), acme());
     const parsed = parseSessionArgs(args);
-    expect(parsed.model).toBe('claude-opus-5');
+    expect(parsed.model).toBe(DEFAULT_CLAUDE_MODEL);
+    expect(parseSessionArgs(supervisor().spawnPlan(item({ answerMode: 'default', model: 'sonnet' }), acme()).args).model).toBe('sonnet');
     // Her fixture still names the store server by the word it had before
     // 2026-09-22. Every other grant is hers and comes back untouched; the store
     // one is read as the name that server answers to now, which is the only way
@@ -292,15 +300,18 @@ describe('the run that answer starts', () => {
   });
 
   // A PROJECT OVERRIDE IS STILL THE BASE IT REWRITES. One reply outranks the
-  // project on the mode and on nothing else, so the project's own tools and
-  // model still stand.
+  // project on the mode and on nothing else, so the project's own tools still
+  // stand. Its `--model` does not, and never came from a screen: a project's
+  // args are built out of the workspace's with a permission mode applied
+  // (`setProjectSetting`, case 'permission'), so that flag is a copy of the
+  // fossil the card already overruled.
   it('outranks a project override on the mode and leaves its grants alone', () => {
     const s = supervisor({
       projectSessionArgs: () => ['--model', 'claude-sonnet-5', '--allowedTools', 'Read', '--permission-mode', 'acceptEdits'],
     });
     const parsed = parseSessionArgs(s.spawnPlan(item({ answerMode: 'dontAsk' }), acme()).args);
     expect(parsed.permissionMode).toBe('dontAsk');
-    expect(parsed.model).toBe('claude-sonnet-5');
+    expect(parsed.model).toBe(DEFAULT_CLAUDE_MODEL);
     expect(parsed.allowedTools).toEqual(['Read']);
   });
 });
@@ -332,7 +343,7 @@ describe('clearing a mode puts the row back on the project setting', () => {
     fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify({
       schemaVersion: 1, id: 'spendprod', name: 'Spend Product',
     }));
-    const { Store } = await import('../main/store.mjs');
+    const { Store } = await import('../main/store.mts');
     store = await new Store({ storeRoot: tmp, accountId: 'test-account', accountRoot, products: [] }).init();
     slug = store.listProducts()[0].slug;
   });
@@ -438,7 +449,7 @@ describe('clearing a mode puts the row back on the project setting', () => {
       fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify({
         schemaVersion: 1, id: 'e2eprod', name: 'E2E Product',
       }));
-      const { Store } = await import('../main/store.mjs');
+      const { Store } = await import('../main/store.mts');
       const realStore = await new Store({
         storeRoot: tmp2, accountId: 'test-account', accountRoot, products: [],
       }).init();
@@ -683,12 +694,12 @@ describe('the wiring from the reply box is present in the source', () => {
   });
 
   it('carries it through the bridge and into the store', () => {
-    const ipc = fs.readFileSync('main/ipc.mjs', 'utf8');
+    const ipc = fs.readFileSync('main/ipc.mts', 'utf8');
     expect(ipc).toMatch(/zero:answer'[^)]*permissionMode/s);
     // `inReplyTo` rides beside it since threads (w-920461cbe6): a reply in a
     // thread is still this one call, naming the message it answers.
     // And `fromPhone` since the phone with the computer closed: the id of the
-    // phone command a reply came from (main/phone-inbox.mjs).
+    // phone command a reply came from (main/phone-inbox.mts).
     expect(ipc).toContain('store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone })');
   });
 });

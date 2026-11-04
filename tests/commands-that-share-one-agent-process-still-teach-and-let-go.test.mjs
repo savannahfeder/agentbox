@@ -1,6 +1,6 @@
 // COMMANDS THAT SHARE ONE AGENT PROCESS STILL TEACH, AND STILL LET GO — w-5601e99977.
 //
-// WHAT BROKE, found by reading main/memory-gate-server.mjs against this app's
+// WHAT BROKE, found by reading main/memory-gate-server.mts against this app's
 // own gate logs of the evening of 2026-10-07 (one `codex app-server` carrying
 // ten distinct threads at once, replaced about every twenty minutes) rather
 // than by a live repro.
@@ -33,8 +33,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { MemoryGateServer } from '../main/memory-gate-server.mjs';
-import { CommandHistory } from '../main/memory-gate-history.mjs';
+import { MemoryGateServer } from '../main/memory-gate-server.mts';
+import { CommandHistory } from '../main/memory-gate-history.mts';
 
 const dirs = [];
 const servers = [];

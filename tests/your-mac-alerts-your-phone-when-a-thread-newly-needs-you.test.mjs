@@ -1,10 +1,10 @@
 // YOUR MAC ALERTS YOUR PHONE WHEN A THREAD NEWLY NEEDS YOU.
 //
 // The phone app could turn alerts on and send itself a test, and nothing ever
-// sent a real one (2026-10-23): the old sender (main/phone-link.mjs) spoke
+// sent a real one (2026-10-23): the old sender (main/phone-link.mts) spoke
 // Web Push to the phone website and is no longer wired to anything. Now the
-// Mac, in its phone pass (main/phone-inbox.mjs), hears the same arrivals the
-// desktop banner hears (main/notify.mjs, from App.tsx's inbox) and sends
+// Mac, in its phone pass (main/phone-inbox.mts), hears the same arrivals the
+// desktop banner hears (main/notify.mts, from App.tsx's inbox) and sends
 // them through Expo's push service to the phones in push_devices, by the
 // same rules: nothing while you have used this Mac in the last five minutes,
 // once per stretch away and once more for a permission card
@@ -19,17 +19,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createPhoneInbox } from '../main/phone-inbox.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createPhoneInbox } from '../main/phone-inbox.mts';
 import { sendToExpo, FOLD_MS, EXPO_PUSH } from '../main/phone-alerts.mjs';
 import { phoneSlug } from '../renderer/src/phone-rows';
 import { AWAY_AFTER_MS } from '../shared/notify-rules.mjs';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
-import { createTeamService } from '../main/team/index.mjs';
+import { Store } from '../main/store.mts';
+import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
-import { installNotifier } from '../main/notify.mjs';
-import { WRAPPED_ARGS } from '../shared/bridge-map.mjs';
+import { installNotifier } from '../main/notify.mts';
+import { WRAPPED_ARGS } from '../shared/bridge-map.mts';
 
 const NOW = Date.parse('2026-10-23T12:00:00Z');
 const TOKEN = 'ExponentPushToken[abcdefghij0123456789AB]';
@@ -347,7 +347,7 @@ describe('how the window\'s arrivals reach Expo', () => {
     const app = read('renderer/src/App.tsx');
     expect(app).toMatch(/item: a\.item \?\? null,/);
     expect(app).toMatch(/window\.zero\?\.notify\?\.\(arrivals, inbox\.filter\(\(i\) => i\.product\)\.map\(\(i\) => \(\{ id: i\.id, product: i\.product as string \}\)\)\)/);
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).toMatch(/onArrivals: \(list, needsYou\) => team\?\.phoneArrivals\(list, needsYou\)/);
     expect(main).toMatch(/idleMs: \(\) => powerMonitor\.getSystemIdleTime\(\) \* 1000/);
   });

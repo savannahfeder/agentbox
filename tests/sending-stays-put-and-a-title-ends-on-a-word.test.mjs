@@ -36,7 +36,7 @@ describe('a title ends on a whole word', () => {
     expect(cut.endsWith('…')).toBe(true);
   });
   it('the title of a conversation goes through it', () => {
-    const src = fs.readFileSync(new URL('../main/team/index.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/team/index.mts', import.meta.url), 'utf8');
     expect(src).not.toContain('words.slice(0, 90)');
   });
 });

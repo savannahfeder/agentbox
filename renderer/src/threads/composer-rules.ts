@@ -276,7 +276,7 @@ export function whenToSend(when: SendWhen, now = Date.now()): { runAt?: number; 
 }
 
 /** When a reply set for later goes, or 0. Its time and its words are written
- *  a few milliseconds apart (main/ipc.mjs); a row put off on its own is not one. */
+ *  a few milliseconds apart (main/ipc.mts); a row put off on its own is not one. */
 export function replyWaitsUntil(
   row: { answer?: string | null; runAt?: number | null; wrote?: Record<string, { ts: number; source: string } | undefined> },
   now = Date.now(),
@@ -313,7 +313,7 @@ export function threadMessage(
 /* -------------------------------- projects -------------------------------- */
 
 // `team` is read loosely on purpose: main writes `direct` on a Direct project's
-// team record (main/team/projects.mjs), and the renderer's Product type has not
+// team record (main/team/projects.mts), and the renderer's Product type has not
 // grown the field yet, so the rule asks for it rather than assuming it.
 interface ProjectLike { slug: string; practice?: boolean; team?: object | null }
 const isDirect = (p: ProjectLike) => (p.team as { direct?: unknown } | null | undefined)?.direct === true;

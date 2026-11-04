@@ -235,7 +235,7 @@ describe('what the launcher install must never do', () => {
     const bin = fs.readFileSync(path.join(repo, 'bin', 'agentbox.mjs'), 'utf8');
     const after = fs.readFileSync(path.join(repo, 'scripts', 'after-install.mjs'), 'utf8');
     const dev = fs.readFileSync(path.join(repo, 'scripts', 'dev.mjs'), 'utf8');
-    const main = fs.readFileSync(path.join(repo, 'main', 'main.mjs'), 'utf8');
+    const main = fs.readFileSync(path.join(repo, 'main', 'main.mts'), 'utf8');
     expect(bin).not.toMatch(/linux-launcher/);
     expect(dev).not.toMatch(/linux-launcher/);
     expect(after).toMatch(/linux-launcher\.mjs/);

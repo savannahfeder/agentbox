@@ -57,6 +57,9 @@ const printable = (key: string) => key.length === 1 && key !== ' ';
 const ACTS = new Set(['e', 'l']);
 const OPEN_THREAD_KEYS = new Set(['j', 'k', 'r', 'n', 'z', '/', 'o', 'g', 's']);
 const LIST_KEYS = new Set(['j', 'k', 'r', 'n', 'z', '/', 'o', 'g', 'b', 'i', '1', '2']);
+// With no row to act on these would do nothing, so on an empty list they are words.
+const ROW_KEYS = new Set(['e', 'l', 'j', 'k', 'r', '1', '2']);
+export const rowKey = (key: string): boolean => ROW_KEYS.has(key.toLowerCase());
 
 /** How long after a letter went to the box the next keys are still words, not shortcuts. */
 export const STILL_TYPING_MS = 1000;
@@ -73,9 +76,10 @@ export function keyOnAnOpenThread({ key, justChanged, hasOptions = false, stillT
 }
 
 /** With the list on screen, where there is no box to put a letter in. */
-export function keyOnTheList({ key, justChanged }: { key: string; justChanged: boolean }): 'shortcut' | 'held' | 'nowhere' {
+export function keyOnTheList({ key, justChanged, nothingToActOn = false }: { key: string; justChanged: boolean; nothingToActOn?: boolean }): 'shortcut' | 'held' | 'nowhere' {
   if (!printable(key)) return 'shortcut';
   const k = key.toLowerCase();
+  if (nothingToActOn && ROW_KEYS.has(k)) return 'nowhere';
   if (LIST_KEYS.has(k)) return 'shortcut';
   if (ACTS.has(k)) return justChanged ? 'held' : 'shortcut';
   return 'nowhere';

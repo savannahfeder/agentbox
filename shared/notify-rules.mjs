@@ -6,7 +6,7 @@
 // product is built to protect. So the gate is closed by default and opens only
 // when she is provably somewhere else.
 //
-// This is the only copy of the rule. main/notify.mjs is the live wiring around
+// This is the only copy of the rule. main/notify.mts is the live wiring around
 // it (the window's focus, the banner's lifetime); everything decidable is here,
 // as plain functions over plain values, because that is the half worth pinning
 // with tests.
@@ -84,7 +84,7 @@ export function clip(text, max = 120) {
 //
 // So: she is told once, in words that stay true however many arrive after, and
 // the rest is waiting on the rows when she comes back. `seen` in
-// main/notify.mjs resets this the moment she has the window, so the next time
+// main/notify.mts resets this the moment she has the window, so the next time
 // she walks away she can be told again.
 //
 // THE ONE EXCEPTION, and it is here because an approval is the one thing in the

@@ -49,7 +49,7 @@ describe('the name', () => {
 
 describe('the hand-over', () => {
   it('happens before the app reads a path or takes a lock', () => {
-    const src = read('main/main.mjs');
+    const src = read('main/main.mts');
     const handOver = src.indexOf('isNewUserBuild(app.getName())');
     expect(handOver).toBeGreaterThan(-1);
     expect(handOver).toBeLessThan(src.indexOf("app.getPath('appData')"));
@@ -60,14 +60,14 @@ describe('the hand-over', () => {
   });
 
   it('opens the stranger through the same door the ⌘K row uses, then leaves', () => {
-    const src = read('main/main.mjs');
+    const src = read('main/main.mts');
     const block = src.slice(src.indexOf('isNewUserBuild(app.getName())'), src.indexOf('requestSingleInstanceLock'));
     expect(block).toContain('openFreshUser({ withAgents: true');
     expect(block).toContain('app.exit(0)');
   });
 
   it('only happens once: a copy already inside a throwaway home is the stranger', () => {
-    const src = read('main/main.mjs');
+    const src = read('main/main.mts');
     expect(src).toContain('isNewUserBuild(app.getName()) && !runningAsAFreshUser()');
     // The mark the hand-over sets is the mark the copy reads.
     expect(runningAsAFreshUser({ [FRESH_USER_ENV]: '1' })).toBe(true);

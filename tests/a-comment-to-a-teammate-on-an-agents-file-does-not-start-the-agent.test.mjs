@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { noteToItsAgent } from '../main/notes-wake.mjs';
 import { cleanMark, marksOf, noteGoesTo, notesForItsAgent } from '../shared/artifact-marks.mjs';
 
@@ -139,6 +139,6 @@ describe("a teammate's note on an agent's file", () => {
 });
 
 it('both doors pass the team\'s people to the rule', () => {
-  const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+  const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
   expect(ipc.match(/noteToItsAgent\(\{[^}]*people/g)?.length).toBe(2);
 });

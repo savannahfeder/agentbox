@@ -6,7 +6,7 @@
 // than the moment it was sent. 21 events since the Oct 6 launch, of which 6
 // pairs share a `happened_at`: 14 real crashes sent as 21 events.
 //
-// WHY. `write` in main/crash-report.mjs puts the report on disk and then hands
+// WHY. `write` in main/crash-report.mts puts the report on disk and then hands
 // it to the live transport, and it never removed the file afterwards. So the
 // queue on disk, which exists for a report written by a process too far gone to
 // send it, also held every report that HAD been sent, and the next launch's
@@ -31,8 +31,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createAnalytics } from '../main/analytics.mjs';
-import { installCrashReports, setTransport } from '../main/crash-report.mjs';
+import { createAnalytics } from '../main/analytics.mts';
+import { installCrashReports, setTransport } from '../main/crash-report.mts';
 
 let dir;
 beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-one-crash-')); });

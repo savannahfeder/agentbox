@@ -24,8 +24,8 @@ import path from 'node:path';
 import {
   ensureTaskFolder, inventoryWorktrees, strayWorktrees, listTaskFolders, taskBranch,
   releaseTaskFolder, parkTaskFolder,
-} from '../main/task-folders.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+} from '../main/task-folders.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 

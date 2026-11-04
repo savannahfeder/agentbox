@@ -8,7 +8,7 @@
 //
 // Measured through the store's own writes on disk and the list's own sort.
 // The row's place is `placedAt`, not `updatedAt`, which keeps moving forward
-// because team sync (main/team/index.mjs) and the caches read it as "changed".
+// because team sync (main/team/index.mts) and the caches read it as "changed".
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';

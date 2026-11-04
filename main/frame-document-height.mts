@@ -1,4 +1,4 @@
-import { DOC_SCHEMES, isScheme } from '../shared/schemes.mjs';
+import { DOC_SCHEMES, isScheme } from '../shared/schemes.mts';
 
 export function wantsDocumentHeight(url: string): boolean {
   try {

@@ -5,7 +5,7 @@
 // thread drew "Moved to Later until 8:16am", then her words under "You 8:02am"
 // as if they had gone, then the running agent's "Thinking just now". She could
 // not tell whether the agent had her note now, at 8:16, or twice. It had not:
-// the reply waits on the row for its time (main/ipc.mjs writes the time, then
+// the reply waits on the row for its time (main/ipc.mts writes the time, then
 // the words). Only the drawing said otherwise.
 //
 // Measured off the tester's own ledger. The reply's words and its time are

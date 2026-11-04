@@ -16,7 +16,7 @@ import { folderTitle, mentionKind, mentionLabel, mentionName, type MentionKind }
 import { TaskTerminal } from './TaskTerminal';
 import { asksForANewTab, whereALinkGoes, type LinkClick } from '../link-click';
 import { watchCommandCatalog } from '../command-catalog';
-import { providerCommand } from '../../../shared/provider-commands.mjs';
+import { providerCommand } from '../../../shared/provider-commands.mts';
 // Focus mode: the whole interruption, rendered to be decidable in seconds.
 //
 // THE MESSAGE IS A CONVERSATION, ON EVERY ROW.An imported Claude Code session
@@ -57,9 +57,9 @@ import {
  * THE ROW'S TWO WORDS COME FROM `rowSays` NOW, not from six constants pulled
    apart here. One list, one row shape (w-23a7b3f568, 2026-08-27). */
 import { commandBeingWritten, enterWaitsForWords, holdingHint, rowKey, rowSays, slashRows, type SlashRow } from '../slash-menu';
-import { commandDraft } from '../../../shared/claude-commands.mjs';
+import { commandDraft } from '../../../shared/claude-commands.mts';
 import { CompactionResult, runCompaction, runCommand } from './CompactionResult';
-import { codexCommand, COMPACTION_COPY } from '../../../shared/codex-commands.mjs';
+import { codexCommand, COMPACTION_COPY } from '../../../shared/codex-commands.mts';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mjs';
 import { dayLabel, itemOptions, offerIsLive, optionsFrom, parseOptions, parseRepeat, repeatsLine, stripOptionsSection, type ParsedOption } from '../format';
 import { ruleIdOf } from '../../../shared/repeats.mjs';
@@ -75,6 +75,10 @@ import { firstFrameSrc, playerShelf } from '../player-shelf';
 import { handleCopyOut, blockCopyText } from '../copy-out';
 import { diagramSource } from '../diagram-fence';
 import { DiagramBlock } from './DiagramBlock';
+import { NeedCard, NeedPlace, HELD, setHeld } from './NeedCard';
+import { NEED_BLOCK, isNewestAnswer, keyFromReply, keyLooksWrong, keySavedWords, needsAsBlocks } from '../key-asks';
+import { connectedReply, needsIn, needId, keysOf, type Need } from '../../../shared/cloud-needs.mjs';
+import { keyLabel, keyWords } from '../../../shared/cloud-keys.mjs';
 import { referencedFiles, isImagePath } from '../referenced-files';
 import { pictureRoots } from '../message-folders';
 import { changePathFor } from '../code-artifact';
@@ -155,6 +159,7 @@ import type { Spot } from '../one-thing-at-a-time';
 import { ChoicesFold, ChoicesShow, QueueNav } from './OneThingAtATime';
 import { InlineTable, gridFromHast } from './TableView';
 import { foldKey, foldedKeys, toggleFold } from '../one-thing-at-a-time';
+const needName = (n: Need) => (n.kind === 'sign-in' ? n.service.name : n.kind === 'key' ? (keyWords(n.what) ? `the ${keyWords(n.what)}` : n.name) : n.kind === 'file' ? (n.path.split('/').pop() ?? n.path) : `the ${n.about} code`);
 
 // A relative product path is an artifact, however the worker wrote it:
 // images render inline, other files become links, and .html demos embed
@@ -292,7 +297,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
   // A picture pasted straight into a message carries its own bytes, so there is
   // no file anywhere for a click to open and it stays a picture and nothing else.
   if (/^data:/.test(src)) return <img src={src} alt={alt ?? ''} className="inline-image" />;
-  // `data-copy-file` is what a right click reads (main/main.mjs), so the
+  // `data-copy-file` is what a right click reads (main/main.mts), so the
   // picture itself offers the file. The chips at the foot used to carry it too
   // and they are gone, so this is now the only one in the message: a right
   // click on the drawing is how she copies the file out.
@@ -352,7 +357,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
 // listening, so the player is the link: the name above it still opens the file
 // in the app that owns it, and the player tries every root the way a picture
 // does. The file comes on the app's own scheme, which serves sound and film
-// from the folders the app owns (main/img-scheme.mjs), because her window is
+// from the folders the app owns (main/img-scheme.mts), because her window is
 // served over http and may not load a file:// url.
 //
 // ITS NAME IS A MENTION LIKE ANY OTHER FILE'S (w-a3a7d1a1ec, 2026-10-12). The
@@ -713,7 +718,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -721,6 +726,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   previewSample?: string;
   /** A file to open big, and a comment to land on, asked for from a search result. */
   openAt?: ArtifactOpen | null;
+  /** The keys saved for cloud runs, by name; null when this Mac has no cloud. */
+  cloudKeys?: string[] | null;
   /** The repeating task this thread is a run of, drawn in its summary. */
   repeat?: RepeatHandle | null;
   /** A ⌘K row that acts on this thread's own page (../thread-commands.ts):
@@ -780,7 +787,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // WHETHER THIS MAC OFFERS A CHOICE OF CODING AGENT, and which one this row
   // runs on. Both off the snapshot and both answered by main: the byline may
   // name an engine only where there is one to name, and the two rules that
-  // decide that are pinned to main/supervisor.mjs. False and absent on every
+  // decide that are pinned to main/supervisor.mts. False and absent on every
   // Mac until the gate is opened, and the line is then the one already chosen,
   // unchanged.
   engineChoice?: boolean;
@@ -985,7 +992,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // the conversation, folded to a rail when closed (w-a3482b8c2c).
   //
   // NOT ON A MESSAGE FROM A PERSON. A message between two people lives in a
-  // record of its own (main/team/projects.mjs makeDirect), is not work, and is
+  // record of its own (main/team/projects.mts makeDirect), is not work, and is
   // never carded for the team, so it has no state to report and nothing to
   // summarise. Not on the rows with no ledger behind them either: a running
   // agent's row, the trouble row and the update row have no fields to keep.
@@ -1405,6 +1412,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         // A MERMAID CHART IS DRAWN, with its source as the fallback (DiagramBlock).
         const code = (Array.isArray(children) ? children[0] : children) as { props?: { className?: string; children?: ReactNode } } | undefined;
         const lang = /language-([\w-]+)/.exec(code?.props?.className ?? '')?.[1];
+        if (lang === NEED_BLOCK) return <NeedCard source={String(code?.props?.children ?? '')} fallback={<CodePre>{children}</CodePre>} />;
         const source = diagramSource(lang, String(code?.props?.children ?? ''));
         if (source) return <DiagramBlock source={source} fallback={<CodePre>{children}</CodePre>} />;
         return <CodePre>{children}</CodePre>;
@@ -1499,11 +1507,112 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     [productDir, direct],
   );
 
-  const md = (text: string) => (
-    <MessagePlace.Provider value={place}>
-      <ReactMarkdown remarkPlugins={mdPlugins} components={mdComponents} urlTransform={artifactUrlTransform}>{text}</ReactMarkdown>
-    </MessagePlace.Provider>
-  );
+  // WHAT A CLOUD RUN ASKED FOR is a card in its message (NeedCard.tsx). A saved
+  // sign-in or key carries on every thread waiting on it (main/ipc.mjs zero:cloud-key);
+  // a file or a code goes back as this thread's reply.
+  const [keysJustSaved, setKeysJustSaved] = useState<string[]>([]);
+  const savedKeys = cloudKeys ? [...new Set([...cloudKeys, ...keysJustSaved])] : null;
+  const latestNeeds = savedKeys ? needsIn(item.result ?? '') : [];
+  const latestAsks = latestNeeds.flatMap(keysOf);
+  // A file sent while a sign-in on the same message was still open waits for it, then both go in one reply (round seven:
+  // the file went alone and the thread came back asking for the sign-in again).
+  const [, setHeldTick] = useState(0);
+  const heldHere = HELD.get(item.id) ?? [];
+  const keyedOpen = (saved: string[]) => latestNeeds.filter((n) => keysOf(n).length && !keysOf(n).every((k) => saved.includes(k)));
+  // What the latest ask still waits on, given these keys saved and these files held. Nothing goes back while it is not empty
+  // (round eight: a held film went back with GitHub while the npm code was still open).
+  const openAfter = (saved: string[], given: string[]) => latestNeeds.filter((n) => (keysOf(n).length ? !keysOf(n).every((k) => saved.includes(k)) : !given.includes(needId(n))));
+  // What went before the last thing given: the sign-ins saved for this ask, which no reply has named yet
+  // (round eleven: the reply after a file and a code never said Sentry was connected), then what was held.
+  const heldWords = () => {
+    const keyed = latestNeeds.filter((n) => keysOf(n).length);
+    const connected = keyed.length ? connectedReply(keyed).replace(/ Carry on\.$/, '') : '';
+    const held = (HELD.get(item.id) ?? []).map((h) => h.words).join(' ');
+    return [connected, held].filter(Boolean).join(' ');
+  };
+  const saveKeys = async (fields: { name: string; value: string; label: string }[], need: Need, words?: string) => {
+    let out: Awaited<ReturnType<typeof api.cloudKey>> = { ok: true };
+    const savedAfter = [...(savedKeys ?? []), ...fields.map((f) => f.name)];
+    const left = openAfter(savedAfter, heldHere.map((h) => h.need));
+    const withHeld = heldHere.length && !left.length
+      ? `${connectedReply(latestNeeds.filter((n) => keysOf(n).length)).replace(/ Carry on\.$/, '')} ${heldWords()}${words ? ` ${words}` : ''} Carry on.`
+      : words;
+    for (const [i, f] of fields.entries()) {
+      const reply = withHeld && i === fields.length - 1 ? { product: item.product, id: item.id, answer: withHeld } : undefined;
+      // Which Stripe key is kept, said where it is listed (round ten).
+      const mode = /^STRIPE_/.test(f.name) ? (/^(sk|rk)_live_/.test(f.value.trim()) ? 'Live ' : /^(sk|rk)_test_/.test(f.value.trim()) ? 'Test-mode ' : '') : '';
+      out = await api.cloudKey({ action: 'save', name: f.name, value: f.value, label: `${mode}${f.label}`, ...(reply ? { reply } : {}) });
+      if (!out.ok) return out.error || 'The cloud did not take the key. Try again.';
+    }
+    if (withHeld !== words) { setHeld(item.id, null); setHeldTick((t) => t + 1); }
+    const names = fields.map((f) => f.name);
+    const saved = [...new Set([...(out.keys ?? []).map((k) => k.name), ...keysJustSaved, ...names])];
+    setKeysJustSaved((was) => [...was, ...names]);
+    const said = need.kind === 'sign-in' ? need.service.name : fields[0].label;
+    onNotice(keySavedWords(said, { asks: latestAsks, saved, freed: out.freed ?? [], thread: item.id, cloudOff: !!out.cloudOff, done: need.kind === 'sign-in' ? 'connected' : 'saved', left: left.map(needName) }));
+    return null;
+  };
+  const sendFile = async (path: string | null, need: Need) => {
+    const waitFor = openAfter(savedKeys ?? [], [...heldHere.map((h) => h.need), needId(need)]);
+    const also = heldWords();
+    const out = await api.cloudSendFile({ product: item.product, id: item.id, ...(path ? { path } : { choose: true }), hold: waitFor.length > 0, ...(also && !waitFor.length ? { also } : {}) });
+    if (out.canceled) return null;
+    if (!out.ok) return out.error || 'The file could not be sent. Try again.';
+    const name = out.path?.split('/').pop();
+    if (out.held && out.words) {
+      setHeld(item.id, [...(HELD.get(item.id) ?? []).filter((h) => h.need !== needId(need)), { need: needId(need), words: out.words }]);
+      setHeldTick((t) => t + 1);
+      onNotice(`${name} is ready. It goes with ${waitFor.map(needName).join(' and ')}.`);
+      return null;
+    }
+    if (also) { setHeld(item.id, null); setHeldTick((t) => t + 1); }
+    onNotice(`Sent ${name}. This thread carries on in the cloud.`);
+    return null;
+  };
+  const sendCode = async (about: string, code: string) => {
+    const also = heldWords();
+    const out = await api.cloudSendCode({ product: item.product, id: item.id, about, code, ...(also ? { also } : {}) });
+    if (!out.ok) return out.error || 'The code could not be sent. Try again.';
+    if (also) { setHeld(item.id, null); setHeldTick((t) => t + 1); }
+    onNotice('Code sent. This thread carries on.');
+    return null;
+  };
+  // A key pasted into the reply box instead of the card is saved, not sent as words.
+  const sendReply: typeof onReplySend = (text, ...rest) => {
+    // A code typed in the reply box goes as the code it asked for (round seven: it went from Needs you into the box, not the card).
+    const codeAsk = latestNeeds.find((n) => n.kind === 'code');
+    if (codeAsk && codeAsk.kind === 'code' && /^\s*\d{4,8}\s*$/.test(text)) {
+      const first = keyedOpen(savedKeys ?? []);
+      // Never as words: a one-time code in the thread is a code in search.
+      if (first.length) { onNotice(`Connect ${first.map(needName).join(' and ')} first, then the code: it runs out in a minute.`); return; }
+      onReplyClose();
+      void sendCode(codeAsk.about, text.trim()).then((said) => { if (said) onNotice(said); });
+      return;
+    }
+    const pasted = keyFromReply(text, latestAsks, savedKeys ?? []);
+    const need = pasted ? latestNeeds.find((n) => keysOf(n).includes(pasted.name)) : null;
+    if (!pasted || !need) { onReplySend(text, ...rest); return; }
+    const label = need.kind === 'sign-in' ? need.service.keys.find((k) => k.name === pasted.name)?.label ?? pasted.name : keyLabel(need.kind === 'key' ? need.what : '') ?? pasted.name;
+    const wrong = keyLooksWrong(pasted.name, pasted.value, label);
+    if (wrong) { onNotice(`${wrong.replace(/ Press Save again.*$/, '')} Nothing was sent or saved; paste it in the card on the thread to keep it anyway.`); return; }
+    if (need.kind === 'sign-in' && need.service.keys.length > 1) { onReplySend(text, ...rest); return; }
+    onReplyClose();
+    const words = pasted.words ? text.replace(pasted.value, `[${label}, saved]`) : undefined;
+    void saveKeys([{ name: pasted.name, value: pasted.value, label }], need, words).then((said) => { if (said) onNotice(said); });
+  };
+  const md = (text: string) => {
+    const needs = needsIn(text);
+    const body = (
+      <MessagePlace.Provider value={place}>
+        <ReactMarkdown remarkPlugins={mdPlugins} components={mdComponents} urlTransform={artifactUrlTransform}>{needs.length ? needsAsBlocks(text) : text}</ReactMarkdown>
+      </MessagePlace.Provider>
+    );
+    if (!needs.length) return body;
+    // Said to since, or running again, it has been answered (round six: a card stayed open under "Do it from my computer.").
+    const spoken = item.answer !== '(withdrawn)' && (item.wrote?.answer?.ts ?? 0) > (item.wrote?.result?.ts ?? 0);
+    const live = isNewestAnswer(text, item.result) && item.status === 'open' && !spoken;
+    return <NeedPlace.Provider value={{ itemId: item.id, given: heldHere.map((h) => h.need), saved: savedKeys, live, needs, saveKeys, sendFile, sendCode, fileInfo: (path) => api.cloudFileInfo({ path }), onComputer: () => onReplySend('Do it from my computer.'), openLink: (href) => openHref(href) }}>{body}</NeedPlace.Provider>;
+  };
 
   // Every design THIS MESSAGE names, embedded live under it. The whole
   // message, not just the ask she opened with: on her own rows the ask is the
@@ -2309,7 +2418,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
 
             That is the whole reasoning and it is not only convention. Stopping
             is something she says TO the agent, and a reply already reaches a
-            running session mid-run (`session.child.steer`, main/live-replies.mjs),
+            running session mid-run (`session.child.steer`, main/live-replies.mts),
             so the box she says things in is where the verb belongs. What was
             here was a 290 point sentence on a bordered button, under a rule of
             the same weight as the rules between messages, in the one strip of
@@ -2436,7 +2545,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer key={`${item.product}:${item.id}`} item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} items={items} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} stop={stopButton} />
+            <DockComposer key={`${item.product}:${item.id}`} item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} items={items} onSend={sendReply} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} stop={stopButton} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
@@ -3069,7 +3178,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   //
   // AND NOTHING IS DRAWN IN ITS PLACE. A Codex worker runs one posture,
   // `untrusted` + `workspace-write`, and the other two approval policies were
-  // measured on 2026-09-04 and neither gates anything (main/codex-session.mjs).
+  // measured on 2026-09-04 and neither gates anything (main/codex-session.mts).
   // Which of the six would stand for which Codex setting is a judgement about
   // what an agent may do on her Mac, and it is hers to make with an approval
   // path built for it. Until then the honest control is no control.

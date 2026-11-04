@@ -9,3 +9,17 @@ export interface TraceReader {
 }
 
 export declare function traceReader(options?: { keep?: number }): TraceReader;
+
+export interface TraceFs {
+  statSync(file: string): { size: number; mtimeMs: number };
+  openSync(file: string, flags: string): number;
+  readSync(fd: number, buffer: Uint8Array, offset: number, length: number, position: number): number;
+  closeSync(fd: number): void;
+}
+
+export type TraceAnswer =
+  | { startedAt: number; text: string; stamp?: string; cut?: true }
+  | { startedAt: number; stamp: string; same: true }
+  | { startedAt: number; stamp: string; from: number; more: string };
+
+export declare function traceAnswer(options: { fs: TraceFs; file: string; startedAt: number; had?: string }): TraceAnswer;

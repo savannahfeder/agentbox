@@ -66,6 +66,6 @@ it('in a group, the row says she was named', () => {
 it('every Needs you door passes your name', () => {
   const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
   expect(read('renderer/src/App.tsx')).toMatch(/fileNewsFor\(i, team\?\.me \?\? null, \{ myName \}\)/);
-  expect(read('main/team/rooms.mjs')).toMatch(/groupFileRow\(\{[^}]*myName/);
+  expect(read('main/team/rooms.mts')).toMatch(/groupFileRow\(\{[^}]*myName/);
   expect(read('main/team/thread-share.mjs')).toMatch(/createdBy: owner \}, me, \{ myName: myName\(\) \}\)/);
 });

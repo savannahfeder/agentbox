@@ -10,8 +10,8 @@
 // read out of the claude binary with `grep -a "not your usage limit"`.
 
 import { describe, it, expect } from 'vitest';
-import { troubleCause, runStoppedLine } from '../shared/spawn-trouble.mjs';
-import { limitInResultLine } from '../main/cloud/run.mjs';
+import { troubleCause, runStoppedLine } from '../shared/spawn-trouble.mts';
+import { limitInResultLine } from '../main/cloud/run.mts';
 import { humanFailure } from '../renderer/src/notes.ts';
 
 const SERVER_BUSY = 'Server is temporarily limiting requests (not your usage limit)';

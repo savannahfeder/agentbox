@@ -2,7 +2,7 @@
 // identical reply with a newer ledger timestamp produced zero immediate
 // continuations. Delivery identity must include when the reply was written.
 import {it,expect} from 'vitest';
-import {Supervisor} from '../main/supervisor.mjs';
+import {Supervisor} from '../main/supervisor.mts';
 import {isDue} from '../shared/work-items.mjs';
 function probe(before,after){
  const s=Object.create(Supervisor.prototype);
