@@ -3216,6 +3216,7 @@ body {
 /* The tasks a close question is about, named so one filed far up the thread
    can be found. The dot matches the filed list's (threads-made.css). */
 .opt-named { margin: 0 0 6px; }
+.close-ask-at-task > .opt-strip { margin-top: 12px; }
 .opt-named-row {
   display: flex; align-items: center; gap: 10px; width: 100%; min-height: 30px; padding: 0 16px;
   appearance: none; background: transparent; border: 0; cursor: pointer; text-align: left;

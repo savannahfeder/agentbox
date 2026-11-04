@@ -11,9 +11,10 @@
 //
 // So a close (E, the "Close this task" option, the pane's button, ⌘K) on a
 // thread with tasks still waiting for a yes does not close. The options turn
-// into the question that was skipped, in the words chosen off the drawings:
-// with one waiting, approve it or drop it; with several, decide each one,
-// start them all, or drop them all; and esc keeps the thread open.
+// into the question that was skipped. The words were rewritten in
+// w-66748120f2: "Approve it, then close" read as the agent approving, "Drop it"
+// said nothing, and the esc row beside the numbers was one more thing to work
+// out, so it is three numbered answers.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
@@ -29,57 +30,61 @@ describe('the question a close asks', () => {
     expect(closeAsk(0)).toBeNull();
   });
 
-  it('with one waiting, offers to approve it or drop it, approve first', () => {
+  it('with one waiting, offers to start it, close both, or keep the thread, starting first', () => {
     const ask = closeAsk(1);
-    expect(ask.ask).toBe('Before this closes: one task it filed has not started.');
-    expect(words(ask)).toEqual(['Approve it, then close', 'Drop it, then close']);
-    expect(ask.options.map((o) => o.act)).toEqual(['start', 'drop']);
-    expect(ask.options[0].recommended).toBe(true);
-    expect(ask.options.map((o) => o.n)).toEqual([1, 2]);
+    expect(ask.ask).toBe('Before this thread closes, what happens to the task it filed?');
+    expect(words(ask)).toEqual([
+      'Start the task in a new thread, then close this one',
+      'Close both without starting the task',
+      'Keep this thread open',
+    ]);
+    expect(ask.options.map((o) => o.act)).toEqual(['start', 'drop', 'keep']);
+    expect(ask.options.filter((o) => o.recommended).map((o) => o.n)).toEqual([1]);
+    expect(ask.options.map((o) => o.n)).toEqual([1, 2, 3]);
   });
 
-  it('with two, offers to decide each one first, then both at once', () => {
+  it('with two, says both, and recommends keeping the thread to decide each one', () => {
     const ask = closeAsk(2);
-    expect(ask.ask).toBe('Before this closes: two tasks it filed have not started.');
-    expect(words(ask)).toEqual(['Decide each one', 'Start both, then close', 'Drop both, then close']);
-    expect(ask.options.map((o) => o.act)).toEqual(['decide', 'start', 'drop']);
-    expect(ask.options[0].recommended).toBe(true);
-    expect(ask.options.filter((o) => o.recommended)).toHaveLength(1);
+    expect(ask.ask).toBe('Before this thread closes, what happens to the two tasks it filed?');
+    expect(words(ask)).toEqual([
+      'Start both in new threads, then close this one',
+      'Close this thread and both tasks without starting them',
+      'Keep this thread open and decide each one',
+    ]);
+    expect(ask.options.map((o) => o.act)).toEqual(['start', 'drop', 'decide']);
+    expect(ask.options.filter((o) => o.recommended).map((o) => o.n)).toEqual([3]);
   });
 
   it('with three, says all three', () => {
     const ask = closeAsk(3);
-    expect(ask.ask).toBe('Before this closes: three tasks it filed have not started.');
-    expect(words(ask)).toEqual(['Decide each one', 'Start all three, then close', 'Drop all three, then close']);
+    expect(ask.ask).toBe('Before this thread closes, what happens to the three tasks it filed?');
+    expect(words(ask)).toContain('Start all three in new threads, then close this one');
+    expect(words(ask)).toContain('Close this thread and all three tasks without starting them');
   });
 
   it('past the words it has, falls back to the number rather than inventing one', () => {
     const ask = closeAsk(12);
-    expect(ask.ask).toBe('Before this closes: 12 tasks it filed have not started.');
-    expect(words(ask)).toContain('Start all 12, then close');
+    expect(ask.ask).toBe('Before this thread closes, what happens to the 12 tasks it filed?');
+    expect(words(ask)).toContain('Start all 12 in new threads, then close this one');
+  });
+
+  it('never words an option as approving or dropping', () => {
+    for (const n of [1, 2, 5]) expect(words(closeAsk(n)).join(' ')).not.toMatch(/approve|drop/i);
   });
 });
 
-describe('the esc row under the question', () => {
+describe('the strip it is drawn in', () => {
   const ask = closeAsk(2);
-  const props = {
+  const html = renderToStaticMarkup(React.createElement(OptionsOffer, {
     ask: ask.ask, askAll: ask.ask, options: ask.options, peekOption: null, askPeek: false,
     selectedOption: null, selRef: { current: null }, onPick: () => {},
     onOptionEnter: () => {}, onAskEnter: () => {}, setPeek: () => {}, setAskPeek: () => {},
-  };
+  }));
 
-  it('is drawn with its key when the strip is given a way to keep the thread', () => {
-    const html = renderToStaticMarkup(React.createElement(OptionsOffer, { ...props, keep: { label: 'Keep this thread open', onKeep: () => {} } }));
-    expect(html).toContain('>esc<');
-    expect(html).toContain('Keep this thread open');
-    expect(html).toContain('Before this closes: two tasks it filed have not started.');
-    expect(html.match(/class="opt-row/g)).toHaveLength(4);
-  });
-
-  it('is not drawn under an ordinary offer', () => {
-    const html = renderToStaticMarkup(React.createElement(OptionsOffer, props));
-    expect(html).not.toContain('>esc<');
+  it('draws three numbered rows and no esc row', () => {
     expect(html.match(/class="opt-row/g)).toHaveLength(3);
+    expect(html).not.toContain('>esc<');
+    expect(html).toContain('Before this thread closes, what happens to the two tasks it filed?');
   });
 });
 
@@ -96,6 +101,10 @@ describe('where the question is wired', () => {
     expect(app).toMatch(/markDone\(item, \{ force: true, unshippedOk: true \}\)/);
   });
 
+  it('keeps the thread open on keeping it and on deciding each one', () => {
+    expect(app).toContain("if (option.act === 'keep' || option.act === 'decide') return;");
+  });
+
   it('gives the number keys, the arrows, Enter and esc to the question while it is up', () => {
     expect(app).toMatch(/if \(asking && closeAskOwnsKey\(e\.key\)\) \{/);
     expect(app).toMatch(/answerCloseAsk\(focused, /);
@@ -103,6 +112,7 @@ describe('where the question is wired', () => {
 
   it('draws the question in the place of the offer, in the pane and on the card', () => {
     expect(focus).toMatch(/closeAsk \?/);
-    expect(focus.match(/keep=\{closeAsk\.keep\}/g)?.length).toBe(2);
+    expect(focus).toContain('{!fullScreenDoc && !askAtTask && closeAskStrip(false)}');
+    expect(focus).toContain('{fullScreenDoc && closeAskStrip(true)}');
   });
 });

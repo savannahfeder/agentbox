@@ -38,7 +38,7 @@ import type { ParsedOption } from '../format';
 
 export function OptionsOffer({
   ask, askAll, options, peekOption, askPeek,
-  selectedOption, selRef, onPick, onOptionEnter, onAskEnter, setPeek, setAskPeek, keep, named, stripRef, onOver, bare = false,
+  selectedOption, selRef, onPick, onOptionEnter, onAskEnter, setPeek, setAskPeek, named, stripRef, onOver, bare = false,
 }: {
   /** The tasks a close question is about, each opening on a click: they may
    *  have been filed on a turn folded far up the thread. */
@@ -49,9 +49,6 @@ export function OptionsOffer({
   onOver?: (over: boolean) => void;
   /** No heading: on the one-at-a-time page the question is already the page's headline. */
   bare?: boolean;
-  /** A last row keyed esc that answers by doing nothing: the question a close
-   *  asks when tasks are still waiting (../close-asks-first.ts). */
-  keep?: { label: string; onKeep: () => void };
   /** The sentence the options answer, off the same field the options came off. */
   ask: string;
   askAll: string;
@@ -153,12 +150,6 @@ export function OptionsOffer({
             : o.recommended && <span className="opt-rec">recommended</span>}
         </button>
       ))}
-      {keep && (
-        <button className="opt-row" onClick={keep.onKeep}>
-          <span className="opt-key">esc</span>
-          <span className="opt-text">{keep.label}</span>
-        </button>
-      )}
     </div>
   );
 }

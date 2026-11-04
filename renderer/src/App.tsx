@@ -189,7 +189,7 @@ import { URGENT_PRIORITY, itemPriority, moveProduct, placeScore, placedScore } f
 import { rankProducts } from './project-priority';
 import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT } from './threads-made';
 import { waitingCounts } from './threads-made';
-import { closeAsk, closeAskOwnsKey, KEEP_OPEN, unshippedAsk } from './close-asks-first';
+import { closeAsk, closeAskOwnsKey, unshippedAsk } from './close-asks-first';
 import { notShipped, shipItAsk } from '../../shared/not-shipped.mts';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, askedInLabel, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
@@ -4726,7 +4726,7 @@ export default function App() {
   }, [flushPending, pushUndo, showToast, refresh]);
 
   // THE ANSWER TO WHAT A CLOSE ASKED (w-d2744c6daa, ./close-asks-first.ts).
-  // Deciding each one keeps the thread open and brings the list into view;
+  // Deciding each one keeps the thread open, under the list it stands beneath;
   // starting or dropping them does so one at a time through the same presses
   // the rows carry, and then closes the thread for real. Each press commits the
   // one before it (`deferCommit`), so Z takes back the close, the last thing.
@@ -4744,7 +4744,8 @@ export default function App() {
     // THE ONE QUESTION HERE THAT IS NOT ABOUT CLOSING (./discard-asks-first.ts).
     // Keeping the change is the whole of its own answer: the question goes and
     // the thread is where it was, with its offer still standing.
-    if (option.act === 'keep') return;
+    // Deciding each one is the same: the question stood under their rows.
+    if (option.act === 'keep' || option.act === 'decide') return;
     if (option.act === 'discard') {
       if (pick) await pickRef.current?.(item, pick.n, { confirmed: true });
       return;
@@ -4755,10 +4756,6 @@ export default function App() {
       return;
     }
     if (option.act === 'close') { await markDone(item, { unshippedOk: true }); return; }
-    if (option.act === 'decide') {
-      document.querySelector('.made-waiting')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      return;
-    }
     for (const kid of waiting) {
       if (option.act === 'start') await resolve(kid, { stay: true });
       else await markDone(kid, { stay: true, force: true });
@@ -7801,11 +7798,8 @@ export default function App() {
                   // The question a close asks while tasks still wait (w-d2744c6daa).
                   closeAsk={(() => {
                     const asked = askingToClose(focused);
-                    // No esc row on the discard question: its option 2 is the
-                    // same answer (./discard-asks-first.ts).
-                    const keep = closeAskWhy === 'discard' ? undefined : { label: KEEP_OPEN, onKeep: keepThreadOpen };
                     const named = closeAskWhy === 'filed' ? waitingFiled(focused).map((i) => ({ id: i.id, title: rowTitle(i) })) : undefined;
-                    return asked && { ...asked, raised: closeAskRaised, onPick: (n: number) => answerCloseAsk(focused, n), keep, named };
+                    return asked && { ...asked, raised: closeAskRaised, onPick: (n: number) => answerCloseAsk(focused, n), named };
                   })()}
                   onNotice={showToast}
                   /*
