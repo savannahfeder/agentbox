@@ -244,6 +244,7 @@ import { InviteRows } from './threads/InviteRows';
 import { mentionRows } from './team/rooms/room-rules';
 import { SAYS_UNDO, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
+import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
 import { reachAudienceOf } from '../../shared/teammate-reach.mjs';
 
@@ -9146,6 +9147,15 @@ export default function App() {
           AND IT NAMES THE TASK: the row's own title is the card's first line,
           and the sentence ("Started in Agentbox Team") the quiet one under it,
           picked out of fourteen drawings over four rounds. */}
+      {multiSel.size > 0 && !toast && !focused && !modal && (
+        <TickedBar count={multiSel.size} view={view} onKey={(does) => {
+          const sel = selectable.filter((i) => multiSel.has(i.id));
+          if (does === 'clear') setMultiSel(new Set());
+          else if (does === 'l') openSnooze(sel);
+          else if (view === 'snoozed') unsnooze(sel);
+          else void batchDone(multiSel);
+        }} />
+      )}
       {toast && (() => {
         // Said above the reply box instead, or about to be: the frame between
         // leaving the answered thread and opening the next one.
