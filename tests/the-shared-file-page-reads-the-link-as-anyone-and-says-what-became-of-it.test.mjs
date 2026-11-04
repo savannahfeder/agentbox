@@ -21,25 +21,26 @@ const rpcOf = (answers) => {
   return { rpc, asked };
 };
 const ROW = { name: 'plan.md', kind: 'markdown', type: 'text/markdown', body: '# Plan', version: 2, updated_at: '2026-11-04T10:00:00Z', owner_name: 'Maya Chen', owner_avatar: null, mine: false };
+const TOK = 'pR3nY0q7Lw2Xc9Vb5Tz1';
 
 describe('reading the link', () => {
   it('is the file when the link is live, and asks nothing more', async () => {
     const { rpc, asked } = rpcOf({ file_link_view: [ROW] });
-    const shown = await readSharedFile(rpc, 'tok');
+    const shown = await readSharedFile(rpc, TOK);
     expect(shown).toEqual({ state: 'file', file: { name: 'plan.md', kind: 'markdown', type: 'text/markdown', body: '# Plan', version: 2, updatedAt: Date.parse('2026-11-04T10:00:00Z'), ownerName: 'Maya Chen', ownerAvatar: null, mine: false } });
-    expect(asked).toEqual([['file_link_view', { tok: 'tok' }]]);
+    expect(asked).toEqual([['file_link_view', { tok: TOK }]]);
   });
   it('says stopped for a link that was stopped, and does not work for one that never was', async () => {
-    expect(await readSharedFile(rpcOf({ file_link_view: [], file_link_stopped: true }).rpc, 't')).toEqual({ state: 'stopped' });
-    expect(await readSharedFile(rpcOf({ file_link_view: [], file_link_stopped: false }).rpc, 't')).toEqual({ state: 'unknown' });
+    expect(await readSharedFile(rpcOf({ file_link_view: [], file_link_stopped: true }).rpc, TOK)).toEqual({ state: 'stopped' });
+    expect(await readSharedFile(rpcOf({ file_link_view: [], file_link_stopped: false }).rpc, TOK)).toEqual({ state: 'unknown' });
   });
   it('names a sharer with no name Someone, and takes only an https picture of them', async () => {
-    const { file } = await readSharedFile(rpcOf({ file_link_view: [{ ...ROW, owner_name: '  ', owner_avatar: 'javascript:x' }] }).rpc, 't');
+    const { file } = await readSharedFile(rpcOf({ file_link_view: [{ ...ROW, owner_name: '  ', owner_avatar: 'javascript:x' }] }).rpc, TOK);
     expect(file.ownerName).toBe('Someone');
     expect(file.ownerAvatar).toBeNull();
   });
   it('lets a lost connection through as a failure, not as a link that does not work', async () => {
-    await expect(readSharedFile(rpcOf({ file_link_view: new Error('Failed to fetch') }).rpc, 't')).rejects.toThrow();
+    await expect(readSharedFile(rpcOf({ file_link_view: new Error('Failed to fetch') }).rpc, TOK)).rejects.toThrow();
   });
 });
 

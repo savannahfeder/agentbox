@@ -41,7 +41,7 @@ export function sharedFileToken(pathname: string, onTheWebApp: boolean): string 
 const KINDS = new Set<FileKind>(['markdown', 'page', 'image', 'pdf']);
 
 export async function readSharedFile(rpc: Rpc, tok: string): Promise<Shown> {
-  if (!PATH.test(`/f/${tok}`)) return { state: 'unknown' };
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(tok)) return { state: 'unknown' };
   const rows = await rpc('file_link_view', { tok });
   const r = Array.isArray(rows) ? rows[0] : null;
   if (r && KINDS.has(r.kind)) {
