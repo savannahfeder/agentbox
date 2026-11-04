@@ -74,10 +74,12 @@ export function SharedFilePage({ token, client, finishing = null }: {
       // A link stopped while the page sat open stops showing the file.
       void anyone('file_link_stopped', { tok: token }).then((stopped) => { if (stopped === true) setLoad({ state: 'stopped' }); }, () => {});
     };
+    // Back on the tab, the file is read again too: the owner may have updated it meanwhile.
+    const back = () => { if (document.visibilityState === 'visible') void readAll(); };
     const t = window.setInterval(tick, 30_000);
-    document.addEventListener('visibilitychange', tick);
-    return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', tick); };
-  }, [anyone, token]);
+    document.addEventListener('visibilitychange', back);
+    return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', back); };
+  }, [anyone, token, readAll]);
 
   const file = load.state === 'file' ? load.file : null;
   const title = file ? titleOf(file).title : null;

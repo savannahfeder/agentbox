@@ -999,12 +999,14 @@ export function createTeamService({
       return true;
     },
     /** This person's live link for one of their files, or why there is none. */
-    async fileLink(source, hashNow = null) {
+    async fileLink(source, hashNow = null, versionNow = null) {
       if (!linkSite) return { site: null, signedIn: !!state.me, link: null };
       if (!backend?.fileLinkFor || !state.me) return { site: linkSite, signedIn: false, link: null };
       const l = await backend.fileLinkFor(source);
-      // `current`: the link holds the very copy on screen (hashNow, main/file-link.mjs).
-      return { site: linkSite, signedIn: true, link: l ? { ...l, url: linkAddress(linkSite, l.token), current: hashNow == null || l.hash === hashNow } : null };
+      if (!l) return { site: linkSite, signedIn: true, link: null };
+      // `current`: the link holds the very copy on screen. `ahead`: it holds a later version than the one on screen.
+      const current = hashNow == null || l.hash === hashNow;
+      return { site: linkSite, signedIn: true, link: { ...l, url: linkAddress(linkSite, l.token), current, ahead: !current && versionNow != null && l.version > versionNow } };
     },
     /** Shares the file, or puts this copy of it in its live link. */
     async shareFile({ source, name, kind, type, body, version, hash }) {

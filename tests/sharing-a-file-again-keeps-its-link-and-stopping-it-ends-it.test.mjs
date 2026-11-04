@@ -91,6 +91,18 @@ describe('signed in', () => {
     expect((await maya.fileLinks()).links.map((l) => l.name)).toEqual(['pricing.html']);
   });
 
+  it('says when the link holds a newer version than the one on screen, so it is not offered an older one', async () => {
+    await maya.shareFile(file(3));
+    const { link } = await maya.fileLink(SOURCE, 'h1', 1);
+    expect(link).toMatchObject({ current: false, ahead: true });
+    expect(linkOffer({ ok: true, link }).behind).toBe(false);
+    expect((await maya.fileLink(SOURCE, 'h4', 4)).link).toMatchObject({ current: false, ahead: false });
+    expect(shareWords.ahead(3)).toBe('The link shows version 3, newer than this one.');
+    expect(shareWords.newer('plan-v2.md')).toBe('plan-v2.md is newer. Open it to share that one.');
+    // Signed out, a file with a live link read as if nothing were shared (power test, round 3).
+    expect(shareWords.signedOut).toBe('Sign in to share this file or see its link.');
+  });
+
   it('says whether the link holds the copy on screen', async () => {
     await maya.shareFile(file(1));
     expect((await maya.fileLink(SOURCE, 'h1')).link.current).toBe(true);

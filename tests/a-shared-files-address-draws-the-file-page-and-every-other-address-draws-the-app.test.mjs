@@ -83,6 +83,12 @@ describe('the boot', () => {
     // A stranger's browser opens it dark, not in the look the app saves for its own people.
     expect(main).toMatch(/if \(!sharedFile\) normalizeSavedLook\(localStorage, machineTheme\(\)\);/);
   });
+  // An open page kept the old copy after Update link (power test, round 3, 2026-11-04).
+  it('reads the file again when its tab comes back into view', () => {
+    const page = read('renderer/src/shared-file/SharedFilePage.tsx');
+    expect(page).toMatch(/const back = \(\) => \{ if \(document\.visibilityState === 'visible'\) void readAll\(\); \};/);
+    expect(page).toContain("document.addEventListener('visibilitychange', back);");
+  });
   it('installs neither of the app\'s bridges on the shared page', () => {
     expect(read('renderer/src/api.ts')).toMatch(/if \(!onASharedFilePage\(\) && !installBrowserBridge\(\)\) installCloudBridge\(\);/);
   });

@@ -17,11 +17,13 @@ import type { CarryState } from '../../shared/carried-files.mjs';
 
 export interface FileLinkAsk { product: string; thread: string; src: string }
 /** `current`: the link holds the copy of the file on screen now. */
-export interface FileLink { token: string; url: string; version: number; createdAt: number; updatedAt: number; comments: number; current: boolean }
+/** `ahead`: the link holds a later version of the file than the one on screen. */
+export interface FileLink { token: string; url: string; version: number; createdAt: number; updatedAt: number; comments: number; current: boolean; ahead?: boolean }
 export interface PublicLink { token: string; url: string; source: string; name: string; kind: string; createdAt: number; updatedAt: number; comments: number }
 export interface LinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean }
 /** `site` null: this copy's cloud has no website, so there is nothing to share on. */
-export interface FileLinkState { ok: boolean; error?: string; site?: string | null; signedIn?: boolean; link?: FileLink | null }
+/** `newer`: a later version beside the file on screen that the link does not hold. */
+export interface FileLinkState { ok: boolean; error?: string; site?: string | null; signedIn?: boolean; link?: FileLink | null; newer?: string | null }
 import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
 import { whileSystemWindowIsOpen } from './system-window';
 import { USAGE_SAME_AS_ANOTHER, USAGE_UNREADABLE } from '../../shared/usage.mjs';
