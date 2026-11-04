@@ -147,7 +147,7 @@ const cards = [
 // Jun shares no threads with the team, as many people won't.
 
 const wallCard = (p, o) => ({
-  id: p.id, me: p.id === ME.id, name: p.name, avatarUrl: p.avatarUrl, headline: null, bio: null, agents: 0, level: null,
+  id: p.id, me: p.id === ME.id, name: p.name, avatarUrl: p.avatarUrl, headline: null, bio: null, agents: 0,
   hoursTotal: 120, hoursWeek: 22, hoursToday: 4, streak: 6, byMonth: [], teammate: true, showActivity: true, activity: null,
   status: null, workingOn: null, workingPrivate: false, ...o,
 });
@@ -155,8 +155,8 @@ const teamRoom = {
   id: 'r-team', name: 'Northwind', kind: 'room', teamId: 't-1', listed: true, inviteOnly: false, role: 'owner', members: 3,
   createdAt: NOW - 30 * 24 * hour, pinned: true, muted: false, unread: 2, readAt: NOW - 2 * hour, lastAt: NOW - 18 * min, agents: 19,
   wall: [
-    wallCard(ME, { agents: 16, level: 53, workingOn: 'Fix mobile inbox crowding', hoursToday: 41, hoursWeek: 236, streak: 19 }),
-    wallCard(MAYA, { agents: 3, level: 31, workingOn: 'Brand colours for the launch', hoursToday: 9, hoursWeek: 58, streak: 7 }),
+    wallCard(ME, { agents: 16, workingOn: 'Fix mobile inbox crowding', hoursToday: 41, hoursWeek: 236, streak: 19 }),
+    wallCard(MAYA, { agents: 3, workingOn: 'Brand colours for the launch', hoursToday: 9, hoursWeek: 58, streak: 7 }),
     wallCard(JUN, { away: true, agents: null, hoursToday: 0, hoursWeek: 12, streak: 0 }),
   ],
   people: [ME, MAYA, JUN].map((p) => ({ id: p.id, name: p.name, avatarUrl: p.avatarUrl })),

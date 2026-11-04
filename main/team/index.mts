@@ -89,6 +89,13 @@ export interface TeamState {
 }
 
 /** A person's open work and AI teammates, handed on when they leave. */
+/** A file put in a link anyone can open. */
+export interface FileLinkShare { source: string; name: string; kind: string; type: string; body: string; version?: number; hash?: string }
+/** This person's live link to one file. */
+export interface FileLinkRow { token: string; version: number; hash: string; createdAt: number; updatedAt: number; comments: number }
+export interface FileLinkListed { token: string; source: string; name: string; kind: string; createdAt: number; updatedAt: number; comments: number }
+export interface FileLinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean }
+
 export interface TeamHandover { handTo: string; name: string; mates: { id: string; name?: string; job?: string | null; to: string | null }[] }
 
 /** The signed-in cloud, as far as the team service asks of it: the real one and the memory one both answer. */
@@ -118,6 +125,13 @@ export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & 
   acceptInvite(teamId: string): Promise<unknown>;
   invite(teamId: string, email: string): Promise<void>;
   shareProject(project: { id: string; teamId: string; name: string; visibility?: string; people?: string[]; direct?: boolean }): Promise<unknown>;
+  shareFile?(file: FileLinkShare): Promise<unknown>;
+  fileLinkFor?(source: string): Promise<FileLinkRow | null>;
+  myFileLinks?(): Promise<FileLinkListed[]>;
+  stopFileLink?(token: string): Promise<void>;
+  fileLinkComments?(token: string): Promise<FileLinkComment[]>;
+  commentOnFileLink?(token: string, text: string): Promise<unknown>;
+  newLinkComments?(since: number): Promise<LinkComment[]>;
   subscribe(onChange: () => void): () => void;
 };
 
@@ -182,6 +196,7 @@ export interface TeamStore {
   answerItem(slug: string, id: string, patch: TeamAnswer): unknown;
   teamPatch(slug: string, id: string, patch: { assignee: string }): unknown;
   composeItem(slug: string, fields: Record<string, unknown>): { id: string };
+  commentOnASharedFile(slug: string, id: string, note: string, comment?: { name: string; file: string; text: string } | null): unknown;
   teammates?: { create(fields: { name?: string; job?: string | null; product?: string }): { id: string }; remember(id: string, text: unknown): unknown } | null;
   config?: { storeRoot?: string };
 }
@@ -243,6 +258,8 @@ export interface TeamServiceOptions {
   /** This person's AI teammates, which the team sees on its board. */
   ownMates?: () => { id: string; name?: string; job?: string | null; openToTeam?: boolean; now?: string | null; running?: boolean; updatedAt?: number; createdAt?: number }[];
   phone?: TeamPhone | null;
+  /** Where a file's link opens; the phone site when undefined, no links when null. */
+  shareSite?: string | null;
   rooms?: TeamRoomsSetup | null;
 }
 
@@ -284,6 +301,11 @@ const createThreadShare = createThreadShareJs as unknown as (args: {
   onChange: () => void; log: (line: string) => void; now: () => number;
 }) => ThreadShare;
 const mateCard = mateCardJs as (t: { id: string; name?: string; job?: string | null; openToTeam?: boolean }, how?: { now?: string | null; at?: number; running?: boolean }) => SyncCard;
+import { linkAddress, linkSiteFor } from '../file-link.mjs';
+import { noticeLinkComments } from './link-comments.mjs';
+import type { LinkComment } from './link-comments.mjs';
+
+const LINK_COMMENTS_EVERY_MS = 60_000;
 
 // `signingIn` is { url } while a Google sign-in waits on the browser, so the
 // page can offer that link again rather than a button that does nothing.
@@ -307,6 +329,8 @@ export function createTeamService({
   // projects she put on it (slugs), how a command from it is done, and where
   // this Mac remembers what it sent. Needs no team, only a sign-in.
   phone = null,
+  // Where a file's link opens; the phone site unless said.
+  shareSite = undefined,
   // ROOMS (alpha, docs/team/ROOMS-PLAN.md): { enabled, device, presenceFacts, prefsFile }.
   rooms: roomsSetup = null,
   // The threads an agent is on right now, by id, so a card says so.
@@ -317,6 +341,7 @@ export function createTeamService({
   // The phone site's address, only an https one, and its code for Settings.
   const site = typeof phone?.site === 'string' && /^https:\/\/[^\s/]+(\/[^\s]*)?$/.test(phone.site) ? phone.site : null;
   let siteQr: string | null = null;
+  const linkSite = linkSiteFor(shareSite === undefined ? site : shareSite);
   // `settling` holds the window's boot screen until the team is known, so it
   // never draws the single-person app first and then redraws with the team.
   // `canSignIn` survives teamForWindow, so a build with Multiplayer off still asks.
@@ -525,10 +550,33 @@ export function createTeamService({
         // nor her phone the team.
         await phoneOnce();
         await rooms?.tick().catch((err) => log(`rooms: ${err.message}`));
+        await linkCommentsOnce();
         pending = null;
       }
     });
     return pending;
+  }
+
+  // Comments on this person's shared links, once a minute, as notes on the
+  // threads the files came from (main/team/link-comments.mjs).
+  let linkCommentsAt = 0;
+  async function linkCommentsOnce() {
+    if (!state.me || !backend?.newLinkComments || now() - linkCommentsAt < LINK_COMMENTS_EVERY_MS) return;
+    linkCommentsAt = now();
+    const me = state.me.id;
+    try {
+      const wrote = await noticeLinkComments({
+        backend, now, log,
+        cursor: () => kept().getLinkComments(me),
+        setCursor: (at) => kept().setLinkComments(me, at),
+        readItem: ({ product, thread }) => {
+          const p = products().find((x) => x.slug === product);
+          return p ? disk.readWorkItems(p.dir).find((i) => i.id === thread) ?? null : null;
+        },
+        write: ({ product, thread }, note, comment) => store.commentOnASharedFile(product, thread, note, comment),
+      });
+      if (wrote) onChange();
+    } catch (err) { log(`link comments: ${(err as Error).message}`); }
   }
 
   async function handOverWhatLeft(cards: SyncCard[], people: TeamPerson[]) {
@@ -1216,6 +1264,45 @@ export function createTeamService({
       if (!dir || !sync?.retryCarried || !(await sync.retryCarried(dir, plainRef(String(src ?? ''))))) return false;
       await syncNow();
       return true;
+    },
+    /** This person's live link for one of their files, or why there is none. */
+    async fileLink(source: string, hashNow: string | null = null, versionNow: number | null = null) {
+      if (!linkSite) return { site: null, signedIn: !!state.me, link: null };
+      if (!backend?.fileLinkFor || !state.me) return { site: linkSite, signedIn: false, link: null };
+      const l = await backend.fileLinkFor(source);
+      if (!l) return { site: linkSite, signedIn: true, link: null };
+      // `current`: the link holds the very copy on screen. `ahead`: it holds a later version than the one on screen.
+      const current = hashNow == null || l.hash === hashNow;
+      return { site: linkSite, signedIn: true, link: { ...l, url: linkAddress(linkSite, l.token), current, ahead: !current && versionNow != null && l.version > versionNow } };
+    },
+    /** Shares the file, or puts this copy of it in its live link. */
+    async shareFile({ source, name, kind, type, body, version, hash }: FileLinkShare) {
+      if (!linkSite) throw new Error('This cloud has no website to share files on.');
+      if (!backend?.shareFile || !state.me) throw new Error('Sign in to share a link.');
+      await backend.shareFile({ source, name, kind, type, body, version, hash });
+      return this.fileLink(source, hash);
+    },
+    /** Every live link of this person's, for the one list of what they made public. */
+    async fileLinks() {
+      if (!linkSite || !backend?.myFileLinks || !state.me) return { site: linkSite, links: [] };
+      const links = await backend.myFileLinks();
+      return { site: linkSite, links: links.map((l) => ({ ...l, url: linkAddress(linkSite, l.token) })) };
+    },
+    async stopFileLink(token: string) {
+      if (!backend?.stopFileLink || !state.me) throw new Error('Sign in first.');
+      await backend.stopFileLink(token);
+    },
+    /** The comments people left on a link's page, and the owner's answer to them. */
+    async fileLinkComments(token: string) {
+      if (!backend?.fileLinkComments || !state.me) return [];
+      return backend.fileLinkComments(token);
+    },
+    async commentOnFileLink(token: string, text: unknown) {
+      if (!backend?.commentOnFileLink || !state.me) throw new Error('Sign in first.');
+      const words = String(text ?? '').trim();
+      if (!words) throw new Error('Write something first.');
+      await backend.commentOnFileLink(token, words);
+      return backend.fileLinkComments!(token);
     },
     /** A first name for the tile that says whose computer a file waits for. */
     firstNameOf: (id: string) => (state.people ?? []).find((p) => p.id === id)?.name?.split(/\s+/)[0] ?? null,

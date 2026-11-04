@@ -18,6 +18,7 @@ import { color, corner, font } from './theme';
 
 const { DISMISS, DO_HERE, START_NEW } = FILED_WORDS;
 const STOPPED = '#e08a6c';
+const MOVED_HERE = 'Moved here';
 const MONO_CAPS = { fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase' as const };
 
 /** Thread.tsx's chevron, turned a quarter when open. */
@@ -244,7 +245,7 @@ export function FiledList({ rows, label, open, approve, here, dismiss, inTurn }:
               <Pressable onPress={() => open(r)} accessibilityRole="button"
                 style={({ pressed }) => ({ flex: 1, minWidth: 0, minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 14, paddingLeft: 14, backgroundColor: pressed ? color.fill : 'transparent' })}>
                 <T numberOfLines={1} style={{ flex: 1, fontSize: 14, color: quiet ? color.faint : color.text }}>{r.title}</T>
-                <T style={{ ...MONO_CAPS, color: quiet || r.state === 'done' || r.state === 'scheduled' ? color.faint : color.dim }}>{stateWord(r.state)}</T>
+                <T style={{ ...MONO_CAPS, color: quiet || r.state === 'done' || r.state === 'scheduled' ? color.faint : color.dim }}>{r.here ? MOVED_HERE : stateWord(r.state)}</T>
               </Pressable>
             </View>
           );

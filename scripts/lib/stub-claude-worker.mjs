@@ -242,6 +242,8 @@ async function actFromPlan({ calls = [], say: words }) {
 //   [[stub:limit-first]] run out on the first attempt only, so a retry or a
 //                        second login can finish it
 //   [[stub:work-then-die]] run a tool, then die with no answer
+//   [[stub:file:leads/x.csv]] end the answer with that path on a line of its
+//                        own, as an agent hands over a file it made
 //
 // The words a limit is reported in are the CLI's own ("You've hit your session
 // limit · resets …"), which is what shared/spawn-trouble.mts reads.
@@ -340,6 +342,8 @@ const COMPUTER_ASK = /\bxcode\b|simulator|testflight/i;
       : `Finished "${title}" with ${[...services.map((x) => `your saved ${x[2]} sign-in`), ...(wantsFile ? [named ? `the ${named} you sent` : 'the film you sent'] : []), ...(wantsCode ? ['the code you sent'] : [])].join(', ')}. It is done.`;
   }
 }
+const handsOver = directive('stub:file')?.[1];
+if (handsOver) said = `${said}\n\n${handsOver}\n`;
 if (directive('stub:limit') || (directive('stub:limit-first') && attempt === 1) || (limitOn && limitOn === loginName) || turn.limit) {
   say({ type: 'result', subtype: 'success', result: "You've hit your session limit · resets 11:59pm", is_error: true, session_id: sessionId });
   await Promise.race([inputEnded, wait(2000)]);

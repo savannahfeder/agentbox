@@ -525,7 +525,7 @@ export default function ThreadScreen() {
           foldedChoices={thread.options.length > 0 && !asking && choicesFolded ? thread.options.length : 0} showChoices={foldChoices} />
       </KeyboardAvoidingView>
       <ThreadMenu open={menu} close={() => setMenu(false)} now={c.now} laterNow={offers.laterNow} runNow={offers.runNow} moveToCloud={offers.moveToCloud}
-        onLater={(until, label) => void press({ kind: 'later', until, label }, item, back)}
+        onLater={(until, label) => void press({ kind: 'later', until, label, running: !!thread.running }, item, back)}
         onBack={() => void press({ kind: 'later', until: 0 })}
         onRunNow={() => void press({ kind: 'run-now' })}
         onMoveToCloud={() => void press({ kind: 'move-to-cloud' })}

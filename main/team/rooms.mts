@@ -9,7 +9,6 @@ import type { WallCard, TeamCardLike } from '../../shared/room-cards.mts';
 import type { AgentHoursSummary } from '../../shared/agent-hours.mts';
 import { groupFileRow, groupRow } from '../../shared/room-needs-you.mjs';
 import type { GroupRow } from '../../shared/room-needs-you.mjs';
-import { GENERAL_ROOM } from './rooms-memory.mts';
 import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mjs';
 import { carryIntoRoom } from './carry-files.mjs';
 import { readRoomMessage } from '../../shared/agent-voice.mjs';
@@ -615,9 +614,6 @@ export function createRooms({
     try {
       const mine = await ensureProfile(b);
       state = { ...state, me: mine };
-      // Someone with no team and no room starts in Coworking, pinned.
-      const rooms = await b.myRooms();
-      if (!rooms.length && !(team()?.team)) await b.joinListedRoom(GENERAL_ROOM).catch((err) => log(`rooms: Coworking: ${err.message}`));
       unsubscribe ??= b.subscribeRooms(hear);
       setUp = true;
       state = { ...state, error: null };
@@ -963,7 +959,10 @@ export function createRooms({
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) throw new Error(`${clean || 'that'} is not an email address`);
       await need().inviteToRoom(roomId, clean);
     },
+    // Groups are your team's: a paid team is how you share one with anyone else.
     async create({ name, kind = 'room', listed = false, inviteOnly = false, people: who = [] }: { name: unknown; kind?: string; listed?: boolean; inviteOnly?: boolean; people?: string[] }) {
+      const mates = new Set((team()?.people ?? []).map((p) => p.id));
+      if (kind !== 'group' || listed || !who.length || who.some((id) => id !== meId() && !mates.has(id))) throw new Error('A group is only ever people on your team');
       const id = await need().createRoom({ name: String(name ?? '').trim(), kind, listed, inviteOnly, people: who });
       prefs.set(meId(), { pinned: [...new Set([...prefs.get(meId()).pinned, id])] });
       await refresh();

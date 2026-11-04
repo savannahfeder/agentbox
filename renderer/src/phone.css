@@ -383,9 +383,9 @@
   :root:root:root .doc-picture { touch-action: none; transform-origin: center center; transition: transform .05s linear; }
   /* A picture's box while it loads is at the foot of this file, outside this
      block, because the phone link in a computer's browser is wider than this. */
-  /* The reply box's attach button, an icon like the box's others. */
-  :root:root:root .compose-attach {
-    flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; margin: 0 4px 0 -6px;
+  /* The reply box's paperclip at a finger's size. */
+  :root:root:root .dock-clip {
+    flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0;
     border: 0; background: none; color: var(--text-dim); box-shadow: none;
   }
   /* The microphone beside it (WebDictation.tsx), the phone app's size. */
@@ -562,7 +562,7 @@
   :root:root:root .tc-card > .tc-bar > .dictate-row {
     order: 3; flex: none; height: calc(52px + var(--phone-foot)); padding: 0 12px var(--phone-foot) 16px; border-top: 1px solid var(--line);
   }
-  /* Send is the orange box, square, 16px in from the edge and centred on the
+  /* Send is the grey box, square, 16px in from the edge and centred on the
      top bar: at 12px from the edge it sat "touching the top corner of the
      app" (2026-10-11). */
   :root:root:root .tc-card .tc-send {

@@ -19,6 +19,7 @@ import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
 import { pressedInTheFindBox } from '../find-in-page';
 import { ArtifactStage, StageLink, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
+import { readCommentDraft, saveCommentDraft } from '../comment-drafts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { noteWithPictures } from '../note-pictures';
 import { AttachRow } from './AttachRow';
@@ -28,6 +29,7 @@ import { CrossIcon } from './CrossIcon';
 import { DocText } from './DocText';
 import { FileNoteCard } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
+import { ShareLink, canShareFile } from './ShareLink';
 import './artifact-view.css';
 
 /** `steps`: the paths the arrows step through, in order, when the press came from a turn of the thread. */
@@ -44,7 +46,7 @@ const KIND_WORD = { image: 'Picture', film: 'Film', pdf: 'PDF', deck: 'Slides', 
 
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-export function ArtifactView({ product, thread, threadName, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, below, files: fromElsewhere }: {
+export function ArtifactView({ product, thread, shareThread, threadName, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, below, files: fromElsewhere }: {
   /** Each path's number on its file's version line, which every surface counts by. */
   numbers?: Record<string, number>;
   /** What to say of a version with no bytes on this computer, by who made it. */
@@ -54,6 +56,8 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   product: string;
   /** The thread whose files these are, so a name opens that thread's own file. */
   thread?: string;
+  /** The thread a file opened from Files was sent in, for its link (ShareLink). */
+  shareThread?: string;
   threadName: string;
   lines: LedgerLine[];
   marks: FileMarks;
@@ -158,9 +162,17 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
   const person = useCallback((id: string | null): Person | null => people.find((p) => p.id === (id ?? me)) ?? null, [people, me]);
   const nameOf = useCallback((id: string | null) => (id === me ? 'You' : firstName(person(id)) || 'A teammate'), [me, person]);
 
+  // The version the comment box's words belong to. Saving waits for it, so the
+  // words on screen are never written under the version just stepped onto.
+  const draftOf = useRef<string | null>(null);
   useEffect(() => {
-    setDraftPlace(null); setHere(null); setCompare(false); setLeftVi(null); setReplyingTo(null); setFound('looking');
+    const kept = readCommentDraft({ product, thread, file: version?.id ?? '' });
+    draftOf.current = version?.id ?? null;
+    setWords(kept.words); setDraftPlace(kept.place); setAsking(null);
+    setNamed(people.filter((p) => kept.words.includes(`@${firstName(p)}`)));
+    setHere(null); setCompare(false); setLeftVi(null); setReplyingTo(null); setFound('looking');
   }, [version?.id]);
+  useEffect(() => { if (draftOf.current) saveCommentDraft({ product, thread, file: draftOf.current }, { words, place: draftPlace }); }, [words, draftPlace]);
   const [editing, setEditing] = useState<Editing | null>(null);
   // The editor read the file itself, so it is open while it is on screen.
   const foundNow: Found = editing ? 'open' : found;
@@ -659,6 +671,9 @@ export function ArtifactView({ product, thread, threadName, lines, numbers, mark
         {editing && editWord && <span className="av-saved" role="status">{editWord}</span>}
         {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
         {canRestore && !compare && !editing && <button type="button" className="av-btn" disabled={restoring} onClick={() => void restore()}><NoteGlyph name="undo" />Restore this version</button>}
+        {(thread ?? shareThread) && version && foundNow === 'open' && !compare && canShareFile(version.path) && (
+          <ShareLink product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me} />
+        )}
         {onOutside && version && foundNow === 'open' && <button type="button" className="av-btn" onClick={() => onOutside(version.path)}><NoteGlyph name="outside" />Open outside</button>}
         <button type="button" className="av-btn av-leave" onClick={leave} title="Back (esc)"><NoteGlyph name="back" />Back</button>
       </header>

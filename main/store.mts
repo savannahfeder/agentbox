@@ -1044,6 +1044,19 @@ export class Store {
     return workItemsDisk.updateWorkItem(this.productDir(slug), id, { note }, { source: 'system' });
   }
 
+  // SOMEONE COMMENTED ON A FILE THIS THREAD MADE, through its shared link
+  // (main/team/link-comments.mjs). Said as a note; a closed thread comes back
+  // to wait on her as `closedBeforeItShipped` brings one, and a thread still
+  // going is left going.
+  commentOnASharedFile(slug: string, id: string, note: string, linkComment: { name: string; file: string; text: string } | null = null) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const item = workItemsDisk.updateWorkItem(dir, id, { note, ...(linkComment ? { linkComment } : {}) }, { source: 'system' });
+    if (item?.status !== 'done') return item;
+    workItemsDisk.updateWorkItem(dir, id, { status: 'open' }, { source: 'founder' });
+    return workItemsDisk.updateWorkItem(dir, id, { status: 'blocked' }, { source: 'system' });
+  }
+
   // A CLOUD RUN'S WORK KEPT ON A BRANCH OF ITS OWN, because laying it into the
   // task folder would have undone work done there (main/cloud/run.mts
   // `park`). Said as a note; the row waits for her, and loses `ship`, so the

@@ -246,6 +246,9 @@ function keyOf(name, path) {
   return `${stem}\0${baseName(name)}`;
 }
 
+/** The key of the family a path belongs to, in plain characters (a database refuses \0). */
+export const familyKeyOf = (path) => keyOf(shownName(path), path).replace(/\0/g, '/');
+
 const endsWithPath = (whole, part) => whole === part || whole.endsWith(`/${part}`);
 
 /**
@@ -419,6 +422,24 @@ export const otherKind = (path) => OTHER_KINDS.find(([, re]) => re.test(String(p
 export const viewKind = (path) => reviewKind(path) ?? otherKind(path);
 /** Whether a file pressed in a group opens in the big view: what it reviews, and a table. */
 export const opensBigInAGroup = (name) => !!reviewKind(name) || otherKind(name) === 'table';
+// The brief has an agent name a page or table it made by its bare path, so one
+// with a folder in it counts too. A script named bare is a sentence about code.
+// Read back from each ending: tried at every letter, it is slow on long messages.
+const BARE_END = /\/[\w.-]+\.(?:html?|csv|tsv)(?![\w/-])/gi;
+const MAY_BE_BARE = new RegExp(BARE_END.source, 'i');
+const BARE_OTHER = /(?<![\w./:@~(\[-])((?:\.?\/)?[\w.-]+(?:\/[\w.-]+)+\.(?:html?|csv|tsv))$/i;
+function bareOthers(text) {
+  const out = [];
+  for (const m of text.matchAll(BARE_END)) {
+    const end = m.index + m[0].length;
+    let start = m.index;
+    const floor = Math.max(0, m.index - 400);
+    while (start > floor && /[\w./:@~(\[-]/.test(text[start - 1])) start -= 1;
+    const word = text.slice(Math.max(0, start - 1), end).match(BARE_OTHER);
+    if (word) out.push({ at: start, path: word[1] });
+  }
+  return out;
+}
 const OTHER_NAMED =/\]\(<?((?:\.?\/)?[^()\s>:]+\.[A-Za-z0-9]+)>?\)|`((?:\.?\/)?[\w.-]+(?:\/[\w.-]+)*\.[A-Za-z0-9]+)`/g;
 
 // "-390.png" is the end of a name said before it, not a file.
@@ -432,11 +453,17 @@ export function otherFilesInLines(lines) {
     const p = l?.patch;
     if (!p) continue;
     for (const field of ['result', 'note', 'body', 'answer']) {
-      // OTHER_NAMED is a link or a code span, so it needs one of these.
-      if (typeof p[field] !== 'string' || !(p[field].includes('](') || p[field].includes('`'))) continue;
-      for (const m of p[field].replace(FENCE, '').matchAll(OTHER_NAMED)) {
-        if (l.source === 'founder' && !m[1]) continue;
-        const path = (m[1] ?? m[2]).replace(/^\.\//, '');
+      if (typeof p[field] !== 'string') continue;
+      const named = p[field].includes('](') || p[field].includes('`');
+      const bare = l.source !== 'founder' && MAY_BE_BARE.test(p[field]);
+      if (!named && !bare) continue;
+      const text = p[field].replace(FENCE, '');
+      const hits = [
+        ...(named ? [...text.matchAll(OTHER_NAMED)].filter((m) => l.source !== 'founder' || m[1]).map((m) => ({ at: m.index, path: m[1] ?? m[2] })) : []),
+        ...(bare ? bareOthers(text) : []),
+      ].sort((a, b) => a.at - b.at);
+      for (const hit of hits) {
+        const path = hit.path.replace(/^\.\//, '');
         if (!otherKind(path) || reviewKind(path) || seen.has(path) || shorthand(path)) continue;
         seen.add(path);
         const agent = p.voice?.name ?? (l.source === 'agent' ? '' : null);
