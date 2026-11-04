@@ -18,6 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { stripTypesFlags } from '../main/strip-types.mts';
 
 const SUPERVISOR = fileURLToPath(new URL('../main/supervisor.mts', import.meta.url));
 const REPO = fileURLToPath(new URL('..', import.meta.url));
@@ -66,7 +67,7 @@ async function startApp({ host = false } = {}) {
   const app = path.join(tmp, 'app.mjs');
   fs.writeFileSync(relay, RELAY);
   fs.writeFileSync(app, APP(host));
-  const child = spawn(process.execPath, [app, relay, said, pidFile], { cwd: tmp, detached: true, stdio: 'ignore' });
+  const child = spawn(process.execPath, [...stripTypesFlags(), app, relay, said, pidFile], { cwd: tmp, detached: true, stdio: 'ignore' });
   pids.push(child.pid);
   const end = Date.now() + 10_000;
   while (!fs.existsSync(pidFile) && Date.now() < end) await wait(50);
