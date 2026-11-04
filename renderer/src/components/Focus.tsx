@@ -114,7 +114,7 @@ import { foldedReply } from '../folded-reply';
 import { applyDockHeight } from '../dock-height';
 import { resumeTo } from '../thread-bottom';
 import { optionIsClipped, optionPeek } from '../option-peek';
-import { changedFiles, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
+import { changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
 import { MOVED_PX, THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw } from '../pick-settles';
 import { askHeading, askFull, askIsClipped } from '../ask-line';
 import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mjs';
@@ -1285,7 +1285,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // conversation is: the run that is writing the trace writes the change the
   // moment it exits, and without this she would have to leave the card and come
   // back before the code she watched being written became pressable. A finished
-  // row does not change under her, so it is read once.
+  // row is read once, after the short while its folder takes to settle.
   const [figures, setFigures] = useState<ChangeFigures | null>(null);
   // And where its folder stands, off the same file, because the figures alone
   // cannot say whether any of this reached a commit (../ship-offer.ts).
@@ -1310,9 +1310,13 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         .catch(() => { if (live) { setFigures(null); setStanding(UNREAD); setChanged([]); } });
     };
     read();
-    if (!session) return () => { live = false; };
+    // And for a short while after the run ends: its folder is read back after
+    // its result is written (../ship-offer.ts, folderMayStillMove).
+    const settling = !!session || folderMayStillMove(item, Date.now());
+    if (!settling) return () => { live = false; };
     const timer = setInterval(read, pollEvery(4000, onPhone()));
-    return () => { live = false; clearInterval(timer); };
+    const settled = session ? null : setTimeout(() => clearInterval(timer), FOLDER_SETTLES_MS);
+    return () => { live = false; clearInterval(timer); if (settled) clearTimeout(settled); };
   }, [item.product, item.id, item.updatedAt, session?.startedAt, agent]);
   const summaryNow = summaryOffered ? (summaryShown ? 'open' : 'closed') : null;
 
