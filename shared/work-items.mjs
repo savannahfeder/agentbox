@@ -660,6 +660,7 @@ export function finishItem(raw, now = Date.now()) {
     item.artifacts = marksOf(item.artifactLines);
     delete item.artifactLines;
   }
+  delete item.closedFrom;
   const closes = item.closes;
   delete item.closes;
   const editLines = item.editLines;
@@ -835,6 +836,20 @@ export function foldRawInto(items, lines, touched = null) {
     // the heartbeat rule above is, because the lines that did it are in the
     // ledger already. Only the name ALONE: a line that carries it with anything
     // else carries that too.
+    //
+    // NOR, FOR WHERE A ROW SITS, IS A CLOSE TAKEN STRAIGHT BACK. A bare reopen
+    // by whoever closed it, with no news between, sets `placedAt` to where the
+    // close found the row, and the lists sort on it. `updatedAt` still only
+    // moves forward: team sync and the caches read it as "something changed".
+    const bareStatus = line.source === 'founder' && Object.keys(patch).length === 1 ? patch.status : undefined;
+    if (bareStatus === 'open' && item.closedFrom && item.closedFrom.by === line.by) {
+      item.placedAt = item.closedFrom.at;
+      delete item.closedFrom;
+    } else if (!isNotNews(line)) {
+      if (bareStatus === 'done') item.closedFrom ??= { at: item.placedAt ?? item.updatedAt, by: line.by };
+      else delete item.closedFrom;
+      delete item.placedAt;
+    }
     if (!isNotNews(line)) item.updatedAt = Math.max(item.updatedAt, line.ts);
     if (item.waitingComments && dealsWithComments(line)) delete item.waitingComments;
     if (line.ts < item.createdAt) item.createdAt = line.ts;

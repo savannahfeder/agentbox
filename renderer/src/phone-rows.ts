@@ -199,17 +199,23 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
     }
     else if (refused && c.item && (c.kind === 'close' || c.kind === 'snooze')) {
       said(c.kind === 'close' ? 'Close this thread' : Number(c.payload?.until) > 0 ? 'Move to Later' : 'Bring back from Later');
-    } else if (c.kind === 'close' && row) items.set(key, { ...row, status: 'done', updatedAt: at });
-    else if (c.kind === 'snooze' && row) items.set(key, { ...row, snoozedUntil: Number(c.payload?.until) || null, updatedAt: at });
+    }
+    // Marked as the person's, as the computer will write them: the lists trust only a done and a time the person set.
+    else if (c.kind === 'close' && row) items.set(key, { ...row, status: 'done', wrote: { ...row.wrote, status: { ts: at, source: 'founder' } }, updatedAt: at });
+    else if (c.kind === 'snooze' && row) items.set(key, { ...row, snoozedUntil: Number(c.payload?.until) || null, wrote: { ...row.wrote, snoozedUntil: { ts: at, source: 'founder' } }, updatedAt: at });
     else if (c.kind === 'new' && names.has(slug)) {
       const made = madeHere(c.id);
       // Started in the cloud with the computer away: the copy the cloud wrote is the thread.
       const inCloud = takenAt === null && !!runOfClaim(c.claimed_by);
       if (inCloud && items.has(`${slug}/${made}`)) continue;
       if (!refused && !inCloud && takenAt === null) queue(made);
+      const { runAt, start, engine, model, effort, priority } = phoneChoices('new', c.payload) as Record<string, any>;
       items.set(`${slug}/${made}`, {
         id: made, product: slug, productName: names.get(slug), title: String(c.payload?.title || c.payload?.body || '').slice(0, 200),
-        body: String(c.payload?.body ?? ''), kind: 'directive', labels: ['founder'], priority: 0, createdAt: at, updatedAt: at,
+        body: String(c.payload?.body ?? ''), kind: 'directive', labels: ['founder'], priority: priority ?? 0, createdAt: at, updatedAt: at,
+        ...Object.fromEntries(Object.entries({ runAt, start, engine, model, effort }).filter(([, v]) => v !== undefined)),
+        // Later trusts a time only the person set (list-rules `hiddenUntil`).
+        ...(runAt ? { wrote: { runAt: { ts: at, source: 'founder' } } } : {}),
         ...(refused ? { status: 'blocked', result: `Your computer could not start this: ${refused}` } : inCloud ? { status: 'claimed' } : { status: 'open', waitsForMac: true }),
       });
     }
