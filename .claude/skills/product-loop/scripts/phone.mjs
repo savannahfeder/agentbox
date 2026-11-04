@@ -34,7 +34,7 @@ const LOOK = `(() => {
     return r.width > 1 && r.height > 1 && s.visibility !== 'hidden' && s.display !== 'none' && r.bottom > 0 && r.top < innerHeight; };
   document.querySelectorAll('[data-phone-ref]').forEach((e) => e.removeAttribute('data-phone-ref'));
   const things = [...document.querySelectorAll('button, a[href], input, textarea, [role="button"], [role="tab"], [role="link"], [role="switch"], [role="checkbox"], [tabindex]:not([tabindex="-1"])')]
-    .filter(seen).filter((el, i, all) => !all.some((o) => o !== el && o.contains(el) && o.matches('[role="button"], button, a'))).slice(0, 80);
+    .filter(seen).filter((el, i, all) => el.matches('[role="button"], button, a[href]') || !all.some((o) => o !== el && o.contains(el) && o.matches('[role="button"], button, a'))).slice(0, 80);
   const list = things.map((el, i) => {
     el.setAttribute('data-phone-ref', String(i + 1));
     const words = (el.getAttribute('aria-label') || el.innerText || el.getAttribute('placeholder') || '').replace(/\\s+/g, ' ').trim().slice(0, 60);

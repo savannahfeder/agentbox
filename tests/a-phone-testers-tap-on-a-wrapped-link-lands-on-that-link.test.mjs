@@ -52,3 +52,14 @@ describe('a target with something on top of it', () => {
     expect(aim(el, () => el)).toEqual({ x: 100, y: 120 });
   });
 });
+
+// Round 1 of the 2026-11-03 testers, issue 32, "Bulk close toast has no Undo":
+// the toast's Undo is a button inside the toast's own button, and look left out
+// every button inside another, so no tester could ever press Undo or Dismiss on
+// a toast. A button or link inside another is its own control and is listed.
+describe('what look lists', () => {
+  it('a button inside another button, like the toast\'s Undo', async () => {
+    const src = (await import('node:fs')).readFileSync('.claude/skills/product-loop/scripts/phone.mjs', 'utf8');
+    expect(src).toMatch(/\.filter\(\(el, i, all\) => el\.matches\('\[role="button"\], button, a\[href\]'\) \|\| !all\.some/);
+  });
+});
