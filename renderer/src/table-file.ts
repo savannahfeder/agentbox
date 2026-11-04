@@ -3,8 +3,8 @@
 
 export type ColumnKind = 'name' | 'tag' | 'number' | 'date' | 'link' | 'email' | 'text';
 export type Tone = 'green' | 'blue' | 'purple' | 'amber' | 'rose' | 'teal' | 'grey';
-/** `values` are a tag column's values as first written; `tones` is keyed by their lower case. */
-export type Column = { name: string; kind: ColumnKind; values: string[]; tones: Record<string, Tone> };
+/** `head` is the header as the file has it; `name` is unique. `values` are a tag column's values as first written; `tones` is keyed by their lower case. */
+export type Column = { name: string; head: string; kind: ColumnKind; values: string[]; tones: Record<string, Tone> };
 /** `ranked`: the first column is the file's own rank, which stands in for the row number. */
 export type Table = { columns: Column[]; rows: string[][]; logoCol: number; ranked: boolean };
 export type Sort = { col: number; dir: 'asc' | 'desc' } | null;
@@ -43,7 +43,7 @@ const firstLine = (text: string) => {
   return nl < 0 ? text : text.slice(0, nl);
 };
 
-const sepFor = (text: string, path: string) => {
+export const sepFor = (text: string, path: string) => {
   if (/\.tsv$/i.test(path.split(/[?#]/)[0])) return '\t';
   // Only separators outside quotes count: `"Company, Inc";Status` is a semicolon file.
   const head = firstLine(text).replace(/"(?:[^"]|"")*"/g, '');
@@ -52,7 +52,7 @@ const sepFor = (text: string, path: string) => {
 };
 
 // A markdown table saved under a .csv name: `| a | b |` lines and a `|---|` rule.
-const isMarkdownTable = (text: string) => /^\s*\|.*\|\s*$/.test(firstLine(text.replace(/^﻿/, '')));
+export const isMarkdownTable = (text: string) => /^\s*\|.*\|\s*$/.test(firstLine(text.replace(/^﻿/, '')));
 function parseMarkdownTable(text: string): string[][] {
   return text.replace(/^﻿/, '').split(/\r?\n/)
     .filter((l) => /^\s*\|/.test(l) && !/^\s*\|[\s|:-]+\|\s*$/.test(l))
@@ -230,7 +230,7 @@ export function tableFromGrid(grid: string[][]): Table {
         shown.push(v);
       }
     }
-    return { name, kind, values: shown, tones };
+    return { name, head: head[src] ?? '', kind, values: shown, tones };
   });
   return { columns, rows, logoCol: logoColumn(columns, rows), ranked };
 }

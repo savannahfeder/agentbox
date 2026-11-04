@@ -71,6 +71,32 @@ export function clearDraft(item: ItemRef, store?: DraftStore): void {
   s.removeItem(draftKey(item));
   s.removeItem(draftImagesKey(item));
   s.removeItem(draftPickKey(item));
+  s.removeItem(draftWhenKey(item));
+}
+
+/* ------------------------------- the time -------------------------------- */
+
+// A REPLY SET FOR LATER keeps its time beside its words, so a fold, a reload or
+// a Z puts both back. A time that has gone by is no longer a pick.
+
+export function draftWhenKey(item: ItemRef): string {
+  return `zero.draftwhen.${item.product}:${item.id}`;
+}
+
+/** The moment this reply is set for, or 0 for now. */
+export function readDraftWhen(item: ItemRef, store?: DraftStore, now = Date.now()): number {
+  let raw: string | null = null;
+  try { raw = backing(store).getItem(draftWhenKey(item)); } catch { return 0; }
+  const at = Number(raw);
+  return Number.isFinite(at) && at > now ? at : 0;
+}
+
+export function saveDraftWhen(item: ItemRef, at: number, store?: DraftStore): void {
+  const s = backing(store);
+  try {
+    if (at > 0) s.setItem(draftWhenKey(item), String(Math.trunc(at)));
+    else s.removeItem(draftWhenKey(item));
+  } catch { /* still set for this box */ }
 }
 
 /* ------------------------------- the pick -------------------------------- */
@@ -259,6 +285,8 @@ export function restoreDraft(
   text: string,
   attachments: DraftAttachment[] = [],
   store?: DraftStore,
+  runAt = 0,
+  pick: DraftPick | null = null,
 ): boolean {
   const words = String(text ?? '').trim();
   const images = (attachments ?? []).filter((a) => a && !!a.name && (!!a.dataBase64 || !!a.srcPath));
@@ -266,15 +294,18 @@ export function restoreDraft(
   if (readDraft(item, store).trim() || readDraftAttachments(item, store).length) return false;
   if (words) saveDraft(item, words, store);
   if (images.length) saveDraftAttachments(item, images, store);
+  saveDraftWhen(item, runAt, store);
+  if (pick) saveDraftPick(item, pick, store);
   return true;
 }
 
 // A rejected live send may return after she has started typing again. Preserve
 // both instead of overwriting her new work or silently discarding the failure.
-export function restoreFailedDraft(item: ItemRef, text: string, attachments: DraftAttachment[] = [], store?: DraftStore): void {
+export function restoreFailedDraft(item: ItemRef, text: string, attachments: DraftAttachment[] = [], store?: DraftStore, runAt = 0): void {
   const existing = readDraft(item, store);
   saveDraft(item, [existing, text.trim()].filter(Boolean).join('\n\n'), store);
   saveDraftAttachments(item, [...readDraftAttachments(item, store), ...attachments], store);
+  if (runAt) saveDraftWhen(item, runAt, store);
   if (!store && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(item) }));
 }
 
@@ -410,8 +441,8 @@ export interface ComposeDraft {
   attachments: DraftAttachment[];
   /** A PriorityId, or null for untagged. Kept as a string so this stays pure. */
   priority: string | null;
-  /** A WhenValue: a moment to start at, or a rule, never both. */
-  when: { runAt: number; repeat: unknown };
+  /** A moment to start at, a rule, or Later, never two of them. */
+  when: { runAt: number; repeat: unknown; later?: boolean };
   /** Images that did not fit, so the card can say so instead of coming back short. */
   dropped: number;
   /** When Send was pressed on these words, while that send has not landed. */
@@ -463,7 +494,7 @@ export function readComposeDraft(store?: DraftStore, place?: string): ComposeDra
     text: typeof d.text === 'string' ? d.text : '',
     attachments: (Array.isArray(d.attachments) ? d.attachments : []).map(attachmentOf).filter((a): a is DraftAttachment => !!a),
     priority: typeof d.priority === 'string' ? d.priority : null,
-    when: { runAt: typeof when.runAt === 'number' ? when.runAt : 0, repeat: when.repeat ?? null },
+    when: { runAt: typeof when.runAt === 'number' ? when.runAt : 0, repeat: when.repeat ?? null, ...(when.later === true ? { later: true } : {}) },
     dropped: typeof d.dropped === 'number' && d.dropped > 0 ? d.dropped : 0,
     ...(typeof d.sendingAt === 'number' ? { sendingAt: d.sendingAt } : {}),
   };
@@ -493,7 +524,7 @@ export function openingComposeDraft(store?: DraftStore, now = Date.now(), place?
 /** Nothing typed, nothing pasted and nothing set is not a draft. */
 export function composeDraftIsEmpty(d: ComposeDraft): boolean {
   return !d.text.trim() && !d.attachments.length && !d.priority
-    && !d.when.runAt && !d.when.repeat;
+    && !d.when.runAt && !d.when.repeat && !d.when.later;
 }
 
 /**

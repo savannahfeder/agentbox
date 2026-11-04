@@ -267,6 +267,10 @@ You use the app through one command, run with Bash:
   ${browse} ${round === 1 ? 'open            (first, once)' : 'look            (the app is already open; start here)'}
   ${browse} look            (what is on screen, and numbered things you can press)
   ${browse} click 7         (press thing 7 from the last look; or click "New thread")
+  ${browse} click 7 shift   (press it holding keys: shift, meta, ctrl, alt)
+  ${browse} dblclick 7      (double-click it)        ${browse} rightclick 7   (right-click it)
+  ${browse} drag 7 12       (press on 7, drag to 12, let go)
+  ${browse} drag 7 +150     (drag the right edge of 7 that far across, as you widen a column)
   ${browse} type "some text"
   ${browse} press n         (one key; add modifiers after: press Enter meta, press k meta)
   ${browse} shot name       (a picture; you can open it with Read: ${shots}/name.png)

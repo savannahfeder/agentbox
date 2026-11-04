@@ -6,8 +6,9 @@
 
 // `repeat` when it is a repeating task's rule rather than a thread: its id is a
 // rule's, so it is opened the way the Later list opens one. `sent` when it is a
-// reply, an approval or a picked option going to that thread.
-export type ToastGoes = { product: string; id: string; repeat?: boolean; sent?: boolean };
+// reply, an approval or a picked option going to that thread. `at` when that
+// reply waits for a time, in the words its caret said.
+export type ToastGoes = { product: string; id: string; repeat?: boolean; sent?: boolean; at?: string };
 type Here = { product: string; id: string } | null;
 
 // The undo clause about a dozen callers bake onto the end of their sentence.

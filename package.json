@@ -2,7 +2,7 @@
   "name": "agentbox-app",
   "productName": "Agentbox",
   "version": "0.1.19",
-  "description": "An inbox for managing dozens of Claude Code and Codex agents.",
+  "description": "A desktop GUI for running dozens of Claude Code and Codex agents in parallel, each in its own git worktree.",
   "author": "Savannah Feder",
   "repository": {
     "type": "git",
@@ -18,6 +18,14 @@
     "agents",
     "ai-agents",
     "coding-agent",
+    "coding-agents",
+    "claude-code-gui",
+    "git-worktree",
+    "worktree",
+    "parallel-agents",
+    "agent-orchestration",
+    "gui",
+    "kanban",
     "inbox",
     "cli",
     "electron"

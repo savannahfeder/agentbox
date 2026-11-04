@@ -11,6 +11,10 @@
 </p>
 
 <p align="center">
+  <a href="https://agentbox.ac/download"><strong>Download for Mac</strong></a>
+</p>
+
+<p align="center">
   <a href="#install">Get it</a> ·
   <a href="#an-interface-that-helps-you-hyperfocus">Hyperfocus</a> ·
   <a href="#how-it-works">How it works</a> ·
@@ -33,9 +37,11 @@
 
 ## Install
 
-There are two ways to run it: in the browser, or as a Mac app. Both need Node 22.18 or newer and Claude Code or Codex installed and signed in.
+**As a Mac app.** [Download Agentbox for Mac](https://agentbox.ac/download). It is signed and notarised, and runs on Apple silicon and Intel.
 
-**As a desktop app.** Build it from this repo. `npm start` is the desktop command on Omarchy and on a Mac:
+Every way needs Claude Code or Codex installed and signed in. Building it from source or running it in the browser also needs Node 22.18 or newer.
+
+**As a desktop app from source.** Build it from this repo. `npm start` is the desktop command on Omarchy and on a Mac:
 
 ```
 git clone https://github.com/savannahfeder/agentbox.git
