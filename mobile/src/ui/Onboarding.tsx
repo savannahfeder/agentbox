@@ -2,11 +2,13 @@
 // (renderer/src/styles.css): a small corner on what you press, the larger
 // artifact corner on cards, the accent button from its sign-in page
 // (team/sign-in.css `.si-primary`), and small capitals for labels.
+import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Line, Rect } from 'react-native-svg';
-import { AppMark } from './icons';
+import { SETUP_STEPS, type Setup } from '../lib/first-run';
+import { AppMark, Back } from './icons';
 import { T, Wall } from './parts';
 import { color, font } from './theme';
 
@@ -14,10 +16,16 @@ export const PAD = 24;
 /** The desktop's two corners, at the phone's sizes. */
 export const CORNER = { small: 8, card: 14 };
 
-export function Screen({ children, foot, top = 72 }: { children: ReactNode; foot?: ReactNode; top?: number }) {
+export function Screen({ children, foot, top = 72, back }: { children: ReactNode; foot?: ReactNode; top?: number; back?: () => void }) {
   const inset = useSafeAreaInsets();
   return (
     <Wall>
+      {back && (
+        <Pressable onPress={back} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}
+          style={({ pressed }) => ({ position: 'absolute', zIndex: 1, top: inset.top + 14, left: PAD - 10, height: 36, paddingHorizontal: 10, borderRadius: CORNER.small, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: pressed ? color.picked : 'transparent' })}>
+          <Back size={14} /><T style={{ fontSize: 15, color: color.dim }}>Back</T>
+        </Pressable>
+      )}
       <ScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: inset.top + top, paddingHorizontal: PAD, paddingBottom: 24 }}>
         {children}
       </ScrollView>
@@ -129,11 +137,31 @@ export function Steps({ items }: { items: ReactNode[] }) {
   );
 }
 
-/** A round tick, filled once done. */
-export function Tick({ on }: { on: boolean }) {
+/** The four steps as bars: done in ink, this one in the accent, the rest a line. */
+export function Bars({ at }: { at: Setup }) {
+  const on = SETUP_STEPS.indexOf(at);
   return (
-    <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: on ? 0 : 1.5, borderColor: color.lineStrong, backgroundColor: on ? color.text : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-      {on && <View style={{ width: 5, height: 10, marginTop: -2, borderColor: color.bg, borderRightWidth: 2, borderBottomWidth: 2, transform: [{ rotate: '45deg' }] }} />}
+    <View accessible accessibilityLabel={`Step ${on + 1} of ${SETUP_STEPS.length}`} style={{ flexDirection: 'row', gap: 4, marginBottom: 30 }}>
+      {SETUP_STEPS.map((s, i) => <View key={s} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: i < on ? color.text : i === on ? color.accent : color.lineStrong }} />)}
     </View>
   );
 }
+
+/** Signed in here, and no computer has sent this account anything yet. Signing in there is what connects it. */
+export function ComputerWait({ email, signOut }: { email: string | null; signOut: () => void }) {
+  return (
+    <Screen top={24} foot={<Btn kind="quiet" label="Use another account" onPress={signOut} />}>
+      <Bars at="computer" />
+      <Devices state="waiting" />
+      <Head style={{ marginTop: 28 }}>Sign in on your computer</Head>
+      <View style={{ marginTop: 22 }}>
+        <Steps items={['Open Agentbox on your computer', email
+          ? <>Sign in as <T style={{ fontFamily: font.medium }}>{email}</T></>
+          : 'Sign in with the account you use here']} />
+      </View>
+      <View style={{ marginTop: 22, marginLeft: 2 }}><Live>Waiting for your computer</Live></View>
+    </Screen>
+  );
+}
+
+export const leaveSetup = () => (router.canGoBack() ? router.back() : router.replace('/'));

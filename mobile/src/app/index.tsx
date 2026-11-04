@@ -7,7 +7,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
-import { Name } from '../../../shared/product-name.mjs';
 import { InboxComposer } from '../ui/NewThreadForm';
 import { phoneBoard, shownTabs, TABS, type Row, type TabId } from '../lib/tabs';
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
@@ -31,6 +30,9 @@ import { barsFor } from '../ui/Pickers';
 import { footRoom, IconButton, PriorityBars, RunningMark, T, TopBar, Wall } from '../ui/parts';
 import { color, font, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
+import { ComputerWait } from '../ui/Onboarding';
+import { ALERTS_ASKED_KEY, nextSetup, type Setup } from '../lib/first-run';
+import { alertsHere } from '../platform/alerts';
 
 // The desktop's own words for an empty tab (renderer/src/threads/Pages.tsx `EmptyTab`).
 const EMPTY: Record<Exclude<TabId, 'inbox'>, string> = {
@@ -174,29 +176,6 @@ function InboxClear() {
   );
 }
 
-/** Signed in to an account no computer has sent a project to (Pages.tsx `ConnectComputer`). */
-function ConnectComputer({ email, signOut }: { email: string | null; signOut: () => void }) {
-  const steps = [
-    `Open ${Name} on your computer.`,
-    <>In Settings › Phone, sign in{email ? <> as <Text style={{ fontFamily: font.semibold, color: color.text }}>{email}</Text></> : null}.</>,
-    'Your threads show up here within a minute.',
-  ];
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 80 }}>
-      <H2>Connect your computer</H2>
-      <View style={{ gap: 10, marginTop: 6, marginBottom: 26 }}>
-        {steps.map((s, i) => (
-          <View key={i} style={{ flexDirection: 'row', gap: 12 }}>
-            <T style={{ width: 14, fontSize: 14, lineHeight: 21, color: color.faint }}>{i + 1}.</T>
-            <T style={{ flex: 1, fontSize: 14, lineHeight: 21, color: color.dim }}>{s}</T>
-          </View>
-        ))}
-      </View>
-      <Outlined label="Use another account" onPress={signOut} />
-    </View>
-  );
-}
-
 /** A tab only empty because of a filter says how many it hides (Pages.tsx `FilteredEmpty`). */
 function FilteredEmpty({ tab, hidden, clear }: { tab: TabId; hidden: number; clear: () => void }) {
   const { head, line } = filteredEmptyWords(tab, hidden);
@@ -244,13 +223,17 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
 
 export default function Threads() {
   const c = useCloud();
-  // Where your messages go, asked once before the first (app/ai-notice.tsx).
-  const askedNotice = useRef(false);
+  // The first run's steps after sign-in, in order (lib/first-run.ts); the computer's is drawn here.
+  const next = c.preview ? null : nextSetup({
+    signedIn: c.signedIn, started: !c.loading, connect: !!c.connect, noticeAnswered: !!c.notice,
+    alertsOn: !!c.alerts, alertsAsked: !!appStore.getItem(ALERTS_ASKED_KEY), alertsHere,
+  });
+  const asked = useRef<Setup | null>(null);
   useEffect(() => {
-    if (askedNotice.current || c.preview || !c.signedIn || !c.noticeRead || c.notice) return;
-    askedNotice.current = true;
-    router.push('/ai-notice');
-  }, [c.signedIn, c.noticeRead, c.notice, c.preview]);
+    if (!c.noticeRead || asked.current === next) return;
+    if (next === 'messages') { asked.current = next; router.push({ pathname: '/ai-notice', params: { first: '1' } }); }
+    else if (next === 'alerts') { asked.current = next; router.push('/alerts'); }
+  }, [next, c.noticeRead]);
   const inset = useSafeAreaInsets();
   const groups = useGroups();
   const [place, setPlace] = useState<PlaceId>('inbox');
@@ -288,7 +271,7 @@ export default function Threads() {
     ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, display, c.now).filter((col) => col.state !== 'waiting') : null), [onEverything, evView, display, c.view, c.tabs, c.now]);
   const rowOf = useMemo(() => new Map(Object.values(c.tabs).flat().map((r) => [r.key, r])), [c.tabs]);
   if (!c.opened) return <Wall><Waiting /></Wall>;
-  if (!c.signedIn) return <Redirect href="/sign-in" />;
+  if (!c.signedIn) return <Redirect href="/welcome" />;
   // Under your own card, your threads without your AI teammates' runs, which their cards hold.
   const rows = onEverything ? myItems(shown.rows[tab].map((r) => ({ ...r, labels: r.item?.labels }))) as typeof shown.rows[TabId] : shown.rows[tab];
   // Later counts its repeating tasks too, as the desktop's does (App.tsx `scheduledCount`).
@@ -305,14 +288,7 @@ export default function Threads() {
   const penUp = c.view.approvals.length > 0;
   // The empty inbox draws the form itself, so it needs no pen.
   const inboxEmpty = tab === 'inbox' && rows.length === 0 && hidden === 0 && !c.loading && !mentionsShown;
-  if (c.connect) {
-    return (
-      <Wall>
-        <TopBar title="Threads" right={<IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>} />
-        <ConnectComputer email={c.connect.email} signOut={c.signOut} />
-      </Wall>
-    );
-  }
+  if (c.connect) return <ComputerWait email={c.connect.email} signOut={c.signOut} />;
   if (onChats) {
     return (
       <Wall>
