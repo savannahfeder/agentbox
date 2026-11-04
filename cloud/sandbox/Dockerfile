@@ -25,9 +25,21 @@ RUN npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" "@openai/c
 # does. Without it a design thread spent its first minutes fetching Chromium's
 # libraries by hand (2026-10-15). Playwright's Chromium, the libraries and
 # fonts it needs, readable by the agent, and the library found from any folder.
+# Both of Playwright's Chromium slots then point at chromium.sh, which runs
+# Debian's patched Chromium with the sandbox on: Playwright 1.64.1 bundled
+# 156.0.8078.4, four critical fixes behind Chrome (2026-11-03).
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright NODE_PATH=/usr/local/lib/node_modules
-RUN npm install -g playwright@1 \
+COPY chromium.sh /opt/agentbox/chromium.sh
+RUN chmod 755 /opt/agentbox/chromium.sh \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends chromium \
+ && npm install -g playwright@1 \
  && playwright install --with-deps chromium \
+ && n=0 && for exe in /opt/ms-playwright/chromium-*/chrome-linux*/chrome /opt/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux*/chrome-headless-shell; do \
+      [ -f "$exe" ] || exit 1; \
+      rm -rf "$(dirname "$exe")" && mkdir "$(dirname "$exe")" && ln -s /opt/agentbox/chromium.sh "$exe" || exit 1; \
+      n=$((n + 1)); \
+    done && [ "$n" = 2 ] \
  && chmod -R a+rX /opt/ms-playwright \
  && rm -rf /var/lib/apt/lists/* && npm cache clean --force
 

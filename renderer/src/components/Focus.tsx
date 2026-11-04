@@ -151,6 +151,7 @@ import { OPEN_WITHIN_MS } from '../opening-wait';
 import { focusAtEnd } from '../focus-at-end';
 import type { Spot } from '../one-thing-at-a-time';
 import { ChoicesFold, ChoicesShow, QueueNav } from './OneThingAtATime';
+import { InlineTable, gridFromHast } from './TableView';
 import { foldKey, foldedKeys, toggleFold } from '../one-thing-at-a-time';
 
 // A relative product path is an artifact, however the worker wrote it:
@@ -1390,6 +1391,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     };
 
     const mdComponents = {
+      // A table an agent writes in its message is drawn as a table artifact is.
+      table: ({ node, children }: { node?: Parameters<typeof gridFromHast>[0]; children?: ReactNode }) => {
+        const grid = gridFromHast(node);
+        return grid.length > 1 ? <InlineTable grid={grid} /> : <table>{children}</table>;
+      },
       pre: ({ children }: { children?: ReactNode }) => {
         // A MERMAID CHART IS DRAWN, with its source as the fallback (DiagramBlock).
         const code = (Array.isArray(children) ? children[0] : children) as { props?: { className?: string; children?: ReactNode } } | undefined;
