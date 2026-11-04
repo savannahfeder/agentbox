@@ -43,7 +43,9 @@ export const linkAddress = (site, token) => `${String(site).replace(/\/+$/, '')}
 // reads as ours.
 const OUR_SITE = 'https://app.agentbox.ac';
 export function linkSiteFor(site) {
-  if (typeof site !== 'string' || !/^https:\/\/[^\s/]+\/*$/.test(site)) return null;
+  if (typeof site !== 'string') return null;
+  // A stand-in cloud's site on this computer has no certificate.
+  if (!/^https:\/\/[^\s/]+\/*$/.test(site) && !/^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?\/*$/.test(site)) return null;
   const s = site.replace(/\/+$/, '');
   return s === PHONE_SITE ? OUR_SITE : s;
 }

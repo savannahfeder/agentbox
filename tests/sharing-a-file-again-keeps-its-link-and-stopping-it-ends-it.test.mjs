@@ -122,6 +122,16 @@ it('links on our cloud read as app.agentbox.ac, whichever address the phone site
   expect(linkSiteFor('https://x.test/some/path')).toBeNull();
 });
 
+// A copy on a stand-in cloud shares onto a site served on this computer, which
+// has no certificate; testers open those links the way a stranger would.
+it('takes a site on this computer over plain http, and no other plain http', () => {
+  expect(linkSiteFor('http://127.0.0.1:8788')).toBe('http://127.0.0.1:8788');
+  expect(linkSiteFor('http://localhost:8788/')).toBe('http://localhost:8788');
+  expect(linkSiteFor('http://127.0.0.1.evil.test:8788')).toBeNull();
+  expect(linkSiteFor('http://localhost.evil.test')).toBeNull();
+  expect(linkSiteFor('http://10.0.0.5:8788')).toBeNull();
+});
+
 it('the panel offers Update link when the link holds another copy', () => {
   const link = { token: 't', url: 'u', version: 2, updatedAt: 0, comments: 0, current: true };
   expect(linkOffer({ ok: true, link })).toEqual({ link, behind: false });
