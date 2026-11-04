@@ -7,7 +7,7 @@ export { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/c
 import { taskRemoteControl } from './task-remote-control.mts';
 import type { BridgeStateEvent } from './task-remote-control.mts';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mts';
-import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor } from './ship-queue.mts';
+import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
@@ -5201,7 +5201,11 @@ export class Supervisor {
     if (!cwd || !isPlainMerge(handBackWhat(result))) return null;
     const product = this.store.listProducts?.().find((p) => p.slug === item.product);
     if (product && this.shipsThroughTheApp(product)) return null;
-    const done = mergeHome(cwd).then((merge) => {
+    // A push runs the project's own hooks, so it takes its turn at the memory check as a ship does.
+    const beforePush = () => shipSlot(this._memoryGate?.gate ?? null, item, this.memoryGateScore(item.product, item.id) ?? 0, {
+      onWait: () => { try { this.store.noteItem?.(item.product, item.id, 'Waiting for memory on this computer before pushing.'); } catch { /* the push still waits */ } },
+    });
+    const done = mergeHome(cwd, { beforePush }).then((merge) => {
       this._mergingHome?.delete(item.id);
       if (merge.ok) this._answeredByMerge(item, merge, startedAt);
       else {
