@@ -59,7 +59,7 @@
 .sf-face img { width: 100%; height: 100%; object-fit: cover; }
 .sf-who { display: flex; align-items: baseline; gap: 8px; min-width: 0; height: 18px; }
 .sf-who b { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sf-owner { font: 9.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.sf-owner { font: 9.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
 .sf-who time { margin-left: auto; font-size: 12px; color: var(--text-faint); white-space: nowrap; }
 /* Remove takes the time's place under the pointer, so every time sits on the same edge. */
 .sf-remove { display: none; margin-left: auto; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--text-dim); cursor: pointer; }

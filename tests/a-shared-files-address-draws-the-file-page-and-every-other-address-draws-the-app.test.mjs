@@ -134,6 +134,8 @@ describe('the comments', () => {
     expect(html).toContain('Looks &lt;b&gt;good&lt;/b&gt;');
     expect(html.match(/sf-owner/g)).toHaveLength(1);
     expect(html.indexOf('sf-owner')).toBeGreaterThan(html.indexOf('Maya Chen'));
+    // Accent colour stays on dots and borders, never on words.
+    expect(/\.sf-owner\s*\{[^}]*\}/.exec(read('renderer/src/shared-file/shared-file.css'))[0]).not.toContain('--accent');
   });
   it('signed out, offers an account in place of the box, and no Remove', () => {
     const html = draw();
