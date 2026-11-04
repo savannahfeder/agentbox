@@ -150,7 +150,7 @@ import { lookAgainAfter } from '../picture-looks-again';
 import { OPEN_WITHIN_MS } from '../opening-wait';
 import { focusAtEnd } from '../focus-at-end';
 import type { Spot } from '../one-thing-at-a-time';
-import { ChoicesFold, ChoicesShow, QueueFile, QueueNav, readsInPlace } from './OneThingAtATime';
+import { ChoicesFold, ChoicesShow, QueueNav } from './OneThingAtATime';
 import { InlineTable, gridFromHast } from './TableView';
 import { foldKey, foldedKeys, toggleFold } from '../one-thing-at-a-time';
 
@@ -1326,8 +1326,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     return () => { live = false; off?.(); };
   }, [item.product, item.id]);
   const madeHere = useMemo(() => filesMadeHere(historyLines, item.artifacts?.notes ?? []), [historyLines, item.artifacts?.notes]);
-  const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig });
-  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig }; });
+  const markdownActions = useRef({ onOpenDoc, onNotice, openPicture, opensBig, openBig, edits: item.artifacts?.edits });
+  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice, openPicture, opensBig, openBig, edits: item.artifacts?.edits }; });
   // A row in Needs you for a comment or an approval opens the file at it.
   const fileNewsMe = teamCtx?.me ?? null;
   useEffect(() => {
@@ -1373,13 +1373,13 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // A miss now SAYS SO.
     const openHref = (href?: string, from?: HTMLElement, click?: LinkClick) => {
       if (!href) return;
-      const { onOpenDoc, onNotice, openPicture, opensBig, openBig } = markdownActions.current;
+      const { onOpenDoc, onNotice, openPicture, opensBig, openBig, edits } = markdownActions.current;
       // A picture opens large over the thread, a page or a web address opens
       // in the pane, and a ⌘-click sends any of them out (../link-click.ts).
       const goes = whereALinkGoes(href, click, { pane: !!onOpenDoc });
       if (!asksForANewTab(click) && opensBig(href)) { openBig(href, from); return; }
       if (goes === 'picture') { openPicture(href, from); return; }
-      if (goes === 'pane') { onOpenDoc?.(href); return; }
+      if (goes === 'pane') { onOpenDoc?.(newestOfFamily(href, edits)); return; }
       // A reference like cart.mjs:2 is that file; its line number is only a label.
       const source = sourceReference(href);
       if (source && !asksForANewTab(click) && whereALinkGoes(source, click, { pane: !!onOpenDoc }) === 'pane') { onOpenDoc?.(source); return; }
@@ -2221,12 +2221,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       {/* THE FILES A MESSAGE NAMES ARE SMALL FRAMED TILES (w-9ed13d72b3), and
           a file nothing can read gets none. The big review card below is
           only the review lab's sample now. */}
-      {/* One thing at a time reads a page or a note in place rather than as a
-          tile, and not a second time while it is open on the side. */}
-      {inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && newestOfFamily(path, item.artifacts?.edits) !== openDoc && <QueueFile key={path} product={product} path={newestOfFamily(path, item.artifacts?.edits)} md={md}
-        onOpen={() => onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'beside')} onFullScreen={() => onOpenArtifact?.(newestOfFamily(path, item.artifacts?.edits), 'focus')} />)}
-      {/* What the page cannot read in place, a deck or a PDF, is a tile under it. */}
-      {page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths.filter((path) => !readsInPlace(path))} revision={item.updatedAt} openDoc={openDoc} onOpen={path => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'beside'))} />}
+      {/* An agent thread draws nothing here: a file it wants read is on a line
+          of its own and opens beside, and any other stays a name in its words.
+          A chat between people keeps tiles, which say whether a file arrived. */}
       {!page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths} revision={item.updatedAt} openDoc={openDoc} onOpen={path => (opensBig(path) ? openBig(path) : onOpenArtifact?.(path, 'beside'))} />}
       {inlineArtifacts && previewSample && <div className="artifact-entry-list" aria-label="Attachments">{previewPaths.map(path =>
         <DirectReview key={path} product={product} path={path} revision={item.updatedAt} open={openDoc === path}
@@ -2940,9 +2937,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
     } else if (finishing.current) return;
     if (saving || (!(spoken ?? text).trim() && !attachments.length)) return;
     if (attaching.length) { onNotice(`${attaching[0].name} is still being attached.`); return; }
-    // AN AGENT WITH NO PROJECT DOES NOT GO OUT. The footer already says why;
-    // ⌘↵ says it again rather than doing nothing.
-    if (chat.block) { onNotice(chat.block); return; }
+    // An agent with no project does not go out: its project list opens instead.
+    if (chat.askForProject()) return;
     const originalDraft = text;
     const consumeCommand = () => {
       if (ref.current?.value !== originalDraft) return;
@@ -3008,6 +3004,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   };
   // A note being recorded is a draft: the box stays open round it.
   const hasDraft = !!text.trim() || attachments.length > 0 || recording;
+  useEffect(() => { if (chat.readyToSend) { chat.sent(); void send(); } }, [chat.readyToSend]);
   // THE SLASH MENU, AND THE MODE THAT IS ALWAYS ON THE SCREEN.
   //
   // It does. Claude Code has no backslash TRIGGER: `/` opens its commands and
@@ -3464,9 +3461,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
               never bare; the formatting bar now sits in that corner, and the
               person asked for the line to go. The conversation's header
               already names who it is with. */}
-          {/* AN AGENT IN THE MESSAGE WITH NO PROJECT says so here, and Send
-              waits (w-7b9cb8636a). */}
-          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo?.length ? (chat.block ? <span className="dim">{chat.block}</span> : null) : <>
+          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo?.length ? null : <>
           <PriorityPicker
             variant="word"
             value={shown}
@@ -3628,8 +3623,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
         <button
           className="dock-send"
           onClick={() => send()}
-          disabled={!hasDraft || !!chat.block || saving}
-          title={chat.block ?? `Send · ${sendKeyFor(enterSends)}`}
+          disabled={!hasDraft || saving}
+          title={`Send · ${sendKeyFor(enterSends)}`}
         >{saving ? 'Sending…' : <>Send <kbd>{sendKeyFor(enterSends)}</kbd></>}</button>
         </>)}
         </>}

@@ -93,7 +93,9 @@ describe('the hour a limit names is read in the zone the CLI printed', () => {
 
 const signIn = (dir, email, uuid) => {
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: uuid } }));
+  // The default login's file sits beside ~/.claude, not in it.
+  const file = path.basename(dir) === '.claude' ? path.join(dir, '..', '.claude.json') : path.join(dir, '.claude.json');
+  fs.writeFileSync(file, JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: uuid } }));
 };
 
 /** A Mac with one subscription in two folders and a second subscription in a
