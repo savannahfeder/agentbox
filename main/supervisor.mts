@@ -176,6 +176,7 @@ import { startDecision, readMacPressureNow, SETTLE_MS } from './start-hold.mts';
 import { MemoryLog } from './memory-log.mts';
 import { StartBudget } from './cloud/start-budget.mjs';
 import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mjs';
+import type { MergeHomeResult } from './cloud/merge-home.mjs';
 import { autoSlots, DEFAULTS as MEMORY_GATE, pressureFrom } from './memory-gate.mts';
 import { LeftoverCleaner } from './leftovers.mts';
 import { syncCodexMemoryGate } from './codex-memory-gate.mts';
@@ -196,6 +197,8 @@ import type { CloudKit } from './cloud/kit.mts';
 import type { CatchUpCard } from './catch-up.mts';
 import type { QueuedLine, ReplyPayload } from './live-replies.mts';
 import type { Kit } from '../shared/cloud-kit.mjs';
+
+type MergeOutcome = MergeHomeResult;
 
 export type WorkItemStatus = 'open' | 'claimed' | 'done' | 'blocked';
 
@@ -1317,6 +1320,8 @@ export class Supervisor {
   declare _notStarting: Map<string, { why: string; engine: string | null; at: number }> | undefined;
   declare _strayFolders: Map<string | null, StrayFolder[]> | undefined;
   declare _handedBack: Set<string> | undefined;
+  declare _mergingHome: Map<string, Promise<void>> | undefined;
+  declare _mergeHomeSaid: Record<string, MergeOutcome> | undefined;
   declare _moveAsked: Set<string> | undefined;
   declare _toCloud: Map<string, number> | undefined;
   declare _movableSeen: { at: number; ids: Set<string> } | undefined;
@@ -5184,7 +5189,7 @@ export class Supervisor {
   // answer and the reply is settled. Not merged: it moves here as any hand-back,
   // and the run that takes it is told why. A project that ships through the app
   // has its own way to main (main/ship-queue.mts).
-  _mergeHome(item, result, cwd, startedAt) {
+  _mergeHome(item: WorkItem, result: string | null | undefined, cwd: string | null | undefined, startedAt: number) {
     if (!cwd || !isPlainMerge(handBackWhat(result))) return null;
     const product = this.store.listProducts?.().find((p) => p.slug === item.product);
     if (product && this.shipsThroughTheApp(product)) return null;
@@ -5203,7 +5208,7 @@ export class Supervisor {
   }
 
   // Only a reply written before the run began was carried by it; a later one still goes to a run.
-  _answeredByMerge(item, merge, startedAt) {
+  _answeredByMerge(item: WorkItem, merge: MergeOutcome, startedAt: number) {
     this._handedBack?.delete(item.id);
     delete this._movedWhy?.[item.id];
     try {
@@ -5214,14 +5219,14 @@ export class Supervisor {
         if (fresh.answer) this.store.settleAnswer?.(item.product, item.id, answerTs(fresh));
       }
       this._saveState();
-    } catch (e) { console.warn('zero: writing the merge as the answer failed:', e.message); }
+    } catch (e) { console.warn('zero: writing the merge as the answer failed:', (e as Error).message); }
   }
 
   // Why the app's own merge stopped, told once to the run that does it instead.
-  _mergeHomeNote(item) {
-    const said = this._mergeHomeSaid?.[item?.id];
+  _mergeHomeNote(item: WorkItem | null | undefined) {
+    const said = this._mergeHomeSaid?.[item?.id as string];
     if (!said) return null;
-    delete this._mergeHomeSaid[item.id];
+    delete this._mergeHomeSaid![item!.id];
     const words = said.said ? `\n\n${String(said.said).slice(0, 2000)}` : '';
     return `${Name} tried to merge this thread's branch into main itself and stopped: ${said.why}.${words}`;
   }
@@ -6149,7 +6154,7 @@ export class Supervisor {
    */
   async lookAtCloudLogins({ force = false }: { force?: boolean } = {}): Promise<void> {
     if (!readCloudConfig(process.env, this.config.home)) return;
-    try { this._noteCloudReadings(); } catch (e) { console.warn('zero: could not read the cloud sign-ins for a limit:', e.message); }
+    try { this._noteCloudReadings(); } catch (e) { console.warn('zero: could not read the cloud sign-ins for a limit:', (e as Error).message); }
     // A Refresh pressed mid-look is kept for when that look ends.
     if (this._cloudLooking) { if (force) this._cloudLookAgain = true; return; }
     const now = Date.now();
@@ -6170,7 +6175,7 @@ export class Supervisor {
     } finally {
       this._cloudLooking = false;
     }
-    try { this._noteCloudReadings(); } catch (e) { console.warn('zero: could not read the cloud sign-ins for a limit:', e.message); }
+    try { this._noteCloudReadings(); } catch (e) { console.warn('zero: could not read the cloud sign-ins for a limit:', (e as Error).message); }
     if (this._cloudLookAgain) {
       this._cloudLookAgain = false;
       await this.lookAtCloudLogins({ force: true });
@@ -6185,8 +6190,9 @@ export class Supervisor {
   _noteCloudReadings() {
     let cleared = false;
     for (const c of this._cloudAccounts()) {
-      if (c.engine !== DEFAULT_ENGINE || !c.profile || !c.limits?.length || !c.readAt) continue;
-      if (this.noteUsageReading(c.profile, { at: c.readAt, limits: c.limits }, { onlyLimit: true })) cleared = true;
+      const limits = c.limits as { percent?: number | null }[] | undefined;
+      if (c.engine !== DEFAULT_ENGINE || !c.profile || !limits?.length || !c.readAt) continue;
+      if (this.noteUsageReading(c.profile as string, { at: c.readAt as number, limits }, { onlyLimit: true })) cleared = true;
     }
     return cleared;
   }

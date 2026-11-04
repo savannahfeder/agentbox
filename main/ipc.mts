@@ -1440,7 +1440,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // engine that was just refused. Both were absent here because neither field
   // reached this handler at all: the whole pair was dropped four times over on
   // the way from her card (main/repeats.mjs says where).
-  ipcMain.handle('zero:compose-repeat', (_e, { product, title, body, priority, rule, engine, model, startsNext }: { product: string; startsNext?: unknown; title: string; body?: string; priority?: number; rule: { every: string; at: string; on?: number }; engine?: unknown; model?: string }) => {
+  ipcMain.handle('zero:compose-repeat', (_e, { product, title, body, priority, rule, engine, model, startsNext }: { product: string; startsNext?: boolean; title: string; body?: string; priority?: number; rule: { every: string; at: string; on?: number }; engine?: unknown; model?: string }) => {
     const made = store.composeRepeat(product, {
       title,
       body,

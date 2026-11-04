@@ -104,7 +104,7 @@ export const CARRIED_AFTERWARDS: string[] = ['parent', 'label', 'problem'];
 
 // Labels a run puts on its row: `ship` would ship the new folder before its
 // agent says so, and a repeat's label names a rule in the old project.
-const RUN_LABEL = (label) => label === 'ship' || label === 'clean' || label.startsWith('repeat:');
+const RUN_LABEL = (label: string) => label === 'ship' || label === 'clean' || label.startsWith('repeat:');
 
 /** The content of `item`, machinery left behind. */
 export function whatMoves(item: MovableThread): Record<string, unknown> {

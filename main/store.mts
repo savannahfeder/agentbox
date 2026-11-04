@@ -140,7 +140,7 @@ export interface RepeatInput {
   on?: number;
   engine?: string | null;
   model?: string | null;
-  startsNext?: unknown;
+  startsNext?: boolean;
 }
 
 export type FiledItem = {
@@ -936,8 +936,8 @@ export class Store {
     // since the run there starts over from this message.
     const said = movedHere(from?.name ?? fromSlug);
     const yours = this.readHistory(fromSlug, id, { max: 1e6 })
-      .filter((l) => l.source === 'founder' && typeof l.patch?.answer === 'string' && l.patch.answer.trim())
-      .map((l) => l.patch.answer.trim());
+      .filter((l: { source?: string; patch?: { answer?: unknown } }) => l.source === 'founder' && typeof l.patch?.answer === 'string' && l.patch.answer.trim())
+      .map((l: { patch?: { answer?: unknown } }) => (l.patch!.answer as string).trim());
     const body = [compose.body || compose.title, ...yours, said].filter(Boolean).join('\n\n');
     let made = this.composeItem(toSlug, { ...compose, body });
     // The three `composeItem` has no argument for (shared/move-thread.mts).
