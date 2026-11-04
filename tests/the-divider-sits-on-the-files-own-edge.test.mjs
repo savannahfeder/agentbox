@@ -27,7 +27,16 @@ describe('the divider sits on the file\'s own edge', () => {
     expect(pane).toMatch(/e\.clientX - body\.left - cardX/)
   })
 
-  it('draws no pill, only the line along the edge', () => {
-    expect(css).not.toContain('.doc-grip::after')
+  // Their pick on 2026-11-04: option five's faint pill on the edge, but only
+  // while the pointer is on it or a drag is under way. At rest the file
+  // looks as it always did, and the edge itself does not light up.
+  it('shows the faint pill on the edge only on hover or while dragging', () => {
+    const pill = css.match(/\.doc-grip::after \{[^}]*\}/)[0]
+    expect(pill).toContain('background: var(--line-strong)')
+    expect(pill).toContain('opacity: 0')
+    expect(pill).toContain('left: 1px')
+    expect(css).toMatch(/\.doc-grip:hover::after, \.doc-pane\.dragging \.doc-grip::after \{ opacity: 1; \}/)
+    expect(css).not.toMatch(/\.doc-grip:hover::before/)
+    expect(css).not.toMatch(/\.doc-pane\.dragging \.doc-grip::before/)
   })
 })

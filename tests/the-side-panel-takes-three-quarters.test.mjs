@@ -40,14 +40,12 @@ describe('three quarters, and no line down the middle', () => {
   })
 
   it('draws nothing down the middle until the pointer finds it', () => {
-    // The line is `.doc-grip::before`. Only the line went.
-    const line = css.match(/\.doc-grip::before \{[^}]*\}/)
-    expect(line).toBeTruthy()
-    expect(line[0]).toContain('background: transparent')
-    expect(line[0]).not.toContain('var(--line-strong)')
-    // It comes back under the pointer, or a divider with no state at all
-    // cannot be found by feel.
-    expect(css).toMatch(/\.doc-grip:hover::before \{ background: var\(--text-faint\); \}/)
+    // What the pointer finds is a pill on the file's edge
+    // (the-divider-sits-on-the-files-own-edge); at rest there is nothing.
+    const pill = css.match(/\.doc-grip::after \{[^}]*\}/)
+    expect(pill).toBeTruthy()
+    expect(pill[0]).toContain('opacity: 0')
+    expect(css).not.toMatch(/\.doc-grip:hover::before/)
   })
 
   it('keeps the reach that makes the divider findable', () => {
