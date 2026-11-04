@@ -114,8 +114,10 @@ export class Repeats {
   // word may be written at all is decided at the door, by
   // `Supervisor#engineOffered` and `#modelOffered`, so a rule cannot be marked
   // for an engine this Mac never offered her.
+  // `startsNext`: the rule is made from a thread that already ran, so the
+  // period it is in counts as served and the first run comes at its next time.
   setRule(productDir, {
-    title, body, priority = 5, every = 'day', at, on, engine, model,
+    title, body, priority = 5, every = 'day', at, on, engine, model, startsNext = false,
   }, now = Date.now()) {
     // Refused here rather than stored and ignored later: a rule that cannot be
     // kept has to fail while the user is still looking at what they typed.
@@ -132,12 +134,14 @@ export class Repeats {
       ...(every === 'week' ? { on } : {}),
       ...(engine ? { engine: String(engine) } : {}),
       ...(model ? { model: String(model) } : {}),
-      createdAt: now, served: '', misses: 0, alerted: 0,
+      createdAt: now, served: startsNext ? periodKey({ every, at, on }, now) ?? '' : '', misses: 0, alerted: 0,
     }, now);
     return this.get(productDir, id, now);
   }
 
-  patchRule(productDir, id, patch, now = Date.now()) {
+  // `startsNext` as in `setRule`: the period the new schedule is in counts as
+  // served, so moving a rule from a run that just answered starts nothing now.
+  patchRule(productDir, id, { startsNext = false, ...patch }, now = Date.now()) {
     // `on` joins the other two: changing a daily rule to a Thursday one sends
     // every, at AND on, and checking the first two alone refused the change for
     // the same reason a new weekly rule was refused.
@@ -150,6 +154,7 @@ export class Repeats {
         on: patch.on ?? current.on,
       };
       if (!isRepeatRule(next)) throw new Error(`not a schedule ${NAME} can keep: ${describeRule(next)}`);
+      if (startsNext) patch.served = periodKey(next, now) ?? '';
     }
     this._append(productDir, id, patch, now);
     return this.get(productDir, id, now);

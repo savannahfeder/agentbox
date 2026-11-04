@@ -27,8 +27,8 @@
 // [their teammate]'s inbox' part." Measured on their screen before the change: the
 // reply box's footer read the formatting bar, then "Goes to …'s inbox.", then
 // Send. The corner is not bare without it, because the formatting bar sits
-// there. What is left of the old rule is that the slot still speaks when an
-// agent in the message has no project and Send is waiting.
+// there. The slot also used to say "Pick a project for @Codex" while Send
+// waited; that line was missed (w-44bc142c26), so Send now asks instead.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -46,10 +46,11 @@ describe('whose inbox a reply goes to', () => {
     }
   });
 
-  // THE CASE THAT MUST STAY: the same slot still says why Send is waiting
-  // when an agent named in the message has no project.
-  it('still says why Send waits when an agent in the message has no project', () => {
-    expect(code(read('renderer/src/components/Focus.tsx'))).toMatch(/chat\.block \? <span className="dim">\{chat\.block\}<\/span> : null/);
+  // Nor does it say anything when an agent named in the message has no project:
+  // Send opens the project list instead
+  // (send-with-an-agent-that-has-no-project-asks-for-one.test.mjs).
+  it('says nothing when an agent in the message has no project', () => {
+    expect(code(read('renderer/src/components/Focus.tsx'))).toMatch(/: talkTo\?\.length \? null : </);
   });
 
   it('keeps the formatting bar in the corner, so the corner is not bare', () => {

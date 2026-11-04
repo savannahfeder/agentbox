@@ -56,7 +56,7 @@ describe('the app names the task on every undo that puts one back', () => {
   });
 
   it('closing several ticked tasks opens one only when there was one', () => {
-    expect(app).toMatch(/label: `Reopened \$\{targets\.length\} items`, undoes: `[^`]+`, brings: bringsBack\(targets\),/);
+    expect(app).toMatch(/label: `Reopened: \$\{closed\}`, undoes: `[^`]+`, brings: bringsBack\(targets\),/);
   });
 
   // The case that must not match: undoing a start from Later sends the task

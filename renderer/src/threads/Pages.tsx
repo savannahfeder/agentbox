@@ -40,7 +40,7 @@ import { shownToPeople } from '../../../shared/thread-cards.mjs';
 import { Name } from '../../../shared/product-name.mjs';
 import { FleetContext } from '../fleet';
 import { TeammateLead } from '../teammates/row-lead';
-import { factsFor, saysOnCard, statusCell, type StatusCell } from '../status-word';
+import { factsFor, laterCell, saysOnCard, statusCell, type StatusCell } from '../status-word';
 import { offersTryAgain } from '../try-again';
 import { voiceName } from '../../../shared/agent-voice.mjs';
 import { shownPriority } from '../../../shared/rank.mjs';
@@ -727,7 +727,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // only ever true there, which is the gate live-line has always had.
   const fleet = useContext(FleetContext);
   const facts = { ...factsFor(fleet, item.id), inProgress: tab === 'progress', now, practice: !!product?.practice };
-  const cell = statusCell(item, facts);
+  const cell = tab === 'snoozed' ? laterCell(item, facts) : statusCell(item, facts);
   const tryAgain = useContext(TryAgainContext);
   const retry = tryAgain && offersTryAgain(item, facts) ? <TryAgainButton onPress={() => tryAgain(item)} /> : undefined;
   const allItems = useContext(ItemsContext);

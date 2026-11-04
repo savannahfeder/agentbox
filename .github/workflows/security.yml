@@ -9,9 +9,9 @@
 #   the code that ships (not tests). A finding fails the run. A false positive
 #   someone has read is silenced with a `nosemgrep` comment on that line, never
 #   by dropping the rule for everyone.
-# audit: npm's advisory database over the packages the app ships. It fails on
-#   critical only, because on 2026-10-24 it already reported four high and two
-#   moderate advisories, all with fixes. Raise it to high once those are upgraded.
+# audit: npm's advisory database over both lockfiles (root and mobile),
+#   dev packages included, failing on high or critical. An advisory with no fix
+#   yet is listed by id in scripts/audit-packages.mjs with why it reaches nobody.
 #
 # The deep agent-driven audit (Cloudflare's security-audit skill, or Anthropic's
 # /claude-security) is not here: it costs agent time and needs a person to read
@@ -60,4 +60,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm audit --omit=dev --audit-level=critical
+      - run: node scripts/audit-packages.mjs

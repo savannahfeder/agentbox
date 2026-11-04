@@ -67,9 +67,9 @@ describe('which account a folder is signed in as', () => {
     });
   });
 
-  it('falls back to the default home when no folder is named, because that is what the default row is', () => {
+  it('reads the file beside ~/.claude when no folder is named, because that is what the default row is', () => {
     fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
-    write(path.join(home, '.claude'), PERSONAL);
+    write(home, PERSONAL);
     expect(accountIdentity(null, { home })?.email).toBe('you@example.com');
   });
 
