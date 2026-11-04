@@ -3,7 +3,7 @@
 // So the pane types straight onto the file on disk. Two rules make that safe
 // enough to leave switched on:
 //
-//   1. ONLY MARKDOWN IS WRITABLE. An html page is a program; the pane shows it
+//   1. ONLY MARKDOWN AND TABLES (csv, tsv) ARE WRITABLE. An html page is a program; the pane shows it
 //      in a sandboxed frame and never edits it. Everything else the pane will
 //      not even open (renderer/src/doc-pane.ts).
 //   2. A WRITE STAYS INSIDE THE PRODUCT'S OWN FOLDERS. Reading follows the
@@ -23,7 +23,7 @@ export type DocFs = Pick<typeof fsDefault, 'existsSync' | 'statSync' | 'readFile
 
 export type DocResult = { ok: boolean; error?: string; stale?: boolean; tooBig?: boolean; path?: string; text?: string; mtime?: number };
 
-export const EDITABLE_RE = /\.(md|markdown)$/i;
+export const EDITABLE_RE = /\.(md|markdown|csv|tsv)$/i;
 export const READABLE_RE = /\.(md|markdown|html?|py|ipynb|js|mjs|ts|tsx|jsx|rb|go|rs|sh|sql|css|txt|csv|tsv|json|ya?ml|xml)$/i;
 
 // A megabyte and a half of markdown is already far past anything in her store
@@ -42,7 +42,7 @@ export function isInside(dir: string | null | undefined, file: string | null | u
 /** May the pane write to this file, on this product. */
 export function canWrite({ file, product, fs = fsDefault }: { file: string; product?: ArtifactProduct | null; fs?: Pick<DocFs, 'existsSync'> }): DocResult {
   if (!file || !EDITABLE_RE.test(file)) {
-    return { ok: false, error: 'Only markdown files can be edited here.' };
+    return { ok: false, error: 'Only markdown files and tables can be edited here.' };
   }
   const roots = artifactRoots(product);
   if (!roots.some((root) => isInside(root, file))) {

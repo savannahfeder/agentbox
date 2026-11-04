@@ -33,6 +33,15 @@ const KEYS = {
   Tab: { code: 'Tab', keyCode: 9 },
   ArrowDown: { code: 'ArrowDown', keyCode: 40 },
   ArrowUp: { code: 'ArrowUp', keyCode: 38 },
+  ArrowLeft: { code: 'ArrowLeft', keyCode: 37 },
+  ArrowRight: { code: 'ArrowRight', keyCode: 39 },
+  Home: { code: 'Home', keyCode: 36 },
+  End: { code: 'End', keyCode: 35 },
+  PageUp: { code: 'PageUp', keyCode: 33 },
+  PageDown: { code: 'PageDown', keyCode: 34 },
+  Backspace: { code: 'Backspace', keyCode: 8 },
+  Delete: { code: 'Delete', keyCode: 46 },
+  F2: { code: 'F2', keyCode: 113 },
   ' ': { code: 'Space', keyCode: 32 },
 };
 const MODIFIERS = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
@@ -57,6 +66,9 @@ export function editingCommands(key, mods = []) {
   if (held === 'meta' && k === 'a') return ['selectAll'];
   if (held === 'meta' && k === 'z') return ['undo'];
   if (held === 'meta+shift' && k === 'z') return ['redo'];
+  // Copy, cut and paste with ⌘ on a Mac or Ctrl elsewhere, where the app says Ctrl.
+  const clip = { c: 'copy', x: 'cut', v: 'paste' }[k];
+  if (clip && (held === 'meta' || held === 'ctrl')) return [clip];
   return [];
 }
 
@@ -197,7 +209,7 @@ export async function connect(wsUrl, { width = 1440, height = 900, targetId: exi
     const base = named
       ? { key, code: named.code, windowsVirtualKeyCode: named.keyCode }
       : { key, code: `Key${key.toUpperCase()}`, windowsVirtualKeyCode: key.toUpperCase().charCodeAt(0) };
-    const text = !named && !mods.length ? key : key === 'Enter' && !mods.length ? '\r' : undefined;
+    const text = !named && !mods.length ? key : key === 'Enter' && !mods.length ? '\r' : key === ' ' && !mods.length ? ' ' : undefined;
     const commands = editingCommands(key, mods);
     await call('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', modifiers, ...base, ...(text ? { text } : {}), ...(commands.length ? { commands } : {}) });
     await call('Input.dispatchKeyEvent', { type: 'keyUp', modifiers, ...base });

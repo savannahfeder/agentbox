@@ -16,7 +16,7 @@ const pick = ({ paddingLeft, paddingRight, paddingTop, paddingBottom }: CSSStyle
 import type { FileNote, NotePlace } from '../types';
 import { quotesKey } from '../selection-bar';
 import { CodeFile } from './CodeFile';
-import { TableView } from './TableView';
+import { TableView, useTableSave } from './TableView';
 import { SelectionBar } from './SelectionBar';
 import { DeckSlides } from './DeckSlides';
 import { PinMarks, spotIn } from './PinMarks';
@@ -503,14 +503,20 @@ function TableStage({ product, path, name, notes, draft, activeId, onPlace, onFo
 }) {
   const thread = useContext(StageThread);
   const [text, setText] = useState<string | null | undefined>(undefined);
+  const [mtime, setMtime] = useState(0);
+  const [reads, setReads] = useState(0);
   const page = useRef<HTMLDivElement | null>(null);
+  // A teammate's file comes through `readText` and is theirs; only a file of this project's can be saved.
+  const save = useTableSave({ product, src: path, mtime, thread });
   useEffect(() => {
     let live = true;
-    setText(undefined);
-    const reading = readText ? readText(path) : api.readDoc({ product, src: path, thread }).then((r) => (r.ok ? r.text ?? null : null));
+    if (!reads) setText(undefined);
+    const reading = readText
+      ? readText(path)
+      : api.readDoc({ product, src: path, thread }).then((r) => { if (r.ok && live) setMtime(r.mtime ?? 0); return r.ok ? r.text ?? null : null; });
     void reading.then((t) => { if (live) { setText(t); if (t === null) onFound?.('gone'); } }).catch(() => { if (live) { setText(null); onFound?.('gone'); } });
     return () => { live = false; };
-  }, [product, path]);
+  }, [product, path, reads]);
   const quotes = useMemo(() => notes.flatMap((n) => (n.place.kind === 'quote' && !n.resolved ? [{ id: n.id, text: n.place.text }] : [])), [notes]);
   const draftQuote = draft?.kind === 'quote' ? draft.text : null;
   const quotesNow = quotesKey(quotes);
@@ -524,7 +530,8 @@ function TableStage({ product, path, name, notes, draft, activeId, onPlace, onFo
   if (text === null) return <div className="doc-missing">{name} could not be opened.</div>;
   if (text === undefined) return <OpeningWait name={name} kind={null} onAgain={onAgain} />;
   return <div className="av-table" ref={page}>
-    <TableView text={text} path={path} mode="full" />
+    <TableView text={text} path={path} mode="full" onSave={readText ? undefined : save} onReload={() => setReads((n) => n + 1)}
+      onComment={onPlace ? (quote) => onPlace({ kind: 'quote', text: quote }) : undefined} storeKey={`${product}/${path}`} />
     {onPlace && <SelectionBar page={page} onComment={(quote) => onPlace({ kind: 'quote', text: quote })} />}
   </div>;
 }

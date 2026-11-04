@@ -14,6 +14,7 @@
 //     --tester-login inherit                           testers sign in with this session's variables
 //     --testers external                               the agent that started this runs each stretch itself
 //     --keep                                           leave the copies up afterwards
+//     --files <dir>                                    copied into every project's documents in every copy (a table, a deck under test)
 //     --team <file> --room <name>                      one tester signs in to a real team (live.mjs --team) and talks in that room
 //
 // For each person: a copy of the app of their own (live.mjs with
@@ -80,6 +81,8 @@ const inherit = opt('tester-login') === 'inherit';
 const external = opt('testers') === 'external';
 const team = opt('team');
 const room = opt('room');
+const files = opt('files') ? path.resolve(opt('files')) : null;
+if (files && !fs.existsSync(files)) stop(`--files: there is no folder at ${files}.`);
 if (team && people.length !== 1) stop('--team signs one account in, so it runs one tester: name them with --who.');
 if (room && !team) stop('--room needs --team: a copy with no team is in no room.');
 try { chaosPlan(chaos, totalMs); } catch (err) { stop(err.message); }
@@ -157,6 +160,14 @@ function seedCode(state) {
   }));
 }
 
+/** `--files <dir>`: what is under test, laid into every project's documents, so a tester meets it as their own. */
+function layFiles(state, from) {
+  for (const d of fs.readdirSync(state.accountRoot)) {
+    const docs = path.join(state.accountRoot, d);
+    if (fs.existsSync(path.join(docs, 'project.json'))) fs.cpSync(from, docs, { recursive: true });
+  }
+}
+
 /** An inbox with a past: done, waiting and put-off threads from the last month, written as the app writes them. */
 function seedHistory(state, person, count) {
   const ids = new Set();
@@ -203,6 +214,7 @@ for (const person of people) {
   const state = readJson(stateFile);
   if (up.code !== 0 || !state) { setups.push({ person, name, dir, failed: `its copy did not start: ${up.out.trim().split('\n').pop()}` }); continue; }
   await seedCode(state);
+  if (files) layFiles(state, files);
   const seeded = person.history ? seedHistory(state, person, person.history) : new Set();
   if (seeded.size) await live(name, 'restart');
   setups.push({ person, name, dir, stateFile, seeded, cmds: layCommands(dir, name) });

@@ -39,7 +39,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNo
 import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { CodeFile } from './CodeFile';
-import { TableView } from './TableView';
+import { TableView, useTableSave } from './TableView';
 import { isTablePath } from '../table-file';
 import { FilmPlayer } from './FilmPlayer';
 import { PdfPages } from './PdfPages';
@@ -154,6 +154,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   const [resolved, setResolved] = useState<string | null>(null);
   const [text, setText] = useState<string | null>(null);
   const [mtime, setMtime] = useState<number>(0);
+  const saveTable = useTableSave({ product: doc.product, src: doc.src, mtime });
   const [failed, setFailed] = useState<string | null>(null);
   // The address the frame points at, minted by main when it resolved the file.
   // An html page is served from its own origin so its pictures load; see
@@ -441,7 +442,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
         ) : text === null ? (
           <PreviewLoading />
         ) : kind === 'table' ? (
-          <TableView text={text} path={src} mode="pane" />
+          <TableView text={text} path={src} mode="pane" onSave={doc.readOnly ? undefined : saveTable} onReload={() => setLooks((n) => n + 1)} onNotice={onNotice} storeKey={`${doc.product}/${src}`} />
         ) : kind === 'text' ? (
           <div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div>
         ) : (
