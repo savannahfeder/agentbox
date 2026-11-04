@@ -33,6 +33,13 @@ export const ENGINE_IDS = ENGINES.map((e) => e.id);
 export const DEFAULT_ENGINE = 'claude';
 
 /**
+ * The Claude Code model a thread with no model runs on, and the one every
+ * screen names for it. Sent outright, so a `--model` left in the workspace
+ * config cannot run something other than what the reply box says.
+ */
+export const DEFAULT_CLAUDE_MODEL = 'opus';
+
+/**
  * The capability gate: passing this to `engineFor` says the call site meant to
  * allow a second engine. It blocks serialized data only. Any module here can
  * import it.

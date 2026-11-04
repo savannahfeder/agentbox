@@ -34,6 +34,7 @@
 // A model set by hand outside this list still draws as itself; see modelChoices.
 
 import { CLAUDE_MODELS } from '../../shared/claude-models.generated.mjs';
+import { DEFAULT_CLAUDE_MODEL } from '../../shared/engines.mjs';
 
 export interface ModelChoice {
   /** What the CLI is sent. Always an alias, never a version. */
@@ -123,7 +124,7 @@ export const MODELS: ModelChoice[] = BUILT_MODELS;
  * Code card nobody has touched, instead of sending nothing and letting a
  * `--model` flag in zero.config.json answer a question already answered.
  */
-export const DEFAULT_MODEL = 'opus';
+export const DEFAULT_MODEL = DEFAULT_CLAUDE_MODEL;
 
 /**
  * A model set by hand that is none of the three is shown AS ITSELF rather than

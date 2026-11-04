@@ -33,6 +33,18 @@ import { AGENT_CREATION_KINDS } from '../shared/contracts.mjs';
 // server lived in that product's repo, which told every worker the wrong name
 // for the thing it was writing to.
 import { Name, possessive } from '../shared/product-name.mjs';
+import { EFFORT_WORDS, MODEL_WORDS, effortWord, modelWord } from '../shared/model-words.mjs';
+
+// The model and effort an agent wrote, in the words a run starts with.
+function runWords(fields) {
+  for (const [field, read] of [['model', modelWord], ['effort', effortWord]]) {
+    if (fields[field] === undefined) continue;
+    const out = read(fields[field]);
+    if (out.error) throw new Error(out.error);
+    fields[field] = out[field];
+  }
+  return fields;
+}
 
 // What fetch_skill tells a reader it has, and what it tells them is missing.
 // Stated once, here, so the header cannot claim a tool that was removed.
@@ -204,8 +216,10 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
         priority: z.number().int().optional().describe('higher goes first; defaults to 0'),
         parent: z.string().optional().describe('another work item id: the thread this one came out of. It decides where the filing lands. With a parent it is a proposal, waiting in Later and drawn on that thread with one press, so they answer it where the conversation already is; with none it is a row of its own in their inbox, addressed to them, whatever it says.'),
         runAt: z.number().int().optional().describe('epoch ms before which nothing happens with this item: it cannot be claimed and will not start. Use it when the work genuinely belongs to a later moment. A missed moment is not lost; the item simply becomes available once it passes.'),
+        model: z.string().max(80).optional().describe(MODEL_WORDS),
+        effort: z.string().optional().describe(EFFORT_WORDS),
       },
-      run: ({ product, ...fields }) => json(claims.file(product, fields)),
+      run: ({ product, ...fields }) => json(claims.file(product, runWords(fields))),
     },
     {
       name: 'claim_work_item',
@@ -243,8 +257,11 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
         solution: z.string().optional().describe(`no longer shown; leave it out (older threads may still carry one, ${SUMMARY_WORDS} words at most)`),
         blockedBy: z.array(z.string()).optional().describe('ids of threads this one waits on, or "person:<name>" for someone on the team whose code, answer or review it waits on. A thread that waits only on others leaves their Needs you, says whom it waits on, and comes back when that person writes or after 3 days, so set this rather than offering "wait for them" as a choice'),
         blocks: z.array(z.string()).optional().describe('ids of threads that wait on this one'),
+        model: z.string().max(80).optional().describe(MODEL_WORDS),
+        effort: z.string().optional().describe(EFFORT_WORDS),
       },
       run: async ({ id, ...patch }) => {
+        runWords(patch);
         if (patch.blockedBy) patch.blockedBy = waitsNamed(patch.blockedBy);
         return json(noteToAnotherThread(id, patch, { ownItem }) ?? await claims.update(id, patch));
       },
