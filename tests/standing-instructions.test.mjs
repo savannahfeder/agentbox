@@ -5,6 +5,13 @@
 // place a session's arguments
 // are built, which is what makes "every session" a fact rather than a hope;
 // this pins that it stays that way.
+//
+// SINCE 2026-11-04 THE SAME FLAG ALSO CARRIES ONE FACT OF THE APP'S OWN: which
+// model and effort level the run is really on, so that a rule naming either can
+// be checked by the run it binds (tests/a-run-can-read-which-model-and-effort-
+// it-is-on). So the flag is no longer absent when she has written nothing, and
+// the cases below ask what they always meant to ask: that her words are in
+// there, and that a block she left empty puts nothing of hers in it.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -52,7 +59,7 @@ describe('who gets them', () => {
   it('a product worker', () => {
     write('Never guess at a number.');
     const { args } = supervisor().spawnPlan(item(), product, {});
-    expect(injected(args)).toBe('Never guess at a number.');
+    expect(injected(args)).toContain('Never guess at a number.');
   });
 
   // A rule she writes today has to apply to the thread she started last week.
@@ -64,23 +71,29 @@ describe('who gets them', () => {
     const { args } = s.spawnPlan(item({ answer: 'yes, do it' }), product, {
       continuation: true, resumeSessionId: 'session-abc',
     });
-    expect(injected(args)).toBe('Never guess at a number.');
+    expect(injected(args)).toContain('Never guess at a number.');
     expect(args).toContain('--resume');
   });
 });
 
 describe('when there is nothing to say', () => {
-  it('adds no flag when the file does not exist', () => {
+  // AND NEVER AN EMPTY BLOCK, which is the rule this pair has always been
+  // about: a blank instruction block briefs every session with nothing and
+  // invites the model to wonder what is missing. What the run is on is a
+  // sentence, so what she has not written adds no second one.
+  const runsOn = 'This run is on Claude Code, Opus 5.5.';
+
+  it('carries nothing of hers when the file does not exist', () => {
     const { args } = supervisor().spawnPlan(item(), product, {});
-    expect(args).not.toContain('--append-system-prompt');
+    expect(injected(args).startsWith(runsOn)).toBe(true);
+    expect(injected(args).trim()).toBe(injected(args));
   });
 
-  // An empty flag is not the same as no flag: it briefs every session with a
-  // blank instruction block and invites the model to wonder what is missing.
-  it('adds no flag when she has emptied the box', () => {
+  it('carries nothing of hers when she has emptied the box', () => {
     write('   \n\n  ');
     const { args } = supervisor().spawnPlan(item(), product, {});
-    expect(args).not.toContain('--append-system-prompt');
+    expect(injected(args).startsWith(runsOn)).toBe(true);
+    expect(injected(args).trim()).toBe(injected(args));
   });
 });
 
@@ -100,9 +113,11 @@ describe('reading and writing the file', () => {
   it('picks up an edit with no restart', () => {
     const s = supervisor();
     s.writeStanding('first rule');
-    expect(injected(s.spawnPlan(item(), product, {}).args)).toBe('first rule');
+    expect(injected(s.spawnPlan(item(), product, {}).args)).toContain('first rule');
     s.writeStanding('second rule');
-    expect(injected(s.spawnPlan(item(), product, {}).args)).toBe('second rule');
+    const after = injected(s.spawnPlan(item(), product, {}).args);
+    expect(after).toContain('second rule');
+    expect(after).not.toContain('first rule');
   });
 
   it('never leaves a half-written file for a spawn to read', () => {
