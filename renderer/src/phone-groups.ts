@@ -124,7 +124,7 @@ export interface GroupPeople {
 }
 
 /**
- * Who is in each group, with what each lets a card show: names, faces, level,
+ * Who is in each group, with what each lets a card show: names, faces,
  * what they are on and their agents. Teammates' thread names come from the
  * team's thread cards, as on the Mac.
  */

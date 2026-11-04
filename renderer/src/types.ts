@@ -495,7 +495,6 @@ export interface RoomCard {
   bio: string | null;
   /** Null when they hid it. */
   agents: number | null;
-  level: number | null;
   hoursTotal: number;
   hoursWeek: number;
   hoursToday: number;
@@ -575,6 +574,7 @@ export interface RoomProfile {
   bio: string | null;
   show_working: 'none' | 'team' | 'everyone';
   show_agents: boolean;
+  /** Named for the level it once showed; it hides your agent hours. */
   show_level: boolean;
   show_status: boolean;
   show_activity?: boolean;

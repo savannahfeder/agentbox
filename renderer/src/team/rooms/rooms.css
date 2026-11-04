@@ -3,7 +3,6 @@
    round 22 answered a screen's contrast fault, not the design. */
 :root { --rm-line: var(--line); }
 
-.rm-quiet { margin-left: 9px; flex: none; font: 12px var(--mono); color: var(--text-faint); }
 .rm-label { font: 11px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 .rm-label b { font-weight: 400; color: var(--text-dim); margin-left: 6px; }
 .rm-btn { height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); background: var(--control-face); box-shadow: var(--control-shadow); color: var(--text); font: inherit; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; box-sizing: border-box; cursor: default; }
@@ -456,7 +455,7 @@
 .gr-two > .tm-av:first-child { left: 0; top: 0; }
 .gr-two > .tm-av:last-child { right: 0; bottom: 0; z-index: 1; outline: 2px solid var(--pop, var(--surface)); }
 
-/* Who is in the group: face, name and level, what they are on, their agents. */
+/* Who is in the group: face, name, what they are on, their agents. */
 .gr-side { width: clamp(240px, 36%, 368px); flex: none; min-height: 0; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; padding: 16px 24px 24px; border-left: 1px solid var(--rm-line); }
 .gr-ph { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 20px; margin-bottom: 8px; }
 .gr-pt { font-size: 13.5px; color: var(--text); }

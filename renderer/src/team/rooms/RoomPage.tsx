@@ -104,7 +104,7 @@ export function WallCard({ card, sel = false, onClick, onPoint }: { card: RoomCa
     onMouseEnter={onPoint ? (e) => onPoint(e.currentTarget) : undefined} onMouseLeave={onPoint ? () => onPoint(null) : undefined}>
     {sel && <span className="rm-check">{I.check()}</span>}
     <Face name={card.name} url={card.avatarUrl} size={64} />
-    <span className="rm-nm"><span className="n">{cardName(card)}</span>{card.level != null && <span className="rm-quiet">{card.level}</span>}</span>
+    <span className="rm-nm"><span className="n">{cardName(card)}</span></span>
     <span className="rm-on rm-one">{card.away ? <span className="rm-priv">Not on Rooms yet</span> : card.workingOn ?? (card.workingPrivate ? <span className="rm-priv">Private thread</span> : card.status ? <span className="rm-priv">{card.status}</span> : ' ')}</span>
     {card.away
       ? <span className="rm-ag" aria-hidden="true">{' '}</span>
@@ -131,7 +131,7 @@ function Ranks({ room, onBack, onPerson }: { room: Room; onBack: () => void; onP
       <div className="hd"><span className="rm-label">Rank</span><span /><span className="rm-label">Person</span><span className="rm-label">{when === 'week' ? 'Agent hours this week' : 'Agent hours today'}</span><span /></div>
       {rows.map((c, i) => <div key={c.id} className={`rm-rrow${c.me ? ' me' : ''}`} role="button" tabIndex={0} onClick={() => onPerson(c.id)}>
         <span className="r">{i + 1}</span><Face name={c.name} url={c.avatarUrl} size={28} />
-        <span className="rm-nm"><span className="n">{cardName(c)}</span>{c.level != null && <span className="rm-quiet">{c.level}</span>}</span>
+        <span className="rm-nm"><span className="n">{cardName(c)}</span></span>
         <span className="bar"><i style={{ width: `${(hours(c) / max) * 100}%` }} /></span><span className="v">{fmt(hours(c))}</span>
       </div>)}
     </div>

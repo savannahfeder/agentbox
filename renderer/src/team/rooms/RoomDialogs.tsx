@@ -141,7 +141,7 @@ export function JoinDialog({ preview, myName, onJoin, onClose }: {
           <span className="rm-live"><LiveMark still={!preview.agentsRunning} />{preview.members} {preview.members === 1 ? 'person' : 'people'} working with {preview.agentsRunning} {preview.agentsRunning === 1 ? 'agent' : 'agents'} right now</span>
         </div>
         <div className="sec">
-          <span className="rm-note">People in {preview.name} will see your name as {myName}, your level and the short name of what you are working on. You can change this in Settings.</span>
+          <span className="rm-note">People in {preview.name} will see your name as {myName}, your agent hours and the short name of what you are working on. You can change this in Settings.</span>
           {error && <span className="rm-err" role="alert">{error}</span>}
           <div className="rm-acts">
             <button type="button" className="rm-btn" onClick={onClose}>Not now</button>
@@ -160,7 +160,7 @@ export function MembersMenu({ room, at, onInvite, onClose, onPerson }: { room: R
     <div className="head"><span className="rm-label">{room.members} {room.members === 1 ? 'member' : 'members'}</span></div>
     {room.kind !== 'group' && <><button type="button" className="row" onClick={onInvite}>{I.invite()}<span>Invite people</span></button><div className="rule" /></>}
     {people.map((c) => <button type="button" key={c.id} className="row" onClick={() => onPerson?.(c.id)}>
-      <Face name={c.name} url={c.avatarUrl} size={18} /><span>{cardName(c)}</span>{c.level != null && <span className="k">{c.level}</span>}</button>)}
+      <Face name={c.name} url={c.avatarUrl} size={18} /><span>{cardName(c)}</span></button>)}
     {hidden > 0 && <div className="row" style={{ color: 'var(--text-faint)' }}>{hidden} more not showing</div>}
   </div>;
 }

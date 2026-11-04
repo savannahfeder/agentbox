@@ -4,8 +4,8 @@
 // default everyone there got the name of the thread their newest agent was on
 // and a list of their thread names with projects. Measured by running
 // cardsFor and myPresence for a person with no team: a thread made 30 days
-// before they signed in went out too. Agreed: strangers see your name, level,
-// agent count and the line you wrote about yourself; thread names only once
+// before they signed in went out too. Agreed: strangers see your name, agent
+// hours, agent count and the line you wrote about yourself; thread names only once
 // you turn them on; an open group says so the first time you open it, with
 // Leave group beside it.
 import { describe, it, expect } from 'vitest';
@@ -99,7 +99,7 @@ describe('your own row in an open group says what strangers see', () => {
 });
 
 describe('the People list', () => {
-  const card = (id, o = {}) => ({ id, me: false, name: id, avatarUrl: null, agents: 2, level: 10, status: null, workingOn: null, workingPrivate: true, bio: null, away: false, ...o });
+  const card = (id, o = {}) => ({ id, me: false, name: id, avatarUrl: null, agents: 2, status: null, workingOn: null, workingPrivate: true, bio: null, away: false, ...o });
   const line = (c) => renderToStaticMarkup(createElement(PeoplePanel, { room: { members: 1, wall: [c] }, onPerson: () => {} }));
 
   it('shows the line someone wrote about themselves where their thread is kept from you', () => {
@@ -121,14 +121,14 @@ describe('the line over an open group', () => {
   const prof = (o = {}) => ({ show_working: 'team', show_level: true, show_agents: true, ...o });
 
   it('says who can join and exactly what they see', () => {
-    expect(openGroupWords(prof())).toBe(`Anyone on ${Name} can join this group. They see your name, level and how many agents you run, never your threads.`);
+    expect(openGroupWords(prof())).toBe(`Anyone on ${Name} can join this group. They see your name, your agent hours and how many agents you run, never your threads.`);
   });
   it('leaves out what you switched off', () => {
     expect(openGroupWords(prof({ show_level: false }))).toBe(`Anyone on ${Name} can join this group. They see your name and how many agents you run, never your threads.`);
     expect(openGroupWords(prof({ show_level: false, show_agents: false }))).toBe(`Anyone on ${Name} can join this group. They see your name, never your threads.`);
   });
   it('says so when your thread names are on', () => {
-    expect(openGroupWords(prof({ show_working: 'everyone' }))).toBe(`Anyone on ${Name} can join this group. They see your name, level, how many agents you run and the names of your threads.`);
+    expect(openGroupWords(prof({ show_working: 'everyone' }))).toBe(`Anyone on ${Name} can join this group. They see your name, your agent hours, how many agents you run and the names of your threads.`);
   });
 
   it('shows over an open group you have not seen yet, and nowhere else', () => {
