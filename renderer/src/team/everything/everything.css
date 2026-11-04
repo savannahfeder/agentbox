@@ -123,12 +123,12 @@
 .pl-btn.quiet { border-color: transparent; }
 .pl-btn.quiet:hover { border-color: transparent; }
 .pl-btn:disabled { opacity: .45; cursor: default; }
-.pl-body { flex: 1; min-height: 0; display: flex; gap: 24px; }
-.pl-chat { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-/* Inside the rounded panel the words and the box share one 24px edge. */
-.pl-chat { --text-x: 24px; }
-.pl-chat .tq-chat .tq-lines { padding-left: 24px; padding-right: 24px; }
-.pl-chat .rm-compose.tq-compose { margin: 8px 24px 24px; }
+.pl-body { flex: 1; min-height: 0; display: flex; gap: 40px; }
+.pl-chat { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* No box around the chat: its words and reply box line up with the face in the header. */
+.pl-chat { --text-x: 6px; }
+.pl-chat .tq-chat .tq-lines { padding-left: 6px; padding-right: 0; }
+.pl-chat .rm-compose.tq-compose { margin: 8px 0 0 6px; }
 .pl-side { width: 272px; flex: none; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; padding-top: 2px; }
 .pl-sec h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 12px; font-weight: 500; line-height: 18px; color: var(--text-dim); }
 .pl-sec h3 b { font-weight: 400; color: var(--text-faint); }
@@ -157,11 +157,12 @@
 .pl-mate { display: flex; align-items: center; gap: 10px; margin: 0 -8px; padding: 6px 8px; border: 0; border-radius: 8px; background: none; text-align: left; font: inherit; font-size: 13.5px; color: var(--text); cursor: pointer; }
 .pl-mate:hover { background: var(--wash); }
 .pl-mate .ev-s { margin: 0 0 0 auto; }
-.pl-send { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 20px 24px 20px; }
+.pl-send { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 20px 0 0 6px; }
 .pl-send-empty { flex: 1; display: flex; align-items: center; justify-content: center; }
 .pl-hello { max-width: 420px; margin: 0; text-align: center; font-size: 14px; line-height: 21px; color: var(--text-faint); }
-.pl-compose { display: flex; align-items: flex-end; gap: 10px; padding: 10px 10px 10px 14px; border: 1px solid var(--line-strong); border-radius: 12px; }
-.pl-compose textarea { flex: 1; min-width: 0; border: 0; background: none; resize: none; outline: none; font: inherit; font-size: 14px; line-height: 20px; color: var(--text); }
+.pl-send .rm-compose.tq-compose { margin: 8px 0 0; }
+.pl-first .rm-compose-input { display: block; width: 100%; border: 0; background: none; resize: none; outline: none; font: inherit; font-size: 15px; line-height: 22px; }
+.pl-first .rm-compose-bar { justify-content: flex-end; }
 .pl-note { margin: 8px 2px 0; font-size: 12.5px; color: var(--text-faint); }
 /* A narrow window: their work under the chat rather than beside it. */
 @media (max-width: 860px) {

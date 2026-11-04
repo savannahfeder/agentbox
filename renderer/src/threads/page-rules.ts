@@ -755,7 +755,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
         const state = stateOf?.(item);
         if (!state || (state === 'done' && !(item.updatedAt >= today))) continue;
         out.push({
-          key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: shownTitle(item), project: null,
+          key: `mine/${item.product}/${item.id}`, ownerId: item.assignee && item.assignee !== 'agent' ? item.assignee : me, state, title: shownTitle(item), project: null,
           projectSlug: product.slug, priority: shownPriority(item), updatedAt: item.updatedAt, item, card: null, task,
         });
         continue;

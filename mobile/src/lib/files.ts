@@ -90,6 +90,24 @@ export function pictureSource(uri: string): { uri: string; cacheKey?: string } {
   return path ? { uri, cacheKey: path } : { uri };
 }
 
+/** What expo-image's `loadAsync` hands back: a reference to a decoded picture held in native memory. */
+export interface HeldPicture { width: number; height: number; release?: () => void }
+
+/**
+ * A picture's own width and height, read and then let go. The reference
+ * `loadAsync` answers with holds the whole decoded picture outside
+ * JavaScript, so a thread of screenshots keeps every one of them until the
+ * collector happens to run, and the phone ends the app first.
+ */
+export async function shapeOfDrawn(load: () => Promise<HeldPicture>): Promise<{ w: number; h: number }> {
+  const held = await load();
+  try {
+    return { w: held.width, h: held.height };
+  } finally {
+    try { held.release?.(); } catch { /* already let go */ }
+  }
+}
+
 /** A picture's width and height as its computer listed them, or null. */
 export function pictureShapeOf(places: Places, product: string, src: string): { w: number; h: number } | null {
   const e = findFile(places, product, src)?.entry;

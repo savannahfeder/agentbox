@@ -106,7 +106,7 @@ describe('the line under the thread while the reply waits', () => {
 
   it('offers to send it now, never "back to inbox"', () => {
     const focus = read('renderer/src/components/Focus.tsx');
-    expect(focus).toMatch(/replyWaitsUntil\(item, Date\.now\(\)\) \? 'send it now'/);
+    expect(focus).toMatch(/replyWaitsUntil\(item, Date\.now\(\)\) \? 'Send it now'/);
   });
 });
 

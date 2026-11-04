@@ -40,25 +40,21 @@ describe('three quarters, and no line down the middle', () => {
   })
 
   it('draws nothing down the middle until the pointer finds it', () => {
-    // The line is `.doc-grip::before`. Only the line went.
-    const line = css.match(/\.doc-grip::before \{[^}]*\}/)
-    expect(line).toBeTruthy()
-    expect(line[0]).toContain('background: transparent')
-    expect(line[0]).not.toContain('var(--line-strong)')
-    // It comes back under the pointer, or a divider with no state at all
-    // cannot be found by feel.
-    expect(css).toMatch(/\.doc-grip:hover::before \{ background: var\(--text-faint\); \}/)
+    // What the pointer finds is a pill on the file's edge
+    // (the-divider-sits-on-the-files-own-edge); at rest there is nothing.
+    const pill = css.match(/\.doc-grip::after \{[^}]*\}/)
+    expect(pill).toBeTruthy()
+    expect(pill[0]).toContain('opacity: 0')
+    expect(css).not.toMatch(/\.doc-grip:hover::before/)
   })
 
-  it('keeps the reach and the handle that make the divider findable', () => {
-    // is her second sentence, and the two things that make the drag reachable
-    // are hers from 2026-08-21: a 9 point hit area over a 1 point line, and a
-    // capsule handle on hover.
+  it('keeps the reach that makes the divider findable', () => {
+    // A 9 point hit area over a 1 point line, from 2026-08-21. The capsule
+    // that sat on it went on 2026-11-04 when the line moved onto the file's
+    // own edge (the-divider-sits-on-the-files-own-edge).
     const grip = css.match(/\n\.doc-grip \{[^}]*\}/)
     expect(grip[0]).toContain('width: 9px')
     expect(grip[0]).toContain('cursor: col-resize')
-    expect(css).toContain('.doc-grip::after')
-    expect(css).toMatch(/\.doc-grip:hover::after, \.doc-pane\.dragging \.doc-grip::after \{ opacity: 1; \}/)
   })
 
   it('leaves the travel in both directions exactly where it was', () => {
