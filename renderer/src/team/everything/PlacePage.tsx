@@ -120,7 +120,7 @@ export function SendBox({ placeholder, note, onSend, empty }: {
     <div className="pl-send-empty">{empty}</div>
     {error && <p className="tq-error" role="alert">{error}</p>}
     <div className="rm-compose tq-compose pl-first">
-      <textarea className="rm-compose-input" rows={1} value={text} placeholder={placeholder} aria-label={placeholder} onChange={(e) => setText(e.target.value)}
+      <textarea className="rm-compose-input" autoFocus rows={1} value={text} placeholder={placeholder} aria-label={placeholder} onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }} />
       <div className="rm-compose-bar">
         <button type="button" className="dock-send" disabled={!text.trim() || busy} title={`Send · ${sendKeyFor(true)}`} onClick={() => { void send(); }}>Send <kbd>{sendKeyFor(true)}</kbd></button>

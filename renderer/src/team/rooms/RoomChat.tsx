@@ -269,7 +269,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
         </div>;
       })}
     </div></div>
-    <Composer key={`${room.id}:${thread ?? ''}`} roomId={room.id} threadId={thread} people={others}
+    <Composer key={`${room.id}:${thread ?? ''}`} roomId={room.id} threadId={thread} takesTyping={full || !!thread} people={others}
       placeholder={root ? `Reply to ${nameOf(root.by)}` : `Message ${room.kind === 'group' ? others.map((p) => p.name.split(' ')[0]).join(', ') || room.name : room.name}`}
       onPutFile={calls.onPutFile} onPutFileFrom={calls.onPutFileFrom} sending={calls.sending} onNotice={onNotice}
       onEditLast={() => { const mine = myNewest(messages, meId, root?.id ?? null); if (mine) setEditing(mine.id); }}
@@ -416,8 +416,8 @@ function sendingWords(sending: Record<string, { done: number; total: number }> |
 // A file in the box is given the name it will be stored under once, here.
 const staged = (a: PendingAttachment): PendingAttachment => (a.storedAs ? a : { ...a, storedAs: storedName(a.name) });
 
-function Composer({ roomId, threadId, placeholder, people, onSend, onPutFile, onPutFileFrom, sending, onNotice, onEditLast }: {
-  roomId: string; threadId: string | null; placeholder: string; people: ChatPerson[];
+function Composer({ roomId, threadId, takesTyping = false, placeholder, people, onSend, onPutFile, onPutFileFrom, sending, onNotice, onEditLast }: {
+  roomId: string; threadId: string | null; takesTyping?: boolean; placeholder: string; people: ChatPerson[];
   onSend: (body: string) => Promise<string | null>;
   onPutFile?: (name: string, dataBase64: string) => Promise<string | null>;
   onPutFileFrom?: (name: string, srcPath: string) => Promise<string | null>;
@@ -436,8 +436,8 @@ function Composer({ roomId, threadId, placeholder, people, onSend, onPutFile, on
   const ref = useRef<RichBox | null>(null);
   const filePicker = useRef<HTMLInputElement>(null);
   useEffect(() => { drafts.set(draftKey, text); }, [draftKey, text]);
-  // A thread opens to be replied in; its box takes the typing, not the app's letter keys.
-  useEffect(() => { if (threadId) requestAnimationFrame(() => ref.current?.focus()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // A chat that is the page, or a thread opened to reply in: its box takes the typing, not the app's letter keys.
+  useEffect(() => { if (takesTyping) requestAnimationFrame(() => ref.current?.focus()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // "@" then letters at the caret opens the people in the room.
   const at = /(^|\s)@([\p{L}.]*)$/u.exec(plain.slice(0, caret));
   const matches = at ? people.filter((p) => p.name.toLowerCase().startsWith(at[2].toLowerCase())).slice(0, 6) : [];

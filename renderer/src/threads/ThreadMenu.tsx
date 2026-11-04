@@ -34,6 +34,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { chord } from '../this-keyboard';
 import { DONE } from '../done-word';
+import { onPhone } from '../phone-screen';
 import { PlaceButton, type PlaceFacts } from './PlaceButton';
 import { nameWait } from '../../../shared/thread-waits.mjs';
 
@@ -90,7 +91,8 @@ export function threadMenuRows({ change, terminal, finish, runNow = false, later
   terminal: 'open' | 'closed' | null;
   finish: boolean;
   runNow?: boolean;
-  later?: boolean;
+  /** 'key' on the laptop, where L does it and the row says so. */
+  later?: boolean | 'key';
   pin?: 'pinned' | 'unpinned' | null;
   give?: boolean;
 }): ThreadMenuRow[] {
@@ -98,7 +100,7 @@ export function threadMenuRows({ change, terminal, finish, runNow = false, later
   if (runNow) rows.push({ id: 'run', label: 'Run now', key: null });
   if (change) rows.push({ id: 'code', label: 'View code changes', key: null });
   if (terminal) rows.push({ id: 'terminal', label: terminal === 'open' ? 'Hide terminal' : 'Open terminal', key: '⌘J' });
-  if (later) rows.push({ id: 'later', label: 'Later', key: null });
+  if (later) rows.push({ id: 'later', label: 'Later', key: later === 'key' ? 'L' : null });
   if (rename) rows.push({ id: 'rename', label: 'Rename', key: null });
   if (pin) rows.push({ id: 'pin', label: pin === 'pinned' ? 'Unpin thread' : 'Pin thread', key: null });
   if (give) rows.push({ id: 'give', label: 'Give it to someone else…', key: null });
@@ -249,7 +251,7 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
   /** True keeps it on this Mac (moving it here if it is in the cloud). */
   onPlace?: (keep: PlaceAct) => void;
 }) {
-  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change, terminal, finish: !!onFinish, runNow: !!onRunNow, later: !!onLater, rename: !!onRename, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', closeTask: !!onCloseTask }));
+  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, rename: !!onRename, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', closeTask: !!onCloseTask }));
   const [open, setOpen] = useState(false);
   const [giving, setGiving] = useState(false);
   const [waiting, setWaiting] = useState(false);

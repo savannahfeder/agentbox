@@ -22,7 +22,8 @@ describe('a thread in a group chat', () => {
     expect(chat).toMatch(/if \(!root\) return undefined;\n\s+const esc = \(e: KeyboardEvent\) => \{ if \(e\.key === 'Escape'\) \{ e\.preventDefault\(\); e\.stopImmediatePropagation\(\); setThread\(null\); \} \};/);
   });
   it('puts the cursor in its reply box when it opens', () => {
-    expect(chat).toMatch(/useEffect\(\(\) => \{ if \(threadId\) requestAnimationFrame\(\(\) => ref\.current\?\.focus\(\)\); \}, \[\]\);/);
+    expect(chat).toMatch(/useEffect\(\(\) => \{ if \(takesTyping\) requestAnimationFrame\(\(\) => ref\.current\?\.focus\(\)\); \}, \[\]\);/);
+    expect(chat).toMatch(/takesTyping=\{full \|\| !!thread\}/);
   });
   it('says how many replies only when there are some', () => {
     expect(chat).toContain("{(replies.get(root.id)?.length ?? 0) > 0 && <span className=\"rm-label\"");

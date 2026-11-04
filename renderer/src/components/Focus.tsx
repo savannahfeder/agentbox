@@ -1726,7 +1726,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onCloseTask={canFinish && givenTask ? onCloseTask ?? null : null}
       onReopen={!canFinish && !agent ? onReopenDone ?? null : null}
       onRunNow={waiting && onRunNow ? onRunNow : null}
-      onLater={onPhone() && canFinish ? onSnooze ?? null : null}
+      onLater={canFinish ? onSnooze ?? null : null}
       // A finished thread has nothing to be pinned for.
       pinned={canFinish && onPin ? !!item.pinned : null}
       onPin={onPin}
