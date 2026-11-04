@@ -138,7 +138,8 @@ language sql stable security definer set search_path = public as $$
   from public.file_link_comments c
   join public.file_links l on l.token = c.token and l.stopped_at is null
   join public.people p on p.id = c.by_person
-  where l.owner = auth.uid() and c.by_person <> l.owner and c.created_at > since
+  -- To the millisecond, as the app keeps the newest time it has seen.
+  where l.owner = auth.uid() and c.by_person <> l.owner and date_trunc('milliseconds', c.created_at) > since
   order by c.created_at, c.id
   limit 100
 $$;

@@ -219,6 +219,15 @@ describe('the comments new to the owner', () => {
     ]);
     expect(await since(MAYA, new Date(Date.now() + 60_000).toISOString())).toEqual([]);
   });
+  // The app keeps the newest comment's time in milliseconds and the database in
+  // microseconds, so the same comment came back every minute (screenshots, 2026-11-04).
+  it('do not bring back a comment by its own time as the app keeps it, to the millisecond', async () => {
+    const tok = await share(MAYA, 'agentbox-team/w-9/notes/twice', '# Twice', { name: 'twice.md' });
+    await comment(SAM, tok, 'Once only');
+    await db.query(`update public.file_link_comments set created_at = '2030-01-01 10:05:00.123456+00' where token = $1`, [tok]);
+    expect((await since(MAYA, '2030-01-01T10:05:00.122Z')).filter((x) => x.token === tok)).toHaveLength(1);
+    expect((await since(MAYA, '2030-01-01T10:05:00.123Z')).filter((x) => x.token === tok)).toEqual([]);
+  });
   it('are nobody else\'s to read, and nothing to someone signed out', async () => {
     const before = new Date(Date.now() - 60_000).toISOString();
     expect((await since(ANA, before)).filter((c) => c.source.includes('w-7'))).toEqual([]);
