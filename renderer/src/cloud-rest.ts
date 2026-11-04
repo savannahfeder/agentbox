@@ -115,6 +115,7 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
   return {
     session: () => session,
     signedIn: () => !!session,
+    email: () => session?.user?.email ?? null,
     /** Moves on at every sign-in and sign-out; a read begun under an older one is stale. */
     generation: () => gen,
 

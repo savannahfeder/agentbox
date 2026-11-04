@@ -12,7 +12,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { sharedFileToken } from '../renderer/src/shared-file/shared-file.ts';
+import { sharedFileToken, titleOf } from '../renderer/src/shared-file/shared-file.ts';
 import { onASharedFilePage } from '../renderer/src/shared-file/route.ts';
 import { FileBody, Comments } from '../renderer/src/shared-file/SharedFilePage.tsx';
 
@@ -27,9 +27,12 @@ describe('the address', () => {
     expect(sharedFileToken(`/f/${'A_-9'.repeat(16)}`, true)).toBe('A_-9'.repeat(16));
   });
   it('is not for a token too short, too long or with anything else in it, nor for any other path', () => {
-    for (const p of ['/f/abcdefghijklmno', `/f/${'a'.repeat(65)}`, '/f/abcdefghijklmnop!', '/f/abc.defghijklmnopq', `/f/${TOK}/raw`, `/x/f/${TOK}`, '/', '/f/', `/files/${TOK}`]) {
+    for (const p of ['/f/abcdefghijklmno', `/f/${'a'.repeat(65)}`, '/f/abcdefghijklmnop$', '/f/abcdefghijklmnop.x', '/f/abc.defghijklmnopq', `/f/${TOK}/raw`, `/x/f/${TOK}`, '/', '/f/', `/files/${TOK}`]) {
       expect(sharedFileToken(p, true), p).toBeNull();
     }
+  });
+  it('takes the full stop, comma or bracket a sentence leaves after a pasted link', () => {
+    for (const end of ['.', ',', ')', '].', '%20', '%29', '!', ' ']) expect(sharedFileToken(`/f/${TOK}${end}`, true), end).toBe(TOK);
   });
   it('is never a shared file outside the web app', () => {
     expect(sharedFileToken(`/f/${TOK}`, false)).toBeNull();
@@ -70,16 +73,16 @@ const file = (kind, body, extra = {}) => ({ name: 'plan.md', kind, type: 'text/m
 
 describe('each kind of file', () => {
   it('draws a document with the app\'s document look, and its HTML as words, never as HTML', () => {
-    const html = renderToStaticMarkup(h(FileBody, { token: TOK, file: file('markdown', '# Plan\n\n<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>\n\n[run](javascript:alert(1)) and [site](https://example.com)') }));
+    const html = renderToStaticMarkup(h(FileBody, { token: TOK, file: file('markdown', '## Plan\n\n<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>\n\n[run](javascript:alert(1)) and [site](https://example.com)') }));
     expect(html).toContain('class="markdown doc-prose"');
-    expect(html).toContain('<h1>Plan</h1>');
+    expect(html).toContain('<h2>Plan</h2>');
     expect(html).not.toMatch(/<script|<img|href="javascript/);
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).toContain('href="https://example.com" target="_blank" rel="noopener noreferrer"');
   });
   it('frames a page from its own address, sandboxed without the page\'s origin', () => {
     const html = renderToStaticMarkup(h(FileBody, { token: TOK, file: file('page', '<p>hi</p>', { name: 'p.html', type: 'text/html' }) }));
-    expect(html).toContain(`src="/f/${TOK}/raw?v=3"`);
+    expect(html).toContain(`src="/f/${TOK}/raw?at=0"`);
     expect(html).toContain('sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms"');
     expect(html).not.toContain('allow-same-origin');
     expect(html).not.toContain('srcdoc');
@@ -115,5 +118,18 @@ describe('the comments', () => {
   });
   it('lets the owner remove any comment', () => {
     expect(draw({ signedIn: true, file: file('markdown', '', { mine: true }) }).match(/sf-remove/g)).toHaveLength(2);
+  });
+});
+
+// A contractor did not know what "competitor-research.md" was (power test, 2026-11-04).
+describe('the words over the file', () => {
+  it('are a document\'s own first heading, taken out of the body under them', () => {
+    expect(titleOf({ name: 'competitor-research.md', kind: 'markdown', body: '# Competitor pricing, Q1\n\nFive tools.' }))
+      .toEqual({ title: 'Competitor pricing, Q1', body: '\nFive tools.' });
+  });
+  it('are its name without .md when it has no heading at the top, and the name of any other file', () => {
+    expect(titleOf({ name: 'notes.md', kind: 'markdown', body: 'Just words\n# Later' }).title).toBe('notes');
+    expect(titleOf({ name: 'deck.pdf', kind: 'pdf', body: 'x' }).title).toBe('deck.pdf');
+    expect(titleOf({ name: 'a.md', kind: 'markdown', body: '## Second level' }).title).toBe('a');
   });
 });

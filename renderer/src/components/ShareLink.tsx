@@ -14,6 +14,7 @@ export const shareWords = {
   stopped: 'Stopped. The old link no longer works.',
   behind: 'The link shows an older copy.',
   comments: (n: number) => (n === 1 ? '1 comment' : `${n} comments`),
+  stopAsk: (n: number) => (n > 0 ? `Stop, and delete ${n === 1 ? 'its comment' : `its ${n} comments`}` : 'Stop the link'),
   shared: (at: number, now = Date.now()) => (new Date(at).toDateString() === new Date(now).toDateString()
     ? `Shared today at ${clock(at)}`
     : `Shared ${new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' })}`),
@@ -47,11 +48,13 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   const box = useRef<HTMLDivElement | null>(null);
   const ask = { product, thread, src };
 
+  const [stopAsked, setStopAsked] = useState(false);
+  // Read again on every opening: an edit or a comment since is what the panel is opened to see.
   useEffect(() => {
     let live = true;
     void api.fileLink(ask).then((s) => { if (live) setState(s); });
     return () => { live = false; };
-  }, [product, thread, src, signedIn]);
+  }, [product, thread, src, signedIn, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -75,6 +78,8 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   };
   const stop = async () => {
     if (!link) return;
+    if (!stopAsked) { setStopAsked(true); return; }
+    setStopAsked(false);
     setBusy(true); setProblem(null);
     const out = await api.fileLinkStop({ token: link.token });
     setBusy(false);
@@ -82,13 +87,13 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
     setState({ ...state, link: null });
     setSaid(shareWords.stopped);
   };
-  const toggle = () => { setOpen(!open); setSaid(null); setProblem(null); };
+  const toggle = () => { setOpen(!open); setSaid(null); setProblem(null); setStopAsked(false); };
 
   return (
     <div className={`av-share${icon ? ' is-mark' : ''}`} ref={box}>
       {icon
-        ? <button type="button" className={`doc-mark${link ? ' is-shared' : ''}`} title={link ? 'Shared' : 'Share'} aria-label={link ? 'Shared' : 'Share'} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="link" /></button>
-        : <button type="button" className={`av-btn${open ? ' is-on' : ''}`} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="link" />{link ? 'Shared' : 'Share'}</button>}
+        ? <button type="button" className={`doc-mark${link ? ' is-shared' : ''}${behind ? ' is-behind' : ''}`} title={behind ? shareWords.behind : link ? 'Shared' : 'Share'} aria-label={link ? 'Shared' : 'Share'} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="link" /></button>
+        : <button type="button" className={`av-btn${open ? ' is-on' : ''}${behind ? ' is-behind' : ''}`} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="link" />{link ? 'Shared' : 'Share'}</button>}
       {open && (
         <div className="av-share-box" role="dialog" aria-label="Share">
           {!state.signedIn ? (
@@ -111,7 +116,9 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
                 </button>
                 <button type="button" className="av-btn" disabled={busy} onClick={() => window.open(link.url, '_blank')}>Open</button>
                 <span className="av-spring" />
-                <button type="button" className="av-share-stop" disabled={busy} onClick={() => void stop()}>Stop sharing</button>
+                <button type="button" className={`av-share-stop${stopAsked ? ' is-asking' : ''}`} disabled={busy} onBlur={() => setStopAsked(false)} onClick={() => void stop()}>
+                  {stopAsked ? shareWords.stopAsk(link.comments) : 'Stop sharing'}
+                </button>
               </div>
             </>
           ) : (

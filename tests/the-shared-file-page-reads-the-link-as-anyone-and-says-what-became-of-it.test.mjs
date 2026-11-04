@@ -57,9 +57,11 @@ describe('comments', () => {
 });
 
 describe('the words on the page', () => {
-  it('say who shared it and on which day, with the year only when it is not this one', () => {
+  it('say who shared it and on which day, with the time today and the year only when it is not this one', () => {
     const now = Date.parse('2026-11-04T12:00:00Z');
-    expect(sharedLine({ ownerName: 'Maya Chen', updatedAt: Date.parse('2026-11-04T10:00:00Z') }, now)).toBe('Shared by Maya Chen · Nov 4');
+    const today = new Date(Date.parse('2026-11-04T10:05:00Z'));
+    expect(sharedLine({ ownerName: 'Maya Chen', updatedAt: today.getTime() }, today.getTime() + 60_000)).toMatch(/^Shared by Maya Chen · today at \d{1,2}:05(am|pm)$/);
+    expect(sharedLine({ ownerName: 'Maya Chen', updatedAt: Date.parse('2026-11-02T10:00:00Z') }, now)).toBe('Shared by Maya Chen · Nov 2');
     expect(sharedLine({ ownerName: 'Maya Chen', updatedAt: Date.parse('2025-06-02T10:00:00Z') }, now)).toBe('Shared by Maya Chen · Jun 2, 2025');
   });
   it('give a comment\'s time the way the app does', () => {

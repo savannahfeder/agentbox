@@ -29,7 +29,8 @@ export interface FileComment {
   byOwner: boolean;
 }
 
-const PATH = /^\/f\/([A-Za-z0-9_-]{16,64})\/?$/;
+// What a sentence leaves on a pasted link ("here it is: <link>." or "(<link>)").
+const PATH = /^\/f\/([A-Za-z0-9_-]{16,64})\/?(?:[.,;:!?)\]}>'"\s]|%20|%29|%5D|%22|%27)*$/;
 
 /** The token when this address is a shared file on the web app; null anywhere else. */
 export function sharedFileToken(pathname: string, onTheWebApp: boolean): string | null {
@@ -88,12 +89,27 @@ export function initialOf(name: string): string {
 
 export function sharedOn(ts: number, now = Date.now()): string {
   const d = new Date(ts);
+  // Today it says the time, so someone told "it's fixed" can tell which copy they have.
+  if (d.toDateString() === new Date(now).toDateString()) return `today at ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(' ', '')}`;
   const sameYear = d.getFullYear() === new Date(now).getFullYear();
   return d.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export function sharedLine(file: Pick<SharedFile, 'ownerName' | 'updatedAt'>, now = Date.now()): string {
   return file.updatedAt ? `Shared by ${file.ownerName} · ${sharedOn(file.updatedAt, now)}` : `Shared by ${file.ownerName}`;
+}
+
+/**
+ * The words over the file. A document's own first heading is its title, so the
+ * page does not lead with "competitor-research.md"; `body` is the rest of it.
+ */
+export function titleOf(file: Pick<SharedFile, 'name' | 'kind' | 'body'>): { title: string; body: string } {
+  if (file.kind === 'markdown') {
+    const m = /^\s*#[ \t]+(.+?)[ \t]*#*[ \t]*(?:\r?\n|$)/.exec(file.body);
+    if (m) return { title: m[1], body: file.body.slice(m[0].length) };
+    return { title: file.name.replace(/\.(md|markdown)$/i, ''), body: file.body };
+  }
+  return { title: file.name, body: file.body };
 }
 
 export function commentWhen(ts: number, now = Date.now()): string {

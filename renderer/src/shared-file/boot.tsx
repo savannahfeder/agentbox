@@ -28,6 +28,7 @@ export async function finishComingBack(client: Pick<CloudClient, 'finishGoogle' 
 }
 
 export function bootSharedFile(token: string, cfg: CloudConfig) {
+  if (location.pathname !== `/f/${token}`) history.replaceState(history.state, '', `/f/${token}${location.search}${location.hash}`);
   const client = cloudClient(cfg, { storage: localStorage, fetchImpl: (u, i) => fetch(u, { ...i, signal: AbortSignal.timeout(15_000) }) });
   const finishing = finishComingBack(client, location, (to) => history.replaceState(history.state, '', to));
   document.documentElement.dataset.page = 'shared-file';

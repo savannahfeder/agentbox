@@ -21,6 +21,11 @@
 .sf-bar-links a:hover, .sf-bar-links button:hover { color: var(--text); }
 
 .sf-main { width: 100%; max-width: 1400px; margin: 0 auto; padding: 32px 32px 64px; box-sizing: border-box; }
+.sf-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+.sf-head > div { min-width: 0; }
+.sf-download { flex: none; font-size: 13.5px; color: var(--text-dim); text-decoration: none; }
+.sf-download:hover { color: var(--text); }
+.sf-me { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; color: var(--text-faint); }
 .sf-head h1 { margin: 0 0 6px; font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.018em; overflow-wrap: anywhere; }
 .sf-head p { margin: 0; font-size: 13px; line-height: 18px; color: var(--text-faint); }
 .sf-split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 32px; margin-top: 24px; align-items: start; }
@@ -34,6 +39,7 @@
 /* A page with no ground of its own is drawn on white, as a browser draws it. */
 .sf-frame { display: block; width: 100%; height: calc(100vh - 210px); min-height: 520px; border: 0; background: #fff; }
 .sf-pdf { height: calc(100vh - 210px); min-height: 520px; display: flex; }
+.sf-pdf > * { flex: 1; min-width: 0; }
 
 .sf-comments { position: sticky; top: 76px; min-width: 0; }
 .sf-comments h2 {
@@ -58,7 +64,9 @@
 .sf-comment:hover:has(.sf-remove) time, .sf-comment:focus-within:has(.sf-remove) time { display: none; }
 .sf-remove:hover { color: var(--text); }
 @media (hover: none) { .sf-remove { display: block; margin-left: 0; } }
-.sf-said p { margin: 4px 0 0; font-size: 14px; line-height: 21px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sf-said p { margin: 4px 0 0; font-size: 14px; line-height: 21px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 252px; overflow-y: auto; }
+.sf-remove.is-asking { display: block; color: var(--text); }
+.sf-comment:has(.sf-remove.is-asking) time { display: none; }
 
 .sf-write { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; margin-top: 14px; }
 .sf-write textarea {
@@ -68,7 +76,11 @@
 }
 :root[data-theme="light"] .sf-write textarea { background: var(--surface); }
 .sf-write textarea:focus { border-color: var(--accent); }
-.sf-send { height: 32px; padding: 0 14px; border: 0; border-radius: var(--radius); background: var(--accent); color: #1a1817; font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; }
+.sf-write-row { display: flex; align-items: center; gap: 12px; }
+.sf-left { font-size: 12px; color: var(--text-faint); }
+.sf-left.is-over { color: #f5a894; }
+.sf-send { height: 32px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--wash-strong); color: var(--text); font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; }
+.sf-send:hover:not(:disabled) { background: var(--wash); }
 .sf-send:disabled { opacity: 0.45; cursor: default; }
 .sf-join {
   width: 100%; height: 40px; margin-top: 14px; border: 1px solid var(--line-strong); border-radius: var(--radius);
@@ -105,7 +117,8 @@
   .sf-split { grid-template-columns: minmax(0, 1fr); gap: 28px; margin-top: 18px; }
   .sf-doc { padding: 24px 20px 32px; }
   .sf-image { padding: 12px; }
-  .sf-frame, .sf-pdf { height: 70vh; min-height: 420px; }
+  .sf-frame, .sf-pdf { height: calc(100svh - 130px); min-height: 420px; }
+  .sf-me { display: none; }
   .sf-comments { position: static; }
   .sf-sign-in .si-card { width: auto; box-sizing: border-box; padding: 30px 22px 22px; }
   .sf-sign-in { grid-template-columns: minmax(0, 1fr); }

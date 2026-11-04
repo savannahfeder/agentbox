@@ -47,13 +47,13 @@ describe('the page at /f/<token>', () => {
     const res = await get(`/f/${TOK}`);
     const html = await res.text();
     expect(res.status).toBe(200);
-    expect(html).toContain('<meta property="og:title" content="plan &quot;&lt;b&gt;&amp;&lt;/b&gt;&quot;.md">');
+    expect(html).toContain('<meta property="og:title" content="Plan &lt;script&gt;x&lt;/script&gt;">');
     expect(html).toContain('<meta property="og:description" content="Shared by Maya &lt;Chen&gt; on Agentbox">');
     expect(html).toContain(`<meta property="og:url" content="https://app.example/f/${TOK}">`);
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('<meta property="og:image" content="https://app.example/phone-icon.png">');
-    expect(html).toContain('<title>plan &quot;&lt;b&gt;&amp;&lt;/b&gt;&quot;.md · Agentbox</title>');
-    expect(html).not.toMatch(/<b>|<Chen>|# Plan/);
+    expect(html).toContain('<title>Plan &lt;script&gt;x&lt;/script&gt; · Agentbox</title>');
+    expect(html).not.toMatch(/<b>|<Chen>|<script>x/);
     expect(asked[0].url).toBe('https://db.example/rest/v1/rpc/file_link_view');
     expect(asked[0].init.headers).toMatchObject({ apikey: 'anon-key', authorization: 'Bearer anon-key' });
     expect(asked[0].init.signal).toBeInstanceOf(AbortSignal);
@@ -130,6 +130,37 @@ describe('the file itself at /f/<token>/raw', () => {
   it('says it did not load when the cloud cannot be reached', async () => {
     cloudDown = true;
     expect((await get(`/f/${TOK}/raw`)).status).toBe(502);
+  });
+});
+
+describe('a shared page opened on its own (power test, 2026-11-04)', () => {
+  const P = 'p'.repeat(40);
+  const open = (p, dest) => worker.fetch(new Request(`https://app.example${p}`, { headers: dest ? { 'sec-fetch-dest': dest } : {} }), { ASSETS });
+  it('goes to the page that says who shared it, so nobody\'s HTML stands alone under our address', async () => {
+    const res = await open(`/f/${P}/raw`, 'document');
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe(`https://app.example/f/${P}`);
+  });
+  it('is still served inside its frame, and to a fetch with no destination', async () => {
+    expect((await open(`/f/${P}/raw`, 'iframe')).status).toBe(200);
+    expect((await open(`/f/${P}/raw`)).status).toBe(200);
+  });
+  it('leaves a PDF or a picture opened on its own alone, so Download works', async () => {
+    expect((await open(`/f/${'d'.repeat(40)}/raw`, 'document')).status).toBe(200);
+    expect((await open(`/f/${'i'.repeat(40)}/raw`, 'document')).status).toBe(200);
+  });
+});
+
+describe('a link pasted at the end of a sentence', () => {
+  it('goes to the clean address, whatever the sentence left on it', async () => {
+    for (const end of ['.', ',', ')', '%20', '%29', '].']) {
+      const res = await get(`/f/${TOK}${end}`);
+      expect(res.status, end).toBe(301);
+      expect(res.headers.get('location'), end).toBe(`https://app.example/f/${TOK}`);
+    }
+  });
+  it('is not stretched to anything with more after it', async () => {
+    expect((await get(`/f/${TOK}.html`)).status).not.toBe(301);
   });
 });
 

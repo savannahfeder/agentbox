@@ -7,7 +7,7 @@ import { AppMark } from '../components/AppMark';
 import { PdfPages } from '../components/PdfPages';
 import type { CloudClient } from '../cloud-rest';
 import {
-  commentWhen, fileBytes, initialOf, postComment, readComments, readSharedFile, removeComment, saidOf, sharedLine,
+  commentWhen, fileBytes, initialOf, postComment, readComments, readSharedFile, removeComment, saidOf, sharedLine, titleOf,
   type FileComment, type Rpc, type SharedFile, type Shown,
 } from './shared-file';
 import { SharedSignIn } from './SharedSignIn';
@@ -67,14 +67,20 @@ export function SharedFilePage({ token, client, finishing = null }: {
   }, [finishing, readAll]);
 
   useEffect(() => {
-    const tick = () => { if (document.visibilityState === 'visible') void readComments(anyone, token).then(setComments, () => {}); };
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return;
+      void readComments(anyone, token).then(setComments, () => {});
+      // A link stopped while the page sat open stops showing the file.
+      void anyone('file_link_stopped', { tok: token }).then((stopped) => { if (stopped === true) setLoad({ state: 'stopped' }); }, () => {});
+    };
     const t = window.setInterval(tick, 30_000);
     document.addEventListener('visibilitychange', tick);
     return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', tick); };
   }, [anyone, token]);
 
   const file = load.state === 'file' ? load.file : null;
-  useEffect(() => { document.title = file ? `${file.name} · Agentbox` : 'Agentbox'; }, [file?.name]);
+  const title = file ? titleOf(file).title : null;
+  useEffect(() => { document.title = title ? `${title} · Agentbox` : 'Agentbox'; }, [title]);
 
   const signedInNow = async () => {
     setAsking(null);
@@ -86,14 +92,18 @@ export function SharedFilePage({ token, client, finishing = null }: {
   let body: ReactNode;
   if (load.state === 'loading') body = <div className="sf-state" aria-busy="true"><span className="sf-dots" aria-label="Loading"><i /><i /><i /></span></div>;
   else if (load.state === 'failed') body = <div className="sf-state" role="alert"><p>This file did not load.</p><button type="button" className="sf-quiet-btn" onClick={() => { setLoad({ state: 'loading' }); void readAll(); }}>Try again</button></div>;
-  else if (load.state === 'stopped') body = <div className="sf-state"><p>This link was stopped.</p></div>;
-  else if (load.state === 'unknown') body = <div className="sf-state"><p>This link does not work.</p></div>;
+  else if (load.state === 'stopped') body = <div className="sf-state"><p>This link was stopped. Ask whoever sent it for a new one.</p></div>;
+  else if (load.state === 'unknown') body = <div className="sf-state"><p>This link does not work. Check it with whoever sent it.</p></div>;
   else {
+    const kept = load.file.kind === 'image' || load.file.kind === 'pdf';
     body = (
       <main className={`sf-main is-${load.file.kind}`}>
         <div className="sf-head">
-          <h1>{load.file.name}</h1>
-          <p>{sharedLine(load.file)}</p>
+          <div>
+            <h1>{titleOf(load.file).title}</h1>
+            <p>{sharedLine(load.file)}</p>
+          </div>
+          {kept && <a className="sf-download" href={`/f/${token}/raw`} download={load.file.name}>Download</a>}
         </div>
         <div className="sf-split">
           <section className="sf-file" aria-label={load.file.name}><FileBody token={token} file={load.file} /></section>
@@ -114,7 +124,10 @@ export function SharedFilePage({ token, client, finishing = null }: {
         <a className="sf-brand" href={SITE}><AppMark size={14} />agentbox</a>
         <nav className="sf-bar-links">
           <a href={SITE}>Get Agentbox</a>
-          {!signedIn && load.state !== 'loading' && <button type="button" onClick={() => setAsking('sign-in')}>Sign in</button>}
+          {signedIn && <span className="sf-me" title={client.email() ?? undefined}>{client.email()}</span>}
+          {signedIn
+            ? <button type="button" onClick={() => { client.signOut(); setSignedIn(false); void readAll(); }}>Sign out</button>
+            : load.state !== 'loading' && <button type="button" onClick={() => setAsking('sign-in')}>Sign in</button>}
         </nav>
       </header>
       {body}
@@ -135,12 +148,12 @@ export function FileBody({ token, file }: { token: string; file: SharedFile }) {
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
   const pdf = useCallback(async () => fileBytes(file), [file]);
   if (file.kind === 'markdown') {
-    return <div className="sf-doc"><div className="markdown doc-prose"><ReactMarkdown remarkPlugins={MD_PLUGINS} components={MD_PARTS}>{file.body}</ReactMarkdown></div></div>;
+    return <div className="sf-doc"><div className="markdown doc-prose"><ReactMarkdown remarkPlugins={MD_PLUGINS} components={MD_PARTS}>{titleOf(file).body}</ReactMarkdown></div></div>;
   }
   if (file.kind === 'image') return <div className="sf-image"><img src={url ?? undefined} alt={file.name} /></div>;
   if (file.kind === 'pdf') return <div className="sf-pdf"><PdfPages load={pdf} name={file.name} /></div>;
   // No allow-same-origin: this page holds the viewer's sign-in, and the page shared runs its own scripts.
-  return <iframe className="sf-frame" title={file.name} src={`/f/${token}/raw?v=${file.version}`}
+  return <iframe className="sf-frame" title={file.name} src={`/f/${token}/raw?at=${file.updatedAt}`}
     sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms" referrerPolicy="no-referrer" />;
 }
 
@@ -168,10 +181,14 @@ export function Comments({ file, comments, signedIn, onAsk, post, remove }: {
     } catch (err) { setError(saidOf(err)); }
     setBusy(false);
   };
+  // Remove asks once more on the same spot, since a comment taken back is gone.
+  const [removing, setRemoving] = useState<string | null>(null);
   const take = async (id: string) => {
-    setError(null);
+    if (removing !== id) { setRemoving(id); return; }
+    setRemoving(null); setError(null);
     try { await remove(id); } catch (err) { setError(saidOf(err)); }
   };
+  const left = 4000 - words.length;
 
   return (
     <aside className="sf-comments" aria-label="Comments">
@@ -186,7 +203,11 @@ export function Comments({ file, comments, signedIn, onAsk, post, remove }: {
                   <b>{c.byName}</b>
                   {c.byOwner && <span className="sf-owner">Owner</span>}
                   <time dateTime={new Date(c.createdAt).toISOString()}>{commentWhen(c.createdAt)}</time>
-                  {signedIn && (c.mine || file.mine) && <button type="button" className="sf-remove" onClick={() => void take(c.id)}>Remove</button>}
+                  {signedIn && (c.mine || file.mine) && (
+                    <button type="button" className={`sf-remove${removing === c.id ? ' is-asking' : ''}`} onBlur={() => setRemoving(null)} onClick={() => void take(c.id)}>
+                      {removing === c.id ? 'Remove it?' : 'Remove'}
+                    </button>
+                  )}
                 </div>
                 <p>{c.body}</p>
               </div>
@@ -196,16 +217,19 @@ export function Comments({ file, comments, signedIn, onAsk, post, remove }: {
       )}
       {signedIn ? (
         <form className="sf-write" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-          <textarea ref={box} value={words} rows={3} maxLength={4000} placeholder="Add a comment" aria-label="Add a comment"
+          <textarea ref={box} value={words} rows={3} placeholder="Add a comment anyone with the link can read" aria-label="Add a comment"
             onChange={(e) => { setWords(e.target.value); setError(null); }}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); } }} />
-          <button type="submit" className="sf-send" disabled={!words.trim() || busy}>{busy ? 'Sending…' : 'Comment'}</button>
+          <div className="sf-write-row">
+            {left < 400 && <span className={`sf-left${left < 0 ? ' is-over' : ''}`}>{left < 0 ? `${-left} over 4000` : `${left} left`}</span>}
+            <button type="submit" className="sf-send" disabled={!words.trim() || busy || left < 0}>{busy ? 'Sending…' : 'Comment'}</button>
+          </div>
         </form>
       ) : (
         <button type="button" className="sf-join" onClick={onAsk}>Create an account to comment</button>
       )}
       {error && <p className="sf-error" role="alert">{error}</p>}
-      {offer && <p className="sf-offer">Agentbox runs your own agents. <a href={DOWNLOAD}>Get it for Mac</a></p>}
+      {offer && <p className="sf-offer">Agentbox runs your own agents. <a href={DOWNLOAD}>Get Agentbox</a></p>}
     </aside>
   );
 }

@@ -12,6 +12,8 @@
 const BAKED = null;
 
 const PATH = /^\/f\/([A-Za-z0-9_-]{16,64})(?:\/(raw|preview))?\/?$/;
+// A link pasted at the end of a sentence carries its full stop or bracket.
+const PUNCTUATED = /^\/f\/([A-Za-z0-9_-]{16,64})\/?(?:[.,;:!?)\]}>'"]|%20|%29|%5D|%22|%27)+$/;
 const DEADLINE_MS = 4000;
 // The page a person shared runs its scripts in an origin of its own, opened
 // framed or on its own, so it never reaches the site's storage and the sign-in kept there.
@@ -28,6 +30,11 @@ function bytesOf(b64) {
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
   return out;
 }
+
+// As the page heads it (renderer/src/shared-file/shared-file.ts titleOf): a document by its first heading.
+const titleOf = (file) => (file.kind === 'markdown'
+  ? (/^\s*#[ \t]+(.+?)[ \t]*#*[ \t]*(?:\r?\n|$)/.exec(file.body ?? '')?.[1] ?? String(file.name).replace(/\.(md|markdown)$/i, ''))
+  : file.name);
 
 const pictureType = (t) => (/^image\/[a-z0-9.+-]{1,60}$/i.test(t ?? '') ? t : 'application/octet-stream');
 
@@ -54,7 +61,7 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
   function tagsFor(url, tok, file) {
     const page = `${url.origin}/f/${tok}`;
     const picture = file?.kind === 'image';
-    const title = file ? file.name : 'Agentbox';
+    const title = file ? titleOf(file) : 'Agentbox';
     const said = file ? `Shared by ${file.owner_name || 'someone'} on Agentbox` : 'A file shared on Agentbox';
     const image = picture ? `${page}/preview` : `${url.origin}/phone-icon.png`;
     return [
@@ -71,7 +78,7 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
     const shell = await env.ASSETS.fetch(new URL('/', url));
     // The app's files are named from the page's own folder, and this page is two folders down.
     let html = (await shell.text()).replace(/(\s(?:src|href))="\.\//g, '$1="/');
-    html = html.replace(/<title>[^<]*<\/title>/, `<title>${escape(file ? `${file.name} · Agentbox` : 'Agentbox')}</title>`);
+    html = html.replace(/<title>[^<]*<\/title>/, `<title>${escape(file ? `${titleOf(file)} · Agentbox` : 'Agentbox')}</title>`);
     html = html.replace('</head>', `  ${tagsFor(url, tok, file)}\n  </head>`);
     return new Response(request.method === 'HEAD' ? null : html, {
       status: 200,
@@ -79,10 +86,15 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
     });
   }
 
-  async function theFile(tok, preview) {
+  async function theFile(request, url, tok, preview) {
     let file;
     try { file = await view(tok); } catch { return plain(502, 'This file did not load. Try again.'); }
     if (!file || (preview && file.kind !== 'image')) return plain(404, 'This link does not work.');
+    // A page opened on its own would be somebody's HTML under our address with
+    // nothing saying whose: a sign-in look-alike. It opens inside the page that names them.
+    if (file.kind === 'page' && request.headers.get('sec-fetch-dest') === 'document') {
+      return new Response(null, { status: 302, headers: { location: `${url.origin}/f/${tok}`, 'cache-control': 'no-store' } });
+    }
     const shared = { 'cache-control': preview ? 'public, max-age=300' : 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' };
     if (file.kind === 'page') return new Response(file.body, { headers: { ...shared, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PAGE_CSP } });
     if (file.kind === 'markdown') return new Response(file.body, { headers: { ...shared, 'content-type': 'text/plain; charset=utf-8', 'content-security-policy': TEXT_CSP } });
@@ -97,12 +109,14 @@ export function sharedFileWorker({ cloud, anonKey, headers = {} }, { fetchImpl =
   return {
     async fetch(request, env) {
       const url = new URL(request.url);
+      const p = PUNCTUATED.exec(url.pathname);
+      if (p) return new Response(null, { status: 301, headers: { location: `${url.origin}/f/${p[1]}`, 'cache-control': 'no-store' } });
       const m = PATH.exec(url.pathname);
       if (!m) return env.ASSETS.fetch(request);
       if (request.method !== 'GET' && request.method !== 'HEAD') return plain(405, 'Not here.', { allow: 'GET, HEAD' });
       const [, tok, part] = m;
       if (!part) return thePage(request, env, url, tok);
-      return theFile(tok, part === 'preview');
+      return theFile(request, url, tok, part === 'preview');
     },
   };
 }
