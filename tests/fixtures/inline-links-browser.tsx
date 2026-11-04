@@ -29,6 +29,8 @@ function draw(round: number, product = 'demo') {
   } as any} />));
 }
 const wait = () => new Promise(r => setTimeout(r, 80));
+// Named so a probe that never finishes says which stage it was in.
+const step = (what: string) => { (window as any).step = what; };
 (async () => {
   let videosCreated = 0;
   const observer = new MutationObserver(entries => {
@@ -37,26 +39,32 @@ const wait = () => new Promise(r => setTimeout(r, 80));
     }
   });
   observer.observe(document.getElementById('root')!, { childList: true, subtree: true });
+  step('the first draw');
   draw(0);
   await wait();
   const link = () => [...document.querySelectorAll('a')].find(el => el.textContent === 'the page')!;
   const before = link();
+  step('the film running out of places to look');
   for (let i = 0; i < 5; i++) {
     document.querySelector('video')?.dispatchEvent(new Event('error'));
     await wait();
   }
   const exhausted = !document.querySelector('video');
   const attemptsBefore = videosCreated;
+  step('five parent updates');
   for (let i = 1; i <= 5; i++) { draw(i); await wait(); }
   const sameNode = link() === before;
   const retriesAfterUpdates = videosCreated - attemptsBefore;
+  step('the page link opening');
   link().click();
   await wait();
   const bigView = document.querySelector('.artifact-view')?.getAttribute('aria-label');
+  step('the address and the missing file');
   [...document.querySelectorAll('a')].find(el => el.textContent === 'localhost:3002')!.click();
   [...document.querySelectorAll('a')].find(el => el.textContent === 'the missing file')!.click();
   await wait();
   const mediaLabel = document.querySelector('.inline-media-name')?.textContent;
+  step('the same thread under another product');
   draw(6, 'other');
   await wait();
   const productChanged = link() !== before;
