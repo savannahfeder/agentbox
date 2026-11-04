@@ -30,6 +30,8 @@ const CLOUD_COLUMNS = `${COMMAND_COLUMNS},claimed_by`;
 const noCloudColumn = (error) => /claimed_by|column .*cloud|cloud.* column/i.test(String(error?.message ?? ''));
 const commandOut = (r) => ({ id: r.id, owner: r.owner, device: r.device, project: r.project, item: r.item, kind: r.kind, payload: r.payload ?? {}, createdAt: r.created_at, claimedAt: r.claimed_at ?? null, claimedBy: r.claimed_by ?? null, takenAt: r.taken_at ?? null, outcome: r.outcome ?? null });
 
+// A time as text or as a Date, to the millisecond (Date.parse of a Date drops them).
+const msOf = (v) => new Date(v).getTime();
 const commentOut = (r) => ({ id: r.id, owner: r.owner, threadId: r.thread_id, by: r.by_person, text: r.body, at: Date.parse(r.created_at) });
 
 export function supabaseBackend(client) {
@@ -322,7 +324,7 @@ export function supabaseBackend(client) {
       await myId();
       const rows = must(await client.rpc('my_file_link', { src: source }), 'asking for the file\'s link');
       const r = rows?.[0];
-      return r ? { token: r.token, version: r.version, hash: r.hash ?? '', createdAt: Date.parse(r.created_at ?? r.updated_at), updatedAt: Date.parse(r.updated_at), comments: r.comments } : null;
+      return r ? { token: r.token, version: r.version, hash: r.hash ?? '', createdAt: msOf(r.created_at ?? r.updated_at), updatedAt: msOf(r.updated_at), comments: r.comments } : null;
     },
 
     async stopFileLink(token) {
@@ -333,19 +335,19 @@ export function supabaseBackend(client) {
     async fileLinkComments(token) {
       await myId();
       const rows = must(await client.rpc('file_link_comments_of', { tok: token }), 'reading the comments');
-      return (rows ?? []).map((c) => ({ id: c.id, byName: c.by_name, byAvatar: c.by_avatar ?? null, text: c.body, at: Date.parse(c.created_at), mine: !!c.mine, byOwner: !!c.by_owner }));
+      return (rows ?? []).map((c) => ({ id: c.id, byName: c.by_name, byAvatar: c.by_avatar ?? null, text: c.body, at: msOf(c.created_at), mine: !!c.mine, byOwner: !!c.by_owner }));
     },
 
     async myFileLinks() {
       await myId();
       const rows = must(await client.rpc('my_file_links'), 'reading your public links');
-      return (rows ?? []).map((r) => ({ token: r.token, source: r.source, name: r.name, kind: r.kind, createdAt: Date.parse(r.created_at), updatedAt: Date.parse(r.updated_at), comments: r.comments }));
+      return (rows ?? []).map((r) => ({ token: r.token, source: r.source, name: r.name, kind: r.kind, createdAt: msOf(r.created_at), updatedAt: msOf(r.updated_at), comments: r.comments }));
     },
 
     async newLinkComments(since) {
       await myId();
       const rows = must(await client.rpc('new_comments_on_my_links', { since: new Date(since).toISOString() }), 'reading new comments on your links');
-      return (rows ?? []).map((c) => ({ token: c.token, source: c.source, name: c.name, byName: c.by_name, text: c.body, at: Date.parse(c.created_at) }));
+      return (rows ?? []).map((c) => ({ token: c.token, source: c.source, name: c.name, byName: c.by_name, text: c.body, at: msOf(c.created_at) }));
     },
 
     async commentOnFileLink(token, text) {

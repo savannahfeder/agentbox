@@ -170,3 +170,21 @@ describe('in the thread', () => {
     expect(written).toEqual({ note: 'Chris commented on x.md. "Yo"', comment: { name: 'Chris', file: 'x.md', text: 'Yo' } });
   });
 });
+
+// A time read back as a Date lost its milliseconds through Date.parse, so the
+// cursor sat on the whole second and the same comment came back every minute
+// (screenshots, 2026-11-04).
+describe('the cloud call', () => {
+  it('keeps a comment\'s time to the millisecond, whether the database hands back text or a Date', async () => {
+    const { supabaseBackend } = await import('../main/team/supabase-backend.mjs');
+    for (const created of ['2026-11-04T10:14:39.697Z', new Date('2026-11-04T10:14:39.697Z')]) {
+      const client = {
+        auth: { getUser: async () => ({ data: { user: { id: 'me' } }, error: null }) },
+        rpc: async () => ({ data: [{ token: 't', source: 'p/w-1/a', name: 'a.md', by_name: 'Chris', body: 'Hi', created_at: created }], error: null }),
+        from: () => { throw new Error('not here'); },
+      };
+      const [c] = await supabaseBackend(client).newLinkComments(0);
+      expect(c.at).toBe(Date.parse('2026-11-04T10:14:39.697Z'));
+    }
+  });
+});
