@@ -128,10 +128,11 @@ export function heldForHer(item: AnsweredItem | null | undefined): boolean {
 // A PERSON'S WORD WRITTEN AFTER THE MOMENT WAS SET, AND NOT YET ACTED ON, RUNS
 // NOW. The moment is for the run it was set for, not for everything said on
 // the thread, and it stays on the row for that run.
-export function wordWaits(item) {
+export function wordWaits(item: AnsweredItem | null | undefined): boolean {
   const said = item?.wrote?.answer;
   const set = item?.wrote?.runAt;
   if (!said || !set || !item.answer || item.answer === '(withdrawn)') return false;
   if (said.source !== 'founder' && !said.teammate) return false;
-  return said.ts > set.ts && (item.answeredThrough ?? 0) < said.ts;
+  // A missing ts compared false before it was typed, so it still does.
+  return said.ts !== undefined && set.ts !== undefined && said.ts > set.ts && (item.answeredThrough ?? 0) < said.ts;
 }

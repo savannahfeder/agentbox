@@ -20,6 +20,7 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RepeatShape } from '../shared/repeats.mjs';
+import type { RouteRecord } from '../shared/auto-route.mjs';
 import type { ItemRef, TeammateStatus, Offer, WakeTrigger, WakeAction } from '../shared/teammates.mjs';
 
 export type { ItemRef, TeammateStatus, Offer, WakeTrigger, WakeAction };
@@ -77,7 +78,7 @@ export interface TeamItem {
   product?: string;
   status?: string;
   labels?: string[];
-  routed?: boolean;
+  routed?: RouteRecord | null;
   title?: string;
   label?: string;
   body?: string;
@@ -127,6 +128,8 @@ export interface OutboxEntry {
   title?: unknown;
   text?: unknown;
   from?: { name?: string } | null;
+  room?: unknown;
+  names?: string[];
   [field: string]: unknown;
 }
 
@@ -237,10 +240,15 @@ function lastRanOf(teammateId: string, dutyId: string, items: TeamItem[]) {
 }
 const TROUBLE_SHOWN_MS = 30 * 60_000;
 
+/** What a teammate reads off the team service it is handed (`bindTeam`). */
+export interface BoundTeam { state?(): { me?: { id?: string } | null; people?: { id: string; name?: string | null }[] } | null | undefined }
+
 export class Teammates {
   declare store: TeammateStore;
   declare trouble: { text: string; at: number } | null | undefined;
-  declare team: unknown;
+  declare team: BoundTeam | null | undefined;
+  /** The Files folders an agent may read, set by whoever owns the Files place (main/ipc.mts). */
+  declare foldersForAgents: (() => Promise<unknown>) | undefined;
 
   constructor(store: TeammateStore) {
     this.store = store;
@@ -532,7 +540,7 @@ export class Teammates {
 
   // The app's half of an agent reaching a person (./teammate-reach.mjs). The team
   // service is handed in by whoever has one; a store without one reaches nobody.
-  bindTeam(team: unknown) {
+  bindTeam(team: BoundTeam | null) {
     this.team = team;
   }
 

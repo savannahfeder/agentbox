@@ -217,7 +217,6 @@ interface FilesPlace {
 }
 // The JS defaults `team = null` and `nameOf = () => ...` read as the whole type.
 const filesPlaceFor = appFilesPlace as (deps: { store: Store; team: IpcTeam | null; accountRoot: string; storeRoot: string; notify?: () => void }) => FilesPlace;
-const noteToAgent = noteToItsAgent as (deps: { store: Store; supervisor: Supervisor; product?: string; id?: string; mark: unknown; nameOf: (by: string) => string; people: unknown[] }) => Promise<unknown>;
 type RoomCalls = Record<string, (...args: unknown[]) => unknown>;
 type ImportableThreads = Awaited<ReturnType<typeof readImportableThreads>>;
 type SetProjectPayload = { product?: string; key: string; value?: unknown };
@@ -1201,7 +1200,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       store.fileMark(product, id, mark);
       push();
       void team?.syncNow?.()?.catch?.(() => {});
-      try { await noteToAgent({ store, supervisor, product, id, mark, nameOf: noteBy, people: teamPeople() }); }
+      try { await noteToItsAgent({ store, supervisor, product, id, mark, nameOf: noteBy, people: teamPeople() }); }
       catch (err) { return { ok: false, error: `The note is saved, but it did not reach the agent: ${(err as Error)?.message ?? err}` }; }
       return { ok: true };
     } catch (err) {
@@ -2397,7 +2396,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const { wrote, ...out } = await filesPlaceNow().mark(String(key ?? ''), mark);
     if (out.ok) { push(); void team?.syncNow?.()?.catch?.(() => {}); }
     if (out.ok && wrote) {
-      try { await noteToAgent({ store, supervisor, ...wrote, mark, nameOf: noteBy, people: teamPeople() }); }
+      try { await noteToItsAgent({ store, supervisor, ...wrote, mark, nameOf: noteBy, people: teamPeople() }); }
       catch (err) { return { ok: false, error: `The note is saved, but it did not reach the agent: ${(err as Error)?.message ?? err}` }; }
     }
     return out;

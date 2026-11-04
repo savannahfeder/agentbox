@@ -1,5 +1,6 @@
 type Labelled = { labels?: string[] } | null | undefined;
-type Routed = { routed?: { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you' } | null };
+export interface RouteRecord { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you' }
+type Routed = { routed?: RouteRecord | null };
 export interface RouteDecision { to?: string; ask?: string[]; why: string }
 export interface RouteMate { id: string; name: string; role?: string | null; job?: string | null; goal?: string | null; duties?: { what: string }[]; status?: string; paused?: boolean; endedAt?: number | null }
 export const AUTO_LABEL: 'auto';

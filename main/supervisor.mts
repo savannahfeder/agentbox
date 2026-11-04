@@ -693,6 +693,7 @@ export interface SupervisorStore {
   composeItem(slug: string, fields: Record<string, unknown>): WorkItem | null | undefined;
   fileItem(slug: string, fields: Record<string, unknown>): { id: string };
   noteItem(slug: string, id: string, note: string): unknown;
+  fileMark(slug: string, id: string, mark: unknown): unknown;
   cloudWorkKeptAside(slug: string, id: string, note: string): unknown;
   closedBeforeItShipped(slug: string, id: string, note: string): unknown;
   shipped(slug: string, id: string, result: { sha: string | null; labels: string[] }): unknown;
@@ -704,7 +705,7 @@ export interface SupervisorStore {
     serve(dir: string, ruleId: string, key: string | null, now?: number): Promise<{ alert?: string[] | null; misses?: number } | null | undefined>;
   } | null;
   teammates?: {
-    team?: { state?(): { me?: { id?: string } | null; people?: unknown[] } | null | undefined } | null;
+    team?: { state?(): { me?: { id?: string } | null; people?: { id: string; name?: string | null }[] } | null | undefined } | null;
     reach(opts: { items: WorkItem[]; now: number; tell: TeammateTell }): Promise<unknown>;
     filesFoldersLine?(project: string | undefined): string | null;
     briefFor(item: WorkItem): string | null;
@@ -715,7 +716,7 @@ export interface SupervisorStore {
 }
 
 /** How a teammate's words reach another thread (`Supervisor#serveTeammates`). */
-export type TeammateTell = (product: string | null, id: string, opts: { text: string; from: { teammate: string; name: string }; hold?: boolean; hop?: number | null }) => Promise<unknown>;
+export type TeammateTell = (product: string | null | undefined, id: string, opts: { text: string; from: { teammate: string; name: string }; hold?: boolean; hop?: number | null }) => Promise<unknown>;
 
 /** What a small model is asked with (main/row-label.mts and its neighbours). */
 export interface SmallModelAsk {
@@ -8877,7 +8878,7 @@ export class Supervisor {
     };
     // A teammate's words on another teammate's thread take the same road, as
     // that teammate's. A held one never reaches a running session.
-    const tell = async (product: string | null, id: string, { text, from, hold = false, hop = null }: { text: string; from: { teammate: string; name: string }; hold?: boolean; hop?: number | null }) => {
+    const tell = async (product: string | null | undefined, id: string, { text, from, hold = false, hop = null }: { text: string; from: { teammate: string; name: string }; hold?: boolean; hop?: number | null }) => {
       const commit = () => this.store.tellItem(product as string, id, { text, from, hold, hop });
       if (hold) { commit(); this.wake?.(); return 'held'; }
       let timer: NodeJS.Timeout | undefined;

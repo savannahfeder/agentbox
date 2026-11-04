@@ -20,6 +20,8 @@ export const GREETING: string;
 export const VOICES: { id: string; label: string; says: string; sample: string }[];
 export const VOICE_WORDS_MOST: number;
 export function voiceOf(t: { id?: string; voice?: string | null; voiceText?: string | null } | null | undefined): { id: string; label: string; says: string; sample?: string };
+export function howYouWrite(t: { id?: string; voice?: string | null; voiceText?: string | null } | null | undefined): string;
+export function howYourRunEnds(): string;
 export function starterAsks(team?: Array<{ starter?: string | null; name: string }>): Array<{ starter: string; ask: string; name: string; role: string }>;
 export function teammatesOn(config: { alphaTeammates?: unknown } | null | undefined): boolean;
 export const FROM_LABEL_PREFIX: 'from:';
@@ -127,7 +129,7 @@ interface TriggerBase {
 export type WakeTrigger =
   | (TriggerBase & { kind: 'schedule'; key: string; label: string })
   | (TriggerBase & { kind: 'duty'; duty: string; what: string; tell?: string; key: string })
-  | (TriggerBase & { kind: 'pass'; title?: string; details?: string })
+  | (TriggerBase & { kind: 'pass'; fromName?: string; title?: string; details?: string })
   | (TriggerBase & { kind: 'message'; text?: string; opening?: 'start' | 'setup' });
 interface ActionBase { teammate: string; msg?: string; trigger?: WakeTrigger }
 export type WakeAction =
@@ -167,6 +169,8 @@ export function primaryOf<T extends { primary?: boolean; endedAt?: number | null
 export function pausedNow(t: { pausedUntil?: string | null } | null | undefined, now?: number): boolean;
 export function isWorks(works: unknown): works is { every: 'day' | 'weekday' | 'week'; at: string; on?: number };
 export function dutyWhen(d: DutyLike | null | undefined): string;
+export function cleanDuty(d: unknown): DutyLike | null;
+export function dutyStart(d: DutyLike, now?: number): string;
 export function dutyOf(item: { labels?: string[] } | null | undefined): string | null;
 export function letterFor(name: string | null | undefined, teammates?: { letter?: string | null }[]): string;
 export function isQueued(item: RunItem | null | undefined): boolean;

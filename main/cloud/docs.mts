@@ -29,7 +29,7 @@ export const DOCS_LIMITS = {
 
 export type DocsLimits = typeof DOCS_LIMITS;
 
-export interface LaidFile { stamp: string | null; hash: string }
+export interface LaidFile { stamp: string | null; hash: string; beside?: { path: string; stamp: string } | null }
 
 const inside = (p: string, root: string) => p === root || p.startsWith(root + path.sep);
 
@@ -107,7 +107,7 @@ const hashOf = (body: BinaryLike) => crypto.createHash('sha256').update(body).di
  * copies of a document and nobody can say which is current (w-27a7ae314a). A
  * copy somebody has edited here is theirs, and gets the next name instead.
  */
-function besideStillOurs(was) {
+function besideStillOurs(was: LaidFile['beside']): string | null {
   if (!was?.path) return null;
   try {
     const st = fs.lstatSync(was.path);

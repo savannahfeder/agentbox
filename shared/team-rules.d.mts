@@ -1,6 +1,6 @@
 // Types for shared/team-rules.mjs, read by the renderer.
 type Row = { createdBy?: string | null; assignee?: string; runner?: string; people?: string[]; status?: string };
-type ProductLike = { team?: { projectId?: string; sharedBy?: string | null; direct?: boolean } | null } | null | undefined;
+type ProductLike = { team?: { projectId?: string; sharedBy?: string | null; direct?: unknown } | null } | null | undefined;
 
 export function isShared(product: ProductLike): boolean;
 export function nameIsAPersons(item: { label?: string; wrote?: Record<string, { source?: string } | undefined> } | null | undefined): boolean;
