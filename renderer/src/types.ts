@@ -87,6 +87,8 @@ export interface WorkItem {
   engine?: string;
   createdAt: number;
   updatedAt: number;
+  // Where the row sits by time when a close was taken straight back; lists sort on it.
+  placedAt?: number;
   // Per field, who set the value that survived the fold and when. The fold's own
   // bookkeeping, handed over rather than discarded, because an agent's `done`
   // and her archive are the same word for opposite events and the inbox has to
@@ -1743,8 +1745,8 @@ declare global {
       schedule(p: { product: string; id: string; runAt: number }): Promise<WorkItem>;
       snooze(p: { product: string; id: string; snoozedUntil: number }): Promise<WorkItem>;
       repeats(): Promise<RepeatRule[]>;
-      composeRepeat(p: { product: string; title: string; body?: string; priority?: number; rule: RepeatShape; engine?: string; model?: string }): Promise<RepeatRule>;
-      setRepeat(p: { product: string; id: string; rule: Partial<RepeatShape & { title: string; body: string; priority: number }> }): Promise<RepeatRule>;
+      composeRepeat(p: { product: string; title: string; body?: string; priority?: number; rule: RepeatShape; engine?: string; model?: string; startsNext?: boolean }): Promise<RepeatRule>;
+      setRepeat(p: { product: string; id: string; rule: Partial<RepeatShape & { title: string; body: string; priority: number; startsNext: boolean }> }): Promise<RepeatRule>;
       endRepeat(p: { product: string; id: string }): Promise<RepeatRule>;
       pauseSupervisor(paused: boolean): Promise<SupervisorStatus>;
       createProduct(p: { name: string; repoPath?: string | null }): Promise<{ slug: string }>;

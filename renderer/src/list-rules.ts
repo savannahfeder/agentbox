@@ -545,9 +545,12 @@ export function clipToSentence(text: string, budget = SUMMARY_BUDGET): string {
 // Every ordered list sorts through this, so the inbox, In progress and the
 // fleet agree on which row comes next. `score` is the one in shared/rank.mjs,
 // passed in so this stays pure. Recency only breaks ties.
-export function byRunningOrder<T extends { updatedAt: number }>(score: (i: T) => number) {
-  return (a: T, b: T) => score(b) - score(a) || b.updatedAt - a.updatedAt;
+export function byRunningOrder<T extends { updatedAt: number; placedAt?: number }>(score: (i: T) => number) {
+  return (a: T, b: T) => score(b) - score(a) || placedAt(b) - placedAt(a);
 }
+
+/** Where a row sits by time: a close taken straight back leaves it where it was (shared/work-items.mjs). */
+export const placedAt = (i: { updatedAt: number; placedAt?: number }): number => i.placedAt ?? i.updatedAt;
 
 // The heading urgent rows are lifted under. Which rows count is `isUrgent` in
 // shared/rank.mjs and nothing else, so the heading never sits over a row that
