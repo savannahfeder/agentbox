@@ -19,7 +19,7 @@ import { PageFrame } from '../ui/PageFrame';
 import { IconButton, T, TopBar, Wall } from '../ui/parts';
 import { Player } from '../ui/Player';
 import { Skeleton } from '../ui/Skeleton';
-import { color } from '../ui/theme';
+import { color, corner } from '../ui/theme';
 
 const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 const nameOf = (src: string) => src.split('/').pop() ?? src;
@@ -39,11 +39,11 @@ function OnItsOwn({ product, src }: { product: string; src: string }) {
   const card = { flex: 1, margin: 12, marginBottom: 12 + inset.bottom };
   let body;
   if (o.kind === 'doc') body = <Doc product={product} src={src} style={{ ...card, borderWidth: 1, borderColor: color.lineStrong, borderRadius: 3 }} />;
-  else if (o.kind === 'page') body = <Page product={product} src={src} style={{ ...card, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)', backgroundColor: PAGE }} />;
+  else if (o.kind === 'page') body = <Page product={product} src={src} style={{ ...card, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: 'rgba(255, 255, 255, 0.1)', backgroundColor: PAGE }} />;
   else if (o.kind === 'media') {
     const film = /\.(mp4|mov|m4v|webm)$/i.test(src);
     body = (
-      <View style={{ ...card, borderWidth: 1, borderColor: color.line, backgroundColor: RAISED, justifyContent: film ? undefined : 'center', padding: film ? 0 : 16 }}>
+      <View style={{ ...card, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line, backgroundColor: RAISED, justifyContent: film ? undefined : 'center', padding: film ? 0 : 16 }}>
         <Player link={o.link} film={film} style={film ? { flex: 1 } : { height: 36 }} />
       </View>
     );
@@ -157,7 +157,7 @@ function PictureRoom({ product, pictures, start }: { product: string; pictures: 
               const thumb = linkOf(p);
               return (
                 <Pressable key={p} onPress={() => go(i)} accessibilityRole="imagebutton" accessibilityLabel={nameOf(p)}
-                  style={{ padding: 3, borderWidth: 1, borderColor: i === index ? paper(0.85) : 'transparent', margin: -4 }}>
+                  style={{ padding: 3, borderWidth: 1, borderRadius: corner.small, borderColor: i === index ? paper(0.85) : 'transparent', margin: -4 }}>
                   <View style={{ width: 72, height: 45, backgroundColor: paper(0.06), opacity: i === index ? 1 : 0.38, overflow: 'hidden' }}>
                     {!!thumb && <Image source={pictureSource(thumb)} cachePolicy="memory-disk" contentFit="cover" style={{ width: 72, height: 45 }} />}
                   </View>
@@ -188,7 +188,7 @@ function Shown({ uri, name, width, height, stage }: { uri: string | null | undef
         maximumZoomScale={MAX_ZOOM} minimumZoomScale={1} centerContent showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false}>
         {!!uri && natural.w > 0 && (
           <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={name} contentFit="contain"
-            style={{ width: natural.w * fit, height: natural.h * fit, borderWidth: 1, borderColor: paper(0.08) }} />
+            style={{ width: natural.w * fit, height: natural.h * fit, borderWidth: 1, borderRadius: corner.card, borderColor: paper(0.08) }} />
         )}
       </ScrollView>
     </View>

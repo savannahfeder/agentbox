@@ -14,7 +14,7 @@ import { IconButton, T } from '../../ui/parts';
 import { computerLine, PageList } from '../../ui/SettingsHome';
 import { SETTINGS_PAGES } from '../../ui/SettingsPages';
 import { NavRow, Page } from '../../ui/SettingsParts';
-import { color, font } from '../../ui/theme';
+import { color, corner, font } from '../../ui/theme';
 
 export default function SettingsHome() {
   const c = useCloud();
@@ -32,7 +32,7 @@ export default function SettingsHome() {
   };
   const close = () => { setSearching(false); setQ(''); };
   const field = searching ? (
-    <View style={{ flex: 1, height: 40, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 12, borderWidth: 1, borderColor: color.lineStrong, backgroundColor: color.bg }}>
+    <View style={{ flex: 1, height: 40, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 12, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: color.bg }}>
       <Magnifier size={16} />
       <TextInput value={q} onChangeText={setQ} autoFocus placeholder="Search settings" placeholderTextColor={color.faint} autoCorrect={false} autoCapitalize="none" returnKeyType="search" accessibilityLabel="Search settings"
         style={[{ flex: 1, minWidth: 0, padding: 0, fontFamily: font.regular, fontSize: 16, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />

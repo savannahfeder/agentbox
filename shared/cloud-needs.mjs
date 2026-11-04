@@ -34,7 +34,7 @@ export const SERVICES = Object.freeze([
 ]);
 export const serviceById = (id) => SERVICES.find((s) => s.id === String(id ?? '').trim().toLowerCase()) ?? null;
 
-const tidy = (s) => String(s ?? '').trim().replace(/^[—–:\s-]+/, '');
+const tidy = (s) => String(s ?? '').trim().replace(/^[\u2014\u2013:\s-]+/, '');
 
 /**
  * What a message asks for, in order and once each:
