@@ -181,16 +181,15 @@
 .tbl-td.at { box-shadow: inset 0 0 0 2px var(--tbl-at); }
 .tbl.holding .tbl-td.at { box-shadow: inset 0 0 0 1px var(--line-strong); }
 
-/* A row's number gives way to the way to open it while the row is under the pointer. */
-.tbl-rn { position: relative; }
+/* The way to open a row sits at the end of its first cell while the row is under the pointer. */
 .tbl-open {
-  position: absolute; inset: 0; display: none; align-items: center; justify-content: flex-end; padding: 0 12px 0 0;
-  background: none; border: 0; color: var(--text-faint); cursor: pointer;
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 24px; height: 24px; display: none; place-items: center; padding: 0;
+  background: var(--surface); border: 1px solid var(--tbl-line); color: var(--text-faint); cursor: pointer;
 }
-.tbl-open svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
-.tbl-open:hover { color: var(--text); }
-.tbl-tr:hover .tbl-open { display: flex; }
-.tbl-tr:hover .tbl-rn-n { visibility: hidden; }
+.tbl-open svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.tbl-open:hover { color: var(--text); border-color: var(--line-strong); }
+.tbl-tr:hover .tbl-open { display: grid; }
 
 /* A header's menu and its edge. Both stay out of sight until the header is
    under the pointer. The menu sits by the name, so a wide column's is in view. */

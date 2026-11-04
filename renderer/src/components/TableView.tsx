@@ -78,8 +78,7 @@ const Row = memo(function Row({ table, row, r, n, c0, c1, at, whole, hands }: {
   return <div className="tbl-tr" role="row">
     {(n !== null || table.ranked) && (
       <div className={`tbl-td tbl-rn${whole ? ' sel' : ''}`} data-rn={hands ? r : undefined}>
-        <span className="tbl-rn-n">{table.ranked ? row[0] : n}</span>
-        {hands && <button type="button" className="tbl-open" tabIndex={-1} aria-label="Open this row" title="Open this row (Space)">{OPEN}</button>}
+        {table.ranked ? row[0] : n}
       </div>
     )}
     {row.map((v, i) => {
@@ -90,6 +89,7 @@ const Row = memo(function Row({ table, row, r, n, c0, c1, at, whole, hands }: {
       return <div key={i} className={`tbl-td${cellClass(kind)}${sel ? ' sel' : ''}${i === at ? ' at' : ''}`} role="cell"
         data-r={hands ? r : undefined} data-c={hands ? i : undefined} title={kind === 'name' || kind === 'link' || kind === 'email' || long ? v.trim() || undefined : undefined}>
         <CellBody table={table} col={i} row={row} value={v} />
+        {hands && i === (table.ranked ? 1 : 0) && <button type="button" className="tbl-open" tabIndex={-1} aria-label="Open this row" title="Open this row (Space)">{OPEN}</button>}
       </div>;
     })}
   </div>;
@@ -839,13 +839,12 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     if (!hit) return;
     pressed.current = true;
     if (editing) endEdit(editing.tag ? null : editing.draft);
-    if (hit.kind === 'row' && t.closest('.tbl-open')) { e.preventDefault(); goTo(pickFor('row', hit.at, false)); setSheet(hit.at.r); return; }
+    if (t.closest('.tbl-open')) { e.preventDefault(); goTo(pickFor('row', hit.at, false)); setSheet(hit.at.r); return; }
     if (hit.kind === 'col' && !order.length) return;
-    // A link opens only from a cell already picked, or with ⌘ or Ctrl held; the
-    // first press picks the cell, and a Shift-press never leaves the table.
+    // A press picks, as everywhere in a spreadsheet; a link opens with ⌘ or Ctrl
+    // held, or from the right-click menu, so a double click to edit never leaves the table.
     e.preventDefault();
-    const on = !!pick && hit.kind === 'cell' && pick.a.r === hit.at.r && pick.a.c === hit.at.c && cellsIn(boxOf(pick)) === 1;
-    linkOpens.current = !e.shiftKey && (on || e.metaKey || e.ctrlKey);
+    linkOpens.current = !e.shiftKey && (e.metaKey || e.ctrlKey);
     setPick(pickFor(hit.kind, hit.at, e.shiftKey));
     drag.current = hit.kind === 'cell' ? 'cells' : hit.kind === 'row' ? 'rows' : 'cols';
     focusKeys();
@@ -1010,7 +1009,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
           <Menu label="Sort" on={!!sort} icon={glyph('M5 3v10M2.5 10.5L5 13l2.5-2.5M11 13V3M8.5 5.5L11 3l2.5 2.5')}>
             {(close) => <>
               <button type="button" className={`when-row${!sort ? ' on' : ''}`} onClick={() => { setSort(null); close(); }}><span className="when-row-label">As the file has it</span></button>
-              {table.columns.map((c, i) => <button key={i} type="button" className={`when-row${sort?.col === i ? ' on' : ''}`} onClick={() => { sortBy(i); close(); }}>
+              {table.columns.map((c, i) => <button key={i} type="button" className={`when-row${sort?.col === i ? ' on' : ''}`} onClick={() => { sortBy(i); if (sort?.col !== i) close(); }}>
                 <span className="when-row-label">{c.name}</span>
                 {sort?.col === i && <span className="when-row-hint">{sortWords(c, sort.dir)}</span>}
               </button>)}
@@ -1154,6 +1153,12 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             closeFloat();
             void navigator.clipboard?.readText?.().then((t) => paste(t)).catch(() => setProblem({ error: `Press ${CMD}V to paste here.` }));
           }} />}
+          {pick && (table.columns[pick.a.c]?.kind === 'link' || table.columns[pick.a.c]?.kind === 'email') && atValue.trim() && (
+            <MenuRow label={table.columns[pick.a.c].kind === 'email' ? 'Write an email' : 'Open link'} hint={`${CMD}click`} onClick={() => {
+              closeFloat();
+              window.open(table.columns[pick.a.c].kind === 'email' ? `mailto:${atValue.trim()}` : hrefOf(atValue), '_blank', 'noreferrer');
+            }} />
+          )}
           {onComment && atValue.trim() && <MenuRow label="Comment" onClick={() => { onComment(atValue.trim()); closeFloat(); }} />}
           {editable && sel && <>
             <span className="when-sep" />
