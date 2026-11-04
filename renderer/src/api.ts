@@ -1455,8 +1455,10 @@ export const api = {
     }
     // AND THE MACHINE THAT MUST NOT BE SIGNED IN FOR: Codex on the disk, signed
     // out. `afterCheck` reads this as `found`, which draws and starts nothing.
+    // A press waits on the browser, so that screen can be photographed too.
     if (useFixtures && engineFixtures === 'signedout') {
-      return { engine, phase: 'idle', error: null, log: '', found: engine === 'codex', signedIn: false };
+      const waiting = engine === 'codex' && action !== 'ready' && action !== 'cancel';
+      return { engine, phase: waiting ? 'signing-in' : 'idle', error: null, log: '', found: engine === 'codex', signedIn: false };
     }
     const zero = window.zero as any;
     if (!zero?.engineSetup) return assumeReady;
