@@ -359,6 +359,7 @@ const CHOICES = {
   reply: {
     permissionMode: orNull((v) => word(v, 40)), model: orNull(word), effort: orNull((v) => word(v, 20)),
     priority: (v) => Number.isInteger(v) && v >= 0 && v <= 10, now: (v) => v === true, unschedule: (v) => v === true,
+    runAt: (v) => Number.isFinite(v) && v > 0,
   },
   new: {
     runAt: (v) => Number.isFinite(v) && v > 0, start: (v) => v === 'later' || v === 'now',

@@ -270,6 +270,13 @@ contextBridge.exposeInMainWorld('zero', {
   // The document pane's own two: the text of a file it has open, and her edit
   // going back onto disk. Markdown only on the way back (main/doc-file.mts).
   readDoc: (payload) => ipcRenderer.invoke('zero:read-doc', payload),
+  // A link anyone can open, to one of her files (main/file-link.mjs).
+  fileLink: (payload) => ipcRenderer.invoke('zero:file-link', payload),
+  fileLinkShare: (payload) => ipcRenderer.invoke('zero:file-link-share', payload),
+  fileLinkStop: (payload) => ipcRenderer.invoke('zero:file-link-stop', payload),
+  fileLinks: () => ipcRenderer.invoke('zero:file-links'),
+  fileLinkComments: (payload) => ipcRenderer.invoke('zero:file-link-comments', payload),
+  fileLinkComment: (payload) => ipcRenderer.invoke('zero:file-link-comment', payload),
   retryFile: (payload) => ipcRenderer.invoke('zero:retry-file', payload),
   // The change a run made, read as a built artifact.
   codeChange: (payload) => ipcRenderer.invoke('zero:code-change', payload),

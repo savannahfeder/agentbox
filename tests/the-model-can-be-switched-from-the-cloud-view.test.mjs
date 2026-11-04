@@ -58,8 +58,9 @@ describe('"On", the model and the full stop stay one clause', () => {
   // The reply box draws the new thread card's menu since w-e1a42f6b21 and the
   // old card still has its own drawer, so each box is asked about the one it
   // draws. The clause is the same clause in both.
+  // The reply box draws the model as the card's chip since w-54cdf7c768, so
+  // the old card is the one box with the clause left.
   for (const [file, tag] of [
-    ['renderer/src/components/Focus.tsx', 'ReplyModel'],
     ['renderer/src/components/Compose.tsx', 'ModelPicker'],
   ]) {
     it(file, () => {

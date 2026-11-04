@@ -4,7 +4,7 @@
 // 20261021000000_rooms.sql): `room_profiles` say what a person lets a card
 // show, `room_presence` is one row per Mac. docs/team/ROOMS-PLAN.md has the
 // rules; the test is tests/a-room-wall-shows-each-person-as-they-chose.
-import { levelFor, localDate, streakOf } from './agent-hours.mts';
+import { localDate, streakOf } from './agent-hours.mts';
 import type { AgentHoursSummary } from './agent-hours.mts';
 import { visibilityOf } from './thread-cards.mjs';
 
@@ -68,7 +68,6 @@ export interface WallCard extends Working {
   headline: string | null;
   bio: string | null;
   agents: number | null;
-  level: number | null;
   hoursTotal: number;
   hoursWeek: number;
   hoursToday: number;
@@ -188,7 +187,6 @@ export function wallCards({ members = [], profiles = [], presence = [], teammate
       bio: p.bio ?? null,
       // My own count is this Mac's, not the cloud's last word on it.
       agents: p.show_agents === false ? null : id === meId && Number.isFinite(mine?.agents) ? mine!.agents as number : s.agents,
-      level: p.show_level === false ? null : levelFor(s.total),
       hoursTotal: s.total,
       hoursWeek: s.week,
       hoursToday: s.today,
@@ -207,7 +205,7 @@ export function wallCards({ members = [], profiles = [], presence = [], teammate
     if (n.has_card || !inRoom.has(n.person_id) || n.person_id === meId) continue;
     out.push({
       id: n.person_id, me: false, away: true, name: displayNameOf(n.name), avatarUrl: n.avatar_url ?? null, headline: null, bio: null,
-      agents: null, level: null, hoursTotal: 0, hoursWeek: 0, hoursToday: 0, streak: 0, byMonth: [],
+      agents: null, hoursTotal: 0, hoursWeek: 0, hoursToday: 0, streak: 0, byMonth: [],
       teammate: mates.has(n.person_id), showActivity: false, activity: null, status: null, workingOn: null, workingPrivate: false,
     });
   }

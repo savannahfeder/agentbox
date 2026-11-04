@@ -1,5 +1,5 @@
 // Rooms in the app (alpha), drawn as Groups: the group open last, a person's
-// page, everyone's threads, Find groups and the dialogs, in one place so
+// page, everyone's threads and the dialogs, in one place so
 // App.tsx only places them beside the narrow sidebar (GroupsSidebar.tsx).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../../api';
@@ -15,9 +15,8 @@ import type { RoomFileOpening } from './RoomFileView';
 import { I } from './icons';
 import type { Conversation } from './MessagesPage';
 import { roomConversations } from './conversations';
-import { FindRooms, type ListedRoom } from './FindRooms';
-import { InviteDialog, JoinDialog, MembersMenu, StartRoomDialog, type Preview, type Sent } from './RoomDialogs';
-import { joinLink, tokenFromLink } from '../../../../shared/room-links.mjs';
+import { MembersMenu } from './RoomDialogs';
+import { tokenFromLink } from '../../../../shared/room-links.mjs';
 import { RoomsNotReady, RoomsSettings } from './RoomsSettings';
 import { GroupPage, GroupWaits, PeoplePanel } from './GroupPage';
 import { GroupMenuButton, groupChoices, type GroupMenuAction } from './GroupList';
@@ -26,12 +25,6 @@ import { GroupFinder, GroupsColumn, GroupsHead } from './GroupsColumn';
 import { directPeople } from './direct-people';
 import { decisionsOf, decisionRows } from '../decisions';
 import { DecisionsList } from '../TeamLists';
-
-type Dialog =
-  | { kind: 'invite'; roomId: string }
-  | { kind: 'start' }
-  | { kind: 'join'; token: string; preview: Preview | null }
-  | null;
 
 type Direct = Conversation & { people: string[] };
 
@@ -68,10 +61,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   const [lastId, setLastId] = useState<string | null>(() => readRoomTab());
   // Everyone's threads in the open group, one step in from its chat.
   const [boardOn, setBoardOn] = useState(false);
-  const [dialog, setDialog] = useState<Dialog>(null);
   const [members, setMembers] = useState<{ roomId: string; at: DOMRect } | null>(null);
-  const [links, setLinks] = useState<Record<string, string>>({});
-  const [finding, setFinding] = useState(false);
   // Groups with no group to open.
   const [empty, setEmpty] = useState(false);
   // The finder G opens, over whatever page is up.
@@ -89,7 +79,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     if (open) seen.current = open.id;
     else if (openId && seen.current === openId && live && rooms?.ready) { seen.current = null; setOpenId(null); }
   }, [openId, live, rooms?.ready, open]);
-  useEffect(() => { if (!live) { setOpenId(null); setDialog(null); setMembers(null); setFinding(false); setEmpty(false); setFinderOpen(false); } }, [live]);
+  useEffect(() => { if (!live) { setOpenId(null); setMembers(null); setEmpty(false); setFinderOpen(false); } }, [live]);
   useEffect(() => { setPicked(new Set()); setBoardOn(false); }, [openId]);
 
   const call = useCallback(async <T,>(op: string, ...args: unknown[]): Promise<{ ok: boolean; value?: T; error?: string }> => {
@@ -97,49 +87,23 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     return res.ok ? { ok: true, value: res.value } : { ok: false, error: res.error };
   }, []);
 
-  const linkFor = useCallback(async (roomId: string) => {
-    if (links[roomId]) return links[roomId];
-    const res = await call<string>('link', roomId);
-    if (res.ok && res.value) { setLinks((l) => ({ ...l, [roomId]: res.value! })); return res.value; }
-    return null;
-  }, [links, call]);
-
-  // The link under a room that is only you, and in the invite dialog.
-  const needLink = open && open.members <= 1 && open.kind !== 'group' && !open.inviteOnly ? open.id : dialog?.kind === 'invite' ? dialog.roomId : null;
-  useEffect(() => { if (needLink && !links[needLink]) void linkFor(needLink); }, [needLink]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const copyLink = async (roomId: string) => {
-    const token = await linkFor(roomId);
-    if (!token) { toast('Could not make a link'); return; }
-    try { await navigator.clipboard.writeText(joinLink(token)); toast('Link copied'); } catch { toast(joinLink(token)); }
-  };
-
   const [openingFile, setOpeningFile] = useState<(RoomFileOpening & { roomId: string }) | null>(null);
   // Every group opens as the Groups page, which then holds it.
   const openRoom = (id: string) => {
-    onLeavePage(); setFinding(false); setEmpty(false); setFinderOpen(false); setOpenId(id); setPane('wall'); setBoardOn(false);
+    onLeavePage(); setEmpty(false); setFinderOpen(false); setOpenId(id); setPane('wall'); setBoardOn(false);
     setLastId(id); writeRoomTab(id);
   };
-  // One step back: from everyone's threads, Find groups or a person's page to the group; from the group out.
+  // One step back: from everyone's threads or a person's page to the group; from the group out.
   const close = () => {
     if (finderOpen) { setFinderOpen(false); return; }
-    if (finding) { setFinding(false); return; }
     if (boardOn) { setBoardOn(false); return; }
     if (pane !== 'wall') { setPane('wall'); return; }
     setOpenId(null); setEmpty(false);
   };
-  // Somewhere else was picked: no group, no Find groups.
+  // Somewhere else was picked: no group.
   // In Chats the list's own box is the search.
   const findGroup = () => { const box = document.querySelector<HTMLInputElement>('.cx-search input'); if (box) box.focus(); else setFinderOpen(true); };
-  const leave = () => { setOpenId(null); setFinding(false); setEmpty(false); setBoardOn(false); setFinderOpen(false); };
-  const find = () => { onLeavePage(); setFinding(true); };
-  const loadListed = useCallback(async () => { const res = await call<ListedRoom[]>('listed'); return res.ok ? res.value ?? [] : null; }, [call]);
-  const inviteId = dialog?.kind === 'invite' ? dialog.roomId : null;
-  const loadSent = useCallback(async () => {
-    if (!inviteId) return null;
-    const res = await call<Sent[]>('invitesSent', inviteId);
-    return res.ok ? res.value ?? [] : null;
-  }, [call, inviteId]);
+  const leave = () => { setOpenId(null); setEmpty(false); setBoardOn(false); setFinderOpen(false); };
 
   // Joining a team opens its group, which may not have reached this window yet.
   const wantTeam = useRef(false);
@@ -163,17 +127,15 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   const tabbed = live ? groupInTab(all, lastId) : null;
   const openTab = () => {
     if (tabbed) { openRoom(tabbed.id); return; }
-    onLeavePage(); setOpenId(null); setFinding(false); setEmpty(true);
+    onLeavePage(); setOpenId(null); setEmpty(true);
   };
 
-  // A link pasted or opened: show the room first, join on a yes.
+  // An invite link from when groups could hold anyone: groups are your team's now.
   const join = useCallback(async (text: string) => {
-    const token = tokenFromLink(text);
-    if (!token) return false;
-    const res = await call<Preview | null>('preview', token);
-    setDialog({ kind: 'join', token, preview: res.ok ? res.value ?? null : null });
+    if (!tokenFromLink(text)) return false;
+    toast('That invite link does not work any more');
     return true;
-  }, [call]);
+  }, [toast]);
 
   // MESSAGE SOMEONE FROM A GROUP. Teammates already have direct records, with
   // their agents and threads, so they keep using them. Anyone else is a small
@@ -288,10 +250,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   const groupAction = async (r: Room, a: GroupMenuAction, at: DOMRect) => {
     if (a === 'board') setBoardOn(true);
     if (a === 'decisions') setListing({ roomId: r.id, project: null, title: `Decisions in ${nameOf(r)}` });
-    if (a === 'invite') setDialog({ kind: 'invite', roomId: r.id });
     if (a === 'members') setMembers({ roomId: r.id, at });
-    if (a === 'new') setDialog({ kind: 'start' });
-    if (a === 'find') find();
     if (a === 'mute' || a === 'unmute') { await call('mute', r.id, a === 'mute'); toast(a === 'mute' ? `${nameOf(r)} is muted` : `${nameOf(r)} is not muted any more`); }
     if (a === 'leave') {
       const res = await call('leave', r.id);
@@ -311,9 +270,9 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   // `right` undefined keeps the bar's own buttons; null clears them.
   let heading: { title: ReactNode; right?: ReactNode } | null = null;
   let page: ReactNode = null;
-  const onChat = !!open && !!rooms && pane === 'wall' && !boardOn && !finding;
+  const onChat = !!open && !!rooms && pane === 'wall' && !boardOn;
   // Everyone's threads: the board of the people here whose threads reach me. Never for a chat with people.
-  const onRoom = !!open && !!rooms && open.kind !== 'group' && pane === 'wall' && boardOn && !finding;
+  const onRoom = !!open && !!rooms && open.kind !== 'group' && pane === 'wall' && boardOn;
   const onBoardPeople = onRoom ? boardPeople(open!.wall) : [];
   const onBoardIds = new Set(onBoardPeople.map((c) => c.id));
   const onBoardPicked = onRoom ? boardPicked(boardPicks[open!.id], open!.wall) : [];
@@ -333,19 +292,9 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
       decisions={open!.listed && !open!.teamId ? null : decisionRows(decisionsIn(open!.id), { project: null }).decisions.length}
       board={open!.kind !== 'group' && !!renderBoard} onPick={(a, at) => void groupAction(open!, a, at)} />
     : null;
-  if (finding && live) {
-    heading = {
-      title: backTitle('Find groups'),
-      right: <div className="th-right"><button type="button" className="th-new" onClick={() => setDialog({ kind: 'start' })}>{I.plus()}New group</button></div>,
-    };
-    page = <div className="rm-split"><div className="rm-main wide"><FindRooms load={loadListed} onOpen={(id) => openRoom(id)} onLink={(t) => void join(t)}
-      onJoin={async (id) => { const res = await call<string>('joinListed', id); return res.ok ? null : res.error ?? 'Could not join'; }} /></div></div>;
-  } else if (empty && live) {
+  if (empty && live) {
     heading = { title: <h1 className="workspace-title">Groups</h1> };
-    page = <div className="rm-empty gr-none"><span className="t">You are not in any groups yet.</span>
-      <span className="s">Start one for the people you work with, or find one to join.</span>
-      <div className="gr-none-acts"><button type="button" className="rm-btn go" onClick={() => setDialog({ kind: 'start' })}>{I.plus()}New group</button>
-        <button type="button" className="rm-btn" onClick={find}>{I.search()}Find groups to join</button></div></div>;
+    page = <div className="rm-empty gr-none"><span className="t">You are not in any groups yet.</span></div>;
   } else if (open && rooms && onChat) {
     page = <GroupPage key={open.id} inline={inline}
       notice={<><GroupWaits row={rooms.mentions.find((m) => m.roomId === open.id) ?? null} onDone={() => void call('markDone', open.id).then((res) => { if (!res.ok) toast(res.error ?? 'Not marked done'); })} />
@@ -360,41 +309,20 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   } else if (open && rooms) {
     heading = { title: backTitle(nameOf(open)) };
     page = <RoomPage room={open} rooms={list} ranks={rooms.ranks ?? {}} me={rooms.me} now={now}
-      pane={pane} link={links[open.id] ?? null} onPane={setPane} chat={null} board={board}
+      pane={pane} onPane={setPane} chat={null} board={board}
       picked={picked} onPick={(ids) => setPicked(new Set(ids))} onMessage={(ids) => void message(ids, open)}
       onRoom={(id) => openRoom(id)}
       onSaveBio={async (bio) => { const res = await call('saveProfile', { bio }); return res.ok ? null : res.error ?? 'Your bio did not save'; }}
-      onComeBack={() => void call('comeBack')} onCopyLink={() => void copyLink(open.id)} />;
+      onComeBack={() => void call('comeBack')} />;
   }
 
-  const inviteRoom = dialog?.kind === 'invite' ? all.find((r) => r.id === dialog.roomId) : null;
   const membersRoom = members ? all.find((r) => r.id === members.roomId) : null;
   const teamRoom = all.find((r) => r.teamId) ?? null;
   const dialogs: ReactNode = <>
     {listing && <DecisionsList title={listing.title} project={listing.project} rows={decisionsIn(listing.roomId)} nameOf={nameIn} onClose={() => setListing(null)}
       onTakeBack={(d) => { void decide(listing.roomId, { messageId: d.messageId, kind: d.kind, on: false }); }} />}
     {finderOpen && <GroupFinder rows={rows} current={open ? `room:${open.id}` : null} now={now} onOpen={pickGroup} onClose={() => setFinderOpen(false)} />}
-    {inviteRoom && <InviteDialog room={inviteRoom} link={links[inviteRoom.id] ?? null} now={now} onClose={() => setDialog(null)} loadSent={loadSent}
-      onCopy={() => void copyLink(inviteRoom.id)}
-      onEmail={async (email) => { const res = await call('invite', inviteRoom.id, email); return res.ok ? null : res.error ?? 'Not sent'; }} />}
-    {dialog?.kind === 'start' && <StartRoomDialog canList={hasTeam} onClose={() => setDialog(null)} onFind={finding ? undefined : () => { setDialog(null); find(); }}
-      onStart={async ({ name, who }) => {
-        const res = await call<string>('create', { name, listed: who === 'everyone', inviteOnly: who === 'invite' });
-        if (!res.ok) return res.error ?? 'Could not start the room';
-        setDialog(null);
-        if (res.value) openRoom(res.value);
-        return null;
-      }} />}
-    {dialog?.kind === 'join' && <JoinDialog preview={dialog.preview} myName={myName} onClose={() => setDialog(null)}
-      onJoin={async () => {
-        const res = await call<string>('joinByLink', dialog.token);
-        if (!res.ok) return res.error ?? 'Could not join';
-        setDialog(null);
-        if (res.value) openRoom(res.value);
-        return null;
-      }} />}
     {membersRoom && members && <MembersMenu room={membersRoom} at={members.at} onClose={() => setMembers(null)}
-      onInvite={() => { setMembers(null); setDialog({ kind: 'invite', roomId: membersRoom.id }); }}
       onPerson={(id) => { setMembers(null); openRoom(membersRoom.id); setPane(`person:${id}`); }} />}
   </>;
 
@@ -443,12 +371,12 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
 
   return {
     chatIn, startChat,
-    live, openId: !live ? null : finding ? 'find' : open ? openId : empty ? 'groups' : null,
+    live, openId: !live ? null : open ? openId : empty ? 'groups' : null,
     open: (id: string) => openRoom(id), close, leave, page, dialogs, join, invisible, settingsPane,
     /** The sidebar's Groups: the group open last, or none. */
     openTab,
     mentions, openMention, faces, heading,
-    dialogOpen: !!dialog || !!members || finderOpen || !!listing,
+    dialogOpen: !!members || finderOpen || !!listing,
     /** After a team invite is taken up. */
     openTeamGroup: () => { wantTeam.current = true; },
     openGroupById: openRoom,

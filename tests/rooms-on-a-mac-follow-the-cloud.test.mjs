@@ -14,7 +14,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
-import { GENERAL_ROOM } from '../main/team/rooms-memory.mts';
 
 const T0 = Date.parse('2026-10-22T15:00:00-07:00');
 const flush = async () => { for (let i = 0; i < 20; i += 1) await new Promise((r) => setImmediate(r)); };
@@ -107,10 +106,10 @@ describe('switched on', () => {
     expect(w.theo.rooms.state().rooms[0].agents).toBe(2);
   });
 
-  it('someone with no team starts in General, pinned', async () => {
+  it('someone with no team starts in no group (groups are only ever a team)', async () => {
     w.jun.on = true;
     await w.jun.rooms.tick();
-    expect(w.jun.rooms.state().rooms.map((r) => [r.id, r.pinned])).toEqual([[GENERAL_ROOM, true]]);
+    expect(w.jun.rooms.state().rooms).toEqual([]);
   });
 
   it('a message reaches the room at once, counts as unread, and a mention of me is a row of its own', async () => {
@@ -222,7 +221,7 @@ describe('switched on', () => {
   });
 
   it('pins and mutes are mine, kept, and leaving a room drops them', async () => {
-    const room = await w.maya.rooms.create({ name: 'Launch' });
+    const room = await w.maya.rooms.create({ name: 'Theo', kind: 'group', people: [w.theo.id] });
     expect(w.maya.rooms.state().rooms.find((r) => r.id === room)).toMatchObject({ pinned: true });
     w.maya.rooms.pin(room, false);
     w.maya.rooms.mute(room, true);

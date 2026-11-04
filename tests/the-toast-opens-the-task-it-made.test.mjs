@@ -82,7 +82,7 @@ describe('the toast after an answer carries the same way in', () => {
   });
 
   it('a typed reply hands it the row it answered', () => {
-    expect(app).toContain('`Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id }');
+    expect(app).toContain('`Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id, ');
   });
 
   it('an approval hands it the row it approved', () => {

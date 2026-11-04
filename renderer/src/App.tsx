@@ -55,7 +55,7 @@ import { Rail } from './components/Rail';
 import { ThreadComposer, type ComposeStart } from './threads/ThreadComposer';
 import { continueStart } from './threads/continue-thread';
 import { OpenTeammateThread } from './threads/ContinuedFrom';
-import { handOffStart, joinNames, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, teammates } from './threads/composer-rules';
+import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, teammates } from './threads/composer-rules';
 import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople } from '../../shared/thread-cards.mjs';
@@ -236,6 +236,7 @@ import { revealLine } from './reveal-line';
 import { FoundInside } from './components/FoundInside';
 import type { PlaceAct } from './threads/ThreadMenu';
 import { SignInPage } from './team/SignInPage';
+import { SIGN_IN_TO_SHARE, ShareLink, canShareFile } from './components/ShareLink';
 import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
 import { inboxEveryone, mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 import { boardStops, leadStops, listStops, stepFromPlace, stepStop, stopKey, type PageStop, type Stop } from './threads/walk-rules';
@@ -823,7 +824,15 @@ export default function App() {
   const [cloudSetupOpen, setCloudSetupOpen] = useState(false);
   // Settings › Phone's own sign-in, for a build whose team version is off.
   const [phoneSignInOpen, setPhoneSignInOpen] = useState(false);
-  useEffect(() => { if (snap?.team?.signedIn) setPhoneSignInOpen(false); }, [snap?.team?.signedIn]);
+  // Share's "Sign in", pressed inside a file opened big (ShareLink.tsx).
+  const [shareSignInOpen, setShareSignInOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setShareSignInOpen(true);
+    window.addEventListener(SIGN_IN_TO_SHARE, open);
+    return () => window.removeEventListener(SIGN_IN_TO_SHARE, open);
+  }, []);
+  const closeAccountSignIn = useCallback(() => { setPhoneSignInOpen(false); setShareSignInOpen(false); }, []);
+  useEffect(() => { if (snap?.team?.signedIn) { setPhoneSignInOpen(false); setShareSignInOpen(false); } }, [snap?.team?.signedIn]);
   // The account a cloud sign-in started from Settings is for, so its page can say whom to sign in as.
   const [cloudSignInAs, setCloudSignInAs] = useState<string | null>(null);
   const floatingRef = useRef<OpenOverTheApp>(NOTHING_OVER_THE_APP);
@@ -3001,9 +3010,9 @@ export default function App() {
   // them whether or not the Groups page has been opened.
   const groupRows = useMemo(() => (snap?.alpha?.rooms && snap?.team?.rooms?.on ? mentionRows(snap.team.rooms.mentions) : []), [snap?.alpha?.rooms, snap?.team?.rooms]);
   const allLeads = useMemo(() => leadRows(
-    inviteRows(snap?.team?.invites, snap?.alpha?.rooms ? snap?.team?.rooms?.invites : []),
+    inviteRows(snap?.team?.invites),
     groupRows,
-  ), [snap?.team?.invites, snap?.alpha?.rooms, snap?.team?.rooms?.invites, groupRows]);
+  ), [snap?.team?.invites, groupRows]);
   const leadCount = allLeads.length;
   // One list by priority, unless someone chose Group by Who under View and filters.
   const [needsFolded, setNeedsFolded] = useState<ReadonlySet<string>>(() => new Set());
@@ -4017,16 +4026,13 @@ export default function App() {
   });
   // AN INVITATION IS ASKED, NEVER TAKEN UP ON ITS OWN: Join or Enter takes it.
   const joinInvite = async (r: InviteRow) => {
-    const out = r.kind === 'team' ? await api.teamAcceptInvite(r.id) : await api.rooms('acceptInvite', r.id);
+    const out = await api.teamAcceptInvite(r.id);
     showToast(out.ok ? 'Joined' : (out as { error?: string }).error ?? 'That invitation could not be taken up');
-    if (out.ok && r.kind === 'team') roomsUi.openTeamGroup();
+    if (out.ok) roomsUi.openTeamGroup();
     void refresh();
   };
-  // The Team page says more about a team. A group has no page to go to before you join it.
-  const openInvite = (r: InviteRow) => {
-    if (r.kind === 'team') { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }
-    else setCardSel(`lead/${r.key}`);
-  };
+  // The Team page says more about a team.
+  const openInvite = () => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); };
   const answerLead = (l: LeadRow) => {
     if (l.invite) void joinInvite(l.invite);
     else if (l.mention) roomsUi.openMention(l.mention);
@@ -4782,13 +4788,13 @@ export default function App() {
 
   // The toast says the words are back in the box, so the box opens with them,
   // and a box already open is told, since it read its draft when it mounted.
-  const wordsBackInTheBox = (item: WorkItem, words: string, attachments: SentDraft['attachments']): boolean => {
-    if (!restoreDraft(item, words, attachments)) return false;
+  const wordsBackInTheBox = (item: WorkItem, words: string, attachments: SentDraft['attachments'], runAt = 0, pick: ReplyPick | null = null): boolean => {
+    if (!restoreDraft(item, words, attachments, undefined, runAt, pick)) return false;
     window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(item) }));
     setModal('reply');
     return true;
   };
-  const answerWith = useCallback(async (item: WorkItem, text: string, priority?: number, sent?: SentDraft, mode?: AnswerMode | null, engine?: string | null, pick?: ReplyPick) => {
+  const answerWith = useCallback(async (item: WorkItem, text: string, priority?: number, sent?: SentDraft, mode?: AnswerMode | null, engine?: string | null, pick?: ReplyPick, runAt?: number) => {
     // AN AGENT ROW IS NOT WORK OF HERS TO CLOSE, DEFER OR RESTART. It stands
     // for a session running outside Agentbox; the only two things that mean
     // anything to it are a reply and being taken to its window.
@@ -4816,6 +4822,12 @@ export default function App() {
     // reads her reply when it exits (deliverMidflightReply). Reopening would
     // put a second worker on the same item.
     const status = statusForReply(item.status);
+    // A REPLY SET FOR LATER (w-54cdf7c768) is written now with the row set for
+    // its time, so nothing hands it to an agent before then.
+    const later = (runAt ?? 0) > Date.now();
+    const keepsTime = later ? runAt : 0;
+    // A reply sent at once while one waits takes the waiting one with it.
+    const waiting = !later && replyWaitsUntil(item, Date.now()) > 0;
     // A REPLY THAT DID NOT GET THROUGH COMES BACK TO THE BOX, on every path.
     // NEVER PULL HER BACK. This settles whenever the agent's session does,
     // which can be minutes after she moved on, and it used to switch the
@@ -4825,7 +4837,7 @@ export default function App() {
     // she can click says where.
     const putBack = (error: unknown) => {
       landed();
-      restoreFailedDraft(item, sent?.words ?? text, sent?.attachments ?? []);
+      restoreFailedDraft(item, sent?.words ?? text, sent?.attachments ?? [], undefined, keepsTime);
       const here = focusedNow.current?.id === item.id && focusedNow.current?.product === item.product;
       if (here) {
         setModal('reply');
@@ -4866,7 +4878,10 @@ export default function App() {
     // What the promise waits on is the acknowledgement, not the handing over.
     // So the message says "press Z to undo" for exactly as long as that is
     // true and stops saying it the moment it stops being true.
-    const isRunning = snap?.supervisor.running.some((run) => run.itemId === item.id && run.product === item.product);
+    const running = snap?.supervisor.running.some((run) => run.itemId === item.id && run.product === item.product);
+    // A reply for later is not handed to the run, and its Z leaves that run alone.
+    const isRunning = running && !later;
+    const runStays = later && running;
     if (isRunning) {
       setFollowing({ product: item.product, id: item.id });
       setModal(null);
@@ -5041,11 +5056,12 @@ export default function App() {
     const restore = (): Restored => {
       setSending((q) => q.filter((s) => s !== mine));
       landed();
-      return wordsBackInTheBox(item, sent?.words ?? text, sent?.attachments ?? []) ? { item } : null;
+      return wordsBackInTheBox(item, sent?.words ?? text, sent?.attachments ?? [], keepsTime, pick) ? { item } : null;
     };
     // A REPLY IS A CLAIM ON NOW. It runs at once whatever the thread is
     // scheduled for, and the schedule stays; a reminder it lifts (list-rules).
     const wasScheduled = replyClearsSchedule(item, Date.now());
+    const priorRunAt = item.runAt ?? 0;
     const priorSnooze = item.snoozedUntil ?? 0;
     if (stay) setFollowing({ product: item.product, id: item.id });
     const undid = [{ product: item.product, id: item.id, words: 'Undid your reply' }];
@@ -5076,6 +5092,7 @@ export default function App() {
           // run this reply starts reads the model she just chose rather than the
           // one it was on (main/store.mts, answerItem).
           ...(pick ?? {}),
+          ...(later ? { runAt } : {}),
         });
       } catch (error) {
         setSending((q) => q.filter((s) => s !== mine));
@@ -5084,7 +5101,8 @@ export default function App() {
       }
       landed();
       setTimeout(() => setSending((q) => q.filter((s) => s !== mine)), LANDED_MS);
-      if (wasScheduled) {
+      if (waiting) await api.schedule({ product: item.product, id: item.id, runAt: 0 });
+      if (wasScheduled && !later) {
         if (priorSnooze > Date.now()) await api.snooze({ product: item.product, id: item.id, snoozedUntil: 0 });
         // The legacy localStorage snooze hides a row on read all by itself, so
         // clearing only the ledger would leave her reply behind a schedule the
@@ -5092,19 +5110,20 @@ export default function App() {
         setSnoozes((s) => { const next = { ...s }; delete next[item.id]; return next; });
       }
       pushUndo({ label: 'Reply withdrawn, back in your inbox', undoes: 'take back that reply and stop the agent', restore, undid, run: async () => {
+        if (later || waiting) await api.schedule({ product: item.product, id: item.id, runAt: priorRunAt });
         if (wasScheduled && priorSnooze) await api.snooze({ product: item.product, id: item.id, snoozedUntil: priorSnooze });
         // `withdraw`: on the phone, take back the reply itself if her Mac has not taken it.
-        await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id, withdraw: true });
+        if (!runStays) await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id, withdraw: true });
         // Put the thread back exactly where the reply found it. The rule and
         // what it cost are in list-rules (`withdrawReply`): restoring the
         // status only when the reply had changed one left an already-open row
         // sitting blocked after the kill, where nothing carries an answer.
-        await api.answer({ product: item.product, id: item.id, ...withdrawReply(item.status) });
+        await api.answer({ product: item.product, id: item.id, ...(runStays ? { answer: '(withdrawn)' } : withdrawReply(item.status)) });
         // Taking the command back ends the watch with it, so the next Escape
         // means what it always meant.
         setFollowing(null);
       } });
-    }, talking ? 'Sent' : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id }, undid, holdsReplies(onPhone()) ? UNDO_GRACE_MS : 0);
+    }, talking ? 'Sent' : later ? `Sends ${laterHint(runAt!)} → ${item.productName}` : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id, ...(later ? { at: laterHint(runAt!) } : {}) }, undid, holdsReplies(onPhone()) ? UNDO_GRACE_MS : 0);
   }, [deferCommit, snap?.supervisor.running, snap?.products, showToast, refresh, markSeen, pushUndo, startChatAgents, fire, movesOn]);
   answerWithRef.current = answerWith;
 
@@ -5485,6 +5504,12 @@ export default function App() {
     refresh();
   }, [showToast, refresh, inboxCandidates, writeMoment, leaveResolved, pushUndo]);
 
+  // A reply set for later, sent now from under the thread: the time comes off
+  // and the reply runs, and she stays where she is.
+  const sendWaitingNow = useCallback(async (item: WorkItem) => {
+    await api.schedule({ product: item.product, id: item.id, runAt: 0 });
+    showToast('Your reply is on its way');
+  }, [showToast]);
   const unsnooze = useCallback(async (target: WorkItem | WorkItem[]) => {
     // An agent row belongs here for the same reason it belongs in the picker:
     // the way back has to exist wherever the way out did.
@@ -6387,7 +6412,8 @@ export default function App() {
           break;
         // N starts a thread (w-fb9051e597). C does nothing: the cloud is ⌘C.
         case 'n': case 'N': e.preventDefault(); startThread(); break;
-        case 'z': case 'Z': undo(); break;
+        // Held, or a card Z reopens takes the keystroke as a typed z.
+        case 'z': case 'Z': e.preventDefault(); undo(); break;
         // B FLIPS LIST AND BOARD (w-58c8f466e7): "I quite often switch between
         // board and list view". B for board; it shipped as V first and that
         // read as "a weird one". Only where the list or the board is what is
@@ -6637,6 +6663,7 @@ export default function App() {
       key={toastShown.current}
       title={sentTo ? reachAudienceOf(sentTo) ?? rowTitle(sentTo) : 'the thread you left'}
       says={sentLineSays(toast.text)}
+      at={toast.goes.at}
       undoes={toastParts(toast.text).undo}
       onBack={() => openToastRow(toast.goes!)}
       onUndo={() => { setToast(null); void undo(); }}
@@ -7832,7 +7859,7 @@ export default function App() {
                   returnedFromSnooze={returnAt(focused) > 0 && returnAt(focused) <= now}
                   scheduledUntil={returnAt(focused) > now ? returnAt(focused) : 0}
                   scheduledByAgent={parkedByAgent(focused, now)}
-                  onUnschedule={() => unsnooze(focused)}
+                  onUnschedule={() => (replyWaitsUntil(focused, Date.now()) ? sendWaitingNow(focused) : unsnooze(focused))}
                   replyOpen={modal === 'reply'}
                   /*
                    * WHAT SHE HAS SENT TO THIS ROW'S RUNNING AGENT IN THE LAST
@@ -7855,7 +7882,7 @@ export default function App() {
                   codexModelDefault={codexModelDefault}
                   engines={snap.engines?.choices}
                   items={items}
-                  onReplySend={(text, priority, repeat, sent, mode, pick) => {
+                  onReplySend={(text, priority, repeat, sent, mode, pick, sendAt) => {
                     // THE REPLY GOES WHERE THE ROW ACTUALLY LIVES. On an agent
                     // row there is no ledger to answer; the text is handed to
                     // the running session itself, and the toast says what came
@@ -7866,7 +7893,7 @@ export default function App() {
                     // be the system swallowing something the user wrote, which is the
                     // failure this app cares about most.
                     if (repeat && !teammateIdOf(focused)) applyRepeat(focused, repeat);
-                    answerWith(focused, text, priority, sent, mode, runningEngine, pick);
+                    answerWith(focused, text, priority, sent, mode, runningEngine, pick, sendAt);
                   }}
                   onReplyClose={() => setModal(null)}
                   onStop={() => stopAgent(focused)}
@@ -8084,7 +8111,10 @@ export default function App() {
                 onClose={closeArtifact}
                 onNotice={showToast}
                 aside={notesShown && focused ? <NotesSidebar key={`${focused.id}\n${openDoc.src}`} item={focused} src={openDoc.src} /> : undefined}
-                firstMark={notesHere && focused ? <NotesToggle open={notesOpen} waiting={(focused.artifacts?.notes ?? []).filter((n) => !n.resolved && stillWaiting(n)).length} onToggle={toggleNotes} /> : undefined}
+                firstMark={<>
+                  {focused && focused.product === openDoc.product && canShareFile(openDoc.src) && <ShareLink icon product={openDoc.product} thread={focused.id} src={openDoc.src} signedIn={!!snap?.team?.signedIn} />}
+                  {notesHere && focused && <NotesToggle open={notesOpen} waiting={(focused.artifacts?.notes ?? []).filter((n) => !n.resolved && stillWaiting(n)).length} onToggle={toggleNotes} />}
+                </>}
               /></ArtifactSurface>
             )}
       </div>
@@ -8951,7 +8981,10 @@ export default function App() {
           Signing in sets the cloud up, and the same open state then shows
           the setup's accounts. */}
       {phoneSignInOpen && snap?.team && !snap.team.signedIn && (
-        drawnIn(<SignInPage purpose="phone" waitingUrl={snap.team.signingIn?.url ?? null} onClose={() => setPhoneSignInOpen(false)} onSignedIn={() => setPhoneSignInOpen(false)} />, document.body)
+        drawnIn(<SignInPage purpose="phone" waitingUrl={snap.team.signingIn?.url ?? null} onClose={closeAccountSignIn} onSignedIn={closeAccountSignIn} />, document.body)
+      )}
+      {shareSignInOpen && !phoneSignInOpen && snap?.team && !snap.team.signedIn && (
+        drawnIn(<SignInPage purpose="share" waitingUrl={snap.team.signingIn?.url ?? null} onClose={closeAccountSignIn} onSignedIn={closeAccountSignIn} />, document.body)
       )}
       {cloudSetupOpen && !snap.cloud?.setUp && snap.cloud?.offered && (
         drawnIn(<SignInPage purpose="cloud" onClose={() => setCloudSetupOpen(false)} onSignedIn={() => setCloudSetupOpen(true)} />, document.body)

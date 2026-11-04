@@ -119,7 +119,9 @@ describe('the card', () => {
 
   it('offers Add it to Later on the menu the Send button already opens', () => {
     expect(composer).toContain('Add it to Later');
-    expect(composer).toMatch(/sendTask\(\{ start: 'later' \}\)/);
+    // Picked there, sent by Send (w-54cdf7c768).
+    expect(composer).toMatch(/pickWhen\(\{ start: 'later' \}\)/);
+    expect(read('renderer/src/threads/composer-rules.ts')).toMatch(/if \('start' in when\) return \{ start: 'later' \};/);
   });
 
   it('says where it went rather than that it started', () => {

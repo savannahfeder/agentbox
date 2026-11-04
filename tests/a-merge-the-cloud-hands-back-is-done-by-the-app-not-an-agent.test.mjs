@@ -9,10 +9,11 @@
 // cost the Mac.
 //
 // Now the app merges the thread's branch into main itself when that is all the
-// hand-back asks, without blocking its own process, and the old hand-back (a
-// run on this computer) happens only when the merge is not plain: a conflict,
-// uncommitted changes, the project's folder off main, or a main that is
-// published elsewhere, whose push is left to an agent.
+// hand-back asks, without blocking its own process, and pushes main when it is
+// published elsewhere, as on GitHub. The old hand-back (a run on this
+// computer) happens only when that is not plain: a conflict, uncommitted
+// changes, the project's folder off main, a main here holding commits the
+// published copy lacks, a published copy out of reach, or a push refused.
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -114,18 +115,6 @@ describe('anything but a plain merge is left to an agent, with main untouched', 
     expect(fs.existsSync(path.join(p.base, '.git', 'MERGE_HEAD'))).toBe(false);
   });
 
-  it('a main published to another copy, whose push is an agent\'s to do', async () => {
-    const p = project();
-    const remote = path.join(p.root, 'remote.git');
-    git(p.root, 'init', '-q', '--bare', remote);
-    git(p.base, 'remote', 'add', 'origin', remote);
-    git(p.base, 'push', '-q', '-u', 'origin', 'main');
-    commit(p.folder, 'b.txt', 'two\n', 'add b');
-    const before = p.head();
-    expect(await mergeHome(p.folder)).toMatchObject({ ok: false, why: expect.stringMatching(/published/) });
-    expect(p.head()).toBe(before);
-  });
-
   it('uncommitted changes in either folder, or the project\'s folder off main', async () => {
     const p = project();
     commit(p.folder, 'b.txt', 'two\n', 'add b');
@@ -142,6 +131,98 @@ describe('anything but a plain merge is left to an agent, with main untouched', 
   it('a thread working in the project\'s own folder, not a folder of its own', async () => {
     const p = project();
     expect((await mergeHome(p.base)).ok).toBe(false);
+  });
+});
+
+/** The same project with its main published to a copy elsewhere, as on GitHub. */
+function published() {
+  const p = project();
+  const remote = path.join(p.root, 'remote.git');
+  git(p.root, 'init', '-q', '--bare', '-b', 'main', remote);
+  git(p.base, 'remote', 'add', 'origin', remote);
+  git(p.base, 'push', '-q', '-u', 'origin', 'main');
+  const remoteMain = () => git(remote, 'rev-parse', 'main');
+  /** Someone else's push to the published main. */
+  const pushedElsewhere = () => {
+    const other = path.join(p.root, 'other');
+    git(p.root, 'clone', '-q', remote, other);
+    git(other, 'config', 'user.email', 'other@example.com');
+    git(other, 'config', 'user.name', 'Other');
+    commit(other, 'other.txt', 'theirs\n', 'their change');
+    git(other, 'push', '-q', 'origin', 'main');
+  };
+  return { ...p, remote, remoteMain, pushedElsewhere };
+}
+
+describe('a main published elsewhere is merged here and pushed', () => {
+  it('the thread\'s commits reach the published main', async () => {
+    const p = published();
+    commit(p.folder, 'b.txt', 'two\n', 'add b');
+    const tip = git(p.folder, 'rev-parse', 'HEAD');
+    const merged = await mergeHome(p.folder);
+    expect(merged).toMatchObject({ ok: true, commits: 1, into: 'main', pushedTo: 'origin' });
+    expect(p.remoteMain()).toBe(p.head());
+    expect(p.onMain(tip)).toBe(true);
+    expect(mergedSentence(merged)).toMatch(/^\*\*Merged into main and pushed\.\*\* The commit this thread made is on main here and on origin now/);
+  });
+
+  it('a published main that moved on is brought up to date here first', async () => {
+    const p = published();
+    p.pushedElsewhere();
+    commit(p.folder, 'b.txt', 'two\n', 'add b');
+    expect(await mergeHome(p.folder)).toMatchObject({ ok: true, pushedTo: 'origin' });
+    expect(git(p.base, 'show', 'main:other.txt')).toBe('theirs');
+    expect(p.remoteMain()).toBe(p.head());
+  });
+
+  it('takes a turn at the memory check for the push alone, and gives it back', async () => {
+    const p = published();
+    commit(p.folder, 'b.txt', 'two\n', 'add b');
+    const turns = [];
+    await mergeHome(p.folder, { beforePush: async () => { turns.push('taken'); return () => turns.push('given back'); } });
+    expect(turns).toEqual(['taken', 'given back']);
+    const local = project();
+    commit(local.folder, 'b.txt', 'two\n', 'add b');
+    const none = [];
+    await mergeHome(local.folder, { beforePush: async () => { none.push('taken'); return () => {}; } });
+    expect(none).toEqual([]);
+  });
+});
+
+describe('a published main is left to an agent when pushing is not plain', () => {
+  it('main here holds commits the published copy does not have: nothing is merged or pushed', async () => {
+    const p = published();
+    commit(p.base, 'mine.txt', 'not pushed yet\n', 'local only');
+    commit(p.folder, 'b.txt', 'two\n', 'add b');
+    const before = p.head();
+    const remoteBefore = p.remoteMain();
+    expect(await mergeHome(p.folder)).toMatchObject({ ok: false, why: expect.stringMatching(/not on origin/) });
+    expect(p.head()).toBe(before);
+    expect(p.remoteMain()).toBe(remoteBefore);
+  });
+
+  it('the published copy cannot be reached: nothing is merged', async () => {
+    const p = published();
+    commit(p.folder, 'b.txt', 'two\n', 'add b');
+    const before = p.head();
+    fs.rmSync(p.remote, { recursive: true, force: true });
+    expect(await mergeHome(p.folder)).toMatchObject({ ok: false, why: expect.stringMatching(/could not reach origin/) });
+    expect(p.head()).toBe(before);
+  });
+
+  it('a push that is refused: the merge stays here, and the agent is told what the push said', async () => {
+    const p = published();
+    commit(p.folder, 'b.txt', 'two\n', 'add b');
+    const tip = git(p.folder, 'rev-parse', 'HEAD');
+    const remoteBefore = p.remoteMain();
+    fs.writeFileSync(path.join(p.remote, 'hooks', 'pre-receive'), '#!/bin/sh\necho "main is protected: open a pull request"\nexit 1\n', { mode: 0o755 });
+    const turns = [];
+    const merged = await mergeHome(p.folder, { beforePush: async () => () => turns.push('given back') });
+    expect(merged).toMatchObject({ ok: false, merged: true, why: expect.stringMatching(/merged into main here, but pushing it to origin failed/) });
+    expect(merged.said).toMatch(/main is protected/);
+    expect(p.onMain(tip)).toBe(true);
+    expect(p.remoteMain()).toBe(remoteBefore);
+    expect(turns).toEqual(['given back']);
   });
 });
 
@@ -174,6 +255,31 @@ describe('the supervisor, when a cloud run hands back', () => {
     expect(sup._handledAnswers.has(sup._answerKey(row))).toBe(true);
     expect(sup._movedHere(item.id)).toBe(false);
     expect(sup._mergingHome.has(item.id)).toBe(false);
+  });
+
+  it('a published main is merged and pushed, and the answer says so', async () => {
+    const p = published();
+    commit(p.folder, 'b.txt', 'two\n', 'add b');
+    const { sup, written } = make(p.root, p.base);
+    sup._noteCloudHandBack(item, handedBack('merging into main'), p.folder);
+    await sup._mergingHome.get(item.id);
+    expect(written).toEqual([expect.objectContaining({ result: expect.stringMatching(/^\*\*Merged into main and pushed\.\*\*.*on origin now/) })]);
+    expect(p.remoteMain()).toBe(p.head());
+    expect(sup._movedHere(item.id)).toBe(false);
+  });
+
+  it('a refused push moves to a run on this computer, told the merge is done and what the push said', async () => {
+    const p = published();
+    commit(p.folder, 'b.txt', 'two\n', 'add b');
+    fs.writeFileSync(path.join(p.remote, 'hooks', 'pre-receive'), '#!/bin/sh\necho "main is protected"\nexit 1\n', { mode: 0o755 });
+    const { sup, written } = make(p.root, p.base);
+    sup._noteCloudHandBack(item, handedBack('merging into main'), p.folder);
+    await sup._mergingHome.get(item.id);
+    expect(written).toEqual([]);
+    expect(sup._movedHere(item.id)).toBe(true);
+    const note = sup._mergeHomeNote(item);
+    expect(note).toMatch(/merged into main here, but pushing it to origin failed/);
+    expect(note).toMatch(/main is protected/);
   });
 
   it('a reply she wrote after the run began is not settled by the merge, so a run still carries it', async () => {
