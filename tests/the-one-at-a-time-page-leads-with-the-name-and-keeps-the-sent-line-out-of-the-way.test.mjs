@@ -29,9 +29,11 @@ const px = (sel, prop) => Number(rule(sel).match(new RegExp(`${prop}: ([\\d.]+)p
 const draw = (p) => renderToStaticMarkup(h(QueueSummary, { onToggle: noop, open: false, earlier: 0, ...p }));
 const noop = () => {};
 
-describe('the name is said once, and read first', () => {
-  it('heads the page, and the bar keeps only the way back', () => {
-    expect(css).toMatch(/\.app\.one-at-a-time \.thread-crumb-sep:has\(\+ \.thread-crumb-name\), \.app\.one-at-a-time \.thread-crumb-name \{ display: none; \}/);
+describe('the name heads the page, and is read first', () => {
+  // The bar names the thread as well since w-b01d58b7df, so it is still named
+  // after the page scrolls (the-thread-bar-names-the-thread-and-starts-as-far-in-as-it-ends).
+  it('the bar does not hide it', () => {
+    expect(css).not.toMatch(/thread-crumb-name[^{]*\{[^}]*display: none/);
   });
   it('but a rename still opens its box in the bar', () => {
     expect(css).not.toMatch(/thread-crumb-edit[^{]*\{[^}]*display: none/);

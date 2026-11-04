@@ -840,7 +840,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
           // A version only a teammate has is marked where the file's newest was said.
           const thread = given?.thread ?? v.copies[0]?.thread ?? file.chain.at(-1).copies[0].thread;
           await writeTo(thread, mark);
-          if (mark.do === 'note' && thread.ref.kind !== 'shared' && thread.ref.kind !== 'room') return { ok: true, wrote: { product: thread.ref.product, id: thread.ref.id } };
+          if (mark.do !== 'unapprove' && thread.ref.kind !== 'shared' && thread.ref.kind !== 'room') return { ok: true, wrote: { product: thread.ref.product, id: thread.ref.id } };
         } else return { ok: false, error: 'that cannot be done here' };
         return { ok: true };
       } catch (err) {
