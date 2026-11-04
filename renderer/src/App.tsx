@@ -56,7 +56,7 @@ import { ThreadComposer, type ComposeStart } from './threads/ThreadComposer';
 import { continueStart } from './threads/continue-thread';
 import { OpenTeammateThread } from './threads/ContinuedFrom';
 import { handOffStart, joinNames, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, teammates } from './threads/composer-rules';
-import { keyOnAnOpenThread, keyOnTheList, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
+import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople } from '../../shared/thread-cards.mjs';
 import { changePathFor } from './code-artifact';
@@ -2507,8 +2507,7 @@ export default function App() {
   // the inbox, which is the whole point: "I only see things that need me."
   const snoozed = useMemo(() => [
     // AND A FIFTH (w-5244c90c33): a thread waiting on another one, unless a
-    // session or the ship queue has it, which is In progress. A put-off thread
-    // the same: the board shows it once, under In progress.
+    // session or the ship queue has it, which is In progress. A put-off one too.
     ...items.filter((i) => !queuedTeammateRun(i) && (notStarted(i) || isProposal(i)
         || ((hiddenAt(i) > now || waitsInLater(i, waitingOn(i))) && !liveIds.has(i.id) && !shippingIds.has(i.id)))
       && (i.status !== 'done' || i.wrote?.status?.source !== 'founder')
@@ -3093,6 +3092,8 @@ export default function App() {
   const pointed: WorkItem | undefined = walkOwn
     ?? (hoveredId && !multiSel.size ? list.find((i) => i.id === hoveredId) : undefined) ?? (keyCard || keyLeadPicked ? undefined : current);
   const keyTab = stacked && pointed ? stacked.tabOf(pointed) : view;
+  // No row, card or tick on the list, so a row's keys are words for its box.
+  const nothingToActOn = !focused && !pointed && !multiSel.size && !keyLead && !stops.length;
 
   /* ------------------------- a panel with a panel in it -------------------- */
   // NO HAIRLINE WITHOUT A SIDEBAR BEHIND IT.
@@ -6085,7 +6086,7 @@ export default function App() {
       // that opens a text field swallows its own keystroke HERE, once, ahead of
       // every branch that could open one. Doing it per branch is what let S
       // through in two places at once (renderer/src/keys.ts carries the story).
-      if (opensATextField(e.key)) e.preventDefault();
+      if (opensATextField(e.key) && !(nothingToActOn && actsOnARow(e.key))) e.preventDefault();
       // And the hand is back on the keys, so the pointer stops owning a row
       // (keys.ts). Here, above the split, because Escape leaves a thread in
       // one branch and the list in another and both hand the list back.
@@ -6288,7 +6289,7 @@ export default function App() {
         // On Your threads a row's keys are its own section's, the way its tab's were (./threads/stack-rules).
         const view = keyTab;
         if (!e.defaultPrevented && !runRef.current) {
-          const means = keyOnTheList({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()) });
+          const means = keyOnTheList({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), nothingToActOn });
           if (means === 'held') { showToast(HELD_AFTER_A_CHANGE); return; }
           if (means === 'nowhere') {
             const box = clearSlot?.querySelector('textarea');
