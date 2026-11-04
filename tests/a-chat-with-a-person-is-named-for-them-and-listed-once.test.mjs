@@ -94,7 +94,7 @@ describe('the team as it is shown', () => {
   });
   it('the team is read through it', () => {
     const team = fs.readFileSync(new URL('../main/team/index.mts', import.meta.url), 'utf8');
-    expect(team.match(/teamPeopleShown\(await backend\.teamPeople/g) ?? []).toHaveLength(1);
-    expect(team).toMatch(/backend\.teamPeople\(state\.team\.id\)\.then\(teamPeopleShown\)/);
+    expect(team.match(/teamPeopleShown\(await backend!?\.teamPeople/g) ?? []).toHaveLength(1);
+    expect(team).toMatch(/backend!?\.teamPeople\(state\.team\.id\)\.then\(teamPeopleShown\)/);
   });
 });
