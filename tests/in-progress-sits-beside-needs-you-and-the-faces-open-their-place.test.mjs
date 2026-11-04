@@ -11,7 +11,7 @@ import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NeedsFaces } from '../renderer/src/team/everything/TeamStrip.tsx';
 import { faceRow, pressOpensIn } from '../renderer/src/team/everything/place.ts';
-import { stackRows, yoursOnly } from '../renderer/src/threads/stack-rules.ts';
+import { stackRows } from '../renderer/src/threads/stack-rules.ts';
 
 const read = (p) => fs.readFileSync(new URL(`../renderer/src/${p}`, import.meta.url), 'utf8');
 const app = read('App.tsx');
@@ -94,26 +94,18 @@ describe('the home has no panel', () => {
 });
 
 describe('In progress beside Needs you', () => {
-  const mateOf = (i) => i.labels?.[0] ?? null;
+  // Your AI teammates' runs are yours too, led by their names
+  // (your-ai-teammates-threads-sit-on-your-board-under-their-names).
   const rows = [
     { id: 'running', status: 'open', updatedAt: 5 },
     { id: 'waits-on-dev', status: 'blocked', updatedAt: 4 },
     { id: 'a-mates-run', status: 'open', labels: ['teammate:t-1'], updatedAt: 3 },
   ];
 
-  // Later and Done today; In progress holds your AI teammates' runs too (your-ai-teammates-work-is-in-your-in-progress).
-  it('leaves an AI teammate\'s runs out of your own threads', () => {
-    expect(yoursOnly(rows, mateOf).map((i) => i.id)).toEqual(['running', 'waits-on-dev']);
-  });
-
-  it('counts nothing when there is nothing', () => {
-    expect(yoursOnly([], mateOf)).toEqual([]);
-  });
-
   it('opens on In progress, with Later and Done today under it', () => {
-    const s = stackRows({ progress: yoursOnly(rows, mateOf), later: [{ id: 'l', updatedAt: 1 }], done: [], dayStart: 0, folded: new Set() });
+    const s = stackRows({ progress: rows, later: [{ id: 'l', updatedAt: 1 }], done: [], dayStart: 0, folded: new Set() });
     expect(s.sections.map((x) => x.label)).toEqual(['In progress', 'Later']);
-    expect(s.rows.map((i) => i.id)).toEqual(['running', 'waits-on-dev', 'l']);
+    expect(s.rows.map((i) => i.id)).toEqual(['running', 'waits-on-dev', 'a-mates-run', 'l']);
   });
 
   it('is the second word on the line, and is the same number the list draws', () => {

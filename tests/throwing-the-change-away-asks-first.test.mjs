@@ -62,9 +62,8 @@ describe('what it asks', () => {
     expect(ask.options.find((o) => o.n === 1)?.act).toBe('discard');
   });
 
-  // A close question carries an esc row because leaving the thread open is a
-  // third answer its two options do not cover. Here option 2 is that answer,
-  // and the row under it said the same thing again.
+  // A close question carries a third option because leaving the thread open
+  // is an answer its first two do not cover. Here option 2 is that answer.
   it('carries no row saying what option 2 already says', () => {
     expect(ask.options).toHaveLength(2);
     expect(JSON.stringify(ask)).not.toContain('Keep the change');
@@ -88,7 +87,7 @@ describe('where it stands', () => {
 
   it('uses the strip the other asks already use', () => {
     expect(app).toContain("closeAskWhy === 'discard' ? discardAsk()");
-    expect(app).toContain("if (option.act === 'keep') return;");
+    expect(app).toContain("if (option.act === 'keep' || option.act === 'decide') return;");
     expect(app).toContain("if (option.act === 'discard') {");
   });
 
@@ -96,7 +95,7 @@ describe('where it stands', () => {
     expect(app).toContain('if (pick) await pickRef.current?.(item, pick.n, { confirmed: true });');
   });
 
-  it('leaves the esc row off, which only a close needs', () => {
-    expect(app).toContain("const keep = closeAskWhy === 'discard' ? undefined : { label: KEEP_OPEN, onKeep: keepThreadOpen };");
+  it('names no filed task, which only a close about filed tasks does', () => {
+    expect(app).toContain("const named = closeAskWhy === 'filed' ?");
   });
 });
