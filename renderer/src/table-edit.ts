@@ -181,6 +181,30 @@ export function showColumnAs(table: Table, at: number, kind: ColumnKind): Table 
   return { ...table, columns };
 }
 
+/**
+ * The columns the Filter menu offers, with the values to tick: every tag
+ * column, and any other column whose values repeat from a short list (a city,
+ * an owner, a plan), in A to Z order as first written.
+ */
+export function filterChoices(table: Table, most = 40): Array<{ col: number; values: string[] }> {
+  return table.columns.flatMap((c, col) => {
+    if (table.ranked && col === 0) return [];
+    if (c.kind === 'tag') return c.values.length ? [{ col, values: c.values }] : [];
+    if (c.kind === 'number' || c.kind === 'name') return [];
+    const seen = new Map<string, string>();
+    let filled = 0;
+    for (const r of table.rows) {
+      const v = (r[col] ?? '').trim();
+      if (!v) continue;
+      filled++;
+      if (!seen.has(v.toLowerCase())) seen.set(v.toLowerCase(), v);
+      if (seen.size > most) return [];
+    }
+    if (seen.size < 2 || seen.size > filled * 0.6) return [];
+    return [{ col, values: [...seen.values()].sort((a, b) => a.localeCompare(b)) }];
+  });
+}
+
 // ---- Back to the file.
 
 export type Shape = { sep: string; eol: string; markdown: boolean; bom: boolean };

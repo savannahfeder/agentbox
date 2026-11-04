@@ -10,7 +10,7 @@
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { filterRows, hrefOf, logoFor, readTable, shownLink, sortRows, tableFromGrid, type Column, type ColumnKind, type Sort, type Table } from '../table-file';
 import {
-  addColumn, addRows, boxOf, cellsIn, dropColumn, dropRows, fromClipboard, inBox, moved, orderAfterAdd, orderAfterDrop,
+  addColumn, addRows, boxOf, filterChoices, cellsIn, dropColumn, dropRows, fromClipboard, inBox, moved, orderAfterAdd, orderAfterDrop,
   pasteInto, renameColumn, shapeOf, showColumnAs, toClipboard, writeCells, writeTable, type At, type Box, type Pick,
 } from '../table-edit';
 import { api } from '../api';
@@ -208,26 +208,29 @@ const MenuRow = ({ label, hint, onClick, off }: { label: string; hint?: string; 
   </button>
 );
 
-function FilterMenu({ table, cols, picked, onToggle, onClear }: {
-  table: Table; cols: number[]; picked: Record<number, string[]>; onToggle: (col: number, v: string) => void; onClear: () => void;
+function FilterMenu({ table, choices, picked, onToggle, onClear }: {
+  table: Table; choices: Array<{ col: number; values: string[] }>; picked: Record<number, string[]>; onToggle: (col: number, v: string) => void; onClear: () => void;
 }) {
   const [find, setFind] = useState('');
-  const many = cols.reduce((n, c) => n + table.columns[c].values.length, 0) > 12;
+  const many = choices.reduce((n, c) => n + c.values.length, 0) > 12;
   const q = find.trim().toLowerCase();
   const filtering = Object.values(picked).some((v) => v.length);
   return <>
-    {many && <div className="when-type-row"><input className="when-type" autoFocus placeholder="Find a tag" value={find} onChange={(e) => setFind(e.target.value)} /></div>}
+    {many && <div className="when-type-row"><input className="when-type" autoFocus placeholder="Find a value" value={find} onChange={(e) => setFind(e.target.value)} /></div>}
     {filtering && <button type="button" className="when-row tbl-clear" onClick={onClear}>Show every row</button>}
-    {cols.map((col) => {
-      const values = table.columns[col].values.filter((v) => !q || v.toLowerCase().includes(q));
+    {choices.map(({ col, values: all }) => {
+      const column = table.columns[col];
+      const values = all.filter((v) => !q || v.toLowerCase().includes(q));
       if (!values.length) return null;
       return <div key={col}>
-        <div className="when-head">{table.columns[col].name}</div>
+        <div className="when-head">{column.name}</div>
         {values.map((v) => {
           const on = (picked[col] ?? []).includes(v);
           return <button key={v} type="button" role="menuitemcheckbox" aria-checked={on} className={`when-row${on ? ' on' : ''}`} onClick={() => onToggle(col, v)}>
             <span className={`tbl-tick${on ? ' on' : ''}`} aria-hidden="true" />
-            <span className={`tbl-tag tone-${table.columns[col].tones[v.toLowerCase()]}`}>{v}</span>
+            {column.kind === 'tag'
+              ? <span className={`tbl-tag tone-${column.tones[v.toLowerCase()]}`}>{v}</span>
+              : <span className="when-row-label">{v}</span>}
           </button>;
         })}
       </div>;
@@ -559,6 +562,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
 
   // ---- Keeping the moving end of the pick in view.
   const follow = useRef(false);
+  /** How much of the left edge the row number and the first column cover, past the first column. */
+  const stuckWidth = (c: number) => (c === first ? RN_W : RN_W + ((box.current?.querySelector(`[data-hc="${first}"]`) as HTMLElement | null)?.offsetWidth ?? 0));
   const headH = () => (box.current?.querySelector('.tbl-th') as HTMLElement | null)?.offsetHeight ?? 38;
   useEffect(() => {
     if (!pick || !follow.current) return;
@@ -571,9 +576,11 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     requestAnimationFrame(() => {
       const cell = el.querySelector(`[data-r="${pick.b.r}"][data-c="${pick.b.c}"]`) as HTMLElement | null;
       if (!cell) return;
-      const stuck = pick.b.c === first ? RN_W : RN_W + ((el.querySelector(`[data-hc="${first}"]`) as HTMLElement | null)?.offsetWidth ?? 0);
+      const stuck = stuckWidth(pick.b.c);
       const left = cell.offsetLeft;
-      if (left < el.scrollLeft + stuck) el.scrollLeft = Math.max(0, left - stuck);
+      const room = el.clientWidth - stuck;
+      // A cell wider than the view shows its start, where its words begin, not its far end.
+      if (left < el.scrollLeft + stuck || (cell.offsetWidth > room && left > el.scrollLeft + stuck)) el.scrollLeft = Math.max(0, left - stuck);
       else if (left + cell.offsetWidth > el.scrollLeft + el.clientWidth) el.scrollLeft = left + cell.offsetWidth - el.clientWidth;
     });
   }, [pick, first]);
@@ -586,6 +593,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     k.select();
   };
   const goTo = (p: Pick | null) => { follow.current = true; setPick(p); };
+  /** The keys to the table itself, which is no text box, so the app's own Escape and letters work again. */
+  const rest = () => root.current?.focus({ preventScroll: true });
 
   // ---- Changing cells.
   const writeAt = (cells: Array<{ r: number; c: number; v: string }>) => {
@@ -696,8 +705,10 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     }
     if (k === 'Escape') {
       stop();
+      // With nothing picked the table itself keeps the keys, not a text box, so
+      // undo still works and the next Escape goes on to close the view.
       if (sel && cellsIn(sel) > 1) setPick({ a: pick.a, b: pick.a });
-      else { setPick(null); keys.current?.blur(); }
+      else { setPick(null); rest(); }
       return;
     }
     if (/^(Arrow(Up|Down|Left|Right)|Home|End|PageUp|PageDown)$/.test(k)) {
@@ -842,9 +853,13 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     const read = () => {
       const cell = el.querySelector(`[data-r="${editing.r}"][data-c="${editing.c}"]`) as HTMLElement | null;
       if (!cell) return;
+      // Never over the row number and the first column, which say whose row this is.
+      // The first column sticks, so its cell sits just right of the row number wherever the table is scrolled.
+      const from = el.scrollLeft + stuckWidth(editing.c);
+      const cellLeft = editing.c === first ? from : cell.offsetLeft;
       const want = editing.tag ? 260 : Math.max(cell.offsetWidth, roomy ? 380 : 0);
-      const w = Math.min(want, el.clientWidth - 16);
-      const left = Math.max(el.scrollLeft, Math.min(cell.offsetLeft, el.scrollLeft + el.clientWidth - w));
+      const w = Math.max(Math.min(cell.offsetWidth, 200), Math.min(want, el.scrollLeft + el.clientWidth - from - 8));
+      const left = Math.max(from, Math.min(cellLeft, el.scrollLeft + el.clientWidth - w));
       const top = cell.offsetTop;
       const below = el.scrollTop + el.clientHeight - (top + ROW_H);
       const next = { left, top, w, up: editing.tag && below < 280 && top - el.scrollTop > below };
@@ -855,6 +870,16 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     return () => el.removeEventListener('scroll', read);
   }, [editing?.r, editing?.c, editing?.tag, roomy, live, view, template]);
 
+  // After a menu's choice the keys come back to the table, unless the choice opened a box of its own (Rename).
+  const closeFloat = () => {
+    setFloat(null);
+    requestAnimationFrame(() => {
+      const at = document.activeElement;
+      if (at && at !== keys.current && root.current?.contains(at) && typingIn(at)) return;
+      focusKeys();
+    });
+  };
+
   // A table the focus left lets its pick go quiet, but keeps it.
   const [holding, setHolding] = useState(false);
 
@@ -862,7 +887,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
 
   const start = preview ? 0 : Math.max(0, Math.floor(view.top / ROW_H) - SPARE);
   const end = inline ? order.length : preview ? Math.min(order.length, PREVIEW_ROWS) : Math.min(order.length, Math.ceil((view.top + view.height) / ROW_H) + SPARE);
-  const tagCols = table.columns.flatMap((c, i) => (c.kind === 'tag' ? [i] : []));
+  const choices = filterChoices(table);
   const filtering = Object.values(picked).some((v) => v.length);
   const total = table.rows.length;
   const count = order.length === total ? rowsWord(total) : `${order.length.toLocaleString()} of ${rowsWord(total)}`;
@@ -872,11 +897,19 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     return { ...p, [col]: [...now] };
   });
   const sortBy = (col: number) => setSort((s) => (!s || s.col !== col ? { col, dir: 'asc' } : s.dir === 'asc' ? { col, dir: 'desc' } : null));
-  // Enter presses a button here even where the view around the table keeps Enter for itself.
-  const enter = (e: React.KeyboardEvent) => {
+  const onRoot = (e: React.KeyboardEvent) => {
     const at = e.target as HTMLElement;
-    if (e.key !== 'Enter' || at.tagName !== 'BUTTON') return;
-    e.preventDefault(); e.stopPropagation(); at.click();
+    // Enter presses a button here even where the view around the table keeps Enter for itself.
+    if (e.key === 'Enter' && at.tagName === 'BUTTON') { e.preventDefault(); e.stopPropagation(); at.click(); return; }
+    // The table itself holds the keys after Escape: undo still works, and an arrow picks a cell again.
+    if (at !== root.current || !hands) return;
+    const meta = e.metaKey || e.ctrlKey;
+    if (meta && /^z$/i.test(e.key)) { e.preventDefault(); e.stopPropagation(); if (e.shiftKey) redo(); else undo(); focusKeys(); }
+    else if (meta && /^y$/i.test(e.key)) { e.preventDefault(); e.stopPropagation(); redo(); focusKeys(); }
+    else if (/^(Arrow|Tab$|Home$|End$|Page)/.test(e.key) && order.length) {
+      e.preventDefault(); e.stopPropagation();
+      goTo({ a: { r: 0, c: first }, b: { r: 0, c: first } }); focusKeys();
+    }
   };
 
   const editingRow = editing ? table.rows[order[editing.r]] : null;
@@ -886,24 +919,25 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   const floatCol = float?.col !== undefined ? table.columns[float.col] : null;
 
   return (
-    <div className={`tbl tbl-${mode}${holding ? ' holding' : ''}`} ref={root} onKeyDown={enter} data-own-escape={owns ? '' : undefined}
+    <div className={`tbl tbl-${mode}${holding ? ' holding' : ''}`} ref={root} onKeyDown={onRoot} data-own-escape={owns ? '' : undefined} tabIndex={hands ? -1 : undefined}
       onFocus={() => setHolding(false)}
       onBlur={(e) => { if (!root.current?.contains(e.relatedTarget as Node | null)) setHolding(true); }}>
       {!preview && (
         <div className="tbl-bar">
           <label className="tbl-search">{SEARCH}
             <input type="search" value={query} placeholder={`Search ${rowsWord(total)}`} onChange={(e) => setQuery(e.target.value)}
-              data-own-escape={query ? '' : undefined} />
+              data-own-escape={query ? '' : undefined}
+              onKeyDown={(e) => { if (e.key === 'Escape' && !query) { e.preventDefault(); rest(); } }} />
           </label>
-          {tagCols.length > 0 && (
+          {choices.length > 0 && (
             <Menu label="Filter" on={filtering} icon={glyph('M2.5 4h11M4.5 8h7M6.5 12h3')}>
-              {() => <FilterMenu table={table} cols={tagCols} picked={picked} onToggle={toggle} onClear={() => setPicked({})} />}
+              {() => <FilterMenu table={table} choices={choices} picked={picked} onToggle={toggle} onClear={() => setPicked({})} />}
             </Menu>
           )}
           <Menu label="Sort" on={!!sort} icon={glyph('M5 3v10M2.5 10.5L5 13l2.5-2.5M11 13V3M8.5 5.5L11 3l2.5 2.5')}>
             {(close) => <>
               <button type="button" className={`when-row${!sort ? ' on' : ''}`} onClick={() => { setSort(null); close(); }}><span className="when-row-label">As the file has it</span></button>
-              {table.columns.map((c, i) => <button key={i} type="button" className={`when-row${sort?.col === i ? ' on' : ''}`} onClick={() => sortBy(i)}>
+              {table.columns.map((c, i) => <button key={i} type="button" className={`when-row${sort?.col === i ? ' on' : ''}`} onClick={() => { sortBy(i); close(); }}>
                 <span className="when-row-label">{c.name}</span>
                 {sort?.col === i && <span className="when-row-hint">{sortWords(c, sort.dir)}</span>}
               </button>)}
@@ -922,7 +956,12 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       <div className="tbl-frame">
       {hands && <textarea ref={keys} className="tbl-keys" aria-label="Table" inputMode="none" tabIndex={0} defaultValue=" "
         onKeyDown={onKeys} onCopy={(e) => onCopy(e)} onCut={(e) => (editable ? onCopy(e, true) : onCopy(e))} onPaste={onPaste}
-        onChange={(e) => { e.target.value = ' '; }} />}
+        onChange={(e) => {
+          // Text that came with no key press (dictation, the emoji picker, a pasted word list) starts an edit as typing would.
+          const typed = e.target.value.trim();
+          e.target.value = ' ';
+          if (typed && pick && editable) startEdit(pick.a, typed);
+        }} />}
       <div className="tbl-scroll" ref={box} onPointerDown={onDown} onDoubleClick={onDouble} onContextMenu={onContext}>
         <div className="tbl-grid" role="table" style={{ gridTemplateColumns: inline && !table.ranked ? template : `${RN_W}px ${template}` }}>
           <div className="tbl-tr" role="row">
@@ -1003,38 +1042,38 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       </div>
       {float && (floatCol
         ? <FloatMenu x={float.x} y={float.y} onClose={() => setFloat(null)}>
-          {(['asc', 'desc'] as const).map((dir) => <MenuRow key={dir} label={`Sort ${sortWords(floatCol, dir)}`} onClick={() => { setSort({ col: float.col!, dir }); setFloat(null); }} />)}
-          {sort?.col === float.col && <MenuRow label="Stop sorting" onClick={() => { setSort(null); setFloat(null); }} />}
+          {(['asc', 'desc'] as const).map((dir) => <MenuRow key={dir} label={`Sort ${sortWords(floatCol, dir)}`} onClick={() => { setSort({ col: float.col!, dir }); closeFloat(); }} />)}
+          {sort?.col === float.col && <MenuRow label="Stop sorting" onClick={() => { setSort(null); closeFloat(); }} />}
           {editable && <>
             <span className="when-sep" />
-            <MenuRow label="Rename" onClick={() => { setRenaming(float.col!); setFloat(null); }} />
-            <MenuRow label="Insert column left" onClick={() => { const at = Math.max(first, float.col!); changeColumns(addColumn(docRef.current.table, at)); setRenaming(at); setFloat(null); }} />
-            <MenuRow label="Insert column right" onClick={() => { const at = float.col! + 1; changeColumns(addColumn(docRef.current.table, at)); setRenaming(at); setFloat(null); }} />
+            <MenuRow label="Rename" onClick={() => { setRenaming(float.col!); closeFloat(); }} />
+            <MenuRow label="Insert column left" onClick={() => { const at = Math.max(first, float.col!); changeColumns(addColumn(docRef.current.table, at)); setRenaming(at); closeFloat(); }} />
+            <MenuRow label="Insert column right" onClick={() => { const at = float.col! + 1; changeColumns(addColumn(docRef.current.table, at)); setRenaming(at); closeFloat(); }} />
             {(floatCol.kind === 'text' || floatCol.kind === 'tag') && (
-              <MenuRow label={floatCol.kind === 'tag' ? 'Show as text' : 'Show as tags'} onClick={() => { changeColumns(showColumnAs(docRef.current.table, float.col!, floatCol.kind === 'tag' ? 'text' : 'tag')); setFloat(null); }} />
+              <MenuRow label={floatCol.kind === 'tag' ? 'Show as text' : 'Show as tags'} onClick={() => { changeColumns(showColumnAs(docRef.current.table, float.col!, floatCol.kind === 'tag' ? 'text' : 'tag')); closeFloat(); }} />
             )}
-            <MenuRow label="Fit to its contents" onClick={() => { fitColumn(float.col!); setFloat(null); }} />
+            <MenuRow label="Fit to its contents" onClick={() => { fitColumn(float.col!); closeFloat(); }} />
             <span className="when-sep" />
-            <MenuRow label="Delete column" off={table.columns.length - first <= 1} onClick={() => { changeColumns(dropColumn(docRef.current.table, float.col!)); setFloat(null); }} />
+            <MenuRow label="Delete column" off={table.columns.length - first <= 1} onClick={() => { changeColumns(dropColumn(docRef.current.table, float.col!)); closeFloat(); }} />
           </>}
-          {!editable && <MenuRow label="Fit to its contents" onClick={() => { fitColumn(float.col!); setFloat(null); }} />}
+          {!editable && <MenuRow label="Fit to its contents" onClick={() => { fitColumn(float.col!); closeFloat(); }} />}
         </FloatMenu>
         : <FloatMenu x={float.x} y={float.y} onClose={() => setFloat(null)}>
-          <MenuRow label="Open row" hint="Space" onClick={() => { if (pick) setSheet(pick.a.r); setFloat(null); }} />
-          {pick && <MenuRow label={editable ? 'Edit cell' : 'Read cell'} hint="↵" onClick={() => { setFloat(null); startEdit(pick.a); }} />}
-          <MenuRow label="Copy" hint={`${CMD}C`} onClick={() => { focusKeys(); document.execCommand('copy'); setFloat(null); }} />
+          <MenuRow label="Open row" hint="Space" onClick={() => { if (pick) setSheet(pick.a.r); closeFloat(); }} />
+          {pick && <MenuRow label={editable ? 'Edit cell' : 'Read cell'} hint="↵" onClick={() => { closeFloat(); startEdit(pick.a); }} />}
+          <MenuRow label="Copy" hint={`${CMD}C`} onClick={() => { focusKeys(); document.execCommand('copy'); closeFloat(); }} />
           {editable && <MenuRow label="Paste" hint={`${CMD}V`} onClick={() => {
-            setFloat(null);
+            closeFloat();
             void navigator.clipboard?.readText?.().then((t) => paste(t)).catch(() => setProblem({ error: `Press ${CMD}V to paste here.` }));
           }} />}
-          {onComment && atValue.trim() && <MenuRow label="Comment" onClick={() => { onComment(atValue.trim()); setFloat(null); }} />}
+          {onComment && atValue.trim() && <MenuRow label="Comment" onClick={() => { onComment(atValue.trim()); closeFloat(); }} />}
           {editable && sel && <>
             <span className="when-sep" />
-            <MenuRow label="Insert row above" onClick={() => { setFloat(null); addRowAt(sel.r0); }} />
-            <MenuRow label="Insert row below" hint="⇧↵" onClick={() => { setFloat(null); addRowAt(sel.r1 + 1); }} />
-            <MenuRow label="Clear" hint="⌫" onClick={() => { setFloat(null); clearPicked(); focusKeys(); }} />
+            <MenuRow label="Insert row above" onClick={() => { closeFloat(); addRowAt(sel.r0); }} />
+            <MenuRow label="Insert row below" hint="⇧↵" onClick={() => { closeFloat(); addRowAt(sel.r1 + 1); }} />
+            <MenuRow label="Clear" hint="⌫" onClick={() => { closeFloat(); clearPicked(); focusKeys(); }} />
             <span className="when-sep" />
-            <MenuRow label={n > 1 ? `Delete ${n} rows` : 'Delete row'} onClick={() => { setFloat(null); dropPicked(); focusKeys(); }} />
+            <MenuRow label={n > 1 ? `Delete ${n} rows` : 'Delete row'} onClick={() => { closeFloat(); dropPicked(); focusKeys(); }} />
           </>}
         </FloatMenu>
       )}

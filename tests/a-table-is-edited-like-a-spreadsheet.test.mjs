@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { readTable } from '../renderer/src/table-file.ts';
 import {
   boxOf, inBox, moved, toClipboard, fromClipboard, pasteInto, writeCells, addRows, dropRows,
-  orderAfterDrop, orderAfterAdd, addColumn, dropColumn, renameColumn, showColumnAs, shapeOf, writeTable, learnTag,
+  orderAfterDrop, orderAfterAdd, addColumn, dropColumn, renameColumn, showColumnAs, shapeOf, writeTable, learnTag, filterChoices,
 } from '../renderer/src/table-edit.ts';
 import { canWrite, writeDoc } from '../main/doc-file.mts';
 
@@ -181,6 +181,27 @@ describe('rows and columns added and taken away', () => {
     const tags = showColumnAs(t, 3, 'tag');
     expect(tags.columns[3].values).toEqual(['ramp.com', 'mercury.com', 'deel.com', 'plaid.com']);
     expect(showColumnAs(tags, 3, 'text').columns[3].values).toEqual([]);
+  });
+});
+
+describe('the Filter menu offers any column with a short list of values', () => {
+  const CITIES = ['Company,Status,Based in,Employees,Note',
+    ...['New York', 'London', 'New York', 'Berlin', 'London', 'new york'].map((c, i) => `Co ${i},${i % 2 ? 'New' : 'Won'},${c},${i * 10},note ${i}`)].join('\n');
+  const t = readTable(CITIES, 'x.csv');
+  const offered = Object.fromEntries(filterChoices(t).map((f) => [t.columns[f.col].name, f.values]));
+  it('offers the tags, and a city column a tester could not filter to New York by', () => {
+    expect(offered.Status).toEqual(['Won', 'New']);
+    expect(offered['Based in']).toEqual(['Berlin', 'London', 'New York']);
+  });
+  it('leaves out names, amounts, and text that never repeats', () => {
+    expect(offered.Company).toBeUndefined();
+    expect(offered.Employees).toBeUndefined();
+    expect(offered.Note).toBeUndefined();
+  });
+  it('leaves out a column with more values than a menu can hold', () => {
+    const many = ['Name,City', ...Array.from({ length: 120 }, (_, i) => `P${i},Town ${i % 60}`)].join('\n');
+    expect(filterChoices(readTable(many, 'x.csv'), 40)).toEqual([]);
+    expect(filterChoices(readTable(many, 'x.csv'), 80).map((f) => f.col)).toEqual([1]);
   });
 });
 
