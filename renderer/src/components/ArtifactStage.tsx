@@ -531,7 +531,7 @@ function TableStage({ product, path, name, notes, draft, activeId, onPlace, onFo
   if (text === undefined) return <OpeningWait name={name} kind={null} onAgain={onAgain} />;
   return <div className="av-table" ref={page}>
     <TableView text={text} path={path} mode="full" onSave={readText ? undefined : save} onReload={() => setReads((n) => n + 1)}
-      onComment={onPlace ? (quote) => onPlace({ kind: 'quote', text: quote }) : undefined} />
+      onComment={onPlace ? (quote) => onPlace({ kind: 'quote', text: quote }) : undefined} storeKey={`${product}/${path}`} />
     {onPlace && <SelectionBar page={page} onComment={(quote) => onPlace({ kind: 'quote', text: quote })} />}
   </div>;
 }

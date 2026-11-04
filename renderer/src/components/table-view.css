@@ -97,7 +97,7 @@
    so a cell far to the right still says whose row it is. */
 .tbl-tr > :nth-child(1), .tbl-tr > :nth-child(2) { position: sticky; background: var(--surface); z-index: 1; }
 .tbl-tr > :nth-child(1) { left: 0; }
-.tbl-tr > :nth-child(2) { left: 44px; }
+.tbl-tr > :nth-child(2) { left: var(--tbl-rn-w, 44px); }
 .tbl-tr > .tbl-th:nth-child(1), .tbl-tr > .tbl-th:nth-child(2) { z-index: 3; }
 .tbl-rn { justify-content: flex-end; padding: 0 12px 0 0; color: var(--tbl-rn); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .tbl-th.tbl-rn { padding: 13px 12px 13px 0; cursor: default; }
@@ -284,3 +284,7 @@
 /* A cell's words never widen its column: the widest note would otherwise set
    the spare-width column as wide as itself, and the table scrolled off into it. */
 .tbl-pane .tbl-td, .tbl-full .tbl-td { contain: inline-size; }
+/* Sideways scrolling settles on a column's edge, so no column sits half under the frozen ones. */
+.tbl-pane .tbl-scroll, .tbl-full .tbl-scroll { scroll-snap-type: x proximity; scroll-padding-left: var(--tbl-stuck, 0px); }
+.tbl-pane .tbl-th:not(.tbl-rn), .tbl-full .tbl-th:not(.tbl-rn) { scroll-snap-align: start; }
+.tbl-field.from .tbl-field-name { color: var(--text); }

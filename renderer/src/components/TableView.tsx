@@ -26,6 +26,7 @@ const SPARE = 12;
 const ROW_H = 46;
 // .tbl-rn's width; the first column sticks just right of it.
 const RN_W = 44;
+const RN_W_WIDE = 58;
 const MIN_W = 64;
 const SAVE_MS = 400;
 const UNDO_DEPTH = 200;
@@ -377,12 +378,14 @@ function Field({ column, value, editable, onWrite }: { column: Column; value: st
 }
 
 /** The whole of one row, every field at full length, as Airtable opens a record. */
-function RowSheet({ table, row, place, count, editable, onWrite, onStep, onClose }: {
-  table: Table; row: string[]; place: number; count: number; editable: boolean;
+function RowSheet({ table, row, place, count, editable, from, onWrite, onStep, onClose }: {
+  table: Table; row: string[]; place: number; count: number; editable: boolean; from?: number;
   onWrite: (c: number, v: string) => void; onStep: (d: number) => void; onClose: () => void;
 }) {
   const sheet = useRef<HTMLDivElement>(null);
   useEffect(() => { sheet.current?.focus({ preventScroll: true }); }, []);
+  // Opened from a cell, the row shows that cell's field, which may be far down a long row.
+  useEffect(() => { if (from) sheet.current?.querySelector(`[data-field="${from}"]`)?.scrollIntoView({ block: 'center' }); }, [from, place]);
   const nameAt = table.ranked ? 1 : 0;
   const key = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose(); return; }
@@ -399,7 +402,7 @@ function RowSheet({ table, row, place, count, editable, onWrite, onStep, onClose
     </div>
     <div className="tbl-sheet-body">
       {table.columns.map((c, i) => (
-        <div key={`${place}:${i}`} className="tbl-field">
+        <div key={`${place}:${i}`} className={`tbl-field${i === from ? ' from' : ''}`} data-field={i}>
           <span className="tbl-field-name">{c.name}</span>
           <Field column={c} value={row[i] ?? ''} editable={editable && !(table.ranked && i === 0)} onWrite={(v) => onWrite(i, v)} />
         </div>
@@ -452,7 +455,7 @@ type Doc = { from: Table; table: Table; order: number[] };
 type Editing = { r: number; c: number; draft: string; typed: boolean; tag: boolean };
 type Float = { x: number; y: number; col?: number };
 
-export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload, onComment, onNotice }: {
+export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload, onComment, onNotice, storeKey }: {
   text: string; path: string; mode: TableMode | 'inline'; onShowAll?: () => void; grid?: string[][];
   /** Given, the table can be edited, and every change is written through it. */
   onSave?: TableSave;
@@ -462,7 +465,10 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   onComment?: (quote: string) => void;
   /** Says a save failed after the table was closed, when there is no table left to say it. */
   onNotice?: (text: string) => void;
+  /** What the widths, sort and filter are kept under: two projects can each have a lists/leads.csv. */
+  storeKey?: string;
 }) {
+  const store = storeKey ?? path;
   const base = useMemo(() => (grid ? tableFromGrid(grid) : readTable(text, path)), [text, path, grid]);
   const shape = useMemo(() => shapeOf(text, path), [text, path]);
   const inline = mode === 'inline';
@@ -472,16 +478,16 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
 
   const [query, setQuery] = useState('');
   // The sort and the filter stay with the file, through another thread and a reload.
-  const [picked, setPicked] = useState<Record<number, string[]>>(() => (hands ? readView(path, base).picked : {}));
-  const [sort, setSort] = useState<Sort>(() => (hands ? readView(path, base).sort : null));
+  const [picked, setPicked] = useState<Record<number, string[]>>(() => (hands ? readView(store, base).picked : {}));
+  const [sort, setSort] = useState<Sort>(() => (hands ? readView(store, base).sort : null));
   const viewFor = useRef(path);
   useEffect(() => {
     if (viewFor.current === path) return;
     viewFor.current = path;
-    const v = hands ? readView(path, base) : { picked: {}, sort: null };
+    const v = hands ? readView(store, base) : { picked: {}, sort: null };
     setQuery(''); setPicked(v.picked); setSort(v.sort);
   }, [path]);
-  useEffect(() => { if (hands && viewFor.current === path) keepView(path, base, picked, sort); }, [picked, sort]);
+  useEffect(() => { if (hands && viewFor.current === path) keepView(store, base, picked, sort); }, [picked, sort]);
   const searched = useDeferredValue(query);
 
   // The table as edited, and the view's order of its rows. The order is worked
@@ -505,19 +511,16 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   const [float, setFloat] = useState<Float | null>(null);
   const [renaming, setRenaming] = useState<number | null>(null);
   const [problem, setProblem] = useState<{ error: string; stale?: boolean } | null>(null);
-  const [sized, setSized] = useState<Record<string, number>>(() => readWidths(path));
-  useEffect(() => { setSized(readWidths(path)); }, [path]);
+  const [sized, setSized] = useState<Record<string, number>>(() => readWidths(store));
+  useEffect(() => { setSized(readWidths(store)); }, [store]);
 
   useEffect(() => {
-    // The picked row stays picked in its new place, so typing after a sort lands where you were.
+    // A new order starts at the top with nothing picked, and the keys go back to
+    // the app, so a letter typed next cannot land in a cell out of sight.
     const d = docRef.current;
-    const order = viewOrder(d.table, searched, picked, sort);
-    const p = pickRef.current;
-    const r = p ? order.indexOf(d.order[p.a.r]) : -1;
-    setDoc({ ...d, order });
-    follow.current = !!p && r >= 0;
-    setPick(p && r >= 0 ? { a: { r, c: p.a.c }, b: { r, c: p.a.c } } : null);
-    setEditing(null); setSheet(null);
+    setDoc({ ...d, order: viewOrder(d.table, searched, picked, sort) });
+    if (pickRef.current && root.current?.contains(document.activeElement)) root.current.focus({ preventScroll: true });
+    setPick(null); setEditing(null); setSheet(null);
   }, [searched, picked, sort]);
   useEffect(() => { setPick(null); setEditing(null); setSheet(null); setFloat(null); setRenaming(null); setProblem(null); }, [base]);
 
@@ -583,6 +586,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
 
   const first = table.ranked ? 1 : 0;
   const last = table.columns.length - 1;
+  // Room for a four-digit row number.
+  const rnW = table.rows.length >= 1000 ? RN_W_WIDE : RN_W;
   const edges = { rows: order.length, first, last };
   const clampPick = (p: Pick, d: Doc): Pick | null => {
     if (!d.order.length) return null;
@@ -633,7 +638,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   // ---- Keeping the moving end of the pick in view.
   const follow = useRef(false);
   /** How much of the left edge the row number and the first column cover, past the first column. */
-  const stuckWidth = (c: number) => (c === first ? RN_W : RN_W + ((box.current?.querySelector(`[data-hc="${first}"]`) as HTMLElement | null)?.offsetWidth ?? 0));
+  const stuckWidth = (c: number) => (c === first ? rnW : rnW + ((box.current?.querySelector(`[data-hc="${first}"]`) as HTMLElement | null)?.offsetWidth ?? 0));
   const headH = () => (box.current?.querySelector('.tbl-th') as HTMLElement | null)?.offsetHeight ?? 38;
   useEffect(() => {
     if (!pick || !follow.current) return;
@@ -912,7 +917,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     const from = th?.getBoundingClientRect().width ?? 160;
     let now = sized;
     const move = (m: PointerEvent) => { now = { ...sized, [name]: Math.max(MIN_W, Math.round(from + m.clientX - start)) }; setSized(now); };
-    const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); keepWidths(path, now); };
+    const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); keepWidths(store, now); };
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', up);
   };
@@ -921,7 +926,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     // Slack for a font the canvas measures a hair narrower than the cell draws it.
     const w = (measure(table, 640, col).px.get(name) ?? 160) + 12;
     const next = { ...sized, [name]: w };
-    setSized(next); keepWidths(path, next);
+    setSized(next); keepWidths(store, next);
   };
 
   // Where the editor or the tag list sits: over the cell, inside the scrolling
@@ -974,7 +979,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   const choices = filterChoices(table);
   // Where the row number and the first column end, so a wide column's name stays in view beside them.
   const firstName = table.columns[first]?.name ?? '';
-  const stuckAt = RN_W + (sized[firstName] ?? natural.px.get(firstName) ?? 160);
+  const stuckAt = rnW + (sized[firstName] ?? natural.px.get(firstName) ?? 160);
   const filtering = Object.values(picked).some((v) => v.length);
   const filteredBy = Object.entries(picked).filter(([, v]) => v.length).map(([c]) => table.columns[Number(c)]?.name).filter(Boolean);
   const filterLabel = !filteredBy.length ? 'Filter' : `Filtered by ${filteredBy.slice(0, 2).join(' and ')}${filteredBy.length > 2 ? ` and ${filteredBy.length - 2} more` : ''}`;
@@ -1023,7 +1028,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
               {() => <FilterMenu table={table} choices={choices} picked={picked} onToggle={toggle} onClear={() => setPicked({})} />}
             </Menu>
           )}
-          <Menu label={sort && table.columns[sort.col] ? `Sorted by ${table.columns[sort.col].name}` : 'Sort'} on={!!sort} icon={glyph('M5 3v10M2.5 10.5L5 13l2.5-2.5M11 13V3M8.5 5.5L11 3l2.5 2.5')}>
+          <Menu label={sort && table.columns[sort.col] ? `Sorted by ${table.columns[sort.col].name}, ${sortWords(table.columns[sort.col], sort.dir).toLowerCase().replace(/^a to z$/, 'A to Z').replace(/^z to a$/, 'Z to A')}` : 'Sort'} on={!!sort} icon={glyph('M5 3v10M2.5 10.5L5 13l2.5-2.5M11 13V3M8.5 5.5L11 3l2.5 2.5')}>
             {(close) => <>
               <button type="button" className={`when-row${!sort ? ' on' : ''}`} onClick={() => { setSort(null); close(); }}><span className="when-row-label">As the file has it</span></button>
               {table.columns.map((c, i) => <button key={i} type="button" className={`when-row${sort?.col === i ? ' on' : ''}`} onClick={() => { sortBy(i); if (sort?.col !== i) close(); }}>
@@ -1051,7 +1056,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
           e.target.value = ' ';
           if (typed && pick && editable) startEdit(pick.a, typed);
         }} />}
-      <div className="tbl-scroll" ref={box} onPointerDown={onDown} onDoubleClick={onDouble} onContextMenu={onContext}
+      <div className="tbl-scroll" ref={box} style={{ ['--tbl-stuck' as string]: `${stuckAt}px`, ['--tbl-rn-w' as string]: `${rnW}px` }} onPointerDown={onDown} onDoubleClick={onDouble} onContextMenu={onContext}
         onClickCapture={(e) => {
           if (hands && (e.target as HTMLElement).closest('.tbl-grid a') && !linkOpens.current) e.preventDefault();
           linkOpens.current = false;
@@ -1059,7 +1064,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
           if (hands && !pressed.current) { const hit = atOf(e.target); if (hit && hit.kind === 'cell') { setPick(pickFor('cell', hit.at, e.shiftKey)); focusKeys(); } }
           pressed.current = false;
         }}>
-        <div className="tbl-grid" role="table" style={{ gridTemplateColumns: inline && !table.ranked ? template : `${RN_W}px ${template}`, ['--tbl-stuck' as string]: `${stuckAt}px` }}>
+        <div className="tbl-grid" role="table" style={{ gridTemplateColumns: inline && !table.ranked ? template : `${rnW}px ${template}` }}>
           <div className="tbl-tr" role="row">
             {table.ranked
               ? <button type="button" role="columnheader" className={`tbl-th tbl-rn${sort?.col === 0 ? ' sorted' : ''}`} disabled={preview && !inline} onClick={() => sortBy(0)} title={table.columns[0].name}>#</button>
@@ -1138,7 +1143,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
         )}
       </div>
       {sheet !== null && sheetRow && (
-        <RowSheet table={table} row={sheetRow} place={sheet} count={order.length} editable={editable}
+        <RowSheet table={table} row={sheetRow} place={sheet} count={order.length} editable={editable} from={pick?.a.c}
           onWrite={(c, v) => writeAt([{ r: sheet, c, v }])}
           onStep={(d) => { const r = Math.max(0, Math.min(order.length - 1, sheet + d)); setSheet(r); goTo({ a: { r, c: pick?.a.c ?? first }, b: { r, c: pick?.a.c ?? first } }); }}
           onClose={() => { setSheet(null); requestAnimationFrame(focusKeys); }} />

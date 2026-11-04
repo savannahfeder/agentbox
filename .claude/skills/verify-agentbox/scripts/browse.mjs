@@ -61,8 +61,13 @@ setTimeout(() => {
 
 /** Number every thing a person could press or type into, and describe the screen. */
 const LOOK = `(() => {
+  // Only what a person could press: on screen, and not behind another view (a
+  // table's side pane stays drawn under the full page opened over it).
   const seen = (el) => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
-    return r.width > 1 && r.height > 1 && s.visibility !== 'hidden' && s.display !== 'none' && r.bottom > 0 && r.top < innerHeight; };
+    if (!(r.width > 1 && r.height > 1 && s.visibility !== 'hidden' && s.display !== 'none' && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth)) return false;
+    const x = Math.min(Math.max(r.left + r.width / 2, 1), innerWidth - 1); const y = Math.min(Math.max(r.top + r.height / 2, 1), innerHeight - 1);
+    const top = document.elementFromPoint(x, y);
+    return !top || top === el || el.contains(top) || top.contains(el); };
   document.querySelectorAll('[data-breaker-ref]').forEach((e) => e.removeAttribute('data-breaker-ref'));
   // A table's cells and headers are things a person presses too; without them a
   // tester could not pick, open or edit a single cell.
