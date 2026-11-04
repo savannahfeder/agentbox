@@ -58,7 +58,8 @@ export function PriorityPicker({ value, set = false, onChange, title, variant = 
   set?: boolean;
   onChange: (id: PriorityId) => void;
   title?: string;
-  variant?: 'tag' | 'word';
+  /** 'chip' is the new thread card's chip, its bars beside the word. */
+  variant?: 'tag' | 'word' | 'chip';
   /*
    * The composer's footer hides its clauses at rest and must not collapse the
      line out from under an open drawer. Nobody else passes this. */
@@ -87,9 +88,10 @@ export function PriorityPicker({ value, set = false, onChange, title, variant = 
   const pick = (id: PriorityId) => { onChange(id); setOpen(false); };
 
   const asWord = variant === 'word';
+  const asChip = variant === 'chip';
 
   return (
-    <span className={asWord ? 'compose-word-wrap' : 'prio-wrap'} ref={wrap}>
+    <span className={asWord || asChip ? 'compose-word-wrap' : 'prio-wrap'} ref={wrap}>
       {open && (
         <span className="prio-menu" role="listbox" aria-label="Priority">
           {PRIORITIES.map((p, i) => (
@@ -110,7 +112,7 @@ export function PriorityPicker({ value, set = false, onChange, title, variant = 
       <button
         type="button"
         className={[
-          asWord ? 'compose-word' : 'prio-tag',
+          asChip ? 'tc-chip' : asWord ? 'compose-word' : 'prio-tag',
           value === 'urgent' ? 'urgent' : '',
           set ? 'set' : '',
           open ? 'open' : '',
@@ -137,7 +139,7 @@ export function PriorityPicker({ value, set = false, onChange, title, variant = 
             "different levels and font sizes" the founder objected to; the
             sentence's whole job is that every glyph in it sits on one
             baseline at one size. */}
-        {!asWord && <PriorityIcon id={value} />}
+        {asChip ? <span className="tc-prio"><PriorityIcon id={value} /></span> : !asWord && <PriorityIcon id={value} />}
         {priorityLabelOf(value)}
       </button>
     </span>

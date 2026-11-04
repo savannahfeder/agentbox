@@ -103,6 +103,8 @@ export interface ThreadEvent {
   words?: string;
   /** When its author last edited the words (item-thread.ts, `withEdits`). */
   edited?: number;
+  /** A reply set for later: when it goes. */
+  sendsAt?: number;
   /** Deleted by its author, kept only because replies hang off it. */
   deleted?: boolean;
   // AN ACTION OF HERS THAT ANSWERED THE AGENT, though it is not a message: a
@@ -167,6 +169,7 @@ export function pickedLine(answer: string): { said: string; words: string } | nu
 // for a slow disk and is still far shorter than anyone bringing a thread back
 // by hand after answering it.
 const REPLY_LIFTS_MS = 60_000;
+const REPLY_SETS_ITS_TIME_MS = 5_000;
 
 // HOW CLOSE A TASK'S BIRTH STAMP AND THE PERSON'S OWN LINE ARE WRITTEN. The
 // composer writes them milliseconds apart; a minute leaves the same room for a
@@ -258,7 +261,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   // after the answer, so it is part of the reply and not a second thing you
   // did. It read "Brought it back" under a teammate's "Working on it" and
   // they could not think why they had (w-2b0cd0f741).
-  let replied: { at: number; by: string | undefined } | null = null;
+  let replied: { at: number; by: string | undefined; index?: number } | null = null;
   const pinsSoFar = new Map<string, number>();
   // A version is called by its file's one name and its number, as the big view counts them.
   const versionWords = new Map<string, string>();
@@ -448,7 +451,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     }
     if (has(patch, 'answer')) {
       const said = words(patch.answer);
-      replied = mine && said ? { at, by: markBy } : null;
+      replied = mine && said ? { at, by: markBy, index: events.length } : null;
       // WAS THE LAST THING SHE SENT ONE OF CLAUDE CODE'S COMMANDS. The blocked
       // line below reads differently after one, and this is the only place that
       // can tell: by the time the status arrives, the ledger line carrying
@@ -471,6 +474,12 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
 
     if (words(patch.result)) {
       events.push({ at, who: 'agent', said: 'It came back to you', words: words(patch.result)!, message: true, field: 'result', ...(ranNow() ? { ran: ranNow() } : {}) });
+      continue;
+    }
+
+    const fromLink = (patch as { linkComment?: { name?: unknown; file?: unknown; text?: unknown } } | null)?.linkComment;
+    if (fromLink && typeof fromLink.name === 'string' && typeof fromLink.file === 'string') {
+      events.push({ at, who: 'agent', said: `${fromLink.name} commented on ${fromLink.file}`, ...(words(fromLink.text) ? { words: words(fromLink.text)! } : {}) });
       continue;
     }
 
@@ -499,9 +508,24 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     if (has(patch, 'snoozedUntil') || has(patch, 'runAt')) {
       const runAt = Number(has(patch, 'snoozedUntil') ? patch.snoozedUntil : patch.runAt) || 0;
       if (!runAt) {
+        // Her waiting reply's time taken off: it goes now, and says so itself.
+        const waited = mine && replied && replied.by === markBy && replied.index !== undefined ? replied.index : -1;
+        if (events[waited]?.sendsAt) {
+          const { sendsAt: _went, ...now } = events[waited];
+          events[waited] = now;
+          continue;
+        }
         if (mine && replied && replied.by === markBy && at - replied.at <= REPLY_LIFTS_MS) continue;
         events.push({ at, who, said: mine ? 'You brought it back' : 'It let this run now' });
       } else {
+        // A reply set for later: its time is written a moment after its words
+        // (main/ipc.mts), and is the reply's, not a move of the thread.
+        const reply = mine && has(patch, 'runAt') && replied && replied.by === markBy && at - replied.at <= REPLY_SETS_ITS_TIME_MS
+          ? events[replied.index ?? -1] : undefined;
+        if (reply?.field === 'answer') {
+          events[replied!.index!] = { ...reply, sendsAt: runAt };
+          continue;
+        }
         events.push({
           at, who,
           said: mine ? 'You moved it to Later' : 'It paused this',
@@ -555,7 +579,33 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   }
   tagWriter();
 
-  return withTitleSaid(theAskComesFirst(events), title, label);
+  return withTitleSaid(theAskComesFirst(waitingReplies(events)), title, label);
+}
+
+// A REPLY SET FOR LATER GOES WITH THE NEXT REPLY OF HERS, at that one's time:
+// the run that carries the newest reply reads the whole conversation. One
+// taken back with Z no longer waits.
+function waitingReplies(events: ThreadEvent[]): ThreadEvent[] {
+  const out = [...events];
+  // Each person's own, on a shared thread.
+  const waiting = new Map<string, number[]>();
+  const at = (k: number, sendsAt: number | undefined) => {
+    const { sendsAt: _was, ...rest } = out[k];
+    out[k] = sendsAt ? { ...rest, sendsAt } : rest;
+  };
+  for (const [k, e] of out.entries()) {
+    if (e.who !== 'you') continue;
+    const theirs = waiting.get(e.by ?? '') ?? [];
+    if (e.said === 'You withdrew your reply') {
+      const undone = theirs.pop();
+      if (undone !== undefined) at(undone, undefined);
+      continue;
+    }
+    if (e.field !== 'answer' || !e.message) continue;
+    for (const w of theirs) at(w, e.sendsAt);
+    waiting.set(e.by ?? '', e.sendsAt ? [...theirs, k] : []);
+  }
+  return out;
 }
 
 // NOTHING HAPPENED ON A THREAD BEFORE YOU ASKED FOR IT.

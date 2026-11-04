@@ -97,7 +97,9 @@ describe('the shortcuts are off the screen and the verbs are not', () => {
     // On a finished task none of the remaining buttons apply, and a bar with a
     // rule over it and nothing in it is 51px of nothing.
     const guard = focus.slice(focus.lastIndexOf('{((', focus.indexOf('<div className="focus-actions">')), focus.indexOf('<div className="focus-actions">'));
-    expect(guard).toContain('(scheduledUntil ?? 0) > 0 && !!onUnschedule');
+    // `scheduledHere` is a scheduled thread that is not closed (w-54cdf7c768).
+    expect(guard).toContain('scheduledHere && !!onUnschedule');
+    expect(focus).toMatch(/const scheduledHere = item\.status !== 'done' && \(scheduledUntil \?\? 0\) > 0;/);
     expect(guard).toContain('!!agent && !agentTakesReply && !!onReveal');
     expect(guard).toContain("item.status === 'blocked'");
     // And an In progress task no longer opens this row by itself, because the

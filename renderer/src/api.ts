@@ -14,6 +14,15 @@ import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine } from '
 import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import type { CarryState } from '../../shared/carried-files.mjs';
+
+export interface FileLinkAsk { product: string; thread: string; src: string }
+/** `current`: the link holds the copy of the file on screen now. */
+/** `ahead`: the link holds a later version of the file than the one on screen. */
+export interface FileLink { token: string; url: string; version: number; createdAt: number; updatedAt: number; comments: number; current: boolean; ahead?: boolean }
+export interface PublicLink { token: string; url: string; source: string; name: string; kind: string; createdAt: number; updatedAt: number; comments: number }
+export interface LinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean }
+/** `site` null: this copy's cloud has no website, so there is nothing to share on. */
+export interface FileLinkState { ok: boolean; error?: string; site?: string | null; signedIn?: boolean; link?: FileLink | null }
 import { checkProjectFolder } from '../../shared/project-folder-check.mts';
 import { whileSystemWindowIsOpen } from './system-window';
 import { USAGE_SAME_AS_ANOTHER, USAGE_UNREADABLE } from '../../shared/usage.mts';
@@ -30,9 +39,11 @@ import { traceReader } from '../../shared/trace-delta.mjs';
 // remember to, and no import order anywhere can get it wrong.
 import { installBrowserBridge } from './browser-bridge';
 import { installCloudBridge } from './cloud-bridge';
+import { onASharedFilePage } from './shared-file/route';
 
 // The Mac's own page first; the phone with the Mac shut only on its own site.
-if (!installBrowserBridge()) installCloudBridge();
+// A shared file's page is neither: it is for people with no app at all.
+if (!onASharedFilePage() && !installBrowserBridge()) installCloudBridge();
 
 // A team call, in words: a build or a window with no team door says so rather
 // than throwing somewhere the person cannot see. Below the bridge's install,
@@ -717,6 +728,39 @@ export const api = {
     return zero.readDoc(p);
   },
 
+  /** A link anyone can open, to one of this person's files (main/file-link.mjs). */
+  async fileLink(p: FileLinkAsk): Promise<FileLinkState> {
+    const zero = window.zero as any;
+    if (!zero?.fileLink) return { ok: false, error: 'not here' };
+    return zero.fileLink(p);
+  },
+  async fileLinkShare(p: FileLinkAsk): Promise<FileLinkState> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinkShare) return { ok: false, error: `quit and reopen ${NAME} to share files` };
+    return zero.fileLinkShare(p);
+  },
+  async fileLinkStop(p: { token: string }): Promise<{ ok: boolean; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinkStop) return { ok: false, error: `quit and reopen ${NAME} to share files` };
+    return zero.fileLinkStop(p);
+  },
+  /** Every live link of this person's, for the list of what they made public. */
+  async fileLinks(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinks) return { ok: false, error: 'not here' };
+    return zero.fileLinks();
+  },
+  async fileLinkComments(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinkComments) return { ok: false, error: 'not here' };
+    return zero.fileLinkComments(p);
+  },
+  async fileLinkComment(p: { token: string; text: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinkComment) return { ok: false, error: `quit and reopen ${NAME} to answer comments` };
+    return zero.fileLinkComment(p);
+  },
+
   /** "Try again" on a file in a conversation that was not delivered. */
   async retryFile(p: { product: string; src: string }): Promise<boolean> {
     const zero = window.zero as any;
@@ -848,7 +892,7 @@ export const api = {
   // once instead of after it (main/claude-input.mts `interrupt`).
   // `inReplyTo` is the uid of the message a reply in a thread answers
   // (w-920461cbe6); main keeps it only in a conversation between people.
-  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; putAway?: boolean }): Promise<WorkItem | null> {
+  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; runAt?: number; putAway?: boolean }): Promise<WorkItem | null> {
     if (useFixtures) return null;
     return window.zero!.answer(p);
   },

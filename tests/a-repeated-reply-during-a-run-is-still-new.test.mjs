@@ -3,9 +3,11 @@
 // continuations. Delivery identity must include when the reply was written.
 import {it,expect} from 'vitest';
 import {Supervisor} from '../main/supervisor.mts';
+import {isDue} from '../shared/work-items.mjs';
 function probe(before,after){
  const s=Object.create(Supervisor.prototype);
- s.store={listItems:()=>[after]};s.pausedProducts=new Set();s.sessions=new Map();
+ // The real store's isDue: a reply set for later waits (a-reply-can-wait-for-a-time).
+ s.store={listItems:()=>[after],isDue};s.pausedProducts=new Set();s.sessions=new Map();
  s._handledAnswers=new Set();s._saveState=()=>{};s.spawned=[];
  s.spawnWorker=(item,options)=>s.spawned.push({item,options});
  s.deliverMidflightReply(before,before.answer);

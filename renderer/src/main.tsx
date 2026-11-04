@@ -18,6 +18,9 @@ import { installPictureWatch } from './phone-files';
 import { theDoorNeedsItsKey } from './browser-bridge';
 import { comeBackFromABlankScreen, writeHeldBeforeReload } from './after-a-crash';
 import { installStrayLetters } from './stray-letters';
+import { onASharedFilePage } from './shared-file/route';
+import { bootSharedFile } from './shared-file/boot';
+import { readCloudConfig } from './cloud-bridge';
 
 // A thrown React error takes the screen down without taking the process down,
 // so nothing in the main process ever hears about it. These two lines are the
@@ -58,7 +61,9 @@ window.addEventListener('unhandledrejection', (e) => {
 // Before the first paint, not in an effect after it: a theme applied on mount
 // shows one frame of the other one, and the other one here is a white flash in
 // a dark room.
-normalizeSavedLook(localStorage, machineTheme());
+// A file shared by its link is its own page on the web app, dark unless this browser chose otherwise.
+const sharedFile = onASharedFilePage();
+if (!sharedFile) normalizeSavedLook(localStorage, machineTheme());
 applyTheme(resolveTheme(localStorage.getItem(THEME_KEY)));
 // And the picture, for the same reason and one worse: a skin changes what the
 // surfaces are made of, so a frame drawn before it lands is an opaque card
@@ -102,4 +107,6 @@ const boot = () => {
 // a bridge the screen draws its fixtures, and an inbox of invented threads is
 // worse than a page saying what the link is missing, which browser-bridge.ts
 // has already put up by now.
-if (!theDoorNeedsItsKey()) boot();
+const cloud = readCloudConfig();
+if (sharedFile && cloud) bootSharedFile(sharedFile, cloud);
+else if (!theDoorNeedsItsKey()) boot();
