@@ -48,6 +48,9 @@ export function runHostSocket({ stamp = runHostStamp(), dir = os.tmpdir(), uid =
   return path.join(dir, `${nameSlug}-runs-${uid}-${stamp}.sock`);
 }
 
+// Windows refuses to listen at a socket path (EACCES), so there runs start directly.
+export const runHostWorksOn = (platform = process.platform) => platform !== 'win32';
+
 export const spoolFiles = (spoolDir, runId) => ({
   out: path.join(spoolDir, `${runId}.out`),
   err: path.join(spoolDir, `${runId}.err`),
