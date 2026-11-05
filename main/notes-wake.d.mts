@@ -38,4 +38,6 @@ export function noteToItsAgent(opts: {
   mark: unknown;
   nameOf?: (by: string) => string;
   people?: readonly Person[];
+  /** How long to wait for a running agent to take the note before counting it as handed over. */
+  handOffMs?: number;
 }): Promise<boolean>;
