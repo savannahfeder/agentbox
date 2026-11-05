@@ -52,6 +52,7 @@ const CONCURRENCY = 200;
 // Longer than its own 60 s wait on AgentCore (main/cloud/aws.mjs), shorter
 // than the Mac's wait on it (main/cloud/managed.mts).
 export const FUNCTION_SECONDS = 90;
+export const HANDLER = 'index.handler';
 
 /**
  * What the function's own role may do. Links are signed by the signer, so
@@ -220,7 +221,8 @@ export async function bundle(outDir) {
   fs.mkdirSync(outDir, { recursive: true });
   await build({
     entryPoints: [path.join(ROOT, 'cloud', 'gateway', 'lambda.mjs')],
-    outfile: path.join(outDir, 'index.mts'),
+    // Lambda finds `index.handler` only as index.js, .mjs or .cjs: never .mts.
+    outfile: path.join(outDir, 'index.mjs'),
     bundle: true, platform: 'node', format: 'esm', target: 'node22', logLevel: 'warning',
     // Lambda's own copy of the AWS libraries has it; this repository does not.
     external: ['@aws-sdk/client-secrets-manager'],
@@ -229,7 +231,7 @@ export async function bundle(outDir) {
   });
   const zip = path.join(outDir, 'gateway.zip');
   fs.rmSync(zip, { force: true });
-  execFileSync('zip', ['-q', '-j', zip, path.join(outDir, 'index.mts')]);
+  execFileSync('zip', ['-q', '-j', zip, path.join(outDir, 'index.mjs')]);
   return zip;
 }
 
@@ -299,7 +301,7 @@ async function main() {
   // The function. A role made a moment ago is not assumable yet: retry.
   const env = { REGION: region, BUCKET: bucket, RUNTIME_ARN: runtimeArn, SUPABASE_URL: db.url, SUPABASE_ANON_KEY: db.anonKey, SIGNER_SECRET_ARN: signerSecretArn, ...(stripeSecretArn ? { STRIPE_SECRET_ARN: stripeSecretArn } : {}), ...(supabaseSecretArn ? { SUPABASE_SERVICE_SECRET_ARN: supabaseSecretArn } : {}) };
   // The chip goes with the code (create, or a code update), never with a settings update.
-  const settings = ['--runtime', 'nodejs22.x', '--handler', 'index.handler', '--timeout', String(FUNCTION_SECONDS), '--memory-size', '512', '--environment', JSON.stringify({ Variables: env })];
+  const settings = ['--runtime', 'nodejs22.x', '--handler', HANDLER, '--timeout', String(FUNCTION_SECONDS), '--memory-size', '512', '--environment', JSON.stringify({ Variables: env })];
   const arm = ['--architectures', 'arm64'];
   const existing = aws(['lambda', 'get-function-configuration', '--function-name', NAMES.fn], { allowFail: true });
   const waitUpdated = () => aws(['lambda', 'wait', 'function-updated-v2', '--function-name', NAMES.fn], { json: false });

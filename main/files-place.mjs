@@ -459,12 +459,12 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   }
   const nameInRoom = (src) => String(src).replace(/^\.?\/?attachments\//, '');
   // A group's file may still be in the cloud, and drawing the list fetches nothing.
-  async function openedOf(file, v, { fetch = false } = {}) {
+  async function openedOf(file, v, { fetch = false, products = readable() } = {}) {
     for (const c of v.copies) {
       const { ref } = c.thread;
       const found = ref.kind === 'room'
         ? await (fetch ? team.rooms.fileOnDisk(ref.roomId, nameInRoom(c.path)).catch(() => null) : team.rooms.fileIfKept(ref.roomId, nameInRoom(c.path)))
-        : await onDisk(c.path, ref.product, ref.kind === 'thread' ? ref.id : null);
+        : await onDisk(c.path, ref.product, ref.kind === 'thread' ? ref.id : null, products);
       if (found) return found;
     }
     return null;
@@ -484,11 +484,11 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
    * agent's shorthand, a file only promised) is no version. `same` maps every
    * other id a version went by to the one it is shown under.
    */
-  async function lineChain(f, shared = audienceOf(f.project) !== 'private') {
+  async function lineChain(f, shared = audienceOf(f.project) !== 'private', products = readable()) {
     const line = lineNow();
     const mine = [];
     for (const v of f.chain) {
-      const src = await openedOf(f, v);
+      const src = await openedOf(f, v, { products });
       const entry = src ? await line.add({ file: f.key, src, name: v.name, by: v.by ?? null, at: v.at || Date.now(), shared }) : null;
       mine.push({ v, src, entry });
     }
@@ -534,9 +534,9 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   };
 
   // A tile draws the newest version this computer has rather than nothing.
-  async function faceOf(f) {
+  async function faceOf(f, products = readable()) {
     for (const v of [...f.chain].reverse()) {
-      const found = v.opened ?? await openedOf(f, v);
+      const found = v.opened ?? await openedOf(f, v, { products });
       if (found) return found;
     }
     return null;
@@ -606,9 +606,11 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       if (!sharedIn.has(key)) sharedIn.set(key, audienceOf(project) !== 'private');
       return sharedIn.get(key);
     };
+    // Read once for the pass: per version it was thousands of stats of every project folder.
+    const products = readable();
     const lined = [];
     for (const whole of files) {
-      const { chain } = await lineChain(whole, isShared(whole.project));
+      const { chain } = await lineChain(whole, isShared(whole.project), products);
       if (chain.length) lined.push(asOf(whole, chain));
     }
     const rows = await Promise.all(lined.map(async (f) => {
@@ -620,7 +622,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const beside = own ? null : homeOf(f);
       // Filed in another project's folder, it is listed where it was filed.
       const shownIn = lib.folders.find((x) => x.id === (own ?? beside))?.project ?? project;
-      return { ...row, project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: await faceOf(f) };
+      return { ...row, project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: await faceOf(f, products) };
     })).then((all) => all.filter((f) => f.opened || (f.kind !== 'page' && f.kind !== 'code')));
     const projects = [];
     for (const name of [...rows.map((f) => f.project), ...lib.folders.map((f) => f.project)]) {

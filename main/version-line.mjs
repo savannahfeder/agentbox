@@ -43,6 +43,7 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }) {
   // Kept beside the line, so a restart does not read every file again.
   let hashes = new Map();
   try { hashes = new Map(Object.entries(JSON.parse(fs.readFileSync(hashFile, 'utf8')))); } catch { /* none yet */ }
+  // file id -> hash -> the ask: thousands can wait on a cloud that never answers.
   const pending = new Map();
   let queue = Promise.resolve();
 
@@ -113,7 +114,7 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }) {
   function of(key) {
     const id = lineId(key);
     const line = lineOf(id);
-    const waiting = [...pending.values()].filter((p) => p.file === id && !line.some((v) => v.hash === p.hash));
+    const waiting = [...(pending.get(id)?.values() ?? [])].filter((p) => !line.some((v) => v.hash === p.hash));
     const last = Math.max(0, ...line.map((v) => v.n));
     return [...line, ...waiting.map((p, i) => ({ ...p, n: last + i + 1, pending: true }))].map(shown);
   }
@@ -134,7 +135,7 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }) {
         folded = null;
         append(row);
       }
-      pending.delete(`${asked.file}:${asked.hash}`);
+      pending.get(asked.file)?.delete(asked.hash);
       return shown(row);
     }, (err) => {
       console.warn(`version line: ${err.message}`);
@@ -156,7 +157,8 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }) {
     const asked = { file: id, hash: bytes.hash, name: lineId(name), by, at };
     const holder = shared ? cloud() : null;
     if (holder) {
-      pending.set(`${id}:${bytes.hash}`, asked);
+      if (!pending.has(id)) pending.set(id, new Map());
+      pending.get(id).set(bytes.hash, asked);
       if (!asking && Date.now() >= outUntil) {
         const answer = askCloud(holder, asked);
         let wait;
