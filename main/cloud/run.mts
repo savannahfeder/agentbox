@@ -455,9 +455,10 @@ const OFFLINE_AFTER_MS = 90_000;
 export const INPUT_CLOSED_IN_CLOUD = 'agentbox_input_closed_in_cloud';
 // A run the app left going when it quit, and the process bringing it home.
 // The store's writes an agent may make while the Mac is away, kept in the cloud
-// and made when it wakes: what it writes on its thread and its documents.
+// and made when it wakes: what it writes on its thread, its documents, and a
+// teammate's chat, hand-offs and method.
 // Never a read, which has nothing to answer with, nor a claim, stale by then.
-export const KEPT_WHILE_AWAY = { [nameSlug]: ['update_work_item', 'create_work_item', 'write_document'] };
+export const KEPT_WHILE_AWAY = { [nameSlug]: ['update_work_item', 'create_work_item', 'write_document', 'team_post', 'team_pass', 'team_method'] };
 // What a server opened afresh to make a kept write is told first.
 const HANDSHAKE_LINES = [
   JSON.stringify({ jsonrpc: '2.0', id: 'kept-hello', method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: `${nameSlug}-cloud`, version: '1' } } }),
@@ -2390,7 +2391,8 @@ export function servedHere(cfg: Partial<ServerConfig> | undefined, env: NodeJS.P
     for (const [k, v] of Object.entries(want)) { if (v == null) delete process.env[k]; else process.env[k] = v; }
     // Named here: runs share this process, so its own ZERO_ITEM is whichever run set it last.
     const ownItem = cfg!.env?.ZERO_ITEM || env.ZERO_ITEM || null;
-    return channel(async (io) => (await import('../../mcp/stdio.mjs')).serveStore({ ...io, holder: `mcp-cloud-${holder}`, ownItem, requestCloudResource } as {}));
+    const ownProduct = cfg!.env?.ZERO_PRODUCT || env.ZERO_PRODUCT || null;
+    return channel(async (io) => (await import('../../mcp/stdio.mjs')).serveStore({ ...io, holder: `mcp-cloud-${holder}`, ownItem, ownProduct, requestCloudResource } as {}));
   }
   return null;
 }

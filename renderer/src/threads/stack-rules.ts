@@ -65,9 +65,6 @@ const WHO: { key: NeedsKey; label: string }[] = [
   { key: 'agents', label: 'Agents' },
 ];
 
-/** Your own threads, without the runs your AI teammates hold on their own place. */
-export const yoursOnly = (rows: WorkItem[], mateOf: (item: WorkItem) => string | null): WorkItem[] => rows.filter((i) => !mateOf(i));
-
 /** A run an AI teammate stopped is an agent's, whoever asked for it; a person's task or direct message is a person's. */
 export function whoIsWaiting(item: WorkItem, { me, isMate, isDirect }: { me: string | null; isMate: (i: WorkItem) => boolean; isDirect: (i: WorkItem) => boolean }): NeedsKey {
   if (isMate(item)) return 'agents';

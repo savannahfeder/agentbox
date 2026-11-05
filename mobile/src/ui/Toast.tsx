@@ -8,7 +8,8 @@
 // important information. Not only is it poorly placed but I can't dismiss it."
 // Now it sits at the foot, over a thread's reply box (`toastLift`,
 // lib/overlays.ts), and a swipe down or the cross takes it away at once.
-import { router, useGlobalSearchParams, useSegments } from 'expo-router';
+import { useGlobalSearchParams, useSegments } from 'expo-router';
+import { router } from '../lib/router';
 import { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, PanResponder, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
