@@ -26,6 +26,7 @@ import { Store } from './store.mts';
 import { storeRootEnv } from './store/home.mjs';
 import { keepAnswerModesIn } from './answer-modes.mts';
 import { Supervisor } from './supervisor.mts';
+import { runHostWorksOn } from './run-host.mjs';
 import { startCodexWatch } from './codex-watch.mts';
 import { watchNewChatsFor } from './new-chats-watch.mts';
 import { readCodexThreadsOffThread } from './codex-threads.mts';
@@ -443,7 +444,7 @@ async function createWindow() {
   imageRoots = () => [config.accountRoot, ...store.listProducts().map((p) => p.repoPath).filter(Boolean) as string[]];
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   // Local runs outlive a quit or a restart of the app (main/run-host.mjs).
-  supervisor.hostRuns = true;
+  supervisor.hostRuns = runHostWorksOn();
   // And their store tools come from one shared process (main/tool-host.mjs).
   supervisor.shareTools = true;
   // THAT agents start and stop work (main/analytics.mts checks the switch).

@@ -5,6 +5,7 @@ export declare const HOST_ALREADY_THERE: 3;
 
 export declare function runHostStamp(): string;
 export declare function runHostSocket(options?: { stamp?: string; dir?: string; uid?: number }): string;
+export declare function runHostWorksOn(platform?: NodeJS.Platform): boolean;
 
 export interface SpoolFiles {
   out: string;
