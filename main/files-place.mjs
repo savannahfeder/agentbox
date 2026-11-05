@@ -31,7 +31,7 @@ const FILES_FOR_AGENTS = 40;
  * same name, as the agent's tools match it (mcp/core/reach.mjs).
  */
 /** Counts for tests: how many threads were parsed for their files. */
-export const filesOfInternals = { parses: 0, entries: 0 };
+export const filesOfInternals = { parses: 0, entries: 0, lists: 0 };
 
 // Every list of Files reads every thread, so a thread is parsed again only when
 // its lines did: one agent writing must not re-read thousands of threads.
@@ -472,7 +472,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   const lines = new Map();
   const lineNow = () => {
     const dir = path.join(logDir(), '.file-versions');
-    if (!lines.has(dir)) lines.set(dir, versionLine({ dir, cloud: () => team?.fileVersions?.() ?? null }));
+    if (!lines.has(dir)) lines.set(dir, versionLine({ dir, cloud: () => team?.fileVersions?.() ?? null, onMoved: notify }));
     return lines.get(dir);
   };
 
@@ -484,9 +484,8 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
    * agent's shorthand, a file only promised) is no version. `same` maps every
    * other id a version went by to the one it is shown under.
    */
-  async function lineChain(f) {
+  async function lineChain(f, shared = audienceOf(f.project) !== 'private') {
     const line = lineNow();
-    const shared = audienceOf(f.project) !== 'private';
     const mine = [];
     for (const v of f.chain) {
       const src = await openedOf(f, v);
@@ -565,51 +564,73 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     else store.fileMark(thread.ref.product, thread.ref.id, mark);
   }
 
+  // Every change in the app asks for the list again. A list asked for while one
+  // runs waits for it and reads once more, so they never pile up behind each other.
+  let listing = null;
+  let listAgain = null;
+  function list() {
+    if (!listing) {
+      listing = listOnce().finally(() => { listing = null; });
+      return listing;
+    }
+    listAgain ??= listing.catch(() => {}).then(() => { listAgain = null; return list(); });
+    return listAgain;
+  }
+
+  async function listOnce() {
+    filesOfInternals.lists += 1;
+    crossSoon();
+    const files = allFiles();
+    const lib = shelf();
+    const placed = [...lib.places.values()].filter((p) => p.folder);
+    const threadOf = (ref) => `${ref.ownerId ?? ref.product}/${ref.threadId ?? ref.id}`;
+    const onThreads = (f) => f.sentIn.filter((s) => s.kind === 'thread' || s.kind === 'shared').map(threadOf);
+    // Where a thread's files were put, so its next one lands beside them. Only
+    // a file made since: tidying one of a thread's files must not move the rest.
+    const homes = new Map();
+    for (const f of files) {
+      const folder = lib.placeOf(f.key);
+      if (!folder) continue;
+      const since = lib.places.get(f.key)?.at ?? 0;
+      for (const t of onThreads(f)) homes.set(t, [...(homes.get(t) ?? []), { folder, since }]);
+    }
+    const homeOf = (f) => {
+      if (!f.project || lib.places.has(f.key)) return null;
+      const here = onThreads(f).flatMap((t) => homes.get(t) ?? []);
+      const found = new Set(here.map((h) => h.folder));
+      return found.size === 1 && here.every((h) => f.at > h.since) ? here[0].folder : null;
+    };
+    const sharedIn = new Map();
+    const isShared = (project) => {
+      const key = projectKey(project);
+      if (!sharedIn.has(key)) sharedIn.set(key, audienceOf(project) !== 'private');
+      return sharedIn.get(key);
+    };
+    const lined = [];
+    for (const whole of files) {
+      const { chain } = await lineChain(whole, isShared(whole.project));
+      if (chain.length) lined.push(asOf(whole, chain));
+    }
+    const rows = await Promise.all(lined.map(async (f) => {
+      const { chain, notes: _n, approvals: _a, seen: _s, ...row } = f;
+      // A file only a chat holds has no project until an agent files it in one.
+      const filed = f.project ? null : placed.find((p) => familyIn(p.key) === familyIn(f.key));
+      const project = f.project ?? filed?.project ?? null;
+      const own = lib.placeOf(filed?.key ?? f.key);
+      const beside = own ? null : homeOf(f);
+      // Filed in another project's folder, it is listed where it was filed.
+      const shownIn = lib.folders.find((x) => x.id === (own ?? beside))?.project ?? project;
+      return { ...row, project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: await faceOf(f) };
+    })).then((all) => all.filter((f) => f.opened || (f.kind !== 'page' && f.kind !== 'code')));
+    const projects = [];
+    for (const name of [...rows.map((f) => f.project), ...lib.folders.map((f) => f.project)]) {
+      if (name && !projects.some((p) => projectKey(p) === projectKey(name))) projects.push(name);
+    }
+    return { files: rows, projects: projects.sort((a, b) => a.localeCompare(b)), folders: lib.folders };
+  }
+
   return {
-    async list() {
-      crossSoon();
-      const files = allFiles();
-      const lib = shelf();
-      const placed = [...lib.places.values()].filter((p) => p.folder);
-      const threadOf = (ref) => `${ref.ownerId ?? ref.product}/${ref.threadId ?? ref.id}`;
-      const onThreads = (f) => f.sentIn.filter((s) => s.kind === 'thread' || s.kind === 'shared').map(threadOf);
-      // Where a thread's files were put, so its next one lands beside them. Only
-      // a file made since: tidying one of a thread's files must not move the rest.
-      const homes = new Map();
-      for (const f of files) {
-        const folder = lib.placeOf(f.key);
-        if (!folder) continue;
-        const since = lib.places.get(f.key)?.at ?? 0;
-        for (const t of onThreads(f)) homes.set(t, [...(homes.get(t) ?? []), { folder, since }]);
-      }
-      const homeOf = (f) => {
-        if (!f.project || lib.places.has(f.key)) return null;
-        const here = onThreads(f).flatMap((t) => homes.get(t) ?? []);
-        const found = new Set(here.map((h) => h.folder));
-        return found.size === 1 && here.every((h) => f.at > h.since) ? here[0].folder : null;
-      };
-      const lined = [];
-      for (const whole of files) {
-        const { chain } = await lineChain(whole);
-        if (chain.length) lined.push(asOf(whole, chain));
-      }
-      const rows = await Promise.all(lined.map(async (f) => {
-        const { chain, notes: _n, approvals: _a, seen: _s, ...row } = f;
-        // A file only a chat holds has no project until an agent files it in one.
-        const filed = f.project ? null : placed.find((p) => familyIn(p.key) === familyIn(f.key));
-        const project = f.project ?? filed?.project ?? null;
-        const own = lib.placeOf(filed?.key ?? f.key);
-        const beside = own ? null : homeOf(f);
-        // Filed in another project's folder, it is listed where it was filed.
-        const shownIn = lib.folders.find((x) => x.id === (own ?? beside))?.project ?? project;
-        return { ...row, project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: await faceOf(f) };
-      })).then((all) => all.filter((f) => f.opened || (f.kind !== 'page' && f.kind !== 'code')));
-      const projects = [];
-      for (const name of [...rows.map((f) => f.project), ...lib.folders.map((f) => f.project)]) {
-        if (name && !projects.some((p) => projectKey(p) === projectKey(name))) projects.push(name);
-      }
-      return { files: rows, projects: projects.sort((a, b) => a.localeCompare(b)), folders: lib.folders };
-    },
+    list,
 
     crossing,
 
