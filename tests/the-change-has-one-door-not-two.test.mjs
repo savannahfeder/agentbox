@@ -33,11 +33,12 @@ it('still gives a design and a note theirs', () => {
   expect(messageDocuments(named)).toEqual(['designs/w-1/page.html', 'notes/plan.md']);
 });
 
-it('keeps the figures as the one way in, now on the menu’s code row', () => {
+it('keeps the figures as the one way in, now a button in the corner', () => {
   // The figures closed the byline from w-8019e8476e until w-e731ca9376
-  // (2026-10-01), when she asked for viewing the code to go into the thread's
-  // three-dot menu with the terminal and Done. They are the code row's detail
-  // there, and that row is still the one door: it opens the same path.
-  expect(focus).toContain('className="change-figures"');
-  expect(focus).toContain('onViewChange={() => onOpenDoc?.(changePathFor(item.id))}');
+  // (2026-10-01), when viewing the code went into the thread's three-dot menu.
+  // Nobody found it there, so on w-c25aae4035 they became a button in the
+  // corner beside Done, which takes the menu's row: still one door, same path.
+  expect(focus).toContain('const openChange = () => onOpenDoc?.(changePathFor(item.id));');
+  expect(focus).toContain('onViewChange={openChange}');
+  expect(focus).toMatch(/const codeButton = figures \?/);
 });

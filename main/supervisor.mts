@@ -11,7 +11,7 @@ import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot } from
 import { MainTests } from './main-went-red.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
-import { queuedReplyText, submitReply, framedTeammate } from './live-replies.mts';
+import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
 import { resolveAnsweredNotes, wakeForNotes } from './notes-wake.mjs';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mjs';
 import { editedFilesLine } from '../shared/artifact-marks.mjs';
@@ -9354,6 +9354,7 @@ export class Supervisor {
     } else if (continuation && toldBy(item)) {
       item = { ...item, answer: framedTeammate(toldBy(item)!.name, item.answer) };
     }
+    if (continuation && item.answer && !toldBy(item)) item = { ...item, answer: framedPick(item.answer) };
     let prompt: string;
     // THE TWO KINDS OF RESUME SAY DIFFERENT THINGS, and handing a finished
     // session the interrupted wording would tell it to go looking for a step it

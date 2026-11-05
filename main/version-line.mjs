@@ -7,7 +7,9 @@
 //
 // With the cloud out of reach a version is numbered after the line as this
 // computer last read it and marked `pending`; the next pass asks again, so the
-// number it shows is the cloud's once the cloud answers.
+// number it shows is the cloud's once the cloud answers. The Files list waits
+// on these asks, so it waits a moment at most, one ask is out at a time, and a
+// cloud that failed is left alone for a while.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,11 +22,16 @@ const RACY_MS = 2000;
 const BYTES = 'version-bytes';
 // A film past this stays a version but is not copied.
 const KEEP_UP_TO = 512 * 1024 * 1024;
+const ASK_WAIT_MS = 2000;
+// An ask still out after this is given up, so one stuck request cannot stop every later one.
+const ASK_GIVE_UP_MS = 60_000;
+const OUT_FIRST_MS = 60_000;
+const OUT_MOST_MS = 30 * 60_000;
 
 export const lineId = (s) => crypto.createHash('sha256').update(String(s)).digest('hex').slice(0, 40);
 const safeName = (name) => String(name ?? 'file').replace(/[^\w.-]+/g, '-').slice(-120) || 'file';
 
-export function versionLine({ dir, cloud = () => null }) {
+export function versionLine({ dir, cloud = () => null, onMoved = () => {} }) {
   const file = path.join(dir, LINE);
   const hashFile = path.join(dir, HASHES);
   let entries = [];
@@ -111,6 +118,34 @@ export function versionLine({ dir, cloud = () => null }) {
     return [...line, ...waiting.map((p, i) => ({ ...p, n: last + i + 1, pending: true }))].map(shown);
   }
 
+  let asking = null;
+  let outUntil = 0;
+  let outFor = 0;
+  /** The cloud's number for `asked`, or null when it failed or took too long. */
+  function askCloud(holder, asked) {
+    let giveUp;
+    const tooLong = new Promise((_, no) => { giveUp = setTimeout(() => no(new Error('the cloud took too long to number a version')), ASK_GIVE_UP_MS); giveUp.unref?.(); });
+    const answer = Promise.race([Promise.resolve().then(() => holder.append(asked)), tooLong]).then((got) => {
+      const row = cleanEntry(got);
+      if (!row) throw new Error('the cloud gave no number');
+      outFor = 0;
+      if (!lineOf(row.file).some((v) => v.hash === row.hash)) {
+        entries.push(row);
+        folded = null;
+        append(row);
+      }
+      pending.delete(`${asked.file}:${asked.hash}`);
+      return shown(row);
+    }, (err) => {
+      console.warn(`version line: ${err.message}`);
+      outFor = Math.min(outFor ? outFor * 2 : OUT_FIRST_MS, OUT_MOST_MS);
+      outUntil = Date.now() + outFor;
+      return null;
+    }).finally(() => { clearTimeout(giveUp); if (asking === answer) asking = null; });
+    asking = answer;
+    return answer;
+  }
+
   async function addNow({ file: key, src, name, by = null, at = Date.now(), shared = true }) {
     const bytes = await hashOf(src);
     if (!bytes) return null;
@@ -121,19 +156,17 @@ export function versionLine({ dir, cloud = () => null }) {
     const asked = { file: id, hash: bytes.hash, name: lineId(name), by, at };
     const holder = shared ? cloud() : null;
     if (holder) {
-      try {
-        const row = cleanEntry(await holder.append(asked));
-        if (!row) throw new Error('the cloud gave no number');
-        entries.push(row);
-        folded = null;
-        pending.delete(`${id}:${bytes.hash}`);
-        append(row);
-        return shown(row);
-      } catch (err) {
-        console.warn(`version line: ${err.message}`);
-        pending.set(`${id}:${bytes.hash}`, asked);
-        return of(key).find((v) => v.hash === bytes.hash) ?? null;
+      pending.set(`${id}:${bytes.hash}`, asked);
+      if (!asking && Date.now() >= outUntil) {
+        const answer = askCloud(holder, asked);
+        let wait;
+        const LATE = {};
+        const got = await Promise.race([answer, new Promise((resolve) => { wait = setTimeout(() => resolve(LATE), ASK_WAIT_MS); wait.unref?.(); })]);
+        clearTimeout(wait);
+        if (got === LATE) answer.then((row) => { if (row) onMoved(); });
+        else if (got) return got;
       }
+      return of(key).find((v) => v.hash === bytes.hash) ?? null;
     }
     const { entry } = appendTo(lineOf(id), asked);
     entries.push({ ...entry, local: true });

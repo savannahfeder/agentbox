@@ -152,6 +152,21 @@ interface Finished {
 
 const at = (item: Finished, field: string) => item.wrote?.[field]?.ts ?? 0;
 
+/** How long after a run's result the folder it worked in is still read again. */
+export const FOLDER_SETTLES_MS = 120_000;
+
+/**
+ * Whether the folder's standing may still change under a run that has ended.
+ * The result lands on the row before the folder is read back on the git thread
+ * (main/supervisor.mts, `saveRunChange`), so a read at the result alone can
+ * answer for the round before: "Git does not know who you are" over a run that
+ * had just committed (F-161).
+ */
+export function folderMayStillMove(item: Finished, now: number): boolean {
+  const t = at(item, 'result');
+  return t > 0 && now - t < FOLDER_SETTLES_MS;
+}
+
 /**
  * Whether the app asks on this thread's behalf. `change` is whether the run
  * left one (the figures the pane already reads), `running` whether anything is
