@@ -16,8 +16,8 @@
 //
 // The document pane's scheme gave the same answer for a page it had just
 // granted, and the phone's /f/ door read the same shape. A Mac and Linux keep
-// the urls they had, byte for byte, and the window reads a drive in a path only
-// when it is on Windows itself (on-a-mac-or-linux-each-picture-resolves-as-pinned-here).
+// the urls they had, byte for byte. What the window draws there is pinned in
+// on-a-mac-or-linux-each-picture-resolves-as-pinned-here.
 //
 // With that fixed, measured again on the same computer. A picture a page names
 // beside itself, or a message names as file:///C:/..., reached the window as
@@ -32,7 +32,7 @@
 // These schemes are the only thing between a page and the disk, so most of
 // this file is what a Windows url must never reach.
 
-import { describe, it, expect, afterAll, vi } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -44,8 +44,6 @@ import { phoneFileUrl } from '../renderer/src/phone-files.ts';
 
 const IMG = `${IMG_SCHEME}://file`;
 const DOC = `${DOC_SCHEME}://file`;
-// The window on Windows. A test has no window, which the window reads as not Windows.
-const WIN = true;
 
 describe('a Windows path as a url', () => {
   it('puts the drive first and the rest in forward slashes', () => {
@@ -71,8 +69,8 @@ describe('a Windows path as a url', () => {
   });
 
   it('is drawn by the window at the same url the main process reads', () => {
-    expect(pictureUrl('C:\\Users\\me\\p\\shot.png', WIN)).toBe(imgUrl('C:\\Users\\me\\p\\shot.png', 'win32'));
-    expect(pictureUrl('C:/Users/me/p/a b#1.png', WIN)).toBe(imgUrl('C:\\Users\\me\\p\\a b#1.png', 'win32'));
+    expect(pictureUrl('C:\\Users\\me\\p\\shot.png')).toBe(imgUrl('C:\\Users\\me\\p\\shot.png', 'win32'));
+    expect(pictureUrl('C:/Users/me/p/a b#1.png')).toBe(imgUrl('C:\\Users\\me\\p\\a b#1.png', 'win32'));
   });
 });
 
@@ -107,7 +105,7 @@ describe('what a Windows path never becomes a url from', () => {
   });
 
   it('the window leaves a drive with no root alone', () => {
-    expect(pictureUrl('C:a.png', WIN)).toBe('C:a.png');
+    expect(pictureUrl('C:a.png')).toBe('C:a.png');
   });
 });
 
@@ -265,32 +263,32 @@ describe('the phone asking for a picture on this disk', () => {
 
 describe('a picture a page or a message names, on Windows', () => {
   it('beside its page is drawn from the page folder', () => {
-    expect(pictureUrl(fileBeside('pic.png', 'C:\\Users\\me\\dir', WIN), WIN)).toBe(imgUrl('C:\\Users\\me\\dir\\pic.png', 'win32'));
-    expect(pictureUrl(fileBeside('../shots/pic.png', 'C:\\Users\\me\\dir', WIN), WIN)).toBe(imgUrl('C:\\Users\\me\\shots\\pic.png', 'win32'));
+    expect(pictureUrl(fileBeside('pic.png', 'C:\\Users\\me\\dir'))).toBe(imgUrl('C:\\Users\\me\\dir\\pic.png', 'win32'));
+    expect(pictureUrl(fileBeside('../shots/pic.png', 'C:\\Users\\me\\dir'))).toBe(imgUrl('C:\\Users\\me\\shots\\pic.png', 'win32'));
   });
 
   it('beside a page in a folder with a space reads back as that file', () => {
-    const url = pictureUrl(fileBeside('a b.png', 'C:\\Users\\Some One\\dir', WIN), WIN);
+    const url = pictureUrl(fileBeside('a b.png', 'C:\\Users\\Some One\\dir'));
     expect(imgPath(url, 'win32')).toBe('C:\\Users\\Some One\\dir\\a b.png');
   });
 
   it('as a file url is the whole path it names', () => {
-    expect(wholePicturePath('file:///C:/Users/me/a%20b.png', WIN)).toBe('C:/Users/me/a b.png');
-    expect(pictureUrl(wholePicturePath('file:///C:/Users/me/a%20b.png', WIN), WIN)).toBe(imgUrl('C:\\Users\\me\\a b.png', 'win32'));
+    expect(wholePicturePath('file:///C:/Users/me/a%20b.png')).toBe('C:/Users/me/a b.png');
+    expect(pictureUrl(wholePicturePath('file:///C:/Users/me/a%20b.png'))).toBe(imgUrl('C:\\Users\\me\\a b.png', 'win32'));
   });
 
   it('as a bare drive path is the whole path, not a name to look for under each root', () => {
-    expect(wholePicturePath('C:\\Users\\me\\a.png', WIN)).toBe('C:\\Users\\me\\a.png');
-    expect(wholePicturePath('C:/Users/me/a.png', WIN)).toBe('C:/Users/me/a.png');
+    expect(wholePicturePath('C:\\Users\\me\\a.png')).toBe('C:\\Users\\me\\a.png');
+    expect(wholePicturePath('C:/Users/me/a.png')).toBe('C:/Users/me/a.png');
   });
 
   it('as a url path with its drive after a slash is still on that drive', () => {
-    expect(pictureUrl('/C:/Users/me/a.png', WIN)).toBe(imgUrl('C:\\Users\\me\\a.png', 'win32'));
+    expect(pictureUrl('/C:/Users/me/a.png')).toBe(imgUrl('C:\\Users\\me\\a.png', 'win32'));
   });
 
   it('is left to the roots when it is a name, a drive with no root or another scheme', () => {
     for (const src of ['attachments/a.png', './a.png', 'C:a.png', 'https://example.com/a.png', 'data:image/png;base64,AA']) {
-      expect(wholePicturePath(src, WIN)).toBe(null);
+      expect(wholePicturePath(src)).toBe(null);
     }
   });
 });
@@ -361,50 +359,32 @@ describe('a root on Windows, whatever the case of its letters', () => {
   });
 });
 
-describe('the window', () => {
-  it.each([['Win32', true], ['MacIntel', false], ['Linux x86_64', false], ['iPhone', false]])('reads a navigator that says %s', async (platform, windows) => {
-    vi.resetModules();
-    vi.stubGlobal('document', {});
-    vi.stubGlobal('navigator', { platform, userAgent: '' });
-    try {
-      expect((await import('../renderer/src/picture.ts')).WINDOWS).toBe(windows);
-    } finally {
-      vi.unstubAllGlobals();
-      vi.resetModules();
-    }
-  });
-
-  it('is not on Windows when there is no window', async () => {
-    expect((await import('../renderer/src/picture.ts')).WINDOWS).toBe(false);
-  });
-});
-
 describe('a folder whose name looks like url syntax, on Windows', () => {
   it.each([
     ['a hash', 'C# notes'],
     ['a percent', '100% done'],
     ['a space', 'my dir'],
   ])('keeps a picture beside its page in a folder with %s', (_, name) => {
-    const url = pictureUrl(fileBeside('pic.png', `C:\\Users\\me\\${name}`, WIN), WIN);
+    const url = pictureUrl(fileBeside('pic.png', `C:\\Users\\me\\${name}`));
     expect(imgPath(url, 'win32')).toBe(`C:\\Users\\me\\${name}\\pic.png`);
   });
 
   it('still climbs out of the folder as the page asks', () => {
-    expect(fileBeside('../shots/a.png', 'C:\\Users\\me\\C# notes', WIN)).toBe('C:/Users/me/shots/a.png');
+    expect(fileBeside('../shots/a.png', 'C:\\Users\\me\\C# notes')).toBe('C:/Users/me/shots/a.png');
   });
 
   it('never climbs on a name that only decodes to a climb or a separator', () => {
     for (const name of ['..%2f..%2fx.png', '..%5c..%5cx.png', 'a%2Fb.png', '%2e%2e%5cx.png']) {
-      expect(fileBeside(name, 'C:\\Users\\me\\dir', WIN)).toBe(`C:/Users/me/dir/${name}`);
-      expect(imgPath(pictureUrl(fileBeside(name, 'C:\\Users\\me\\dir', WIN), WIN), 'win32')).toBe(`C:\\Users\\me\\dir\\${name}`);
+      expect(fileBeside(name, 'C:\\Users\\me\\dir')).toBe(`C:/Users/me/dir/${name}`);
+      expect(imgPath(pictureUrl(fileBeside(name, 'C:\\Users\\me\\dir')), 'win32')).toBe(`C:\\Users\\me\\dir\\${name}`);
     }
-    expect(fileBeside('a%20b.png', 'C:\\Users\\me\\dir', WIN)).toBe('C:/Users/me/dir/a b.png');
+    expect(fileBeside('a%20b.png', 'C:\\Users\\me\\dir')).toBe('C:/Users/me/dir/a b.png');
   });
 });
 
 describe('a file url that does not decode, on Windows', () => {
   it('is kept as written rather than stopping the message from drawing', () => {
-    expect(wholePicturePath('file:///C:/x/a%zz.png', WIN)).toBe('C:/x/a%zz.png');
+    expect(wholePicturePath('file:///C:/x/a%zz.png')).toBe('C:/x/a%zz.png');
   });
 });
 
@@ -419,16 +399,16 @@ describe('a sound, a film or a voice note a message names by its whole path', ()
   });
 
   it('is read as a whole path for a film on a drive, bare or as a file url', () => {
-    expect(wholeMediaPath('C:\\Users\\me\\clip.mp4', WIN)).toBe('C:\\Users\\me\\clip.mp4');
-    expect(wholeMediaPath('file:///C:/Users/me/a%20b.m4a', WIN)).toBe('C:/Users/me/a b.m4a');
-    expect(pictureUrl(wholeMediaPath('C:\\Users\\me\\clip.mp4', WIN), WIN)).toBe(imgUrl('C:\\Users\\me\\clip.mp4', 'win32'));
-    expect(wholeMediaPath('clips/a.mp4', WIN)).toBe(null);
+    expect(wholeMediaPath('C:\\Users\\me\\clip.mp4')).toBe('C:\\Users\\me\\clip.mp4');
+    expect(wholeMediaPath('file:///C:/Users/me/a%20b.m4a')).toBe('C:/Users/me/a b.m4a');
+    expect(pictureUrl(wholeMediaPath('C:\\Users\\me\\clip.mp4'))).toBe(imgUrl('C:\\Users\\me\\clip.mp4', 'win32'));
+    expect(wholeMediaPath('clips/a.mp4')).toBe(null);
   });
 
   it('goes straight to the picture scheme only as a whole path, and anything else is looked for under the roots', () => {
     for (const src of ['file://clips/a.mp4', 'file://%5C%5Cx%5Cclip.mp4', 'file://%5Cclip.mp4', 'file://C:clip.mp4']) {
-      expect(wholeMediaPath(src, WIN)).toBe(null);
+      expect(wholeMediaPath(src)).toBe(null);
     }
-    expect(wholeMediaPath('file:///clips/a.mp4', WIN)).toBe('/clips/a.mp4');
+    expect(wholeMediaPath('file:///clips/a.mp4')).toBe('/clips/a.mp4');
   });
 });
