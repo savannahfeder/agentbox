@@ -314,7 +314,7 @@ export function supabaseBackend(client) {
     },
 
     // A FILE ANYONE WITH ITS LINK CAN READ: only through the functions in
-    // 20261105000000_a_file_anyone_with_its_link_can_read.sql.
+    // 20261105000001_a_file_anyone_with_its_link_can_read.sql.
     async shareFile({ source, name, kind, type, body, version = 1, hash = '' }) {
       await myId();
       return must(await client.rpc('share_file', { src: source, nm: name, k: kind, typ: type, b: body, v: version, h: hash }), 'sharing the file');

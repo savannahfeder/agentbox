@@ -3,7 +3,7 @@
 // Asked for 2026-11-03 (w-d7e61eb261): make documents and other files shareable
 // on the web, with a way to make an account from there. A link is read by
 // people who are not signed in, so a mistake in
-// 20261105000000_a_file_anyone_with_its_link_can_read.sql is a stranger reading
+// 20261105000001_a_file_anyone_with_its_link_can_read.sql is a stranger reading
 // someone's other files, or a link that keeps working after it was stopped.
 // Every migration runs here in PGlite and each door is tried from each side:
 // Maya shares, Jun is signed in on another team, Theo comments, and nobody

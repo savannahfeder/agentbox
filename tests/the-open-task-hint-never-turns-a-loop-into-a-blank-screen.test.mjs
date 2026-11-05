@@ -74,6 +74,7 @@ describe.skipIf(!browserAvailable)('the ↵ Open task plate in a real window', (
 
   it('a loop elsewhere is still reported but the screen stays drawn', async () => {
     const { tab, errors } = await mount(browser, LOOP);
+    await tab.waitForFunction(() => window.go);
     await tab.evaluate(() => window.go());
     await tab.waitForTimeout(300);
     expect(errors.some((m) => m.includes('#185'))).toBe(true);

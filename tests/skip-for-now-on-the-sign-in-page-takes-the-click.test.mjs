@@ -32,8 +32,8 @@ const rule = (sel) => {
 describe('the sign-in page is drawn after every drag strip in the window', () => {
   const uses = [...app.matchAll(/<SignInPage\b/g)].map((m) => m.index);
 
-  it('is shown in three places: the ask, the phone and the cloud', () => {
-    expect(uses).toHaveLength(3);
+  it('is shown in four places: the ask, the phone, sharing a link and the cloud', () => {
+    expect(uses).toHaveLength(4);
   });
 
   it('every one of them goes to the end of <body>, not inside the app', () => {
