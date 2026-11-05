@@ -23,16 +23,20 @@ import { DOC_SCHEME } from '../shared/schemes.mts';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
+// These are Mac paths, so they are read as a Mac reads them on any computer.
+// Windows has its own test, on-windows-a-picture-or-document-opens-from-its-drive.
+const MAC = 'darwin';
+
 describe('the url a picture is asked for on', () => {
   it('is the app scheme, not file://', () => {
-    expect(imgUrl('/Users/x/.staging/pasted-1.png'))
+    expect(imgUrl('/Users/x/.staging/pasted-1.png', MAC))
       .toBe(`${IMG_SCHEME}://file/Users/x/.staging/pasted-1.png`);
   });
 
   it('survives a filename with a space, a hash or a question mark in it', () => {
     for (const name of ['a picture.png', 'shot #2.png', 'why?.png', 'café.png']) {
-      const url = imgUrl(`/Users/x/${name}`);
-      expect(imgPath(url)).toBe(`/Users/x/${name}`);
+      const url = imgUrl(`/Users/x/${name}`, MAC);
+      expect(imgPath(url, MAC)).toBe(`/Users/x/${name}`);
     }
   });
 
@@ -43,7 +47,7 @@ describe('the url a picture is asked for on', () => {
   });
 
   it('normalises a climb written into the url away', () => {
-    expect(imgPath(`${IMG_SCHEME}://file/Users/x/attachments/../../../etc/hosts`)).toBe('/etc/hosts');
+    expect(imgPath(`${IMG_SCHEME}://file/Users/x/attachments/../../../etc/hosts`, MAC)).toBe('/etc/hosts');
   });
 });
 
@@ -51,26 +55,26 @@ describe('what the app agrees to hand back', () => {
   const roots = ['/Users/x/Store/accounts/acct', '/Users/x/code/zero'];
 
   it('serves a staged paste and a worker screenshot', () => {
-    expect(servable('/Users/x/Store/accounts/acct/.staging/mt5-pasted-8.png', roots)).toBe(true);
-    expect(servable('/Users/x/Store/accounts/acct/agentbox/attachments/a.jpeg', roots)).toBe(true);
-    expect(servable('/Users/x/code/zero/shots/first-run/beat-3.png', roots)).toBe(true);
+    expect(servable('/Users/x/Store/accounts/acct/.staging/mt5-pasted-8.png', roots, MAC)).toBe(true);
+    expect(servable('/Users/x/Store/accounts/acct/agentbox/attachments/a.jpeg', roots, MAC)).toBe(true);
+    expect(servable('/Users/x/code/zero/shots/first-run/beat-3.png', roots, MAC)).toBe(true);
   });
 
   it('serves pictures and nothing else, whatever folder it is in', () => {
-    expect(servable('/Users/x/Store/accounts/acct/zero.config.json', roots)).toBe(false);
-    expect(servable('/Users/x/code/zero/main/main.mts', roots)).toBe(false);
-    expect(servable('/Users/x/Store/accounts/acct/notes.md', roots)).toBe(false);
+    expect(servable('/Users/x/Store/accounts/acct/zero.config.json', roots, MAC)).toBe(false);
+    expect(servable('/Users/x/code/zero/main/main.mts', roots, MAC)).toBe(false);
+    expect(servable('/Users/x/Store/accounts/acct/notes.md', roots, MAC)).toBe(false);
   });
 
   it('stays inside the folders the app owns', () => {
-    expect(servable('/Users/x/Library/Keychains/login.keychain.png', roots)).toBe(false);
-    expect(servable('/etc/hosts.png', roots)).toBe(false);
+    expect(servable('/Users/x/Library/Keychains/login.keychain.png', roots, MAC)).toBe(false);
+    expect(servable('/etc/hosts.png', roots, MAC)).toBe(false);
     // /a/bc is not inside /a/b.
-    expect(servable('/Users/x/code/zero-other/shot.png', roots)).toBe(false);
+    expect(servable('/Users/x/code/zero-other/shot.png', roots, MAC)).toBe(false);
   });
 
   it('opens nothing at all when the app has not said what it owns yet', () => {
-    expect(servable('/Users/x/Store/accounts/acct/.staging/a.png', [])).toBe(false);
+    expect(servable('/Users/x/Store/accounts/acct/.staging/a.png', [], MAC)).toBe(false);
   });
 });
 

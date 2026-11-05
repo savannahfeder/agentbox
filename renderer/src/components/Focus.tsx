@@ -69,7 +69,7 @@ import { ReplyModel } from './ReplyModel';
 import type { ModelChoice } from '../models';
 import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mjs';
 import { fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
-import { onPictureLinks, pictureLinksVersion, pictureUrl, sentPictureLink } from '../picture';
+import { onPictureLinks, pictureLinksVersion, pictureUrl, sentPictureLink, wholeMediaPath, wholePicturePath } from '../picture';
 import { Listening, MicButton, useWebDictation } from './WebDictation';
 import { firstFrameSrc, playerShelf } from '../player-shelf';
 import { handleCopyOut, blockCopyText } from '../copy-out';
@@ -262,7 +262,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
     return () => clearTimeout(timer);
   }, [broken, tries]);
   const again = (url: string) => (tries ? `${url}?look=${tries}` : url);
-  const relative = !!src && !/^(data|https?|file):/.test(src) && !src.startsWith('/');
+  const relative = !!src && !/^(data|https?|file):/.test(src) && wholePicturePath(src) === null;
   const exhausted = relative && attempt >= roots.length;
   useEffect(() => {
     // A whole path written on a teammate's computer is not on this one: the
@@ -328,8 +328,9 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
   // LETS A COPY CARRY THE PICTURE. Without it the picture taints a canvas and
   // ../copy-out.ts has nothing to inline, so a message pasted into an email
   // arrives with a dead url where it should be.
-  if (/^file:\/\//.test(src) || src.startsWith('/')) {
-    const file = src.startsWith('/') ? src : decodeURIComponent(src.slice(7));
+  const whole = wholePicturePath(src);
+  if (whole !== null) {
+    const file = whole;
     if (found) return door(found, <img src={pictureUrl(found)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" />);
     if (broken && direct) return <CarriedNote src={file} always />;
     if (broken) return <button type="button" className="missing-artifact" title="Look for it again" onClick={() => { setTries(tries + 1); setBroken(false); }}>missing image: {file}</button>;
@@ -420,7 +421,8 @@ export function ArtifactMedia({ src, label, roots, onOpen, find }: { src: string
   // or has still to come, and fills in when it lands.
   const [found, setFound] = useState<string | null>(null);
   const [looks, setLooks] = useState(0);
-  const candidates = found ? [pictureUrl(found)] : src.startsWith('/') ? [pictureUrl(src)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
+  const whole = wholeMediaPath(src);
+  const candidates = found ? [pictureUrl(found)] : whole !== null ? [pictureUrl(whole)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
   const looked = candidates.join('\n');
   const missing = attempt >= candidates.length;
   useEffect(() => {
@@ -1451,7 +1453,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         const note = href && !/^(https?|data):/.test(href) ? voiceNoteOf(href) : null;
         if (href && note) {
           const rel = href.replace(/^\.\//, '');
-          const urls = href.startsWith('/') ? [pictureUrl(href)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
+          const whole = wholeMediaPath(href);
+          const urls = whole !== null ? [pictureUrl(whole)] : roots.map((r) => pictureUrl(`${r}/${rel}`));
           return <VoiceNote key={href} id={`${product}:${rel}`} ms={note.ms} load={() => firstFound(urls)} />;
         }
         // A SOUND OR A FILM PLAYS IN PLACE (ArtifactMedia, above).

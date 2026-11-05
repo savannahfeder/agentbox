@@ -74,7 +74,7 @@ describe('what the window may open', () => {
   it('opens a pptx big and may load it, and still not an old binary ppt', () => {
     expect(reviewKind('attachments/a-b-deck.pptx')).toBe('deck');
     expect(reviewKind('deck.ppt')).toBeNull();
-    expect(servable('/root/deck.pptx', ['/root'])).toBe(true);
-    expect(servable('/elsewhere/deck.pptx', ['/root'])).toBe(false);
+    expect(servable('/root/deck.pptx', ['/root'], 'darwin')).toBe(true);
+    expect(servable('/elsewhere/deck.pptx', ['/root'], 'darwin')).toBe(false);
   });
 });
