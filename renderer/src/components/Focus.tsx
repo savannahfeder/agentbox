@@ -114,7 +114,7 @@ import { foldedReply } from '../folded-reply';
 import { applyDockHeight } from '../dock-height';
 import { resumeTo } from '../thread-bottom';
 import { optionIsClipped, optionPeek } from '../option-peek';
-import { changedFiles, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
+import { changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
 import { MOVED_PX, THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw } from '../pick-settles';
 import { askHeading, askFull, askIsClipped } from '../ask-line';
 import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mjs';
@@ -130,7 +130,7 @@ import { SidebarIcon } from './SidebarIcon';
 import { Byline, ConversationAside } from './Byline';
 import { ItemThread } from './ItemThread';
 import { ContinuedFrom } from '../threads/ContinuedFrom';
-import type { PendingSaid } from '../item-thread';
+import { answerOnItsWay, type PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
 import { useKeepInWindow } from '../keep-in-window';
@@ -1285,7 +1285,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // conversation is: the run that is writing the trace writes the change the
   // moment it exits, and without this she would have to leave the card and come
   // back before the code she watched being written became pressable. A finished
-  // row does not change under her, so it is read once.
+  // row is read once, after the short while its folder takes to settle.
   const [figures, setFigures] = useState<ChangeFigures | null>(null);
   // And where its folder stands, off the same file, because the figures alone
   // cannot say whether any of this reached a commit (../ship-offer.ts).
@@ -1310,9 +1310,13 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         .catch(() => { if (live) { setFigures(null); setStanding(UNREAD); setChanged([]); } });
     };
     read();
-    if (!session) return () => { live = false; };
+    // And for a short while after the run ends: its folder is read back after
+    // its result is written (../ship-offer.ts, folderMayStillMove).
+    const settling = !!session || folderMayStillMove(item, Date.now());
+    if (!settling) return () => { live = false; };
     const timer = setInterval(read, pollEvery(4000, onPhone()));
-    return () => { live = false; clearInterval(timer); };
+    const settled = session ? null : setTimeout(() => clearInterval(timer), FOLDER_SETTLES_MS);
+    return () => { live = false; clearInterval(timer); if (settled) clearTimeout(settled); };
   }, [item.product, item.id, item.updatedAt, session?.startedAt, agent]);
   const summaryNow = summaryOffered ? (summaryShown ? 'open' : 'closed') : null;
 
@@ -1670,6 +1674,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const shipAsk = shipOfferLive(item, { change: !!figures, running: !!session || !!agent }) ? shipOfferFor(standing, onlyNamedFiles(changed, referencedFiles(item.result, item.note, item.body, item.answer, { dir: productDir }), productDir)) : null;
   const shipOffer = !!shipAsk;
   const stripShown = showOptions || shipOffer;
+  // A pick is held a few seconds for Z before it is written, and the card it
+  // answered stayed up all that time, as if nothing had been taken (F-170).
+  const answered = answerOnItsWay(sending);
   // Whatever the pane is leading with, not the ask alone: on a row the user
   // wrote, the ask is the one field a worker cannot answer in (format.ts says
   // why). The agent's own offer wins wherever there is one.
@@ -2312,7 +2319,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         {!fullScreenDoc && !askAtTask && closeAskStrip(false)}
         {questions}
         {/* One at a time draws them at the foot instead, apart from the reply box. */}
-        {offerInPane && (page || closeAsk ? null : (
+        {offerInPane && (page || closeAsk || answered ? null : (
           <OptionsOffer
             ask={ask} askAll={askAll} options={options}
             peekOption={peekOption} askPeek={askPeek}
@@ -2501,7 +2508,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             something the page does not: there was nothing over "Ship it
             (recommended)" saying the change had never been committed (F-79,
             ../ship-offer.ts). */}
-        {page && stripShown && !fullScreenDoc && !closeAsk && (
+        {page && stripShown && !fullScreenDoc && !closeAsk && !answered && (
           <div className={`one-choices${choicesFolded ? ' one-choices-folded' : ''}`}>
             <OptionsOffer
               ask={ask} askAll={askAll} options={options}
@@ -2533,7 +2540,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               folds. It follows nobody down a page, because in that mode there
               is no page of conversation on the screen. */}
           {fullScreenDoc && closeAskStrip(true)}
-          {offerInDock && (closeAsk ? null : (
+          {offerInDock && (closeAsk || answered ? null : (
             <OptionsOffer
               ask={ask} askAll={askAll} options={options}
               peekOption={peekOption} askPeek={askPeek}
@@ -2596,7 +2603,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                 >{modelWord}</span>
               )}
               <span className="dock-pill-key"><kbd>R</kbd></span>
-              {choicesFolded && page && stripShown && !fullScreenDoc && !closeAsk && <ChoicesShow count={options.length} onShow={foldChoices} />}
+              {choicesFolded && page && stripShown && !fullScreenDoc && !closeAsk && !answered && <ChoicesShow count={options.length} onShow={foldChoices} />}
             </button>
           )}
         </div>
