@@ -1,7 +1,7 @@
 // Settings opens on its pages. Its search is an icon at the right of the Back
 // row, which opens across the row while you type (phone.css `.set-search`), and
 // it reads the desktop's own index (renderer/src/settings-search.ts).
-import { router } from 'expo-router';
+import { router } from '../../lib/router';
 import { useMemo, useState } from 'react';
 import { Platform, TextInput, View } from 'react-native';
 import { cloudCarriesOn } from '../../../../renderer/src/phone-rows';

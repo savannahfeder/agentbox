@@ -1,6 +1,6 @@
 // How a thread's messages reach the files they name on the phone app, and the
 // tiles for its documents and designs (MessageFiles.tsx on the phone site).
-import { router } from 'expo-router';
+import { router } from '../lib/router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, View } from 'react-native';

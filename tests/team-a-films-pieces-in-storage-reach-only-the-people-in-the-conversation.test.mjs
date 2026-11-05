@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const migrationsDir = path.join(root, 'cloud/supabase/migrations');
@@ -62,7 +63,7 @@ const add = (person, name) => as(person, `insert into storage.objects (bucket_id
 const names = async (person, role) => (await rows(person, `select name from storage.objects where bucket_id = 'message-files' order by name`, [], role)).map((r) => r.name);
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite(await emptyDatabase());
   await db.exec(SUPABASE_STAND_IN);
   await db.exec(migration);
   await db.exec(GRANTS);

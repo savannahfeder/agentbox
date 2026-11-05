@@ -14,6 +14,7 @@ import {
   pasteInto, renameColumn, shapeOf, showColumnAs, toClipboard, writeCells, writeTable, type At, type Box, type Pick,
 } from '../table-edit';
 import { api } from '../api';
+import { MAC } from '../this-keyboard';
 import './table-view.css';
 
 export type TableMode = 'preview' | 'pane' | 'full';
@@ -186,8 +187,7 @@ const sortWords = (c: Column, dir: 'asc' | 'desc') => {
 };
 const rowsWord = (n: number) => `${n.toLocaleString()} ${n === 1 ? 'row' : 'rows'}`;
 const typingIn = (el: Element | null) => !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable);
-const isMac = typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent);
-const CMD = isMac ? '⌘' : 'Ctrl+';
+const CMD = MAC ? '⌘' : 'Ctrl+';
 
 function Menu({ label, icon, on, children }: { label: string; icon: ReactNode; on: boolean; children: (close: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false);

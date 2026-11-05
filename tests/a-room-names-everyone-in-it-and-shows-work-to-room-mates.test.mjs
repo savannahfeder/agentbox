@@ -14,6 +14,7 @@ import { it, expect, beforeAll, afterAll, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 
 const dir = path.join(import.meta.dirname, '..', 'cloud/supabase/migrations');
 const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
@@ -57,7 +58,7 @@ const refused = async (person, sql, params, role) => { try { await as(person, sq
 const names = async (person) => (await rows(person, `select person_id, name, has_card from public.room_names($1) order by name`, [room]));
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite(await emptyDatabase());
   await db.exec(STAND_IN);
   await db.exec(migration);
   await db.exec(GRANTS);

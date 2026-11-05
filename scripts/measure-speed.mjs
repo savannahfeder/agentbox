@@ -1,6 +1,6 @@
 // WHERE THE APP'S MAIN THREAD SPENDS ITS TIME, ON A BIG INBOX.
 //
-//   node scripts/measure-speed.mjs [--projects 8] [--threads 400] [--fresh]
+//   node scripts/measure-speed.mjs [--projects 8] [--threads 400] [--stranded 800] [--fresh]
 //
 // Makes a made-up store (projects × threads, long histories, most finished),
 // starts the browser copy of the app on it in a child process with the freeze
@@ -23,11 +23,21 @@ const root = path.join(os.tmpdir(), 'agentbox-speed');
 const data = path.join(root, 'data');
 const timings = path.join(data, 'timings.jsonl');
 const log = (o) => fs.appendFileSync(timings, `${JSON.stringify({ t: Date.now(), ...o })}\n`);
+// Threads whose last run ended and left them where they were: the agents' clock
+// walks these every tick. A real store measured 2026-11-04 had 747 of them with
+// logs of 4 KB at the median, so --stranded defaults near that.
+const STRANDED_LOG_KB = 4;
 
 if (args[0] === '--serve') await serve(Number(args[1]));
 else await measure();
 
-async function makeStore(projects, perProject) {
+function strandedLog(id) {
+  let text = `# ${id} · spawned 2026-08-27T22:25:22.807Z\n\n`;
+  for (let n = 0; text.length < STRANDED_LOG_KB * 1024; n += 1) text += `22:${String(n % 60).padStart(2, '0')}:29  [Bash] npm run test:changed\n`;
+  return `${text}\n# exited (0) 2026-08-27T22:31:01.414Z\n`;
+}
+
+async function makeStore(projects, perProject, strandedCount) {
   const storeRoot = path.join(root, 'store');
   const accountRoot = path.join(storeRoot, 'accounts', 'speed');
   fs.rmSync(root, { recursive: true, force: true });
@@ -40,6 +50,8 @@ async function makeStore(projects, perProject) {
   const words = 'the app froze when she pressed E and the inbox moved on to the next task while a worker wrote its answer report.md into the store'.split(' ');
   const text = (n) => Array.from({ length: n }, () => words[Math.floor(Math.random() * words.length)]).join(' ');
   const now = Date.now();
+  const strandedPerProject = Math.ceil(strandedCount / projects);
+  const fruitless = {};
   for (let p = 0; p < projects; p += 1) {
     const slug = `project-${p}`;
     const dir = path.join(accountRoot, slug);
@@ -55,20 +67,30 @@ async function makeStore(projects, perProject) {
     const lines = [];
     for (let i = 0; i < perProject; i += 1) {
       const id = `w-${crypto.randomBytes(5).toString('hex')}`;
+      // The stranded ones are open, unanswered and waiting: what the pass walks.
+      const stranded = i < strandedPerProject;
       let t = now - Math.floor(Math.random() * 30 * 86_400_000);
       lines.push(buildLine({ id, patch: { title: text(12), body: text(80), status: 'open', labels: ['founder'] }, source: 'founder', now: t }));
       for (let r = 0, rounds = 3 + Math.floor(Math.random() * 10); r < rounds; r += 1) {
         t += 60_000 + Math.floor(Math.random() * 3_600_000);
         lines.push(buildLine({ id, patch: { note: text(60 + Math.floor(Math.random() * 200)), problem: text(30), progress: text(40) }, now: t }));
-        if (r % 3 === 2) lines.push(buildLine({ id, patch: { answer: text(30) }, source: 'founder', now: t + 1000 }));
+        if (!stranded && r % 3 === 2) lines.push(buildLine({ id, patch: { answer: text(30) }, source: 'founder', now: t + 1000 }));
       }
-      const status = Math.random() < 0.8 ? 'done' : Math.random() < 0.5 ? 'blocked' : 'open';
+      const status = stranded ? 'open' : Math.random() < 0.8 ? 'done' : Math.random() < 0.5 ? 'blocked' : 'open';
       lines.push(buildLine({ id, patch: { status, result: text(120) }, now: t + 5000 }));
+      if (!stranded) continue;
+      const log = machineryPath(dir, path.join('sessions', id, '1787863899445.log'));
+      fs.mkdirSync(path.dirname(log), { recursive: true });
+      fs.writeFileSync(log, strandedLog(id));
+      // Later than everything written on the thread, so the pass reads it as a
+      // run that ended after the last word anybody said there.
+      fruitless[`${slug}:${id}`] = { runs: 1, endedAt: now };
     }
     const file = machineryPath(dir, 'work-items.jsonl');
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, `${lines.sort((a, b) => a.ts - b.ts).map((l) => JSON.stringify(l)).join('\n')}\n`);
   }
+  fs.writeFileSync(path.join(storeRoot, '.zero-supervisor.json'), JSON.stringify({ fruitless }));
 }
 
 async function serve(port) {
@@ -105,7 +127,8 @@ async function measure() {
   if (!fs.existsSync(path.join(repo, 'renderer', 'dist', 'index.html'))) throw new Error('No built screen: run npx vite build renderer first.');
   const projects = Number(flag('projects', 8));
   const perProject = Number(flag('threads', 400));
-  if (args.includes('--fresh') || !fs.existsSync(path.join(data, 'zero.config.json'))) await makeStore(projects, perProject);
+  const stranded = Number(flag('stranded', 800));
+  if (args.includes('--fresh') || !fs.existsSync(path.join(data, 'zero.config.json'))) await makeStore(projects, perProject, stranded);
   fs.rmSync(timings, { force: true });
   fs.rmSync(path.join(data, 'memory-log'), { recursive: true, force: true });
   const port = 4700 + Math.floor(Math.random() * 200);
