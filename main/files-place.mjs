@@ -626,7 +626,9 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     for (const name of [...rows.map((f) => f.project), ...lib.folders.map((f) => f.project)]) {
       if (name && !projects.some((p) => projectKey(p) === projectKey(name))) projects.push(name);
     }
-    return { files: rows, projects: projects.sort((a, b) => a.localeCompare(b)), folders: lib.folders };
+    // The projects a new document can go in: only this computer's own.
+    const mine = store.listProducts().filter((p) => !p.team?.direct).map((p) => p.name).sort((a, b) => a.localeCompare(b));
+    return { files: rows, projects: projects.sort((a, b) => a.localeCompare(b)), folders: lib.folders, mine };
   }
 
   return {
@@ -670,6 +672,37 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       writeFolderLog(logDir(), { op: 'place', key, project: file.project, family: familyIn(key), folder: into?.id ?? null, by, at: Date.now() });
       void crossing();
       return { ok: true };
+    },
+
+    /**
+     * An empty document, made by the person rather than an agent. Files lists
+     * only what a thread names, so it gets a thread of its own, made closed so
+     * no agent starts on it.
+     */
+    async newDocument({ project, name, folder = null, by = team?.state?.().me?.id ?? null }) {
+      const title = cleanFolderName(name);
+      if (!title) throw new Error('a document needs a name');
+      const home = store.listProducts().find((p) => !p.team?.direct && projectKey(p.name) === projectKey(project));
+      if (!home) throw new Error('a new document goes in one of your own projects');
+      const lib = shelf();
+      const into = folder ? lib.folders.find((f) => f.id === lib.canon(folder)) : null;
+      if (folder && !into) throw new Error('that folder is gone');
+      if (into && projectKey(into.project) !== projectKey(home.name)) throw new Error('that folder is in another project');
+      const stem = title.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'document';
+      const keys = new Set(allFiles().map((f) => f.key));
+      const taken = (file) => keys.has(fileKeyIn(home.name, file)) || fs.existsSync(path.join(home.dir, 'documents', file));
+      let file = `${stem}.md`;
+      for (let n = 2; taken(file); n += 1) file = `${stem}-${n}.md`;
+      const rel = `documents/${file}`;
+      fs.mkdirSync(path.join(home.dir, 'documents'), { recursive: true });
+      fs.writeFileSync(path.join(home.dir, rel), '', { flag: 'wx' });
+      store.modules.workItemsDisk.createWorkItem(home.dir, { title, kind: 'directive', labels: ['founder'], status: 'done', body: `[${file}](${rel})` }, { source: 'founder' });
+      const key = fileKeyIn(home.name, file);
+      if (into) {
+        writeFolderLog(logDir(), { op: 'place', key, project: home.name, family: familyOfName(file), folder: into.id, by, at: Date.now() });
+        void crossing();
+      }
+      return { key };
     },
 
     /** Files named on a thread, into a project's folder by that name, made if it is not there. */

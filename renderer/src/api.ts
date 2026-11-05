@@ -983,6 +983,10 @@ export const api = {
     if (!window.zero?.filesPlaceFolder) return { ok: false, error: `quit and reopen ${NAME} to use folders` };
     return window.zero.filesPlaceFolder(p);
   },
+  async filesPlaceNew(p: { project: string; name: string; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }> {
+    if (!window.zero?.filesPlaceNew) return { ok: false, error: `Quit and reopen ${NAME} to make a document here.` };
+    return window.zero.filesPlaceNew(p);
+  },
   async filesPlaceOpen(p: { key: string }): Promise<FilesPlaceView | null> {
     return (await window.zero?.filesPlaceOpen?.(p).catch(() => null)) ?? null;
   },

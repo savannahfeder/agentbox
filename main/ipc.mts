@@ -2468,6 +2468,13 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       return { ok: true, folder: out.id ?? null };
     } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   });
+  ipcMain.handle('zero:files-place-new', async (_e, { project, name, folder }: { project?: unknown; name?: unknown; folder?: unknown } = {}) => {
+    try {
+      const out = await filesPlaceNow().newDocument({ project: String(project ?? ''), name: String(name ?? ''), folder: typeof folder === 'string' ? folder : null });
+      push();
+      return { ok: true, key: out.key };
+    } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+  });
   ipcMain.handle('zero:files-place-open', async (_e, { key }: { key?: unknown } = {}) => {
     try { return await filesPlaceNow().open(String(key ?? '')); } catch { return null; }
   });

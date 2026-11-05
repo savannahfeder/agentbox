@@ -173,6 +173,38 @@ function MoveMenu({ file, name, keys, folders, act, onNewFolder }: {
   </div>;
 }
 
+type Making = 'document' | 'folder';
+
+/** "New": a document or a folder, here or, from every file, in a project you pick. */
+function NewMenu({ project, projects, canDocument, canFolder, onPick }: {
+  project: string | null; projects: string[]; canDocument: boolean; canFolder: boolean; onPick: (what: Making, project: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [what, setWhat] = useState<Making | null>(null);
+  const box = useClosesOutside(open, () => { setOpen(false); setWhat(null); });
+  const pick = (w: Making, p: string) => { setOpen(false); setWhat(null); onPick(w, p); };
+  const choose = (w: Making) => {
+    if (project) pick(w, project);
+    else if (projects.length === 1) pick(w, projects[0]);
+    else setWhat(w);
+  };
+  if ((!project && !projects.length) || (!canDocument && !canFolder)) return null;
+  return <div className="fp-new-box" ref={box}>
+    <button type="button" className="fp-new" aria-haspopup="menu" aria-expanded={open} onClick={() => { setOpen(!open); setWhat(null); }}>New</button>
+    {open && <div className="fp-menu" role="menu">
+      {what
+        ? <>
+          <div className="fp-menu-head">{what === 'document' ? 'New document in' : 'New folder in'}</div>
+          <div className="fp-menu-list">{projects.map((p) => <button type="button" key={p} role="menuitem" className="fp-menu-item" onClick={() => pick(what, p)}>{p}</button>)}</div>
+        </>
+        : <>
+          {canDocument && <button type="button" role="menuitem" className="fp-menu-item" onClick={() => choose('document')}><DocGlyph />Document</button>}
+          {canFolder && <button type="button" role="menuitem" className="fp-menu-item" onClick={() => choose('folder')}><FolderGlyph />Folder</button>}
+        </>}
+    </div>}
+  </div>;
+}
+
 function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder }: {
   file: PlacedFile; list: boolean; now: number; me: string | null; nameOf: (id: string) => string; onOpen: () => void;
   folders: FileFolder[]; act: (p: FileFolderAct) => void; onNewFolder: (file: PlacedFile, name: string) => void;
@@ -224,6 +256,7 @@ function FolderCard({ folder, count, onOpen, onDropFile, onRename }: {
 }
 
 const FolderGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M2 4.6c0-.6.5-1.1 1.1-1.1h2.7c.3 0 .6.1.8.3l1 1h5.3c.6 0 1.1.5 1.1 1.1v6c0 .6-.5 1.1-1.1 1.1H3.1c-.6 0-1.1-.5-1.1-1.1z" strokeLinejoin="round" /></svg>;
+const DocGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M4 2.5h5l3 3v8H4z M9 2.5v3h3 M6 8.5h4 M6 10.8h4" strokeLinejoin="round" strokeLinecap="round" /></svg>;
 const MoreGlyph = () => <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.2" /><circle cx="8" cy="8" r="1.2" /><circle cx="12.5" cy="8" r="1.2" /></svg>;
 const PenGlyph = () => <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M3 13l.7-2.8 7-7a1.2 1.2 0 0 1 1.7 0l.4.4a1.2 1.2 0 0 1 0 1.7l-7 7z" strokeLinejoin="round" /></svg>;
 const GridGlyph = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><rect x="2.5" y="2.5" width="4.4" height="4.4" rx="1.1" /><rect x="9.1" y="2.5" width="4.4" height="4.4" rx="1.1" /><rect x="2.5" y="9.1" width="4.4" height="4.4" rx="1.1" /><rect x="9.1" y="9.1" width="4.4" height="4.4" rx="1.1" /></svg>;
@@ -232,8 +265,8 @@ const ListGlyph = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="no
 const CommentGlyph = () => <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" strokeLinejoin="round" /></svg>;
 
 /** The file opened big, with every place it went to under it. */
-function OpenFile({ fileKey, onClose, onPlace, onNotice }: {
-  fileKey: string; onClose: () => void; onPlace: (p: FileSentIn) => void; onNotice: (words: string) => void;
+function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice }: {
+  fileKey: string; typing?: boolean; onClose: () => void; onPlace: (p: FileSentIn) => void; onNotice: (words: string) => void;
 }) {
   const team = useContext(TeamContext);
   const [view, setView] = useState<FilesPlaceView | null>(null);
@@ -277,6 +310,7 @@ function OpenFile({ fileKey, onClose, onPlace, onNotice }: {
     onOutside={(src) => { void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) onNotice(r.error || 'That file could not be opened.'); }); }}
     onClose={onClose}
     below={below}
+    typing={typing}
   />;
 }
 
@@ -300,14 +334,25 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
   const [sort, setSort] = useState<FileSort>('recent');
   const [asList, setAsList] = useState(false);
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [madeKey, setMadeKey] = useState<string | null>(null);
   const [folderId, setFolderId] = useState<string | null>(null);
-  const [naming, setNaming] = useState(false);
+  const [naming, setNaming] = useState<{ what: Making; project: string } | null>(null);
   const box = useRef<HTMLInputElement | null>(null);
   const all = list ?? NONE;
   const folders = all.folders ?? NO_FOLDERS;
   const folder = folders.some((f) => f.id === folderId) ? folderId : null;
   const place = { project, folder };
-  useEffect(() => { setFolderId(null); setNaming(false); }, [project]);
+  // Picking a project from every file opens its page with the name box already there.
+  useEffect(() => { setFolderId(null); setNaming((n) => (n && n.project === project ? n : null)); }, [project]);
+  const mine = all.mine ?? [];
+  const isMine = (p: string | null) => !!p && mine.some((m) => m.toLowerCase() === p.toLowerCase());
+  const makeDocument = (name: string) => {
+    setNaming(null);
+    if (!project) return;
+    void api.filesPlaceNew({ project, name, folder }).then((r) => {
+      if (r.ok && r.key) { setMadeKey(r.key); setOpenKey(r.key); } else onNotice(r.error || 'That document could not be made.');
+    });
+  };
   const below = useMemo(() => filesBelow(all.files, folders, place), [all.files, folders, project, folder]); // eslint-disable-line react-hooks/exhaustive-deps
   const here = useMemo(() => filesInPlace(all.files, folders, place), [all.files, folders, project, folder]); // eslint-disable-line react-hooks/exhaustive-deps
   const looking = !!query || !!kind || review;
@@ -371,17 +416,24 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
           <button type="button" className={`fp-kind fp-view-icon${asList ? '' : ' is-on'}`} aria-pressed={!asList} aria-label="Grid" title="Grid" onClick={() => setAsList(false)}><GridGlyph /></button>
           <button type="button" className={`fp-kind fp-view-icon${asList ? ' is-on' : ''}`} aria-pressed={asList} aria-label="List" title="List" onClick={() => setAsList(true)}><ListGlyph /></button>
         </div>
-        {project && canNest && !looking && <button type="button" className="fp-new" onClick={() => setNaming(true)}>New folder</button>}
+        {!looking && <NewMenu project={project} projects={mine} canDocument={project ? isMine(project) : true} canFolder={project ? canNest : true}
+          onPick={(what, p) => { if (p !== project) onProject(p); setNaming({ what, project: p }); }} />}
       </div>
     </div>
-    {(cards.length > 0 || projectCards.length > 0 || naming) && <div className="fp-folders">
+    {(cards.length > 0 || projectCards.length > 0 || naming?.what === 'folder') && <div className="fp-folders">
       {projectCards.map((p) => <FolderCard key={p} folder={{ name: p }} count={filesBelow(all.files, folders, { project: p, folder: null }).length} onOpen={() => onProject(p)} />)}
       {cards.map((f) => <FolderCard key={f.id} folder={f} count={countIn(f.id)} onOpen={() => setFolderId(f.id)}
         onDropFile={(key) => move(key, f.id)} onRename={(name) => { void act({ do: 'rename', id: f.id, name }); }} />)}
-      {naming && project && <div className="fp-folder is-new"><div className="fp-folder-open"><FolderGlyph /><span className="fp-folder-words"><NameBox placeholder="Folder name" onCancel={() => setNaming(false)} onDone={(name) => { setNaming(false); void act({ do: 'make', project, name, parent: folder }); }} /></span></div></div>}
+      {naming?.what === 'folder' && project && <div className="fp-folder is-new"><div className="fp-folder-open"><FolderGlyph /><span className="fp-folder-words"><NameBox placeholder="Folder name" onCancel={() => setNaming(null)} onDone={(name) => { setNaming(null); void act({ do: 'make', project, name, parent: folder }); }} /></span></div></div>}
     </div>}
     {list && !shown.length && !scratch.length && !cards.length && !projectCards.length && !naming && <p className="fp-empty">{empty}</p>}
     <div className={asList ? 'fp-lines' : 'fp-grid'}>
+      {naming?.what === 'document' && project && <div className={asList ? 'fp-line is-new' : 'fp-tile is-new'}>
+        <div className="fp-open-file">
+          <span className={`fp-face fp-face-markdown${asList ? ' fp-thumb' : ''}`}>{asList ? <span className="fp-thumb-word">DOC</span> : <DocGlyph />}</span>
+          <span className="fp-name"><NameBox placeholder="Document name" onCancel={() => setNaming(null)} onDone={makeDocument} /></span>
+        </div>
+      </div>}
       {shown.map(tile)}
     </div>
     {scratch.length > 0 && <div className="fp-scratch-row">
@@ -395,7 +447,7 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
     {scratchOpen && scratch.length > 0 && <div className={`${asList ? 'fp-lines' : 'fp-grid'} fp-grid-scratch`}>
       {scratch.map(tile)}
     </div>}
-    {openKey && <OpenFile key={openKey} fileKey={openKey} onClose={() => setOpenKey(null)} onNotice={onNotice}
+    {openKey && <OpenFile key={openKey} fileKey={openKey} typing={openKey === madeKey} onClose={() => { setOpenKey(null); setMadeKey(null); }} onNotice={onNotice}
       onPlace={(p) => { setOpenKey(null); onPlace(p); }} />}
   </div>;
 }

@@ -46,7 +46,7 @@ const KIND_WORD = { image: 'Picture', film: 'Film', pdf: 'PDF', deck: 'Slides', 
 
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-export function ArtifactView({ product, thread, shareThread, threadName, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, below, files: fromElsewhere }: {
+export function ArtifactView({ product, thread, shareThread, threadName, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, below, files: fromElsewhere, typing = false }: {
   /** Each path's number on its file's version line, which every surface counts by. */
   numbers?: Record<string, number>;
   /** What to say of a version with no bytes on this computer, by who made it. */
@@ -77,6 +77,8 @@ export function ArtifactView({ product, thread, shareThread, threadName, lines, 
   onOutside?: (path: string) => void;
   /** A line under the file, the full width of the window. */
   below?: ReactNode;
+  /** Opened to write in, so the editor takes the cursor. */
+  typing?: boolean;
 }) {
   const files = useMemo(() => {
     const reviewed = filesInLines(lines);
@@ -692,7 +694,7 @@ export function ArtifactView({ product, thread, shareThread, threadName, lines, 
           {editing && !compare && (
             <div className="av-pane" key={`editing-${editing.base.id}`} ref={editPane} onClick={pickInEditor}>
               <DocText product={product} src={editing.base.path} text={editing.text} mtime={0} folder={editing.folder} onSaved={() => {}} onNotice={setTold}
-                versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, draft: editing.draft, byline: bylineOf(version ?? editing.base) }} />
+                versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, draft: editing.draft, byline: bylineOf(version ?? editing.base), focus: typing }} />
               {offers.comment && <SelectionBar page={editPane} onComment={(quote) => { setWholeAsked(false); setDraftPlace({ kind: 'quote', text: quote }); box.current?.focus(); }} />}
             </div>
           )}

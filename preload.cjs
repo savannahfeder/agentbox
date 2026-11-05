@@ -95,6 +95,7 @@ contextBridge.exposeInMainWorld('zero', {
   filesPlaceEdit: (payload) => ipcRenderer.invoke('zero:files-place-edit', payload),
   filesPlaceMark: (payload) => ipcRenderer.invoke('zero:files-place-mark', payload),
   filesPlaceFolder: (payload) => ipcRenderer.invoke('zero:files-place-folder', payload),
+  filesPlaceNew: (payload) => ipcRenderer.invoke('zero:files-place-new', payload),
   fileElsewhere: (payload) => ipcRenderer.invoke('zero:file-elsewhere', payload),
   fileLine: (payload) => ipcRenderer.invoke('zero:file-line', payload),
   connections: () => ipcRenderer.invoke('zero:connections'),
