@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { nextVersion, serverConfig, whatIsLive } from './lib/deploy-rules.mjs';
+import { leftFromARelease, nextVersion, serverConfig, whatIsLive } from './lib/deploy-rules.mjs';
 import { RELEASE_REPO } from './lib/live-download.mjs';
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -66,7 +66,15 @@ function live(cmd, args, env = {}) {
 // ---------------------------------------------------------------------------
 // 1. THIS FOLDER, AT THE TIP OF MAIN.
 say('bringing this folder to the tip of main');
-const dirty = quiet('git', ['status', '--porcelain', '--untracked-files=no']).out;
+let dirty = quiet('git', ['status', '--porcelain', '--untracked-files=no']).out;
+const changed = dirty ? dirty.split('\n').map((l) => l.trim().split(/\s+/).pop()) : [];
+if (changed.length === 1 && changed[0] === 'package.json'
+  && leftFromARelease(quiet('git', ['show', 'HEAD:package.json']).out, fs.readFileSync(pkgPath, 'utf8'))) {
+  console.log('  package.json still had the version left by a deploy that was cut short; putting it back');
+  packageWritten = true;
+  restorePackageJson();
+  dirty = quiet('git', ['status', '--porcelain', '--untracked-files=no']).out;
+}
 if (dirty) {
   stop('These files have changes that are not on main:', dirty, '', 'Deploy from a folder with none, normally ~/Desktop/dev/agentbox-team.');
 }
@@ -180,7 +188,10 @@ if (checkOnly) {
 fs.writeFileSync(pkgPath, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(pkgPath, 'utf8')), version, bakedPosthogKey: posthog }, null, 2)}\n`);
 packageWritten = true;
 process.on('exit', restorePackageJson);
-process.on('SIGINT', () => { restorePackageJson(); process.exit(130); });
+// SIGHUP is the Terminal window closing mid-build.
+for (const [signal, code] of [['SIGINT', 130], ['SIGHUP', 129], ['SIGTERM', 143]]) {
+  process.on(signal, () => { restorePackageJson(); process.exit(code); });
+}
 
 // ---------------------------------------------------------------------------
 // 4. THE MAC APP. Nothing public changes until it is done.
