@@ -289,6 +289,8 @@ export interface PlacedFile {
   project: string | null;
   name: string;
   kind: FileKind | null;
+  /** Made in Files and nothing written in it yet. */
+  blank?: boolean;
   versions: number;
   at: number;
   by: string | null;

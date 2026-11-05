@@ -8,6 +8,10 @@
 // What must hold: the new document is listed in its project and in the folder it
 // was made in, opens with an editable version, takes a name no other file in the
 // project has, and starts no agent (its thread is made already closed).
+//
+// Two synthetic testers then used it for 34 minutes (2026-11-05) and both met
+// the same two things: every new document read "v2", and its holder thread
+// showed in Done, search and Sent in. Those cases are below.
 import { it, expect, beforeEach, describe } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -15,6 +19,8 @@ import path from 'node:path';
 import * as disk from '../main/store/work-items.mjs';
 import { Store } from '../main/store.mts';
 import { appFilesPlace } from '../main/files-place.mjs';
+import { filesInLines, sharedByWords, threadFiles } from '../shared/artifact-marks.mjs';
+import { isFileHome, withoutFileHomes } from '../shared/file-home.mjs';
 
 let store; let place; let dir; let accountRoot; let storeRoot;
 
@@ -47,14 +53,75 @@ describe('a new document', () => {
     expect(file).toMatchObject({ key: out.key, folder: folder.id });
   });
 
-  it('opens with a version that can be edited, and the edit is its next version', async () => {
+  it('opens with a version that can be edited', async () => {
     const out = await place.newDocument({ project: 'Company', name: 'Journal' });
     const view = await place.open(out.key);
-    expect(view).not.toBeNull();
-    const saved = await place.edit(out.key, 'Today I shipped the new menu.\n');
-    expect(saved).toMatchObject({ ok: true });
+    expect(view.versions).toHaveLength(1);
+    expect(view.editsTo).not.toBeNull();
+  });
+
+  // Both testers on 2026-11-05: every new document read "v2 of 2", named -v2,
+  // with an empty v1 to restore. The empty start is not a version.
+  it('takes its first words as version 1, in the same file', async () => {
+    const out = await place.newDocument({ project: 'Company', name: 'Journal' });
+    expect(await place.edit(out.key, 'Today I shipped the new menu.\n')).toMatchObject({ ok: true });
+    const [file] = await listed();
+    expect(file).toMatchObject({ key: out.key, name: 'journal.md', versions: 1 });
+    expect(fs.readFileSync(path.join(dir, 'documents', 'journal.md'), 'utf8')).toBe('Today I shipped the new menu.\n');
+    expect(fs.existsSync(path.join(dir, 'documents', 'journal-v2.md'))).toBe(false);
+  });
+
+  it('makes its next version from the second save on', async () => {
+    const out = await place.newDocument({ project: 'Company', name: 'Journal' });
+    await place.edit(out.key, 'one\n');
+    await place.edit(out.key, 'two\n');
     const [file] = await listed();
     expect(file).toMatchObject({ key: out.key, versions: 2 });
+    expect(fs.readFileSync(path.join(dir, 'documents', 'journal.md'), 'utf8')).toBe('one\n');
+  });
+
+  it('numbers an empty file an agent names with words already beside it as before', async () => {
+    fs.mkdirSync(path.join(dir, 'reports'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'reports', 'notes.md'), 'words');
+    const t = disk.createWorkItem(dir, { title: 'Notes', status: 'done' }, { source: 'founder' });
+    disk.updateWorkItem(dir, t.id, { result: 'Saved [notes.md](reports/notes.md).' }, { source: 'agent' });
+    await listed();
+    fs.writeFileSync(path.join(dir, 'reports', 'notes-v2.md'), '');
+    disk.updateWorkItem(dir, t.id, { result: 'Saved [notes-v2.md](reports/notes-v2.md).' }, { source: 'agent' });
+    expect((await listed()).find((f) => f.name.startsWith('notes'))).toMatchObject({ versions: 2 });
+  });
+
+  // The thread that holds it is the app's, not the person's: both testers met it
+  // in Done, in search and under Sent in, with a raw link as "their" message.
+  it('is not sent in any thread, and its holder is marked as only holding it', async () => {
+    const out = await place.newDocument({ project: 'Company', name: 'Journal' });
+    const [file] = await listed();
+    expect(file.sentIn).toEqual([]);
+    expect((await place.open(out.key)).sentIn).toEqual([]);
+    const [holder] = store.listItems().filter((i) => i.product === 'company');
+    expect(isFileHome(holder)).toBe(true);
+    expect(withoutFileHomes(store.listItems())).toEqual([]);
+  });
+
+  it('says it was made by you, not shared', async () => {
+    const out = await place.newDocument({ project: 'Company', name: 'Journal' });
+    await place.edit(out.key, 'words\n');
+    const view = await place.open(out.key);
+    const [family] = threadFiles(filesInLines(view.lines));
+    expect(sharedByWords(family.versions[0], { me: null, nameOf: () => 'Maya' })).toBe('Made by you');
+    await place.edit(out.key, 'more words\n');
+    const [again] = threadFiles(filesInLines((await place.open(out.key)).lines));
+    expect(sharedByWords(again.versions[1], { me: null, nameOf: () => 'Maya' })).toBe('Edited by you');
+  });
+
+  it('leaves a thread that only names a file it did not make as it was', async () => {
+    fs.mkdirSync(path.join(dir, 'reports'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'reports', 'plan.md'), 'plan');
+    const t = disk.createWorkItem(dir, { title: 'Plan', status: 'done' }, { source: 'founder' });
+    disk.updateWorkItem(dir, t.id, { result: 'Saved [plan.md](reports/plan.md).' }, { source: 'agent' });
+    const [file] = await listed();
+    expect(file.sentIn).toHaveLength(1);
+    expect(withoutFileHomes(store.listItems())).toHaveLength(1);
   });
 
   it('starts no agent: its thread is made closed, by the person', async () => {

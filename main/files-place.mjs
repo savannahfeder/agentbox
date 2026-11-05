@@ -13,6 +13,7 @@ import { versionLine } from './version-line.mjs';
 import { cleanFolderName, fileKeyIn, folderNamed, foldFolders, newFolderId, readFolderLog, writeFolderLog } from '../shared/file-folders.mjs';
 import { projectSeenBy } from '../shared/thread-cards.mjs';
 import { shownTitle } from '../shared/thread-title.mjs';
+import { FILE_HOME, isFileHome } from '../shared/file-home.mjs';
 
 const entriesOf = (lines) => (lines ?? []).filter((l) => l?.patch?.artifact)
   .map((l) => ({ ...l.patch.artifact, by: l.by ?? null, ts: l.ts, uid: l.uid ?? null }));
@@ -184,7 +185,7 @@ function summary(f) {
     const ownerOf = c.thread.ref.kind === 'shared' ? c.thread.ref.ownerId : null;
     for (const v of c.family.versions) {
       const was = versions.get(v.id);
-      if (!was) versions.set(v.id, { id: v.id, name: v.name, at: v.at, by: v.by ?? ownerOf, ...(typeof v.agent === 'string' ? { agent: v.agent } : {}), ...(v.edited ? { edited: true } : {}), copies: [{ thread: c.thread, path: v.path, at: v.at || 0 }] });
+      if (!was) versions.set(v.id, { id: v.id, name: v.name, at: v.at, by: v.by ?? ownerOf, ...(typeof v.agent === 'string' ? { agent: v.agent } : {}), ...(v.edited ? { edited: true } : c.thread.home ? { made: true } : {}), copies: [{ thread: c.thread, path: v.path, at: v.at || 0 }] });
       else { was.copies.push({ thread: c.thread, path: v.path, at: v.at || 0 }); if (v.at && (!was.at || v.at < was.at)) was.at = v.at; }
     }
     // `deck.pdf@3` is a version by its number on the line, which a thread may not hold itself.
@@ -211,7 +212,7 @@ function summary(f) {
     approvedBy: [...new Set(approvals.filter((a) => a.file === newest.id).map((a) => a.by))],
     approved: newestEach(approvals),
     ...(stoodApproved ? { changedSinceApproval: { by: newest.by ?? null, approvedBy: stoodApproved.by ?? null } } : {}),
-    sentIn: places.map((t) => ({ ...t.ref, title: t.title })),
+    sentIn: places.filter((t) => !t.home).map((t) => ({ ...t.ref, title: t.title })),
     chain, notes, approvals, seen,
   };
 }
@@ -222,7 +223,7 @@ function viewOf(file, opened) {
     ? { ts: v.at, by: v.by, source: 'founder', patch: { artifact: { do: 'edit', file: v.id, path: opened.get(v.id) } } }
     : {
       ts: v.at, by: v.by, source: typeof v.agent === 'string' ? 'agent' : 'system',
-      patch: { note: `[${v.name}](${opened.get(v.id)})`, ...(v.agent ? { voice: { name: v.agent } } : {}) },
+      patch: { note: `[${v.name}](${opened.get(v.id)})`, ...(v.agent ? { voice: { name: v.agent } } : {}), ...(v.made ? { made: true } : {}) },
     }));
   const many = file.sentIn.length > 1;
   // Each copy numbers its own pins from 1; here they are one file's pins.
@@ -385,6 +386,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
         project: chat ? null : product.name,
         dirs: chat ? [] : [product.dir, product.repoPath, product.repoPath ? path.join(product.repoPath, '.claude', 'worktrees', item.id) : null].filter(Boolean),
         lines,
+        ...(isFileHome(item) ? { home: true } : {}),
       };
       if (!chat) {
         sigs.set(entry, sigOf(entry));
@@ -487,10 +489,13 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   async function lineChain(f, shared = audienceOf(f.project) !== 'private') {
     const line = lineNow();
     const mine = [];
+    // A file nothing was ever written in is no version yet: its first words are v1.
+    const unwritten = f.chain.length === 1 && !line.of(f.key).length;
     for (const v of f.chain) {
       const src = await openedOf(f, v);
-      const entry = src ? await line.add({ file: f.key, src, name: v.name, by: v.by ?? null, at: v.at || Date.now(), shared }) : null;
-      mine.push({ v, src, entry });
+      const blank = !!src && unwritten && (await fs.promises.stat(src).catch(() => null))?.size === 0;
+      const entry = src && !blank ? await line.add({ file: f.key, src, name: v.name, by: v.by ?? null, at: v.at || Date.now(), shared }) : null;
+      mine.push({ v, src, entry, blank });
     }
     const fallback = familyName({ versions: f.chain }, f.chain.at(-1));
     const chain = [];
@@ -507,7 +512,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       chain.push({
         id, name, n: e.n, at: first?.at || e.at || 0, by: first?.by ?? e.by ?? null,
         ...(typeof first?.agent === 'string' ? { agent: first.agent } : {}),
-        ...(first?.edited ? { edited: true } : {}),
+        ...(first?.edited ? { edited: true } : first?.made ? { made: true } : {}),
         copies: held.flatMap((m) => m.v.copies).concat(first ? [] : overwritten?.copies ?? []),
         opened: held.find((m) => m.src && m.entry?.hash === e.hash)?.src ?? e.kept ?? null,
         ...(e.pending ? { pending: true } : {}),
@@ -516,6 +521,8 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     // A group's file not fetched yet is in the cloud's keeping: a version still to be numbered.
     const waiting = mine.filter((m) => !m.entry && !chain.some((v) => v.id === m.v.id || same.has(m.v.id)) && m.v.copies.some((c) => c.thread.ref.kind === 'room'));
     for (const { v } of waiting) chain.push({ ...v, n: chain.length + 1, opened: null, pending: true });
+    const blank = mine.find((m) => m.blank);
+    if (blank && !chain.length) chain.push({ ...blank.v, n: 1, opened: blank.src, blank: true });
     for (const v of chain) same.set(`${baseName(v.name)}@${v.n}`, v.id);
     return { chain, same };
   }
@@ -529,6 +536,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       versions: chain.length, at: newest.at || 0, by: newest.by ?? null,
       ...(typeof newest.agent === 'string' ? { agent: newest.agent } : {}),
       approvedBy: [...new Set(row.approvals.filter((a) => a.file === newest.id).map((a) => a.by))],
+      ...(newest.blank ? { blank: true } : {}),
       chain,
     };
   };
@@ -696,7 +704,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const rel = `documents/${file}`;
       fs.mkdirSync(path.join(home.dir, 'documents'), { recursive: true });
       fs.writeFileSync(path.join(home.dir, rel), '', { flag: 'wx' });
-      store.modules.workItemsDisk.createWorkItem(home.dir, { title, kind: 'directive', labels: ['founder'], status: 'done', body: `[${file}](${rel})` }, { source: 'founder' });
+      store.modules.workItemsDisk.createWorkItem(home.dir, { title, kind: 'directive', labels: ['founder', FILE_HOME], status: 'done', body: `[${file}](${rel})` }, { source: 'founder' });
       const key = fileKeyIn(home.name, file);
       if (into) {
         writeFolderLog(logDir(), { op: 'place', key, project: home.name, family: familyOfName(file), folder: into.id, by, at: Date.now() });
@@ -744,6 +752,11 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const base = thread && threadFiles(filesInLines(thread.lines)).find((f) => f.key === familyIn(file.key))?.versions.at(-1);
       if (!base) return refuse('No thread holds that file now.');
       try {
+        const { chain } = await lineChain(file);
+        if (thread.ref.kind === 'thread' && chain.length === 1 && chain[0].blank) {
+          await fs.promises.writeFile(chain[0].opened, text);
+          return { ok: true };
+        }
         if (thread.ref.kind === 'shared') {
           if (new TextEncoder().encode(text).length > MAX_EDIT_BYTES) return refuse('This document is too long to send from here. Whoever made it can edit it on their own thread.');
           await team.markSharedFile(thread.ref.ownerId, thread.ref.threadId, { do: 'edit', file: base.id, text });

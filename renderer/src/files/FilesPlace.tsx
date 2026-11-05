@@ -18,6 +18,10 @@ import './files-place.css';
 const NONE: FilesPlaceList = { files: [], projects: [], folders: [] };
 const NO_FOLDERS: FileFolder[] = [];
 
+const readers = new Set<() => void>();
+/** A change made here shows at once, not after the store's next word. */
+const readAgain = () => { for (const read of readers) read(); };
+
 /** Every file, read again whenever the store says something changed. */
 export function useFilesList(on: boolean) {
   const [list, setList] = useState<FilesPlaceList | null>(null);
@@ -27,9 +31,10 @@ export function useFilesList(on: boolean) {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const read = () => { void api.filesPlace().then((l) => { if (live) setList(l); }); };
     read();
+    readers.add(read);
     // A burst of changes reads once.
     const off = api.onChanged(() => { if (timer) clearTimeout(timer); timer = setTimeout(read, 400); });
-    return () => { live = false; if (timer) clearTimeout(timer); off?.(); };
+    return () => { live = false; readers.delete(read); if (timer) clearTimeout(timer); off?.(); };
   }, [on]);
   return list;
 }
@@ -43,7 +48,7 @@ function DocFace({ file }: { file: PlacedFile }) {
       if (live && r.ok) setBlocks(docBlocks(r.text ?? ''));
     });
     return () => { live = false; };
-  }, [file.opened]);
+  }, [file.opened, file.blank]);
   return <div className="fp-doc" aria-hidden="true">
     {blocks.map((b, i) => (b.kind === 'h1' ? <strong key={i}>{b.text}</strong>
       : b.kind === 'h2' ? <b key={i}>{b.text}</b>
@@ -280,7 +285,7 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice }: {
   }, [fileKey]);
   const product = view?.sentIn[0]?.product ?? '';
   const editsTo = view?.editsTo ?? null;
-  const below = view && <footer className="fp-sent">
+  const below = !!view?.sentIn.length && <footer className="fp-sent">
     <span className="fp-sent-label">Sent in</span>
     {view.sentIn.map((p) => <button type="button" key={`${p.kind}/${p.product ?? p.ownerId}/${p.id ?? p.threadId}`} className="fp-sent-place" onClick={() => onPlace(p)}>
       <PlaceGlyph kind={p.kind} />{p.title}
@@ -350,7 +355,7 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
     setNaming(null);
     if (!project) return;
     void api.filesPlaceNew({ project, name, folder }).then((r) => {
-      if (r.ok && r.key) { setMadeKey(r.key); setOpenKey(r.key); } else onNotice(r.error || 'That document could not be made.');
+      if (r.ok && r.key) { setMadeKey(r.key); setOpenKey(r.key); readAgain(); } else onNotice(r.error || 'That document could not be made.');
     });
   };
   const below = useMemo(() => filesBelow(all.files, folders, place), [all.files, folders, project, folder]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -366,7 +371,7 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
   const shown = sortFiles(unsorted, sort);
   const [scratchOpen, setScratchOpen] = useState(false);
   const nameOf = (id: string) => firstName(team?.byId.get(id) ?? null) || 'A teammate';
-  const act = (p: FileFolderAct) => api.filesPlaceFolder(p).then((r) => { if (!r.ok) onNotice(r.error || 'That could not be done.'); return r; });
+  const act = (p: FileFolderAct) => api.filesPlaceFolder(p).then((r) => { if (!r.ok) onNotice(r.error || 'That could not be done.'); else readAgain(); return r; });
   const move = (key: string, to: string | null) => { void act({ do: 'move', key, folder: to }); };
   const countIn = (id: string) => filesBelow(all.files, folders, { project, folder: id }).length;
   const crumbs = crumbsTo(folders, place);
@@ -447,7 +452,7 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
     {scratchOpen && scratch.length > 0 && <div className={`${asList ? 'fp-lines' : 'fp-grid'} fp-grid-scratch`}>
       {scratch.map(tile)}
     </div>}
-    {openKey && <OpenFile key={openKey} fileKey={openKey} typing={openKey === madeKey} onClose={() => { setOpenKey(null); setMadeKey(null); }} onNotice={onNotice}
+    {openKey && <OpenFile key={openKey} fileKey={openKey} typing={openKey === madeKey} onClose={() => { setOpenKey(null); setMadeKey(null); readAgain(); }} onNotice={onNotice}
       onPlace={(p) => { setOpenKey(null); onPlace(p); }} />}
   </div>;
 }

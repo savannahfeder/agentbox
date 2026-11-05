@@ -31,6 +31,7 @@ import { MOVE_SAY } from '../../shared/where-it-runs-from.mts';
 import { cardsInFront } from '../../shared/which-card-is-in-front.mts';
 import { snapshotReader } from '../../shared/snapshot-delta.mjs';
 import { traceReader } from '../../shared/trace-delta.mjs';
+import { withoutFileHomes } from '../../shared/file-home.mjs';
 // THE SECOND FRONT DOOR, AND IT HAS TO BE BUILT BEFORE THE LINE BELOW RUNS.
 // `useFixtures` reads `window.zero` once, at module load, and on the desktop
 // preload.cjs has already put it there. In a browser tab nothing has, so this
@@ -581,10 +582,12 @@ export const api = {
       }
       return fixtureSecondEngine(base, engineFixtures);
     }
+    // A document's holder thread is the app's, so no list of threads draws it.
+    const shown = (s: Snapshot) => ({ ...s, items: withoutFileHomes(s.items) });
     const got = snapshots.take(await window.zero!.snapshot({ ...snapshots.ask(), open: openThread }));
-    if (got) return got;
+    if (got) return shown(got);
     // Built on a list this window no longer holds: a whole one, which take() never refuses.
-    return snapshots.take(await window.zero!.snapshot({ open: openThread })) as Snapshot;
+    return shown(snapshots.take(await window.zero!.snapshot({ open: openThread })) as Snapshot);
   },
 
   // WHERE YOU ARE, FOR THE ONE THING THAT DEPENDS ON IT: the approval card in
