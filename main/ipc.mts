@@ -2074,12 +2074,20 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // says to check the inbox, and the sign-in finishes here, so the page moves
   // on by itself. Behind the handler, which it would hold for a quarter hour.
   let confirming: Promise<void> | null = null;
+  // One sign-in for both: the phone side has its own session and would
+  // otherwise stay signed out after a cloud sign-in.
+  const connectThePhone = async (acct: CloudAccountHold) => {
+    const s = acct.session.takeSession();
+    if (!team || !s) return;
+    try { await team.adoptSession(s); } catch (err) { console.warn(`cloud account: the phone did not sign in with it: ${(err as Error)?.message ?? err}`); }
+  };
   const waitForTheLink = async (acct: CloudAccountHold) => {
     if (confirming) return;
     const { waitForEmailConfirmation } = await import('./cloud/account.mts');
     confirming = waitForEmailConfirmation({ config: acct.value, session: acct.session, home: supervisor.config.home || os.homedir() })
-      .then((out) => {
+      .then(async (out) => {
         if (!out.ok) { console.log(`cloud account: the confirmation link did not finish: ${out.error}`); return; }
+        await connectThePhone(acct);
         try { if (window?.isMinimized?.()) window.restore?.(); window?.show?.(); } catch { /* no window to raise */ }
         push();
       })
@@ -2092,6 +2100,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const out = await cloudSignIn({ config: acct.value, session: acct.session, method, email, password, name, acceptTerms: acceptTerms === true, home: supervisor.config.home || os.homedir() });
     if (method === 'google') { try { if (window?.isMinimized?.()) window.restore?.(); window?.show?.(); } catch { /* no window to raise */ } }
     if (out.ok && out.confirm) void waitForTheLink(acct);
+    else if (out.ok) await connectThePhone(acct);
     push();
     return out;
   });

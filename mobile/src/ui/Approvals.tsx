@@ -2,7 +2,8 @@
 // (App.tsx `.approvals`, styles.css and phone.css): one card across the foot,
 // the queue as edges behind it, Allow and Deny big enough for a thumb, and the
 // answered card stamped with what she decided on its way out.
-import { router, usePathname } from 'expo-router';
+import { usePathname } from 'expo-router';
+import { router } from '../lib/router';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

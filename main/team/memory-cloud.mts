@@ -446,7 +446,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
     },
 
     // A FILE ANYONE WITH ITS LINK CAN READ, as
-    // 20261105000000_a_file_anyone_with_its_link_can_read.sql keeps it.
+    // 20261105000001_a_file_anyone_with_its_link_can_read.sql keeps it.
     async shareFile({ source, name, kind, type, body, version = 1, hash = '' }: FileLinkShare) {
       if (!LINK_KINDS.has(kind)) refuse('a link to a file it cannot draw');
       if (String(body ?? '').length > MAX_LINK_BODY) refuse('a link to a file that big');

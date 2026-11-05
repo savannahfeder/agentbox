@@ -18,7 +18,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { nextVersion, serverConfig, whatIsLive } from '../scripts/lib/deploy-rules.mjs';
+import { leftFromARelease, nextVersion, serverConfig, whatIsLive } from '../scripts/lib/deploy-rules.mjs';
 
 const scriptUrl = new URL('../scripts/deploy.mjs', import.meta.url);
 const source = fs.readFileSync(scriptUrl, 'utf8')
@@ -36,7 +36,7 @@ function deploy({ configKey = 'phc_from_config', envKey } = {}) {
   let exitCode = 0;
   const said = [];
   const context = {
-    path, os, fileURLToPath, nextVersion, serverConfig, whatIsLive,
+    path, os, fileURLToPath, leftFromARelease, nextVersion, serverConfig, whatIsLive,
     RELEASE_REPO: 'example/releases',
     fs: {
       existsSync: () => true,

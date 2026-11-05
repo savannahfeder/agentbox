@@ -3,7 +3,7 @@
 // A row that belongs to the computer reads its copy and sends a change to it
 // (state/settings.tsx); the account, the alerts and the look belong to this phone.
 import Constants from 'expo-constants';
-import { router } from 'expo-router';
+import { router } from '../lib/router';
 import * as WebBrowser from 'expo-web-browser';
 import { useState, type ComponentType } from 'react';
 import { Pressable, View } from 'react-native';

@@ -2,7 +2,8 @@
 // (renderer/src/teammates/TeammatesPage.tsx `NewTeammate`): its greeting with
 // the starters to tap, or your own words, and the project it works in. Your
 // computer makes it, and it sets itself up by asking you in its chat.
-import { Redirect, router } from 'expo-router';
+import { Redirect } from 'expo-router';
+import { router } from '../../lib/router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { splitSlug } from '../../../../renderer/src/phone-rows';

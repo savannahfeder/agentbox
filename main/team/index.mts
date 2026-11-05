@@ -143,6 +143,7 @@ export interface TeamSession {
   reopen?(url: string): Promise<unknown>;
   cancelSignIn?(): boolean;
   signInWithPassword?(email: string, password: string): Promise<TeamBackend>;
+  adoptSession?(session: { supabaseUrl: string; access_token: string; refresh_token: string } | null): Promise<TeamBackend | null>;
   signUp?(account: { email: string; password: string; name: string }): Promise<{ backend?: TeamBackend; confirm?: boolean } | null | undefined>;
   signOut?(): Promise<unknown>;
 }
@@ -832,6 +833,14 @@ export function createTeamService({
       if (!session?.signInWithPassword) throw new Error('this build cannot sign in with email');
       const b = await session.signInWithPassword(email, password);
       await signedIn(b);
+      return state;
+    },
+
+    /** Signed in with the session an Agentbox Cloud sign-in made, unless already signed in. */
+    async adoptSession(s: { supabaseUrl: string; access_token: string; refresh_token: string } | null) {
+      if (state.signedIn || !s || !session?.adoptSession) return state;
+      const b = await session.adoptSession(s);
+      if (b) await signedIn(b);
       return state;
     },
 
