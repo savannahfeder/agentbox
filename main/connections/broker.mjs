@@ -17,10 +17,12 @@ import { approvalPublicKey, spoolDir } from '../approvals.mjs';
 import { serveApprovals } from '../approval-prompt-core.mts';
 import { stateOfError } from './talk.mjs';
 import { Name } from '../../shared/product-name.mjs';
+import { serveLocal } from '../local-channel.mjs';
 
 const MAX_LINE = 1024 * 1024;
 const MAX_ANSWER = 900 * 1024;
 const MAX_AT_ONCE = 16;
+export const CHANNEL_KIND = 'connections';
 
 /** How a write reads on her card: the card's own "server / tool" line. */
 export const WRITE_CARD_TOOL = (name, tool) => `mcp__${name}__${tool}`;
@@ -62,10 +64,24 @@ function askTheCard({ storeRoot, item, tool, input, signal }) {
   });
 }
 
-export function createBroker({ connections, storeRoot, socketPath, proxyFile, runtime = process.execPath }) {
+/**
+ * `channel` is set on Windows only, by start.mjs brokerChannel. It is the local
+ * channel's `{ dir, stamp }`, or `{ dir: null, problem }` when it has no folder.
+ * Without it the broker is a unix socket at `socketPath`.
+ */
+export function createBroker({ connections, storeRoot, socketPath, proxyFile, runtime = process.execPath, channel = null }) {
   const runs = new Map();
   const sockets = new Set();
   let server = null;
+
+  async function listenOnChannel() {
+    if (!channel.dir) throw new Error(`there is no folder for the app's local channel: ${channel.problem}`);
+    const pipe = net.createServer(serveSocket);
+    const served = await serveLocal(pipe, { kind: CHANNEL_KIND, stamp: channel.stamp, dir: channel.dir, platform: 'win32', log: (line) => console.warn(`zero: ${line}`) });
+    if (served.state === 'serving') { server = pipe; return; }
+    if (served.state === 'taken') throw new Error(`another copy of ${Name} on this store already serves its connections`);
+    throw new Error(`the connections server already running for this store (${served.name}) did not answer in time, so this one did not start`);
+  }
 
   async function listTools(entry) {
     let tools = null;
@@ -164,6 +180,7 @@ export function createBroker({ connections, storeRoot, socketPath, proxyFile, ru
     socketPath,
     _answer: answer,
     listen() {
+      if (channel) return listenOnChannel();
       try { fs.rmSync(socketPath, { force: true }); } catch { /* listening will say */ }
       server = net.createServer(serveSocket);
       return new Promise((resolve, reject) => {
@@ -176,6 +193,7 @@ export function createBroker({ connections, storeRoot, socketPath, proxyFile, ru
     openRun({ runId, item }) {
       const usable = connections.workingNow();
       if (!usable.length) return { servers: {}, names: [], close: () => {} };
+      if (channel && !channel.dir) return { servers: {}, names: [], close: () => {} };
       const key = crypto.randomBytes(32).toString('base64url');
       const run = { runId, item, ids: new Set(usable.map((e) => e.id)), live: new Set() };
       runs.set(key, run);
@@ -184,7 +202,15 @@ export function createBroker({ connections, storeRoot, socketPath, proxyFile, ru
         servers[connectionServerName(entry.id)] = {
           command: runtime,
           args: [proxyFile],
-          env: {
+          env: channel ? {
+            ELECTRON_RUN_AS_NODE: '1',
+            AGENTBOX_CHANNEL_DIR: channel.dir,
+            AGENTBOX_CHANNEL_KIND: CHANNEL_KIND,
+            AGENTBOX_CHANNEL_STAMP: channel.stamp,
+            AGENTBOX_CONNECTION_RUN: key,
+            AGENTBOX_CONNECTION: entry.id,
+            AGENTBOX_CONNECTION_NAME: entry.name,
+          } : {
             ELECTRON_RUN_AS_NODE: '1',
             AGENTBOX_CONNECTIONS_SOCK: socketPath,
             AGENTBOX_CONNECTION_RUN: key,
@@ -202,6 +228,7 @@ export function createBroker({ connections, storeRoot, socketPath, proxyFile, ru
       for (const s of sockets) s.destroy();
       await new Promise((done) => { if (server?.listening) server.close(() => done()); else done(); });
       server = null;
+      if (channel) return;
       try { fs.rmSync(socketPath, { force: true }); } catch { /* it went with the server */ }
     },
   };
