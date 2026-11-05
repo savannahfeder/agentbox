@@ -43,8 +43,11 @@ describe('the link is a junction', () => {
     const made = [];
     const out = linkAccountTooling(account, { home, symlink: (from, to, type) => made.push({ from, to, type }) });
     expect(out.linked).toEqual(SHARED_DIRS);
+    // The link is made in the account folder's real path, and a Mac's temp
+    // folder is under /var, which is itself a link to /private/var.
+    const real = fs.realpathSync(account);
     expect(made).toEqual(SHARED_DIRS.map((name) => ({
-      from: path.join(home, '.claude', name), to: path.join(account, name), type: 'junction',
+      from: path.join(home, '.claude', name), to: path.join(real, name), type: 'junction',
     })));
   });
 
