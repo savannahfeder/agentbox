@@ -31,7 +31,7 @@ import { providerCommand } from '../../../shared/provider-commands.mts';
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent as BoxKeyEvent, type ReactNode } from 'react';
 import { Face, TeamContext, firstName } from '../team/people';
-import { workAudience } from '../threads/page-rules';
+import { isDirect, peopleInConversation, peopleToAdd, workAudience } from '../threads/page-rules';
 import {
   allModels, joinNames, moreCount, recentModels, replyBoxAsk, replyWaitsUntil, type Harness, type ModelPick,
 } from '../threads/composer-rules';
@@ -1808,8 +1808,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       stateShown={summarised && summaryOffered}
       /* ADD PEOPLE, beside the faces (w-71e6af492d). A conversation only: the
          control decides that for itself off the record on screen, so nothing
-         here has to ask again. */
-      onAddPeople={onAddPeople}
+         here has to ask again. Where the corner's menu offers it, that is
+         the one place. */
+      onAddPeople={cornerHeaderTarget ? undefined : onAddPeople}
     />
   );
 
@@ -1831,6 +1832,26 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       <span className="cf-files">in {fileCount(figures)}</span>
     </span>
   ) : null;
+  // THE CODE BUTTON, in the corner beside Done (w-c25aae4035): people never
+  // found the change while it was only a row in the dots menu.
+  const openChange = () => onOpenDoc?.(changePathFor(item.id));
+  const codeButton = figures ? (
+    <span className="ts-code-figures">
+      {signed(figures).map(({ sign, text }) => (
+        <span key={sign} className={sign === '+' ? 'code-plus' : 'code-minus'}>{text}</span>
+      ))}
+    </span>
+  ) : null;
+
+  // ADD PEOPLE IS A ROW IN THE MENU, not a button beside it. A conversation
+  // adds through New thread, so it lists nobody here.
+  const cornerPeople = (() => {
+    if (!teamCtx || !onAddPeople || !crumbFrom || inChats || !(direct || summarised)) return null;
+    const project = teamCtx.products.get(item.product);
+    if (isDirect(project)) return peopleInConversation(project, teamCtx.me, teamCtx.state.people) ? { people: [], conversation: true } : null;
+    const people = peopleToAdd({ item, me: teamCtx.me, company: teamCtx.state.people });
+    return people.length ? { people, conversation: false } : null;
+  })();
 
   /* THE THREAD'S MENU: the three verbs that crowded the right of the bar
      (the terminal mark, the code figures, the Done mark), as rows under one
@@ -1852,7 +1873,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       key={`${item.product}:${item.id}`}
       files={<ThreadFilesButton files={madeHere} onOpen={(f) => (opensBig(f.src) ? openBig(f.src) : onOpenDoc?.(f.src))} />}
       change={changeFigures}
-      onViewChange={() => onOpenDoc?.(changePathFor(item.id))}
+      codeButton={codeButton}
+      codeOpen={openDoc === changePathFor(item.id)}
+      onViewChange={openChange}
+      addPeople={cornerPeople}
+      onAddPeople={onAddPeople ? (person) => onAddPeople(item, person) : undefined}
       /* A PHONE HAS NO TERMINAL AND NO ⌘J (QA batch 005, F-118), and it is the
          only way it has of putting a thread off (F-117). */
       terminal={direct || onPhone() ? null : terminalOpen ? 'open' : 'closed'}
@@ -2013,7 +2038,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     {/* THE CORNER: THE THREAD'S MENU, and nothing else. The Summary button
         that stood beside it (w-e731ca9376) moved onto the summary itself on
         w-a3482b8c2c: the rail opens it, the icon beside its title closes it. */}
-    {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && (direct || summarised) && <ConversationAside item={item} onAddPeople={onAddPeople} />}{threadMenu}</span>, cornerHeaderTarget)}
+    {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && (direct || summarised) && <ConversationAside item={item} />}{threadMenu}</span>, cornerHeaderTarget)}
     {artifact && (
       <ThreadArtifacts item={item} open={artifact} withAgent={!direct && !heldByPerson && !item.agent}
         onClose={() => setArtifact(null)} onNotice={onNotice} />
