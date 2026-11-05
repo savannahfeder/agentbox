@@ -38,17 +38,17 @@ import type { ParsedOption } from '../format';
 
 export function OptionsOffer({
   ask, askAll, options, peekOption, askPeek,
-  selectedOption, selRef, onPick, onOptionEnter, onAskEnter, setPeek, setAskPeek, keep, stripRef, onOver, bare = false,
+  selectedOption, selRef, onPick, onOptionEnter, onAskEnter, setPeek, setAskPeek, named, stripRef, onOver, bare = false,
 }: {
+  /** The tasks a close question is about, each opening on a click: they may
+   *  have been filed on a turn folded far up the thread. */
+  named?: { rows: Array<{ id: string; title: string }>; onOpen: (id: string) => void };
   stripRef?: React.RefObject<HTMLDivElement>;
   /** Whether the pointer is standing on the strip. A click is refused while
    *  the rows have just moved under it (../pick-settles.ts). */
   onOver?: (over: boolean) => void;
   /** No heading: on the one-at-a-time page the question is already the page's headline. */
   bare?: boolean;
-  /** A last row keyed esc that answers by doing nothing: the question a close
-   *  asks when tasks are still waiting (../close-asks-first.ts). */
-  keep?: { label: string; onKeep: () => void };
   /** The sentence the options answer, off the same field the options came off. */
   ask: string;
   askAll: string;
@@ -117,6 +117,16 @@ export function OptionsOffer({
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{askAll}</ReactMarkdown>
         </div>
       )}
+      {named && named.rows.length > 0 && (
+        <div className="opt-named">
+          {named.rows.map((r) => (
+            <button type="button" key={r.id} className="opt-named-row" title={`Open ${r.title}`} onClick={() => named.onOpen(r.id)}>
+              <span className="opt-named-dot" />
+              <span className="opt-named-title">{r.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {options.map((o) => (
         <button
           key={o.n}
@@ -140,12 +150,6 @@ export function OptionsOffer({
             : o.recommended && <span className="opt-rec">recommended</span>}
         </button>
       ))}
-      {keep && (
-        <button className="opt-row" onClick={keep.onKeep}>
-          <span className="opt-key">esc</span>
-          <span className="opt-text">{keep.label}</span>
-        </button>
-      )}
     </div>
   );
 }

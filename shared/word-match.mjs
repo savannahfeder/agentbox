@@ -13,6 +13,13 @@ export function fold(text) {
   return String(text ?? '').toLowerCase().replace(/[‘’ʼ“”–—]/g, (c) => FOLDED[c]);
 }
 
+/** Unfolded text with its camelCase names also written split ("toKebab" adds "to Kebab"), for haystacks that are matched and never sliced. */
+export function withHumps(text) {
+  const raw = String(text ?? '');
+  const split = raw.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+  return split === raw ? raw : `${raw} . ${split}`;
+}
+
 export function isWordChar(c) {
   return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
 }
