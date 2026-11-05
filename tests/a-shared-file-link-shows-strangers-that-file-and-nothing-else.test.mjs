@@ -12,6 +12,7 @@ import { it, expect, beforeAll, afterAll, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 
 const dir = path.join(import.meta.dirname, '..', 'cloud/supabase/migrations');
 const migration = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort().map((f) => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n');
@@ -51,7 +52,7 @@ const comments = (tok, who = null) => (who ? rows(who, `select * from public.fil
 const comment = (who, tok, body = 'Looks good') => rows(who, `select public.comment_on_file_link($1, $2) as id`, [tok, body]);
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite(await emptyDatabase());
   await db.exec(STAND_IN);
   await db.exec(migration);
   await db.exec(GRANTS);
