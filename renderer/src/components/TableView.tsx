@@ -923,7 +923,14 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     const order = d.order.map((i) => to[i]).sort((a, b) => a - b);
     commit({ ...d, table: t, order });
     const r0 = order.indexOf(to[d.order[s.r0]]);
-    goTo({ a: { r: r0, c: first }, b: { r: r0 + s.r1 - s.r0, c: last }, rows: true });
+    // Not goTo: following the pick's far end would scroll the table sideways to its last column.
+    setPick({ a: { r: r0, c: first }, b: { r: r0 + s.r1 - s.r0, c: last }, rows: true });
+    const el = box.current;
+    if (el) {
+      const top = headH() + r0 * ROW_H;
+      if (top < el.scrollTop + headH()) el.scrollTop = top - headH();
+      else if (top + ROW_H > el.scrollTop + el.clientHeight) el.scrollTop = top + ROW_H - el.clientHeight;
+    }
   };
   const moveColsTo = (c0: number, c1: number, place: number) => {
     const d = docRef.current;
@@ -1399,7 +1406,9 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
         </div>
         {!order.length && <div className="tbl-none">{total ? 'No rows match.' : 'This table has no rows yet.'}</div>}
         {drop && <div className={`tbl-drop ${drop.kind}`} aria-hidden="true"
-          style={drop.kind === 'row' ? { top: drop.at - 1, width: box.current?.scrollWidth } : { left: drop.at - 1, height: box.current?.scrollHeight }} />}
+          style={drop.kind === 'row'
+            ? { top: drop.at - 1, width: (box.current?.querySelector('.tbl-grid') as HTMLElement | null)?.offsetWidth }
+            : { left: drop.at - 1, height: (box.current?.querySelector('.tbl-grid') as HTMLElement | null)?.offsetHeight }} />}
         {editing && place && editingRow && (
           editing.pop
             ? <div className={`tbl-pop${place.up ? ' up' : ''}`} style={{ left: place.left, top: place.up ? undefined : place.top + ROW_H - 1, bottom: place.up ? `calc(100% - ${place.top + 1}px)` : undefined, width: place.w }}>

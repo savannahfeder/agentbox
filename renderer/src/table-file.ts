@@ -138,8 +138,12 @@ export function dateWords(day: number, column: string[]): string {
   const most = (re: RegExp) => filled.length > 0 && filled.filter((v) => re.test(v)).length / filled.length >= 0.6;
   if (most(/^\d{4}-\d{1,2}-\d{1,2}$/)) return `${y}-${String(m).padStart(2, '0')}-${String(n).padStart(2, '0')}`;
   if (most(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) return `${m}/${n}/${y}`;
-  return `${MONTHS[m - 1]} ${n}, ${y}`;
+  // "Mon Nov 9" in a column of those; a year only where the column writes one.
+  const weekday = most(/\b(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b/i) ? `${DAYS[d.getUTCDay()]} ` : '';
+  const year = !filled.length || most(/\b\d{4}\b/) ? `, ${y}` : '';
+  return `${weekday}${MONTHS[m - 1]} ${n}${year}`;
 }
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function kindOf(name: string, values: string[], first: boolean): ColumnKind {
   if (first) return 'name';

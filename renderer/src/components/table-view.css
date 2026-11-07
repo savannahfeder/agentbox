@@ -270,6 +270,7 @@
 .tbl-cal-day.today { color: var(--text); box-shadow: inset 0 0 0 1px var(--line-strong); }
 .tbl-cal-day.on { background: var(--tbl-at); color: #fff; box-shadow: none; }
 .tbl-cal-foot { display: flex; gap: 2px; border-top: 1px solid var(--line); padding-top: 3px; margin-top: 2px; }
+.tbl-cal-foot .when-row { width: auto; }
 
 /* Rows and columns picked can be picked up and moved; a line shows where they will land. */
 .tbl.rows-move .tbl-rn.sel[data-rn], .tbl.cols-move .tbl-th.sel { cursor: grab; }

@@ -107,8 +107,14 @@ describe('a day picked from the calendar is written the way the column writes da
   it('ISO in an ISO column, slashes in a slash column, words otherwise', () => {
     expect(dateWords(day, ['2026-11-01', '2026-10-30', ''])).toBe('2026-11-12');
     expect(dateWords(day, ['11/1/2026', '10/30/2026'])).toBe('11/12/2026');
-    expect(dateWords(day, ['Nov 1, 2026', 'Oct 30'])).toBe('Nov 12, 2026');
+    expect(dateWords(day, ['Nov 1, 2026', 'Oct 30, 2026'])).toBe('Nov 12, 2026');
     expect(dateWords(day, [])).toBe('Nov 12, 2026');
+  });
+  it('a column of "Mon Nov 9" gets a weekday and no year; one with years keeps them', () => {
+    expect(dateWords(day, ['Mon Nov 9', 'Sat Nov 7', ''])).toBe('Thu Nov 12');
+    expect(dateWords(day, ['Cloud Thu Nov 12', 'Multiplayer Tue Nov 17'])).toBe('Thu Nov 12');
+    expect(dateWords(day, ['Nov 9', 'Oct 30'])).toBe('Nov 12');
+    expect(dateWords(day, ['Mon, Nov 9, 2026'])).toBe('Thu Nov 12, 2026');
   });
   it('reads every way of writing a day as the same day, so the calendar marks the right one', () => {
     for (const v of ['2026-11-12', '11/12/2026', 'Nov 12, 2026', 'November 12 2026', 'Thu Nov 12 2026']) expect(dateOf(v)).toBe(day);
