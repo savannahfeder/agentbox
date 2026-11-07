@@ -47,6 +47,7 @@ describe('what the page says about the plan', () => {
   it('a plan Stripe bills: its name, price, Manage billing, and the month as two meters', () => {
     expect(planSummary(max)).toEqual({
       name: 'Agentbox Cloud Max', price: '$200 a month', who: 'Billed monthly by Stripe', manage: true,
+      period: 'This month', change: 'Change plan',
       agents: { line: '3 running, no limit', percent: 0 },
       hours: { line: '86 of 3,000 hours', percent: 3 },
     });

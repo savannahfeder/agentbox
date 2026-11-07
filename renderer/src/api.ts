@@ -1641,10 +1641,13 @@ export const api = {
   async cloudAccountReopen(): Promise<void> { await (window.zero as any)?.cloudAccountReopen?.(); },
   async cloudAccountSignOut(): Promise<void> { await (window.zero as any)?.cloudAccountSignOut?.(); },
   async cloudAccountPlan(): Promise<CloudPlan> {
-    // &cloudplan=pro draws someone on Pro, 6 running and 88 of 400 hours used.
-    if (useFixtures) return params.get('cloudplan') === 'pro'
-      ? { signedIn: true, plan: 'pro', unlimited: false, agents: 10, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 }
-      : { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };
+    // &cloudplan=pro draws someone on Pro, 6 running and 88 of 400 hours used;
+    // &cloudplan=free someone on the free hours, 1 running and 1.5 of 5 used.
+    if (useFixtures) {
+      if (params.get('cloudplan') === 'pro') return { signedIn: true, plan: 'pro', unlimited: false, agents: 10, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 };
+      if (params.get('cloudplan') === 'free') return { signedIn: true, plan: 'free', unlimited: false, agents: 2, hoursPerMonth: 5, running: 1, usedSeconds: 1.5 * 3600, billing: null };
+      return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };
+    }
     return (await (window.zero as any)?.cloudAccountPlan?.()) ?? { signedIn: false };
   },
   async cloudAccountPay(plan: 'pro' | 'plus' | 'max'): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }> {
