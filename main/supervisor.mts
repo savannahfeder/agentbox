@@ -6708,7 +6708,9 @@ export class Supervisor {
       }
       const n = (this._cloudStartFails.get(item.id) ?? 0) + 1;
       this._cloudStartFails.set(item.id, n);
-      keep = n >= CLOUD_STARTS_TO_GIVE_UP;
+      // A server that errored is not mended by starting this thread there again.
+      const serverBroke = (session.tail ?? []).some((l) => typeof l === 'string' && /agentbox cloud:.*the cloud server said 5\d\d\b/.test(l));
+      keep = serverBroke || n >= CLOUD_STARTS_TO_GIVE_UP;
     }
     if (!keep) return false;
     this._cloudStartFails.delete(item.id);
