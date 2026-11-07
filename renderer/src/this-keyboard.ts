@@ -17,6 +17,10 @@ export const MAC: boolean = typeof document === 'undefined' || typeof navigator 
   ? true
   : /mac/i.test(navigator.platform || '') || /Macintosh/i.test(navigator.userAgent || '');
 
+/** Whether this window is on Windows. No window at all is not. */
+export const WINDOWS: boolean = typeof document !== 'undefined' && typeof navigator !== 'undefined'
+  && /^win/i.test(navigator.platform || '');
+
 /** One cap per key, in this keyboard's glyphs. */
 export const caps = (key: string): string[] => capsOf(key, MAC);
 

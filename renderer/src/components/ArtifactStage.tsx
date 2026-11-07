@@ -8,7 +8,7 @@ import { findQuote, viewKind } from '../../../shared/artifact-marks.mjs';
 import { api } from '../api';
 import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { fetchableFileUrl } from '../phone-files';
-import { pictureUrl } from '../picture';
+import { fileBeside, pictureUrl } from '../picture';
 import { MAX_ZOOM, lowestZoom } from '../picture-view';
 import { filmMarks, filmPins, hasSpot, keepUnder, marksOnPages, nextZoom, pagePins, pageSpot, pictureFit, pinned, pinsToDraw, realZoom, roomInside, wheelZoom, zoomAnchor, zoomWords, type Found } from '../artifact-pins';
 
@@ -57,7 +57,7 @@ const partsFor = (folder: string | null) => ({
     const from = src ?? '';
     if (/^https?:/.test(from)) return <img src={from} alt={alt ?? ''} />;
     if (!folder || !from || /^[a-z][a-z0-9+.-]*:/i.test(from)) return <em>{alt || from}</em>;
-    return <img src={pictureUrl(from.startsWith('/') ? from : new URL(from, `file://${folder}/`).pathname)} alt={alt ?? ''} crossOrigin="anonymous" />;
+    return <img src={pictureUrl(from.startsWith('/') ? from : fileBeside(from, folder))} alt={alt ?? ''} crossOrigin="anonymous" />;
   },
 });
 
