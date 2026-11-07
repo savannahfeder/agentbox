@@ -71,6 +71,7 @@ import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterI
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
 import { JOIN_SCHEME, ourLink, tokenFromLink } from '../shared/room-links.mjs';
 import { getMic } from './mic.mts';
+import { openInBrowser } from './open-in-browser.mts';
 import type { IpcConfig } from './ipc.mts';
 import type { CornerTagConfig } from './corner-tag.mts';
 import type { AnalyticsConfig } from './analytics.mts';
@@ -583,7 +584,7 @@ async function createWindow() {
   // fix missed the main window for exactly that reason, 2026-08-04).
   const openLink = (url: string) => {
     if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
-    else shell.openExternal(url);
+    else void openInBrowser(url, { shell });
   };
 
   // A PICTURE GOES ON THE CLIPBOARD AS A PICTURE AND AS NOTHING ELSE.
@@ -1152,7 +1153,7 @@ async function createWindow() {
   // (a demo page, a screenshot a worker saved) open in their default app, so
   // "see it working" is one click from the message.
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:/.test(url)) shell.openExternal(url);
+    if (/^https?:/.test(url)) void openInBrowser(url, { shell });
     else if (url.startsWith('file://')) shell.openPath(decodeURIComponent(url.replace('file://', '')));
     return { action: 'deny' };
   });
@@ -1161,7 +1162,7 @@ async function createWindow() {
   window.webContents.on('will-navigate', (e, url) => {
     if (!leavesTheApp(window!.webContents.getURL(), url)) return;
     e.preventDefault();
-    if (/^https?:/.test(url)) shell.openExternal(url);
+    if (/^https?:/.test(url)) void openInBrowser(url, { shell });
   });
 
   // WHAT AN EMBEDDED PAGE MAY DO IS DECIDED HERE, NOT ON THE TAG THAT ASKED.
@@ -1193,7 +1194,7 @@ async function createWindow() {
     // browser we have not designed, and `allowpopups` is off anyway
     // (webview-guard.mts), so without this such a link does nothing at all.
     contents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:/.test(url)) shell.openExternal(url);
+      if (/^https?:/.test(url)) void openInBrowser(url, { shell });
       return { action: 'deny' };
     });
 
