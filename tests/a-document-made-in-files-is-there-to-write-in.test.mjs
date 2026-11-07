@@ -166,3 +166,77 @@ describe('a new document', () => {
     expect((await place.list()).mine).toEqual(['Company']);
   });
 });
+
+// "What about tables and other stuff?" (2026-11-06): New made documents only.
+describe('a new table', () => {
+  it('is a table with a header row to type under', async () => {
+    const out = await place.newDocument({ project: 'Company', name: 'Clients', kind: 'table' });
+    const [file] = await listed();
+    expect(file).toMatchObject({ key: out.key, name: 'clients.csv', kind: 'table', versions: 1, sentIn: [] });
+    // A blank row is not drawn, so the table view offers "New row" under the header.
+    expect(fs.readFileSync(path.join(dir, 'documents', 'clients.csv'), 'utf8')).toBe('Name,Notes\n');
+  });
+
+  it('takes its first rows as version 1, the way the table view saves them', async () => {
+    await place.newDocument({ project: 'Company', name: 'Clients', kind: 'table' });
+    fs.writeFileSync(path.join(dir, 'documents', 'clients.csv'), 'Name,Notes\nRamp,call Friday\n');
+    expect((await listed())[0]).toMatchObject({ name: 'clients.csv', versions: 1 });
+    fs.writeFileSync(path.join(dir, 'documents', 'clients.csv'), 'Name,Notes\nRamp,call Friday\nBrex,sent deck\n');
+    expect((await listed())[0]).toMatchObject({ name: 'clients.csv', versions: 2 });
+  });
+
+  it('does not take a document\'s name for a table of the same words', async () => {
+    await place.newDocument({ project: 'Company', name: 'Clients' });
+    await place.newDocument({ project: 'Company', name: 'Clients', kind: 'table' });
+    expect((await listed()).map((f) => f.name).sort()).toEqual(['clients.csv', 'clients.md']);
+  });
+
+  it('is refused for a kind it cannot make', async () => {
+    await expect(place.newDocument({ project: 'Company', name: 'Deck', kind: 'deck' })).rejects.toThrow(/document or a table/);
+  });
+});
+
+describe('files uploaded from the computer', () => {
+  let from;
+  beforeEach(() => {
+    from = fs.mkdtempSync(path.join(os.tmpdir(), 'upload-from-'));
+    fs.writeFileSync(path.join(from, 'Logo.png'), 'png bytes');
+    fs.writeFileSync(path.join(from, 'Q3 report.pdf'), 'pdf bytes');
+    fs.writeFileSync(path.join(from, 'backup.zip'), 'zip bytes');
+  });
+
+  it('are copied into the project and listed in Files, in the folder they were added to', async () => {
+    const folder = await place.makeFolder({ project: 'Company', name: 'Brand kit' });
+    const out = await place.addFiles({ project: 'Company', folder: folder.id, paths: [path.join(from, 'Logo.png'), path.join(from, 'Q3 report.pdf')] });
+    expect(out.refused).toEqual([]);
+    const files = await listed();
+    expect(files.map((f) => [f.name, f.kind, f.folder]).sort()).toEqual([['Q3-report.pdf', 'pdf', folder.id], ['Logo.png', 'image', folder.id]].sort());
+    expect(fs.readFileSync(path.join(from, 'Logo.png'), 'utf8')).toBe('png bytes');
+    expect(files.every((f) => f.sentIn.length === 0)).toBe(true);
+    expect(withoutFileHomes(store.listItems())).toEqual([]);
+  });
+
+  it('refuses a kind Files cannot show, by name, and adds the rest', async () => {
+    const out = await place.addFiles({ project: 'Company', paths: [path.join(from, 'backup.zip'), path.join(from, 'Logo.png')] });
+    expect(out.refused).toEqual(['backup.zip']);
+    expect((await listed()).map((f) => f.name)).toEqual(['Logo.png']);
+  });
+
+  it('adds nothing and makes no thread when nothing it was given can be shown', async () => {
+    const out = await place.addFiles({ project: 'Company', paths: [path.join(from, 'backup.zip')] });
+    expect(out).toMatchObject({ added: 0, refused: ['backup.zip'] });
+    expect(store.listItems()).toHaveLength(0);
+  });
+
+  it('keeps a file already there under its own name', async () => {
+    await place.addFiles({ project: 'Company', paths: [path.join(from, 'Logo.png')] });
+    await place.addFiles({ project: 'Company', paths: [path.join(from, 'Logo.png')] });
+    expect((await listed()).map((f) => f.name).sort()).toEqual(['Logo-2.png', 'Logo.png']);
+  });
+});
+
+describe('the projects', () => {
+  it('lists only this computer\'s own as ones a new file can go in', async () => {
+    expect((await place.list()).mine).toEqual(['Company']);
+  });
+});

@@ -30,6 +30,7 @@ import { DocText } from './DocText';
 import { FileNoteCard } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
 import { ShareLink, canShareFile } from './ShareLink';
+import { paneKey, staysOnNewest } from '../table-follows';
 import './artifact-view.css';
 
 /** `steps`: the paths the arrows step through, in order, when the press came from a turn of the thread. */
@@ -117,6 +118,7 @@ export function ArtifactView({ product, thread, shareThread, threadName, lines, 
   const box = useRef<HTMLTextAreaElement | null>(null);
   const placedFor = useRef<string | null>(null);
   const inHand = useRef<string | null>(null);
+  const newestInHand = useRef(false);
 
   // Where the press wants to land, once the thread's files are read. The picked
   // comment's file wins, then the file, then the path.
@@ -126,7 +128,8 @@ export function ArtifactView({ product, thread, shareThread, threadName, lines, 
     if (!flat.length) return;
     if (placedFor.current === press) {
       const same = flat.find((x) => x.v.id === inHand.current);
-      if (same) setAt({ fi: same.fi, vi: same.vi });
+      if (same && staysOnNewest({ kind: viewKind(same.v.path), wasNewest: newestInHand.current })) setAt({ fi: same.fi, vi: families[same.fi].versions.length - 1 });
+      else if (same) setAt({ fi: same.fi, vi: same.vi });
       return;
     }
     placedFor.current = press;
@@ -142,6 +145,8 @@ export function ArtifactView({ product, thread, shareThread, threadName, lines, 
   const family = at ? families[at.fi] : undefined;
   const version = family?.versions[at!.vi];
   useEffect(() => { inHand.current = version?.id ?? null; setLink(null); }, [version?.id]);
+  // Read by the placing effect above, which runs first, so it says what was true before a version arrived.
+  useEffect(() => { newestInHand.current = !!family && !!at && at.vi === family.versions.length - 1; });
   const kind = version ? viewKind(version.path) : null;
   const [savingNotes, setSavingNotes] = useState<FileNote[]>([]);
   const [settling, setSettling] = useState<Record<string, boolean>>({});
@@ -699,7 +704,7 @@ export function ArtifactView({ product, thread, shareThread, threadName, lines, 
             </div>
           )}
           {version && waitingForEditor && <OpeningWait name={version.name} kind="markdown" />}
-          {version && !compare && !editing && !waitingForEditor && <div className="av-pane" key={version.id}>{stage(version.path, version.id, version.name, true, version)}</div>}
+          {version && !compare && !editing && !waitingForEditor && <div className="av-pane" key={paneKey(kind, version)}>{stage(version.path, version.id, version.name, true, version)}</div>}
           {version && compare && left && !editing && (
             <div className="av-split" ref={split}>
               <div className="av-pane" key={`l-${left.id}`}>

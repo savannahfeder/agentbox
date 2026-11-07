@@ -181,7 +181,8 @@ function MoveMenu({ file, name, keys, folders, act, onNewFolder }: {
   </div>;
 }
 
-type Making = 'document' | 'folder';
+type Making = 'document' | 'table' | 'folder' | 'upload';
+const MAKING_IN: Record<Making, string> = { document: 'New document in', table: 'New table in', folder: 'New folder in', upload: 'Add files to' };
 
 /** "New": a document or a folder, here or, from every file, in a project you pick. */
 function NewMenu({ project, projects, canDocument, canFolder, onPick, look = 'button', opens = 'left' }: {
@@ -208,12 +209,14 @@ function NewMenu({ project, projects, canDocument, canFolder, onPick, look = 'bu
     {open && <div className={`fp-menu${opens === 'right' ? ' opens-right' : ''}`} role="menu">
       {what
         ? <>
-          <div className="fp-menu-head">{what === 'document' ? 'New document in' : 'New folder in'}</div>
+          <div className="fp-menu-head">{MAKING_IN[what]}</div>
           <div className="fp-menu-list">{projects.map((p) => <button type="button" key={p} role="menuitem" className="fp-menu-item" onClick={() => pick(what, p)}>{p}</button>)}</div>
         </>
         : <>
           {canDocument && <button type="button" role="menuitem" className="fp-menu-item" onClick={() => choose('document')}><DocGlyph />Document</button>}
+          {canDocument && <button type="button" role="menuitem" className="fp-menu-item" onClick={() => choose('table')}><TableGlyph />Table</button>}
           {canFolder && <button type="button" role="menuitem" className="fp-menu-item" onClick={() => choose('folder')}><FolderGlyph />Folder</button>}
+          {canDocument && <button type="button" role="menuitem" className="fp-menu-item" onClick={() => choose('upload')}><UploadGlyph />Upload from computer</button>}
         </>}
     </div>}
   </div>;
@@ -307,6 +310,8 @@ function FolderCard({ folder, count, onOpen, onDropFile, onRename }: {
 }
 
 const FolderGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M2 4.6c0-.6.5-1.1 1.1-1.1h2.7c.3 0 .6.1.8.3l1 1h5.3c.6 0 1.1.5 1.1 1.1v6c0 .6-.5 1.1-1.1 1.1H3.1c-.6 0-1.1-.5-1.1-1.1z" strokeLinejoin="round" /></svg>;
+const TableGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="1" /><path d="M2.5 6.4h11M2.5 9.7h11M6.2 6.4V13" /></svg>;
+const UploadGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 10.5V3M5 6l3-3 3 3M3 10.5v2h10v-2" /></svg>;
 const PlusGlyph = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>;
 const DocGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M4 2.5h5l3 3v8H4z M9 2.5v3h3 M6 8.5h4 M6 10.8h4" strokeLinejoin="round" strokeLinecap="round" /></svg>;
 const MoreGlyph = () => <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.2" /><circle cx="8" cy="8" r="1.2" /><circle cx="12.5" cy="8" r="1.2" /></svg>;
@@ -398,11 +403,19 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
   useEffect(() => { setFolderId(null); setNaming((n) => (n && n.project === project ? n : null)); }, [project]);
   const mine = all.mine ?? [];
   const isMine = (p: string | null) => !!p && mine.some((m) => m.toLowerCase() === p.toLowerCase());
-  const makeDocument = (name: string) => {
+  const makeFile = (kind: 'document' | 'table', name: string) => {
     setNaming(null);
     if (!project) return;
-    void api.filesPlaceNew({ project, name, folder }).then((r) => {
-      if (r.ok && r.key) { setMadeKey(r.key); setOpenKey(r.key); readAgain(); } else onNotice(r.error || 'That document could not be made.');
+    void api.filesPlaceNew({ project, name, kind, folder }).then((r) => {
+      if (r.ok && r.key) { setMadeKey(r.key); setOpenKey(r.key); readAgain(); } else onNotice(r.error || `That ${kind} could not be made.`);
+    });
+  };
+  const upload = (into: string, inFolder: string | null) => {
+    void api.filesPlaceUpload({ project: into, folder: inFolder }).then((r) => {
+      if (!r.ok) { onNotice(r.error || 'Those files could not be added.'); return; }
+      readAgain();
+      const left = r.refused ?? [];
+      if (left.length) onNotice(`${left.join(', ')} ${left.length === 1 ? 'is a kind' : 'are kinds'} Files cannot show, so ${left.length === 1 ? 'it was' : 'they were'} not added.`);
     });
   };
   const below = useMemo(() => filesBelow(all.files, folders, place), [all.files, folders, project, folder]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -434,7 +447,11 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
   const at = newAt();
   const canDocument = project ? isMine(project) : true;
   const canFolder = project ? canNest : true;
-  const pick = (what: Making, p: string) => { if (p !== project) onProject(p); setNaming({ what, project: p }); };
+  const pick = (what: Making, p: string) => {
+    if (p !== project) onProject(p);
+    if (what === 'upload') upload(p, p === project ? folder : null);
+    else setNaming({ what, project: p });
+  };
   const newMenu = (look: 'button' | 'header' | 'plus', opens: 'left' | 'right') => !looking && <NewMenu project={project} projects={mine} canDocument={canDocument} canFolder={canFolder} onPick={pick} look={look} opens={opens} />;
   const headSlot = useSlot('fp-head-slot');
   const titleSlot = useSlot('fp-title-slot');
@@ -493,10 +510,10 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
     </div>}
     {list && !shown.length && !scratch.length && !cards.length && !projectCards.length && !naming && <p className="fp-empty">{empty}</p>}
     <div className={asList ? 'fp-lines' : 'fp-grid'}>
-      {naming?.what === 'document' && project && <div className={asList ? 'fp-line is-new' : 'fp-tile is-new'}>
+      {(naming?.what === 'document' || naming?.what === 'table') && project && <div className={asList ? 'fp-line is-new' : 'fp-tile is-new'}>
         <div className="fp-open-file">
-          <span className={`fp-face fp-face-markdown${asList ? ' fp-thumb' : ''}`}>{asList ? <span className="fp-thumb-word">DOC</span> : <DocGlyph />}</span>
-          <span className="fp-name"><NameBox placeholder="Document name" onCancel={() => setNaming(null)} onDone={makeDocument} /></span>
+          <span className={`fp-face fp-face-${naming.what === 'table' ? 'table' : 'markdown'}${asList ? ' fp-thumb' : ''}`}>{asList ? <span className="fp-thumb-word">{naming.what === 'table' ? 'TABLE' : 'DOC'}</span> : naming.what === 'table' ? <TableGlyph /> : <DocGlyph />}</span>
+          <span className="fp-name"><NameBox placeholder={naming.what === 'table' ? 'Table name' : 'Document name'} onCancel={() => setNaming(null)} onDone={(name) => makeFile(naming.what === 'table' ? 'table' : 'document', name)} /></span>
         </div>
       </div>}
       {at === 'tiles' && !looking && canDocument && naming?.what !== 'document' && !asList && <GhostNew what="document" project={project} projects={mine} onPick={pick} />}

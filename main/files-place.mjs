@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { resolveArtifact } from './artifact-path.mjs';
-import { approvalId, baseName, editedWords, familyName, familyOfName, filesInLines, marksOf, MAX_EDIT_BYTES, otherFilesInLines, otherKind, reviewKind, shownName, threadFiles } from '../shared/artifact-marks.mjs';
+import { approvalId, baseName, editedWords, familyName, familyOfName, filesInLines, marksOf, MAX_EDIT_BYTES, otherFilesInLines, otherKind, reviewKind, shownName, threadFiles, viewKind } from '../shared/artifact-marks.mjs';
 import { saveNextVersion } from './file-version.mjs';
 import { versionLine } from './version-line.mjs';
 import { cleanFolderName, fileKeyIn, folderNamed, foldFolders, newFolderId, readFolderLog, writeFolderLog } from '../shared/file-folders.mjs';
@@ -23,6 +23,17 @@ const projectKey = (name) => String(name ?? '').trim().toLowerCase();
 const toCloudFamily = (family) => family.split('\0').map(encodeURIComponent).join('/');
 const fromCloudFamily = (family) => String(family).split('/').map(decodeURIComponent).join('\0');
 const CROSS_EVERY_MS = 10_000;
+// What New makes, and what it starts with: a table needs its columns to be typed into.
+const MADE = { document: { ext: '.md', seed: '' }, table: { ext: '.csv', seed: 'Name,Notes\n' } };
+const SEED_OF = new Map(Object.values(MADE).map((m) => [m.ext, m.seed]));
+/** Whether the file at `src` is still exactly what New started it with. */
+async function untouched(src) {
+  const seed = SEED_OF.get(path.extname(src).toLowerCase());
+  if (seed === undefined) return false;
+  const st = await fs.promises.stat(src).catch(() => null);
+  if (!st || st.size !== Buffer.byteLength(seed)) return false;
+  return (await fs.promises.readFile(src, 'utf8').catch(() => null)) === seed;
+}
 const FILES_FOR_AGENTS = 40;
 
 /**
@@ -493,7 +504,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     const unwritten = f.chain.length === 1 && !line.of(f.key).length;
     for (const v of f.chain) {
       const src = await openedOf(f, v, { products });
-      const blank = !!src && unwritten && (await fs.promises.stat(src).catch(() => null))?.size === 0;
+      const blank = !!src && unwritten && await untouched(src);
       const entry = src && !blank ? await line.add({ file: f.key, src, name: v.name, by: v.by ?? null, at: v.at || Date.now(), shared }) : null;
       mine.push({ v, src, entry, blank });
     }
@@ -641,6 +652,40 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     return { files: rows, projects: projects.sort((a, b) => a.localeCompare(b)), folders: lib.folders, mine };
   }
 
+  /** The project a new file goes in, which must be this computer's own, and the folder, which must be in it. */
+  function whereNew(project, folder) {
+    const home = store.listProducts().find((p) => !p.team?.direct && projectKey(p.name) === projectKey(project));
+    if (!home) throw new Error('a new file goes in one of your own projects');
+    const lib = shelf();
+    const into = folder ? lib.folders.find((f) => f.id === lib.canon(folder)) : null;
+    if (folder && !into) throw new Error('that folder is gone');
+    if (into && projectKey(into.project) !== projectKey(home.name)) throw new Error('that folder is in another project');
+    return { home, into };
+  }
+
+  /** `stem` + `ext`, or with -2, -3 when the project has a file of that name already. */
+  function freeName(home, stem, ext) {
+    const keys = new Set(allFiles().map((f) => f.key));
+    const taken = (file) => keys.has(fileKeyIn(home.name, file)) || fs.existsSync(path.join(home.dir, 'documents', file));
+    let file = `${stem}${ext}`;
+    for (let n = 2; taken(file); n += 1) file = `${stem}-${n}${ext}`;
+    return file;
+  }
+
+  // Files lists only what a thread names, so new files get a thread of their
+  // own, made closed by the person so no agent starts on it.
+  function holdIn(home, title, files) {
+    const body = files.map((f) => `[${f}](documents/${f})`).join('\n');
+    store.modules.workItemsDisk.createWorkItem(home.dir, { title, kind: 'directive', labels: ['founder', FILE_HOME], status: 'done', body }, { source: 'founder' });
+  }
+
+  function placeIn(home, into, files, by) {
+    if (!into) return;
+    const at = Date.now();
+    for (const f of files) writeFolderLog(logDir(), { op: 'place', key: fileKeyIn(home.name, f), project: home.name, family: familyOfName(f), folder: into.id, by, at });
+    void crossing();
+  }
+
   return {
     list,
 
@@ -689,30 +734,41 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
      * only what a thread names, so it gets a thread of its own, made closed so
      * no agent starts on it.
      */
-    async newDocument({ project, name, folder = null, by = team?.state?.().me?.id ?? null }) {
+    async newDocument({ project, name, kind = 'document', folder = null, by = team?.state?.().me?.id ?? null }) {
       const title = cleanFolderName(name);
-      if (!title) throw new Error('a document needs a name');
-      const home = store.listProducts().find((p) => !p.team?.direct && projectKey(p.name) === projectKey(project));
-      if (!home) throw new Error('a new document goes in one of your own projects');
-      const lib = shelf();
-      const into = folder ? lib.folders.find((f) => f.id === lib.canon(folder)) : null;
-      if (folder && !into) throw new Error('that folder is gone');
-      if (into && projectKey(into.project) !== projectKey(home.name)) throw new Error('that folder is in another project');
-      const stem = title.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'document';
-      const keys = new Set(allFiles().map((f) => f.key));
-      const taken = (file) => keys.has(fileKeyIn(home.name, file)) || fs.existsSync(path.join(home.dir, 'documents', file));
-      let file = `${stem}.md`;
-      for (let n = 2; taken(file); n += 1) file = `${stem}-${n}.md`;
-      const rel = `documents/${file}`;
+      if (!title) throw new Error(`a ${kind} needs a name`);
+      const made = MADE[kind];
+      if (!made) throw new Error('New makes a document or a table');
+      const { home, into } = whereNew(project, folder);
+      const stem = title.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || kind;
+      const file = freeName(home, stem, made.ext);
       fs.mkdirSync(path.join(home.dir, 'documents'), { recursive: true });
-      fs.writeFileSync(path.join(home.dir, rel), '', { flag: 'wx' });
-      store.modules.workItemsDisk.createWorkItem(home.dir, { title, kind: 'directive', labels: ['founder', FILE_HOME], status: 'done', body: `[${file}](${rel})` }, { source: 'founder' });
-      const key = fileKeyIn(home.name, file);
-      if (into) {
-        writeFolderLog(logDir(), { op: 'place', key, project: home.name, family: familyOfName(file), folder: into.id, by, at: Date.now() });
-        void crossing();
+      fs.writeFileSync(path.join(home.dir, 'documents', file), made.seed, { flag: 'wx' });
+      holdIn(home, title, [file]);
+      placeIn(home, into, [file], by);
+      return { key: fileKeyIn(home.name, file) };
+    },
+
+    /** Copies of files from this computer, into the project's documents. A kind Files cannot show is left out and named. */
+    async addFiles({ project, paths = [], folder = null, by = team?.state?.().me?.id ?? null }) {
+      const { home, into } = whereNew(project, folder);
+      const refused = [];
+      const added = [];
+      for (const from of paths) {
+        const base = path.basename(String(from));
+        if (!viewKind(base)) { refused.push(base); continue; }
+        const ext = path.extname(base);
+        const stem = base.slice(0, base.length - ext.length).normalize('NFC').replace(/\s+/g, '-').replace(/[^\p{L}\p{N}._-]+/gu, '').replace(/^[-_.]+/, '').slice(0, 80) || 'file';
+        const file = freeName(home, stem, ext.toLowerCase());
+        fs.mkdirSync(path.join(home.dir, 'documents'), { recursive: true });
+        fs.copyFileSync(from, path.join(home.dir, 'documents', file), fs.constants.COPYFILE_EXCL);
+        added.push(file);
       }
-      return { key };
+      if (added.length) {
+        holdIn(home, added.length === 1 ? added[0] : `${added.length} files`, added);
+        placeIn(home, into, added, by);
+      }
+      return { added: added.length, refused, keys: added.map((f) => fileKeyIn(home.name, f)) };
     },
 
     /** Files named on a thread, into a project's folder by that name, made if it is not there. */

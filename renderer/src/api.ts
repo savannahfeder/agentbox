@@ -4,7 +4,7 @@ import {updateFixture} from './agent-update-fixture';
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
-import type { AccountUsageReading, AgentConversation, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, UsageLimit, WorkItem } from './types';
+import type { AccountUsageReading, AgentConversation, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, UsageLimit, WorkItem } from './types';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
@@ -986,9 +986,13 @@ export const api = {
     if (!window.zero?.filesPlaceFolder) return { ok: false, error: `quit and reopen ${NAME} to use folders` };
     return window.zero.filesPlaceFolder(p);
   },
-  async filesPlaceNew(p: { project: string; name: string; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }> {
+  async filesPlaceNew(p: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }> {
     if (!window.zero?.filesPlaceNew) return { ok: false, error: `Quit and reopen ${NAME} to make a document here.` };
     return window.zero.filesPlaceNew(p);
+  },
+  async filesPlaceUpload(p: { project: string; folder: string | null }): Promise<FilesUploaded> {
+    if (!window.zero?.filesPlaceUpload) return { ok: false, error: `Quit and reopen ${NAME} to add files here.` };
+    return window.zero.filesPlaceUpload(p);
   },
   async filesPlaceOpen(p: { key: string }): Promise<FilesPlaceView | null> {
     return (await window.zero?.filesPlaceOpen?.(p).catch(() => null)) ?? null;
