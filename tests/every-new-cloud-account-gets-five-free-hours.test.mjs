@@ -183,6 +183,11 @@ describe('the screens, on the free hours', () => {
     });
   });
 
+  // A power tester, on a quarter of an hour: the bar was a quarter full with all of it left.
+  it('a bar out of less than an hour is filled by what is left of it', () => {
+    expect(planSummary({ ...free, hoursPerMonth: 0.25, usedSeconds: 0 }).hours.percent).toBe(100);
+  });
+
   it('every free hour used leaves none, never a negative', () => {
     expect(planSummary({ ...free, usedSeconds: 5 * 3600 }).hours).toMatchObject({ line: '0 of 5', percent: 0 });
     expect(planSummary({ ...free, usedSeconds: 6 * 3600 }).hours).toMatchObject({ line: '0 of 5', percent: 0 });
