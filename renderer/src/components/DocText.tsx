@@ -24,7 +24,7 @@ import { patchOriginal } from '../editor/patch-md';
 import { theAppKeepsThisKey } from '../../../shared/artifact-keys.mts';
 import { api } from '../api';
 import { asksForANewTab } from '../link-click';
-import { pictureUrl } from '../picture';
+import { fileBeside, pictureUrl } from '../picture';
 import { agoWords } from '../threads/summary-rules';
 import { DocOutline } from './DocOutline';
 import { scrollKey, useKeptScroll } from '../kept-scroll';
@@ -96,7 +96,7 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   // A picture the document names beside itself, on the window's picture scheme:
   // the page's own address is no folder, so it drew as a broken picture.
   const extensions = useMemo(() => buildExtensions('Write anything…', {
-    drawnFrom: folder ? (from) => (/^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(from) ? from : pictureUrl(new URL(from, `file://${folder}/`).pathname)) : null,
+    drawnFrom: folder ? (from) => (/^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(from) ? from : pictureUrl(fileBeside(from, folder))) : null,
   }), [folder]);
 
   const editor = useEditor({

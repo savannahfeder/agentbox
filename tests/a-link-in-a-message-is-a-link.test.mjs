@@ -190,17 +190,17 @@ describe('the app hands the window audio and video, from its own folders only', 
   const roots = ['/Users/x/Store/accounts/acct', '/Users/x/code/zero'];
 
   it('serves a voice sample and a render inside the store', () => {
-    expect(servable('/Users/x/Store/accounts/acct/astral/designs/w-a9/voices/lily.mp3', roots)).toBe(true);
-    expect(servable('/Users/x/Store/accounts/acct/astral/designs/cut.mp4', roots)).toBe(true);
+    expect(servable('/Users/x/Store/accounts/acct/astral/designs/w-a9/voices/lily.mp3', roots, 'darwin')).toBe(true);
+    expect(servable('/Users/x/Store/accounts/acct/astral/designs/cut.mp4', roots, 'darwin')).toBe(true);
   });
 
   it('serves none of them outside the folders it owns', () => {
-    expect(servable('/Users/x/Music/song.mp3', roots)).toBe(false);
+    expect(servable('/Users/x/Music/song.mp3', roots, 'darwin')).toBe(false);
   });
 
   it('still refuses everything that is not a picture, a sound or a film', () => {
-    expect(servable('/Users/x/Store/accounts/acct/zero.config.json', roots)).toBe(false);
-    expect(servable('/Users/x/Store/accounts/acct/astral/decisions.md', roots)).toBe(false);
+    expect(servable('/Users/x/Store/accounts/acct/zero.config.json', roots, 'darwin')).toBe(false);
+    expect(servable('/Users/x/Store/accounts/acct/astral/decisions.md', roots, 'darwin')).toBe(false);
   });
 });
 

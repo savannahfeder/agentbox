@@ -14,6 +14,7 @@
 // scheme is READ rather than typed, out of the one module that names this app,
 // so a rename reaches the window and the main process in one move.
 import { IMG_SCHEME } from '../../shared/schemes.mts';
+import { urlPathOf } from '../../shared/file-url-path.mts';
 
 const SCHEME = `${IMG_SCHEME}://file`;
 
@@ -40,13 +41,51 @@ export const pictureLinksVersion = () => version;
 export function onPictureLinks(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; }
 export function pictureLinksChanged() { version += 1; for (const fn of listeners) fn(); }
 
-/** The url for a picture at an absolute path on this Mac. */
+// A file url's path puts a slash before the drive, `/C:/Users/...`.
+const DRIVE_PATH = /^\/?[A-Za-z]:[\\/]/;
+
+/** The url for a picture at an absolute path on the computer the app runs on. */
 export function pictureUrl(file: string): string {
-  if (!file || !file.startsWith('/')) return file;
-  const link = linkFor?.(file);
+  // The window has no platform of its own to ask (a phone draws the computer's
+  // paths), so the path's own shape says which kind it is.
+  const drive = !!file && DRIVE_PATH.test(file);
+  const own = drive ? file.replace(/^\//, '') : file;
+  const at = file ? urlPathOf(own, drive ? 'win32' : 'posix') : null;
+  if (at === null) return file;
+  const link = linkFor?.(own);
   if (link) return link;
-  // Segment by segment: encodeURIComponent would eat the separators, and
-  // encodeURI would leave '#' and '?' in a filename to be read as url syntax.
-  const parts = file.split('/').filter(Boolean).map(encodeURIComponent);
-  return `${SCHEME}/${parts.join('/')}`;
+  return `${SCHEME}${at}`;
+}
+
+// A '%' in a name that starts no escape stays as it was written.
+function decoded(text: string): string {
+  try { return decodeURIComponent(text); } catch { return text; }
+}
+
+/** The whole path a picture's source names, bare or as a file url, or null when it is only a name. */
+export function wholePicturePath(src: string): string | null {
+  if (/^file:\/\//.test(src)) return decoded(src.slice(7)).replace(/^\/(?=[A-Za-z]:[\\/])/, '');
+  if (src.startsWith('/') || DRIVE_PATH.test(src)) return src;
+  return null;
+}
+
+/** The whole path a film or a voice note names, or null when it is only a name. */
+export function wholeMediaPath(src: string): string | null {
+  // Anything else a file url decodes to is looked for under the roots.
+  const whole = wholePicturePath(src);
+  return whole !== null && (whole.startsWith('/') || DRIVE_PATH.test(whole)) ? whole : null;
+}
+
+/** The file a picture names beside a folder, as a path rather than a url. */
+export function fileBeside(from: string, folder: string): string {
+  // The folder is encoded first, or a '#' or '?' in its name would end the url there.
+  const drive = DRIVE_PATH.test(folder);
+  const base = urlPathOf(drive ? folder.replace(/^\//, '') : folder, drive ? 'win32' : 'posix');
+  const at = new URL(from, base === null ? `file://${folder}/` : `file://${base.replace(/\/$/, '')}/`).pathname;
+  // A name is decoded only where it stays one name, so ..%2f can never climb.
+  const names = at.split('/').map((name) => {
+    const plain = decoded(name);
+    return plain === '.' || plain === '..' || /[\\/]/.test(plain) ? name : plain;
+  });
+  return names.join('/').replace(/^\/(?=[A-Za-z]:\/)/, '');
 }
