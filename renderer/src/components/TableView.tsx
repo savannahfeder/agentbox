@@ -214,14 +214,14 @@ const typingIn = (el: Element | null) => !!el && (el.tagName === 'INPUT' || el.t
 const CMD = MAC ? '⌘' : 'Ctrl+';
 const ALT = MAC ? '⌥' : 'Alt+';
 
-function Menu({ label, icon, on, children }: { label: string; icon: ReactNode; on: boolean; children: (close: () => void) => ReactNode }) {
+function Menu({ label, icon, on, children, onEscape }: { label: string; icon: ReactNode; on: boolean; children: (close: () => void) => ReactNode; onEscape?: () => void }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!open) return undefined;
     const away = (e: PointerEvent) => { if (!wrap.current?.contains(e.target as Node)) setOpen(false); };
     // An open menu takes Escape before the full screen view or the thread does.
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopImmediatePropagation(); e.preventDefault(); setOpen(false); } };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopImmediatePropagation(); e.preventDefault(); setOpen(false); onEscape?.(); } };
     document.addEventListener('pointerdown', away);
     window.addEventListener('keydown', key, true);
     return () => { document.removeEventListener('pointerdown', away); window.removeEventListener('keydown', key, true); };
@@ -748,6 +748,15 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     docRef.current = next;
     setDoc(next);
     setPick((p) => (p ? clampPick(p, next) : p));
+    // Undoing a column move takes the sort and the filters back with their columns, found by name.
+    const at = (i: number) => { const n = next.table.columns.findIndex((c) => c.name === was.table.columns[i]?.name); return n < 0 ? i : n; };
+    const sortMoves = !!sort && at(sort.col) !== sort.col;
+    const pickedMoves = Object.keys(picked).some((k) => at(Number(k)) !== Number(k));
+    if (sortMoves || pickedMoves) {
+      quiet.current = true;
+      if (sortMoves) setSort((s) => (s ? { ...s, col: at(s.col) } : s));
+      if (pickedMoves) setPicked((p) => Object.fromEntries(Object.entries(p).map(([k, v]) => [at(Number(k)), v])));
+    }
     if (next.looks !== was.looks) keepLooks(store, next.looks);
     if (fileChanged(next.table, was.table) && saveRef.current) {
       unsaved.current = writeTable(next.table, shape);
@@ -936,8 +945,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     if (!on.some((v) => v.toLowerCase() === from.trim().toLowerCase())) return;
     const kept = on.filter((v) => v.toLowerCase() !== from.trim().toLowerCase());
     const next = to === null || kept.some((v) => v.toLowerCase() === to.toLowerCase()) ? kept : [...kept, to];
-    // Quietly: the rows in view are the same ones, and the tag list stays open.
-    quiet.current = true;
+    // A rename leaves the same rows in view, so the tag list stays open; a delete shows the rows it no longer hides.
+    if (to !== null) quiet.current = true;
     setPicked((p) => ({ ...p, [col]: next }));
   };
   const tagHands = (col: number): TagHands => ({
@@ -1333,6 +1342,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     });
   };
 
+  const keysBack = () => requestAnimationFrame(() => (pickRef.current ? focusKeys() : rest()));
+
   // A table the focus left lets its pick go quiet, but keeps it.
   const [holding, setHolding] = useState(false);
 
@@ -1389,11 +1400,11 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
               onKeyDown={(e) => { if (e.key === 'Escape' && !query) { e.preventDefault(); e.stopPropagation(); passEscape(); } }} />
           </label>
           {choices.length > 0 && (
-            <Menu label={filterLabel} on={filtering} icon={glyph('M2.5 4h11M4.5 8h7M6.5 12h3')}>
+            <Menu label={filterLabel} on={filtering} onEscape={keysBack} icon={glyph('M2.5 4h11M4.5 8h7M6.5 12h3')}>
               {() => <FilterMenu table={table} choices={choices} picked={picked} onToggle={toggle} onClear={() => setPicked({})} />}
             </Menu>
           )}
-          <Menu label={sort && table.columns[sort.col] ? `Sorted by ${table.columns[sort.col].name}, ${sortWords(table.columns[sort.col], sort.dir).toLowerCase().replace(/^a to z$/, 'A to Z').replace(/^z to a$/, 'Z to A')}` : 'Sort'} on={!!sort} icon={glyph('M5 3v10M2.5 10.5L5 13l2.5-2.5M11 13V3M8.5 5.5L11 3l2.5 2.5')}>
+          <Menu label={sort && table.columns[sort.col] ? `Sorted by ${table.columns[sort.col].name}, ${sortWords(table.columns[sort.col], sort.dir).toLowerCase().replace(/^a to z$/, 'A to Z').replace(/^z to a$/, 'Z to A')}` : 'Sort'} on={!!sort} onEscape={keysBack} icon={glyph('M5 3v10M2.5 10.5L5 13l2.5-2.5M11 13V3M8.5 5.5L11 3l2.5 2.5')}>
             {(close) => <>
               <button type="button" className={`when-row${!sort ? ' on' : ''}`} onClick={() => { setSort(null); close(); }}><span className="when-row-label">As the file has it</span></button>
               {table.columns.map((c, i) => <button key={i} type="button" className={`when-row${sort?.col === i ? ' on' : ''}`} onClick={() => { sortBy(i); if (sort?.col !== i) close(); }}>
