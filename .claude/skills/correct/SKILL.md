@@ -15,7 +15,7 @@ Make a change that looks right from one file be right for the whole
 repository.
 
 This repository already works this way in places.
-`tests/no-worker-drives-her-own-browser.test.mjs` turned a rule into a
+`tests/no-worker-drives-her-own-browser.test.mts` turned a rule into a
 failing test, and `scripts/hooks/` turned "never commit in the app's folder"
 into a refusal. This skill does that on purpose, across the history.
 

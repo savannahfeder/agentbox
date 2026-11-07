@@ -9,7 +9,7 @@
 // folder line is never a way to list anything else: the folder is inside this
 // product's own folders or the account root, and only pictures come back. One
 // level only, because a design folder keeps old rounds in folders of their own.
-// tests/a-named-folder-shows-its-pictures.test.mjs holds every edge.
+// tests/a-named-folder-shows-its-pictures.test.mts holds every edge.
 import fsDefault from 'node:fs';
 import path from 'node:path';
 import { resolveArtifact } from './artifact-path.mjs';

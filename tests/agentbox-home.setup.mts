@@ -1,0 +1,69 @@
+// NO TEST MAY WRITE INTO THE REAL APP HOME.
+//
+// The app's records moved out of the product folder and into the app's own home
+// (main/store/home.mjs). That home is a real path on a real Mac, and a suite
+// that used a temp store but the developer's actual home would quietly append
+// to her ledgers while pretending to be hermetic.
+//
+// One temp home per test FILE, because vitest runs setup files per file and
+// files run in parallel workers. Cleaned up after, so a full run leaves nothing.
+
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterAll } from 'vitest';
+import { setAppHome } from './app-home.mts';
+import { keepAnswerModesIn } from '../main/answer-modes.mts';
+
+const home = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-home-'));
+// UNDER EVERY NAME THIS APP HAS HAD, not just one. An agent session inherits
+// the store root under all of them, the newest one wins inside `appHome`, and
+// this line setting only the oldest is how a hermetic suite came to write into
+// her real store. tests/app-home.mts carries the measurement.
+setAppHome(home);
+
+// AND A FOLDER OF HER OWN for what a reply may do, as main/main.mts gives the
+// app at start: until one is named, no mode is kept (main/answer-modes.mts).
+const userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-user-'));
+keepAnswerModesIn({ userDir, storeRoot: home });
+
+// ONE CLOCK ZONE FOR EVERY RUN. The tests that check a time in words ("7:21 PM
+// today") are written in Pacific time, and passed only on a Mac set to it: on
+// GitHub's runners, which are on UTC, they read "2:21 AM today" and main was
+// red on every push (measured 2026-10-01, three tests in two files). Node
+// reads TZ whenever it changes, and this runs before each test file loads.
+process.env.TZ = 'America/Los_Angeles';
+
+// AND NO TEST SEES THIS MAC'S CLOUD RUNS. A Mac that has run
+// scripts/cloud-setup.mjs keeps ~/.agentbox/cloud.json, and a supervisor
+// built in a test would otherwise send its overflow to the developer's real
+// AWS account (docs/cloud/PLAN.md). A test that wants cloud runs names its own.
+process.env.AGENTBOX_CLOUD_CONFIG = path.join(home, 'no-cloud-runs-here.json');
+
+// NOBODY IS SIGNED IN. AGENTBOX_PERSON_ID names whoever is signed into the team
+// on this Mac; main sets it at sign-in (main/team/index.mts) so the store server
+// a worker talks through stamps every line with its author, and
+// main/store/work-items.mjs reads it. A session the app spawns for a work item
+// INHERITS it, so the suite read real machine state: tests whose premise is
+// "before anyone signs in" asserted against an identity nobody handed them.
+//
+// Measured 2026-10-01. It first looked like flakiness by time of day and is not
+// flaky at all, because the variable is WHO STARTED THE RUN: red for every agent
+// in the fleet, green whenever a person ran the suite in their own terminal. Two
+// tests went red on it, team-signing-in-turns-the-team-on's "is configured but
+// signed out, and writes plain lines" and the four-key store server env in
+// a-codex-worker-can-write-to-her-store-or-it-does-not-run, and both of those
+// now clear it in their own beforeEach as well.
+//
+// This is the same rule in the one place it cannot be forgotten, next to the app
+// home and the clock zone, so a test written later inherits the signed-out Mac
+// rather than this bug. Stripped rather than faked, because signed out is what
+// those premises say and what the single-person app is. Stamping is not
+// disabled, only un-inherited: a test that sets the variable itself still gets
+// stamped lines, which is what team-every-line-carries-its-writer relies on.
+delete process.env.AGENTBOX_PERSON_ID;
+
+afterAll(() => {
+  try { fs.rmSync(home, { recursive: true, force: true }); } catch { /* best effort */ }
+  try { fs.rmSync(userDir, { recursive: true, force: true }); } catch { /* best effort */ }
+});

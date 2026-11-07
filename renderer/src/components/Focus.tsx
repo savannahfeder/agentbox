@@ -3524,7 +3524,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
 
            It also says the one true thing the old line was reaching for, that what is
            typed here becomes the agent's next instruction, without having to explain it.
-           `tests/the-reply-box-asks-one-question.test.mjs` holds the sentence count.
+           `tests/the-reply-box-asks-one-question.test.mts` holds the sentence count.
         */
         placeholder="What should the agent do next?"
         onKeyDown={boxKey}

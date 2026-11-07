@@ -514,7 +514,7 @@ export function rowTitle(i: {
 }
 
 // The schedule box names a thread the way the list does, not by its raw title
-// (tests/the-schedule-box-names-the-thread-not-the-prompt.test.mjs).
+// (tests/the-schedule-box-names-the-thread-not-the-prompt.test.mts).
 export function scheduleSubtitle(i: Parameters<typeof rowTitle>[0], count = 1): string {
   return count > 1 ? `${count} items` : rowTitle(i);
 }

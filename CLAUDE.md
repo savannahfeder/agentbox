@@ -17,7 +17,7 @@ rules that are not obvious from them.
 - Cover the cases, not the case: the reported one, the boundary either side of
   it, and the case that must NOT match.
 - Name the test file after the behaviour, as a sentence
-  (`a-reply-moves-the-agent-row.test.mjs`), and open it with a comment saying
+  (`a-reply-moves-the-agent-row.test.mts`), and open it with a comment saying
   what broke and how you measured it.
 - Before you report, run the tests for what you changed: `npm run test:changed`
   (or `npm run test:changed <files>`). That is your own tests, every test that
@@ -158,7 +158,7 @@ instead, then ship as usual:
 Claude Code can attach a session to the browser a person is signed into with
 `--chrome`. That flag must never appear in anything this app spawns, because
 that browser is signed into every account its owner holds.
-`tests/no-worker-drives-her-own-browser.test.mjs` fails if it ever does. A
+`tests/no-worker-drives-her-own-browser.test.mts` fails if it ever does. A
 browser an agent may drive has to carry nothing; the app's own pane on the
 `persist:junk` partition is the only candidate. `--ide` is the user's to switch
 on, never ours.
@@ -219,5 +219,5 @@ is the one app and the one source of truth. The plan is `docs/team/PLAN.md`.
   `git rebase --onto refs/remotes/origin/main $(git merge-base <branch> 5ff1b688195c90508ecb8abdc7355e028226e729) <branch>`,
   where that sha is the old team history's last commit.
 - Keep team code in its own files (`main/team/`, `renderer/src/team/`,
-  `shared/team-*.mjs`, `cloud/`, `tests/team-*.test.mjs`) where that is
+  `shared/team-*.mjs`, `cloud/`, `tests/team-*.test.mts`) where that is
   natural.

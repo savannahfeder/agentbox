@@ -2979,7 +2979,7 @@ export default function App() {
   // reading order, down each column and on to the next (`boardColumns`, the
   // same call InboxBoard draws). Walking the tab's list instead stopped J
   // halfway down a full board, because a card from another column was not in
-  // it (2026-10-02, tests/the-board-walks-in-the-order-it-is-drawn.test.mjs).
+  // it (2026-10-02, tests/the-board-walks-in-the-order-it-is-drawn.test.mts).
   const onBoard = search === null && (teamMode ? !!evBoard : inboxDisplay.view === 'board');
   // WHICH TAB THE OPEN THREAD'S BAR NAMES: the one holding it now, not the one
   // you were standing on when you opened it (`crumbTab`, w-474ac45a33).
@@ -4479,7 +4479,7 @@ export default function App() {
   ) => {
     // A new action commits the previous one immediately, without waiting for
     // it, so E moves on however busy main is
-    // (tests/e-never-waits-for-the-app.test.mjs). This action's write goes after it.
+    // (tests/e-never-waits-for-the-app.test.mts). This action's write goes after it.
     const flushed = flushPending().catch((err) => console.warn('a held action was not written', err));
     if (!stay) leaveResolved(item);
     setModal(null);
@@ -5640,7 +5640,7 @@ export default function App() {
     // A MESSAGE STILL IN ITS THREE SECONDS IS WRITTEN BEFORE THE STOP. Held, it
     // landed after the kill, read as a reply sent after stopping, reopened the
     // row and started a fresh run on it two minutes later (2026-10-05).
-    // tests/a-message-still-sending-lands-before-the-stop.test.mjs
+    // tests/a-message-still-sending-lands-before-the-stop.test.mts
     await flushPending();
     // FROM THE PHONE WITH THE COMPUTER CLOSED the stop goes to her Mac, and the
     // toast says it went rather than that it stopped (Codex's review of step 1,
@@ -6062,7 +6062,7 @@ export default function App() {
       //
       // ONLY WHERE THOSE TABS ARE ON THE SCREEN WITH NOTHING OVER THEM: not
       // from inside a field, not with a card or a menu open, not on an opened
-      // task (pinned next door in tab-does-nothing-on-an-open-task.test.mjs),
+      // task (pinned next door in tab-does-nothing-on-an-open-task.test.mts),
       // not while a search is up, and not in board view or on a rooms page,
       // which draw no tabs.
       // Everywhere else Tab goes on walking browser focus as it has since

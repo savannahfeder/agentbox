@@ -230,7 +230,7 @@ export function laterHint(ts: number): string {
  * What a time typed into Send later means, or null. It reads the same words the
  * Schedule box on a thread reads ("3h", "fri 6pm", "tomorrow 3pm"), because a
  * browser date field was the harder of the two to use
- * (tests/send-later-takes-a-time-in-words.test.mjs). A moment already past is
+ * (tests/send-later-takes-a-time-in-words.test.mts). A moment already past is
  * refused rather than sent: the store would run it at once, and a card that
  * says "later" and starts now is a small lie about when an agent has it.
  */

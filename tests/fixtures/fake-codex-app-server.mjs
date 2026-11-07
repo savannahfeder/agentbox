@@ -9,7 +9,7 @@
 // `codex login` keeps failing, and the app has to start a fresh one.
 //
 // A failed turn carries the words a real signed-out Codex was measured saying
-// (tests/a-codex-run-that-is-signed-out-or-capped-says-which.test.mjs) and the
+// (tests/a-codex-run-that-is-signed-out-or-capped-says-which.test.mts) and the
 // schema's own `unauthorized` code.
 //
 // Every process start and every method is appended to `$CODEX_HOME/fake.log`,

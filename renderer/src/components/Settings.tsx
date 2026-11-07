@@ -2579,7 +2579,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
             CONTROL: it is the one page you read rather than set. What is here
             is what a person actually presses, grouped by the moment they would
             want it; ../shortcuts.ts holds the list. Every key on it works today
-            (`tests/the-shortcuts-page-lists-keys-that-work.test.mjs`). */}
+            (`tests/the-shortcuts-page-lists-keys-that-work.test.mts`). */}
         {pane === 'phone' && <PhonePage onFeedback={onFeedback} onSignIn={onPhoneSignIn} web={phoneWeb}
           onPhoneProjects={webComputer ? <WebPhoneProjects web={webComputer} onWorkspace={setWorkspace} /> : undefined} macShut={phoneCloud ? { ...phoneCloud, all: model?.workspace?.phoneAll !== false, projects: projects.filter((p) => p.slug !== 'practice'), onChoose: (all, except) => setWorkspace('phoneProjects', { all, except }) } : undefined} />}
         {pane === 'shortcuts' && (

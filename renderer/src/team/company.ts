@@ -1,6 +1,6 @@
 // THE TEAM'S PURE RULES ON THE WINDOW SIDE: the company list the Team page
 // draws, due-day words, and who a row is from. No React and no styles, so
-// tests read them directly (tests/team-the-company-list.test.mjs).
+// tests read them directly (tests/team-the-company-list.test.mts).
 import type { Person, Product, TeamState, ThreadCard, WorkItem } from '../types';
 import { blockedWords, clockWords, dayDeadline } from '../../../shared/team-tasks.mjs';
 import { inMyInbox, isGivenTask, isShared, heldByAPerson, lastSpeaker, runnerOf, taskGiver } from '../../../shared/team-rules.mjs';

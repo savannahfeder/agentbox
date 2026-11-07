@@ -446,7 +446,7 @@ export const fixtureSnapshot: Snapshot = {
   // zero.config.json, so `Supervisor#engineChoices` hands over one entry on
   // every Mac that exists today, and the composer's clause, the byline's engine
   // word and the Settings row all draw nothing off it. That is the founder rule
-  // (tests/one-coding-agent-draws-nothing-new.test.mjs) and it is what the
+  // (tests/one-coding-agent-draws-nothing-new.test.mts) and it is what the
   // default world has to be a photograph of.
   //
   // THE SECOND ENGINE IS A URL MODIFIER, NOT A NEW DEFAULT. See
@@ -1004,7 +1004,7 @@ export const fixtureSettings = {
 // founder rule and not an implementation detail: on every Mac she has, and on
 // every Mac until she writes the opt-in moment into zero.config.json, the
 // screen must be exactly the screen it is today (the whole of
-// tests/one-coding-agent-draws-nothing-new.test.mjs). A two-engine world that
+// tests/one-coding-agent-draws-nothing-new.test.mts). A two-engine world that
 // was the ONLY world would make THAT unphotographable, which is the same defect
 // pointing the other way, and it would silently rewrite every existing
 // scripts/shot-*.mjs picture: two choices in the workspace turn on five

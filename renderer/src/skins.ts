@@ -3,7 +3,7 @@ import { THEME_KEY, type ThemeChoice } from './theme';
 // The picture themes, and which one the window is wearing.
 //
 // A skin is a second axis laid over the light and dark token sets in theme.ts
-// (pinned by tests/theme-tokens.test.mjs), carried on its own `data-skin`
+// (pinned by tests/theme-tokens.test.mts), carried on its own `data-skin`
 // attribute so nothing under it moves. A third value of `theme` would have
 // made every token block a three-way answer.
 

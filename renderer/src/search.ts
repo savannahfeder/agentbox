@@ -35,7 +35,7 @@ export interface Searchable {
 }
 
 // How well a row matched sets only the order. The list prints no headings for
-// it (tests/a-result-list-has-no-headings.test.mjs).
+// it (tests/a-result-list-has-no-headings.test.mts).
 export interface SearchHit<T> {
   item: T;
   // The sentence the query was found in, ready for the row's summary line.

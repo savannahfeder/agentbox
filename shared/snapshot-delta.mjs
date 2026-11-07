@@ -2,7 +2,7 @@
 //
 // The window reads the inbox on every push, up to two and a half times a second
 // while any agent writes, and the inbox is every thread in every project
-// (tests/the-window-is-sent-only-the-threads-that-changed.test.mjs). So each
+// (tests/the-window-is-sent-only-the-threads-that-changed.test.mts). So each
 // answer carries a token. A window that asks with the token of an answer it
 // holds gets the threads and other parts that changed since, what is gone, and
 // the order only when it moved. One that asks with nothing, or with a token this

@@ -316,7 +316,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // and `sweepForgery` deleted it two seconds later while logging that the
   // founder had not written it. `installMenu` runs before this function exists,
   // which is why it did that; main/main.mts late-binds the door instead, and
-  // tests/the-menu-answers-a-card-through-the-one-door.test.mjs holds it.
+  // tests/the-menu-answers-a-card-through-the-one-door.test.mts holds it.
   //
   // AND IT ANSWERS BOTH ENGINES, in two ways rather than one. A Claude Code
   // worker waits on the answer FILE, in another process, so the file is the

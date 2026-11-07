@@ -1,5 +1,5 @@
 // AN OPEN THREAD IS SENT ONLY THE AGENT LOGS THAT CHANGED, AND ONLY WHAT THEY
-// GREW BY (tests/an-open-thread-is-sent-only-the-agent-logs-that-changed.test.mjs).
+// GREW BY (tests/an-open-thread-is-sent-only-the-agent-logs-that-changed.test.mts).
 //
 // The window sends the stamps of the logs it holds. `traceAnswer` is the
 // computer's half, and `traceReader` the window's: a log marked the same comes

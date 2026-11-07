@@ -2,7 +2,7 @@
 //
 // main/cloud/run.mts is written against two small interfaces so a test can
 // run it against the real sandbox server on this machine (see
-// tests/a-cloud-run-brings-the-agents-work-home.test.mjs). These are the real
+// tests/a-cloud-run-brings-the-agents-work-home.test.mts). These are the real
 // ones: the AgentCore session (invoke, stop) and the S3 bucket (put, get, and
 // the presigned links the sandbox uses, so it holds no AWS rights of its own).
 //

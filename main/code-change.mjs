@@ -22,7 +22,7 @@
 // WHAT IS STILL REFUSED, from her 2026-08-23 answer: a branch diffed against
 // main, and a slab of raw patch handed to the window. What replaced it is a
 // photograph of this run's own checkout, taken when the run spawns.
-// tests/the-old-git-diff-screen-stays-gone.test.mjs holds the line.
+// tests/the-old-git-diff-screen-stays-gone.test.mts holds the line.
 //
 // MEASURED ON HER MAC, 2026-08-23, over the sixty largest conversations: 4,442
 // file writes, 99.7% with the agent's own prose earlier in the same message.

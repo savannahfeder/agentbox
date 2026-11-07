@@ -29,7 +29,7 @@ import { testsThatImport } from './tests-that-import.mjs';
 // three minutes it is allowed.
 export const GATE_CAP = 60;
 
-const isTest = (f) => /(^|\/)tests\/.+\.test\.mjs$/.test(f);
+const isTest = (f) => /(^|\/)tests\/.+\.test\.m[jt]s$/.test(f);
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** How often a test file says the name of any of these files. */

@@ -131,7 +131,7 @@ export function engineLabel(id) {
  * This is ungated, like `engineChoiceExists` and `enginePicked`. Its one caller
  * is `Supervisor#engineChoices`, which asks `engineChoiceSince` first, so the
  * offer and the routing cannot disagree. The renderer gets the list on the
- * snapshot. tests/a-codex-row-from-august-still-runs-on-claude.test.mjs pins the
+ * snapshot. tests/a-codex-row-from-august-still-runs-on-claude.test.mts pins the
  * caller list.
  */
 export function availableEngines(found = {}) {

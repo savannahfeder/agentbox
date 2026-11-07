@@ -1,6 +1,6 @@
 // WHAT THE RENDERER'S TYPES MUST STILL REFUSE.
 //
-// tests/the-renderer-typechecks-clean.test.mjs compiles this file on the
+// tests/the-renderer-typechecks-clean.test.mts compiles this file on the
 // renderer's own settings and checks that every marked line is STILL an error,
 // with the code written beside it. Nothing here is ever imported or run.
 //

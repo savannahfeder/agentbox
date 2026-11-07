@@ -469,7 +469,7 @@ async function createWindow() {
   // THE KEYCHAIN IS ONLY ASKED WHEN THERE IS A TEAM (2026-10-06): asking it at
   // every launch put a "Agentbox Safe Storage" password prompt in front of the
   // single-person app, which has no sign-in to keep
-  // (tests/the-installed-app-is-the-single-person-app.test.mjs).
+  // (tests/the-installed-app-is-the-single-person-app.test.mts).
   const cloudConfig = loadCloudConfig(appDir, { packaged: app.isPackaged });
   let phoneApply: ReturnType<typeof applyThrough> | null = null;
   let phoneSettings: (() => unknown) | null = null;

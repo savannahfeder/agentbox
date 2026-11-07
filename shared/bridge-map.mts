@@ -4,7 +4,7 @@
 // Electron invoke. renderer/src/browser-bridge.ts is the other half and turns
 // the same name into a POST to the local server. Both doors read this list, so
 // a channel added to one cannot go missing from the other, and
-// tests/both-front-doors-offer-the-same-bridge.test.mjs fails the suite if
+// tests/both-front-doors-offer-the-same-bridge.test.mts fails the suite if
 // preload.cjs and this file ever disagree.
 //
 // The keys are the screen's own vocabulary, the values are the channels

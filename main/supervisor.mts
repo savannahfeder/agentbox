@@ -137,7 +137,7 @@ import { effortLabel, isEffort, isEffortWord } from '../shared/effort-levels.mts
 //
 // It did not used to be. The capability Symbol was deliberately unimported and
 // deliberately unnamed here, and
-// tests/a-codex-row-from-august-still-runs-on-claude.test.mjs held that its
+// tests/a-codex-row-from-august-still-runs-on-claude.test.mts held that its
 // name appeared in no source under main/ or renderer/src, so that the slice
 // which finally opened the gate would be a slice somebody had to come here and
 // write. This is that slice, and that tripwire now asserts the exact list of
@@ -2856,7 +2856,7 @@ export class Supervisor {
    *     on the other side and the reason is stronger here: a run that goes ahead
    *     and SUCCEEDS has no channel to tell her, and on a one-engine Mac there
    *     is no channel at all -- the byline names no engine there by design
-   *     (tests/one-coding-agent-draws-nothing-new.test.mjs) and
+   *     (tests/one-coding-agent-draws-nothing-new.test.mts) and
    *     `_sayTheChoiceIsOld` is a console.warn.
    *   STOP AND SAY SO -> the only outcome she can see.
    *
@@ -9826,7 +9826,7 @@ export class Supervisor {
   // THE STATE PAGE USED TO BE HERE AND IS GONE.It was optional from and off by
   // default, and off is how her own workspace had it while every session went
   // on maintaining the file anyway, 731,396 characters of it.
-  // tests/the-state-page-is-gone.test.mjs has the measurements and keeps it
+  // tests/the-state-page-is-gone.test.mts has the measurements and keeps it
   // out. Nothing replaced it: a row carries its own history.
 
   // THE RULE ABOUT WHEN WORK GETS ITS OWN ROW had a switch here, read off
@@ -10018,7 +10018,7 @@ export class Supervisor {
    * `config.engineChoice` names the moment she opened the gate, which is a line
    * somebody writes in zero.config.json on purpose. Nothing else in main/ or
    * renderer/src names the Symbol, and the last block of
-   * tests/a-codex-row-from-august-still-runs-on-claude.test.mjs holds that as an
+   * tests/a-codex-row-from-august-still-runs-on-claude.test.mts holds that as an
    * exact list rather than as an intention.
    *
    * THREE INDEPENDENT REFUSALS, AND ANY ONE OF THEM IS ENOUGH.
@@ -10157,7 +10157,7 @@ export class Supervisor {
    * `zero.config.json` by hand, which is the point of the gate.
    *
    * It is HERE, in the one file allowed to read the opt-in
-   * (tests/a-codex-row-from-august-still-runs-on-claude.test.mjs holds that as
+   * (tests/a-codex-row-from-august-still-runs-on-claude.test.mts holds that as
    * an exact list), and `_engineFor` derives the token from this same
    * expression so the permission and the screen cannot come apart.
    */

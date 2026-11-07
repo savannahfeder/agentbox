@@ -15,7 +15,7 @@
    defined in BOTH themes. A raw rgba(255,255,255,x) wash is invisible on a
    light ground and a raw black shadow is a smudge on one, so the washes and
    shadows are tokens too (--wash, --wash-strong, --shadow-*).
-   tests/theme-tokens.test.mjs fails if a token is defined in only one theme,
+   tests/theme-tokens.test.mts fails if a token is defined in only one theme,
    because that failure has no symptom until you are staring at a control that
    is not there. --line-strong was that bug: used in nine places, defined in
    none, so every border that named it was an invalid declaration the browser
@@ -70,7 +70,7 @@
      the app's own fade taken one step further, not a new colour. Then the
      chosen option: the heading is left exactly as it is and the rows drop two steps to get out
      of its way. NEVER TUNE THIS BY EYE. `scripts/shot-sidebar-agents-four.mjs`
-     walks it and `tests/the-sidebar-agents.test.mjs` measures what it lands on.
+     walks it and `tests/the-sidebar-agents.test.mts` measures what it lands on.
   */
   --agent-ink: #949bb8;
   --line: rgba(17, 25, 48, 0.065);
@@ -331,7 +331,7 @@
      swatch cannot wear the shared glass and its line; this is the film at the
      alpha the theme's own token block was measured at. A token rather than a
      literal because the rules below the token blocks may not carry a bare
-     white, which tests/theme-tokens.test.mjs enforces. */
+     white, which tests/theme-tokens.test.mts enforces. */
   --look-glass-haze: rgba(255, 255, 255, 0.055);
   /* The three light hazes' tiles. Each carries its own because a card on paper
      has to lift off a ground that is already near white, so these are 0.41,
@@ -355,7 +355,7 @@
    produced it, because `setLook` is the only writer of either key and it writes
    both at once. This makes it impossible rather than merely unreached: any
    window wearing a picture takes the whole dark token set first, and the
-   picture's own block layers over that. tests/theme-tokens.test.mjs holds it.
+   picture's own block layers over that. tests/theme-tokens.test.mts holds it.
    `:not([data-theme="light"])` IS NOT A HOLE IN THAT, IT IS THE SAME RULE SAID
    PROPERLY, and it is what lets a picture be light at all. The bare
    `:root[data-skin]` was written when every picture was a photograph, where the
@@ -380,7 +380,7 @@
    `--skin-image` computed to `none` and `--skin-pane` to `#2e3136`, which is
    `--surface`. `:where` has zero specificity, so the selector is (0,2,0) again
    and the per picture blocks are back to being later-and-equal.
-   tests/theme-tokens.test.mjs measures the specificity now rather than trusting
+   tests/theme-tokens.test.mts measures the specificity now rather than trusting
    the shape.
 */
 :root[data-theme="dark"],
@@ -399,7 +399,7 @@
   --find-current: var(--accent);
   --find-current-ink: #ffffff;
   /* The same answer light gives, and said again here because every token this
-     app has is answered in both blocks (tests/theme-tokens.test.mjs). What
+     app has is answered in both blocks (tests/theme-tokens.test.mts). What
      moves is the picture themes, one block down.
   */
   --control-face: var(--surface);
@@ -417,7 +417,7 @@
      the same direction and stops where its heading-to-row distance meets
      lake's: 0.755 of the step, 1.326 against lake's 1.336, which is as close as
      8-bit hex gets while holding hue and chroma. Against the card the row goes
-     3.25 to 3.57. tests/the-sidebar-agents.test.mjs measures that equality, so
+     3.25 to 3.57. tests/the-sidebar-agents.test.mts measures that equality, so
      this cannot be nudged by eye without the test saying so.
   */
   --agent-ink: #818690;
@@ -501,7 +501,7 @@
      with orange accents. This block is the dark set UNDER the launch film's
      look rather than a look of its own, and it still carried the blue the app
      wore before that, so anything painting dark without the picture got it.
-     tests/every-theme-wears-the-one-orange.test.mjs reads every declaration. */
+     tests/every-theme-wears-the-one-orange.test.mts reads every declaration. */
   --accent: #ee6018;
   /* The logo's own two colours, the same as light's: the logo does not theme. */
   --logo-dot: #5f5e5c;
@@ -640,7 +640,7 @@
      swatch cannot wear the shared glass and its line; this is the film at the
      alpha the theme's own token block was measured at. A token rather than a
      literal because the rules below the token blocks may not carry a bare
-     white, which tests/theme-tokens.test.mjs enforces. */
+     white, which tests/theme-tokens.test.mts enforces. */
   --look-glass-haze: rgba(255, 255, 255, 0.055);
   /* The three light hazes' tiles. Each carries its own because a card on paper
      has to lift off a ground that is already near white, so these are 0.41,
@@ -686,7 +686,7 @@
    #5C5855, which is 2.7:1 on the panel: fine at 18px on a 1080p frame, too
    faint at 11px in a window. The three greys here are the film's #8A8380
    family walked up to 7.5, 4.8 and 3.3 to 1 on #101010, one step apart by the
-   ladder tests/the-note-she-asked-us-to-clean-up.test.mjs holds.
+   ladder tests/the-note-she-asked-us-to-clean-up.test.mts holds.
 
    THE GROUND IS ASH, NOT THE FILM'S NEAR BLACK (w-fbcb316f08, option 2, Ash).
    A near black theme is hard to read with any sun on the screen, and most dark
@@ -1274,7 +1274,7 @@ body {
    holds only the select box, which is invisible at rest. So the gutter costs
    the text nothing and the checkbox still gets a comfortable hit area away from
    the card's edge. --text-x is --gutter plus the box plus the gap;
-   tests/list-alignment.test.mjs pins that arithmetic.
+   tests/list-alignment.test.mts pins that arithmetic.
 */
 .list { --gutter: 8px; --text-x: 32px; --row-r: 24px; }
 
@@ -5480,7 +5480,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 /* --- controls ------------------------------------------------------------ */
 /* The three defaults are answered in the light block at the top of this file,
    beside every other colour token, because "light answers everything" is the
-   rule tests/theme-tokens.test.mjs holds. Only the override lives here. */
+   rule tests/theme-tokens.test.mts holds. Only the override lives here. */
 :root[data-skin] {
   --control-face: var(--skin-pane);
   --control-face-line: var(--line-strong);
@@ -5642,7 +5642,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
    nothing of ours at all. Deleted rather than left here greying over, because
    dead rules with a long note above them read as a card somebody can bring
    back. If one ever is wanted, it goes on `.modal.compose` like every other
-   card, which is what tests/skin-grounds.test.mjs still holds.
+   card, which is what tests/skin-grounds.test.mts still holds.
 */
 
 
@@ -5818,7 +5818,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
    `div.modal.palette`, rgb(55, 58, 65), covering 22.7% of the window, and 22.1%
    of that screen was byte-for-byte IDENTICAL to the app with no skin on at all.
    Nothing was wrong with the palette; it had simply never been on the list,
-   which is the failure mode `tests/skin-grounds.test.mjs` exists to catch and
+   which is the failure mode `tests/skin-grounds.test.mts` exists to catch and
    could not catch here, because the palette is not a ground of its own — it is
    `.modal`, and `.modal` had an answer on file. ⌘K is a surface the user TYPES
    into — the field at the top of it is the whole screen — so it is the same kind
@@ -6552,7 +6552,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   /* UNDER THE TOAST AND UNDER THE WALK'S OWN SCREENS. The toast is 310 and it
      is the app telling somebody something went wrong; a band saying where they
      are may never be the thing that hides it
-     (tests/the-setup-says-why-it-could-not-make-the-project.test.mjs). It does
+     (tests/the-setup-says-why-it-could-not-make-the-project.test.mts). It does
      not need to be high: the app is pushed down by the band's own height, so
      there is nothing under it to be over. */
   z-index: 90;
@@ -6593,7 +6593,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   max-width: min(560px, calc(100vw - 260px));
   /* THE CAPSULE THE APP ALREADY HAS, not a new number. 22px is the settings
      switch track's radius and the one capsule shape in the stylesheet
-     (tests/one-corner-for-the-whole-app.test.mjs holds the list of shapes that
+     (tests/one-corner-for-the-whole-app.test.mts holds the list of shapes that
      are allowed not to be the 3px corner). Anything over half this pill's
      height draws the same capsule, so reusing the app's own value costs
      nothing and adds no loose number to that list. */
@@ -7326,7 +7326,7 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
    the beat they belonged to — `coach` in renderer/src/onboarding.ts names each
    one and says where it went — so nothing asked for by name was dropped, it
    was just said in one line instead of two.
-   `tests/the-coaching-card-is-two-lines.test.mjs` fails if a third line comes
+   `tests/the-coaching-card-is-two-lines.test.mts` fails if a third line comes
    back, in the copy or in the drawing.
 */
 .fr-tether kbd {

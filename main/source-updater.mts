@@ -66,13 +66,13 @@ const SAY = {
 // rewrites shared/*.generated.mjs with the version and date of the Claude Code
 // on this Mac, and the restart below runs that build. Counted as her changes,
 // they made every update after the first say "changes of your own" for good
-// (tests/a-build-does-not-stop-the-next-update.test.mjs).
+// (tests/a-build-does-not-stop-the-next-update.test.mts).
 //
 // THE LOCKFILE IS NPM'S, TOO (2026-10-07). The restart's `npm install` rewrote
 // package-lock.json (this npm drops its `libc` lines), and the card never came
 // back while main ran 21 commits ahead. An edit to the dependencies themselves
 // is in package.json, which still blocks
-// (tests/a-package-install-does-not-stop-the-next-update.test.mjs).
+// (tests/a-package-install-does-not-stop-the-next-update.test.mts).
 const isBuildOutput = (file: string) => file === 'package-lock.json' || /^shared\/[^/]+\.generated\.[cm]?[jt]s$/.test(file);
 // The status code is one or two letters and `gitIn` trims the output, which
 // takes the leading space off the first line, so it is matched, not sliced.
@@ -283,7 +283,7 @@ export function createSourceUpdater({
     }
     // Packages changed when either file's object id moved. Compared by id
     // rather than by asking git for a diff, which this process does in exactly
-    // one file (tests/the-old-git-diff-screen-stays-gone.test.mjs).
+    // one file (tests/the-old-git-diff-screen-stays-gone.test.mts).
     let depsMoved = false;
     for (const file of ['package.json', 'package-lock.json']) {
       const was = await git(['rev-parse', '--verify', '--quiet', `${bootHead}:${file}`]);

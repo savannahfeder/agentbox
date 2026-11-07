@@ -5,7 +5,7 @@
 // You are picked by default, so the page opens as your inbox; picking a
 // teammate puts their threads in the same table, under the same tabs, with a
 // Person column. Pure, so tests read it directly
-// (tests/team-one-page-shows-the-people-you-pick.test.mjs).
+// (tests/team-one-page-shows-the-people-you-pick.test.mts).
 import type { Person, Product, ThreadCard, WorkItem } from '../types';
 import { priorityIdOf } from '../priority';
 import { conversationSlugs, order, rowSharing, type Display, type Ranked } from './page-rules';

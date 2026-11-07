@@ -197,8 +197,8 @@ and the Edge Function, is still to build.
   current release on 2026-10-20), TypeScript, expo-router. Metro watches
   `../shared` for the modules the app may import.
 - Logic lives in `mobile/src/lib/` with no React Native imports. Its tests sit
-  in `tests/` as `.test.mjs` files, because vitest only collects
-  `tests/**/*.test.mjs` (vitest.config.mjs) and the push hook only picks out
+  in `tests/` as `.test.mts` files, because vitest only collects
+  `tests/**/*.test.mts` (vitest.config.mjs) and the push hook only picks out
   that shape (scripts/lib/tests-the-push-runs.mjs). GitHub's workflow also
   installs `mobile/` and type-checks it.
 - EAS credentials never enter git; the public check already refuses

@@ -6,7 +6,7 @@
 // checks against reality, so an account set up the ordinary way (a new
 // CLAUDE_CONFIG_DIR, a /login) was invisible BY CONSTRUCTION: it could not be
 // seen on the Accounts page and could not be picked.
-// tests/an-account-she-signed-into-is-not-invisible.test.mjs has the folders,
+// tests/an-account-she-signed-into-is-not-invisible.test.mts has the folders,
 // the ids and the CLI's own sentence.
 //
 // KNOWING ABOUT AN ACCOUNT IS NOT SENDING WORK TO IT (w-dac993a554). This list

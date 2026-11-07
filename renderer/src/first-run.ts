@@ -1,5 +1,5 @@
 // THE FIRST RUN'S RULES, with no window in them (w-fadbbea8ef). The screens are
-// components/FirstRun.tsx; tests/the-first-run-starts-on-real-work.test.mjs
+// components/FirstRun.tsx; tests/the-first-run-starts-on-real-work.test.mts
 // holds what each rule is for.
 
 import { checkProjectFolder } from '../../shared/project-folder-check.mts';

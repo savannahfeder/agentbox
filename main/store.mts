@@ -536,7 +536,7 @@ export class Store {
   // The fold now draws that line itself: her 'open' is a HANDBACK and claims no
   // authority, so the claim, the blocked and the done that follow all land,
   // while her terminal words hold (shared/work-items.mjs, authorityOf). Pinned
-  // by tests/v0-loop.test.mjs here and archive-is-final.test.mjs there.
+  // by tests/v0-loop.test.mts here and archive-is-final.test.mjs there.
   // `permissionMode` is WHAT THE ANSWER ITSELF MAY DO, and it belongs to this
   // one reply rather than to the project.It is written as a founder field
   // beside the answer, read once by the run that answer starts
@@ -1979,7 +1979,7 @@ export class Store {
  *  pane printed "Mon, Aug 24 3:38pm" under a result stamped 10:37pm. Seventeen
  *  hours out and the work appeared to happen after the answer.
  *
- *  Pinned by tests/the-practice-project-is-the-whole-app.test.mjs, which writes
+ *  Pinned by tests/the-practice-project-is-the-whole-app.test.mts, which writes
  *  a trace and reads it back through the renderer's own parser. */
 function clockAt(ms: number) {
   return new Date(ms).toISOString().slice(11, 19);

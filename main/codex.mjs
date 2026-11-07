@@ -36,7 +36,7 @@ export const SAYING_CAP = 20_000;
 
 /**
  * Paths that never belong in a run's code artifact. Copied from main/code-change.mjs;
- * tests/a-codex-turn-reads-like-every-other-run-on-her-page.test.mjs checks the
+ * tests/a-codex-turn-reads-like-every-other-run-on-her-page.test.mts checks the
  * two copies still match.
  */
 export const NOT_CODE = /(^|\/)(node_modules|\.git)\//;

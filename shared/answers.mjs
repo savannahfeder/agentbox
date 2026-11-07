@@ -82,7 +82,7 @@ export function answerTs(item) {
 // she replies, resumes it or sends it back. A reply she wrote BEFORE the stop
 // is not one of those, though a kill hands it back to the queue: that is how a
 // stopped run came straight back ten seconds later (2026-10-01).
-// tests/a-stopped-agent-stays-stopped-until-she-resumes-it.test.mjs
+// tests/a-stopped-agent-stays-stopped-until-she-resumes-it.test.mts
 // A teammate's reply after the stop is not her speaking, so it never lifts it.
 export function stoppedByHer(item) {
     const status = item?.wrote?.status;

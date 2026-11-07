@@ -42,7 +42,7 @@ export const LAST_ENGINE_KEY = 'zero.lastEngine';
  * what the picker uses for Claude Code. That is the one
  * comparison this file makes on its own, against the same constant the two
  * functions below already compare against, and it is deliberately NOT
- * `enginePicked`: tests/a-codex-row-from-august-still-runs-on-claude.test.mjs
+ * `enginePicked`: tests/a-codex-row-from-august-still-runs-on-claude.test.mts
  * holds an exact list of that helper's callers so that the renderer cannot grow
  * a second opinion about what is on this Mac, and there is no reason to spend
  * that line on a comparison the file already spells twice.

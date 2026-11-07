@@ -135,7 +135,7 @@ export function git(cwd, ...args) {
  *   Agentbox has. It means `requireMcpServer` is null and a worker does not wait
  *   for a store server, and it means these proofs say nothing about the store
  *   MCP gate -- that path has its own tests
- *   (tests/a-codex-worker-can-write-to-her-store-or-it-does-not-run.test.mjs).
+ *   (tests/a-codex-worker-can-write-to-her-store-or-it-does-not-run.test.mts).
  */
 export async function throwawayApp({
   scratch,

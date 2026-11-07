@@ -303,7 +303,7 @@ export function tokenize(line: string): Tok[] {
 /**
  * The part of each line the other does not share, between their common start
  * and common end, or null when there is nothing worth marking
- * (tests/the-words-that-changed-are-marked.test.mjs).
+ * (tests/the-words-that-changed-are-marked.test.mts).
  */
 export function changedSpan(a: string, b: string): { minus: [number, number]; plus: [number, number] } | null {
   if (a === b) return null;
@@ -405,7 +405,7 @@ export function linesSkipped(before: Hunk | undefined, after: Hunk | undefined):
 
 /**
  * The lines a gap between two hunks stood for, read from the file on disk now
- * and numbered from `from` (tests/the-hidden-lines-open-in-place.test.mjs).
+ * and numbered from `from` (tests/the-hidden-lines-open-in-place.test.mts).
  * The file may have moved on since the change, so the rows either side of the
  * gap must still match at their numbers, or only the reason comes back.
  */
@@ -519,7 +519,7 @@ export function toggled(set: ReadonlySet<string>, path: string): Set<string> {
 /**
  * Where an arrow on the tree goes, as a path, or null for nowhere. `shown` is
  * the files the tree draws, `all` every file in the same order. Folding never
- * moves her (tests/folding-the-tree-never-moves-the-code.test.mjs), so she may
+ * moves her (tests/folding-the-tree-never-moves-the-code.test.mts), so she may
  * be in a file the tree hides; then down is the next shown file after hers and
  * up the one before.
  */

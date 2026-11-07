@@ -17,7 +17,7 @@
 //     no way to reach the real store or anybody's threads.
 //   - The Chrome it drives is a throwaway on a profile inside the instance
 //     folder. Never `--chrome`: no worker of this app ever drives a person's own
-//     browser (tests/no-worker-drives-her-own-browser.test.mjs).
+//     browser (tests/no-worker-drives-her-own-browser.test.mts).
 //   - It runs on this Mac's Claude Code login like any session; no API key is
 //     passed (cleanEnv strips them).
 // It is stopped at --minutes whatever it is doing.

@@ -64,7 +64,7 @@ export function testsThatImport(changed, root = process.cwd()) {
   let tests = [];
   try {
     tests = fs.readdirSync(path.join(root, 'tests'))
-      .filter((f) => f.endsWith('.test.mjs'))
+      .filter((f) => /\.test\.m[jt]s$/.test(f))
       .map((f) => path.join(root, 'tests', f));
   } catch { return []; }
 
