@@ -142,6 +142,13 @@ function Faces({ here }: { here: Here[] }) {
   );
 }
 
+/** Who is here, as faces, for a surface that marks places itself (a table). */
+export function LiveFaces({ session }: { session: LiveSession }) {
+  const here = useHere(session);
+  if (here.length < 2) return null;
+  return <Faces here={here} />;
+}
+
 /** What is drawn around the page: who is here, and where they are. */
 export function LivePresence({ session, editor, column, look }: { session: LiveSession; editor: Editor | null; column: HTMLElement | null; look: PresenceLook }) {
   const here = useHere(session);

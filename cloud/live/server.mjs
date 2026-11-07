@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// THE LIVE RELAY: one room per open file (shared/live/room.mjs) behind a
+// THE LIVE RELAY: one room per open file (room.mjs) behind a
 // WebSocket at /room/<id>. Runs for the stand-in team cloud and the load test,
 // and is what a hosted relay runs.
 //
@@ -10,7 +10,7 @@
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { createRoom } from '../../shared/live/room.mjs';
+import { createRoom } from './room.mjs';
 
 const ROOM_ID = /^[A-Za-z0-9_.:-]{8,200}$/;
 const ALLOW_DEADLINE_MS = 10_000;

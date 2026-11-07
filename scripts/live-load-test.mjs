@@ -19,7 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import WebSocket from 'ws';
 import * as Y from 'yjs';
-import { connectLive } from '../shared/live/client.mjs';
+import { connectLive } from '../renderer/src/live/client.mjs';
 import { changes } from '../shared/text-merge.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

@@ -58,3 +58,14 @@
 .lv-roster-at { color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lv-roster-more { color: var(--text-faint); padding-top: 4px; }
 .doc-sheet.lv-look-roster .doc-outline { visibility: hidden; }
+
+/* A table: the cell someone else is on, outlined in their colour, their name on its corner. */
+.tbl-bar .lv-faces { position: static; margin-left: auto; padding-left: 12px; }
+.lv-cell { box-shadow: inset 0 0 0 2px var(--lv); position: relative; }
+.lv-cell.is-agent { box-shadow: inset 0 0 0 1.5px var(--lv); background-image: linear-gradient(90deg, transparent, color-mix(in srgb, var(--lv) 14%, transparent), transparent); background-size: 200% 100%; animation: lv-cell-sheen 1.8s linear infinite; }
+@keyframes lv-cell-sheen { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.lv-cell::after {
+  content: attr(data-lv); position: absolute; top: -15px; right: -2px; padding: 0 4px; max-width: 160px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 600 10px/15px var(--font-ui, inherit); color: #0d1220; background: var(--lv); z-index: 3; pointer-events: none;
+}

@@ -1,14 +1,14 @@
 // A LIVE TABLE KEEPS EVERY CELL EACH WRITER CHANGED.
 //
 // A table used to be written whole over its file, refused when the file had
-// moved: measured on 2026-11-06 (scripts/scratch/baseline-many-writers.mjs),
+// moved: measured on 2026-11-06 by replaying N saves through it,
 // any number of writers past one kept exactly one edit. In a live table each
 // cell is its own entry under a row and a column that keep their ids, so edits
 // to different cells all land, a row added or taken away does not move anyone's
 // edit to another row, and two edits to one cell settle on one value everywhere.
 import { describe, it, expect } from 'vitest';
 import * as Y from 'yjs';
-import { gridOf, putGrid, seedGrid } from '../shared/live/table-doc.mjs';
+import { gridOf, putGrid, seedGrid } from '../renderer/src/live/table-doc.mjs';
 
 const grid = [['Name', 'Stage', 'Owner'], ['Acme', 'Lead', 'Ana'], ['Birch', 'Call', 'Ben'], ['Cove', 'Lead', 'Cy']];
 

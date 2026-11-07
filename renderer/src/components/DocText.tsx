@@ -138,7 +138,7 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
     if (!editor || !collab?.seed || seeded.current) return;
     if (collab.doc.getXmlFragment('default').length > 0) return;
     seeded.current = true;
-    editor.commands.setContent(mdToPmDoc(versions?.draft ?? text));
+    editor.commands.setContent(mdToPmDoc(versions?.draft ?? text), { emitUpdate: false });
   }, [editor, collab?.seed, collab?.doc]);
   // Becoming the keeper with words nobody saved yet: save them.
   useEffect(() => {
@@ -189,7 +189,8 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
       if (!room.keeper) return;
       const now = pmDocToMd(editor.getJSON());
       const merged = mergeText(was, now, text, { overlap: 'mine' }).text;
-      if (merged !== now) editor.commands.setContent(mdToPmDoc(merged));
+      // An edit, so the keeper saves the merged words.
+      if (merged !== now) editor.commands.setContent(mdToPmDoc(merged), { emitUpdate: true });
       return;
     }
     if (dirty.current) return;

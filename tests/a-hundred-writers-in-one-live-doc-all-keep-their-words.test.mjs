@@ -1,16 +1,16 @@
 // A HUNDRED WRITERS IN ONE LIVE DOC ALL KEEP THEIR WORDS.
 //
 // Before live rooms, a document was a chain of whole-file saves merged three
-// ways. Measured on 2026-11-06 with that merge (scripts/scratch/baseline-many-
-// writers.mjs): two people typing at the same spot kept one person's words, ten
+// ways. Measured on 2026-11-06 by replaying N saves through that merge
+// (shared/text-merge.mjs): two people typing at the same spot kept one person's words, ten
 // writers to a paragraph kept 10 of 50 and 10 of 200 edits, and a table kept one
 // edit out of any number. A live room merges every keystroke, so this holds the
 // line at every writer count, at the same spot, and for the case that must not
 // match: a writer who deleted words does not get them back.
 import { describe, it, expect, afterEach } from 'vitest';
 import * as Y from 'yjs';
-import { createRoom } from '../shared/live/room.mjs';
-import { connectLive } from '../shared/live/client.mjs';
+import { createRoom } from '../cloud/live/room.mjs';
+import { connectLive } from '../renderer/src/live/client.mjs';
 import { pairedSockets } from './helpers/live-sockets.mjs';
 
 const rooms = [];

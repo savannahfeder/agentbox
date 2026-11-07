@@ -18,7 +18,7 @@ import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, 
 import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
 import { pressedInTheFindBox } from '../find-in-page';
-import { ArtifactStage, StageLink, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
+import { ArtifactStage, StageLink, StageProject, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
 import { readCommentDraft, saveCommentDraft } from '../comment-drafts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { noteWithPictures } from '../note-pictures';
@@ -665,7 +665,7 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
   );
 
   return createPortal(
-    <StageThread.Provider value={thread}>
+    <StageThread.Provider value={thread}><StageProject.Provider value={project}>
     <StageLink.Provider value={setLink}>
     <div className="artifact-view" data-find-layer role="dialog" aria-label={version?.name ?? 'File'}>
       <header className="av-top">
@@ -707,10 +707,10 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
               <button type="button" className="av-btn" onClick={() => setApproveAsked(null)}>Not yet</button>
             </p>
           )}
-          {editing && !compare && liveTicket !== undefined && (
+          {editing && !compare && (
             <div className="av-pane" key={`editing-${editing.base.id}`} ref={editPane} onClick={pickInEditor}>
-              <DocText product={product} src={editing.base.path} text={incoming ?? editing.text} mtime={0} folder={editing.folder} onSaved={() => {}} onNotice={setTold} live={liveSession}
-                versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, draft: editing.draft, byline: bylineOf(version ?? editing.base) }} />
+              {liveTicket !== undefined && <DocText product={product} src={editing.base.path} text={incoming ?? editing.text} mtime={0} folder={editing.folder} onSaved={() => {}} onNotice={setTold} live={liveSession}
+                versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, draft: editing.draft, byline: bylineOf(version ?? editing.base) }} />}
               {offers.comment && <SelectionBar page={editPane} onComment={(quote) => { setWholeAsked(false); setDraftPlace({ kind: 'quote', text: quote }); box.current?.focus(); }} />}
             </div>
           )}
@@ -806,7 +806,7 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
       {below}
     </div>
     </StageLink.Provider>
-    </StageThread.Provider>,
+    </StageProject.Provider></StageThread.Provider>,
     document.body,
   );
 }

@@ -1,4 +1,4 @@
-// A COPY'S END OF A LIVE ROOM (shared/live/room.mjs). It keeps a Yjs document
+// A COPY'S END OF A LIVE ROOM (cloud/live/room.mjs). It keeps a Yjs document
 // and its cursors in step with everyone else's through one socket.
 //
 // Edits are gathered for `flushMs` and sent as one frame, and the cursor is sent
@@ -10,7 +10,7 @@
 // go up with the next sync, because the sync sends whatever the room lacks.
 import * as Y from 'yjs';
 import * as aw from 'y-protocols/awareness';
-import { AWARENESS, HELLO, ROOM, SYNC, SYNC_REPLY, UPDATE, frame, jsonFrame, readFrame } from './wire.mjs';
+import { AWARENESS, HELLO, ROOM, SYNC, SYNC_REPLY, UPDATE, frame, jsonFrame, readFrame } from '../../../shared/live/wire.mjs';
 
 const RETRY_WAITS_MS = [500, 1000, 2000, 4000, 8000, 15000, 30000, 30000];
 const FROM_ROOM = 'live-room';
