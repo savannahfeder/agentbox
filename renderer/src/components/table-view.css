@@ -232,6 +232,51 @@
 .tbl-pick .when-row.hi { background: var(--bg-selected); color: var(--text); }
 .tbl-pick .when-row.on .tbl-tag { box-shadow: inset 0 0 0 1px currentColor; }
 .tbl-pick-add { font-family: inherit; font-size: 13px; }
+/* Each tag's own menu waits at the end of its row. */
+.tbl-pick-row { position: relative; display: flex; }
+.tbl-pick-row .when-row { padding-right: 34px; }
+.tbl-pick-more {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  width: 24px; height: 24px; display: grid; place-items: center; padding: 0;
+  background: none; border: 0; border-radius: var(--radius); color: var(--text-faint); cursor: pointer; opacity: 0;
+}
+.tbl-pick-more svg { width: 14px; height: 14px; fill: currentColor; }
+.tbl-pick-row.hi .tbl-pick-more, .tbl-pick-row:hover .tbl-pick-more { opacity: 1; }
+.tbl-pick-more:hover { color: var(--text); background: var(--bg-hover); }
+
+/* One tag: its name, its colour, and a way to delete it. */
+.tbl-tagedit-head { display: flex; align-items: center; gap: 2px; margin: 6px 5px 3px 2px; }
+.tbl-tagedit-head .tbl-icon { width: 28px; height: 28px; flex: none; }
+.tbl-tagedit-head .tbl-icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.tbl-tagedit-tones { display: flex; gap: 4px; padding: 4px 9px 6px; }
+.tbl-swatch { width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border: 0; cursor: pointer; }
+.tbl-swatch::after { content: ''; width: 10px; height: 10px; background: var(--dot); }
+.tbl-swatch:hover, .tbl-swatch.on { box-shadow: inset 0 0 0 1.5px var(--dot); }
+.tbl-danger .when-row-label { color: var(--ti-rose); }
+
+/* A date cell's calendar. */
+.tbl-cal-head { display: flex; align-items: center; gap: 2px; padding: 4px 4px 2px 9px; }
+.tbl-cal-month { flex: 1; font-size: 13px; color: var(--text); }
+.tbl-cal-head .tbl-icon { width: 28px; height: 28px; }
+.tbl-cal-head .tbl-icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.tbl-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; padding: 0 5px 4px; }
+.tbl-cal-wd { height: 24px; display: grid; place-items: center; font: 10.5px var(--mono); color: var(--text-faint); }
+.tbl-cal-day {
+  height: 30px; padding: 0; font: inherit; font-size: 12.5px; font-variant-numeric: tabular-nums;
+  color: var(--text-dim); background: none; border: 0; border-radius: var(--radius); cursor: pointer;
+}
+.tbl-cal-day:hover { background: var(--bg-selected); color: var(--text); }
+.tbl-cal-day.out { color: var(--text-faint); opacity: 0.55; }
+.tbl-cal-day.today { color: var(--text); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.tbl-cal-day.on { background: var(--tbl-at); color: #fff; box-shadow: none; }
+.tbl-cal-foot { display: flex; gap: 2px; border-top: 1px solid var(--line); padding-top: 3px; margin-top: 2px; }
+
+/* Rows and columns picked can be picked up and moved; a line shows where they will land. */
+.tbl.rows-move .tbl-rn.sel[data-rn], .tbl.cols-move .tbl-th.sel { cursor: grab; }
+.tbl.moving, .tbl.moving * { cursor: grabbing !important; }
+.tbl-drop { position: absolute; z-index: 7; pointer-events: none; background: var(--tbl-at); }
+.tbl-drop.row { left: 0; height: 2px; }
+.tbl-drop.col { top: 0; width: 2px; }
 
 /* A menu at the pointer. */
 .when-menu.tbl-menu.tbl-float { position: fixed; top: 0; width: 220px; z-index: 1000; }

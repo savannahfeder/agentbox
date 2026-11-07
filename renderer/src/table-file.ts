@@ -122,7 +122,23 @@ export function dateOf(v: string): number {
   if (!MONTH.test(s)) return NaN;
   // "Jan 5" has no year, and Date.parse would put it in 2001.
   const t = Date.parse(/\b\d{4}\b/.test(s) ? s : `${s} ${new Date().getFullYear()}`);
-  return Number.isFinite(t) ? t : NaN;
+  if (!Number.isFinite(t)) return NaN;
+  // Date.parse gives local midnight and the ISO path UTC midnight; one day must be one number.
+  const d = new Date(t);
+  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** A day picked from the calendar, written the way the column already writes its dates. */
+export function dateWords(day: number, column: string[]): string {
+  const d = new Date(day);
+  const y = d.getUTCFullYear(), m = d.getUTCMonth() + 1, n = d.getUTCDate();
+  const filled = column.map((v) => v.trim()).filter((v) => Number.isFinite(dateOf(v)));
+  const most = (re: RegExp) => filled.length > 0 && filled.filter((v) => re.test(v)).length / filled.length >= 0.6;
+  if (most(/^\d{4}-\d{1,2}-\d{1,2}$/)) return `${y}-${String(m).padStart(2, '0')}-${String(n).padStart(2, '0')}`;
+  if (most(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) return `${m}/${n}/${y}`;
+  return `${MONTHS[m - 1]} ${n}, ${y}`;
 }
 
 function kindOf(name: string, values: string[], first: boolean): ColumnKind {
