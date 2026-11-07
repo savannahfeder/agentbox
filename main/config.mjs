@@ -18,6 +18,7 @@ import { machineSlots } from './machine.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mjs';
 import { runningAsADemo } from '../shared/demo-world.mjs';
+import { replaceFileSync } from './replace-file.mjs';
 
 const CONFIG_NAME = 'zero.config.json';
 
@@ -433,7 +434,7 @@ export function saveConfig(config, patch) {
   }
   const tmp = `${file}.tmp-${process.pid}`;
   fs.writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
-  fs.renameSync(tmp, file);
+  replaceFileSync(tmp, file);
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) delete config[key];
     else config[key] = value;

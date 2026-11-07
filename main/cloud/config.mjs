@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Name } from '../../shared/product-name.mjs';
 import { CLOUD_ADDRESS } from '../../shared/cloud-address.mjs';
+import { replaceFileSync } from '../replace-file.mjs';
 
 // `home` is the supervisor's own idea of the home folder (config.home), so a
 // supervisor built for a test, with a home that is not the developer's, never
@@ -87,7 +88,7 @@ export function noteImageCaps(config, caps, env = process.env, home = os.homedir
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(all, null, 2));
-  fs.renameSync(tmp, file);
+  replaceFileSync(tmp, file);
 }
 
 export function readCloudKey(env = process.env, home = os.homedir()) {
@@ -112,7 +113,7 @@ export function writeCloudKey(key, env = process.env, home = os.homedir()) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, key, { mode: 0o600 });
-  fs.renameSync(tmp, file);
+  replaceFileSync(tmp, file);
 }
 
 // The keychain service the first cloud build kept its own Claude tokens

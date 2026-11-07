@@ -7,6 +7,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { foldTeammates, foldChat, foldPlaybooks } from '../../shared/teammates.mjs';
 import { foldOutbox } from '../../shared/teammate-reach.mjs';
+import { replaceFileSync } from '../replace-file.mjs';
 
 const MAX_READ = 4 * 1024 * 1024;
 const MAX_LINE = 64 * 1024;
@@ -45,7 +46,7 @@ export function writeMethod(dir, id, text) {
   }
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, text);
-  fs.renameSync(tmp, file);
+  replaceFileSync(tmp, file);
   return file;
 }
 
@@ -151,7 +152,7 @@ export function writeTeamView(dir, view) {
   const file = teamViewFile(dir);
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(view));
-  fs.renameSync(tmp, file);
+  replaceFileSync(tmp, file);
 }
 
 export function readPlaybooks(dir) {
