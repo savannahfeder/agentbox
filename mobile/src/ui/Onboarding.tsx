@@ -2,7 +2,7 @@
 // (renderer/src/styles.css): a small corner on what you press, the larger
 // artifact corner on cards, the accent button from its sign-in page
 // (team/sign-in.css `.si-primary`), and small capitals for labels.
-import { router } from 'expo-router';
+import { router } from '../lib/router';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

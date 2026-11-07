@@ -5,7 +5,9 @@
 // any of them. Pure, so the rules are pinned by
 // tests/the-board-picks-several-threads-by-click-or-by-dragging-a-box.test.mjs.
 
-export type Box = { left: number; top: number; right: number; bottom: number };
+import { edgeScroll } from './row-drag';
+
+export type Box ={ left: number; top: number; right: number; bottom: number };
 
 /** A click on a card. The list reads Shift as a range down its rows; a board
  *  has no one direction to run a range in, so Shift and ⌘ both add or take
@@ -43,6 +45,62 @@ export function cardsUnder(box: Box, cards: { id: string; box: Box }[]): string[
   return cards
     .filter(({ box: c }) => box.left < c.right && box.right > c.left && box.top < c.bottom && box.bottom > c.top)
     .map((c) => c.id);
+}
+
+/** One box drag, from the press to letting go. Boxes are measured on screen
+ *  and kept in the board's own coordinates, so the board scrolling under the
+ *  pointer cannot throw the box off. Held near the top or bottom of
+ *  `scroller` it scrolls a frame at a time (`edgeScroll`, the same rule a
+ *  dragged card follows), and the box grows with it. `scrolled` redraws the
+ *  box after a scroll the drag did not make, such as the wheel's. */
+export function bandDrag(o: {
+  from: { x: number; y: number };
+  wrapRect: () => Box;
+  cards: () => { id: string; box: Box }[];
+  scroller: { rect: () => Box; scrollBy: (dy: number) => void } | null;
+  frame: (fn: () => void) => number;
+  cancelFrame: (handle: number) => void;
+  onBand: (box: Box | null) => void;
+  onHits: (ids: string[]) => void;
+}) {
+  const inWrap = (x: number, y: number) => { const r = o.wrapRect(); return { x: x - r.left, y: y - r.top }; };
+  const start = inWrap(o.from.x, o.from.y);
+  const at = { ...o.from };
+  let moved = false;
+  let handle: number | null = null;
+  const paint = () => {
+    const b = marqueeBox(start, inWrap(at.x, at.y));
+    o.onBand(b);
+    const r = o.wrapRect();
+    const under = o.cards().map(({ id, box: c }) => ({ id, box: { left: c.left - r.left, top: c.top - r.top, right: c.right - r.left, bottom: c.bottom - r.top } }));
+    o.onHits(cardsUnder(b, under));
+  };
+  const tick = () => {
+    handle = null;
+    const s = o.scroller?.rect();
+    const by = s ? edgeScroll(at.y, s.top, s.bottom) : 0;
+    if (!by) return;
+    o.scroller!.scrollBy(by);
+    paint();
+    handle = o.frame(tick);
+  };
+  return {
+    move(x: number, y: number) {
+      at.x = x; at.y = y;
+      if (!moved && Math.hypot(x - o.from.x, y - o.from.y) < 4) return;
+      moved = true;
+      paint();
+      if (handle === null) handle = o.frame(tick);
+    },
+    scrolled() { if (moved) paint(); },
+    /** Lets go; says whether the press ever moved far enough to be a box. */
+    end() {
+      if (handle !== null) o.cancelFrame(handle);
+      handle = null;
+      o.onBand(null);
+      return moved;
+    },
+  };
 }
 
 /** What is picked once the box has caught `hits`. A plain box starts the pick

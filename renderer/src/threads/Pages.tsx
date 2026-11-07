@@ -9,7 +9,7 @@ import { laterTabShown } from '../later-tab';
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { LiveMark } from '../components/LiveMark';
 import { createPortal } from 'react-dom';
-import { useRowDrag } from './row-drag';
+import { scrollerOf, useRowDrag } from './row-drag';
 import { chord } from '../this-keyboard';
 import type { Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
@@ -36,7 +36,7 @@ import { STATE_WORD, linkWords } from './summary-rules';
 import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
 import { stopKey } from './walk-rules';
 import { PinMark } from './ThreadMenu';
-import { cardClickIntent, cardsUnder, clickMarks, marqueeBox, marqueeMarks, type Box } from './board-select';
+import { bandDrag, cardClickIntent, clickMarks, marqueeMarks, type Box } from './board-select';
 import { shownToPeople } from '../../../shared/thread-cards.mjs';
 import { Name } from '../../../shared/product-name.mjs';
 import { FleetContext } from '../fleet';
@@ -1005,37 +1005,33 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
     const wrap = wrapRef.current;
     if (!wrap) return;
     e.preventDefault();
-    const at = (ev: { clientX: number; clientY: number }) => {
-      const r = wrap.getBoundingClientRect();
-      return { x: ev.clientX - r.left, y: ev.clientY - r.top };
-    };
-    const start = at(e);
     const before = new Set(marked ?? []);
     const add = e.shiftKey || e.metaKey || e.ctrlKey;
-    let moved = false;
-    const move = (ev: PointerEvent) => {
-      const p = at(ev);
-      if (!moved && Math.hypot(p.x - start.x, p.y - start.y) < 4) return;
-      moved = true;
-      const b = marqueeBox(start, p);
-      setBand(b);
-      const r = wrap.getBoundingClientRect();
-      const under = [...wrap.querySelectorAll<HTMLElement>('[data-board-id]')].map((el) => {
-        const c = el.getBoundingClientRect();
-        return { id: el.dataset.boardId ?? '', box: { left: c.left - r.left, top: c.top - r.top, right: c.right - r.left, bottom: c.bottom - r.top } };
-      });
-      markNow.current?.(marqueeMarks(before, cardsUnder(b, under), add));
-    };
+    const scroller = scrollerOf(wrap);
+    const d = bandDrag({
+      from: { x: e.clientX, y: e.clientY },
+      wrapRect: () => wrap.getBoundingClientRect(),
+      cards: () => [...wrap.querySelectorAll<HTMLElement>('[data-board-id]')].map((el) => ({ id: el.dataset.boardId ?? '', box: el.getBoundingClientRect() })),
+      scroller: scroller && { rect: () => scroller.getBoundingClientRect(), scrollBy: (dy) => { scroller.scrollTop += dy; } },
+      frame: requestAnimationFrame,
+      cancelFrame: cancelAnimationFrame,
+      onBand: setBand,
+      onHits: (hits) => markNow.current?.(marqueeMarks(before, hits, add)),
+    });
+    const move = (ev: PointerEvent) => d.move(ev.clientX, ev.clientY);
+    const scrolled = () => d.scrolled();
     const stop = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', stop);
-      setBand(null);
+      scroller?.removeEventListener('scroll', scrolled);
+      return d.end();
     };
-    const up = () => { stop(); if (!moved && !add && before.size) markNow.current?.(new Set()); };
+    const up = () => { if (!stop() && !add && before.size) markNow.current?.(new Set()); };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', stop);
+    scroller?.addEventListener('scroll', scrolled, { passive: true });
   };
   return <div className={`list hm-me th-board-wrap${band ? ' banding' : ''}`} ref={wrapRef} onPointerDown={startBand}>
     {band && <div className="th-band" aria-hidden="true" style={{ left: band.left, top: band.top, width: band.right - band.left, height: band.bottom - band.top }} />}

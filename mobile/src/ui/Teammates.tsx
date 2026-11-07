@@ -1,7 +1,7 @@
 // Your AI teammates on the phone, drawn as the desktop's Chats draws them
 // (renderer/src/teammates/ChatsColumn.tsx): the dashed letter, the primary
 // first, a dot on the ones waiting on you, and your groups under them.
-import { router } from 'expo-router';
+import { router } from '../lib/router';
 import { useState, type ReactNode } from 'react';
 import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';

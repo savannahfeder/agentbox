@@ -1,7 +1,7 @@
 // Settings' pieces, as the phone layout draws the desktop's (`.set-*` in
 // renderer/src/components/settings.css and phone.css): a page's title, plates
 // of rows, and at a row's end a switch, a chip that opens a sheet, or a stepper.
-import { router } from 'expo-router';
+import { router } from '../lib/router';
 import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

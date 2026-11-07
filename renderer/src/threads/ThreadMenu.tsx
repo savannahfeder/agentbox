@@ -13,6 +13,10 @@
 // the rows print them so the menu teaches the keys rather than hiding them.
 // The code row has no key, so it prints what the run changed instead.
 //
+// CODE CAME OUT AS A BUTTON AND ADD PEOPLE WENT IN (w-c25aae4035). Nobody found
+// the change as a row, so the corner draws it beside Done with its figures, and
+// Add people, which was that corner's button, is a row here.
+//
 // ONLY WHAT APPLIES. A run that changed no code has no code row, rather than a
 // row that opens nothing. A conversation with a person has no code and no
 // terminal, so its menu is Mark done alone, and with nothing left to offer
@@ -37,8 +41,10 @@ import { DONE } from '../done-word';
 import { onPhone } from '../phone-screen';
 import { PlaceButton, type PlaceFacts } from './PlaceButton';
 import { nameWait } from '../../../shared/thread-waits.mjs';
+import { Face } from '../team/people';
+import type { Person } from '../types';
 
-export type ThreadMenuRowId = 'run' | 'code' | 'terminal' | 'later' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'close-task' | 'done';
+export type ThreadMenuRowId = 'run' | 'code' | 'terminal' | 'people' | 'later' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'close-task' | 'done';
 
 /**
  * WHERE THIS THREAD RUNS: in the cloud now (`cloud`), free to go there
@@ -80,7 +86,9 @@ export interface ThreadMenuRow { id: ThreadMenuRowId; label: string; key: string
  * door to one verb; on a phone there was no door at all and the Later tab
  * could not be filled. It names no key for the same reason.
  */
-export function threadMenuRows({ change, terminal, finish, runNow = false, later = false, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, closeTask = false }: {
+export function threadMenuRows({ change, terminal, finish, runNow = false, people = false, later = false, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, closeTask = false }: {
+  /** Someone could still be added to the thread. */
+  people?: boolean;
   /** An open task between people: E only clears it from your Needs you, so closing it is its own row. */
   closeTask?: boolean;
   /** Whether a person has said it shipped, or null where the team would not see that. */
@@ -102,6 +110,7 @@ export function threadMenuRows({ change, terminal, finish, runNow = false, later
   if (runNow) rows.push({ id: 'run', label: 'Run now', key: null });
   if (change) rows.push({ id: 'code', label: 'View code changes', key: null });
   if (terminal) rows.push({ id: 'terminal', label: terminal === 'open' ? 'Hide terminal' : 'Open terminal', key: '⌘J' });
+  if (people) rows.push({ id: 'people', label: 'Add people', key: null });
   if (later) rows.push({ id: 'later', label: 'Later', key: later === 'key' ? 'L' : null });
   if (rename) rows.push({ id: 'rename', label: 'Rename', key: null });
   if (move) rows.push({ id: 'move', label: 'Move to another project', key: null });
@@ -171,7 +180,11 @@ function RenameMark() {
 function MoveMark() {
   return <svg {...mark}><path d="M3 12h13m-4-4 4 4-4 4" /><path d="M20 4v16" /></svg>;
 }
-const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { run: RunMark, code: CodeMark, terminal: TerminalMark, later: LaterMark, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'close-task': DoneMark, done: DoneMark };
+/** A person with a plus beside them. */
+function PeopleMark() {
+  return <svg {...mark}><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.5 2.7-5.5 6-5.5 1.4 0 2.7.4 3.7 1" /><path d="M18 13v7m-3.5-3.5h7" /></svg>;
+}
+const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { run: RunMark, code: CodeMark, terminal: TerminalMark, people: PeopleMark, later: LaterMark, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'close-task': DoneMark, done: DoneMark };
 
 /** Three square dots, because every shape in this skin is square. */
 function Dots() {
@@ -216,7 +229,7 @@ function BlockWords({ onPick }: { onPick: (id: string) => void }) {
 
 /* ----------------------------------------------------------------- button */
 
-export function ThreadMenu({ change = null, onViewChange, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onReopen = null, onRunNow = null, onLater = null, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
+export function ThreadMenu({ change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onReopen = null, onRunNow = null, onLater = null, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
   /** Opens ⌘K on the Move to rows. */
   onMove?: (() => void) | null;
   /** Whether a person has said it shipped, or null where the team would not see that. */
@@ -236,7 +249,15 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
   onRename?: (() => void) | null;
   /** The change figures, or null when this run changed no code. */
   change?: ReactNode | null;
+  /** Drawn as a button in the corner, which then takes the menu's code row. */
+  codeButton?: ReactNode | null;
+  /** The change is the file open beside the thread. */
+  codeOpen?: boolean;
   onViewChange?: () => void;
+  /** Who can be added, or null where nobody can. A conversation adds through New thread, so it lists nobody. */
+  addPeople?: { people: readonly Person[]; conversation: boolean } | null;
+  /** With no one named, a conversation opens New thread to pick. */
+  onAddPeople?: (person?: string) => void;
   terminal?: 'open' | 'closed' | null;
   onToggleTerminal?: () => void;
   /** Null on a thread that is already done. */
@@ -260,18 +281,32 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
   /** True keeps it on this Mac (moving it here if it is in the cloud). */
   onPlace?: (keep: PlaceAct) => void;
 }) {
-  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', closeTask: !!onCloseTask }));
+  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change && !codeButton, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', closeTask: !!onCloseTask }));
   const [open, setOpen] = useState(false);
   const [giving, setGiving] = useState(false);
   const [waiting, setWaiting] = useState(false);
+  const [adding, setAdding] = useState(false);
   const wrap = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const close = useCallback((refocus: boolean) => {
     setOpen(false);
     setGiving(false);
     setWaiting(false);
+    setAdding(false);
     if (refocus) button.current?.focus();
   }, []);
+
+  // ⌘K's Add people and the reply box's @ ask for the picker with this event.
+  const askToAdd = useCallback(() => {
+    if (!addPeople || !onAddPeople) return;
+    if (addPeople.conversation) { close(false); onAddPeople(); return; }
+    setAdding(true);
+    setOpen(true);
+  }, [addPeople, onAddPeople, close]);
+  useEffect(() => {
+    window.addEventListener('zero:add-people', askToAdd);
+    return () => window.removeEventListener('zero:add-people', askToAdd);
+  }, [askToAdd]);
 
   // CLOSED BY ESCAPE AND BY A PRESS ANYWHERE OUTSIDE IT. Both listen first, on
   // the window's capture, and Escape stops there: the window's own Escape
@@ -314,7 +349,7 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
   // The first row takes the focus as the menu opens, so the arrows work at once.
   useEffect(() => {
     if (open) wrap.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
-  }, [open, giving, waiting]);
+  }, [open, giving, waiting, adding]);
 
   // Enter, Space or the down arrow on the dots opens the menu. Handled here and
   // stopped, because the window reads Enter on a thread as "send the picked
@@ -329,6 +364,7 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
   const pick = (id: ThreadMenuRowId) => {
     if (id === 'give') { setGiving(true); return; }
     if (id === 'wait') { setWaiting(true); return; }
+    if (id === 'people') { askToAdd(); return; }
     close(id === 'terminal');
     if (id === 'run') onRunNow?.();
     else if (id === 'code') onViewChange?.();
@@ -342,10 +378,14 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
     else onFinish?.();
   };
 
-  if (!rows.length && !done && !place && !onReopen && !files) return null;
+  if (!rows.length && !done && !place && !onReopen && !files && !codeButton) return null;
   return (
     <span className="ts-more-wrap" ref={wrap}>
       {files}
+      {codeButton && <button type="button" className="ts-done ts-code" aria-label="View code changes" aria-pressed={codeOpen} onClick={() => onViewChange?.()}>
+        <CodeMark />
+        {codeButton}
+      </button>}
       {place && <PlaceButton place={place} {...placeFacts} onPlace={onPlace} />}
       {onReopen && !done && <button type="button" className="ts-done ts-reopen" onClick={onReopen}><span>Reopen</span></button>}
       {onCloseTask && <button type="button" className="ts-done ts-close-task" data-hint="close-task" data-hint-align="right" onClick={onCloseTask}><span>Close task</span></button>}
@@ -389,7 +429,16 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
           {blocks && <BlockWords onPick={(id) => { close(false); onWait?.(id); }} />}
         </div>
       )}
-      {open && !waiting && (giving
+      {open && adding && addPeople && (
+        <div className="th-menu ts-more-menu" role="menu" aria-label="Add to this thread">
+          <p className="ts-menu-say">They see this thread and its files and can comment.</p>
+          {addPeople.people.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { close(false); onAddPeople?.(p.id); }}>
+            <span className="ico"><Face person={p} size={18} /></span>
+            <span className="ts-more-label">{p.name}</span>
+          </button>)}
+        </div>
+      )}
+      {open && !waiting && !adding && (giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Give it to">
           <p className="ts-menu-say">A person gets it as a task in their Needs you. An AI teammate starts on it.</p>
           {giveTo.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { close(false); onGive?.(p); }}>

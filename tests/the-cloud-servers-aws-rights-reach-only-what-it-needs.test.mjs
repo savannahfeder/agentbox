@@ -1,19 +1,13 @@
-// THE CLOUD SERVER'S AWS RIGHTS REACH ONLY WHAT IT NEEDS, AND IT DEPLOYS AS
-// ONE FILE THAT STARTS.
+// THE CLOUD SERVER'S AWS RIGHTS REACH ONLY WHAT IT NEEDS.
 //
 // scripts/cloud-gateway-setup.mjs gives the cloud server (w-6633e825a7) its
 // rights in our AWS account. Two of them guard everyone's data: the links it
 // hands to Macs are signed by a user that must never reach the ledger (or a
 // Mac could rewrite its own plan), and the function itself must start only
-// our one runtime. And the function is bundled into one file for Lambda,
-// where nothing is installed: a bundle that cannot even load is only found
-// once it is deployed, by every caller at once.
+// our one runtime. That its bundle starts in Lambda is
+// tests/the-cloud-server-deploys-as-a-file-lambda-can-start.
 import { describe, it, expect } from 'vitest';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { rolePolicy, signerPolicy, signerKeyPlan, withDoneNotice, bundle, FUNCTION_SECONDS } from '../scripts/cloud-gateway-setup.mjs';
+import { rolePolicy, signerPolicy, signerKeyPlan, withDoneNotice, FUNCTION_SECONDS } from '../scripts/cloud-gateway-setup.mjs';
 import { CALL_MS } from '../main/cloud/managed.mts';
 import { runtimeRolePolicy } from '../scripts/cloud-setup.mjs';
 
@@ -119,22 +113,4 @@ describe('S3\'s notices', () => {
     expect(again.LambdaFunctionConfigurations[1]).toMatchObject({ LambdaFunctionArn: 'arn:fn2', Filter: { Key: { FilterRules: [{ Name: 'prefix', Value: 'runs/' }, { Name: 'suffix', Value: 'done.json' }] } } });
     expect(withDoneNotice({}, 'arn:fn').LambdaFunctionConfigurations).toHaveLength(1);
   });
-});
-
-describe('the bundle', () => {
-  it('is one file that loads with nothing installed beside it, and says what settings it is missing', async () => {
-    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'gateway-bundle-'));
-    try {
-      const zip = await bundle(out);
-      expect(fs.statSync(zip).size).toBeGreaterThan(1000);
-      // Loaded from a folder with no node_modules anywhere above it.
-      const alone = fs.mkdtempSync(path.join(os.tmpdir(), 'gateway-alone-'));
-      fs.copyFileSync(path.join(out, 'index.mts'), path.join(alone, 'index.mts'));
-      const mod = await import(pathToFileURL(path.join(alone, 'index.mts')).href);
-      await expect(mod.handler({ rawPath: '/v1/me', headers: {}, requestContext: { http: { method: 'GET' } } })).rejects.toThrow(/missing REGION/);
-      fs.rmSync(alone, { recursive: true, force: true });
-    } finally {
-      fs.rmSync(out, { recursive: true, force: true });
-    }
-  }, 60_000);
 });

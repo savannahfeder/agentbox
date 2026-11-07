@@ -14,6 +14,7 @@ import { it, expect, beforeAll, afterAll, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 
 const migrationsDir = path.join(import.meta.dirname, '..', 'cloud/supabase/migrations');
 const migration = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort()
@@ -67,7 +68,7 @@ const say = async (person, body, mentions = []) => (await one(person,
 const asRoot = async (sql, params) => (await db.query(sql, params)).rows;
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite(await emptyDatabase());
   await db.exec(SUPABASE_STAND_IN);
   await db.exec(migration);
   await db.exec(GRANTS);

@@ -115,6 +115,11 @@ export interface PendingSaid {
   sent?: boolean;
 }
 
+/** Whether something sent to this row is on its way, which answers any card on it. */
+export function answerOnItsWay(sending: readonly PendingSaid[] | undefined): boolean {
+  return (sending ?? []).some((s) => !s.refused);
+}
+
 export interface ItemThread {
   events: AgentEvent[];
   // The agent's last word, when the last word is the agent's. Not in `events`.

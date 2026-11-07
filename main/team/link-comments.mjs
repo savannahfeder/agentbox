@@ -1,5 +1,5 @@
 // COMMENTS ON THIS PERSON'S SHARED LINKS, PUT ON THE THREAD EACH FILE CAME FROM
-// (new_comments_on_my_links in 20261105000000_a_file_anyone_with_its_link_can_read.sql).
+// (new_comments_on_my_links in 20261105000001_a_file_anyone_with_its_link_can_read.sql).
 // A link's source is `<project>/<thread>/<file>` (main/file-link.mjs linkSource).
 
 const QUOTE_MAX = 180;

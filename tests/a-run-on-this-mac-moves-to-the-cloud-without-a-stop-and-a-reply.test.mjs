@@ -96,7 +96,6 @@ describe('with the cloud on Everything', () => {
     const { sup, rows, run, killed, root } = make();
     sup.setThreadOnMac({ 'w-kept': true });
     run('w-kept');
-    run('w-mate', { item: { labels: ['teammate:someone'] } });
     run('w-codex', { session: { engine: 'codex' } });
     run('w-cmd', { session: { command: '/compact' } });
     run('w-young', { sessionId: null });
@@ -107,6 +106,13 @@ describe('with the cloud on Everything', () => {
     fs.writeFileSync(path.join(root, '.approvals', 'x1.request.json'), JSON.stringify({ item: 'w-asks', tool: 'Bash' }));
     sup._moveRunsToTheCloud(rows);
     expect(killed).toEqual([]);
+  });
+
+  it('moves an AI teammate\'s run like any other', () => {
+    const { sup, rows, run, killed } = make();
+    run('w-mate', { item: { labels: ['teammate:someone'] } });
+    sup._moveRunsToTheCloud(rows);
+    expect(killed).toEqual(['w-mate']);
   });
 
   it('waits while the cloud is resting after failures', () => {

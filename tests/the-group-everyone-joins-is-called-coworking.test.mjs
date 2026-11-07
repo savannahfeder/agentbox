@@ -9,6 +9,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { GENERAL_ROOM } from '../main/team/rooms-memory.mts';
 
@@ -34,7 +35,7 @@ describe('on the cloud', () => {
   let db;
   const nameOf = async (id) => (await db.query('select name, listed from public.rooms where id = $1', [id])).rows[0];
   beforeAll(async () => {
-    db = new PGlite();
+    db = new PGlite(await emptyDatabase());
     await db.exec(STAND_IN);
     await db.exec(sql(files.filter((f) => f < RENAME)));
     await db.exec(`insert into public.rooms (id, name, kind, listed) values ('${OTHER}', 'General', 'room', false)`);

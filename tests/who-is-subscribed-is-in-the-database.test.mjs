@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { supabaseRest } from '../cloud/gateway/phone.mjs';
 
@@ -215,7 +216,7 @@ grant usage on schema public to anon, authenticated;
   const plans = () => server(`select person, plan, source, give, rev from public.cloud_plans order by person`);
 
   beforeEach(async () => {
-    db = new PGlite();
+    db = new PGlite(await emptyDatabase());
     await db.exec(STAND_IN);
     await db.exec(migrations);
     await db.exec(`

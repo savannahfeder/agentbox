@@ -50,6 +50,21 @@ export function serverConfig(files) {
   return order.find((f) => files[f]?.bucket && files[f]?.runtimeArn) ?? null;
 }
 
+/**
+ * Whether package.json differs from the committed one only in what a deploy
+ * writes there for its run, so a deploy that was cut short left it.
+ */
+export function leftFromARelease(committed, current) {
+  const rest = (t) => {
+    try {
+      const { version, bakedPosthogKey, ...others } = JSON.parse(t);
+      return JSON.stringify(others);
+    } catch { return null; }
+  };
+  const [a, b] = [rest(committed), rest(current)];
+  return a !== null && a === b;
+}
+
 /** One line per place people get Agentbox from, and whether it now has this version. */
 export function whatIsLive({ version, startedAt, npm, download, feed, server }) {
   const deployed = Date.parse(String(server ?? '').replace(/\+0000$/, 'Z'));
