@@ -139,7 +139,10 @@ const NEAR: Record<string, number> = { yesterday: -1, today: 0, tomorrow: 1 };
 /** A day as a person types one into a date cell: what dateOf reads, and today, tomorrow and yesterday. */
 export function dayTyped(v: string, now = new Date()): number {
   const near = NEAR[v.trim().toLowerCase()];
-  return near === undefined ? dateOf(v) : Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + near);
+  if (near !== undefined) return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + near);
+  // "12/3" typed into a date cell is this year's; in a file it could as well be a fraction.
+  const short = v.trim().match(/^(\d{1,2})\/(\d{1,2})$/);
+  return short ? dateOf(`${short[1]}/${short[2]}/${now.getFullYear()}`) : dateOf(v);
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

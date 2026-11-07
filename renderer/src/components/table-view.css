@@ -313,6 +313,7 @@
 .tbl-field-tagbtn { align-self: flex-start; display: inline-flex; padding: 4px 0; background: none; border: 0; cursor: pointer; font: inherit; }
 .tbl-field-tagbtn:disabled { cursor: default; }
 .tbl-field-tag { display: flex; flex-direction: column; }
+.tbl-field-datebtn { color: var(--text); text-align: left; }
 .tbl-field-pick { margin-top: 4px; width: 260px; padding: 4px; background: var(--pop); border: 1px solid var(--line-strong); box-shadow: var(--shadow-lg); }
 
 /* A new row, at the foot. */

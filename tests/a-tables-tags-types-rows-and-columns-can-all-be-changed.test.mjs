@@ -148,6 +148,8 @@ describe('a day picked from the calendar is written the way the column writes da
     expect(dayTyped(' Today ', now)).toBe(Date.UTC(2026, 10, 7));
     expect(dayTyped('yesterday', now)).toBe(Date.UTC(2026, 10, 6));
     expect(dayTyped('after the demo', now)).toBeNaN();
+    expect(dayTyped('12/3', now)).toBe(Date.UTC(2026, 11, 3));
+    expect(dayTyped('2/30', now)).toBeNaN();
     expect(dayTyped('Nov 30, 2026', now)).toBe(Date.UTC(2026, 10, 30));
   });
   // A tester picked a day in Launch ("Cloud Thu Nov 12") and the file lost "Cloud".

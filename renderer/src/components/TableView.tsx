@@ -511,7 +511,7 @@ function Field({ column, value, editable, onWrite, hands, cells }: {
   };
   if (column.kind === 'date' && editable) {
     return <div className="tbl-field-tag" ref={here}>
-      <button type="button" className="tbl-field-tagbtn tbl-field-text" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
+      <button type="button" className="tbl-field-tagbtn tbl-field-text tbl-field-datebtn" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
         {value.trim() || <span className="tbl-field-none">Pick a date</span>}
       </button>
       {picking && <div className="tbl-field-pick">
@@ -723,9 +723,11 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   }, []);
   useEffect(() => () => { void flush(); }, [flush, base]);
 
-  const commit = useCallback((next: Doc) => {
+  const commit = useCallback((given: Doc) => {
     const was = docRef.current;
-    if (next.table === was.table && next.order === was.order) return;
+    if (given.table === was.table && given.order === was.order) return;
+    // A tag added now keeps the colour it was drawn in; read again, the guess would deal it another.
+    const next = fileChanged(given.table, was.table) ? { ...given, looks: pinTones(given.table, given.looks) } : given;
     past.current.push(was);
     if (past.current.length > UNDO_DEPTH) past.current.shift();
     ahead.current = [];
