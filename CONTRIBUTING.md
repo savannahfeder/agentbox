@@ -17,6 +17,7 @@ by a person before it is merged.
 npm install
 npm run dev          # the app, with hot reload
 npm run test:changed # the tests for what you changed
+npm run typecheck    # strict tsc, which CI also runs
 ```
 
 - **Every change comes with tests.** Write the test first and watch it fail,

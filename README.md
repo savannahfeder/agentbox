@@ -348,7 +348,13 @@ agent noticing.
 ```
 npm run dev        # vite HMR plus electron
 npm test
+npm run typecheck  # strict tsc over the back end and the renderer
 ```
+
+The app is TypeScript throughout. `main/`, `shared/` and `mcp/` are `.mts` that
+Node runs as they are, stripping the types at load, so there is no build step
+for the back end; the renderer and the phone app are `.ts` and `.tsx` built
+by Vite and Expo. CI runs the strict type check beside the tests on every push.
 
 Useful modes:
 
