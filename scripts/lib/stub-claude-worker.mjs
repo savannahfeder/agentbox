@@ -344,6 +344,29 @@ const COMPUTER_ASK = /\bxcode\b|simulator|testflight/i;
 }
 const handsOver = directive('stub:file')?.[1];
 if (handsOver) said = `${said}\n\n${handsOver}\n`;
+else {
+  // A file the task names that is in the project's documents comes back with the answer, as a real agent's would.
+  const docs = promptText.match(/^Product docs live in: (.+)$/m)?.[1]?.trim();
+  const task = promptText.match(/^Title: [\s\S]*?(?=\n# |(?![\s\S]))/m)?.[0] ?? '';
+  const names = [...new Set(task.match(/[\w./-]+\.(?:html?|md|png|jpe?g|svg|gif|webp|txt|csv|json|pdf|mp4)\b/gi) ?? [])];
+  const found = docs && names.length ? handBack(docs, names) : [];
+  if (found.length) said = `${said}\n\n${found.join('\n\n')}\n`;
+}
+
+function handBack(docs, names) {
+  const all = [];
+  const walk = (dir, depth) => {
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) { if (depth < 4) walk(p, depth + 1); } else all.push(path.relative(docs, p));
+    }
+  };
+  walk(docs, 0);
+  return names.map((n) => all.find((rel) => rel === n) ?? all.find((rel) => path.basename(rel) === path.basename(n))).filter(Boolean);
+}
 if (directive('stub:limit') || (directive('stub:limit-first') && attempt === 1) || (limitOn && limitOn === loginName) || turn.limit) {
   say({ type: 'result', subtype: 'success', result: "You've hit your session limit · resets 11:59pm", is_error: true, session_id: sessionId });
   await Promise.race([inputEnded, wait(2000)]);
