@@ -128,6 +128,13 @@ export function dateOf(v: string): number {
   return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+const NEAR: Record<string, number> = { yesterday: -1, today: 0, tomorrow: 1 };
+/** A day as a person types one into a date cell: what dateOf reads, and today, tomorrow and yesterday. */
+export function dayTyped(v: string, now = new Date()): number {
+  const near = NEAR[v.trim().toLowerCase()];
+  return near === undefined ? dateOf(v) : Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + near);
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** A day picked from the calendar, written the way the column already writes its dates. */
@@ -145,6 +152,10 @@ export function dateWords(day: number, column: string[]): string {
 }
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+// "Cloud Thu Nov 12" names a launch and its day; picking a new day would lose the name.
+const DATE_PARTS = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\b|\d+(st|nd|rd|th)?\b|\b(of|at|am|pm)\b|(?<=\d)t(?=\d)|(?<=\d)z\b|[\s,./:+-]/gi;
+const onlyADate = (v: string) => !/[a-z]/i.test(v.replace(DATE_PARTS, ''));
+
 function kindOf(name: string, values: string[], first: boolean): ColumnKind {
   if (first) return 'name';
   const filled = values.map((v) => v.trim()).filter((v) => v && !NOTHING.test(v));
@@ -152,7 +163,7 @@ function kindOf(name: string, values: string[], first: boolean): ColumnKind {
   if (share(filled, (v) => EMAIL.test(v)) >= 0.8) return 'email';
   if (share(filled, (v) => URLISH.test(v) && !NUMBER.test(v)) >= 0.8) return 'link';
   if (!(LABEL_NUMBER.test(name) && !AMOUNT_HEADER.test(name)) && share(filled, (v) => NUMBER.test(v) || Number.isFinite(amountOf(v))) >= 0.9) return 'number';
-  if (share(filled, (v) => Number.isFinite(dateOf(v))) >= 0.8 && (DATE_HEADER.test(name) || filled.some((v) => MONTH.test(v) || v.includes('/') || /^\d{4}-/.test(v)))) return 'date';
+  if (share(filled, (v) => Number.isFinite(dateOf(v)) && onlyADate(v)) >= 0.8 && (DATE_HEADER.test(name) || filled.some((v) => MONTH.test(v) || v.includes('/') || /^\d{4}-/.test(v)))) return 'date';
   const short = filled.every((v) => v.length <= 28 && v.split(/\s+/).length <= 4);
   const distinct = new Set(filled.map((v) => v.toLowerCase())).size;
   if (short && distinct <= 30 && TAG_HEADER.test(name)) return 'tag';

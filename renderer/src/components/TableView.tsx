@@ -8,7 +8,7 @@
 // picks its column. Typing, Enter or a double click edits; a tag cell opens its
 // tags. Space opens the whole row. Every change is written back to the file.
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { dateOf, dateWords, filterRows, hrefOf, logoFor, readTable, shownLink, sortRows, tableFromGrid, type Column, type ColumnKind, type Sort, type Table, type Tone } from '../table-file';
+import { dateWords, dayTyped, filterRows, hrefOf, logoFor, readTable, shownLink, sortRows, tableFromGrid, type Column, type ColumnKind, type Sort, type Table, type Tone } from '../table-file';
 import {
   addColumn, addRows, boxOf, filterChoices, likeItsColumn, cellsIn, dropColumn, dropRows, fromClipboard, inBox, moved, orderAfterAdd, orderAfterDrop,
   pasteInto, renameColumn, shapeOf, toClipboard, writeCells, writeTable, type At, type Box, type Pick,
@@ -200,7 +200,7 @@ const typeName = (kind: ColumnKind) => TYPES.find(([k]) => k === kind)?.[1] ?? '
 const TONES: Tone[] = ['grey', 'blue', 'purple', 'teal', 'green', 'amber', 'rose'];
 /** A date typed in words, written the way the column writes its dates; anything else as typed. */
 const asDate = (value: string, was: string, cells: string[]) => {
-  const day = value.trim() === was.trim() ? NaN : dateOf(value);
+  const day = value.trim() === was.trim() ? NaN : dayTyped(value);
   return Number.isFinite(day) ? dateWords(day, cells) : value;
 };
 const popOf = (kind: ColumnKind | undefined) => (kind === 'tag' ? 'tag' : kind === 'date' ? 'date' : null);
@@ -323,7 +323,7 @@ function TagEditor({ column, tag, hands, onBack }: { column: Column; tag: string
   };
   return <div className="tbl-tagedit" onKeyDown={(e) => {
     e.stopPropagation();
-    if (e.key === 'Escape') { e.preventDefault(); onBack(); }
+    if (e.key === 'Escape') { e.preventDefault(); onBack(rename()); }
   }}>
     <div className="tbl-tagedit-head">
       <button type="button" className="tbl-btn tbl-icon tbl-tagedit-back" tabIndex={-1} aria-label="Back to the tags" title="Back (esc)"
@@ -413,7 +413,7 @@ function DatePicker({ value, column, onPick, onClose, onDraft }: {
 }) {
   const [q, setQ] = useState(value);
   useEffect(() => { onDraft?.(q); }, [q]);
-  const typedDay = dateOf(q);
+  const typedDay = dayTyped(q);
   const now = new Date();
   const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   const [month, setMonth] = useState(() => { const d = new Date(Number.isFinite(typedDay) ? typedDay : today); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1); });
@@ -432,7 +432,11 @@ function DatePicker({ value, column, onPick, onClose, onDraft }: {
   const key = (e: React.KeyboardEvent) => {
     e.stopPropagation();
     if (e.key === 'Enter') { e.preventDefault(); typed('down'); }
-    else if (e.key === 'Tab') { e.preventDefault(); typed(e.shiftKey ? 'left' : 'right'); }
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const from = Number.isFinite(typedDay) ? typedDay : today;
+      setQ(dateWords(from + (e.key === 'ArrowDown' ? 1 : -1) * 86_400_000, column));
+    } else if (e.key === 'Tab') { e.preventDefault(); typed(e.shiftKey ? 'left' : 'right'); }
     else if (e.key === 'Escape') { e.preventDefault(); onClose(); }
   };
   const noPress = (e: React.PointerEvent) => e.preventDefault();
@@ -492,23 +496,32 @@ function Field({ column, value, editable, onWrite, hands, cells }: {
 }) {
   const [draft, setDraft] = useState(value);
   const [picking, setPicking] = useState(false);
+  const here = useRef<HTMLDivElement>(null);
   useEffect(() => setDraft(value), [value]);
+  // A list closing takes its focus with it; the keys go back to the sheet, so Escape and undo still work.
+  const done = () => {
+    setPicking(false);
+    requestAnimationFrame(() => {
+      if (document.activeElement && document.activeElement !== document.body) return;
+      here.current?.closest<HTMLElement>('.tbl-sheet')?.focus({ preventScroll: true });
+    });
+  };
   if (column.kind === 'date' && editable) {
-    return <div className="tbl-field-tag">
+    return <div className="tbl-field-tag" ref={here}>
       <button type="button" className="tbl-field-tagbtn tbl-field-text" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
         {value.trim() || <span className="tbl-field-none">Pick a date</span>}
       </button>
       {picking && <div className="tbl-field-pick">
-        <DatePicker value={value} column={cells()} onPick={(v) => { setPicking(false); onWrite(asDate(v, value, cells())); }} onClose={() => setPicking(false)} />
+        <DatePicker value={value} column={cells()} onPick={(v) => { done(); onWrite(asDate(v, value, cells())); }} onClose={done} />
       </div>}
     </div>;
   }
   if (column.kind === 'tag') {
-    return <div className="tbl-field-tag">
+    return <div className="tbl-field-tag" ref={here}>
       <button type="button" className="tbl-field-tagbtn" disabled={!editable} onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
         {value.trim() ? <TagChip column={column} value={value} /> : <span className="tbl-field-none">{editable ? 'Pick a tag' : ''}</span>}
       </button>
-      {picking && <div className="tbl-field-pick"><TagPicker column={column} value={value} hands={hands} onPick={(v) => { setPicking(false); onWrite(v); }} onClose={() => setPicking(false)} /></div>}
+      {picking && <div className="tbl-field-pick"><TagPicker column={column} value={value} hands={hands} onPick={(v) => { done(); onWrite(v); }} onClose={done} /></div>}
     </div>;
   }
   if (!editable) return <div className="tbl-field-text">{value || <span className="tbl-field-none">Empty</span>}</div>;
@@ -912,6 +925,16 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     const looks = lookKind(d.looks, c.name, kind);
     changeColumns(withLooks(d.table, looks), col, looks);
   };
+  /** A filter on a tag that was renamed follows the new name; one on a tag deleted is let go. */
+  const refilter = (col: number, from: string, to: string | null) => {
+    const on = picked[col] ?? [];
+    if (!on.some((v) => v.toLowerCase() === from.trim().toLowerCase())) return;
+    const kept = on.filter((v) => v.toLowerCase() !== from.trim().toLowerCase());
+    const next = to === null || kept.some((v) => v.toLowerCase() === to.toLowerCase()) ? kept : [...kept, to];
+    // Quietly: the rows in view are the same ones, and the tag list stays open.
+    quiet.current = true;
+    setPicked((p) => ({ ...p, [col]: next }));
+  };
   const tagHands = (col: number): TagHands => ({
     rename: (from, to) => {
       const d = docRef.current;
@@ -920,6 +943,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       if (!c || t === d.table) return;
       const merges = c.values.some((v) => v.toLowerCase() === to.trim().toLowerCase() && v.toLowerCase() !== from.trim().toLowerCase());
       commit({ ...d, table: t, looks: merges ? d.looks : lookRenameTag(d.looks, c.name, from, to) });
+      const written = t.columns[col].values.find((v) => v.toLowerCase() === to.trim().toLowerCase()) ?? to.trim();
+      refilter(col, from, written);
     },
     tone: (tag, tone) => {
       const d = docRef.current;
@@ -928,7 +953,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       const looks = lookTone(d.looks, c.name, tag, tone);
       commit({ ...d, table: withLooks(d.table, looks), looks });
     },
-    drop: (tag) => { const d = docRef.current; commit({ ...d, table: dropTag(d.table, col, tag) }); },
+    drop: (tag) => { const d = docRef.current; commit({ ...d, table: dropTag(d.table, col, tag) }); refilter(col, tag, null); },
     count: (tag) => docRef.current.table.rows.filter((r) => (r[col] ?? '').trim().toLowerCase() === tag.trim().toLowerCase()).length,
   });
 
@@ -967,6 +992,15 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     }
     if (d.order.length) setPick({ a: { r: 0, c: to[c0] }, b: { r: d.order.length - 1, c: to[c1] } });
     focusKeys();
+    // Sideways only: a column moved to the left must not land under the frozen first column.
+    requestAnimationFrame(() => {
+      const el = box.current;
+      const th = el?.querySelector(`[data-hc="${to[c0]}"]`) as HTMLElement | null;
+      if (!el || !th) return;
+      const stuck = stuckWidth(to[c0]);
+      if (th.offsetLeft < el.scrollLeft + stuck) el.scrollLeft = Math.max(0, th.offsetLeft - stuck);
+      else if (th.offsetLeft + th.offsetWidth > el.scrollLeft + el.clientWidth) el.scrollLeft = th.offsetLeft + th.offsetWidth - el.clientWidth;
+    });
   };
 
   // ---- Editing a cell. The ref says whether an edit is still open, so the

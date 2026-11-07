@@ -244,7 +244,9 @@
 .tbl-menu-back { width: 100%; background: none; border: 0; cursor: pointer; align-items: center; gap: 4px; font-family: inherit; }
 .tbl-menu-back:hover { color: var(--text); }
 .tbl-menu-back svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.tbl-pick-row.hi .tbl-pick-more, .tbl-pick-row:hover .tbl-pick-more { opacity: 1; }
+/* The keys and the pointer share one highlight: the pointer moves it, and keys move it away from the pointer. */
+.tbl-pick .tbl-pick-row .when-row:hover:not(.hi) { background: none; }
+.tbl-pick-row.hi .tbl-pick-more { opacity: 1; }
 .tbl-pick-more:hover { color: var(--text); background: var(--bg-hover); }
 
 /* One tag: its name, its colour, and a way to delete it. */

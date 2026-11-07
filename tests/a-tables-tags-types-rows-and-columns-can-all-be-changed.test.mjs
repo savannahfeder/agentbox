@@ -7,7 +7,7 @@
 // written back in the new order.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { readTable, dateOf, dateWords } from '../renderer/src/table-file.ts';
+import { readTable, dateOf, dateWords, dayTyped } from '../renderer/src/table-file.ts';
 import {
   renameTag, dropTag, withLooks, lookKind, lookTone, lookRenameColumn, lookRenameTag, NO_LOOKS,
   moveRows, moveColumns, writeTable, shapeOf, learnTag, writeCells, pinTones, newTone,
@@ -141,6 +141,20 @@ describe('a day picked from the calendar is written the way the column writes da
     expect(dateWords(day, ['Cloud Thu Nov 12', 'Multiplayer Tue Nov 17'])).toBe('Thu Nov 12');
     expect(dateWords(day, ['Nov 9', 'Oct 30'])).toBe('Nov 12');
     expect(dateWords(day, ['Mon, Nov 9, 2026'])).toBe('Thu Nov 12, 2026');
+  });
+  it('today, tomorrow and yesterday are days; other words are not', () => {
+    const now = new Date(2026, 10, 7, 15, 0);
+    expect(dayTyped('tomorrow', now)).toBe(Date.UTC(2026, 10, 8));
+    expect(dayTyped(' Today ', now)).toBe(Date.UTC(2026, 10, 7));
+    expect(dayTyped('yesterday', now)).toBe(Date.UTC(2026, 10, 6));
+    expect(dayTyped('after the demo', now)).toBeNaN();
+    expect(dayTyped('Nov 30, 2026', now)).toBe(Date.UTC(2026, 10, 30));
+  });
+  // A tester picked a day in Launch ("Cloud Thu Nov 12") and the file lost "Cloud".
+  it('a column of names with a day in them is not guessed to be dates; a column of days still is', () => {
+    expect(readTable('Goal,Launch\nA,Cloud Thu Nov 12\nB,Multiplayer Tue Nov 17\nC,Cloud Thu Nov 12\n', 'x.csv').columns[1].kind).not.toBe('date');
+    expect(readTable('Goal,By\nA,Mon Nov 9\nB,Sat Nov 7\nC,Thu Nov 12\n', 'x.csv').columns[1].kind).toBe('date');
+    expect(readTable('Goal,Due\nA,2026-11-12T10:30:00Z\nB,2026-11-13\n', 'x.csv').columns[1].kind).toBe('date');
   });
   it('reads every way of writing a day as the same day, so the calendar marks the right one', () => {
     for (const v of ['2026-11-12', '11/12/2026', 'Nov 12, 2026', 'November 12 2026', 'Thu Nov 12 2026']) expect(dateOf(v)).toBe(day);
