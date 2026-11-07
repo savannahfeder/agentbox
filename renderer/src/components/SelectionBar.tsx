@@ -12,6 +12,61 @@ const CommentGlyph = () => (
   </svg>
 );
 
+/** The same bar over words selected inside a page's own frame, which says what they are (main/frame-selected-words.mts). */
+export function FrameWordsBar({ frame, onComment }: { frame: HTMLIFrameElement | null; onComment: (quote: string) => void }) {
+  const bar = useRef<HTMLDivElement | null>(null);
+  const [picked, setPicked] = useState<{ words: string; first: Box; all: Box } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [moves, setMoves] = useState(0);
+  useEffect(() => {
+    setPicked(null);
+    if (!frame) return undefined;
+    const hear = (e: MessageEvent) => {
+      if (e.source !== frame.contentWindow || e.data?.type !== 'agentbox-selected-words') return;
+      const { words, first, all } = e.data;
+      setCopied(false);
+      setPicked(typeof words === 'string' && words.trim() && first && all ? { words, first, all } : null);
+    };
+    const down = (e: MouseEvent) => { if (!bar.current?.contains(e.target as Node)) setPicked(null); };
+    const moved = () => setMoves((n) => n + 1);
+    window.addEventListener('message', hear);
+    document.addEventListener('mousedown', down, true);
+    window.addEventListener('scroll', moved, true);
+    window.addEventListener('resize', moved);
+    return () => {
+      window.removeEventListener('message', hear);
+      document.removeEventListener('mousedown', down, true);
+      window.removeEventListener('scroll', moved, true);
+      window.removeEventListener('resize', moved);
+    };
+  }, [frame]);
+
+  useLayoutEffect(() => {
+    const el = bar.current;
+    if (!el || !picked || !frame) return;
+    const r = frame.getBoundingClientRect();
+    const onScreen = (b: Box) => ({ top: b.top + r.top, bottom: b.bottom + r.top, left: b.left + r.left, right: b.right + r.left });
+    const top = frame.closest('.preview-frame')?.getBoundingClientRect().top ?? 0;
+    const spot = barSpot(onScreen(picked.first), onScreen(picked.all), { w: el.offsetWidth, h: el.offsetHeight }, { w: window.innerWidth, h: window.innerHeight, top });
+    el.style.left = `${spot.left}px`;
+    el.style.top = `${spot.top}px`;
+  }, [picked, copied, moves, frame]);
+
+  if (!picked) return null;
+  const comment = () => {
+    onComment(quoteFrom(picked.words));
+    frame?.contentWindow?.postMessage({ type: 'agentbox-clear-selection' }, '*');
+    setPicked(null);
+  };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(picked.words); setCopied(true); } catch { /* clipboard blocked */ }
+  };
+  return createPortal(<div ref={bar} className="link-pop selection-bar" role="toolbar" aria-label="Selected words" onMouseDown={(e) => e.preventDefault()}>
+    <button type="button" className="link-pop-btn selection-bar-comment" onClick={comment}><CommentGlyph />Comment</button>
+    <button type="button" className="link-pop-btn" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</button>
+  </div>, document.body);
+}
+
 export function SelectionBar({ page, onComment }: { page: RefObject<HTMLElement | null>; onComment: (quote: string) => void }) {
   const bar = useRef<HTMLDivElement | null>(null);
   const [at, setAt] = useState<{ first: Box; all: Box } | null>(null);

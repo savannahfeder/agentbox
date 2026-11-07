@@ -40,8 +40,9 @@ describe('which documents take it', () => {
   it('a markdown document', () => {
     for (const f of ['answers.md', 'docs/plan.markdown', 'designs/w-1/plan-v2.md?x=1']) expect(takesNotesSidebar(f), f).toBe(true);
   });
-  it('not a page, a picture, a script or nothing', () => {
-    for (const f of ['options.html', 'a.png', 'cart.mjs', 'notes.md.png', '', null]) expect(takesNotesSidebar(f), String(f)).toBe(false);
+  // Pages, pictures and scripts take it too since w-d18e699928 (notes-sit-beside-a-page-and-every-file-the-pane-draws).
+  it('not a website or nothing', () => {
+    for (const f of ['https://example.com/notes.md', '', null]) expect(takesNotesSidebar(f), String(f)).toBe(false);
   });
   it('only full screen, on the thread you are in, and never a teammate\'s read-only copy', () => {
     const app = read('App.tsx');

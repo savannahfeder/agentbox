@@ -1,5 +1,8 @@
 import { noteGoesTo } from '../../shared/artifact-marks.mjs';
 import type { FileNote } from './types';
+import { isLocalPreview } from './artifact-layout';
+import { docKind, isPlainText } from './doc-pane';
+import { isTablePath } from './table-file';
 
 /** Stored when someone closes the notes sidebar; every window reads the same key. */
 export const NOTES_CLOSED_KEY = 'agentbox.notesSidebar.closed';
@@ -17,8 +20,31 @@ export function rememberNotesSidebar(storage: Storage, open: boolean): void {
   } catch { /* no storage: it opens next time */ }
 }
 
-/** A thread's markdown document is the one kind the sidebar sits beside. */
-export const takesNotesSidebar = (src: string | null | undefined) => /\.(md|markdown)$/i.test(String(src ?? '').split(/[?#]/)[0]);
+/** Every file the pane draws itself. A website, a local app and a code change are not files to note. */
+export function takesNotesSidebar(src: string | null | undefined): boolean {
+  const path = String(src ?? '');
+  if (!path || isLocalPreview(path)) return false;
+  const kind = docKind(path);
+  return kind ? kind !== 'website' && kind !== 'code' : isPlainText(path);
+}
+
+/** Words can be selected where the text is the page's own; a page also takes a pin. */
+export function notesCanPoint(src: string): { words: boolean; spots: boolean } {
+  const kind = docKind(src);
+  if (kind === 'html') return { words: true, spots: true };
+  if (kind === 'markdown' || (!kind && isPlainText(src) && !isTablePath(src))) return { words: true, spots: false };
+  return { words: false, spots: false };
+}
+
+/** The page drawn whole so a pin stays on its spot, and asked to say which words are selected. */
+export function pageForNotes(url: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.set('agentbox-height', '1');
+    u.searchParams.set('agentbox-notes', '1');
+    return u.href;
+  } catch { return url; }
+}
 
 /** The open notes on one document, split into those Send would tell the agent and the rest. */
 export function sidebarNotes(notes: readonly FileNote[], fileIds: readonly string[], people: ReadonlyArray<{ id: string; name?: string | null }> = []) {

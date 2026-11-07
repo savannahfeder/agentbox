@@ -1,7 +1,8 @@
-// Notes beside a document opened full screen from its thread: you select words,
-// write as much as you like, attach files, and Send hands every waiting note
-// to the agent at once (main/notes-wake.mjs noteToItsAgent).
+// Notes beside a file opened full screen from its thread: you select words or
+// pin a spot on a page, write as much as you like, attach files, and Send hands
+// every waiting note to the agent at once (main/notes-wake.mjs noteToItsAgent).
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { Face, TeamContext } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
@@ -10,11 +11,13 @@ import { notedFilesInLines, threadFiles, versionForPath, whoseIsTheFile } from '
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { notePictures, noteWithPictures } from '../note-pictures';
 import { canPaintQuotes, paintQuotes } from '../paint-quotes';
-import { noteAttachments, sidebarNotes } from '../notes-sidebar';
+import { notesCanPoint, noteAttachments, sidebarNotes } from '../notes-sidebar';
+import { pinLabel, pinsToDraw } from '../artifact-pins';
 import { AttachRow } from './AttachRow';
 import { NotePictureShown } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
-import { SelectionBar } from './SelectionBar';
+import { PinMarks, spotIn } from './PinMarks';
+import { FrameWordsBar, SelectionBar } from './SelectionBar';
 import './notes-sidebar.css';
 
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -47,6 +50,7 @@ function SidebarNote({ note, product, on, who, person, me, onGo }: {
         <span className="sb-when">{note.sent && <NoteGlyph name="check" />}{note.sent ? 'Sent ' : ''}{clock(note.ts)}</span>
       </span>
       {note.place.kind === 'quote' && <span className="sb-quote">{note.place.text}</span>}
+      {note.place.kind === 'pin' && <span className="sb-pin">Pin {pinLabel(note)}</span>}
       {words && <span className="sb-text">{words}</span>}
       {said.pictures.length > 0 && <span className="sb-pictures">{said.pictures.map((p) => <NotePictureShown key={p.src} product={product} picture={p} />)}</span>}
       {files.length > 0 && <span className="sb-files">{files.map((f) => <span key={f.src} className="sb-file">{f.name}</span>)}</span>}
@@ -92,21 +96,47 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
   const aside = useRef<HTMLElement | null>(null);
   const page = useRef<HTMLElement | null>(null);
   const [pageAt, setPageAt] = useState(0);
+  // A page is drawn in a frame on a sheet as tall as itself (DocPane PinSheet); pins go on the sheet.
+  const [sheet, setSheet] = useState<HTMLElement | null>(null);
+  const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
+  const [sheetSize, setSheetSize] = useState({ w: 0, h: 0 });
   useEffect(() => {
     const card = aside.current?.closest('.doc-card');
     if (!card) return;
     const find = () => {
-      const found = card.querySelector<HTMLElement>('.doc-rich-content');
+      const found = card.querySelector<HTMLElement>('.doc-rich-content, .code-file');
       if (found !== page.current) { page.current = found; setPageAt((n) => n + 1); }
+      const on = card.querySelector<HTMLElement>('.doc-pin-sheet');
+      setSheet(on);
+      setFrame(on?.querySelector('iframe') ?? null);
     };
     find();
     const watch = new MutationObserver(find);
     watch.observe(card, { childList: true, subtree: true });
     return () => watch.disconnect();
   }, []);
+  useLayoutEffect(() => {
+    if (!sheet) return undefined;
+    const measure = () => setSheetSize({ w: sheet.clientWidth, h: sheet.clientHeight });
+    measure();
+    const seen = new ResizeObserver(measure);
+    seen.observe(sheet);
+    return () => seen.disconnect();
+  }, [sheet]);
 
+  const points = notesCanPoint(src);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [quote, setQuote] = useState<string | null>(null);
+  const [spot, setSpot] = useState<{ x: number; y: number } | null>(null);
+  const [pinning, setPinning] = useState(false);
+  const pinNotes = [...waiting, ...said].filter((n) => n.place.kind === 'pin');
+  const pins = pinsToDraw(pinNotes, [], activeId);
+  useEffect(() => {
+    if (!pinning) return undefined;
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setPinning(false); } };
+    window.addEventListener('keydown', esc, true);
+    return () => window.removeEventListener('keydown', esc, true);
+  }, [pinning]);
   const ranges = useRef(new Map<string, Range>());
   const quotes = [...waiting, ...said].filter((n) => n.place.kind === 'quote').map((n) => ({ id: n.id, text: (n.place as { text: string }).text }));
   const quotesKey = JSON.stringify(quotes);
@@ -128,7 +158,16 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
 
   const goTo = (note: FileNote) => {
     setActiveId(note.id);
+    if (note.place.kind === 'pin' && sheet) {
+      const box = sheet.parentElement;
+      box?.scrollTo({ top: note.place.y * sheet.clientHeight - box.clientHeight / 2, behavior: 'smooth' });
+      return;
+    }
     ranges.current.get(note.id)?.startContainer.parentElement?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+  const pointAt = (q: string | null, s: { x: number; y: number } | null) => {
+    setQuote(q); setSpot(s); setPinning(false);
+    if (q || s) requestAnimationFrame(() => box.current?.focus());
   };
 
   const [words, setWords] = useState('');
@@ -162,12 +201,13 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
       return;
     }
     const text = noteWithPictures(typed, links);
-    const place: NotePlace = quote ? { kind: 'quote', text: quote } : { kind: 'whole' };
+    const place: NotePlace = spot ? { kind: 'pin', x: spot.x, y: spot.y } : quote ? { kind: 'quote', text: quote } : { kind: 'whole' };
     const id = newId();
     const owner = whoseIsTheFile(files, version.id);
-    const kept = { words, quote, pictures };
-    setPending((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), mentions: [], owner: null, uid: null, wait: true, saving: true }]);
-    setWords(''); setQuote(null); setPictures([]); setTrouble(null);
+    const kept = { words, quote, spot, pictures };
+    const pin = spot ? { pin: pinNotes.length + 1 } : {};
+    setPending((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), mentions: [], owner: null, uid: null, wait: true, saving: true, ...pin }]);
+    setWords(''); setQuote(null); setSpot(null); setPictures([]); setTrouble(null);
     const out = await api.fileMark({ product: item.product, id: item.id, mark: { do: 'note', id, file: version.id, place, text, wait: true, ...(owner ? { owner } : {}) } })
       .catch((err: Error) => ({ ok: false, error: err.message }));
     setSending(false);
@@ -175,7 +215,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
     if (out.ok) setPending((was) => was.map((n) => (n.id === id ? { ...n, saving: false } : n)));
     else {
       setPending((was) => was.filter((n) => n.id !== id));
-      setWords(kept.words); setQuote(kept.quote); setPictures(kept.pictures);
+      setWords(kept.words); setQuote(kept.quote); setSpot(kept.spot); setPictures(kept.pictures);
       setTrouble(out.error ?? 'That note did not save.');
     }
   };
@@ -213,18 +253,19 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
       </div>
       {trouble && <p className="sb-trouble" role="alert">{trouble}</p>}
       <form className="sb-foot" onSubmit={(e) => { e.preventDefault(); void add(); }}>
-        <div className={`sb-write${quote ? ' has-quote' : ''}`}
+        <div className={`sb-write${quote || spot ? ' has-quote' : ''}`}
           onClick={(e) => { if (e.target === e.currentTarget) box.current?.focus(); }}
           onDragOver={canAttach ? (e) => e.preventDefault() : undefined}
           onDrop={canAttach ? (e) => { e.preventDefault(); void addFiles(e.dataTransfer.files); } : undefined}>
-          {quote && (
+          {(quote || spot) && (
             <div className="sb-write-quote">
-              <span className="sb-quote">{quote}</span>
-              <button type="button" className="sb-icon" aria-label="Note the whole page instead" title="Note the whole page instead" onClick={() => setQuote(null)}><Glyph d="M4 4l8 8M12 4l-8 8" /></button>
+              {spot ? <span className="sb-pin">Pin {pinNotes.length + 1}</span> : <span className="sb-quote">{quote}</span>}
+              <button type="button" className="sb-icon" aria-label="Note the whole page instead" title="Note the whole page instead" onClick={() => pointAt(null, null)}><Glyph d="M4 4l8 8M12 4l-8 8" /></button>
             </div>
           )}
           <textarea ref={box} rows={1} value={words} aria-label="Note"
-            placeholder={quote ? 'Your note on these words' : 'Add a note, or select words in the page'}
+            placeholder={spot ? 'Your note on this spot' : quote ? 'Your note on these words' : pinning ? 'Click a spot on the page'
+              : points.spots ? 'Add a note, select words or pin a spot' : points.words ? 'Add a note, or select words in the page' : 'Add a note on this file'}
             onChange={(e) => setWords(e.target.value)}
             onPaste={canAttach ? async (e) => {
               if (![...e.clipboardData.items].some((i) => i.kind === 'file')) return;
@@ -241,6 +282,12 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
               <button type="button" className="sb-icon" title="Attach files" aria-label="Attach files" onClick={() => fileInput.current?.click()}><Glyph d="M10.5 4.5 5.2 9.8a1.6 1.6 0 0 0 2.3 2.3l5.6-5.6a3 3 0 0 0-4.2-4.2L3.3 7.9a4.4 4.4 0 0 0 6.2 6.2l4-4" /></button>
               <input ref={fileInput} type="file" multiple hidden onChange={async (e) => { await addFiles(e.target.files); e.target.value = ''; }} />
             </>}
+            {points.spots && sheet && (
+              <button type="button" className={`sb-icon${pinning ? ' is-on' : ''}`} aria-pressed={pinning}
+                title={pinning ? 'Click a spot on the page' : 'Pin a spot'} aria-label="Pin a spot" onClick={() => setPinning(!pinning)}>
+                <Glyph d="M8 9.2V14M3.5 7a4.5 4.5 0 0 1 9 0M10.2 7a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0" />
+              </button>
+            )}
             <span className="sb-spring" />
             <button type="submit" className="sb-add" title="Add note (return)" aria-label="Add note"
               disabled={(!words.trim() && !pictures.length) || sending || attaching.length > 0 || !!attachProblem(pictures)}>
@@ -249,7 +296,14 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
           </div>
         </div>
       </form>
-      <SelectionBar page={page} onComment={(q) => { setQuote(q); requestAnimationFrame(() => box.current?.focus()); }} />
+      <SelectionBar page={page} onComment={(q) => pointAt(q, null)} />
+      {points.words && frame && <FrameWordsBar frame={frame} onComment={(q) => pointAt(q, null)} />}
+      {points.spots && sheet && createPortal(<>
+        {pinning && <div className="doc-pin-catch" onClick={(e) => pointAt(null, spotIn(e.currentTarget, e))} />}
+        <div className="doc-pin-marks">
+          <PinMarks pins={pins} draft={spot} draftLabel={String(pinNotes.length + 1)} size={sheetSize} onPick={(id) => setActiveId(id)} />
+        </div>
+      </>, sheet)}
     </aside>
   );
 }

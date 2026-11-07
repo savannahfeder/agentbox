@@ -20,6 +20,7 @@
 import type { WebContents, WebFrameMain } from 'electron';
 import { DOC_SCHEMES, isScheme } from '../shared/schemes.mts';
 import { DOCUMENT_HEIGHT_SCRIPT, wantsDocumentHeight } from './frame-document-height.mts';
+import { SELECTED_WORDS_SCRIPT, wantsSelectedWords } from './frame-selected-words.mts';
 
 const RULES = (thumb: string) => `@layer agentbox-scrollbars {
   ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -108,6 +109,9 @@ function quiet(frame: WebFrameMain) {
   frame.executeJavaScript(SCRIPT).catch(() => { /* a sandbox without scripts, or the frame went away */ });
   if (wantsDocumentHeight(frame.url)) {
     frame.executeJavaScript(DOCUMENT_HEIGHT_SCRIPT).catch(() => { /* the document navigated away */ });
+  }
+  if (wantsSelectedWords(frame.url)) {
+    frame.executeJavaScript(SELECTED_WORDS_SCRIPT).catch(() => { /* the document navigated away */ });
   }
 }
 
