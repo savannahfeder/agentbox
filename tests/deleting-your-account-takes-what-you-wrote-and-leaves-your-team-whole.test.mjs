@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dir = path.join(root, 'cloud/supabase/migrations');
@@ -48,7 +49,7 @@ const as = async (person, sql, role = 'authenticated') => {
 const one = async (sql) => (await db.query(sql)).rows[0];
 
 beforeEach(async () => {
-  db = new PGlite();
+  db = new PGlite(await emptyDatabase());
   await db.exec(STAND_IN);
   await db.exec(migrations);
   await db.exec(`

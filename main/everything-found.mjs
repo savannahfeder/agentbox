@@ -14,6 +14,7 @@ import { resolveArtifact } from './artifact-path.mjs';
 import { filesInLines, marksOf, reviewKind, threadFiles } from '../shared/artifact-marks.mjs';
 import { editOfLine, resolveEdits } from '../shared/message-edits.mjs';
 import { firstHit, fold, holds, queryOf, windowAround } from '../shared/word-match.mjs';
+import { withoutFileHomes } from '../shared/file-home.mjs';
 
 export const SNIPPET_CHARS = 180;
 export const MARKDOWN_BYTES = 400_000;
@@ -232,7 +233,7 @@ export function appFinder({ store, team, readableProducts, accountRoot, storeRoo
   const listThreads = () => {
     if (now() - listed.at < 2000) return listed.threads;
     const direct = new Set(store.listProducts().filter((p) => p.team?.direct).map((p) => p.slug));
-    const mine = store.listAllWorkItems().map((i) => ({
+    const mine = withoutFileHomes(store.listAllWorkItems()).map((i) => ({
       key: `${i.product}/${i.id}`, kind: direct.has(i.product) ? 'chat' : 'thread', product: i.product, id: i.id, version: i.updatedAt, updatedAt: i.updatedAt,
     }));
     const theirs = (team?.sharedThreads?.() ?? []).map((s) => ({

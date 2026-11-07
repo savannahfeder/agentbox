@@ -1,6 +1,6 @@
 // Reached from Sign up, or from a sign-in that failed. Accounts are made on the
 // computer, where the agents run, so this sends you there.
-import { router } from 'expo-router';
+import { router } from '../lib/router';
 import { Share } from 'react-native';
 import { Btn, Card, CardRow, Devices, Head, Lede, Screen } from '../ui/Onboarding';
 import { T } from '../ui/parts';

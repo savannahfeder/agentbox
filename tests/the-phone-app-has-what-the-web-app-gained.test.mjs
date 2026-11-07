@@ -100,7 +100,10 @@ describe('sign in', () => {
     expect(src).toMatch(/<AppMark /);
   });
   it('can show the password', () => {
-    expect(src).toMatch(/secureTextEntry=\{secureTextEntry && !shown\}/);
-    expect(src).toMatch(/'Show password'/);
+    // The field is shared with the reset screen.
+    const field = read('mobile/src/ui/Field.tsx');
+    expect(src).toMatch(/<Field label="Password"[^>]*secureTextEntry/);
+    expect(field).toMatch(/secureTextEntry=\{secureTextEntry && !shown\}/);
+    expect(field).toMatch(/'Show password'/);
   });
 });

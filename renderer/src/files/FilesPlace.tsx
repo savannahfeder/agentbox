@@ -2,6 +2,7 @@
 // Each file is one tile however many threads it went to; opening it is the big
 // view with every comment from every copy, and the places it was sent in.
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { fitMenu } from '../keep-in-window';
 import { ago } from '../format';
@@ -18,18 +19,25 @@ import './files-place.css';
 const NONE: FilesPlaceList = { files: [], projects: [], folders: [] };
 const NO_FOLDERS: FileFolder[] = [];
 
+const readers = new Set<() => void>();
+/** A change made here shows at once, not after the store's next word. */
+const readAgain = () => { for (const read of readers) read(); };
+// A pass over every file takes seconds on a big store; a visit starts from the last one.
+let lastList: FilesPlaceList | null = null;
+
 /** Every file, read again whenever the store says something changed. */
 export function useFilesList(on: boolean) {
-  const [list, setList] = useState<FilesPlaceList | null>(null);
+  const [list, setList] = useState<FilesPlaceList | null>(() => lastList);
   useEffect(() => {
     if (!on) return;
     let live = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const read = () => { void api.filesPlace().then((l) => { if (live) setList(l); }); };
+    const read = () => { void api.filesPlace().then((l) => { lastList = l; if (live) setList(l); }); };
     read();
+    readers.add(read);
     // A burst of changes reads once.
     const off = api.onChanged(() => { if (timer) clearTimeout(timer); timer = setTimeout(read, 400); });
-    return () => { live = false; if (timer) clearTimeout(timer); off?.(); };
+    return () => { live = false; readers.delete(read); if (timer) clearTimeout(timer); off?.(); };
   }, [on]);
   return list;
 }
@@ -43,7 +51,7 @@ function DocFace({ file }: { file: PlacedFile }) {
       if (live && r.ok) setBlocks(docBlocks(r.text ?? ''));
     });
     return () => { live = false; };
-  }, [file.opened]);
+  }, [file.opened, file.blank]);
   return <div className="fp-doc" aria-hidden="true">
     {blocks.map((b, i) => (b.kind === 'h1' ? <strong key={i}>{b.text}</strong>
       : b.kind === 'h2' ? <b key={i}>{b.text}</b>
@@ -173,6 +181,49 @@ function MoveMenu({ file, name, keys, folders, act, onNewFolder }: {
   </div>;
 }
 
+type Making = 'document' | 'table' | 'folder' | 'upload';
+const MAKING_IN: Record<Making, string> = { document: 'New document in', table: 'New table in', folder: 'New folder in', upload: 'Add files to' };
+
+/** "New", in the page's header where Threads has New thread: here, or from every file in a project you pick. */
+function NewMenu({ project, projects, canDocument, canFolder, onPick }: {
+  project: string | null; projects: string[]; canDocument: boolean; canFolder: boolean; onPick: (what: Making, project: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [what, setWhat] = useState<Making | null>(null);
+  const box = useClosesOutside(open, () => { setOpen(false); setWhat(null); });
+  const pick = (w: Making, p: string) => { setOpen(false); setWhat(null); onPick(w, p); };
+  const choose = (w: Making) => {
+    if (project) pick(w, project);
+    else if (projects.length === 1) pick(w, projects[0]);
+    else setWhat(w);
+  };
+  if ((!project && !projects.length) || (!canDocument && !canFolder)) return null;
+  const toggle = () => { setOpen(!open); setWhat(null); };
+  return <div className="fp-new-box" ref={box}>
+    <button type="button" className="th-new" aria-haspopup="menu" aria-expanded={open} onClick={toggle}><PlusGlyph />New</button>
+    {open && <div className="fp-menu" role="menu">
+      {what
+        ? <>
+          <div className="fp-menu-head">{MAKING_IN[what]}</div>
+          <div className="fp-menu-list">{projects.map((p) => <button type="button" key={p} role="menuitem" className="fp-menu-item" onClick={() => pick(what, p)}>{p}</button>)}</div>
+        </>
+        : <>
+          {canDocument && <button type="button" role="menuitem" className="fp-menu-item" onClick={() => choose('document')}><DocGlyph />Document</button>}
+          {canDocument && <button type="button" role="menuitem" className="fp-menu-item" onClick={() => choose('table')}><TableGlyph />Table</button>}
+          {canFolder && <button type="button" role="menuitem" className="fp-menu-item" onClick={() => choose('folder')}><FolderGlyph />Folder</button>}
+          {canDocument && <button type="button" role="menuitem" className="fp-menu-item" onClick={() => choose('upload')}><UploadGlyph />Upload from computer</button>}
+        </>}
+    </div>}
+  </div>;
+}
+
+/** An element the window's header draws for this page, once it is there. */
+function useSlot(id: string) {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  useEffect(() => { setEl(document.getElementById(id)); }, [id]);
+  return el;
+}
+
 function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder }: {
   file: PlacedFile; list: boolean; now: number; me: string | null; nameOf: (id: string) => string; onOpen: () => void;
   folders: FileFolder[]; act: (p: FileFolderAct) => void; onNewFolder: (file: PlacedFile, name: string) => void;
@@ -224,6 +275,10 @@ function FolderCard({ folder, count, onOpen, onDropFile, onRename }: {
 }
 
 const FolderGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M2 4.6c0-.6.5-1.1 1.1-1.1h2.7c.3 0 .6.1.8.3l1 1h5.3c.6 0 1.1.5 1.1 1.1v6c0 .6-.5 1.1-1.1 1.1H3.1c-.6 0-1.1-.5-1.1-1.1z" strokeLinejoin="round" /></svg>;
+const TableGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="1" /><path d="M2.5 6.4h11M2.5 9.7h11M6.2 6.4V13" /></svg>;
+const UploadGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 10.5V3M5 6l3-3 3 3M3 10.5v2h10v-2" /></svg>;
+const PlusGlyph = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>;
+const DocGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M4 2.5h5l3 3v8H4z M9 2.5v3h3 M6 8.5h4 M6 10.8h4" strokeLinejoin="round" strokeLinecap="round" /></svg>;
 const MoreGlyph = () => <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.2" /><circle cx="8" cy="8" r="1.2" /><circle cx="12.5" cy="8" r="1.2" /></svg>;
 const PenGlyph = () => <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M3 13l.7-2.8 7-7a1.2 1.2 0 0 1 1.7 0l.4.4a1.2 1.2 0 0 1 0 1.7l-7 7z" strokeLinejoin="round" /></svg>;
 const GridGlyph = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><rect x="2.5" y="2.5" width="4.4" height="4.4" rx="1.1" /><rect x="9.1" y="2.5" width="4.4" height="4.4" rx="1.1" /><rect x="2.5" y="9.1" width="4.4" height="4.4" rx="1.1" /><rect x="9.1" y="9.1" width="4.4" height="4.4" rx="1.1" /></svg>;
@@ -232,8 +287,8 @@ const ListGlyph = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="no
 const CommentGlyph = () => <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" strokeLinejoin="round" /></svg>;
 
 /** The file opened big, with every place it went to under it. */
-function OpenFile({ fileKey, onClose, onPlace, onNotice }: {
-  fileKey: string; onClose: () => void; onPlace: (p: FileSentIn) => void; onNotice: (words: string) => void;
+function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice }: {
+  fileKey: string; typing?: boolean; onClose: () => void; onPlace: (p: FileSentIn) => void; onNotice: (words: string) => void;
 }) {
   const team = useContext(TeamContext);
   const [view, setView] = useState<FilesPlaceView | null>(null);
@@ -247,7 +302,7 @@ function OpenFile({ fileKey, onClose, onPlace, onNotice }: {
   }, [fileKey]);
   const product = view?.sentIn[0]?.product ?? '';
   const editsTo = view?.editsTo ?? null;
-  const below = view && <footer className="fp-sent">
+  const below = !!view?.sentIn.length && <footer className="fp-sent">
     <span className="fp-sent-label">Sent in</span>
     {view.sentIn.map((p) => <button type="button" key={`${p.kind}/${p.product ?? p.ownerId}/${p.id ?? p.threadId}`} className="fp-sent-place" onClick={() => onPlace(p)}>
       <PlaceGlyph kind={p.kind} />{p.title}
@@ -277,6 +332,7 @@ function OpenFile({ fileKey, onClose, onPlace, onNotice }: {
     onOutside={(src) => { void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) onNotice(r.error || 'That file could not be opened.'); }); }}
     onClose={onClose}
     below={below}
+    typing={typing}
   />;
 }
 
@@ -300,14 +356,33 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
   const [sort, setSort] = useState<FileSort>('recent');
   const [asList, setAsList] = useState(false);
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [madeKey, setMadeKey] = useState<string | null>(null);
   const [folderId, setFolderId] = useState<string | null>(null);
-  const [naming, setNaming] = useState(false);
+  const [naming, setNaming] = useState<{ what: Making; project: string } | null>(null);
   const box = useRef<HTMLInputElement | null>(null);
   const all = list ?? NONE;
   const folders = all.folders ?? NO_FOLDERS;
   const folder = folders.some((f) => f.id === folderId) ? folderId : null;
   const place = { project, folder };
-  useEffect(() => { setFolderId(null); setNaming(false); }, [project]);
+  // Picking a project from every file opens its page with the name box already there.
+  useEffect(() => { setFolderId(null); setNaming((n) => (n && n.project === project ? n : null)); }, [project]);
+  const mine = all.mine ?? [];
+  const isMine = (p: string | null) => !!p && mine.some((m) => m.toLowerCase() === p.toLowerCase());
+  const makeFile = (kind: 'document' | 'table', name: string) => {
+    setNaming(null);
+    if (!project) return;
+    void api.filesPlaceNew({ project, name, kind, folder }).then((r) => {
+      if (r.ok && r.key) { setMadeKey(r.key); setOpenKey(r.key); readAgain(); } else onNotice(r.error || `That ${kind} could not be made.`);
+    });
+  };
+  const upload = (into: string, inFolder: string | null) => {
+    void api.filesPlaceUpload({ project: into, folder: inFolder }).then((r) => {
+      if (!r.ok) { onNotice(r.error || 'Those files could not be added.'); return; }
+      readAgain();
+      const left = r.refused ?? [];
+      if (left.length) onNotice(`${left.join(', ')} ${left.length === 1 ? 'is a kind' : 'are kinds'} Files cannot show, so ${left.length === 1 ? 'it was' : 'they were'} not added.`);
+    });
+  };
   const below = useMemo(() => filesBelow(all.files, folders, place), [all.files, folders, project, folder]); // eslint-disable-line react-hooks/exhaustive-deps
   const here = useMemo(() => filesInPlace(all.files, folders, place), [all.files, folders, project, folder]); // eslint-disable-line react-hooks/exhaustive-deps
   const looking = !!query || !!kind || review;
@@ -321,7 +396,7 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
   const shown = sortFiles(unsorted, sort);
   const [scratchOpen, setScratchOpen] = useState(false);
   const nameOf = (id: string) => firstName(team?.byId.get(id) ?? null) || 'A teammate';
-  const act = (p: FileFolderAct) => api.filesPlaceFolder(p).then((r) => { if (!r.ok) onNotice(r.error || 'That could not be done.'); return r; });
+  const act = (p: FileFolderAct) => api.filesPlaceFolder(p).then((r) => { if (!r.ok) onNotice(r.error || 'That could not be done.'); else readAgain(); return r; });
   const move = (key: string, to: string | null) => { void act({ do: 'move', key, folder: to }); };
   const countIn = (id: string) => filesBelow(all.files, folders, { project, folder: id }).length;
   const crumbs = crumbsTo(folders, place);
@@ -334,8 +409,15 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
   const empty = looking ? 'No file matches.'
     : folder ? 'Nothing in this folder yet.'
       : project ? `No files in ${project} yet.` : 'Nothing in Files yet.';
+  const pick = (what: Making, p: string) => {
+    if (p !== project) onProject(p);
+    if (what === 'upload') upload(p, p === project ? folder : null);
+    else setNaming({ what, project: p });
+  };
+  const headSlot = useSlot('fp-head-slot');
 
   return <div className="fp-page">
+    {headSlot && createPortal(<NewMenu project={project} projects={mine} canDocument={project ? isMine(project) : true} canFolder={project ? canNest : true} onPick={pick} />, headSlot)}
     <div className="fp-bar">
       <nav className="fp-crumbs" aria-label="Where you are">
         {crumbs.map((c, i) => {
@@ -371,17 +453,22 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
           <button type="button" className={`fp-kind fp-view-icon${asList ? '' : ' is-on'}`} aria-pressed={!asList} aria-label="Grid" title="Grid" onClick={() => setAsList(false)}><GridGlyph /></button>
           <button type="button" className={`fp-kind fp-view-icon${asList ? ' is-on' : ''}`} aria-pressed={asList} aria-label="List" title="List" onClick={() => setAsList(true)}><ListGlyph /></button>
         </div>
-        {project && canNest && !looking && <button type="button" className="fp-new" onClick={() => setNaming(true)}>New folder</button>}
       </div>
     </div>
-    {(cards.length > 0 || projectCards.length > 0 || naming) && <div className="fp-folders">
+    {(cards.length > 0 || projectCards.length > 0 || naming?.what === 'folder') && <div className="fp-folders">
       {projectCards.map((p) => <FolderCard key={p} folder={{ name: p }} count={filesBelow(all.files, folders, { project: p, folder: null }).length} onOpen={() => onProject(p)} />)}
       {cards.map((f) => <FolderCard key={f.id} folder={f} count={countIn(f.id)} onOpen={() => setFolderId(f.id)}
         onDropFile={(key) => move(key, f.id)} onRename={(name) => { void act({ do: 'rename', id: f.id, name }); }} />)}
-      {naming && project && <div className="fp-folder is-new"><div className="fp-folder-open"><FolderGlyph /><span className="fp-folder-words"><NameBox placeholder="Folder name" onCancel={() => setNaming(false)} onDone={(name) => { setNaming(false); void act({ do: 'make', project, name, parent: folder }); }} /></span></div></div>}
+      {naming?.what === 'folder' && project && <div className="fp-folder is-new"><div className="fp-folder-open"><FolderGlyph /><span className="fp-folder-words"><NameBox placeholder="Folder name" onCancel={() => setNaming(null)} onDone={(name) => { setNaming(null); void act({ do: 'make', project, name, parent: folder }); }} /></span></div></div>}
     </div>}
     {list && !shown.length && !scratch.length && !cards.length && !projectCards.length && !naming && <p className="fp-empty">{empty}</p>}
     <div className={asList ? 'fp-lines' : 'fp-grid'}>
+      {(naming?.what === 'document' || naming?.what === 'table') && project && <div className={asList ? 'fp-line is-new' : 'fp-tile is-new'}>
+        <div className="fp-open-file">
+          <span className={`fp-face fp-face-${naming.what === 'table' ? 'table' : 'markdown'}${asList ? ' fp-thumb' : ''}`}>{asList ? <span className="fp-thumb-word">{naming.what === 'table' ? 'TABLE' : 'DOC'}</span> : naming.what === 'table' ? <TableGlyph /> : <DocGlyph />}</span>
+          <span className="fp-name"><NameBox placeholder={naming.what === 'table' ? 'Table name' : 'Document name'} onCancel={() => setNaming(null)} onDone={(name) => makeFile(naming.what === 'table' ? 'table' : 'document', name)} /></span>
+        </div>
+      </div>}
       {shown.map(tile)}
     </div>
     {scratch.length > 0 && <div className="fp-scratch-row">
@@ -395,7 +482,7 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
     {scratchOpen && scratch.length > 0 && <div className={`${asList ? 'fp-lines' : 'fp-grid'} fp-grid-scratch`}>
       {scratch.map(tile)}
     </div>}
-    {openKey && <OpenFile key={openKey} fileKey={openKey} onClose={() => setOpenKey(null)} onNotice={onNotice}
+    {openKey && <OpenFile key={openKey} fileKey={openKey} typing={openKey === madeKey} onClose={() => { setOpenKey(null); setMadeKey(null); readAgain(); }} onNotice={onNotice}
       onPlace={(p) => { setOpenKey(null); onPlace(p); }} />}
   </div>;
 }
