@@ -13,13 +13,16 @@ export const FEEDBACK_LIMITS = Object.freeze({
   bytes: 8 * 1024 * 1024,
 });
 
-export function totalBytes(files = []) {
-  return files.reduce((sum, f) => sum + (Number.isFinite(f?.size) ? f.size : 0), 0);
+export interface FeedbackFile { name: string; type: string; data: string }
+export interface FeedbackPayload { text: string; files: FeedbackFile[]; app?: { version: string; os: string; install?: string } }
+
+export function totalBytes(files: ({ size?: number } | null | undefined)[] = []): number {
+  return files.reduce((sum: number, f) => sum + (Number.isFinite(f?.size) ? f!.size! : 0), 0);
 }
 
 // { ok: true } or { ok: false, reason } where the reason is a sentence the
 // card can show as it is.
-export function checkFeedback({ text = '', files = [] } = {}) {
+export function checkFeedback({ text = '', files = [] }: { text?: string | null; files?: ({ size?: number } | null | undefined)[] | null } = {}): { ok: true } | { ok: false; reason: string } {
   const words = String(text ?? '').trim();
   const list = Array.isArray(files) ? files : [];
   if (!words && list.length === 0) return { ok: false, reason: 'Write something or attach a file first.' };
@@ -37,7 +40,11 @@ export function checkFeedback({ text = '', files = [] } = {}) {
 // base64, the app's version so a report can be matched to a release, and the
 // random install id so reports from one install read as one sender.
 // Nothing else the card happened to hold rides along.
-export function feedbackPayload({ text = '', files = [], app = {} } = {}) {
+export function feedbackPayload({ text = '', files = [], app = {} }: {
+  text?: string | null;
+  files?: Partial<FeedbackFile>[] | null;
+  app?: { version?: string; os?: string; install?: string };
+} = {}): Required<FeedbackPayload> {
   return {
     text: String(text ?? '').trim(),
     files: (files ?? []).map(({ name, type, data }) => ({ name: String(name ?? 'file'), type: String(type || 'application/octet-stream'), data: String(data ?? '') })),
@@ -48,7 +55,12 @@ export function feedbackPayload({ text = '', files = [], app = {} } = {}) {
 // Answers { ok: true } or { ok: false, error } with the error as a sentence.
 // It never throws, so the card always has something to say. The Mac sends
 // through it (main/feedback.mts) and so does the phone website (cloud-bridge.ts).
-export async function sendFeedback({ url, payload, fetchImpl = globalThis.fetch, timeoutMs = 60_000 }) {
+export async function sendFeedback({ url, payload, fetchImpl = globalThis.fetch, timeoutMs = 60_000 }: {
+  url: string | null | undefined;
+  payload: FeedbackPayload;
+  fetchImpl?: (url: string, init: RequestInit) => Promise<{ ok: boolean }>;
+  timeoutMs?: number;
+}): Promise<{ ok: boolean; error?: string }> {
   if (!url) return { ok: false, error: `Feedback is not set up in this copy of ${Name}.` };
   // Checked again here, off the bytes that would actually travel, since the
   // card is not the last word on what leaves the device.

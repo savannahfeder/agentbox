@@ -15,15 +15,15 @@ export const PHONE_UNDO_MS = 6000;
 export const PHONE_UNDO_HOLD_MS = PHONE_UNDO_MS + 2000;
 // The kinds the phone's Undo takes back (takeBack in renderer/src/phone-rows.ts).
 // A stop, a run-now or an answer to a permission card goes at once.
-const UNDOABLE = new Set(['reply', 'new', 'close', 'snooze', 'schedule']);
+const UNDOABLE = new Set<string | undefined>(['reply', 'new', 'close', 'snooze', 'schedule']);
 // A computer clock this far behind the cloud's is wrong, and holding by it
 // would hold for as long as it is wrong.
 const SKEW_MS = 60_000;
 
 /** Is this phone send still inside its Undo window? */
-export function heldForUndo(cmd, now, holdMs = PHONE_UNDO_HOLD_MS) {
+export function heldForUndo(cmd: { kind?: string; createdAt?: string; created_at?: string } | null | undefined, now: number, holdMs: number = PHONE_UNDO_HOLD_MS): boolean {
   if (!holdMs || !UNDOABLE.has(cmd?.kind)) return false;
-  const made = Date.parse(cmd.createdAt ?? cmd.created_at ?? '');
+  const made = Date.parse(cmd!.createdAt ?? cmd!.created_at ?? '');
   if (!Number.isFinite(made)) return false;
   const age = now - made;
   return age < holdMs && age > -SKEW_MS;

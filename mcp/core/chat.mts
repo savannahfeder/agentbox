@@ -17,7 +17,7 @@ const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
 const MAX_TEXT = 4000;
 
-export function listProductChats(ref) {
+export function listProductChats(ref: string) {
   const project = resolveProduct(ref);
   return listChats(project.dir).map((c) => ({
     id: c.id,
@@ -32,7 +32,7 @@ export function listProductChats(ref) {
  * almost always what a reader wants, and a long chat would otherwise spend the
  * whole budget on its opening.
  */
-export function readProductChat(ref, { chatId = null, limit = DEFAULT_LIMIT } = {}) {
+export function readProductChat(ref: string, { chatId = null, limit = DEFAULT_LIMIT }: { chatId?: string | null; limit?: number } = {}) {
   const project = resolveProduct(ref);
   const chats = listChats(project.dir);
   if (!chats.length) return { chatId: null, title: null, messages: [] };

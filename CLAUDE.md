@@ -186,6 +186,19 @@ menu offers or an alias the picker offers has gone. If a build says the committe
 table is behind, run `npm run read:claude` and commit the diff; do not reach for
 the build.
 
+## The app is TypeScript; write new code and tests as `.mts` (2026-11-06)
+
+`main/`, `shared/`, `mcp/` and `tests/` are `.mts`, run as they are (Node
+strips the types; nothing compiles them), and checked by strict `tsc` in CI.
+Only syntax that strips cleanly is allowed: no enums, namespaces or parameter
+properties. The few `.mjs` left there are named, with the reason, in
+`tests/the-back-end-is-typescript-that-runs-as-it-is`. `tests/fixtures` stays
+`.mjs` because those are fake CLIs started as their own processes.
+
+Node loads `.mts` by itself from 22.18. On an older 22, start a script that
+reaches the back end as `node scripts/run.mjs scripts/<name>.mjs`, which adds
+the flag; npm scripts already do.
+
 ## One-off harnesses go in `scripts/scratch/`
 
 It is gitignored. A script that proves one change runs once; move it up into

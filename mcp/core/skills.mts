@@ -24,10 +24,10 @@ const NAME_RE = /^[a-z0-9][a-z0-9-]{0,60}$/;
 // Front matter is `---\nname: x\ndescription: y\n---`. Parsed loosely on
 // purpose: a skill with a malformed header should still be readable, because
 // the prose is the part that matters.
-function frontMatter(text) {
+function frontMatter(text: string): Record<string, string | undefined> {
   const match = /^---\n([\s\S]*?)\n---/.exec(text);
   if (!match) return {};
-  const out = {};
+  const out: Record<string, string> = {};
   for (const line of match[1].split('\n')) {
     const kv = /^([a-zA-Z-]+):\s*(.*)$/.exec(line.trim());
     if (kv) out[kv[1]] = kv[2].trim();
@@ -35,8 +35,14 @@ function frontMatter(text) {
   return out;
 }
 
-export function listSkills() {
-  let entries = [];
+export interface SkillListing {
+  name: string;
+  description: string;
+  bytes: number;
+}
+
+export function listSkills(): SkillListing[] {
+  let entries: fs.Dirent[] = [];
   try {
     entries = fs.readdirSync(SKILLS_DIR, { withFileTypes: true }).filter((e) => e.isDirectory());
   } catch {
@@ -54,10 +60,10 @@ export function listSkills() {
       // spending the tokens on it.
       bytes: Buffer.byteLength(text, 'utf8'),
     };
-  }).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+  }).filter((s): s is SkillListing => Boolean(s)).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function firstLine(text) {
+function firstLine(text: string) {
   const line = text.split('\n').find((l) => l.trim() && !l.startsWith('---') && !l.startsWith('#'));
   return (line ?? '').trim().slice(0, 200);
 }
@@ -69,7 +75,7 @@ function firstLine(text) {
  * in by the tool layer rather than hard-coded here, so the header and the tool
  * list are the same fact stated once.
  */
-export function fetchSkill(name, { capabilities = [], missing = [] } = {}) {
+export function fetchSkill(name: string, { capabilities = [], missing = [] }: { capabilities?: string[]; missing?: string[] } = {}) {
   if (!NAME_RE.test(String(name ?? ''))) throw new Error(`invalid skill name: ${name}`);
   const file = path.join(SKILLS_DIR, name, 'SKILL.md');
   let text;
@@ -86,7 +92,7 @@ export function fetchSkill(name, { capabilities = [], missing = [] } = {}) {
 
 // Some skills carry reference files beside SKILL.md (the design skill does).
 // Listed rather than inlined: they are large, and the agent should choose.
-function listReferences(name) {
+function listReferences(name: string) {
   const dir = path.join(SKILLS_DIR, name, 'references');
   try {
     return fs.readdirSync(dir).filter((f) => f.endsWith('.md')).map((f) => `${name}/references/${f}`);
@@ -95,7 +101,7 @@ function listReferences(name) {
   }
 }
 
-export function fetchReference(rel) {
+export function fetchReference(rel: string) {
   const parts = String(rel ?? '').split('/');
   if (parts.length !== 3 || parts[1] !== 'references' || !NAME_RE.test(parts[0]) || !/^[a-zA-Z0-9._-]+\.md$/.test(parts[2])) {
     throw new Error(`invalid reference path: ${rel} (expected "<skill>/references/<file>.md")`);
@@ -104,7 +110,7 @@ export function fetchReference(rel) {
   try { return fs.readFileSync(file, 'utf8'); } catch { throw new Error(`no such reference: ${rel}`); }
 }
 
-function header({ capabilities, missing, references }) {
+function header({ capabilities, missing, references }: { capabilities: string[]; missing: string[]; references: string[] }) {
   const lines = [
     'This skill was written for the agent inside the app, which has a larger tool set than this server exposes. The method is what matters and it still applies; the tool names sometimes do not.',
     '',

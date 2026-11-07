@@ -15,11 +15,8 @@
 // organize.
 export const STORAGE_ROOT = 'creations';
 
-/**
- * @param {{ path?: string, dir?: string }} envelope
- * @returns {string} 'designs/round-1', or '' for something at the top level
- */
-export function libraryFolderOf(envelope) {
+/** 'designs/round-1', or '' for something at the top level. */
+export function libraryFolderOf(envelope: { path?: string | null, dir?: string | null } | null | undefined): string {
   const p = envelope?.path ?? envelope?.dir ?? '';
   const cut = String(p).lastIndexOf('/');
   const folder = cut <= 0 ? '' : String(p).slice(0, cut);

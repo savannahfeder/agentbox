@@ -3,7 +3,7 @@
 export const MAX_CONNECTIONS = 40;
 const AN_ID = /^[a-z0-9-]{1,40}$/;
 
-export function cleanConnections(ids) {
+export function cleanConnections(ids: unknown): string[] {
   if (!Array.isArray(ids)) return [];
-  return [...new Set(ids.filter((id) => typeof id === 'string' && AN_ID.test(id)))].slice(0, MAX_CONNECTIONS);
+  return [...new Set(ids.filter((id): id is string => typeof id === 'string' && AN_ID.test(id)))].slice(0, MAX_CONNECTIONS);
 }

@@ -18,8 +18,11 @@ const ALIASES = CLAUDE_MODELS.filter((m) => !m.alias.startsWith('claude-')).map(
 export const MODEL_WORDS = `which model this thread runs on from its next turn. For Claude Code: ${ALIASES.join(', ')} (the newest of each), or a full id such as claude-opus-5-5. For Codex: its model slug, such as gpt-5.6-sol`;
 export const EFFORT_WORDS = `how hard this thread thinks from its next turn: ${EFFORT_LEVELS.map((e) => e.id).join(', ')}`;
 
+export type ModelWord = { model: string; error?: never } | { error: string; model?: never };
+export type EffortWord = { effort: string; error?: never } | { error: string; effort?: never };
+
 /** `{ model }` in the CLI's words, or `{ error }`. A label such as "Opus 5.5" is read as its alias. */
-export function modelWord(value) {
+export function modelWord(value: unknown): ModelWord {
   const said = String(value ?? '').trim();
   if (!said) return { model: '' };
   const lower = said.toLowerCase();
@@ -30,7 +33,7 @@ export function modelWord(value) {
 }
 
 /** `{ effort }` in the CLI's words, or `{ error }`. */
-export function effortWord(value) {
+export function effortWord(value: unknown): EffortWord {
   const said = String(value ?? '').trim().toLowerCase();
   if (!said) return { effort: '' };
   const named = EFFORT_LEVELS.find((e) => e.id === said || e.label.toLowerCase() === said);

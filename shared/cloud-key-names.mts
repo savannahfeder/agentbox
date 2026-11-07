@@ -13,7 +13,7 @@ const RESERVED = new Set([
 const SYSTEM = /^(?:LD_|DYLD_|LC_|GIT_CONFIG|NPM_CONFIG_)/;
 
 /** Why a key cannot be saved under `name`, or null when it can. */
-export function keyNameRefused(name) {
+export function keyNameRefused(name: unknown): string | null {
   const n = String(name ?? '');
   if (!SHAPE.test(n)) return 'A key’s name is capital letters, digits and underscores, starting with a letter, like SUPABASE_ACCESS_TOKEN.';
   if (ENGINE.test(n) || n === 'OPENAI_API_KEY' || n === 'OPENAI_BASE_URL') return `${n} is read by Claude Code or Codex themselves, so it is never handed to an agent.`;

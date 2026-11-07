@@ -9,8 +9,10 @@ import path from 'node:path';
 export const SENT_FILE_MAX = 1024 ** 3;
 const SIGN_INS = /(^|\/)(\.ssh|\.aws|\.gnupg|\.netrc|\.npmrc|\.pypirc|\.docker|\.kube|\.claude[^/]*|\.codex|\.agentbox|Keychains|\.config\/gh|\.config\/gcloud|\.password-store)(\/|$)/;
 
+export type FileToSend = { path: string; size: number; error?: undefined } | { error: string; path?: undefined; size?: undefined };
+
 /** The file to send for `asked` (a full or ~/ path), or why it cannot go. */
-export function fileToSend(asked, { home = os.homedir() } = {}) {
+export function fileToSend(asked: unknown, { home = os.homedir() }: { home?: string } = {}): FileToSend {
   const raw = String(asked ?? '').trim();
   const full = raw.startsWith('~/') ? path.join(home, raw.slice(2)) : raw;
   if (!path.isAbsolute(full)) return { error: 'That is not a full path on this computer.' };
@@ -26,8 +28,8 @@ export function fileToSend(asked, { home = os.homedir() } = {}) {
 }
 
 /** The files a cloud turn was given to send (AGENTBOX_SEND_FILES), still sendable. */
-export function filesSentFor(env, opts) {
-  let list;
+export function filesSentFor(env: NodeJS.ProcessEnv | null | undefined, opts?: { home?: string }): string[] {
+  let list: unknown;
   try { list = JSON.parse(env?.AGENTBOX_SEND_FILES || '[]'); } catch { return []; }
   return Array.isArray(list) ? list.map((f) => fileToSend(f, opts)).filter((f) => f.path).map((f) => f.path) : [];
 }

@@ -8,12 +8,12 @@
 // what the write to disk did, and then keys are sorted.
 import crypto from 'node:crypto';
 
-function canonical(value) {
-  if (Array.isArray(value)) return `[${value.map((v) => canonical(v) ?? 'null').join(',')}]`;
+function canonical(value: unknown): string | undefined {
+  if (Array.isArray(value)) return `[${value.map((v): string => canonical(v) ?? 'null').join(',')}]`;
   if (value && typeof value === 'object') {
-    const fields = [];
+    const fields: string[] = [];
     for (const key of Object.keys(value).sort()) {
-      const v = canonical(value[key]);
+      const v: string | undefined = canonical((value as Record<string, unknown>)[key]);
       if (v !== undefined) fields.push(`${JSON.stringify(key)}:${v}`);
     }
     return `{${fields.join(',')}}`;
@@ -27,9 +27,9 @@ function canonical(value) {
  * callers deny. No Unicode normalisation: two byte strings that look the same
  * are still two different commands to her shell.
  */
-export function cardDigest(request) {
+export function cardDigest(request: unknown): string | null {
   if (!request || typeof request !== 'object' || Array.isArray(request)) return null;
-  let text;
+  let text: string | undefined;
   try { text = canonical(JSON.parse(JSON.stringify(request))); } catch { return null; }
   if (typeof text !== 'string') return null;
   return crypto.createHash('sha256').update(text, 'utf8').digest('base64');

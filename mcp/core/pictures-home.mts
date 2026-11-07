@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const FIELDS = ['result', 'note', 'answer', 'body'];
-const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function temporaryRoots() {
   const roots = new Set(['/tmp/', '/private/tmp/', '/var/folders/', '/private/var/folders/']);
@@ -20,13 +20,13 @@ function picturePaths() {
   return new RegExp(String.raw`(?<![\w./:@~-])(?:${roots})[\w./-]*\.(?:png|jpe?g|gif|webp)\b`, 'gi');
 }
 
-function sameBytes(a, b) {
+function sameBytes(a: string, b: string) {
   try { return fs.readFileSync(a).equals(fs.readFileSync(b)); } catch { return false; }
 }
 
 // The copy's name inside designs/<id>/: its own name, unless a different
 // picture already has it.
-function copyIn(dir, id, from) {
+function copyIn(dir: string, id: string, from: string) {
   const folder = path.join(dir, 'designs', id);
   const ext = path.extname(from);
   const stem = path.basename(from, ext);
@@ -42,16 +42,16 @@ function copyIn(dir, id, from) {
 }
 
 /** The patch with every temporary picture it names copied home and renamed in its words. */
-export function bringPicturesHome(dir, id, patch) {
+export function bringPicturesHome<P extends Record<string, unknown>>(dir: string | null | undefined, id: string | null | undefined, patch: P): P {
   if (!dir || !id || !patch) return patch;
   let out = patch;
-  const done = new Map();
+  const done = new Map<string, string>();
   for (const field of FIELDS) {
     const words = patch[field];
     if (typeof words !== 'string' || !words) continue;
     const next = words.replace(picturePaths(), (full) => {
-      if (done.has(full)) return done.get(full);
-      let home = null;
+      if (done.has(full)) return done.get(full)!;
+      let home: string | null = null;
       try { if (fs.statSync(full).isFile()) home = copyIn(dir, id, full); } catch { /* not there: left as written */ }
       done.set(full, home ?? full);
       return home ?? full;

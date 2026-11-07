@@ -17,7 +17,7 @@ import { envName } from '../../shared/product-name.mjs';
  * several exist we REFUSE rather than pick: silently operating on the wrong
  * founder's store would be discovered late and by writing to it.
  */
-export function resolveAccount({ accountId = process.env.STORE_ACCOUNT_ID } = {}) {
+export function resolveAccount({ accountId = process.env.STORE_ACCOUNT_ID }: { accountId?: string } = {}) {
   const accountsDir = path.join(legacyRoot(), 'accounts');
 
   if (accountId) {
@@ -49,7 +49,7 @@ export function resolveAccount({ accountId = process.env.STORE_ACCOUNT_ID } = {}
  * person would ("kestrel"), not by generated id, so accept all three and say
  * clearly when a name is ambiguous rather than guessing which one was meant.
  */
-export function resolveProduct(ref) {
+export function resolveProduct(ref: string | null | undefined) {
   const wanted = String(ref ?? '').trim();
   if (!wanted) throw new Error('which product? pass its name or id (list_products shows them)');
   const projects = listProjects();

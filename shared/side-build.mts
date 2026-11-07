@@ -31,7 +31,7 @@ export const REAL_NAME = NAME;
  *  a name that does not read as the app plus a word is a name
  *  nobody will recognise in the Dock, and pack-side refuses it rather than
  *  quietly building a second supervisor. */
-export function isSideBuild(name) {
+export function isSideBuild(name: string | null | undefined): boolean {
   const word = REAL_NAME.replace(/[.*+?^${}()|[\]\\]/g, (c) => `\\${c}`);
   return new RegExp(`^${word} .+`).test(name ?? '');
 }
@@ -43,7 +43,7 @@ export function isSideBuild(name) {
 // opening a stranger's.
 export const NEW_USER_NAME = `${REAL_NAME} new user`;
 
-export function isNewUserBuild(name) {
+export function isNewUserBuild(name: string | null | undefined): boolean {
   return name === NEW_USER_NAME;
 }
 
@@ -51,7 +51,7 @@ export function isNewUserBuild(name) {
  * The folder Chromium should name after this app, whatever the bundle is
  * called. Everything downstream keys off app.getName, so a side build sets
  * its name back to this before anything reads a path. */
-export function dataFolderName(name) {
+export function dataFolderName(name: string): string {
   if (isNewUserBuild(name)) return name;
   return isSideBuild(name) ? REAL_NAME : name;
 }
