@@ -50,6 +50,8 @@ function setup({ storageBytes } = {}) {
     objects,
     whoIs: async (token) => ({ 'session-of-a': { id: A }, 'session-of-b': { id: B } })[token] ?? null,
     now: () => t,
+    // No plan here means the free hours are spent too.
+    free: { agents: 2, hours: 0 },
     ...(storageBytes ? { storageBytes } : {}),
   });
   const call = async (method, p, { key, body } = {}) => gw.handle({ method, path: p, headers: key ? { authorization: `Bearer ${key}` } : {}, body: body ? JSON.stringify(body) : '' });
@@ -215,6 +217,7 @@ describe('the Mac, refused a link that writes', () => {
       removeObject: async () => {},
       objects: memoryObjects(),
       whoIs: async (t) => (t === 'their-session' ? { id: A } : null),
+      free: { agents: 2, hours: 0 },
     });
     server = gatewayServer(gw);
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -242,7 +245,7 @@ describe('the Mac, refused a link that writes', () => {
       stdin, stdout: new PassThrough(), stderr, watchParent: false, signals: new EventEmitter(), homeDir: path.join(tmp, 'home'),
     });
     expect(code, said).toBe(CLOUD_NO_ROOM);
-    expect(said).toMatch(/no room in the cloud \(plan\): Choose a cloud plan/);
+    expect(said).toMatch(/no room in the cloud \(plan\): .*Choose a cloud plan/);
     expect(uploads).toEqual([]);
   });
 });

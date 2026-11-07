@@ -118,6 +118,29 @@ describe('the free hours', () => {
     expect(after.free).toBeUndefined();
   });
 
+  // Found reading the server after the first ship: the upload link a cloud run
+  // needs before it starts, and the phone's room check, still said "no plan".
+  it('let the Mac upload a run\'s work before it starts, and stop once they are spent', async () => {
+    const { call, start, finish, tick } = setup();
+    const put = () => call('POST', '/v1/link', { op: 'put', key: 'runs/r9/in.bundle', seconds: 600 });
+    expect((await put()).status).toBe(200);
+    await start(1);
+    tick(5 * HOUR);
+    await finish(1);
+    expect((await put()).body).toMatchObject({ error: 'plan' });
+  });
+
+  it('give the phone room to start a run with the computer shut, and none once spent', async () => {
+    const { gw, start, finish, tick } = setup();
+    await start(1);
+    expect(await gw.room(A)).toEqual({ ok: true });
+    await start(2);
+    expect(await gw.room(A)).toMatchObject({ ok: false, error: 'agents' });
+    tick(3 * HOUR);
+    await finish(1); await finish(2);
+    expect(await gw.room(A)).toMatchObject({ ok: false, error: 'plan' });
+  });
+
   it('come back as no plan, not a gift, so nothing is billed or offered as a switch', async () => {
     const { me } = setup();
     expect((await me()).billing).toBeNull();
