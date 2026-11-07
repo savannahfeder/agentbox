@@ -538,7 +538,7 @@ export class Teammates {
     return true;
   }
 
-  // The app's half of an agent reaching a person (./teammate-reach.mjs). The team
+  // The app's half of an agent reaching a person (./teammate-reach.mts). The team
   // service is handed in by whoever has one; a store without one reaches nobody.
   bindTeam(team: BoundTeam | null) {
     this.team = team;

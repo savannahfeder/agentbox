@@ -107,7 +107,7 @@ describe('the committed table is the floor, never an empty picker', () => {
   // a test that left it to the default would pass in CI and fail on the Mac that
   // runs the app. Naming a path that is not there is what makes these three about
   // the COMMITTED table. The other floor has its own tests in
-  // a-build-does-not-rewrite-a-tracked-file.test.mjs.
+  // a-build-does-not-rewrite-a-tracked-file.test.mts.
   const noLocal = { local: '/no/such/claude-models.local.json' };
 
   it('falls back on a Mac with no Claude Code', () => {

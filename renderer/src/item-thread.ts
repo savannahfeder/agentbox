@@ -551,7 +551,7 @@ export function itemThread(
   // The pickup-to-run match is thread-history's, not a second copy of it: it is
   // the part that can be wrong while the screen still looks perfect (a run
   // credited to the wrong pickup reads exactly like one credited to the right
-  // one), and it is pinned in tests/one-door-one-list.test.mjs. `readNotes` is
+  // one), and it is pinned in tests/one-door-one-list.test.mts. `readNotes` is
   // given one session at a time there, so a run's `raw` IS that session's text.
   const events = withEdits(withRuns(threadEvents(lines, opts.engine, opts.numbers), sessions), lines);
   const out: AgentEvent[] = [];

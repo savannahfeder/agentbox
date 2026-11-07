@@ -416,7 +416,7 @@ export function createCodexWorker({
    *
    * `troubleCause` matches "untrusted" and "connection", so the message must
    * contain neither. Pinned by
-   * tests/a-codex-worker-does-not-reach-her-connected-apps.test.mjs.
+   * tests/a-codex-worker-does-not-reach-her-connected-apps.test.mts.
    */
   const spoken = new Set<string>();
   const sayUnasked = (params: CodexParams) => {

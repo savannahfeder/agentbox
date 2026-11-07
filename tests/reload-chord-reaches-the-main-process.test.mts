@@ -12,7 +12,7 @@
 //
 // Asserted against the source: the main process is not something this suite can
 // boot, and the invariant is structural. Same reasoning as
-// tests/shortcuts-swallow-their-key.test.mjs.
+// tests/shortcuts-swallow-their-key.test.mts.
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';

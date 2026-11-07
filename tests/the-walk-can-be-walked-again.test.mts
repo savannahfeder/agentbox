@@ -62,7 +62,7 @@ describe('walking the onboarding again', () => {
      (w-9a6ea066d6). What this test was written to hold is untouched and is still held
      below: the row exists, it is findable by the words SHE types, it is wired to
      `walkAgain`, and it deletes nothing. The pair of them is held against each other in
-     tests/the-tutorial-and-the-onboarding-are-two-things.test.mjs.
+     tests/the-tutorial-and-the-onboarding-are-two-things.test.mts.
   */
   it('is a row in ⌘K, found by the words she would type', () => {
     const row = palette.slice(palette.indexOf("id: 'first-run'"), palette.indexOf("id: 'keyhints'"));

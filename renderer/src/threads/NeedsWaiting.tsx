@@ -10,7 +10,7 @@ import { DARK_INK, logoOf } from '../connections/logos';
 type Row = { key: string; need: string; mark: string | null; glyph: 'key' | 'file'; title: string; act: string; items: WorkItem[] };
 
 // One row per thing, not per thread: a sign-in two threads wait on is one row,
-// and connecting it frees both (main/ipc.mjs zero:cloud-key).
+// and connecting it frees both (main/ipc.mts zero:cloud-key).
 export function waitingRows(items: WorkItem[], saved: readonly string[] = []): Row[] {
   const rows = new Map<string, Row>();
   // Oldest ask first: it has waited longest (round eight: the first stuck thread was folded under "more").

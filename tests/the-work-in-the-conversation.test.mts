@@ -61,7 +61,7 @@ describe('what the work line says it did', () => {
   // heredoc is still forty lines of shell, just on one line, and the ellipsis
   // then ate the command in front of it. It is cut at its marker now. The rest
   // of these are unchanged, and the whole set of cases is in
-  // tests/the-work-lines-are-clean.test.mjs.
+  // tests/the-work-lines-are-clean.test.mts.
   it('names which one it was, on one line', () => {
     expect(workSubject({ command: 'ls -la' })).toBe('ls -la');
     expect(workSubject({ file_path: '/x/store.mjs' })).toBe('/x/store.mjs');

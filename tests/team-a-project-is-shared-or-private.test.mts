@@ -96,4 +96,4 @@ describe('joining a teammate\'s project', () => {
 });
 
 // Private work on the Team board is a thread card now, not a project-wide
-// activity line: tests/team-a-teammate-sees-the-summary-and-nothing-more.test.mjs.
+// activity line: tests/team-a-teammate-sees-the-summary-and-nothing-more.test.mts.

@@ -6,7 +6,7 @@
 // the computer then knew nothing about, put a wall of text about where words
 // go in front of an empty inbox, and only then said to connect a computer,
 // pointing at a Settings › Phone switch that signing in on the computer
-// already covers (main/team/index.mjs makes the phone's copy for whoever is
+// already covers (main/team/index.mts makes the phone's copy for whoever is
 // signed in). Measured by drawing those screens in the phone preview.
 //
 // Now it opens on sign-in, since nearly everyone already has an account from

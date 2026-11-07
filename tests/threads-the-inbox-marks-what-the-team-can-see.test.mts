@@ -24,7 +24,7 @@ globalThis.React = React;
 
 // A FIXED NOON, not Date.now(): the updated words are calendar days, and a day
 // is not always 86,400,000 ms long. See
-// tests/a-day-with-an-extra-hour-still-knows-what-today-is.test.mjs.
+// tests/a-day-with-an-extra-hour-still-knows-what-today-is.test.mts.
 const NOW = new Date('2026-06-15T12:00:00-07:00').getTime();
 const DAY = 86_400_000;
 const SINCE = NOW - 7 * DAY;
@@ -77,7 +77,7 @@ describe('the row', () => {
   });
   // A private thread wears the LOCK here rather than nothing: the mark is
   // unconditional now. Its own rule is pinned in
-  // tests/a-private-thread-always-wears-the-lock.test.mjs.
+  // tests/a-private-thread-always-wears-the-lock.test.mts.
   it('draws the lock on a thread only you can see, and no Share', () => {
     const html = draw(row());
     expect(html).not.toContain('th-shared');

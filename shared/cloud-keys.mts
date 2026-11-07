@@ -1,5 +1,5 @@
 // KEYS SAVED FOR CLOUD RUNS. A cloud run that needs a key it was not given
-// asks for it on one marked line per key (main/cloud/run.mjs cloudNote); the
+// asks for it on one marked line per key (main/cloud/run.mts cloudNote); the
 // thread draws each as a field, and what is pasted there is kept in the cloud
 // and handed to every later cloud run as an environment variable
 // (main/cloud/keys.mts, cloud/sandbox/server.mjs placeKeys).

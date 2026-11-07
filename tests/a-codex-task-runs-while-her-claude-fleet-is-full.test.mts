@@ -45,7 +45,7 @@ const ONE_ACCOUNT_HOME = '/nonexistent-home-with-no-second-account';
 const CODEX_BIN = '/nonexistent/codex/codex';
 // A second CLAUDE_CONFIG_DIR folder: a Claude login lives here and no Codex
 // auth ever will. Handing this to a Codex worker is the "wrong home" half of
-// tests/a-codex-failure-is-not-her-claude-account.test.mjs.
+// tests/a-codex-failure-is-not-her-claude-account.test.mts.
 const HER_SECOND_CLAUDE = '/Users/her/.claude-second';
 
 const NOW = 1_756_000_000_000; // 2026-08-24, the week she asked
@@ -462,7 +462,7 @@ describe('the other paths measure a row against its own engine too', () => {
   // what this block measured. The drive is deleted (w-d19d6d387c, 2026-09-22).
   // The digest is the synthetic session that remains, and it is measured
   // against its own engine in
-  // tests/a-digest-runs-on-the-engine-whose-slot-it-took.test.mjs.
+  // tests/a-digest-runs-on-the-engine-whose-slot-it-took.test.mts.
 });
 
 /* ========================= and nothing routes to it ====================== */

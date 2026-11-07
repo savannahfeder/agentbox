@@ -6,7 +6,7 @@
 // `/Users/you`, a folder that does not exist on her Mac, so every measuring and
 // screenshot script an agent ran against her real store read nothing. (The same
 // sweep commented out a shebang and stopped every Claude agent, which is
-// tests/every-agent-dies-when-the-approvals-launcher-cannot-run.test.mjs.)
+// tests/every-agent-dies-when-the-approvals-launcher-cannot-run.test.mts.)
 //
 // The scripts now take their paths from scripts/lib/machine-paths.mjs, which
 // reads the OS home folder and zero.config.json at run time. Two things pinned:

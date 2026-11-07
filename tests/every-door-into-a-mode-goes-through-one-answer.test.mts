@@ -226,7 +226,7 @@ describe('a Mac with one coding agent is exactly where it was', () => {
   // The rule as it was on 2026-09-04, written out rather than paraphrased, and
   // the rule as it is now, and the two compared over every input such a Mac can
   // produce. Same technique as
-  // tests/a-mac-with-one-coding-agent-is-exactly-where-it-was.test.mjs.
+  // tests/a-mac-with-one-coding-agent-is-exactly-where-it-was.test.mts.
   const was = (item) => !item.agent;
   const now = (item, runningEngine) => !item.agent && (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE;
 

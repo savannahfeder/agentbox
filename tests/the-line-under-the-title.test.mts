@@ -83,7 +83,7 @@ describe('the four facts she cut are not on it', () => {
   // AND ON THIS MAC THE SLOT IS EMPTY, which is the state every other assertion
   // in this file is written about: no choice, so no word, so the line she
   // picked on 08-28 is unchanged. The word itself is
-  // tests/the-line-under-the-title-names-the-engine.test.mjs.
+  // tests/the-line-under-the-title-names-the-engine.test.mts.
   it('keeps the coding-agent slot empty here, and marks no harness anywhere', () => {
     expect(engineWordFor()).toBeNull();
     expect(engineWordFor({ engine: 'codex' })).toBeNull();

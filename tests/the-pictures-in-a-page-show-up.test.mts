@@ -120,7 +120,7 @@ describe('what that scheme may hand out', () => {
 //
 // The app zoom is still tested, in the two suites it has always had:
 // tests/the-zoom-chords-reach-the-main-process.test.mts and
-// tests/the-zoom-percent-shows-and-goes.test.mjs. What is pinned below is that
+// tests/the-zoom-percent-shows-and-goes.test.mts. What is pinned below is that
 // nothing puts a listener back into a page she reads.
 describe('a page is served exactly as it was written', () => {
   it('has no listener to inject, at either end', async () => {

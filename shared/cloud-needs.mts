@@ -1,6 +1,6 @@
 // WHAT A CLOUD RUN NEEDS FROM THE PERSON, AND HOW IT ASKS. A run that cannot
 // go on without something only they can give ends its answer with one marked
-// line per thing (main/cloud/run.mjs cloudNote), and the thread draws each as a
+// line per thing (main/cloud/run.mts cloudNote), and the thread draws each as a
 // card (renderer/src/components/NeedCard.tsx):
 //
 //   AGENTBOX-NEEDS: sign-in supabase | to apply the storage rules to the Northwind database

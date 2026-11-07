@@ -13,7 +13,7 @@
 // `idleReleaseMs` is let go. A grant whose agent process has died, or whose pid
 // now belongs to another program (pid reuse after a restart), is let go at once.
 // A grant whose agent is shared, where none of those readings can arrive, is in
-// commands-that-share-one-agent-process-still-teach-and-let-go.test.mjs.
+// commands-that-share-one-agent-process-still-teach-and-let-go.test.mts.
 
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -113,7 +113,7 @@ describe('what a command is measured as', () => {
 
   // What two commands on one agent process DO still teach, which is how long
   // each of them took, is in
-  // commands-that-share-one-agent-process-still-teach-and-let-go.test.mjs.
+  // commands-that-share-one-agent-process-still-teach-and-let-go.test.mts.
   it('two commands on one agent at once share the reading and claim no figure', async () => {
     const history = new CommandHistory();
     const h = harness({ history });

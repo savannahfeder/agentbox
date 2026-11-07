@@ -1,7 +1,7 @@
 // HER THREADS ARRIVE AS TASKS.
 //
 // `main/agent-sessions.mts` found them; the tests for the finding are in
-// tests/the-import-finds-the-threads-she-started.test.mjs. This file is the
+// tests/the-import-finds-the-threads-she-started.test.mts. This file is the
 // other half, which is what happens on the card and after the press, and it was
 // hers to decide.
 //

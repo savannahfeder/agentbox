@@ -20,7 +20,7 @@
 // arriving through the mouse instead of the keyboard.
 //
 // The counter the same round deleted is pinned in
-// tests/the-introduction-shows-the-product.test.mjs.
+// tests/the-introduction-shows-the-product.test.mts.
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';

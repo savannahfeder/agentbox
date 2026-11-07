@@ -16,7 +16,7 @@
 // always drew fine, which is exactly why this looked like it worked.
 //
 // The two ways that already drew the picture are held by
-// a-picture-on-a-card-opens.test.mjs. This holds the two that did not.
+// a-picture-on-a-card-opens.test.mts. This holds the two that did not.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';

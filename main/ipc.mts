@@ -2170,7 +2170,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       let file = asked;
       if (choose) {
         const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, { title: 'Pick the file to send', buttonLabel: 'Send this file', properties: ['openFile'] });
-        // The browser copy has no file panel (main/serve.mjs).
+        // The browser copy has no file panel (main/serve.mts).
         if (r.noDialog) return { ok: false, error: `Choosing a file needs the ${Name} app on this computer.` };
         if (r.canceled || !r.filePaths?.length) return { ok: true, canceled: true };
         file = r.filePaths[0];
@@ -2466,6 +2466,23 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       if (!out) return { ok: false, error: 'that cannot be done here' };
       push();
       return { ok: true, folder: out.id ?? null };
+    } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+  });
+  ipcMain.handle('zero:files-place-new', async (_e, { project, name, kind, folder }: { project?: unknown; name?: unknown; kind?: unknown; folder?: unknown } = {}) => {
+    try {
+      const out = await filesPlaceNow().newDocument({ project: String(project ?? ''), name: String(name ?? ''), kind: kind === 'table' ? 'table' : 'document', folder: typeof folder === 'string' ? folder : null });
+      push();
+      return { ok: true, key: out.key };
+    } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+  });
+  ipcMain.handle('zero:files-place-upload', async (_e, { project, folder }: { project?: unknown; folder?: unknown } = {}) => {
+    try {
+      const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, { title: `Add files to ${String(project ?? '')}`, buttonLabel: 'Add', properties: ['openFile', 'multiSelections'] });
+      if (r.noDialog) return { ok: false, error: `Adding files needs the ${Name} app on this computer.` };
+      if (r.canceled || !r.filePaths?.length) return { ok: true, added: 0, refused: [], keys: [] };
+      const out = await filesPlaceNow().addFiles({ project: String(project ?? ''), folder: typeof folder === 'string' ? folder : null, paths: r.filePaths });
+      if (out.added) push();
+      return { ok: true, ...out };
     } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   });
   ipcMain.handle('zero:files-place-open', async (_e, { key }: { key?: unknown } = {}) => {

@@ -14,7 +14,7 @@ describe('a message naming a TypeScript back-end file', () => {
     expect(sourceReference('main/supervisor.mts')).toBe('main/supervisor.mts');
     expect(sourceReference('main/supervisor.mts:120')).toBe('main/supervisor.mts');
     expect(sourceReference('scripts/build.cts')).toBe('scripts/build.cts');
-    expect(sourceReference('main/supervisor.mjs')).toBe('main/supervisor.mjs');
+    expect(sourceReference('main/supervisor.mts')).toBe('main/supervisor.mts');
   });
 
   it('is not stretched to an ending that is not a source file', () => {

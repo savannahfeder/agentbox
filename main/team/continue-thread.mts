@@ -12,7 +12,7 @@ const FILE_LINK = /(!?)\[([^\]\n]*)\]\(attachments\/([\w.-]+)\)/g;
 const shownName = (name) => name.replace(/^[0-9a-f]{12}-/, '');
 const quoted = (text) => text.split('\n').map((l) => (l ? `> ${l}` : '>')).join('\n');
 
-/** `work` is what this copy holds of the thread (thread-share.mjs `read`). */
+/** `work` is what this copy holds of the thread (thread-share.mts `read`). */
 export function briefToContinue({ work, title, ownerName, nameOf }) {
   const files = new Map();
   const unlinked = (text) => text.replace(FILE_LINK, (_, bang, label, name) => {

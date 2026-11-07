@@ -11,7 +11,7 @@
 // of Tab landed somewhere with no tab under it.
 //
 // AND IT STILL DOES NOTHING ON AN OPENED TASK, which is pinned next door in
-// tab-does-nothing-on-an-open-task.test.mjs. The gate here is the other half of
+// tab-does-nothing-on-an-open-task.test.mts. The gate here is the other half of
 // that promise: not in a field, no card open, no menu up, list view only,
 // because in board view there are no tabs on the screen to move along.
 import { describe, it, expect } from 'vitest';

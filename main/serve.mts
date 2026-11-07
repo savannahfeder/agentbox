@@ -200,7 +200,7 @@ function readVersion() {
  *  files them and a tab asking got a 404. That was not harmless: a failed
  *  `badge` became an uncaught error, the screen reported it on `crash`, that
  *  failed too, and the tab sent thousands of requests a second.
- *  tests/a-browser-tab-gets-an-answer-on-every-channel.test.mjs.
+ *  tests/a-browser-tab-gets-an-answer-on-every-channel.test.mts.
  *
  *  A tab has no dock and no ⌘R of ours to report, and nothing here decides
  *  banners yet, so three of them answer with nothing. A crash goes through the
@@ -244,7 +244,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   // that same variable. Without this line the two disagreed: the copy wrote its
   // rows wherever an inherited variable pointed (or a dot-folder in $HOME), each worker
   // looked under `storeRoot`, and every store call answered "no work item".
-  // tests/an-agent-in-a-browser-copy-can-reach-its-own-work-item.test.mjs.
+  // tests/an-agent-in-a-browser-copy-can-reach-its-own-work-item.test.mts.
   // Rows already written under the old home come along, or they would vanish.
   const inheritedHome = appHome();
   Object.assign(process.env, storeRootEnv(config.storeRoot));

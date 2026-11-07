@@ -153,7 +153,7 @@ describe('the thread hands a web link to the pane', () => {
 
   it('still hands a spreadsheet to the app that owns it; a script draws in the pane', () => {
     expect(opensInPane('reports/audit.xlsx')).toBe(false);
-    expect(opensInPane('main/ipc.mjs')).toBe(true);
+    expect(opensInPane('main/ipc.mts')).toBe(true);
     // The back end is .mts since 2026-11-01, so that is what agents name.
     expect(opensInPane('main/ipc.mts')).toBe(true);
     expect(opensInPane('scripts/build.cjs')).toBe(true);

@@ -120,7 +120,7 @@ describe('the app is wired to all three', () => {
     // The rule moved into `freshCopy` on, when it stopped being only about a
     // command. A followed row still takes every copy it is handed, which is the
     // case this file is for; the gate is tested next door in
-    // an-answer-written-while-she-reads-the-row-reaches-her-screen.test.mjs.
+    // an-answer-written-while-she-reads-the-row-reaches-her-screen.test.mts.
     expect(app).toMatch(/const fresh = freshCopy\(items, focused, following\)/);
     expect(app).toMatch(/if \(fresh\) setFocused\(fresh\)/);
     const watched = { product: 'agentbox', id: 'w-1' };

@@ -419,11 +419,11 @@ at AgentCore's published rates. The plan limits are set from these.
   what it uses, so packing agents onto one machine would not save money.
 - AWS lets this account run 5,000 sessions at once and start 25 a second
   (checked 2026-10-13; both can be raised).
-- No free cloud (the owner's call, 2026-10-20, replacing "Free: 5 hours,
-  no card"): five hours go in half an hour with ten agents, which sells the
-  cloud short, and the moment someone reaches for it is the moment they will
-  pay. The app itself is the free part. Sign-in is the app's own sign-in
-  page.
+- Free: 5 hours once per account, no card, two agents at once (the owner,
+  2026-11-06, for the cloud launch; it replaces 2026-10-20's "no free cloud").
+  Two at once answers that call's worry, five hours gone in half an hour with
+  ten agents. The hours never come back, and a paid plan never spends them
+  (`FREE` in cloud/gateway/plans.mjs). Sign-in is the app's own sign-in page.
 
 ## Phases
 
@@ -553,7 +553,7 @@ input. In order:
 Replaces the machine-per-account design in "The hub" below. What survives from
 that section is the thin window, and the measurements of it.
 
-Today every cloud agent is a process on the Mac (main/cloud/run.mjs): it packs
+Today every cloud agent is a process on the Mac (main/cloud/run.mts): it packs
 the folder, pumps events, runs the agent's tools and brings the work home. The
 Mac is in charge and holds the record, so each agent costs it memory, and the
 cloud stops being useful when it sleeps. The gateway function already carries a
@@ -672,7 +672,7 @@ Settled, not to be reopened:
   it does not (mobile/src/state/cloud.tsx:127), and asks for a Claude or ChatGPT
   sign-in started from the app, through the function.
 - **Sign-ins renew in the cloud.** Codex's login lasts about ten days, and today the
-  Mac renews it (main/cloud/logins.mjs:465), which a person with no computer does not
+  Mac renews it (main/cloud/logins.mts:465), which a person with no computer does not
   have. The sweep takes this over: one renewal at a time per login, a fence written
   first, a new object per renewal, as the Mac does. Refresh secrets stay out of agent
   sandboxes, as they do today (cloud/sandbox/server.mjs:965).
@@ -706,7 +706,7 @@ built, off by default, because people who only use the cloud need never connect
 anything. No sandbox waits on a person beyond the 15-minute approval hold, and no
 request waits for ever.
 
-Rules: a path keeps the checks in main/cloud/resources.mjs (real path, inside a
+Rules: a path keeps the checks in main/cloud/resources.mts (real path, inside a
 granted root, size limits). Grants name person, device, folder, read or write, and
 expiry. Whatever comes up is treated as untrusted input. The rule that no worker
 drives the person's browser is untouched.
@@ -718,7 +718,7 @@ files only:
 - **Move the turn.** The thread's placement moves to the computer for one turn
   (a new generation, from the last checkpoint), the worker runs there through the
   supervisor, then it goes back. Today's hand-back already sends the next reply to
-  the cloud (main/supervisor.mjs:4161), but with the computer in charge throughout;
+  the cloud (main/supervisor.mts:4161), but with the computer in charge throughout;
   moving the record is what is new.
 - **Borrow one command.** One bounded command runs in a dedicated task folder on
   the computer and its output comes back. Built after moving the turn.
@@ -790,7 +790,7 @@ The cloud lent each agent a computer and left the rest on the Mac: the store, a
 task folder per thread, a process per run, packing, bringing home, shipping. So
 every agent added to the Mac, shipping was one queue, and "Everything" still left
 most agent-hours there. Moving the hub, not rewriting it: `bootHeadless`
-(main/serve.mjs) already runs the store, the supervisor and every handler with no
+(main/serve.mts) already runs the store, the supervisor and every handler with no
 Electron, and the window already runs over http (renderer/src/browser-bridge.ts).
 
 - **The hub.** One dedicated EC2 Graviton machine per account, us-east-1,
@@ -808,7 +808,7 @@ Electron, and the window already runs over http (renderer/src/browser-bridge.ts)
   is main/hub-client.mts and loads no store or supervisor. Alerts, the Dock count
   and web links stay on the Mac; the rest goes to the hub. Every door refuses to
   run agents on a machine that names a hub, a damaged file included. Still to do
-  before anyone runs on it: the client updating itself (main/main.mjs starts the
+  before anyone runs on it: the client updating itself (main/main.mts starts the
   updater; this does not).
 - **Documents.** The hub's are the truth, with `~/Zero` a synced mirror: version
   preconditions, tombstones, conflict copies. Agents get pinned versions.
@@ -825,7 +825,7 @@ Electron, and the window already runs over http (renderer/src/browser-bridge.ts)
   candidates; publishing stays serial per repository, by compare-and-swap against
   the tested main; a moved main means rebuilding and rerunning on the new merged
   tree; failing batches split. Policy, test selection and the script stay outside
-  the candidate (main/ship-queue.mjs). Five-change batches at 5 to 10 minutes
+  the candidate (main/ship-queue.mts). Five-change batches at 5 to 10 minutes
   suggest 30 to 60 changes an hour, not 200 instant ships.
 - **Hub limits.** Stream parsing and folding move to workers with bounded queues;
   one shared versioned projection, client deltas from it. Starts are earned

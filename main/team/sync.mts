@@ -21,7 +21,7 @@
 //      (who, what state, when it moved), and only when that set changed.
 //
 //   And in a conversation, the files its messages link to (below, FILES) and
-//   every other file they name (./carry-files.mjs).
+//   every other file they name (./carry-files.mts).
 //
 // Everything outside this file is passed in, so two "Macs" can run in one test
 // over an in-memory cloud. The app wires the real ones in main/team/index.mts.
@@ -105,7 +105,7 @@ export interface SyncBackend {
   getPiece?(projectId: string, name: string): Promise<unknown>;
 }
 
-/** What a conversation's file carrier answers to `send` (./carry-files.mjs). */
+/** What a conversation's file carrier answers to `send` (./carry-files.mts). */
 export interface CarrySent { sent?: boolean; entry?: object; looking?: boolean; working?: boolean; failed?: boolean }
 
 export interface FileCarrier {

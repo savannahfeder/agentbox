@@ -36,7 +36,7 @@
 // is `engineWordFor`'s standing rule in renderer/src/byline.ts and
 // EnginePicker's. The Mac almost every copy of Agentbox runs on has one coding
 // agent, and nothing there may move -- that is
-// tests/the-corner-on-a-mac-with-one-coding-agent-is-exactly-where-it-was.test.mjs.
+// tests/the-corner-on-a-mac-with-one-coding-agent-is-exactly-where-it-was.test.mts.
 
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';

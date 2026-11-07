@@ -11,7 +11,7 @@
 // because they fail independently: the composer's clause, the Settings row, the
 // byline's slot, and the stylesheet. The supervisor's half -- that a one-engine
 // Mac is REPORTED as a one-engine Mac, including one with Codex installed and
-// the gate shut -- is tests/the-engine-choice-reaches-her-screen.test.mjs.
+// the gate shut -- is tests/the-engine-choice-reaches-her-screen.test.mts.
 //
 // THE PICKER REFUSES ITSELF, which is the load-bearing part. The outer guards in
 // Compose.tsx and Settings.tsx are asserted below as well, but the reason this

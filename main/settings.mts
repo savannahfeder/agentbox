@@ -549,7 +549,7 @@ function takeCodex(config: SettingsConfig) {
  * NO PATH FROM THE WINDOW IS EVER TRUSTED: main/ipc.mts opens the picker and
  * calls this in the same trip, so the only path that reaches here is one the
  * open panel itself produced. The sibling rule is
- * tests/where-codex-runs-from-is-not-a-file-a-worker-can-write.test.mjs.
+ * tests/where-codex-runs-from-is-not-a-file-a-worker-can-write.test.mts.
  */
 const BIN_KEY: Record<string, string> = { claude: 'claudeBin', codex: 'codexBin' };
 
@@ -657,7 +657,7 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
     // A reason filed before an ended subscription had its own name still reads
     // as an admin's block; the login's file says which it is.
     // THE SUBSCRIPTION'S TROUBLE, not the folder's: one row stands for every
-    // folder holding this account (account-discovery.mjs says why).
+    // folder holding this account (account-discovery.mts says why).
     const filed = troubleForProfile(troubles, profile, { home: config.home });
     const trouble = filed ? { ...filed, cause: refineCause(filed.cause, plan) } : null;
     const resting = (supervisor._profileCooldown?.[profile] ?? 0) >= now;

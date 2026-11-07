@@ -165,7 +165,7 @@ describe('3. there is a quiet way out, and it asks them to stay', () => {
     // "Keep going", so the card was arguing with somebody who had already
     // answered it. The words are unchanged, the shapes are unchanged, and
     // which one is recommended is pinned next door in
-    // tests/her-way-out-of-the-walk-really-works.test.mjs.
+    // tests/her-way-out-of-the-walk-really-works.test.mts.
     expect(COPY.leaveStay).toBe('Keep going');
     expect(COPY.leaveGo).toBe('Skip it');
     expect(css).toMatch(/\.fr-stay-keep\s*\{/);
@@ -199,7 +199,7 @@ describe('3. there is a quiet way out, and it asks them to stay', () => {
     // — and on 2026-08-28 that turned out not to be enough on its own, which is
     // the whole of. The strip's drag lane now stops short of this button as
     // well; both halves are pinned in
-    // tests/her-way-out-of-the-walk-really-works.test.mjs.
+    // tests/her-way-out-of-the-walk-really-works.test.mts.
     expect(rule).toMatch(/-webkit-app-region: no-drag/);
     // And over the band it sits in, and under the card it opens.
     const band = css.slice(css.indexOf('.fr-band {'), css.indexOf('.fr-band-pill'));

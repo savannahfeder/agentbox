@@ -72,7 +72,7 @@ export async function __gitJobsIdle() {
   while (waiting.size) await new Promise((resolve) => { setTimeout(resolve, 10); });
 }
 
-/** Run one of git-change.mjs's exports without blocking this thread. */
+/** Run one of git-change.mts's exports without blocking this thread. */
 export function gitJob(name: string, ...args: unknown[]): Promise<unknown> {
   if (!JOBS.has(name)) return Promise.reject(new Error(`not a git job: ${name}`));
   return new Promise((resolve, reject) => {

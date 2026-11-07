@@ -284,7 +284,7 @@ const noticeEndedWaits = noticeEndedWaitsJs as (args: {
   cards: SyncCard[]; nameOf: (id: string) => string; now: number; me?: string | null;
 }) => unknown;
 
-/** What the shared threads of teammates look like on this Mac (./thread-share.mjs). */
+/** What the shared threads of teammates look like on this Mac (./thread-share.mts). */
 interface ThreadShare {
   pass(teamId: string | null | undefined): Promise<void>;
   read(owner: string, threadId: string): { shared: boolean; lines: unknown[]; earlier: number; product: string | null; dir: string | null };

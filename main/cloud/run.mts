@@ -874,7 +874,7 @@ export async function cloudRun({
   // Other sign-ins the run carries, in the same shape (./run-cli.mts
   // `loginsCarriedBy`). The sandbox places them if it can and starts anyway.
   also = [],
-  // The keys saved for cloud runs (./keys.mjs keysCarried): { name, key }.
+  // The keys saved for cloud runs (./keys.mts keysCarried): { name, key }.
   keys = [],
   // Told when the sandbox says the login was missing, refused or ran out.
   onLoginTrouble = () => {},

@@ -109,7 +109,7 @@ describe('the words the tool printed never reach her screen', () => {
   // switched Claude Code off is not a login that has run out: a user told to
   // type /login does it, the login succeeds, and the row stays dead. It has its
   // own cause and its own remedy now, and the whole of it is written up in
-  // tests/an-account-her-admin-turned-off-is-not-signed-out.test.mjs.
+  // tests/an-account-her-admin-turned-off-is-not-signed-out.test.mts.
   it('knows an organization that blocks Claude Code from a login that has run out', () => {
     expect(troubleCause('organization has disabled Claude subscription access')).toBe('org-blocked');
   });

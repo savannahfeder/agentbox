@@ -1512,7 +1512,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   );
 
   // WHAT A CLOUD RUN ASKED FOR is a card in its message (NeedCard.tsx). A saved
-  // sign-in or key carries on every thread waiting on it (main/ipc.mjs zero:cloud-key);
+  // sign-in or key carries on every thread waiting on it (main/ipc.mts zero:cloud-key);
   // a file or a code goes back as this thread's reply.
   const [keysJustSaved, setKeysJustSaved] = useState<string[]>([]);
   const savedKeys = cloudKeys ? [...new Set([...cloudKeys, ...keysJustSaved])] : null;

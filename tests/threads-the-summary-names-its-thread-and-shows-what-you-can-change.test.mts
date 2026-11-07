@@ -81,7 +81,7 @@ describe('what you can change looks changeable, and what you cannot does not', (
   // button only where there is something to set and somebody to set it with,
   // which is what `onFinish` is; this file draws the panel without that prop,
   // so Status is a plain word here and stays below with Owner and Project.
-  // The dropdown itself is tests/the-status-row-marks-a-thread-done.test.mjs.
+  // The dropdown itself is tests/the-status-row-marks-a-thread-done.test.mts.
   it('draws Owner and Project as plain words: no button, no caret', () => {
     for (const [from, to] of [['Owner', 'Project'], ['Project', 'Visible to']]) {
       const cell = between(html, from, to);

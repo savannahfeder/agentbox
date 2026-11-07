@@ -116,7 +116,7 @@ export function createProject(name, root = dataRoot()) {
   }
   fs.mkdirSync(dir, { recursive: true });
   // `runs` CAME OUT OF THIS LIST. it holds the record of what each run changed,
-  // and home.mjs carries it to the app's home. Making it here put an empty
+  // and home.mts carries it to the app's home. Making it here put an empty
   // folder of our machinery into every brand-new product, which is the thing a
   // new user watched happen and asked us not to do. The rest of this list is
   // hers.

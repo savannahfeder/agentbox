@@ -399,7 +399,7 @@ function readHistory(sessionId: string, cwd: string | undefined) {
   return { ...entry, transcript: file };
 }
 
-// Exported for tests/one-inbox-no-agents-tab.test.mjs. The fields it reads are
+// Exported for tests/one-inbox-no-agents-tab.test.mts. The fields it reads are
 // Claude Code's, so an upstream rename would blank the card without an error.
 export { readHistory as __readTail, readHistory as __readHistory };
 export const __transcriptSearch = transcriptSearch;
@@ -711,7 +711,7 @@ function heldNotice(agent: Agent, sinceSize: number, message: string) {
   return null;
 }
 
-// Exported for tests/a-held-message-is-not-delivered.test.mjs.
+// Exported for tests/a-held-message-is-not-delivered.test.mts.
 export const __heldNotice = heldNotice;
 
 function readState(pid: number) {

@@ -146,7 +146,7 @@ describe('6. snoozing, which is the third way a row leaves the inbox', () => {
     // with the row's chip made into a button to match; the chip is drawn only
     // while the walk is on, so that taught a control the real app does not
     // have. The whole of it is in
-    // tests/every-tutorial-beat-says-what-to-click.test.mjs.
+    // tests/every-tutorial-beat-says-what-to-click.test.mts.
     expect(`${say.lead}${say.tail}`).not.toContain('click');
   });
 

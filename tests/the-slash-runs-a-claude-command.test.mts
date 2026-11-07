@@ -226,7 +226,7 @@ describe('the menu is one list', () => {
     // AND SEND, NOT THE PICK, SENDS IT (w-2c8ef9ed9e). Enter ran a command from
     // w-5d1ad29efa until /loop started with nothing to loop on. Every command
     // now goes into the box and waits; the box says faintly that ⌘↵ runs it.
-    // tests/enter-on-a-command-that-wants-words-waits-for-send.test.mjs.
+    // tests/enter-on-a-command-that-wants-words-waits-for-send.test.mts.
     const focus = read('renderer/src/components/Focus.tsx');
     // Both mode kinds take the same branch: a mode is a value, not a message,
     // whichever engine's vocabulary it belongs to.

@@ -53,7 +53,7 @@ export function atTheComputer({ idleMs = 0 } = {}) {
 // also true of inbox zero — the state the whole product aims at. So the
 // arrival that most deserved to reach her, the first one after she got clear,
 // was the one the app silently dropped before any rule here could see it.
-// tests/the-first-arrival-after-inbox-zero-still-speaks.test.mjs.
+// tests/the-first-arrival-after-inbox-zero-still-speaks.test.mts.
 export function isNew(known, id) {
   if (!known) return false;
   return !known.has(id);

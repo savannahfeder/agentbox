@@ -81,7 +81,7 @@ describe('the welcome screen', () => {
   // screen has nothing about Claude Code on it at all now and the finish card
   // is the only place it can appear. What that costs, and what the rest of the
   // states are, is in
-  // tests/the-claude-code-line-almost-never-comes-up.test.mjs.
+  // tests/the-claude-code-line-almost-never-comes-up.test.mts.
   it('is nowhere near the folder screen any more', () => {
     // The end of that screen used to be the row of counting dots and this read
     // up to them; the dots came off on 2026-08-25. What closes the folder step
@@ -98,5 +98,5 @@ describe('the welcome screen', () => {
 /* * THE COUNTING DOTS ARE GONE, AND FOUR TESTS WENT WITH THEM (2026-08-25). They held
  `dotsBottom`, which lifted the row of dots off the reply box on the one beat that draws
  one. The one thing the walk still draws over the app is the way out, and where THAT sits is
- held in tests/her-three-onboarding-fixes.test.mjs.
+ held in tests/her-three-onboarding-fixes.test.mts.
 */

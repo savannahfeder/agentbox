@@ -247,7 +247,7 @@ describe('where the line can appear in the walk', () => {
   // AND ON THAT CARD IT IS NO LONGER A FOOTNOTE UNDER A BUTTON.It is the
   // card's own line now, under a headline that names it, with the celebration
   // gone. The full rule and the gate it belongs to are pinned in
-  // tests/the-inbox-does-not-open-without-claude-code.test.mjs.
+  // tests/the-inbox-does-not-open-without-claude-code.test.mts.
   it('is the card, not a note at the bottom of one', () => {
     const html = drawWalk('done', saying);
     expect(html).toContain(COPY.gateHead);

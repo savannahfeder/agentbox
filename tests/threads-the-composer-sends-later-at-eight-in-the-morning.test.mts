@@ -51,4 +51,4 @@ describe('the hint on the right of each row', () => {
 });
 
 // "Pick a date and time" was a browser date field until 2026-10-02; it is now a
-// time typed in words, pinned in send-later-takes-a-time-in-words.test.mjs.
+// time typed in words, pinned in send-later-takes-a-time-in-words.test.mts.

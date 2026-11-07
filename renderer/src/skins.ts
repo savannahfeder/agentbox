@@ -186,7 +186,7 @@ export const TUNE_LIMITS = {
 
 export const TUNE_DEFAULT: Record<SkinId, SkinTune> = {
   // Several of these follow reference screenshots, pinned by
-  // tests/her-theme-screenshots-set-the-defaults.test.mjs. The Lake's 0.63 was
+  // tests/her-theme-screenshots-set-the-defaults.test.mts. The Lake's 0.63 was
   // fitted per channel against a reference drawing, and the Lake is also the
   // fallback in resolveTune.
   lake: { blur: 8, backgroundBlur: 5, dim: 0.63 },

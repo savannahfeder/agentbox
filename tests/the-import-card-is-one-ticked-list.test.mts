@@ -19,7 +19,7 @@ import { LIST, importLines } from '../renderer/src/agent-import-card';
 const DAY = 86400e3;
 // A FIXED NOON, not Date.now(): the words are calendar days, and a day is not
 // always 86,400,000 ms long. See
-// tests/a-day-with-an-extra-hour-still-knows-what-today-is.test.mjs.
+// tests/a-day-with-an-extra-hour-still-knows-what-today-is.test.mts.
 const NOW = new Date('2026-06-15T12:00:00-07:00').getTime();
 const thread = (id, source, daysAgo, title) => ({
   id, source, folder: `/w/${id}`, folderName: id, short: `~/w/${id}`, title, when: NOW - daysAgo * DAY, path: `/t/${id}`,

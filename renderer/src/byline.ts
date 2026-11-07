@@ -132,7 +132,7 @@ export function lastChange(item: WorkItem): number {
 // NEITHER FACT IS WORKED OUT HERE. Whether a choice is real needs the
 // capability gate and the staleness rule, both of which live in main and are
 // pinned to one file there by
-// tests/a-codex-row-from-august-still-runs-on-claude.test.mjs. A byline that
+// tests/a-codex-row-from-august-still-runs-on-claude.test.mts. A byline that
 // derived its own answer could print "Codex" over a row the supervisor was
 // about to run on Claude Code, which is worse than saying nothing: it is the
 // app telling her something it knows is not true. Both arrive already answered,

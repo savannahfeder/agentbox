@@ -2,7 +2,7 @@
 //
 // A key is pasted once, put in the cloud bucket as its own object
 // (`logins/keys/<id>.json`, `{ name, value }`), and every cloud run carries a
-// link to each one (main/cloud/run.mjs `keys`). The Mac keeps only
+// link to each one (main/cloud/run.mts `keys`). The Mac keeps only
 // ~/.agentbox/cloud-keys.json: each name, its object and when it was saved.
 // Nothing here reads a key back.
 import fs from 'node:fs';

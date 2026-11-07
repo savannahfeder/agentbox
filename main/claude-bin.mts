@@ -13,7 +13,7 @@
 // several tests reach for through this file because Claude Code is the binary the
 // app will not open an inbox without.
 //
-// THE RULE THIS FILE ARGUED FOR AND engine-bin.mjs KEEPS: never tell somebody
+// THE RULE THIS FILE ARGUED FOR AND engine-bin.mts KEEPS: never tell somebody
 // Claude Code is missing unless we are certain it is. `found` is whether a
 // runnable file is really there, and it decides which path gets spawned.
 // `certain` is whether we are entitled to SAY it is missing.

@@ -119,7 +119,7 @@ describe('privateMark: a lock where it tells you something', () => {
   it('a thread only you can see wears a lock once a teammate is on the page', () => expect(privateMark(item(), northwind, team, true)).toBe(true));
   // AND ON YOUR OWN PAGE TOO: the lock is unconditional now, because a mark
   // that comes and goes with the faces at the top of the page cannot be read.
-  // The whole rule lives in tests/a-private-thread-always-wears-the-lock.test.mjs.
+  // The whole rule lives in tests/a-private-thread-always-wears-the-lock.test.mts.
   it('and the same lock while the page is yours alone', () => expect(privateMark(item(), northwind, team, false)).toBe(true));
   it('no lock on a thread the team can see', () => expect(privateMark(item({ createdAt: NOW }), northwind, team, true)).toBe(false));
   it('no lock when nobody is signed in', () => expect(privateMark(item(), northwind, null, true)).toBe(false));

@@ -1,7 +1,7 @@
 // THE SHARED CLOUD, IN MEMORY, WITH THE SAME RULES AS THE REAL ONE.
 //
 // The team version talks to Supabase through one small set of calls (see
-// supabase-backend.mjs). This is the same set of calls over plain objects, so
+// supabase-backend.mts). This is the same set of calls over plain objects, so
 // the sync engine and the app can be tested without a network, and so two
 // stores in one test can be two teammates. Every rule the database's row level
 // security enforces is enforced here too, and tests/team-cloud-backends-agree

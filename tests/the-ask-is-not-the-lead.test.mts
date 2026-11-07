@@ -7,7 +7,7 @@
 // Where the ask GOES is no longer here. It used to be a second toggle under the
 // title assembled from the four folded fields; the ways to look back were cut
 // to one, so it is the thread history behind the time, and
-// what it holds is pinned in tests/the-time-is-the-door.test.mjs.
+// what it holds is pinned in tests/the-time-is-the-door.test.mts.
 
 import { describe, it, expect } from 'vitest';
 import { leadField } from '../renderer/src/recap.ts';

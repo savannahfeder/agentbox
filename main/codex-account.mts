@@ -134,9 +134,12 @@ export function codexAccount(home: string | null = null, { file = null }: { file
   const email = typeof id?.email === 'string' && id.email.trim() ? id.email.trim() : null;
   const name = typeof id?.name === 'string' && id.name.trim() ? id.name.trim() : null;
   const live = liveAccounts.get(at);
-  const hasLive = live?.fingerprint === fingerprint;
-  if (hasLive && !live.account) return null;
-  const current = hasLive ? live.account : null;
+  // A running Codex answering with no account is not believed over the file:
+  // it once answered that for a login that went on running tasks, and the
+  // answer stuck until a restart (F-194). A login that is really gone fails
+  // its next run, which says so on the thread.
+  const hasLive = live?.fingerprint === fingerprint && !!live.account;
+  const current = hasLive ? live!.account : null;
   const planType = hasLive ? (current?.type === 'chatgpt' ? current.planType : null) : chatgpt?.chatgpt_plan_type;
   const plan = planLabel(planType);
   // The uuid, which is nobody's name and is only worth drawing when there is no

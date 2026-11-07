@@ -519,7 +519,7 @@ describe('the introduction, in front of the app', () => {
     // slab with the theme picker and the tutorial card still to come, so the
     // one number on the screen was wrong about how much was left. The whole
     // reason, and the rest of the pins, are in
-    // tests/the-introduction-shows-the-product.test.mjs.
+    // tests/the-introduction-shows-the-product.test.mts.
     expect(COPY.introOn).toBeUndefined();
   });
 

@@ -25,7 +25,7 @@ Approved as a smaller, read-only first version. What changed, and it overrides a
    flagged. Writes use the app's own card and signed decision, or wait. No heuristic for what
    writes, and no blanket "Agents may write".
 3. Say plainly that a connection needs its owner's app online. Reuse the cloud run's MCP relay
-   (main/cloud/run.mjs); stdio fits it. Test both engines, and resumed Codex threads.
+   (main/cloud/run.mts); stdio fits it. Test both engines, and resumed Codex threads.
 4. OAuth differs per vendor: Linear documents localhost OAuth, Slack does not support dynamic
    registration. Start with one real flow, Linear; the catalog records each vendor's needs. No
    six-vendor promise.
@@ -46,7 +46,7 @@ it works".
 ## Facts this is built on
 
 - Workers are Claude Code and Codex. Both speak MCP. Claude workers take `--mcp-config`
-  (main/supervisor.mjs `mcpServers()`, about line 11861, written per spawn) and also see the
+  (main/supervisor.mts `mcpServers()`, about line 11861, written per spawn) and also see the
   user's own MCP servers, since there is no `--strict-mcp-config`. Codex workers take
   `mcpServers` in thread params (`codexThreadParamsFor`).
 - Vendors ship official remote MCP servers over HTTP with OAuth: Notion, Linear, Slack,

@@ -69,7 +69,7 @@ describe('the app answers L for later and S for the summary', () => {
   it('swallows the press that opens the picker, and only the ones with a field', () => {
     // The picker focuses a text field the moment it opens, so the keystroke
     // that opened it would be typed into that field. The whole story is in
-    // tests/shortcuts-swallow-their-key.test.mjs.
+    // tests/shortcuts-swallow-their-key.test.mts.
     expect([...OPENS_A_TEXT_FIELD]).toContain('l');
     // The summary panel has no field in it, so S needs no swallow.
     expect([...OPENS_A_TEXT_FIELD]).not.toContain('s');
@@ -111,7 +111,7 @@ describe('every surface that says a key says the same one', () => {
     expect(rowsFor('S')[0].what).toBe('Show or hide the summary.');
     // S is listed under the heading for an open thread, because that is the one
     // place it works. The handler behind each of these caps is checked in
-    // tests/the-shortcuts-page-lists-keys-that-work.test.mjs.
+    // tests/the-shortcuts-page-lists-keys-that-work.test.mts.
     const group = SHORTCUTS.find((g) => g.keys.some((k) => k.keys.includes('S')));
     expect(group.label).toBe('In a task you have opened');
     expect(everyKey()).toContain('L');
@@ -123,7 +123,7 @@ describe('every surface that says a key says the same one', () => {
     expect(say.key).toBe('L');
     // The key alone: the beat named a click for an hour on 2026-10-01 and the
     // chip it pointed at exists only inside the tutorial, which is written up
-    // in tests/every-tutorial-beat-says-what-to-click.test.mjs. What this file
+    // in tests/every-tutorial-beat-says-what-to-click.test.mts. What this file
     // is about is unchanged, which is that the letter is L.
     expect(`${say.lead}${say.key}${say.tail}`).toBe('Press L to deal with it later.');
   });
@@ -136,7 +136,7 @@ describe('every surface that says a key says the same one', () => {
     // The walk's own rows, in the order it stages them, which is the link the
     // refusals read: the row that is real work and not for today is the one at
     // `laterIndex`. Walked at length in
-    // tests/the-walk-keeps-the-beat-that-presses-one.test.mjs.
+    // tests/the-walk-keeps-the-beat-that-presses-one.test.mts.
     const ids = PRACTICE_ROWS.map((_, i) => `w-example${i}`);
     const run = {
       step: 'clear', folder: '/tmp', name: 'Zero', product: 'zero',

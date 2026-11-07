@@ -137,7 +137,7 @@ describe('files and pictures a message names', () => {
   });
 
   it('draws a page, a document, a film and a source file as mentions by name', () => {
-    expect(messageBlocks('See designs/w-1a2b3c4d5e/page.html and docs/mobile/PLAN.md, `films/cut.mp4` and `main/main.mjs`', { dir: DIR })[0].spans).toEqual([
+    expect(messageBlocks('See designs/w-1a2b3c4d5e/page.html and docs/mobile/PLAN.md, `films/cut.mp4` and `main/main.mts`', { dir: DIR })[0].spans).toEqual([
       { text: 'See ' },
       { text: 'page.html', mention: { kind: 'page', src: 'designs/w-1a2b3c4d5e/page.html' } },
       { text: ' and ' },
@@ -145,7 +145,7 @@ describe('files and pictures a message names', () => {
       { text: ', ' },
       { text: 'cut.mp4', mention: { kind: 'media', src: 'films/cut.mp4' } },
       { text: ' and ' },
-      { text: 'main.mjs', mention: { kind: 'code', src: 'main/main.mjs' } },
+      { text: 'main.mjs', mention: { kind: 'code', src: 'main/main.mts' } },
     ]);
   });
 

@@ -46,7 +46,7 @@
 // one Codex knows is carried, one it does not know stops the run before
 // `thread/start`, and a Mac with no list refuses nothing. The whole argument,
 // and the measurement of why a dropped model reached nobody, is in
-// tests/a-model-she-picked-for-codex-is-honoured-or-the-run-says-why.test.mjs.
+// tests/a-model-she-picked-for-codex-is-honoured-or-the-run-says-why.test.mts.
 
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, copyFileSync } from 'node:fs';

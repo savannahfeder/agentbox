@@ -13,7 +13,9 @@
 //     its key kept in Secrets Manager
 //   - the function's role: start and stop sessions on that one runtime, its
 //     ledger and relayed calls in that one bucket, and that one secret
-//   - the function, bundled into one file, with a public function URL
+//   - the function, bundled into one file, with a public function URL; a new
+//     bundle is asked one question once live, and the one before it is put
+//     back when it cannot answer
 //   - S3's notice to the function when a run's done.json lands
 //   - a sweep every 5 minutes
 //   - a phone sweep every minute, which starts in the cloud a phone's reply
@@ -25,7 +27,8 @@
 //   - a trail of the account's management events and of reads and writes of
 //     sign-ins, into its own bucket and log group, and alarms, emailed to
 //     `--alarm-email <address>` or to whoever the budget already emails, when
-//     the signer's key is used outside a link or someone fills their storage
+//     the signer's key is used outside a link, someone fills their storage, or
+//     the server itself keeps erroring
 // and prints the function URL. Paying is on once scripts/stripe-setup.mjs has
 // stored Stripe's secret; run this again after it.
 
@@ -169,6 +172,64 @@ export function gatewayAlarms({ topicArn, signerArn }) {
   ];
 }
 
+/**
+ * The server erroring, from Lambda's own counts: calls that failed to run (a
+ * bundle that cannot load, a crash) and 5xx answers to Macs. The phone sweep
+ * calls it every minute, so a dead server crosses these even with nobody about.
+ * Two periods running, so one bad minute is not an email.
+ */
+export function serverDownAlarms({ topicArn }) {
+  const each = { namespace: 'AWS/Lambda', dimensions: [`Name=FunctionName,Value=${NAMES.fn}`], statistic: 'Sum', periodSeconds: 300, evaluationPeriods: 2, threshold: 3, missing: 'notBreaching', actions: [topicArn] };
+  return [
+    { name: `${NAMES.fn}-failing`, metric: 'Errors', ...each },
+    { name: `${NAMES.fn}-answering-5xx`, metric: 'Url5xxCount', ...each },
+  ];
+}
+
+/** The one call the deploy makes to a new server before it counts as live: one anyone may make. */
+export const CHECK_EVENT = { version: '2.0', rawPath: '/v1/terms', headers: {}, requestContext: { http: { method: 'GET', path: '/v1/terms' } } };
+
+/** Why the new server's answer to CHECK_EVENT shows it cannot serve, or null when it can. */
+export function whyNotServing({ functionError = null, payload = '' }) {
+  const text = String(payload ?? '');
+  if (functionError) return `it failed to run (${functionError}): ${text.slice(0, 300)}`;
+  let out;
+  try { out = JSON.parse(text); } catch { return `it answered something that is not JSON: ${text.slice(0, 200)}`; }
+  if (out?.statusCode !== 200) return `it answered ${out?.statusCode ?? 'nothing'}: ${String(out?.body ?? '').slice(0, 200)}`;
+  return null;
+}
+
+/** The settings a function had, as the arguments that would set them again. */
+export function settingsOf(conf) {
+  return [
+    '--role', conf.Role, '--runtime', conf.Runtime, '--handler', conf.Handler,
+    '--timeout', String(conf.Timeout), '--memory-size', String(conf.MemorySize),
+    '--environment', JSON.stringify({ Variables: conf.Environment?.Variables ?? {} }),
+  ];
+}
+
+/**
+ * Puts the new server live, asks it one question, and puts the one before it
+ * back when it cannot answer, so a release that breaks the server is down for
+ * about a minute and not until somebody notices.
+ */
+export async function updateOrRollBack({ update, check, rollBack, say = () => {} }) {
+  let why;
+  try {
+    await update();
+    why = await check();
+  } catch (err) {
+    why = err.message;
+  }
+  if (!why) return;
+  say(`the new cloud server cannot serve (${why}); putting the one before it back`);
+  try { await rollBack(); } catch (err) {
+    throw new Error(`the new cloud server cannot serve (${why}), and putting the old one back failed too: ${err.message}`);
+  }
+  const after = await check().catch((err) => err.message);
+  throw new Error(`the new cloud server cannot serve (${why}), so the one before it was put back${after ? `, and it does not answer either (${after})` : ' and answers'}`);
+}
+
 /** Where the alarms are emailed: the address given, or the one the budget already emails. */
 export function alarmEmail({ argv, subscribers }) {
   const i = argv.indexOf('--alarm-email');
@@ -305,6 +366,11 @@ async function main() {
   const arm = ['--architectures', 'arm64'];
   const existing = aws(['lambda', 'get-function-configuration', '--function-name', NAMES.fn], { allowFail: true });
   const waitUpdated = () => aws(['lambda', 'wait', 'function-updated-v2', '--function-name', NAMES.fn], { json: false });
+  const answer = path.join(out, 'check.json');
+  const check = () => {
+    const meta = aws(['lambda', 'invoke', '--function-name', NAMES.fn, '--cli-binary-format', 'raw-in-base64-out', '--cli-read-timeout', String(FUNCTION_SECONDS + 30), '--payload', JSON.stringify(CHECK_EVENT), answer]);
+    return whyNotServing({ functionError: meta?.FunctionError ?? null, payload: fs.readFileSync(answer, 'utf8') });
+  };
   if (!existing) {
     for (let i = 1; ; i += 1) {
       try { aws(['lambda', 'create-function', '--function-name', NAMES.fn, '--role', role.Arn, '--zip-file', `fileb://${zip}`, ...arm, ...settings]); break; } catch (err) {
@@ -313,11 +379,27 @@ async function main() {
       }
     }
     aws(['lambda', 'wait', 'function-active-v2', '--function-name', NAMES.fn], { json: false });
+    const why = check();
+    if (why) throw new Error(`the new cloud server cannot serve (${why})`);
   } else {
-    aws(['lambda', 'update-function-code', '--function-name', NAMES.fn, '--zip-file', `fileb://${zip}`, ...arm]);
-    waitUpdated();
-    aws(['lambda', 'update-function-configuration', '--function-name', NAMES.fn, '--role', role.Arn, ...settings]);
-    waitUpdated();
+    // The running server's code, kept so a release that cannot serve is undone.
+    const before = path.join(out, 'before.zip');
+    const res = await fetch(aws(['lambda', 'get-function', '--function-name', NAMES.fn]).Code.Location, { signal: AbortSignal.timeout(60_000) });
+    if (!res.ok) throw new Error(`could not keep a copy of the running cloud server (${res.status}), so nothing was changed`);
+    fs.writeFileSync(before, Buffer.from(await res.arrayBuffer()));
+    const put = (code, rest) => {
+      aws(['lambda', 'update-function-code', '--function-name', NAMES.fn, '--zip-file', `fileb://${code}`, ...arm]);
+      waitUpdated();
+      aws(['lambda', 'update-function-configuration', '--function-name', NAMES.fn, ...rest]);
+      waitUpdated();
+    };
+    await updateOrRollBack({
+      update: () => put(zip, ['--role', role.Arn, ...settings]),
+      check,
+      rollBack: () => put(before, settingsOf(existing)),
+      say,
+    });
+    say('the new cloud server answers');
   }
   aws(['lambda', 'put-function-concurrency', '--function-name', NAMES.fn, '--reserved-concurrent-executions', String(CONCURRENCY)], { allowFail: true });
   const fnArn = aws(['lambda', 'get-function-configuration', '--function-name', NAMES.fn]).FunctionArn;
@@ -401,6 +483,10 @@ async function main() {
   for (const a of gatewayAlarms({ topicArn: alarmTopic, signerArn })) {
     aws(['logs', 'put-metric-filter', '--log-group-name', a.logGroup, '--filter-name', a.name, '--filter-pattern', a.pattern, '--metric-transformations', JSON.stringify([{ metricName: a.metric, metricNamespace: 'Agentbox', metricValue: '1' }])], { json: false });
     aws(['cloudwatch', 'put-metric-alarm', '--alarm-name', a.name, '--namespace', 'Agentbox', '--metric-name', a.metric, '--statistic', 'Sum', '--period', String(a.periodSeconds), '--evaluation-periods', '1', '--threshold', String(a.threshold), '--comparison-operator', 'GreaterThanOrEqualToThreshold', '--treat-missing-data', a.missing, '--alarm-actions', ...a.actions], { json: false });
+  }
+  // Emailed when it starts and again when it clears.
+  for (const a of serverDownAlarms({ topicArn: alarmTopic })) {
+    aws(['cloudwatch', 'put-metric-alarm', '--alarm-name', a.name, '--namespace', a.namespace, '--metric-name', a.metric, '--dimensions', ...a.dimensions, '--statistic', a.statistic, '--period', String(a.periodSeconds), '--evaluation-periods', String(a.evaluationPeriods), '--threshold', String(a.threshold), '--comparison-operator', 'GreaterThanOrEqualToThreshold', '--treat-missing-data', a.missing, '--alarm-actions', ...a.actions, '--ok-actions', ...a.actions], { json: false });
   }
 
   say('ready');

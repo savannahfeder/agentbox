@@ -230,11 +230,11 @@ export interface RoomsOptions {
   device: () => string;
   presenceFacts: () => PresenceFacts | null | undefined;
   prefsFile: string;
-  /** What a name in a message means on this computer (./carry-files.mjs). */
+  /** What a name in a message means on this computer (./carry-files.mts). */
   findFile?: ((ref: string, how?: { meant?: boolean }) => unknown) | null;
-  /** Writes the team's decisions where agents read (./decisions-doc.mjs). */
+  /** Writes the team's decisions where agents read (./decisions-doc.mts). */
   decisionDocs?: ((args: { teamName: string; rows: RoomDecision[]; nameOf: (id: string) => string }) => unknown) | null;
-  /** Writes the Team look where agents read (./team-look-doc.mjs). */
+  /** Writes the Team look where agents read (./team-look-doc.mts). */
   teamLookDocs?: ((args: { text: string }) => unknown) | null;
   /** Where a room's file is put back together whole, inside a folder the window may draw from. */
   filesDir?: string | null;
@@ -304,9 +304,9 @@ export function createRooms({
   prefsFile,
   now = Date.now,
   log = () => {},
-  findFile = null, // (ref) => what a name in a message means on this computer (./carry-files.mjs)
-  decisionDocs = null, // ({ teamName, rows, nameOf }) => writes the team's decisions where agents read (./decisions-doc.mjs)
-  teamLookDocs = null, // ({ text }) => writes the Team look where agents read (./team-look-doc.mjs)
+  findFile = null, // (ref) => what a name in a message means on this computer (./carry-files.mts)
+  decisionDocs = null, // ({ teamName, rows, nameOf }) => writes the team's decisions where agents read (./decisions-doc.mts)
+  teamLookDocs = null, // ({ text }) => writes the Team look where agents read (./team-look-doc.mts)
   filesDir = null, // where a room's file is put back together whole, inside a folder the window may draw from
   onChange = () => {},
   timers = { setTimeout, clearTimeout },

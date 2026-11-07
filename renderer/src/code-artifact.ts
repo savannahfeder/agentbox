@@ -437,7 +437,7 @@ export function hunkGuessPx(rows: number): number {
 // The browser skips off-screen code in slices of at most this many rows, about
 // two screenfuls, rather than whole hunks. A hunk can be a whole new file, and
 // scrolling into one would make the browser lay out every row of it in one
-// frame. Pinned by tests/a-big-change-scrolls-without-stalling.test.mjs.
+// frame. Pinned by tests/a-big-change-scrolls-without-stalling.test.mts.
 export const SLICE_ROWS = 48;
 
 /** [from, to) row ranges cutting `n` rows into slices of at most SLICE_ROWS. */

@@ -3,7 +3,7 @@
 //
 //   node cloud/standin/server.mjs --port 54900 --file /tmp/lumen/cloud.json
 //
-// The in-memory cloud (main/team/memory-cloud.mjs) behind a small HTTP door, so
+// The in-memory cloud (main/team/memory-cloud.mts) behind a small HTTP door, so
 // several copies of the app can be different people on one team without the
 // hosted database. It listens on loopback only and trusts whoever knocks: a
 // person's token is their id.

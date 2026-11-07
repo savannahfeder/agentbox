@@ -470,7 +470,7 @@ describe('every way of not getting an answer is a refusal, never an accept and n
     // the error frame this test pinned reached a Codex worker as "user rejected
     // MCP tool call" for every store tool it tried. It is answered in its own
     // vocabulary now, and the measurement that changed it is in
-    // tests/the-store-tools-a-codex-worker-lives-on-are-not-rejected.test.mjs.
+    // tests/the-store-tools-a-codex-worker-lives-on-are-not-rejected.test.mts.
     ['item/tool/call', { threadId: 'T-A' }],
     // `execCommandApproval` AND `applyPatchApproval` HAVE LEFT THIS LIST TOO,
     // for the same reason the elicitation did and found the same way round
@@ -481,7 +481,7 @@ describe('every way of not getting an answer is a refusal, never an accept and n
     // ReviewDecision}`, which is approved / approved_for_session /
     // {denied:{rejection}} / abort and NOT our four words -- and the mapping is
     // `LEGACY_DECISIONS` in main/codex-app-server.mts. Pinned in
-    // tests/every-request-codex-can-send-has-an-answer-or-a-refusal.test.mjs.
+    // tests/every-request-codex-can-send-has-an-answer-or-a-refusal.test.mts.
     ['some/method/from/a/newer/codex', { threadId: 'T-A' }],
   ])('answers %s with a refusal rather than leaving it open', async (method, params) => {
     const { codex } = await withThread({ onApproval: () => 'accept' });

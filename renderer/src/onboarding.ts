@@ -2882,7 +2882,7 @@ export function fitsBeside(left: number, view: { w: number }): boolean {
 
 /**
  * Draw the ring and place the sentence. Pure, so the geometry is tested rather
- *  than eyeballed: tests/the-coach-ring-lands-on-the-thing.test.mjs. */
+ *  than eyeballed: tests/the-coach-ring-lands-on-the-thing.test.mts. */
 export function ring(
   anchor: Rect,
   bounds: { left: number; right: number },

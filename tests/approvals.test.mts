@@ -10,7 +10,7 @@
 // front of the card stack, permanently, in front of every real question on
 // either engine. Ordering is Agentbox's own sighting now, and the attack and its
 // boundaries are pinned in
-// tests/a-card-a-worker-forged-cannot-hold-the-front-of-her-stack.test.mjs.
+// tests/a-card-a-worker-forged-cannot-hold-the-front-of-her-stack.test.mts.
 // What survives here is the half that was never about the worker's number: a
 // card with an answer beside it is not pending.
 

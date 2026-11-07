@@ -122,7 +122,7 @@ describe('what a codex approval looks like on her card', () => {
   // turnId, startedAtMs, reason and grantRoot -- no path and no diff -- so with
   // no memory of the item behind it there is nothing to draw; a fileChange IS
   // carded when the run saw that item go past, which is
-  // tests/a-codex-file-change-reaches-her-as-something-she-can-read.test.mjs.
+  // tests/a-codex-file-change-reaches-her-as-something-she-can-read.test.mts.
   // The permissions one is answered with a granted profile rather than a word
   // and stays undrawable outright. Both are refused by the transport's own
   // deny-by-default instead.

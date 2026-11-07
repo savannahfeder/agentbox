@@ -21,7 +21,7 @@
 //
 // The two ways into the modes are Claude Code's own and both still work: `/`
 // opens the menu, Shift+Tab cycles. Those are covered by
-// the-slash-picks-a-mode.test.mjs. What this file asserts is only that nothing
+// the-slash-picks-a-mode.test.mts. What this file asserts is only that nothing
 // is permanently parked on the footer again, and that the toast she asked for
 // in exchange is still wired up.
 

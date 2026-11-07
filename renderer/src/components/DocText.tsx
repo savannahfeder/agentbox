@@ -58,6 +58,8 @@ export interface DocVersions {
   /** Words kept from a sitting that never got to save. */
   draft?: string;
   byline?: string | null;
+  /** Take the cursor on open: a document just made is there to write in. */
+  focus?: boolean;
 }
 
 export function DocText({ product, src, text, mtime, folder = null, onSaved, onNotice, readOnly = false, versions }: {
@@ -101,6 +103,7 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
     extensions,
     content: mdToPmDoc(versions?.draft ?? text),
     editable: !readOnly,
+    autofocus: versions?.focus && !readOnly ? 'end' : false,
     onUpdate: () => {
       dirty.current = true;
       if (saveTimer.current != null) window.clearTimeout(saveTimer.current);

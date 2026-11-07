@@ -60,4 +60,4 @@ export function searchFieldInStrip({ searching = false, focused = false, setting
 // move along those (App.tsx, `nextTab` in threads/page-rules). The number keys
 // were removed on her word rather than left jumping through a sidebar list that
 // is no longer drawn.
-// tests/tab-moves-along-the-tabs-and-the-number-keys-are-gone.test.mjs.
+// tests/tab-moves-along-the-tabs-and-the-number-keys-are-gone.test.mts.

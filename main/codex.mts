@@ -342,7 +342,7 @@ function frameSize(params) {
  * at}], roots, plus, minus, editCount, withProse, startedAt, endedAt}`.
  *
  * `events` are the `{method, params}` frames `rememberCodexChange` kept, in
- * order. `roots` and `since` mean what they mean in code-change.mjs.
+ * order. `roots` and `since` mean what they mean in code-change.mts.
  */
 export function changeFromCodexTurn(events, { roots = [], since = 0 } = {}) {
   const into = collector({ roots });
@@ -406,7 +406,7 @@ function splitLines(text) {
   return out;
 }
 
-/** The last non-empty line of what the agent said, as code-change.mjs keeps it. */
+/** The last non-empty line of what the agent said, as code-change.mts keeps it. */
 function proseFrom(text) {
   const said = String(text ?? '').trim();
   if (!said) return '';
@@ -442,7 +442,7 @@ function rootSpellings(roots) {
   return [...out];
 }
 
-/** The same tally as the private collector in code-change.mjs, over absolute paths from events. */
+/** The same tally as the private collector in code-change.mts, over absolute paths from events. */
 function collector({ roots = [] } = {}) {
   const files = new Map();
   const totals = { plus: 0, minus: 0, editCount: 0, withProse: 0, startedAt: 0, endedAt: 0 };

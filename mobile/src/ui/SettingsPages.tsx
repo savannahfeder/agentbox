@@ -153,12 +153,12 @@ function PhoneProjects() {
   };
   return (
     <>
-      <Row first label="Projects on your phone" desc="A copy of their threads is kept in your account, so your phone can read and reply with this computer closed." reading={r}
+      <Row first label="Projects on your phone" desc="A copy of their threads is kept in your account, so your phone can read and reply with your computer closed." reading={r}
         control={<Chip label="Projects on your phone" now={word} onPress={() => setOpen(true)} />} />
       <Sheet open={open} close={() => setOpen(false)}>
         <SheetHead>Projects on your phone</SheetHead>
         <SheetRow label="Every project" aside="New ones too" on={every} onPress={() => choose(true, [])} />
-        <SheetRow label="None" aside="Everything stays on this computer" on={none} onPress={() => choose(false, [])} />
+        <SheetRow label="None" aside="Everything stays on your computer" on={none} onPress={() => choose(false, [])} />
         <SheetSep />
         {projects.map((p) => <SheetRow key={p.slug} label={p.name} lead={<View style={{ width: 22, alignItems: 'center' }}>{on(p.slug) ? <Tick size={18} tint={color.text} /> : null}</View>} onPress={() => tick(p.slug)} />)}
       </Sheet>
@@ -227,7 +227,7 @@ function Claude() {
   const r = s.reading('workspace', 'permission', w.permission);
   return (
     <>
-      {!w.claude.found ? <Group label="Status"><Row first label="Claude Code is not on this computer" /></Group> : null}
+      {!w.claude.found ? <Group label="Status"><Row first label="Claude Code is not on your computer" /></Group> : null}
       <Group label="Signed in"><Accounts engine="claude" list={w.accounts} /></Group>
       <Group label="Permissions">
         {w.permission === 'custom'
@@ -246,7 +246,7 @@ function Codex() {
   const r = s.reading('workspace', 'codexMode', w.codexMode ?? 'auto');
   return (
     <>
-      {!w.codex.found ? <Group label="Status"><Row first label="Codex is not on this computer" /></Group> : null}
+      {!w.codex.found ? <Group label="Status"><Row first label="Codex is not on your computer" /></Group> : null}
       <Group label="Signed in"><Accounts engine="codex" list={w.codexAccounts} /></Group>
       <Group label="Permissions">
         <Row first label="Permission mode" desc={CODEX_MODES[r.value as keyof typeof CODEX_MODES]?.what} reading={r}
@@ -266,7 +266,7 @@ function AgentsAtOnce() {
   const options = [{ value: 'auto', label: `Automatic (${say(w.agentsTotal)})` }, ...Array.from({ length: w.slotsMax ?? 12 }, (_, i) => ({ value: String(i + 1), label: say(i + 1) }))];
   return (
     <Row first stack label="How many run at once" reading={auto.waiting || auto.refused ? auto : count}
-      desc={isAuto ? 'From this computer’s memory, kept there as you add accounts or turn the memory check on.' : `You set this. Automatic would run ${w.agentsAutoTotal ?? w.sessionsAtOnce} on this computer.`}
+      desc={isAuto ? 'From your computer’s memory, kept there as you add accounts or turn the memory check on.' : `You set this. Automatic would run ${w.agentsAutoTotal ?? w.sessionsAtOnce} on your computer.`}
       control={<Choice label="How many run at once" value={isAuto ? 'auto' : String(count.value)} options={options}
         onChange={(v) => void (v === 'auto' ? s.change({ scope: 'workspace', key: 'agentsAuto', value: true }) : s.change({ scope: 'workspace', key: 'sessionsAtOnce', value: Number(v) }))} />} />
   );
@@ -295,14 +295,14 @@ function Running() {
           control={<Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => void s.change({ scope: 'workspace', key: 'memoryGate', value: v })} />} />
         {gate.value && !isAutoNow(s, w) ? (
           <Row label="Heavy commands at once" reading={slots}
-            desc={slots.value === null ? `Auto: ${w.memoryGate.slotsAuto} on this computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${w.memoryGate.slotsAuto} on this computer.`}
+            desc={slots.value === null ? `Auto: ${w.memoryGate.slotsAuto} on your computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${w.memoryGate.slotsAuto} on your computer.`}
             control={<Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? w.memoryGate.slotsAuto} min={1} max={w.memoryGate.slotsMax ?? 8}
               onChange={(v) => void s.change({ scope: 'workspace', key: 'memoryGateSlots', value: v === w.memoryGate.slotsAuto ? null : v })} />} />
         ) : null}
         <SettingSwitch label="Stop programs agents leave behind" k="cleanupLeftovers" copy={w.leftovers.on}
-          desc={`Dev servers, previews and test runs an agent started keep running until you close its task, or until memory runs short. Apps installed on this computer are never stopped.${two ? ' Codex agents’ programs are not found yet.' : ''}`} />
+          desc={`Dev servers, previews and test runs an agent started keep running until you close its task, or until memory runs short. Apps installed on your computer are never stopped.${two ? ' Codex agents’ programs are not found yet.' : ''}`} />
         <Row label="Something felt slow" reading={slow}
-          desc={w.agentsNudge ? `${NAME} is running ${w.agentsNudge} fewer than this computer suggests.` : `${NAME} runs one fewer from now on, and remembers that it did.`}
+          desc={w.agentsNudge ? `${NAME} is running ${w.agentsNudge} fewer than your computer suggests.` : `${NAME} runs one fewer from now on, and remembers that it did.`}
           control={<View style={{ flexDirection: 'row', gap: 8 }}>
             {w.agentsNudge ? <Button title="Undo" onPress={() => void s.change({ scope: 'workspace', key: 'agentsFeltSlow', value: 'reset' })} /> : null}
             <Button title="Tell it" onPress={() => void s.change({ scope: 'workspace', key: 'agentsFeltSlow', value: 'more' })} />
@@ -374,7 +374,7 @@ const hasComputer = (s: SettingsState) => !!s.settings;
 export const SETTINGS_PAGES: SettingsPageDef[] = [
   { id: 'general', label: 'General', group: 'Personal', Body: General, shown: () => true },
   { id: 'appearance', label: 'Appearance', group: 'Personal', Body: Appearance, shown: () => true },
-  { id: 'phone', label: 'Phone', group: 'Personal', lede: 'Read and reply from your phone, even with this computer closed.', Body: Phone, shown: () => true },
+  { id: 'phone', label: 'Phone', group: 'Personal', lede: 'Read and reply from your phone, even with your computer closed.', Body: Phone, shown: () => true },
   { id: 'alpha', label: 'Alpha features', group: 'Personal', lede: 'Early features you can try before they are finished. They may change or go away.', Body: Alpha, shown: hasComputer },
   { id: 'claude', label: 'Claude Code', group: 'Agents', Body: Claude, shown: hasComputer },
   { id: 'codex', label: 'Codex', group: 'Agents', Body: Codex, shown: (s) => !!s.settings && (s.settings.workspace.engines.includes('codex') || s.settings.workspace.codex.found) },

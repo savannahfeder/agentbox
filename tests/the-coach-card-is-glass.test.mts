@@ -13,7 +13,7 @@
 // difference from the looks she rejected is the whole point — every one of
 // those sentences is still said, folded into the two lines that remain, rather
 // than deleted to make a card look shorter. The budget and the folds are held
-// by tests/the-coaching-card-is-two-lines.test.mjs.
+// by tests/the-coaching-card-is-two-lines.test.mts.
 //
 // AND WHAT IS DELIBERATELY NOT RE-ASKED.
 

@@ -305,7 +305,7 @@ describe('a persisted codex row still spawns Claude Code', () => {
   // ENOENT and it was the wrong half of the fix: the supervisor now listens for
   // that stream's failure itself, because the same event arrives when a product
   // folder moves mid-run or the disk fills, and there it was killing the main
-  // process. See tests/a-run-whose-trace-cannot-be-written-still-runs.test.mjs.
+  // process. See tests/a-run-whose-trace-cannot-be-written-still-runs.test.mts.
   // This stays because letting the spawn settle before asserting on it is right
   // regardless, not because anything depends on it any more.
   const settle = () => new Promise((resolve) => { setImmediate(resolve); });

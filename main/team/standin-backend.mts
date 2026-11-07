@@ -1,6 +1,6 @@
 // THE SESSION AND BACKEND OVER cloud/standin/server.mjs: the same calls as
-// memory-cloud.mjs, made over loopback, so copies of the app on one machine are
-// one team. A checkout only; session.mjs refuses it in an installed build.
+// memory-cloud.mts, made over loopback, so copies of the app on one machine are
+// one team. A checkout only; session.mts refuses it in an installed build.
 const CALL_MS = 120_000;
 const WAIT_MS = 35_000;
 

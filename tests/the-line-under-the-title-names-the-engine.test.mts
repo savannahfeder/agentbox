@@ -23,7 +23,7 @@
 // AND THE RENDERER DOES NOT WORK IT OUT. Whether a choice is real needs the
 // capability gate (`ENGINE_CHOICE_ENABLED`) and the staleness rule
 // (`engineChoiceOnRowIsStale`), both of which live in main and are pinned to
-// one file there by tests/a-codex-row-from-august-still-runs-on-claude.test.mjs.
+// one file there by tests/a-codex-row-from-august-still-runs-on-claude.test.mts.
 // A byline that derived its own answer could print "Codex" over a row the
 // supervisor was about to run on Claude Code, which is worse than saying
 // nothing: it would be the app telling her something it knows is not true.

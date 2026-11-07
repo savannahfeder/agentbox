@@ -10,7 +10,7 @@
 // the real sync engine, where Maya shares one thread with Theo, and Jun, who
 // is on the same team, must not see it. The hosted database enforces the same
 // thing in its own row level security, which is tested on PGlite in
-// tests/team-cloud-keeps-each-team-to-itself.test.mjs.
+// tests/team-cloud-keeps-each-team-to-itself.test.mts.
 import { it, expect, beforeEach, describe } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';

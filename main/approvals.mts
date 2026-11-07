@@ -52,7 +52,7 @@ export function approvalPublicKey() {
 // a worker can rewrite its request file in place while the waiting process
 // still holds the original. So `answer` signs a digest of the card Agentbox
 // last showed her, and each engine compares it with the request it holds
-// (approval-prompt-server.mts its `request`, codex-approvals.mjs its `open`
+// (approval-prompt-server.mts its `request`, codex-approvals.mts its `open`
 // entry). A mismatch is a deny.
 //
 // The digest is of what was displayed, not of the file at answer time: a

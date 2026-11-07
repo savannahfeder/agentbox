@@ -234,7 +234,7 @@ function rowsFromPatchBody(body, starts) {
  * A unified diff as files and hunks.
  *
  * Git's own diff rather than our line matcher, because a whole file read off
- * the disk is thousands of lines and the matcher in code-change.mjs gives up
+ * the disk is thousands of lines and the matcher in code-change.mts gives up
  * over four million cells, which a 3,000 line file crosses on its own. Git
  * also brings the three lines of context that make a save able to find its
  * place again (renderer/src/code-edit.ts).

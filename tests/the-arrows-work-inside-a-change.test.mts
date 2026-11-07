@@ -139,7 +139,7 @@ describe('the caret crossing out of a one-line editable', () => {
   it('does not take a shifted arrow, because that is a selection and not a move', () => {
     // A SELECTION MAY CROSS LINES — round four built it, and it is `extendHead`
     // in the same module, tested in
-    // tests/selecting-code-out-of-a-change.test.mjs. This line used to say a
+    // tests/selecting-code-out-of-a-change.test.mts. This line used to say a
     // selection may NOT cross lines, which was true of the code and false of
     // what she needed: measured 2026-08-27, shift and two downs reached zero
     // lines of the change. What stays true is that the CARET must not move
