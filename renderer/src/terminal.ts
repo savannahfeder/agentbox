@@ -118,17 +118,19 @@ export function traceLines(session: TraceSession): TraceLine[] {
 
   // The tool line an `#out` block is being read into.
   let outputOf: TraceLine | null = null;
+  let outputRead: string[] = [];
 
   for (const raw of (session?.text ?? '').split('\n')) {
     const stamped = STAMPED.exec(raw);
     if (!stamped) {
       if (raw.startsWith('#| ')) {
-        if (outputOf) outputOf.output = outputOf.output ? `${outputOf.output}\n${raw.slice(3)}` : raw.slice(3);
+        if (outputOf) { outputRead.push(raw.slice(3)); outputOf.output = outputRead.join('\n'); }
         continue;
       }
       const head = OUTPUT_HEAD.exec(raw);
       if (head) {
         outputOf = null;
+        outputRead = [];
         for (let i = lines.length - 1; i >= 0; i -= 1) {
           if (lines[i].kind === 'tool' && lines[i].id === head[1]) { outputOf = lines[i]; break; }
         }

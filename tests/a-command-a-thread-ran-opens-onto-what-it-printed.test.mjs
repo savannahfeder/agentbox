@@ -35,6 +35,12 @@ describe('what a command printed', () => {
     expect(w.failed).toBe(false);
   });
 
+  it('keeps blank lines, the first one too', () => {
+    const [w] = work(thread(call('t1', 'npx vitest run'), result('t1', '\n RUN  v3\n\n ✓ a.test.ts')));
+    expect(w.output).toBe('\n RUN  v3\n\n ✓ a.test.ts');
+    expect(w.lines).toBe(4);
+  });
+
   it('a result given as text blocks reads the same', () => {
     const [w] = work(thread(call('t1', 'npm test'), result('t1', [{ type: 'text', text: 'done' }])));
     expect(w.output).toBe('done');
