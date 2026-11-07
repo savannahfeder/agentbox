@@ -31,8 +31,9 @@
 .sb-when { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .sb-when .av-glyph { width: 12px; height: 12px; }
 .sb-quote { display: block; margin-top: 8px; padding-left: 10px; border-left: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); font-size: 12.5px; line-height: 1.45; color: var(--text-dim); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
-.sb-pin { display: inline-block; margin-top: 8px; font: 11px/1 var(--mono); color: var(--accent); }
-.sb-write-quote .sb-pin { flex: 1; margin-top: 6px; }
+/* The pin's own tag, as on the page (artifact-view.css .av-pin-tag). */
+.sb-pin.av-pin-tag { position: static; flex: none; box-shadow: none; cursor: inherit; }
+.sb-pin-draft { flex: 1; display: flex; padding-top: 4px; }
 .sb-text { display: block; margin-top: 6px; font-size: 13.5px; line-height: 1.5; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
 .sb-note.is-sent .sb-text { color: var(--text-dim); }
 .sb-pictures { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }

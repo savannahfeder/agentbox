@@ -47,10 +47,10 @@ function SidebarNote({ note, product, on, who, person, me, onGo }: {
       <span className="sb-meta">
         <Face person={person} name={person ? undefined : who} me={me} />
         <span className="sb-who">{who}</span>
+        {note.place.kind === 'pin' && <span className="av-pin-tag sb-pin">{pinLabel(note)}</span>}
         <span className="sb-when">{note.sent && <NoteGlyph name="check" />}{note.sent ? 'Sent ' : ''}{clock(note.ts)}</span>
       </span>
       {note.place.kind === 'quote' && <span className="sb-quote">{note.place.text}</span>}
-      {note.place.kind === 'pin' && <span className="sb-pin">Pin {pinLabel(note)}</span>}
       {words && <span className="sb-text">{words}</span>}
       {said.pictures.length > 0 && <span className="sb-pictures">{said.pictures.map((p) => <NotePictureShown key={p.src} product={product} picture={p} />)}</span>}
       {files.length > 0 && <span className="sb-files">{files.map((f) => <span key={f.src} className="sb-file">{f.name}</span>)}</span>}
@@ -262,7 +262,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
           onDrop={canAttach ? (e) => { e.preventDefault(); void addFiles(e.dataTransfer.files); } : undefined}>
           {(quote || spot) && (
             <div className="sb-write-quote">
-              {spot ? <span className="sb-pin">Pin {pinNotes.length + 1}</span> : <span className="sb-quote">{quote}</span>}
+              {spot ? <span className="sb-pin-draft"><span className="av-pin-tag sb-pin">{pinNotes.length + 1}</span></span> : <span className="sb-quote">{quote}</span>}
               <button type="button" className="sb-icon" aria-label="Note the whole page instead" title="Note the whole page instead" onClick={() => pointAt(null, null)}><Glyph d="M4 4l8 8M12 4l-8 8" /></button>
             </div>
           )}

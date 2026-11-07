@@ -441,8 +441,6 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
           // page, which is exactly what she was looking at.
           // A local address nothing answers draws no frame at all, only the
           // words saying so: behind a refusal the frame holds an error page.
-          // Beside the notes the page is drawn whole and the box scrolls, so a
-          // pin stays on its spot (NotesSidebar draws the pins into the sheet).
           resolved ? (url
             ? <div className={`preview-frame${aside ? ' doc-pin-scroll' : ''}`} aria-busy={!frameReady}>
               {app.local
