@@ -495,8 +495,11 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   // out when the search, a filter or the sort changes, not when a cell does, so
   // a row typed into does not jump out from under the caret.
   const [doc, setDoc] = useState<Doc>(() => ({ from: base, table: base, order: ids(base.rows.length) }));
-  let live = doc;
-  if (doc.from !== base) { live = { from: base, table: base, order: viewOrder(base, searched, picked, sort) }; setDoc(live); }
+  // A new table is drawn at once and kept just after the paint. Kept during the
+  // draw instead, it never settled when the message around it redrew in the same paint.
+  const fresh = useMemo<Doc | null>(() => (doc.from === base ? null : { from: base, table: base, order: viewOrder(base, searched, picked, sort) }), [base, doc.from]); // eslint-disable-line react-hooks/exhaustive-deps
+  const live = fresh ?? doc;
+  useLayoutEffect(() => { if (fresh) setDoc(fresh); }, [fresh]);
   const { table, order } = live;
   const docRef = useRef(live);
   docRef.current = live;
