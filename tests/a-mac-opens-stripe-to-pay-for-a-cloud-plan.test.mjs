@@ -148,10 +148,10 @@ describe('billing', () => {
 });
 
 describe('which plan this Mac is on', () => {
-  it('no plan until paid, then the plan Stripe says', async () => {
+  it('the free hours until paid, then the plan Stripe says', async () => {
     const gw = await start();
     await signIn();
-    expect(await cloudPlan({ env, home })).toMatchObject({ signedIn: true, plan: 'none', agents: 0 });
+    expect(await cloudPlan({ env, home })).toMatchObject({ signedIn: true, plan: 'free', agents: 2, hoursPerMonth: 5 });
     await pays(gw, 'max');
     expect(await cloudPlan({ env, home })).toMatchObject({ signedIn: true, plan: 'max', unlimited: true, hoursPerMonth: 3000 });
   });

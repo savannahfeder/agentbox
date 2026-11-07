@@ -9,6 +9,7 @@ import type { BridgeStateEvent } from './task-remote-control.mts';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mts';
 import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
+import { CloudServerWatch, serverError } from './cloud-server-down.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
 import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
@@ -1222,6 +1223,7 @@ export class Supervisor {
   declare onShipped: () => void;
   declare shipQueue: ShipQueue;
   declare mainTests: MainTests;
+  declare cloudServerWatch: Pick<CloudServerWatch, 'down' | 'up'>;
   declare sessions: Map<string, WorkerSession>;
   declare onChange: (() => void) | null;
   declare onRecovered: ((news: RecoveryNews) => void) | null;
@@ -1444,6 +1446,7 @@ export class Supervisor {
     // agent has ended its turn, so main was red for four days in October with
     // nobody reading the cross (main/main-went-red.mts).
     this.mainTests = new MainTests({ store, userDir });
+    this.cloudServerWatch = new CloudServerWatch({ store, userDir, home: config?.home || undefined });
     this._compactionJobs = new Map();
     this.sessions = new Map(); // itemId -> {child, product, startedAt, tail, itemId}
     // Spawns waiting on their row's folder, and folders made for the spawn that
@@ -6673,6 +6676,7 @@ export class Supervisor {
     const h = (this._cloudHealth ??= { faults: 0, lastError: null, restUntil: 0 });
     if (session.sessionId != null || session.result != null) {
       Object.assign(h, { faults: 0, lastError: null, restUntil: 0 });
+      this.cloudServerWatch?.up();
       return;
     }
     if (!signal && code === 0) return;
@@ -6687,7 +6691,11 @@ export class Supervisor {
     h.faults += 1;
     this._startBudget.failed();
     h.lastError = said || `a cloud run ended (${signal || code}) before its agent started`;
-    if (h.faults >= CLOUD_FAULTS_TO_REST) h.restUntil = Date.now() + CLOUD_REST_MS;
+    if (h.faults >= CLOUD_FAULTS_TO_REST) {
+      h.restUntil = Date.now() + CLOUD_REST_MS;
+      const broke = serverError(session.tail);
+      if (broke) this.cloudServerWatch?.down(broke, h.faults);
+    }
     this.onChange?.();
   }
 
@@ -6708,7 +6716,8 @@ export class Supervisor {
       }
       const n = (this._cloudStartFails.get(item.id) ?? 0) + 1;
       this._cloudStartFails.set(item.id, n);
-      keep = n >= CLOUD_STARTS_TO_GIVE_UP;
+      // A server that errored is not mended by starting this thread there again.
+      keep = !!serverError(session.tail) || n >= CLOUD_STARTS_TO_GIVE_UP;
     }
     if (!keep) return false;
     this._cloudStartFails.delete(item.id);

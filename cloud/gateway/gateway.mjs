@@ -10,7 +10,7 @@
 // in tests, and behind a plain HTTP server (gatewayServer).
 import crypto from 'node:crypto';
 import http from 'node:http';
-import { PLANS, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE } from './plans.mjs';
+import { FREE, PLANS, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE } from './plans.mjs';
 import { TERMS_VERSION } from './terms.mjs';
 import { LOGIN_NAME } from '../../shared/cloud-login-name.mjs';
 import { Name } from '../../shared/product-name.mjs';
@@ -121,7 +121,7 @@ export function memoryObjects() {
   };
 }
 
-export function createGateway({ agentcore, links, removeObject, objects, whoIs, stripe = null, now = Date.now, plans = PLANS, termsVersion = TERMS_VERSION, storageBytes = STORAGE_BYTES, log = () => {},
+export function createGateway({ agentcore, links, removeObject, objects, whoIs, stripe = null, now = Date.now, plans = PLANS, free = FREE, termsVersion = TERMS_VERSION, storageBytes = STORAGE_BYTES, log = () => {},
   // The phone's replies with the computer shut (./phone.mjs): { db, runFiles, sendPush }.
   phone = null,
   // The database (./phone.mjs supabaseRest), where who is subscribed is read
@@ -146,7 +146,13 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   const live = (rec, kind) => Object.values(rec.live).filter((s) => s.kind === kind);
   // A run going counts against this month only for its time in this month.
   const usedNow = (rec, t) => (rec.used[month(t)] || 0) + live(rec, 'run').reduce((sum, s) => sum + (t - Math.max(s.at, monthStart(t))) / 1000, 0);
-  const overHours = (rec, t) => planOf(rec).hoursPerMonth != null && usedNow(rec, t) >= planOf(rec).hoursPerMonth * 3600;
+  // With no plan, runs spend the free hours instead, which never come back.
+  const onFree = (rec) => !planOf(rec).agents;
+  const freeUsedNow = (rec, t) => (rec.freeUsed || 0) + live(rec, 'run').filter((s) => s.free).reduce((sum, s) => sum + (t - s.at) / 1000, 0);
+  const freeSpent = (rec, t) => freeUsedNow(rec, t) >= free.hours * 3600;
+  const overHours = (rec, t) => (onFree(rec) ? freeSpent(rec, t) : planOf(rec).hoursPerMonth != null && usedNow(rec, t) >= planOf(rec).hoursPerMonth * 3600);
+  // A run a cancelled plan started does not carry on on the free hours.
+  const outOfPlan = (rec, s) => onFree(rec) && !s.free;
 
   // Ending a session in the ledger: its time charged to each month it ran
   // in, and, in the same write, its stop and its record owed. `update` makes
@@ -156,12 +162,13 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     delete rec.live[sid];
     rec.retired = { ...(rec.retired || {}), [sid]: at };
     const charged = s.kind === 'run' && why !== 'not-started';
-    if (charged) for (const [m, secs] of secondsByMonth(s.at, at)) rec.used[m] = (rec.used[m] || 0) + secs;
+    if (charged && s.free) rec.freeUsed = (rec.freeUsed || 0) + Math.max(0, (at - s.at) / 1000);
+    else if (charged) for (const [m, secs] of secondsByMonth(s.at, at)) rec.used[m] = (rec.used[m] || 0) + secs;
     if (!stoppingOf(rec).some((e) => e.sid === sid)) rec.stopping = [...stoppingOf(rec), { sid, tries: 0 }];
     if (charged) {
       rec.unrecorded = [...(rec.unrecorded || []), {
         key: `ledger/runs/${ctx.person}/${month(at)}/${sid}-${s.at}.json`,
-        sessionId: sid, runId: s.runId, startedAt: s.at, endedAt: at, seconds: Math.max(0, Math.round((at - s.at) / 1000)), why,
+        sessionId: sid, runId: s.runId, startedAt: s.at, endedAt: at, seconds: Math.max(0, Math.round((at - s.at) / 1000)), why, ...(s.free ? { free: true } : {}),
       }];
     }
     ctx.ended.push(sid);
@@ -171,9 +178,10 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   function settle(rec, ctx, t) {
     rec.retired = Object.fromEntries(Object.entries(rec.retired || {}).filter(([, at]) => t - at < RETIRED_MS));
     for (const [sid, s] of Object.entries(rec.live)) if (t - s.at >= ceilingOf(s)) end(rec, ctx, sid, s.at + ceilingOf(s), 'ceiling');
-    if (overHours(rec, t)) for (const [sid, s] of Object.entries(rec.live)) if (s.kind === 'run') end(rec, ctx, sid, t, 'hours');
+    const over = overHours(rec, t);
+    for (const [sid, s] of Object.entries(rec.live)) if (s.kind === 'run' && (over || outOfPlan(rec, s))) end(rec, ctx, sid, t, 'hours');
   }
-  const needsSettling = (rec, t) => Object.values(rec.live).some((s) => t - s.at >= ceilingOf(s)) || (live(rec, 'run').length > 0 && overHours(rec, t));
+  const needsSettling = (rec, t) => Object.values(rec.live).some((s) => t - s.at >= ceilingOf(s)) || live(rec, 'run').some((s) => outOfPlan(rec, s)) || (live(rec, 'run').length > 0 && overHours(rec, t));
 
   // Read, change and write one person's record; a write that lost a race
   // reads again, so two starts can never both take the last agent.
@@ -285,6 +293,8 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       plan: plans[rec.plan] ? rec.plan : 'none', unlimited: !!plan.unlimited, agents: plan.unlimited ? null : plan.agents, hoursPerMonth: plan.hoursPerMonth, running: live(rec, 'run').length, usedSeconds: rec.used[month(t)] || 0, month: month(t),
       billing: whoBills(rec),
       terms: { accepted: rec.terms?.version ?? null, current: termsVersion },
+      // Apart from the plan, so an app from before the free hours still reads no plan.
+      ...(onFree(rec) ? { free: { agents: free.agents, hours: free.hours, usedSeconds: Math.min(free.hours * 3600, Math.round(rec.freeUsed || 0)) } } : {}),
     };
   }
 
@@ -304,16 +314,20 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (kind === 'run') {
       const plan = planOf(rec);
       if (paused) return { ok: false, error: 'paused', message: 'The cloud is not starting new runs right now.' };
-      if (!plan.agents) return { ok: false, error: 'plan', message: 'Choose a cloud plan to run agents there.' };
-      if (overHours(rec, t)) return { ok: false, error: 'hours', message: `This month's ${plan.hoursPerMonth} cloud hours are used.` };
-      if (live(rec, 'run').length >= plan.agents) {
-        return { ok: false, error: 'agents', message: plan.unlimited ? `${plan.agents} cloud agents are running, the most one account can run at once.` : `All ${plan.agents} of your cloud agents are running.` };
+      if (onFree(rec)) {
+        if (freeSpent(rec, t)) return { ok: false, error: 'plan', message: `Your ${free.hours} free cloud hours are used. Choose a cloud plan to keep running agents there.` };
+        if (live(rec, 'run').length >= free.agents) return { ok: false, error: 'agents', message: `Both of your free cloud agents are running.` };
+      } else {
+        if (overHours(rec, t)) return { ok: false, error: 'hours', message: `This month's ${plan.hoursPerMonth} cloud hours are used.` };
+        if (live(rec, 'run').length >= plan.agents) {
+          return { ok: false, error: 'agents', message: plan.unlimited ? `${plan.agents} cloud agents are running, the most one account can run at once.` : `All ${plan.agents} of your cloud agents are running.` };
+        }
       }
     } else if (live(rec, 'signin').length >= SIGNINS_AT_ONCE) {
       return { ok: false, error: 'signins', message: `${SIGNINS_AT_ONCE} sign-ins are already waiting.` };
     }
     const nonce = crypto.randomUUID();
-    rec.live[sid] = { kind, runId: typeof runId === 'string' ? runId : null, at: t, nonce };
+    rec.live[sid] = { kind, runId: typeof runId === 'string' ? runId : null, at: t, nonce, ...(kind === 'run' && onFree(rec) ? { free: true } : {}) };
     return { ok: true, nonce, fresh: true };
   }
 

@@ -419,11 +419,11 @@ at AgentCore's published rates. The plan limits are set from these.
   what it uses, so packing agents onto one machine would not save money.
 - AWS lets this account run 5,000 sessions at once and start 25 a second
   (checked 2026-10-13; both can be raised).
-- No free cloud (the owner's call, 2026-10-20, replacing "Free: 5 hours,
-  no card"): five hours go in half an hour with ten agents, which sells the
-  cloud short, and the moment someone reaches for it is the moment they will
-  pay. The app itself is the free part. Sign-in is the app's own sign-in
-  page.
+- Free: 5 hours once per account, no card, two agents at once (the owner,
+  2026-11-06, for the cloud launch; it replaces 2026-10-20's "no free cloud").
+  Two at once answers that call's worry, five hours gone in half an hour with
+  ten agents. The hours never come back, and a paid plan never spends them
+  (`FREE` in cloud/gateway/plans.mjs). Sign-in is the app's own sign-in page.
 
 ## Phases
 

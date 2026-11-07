@@ -14,7 +14,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { LAST_PRODUCT_KEY } from '../compose-project';
 import {
-  ENGINE_NAME, FIRST_RUN_STEP, chatChoices, chatsHeadline, installGate, listKey, previousScreen, projectsToMake, readyEngines,
+  ENGINE_NAME, FIRST_RUN_STEP, chatChoices, chatsHeadline, foundLine, installGate, listKey, previousScreen, projectsToMake, readyEngines, setupWord, signedOutEngines,
   type Engine, type Screen,
   inHomeFolder,
 } from '../first-run';
@@ -66,8 +66,9 @@ export function FirstRunFlow({ snap, home, onDone }: {
   const [leaving, setLeaving] = useState(false);
   const [ready, setReady] = useState<Engine[] | undefined>(undefined);
   const hasReady = !!ready?.length;
+  const [signedOut, setSignedOut] = useState<Engine[]>([]);
   const [setup, setSetup] = useState<{ engine: Engine; phase: string; error: string | null } | null>(null);
-  const gate = installGate(setup);
+  const gate = installGate(setup, signedOut);
   const [threads, setThreads] = useState<SessionThread[] | null>(null);
   const [chatTicks, setChatTicks] = useState<Set<string>>(new Set());
   const [cursor, setCursor] = useState(0);
@@ -83,6 +84,7 @@ export function FirstRunFlow({ snap, home, onDone }: {
       ]);
       if (!live) return;
       setReady(readyEngines([claude, codex]));
+      setSignedOut(signedOutEngines([claude, codex]));
     })();
     api.agentThreads().then((t) => { if (live) setThreads(t); }).catch(() => { if (live) setThreads([]); });
     return () => { live = false; };
@@ -149,6 +151,13 @@ export function FirstRunFlow({ snap, home, onDone }: {
     const s = await api.engineSetup('start', engine).catch(() => null);
     setSetup({ engine, phase: s?.phase ?? 'installing', error: s?.error ?? null });
   }, []);
+  const stopSetup = useCallback(() => {
+    if (setup) void api.engineSetup('cancel', setup.engine).catch(() => null);
+    setSetup(null);
+  }, [setup]);
+  const signInAgain = useCallback(() => {
+    if (setup) void api.engineSetup('again', setup.engine).catch(() => null);
+  }, [setup]);
 
   /** The folder's project, made now if it has none. `counted` says this press was already counted once. */
   const projectFor = useCallback(async (folder: string, counted = false): Promise<Project | null> => {
@@ -190,6 +199,8 @@ export function FirstRunFlow({ snap, home, onDone }: {
       if ((e.target as Element | null)?.closest('.ob-back') && (e.key === 'Enter' || e.key === ' ')) return;
       if (screen === 'welcome') {
         if (e.key === 'Enter' && hasReady) { e.preventDefault(); start(); }
+        else if (!hasReady && gate.running && e.key === 'Escape') { e.preventDefault(); stopSetup(); }
+        else if (!hasReady && gate.again && e.key === 'Enter') { e.preventDefault(); signInAgain(); }
         else if (!hasReady && !gate.running && e.key === '1') startSetup('claude');
         else if (!hasReady && !gate.running && e.key === '2') startSetup('codex');
         return;
@@ -208,7 +219,7 @@ export function FirstRunFlow({ snap, home, onDone }: {
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [screen, leaving, hasReady, gate.running, chats, cursor, start, startSetup, bringIn, leave]);
+  }, [screen, leaving, hasReady, gate.running, gate.again, chats, cursor, start, startSetup, stopSetup, signInAgain, bringIn, leave]);
 
   const cls = `ob-screen${leaving ? ' ob-leaving' : ''}`;
 
@@ -226,8 +237,13 @@ export function FirstRunFlow({ snap, home, onDone }: {
               <>
                 <h1 className="ob-big ob-in" style={{ animationDelay: '1.3s' }}>{gate.heading}</h1>
                 <div className="ob-actions ob-in" style={{ animationDelay: '1.6s', marginTop: 40 }}>
-                  <button type="button" className="ob-btn" disabled={gate.running} onClick={() => startSetup('claude')}>Install Claude Code <Key k="1" /></button>
-                  <button type="button" className="ob-btn" disabled={gate.running} onClick={() => startSetup('codex')}>Install Codex <Key k="2" /></button>
+                  {gate.running ? <>
+                    {gate.again && <button type="button" className="ob-btn" onClick={signInAgain}>Open the page again <Key k="↵" /></button>}
+                    <button type="button" className="ob-btn ob-quiet" onClick={stopSetup}>Back <Key k="esc" /></button>
+                  </> : <>
+                    <button type="button" className="ob-btn" onClick={() => startSetup('claude')}>{setupWord('claude', signedOut)} <Key k="1" /></button>
+                    <button type="button" className="ob-btn" onClick={() => startSetup('codex')}>{setupWord('codex', signedOut)} <Key k="2" /></button>
+                  </>}
                 </div>
               </>
             ) : (
@@ -248,7 +264,7 @@ export function FirstRunFlow({ snap, home, onDone }: {
             ) : ready?.length ? (
               <><span className="ob-sq" />{ready.map((engine) => ENGINE_NAME[engine]).join(' and ')} <b>ready</b></>
             ) : ready ? (
-              <><span className="ob-sq ob-off" />No coding agent <b>found</b></>
+              <><span className="ob-sq ob-off" />{foundLine(signedOut)[0]} <b>{foundLine(signedOut)[1]}</b></>
             ) : (
               <><span className="ob-sq ob-off" />Checking this computer</>
             )}

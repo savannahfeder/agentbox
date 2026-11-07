@@ -23,7 +23,7 @@ it('refreshes the account before models and uses the live plan until the login c
   write('plus');
   expect(codexAccount(home).plan).toBe('Plus');
   rememberCodexAccount(home,null);
-  expect(codexAccount(home)).toBeNull();
+  expect(codexAccount(home)).toMatchObject({email:'test@example.com',plan:'Plus'});
   expect(codexFreePlan([home])).toBeNull();
   rememberCodexAccount(home,{type:'apiKey'});
   expect(codexAccount(home).plan).toBeNull();
