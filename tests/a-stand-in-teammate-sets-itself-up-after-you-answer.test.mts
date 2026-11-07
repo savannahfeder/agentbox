@@ -11,11 +11,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { appHome } from '../main/store/home.mjs';
+import { appHome } from '../main/store/home.mts';
 import { loadStore } from '../main/store-modules.mts';
 import { Teammates } from '../main/teammates.mts';
-import { writeChat } from '../main/store/teammates-files.mjs';
-import { YOU } from '../shared/teammates.mjs';
+import { writeChat } from '../main/store/teammates-files.mts';
+import { YOU } from '../shared/teammates.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STUB = path.join(root, 'scripts', 'lib', 'stub-claude-worker.mjs');
@@ -26,9 +26,9 @@ describe('a stand-in on a teammate\'s run', () => {
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = `acct-${Math.random().toString(36).slice(2, 8)}`;
     fs.mkdirSync(path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     product = createProduct(`Shop ${Math.random().toString(36).slice(2, 8)}`);
     dir = path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID, product.id);
     const mods = await loadStore();
@@ -40,7 +40,7 @@ describe('a stand-in on a teammate\'s run', () => {
     };
     team = new Teammates(store);
     config = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'stand-in-mate-')), 'mcp.json');
-    fs.writeFileSync(config, JSON.stringify({ mcpServers: { agentbox: { command: process.execPath, args: [path.join(root, 'mcp', 'stdio.mjs')], env: { STORE_ACCOUNT_ID: process.env.STORE_ACCOUNT_ID } } } }));
+    fs.writeFileSync(config, JSON.stringify({ mcpServers: { agentbox: { command: process.execPath, args: [path.join(root, 'mcp', 'stdio.mts')], env: { STORE_ACCOUNT_ID: process.env.STORE_ACCOUNT_ID } } } }));
   });
   afterEach(() => { delete process.env.STORE_ACCOUNT_ID; });
 

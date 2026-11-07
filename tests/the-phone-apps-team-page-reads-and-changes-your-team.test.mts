@@ -4,7 +4,7 @@
 // you are signed in: its `team()` answers null (renderer/src/cloud-bridge.ts),
 // because the desktop's page asks the Mac. The team lives in the account, so
 // the phone asks the account directly, the same tables the Mac reads
-// (main/team/supabase-backend.mjs myTeams, teamPeople, listInvites, invite,
+// (main/team/supabase-backend.mts myTeams, teamPeople, listInvites, invite,
 // cancelInvite, removeMember, acceptInvite). The database's own rules decide
 // who may do what; a removal the rules turned down comes back empty and says so.
 import { describe, it, expect } from 'vitest';

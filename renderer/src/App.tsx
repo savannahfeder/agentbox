@@ -58,7 +58,7 @@ import { OpenTeammateThread } from './threads/ContinuedFrom';
 import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, teammates } from './threads/composer-rules';
 import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
-import { shownToPeople } from '../../shared/thread-cards.mjs';
+import { shownToPeople } from '../../shared/thread-cards.mts';
 import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
 import { SEE_SAID, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
@@ -94,8 +94,8 @@ import { approvalAnswered, approvalAsker, approvalReads, approvalShown } from '.
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
 import { asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
-import { filedByThePerson, wordWaits } from '../../shared/answers.mjs';
-import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
+import { filedByThePerson, wordWaits } from '../../shared/answers.mts';
+import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
 import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
@@ -127,8 +127,8 @@ import { ConnectionsPlace } from './connections/ConnectionsPlace';
 import { TeammatesContext } from './teammates/row-lead';
 import { ChatsContext, ChatsFrame, LAST_CHAT_KEY, type ChatsValue } from './teammates/ChatsColumn';
 import { queuedTeammateRun } from './teammates/chat-lines';
-import { teammateIdOf } from '../../shared/teammates.mjs';
-import { asksWho } from '../../shared/auto-route.mjs';
+import { teammateIdOf } from '../../shared/teammates.mts';
+import { asksWho } from '../../shared/auto-route.mts';
 import { RoomBoard } from './team/rooms/RoomBoard';
 import { directConversations } from './team/rooms/conversations';
 import { isPresenceCard, roomMateCards, roomMatesById } from './team/rooms/room-rules';
@@ -185,7 +185,7 @@ import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from
 import { runNowCommands } from './run-now';
 import { withOlder } from './older-threads';
 import { NO_FILTER, filterBox, isFiltering, type BoxFilter as BoxFilterState, type Harness } from './box-filter';
-import { URGENT_PRIORITY, itemPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mjs';
+import { URGENT_PRIORITY, itemPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mts';
 import { rankProducts } from './project-priority';
 import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT } from './threads-made';
 import { waitingCounts } from './threads-made';
@@ -195,14 +195,14 @@ import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, askedInLabel, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { answersInTheirChat } from './team/answers-in-the-chat';
 import type { LedgerLine } from './thread-history';
-import { dateKey, ruleIdOf, ruleLabel, runToOpen } from '../../shared/repeats.mjs';
+import { dateKey, ruleIdOf, ruleLabel, runToOpen } from '../../shared/repeats.mts';
 import { lastUsedByMate, readMateOrder, settleMateOrder, writeMateOrder, type MateOrder } from './team/everything/mate-order';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { NOT_ANSWERING, NOT_ANSWERING_MS, RESTART_IT, RESTART_IT_MS, SEND_NOT_TAKEN } from './not-answering';
 import { TEAM_WAIT_MS } from './boot-waits';
 import { signInAsk, SIGN_IN_SKIPPED } from './sign-in-ask';
-import { isNew } from '../../shared/notify-rules.mjs';
-import { closedByTheOther, closedOverWords, inMyInbox, isGivenTask, isShared, isTaskRow, heldByAPerson, runnerOf, iSpokeLast } from '../../shared/team-rules.mjs';
+import { isNew } from '../../shared/notify-rules.mts';
+import { closedByTheOther, closedOverWords, inMyInbox, isGivenTask, isShared, isTaskRow, heldByAPerson, runnerOf, iSpokeLast } from '../../shared/team-rules.mts';
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { namedCards } from './team/company';
 import { FaceHover } from './team/status';
@@ -224,11 +224,11 @@ import { teamToday, type TodayRange } from './team/today';
 import { TodayPage } from './team/TodayPage';
 import { TasksPage } from './team/TasksPage';
 import { teamTasks } from './team/tasks';
-import { shippedAtOf, shownToTeam } from '../../shared/thread-cards.mjs';
-import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shared/thread-waits.mjs';
-import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mjs';
+import { shippedAtOf, shownToTeam } from '../../shared/thread-cards.mts';
+import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shared/thread-waits.mts';
+import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mts';
 import type { ArtifactOpen } from './components/ArtifactView';
-import { fileNewsFor, newestOfFamily, stillWaiting } from '../../shared/artifact-marks.mjs';
+import { fileNewsFor, newestOfFamily, stillWaiting } from '../../shared/artifact-marks.mts';
 import { teammateThreadsFound } from './threads/teammate-thread';
 import { chatsFound } from './team/chats-found';
 import { insideGroups, type InsideGroup, type InsideGroupKey, type InsideRow } from './found-inside';
@@ -248,7 +248,7 @@ import { SAYS_UNDO, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent,
 import { SentLine } from './components/SentLine';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
-import { reachAudienceOf } from '../../shared/teammate-reach.mjs';
+import { reachAudienceOf } from '../../shared/teammate-reach.mts';
 
 const FIRST_IDEAS = ideasFor();
 
@@ -2062,7 +2062,7 @@ export default function App() {
   const multiplayer = snap?.alpha?.multiplayer !== false;
   // "Maya", "Maya and Jun": who a message from the new thread card went to.
   const firstNames = (ids: string[]) => joinNames(ids.map((id) => team?.byId.get(id)?.name?.split(/\s+/)[0]).filter(Boolean) as string[]);
-  // A SHARED ROW IS IN ONE INBOX AT A TIME (shared/team-rules.mjs). A row given
+  // A SHARED ROW IS IN ONE INBOX AT A TIME (shared/team-rules.mts). A row given
   // to a person is theirs while it is open, whatever its kind, because a task a
   // teammate handed you is waiting on you the moment it arrives. Null means
   // "not a team question", and the inbox's ordinary rules decide.
@@ -2301,7 +2301,7 @@ export default function App() {
     //
     // IT HAS TO BE A LIFT AND NOT A HIGHER SCORE, for the reason the import
     // above is one. The score is her order over her PROJECTS and a place in
-    // that order is worth a hundred item points (RANK_STEP, shared/rank.mjs),
+    // that order is worth a hundred item points (RANK_STEP, shared/rank.mts),
     // so an urgent row on her fifth project sits below an ordinary row on her
     // first, and no number she can put on one item ever changes that. That is
     // why this row exists: higher priority tasks were easy to miss.
@@ -2405,7 +2405,7 @@ export default function App() {
   // her waiting on work nothing was going to start. AND AN AGENT SHE HAS
   // REPLIED TO IS IN IT.An agent row had never been in any list but the inbox,
   // so the user's words went into somebody's terminal and their own screen was identical
-  // afterwards. The rule is `progressAfterReply` in shared/agents.mjs and it is
+  // afterwards. The rule is `progressAfterReply` in shared/agents.mts and it is
   // the same promise this list makes about everything else in it: something is
   // on this right now. It ends when the session stops, and the row is back here
   // in the inbox — the two rules read the one fact, because "one row, two tabs"
@@ -3281,7 +3281,7 @@ export default function App() {
   const [split, setSplit] = useState<number>(() => readSplit(window.localStorage));
   // The folders the open document's own product owns, so the breadcrumb reads
   // "astral › designs ›" and not the account plumbing above it. The same list
-  // main/artifact-path.mjs guesses against.
+  // main/artifact-path.mts guesses against.
   const docRoots = useMemo(() => {
     const prod = snap?.products.find((p) => p.slug === openDoc?.product) ?? null;
     if (!prod) return [];
@@ -4519,7 +4519,7 @@ export default function App() {
   // It closes the ROW and touches nothing else — no message, no signal, and the
   // session goes on waiting exactly as it was. The way back is the undo below,
   // which sends the same close with 0. The rule is `putAway` in
-  // shared/agents.mjs.
+  // shared/agents.mts.
   const closeAgentRow = useCallback(async (item: WorkItem) => {
     const agent = item.agent!;
     const key = agentKey(agent);
@@ -6974,7 +6974,7 @@ export default function App() {
   openRepeatRef.current = openRepeat;
   // HER MESSAGE, SPLIT THE SAME WAY IT WAS SPLIT WHEN SHE TYPED IT. The label is
   // derived rather than kept, so the Later row and the instruction cannot drift
-  // apart, and the next run reads the new body (main/repeats.mjs briefs it with
+  // apart, and the next run reads the new body (main/repeats.mts briefs it with
   // `rule.body`). Null when the write was refused, so the box that sent it can
   // keep her words.
   const saveRule = async (rule: RepeatRule, message: string): Promise<RepeatRule | null> => {
@@ -7033,7 +7033,7 @@ export default function App() {
   const waitsFor = (item: WorkItem) => {
     const product = team?.products.get(item.product);
     if (!team || !product || item.agent || item.status === 'done' || isTroubleRow(item) || isUpdateRow(item)) return [];
-    // A task's block has to be one its holder's Mac can look up (shared/team-tasks.mjs).
+    // A task's block has to be one its holder's Mac can look up (shared/team-tasks.mts).
     if (isTaskRow(item)) return taskBlockChoices(item.assignee ?? null, item);
     if (isDirect(product)) return [];
     return waitChoicesOf({ item, me: team.me, people: team.state.people ?? [], items, cards, nameOf: nameOfPerson });
@@ -7732,7 +7732,7 @@ export default function App() {
                      TYPED IT. The label is derived rather than kept, so the
                      Scheduled row and the instruction cannot drift apart, and
                      the run served tomorrow morning reads the new body
-                     (main/repeats.mjs briefs it with `rule.body`). */
+                     (main/repeats.mts briefs it with `rule.body`). */
                   onSave={async (message) => {
                     const fresh = await saveRule(focusedRepeat, message);
                     // The pane is holding a copy, so it has to be handed the
@@ -9121,7 +9121,7 @@ export default function App() {
                           differ constantly: it reads, searches and edits by
                           running shell commands, so a long one is the ordinary
                           case, and a patch is longer again. The one cap left is
-                          in main/codex-approvals.mjs, which says out loud how
+                          in main/codex-approvals.mts, which says out loud how
                           much it dropped, and this <pre> scrolls (styles.css). */}
                       <pre className="approval-cmd">{approvalShown(reads.body, a.tool)}</pre>
                       {/* AND WHAT ELSE THE YES OPENS, which is the half a card

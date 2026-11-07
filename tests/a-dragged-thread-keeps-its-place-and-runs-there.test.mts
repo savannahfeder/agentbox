@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { dropPlaces } from '../shared/rank.mjs';
+import { dropPlaces } from '../shared/rank.mts';
 import { sorted, rankScore, sortedEntries, entryScore, placesForDrop, overlayPlaces, PLACE_WAIT } from '../renderer/src/threads/page-rules.ts';
 import { Supervisor } from '../main/supervisor.mts';
 import { chipHome, edgeScroll, grabWithin, shiftFor, slotOffset, stays } from '../renderer/src/threads/row-drag.ts';

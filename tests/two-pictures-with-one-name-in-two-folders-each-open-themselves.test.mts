@@ -3,12 +3,12 @@
 // A long thread showed designs/w-e5f506ccb3/two-tabs-and-team/1-needs-you.png
 // in its newest message, and clicking it opened an older 1-needs-you.png the
 // same thread had shown from another folder, under the same title. Measured in
-// shared/artifact-marks.mjs: threadFiles folded any path with an already-seen
+// shared/artifact-marks.mts: threadFiles folded any path with an already-seen
 // name into that first version's `also`, so the press landed on the first path
 // said. A second path is now the same file only when one path ends with the
 // other, as a bare name or a relative path does inside a whole one.
 import { describe, it, expect } from 'vitest';
-import { filesInLines, threadFiles, versionForPath, whereAPressLands } from '../shared/artifact-marks.mjs';
+import { filesInLines, threadFiles, versionForPath, whereAPressLands } from '../shared/artifact-marks.mts';
 
 const said = (ts, note) => ({ ts, source: 'agent', patch: { note } });
 const opened = (families, path) => {

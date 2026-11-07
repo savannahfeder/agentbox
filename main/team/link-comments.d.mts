@@ -1,4 +1,4 @@
-// Types for main/team/link-comments.mjs.
+// Types for main/team/link-comments.mts.
 export type LinkComment = { token: string; source: string; name: string; byName: string; text: string; at: number };
 export type LinkThread = { product: string; thread: string };
 

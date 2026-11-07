@@ -33,7 +33,7 @@ describe('the helper resolves to this Mac', () => {
   });
 
   it('the machinery prefix encodes the account folder exactly as the store does', async () => {
-    const { encodeProjectPath } = await import('../main/store/home.mjs');
+    const { encodeProjectPath } = await import('../main/store/home.mts');
     expect(`${MACHINERY_PREFIX}agentbox`).toBe(path.join(STORE_ROOT, 'projects', encodeProjectPath(path.join(ACCOUNT_ROOT, 'agentbox'))));
   });
 });

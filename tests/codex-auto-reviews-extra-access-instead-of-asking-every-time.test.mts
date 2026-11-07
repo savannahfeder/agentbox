@@ -1,7 +1,7 @@
 // Auto sent every escalation to the person. Check the reviewer on starts and
 // resumes, while keeping Read only and explicit reviewer overrides intact.
 import { describe, expect, it } from 'vitest';
-import { codexPosture } from '../shared/codex-modes.mjs';
+import { codexPosture } from '../shared/codex-modes.mts';
 import { workerThreadParams, resumeThreadParams, createCodexWorker } from '../main/codex-session.mts';
 
 describe('Codex Auto reviews extra access', () => {

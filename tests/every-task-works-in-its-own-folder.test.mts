@@ -18,7 +18,7 @@
 // almost none, because folding the work back only happens once she approves,
 // and approval rarely lands in the same hour the session dies.
 //
-// AND IT IS NOT ONLY DISK. main/git-change.mjs photographs a run's checkout at
+// AND IT IS NOT ONLY DISK. main/git-change.mts photographs a run's checkout at
 // spawn and reads it again at exit, and says so in its own comment: "In a
 // checkout two agents share, a file the other one wrote inside this run's
 // window is inside this run's window, and no reading of the disk can tell them

@@ -13,7 +13,7 @@
 // and the window's focus does not.
 
 import { describe, it, expect } from 'vitest';
-import { atTheComputer, atTheApp, AWAY_AFTER_MS } from '../shared/notify-rules.mjs';
+import { atTheComputer, atTheApp, AWAY_AFTER_MS } from '../shared/notify-rules.mts';
 
 describe('at the computer, for the phone', () => {
   it('typing in another app is at the computer', () => {

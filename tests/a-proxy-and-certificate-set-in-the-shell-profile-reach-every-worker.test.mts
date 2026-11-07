@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { learnShellDataDirs, launchAdditions, readShellSettings } from '../main/shell-path.mjs';
+import { learnShellDataDirs, launchAdditions, readShellSettings } from '../main/shell-path.mts';
 import { harnessFor } from '../main/harnesses.mts';
 
 const hasZsh = fs.existsSync('/bin/zsh');

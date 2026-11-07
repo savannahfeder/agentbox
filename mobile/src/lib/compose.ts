@@ -8,7 +8,7 @@ import { readLastEngine, startingEngine, writeLastEngine } from '../../../render
 import { priorityValueOf, type PriorityId } from '../../../renderer/src/priority';
 import { harnessFields, harnessOf, projectsOffered, startingProject, type Harness } from '../../../renderer/src/threads/composer-rules';
 import { readLastRecipient, writeLastRecipient } from '../../../renderer/src/threads/recipient';
-import type { Engine } from '../../../shared/engines.mjs';
+import type { Engine } from '../../../shared/engines.mts';
 import type { Choices } from './actions';
 
 export interface KeptStore { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void }

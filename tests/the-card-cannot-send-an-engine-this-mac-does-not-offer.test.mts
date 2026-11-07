@@ -28,7 +28,7 @@
 // forwarded `model` RAW. So the corrected row was filed as
 // `{ engine: undefined, model: "gpt-5.6-sol" }` -- no engine at all, and the
 // other harness's slug still on it. That row is worse than the one the gate
-// refused: with no `engine` on it, `modelForEngine` in shared/engines.mjs has
+// refused: with no `engine` on it, `modelForEngine` in shared/engines.mts has
 // nothing to compare against, so the cross-harness guard in `spawnWorker` cannot
 // see it either and the row goes to `claude --model gpt-5.6-sol`. The door has
 // to refuse the model the same way it refuses the engine, and for the same
@@ -41,7 +41,7 @@ import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ENGINES } from '../shared/engines.mjs';
+import { ENGINES } from '../shared/engines.mts';
 import { engineThisMacOffers, readLastEngine } from '../renderer/src/engines.ts';
 import { Compose } from '../renderer/src/components/Compose.tsx';
 import { Supervisor } from '../main/supervisor.mts';

@@ -27,7 +27,7 @@
 // THE CODEX HALF HAS THE SAME SHAPE. `settle` takes an id and a verdict while
 // the original request sits in `open` in Agentbox's memory, and the card she is
 // shown is drawn from the same worker-writable spool file. A Codex worker's own
-// sandbox cannot reach the spool (measured, main/codex-approvals.mjs), but a
+// sandbox cannot reach the spool (measured, main/codex-approvals.mts), but a
 // CLAUDE worker on the same machine can, and one Agentbox shows both engines'
 // cards out of one directory.
 //
@@ -62,8 +62,8 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   answer, answerIsHers, approvalPublicKey, cardDigest, cardShown, listPending, spoolDir,
-} from '../main/approvals.mjs';
-import { createCodexApprovals } from '../main/codex-approvals.mjs';
+} from '../main/approvals.mts';
+import { createCodexApprovals } from '../main/codex-approvals.mts';
 import { stripTypesFlags } from '../main/strip-types.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -365,7 +365,7 @@ describe('a request rewritten under the id she is reading', () => {
 /* ================== and the same rule on the Codex side ================== */
 //
 // Here the thing holding the original is Agentbox itself: `open` in
-// main/codex-approvals.mjs, keyed by the id the card was written under. The
+// main/codex-approvals.mts, keyed by the id the card was written under. The
 // request FILE is still in the shared spool and a Claude Code worker can still
 // write there, so the card she reads and the question the turn is parked on can
 // still come apart.

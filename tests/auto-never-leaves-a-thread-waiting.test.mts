@@ -2,7 +2,7 @@
 //
 // A thread sent To Auto carries the `auto` label, and nothing starts it while
 // it does: the supervisor asks the small model who takes it first
-// (`routeTheThreads`, shared/auto-route.mjs). That makes Auto one more thing
+// (`routeTheThreads`, shared/auto-route.mts). That makes Auto one more thing
 // that could hold a thread for good, so this is held to the rules every
 // background call here keeps (CLAUDE.md, 2026-10-19): one question per thread,
 // a deadline on it, and every way it can fail ends with an agent on the thread
@@ -33,7 +33,7 @@ vi.mock('node:child_process', async (importActual) => {
 });
 
 const { Supervisor } = await import('../main/supervisor.mts');
-const { AUTO_LABEL, AGENT_WHY, NOBODY_WHY, FAILED_WHY } = await import('../shared/auto-route.mjs');
+const { AUTO_LABEL, AGENT_WHY, NOBODY_WHY, FAILED_WHY } = await import('../shared/auto-route.mts');
 
 const video = { id: 't-video', name: 'Video producer', role: null, job: 'Makes the clips.', status: 'active', paused: false, duties: [] };
 const growth = { id: 't-growth', name: 'Growth marketer', role: null, job: 'Writes the posts.', status: 'active', paused: false, duties: [] };

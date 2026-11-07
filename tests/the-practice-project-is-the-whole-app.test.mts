@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
-import { machineryPath } from '../main/store/home.mjs';
+import { machineryPath } from '../main/store/home.mts';
 import { traceLines } from '../renderer/src/terminal.ts';
 import {
   PRACTICE_ANSWER, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_ROWS, PRACTICE_SLUG, PRACTICE_TASK,
@@ -28,7 +28,7 @@ import {
 async function freshStore() {
   const account = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-practice-'));
   // AND ITS OWN APP HOME, because that is where the ledger and the session
-  // traces really live now (main/store/home.mjs) and because these tests delete
+  // traces really live now (main/store/home.mts) and because these tests delete
   // things.
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-practice-home-'));
   process.env.ASTRAL_HOME = home;
@@ -313,7 +313,7 @@ describe('putting it away at the end', () => {
 
   it('takes the machinery with it, which is where the ledger actually lives', async () => {
     // The work item ledger and the session traces are not in the product folder
-    // any more; they are under the app's own home (main/store/home.mjs). Six
+    // any more; they are under the app's own home (main/store/home.mts). Six
     // walks of them were sitting in the founder's when this was written: 168
     // ledger lines and 29 session traces, for a project whose folder held two
     // files. Deleting the visible half only would have left every one of them.

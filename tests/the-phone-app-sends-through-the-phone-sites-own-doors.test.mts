@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { phoneSlug, UNDONE } from '../renderer/src/phone-rows';
 import { phoneSender } from '../renderer/src/phone-send';
 import { planFor, runSteps } from '../mobile/src/lib/actions';
-import { madeHere } from '../shared/phone-snapshot.mjs';
+import { madeHere } from '../shared/phone-snapshot.mts';
 
 const NOW = Date.now();
 const DEV = 'a1b2c3d4e5f6';

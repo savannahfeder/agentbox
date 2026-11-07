@@ -22,8 +22,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { claudeLoginCommand, makeClaudeHome, SHARED_DIRS } from '../main/account-tooling.mjs';
-import { discoverProfiles, effectiveProfiles, forgetDiscovery } from '../main/account-discovery.mjs';
+import { claudeLoginCommand, makeClaudeHome, SHARED_DIRS } from '../main/account-tooling.mts';
+import { discoverProfiles, effectiveProfiles, forgetDiscovery } from '../main/account-discovery.mts';
 import { addClaudeAccount } from '../main/settings.mts';
 
 const root = path.resolve(path.dirname(path.dirname(fileURLToPath(import.meta.url))), '.');
@@ -64,7 +64,7 @@ describe('the folder for the next login', () => {
 
   // THE NAME IS THE SHAPE DISCOVERY LOOKS FOR, so a folder made here is found
   // again on its own even if the config entry is deleted by hand later.
-  it('is named the shape main/account-discovery.mjs already hunts for', () => {
+  it('is named the shape main/account-discovery.mts already hunts for', () => {
     const home = freshHome();
     const made = makeClaudeHome({ home });
     expect(path.basename(made.home).startsWith('.claude-')).toBe(true);

@@ -17,8 +17,8 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NEW_USER_NAME, isNewUserBuild, isSideBuild, dataFolderName } from '../shared/side-build.mjs';
-import { FRESH_USER_ENV, HOMES, runningAsAFreshUser } from '../shared/fresh-user-home.mjs';
+import { NEW_USER_NAME, isNewUserBuild, isSideBuild, dataFolderName } from '../shared/side-build.mts';
+import { FRESH_USER_ENV, HOMES, runningAsAFreshUser } from '../shared/fresh-user-home.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');

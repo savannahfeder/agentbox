@@ -13,35 +13,35 @@
 //     my teammates' private tasks doing.
 import path from 'node:path';
 import { createTeamSync, fileSyncState, MAX_MESSAGE_FILE_BYTES } from './sync.mts';
-import { createThreadShare as createThreadShareJs } from './thread-share.mjs';
-import { briefToContinue } from './continue-thread.mjs';
-import { CONTINUED_NOTE } from '../../shared/thread-continued.mjs';
-import { findFileToSend as findFileToSendJs } from './carry-files.mjs';
-import { readableSharedThreads } from '../everything-found.mjs';
-import { plainRef } from '../../shared/carried-files.mjs';
+import { createThreadShare as createThreadShareJs } from './thread-share.mts';
+import { briefToContinue } from './continue-thread.mts';
+import { CONTINUED_NOTE } from '../../shared/thread-continued.mts';
+import { findFileToSend as findFileToSendJs } from './carry-files.mts';
+import { readableSharedThreads } from '../everything-found.mts';
+import { plainRef } from '../../shared/carried-files.mts';
 import { listSharedProjects, joinSharedProject, markShared, makeDirect } from './projects.mts';
 import type { TeamRecord } from './projects.mts';
 import type { SyncBackend, SyncCard, SyncDisk, SyncReport, SyncState } from './sync.mts';
 import type { AttachmentFile, SavedAttachment } from '../save-attachments.mts';
-import type { PersonStatus } from '../../shared/team-status.mjs';
-import { GIVEN_TASK, WORK_THREAD, isTaskRow, isWorkThread, teamPeopleShown } from '../../shared/team-rules.mjs';
+import type { PersonStatus } from '../../shared/team-status.mts';
+import { GIVEN_TASK, WORK_THREAD, isTaskRow, isWorkThread, teamPeopleShown } from '../../shared/team-rules.mts';
 import { referencedFiles } from '../../shared/referenced-files.mts';
-import { shortTitle } from '../../shared/thread-title.mjs';
-import { taskTitle } from '../../shared/team-tasks.mjs';
-import { firstSentence } from '../../shared/thread-cards.mjs';
-import { cardsFor as cardsForJs } from '../../shared/thread-cards.mjs';
+import { shortTitle } from '../../shared/thread-title.mts';
+import { taskTitle } from '../../shared/team-tasks.mts';
+import { firstSentence } from '../../shared/thread-cards.mts';
+import { cardsFor as cardsForJs } from '../../shared/thread-cards.mts';
 import fs from 'node:fs';
 import { saveAttachments, attachmentMarkdown } from '../save-attachments.mts';
-import { hasLapsed, statusEnds } from '../../shared/team-status.mjs';
+import { hasLapsed, statusEnds } from '../../shared/team-status.mts';
 import QRCode from 'qrcode';
 import { createPhoneInbox } from '../phone-inbox.mts';
 import type { PhoneBackendCalls, PhoneHistoryLine, PhoneInboxOptions, PhoneItem } from '../phone-inbox.mts';
-import { PHONE_UNDO_HOLD_MS } from '../../shared/phone-undo.mjs';
-import { SNAPSHOT_LIMITS, phoneProjectsOf, phoneEligible } from '../../shared/phone-snapshot.mjs';
+import { PHONE_UNDO_HOLD_MS } from '../../shared/phone-undo.mts';
+import { SNAPSHOT_LIMITS, phoneProjectsOf, phoneEligible } from '../../shared/phone-snapshot.mts';
 import { createRooms } from './rooms.mts';
-import { noticeEndedWaits as noticeEndedWaitsJs } from './waits.mjs';
-import { handOverDepartures } from './departures.mjs';
-import { mateCard as mateCardJs, splitCards as splitCardsJs } from '../../shared/mate-cards.mjs';
+import { noticeEndedWaits as noticeEndedWaitsJs } from './waits.mts';
+import { handOverDepartures } from './departures.mts';
+import { mateCard as mateCardJs, splitCards as splitCardsJs } from '../../shared/mate-cards.mts';
 import type { RoomsBackend, RoomsOptions, RoomsState } from './rooms.mts';
 
 export interface TeamPerson {
@@ -53,7 +53,7 @@ export interface TeamPerson {
   role?: string;
   connections?: string[];
 }
-/** Somebody else's AI teammate, as their card on the team's board describes it (shared/mate-cards.mjs). */
+/** Somebody else's AI teammate, as their card on the team's board describes it (shared/mate-cards.mts). */
 export interface TeamMate { id: string; owner: string; name?: string; job?: string | null; now?: unknown; open?: boolean; running?: boolean; updatedAt?: number }
 export interface TeamRef { id: string; name: string }
 export interface TeamInvite { teamId: string; teamName: string; invitedBy: string | null; invitedByName: string | null }
@@ -302,9 +302,9 @@ const createThreadShare = createThreadShareJs as unknown as (args: {
   onChange: () => void; log: (line: string) => void; now: () => number;
 }) => ThreadShare;
 const mateCard = mateCardJs as (t: { id: string; name?: string; job?: string | null; openToTeam?: boolean }, how?: { now?: string | null; at?: number; running?: boolean }) => SyncCard;
-import { linkAddress, linkSiteFor } from '../file-link.mjs';
-import { noticeLinkComments } from './link-comments.mjs';
-import type { LinkComment } from './link-comments.mjs';
+import { linkAddress, linkSiteFor } from '../file-link.mts';
+import { noticeLinkComments } from './link-comments.mts';
+import type { LinkComment } from './link-comments.mts';
 
 const LINK_COMMENTS_EVERY_MS = 60_000;
 
@@ -380,7 +380,7 @@ export function createTeamService({
 
   // A status the owner set has run out: wipe it where it is stored, so old
   // text does not sit in the cloud. Everyone who READS it already saw it go,
-  // on their own clock (shared/team-status.mjs); this is the tidying.
+  // on their own clock (shared/team-status.mts); this is the tidying.
   async function clearLapsedStatus() {
     if (!backend || !hasLapsed(state.me?.status, now())) return;
     await backend.setStatus({ text: null, until: null });
@@ -559,7 +559,7 @@ export function createTeamService({
   }
 
   // Comments on this person's shared links, once a minute, as notes on the
-  // threads the files came from (main/team/link-comments.mjs).
+  // threads the files came from (main/team/link-comments.mts).
   let linkCommentsAt = 0;
   async function linkCommentsOnce() {
     if (!state.me || !backend?.newLinkComments || now() - linkCommentsAt < LINK_COMMENTS_EVERY_MS) return;
@@ -657,7 +657,7 @@ export function createTeamService({
       teammatesOf: phone.teammates ?? null,
       version: phone.version ?? '',
       idleMs: phone.idleMs ?? null,
-      // The lid shut: projects whose threads carry on in the cloud, and runs it started (shared/cloud-kit.mjs).
+      // The lid shut: projects whose threads carry on in the cloud, and runs it started (shared/cloud-kit.mts).
       carrying: phone.carrying ?? null,
       kitsFor: phone.kitsFor ?? null,
       adopt: phone.adopt ?? null,
@@ -778,7 +778,7 @@ export function createTeamService({
   return {
     state: () => ({ ...state, sharedFileNews: threadShare?.fileNews() ?? [], ...(rooms ? { rooms: rooms.state() } : {}) }),
     rooms,
-    /** What the desktop's banner was told arrived, for her phone's alerts (main/phone-alerts.mjs). */
+    /** What the desktop's banner was told arrived, for her phone's alerts (main/phone-alerts.mts). */
     phoneArrivals: (list: unknown[], needsYou: unknown[]) => phoneInbox?.arrivals(list, needsYou),
 
     // THREE TRIES AT START, because one dropped request left the app signed
@@ -1025,7 +1025,7 @@ export function createTeamService({
       const convo = about ? null : conversationIn(product.slug);
       if (convo) {
         store.answerItem(product.slug, convo.id, { answer: text, voice, forAgent });
-        // Who answers next is whoever did not speak last (shared/team-rules.mjs,
+        // Who answers next is whoever did not speak last (shared/team-rules.mts,
         // `inMyInbox`); the assignee stays for a Mac on an older build.
         store.teamPatch(product.slug, convo.id, { assignee: others[0] });
         onChange();
@@ -1080,7 +1080,7 @@ export function createTeamService({
     /**
      * Words to someone else's AI teammate. They go to its owner, in the record the
      * two of you share, because only its owner directs it (their copy decides
-     * whether it wakes: shared/teammate-reach.mjs).
+     * whether it wakes: shared/teammate-reach.mts).
      */
     async messageMate({ owner, mate, text }: { owner?: string; mate?: string; text?: unknown } = {}) {
       if (!state.me) throw new Error('sign in first');
@@ -1093,7 +1093,7 @@ export function createTeamService({
     /**
      * A TASK TO ONE PERSON. Its own row in the record you two share, never your
      * project, so it reaches them and no agent starts on it on either Mac
-     * (shared/team-rules.mjs). A file with a `rel` is one the words name: its
+     * (shared/team-rules.mts). A file with a `rel` is one the words name: its
      * links are pointed at the copy.
      */
     async giveTask(toIn: string | string[] | null | undefined, { title, body, priority, due, files = [], voice, visibility, visibleTo, blockedBy }: TaskInput = {}) {
@@ -1203,7 +1203,7 @@ export function createTeamService({
       return state;
     },
 
-    /** The teammates' threads this person may search, each with a stamp that changes with it (main/everything-found.mjs). */
+    /** The teammates' threads this person may search, each with a stamp that changes with it (main/everything-found.mts). */
     sharedThreads: () => readableSharedThreads({ cards: state.cards, me: state.me?.id ?? null, folders: threadShare?.folders() ?? [] }),
 
     /** Those folders, as projects the file pane can read. */
@@ -1232,7 +1232,7 @@ export function createTeamService({
       };
     },
 
-    /** The team's version line (main/version-line.mjs). Null with no team to reach. */
+    /** The team's version line (main/version-line.mts). Null with no team to reach. */
     fileVersions() {
       if (!backend?.addFileVersion || !state.team) return null;
       const teamId = state.team.id;

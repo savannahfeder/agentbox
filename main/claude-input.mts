@@ -207,7 +207,7 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
       }
     }
   });
-  // A run the app reattached to (main/hosted-run.mjs): the host has been
+  // A run the app reattached to (main/hosted-run.mts): the host has been
   // reading the stream meanwhile, and knows where the turn stands.
   child.on('input-state', (s: HostInputState | null | undefined) => {
     if (s?.closed) { closed = true; ended = true; return; }

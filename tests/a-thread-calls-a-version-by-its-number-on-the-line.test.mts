@@ -3,11 +3,11 @@
 // Sofia: a pin she made on v7 read "Pin v6·1", and Maya's note on
 // the investor update's v6 was labelled "v3". Measured from the code: the
 // thread's words counted only the versions its own lines named. With the
-// file's line (main/files-place.mjs lineFor) they say the number Files says.
+// file's line (main/files-place.mts lineFor) they say the number Files says.
 import { describe, it, expect } from 'vitest';
 import { threadEvents } from '../renderer/src/thread-history.ts';
 import { messageKind } from '../renderer/src/threads/message-kind.ts';
-import { carriedNotes, threadFiles, filesInLines, notesForTheAgent } from '../shared/artifact-marks.mjs';
+import { carriedNotes, threadFiles, filesInLines, notesForTheAgent } from '../shared/artifact-marks.mts';
 
 const agent = (ts, result) => ({ ts, source: 'agent', patch: { result } });
 const note = (ts, file) => ({ ts, source: 'founder', patch: { artifact: { do: 'note', id: `n${ts}`, file, place: { kind: 'pin', x: 0.5, y: 0.5 }, text: 'Tighten this' } } });

@@ -28,7 +28,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   askShellForAll, warmShellAnswers, forgetEngine, resolveEngine, engineKeys,
-} from '../main/engine-bin.mjs';
+} from '../main/engine-bin.mts';
 
 const HOME = '/Users/stranger';
 const never = () => false;
@@ -170,7 +170,7 @@ describe('what it seeds, and what it refuses to seed', () => {
 
   it('is what the config asks for before it resolves either engine', async () => {
     const fs = await import('node:fs');
-    const src = fs.readFileSync(new URL('../main/config.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/config.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/warmShellAnswers/);
     expect(src.indexOf('warmShellAnswers')).toBeLessThan(src.indexOf('resolveClaudeBin(config.claudeBinConfigured)'));
   });

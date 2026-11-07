@@ -1,7 +1,7 @@
 // NO TEST MAY WRITE INTO THE REAL APP HOME.
 //
 // The app's records moved out of the product folder and into the app's own home
-// (main/store/home.mjs). That home is a real path on a real Mac, and a suite
+// (main/store/home.mts). That home is a real path on a real Mac, and a suite
 // that used a temp store but the developer's actual home would quietly append
 // to her ledgers while pretending to be hermetic.
 //
@@ -43,7 +43,7 @@ process.env.AGENTBOX_CLOUD_CONFIG = path.join(home, 'no-cloud-runs-here.json');
 // NOBODY IS SIGNED IN. AGENTBOX_PERSON_ID names whoever is signed into the team
 // on this Mac; main sets it at sign-in (main/team/index.mts) so the store server
 // a worker talks through stamps every line with its author, and
-// main/store/work-items.mjs reads it. A session the app spawns for a work item
+// main/store/work-items.mts reads it. A session the app spawns for a work item
 // INHERITS it, so the suite read real machine state: tests whose premise is
 // "before anyone signs in" asserted against an identity nobody handed them.
 //

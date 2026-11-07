@@ -22,7 +22,7 @@ import { bootHeadless } from '../main/serve.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { readDeadRunTrace, traceShowsASilentDeath, STOPPED_ON_REQUEST } from '../shared/dead-run-trace.mts';
 import { Name } from '../shared/product-name.mjs';
-import { machineryPath } from '../main/store/home.mjs';
+import { machineryPath } from '../main/store/home.mts';
 import { setAppHome, clearAppHome } from './app-home.mts';
 
 const RAN = '# t\n# w-1 · spawned 2026-10-20T17:00:00.000Z · continuation (the founder answered)\n\n17:01:02  Writing the pagination.\n17:01:03  [Bash] ls\n';

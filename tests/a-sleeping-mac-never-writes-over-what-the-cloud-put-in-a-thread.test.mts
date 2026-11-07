@@ -50,7 +50,7 @@ function world({ adoptAs = () => 'busy', home = () => false } = {}) {
     runHome: (a) => home(a),
   });
   const copy = async (project = 'alpha') => (await phone.phoneThreads()).find((t) => t.project === project && t.item === 'w-1')?.snapshot;
-  // What the cloud server writes when its run answers (shared/phone-snapshot.mjs withCloudTurn).
+  // What the cloud server writes when its run answers (shared/phone-snapshot.mts withCloudTurn).
   const cloudAnswers = async () => {
     const key = `${me}:${DEV}:alpha:w-1`;
     const t = cloud.phoneThreads.get(key);

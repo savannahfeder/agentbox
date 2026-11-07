@@ -6,7 +6,7 @@
 // spoke to a computer serving the page itself, which nothing uses any more,
 // so on the hosted site it answered "unsupported". Now the web app makes its
 // own Web Push subscription and signing keys and hands them to each computer
-// as a setting (shared/web-alerts.mjs), and the computer sends its alerts to
+// as a setting (shared/web-alerts.mts), and the computer sends its alerts to
 // it beside the phone app's, by the same rules. Measured here with the
 // in-memory cloud, real keys, and the real encryption: the pushed body is
 // decrypted with the subscription's own keys.
@@ -19,9 +19,9 @@ import webpush from 'web-push';
 import ece from 'http_ece';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createPhoneInbox } from '../main/phone-inbox.mts';
-import { FOLD_MS } from '../main/phone-alerts.mjs';
-import { checkSetting } from '../shared/phone-settings.mjs';
-import { makeVapidKeys, WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY } from '../shared/web-alerts.mjs';
+import { FOLD_MS } from '../main/phone-alerts.mts';
+import { checkSetting } from '../shared/phone-settings.mts';
+import { makeVapidKeys, WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY } from '../shared/web-alerts.mts';
 
 const NOW = Date.parse('2026-10-27T12:00:00Z');
 const ENDPOINT = 'https://web.push.apple.com/QH4bAbCdEfGh0123456789';

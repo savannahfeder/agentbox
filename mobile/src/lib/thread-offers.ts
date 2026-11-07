@@ -8,8 +8,8 @@ import { liveLine, livePlace, shortSpan, shortWord, type LiveFacts } from '../..
 import { priorityIdOf, type PriorityId } from '../../../renderer/src/priority';
 import { offersRunNow } from '../../../renderer/src/run-now';
 import { updatedWord } from '../../../renderer/src/threads/summary-rules';
-import { shownPriority } from '../../../shared/rank.mjs';
-import { doneSteps, summaryOf } from '../../../shared/thread-cards.mjs';
+import { shownPriority } from '../../../shared/rank.mts';
+import { doneSteps, summaryOf } from '../../../shared/thread-cards.mts';
 
 export interface Session { startedAt: number; activity?: { id: string; label: string; detail: string; startedAt?: number }[]; helpers?: number; engine?: string; where?: string; movable?: boolean }
 // What the computer said of the thread when nothing runs on it (phone-rows.ts `waitFacts`), so waiting reads Queued.

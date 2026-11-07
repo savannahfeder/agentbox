@@ -13,7 +13,7 @@
 // that takes the request and never answers.
 import { describe, it, expect, afterEach } from 'vitest';
 import http from 'node:http';
-import { awsTransport, awsStorage } from '../main/cloud/aws.mjs';
+import { awsTransport, awsStorage } from '../main/cloud/aws.mts';
 
 let server;
 afterEach(async () => { server?.closeAllConnections?.(); await new Promise((r) => (server ? server.close(r) : r())); server = null; });
@@ -45,7 +45,7 @@ describe('a call to the cloud', () => {
 
   it('is made with a timeout that throws, not one that only warns', async () => {
     const fs = await import('node:fs');
-    const src = fs.readFileSync(new URL('../main/cloud/aws.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/cloud/aws.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/throwOnRequestTimeout: true/);
   });
 });
@@ -59,7 +59,7 @@ describe('a call to the cloud', () => {
 describe('the deadline itself', () => {
   it('is minutes, enough for a large upload and a cold start, and still a deadline', async () => {
     const fs = await import('node:fs');
-    const src = fs.readFileSync(new URL('../main/cloud/aws.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/cloud/aws.mts', import.meta.url), 'utf8');
     const ms = Number(eval(src.match(/const TIMEOUT_MS = ([^;]+);/)[1]));
     expect(ms).toBeGreaterThanOrEqual(5 * 60_000);
     expect(ms).toBeLessThanOrEqual(15 * 60_000);

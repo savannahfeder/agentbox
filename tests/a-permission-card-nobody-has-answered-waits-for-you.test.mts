@@ -11,7 +11,7 @@
 //
 // TWO CLOCKS, AND THEY DISAGREED. The engines denied a card after fifteen
 // minutes of `setTimeout`, which does not run while a machine is suspended. The
-// spool's own sweep (REQUEST_TTL_MS, main/approvals.mjs) counts `Date.now()`,
+// spool's own sweep (REQUEST_TTL_MS, main/approvals.mts) counts `Date.now()`,
 // which does. So on a box that slept the card left the screen at sixteen
 // minutes of wall time -- the log said "approval 3bf36a0e-… outlasted every
 // deadline that could have answered it" -- while the thing that was supposed to
@@ -25,7 +25,7 @@
 // sweep only ever reaps what nobody is holding up.
 //
 // Measured by driving both engines' own code: the Codex handler
-// (main/codex-approvals.mjs) and the Claude Code channel
+// (main/codex-approvals.mts) and the Claude Code channel
 // (main/approval-prompt-core.mts), with the sweep done by hand exactly as
 // `listPending` does it.
 import { describe, it, expect, vi, afterAll } from 'vitest';
@@ -34,9 +34,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { fileURLToPath } from 'node:url';
-import { createCodexApprovals } from '../main/codex-approvals.mjs';
+import { createCodexApprovals } from '../main/codex-approvals.mts';
 import { serveApprovals } from '../main/approval-prompt-core.mts';
-import { answer, approvalPublicKey, listPending, spoolDir } from '../main/approvals.mjs';
+import { answer, approvalPublicKey, listPending, spoolDir } from '../main/approvals.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (p) => fs.readFileSync(path.join(here, '..', p), 'utf8');
@@ -218,7 +218,7 @@ describe('a Claude Code card nobody has answered', () => {
 // places it is told it.
 describe('the DONE list a worker writes', () => {
   it('is told, in the brief and on the tool, that a line is a step that has finished', () => {
-    for (const source of [read('briefs/worker.md'), read('mcp/tools.mjs')]) {
+    for (const source of [read('briefs/worker.md'), read('mcp/tools.mts')]) {
       expect(source).toMatch(/step that (has )?FINISHED/i);
       expect(source).toMatch(/never before/);
     }

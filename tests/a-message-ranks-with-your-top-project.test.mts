@@ -15,7 +15,7 @@
 // own level decides where it sits among that project's threads. With no order
 // at all nothing changes, because no project has a place to borrow.
 import { describe, it, expect } from 'vitest';
-import { RANK_STEP, placeScore, productRankScore } from '../shared/rank.mjs';
+import { RANK_STEP, placeScore, productRankScore } from '../shared/rank.mts';
 import { sorted } from '../renderer/src/threads/page-rules.ts';
 
 const NOW = Date.UTC(2026, 9, 5, 17);

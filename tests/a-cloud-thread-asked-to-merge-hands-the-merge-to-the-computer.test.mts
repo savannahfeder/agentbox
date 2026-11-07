@@ -11,7 +11,7 @@
 // on Claude Code's command line, so a Codex run could not know to hand back.
 import { describe, it, expect } from 'vitest';
 import { CLOUD_NOTE, PLAIN_CLOUD_NOTE, codexLineForTheCloud } from '../main/cloud/run.mts';
-import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
+import { HAND_BACK } from '../shared/cloud-hand-back.mts';
 
 describe('what a cloud run is told about branches', () => {
   it('says only its own branch comes home, and a merge into main is handed back', () => {

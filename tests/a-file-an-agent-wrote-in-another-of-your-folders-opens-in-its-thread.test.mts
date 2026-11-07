@@ -14,8 +14,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { resolveArtifact } from '../main/artifact-path.mjs';
-import { noteAgentWrites, noteWrittenElsewhere, writtenElsewhere, writtenFileNamed, writesInClaudeLine } from '../main/store/written-elsewhere.mjs';
+import { resolveArtifact } from '../main/artifact-path.mts';
+import { noteAgentWrites, noteWrittenElsewhere, writtenElsewhere, writtenFileNamed, writesInClaudeLine } from '../main/store/written-elsewhere.mts';
 
 let root, own, direct, products;
 const put = (dir, rel, text = 'x') => {
@@ -140,15 +140,15 @@ describe('a document the agent writes with the store tool', () => {
   let tools, mine, theirs;
   const store = (p) => ({ slug: p.slug ?? p.id, name: p.name, dir: p.dir });
   beforeEach(async () => {
-    const { appHome } = await import('../main/store/home.mjs');
+    const { appHome } = await import('../main/store/home.mts');
     process.env.STORE_ACCOUNT_ID = 'acct-written';
     fs.mkdirSync(path.join(appHome(), 'accounts', 'acct-written'), { recursive: true });
-    const { resolveAccount, resolveProduct } = await import('../mcp/core/account.mjs');
+    const { resolveAccount, resolveProduct } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     mine = resolveProduct(createProduct(`Company ${Math.random().toString(36).slice(2, 7)}`).id);
     theirs = resolveProduct(createProduct(`Direct ${Math.random().toString(36).slice(2, 7)}`).id);
-    ({ tools } = (await import('../mcp/tools.mjs')).buildTools({ holder: 'test' }));
+    ({ tools } = (await import('../mcp/tools.mts')).buildTools({ holder: 'test' }));
   });
   afterEach(() => { delete process.env.STORE_ACCOUNT_ID; delete process.env.ZERO_PRODUCT; delete process.env.ZERO_ITEM; });
   const write = (product) => tools.find((t) => t.name === 'write_document').run({ product, path: 'launch-film-shot-list.md', title: 'Shot list', content: '# Shots\n' });

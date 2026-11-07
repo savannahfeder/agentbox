@@ -9,7 +9,7 @@
 // still sit unanswered after a day does not wake again until you answer or
 // close one of them, and the teammate's chat says so.
 import { describe, it, expect } from 'vitest';
-import { planWakes, teammateLabel, DEFAULT_LIMIT, UNREAD_HOLD } from '../shared/teammates.mjs';
+import { planWakes, teammateLabel, DEFAULT_LIMIT, UNREAD_HOLD } from '../shared/teammates.mts';
 
 const NOW = new Date(2026, 10, 2, 10, 0).getTime();
 const DAY = 86_400_000;

@@ -1,4 +1,4 @@
-// Types for shared/thread-waits.mjs.
+// Types for shared/thread-waits.mts.
 
 export function personWait(id: string): string;
 export function cardWait(person: string, thread: string): string;

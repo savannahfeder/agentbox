@@ -11,7 +11,7 @@
 // numbered, drawn, and read out to the agent like picture pins.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { cleanMark, marksOf, notesForTheAgent, placeWords } from '../shared/artifact-marks.mjs';
+import { cleanMark, marksOf, notesForTheAgent, placeWords } from '../shared/artifact-marks.mts';
 import { notePlaceWords, pagePins, pinned } from '../renderer/src/artifact-pins.ts';
 
 const note = (id, place, over = {}) => ({ do: 'note', id, file: 'deck.pdf', place, text: `about ${id}`, by: 'sofia', ts: Number(id.slice(1)) || 1, ...over });

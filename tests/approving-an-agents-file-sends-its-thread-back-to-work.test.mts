@@ -10,9 +10,9 @@ import { it, expect, beforeEach, describe } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
-import { noteToItsAgent } from '../main/notes-wake.mjs';
+import { noteToItsAgent } from '../main/notes-wake.mts';
 import { threadEvents } from '../renderer/src/thread-history.ts';
 
 let store, dir, thread, woke;
@@ -76,7 +76,7 @@ describe('what starts nothing', () => {
 });
 
 it('an approval from the Files page goes the same way', () => {
-  const place = fs.readFileSync(new URL('../main/files-place.mjs', import.meta.url), 'utf8');
+  const place = fs.readFileSync(new URL('../main/files-place.mts', import.meta.url), 'utf8');
   const branch = place.slice(place.indexOf("mark.do === 'note' || mark.do === 'approve'"), place.indexOf('} else return'));
   expect(branch).toMatch(/mark\.do !== 'unapprove'/);
 });

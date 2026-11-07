@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import {
   planWakes, foldTeammates, foldChat, mentionsIn, letterFor, runIdFor, waitingOnYou,
   isActiveRun, statusOf, runLines, teammateLabel, seenKey, DEFAULT_LIMIT, MAX_HOPS,
-} from '../shared/teammates.mjs';
+} from '../shared/teammates.mts';
 
 const NOW = new Date(2026, 9, 26, 9, 30).getTime(); // a Monday, after 9am
 const ada = { id: 't-aaaaaa', name: 'Ada', letter: 'A', status: 'active', paused: false, served: '2026-10-26', limit: DEFAULT_LIMIT, works: { every: 'weekday', at: '09:00' }, product: 'kestrel', memory: [] };

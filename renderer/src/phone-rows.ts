@@ -4,15 +4,15 @@
 // one copy of every rule.
 
 import { REQUEST_CHANNELS } from '../../shared/bridge-map.mts';
-import { madeHere, phoneChoices, WAIT_STATES } from '../../shared/phone-snapshot.mjs';
-import { runOfClaim } from '../../shared/cloud-kit.mjs';
-import { isCarried } from '../../shared/cloud-carry.mjs';
+import { madeHere, phoneChoices, WAIT_STATES } from '../../shared/phone-snapshot.mts';
+import { runOfClaim } from '../../shared/cloud-kit.mts';
+import { isCarried } from '../../shared/cloud-carry.mts';
 import { Name } from '../../shared/product-name.mjs';
 import { statusForReply } from './list-rules';
 import { cloudPlaces } from './cloud-files';
 
 export interface PhoneRows {
-  // `cloud`: that computer leaves its threads ready for Agentbox Cloud (shared/cloud-kit.mjs).
+  // `cloud`: that computer leaves its threads ready for Agentbox Cloud (shared/cloud-kit.mts).
   projects: { device: string; project: string; name: string; updated_at?: string; cloud?: boolean }[];
   threads: { device: string; project: string; item: string; snapshot: any; updated_at?: string }[];
   // `project` is null only on a 'setting', which is for the computer, not a thread.
@@ -142,7 +142,7 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
         activity: (Array.isArray(live.doing) ? live.doing : []).map((d: any, i: number) => ({ id: `live-${i}`, label: String(d?.label ?? ''), detail: '', startedAt: Number(d?.startedAt) || 0 })),
       });
     }
-    // Why the computer has not started it, in its own words (shared/phone-snapshot.mjs phoneWaitsOf).
+    // Why the computer has not started it, in its own words (shared/phone-snapshot.mts phoneWaitsOf).
     const wait = t.snapshot.wait;
     if (wait && typeof wait === 'object' && WAIT_STATES.includes(wait.state)) waits.set(id, wait);
   }
@@ -278,7 +278,7 @@ export async function readCommands(select: Select, now = Date.now()): Promise<Ph
   return [...waiting, ...done];
 }
 
-/** Each computer's settings as it last sent them (shared/phone-settings.mjs), newest first. */
+/** Each computer's settings as it last sent them (shared/phone-settings.mts), newest first. */
 export const readSettingsRows = (select: Select) => select('phone_settings', 'select=device,name,settings,updated_at&order=updated_at.desc&limit=20');
 
 /** A change for one computer's settings, which its own handlers carry out. */

@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { belongsInInbox, belongsInProgress } from '../renderer/src/list-rules';
-import { isCleanRun } from '../shared/repeats.mjs';
+import { isCleanRun } from '../shared/repeats.mts';
 
 const run = (over = {}) => ({
   status: 'done',

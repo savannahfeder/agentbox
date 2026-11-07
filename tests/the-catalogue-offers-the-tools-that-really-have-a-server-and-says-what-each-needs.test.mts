@@ -7,8 +7,8 @@
 // GitHub do not, and Figma lists only clients on its own catalogue, so pressing
 // Connect there could only fail. These tests hold those facts and the policy.
 import { describe, expect, it } from 'vitest';
-import { ACCESS, catalogFor, GROUPS, OWN_CLIENT_REDIRECT } from '../shared/connections-catalog.mjs';
-import { oneLineRead } from '../main/connections/talk.mjs';
+import { ACCESS, catalogFor, GROUPS, OWN_CLIENT_REDIRECT } from '../shared/connections-catalog.mts';
+import { oneLineRead } from '../main/connections/talk.mts';
 import { tilesFound, toolWords } from '../renderer/src/connections/connections-shown';
 
 const real = catalogFor({ env: {}, packaged: true });

@@ -8,10 +8,10 @@
 // draws each as a card. Measured on the lines a run writes and on which waiting
 // threads a saved sign-in frees.
 import { describe, it, expect } from 'vitest';
-import { needsIn, isNeedLine, keysOf, needsWord, connectedReply, threadsKeysFree, serviceById, SERVICES, NEED } from '../shared/cloud-needs.mjs';
-import { KEY_ASK } from '../shared/cloud-keys.mjs';
-import { handsBack } from '../shared/cloud-hand-back.mjs';
-import { keyNameRefused } from '../shared/cloud-key-names.mjs';
+import { needsIn, isNeedLine, keysOf, needsWord, connectedReply, threadsKeysFree, serviceById, SERVICES, NEED } from '../shared/cloud-needs.mts';
+import { KEY_ASK } from '../shared/cloud-keys.mts';
+import { handsBack } from '../shared/cloud-hand-back.mts';
+import { keyNameRefused } from '../shared/cloud-key-names.mts';
 
 const SIGN_IN = `${NEED} sign-in supabase | to apply the new storage rules to the Northwind database`;
 const FILE = `${NEED} file ~/Movies/launch-film-original.mov | the cut is made from the original`;

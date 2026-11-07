@@ -8,8 +8,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { changeFromTranscript, writeChangeForRun, changePath } from '../main/code-change.mjs';
-import { machineryPath } from '../main/store/home.mjs';
+import { changeFromTranscript, writeChangeForRun, changePath } from '../main/code-change.mts';
+import { machineryPath } from '../main/store/home.mts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

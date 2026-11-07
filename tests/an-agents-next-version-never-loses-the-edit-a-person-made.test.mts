@@ -17,9 +17,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
-import { filesOf } from '../main/files-place.mjs';
-import { saveNextVersion } from '../main/file-version.mjs';
+import { appHome } from '../main/store/home.mts';
+import { filesOf } from '../main/files-place.mts';
+import { saveNextVersion } from '../main/file-version.mts';
 
 let tools; let product; let dir; let store; let row;
 
@@ -46,16 +46,16 @@ const editByHand = (words) => {
 beforeEach(async () => {
   process.env.STORE_ACCOUNT_ID = 'acct-no-lost-edit';
   fs.mkdirSync(path.join(appHome(), 'accounts', 'acct-no-lost-edit'), { recursive: true });
-  (await import('../mcp/core/account.mjs')).resolveAccount();
-  const { createProduct } = await import('../mcp/core/products.mjs');
+  (await import('../mcp/core/account.mts')).resolveAccount();
+  const { createProduct } = await import('../mcp/core/products.mts');
   product = createProduct(`Company ${Math.random().toString(36).slice(2, 8)}`);
   dir = path.join(appHome(), 'accounts', 'acct-no-lost-edit', product.id);
-  const work = await import('../mcp/core/work.mjs');
-  store = await import('../main/store/work-items.mjs');
+  const work = await import('../mcp/core/work.mts');
+  store = await import('../main/store/work-items.mts');
   row = work.createItem(product.id, { title: 'Write the YC application', labels: ['founder'] }, { source: 'founder' });
   process.env.ZERO_PRODUCT = product.id;
   process.env.ZERO_ITEM = row.id;
-  ({ tools } = (await import('../mcp/tools.mjs')).buildTools({ holder: 'test-worker', ownItem: row.id }));
+  ({ tools } = (await import('../mcp/tools.mts')).buildTools({ holder: 'test-worker', ownItem: row.id }));
   await write({ path: 'yc/application.md', title: 'YC application', content: draft(ONE_LINER) });
 });
 afterEach(() => { delete process.env.STORE_ACCOUNT_ID; delete process.env.ZERO_PRODUCT; delete process.env.ZERO_ITEM; });

@@ -9,19 +9,19 @@
 // of that line gave "Task for Sofia", and `taskBlocks` dropped any block that
 // was not a person or a card.
 import { describe, it, expect } from 'vitest';
-import { pickFields } from '../shared/work-items.mjs';
-import { dayDeadline, dueFromWords, dueSaid, taskTitle, taskBlocks, blockedWords, endedTaskBlocks } from '../shared/team-tasks.mjs';
-import { nameWait, waitParts } from '../shared/thread-waits.mjs';
+import { pickFields } from '../shared/work-items.mts';
+import { dayDeadline, dueFromWords, dueSaid, taskTitle, taskBlocks, blockedWords, endedTaskBlocks } from '../shared/team-tasks.mts';
+import { nameWait, waitParts } from '../shared/thread-waits.mts';
 import { dueWords as cardDueWords } from '../renderer/src/threads/composer-rules.ts';
 import { dueWords as rowDueWords } from '../renderer/src/team/company.ts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
+import { memorySession } from '../main/team/session.mts';
 
 async function aMac(cloud, personId) {
   const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'task-fields-'));

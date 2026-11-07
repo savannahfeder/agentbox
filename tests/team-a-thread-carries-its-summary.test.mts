@@ -8,7 +8,7 @@
 // these fields go to whoever wrote last. Visibility is the person's: team or
 // private, per thread.
 import { describe, it, expect } from 'vitest';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 
 const T = 1_000_000;
 const line = (ts, source, patch) => ({ id: 'w-1', ts, source, patch });

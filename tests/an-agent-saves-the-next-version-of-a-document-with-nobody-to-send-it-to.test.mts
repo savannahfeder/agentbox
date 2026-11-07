@@ -13,13 +13,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
-import { filesOf } from '../main/files-place.mjs';
+import { appHome } from '../main/store/home.mts';
+import { filesOf } from '../main/files-place.mts';
 
 let tools; let product; let dir; let work; let store; let row;
 
 const build = async (ownItem) => {
-  ({ tools } = (await import('../mcp/tools.mjs')).buildTools({ holder: 'test-worker', ownItem }));
+  ({ tools } = (await import('../mcp/tools.mts')).buildTools({ holder: 'test-worker', ownItem }));
 };
 const write = (fields) => tools.find((t) => t.name === 'write_document').run({ product: product.id, ...fields });
 const said = (r) => JSON.parse(r.content[0].text);
@@ -29,13 +29,13 @@ const inFiles = () => filesOf([{ ref: { kind: 'thread', product: product.id, id:
 beforeEach(async () => {
   process.env.STORE_ACCOUNT_ID = 'acct-next-version';
   fs.mkdirSync(path.join(appHome(), 'accounts', 'acct-next-version'), { recursive: true });
-  const { resolveAccount } = await import('../mcp/core/account.mjs');
+  const { resolveAccount } = await import('../mcp/core/account.mts');
   resolveAccount();
-  const { createProduct } = await import('../mcp/core/products.mjs');
+  const { createProduct } = await import('../mcp/core/products.mts');
   product = createProduct(`Company ${Math.random().toString(36).slice(2, 8)}`);
   dir = path.join(appHome(), 'accounts', 'acct-next-version', product.id);
-  work = await import('../mcp/core/work.mjs');
-  store = await import('../main/store/work-items.mjs');
+  work = await import('../mcp/core/work.mts');
+  store = await import('../main/store/work-items.mts');
   row = work.createItem(product.id, { title: 'Fix the Summary of the investor update', labels: ['founder'] }, { source: 'founder' });
   process.env.ZERO_PRODUCT = product.id;
   process.env.ZERO_ITEM = row.id;
@@ -88,7 +88,7 @@ describe('write_document without versionOf', () => {
 describe('what an agent is told', () => {
   const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
   it('write_document offers versionOf, and the rules say a revision is the next version', () => {
-    expect(read('mcp/tools.mjs')).toMatch(/name: 'write_document'[\s\S]*?versionOf: z\.string\(\)\.optional\(\)[\s\S]*?name: 'list_skills'/);
+    expect(read('mcp/tools.mts')).toMatch(/name: 'write_document'[\s\S]*?versionOf: z\.string\(\)\.optional\(\)[\s\S]*?name: 'list_skills'/);
     expect(read('briefs/message-rules.md')).toMatch(/A CHANGE TO A FILE SOMEONE ALREADY HAS IS ITS NEXT VERSION/);
   });
 });

@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { saveNextVersion } from '../main/file-version.mjs';
+import { saveNextVersion } from '../main/file-version.mts';
 import { keptDraft } from '../renderer/src/edit-sitting.ts';
 
 const doc = (a, b = 'b', c = 'c') => `${a}\n\n${b}\n\n${c}\n`;

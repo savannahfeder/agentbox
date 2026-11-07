@@ -13,7 +13,7 @@ import { fixtureAgents, fixtureSnapshot, fixtureDashboards, fixtureRepeats, fixt
 import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine } from './fixtures';
 import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
-import type { CarryState } from '../../shared/carried-files.mjs';
+import type { CarryState } from '../../shared/carried-files.mts';
 
 export interface FileLinkAsk { product: string; thread: string; src: string }
 /** `current`: the link holds the copy of the file on screen now. */
@@ -29,8 +29,8 @@ import { USAGE_SAME_AS_ANOTHER, USAGE_UNREADABLE } from '../../shared/usage.mts'
 import { accountSentence } from '../../shared/spawn-trouble.mts';
 import { MOVE_SAY } from '../../shared/where-it-runs-from.mts';
 import { cardsInFront } from '../../shared/which-card-is-in-front.mts';
-import { snapshotReader } from '../../shared/snapshot-delta.mjs';
-import { traceReader } from '../../shared/trace-delta.mjs';
+import { snapshotReader } from '../../shared/snapshot-delta.mts';
+import { traceReader } from '../../shared/trace-delta.mts';
 // THE SECOND FRONT DOOR, AND IT HAS TO BE BUILT BEFORE THE LINE BELOW RUNS.
 // `useFixtures` reads `window.zero` once, at module load, and on the desktop
 // preload.cjs has already put it there. In a browser tab nothing has, so this
@@ -450,7 +450,7 @@ export const api = {
       // be looked at.
       if (params.has('stale')) {
         base.restartNeeded = {
-          files: ['main/supervisor.mts', 'main/ipc.mts', 'preload.cjs', 'shared/rank.mjs'],
+          files: ['main/supervisor.mts', 'main/ipc.mts', 'preload.cjs', 'shared/rank.mts'],
           since: Date.now() - 2.9 * 24 * 3_600_000,
         };
       }
@@ -728,7 +728,7 @@ export const api = {
     return zero.readDoc(p);
   },
 
-  /** A link anyone can open, to one of this person's files (main/file-link.mjs). */
+  /** A link anyone can open, to one of this person's files (main/file-link.mts). */
   async fileLink(p: FileLinkAsk): Promise<FileLinkState> {
     const zero = window.zero as any;
     if (!zero?.fileLink) return { ok: false, error: 'not here' };
@@ -937,7 +937,7 @@ export const api = {
     if (!window.zero?.teamThreadWork) return { shared: false, lines: [], earlier: 0, product: null, dir: null };
     return window.zero.teamThreadWork(p);
   },
-  // Lines, files and comments inside threads (main/everything-found.mjs).
+  // Lines, files and comments inside threads (main/everything-found.mts).
   async findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number } }): Promise<FoundInThreads> {
     const none: FoundInThreads = { lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 } };
     if (!window.zero?.findInThreads) return none;
@@ -1100,7 +1100,7 @@ export const api = {
     return window.zero!.compose(p);
   },
 
-  /** Who takes a thread sent to Auto: 'agent' or a teammate as 'mate:<id>' (shared/auto-route.mjs). */
+  /** Who takes a thread sent to Auto: 'agent' or a teammate as 'mate:<id>' (shared/auto-route.mts). */
   async routeThread(p: { product: string; id: string; to: string }): Promise<void> {
     if (useFixtures || !window.zero?.routeThread) return;
     await window.zero.routeThread(p);
@@ -1227,7 +1227,7 @@ export const api = {
   // ledger. Nothing is sent and no process is touched — the moment says when
   // her inbox raises the agent again, and 0 brings it back now. The key is the
   // agent's, not the row's, because the row's id carries a pid and a pid is not
-  // an identity (shared/agents.mjs).
+  // an identity (shared/agents.mts).
   async scheduleAgent(p: { key: string; runAt: number }): Promise<{ ok: boolean; runAt: number }> {
     if (useFixtures) return { ok: true, runAt: p.runAt };
     const out = await (window.zero as any)?.scheduleAgent?.(p);
@@ -1265,7 +1265,7 @@ export const api = {
   // the draft: a refused rule that also eats what the user typed is two failures.
   // `engine` and `model` ride beside the rule rather than inside it: they are
   // hers about the WORK, not about the schedule, and `isRepeatRule` in
-  // shared/repeats.mjs validates the schedule shape and would refuse a rule
+  // shared/repeats.mts validates the schedule shape and would refuse a rule
   // object carrying anything else.
   async composeRepeat(p: {
     product: string; title: string; body?: string; priority?: number; rule: RepeatShape;
@@ -1281,7 +1281,7 @@ export const api = {
     // answer null, so in the fixture app the box would take the words, close,
     // and redraw the old instruction — a demo of the fix that showed the bug.
     // There is no store behind this and nothing claims there is; the fold is
-    // the same one main/repeats.mjs does.
+    // the same one main/repeats.mts does.
     if (useFixtures) {
       const rule = (fixtureRepeats as unknown as RepeatRule[]).find((r) => r.id === p.id);
       if (!rule) return null;

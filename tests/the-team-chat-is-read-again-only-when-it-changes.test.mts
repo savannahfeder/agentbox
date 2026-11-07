@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readChat, writeChat } from '../main/store/teammates-files.mjs';
+import { readChat, writeChat } from '../main/store/teammates-files.mts';
 
 describe('reading the team chat', () => {
   it('sees every new line, and hands each reader a list of its own', () => {

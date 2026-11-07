@@ -19,9 +19,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { isPlainMerge, mergeHome, mergedSentence } from '../main/cloud/merge-home.mjs';
+import { isPlainMerge, mergeHome, mergedSentence } from '../main/cloud/merge-home.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
+import { HAND_BACK } from '../shared/cloud-hand-back.mts';
 
 const dirs = [];
 const tmp = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'merge-home-')); dirs.push(d); return d; };

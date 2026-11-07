@@ -9,8 +9,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   RUN_MIN, groupWork, plainCommand, runFailures, runSummary, shortPath, workSubject, workVerb,
-} from '../shared/agents.mjs';
-import { fullSubject } from '../shared/work-lines.mjs';
+} from '../shared/agents.mts';
+import { fullSubject } from '../shared/work-lines.mts';
 
 const ZERO = '/Users/you/Desktop/dev/zero';
 
@@ -56,7 +56,7 @@ describe('a path, shown from the end', () => {
   it('is relative inside the folder the session runs in', () => {
     expect(shortPath(`${ZERO}/renderer/src/components/Tweaks.tsx`, ZERO))
       .toBe('…/src/components/Tweaks.tsx');
-    expect(shortPath(`${ZERO}/shared/agents.mjs`, ZERO)).toBe('shared/agents.mjs');
+    expect(shortPath(`${ZERO}/shared/agents.mts`, ZERO)).toBe('shared/agents.mts');
     expect(shortPath(`${ZERO}/CLAUDE.md`, ZERO)).toBe('CLAUDE.md');
   });
 
@@ -119,7 +119,7 @@ describe('a command, with the scaffolding off the front', () => {
 describe('the subject, and the whole of it', () => {
   it('shortens the command and the path, and leaves the rest', () => {
     expect(workSubject({ command: `cd ${ZERO} && npm test` }, ZERO)).toBe('npm test');
-    expect(workSubject({ file_path: `${ZERO}/shared/agents.mjs` }, ZERO)).toBe('shared/agents.mjs');
+    expect(workSubject({ file_path: `${ZERO}/shared/agents.mts` }, ZERO)).toBe('shared/agents.mts');
     expect(workSubject({ to: 'agentbox-a1' }, ZERO)).toBe('agentbox-a1');
     expect(workSubject({}, ZERO)).toBe('');
     expect(workSubject(null, ZERO)).toBe('');
@@ -128,7 +128,7 @@ describe('the subject, and the whole of it', () => {
   it('can still hand back every character it shortened', () => {
     const command = `cd ${ZERO} && npm test`;
     expect(fullSubject({ command })).toBe(command);
-    expect(fullSubject({ file_path: `${ZERO}/shared/agents.mjs` })).toBe(`${ZERO}/shared/agents.mjs`);
+    expect(fullSubject({ file_path: `${ZERO}/shared/agents.mts` })).toBe(`${ZERO}/shared/agents.mts`);
   });
 });
 

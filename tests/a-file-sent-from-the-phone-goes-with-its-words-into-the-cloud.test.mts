@@ -9,7 +9,7 @@
 // Now the server checks each file is what its name says, has the sandbox
 // fetch it into the project's documents folder, and links her words to it
 // there before they reach the agent. The computer saves the same file under
-// the same name (shared/phone-files.mjs), so the turn the cloud ran and the
+// the same name (shared/phone-files.mts), so the turn the cloud ran and the
 // row the computer keeps link one file, and her own copy on the phone keeps
 // the phone's link.
 import { describe, it, expect } from 'vitest';
@@ -17,9 +17,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { KIT_VERSION, NEW_THREAD, NEW_ITEM_MARK, NEW_TITLE_MARK, NEW_BODY_MARK, kitKey, newThreadKitKey, runOfClaim } from '../shared/cloud-kit.mjs';
-import { phoneFilesIn, phoneAttachmentRel, linkPhoneFiles, PHONE_FILES_MAX } from '../shared/phone-files.mjs';
-import { threadSnapshot, madeHere } from '../shared/phone-snapshot.mjs';
+import { KIT_VERSION, NEW_THREAD, NEW_ITEM_MARK, NEW_TITLE_MARK, NEW_BODY_MARK, kitKey, newThreadKitKey, runOfClaim } from '../shared/cloud-kit.mts';
+import { phoneFilesIn, phoneAttachmentRel, linkPhoneFiles, PHONE_FILES_MAX } from '../shared/phone-files.mts';
+import { threadSnapshot, madeHere } from '../shared/phone-snapshot.mts';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';

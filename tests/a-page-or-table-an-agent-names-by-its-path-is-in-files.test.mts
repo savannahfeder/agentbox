@@ -11,10 +11,10 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
-import { appFilesPlace } from '../main/files-place.mjs';
-import { otherFilesInLines } from '../shared/artifact-marks.mjs';
+import { appFilesPlace } from '../main/files-place.mts';
+import { otherFilesInLines } from '../shared/artifact-marks.mts';
 
 const found = (text, source = 'agent') => otherFilesInLines([{ ts: 1, source, patch: { result: text } }]).map((f) => f.path);
 const DIR = '/Users/x/Zero/accounts/a/app';
@@ -38,7 +38,7 @@ describe('a page or table an agent names bare', () => {
   });
 
   it('counts no script named bare, which a sentence about code names all the time', () => {
-    expect(found('I changed main/files-place.mjs and scripts/ship.sh.')).toEqual([]);
+    expect(found('I changed main/files-place.mts and scripts/ship.sh.')).toEqual([]);
   });
 
   it('counts no bare path in a person\'s own words, only what they attached', () => {

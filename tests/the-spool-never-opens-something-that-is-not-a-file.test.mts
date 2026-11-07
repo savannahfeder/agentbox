@@ -29,7 +29,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { listPending, spoolDir, MAX_REQUEST_BYTES } from '../main/approvals.mjs';
+import { listPending, spoolDir, MAX_REQUEST_BYTES } from '../main/approvals.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, '..');
@@ -57,7 +57,7 @@ describe('a named pipe wearing a request file\'s name', () => {
     const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-probe-'));
     dirs.push(probeDir);
     const probe = path.join(probeDir, 'probe.mjs');
-    fs.writeFileSync(probe, `import { listPending } from ${JSON.stringify(path.join(repo, 'main', 'approvals.mjs'))};\n`
+    fs.writeFileSync(probe, `import { listPending } from ${JSON.stringify(path.join(repo, 'main', 'approvals.mts'))};\n`
       + 'process.stdout.write(JSON.stringify(listPending(process.argv[2]).map((r) => r.id)));\n');
     const ran = spawnSync(process.execPath, [probe, root], { timeout: 8_000, encoding: 'utf8' });
 
@@ -94,7 +94,7 @@ describe('a request file that is really a link to one of hers', () => {
 
   it('reads a request right up to the size a real one could be', () => {
     // The case that must NOT match: the cap is a guard against a worker filling
-    // memory, never a reason to drop a card. main/codex-approvals.mjs already
+    // memory, never a reason to drop a card. main/codex-approvals.mts already
     // cuts a card's text at CARD_CAP (4,000 characters), so anything near the
     // cap here is far past any honest request.
     const { root, dir } = spool();

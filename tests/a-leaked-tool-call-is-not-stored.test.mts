@@ -15,8 +15,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { unleaked } from '../shared/agents.mjs';
-import { appHome } from '../main/store/home.mjs';
+import { unleaked } from '../shared/agents.mts';
+import { appHome } from '../main/store/home.mts';
 
 describe('the cut itself', () => {
   it('takes the machinery off the end of a real result', () => {
@@ -66,12 +66,12 @@ describe('the write an agent makes', () => {
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = 'acct';
     fs.mkdirSync(path.join(home, 'accounts', 'acct'), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     product = createProduct('Copytest');
-    work = await import('../mcp/core/work.mjs');
-    store = await import('../main/store/work-items.mjs');
+    work = await import('../mcp/core/work.mts');
+    store = await import('../main/store/work-items.mts');
   });
 
   afterEach(() => { delete process.env.STORE_ACCOUNT_ID; });

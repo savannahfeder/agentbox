@@ -8,10 +8,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { cloudConfigPath, readCloudConfig, readCloudKey, writeCloudKey, cloudKeyPath, cloudAccountConfig, forgetCloudKey } from './config.mjs';
-import { withDeadline } from '../team/session.mjs';
-import { plainAuthError } from '../team/auth-words.mjs';
-import { signInWithGoogle, cancelGoogleSignIn, sendPasswordReset, waitForTheConfirmationLink } from '../team/sign-in.mjs';
+import { cloudConfigPath, readCloudConfig, readCloudKey, writeCloudKey, cloudKeyPath, cloudAccountConfig, forgetCloudKey } from './config.mts';
+import { withDeadline } from '../team/session.mts';
+import { plainAuthError } from '../team/auth-words.mts';
+import { signInWithGoogle, cancelGoogleSignIn, sendPasswordReset, waitForTheConfirmationLink } from '../team/sign-in.mts';
 import { Name } from '../../shared/product-name.mjs';
 import type { SupabaseClient, createClient as createSupabaseClient } from '@supabase/supabase-js';
 

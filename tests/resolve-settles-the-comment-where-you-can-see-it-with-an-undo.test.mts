@@ -11,7 +11,7 @@
 // "Show resolved" with the count, carried ones included, and its pin leaves.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { carriedNotes } from '../shared/artifact-marks.mjs';
+import { carriedNotes } from '../shared/artifact-marks.mts';
 import { commentsInList, settleLocally, UNDO_MS } from '../renderer/src/note-saving.ts';
 import { pinsToDraw } from '../renderer/src/artifact-pins.ts';
 

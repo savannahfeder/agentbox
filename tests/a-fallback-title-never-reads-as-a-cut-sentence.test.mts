@@ -3,14 +3,14 @@
 // Rows read "Ask Dev whether the Render invite", "Patients in
 // Austin say they got" and "Fact check the refund wording before": the first
 // six words of a sentence, stopped wherever the sixth fell. Measured in
-// shared/thread-title.mjs: the only trim dropped a last word from a short list
+// shared/thread-title.mts: the only trim dropped a last word from a short list
 // (a, the, to, ...), and whether, before, got, going and off were not on it,
 // nor was anything that stops at the start of a new clause.
 //
 // Now a cut title stops before a clause it cannot finish, and drops a last
 // word that only leads somewhere. A title that was not cut is left alone.
 import { it, expect, describe } from 'vitest';
-import { shortTitle, TITLE_WORDS } from '../shared/thread-title.mjs';
+import { shortTitle, TITLE_WORDS } from '../shared/thread-title.mts';
 
 const said = (t) => shortTitle(t);
 

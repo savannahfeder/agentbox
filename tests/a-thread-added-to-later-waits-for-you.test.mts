@@ -15,8 +15,8 @@
 // Measured before the fix: `isDue({ start: 'later' })` was true, because the
 // field did not exist and the fold dropped it.
 import { describe, it, expect } from 'vitest';
-import { isDue, isClaimable, foldWorkItems, WORK_ITEM_FIELDS } from '../shared/work-items.mjs';
-import { threadState } from '../shared/thread-cards.mjs';
+import { isDue, isClaimable, foldWorkItems, WORK_ITEM_FIELDS } from '../shared/work-items.mts';
+import { threadState } from '../shared/thread-cards.mts';
 
 const NOW = Date.now();
 const HOUR = 3_600_000;

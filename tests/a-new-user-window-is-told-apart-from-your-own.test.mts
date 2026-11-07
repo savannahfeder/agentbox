@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { freshEnv, runningAsAFreshUser } from '../shared/fresh-user-home.mjs';
+import { freshEnv, runningAsAFreshUser } from '../shared/fresh-user-home.mts';
 import { newUserWindow } from '../main/new-user-window.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

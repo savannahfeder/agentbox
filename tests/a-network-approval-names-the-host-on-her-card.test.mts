@@ -55,7 +55,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { codexApprovalCard, createCodexApprovals } from '../main/codex-approvals.mjs';
+import { codexApprovalCard, createCodexApprovals } from '../main/codex-approvals.mts';
 import { approvalReads } from '../renderer/src/approval-card.ts';
 import { NAME } from '../shared/product-name.mjs';
 

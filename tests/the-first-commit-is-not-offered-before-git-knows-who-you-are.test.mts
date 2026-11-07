@@ -21,10 +21,10 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { snapshotRepo, changeFromRepo, gitKnowsYou } from '../main/git-change.mjs';
-import { writeChangeForRun, knowsYouAcross } from '../main/code-change.mjs';
-import { machineryPath } from '../main/store/home.mjs';
-import { changePath } from '../main/code-change.mjs';
+import { snapshotRepo, changeFromRepo, gitKnowsYou } from '../main/git-change.mts';
+import { writeChangeForRun, knowsYouAcross } from '../main/code-change.mts';
+import { machineryPath } from '../main/store/home.mts';
+import { changePath } from '../main/code-change.mts';
 import { COMMIT_IDENTITY_CHECK, workerGitBrief } from '../main/worker-git.mts';
 import {
   COMMIT_FIRST_OFFER, NAME_YOURSELF_ASK, NAME_YOURSELF_OFFER, NOT_COMMITTED_ASK, SHIP_OFFER,

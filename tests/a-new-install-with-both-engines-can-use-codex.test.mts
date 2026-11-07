@@ -18,8 +18,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadConfig } from '../main/config.mjs';
-import { engineChoiceSince } from '../shared/engines.mjs';
+import { loadConfig } from '../main/config.mts';
+import { engineChoiceSince } from '../shared/engines.mts';
 
 const dir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'new-install-codex-'));
 const saved = (d) => JSON.parse(fs.readFileSync(path.join(d, 'zero.config.json'), 'utf8'));

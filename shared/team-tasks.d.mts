@@ -1,4 +1,4 @@
-// Types for shared/team-tasks.mjs.
+// Types for shared/team-tasks.mts.
 
 export interface Deadline { at: number; clock: boolean }
 interface BlockCtx { items?: readonly unknown[]; cards?: readonly unknown[]; me: string | null; nameOf: (id: string) => string }

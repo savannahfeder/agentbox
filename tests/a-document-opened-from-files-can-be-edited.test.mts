@@ -7,7 +7,7 @@
 // version was said first: a group's own file is edited in the group.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { whereEditsGo } from '../main/files-place.mjs';
+import { whereEditsGo } from '../main/files-place.mts';
 
 const at = (ref, title = ref.kind) => ({ ref, title });
 const mine = at({ kind: 'thread', product: 'lumen', id: 'w-1' });

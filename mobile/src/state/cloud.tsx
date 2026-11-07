@@ -287,7 +287,7 @@ function useCloudState() {
   const [approvalRoom, setApprovalRoom] = useState(0);
 
   // A message to a teammate, someone new, or a go-ahead, left for the computer
-  // that sent the teammates (shared/phone-settings.mjs `teammate`).
+  // that sent the teammates (shared/phone-settings.mts `teammate`).
   const askTeammate = useCallback(async (key: 'post' | 'describe' | 'goAhead' | 'pause', value: Record<string, unknown>) => {
     if (!cloud || !team) throw new Error('Your computer has not sent your teammates yet.');
     // Only words for an agent need the yes; a go-ahead or a pause carries none.

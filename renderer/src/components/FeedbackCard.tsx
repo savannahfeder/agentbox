@@ -1,7 +1,7 @@
 import { Name } from '../../../shared/product-name.mjs';
 import { SEND } from '../this-keyboard';
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
-import { FEEDBACK_LIMITS, checkFeedback } from '../../../shared/feedback.mjs';
+import { FEEDBACK_LIMITS, checkFeedback } from '../../../shared/feedback.mts';
 import { CrossIcon } from './CrossIcon';
 import './feedback-card.css';
 
@@ -16,7 +16,7 @@ import './feedback-card.css';
  *
  *  Files come in three ways, all landing in the same row of tiles: paste
  *  (a screenshot straight off the clipboard), drop anywhere on the card, or
- *  Attach. What may be sent is shared/feedback.mjs, read here to switch Send
+ *  Attach. What may be sent is shared/feedback.mts, read here to switch Send
  *  off and again in the main process before anything leaves.
  *
  *  It never names where it goes. The address is a secret on the server and in

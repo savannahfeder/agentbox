@@ -27,12 +27,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig } from '../main/config.mjs';
+import { loadConfig } from '../main/config.mts';
 import { readSettings, recheckCodex } from '../main/settings.mts';
-import { forgetCodexBin, appCopyPaths } from '../main/codex-bin.mjs';
+import { forgetCodexBin, appCopyPaths } from '../main/codex-bin.mts';
 import { createEngineSetup } from '../main/engine-setup.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { engineChoiceSince, engineChoiceOnRowIsStale } from '../shared/engines.mjs';
+import { engineChoiceSince, engineChoiceOnRowIsStale } from '../shared/engines.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');

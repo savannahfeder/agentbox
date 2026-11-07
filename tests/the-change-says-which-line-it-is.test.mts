@@ -1,12 +1,12 @@
 // LINE NUMBERS, AND A MARK WHERE THE FILE JUMPS —, 2026-09-20.
 //
 // Two of the reasons were measurable. The pane had no line numbers anywhere,
-// because `main/git-change.mjs` matched `@@` only to know a hunk had started and
+// because `main/git-change.mts` matched `@@` only to know a hunk had started and
 // threw the header away with the numbers in it. And the hunks of a file ran
 // together with nothing saying the code jumps between them, so a file edited at
 // line 40 and at line 900 drew the two as neighbours.
 import { it, expect, describe } from 'vitest';
-import { filesFromPatch } from '../main/git-change.mjs';
+import { filesFromPatch } from '../main/git-change.mts';
 import { linesSkipped } from '../renderer/src/code-artifact';
 
 const patch = [

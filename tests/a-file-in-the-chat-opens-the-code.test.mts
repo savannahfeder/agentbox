@@ -17,8 +17,8 @@
 //      stop meeting, every chip disappears and nothing else changes, which is
 //      the failure with no symptom.
 import { describe, expect, it } from 'vitest';
-import { changedFile, fileInChange } from '../shared/agents.mjs';
-import { changeFromTranscript } from '../main/code-change.mjs';
+import { changedFile, fileInChange } from '../shared/agents.mts';
+import { changeFromTranscript } from '../main/code-change.mts';
 import { itemThread } from '../renderer/src/item-thread.ts';
 
 const ROOT = '/Users/you/Desktop/dev/zero';
@@ -50,7 +50,7 @@ describe('a work line says which file it changed', () => {
     expect(changedFile('Grep', { pattern: 'b.ts' })).toBe('');
   });
 
-  it('is the same four tools main/code-change.mjs turns into a diff', () => {
+  it('is the same four tools main/code-change.mts turns into a diff', () => {
     // If these two lists drift, a line becomes a chip that opens onto a file
     // the change does not hold, or a file in the change never becomes a chip.
     const source = String(changeFromTranscript);

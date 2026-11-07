@@ -10,10 +10,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
+import { appHome } from '../main/store/home.mts';
 import { loadStore } from '../main/store-modules.mts';
 import { Teammates } from '../main/teammates.mts';
-import { writeChat, methodFile } from '../main/store/teammates-files.mjs';
+import { writeChat, methodFile } from '../main/store/teammates-files.mts';
 
 describe('what a teammate run is told', () => {
   let product; let dir; let mods; let team; let store; let core;
@@ -22,9 +22,9 @@ describe('what a teammate run is told', () => {
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = `acct-${Math.random().toString(36).slice(2, 8)}`;
     fs.mkdirSync(path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     product = createProduct(`Shop ${Math.random().toString(36).slice(2, 8)}`);
     dir = path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID, product.id);
     mods = await loadStore();
@@ -36,7 +36,7 @@ describe('what a teammate run is told', () => {
       listItems: (now) => mods.workItemsDisk.readWorkItems(dir, now).map((i) => ({ ...i, product: product.id })),
     };
     team = new Teammates(store);
-    core = await import('../mcp/core/teammates.mjs');
+    core = await import('../mcp/core/teammates.mts');
   });
 
   afterEach(() => {

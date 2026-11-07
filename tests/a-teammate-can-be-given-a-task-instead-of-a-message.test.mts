@@ -2,7 +2,7 @@
 //
 // What broke: a to-do is a task you give yourself, and the same gesture should
 // give one to a teammate — but the card could only ever make a message out of a
-// person. `assignee` and its laws already existed (shared/team-rules.mjs: a row
+// person. `assignee` and its laws already existed (shared/team-rules.mts: a row
 // held by a person never starts an agent, and sits in that one person's inbox
 // until it is done); the card had no way to set them. The old one-line card did
 // ("Maya does it.", approved 2026-09-30) and the 2026-10-01 rewrite dropped it.

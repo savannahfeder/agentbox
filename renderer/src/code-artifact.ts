@@ -8,7 +8,7 @@ export type Row = ['=' | '+' | '-', string];
 
 /**
  * A row's line number in the old file and in the new one, null on the side the
- * row does not exist in. `main/git-change.mjs` fills it from the `@@` header.
+ * row does not exist in. `main/git-change.mts` fills it from the `@@` header.
  *
  * Often absent. A change read from the conversation instead of git diffs one
  * edit's before against its after, so its offsets are inside a fragment, not
@@ -43,7 +43,7 @@ export type Change = {
   startedAt?: number;
   endedAt?: number;
   editCount?: number;
-  /** Where the folder stood when the run ended (main/git-change.mjs). */
+  /** Where the folder stood when the run ended (main/git-change.mts). */
   committed?: boolean | null;
   uncommitted?: boolean | null;
 };
@@ -55,7 +55,7 @@ export function isChangePath(path: string | undefined | null): boolean {
 
 /**
  * Where one item's change is, product-relative. It has to match `changePath` in
- * main/code-change.mjs, which writes the file this opens.
+ * main/code-change.mts, which writes the file this opens.
  */
 export function changePathFor(itemId: string): string {
   return `runs/${itemId}/the-change-it-made.change`;

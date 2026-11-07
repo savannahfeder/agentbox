@@ -9,9 +9,9 @@
 // the owner opened it to the team. No other copy may wake it.
 import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { isMateCard, mateCard, mateFromCard, splitCards } from '../shared/mate-cards.mjs';
-import { teammateIdOf } from '../shared/teammates.mjs';
-import { inMyInbox } from '../shared/team-rules.mjs';
+import { isMateCard, mateCard, mateFromCard, splitCards } from '../shared/mate-cards.mts';
+import { teammateIdOf } from '../shared/teammates.mts';
+import { inMyInbox } from '../shared/team-rules.mts';
 import { messageLine } from '../renderer/src/threads/page-rules';
 
 let t; let chief;
@@ -82,7 +82,7 @@ describe('someone else writing to it', () => {
     t.maya.store.teammates.update(chief.id, { openToTeam: true });
     await write('Add group bookings to the brief.');
     await land();
-    const { teamTell } = await import('../mcp/core/reach.mjs');
+    const { teamTell } = await import('../mcp/core/reach.mts');
     process.env.ZERO_ITEM = runsOf()[0].id;
     process.env.ZERO_PRODUCT = t.product.id;
     expect(teamTell({ text: 'Added.', to: ['Dev'] }).held).toBe(false);

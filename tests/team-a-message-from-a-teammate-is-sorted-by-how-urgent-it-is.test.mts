@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 import { wantsPriority, latestMessage, cleanPriority, priorityPrompt, sortMessage, LEVELS } from '../main/message-priority.mts';
 import { Supervisor } from '../main/supervisor.mts';
 

@@ -16,8 +16,8 @@ import { herTurnEnds, herTurnStarts } from '../../../renderer/src/her-turns';
 import { filedOnTurn } from '../../../renderer/src/filed-in-thread';
 import { approvableFiled, doItHereWords, threadsMade } from '../../../renderer/src/threads-made';
 import { closeAsk } from '../../../renderer/src/close-asks-first';
-import { conversationGap, gapIndex } from '../../../shared/agents.mjs';
-import { groupWork } from '../../../shared/work-lines.mjs';
+import { conversationGap, gapIndex } from '../../../shared/agents.mts';
+import { groupWork } from '../../../shared/work-lines.mts';
 import type { ThreadStateWord } from '../../../renderer/src/types';
 import type { Row, TabId } from './tabs';
 
@@ -50,7 +50,7 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   const message = String(item.body || item.title || '').trim();
   const sent = item.waitsForMac && message && message !== pageTitle(item).trim() ? [{ at: item.createdAt ?? 0, text: message }] : [];
   const pending = [...sent, ...mine.map((w) => ({ at: w.at, text: w.text, ...(w.refused ? { refused: w.refused } : {}) }))];
-  // A reply Agentbox Cloud took with the computer away says so (shared/cloud-kit.mjs).
+  // A reply Agentbox Cloud took with the computer away says so (shared/cloud-kit.mts).
   const inCloud = new Set(mine.filter((w) => w.cloud).map((w) => w.at));
   // Taken, and not in the thread's copy yet: sent, and drawn until the copy has it.
   const sentAt = new Set(mine.filter((w) => w.sent).map((w) => w.at));

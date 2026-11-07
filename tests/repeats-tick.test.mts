@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { Repeats } from '../main/repeats.mjs';
+import { Repeats } from '../main/repeats.mts';
 import { loadStore } from '../main/store-modules.mts';
 
 let dir, mods, repeats, filed;

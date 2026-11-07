@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { stripTypeScriptTypes } from 'node:module';
-import { readItemHistory, _internals } from '../main/store/work-items.mjs';
+import { readItemHistory, _internals } from '../main/store/work-items.mts';
 
 const source = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
 const start = source.indexOf("  ipcMain.handle('zero:item-history'");

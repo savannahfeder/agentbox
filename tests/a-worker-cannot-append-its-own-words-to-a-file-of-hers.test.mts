@@ -3,7 +3,7 @@
 //
 // Both engines end a decision the same way: `fs.appendFileSync(path.join(dir,
 // 'log.jsonl'), ...)` -- main/approval-prompt-server.mts's `finish` for a
-// Claude Code worker, main/codex-approvals.mjs's `finish` for a Codex one. The
+// Claude Code worker, main/codex-approvals.mts's `finish` for a Codex one. The
 // name is FIXED, so unlike the answer file it needs no guessing at all, and the
 // bytes appended include the worker's own `command` string. Measured on this
 // Mac, node v22.19.0:
@@ -39,8 +39,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
-import { createCodexApprovals } from '../main/codex-approvals.mjs';
-import { answer, approvalPublicKey, listPending, spoolDir } from '../main/approvals.mjs';
+import { createCodexApprovals } from '../main/codex-approvals.mts';
+import { answer, approvalPublicKey, listPending, spoolDir } from '../main/approvals.mts';
 import { stripTypesFlags } from '../main/strip-types.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));

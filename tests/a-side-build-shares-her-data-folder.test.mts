@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NEW_USER_NAME, REAL_NAME, isNewUserBuild, isSideBuild, dataFolderName } from '../shared/side-build.mjs';
+import { NEW_USER_NAME, REAL_NAME, isNewUserBuild, isSideBuild, dataFolderName } from '../shared/side-build.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');

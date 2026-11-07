@@ -9,13 +9,13 @@
 // the counting (CLAUDE.md: THE SIDEBAR CARRIES THE LAST FEW THINGS, NOT A
 // LEDGER).
 //
-// The rule is shared/notify-rules.mjs and the lifetime is main/notify.mts.
+// The rule is shared/notify-rules.mts and the lifetime is main/notify.mts.
 // Both are pinned here, because the expensive half of this feature is what it
 // does NOT do, and a notification that fails to be suppressed has no symptom
 // anyone would notice in a screenshot.
 
 import { describe, it, expect, vi } from 'vitest';
-import { atTheApp, banner, clip, shouldSpeak, AWAY_AFTER_MS } from '../shared/notify-rules.mjs';
+import { atTheApp, banner, clip, shouldSpeak, AWAY_AFTER_MS } from '../shared/notify-rules.mts';
 import { createNotifier } from '../main/notify.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 

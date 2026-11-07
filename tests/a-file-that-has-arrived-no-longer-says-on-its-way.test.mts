@@ -10,8 +10,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { resolveArtifact } from '../main/artifact-path.mjs';
-import { shelve } from '../main/team/carried-shelf.mjs';
+import { resolveArtifact } from '../main/artifact-path.mts';
+import { shelve } from '../main/team/carried-shelf.mts';
 
 let dir, products;
 beforeEach(() => {

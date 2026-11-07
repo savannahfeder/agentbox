@@ -16,7 +16,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
-import { supabaseBackend } from '../main/team/supabase-backend.mjs';
+import { supabaseBackend } from '../main/team/supabase-backend.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

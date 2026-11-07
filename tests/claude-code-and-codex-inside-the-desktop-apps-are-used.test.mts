@@ -18,8 +18,8 @@
 // install anywhere on the Mac, including one only the shell can find, wins.
 
 import { describe, it, expect } from 'vitest';
-import { findClaudeBin, appCopyPaths as claudeAppCopies } from '../main/claude-bin.mjs';
-import { findCodexBin, appCopyPaths as codexAppCopies } from '../main/codex-bin.mjs';
+import { findClaudeBin, appCopyPaths as claudeAppCopies } from '../main/claude-bin.mts';
+import { findCodexBin, appCopyPaths as codexAppCopies } from '../main/codex-bin.mts';
 
 const HOME = '/Users/stranger';
 const SUPPORT = `${HOME}/Library/Application Support/Claude/claude-code`;

@@ -225,7 +225,7 @@ nothing new to pay for.
 <br>
 
 `zero.config.json` in the repo root, gitignored and machine-specific. Every
-default works unset and they all live in `main/config.mjs`. The ones that
+default works unset and they all live in `main/config.mts`. The ones that
 matter:
 
 - `storeRoot`: where the store lives. On macOS this defaults to a folder
@@ -329,7 +329,7 @@ in exactly one place. The app can crash, restart or be rewritten without any
 agent noticing.
 
 - `main/` the Electron main process: config, the store
-  (`main/store/work-items.mjs` is the single write path), the supervisor that
+  (`main/store/work-items.mts` is the single write path), the supervisor that
   spawns one headless session per work item, and IPC.
 - `mcp/` the store server handed to those sessions.
 - `renderer/` the inbox: list, focus mode, rail, compose, palette, browser.

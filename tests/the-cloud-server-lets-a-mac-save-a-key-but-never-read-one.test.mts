@@ -1,6 +1,6 @@
 // THE CLOUD SERVER LETS A MAC SAVE A KEY, BUT NEVER READ ONE.
 //
-// Keys saved for cloud runs (main/cloud/keys.mjs) live beside the sign-ins,
+// Keys saved for cloud runs (main/cloud/keys.mts) live beside the sign-ins,
 // under logins/, which the server refused to link for a Mac at all. So a Mac
 // on the managed cloud could not save one, and a run's keys, named rather
 // than linked, would have reached the sandbox as names it cannot fetch.

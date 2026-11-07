@@ -11,7 +11,7 @@
 // 2. An app opened from the Dock never sees what a shell profile exports, so a
 //    CLAUDE_CONFIG_DIR (or CODEX_HOME) somewhere other than ~/.claude-<name>
 //    was invisible. The login shell is asked for those two variables, once, at
-//    startup, the way main/shell-path.mjs already asks it for PATH. They are
+//    startup, the way main/shell-path.mts already asks it for PATH. They are
 //    used to FIND sessions and never written into the app's environment,
 //    because CLAUDE_CONFIG_DIR there would change which account workers run on.
 
@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readShellDataDirs } from '../main/shell-path.mjs';
+import { readShellDataDirs } from '../main/shell-path.mts';
 import { readImportableThreads } from '../main/importable-threads.mts';
 import { markImported } from '../shared/agent-import.mts';
 

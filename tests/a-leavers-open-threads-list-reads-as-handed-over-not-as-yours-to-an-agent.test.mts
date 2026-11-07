@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { threadEvents } from '../renderer/src/thread-history';
 import { replyBoxAsk } from '../renderer/src/threads/composer-rules.ts';
-import { handedFromLabel } from '../shared/team-departures.mjs';
+import { handedFromLabel } from '../shared/team-departures.mts';
 
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 const ME = 'p-maya';
@@ -32,7 +32,7 @@ describe('the opening of the list', () => {
     expect(first).toMatchObject({ said: 'You opened this', by: ME });
   });
   it('is made with the label that says so', () => {
-    expect(read('main/team/departures.mjs')).toMatch(/labels: \[handedFromLabel\(d\.personId\)\]/);
+    expect(read('main/team/departures.mts')).toMatch(/labels: \[handedFromLabel\(d\.personId\)\]/);
   });
 });
 

@@ -27,10 +27,10 @@ import path from 'node:path';
 import {
   HOMES as DEMO_HOMES, clearDemoHomes, demoEnv, demoPaths, makeDemoHome, openDemo, seedDemoStore,
 } from '../main/demo.mts';
-import { DEMO_ENV, DEMO_INSTALL_ID, DEMO_PRODUCTS, demoLedgerLines, runningAsADemo } from '../shared/demo-world.mjs';
-import { HOMES as FRESH_HOMES } from '../shared/fresh-user-home.mjs';
+import { DEMO_ENV, DEMO_INSTALL_ID, DEMO_PRODUCTS, demoLedgerLines, runningAsADemo } from '../shared/demo-world.mts';
+import { HOMES as FRESH_HOMES } from '../shared/fresh-user-home.mts';
 import { readInstallId } from '../shared/install-id.mts';
-import { readWorkItems } from '../main/store/work-items.mjs';
+import { readWorkItems } from '../main/store/work-items.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 import { setAppHome, clearAppHome, appHomeEnv } from './app-home.mts';
 
@@ -217,7 +217,7 @@ describe('what a demo never shows', () => {
     // read off the machine running the test instead of typed.
     //
     // NOT THE APP'S OWN NAME. The store root a copy with no config file reads
-    // is `<home>/<Name>` (main/config.mjs), so that word is in the demo's own
+    // is `<home>/<Name>` (main/config.mts), so that word is in the demo's own
     // paths by construction. It sits inside a /tmp folder and it is a default,
     // not anything of anybody's. Another product's name was that default until 2026-09-22
     // and is banned by name, so a demo can never quietly start writing to a

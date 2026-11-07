@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
-import { CONTEXT_WORDS, summaryOf, wordsIn } from '../shared/thread-cards.mjs';
+import { CONTEXT_WORDS, summaryOf, wordsIn } from '../shared/thread-cards.mts';
 import {
   GIVE_UP_MS, MainTests, failedTestsIn, machineOf, runFor, verdict,
 } from '../main/main-went-red.mts';

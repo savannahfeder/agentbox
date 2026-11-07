@@ -30,7 +30,7 @@ import { it, expect, describe, afterEach, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadCloudConfig, teamConfigOnThisMac } from '../main/team/session.mjs';
+import { loadCloudConfig, teamConfigOnThisMac } from '../main/team/session.mts';
 
 const tmp = (name) => fs.mkdtempSync(path.join(os.tmpdir(), `team-key-${name}-`));
 const KEY = { url: 'https://hers.test', anonKey: 'anon' };

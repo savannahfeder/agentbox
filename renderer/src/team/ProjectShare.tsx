@@ -7,7 +7,7 @@
 // otherwise from the New thread card.
 import { useContext, useEffect, useRef, useState } from 'react';
 import type { Person, Product } from '../types';
-import { projectSeenBy } from '../../../shared/thread-cards.mjs';
+import { projectSeenBy } from '../../../shared/thread-cards.mts';
 import { chosenWords, teammates } from '../threads/composer-rules';
 import { LockIcon, TeamContext } from './people';
 

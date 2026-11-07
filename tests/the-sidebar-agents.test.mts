@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { RAIL_CUT_MS, onTheRail, railLine } from '../shared/agents.mjs';
+import { RAIL_CUT_MS, onTheRail, railLine } from '../shared/agents.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

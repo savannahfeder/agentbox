@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig } from '../main/config.mjs';
+import { loadConfig } from '../main/config.mts';
 import { readSettings, setProjectSetting } from '../main/settings.mts';
 import { Supervisor } from '../main/supervisor.mts';
 

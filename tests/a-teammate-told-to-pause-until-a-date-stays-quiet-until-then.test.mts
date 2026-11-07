@@ -7,7 +7,7 @@
 // save `pausedUntil` (a date): its duties and rounds do not wake it before that
 // day, and your own words still reach it.
 import { describe, it, expect } from 'vitest';
-import { planWakes, foldTeammates, DEFAULT_LIMIT } from '../shared/teammates.mjs';
+import { planWakes, foldTeammates, DEFAULT_LIMIT } from '../shared/teammates.mts';
 
 const at = (d, h) => new Date(2026, 10, d, h, 0).getTime();
 const base = { id: 't-growth', name: 'Growth marketer', status: 'active', paused: false, served: '', limit: DEFAULT_LIMIT, works: null, product: 'kestrel', memory: [] };

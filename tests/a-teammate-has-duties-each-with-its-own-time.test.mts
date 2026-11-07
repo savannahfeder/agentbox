@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { planWakes, foldTeammates, dutyWhen, teammateLabel, DEFAULT_LIMIT } from '../shared/teammates.mjs';
+import { planWakes, foldTeammates, dutyWhen, teammateLabel, DEFAULT_LIMIT } from '../shared/teammates.mts';
 
 const NOW = new Date(2026, 9, 26, 15, 10).getTime(); // a Monday, 3:10pm
 const base = { id: 't-aaaaaa', name: 'Marketing lead', letter: 'M', status: 'active', paused: false, served: '', limit: DEFAULT_LIMIT, works: null, product: 'kestrel', memory: [] };
@@ -87,15 +87,15 @@ describe('a duty, written down', () => {
 describe('a teammate given duties', () => {
   let team; let store; let product; let dir; let core;
   beforeEach(async () => {
-    const { appHome } = await import('../main/store/home.mjs');
+    const { appHome } = await import('../main/store/home.mts');
     const { loadStore } = await import('../main/store-modules.mts');
     const { Teammates } = await import('../main/teammates.mts');
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = `acct-${Math.random().toString(36).slice(2, 8)}`;
     fs.mkdirSync(path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     product = createProduct(`Shop ${Math.random().toString(36).slice(2, 8)}`);
     dir = path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID, product.id);
     const mods = await loadStore();
@@ -106,7 +106,7 @@ describe('a teammate given duties', () => {
       listItems: (now) => mods.workItemsDisk.readWorkItems(dir, now).map((i) => ({ ...i, product: product.id })),
     };
     team = new Teammates(store);
-    core = await import('../mcp/core/teammates.mjs');
+    core = await import('../mcp/core/teammates.mts');
   });
   afterEach(() => { delete process.env.STORE_ACCOUNT_ID; delete process.env.ZERO_ITEM; delete process.env.ZERO_PRODUCT; });
 

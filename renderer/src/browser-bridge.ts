@@ -47,7 +47,7 @@ const KEEPALIVE_MAX = 16_000;
 // a phone's home-screen icon is saved from that address, and on a phone the
 // icon gets storage of its own, so a key kept anywhere else is lost to it.
 const LOOPBACK = /^(127\.\d+\.\d+\.\d+|localhost|\[::1\])$/;
-// A DESKTOP WINDOW ONTO A HUB is not a phone, wherever its hub is (main/hub-client.mjs).
+// A DESKTOP WINDOW ONTO A HUB is not a phone, wherever its hub is (main/hub-client.mts).
 type DesktopShell = {
   notify(payload: { arrivals: unknown; needsYou: unknown }): Promise<unknown>;
   badge(count: unknown): Promise<unknown>;

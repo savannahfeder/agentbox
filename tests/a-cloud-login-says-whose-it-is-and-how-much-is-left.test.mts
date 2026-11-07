@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { createSandbox, pickBaseEnv, readReplyHeaders } from '../cloud/sandbox/server.mjs';
 import { TOKEN, ORG } from './fixtures/cloud/fake-vendor-cli.mjs';
 import { cloudLoginFor, lookAtCloudLogin, recordCloudLogin } from '../main/cloud/logins.mts';
-import { nameForOrganization } from '../main/account-tooling.mjs';
+import { nameForOrganization } from '../main/account-tooling.mts';
 import { Supervisor } from '../main/supervisor.mts';
 
 const FAKE = fileURLToPath(new URL('./fixtures/cloud/fake-vendor-cli.mjs', import.meta.url));

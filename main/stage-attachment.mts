@@ -7,7 +7,7 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { turnedName } from '../shared/picture-formats.mts';
-import { MAX_SENT_BYTES, MAX_SENT_WORDS } from '../shared/carried-files.mjs';
+import { MAX_SENT_BYTES, MAX_SENT_WORDS } from '../shared/carried-files.mts';
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 const SIPS_MS = 30_000;

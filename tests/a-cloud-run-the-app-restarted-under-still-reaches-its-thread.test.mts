@@ -23,7 +23,7 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { Supervisor } from '../main/supervisor.mts';
 import { Store } from '../main/store.mts';
-import { machineryPath } from '../main/store/home.mjs';
+import { machineryPath } from '../main/store/home.mts';
 
 let tmp; let store; let sup; let row; let folder; let relays;
 

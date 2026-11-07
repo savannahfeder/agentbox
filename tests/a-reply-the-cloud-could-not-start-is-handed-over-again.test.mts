@@ -22,8 +22,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { CARRY_AGAIN_MS, CARRY_AHEAD_MS, CARRIED, handOverSpent } from '../shared/cloud-carry.mjs';
-import { KIT_VERSION, kitKey } from '../shared/cloud-kit.mjs';
+import { CARRY_AGAIN_MS, CARRY_AHEAD_MS, CARRIED, handOverSpent } from '../shared/cloud-carry.mts';
+import { KIT_VERSION, kitKey } from '../shared/cloud-kit.mts';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { GIVEN_UP_FOR_MS, PHONE_TRIES } from '../cloud/gateway/phone.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
@@ -64,7 +64,7 @@ const DEV = 'a1b2c3d4e5f6';
 const fresh = (id, extra = {}) => ({ id, product: 'alpha', status: 'open', kind: 'task', labels: ['founder'], title: `Task ${id}`, createdAt: 1000, updatedAt: 1000, ...extra });
 
 // A Mac whose last pass came a quarter of an hour ago, with nobody at it: one
-// of a shut lid's few-second wakes (shared/cloud-carry.mjs macAsleep).
+// of a shut lid's few-second wakes (shared/cloud-carry.mts macAsleep).
 function sleeping(items, { dir = null } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-again-'));
   const store = {

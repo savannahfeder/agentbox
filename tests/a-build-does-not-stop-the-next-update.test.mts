@@ -2,7 +2,7 @@
 //
 // Measured on the team app folder, 2026-10-02: `git status` showed two files
 // changed, shared/claude-commands.generated.mts and
-// shared/claude-models.generated.mjs, both only a version and date stamp. The
+// shared/claude-models.generated.mts, both only a version and date stamp. The
 // updater's own restart runs `npm run build`, and the build rewrites those two
 // files from the Claude Code on this Mac. So after one update the folder read
 // as "changes of your own", and every later check said it could not update
@@ -79,7 +79,7 @@ afterEach(() => {
 });
 
 
-const GEN = path.join('shared', 'claude-models.generated.mjs');
+const GEN = path.join('shared', 'claude-models.generated.mts');
 function seedGenerated() {
   fs.mkdirSync(path.join(theirs, 'shared'), { recursive: true });
   commit(theirs, GEN, 'export const READ_AT = "2026-10-01";\n', 'Generated');

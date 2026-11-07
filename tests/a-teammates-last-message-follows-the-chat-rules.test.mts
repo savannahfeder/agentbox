@@ -14,7 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Supervisor } from '../main/supervisor.mts';
-import { howYourRunEnds } from '../shared/teammates.mjs';
+import { howYourRunEnds } from '../shared/teammates.mts';
 import { messageDocuments } from '../renderer/src/message-artifacts.ts';
 
 const BRIEF = '# You are Ops lead: a teammate';

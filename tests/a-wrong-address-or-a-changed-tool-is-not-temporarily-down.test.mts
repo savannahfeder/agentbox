@@ -14,9 +14,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { startToolsFixture } from '../cloud/standin/tools-mcp.mjs';
-import { createConnections } from '../main/connections/index.mjs';
-import { stateOfError } from '../main/connections/talk.mjs';
-import { catalogFor, stateWords, STATES } from '../shared/connections-catalog.mjs';
+import { createConnections } from '../main/connections/index.mts';
+import { stateOfError } from '../main/connections/talk.mts';
+import { catalogFor, stateWords, STATES } from '../shared/connections-catalog.mts';
 
 const key = crypto.randomBytes(32);
 const cipher = {

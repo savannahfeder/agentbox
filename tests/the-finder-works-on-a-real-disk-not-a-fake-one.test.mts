@@ -1,6 +1,6 @@
 // THE FINDER AGAINST REAL FILESYSTEMS, NOT FAKE `exists` FUNCTIONS.
 //
-// Every other test of main/engine-bin.mjs hands in `exists`, `readdir` and
+// Every other test of main/engine-bin.mts hands in `exists`, `readdir` and
 // `dangles` as functions. That is the right way to test the STRATEGY and it is
 // what keeps the search a pure function somebody can put a tool anywhere for.
 // It also means the real `fs.existsSync`, `fs.readdirSync` and `fs.lstatSync`
@@ -24,7 +24,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { findEngine, installEvidence } from '../main/engine-bin.mjs';
+import { findEngine, installEvidence } from '../main/engine-bin.mts';
 
 const made = [];
 afterAll(() => { for (const d of made) { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } } });

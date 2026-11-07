@@ -13,10 +13,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { teamFile } from '../mcp/core/reach.mjs';
-import { foldFolders, readFolderLog, writeFolderLog } from '../shared/file-folders.mjs';
-import { readTeamView, writeTeamView } from '../main/store/teammates-files.mjs';
-import { appFilesPlace } from '../main/files-place.mjs';
+import { teamFile } from '../mcp/core/reach.mts';
+import { foldFolders, readFolderLog, writeFolderLog } from '../shared/file-folders.mts';
+import { readTeamView, writeTeamView } from '../main/store/teammates-files.mts';
+import { appFilesPlace } from '../main/files-place.mts';
 
 let t; let dir; let own;
 const inView = (folders) => writeTeamView(dir, { ...readTeamView(dir), folders });

@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
+import { appHome } from '../main/store/home.mts';
 import { loadStore } from '../main/store-modules.mts';
 import { Teammates } from '../main/teammates.mts';
 
@@ -20,9 +20,9 @@ describe('a teammate setting itself up', () => {
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = `acct-${Math.random().toString(36).slice(2, 8)}`;
     fs.mkdirSync(path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     product = createProduct(`Shop ${Math.random().toString(36).slice(2, 8)}`);
     dir = path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID, product.id);
     const mods = await loadStore();
@@ -33,7 +33,7 @@ describe('a teammate setting itself up', () => {
       listItems: (now) => mods.workItemsDisk.readWorkItems(dir, now).map((i) => ({ ...i, product: product.id })),
     };
     team = new Teammates(store);
-    core = await import('../mcp/core/teammates.mjs');
+    core = await import('../mcp/core/teammates.mts');
   });
   afterEach(() => { delete process.env.STORE_ACCOUNT_ID; delete process.env.ZERO_ITEM; delete process.env.ZERO_PRODUCT; });
 
@@ -62,7 +62,7 @@ describe('a teammate setting itself up', () => {
 
 describe('the team_setup tool', () => {
   it('sets times only as duties, so a teammate cannot pick the old single round', () => {
-    const src = fs.readFileSync(new URL('../mcp/tools.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../mcp/tools.mts', import.meta.url), 'utf8');
     const tool = src.slice(src.indexOf("name: 'team_setup'"), src.indexOf("name: 'team_roster'"));
     const top = tool.slice(tool.indexOf('schema: {'), tool.indexOf('run:'));
     const outside = top.replace(/duties: z\.array\(z\.object\(\{[\s\S]*?\}\)\)\.optional\(\),/, '');

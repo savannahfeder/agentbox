@@ -11,8 +11,8 @@
 import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { firstSentence } from '../shared/thread-cards.mjs';
-import { shortTitle, withoutFiles } from '../shared/thread-title.mjs';
+import { firstSentence } from '../shared/thread-cards.mts';
+import { shortTitle, withoutFiles } from '../shared/thread-title.mts';
 import { typedParts } from '../renderer/src/typed-message.ts';
 import { teamToday } from '../renderer/src/team/today.ts';
 import { ArtifactImg } from '../renderer/src/components/Focus.tsx';

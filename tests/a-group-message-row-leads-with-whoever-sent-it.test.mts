@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 import { messageLine } from '../renderer/src/threads/page-rules.ts';
 import { ThreadCells } from '../renderer/src/threads/Pages.tsx';
 import { TeamContext } from '../renderer/src/team/people.tsx';

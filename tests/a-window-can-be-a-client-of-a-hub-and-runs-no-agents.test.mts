@@ -16,9 +16,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { readHubAddress, whichApp } from '../main/hub-address.mjs';
+import { readHubAddress, whichApp } from '../main/hub-address.mts';
 import { withDesktopShell, onPhoneDoor } from '../renderer/src/browser-bridge';
-import { mayOpenOutside, sameHub } from '../main/hub-rules.mjs';
+import { mayOpenOutside, sameHub } from '../main/hub-rules.mts';
 import { stripTypesFlags } from '../main/strip-types.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -100,7 +100,7 @@ describe('the client carries no part of the hub', () => {
     return seen;
   }
   it('nothing the client loads reaches the store, the supervisor or the handlers', () => {
-    const loaded = [...reach(path.join(root, 'main', 'hub-client.mjs'))].map((f) => path.relative(root, f));
+    const loaded = [...reach(path.join(root, 'main', 'hub-client.mts'))].map((f) => path.relative(root, f));
     for (const heavy of ['main/supervisor.mts', 'main/store.mts', 'main/ipc.mts', 'main/main.mts', 'main/serve.mts']) expect(loaded).not.toContain(heavy);
   });
 

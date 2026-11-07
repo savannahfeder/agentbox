@@ -4,7 +4,7 @@
 // On 2026-10-24 the founder said the phone must work "with your computer
 // completely closed": a reply sent from the bus waited in phone_commands until
 // the computer woke. Now, after each turn, the computer leaves a kit in the
-// cloud (shared/cloud-kit.mjs): the reply run's own pack and command line,
+// cloud (shared/cloud-kit.mts): the reply run's own pack and command line,
 // with the reply's place marked. Driven here end to end on this machine: the
 // computer's real relay (main/cloud/run.mts) writes the kit, a stand-in for
 // the cloud server starts the reply from it with nothing but the kit (as
@@ -26,7 +26,7 @@ import { cloudRun } from '../main/cloud/run.mts';
 import { readMarker, writeMarker } from '../main/cloud/marker.mts';
 import { markerForCloudRun, readKitCopy } from '../main/cloud/kit.mts';
 import { kitFrom } from '../main/cloud/run-cli.mts';
-import { REPLY_MARK, kitKey, checkKit, startPayload, replyFrame, replyPrompt, cloudUserLine, cloudSessionId, lastAnswerIn } from '../shared/cloud-kit.mjs';
+import { REPLY_MARK, kitKey, checkKit, startPayload, replyFrame, replyPrompt, cloudUserLine, cloudSessionId, lastAnswerIn } from '../shared/cloud-kit.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');

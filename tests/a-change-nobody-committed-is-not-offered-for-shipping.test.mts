@@ -19,10 +19,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { snapshotRepo, changeFromRepo, whereTheWorkStands } from '../main/git-change.mjs';
-import { writeChangeForRun, changeFromTranscript, standsAcross } from '../main/code-change.mjs';
-import { machineryPath } from '../main/store/home.mjs';
-import { changePath } from '../main/code-change.mjs';
+import { snapshotRepo, changeFromRepo, whereTheWorkStands } from '../main/git-change.mts';
+import { writeChangeForRun, changeFromTranscript, standsAcross } from '../main/code-change.mts';
+import { machineryPath } from '../main/store/home.mts';
+import { changePath } from '../main/code-change.mts';
 import {
   COMMIT_FIRST_OFFER, NOT_COMMITTED_ASK, SHIP_ASK, SHIP_OFFER, shipOfferFor, standingFrom, UNREAD,
 } from '../renderer/src/ship-offer.ts';

@@ -4,7 +4,7 @@
 // Maya shares a project, Theo's Mac joins it as a project of its own (in a
 // folder of its own, at a different path), and the rows' summaries and who
 // has to act next reach both Macs. Since a review on 2026-10-01 that is ALL a
-// teammate's line may set here (shared/team-rules.mjs whatATeammateMaySet):
+// teammate's line may set here (shared/team-rules.mts whatATeammateMaySet):
 // a body, answer or status from another Mac could start an agent on words
 // its owner never wrote. Words travel between two people as messages.
 //
@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamSync, memorySyncState, MAX_SHARED_PROJECTS } from '../main/team/sync.mts';
 

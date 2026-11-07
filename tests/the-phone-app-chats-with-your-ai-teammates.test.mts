@@ -5,7 +5,7 @@
 // came unsigned. It also lacked three smaller things the web app had: group
 // messages that name you at the top of Needs you, Mark unread, and "in the
 // cloud" on a cloud run's working line. These pin the phone's own rules with
-// teammates in the shape the computer sends them (shared/phone-snapshot.mjs
+// teammates in the shape the computer sends them (shared/phone-snapshot.mts
 // `phoneTeammatesOf`), and that the screens use them.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -13,7 +13,7 @@ import { actWords, chatRows, mateOf, nowLine, onTheirWay, openQuestions, roleOf,
 import { bottomTabs } from '../mobile/src/lib/groups';
 import { isUnread, markSeen, markUnseen } from '../mobile/src/lib/unread';
 import { liveOf } from '../mobile/src/lib/thread-offers';
-import { checkCommand } from '../shared/phone-snapshot.mjs';
+import { checkCommand } from '../shared/phone-snapshot.mts';
 import { settingCommand } from '../renderer/src/phone-rows';
 
 const read = (p) => fs.readFileSync(p, 'utf8');

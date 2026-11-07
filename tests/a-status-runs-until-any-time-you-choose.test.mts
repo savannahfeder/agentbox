@@ -25,8 +25,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
-import { holdEnds, statusEnds } from '../shared/team-status.mjs';
+import { memorySession } from '../main/team/session.mts';
+import { holdEnds, statusEnds } from '../shared/team-status.mts';
 import { UNTIL_PRESETS, endOf, readUntil, untilWords } from '../renderer/src/team/status-until';
 import { StatusComposer } from '../renderer/src/team/status';
 

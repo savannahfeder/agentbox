@@ -11,9 +11,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
+import { appHome } from '../main/store/home.mts';
 import { belongsInInbox } from '../renderer/src/list-rules';
-import { isCleanRun } from '../shared/repeats.mjs';
+import { isCleanRun } from '../shared/repeats.mts';
 import { loadStore } from '../main/store-modules.mts';
 import { Teammates } from '../main/teammates.mts';
 
@@ -25,11 +25,11 @@ describe('the store tool', () => {
   beforeEach(async () => {
     process.env.STORE_ACCOUNT_ID = 'acct-routed-ask';
     fs.mkdirSync(path.join(appHome(), 'accounts', 'acct-routed-ask'), { recursive: true });
-    (await import('../mcp/core/account.mjs')).resolveAccount();
-    product = (await import('../mcp/core/products.mjs')).createProduct(`Lumen ${Math.random().toString(36).slice(2, 8)}`);
+    (await import('../mcp/core/account.mts')).resolveAccount();
+    product = (await import('../mcp/core/products.mts')).createProduct(`Lumen ${Math.random().toString(36).slice(2, 8)}`);
     dir = path.join(appHome(), 'accounts', 'acct-routed-ask', product.id);
-    work = await import('../mcp/core/work.mjs');
-    store = await import('../main/store/work-items.mjs');
+    work = await import('../mcp/core/work.mts');
+    store = await import('../main/store/work-items.mts');
     claims = work.createClaimRegistry({ holder: 'test-worker', heartbeatMs: 60_000 });
   });
   afterEach(() => { claims._stop(); delete process.env.STORE_ACCOUNT_ID; });
@@ -79,8 +79,8 @@ describe('what the teammate is told', () => {
   beforeEach(async () => {
     process.env.STORE_ACCOUNT_ID = `acct-${Math.random().toString(36).slice(2, 8)}`;
     fs.mkdirSync(path.join(appHome(), 'accounts', process.env.STORE_ACCOUNT_ID), { recursive: true });
-    (await import('../mcp/core/account.mjs')).resolveAccount();
-    const product = (await import('../mcp/core/products.mjs')).createProduct(`Lumen ${Math.random().toString(36).slice(2, 8)}`);
+    (await import('../mcp/core/account.mts')).resolveAccount();
+    const product = (await import('../mcp/core/products.mts')).createProduct(`Lumen ${Math.random().toString(36).slice(2, 8)}`);
     const dir = path.join(appHome(), 'accounts', process.env.STORE_ACCOUNT_ID, product.id);
     const mods = await loadStore();
     team = new Teammates({

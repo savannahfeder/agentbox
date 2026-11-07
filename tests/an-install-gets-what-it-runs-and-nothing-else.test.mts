@@ -123,7 +123,7 @@ describe('the dependency list', () => {
     // The number is a ceiling rather than an equality so that adding a real
     // one is not a test edit, but doubling it is. Raised from 10 to 12 for the
     // three AWS packages cloud runs talk to the sandbox and its storage with
-    // (main/cloud/aws.mjs), which run on every Mac that sends a thread there.
+    // (main/cloud/aws.mts), which run on every Mac that sends a thread there.
     expect(Object.keys(pkg.dependencies).length).toBeLessThan(12);
   });
 

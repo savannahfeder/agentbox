@@ -8,7 +8,7 @@ import { it, expect, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { machineSlots, autoAgents } from '../main/machine.mjs';
+import { machineSlots, autoAgents } from '../main/machine.mts';
 import { Supervisor } from '../main/supervisor.mts';
 
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });

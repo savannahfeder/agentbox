@@ -14,9 +14,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Repeats } from '../main/repeats.mjs';
+import { Repeats } from '../main/repeats.mts';
 import { loadStore } from '../main/store-modules.mts';
-import { isOwed, nextRunAt } from '../shared/repeats.mjs';
+import { isOwed, nextRunAt } from '../shared/repeats.mts';
 
 let dir, repeats;
 beforeEach(async () => {

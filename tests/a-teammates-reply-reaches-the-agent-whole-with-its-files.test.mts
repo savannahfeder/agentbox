@@ -12,10 +12,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { teamTell } from '../mcp/core/reach.mjs';
-import { REACH_LABEL } from '../shared/teammate-reach.mjs';
-import { isTaskRow } from '../shared/team-rules.mjs';
-import { filesForTheAgent } from '../main/teammate-reach.mjs';
+import { teamTell } from '../mcp/core/reach.mts';
+import { REACH_LABEL } from '../shared/teammate-reach.mts';
+import { isTaskRow } from '../shared/team-rules.mts';
+import { filesForTheAgent } from '../main/teammate-reach.mts';
 
 let t; let run;
 const askRows = () => t.rows(t.maya).filter((i) => (i.labels ?? []).includes(REACH_LABEL));

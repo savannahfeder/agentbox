@@ -32,7 +32,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_ENGINE } from '../shared/engines.mjs';
+import { DEFAULT_ENGINE } from '../shared/engines.mts';
 import { MODE_CYCLE, MODE_ORDER, nextMode, exactMode, exactClear } from '../renderer/src/modes.ts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

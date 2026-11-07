@@ -1,7 +1,7 @@
 // A CHARACTER SPLIT BETWEEN TWO LOG READS ARRIVES WHOLE.
 //
 // An open thread's agent log is sent only what it grew by
-// (shared/trace-delta.mjs). When one read ended partway through a character
+// (shared/trace-delta.mts). When one read ended partway through a character
 // of more than one byte, say the first byte of "€", and the next read brought
 // the rest, each piece was decoded alone and the window showed "���" where a
 // whole read shows "€". It stayed that way until the log was read whole again.
@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { traceAnswer, traceReader } from '../shared/trace-delta.mjs';
+import { traceAnswer, traceReader } from '../shared/trace-delta.mts';
 
 const BROKEN = '�';
 let dir, file, read;

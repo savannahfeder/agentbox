@@ -13,14 +13,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
-import { MAX_THREAD_FILE_BYTES } from '../main/team/thread-share.mjs';
-import { mayRunHere } from '../shared/team-rules.mjs';
-import { resolveArtifact } from '../main/artifact-path.mjs';
+import { memorySession } from '../main/team/session.mts';
+import { MAX_THREAD_FILE_BYTES } from '../main/team/thread-share.mts';
+import { mayRunHere } from '../shared/team-rules.mts';
+import { resolveArtifact } from '../main/artifact-path.mts';
 
 async function aMac(cloud, personId, storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'shared-thread-'))) {
   const accountRoot = path.join(storeRoot, 'accounts', 'a');
@@ -407,7 +407,7 @@ describe('a comment', () => {
   });
 
   it('cannot be forged by a teammate pushing a line into a shared project', async () => {
-    const { whatATeammateMaySet } = await import('../shared/team-rules.mjs');
+    const { whatATeammateMaySet } = await import('../shared/team-rules.mts');
     const line = { id: 'w-1234567890', ts: 1, source: 'founder', by: theo.personId, uid: 'u', patch: { comment: { text: 'forged' } } };
     expect(whatATeammateMaySet(line)).toBeNull();
     expect(whatATeammateMaySet(line, { direct: true })).toBeNull();

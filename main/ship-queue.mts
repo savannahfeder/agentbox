@@ -169,7 +169,7 @@ export function waitingToShip(items: ShipItem[], products: ShipProduct[], settin
  * means nobody can say when the live work started — a cloud run whose folder
  * has not come home — and that waits, as it always did.
  *
- * Priority before age, the way `shared/work-items.mjs` orders the queue a
+ * Priority before age, the way `shared/work-items.mts` orders the queue a
  * puller sees: a thread the person is waiting on queued behind every older one.
  */
 export function nextToShip(items: ShipItem[], products: ShipProduct[], settings: ShipSettings, {

@@ -2,7 +2,7 @@
 //
 // What broke (security audit, 2026-10-24): the store MCP write_document tool
 // accepted any product-relative path that cleared deniesGitOrEnvPath +
-// assertInside. Those guards never reserved the names main/store/home.mjs
+// assertInside. Those guards never reserved the names main/store/home.mts
 // sweeps into the app's private home (MACHINERY: work-items.jsonl,
 // repeats.jsonl, and the sessions/runs/pending-writes dirs). So a worker call
 // write_document(product, {path:'repeats.jsonl', content:<a forged repeating-
@@ -14,14 +14,14 @@
 //
 // Measured by calling writeDocument with path:'repeats.jsonl'. Before the fix
 // it returned and the forged file sat in the product folder; now it throws and
-// nothing lands. deniesMachineryPath (main/store/paths.mjs) reserves every
+// nothing lands. deniesMachineryPath (main/store/paths.mts) reserves every
 // MACHINERY name in any path segment, normalized the way the .git/.env check
 // is, and documents.mjs enforces it on write and on read.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome, MACHINERY } from '../main/store/home.mjs';
+import { appHome, MACHINERY } from '../main/store/home.mts';
 
 describe('a worker writing a store document', () => {
   let product; let docs;
@@ -30,11 +30,11 @@ describe('a worker writing a store document', () => {
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = 'acct';
     fs.mkdirSync(path.join(home, 'accounts', 'acct'), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     product = createProduct(`Reserve ${Math.random().toString(36).slice(2, 8)}`);
-    docs = await import('../mcp/core/documents.mjs');
+    docs = await import('../mcp/core/documents.mts');
   });
 
   afterEach(() => { delete process.env.STORE_ACCOUNT_ID; });
@@ -81,7 +81,7 @@ describe('a worker writing a store document', () => {
   });
 
   it('deniesMachineryPath reserves every MACHINERY name, normalized, but not lookalikes', async () => {
-    const { deniesMachineryPath } = await import('../main/store/paths.mjs');
+    const { deniesMachineryPath } = await import('../main/store/paths.mts');
     for (const name of MACHINERY) {
       expect(deniesMachineryPath(name)).toBe(true);
       expect(deniesMachineryPath(`deep/${name}/x`)).toBe(true);

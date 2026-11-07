@@ -13,7 +13,7 @@ import { attachmentLinks } from '../../../renderer/src/attachments';
 import { doItHereWrites } from '../../../renderer/src/threads-made';
 import type { PhoneSender } from '../../../renderer/src/phone-send';
 import type { WorkItem } from '../../../renderer/src/types';
-import { ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
+import { ruleLabel, type RepeatShape } from '../../../shared/repeats.mts';
 import type { Saved } from './attach';
 import { dayClock } from './back-at';
 

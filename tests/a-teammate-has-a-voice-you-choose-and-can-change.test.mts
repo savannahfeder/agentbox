@@ -9,8 +9,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { STARTERS, VOICES, voiceOf } from '../shared/teammates.mjs';
-import { teamSetup } from '../mcp/core/teammates.mjs';
+import { STARTERS, VOICES, voiceOf } from '../shared/teammates.mts';
+import { teamSetup } from '../mcp/core/teammates.mts';
 
 const page = fs.readFileSync(new URL('../renderer/src/teammates/TeammatesPage.tsx', import.meta.url), 'utf8');
 const fn = (name) => page.slice(page.indexOf(`function ${name}(`), page.indexOf('\nfunction ', page.indexOf(`function ${name}(`) + 10));

@@ -8,7 +8,7 @@
 // as fresh work (true); after, only a founder/system author does.
 import { describe, it, expect } from 'vitest';
 import { Supervisor } from '../main/supervisor.mts';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 
 const row = ({ source, labels = [], id = 'w-1', product = 'acme' }) => {
   const it = foldWorkItems([{ id, ts: 1, source, patch: { title: 't', kind: 'directive', status: 'open', labels } }]).get(id);

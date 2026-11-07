@@ -12,9 +12,9 @@ import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { teamFile } from '../mcp/core/reach.mjs';
-import { foldFolders, readFolderLog } from '../shared/file-folders.mjs';
-import { filesOf } from '../main/files-place.mjs';
+import { teamFile } from '../mcp/core/reach.mts';
+import { foldFolders, readFolderLog } from '../shared/file-folders.mts';
+import { filesOf } from '../main/files-place.mts';
 
 let t; let run; let project; let dir;
 const lines = () => t.maya.store.readHistory(t.product.id, run.id, { max: 1000 });

@@ -5,7 +5,7 @@
 // holds what each rule is for.
 
 import { checkProjectFolder } from '../../shared/project-folder-check.mts';
-import { occurrenceId, periodKey, type RepeatShape } from '../../shared/repeats.mjs';
+import { occurrenceId, periodKey, type RepeatShape } from '../../shared/repeats.mts';
 import { projectNameFor } from './agent-import-card';
 import { shortPath } from './onboarding';
 

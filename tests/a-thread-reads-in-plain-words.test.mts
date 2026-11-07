@@ -29,7 +29,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { commandWork, isBookkeeping, workVerb } from '../shared/work-lines.mjs';
+import { commandWork, isBookkeeping, workVerb } from '../shared/work-lines.mts';
 import { runNodes } from '../renderer/src/item-thread';
 import { activitySummary } from '../renderer/src/activity-summary';
 import { claudeActivity, currentActivity } from '../main/agent-activity.mts';
@@ -108,7 +108,7 @@ describe('a command in plain words', () => {
   it('reads the shapes the traces actually hold', () => {
     const say = (c) => { const w = commandWork(c); return w ? `${w.verb} ${w.subject}`.trim() : null; };
     expect(say('sed -n 1,200p renderer/src/item-thread.ts')).toBe('read renderer/src/item-thread.ts');
-    expect(say('grep -rn "workVerb" shared/agents.mjs')).toBe('searched for workVerb');
+    expect(say('grep -rn "workVerb" shared/agents.mts')).toBe('searched for workVerb');
     expect(say('ls renderer/src')).toBe('listed renderer/src');
     expect(say('npx vitest run tests/one-door-one-list.test.mts --maxWorkers=1'))
       .toBe('ran the tests one-door-one-list.test.mts');

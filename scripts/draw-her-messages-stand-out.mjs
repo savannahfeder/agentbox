@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { openInbox } from './lib/inbox-harness.mjs';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 
 const outDir = process.argv[2] ?? '/tmp/w-250047ba5f-chapters';
 const dist = process.argv[3];

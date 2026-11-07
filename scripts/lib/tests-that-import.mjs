@@ -3,7 +3,7 @@
 //
 // A test that imports the changed file DIRECTLY quotes its name, so
 // scripts/lib/tests-that-read.mjs already finds it. A test that imports
-// something that imports it quotes nothing. For main/engine-bin.mjs that is
+// something that imports it quotes nothing. For main/engine-bin.mts that is
 // the difference between 11 test files and 362, and the gate was sizing a
 // ship's three minutes off the 11
 // (tests/a-core-change-does-not-hand-the-push-more-tests-than-it-can-run).

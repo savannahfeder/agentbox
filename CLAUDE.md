@@ -211,7 +211,7 @@ is the one app and the one source of truth. The plan is `docs/team/PLAN.md`.
   makes a copy the team version: machines that run it keep their own copy, and
   without it the app is the single-person app. `cloud/team.config.example.json`
   shows the shape. The same database's public address and anon key do ship, in
-  `shared/cloud-address.mjs`, so every copy can sign in to Agentbox Cloud
+  `shared/cloud-address.mts`, so every copy can sign in to Agentbox Cloud
   (2026-10-26); they were already inside every download.
 - A branch cut from the old private repository's history will not line up with
   this one: the merge rewrote those commits to take the key file out. Move it

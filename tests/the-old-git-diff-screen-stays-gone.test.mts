@@ -11,7 +11,7 @@
 // The reason is measured rather than argued. A card drawn only from the
 // agent's conversation is empty whenever the agent used sed or a script, which
 // on her Mac was 101 of the 105 runs that changed a file over two days. So the
-// disk is read as well, in ONE place: main/git-change.mjs, which photographs a
+// disk is read as well, in ONE place: main/git-change.mts, which photographs a
 // run's own checkout when it spawns and reads it back when it exits. What
 // stays forbidden is the old shape: a channel the renderer can ask for a patch
 // on, a branch-versus-main diff, and a slab of raw patch on the screen.
@@ -55,7 +55,7 @@ describe('the code an agent wrote comes out of the conversation, never out of gi
 
   // COMMENTS ARE STRIPPED BEFORE THIS LOOKS, and that is not a loosening.
   // What must not exist is a CALL; the reason for the shape we chose is
-  // written out in prose in main/code-change.mjs, main/git-change.mjs and the
+  // written out in prose in main/code-change.mts, main/git-change.mts and the
   // supervisor's exit handler, and all three have to be able to name the thing
   // they are refusing to do. Matching the prose made writing down the reason
   // fail the test.
@@ -67,7 +67,7 @@ describe('the code an agent wrote comes out of the conversation, never out of gi
     for (const f of files) {
       // 2026-09-16: an explicit /diff command is approved migration parity.
       // The automatic task diff screen remains absent.
-      if (f === 'git-change.mjs' || f === 'task-commands.mts') continue;
+      if (f === 'git-change.mts' || f === 'task-commands.mts') continue;
       const src = code(read(path.join('main', f)));
       expect(src, `${f} runs git diff`).not.toMatch(/'diff'|"diff"|git diff/);
     }
@@ -78,7 +78,7 @@ describe('the code an agent wrote comes out of the conversation, never out of gi
   // work in a shared checkout, and it is empty on a product with no repository
   // at all. The photograph taken at spawn is what makes the window this run's.
   it('never diffs a branch against main, and never hands a patch to the window', () => {
-    const src = read('main/git-change.mjs');
+    const src = read('main/git-change.mts');
     expect(src).not.toMatch(/main\.\.\./);
     expect(src).not.toContain('ipcMain');
     expect(read('preload.cjs')).not.toContain('git-change');

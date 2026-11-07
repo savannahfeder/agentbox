@@ -21,7 +21,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Supervisor } from '../main/supervisor.mts';
-import { answerSettled } from '../shared/answers.mjs';
+import { answerSettled } from '../shared/answers.mts';
 import { belongsInInbox } from '../renderer/src/list-rules';
 
 const SPAWNED = 1_790_131_152_960; // she answered at 19:39:12

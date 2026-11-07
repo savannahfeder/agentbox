@@ -105,7 +105,7 @@ describe('the corner asks the app-server for nothing', () => {
   // AND NOWHERE ELSE IN THE APP EITHER. The method name is the thing to search
   // for: one occurrence anywhere in shipped code is the call being back.
   it('is not asked for anywhere in the app', () => {
-    for (const file of ['main/codex-usage.mts', 'shared/codex-usage.mts', 'main/supervisor.mts', 'main/ipc.mts', 'main/codex-app-server.mjs']) {
+    for (const file of ['main/codex-usage.mts', 'shared/codex-usage.mts', 'main/supervisor.mts', 'main/ipc.mts', 'main/codex-app-server.mts']) {
       expect(code(file)).not.toContain('account/rateLimits/read');
     }
   });

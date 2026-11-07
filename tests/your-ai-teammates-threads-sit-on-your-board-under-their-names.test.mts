@@ -17,7 +17,7 @@ import { boardItems, whoseBoard } from '../renderer/src/team/everything/whose-bo
 import { InboxBoard } from '../renderer/src/threads/Pages.tsx';
 import { TeamContext } from '../renderer/src/team/people.tsx';
 import { TeammatesContext } from '../renderer/src/teammates/row-lead.tsx';
-import { teammateIdOf } from '../shared/teammates.mjs';
+import { teammateIdOf } from '../shared/teammates.mts';
 globalThis.React = React;
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');

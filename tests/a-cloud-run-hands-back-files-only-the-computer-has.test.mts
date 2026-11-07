@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { CLOUD_NOTE, PLAIN_CLOUD_NOTE } from '../main/cloud/run.mts';
 import { createResourceRequests } from '../main/cloud/resources.mts';
-import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
+import { HAND_BACK } from '../shared/cloud-hand-back.mts';
 
 describe('what a cloud run is told about files only the computer has', () => {
   for (const [name, note] of [['with a repository', CLOUD_NOTE], ['with none', PLAIN_CLOUD_NOTE]]) {

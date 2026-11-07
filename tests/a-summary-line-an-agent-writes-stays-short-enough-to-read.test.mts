@@ -18,8 +18,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
-import { SUMMARY_WORDS, wordsIn } from '../shared/thread-cards.mjs';
+import { appHome } from '../main/store/home.mts';
+import { SUMMARY_WORDS, wordsIn } from '../shared/thread-cards.mts';
 
 const words = (n) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
 
@@ -30,12 +30,12 @@ describe('a summary line an agent writes', () => {
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = 'acct';
     fs.mkdirSync(path.join(home, 'accounts', 'acct'), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     product = createProduct(`Summary ${Math.random().toString(36).slice(2, 8)}`);
-    work = await import('../mcp/core/work.mjs');
-    store = await import('../main/store/work-items.mjs');
+    work = await import('../mcp/core/work.mts');
+    store = await import('../main/store/work-items.mts');
     dir = path.join(home, 'accounts', 'acct', product.id);
     claims = work.createClaimRegistry({ holder: 'test-worker', heartbeatMs: 60_000 });
   });

@@ -5,9 +5,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { appFilesPlace } from '../main/files-place.mjs';
+import { appFilesPlace } from '../main/files-place.mts';
 import { filesShown } from '../renderer/src/files/files-shown.ts';
-import { filesInLines, shownName, threadFiles } from '../shared/artifact-marks.mjs';
+import { filesInLines, shownName, threadFiles } from '../shared/artifact-marks.mts';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'group-files-'));
 afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));

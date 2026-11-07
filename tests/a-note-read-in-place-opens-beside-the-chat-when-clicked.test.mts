@@ -12,7 +12,7 @@
 // behind its own corner mark; media keeps the large viewer.
 import { it, expect } from 'vitest';
 import fs from 'node:fs';
-import { viewKind } from '../shared/artifact-marks.mjs';
+import { viewKind } from '../shared/artifact-marks.mts';
 import { opensInTheLargeViewer } from '../renderer/src/artifact-layout.ts';
 
 const read = (p) => fs.readFileSync(new URL(`../renderer/src/${p}`, import.meta.url), 'utf8');

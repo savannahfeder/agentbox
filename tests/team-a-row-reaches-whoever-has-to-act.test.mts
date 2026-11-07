@@ -8,7 +8,7 @@
 // conversation goes back and forth between two inboxes instead of sitting in
 // both. A private row is untouched by any of this.
 import { it, expect, describe } from 'vitest';
-import { inMyInbox, handedOnByReply } from '../shared/team-rules.mjs';
+import { inMyInbox, handedOnByReply } from '../shared/team-rules.mts';
 
 const MAYA = 'p-maya';
 const THEO = 'p-theo';

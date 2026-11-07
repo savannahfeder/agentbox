@@ -120,7 +120,7 @@ export function git(cwd, ...args) {
  *   them ever routed a row to Claude Code the spawn would fail loudly rather
  *   than quietly succeeding and proving the wrong thing.
  *
- *   `engineChoice` IS THE GATE. shared/engines.mjs refuses the second engine
+ *   `engineChoice` IS THE GATE. shared/engines.mts refuses the second engine
  *   for every caller that cannot produce the ENGINE_CHOICE_ENABLED symbol, and
  *   main/supervisor.mts derives that symbol from exactly this value. Without a
  *   date here every row in these proofs would run on Claude Code -- which is
@@ -144,7 +144,7 @@ export async function throwawayApp({
 } = {}) {
   // AGENTBOX'S OWN HOME GOES IN THE SCRATCH FOLDER TOO, AND IT DID NOT AT FIRST.
   // A run's trace is written under `appHome`, which is `~/.astral` unless
-  // ASTRAL_HOME says otherwise (main/store/home.mjs) -- so the first green run
+  // ASTRAL_HOME says otherwise (main/store/home.mts) -- so the first green run
   // of the two-worker proof left two project folders in the real ~/.astral for
   // a store that lives in /tmp and is deleted on the next run. A proof that
   // tidies up after itself everywhere except one directory is a proof that

@@ -1,27 +1,27 @@
 // Teammates in the main process: the files, the tick that carries out
 // `planWakes`, and the brief a teammate's run is given. The decisions are in
-// shared/teammates.mjs; this only reads, writes and starts.
+// shared/teammates.mts; this only reads, writes and starts.
 import {
   planWakes, teammateLabel, FROM_LABEL_PREFIX, HOP_LABEL_PREFIX, hopOf, teammateIdOf, YOU, mentionsIn,
   letterFor, statusOf, runLines, STARTERS, CHAT_TAIL, isWorks, DEFAULT_LIMIT, MAX_HOPS,
   offerFrom, offerAnswer, OFFER_LABEL, OFFER_MAKE, OFFER_NOT_NOW, TEAMMATE_EFFORT, GREETING, starterAsks,
   dutyWhen, dutyOf, DUTY_LABEL_PREFIX, CHAT_LABEL, yesFirst, WORK_LABEL_PREFIX, isActiveRun, isQueued, STOPPED_NOTE,
   METHOD_CAP, recordOf, sourceText, pausedNow, WEEK_MS, workOf, UNREAD_HOLD, cleanDuty, dutyStart, howYouWrite, VOICES,
-} from '../shared/teammates.mjs';
-import { reachTick } from './teammate-reach.mjs';
-import { filesFoldersBrief } from '../shared/file-folders.mjs';
-import { audienceWords } from '../shared/teammate-reach.mjs';
-import { isShippedNote } from '../shared/shipped-note.mjs';
-import { ruleLabel, periodKey } from '../shared/repeats.mjs';
+} from '../shared/teammates.mts';
+import { reachTick } from './teammate-reach.mts';
+import { filesFoldersBrief } from '../shared/file-folders.mts';
+import { audienceWords } from '../shared/teammate-reach.mts';
+import { isShippedNote } from '../shared/shipped-note.mts';
+import { ruleLabel, periodKey } from '../shared/repeats.mts';
 import {
   teamDir, readTeammates, readChat, writeTeammate, writeChat, newTeammateId, newMemoryId, readPlaybooks,
   readMethod, methodFile, sourcesDir, readTeamView, readOutbox, writeOutbox,
-} from './store/teammates-files.mjs';
+} from './store/teammates-files.mts';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RepeatShape } from '../shared/repeats.mjs';
-import type { RouteRecord } from '../shared/auto-route.mjs';
-import type { ItemRef, TeammateStatus, Offer, WakeTrigger, WakeAction } from '../shared/teammates.mjs';
+import type { RepeatShape } from '../shared/repeats.mts';
+import type { RouteRecord } from '../shared/auto-route.mts';
+import type { ItemRef, TeammateStatus, Offer, WakeTrigger, WakeAction } from '../shared/teammates.mts';
 
 export type { ItemRef, TeammateStatus, Offer, WakeTrigger, WakeAction };
 

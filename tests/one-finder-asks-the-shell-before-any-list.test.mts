@@ -1,7 +1,7 @@
 // ONE FINDER FOR EVERY CODING AGENT, AND IT ASKS THE SHELL FIRST.
 //
-// What was here before: `main/claude-bin.mjs` (338 lines) and
-// `main/codex-bin.mjs` (279 lines), two copies of one idea, pinned by 713 lines
+// What was here before: `main/claude-bin.mts` (338 lines) and
+// `main/codex-bin.mts` (279 lines), two copies of one idea, pinned by 713 lines
 // of test across two files. Between them they shipped 35 hand-written absolute
 // paths, 10 globbed node-version-manager trees and 8 app-bundle paths. Every
 // entry was a place somebody once had the tool installed.
@@ -41,9 +41,9 @@ import { describe, it, expect } from 'vitest';
 import path from 'node:path';
 import {
   ENGINES, engineKeys, findEngine, resolveEngine, forgetEngine, sharedBinDirs,
-} from '../main/engine-bin.mjs';
-import { findClaudeBin, candidatePaths as claudePaths } from '../main/claude-bin.mjs';
-import { findCodexBin, candidatePaths as codexPaths } from '../main/codex-bin.mjs';
+} from '../main/engine-bin.mts';
+import { findClaudeBin, candidatePaths as claudePaths } from '../main/claude-bin.mts';
+import { findCodexBin, candidatePaths as codexPaths } from '../main/codex-bin.mts';
 
 const HOME = '/Users/stranger';
 const only = (...paths) => (p) => paths.includes(p);

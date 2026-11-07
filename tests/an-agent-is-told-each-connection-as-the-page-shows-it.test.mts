@@ -19,10 +19,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { startToolsFixture } from '../cloud/standin/tools-mcp.mjs';
-import { createConnections } from '../main/connections/index.mjs';
-import { createBroker } from '../main/connections/broker.mjs';
+import { createConnections } from '../main/connections/index.mts';
+import { createBroker } from '../main/connections/broker.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { catalogFor, clockAt } from '../shared/connections-catalog.mjs';
+import { catalogFor, clockAt } from '../shared/connections-catalog.mts';
 
 const key = crypto.randomBytes(32);
 const cipher = {

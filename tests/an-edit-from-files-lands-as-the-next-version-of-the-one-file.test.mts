@@ -14,14 +14,14 @@ import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
-import { appFilesPlace } from '../main/files-place.mjs';
-import { saveNextVersion } from '../main/file-version.mjs';
-import { approvalSince, filesInLines, familyName, threadFiles } from '../shared/artifact-marks.mjs';
+import { memorySession } from '../main/team/session.mts';
+import { appFilesPlace } from '../main/files-place.mts';
+import { saveNextVersion } from '../main/file-version.mts';
+import { approvalSince, filesInLines, familyName, threadFiles } from '../shared/artifact-marks.mts';
 
 async function aMac(cloud, personId) {
   const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'edit-files-'));

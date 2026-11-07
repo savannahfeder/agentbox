@@ -1,5 +1,5 @@
 import { harnessFor } from './harnesses.mts';
-import { teammateIdOf } from '../shared/teammates.mjs';
+import { teammateIdOf } from '../shared/teammates.mts';
 import { catchUpDue } from '../shared/agent-import.mts';
 // THE NAME ON THE ROW, WRITTEN RATHER THAN TAKEN FROM THE FIRST SENTENCE.
 //
@@ -35,7 +35,7 @@ import { catchUpDue } from '../shared/agent-import.mts';
 //
 // The write goes to `label`, never to `title`. The title belongs to the user,
 // the fold makes the user outrank us on it, and the user still reads their own
-// words the moment they open the row (shared/work-items.mjs).
+// words the moment they open the row (shared/work-items.mts).
 
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
@@ -138,7 +138,7 @@ export function namePrompt(item?: RowItem | null) {
     '--- opened with ---',
     cut(item?.title, 300),
     // A teammate's run is titled with its own part of a message that may have
-    // woken several (shared/teammates.mjs `runTitle`); the whole would mix them.
+    // woken several (shared/teammates.mts `runTitle`); the whole would mix them.
     // A task asked in a chat carries the chat after its ask
     // (renderer/src/team/agent-mentions.ts taskBrief); the oldest lines of it
     // are not what the thread is about.

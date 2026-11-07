@@ -54,8 +54,8 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { prepareHome, freshEnv } from '../shared/fresh-user-home.mjs';
-import { candidatePaths, findClaudeBin } from '../main/claude-bin.mjs';
+import { prepareHome, freshEnv } from '../shared/fresh-user-home.mts';
+import { candidatePaths, findClaudeBin } from '../main/claude-bin.mts';
 
 const tmp = (tag) => fs.mkdtempSync(path.join(os.tmpdir(), `zero-${tag}-`));
 

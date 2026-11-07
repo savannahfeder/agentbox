@@ -7,7 +7,7 @@
 // v14 each changing a different sentence of a paragraph. This merge goes by lines
 // and then by words, and says when it could not tell what was meant.
 import { describe, it, expect } from 'vitest';
-import { changeSize, mergeText } from '../shared/text-merge.mjs';
+import { changeSize, mergeText } from '../shared/text-merge.mts';
 
 const para = 'One sentence here. A second sentence there. A third one follows.';
 

@@ -1,4 +1,4 @@
-// Types for shared/agents.mjs, which is plain ESM so that main (Node), the
+// Types for shared/agents.mts, which is plain ESM so that main (Node), the
 // renderer (Vite) and the tests share one copy of the rules.
 
 export interface AgentLike {
@@ -129,8 +129,8 @@ export const WORK_CHARS: number;
 export const WORK_RUN: number;
 export const WORK_TOTAL: number;
 // WHAT A TOOL CALL SAYS, in three rules:
-// the verb, the subject and the fold. Implemented in shared/work-lines.mjs and
-// re-exported from shared/agents.mjs so nothing needs a second import.
+// the verb, the subject and the fold. Implemented in shared/work-lines.mts and
+// re-exported from shared/agents.mts so nothing needs a second import.
 export function workVerb(name: string): string;
 export function workSubject(
   input: Record<string, unknown> | null | undefined,

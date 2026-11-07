@@ -46,9 +46,9 @@ import { EventEmitter } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createCodexAppServer } from '../main/codex-app-server.mjs';
+import { createCodexAppServer } from '../main/codex-app-server.mts';
 import { createCodexWorker } from '../main/codex-session.mts';
-import { rememberCodexChange, CHANGE_FRAME_CAP, CHANGE_BYTE_CAP } from '../main/codex.mjs';
+import { rememberCodexChange, CHANGE_FRAME_CAP, CHANGE_BYTE_CAP } from '../main/codex.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 

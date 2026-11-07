@@ -8,7 +8,7 @@ import { it, expect, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { filesOf } from '../main/files-place.mjs';
+import { filesOf } from '../main/files-place.mts';
 
 afterEach(() => vi.restoreAllMocks());
 

@@ -1,7 +1,7 @@
 // HER MAC'S SIDE OF THE PHONE WITH THE MAC SHUT (docs/cloud/PHONE-PLAN.md, step 1).
 //
 // For each project she put on her phone, this writes a readable copy of every
-// thread worth carrying (shared/phone-snapshot.mjs) to her own rows in the
+// thread worth carrying (shared/phone-snapshot.mts) to her own rows in the
 // cloud, and takes the commands her phone left while the Mac was away: a
 // reply, a new thread, a snooze, a close. Each command goes through the very
 // handler the window uses for the same thing, so a reply from the phone is a
@@ -34,19 +34,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import os from 'node:os';
-import { threadSnapshot, threadsWorthCarrying, snapshotKey, checkCommand, madeHere, hideSecrets, bytesOf, phoneChoices, phoneApproval, phoneRepeatsOf, phoneTeammatesOf, SNAPSHOT_LIMITS, TEAMMATES_LIMITS } from '../shared/phone-snapshot.mjs';
-import { phoneSettingsOf, settingRoute } from '../shared/phone-settings.mjs';
+import { threadSnapshot, threadsWorthCarrying, snapshotKey, checkCommand, madeHere, hideSecrets, bytesOf, phoneChoices, phoneApproval, phoneRepeatsOf, phoneTeammatesOf, SNAPSHOT_LIMITS, TEAMMATES_LIMITS } from '../shared/phone-snapshot.mts';
+import { phoneSettingsOf, settingRoute } from '../shared/phone-settings.mts';
 import { createPhoneUploads, UPLOAD_LIMITS } from './phone-uploads.mts';
 import type { PhoneBackend, ThreadSnapshot, UploadedFile } from './phone-uploads.mts';
-import { createPhoneAlerts } from './phone-alerts.mjs';
-import { PHONE_FILES_MAX, phoneFilesIn, phoneFileSafeName, phoneAttachmentRel } from '../shared/phone-files.mjs';
-import { runOfClaim, cloudCard } from '../shared/cloud-kit.mjs';
-import { isCarried } from '../shared/cloud-carry.mjs';
-import { heldForUndo } from '../shared/phone-undo.mjs';
-import type { CarriedCommand } from '../shared/cloud-carry.mjs';
-import type { PhoneWait } from '../shared/phone-snapshot.mjs';
+import { createPhoneAlerts } from './phone-alerts.mts';
+import { PHONE_FILES_MAX, phoneFilesIn, phoneFileSafeName, phoneAttachmentRel } from '../shared/phone-files.mts';
+import { runOfClaim, cloudCard } from '../shared/cloud-kit.mts';
+import { isCarried } from '../shared/cloud-carry.mts';
+import { heldForUndo } from '../shared/phone-undo.mts';
+import type { CarriedCommand } from '../shared/cloud-carry.mts';
+import type { PhoneWait } from '../shared/phone-snapshot.mts';
 
-// A file her phone sent with a reply or a new thread (shared/phone-files.mjs).
+// A file her phone sent with a reply or a new thread (shared/phone-files.mts).
 export { phoneFilesIn };
 const HEARTBEAT_MS = 30_000;
 const SETTINGS_HEARTBEAT_MS = 5 * 60_000;
@@ -227,7 +227,7 @@ type Manifest = ReturnType<ReturnType<typeof createPhoneUploads>['manifest']>;
 type LiveCopy = { since: number; where: 'cloud' | 'mac'; doing: { label: string; startedAt: number }[]; at: number; movable?: boolean; runId?: string };
 type BuiltCopy = { inputs: string; key: string; live: LiveCopy | null; files: Manifest | null; askKey: string; waitKey: string; base: Snapshot | null };
 
-declare module '../shared/phone-snapshot.mjs' {
+declare module '../shared/phone-snapshot.mts' {
   export function phoneApproval(request: { id: unknown; at?: unknown; tool?: unknown; input?: unknown }, card: unknown, ctx?: { home?: string | null }): Record<string, unknown>;
   export function phoneRepeatsOf(rules: unknown, slugs: string[], opts?: { home?: string | null }): unknown[];
   export function phoneTeammatesOf(view: unknown, opts?: { home?: string | null; limits?: typeof TEAMMATES_LIMITS }): Record<string, unknown> | null;
@@ -249,7 +249,7 @@ export function createPhoneInbox({
   stateFile,
   home = os.homedir(),
   now = Date.now,
-  // How long a phone send her Undo can take back is left alone (shared/phone-undo.mjs).
+  // How long a phone send her Undo can take back is left alone (shared/phone-undo.mts).
   // The app passes PHONE_UNDO_HOLD_MS; none takes each one on sight.
   undoHoldMs = 0,
   log = () => {},
@@ -257,7 +257,7 @@ export function createPhoneInbox({
   build = threadSnapshot,
   // (slug, id) -> { since, where: 'mac' | 'cloud', doing: [{ label, startedAt }] } while an agent runs on it, else null.
   liveOf = () => null,
-  // () -> { byId: { [id]: { state, tool?, until? } }, paused } (shared/phone-snapshot.mjs phoneWaitsOf),
+  // () -> { byId: { [id]: { state, tool?, until? } }, paused } (shared/phone-snapshot.mts phoneWaitsOf),
   // why each thread nothing runs on is waiting, read once a pass; none says nothing.
   waitsOf = () => null,
   // The permission cards waiting on her, each with the fingerprint of the card as drawn: [{ ...request, card }].
@@ -273,13 +273,13 @@ export function createPhoneInbox({
   version = '',
   // This computer as her phone names it.
   name = os.hostname().replace(/\.local$/i, ''),
-  // How long since she last touched this Mac; none sends no alerts (main/phone-alerts.mjs).
+  // How long since she last touched this Mac; none sends no alerts (main/phone-alerts.mts).
   idleMs = null,
   // How an alert reaches Expo; a test stands in for it.
   sendPush,
   // And how a Web Push reaches the web app; a test stands in for it too.
   sendWebPush,
-  // THE PHONE WITH THE LID SHUT (shared/cloud-kit.mjs). Told which projects
+  // THE PHONE WITH THE LID SHUT (shared/cloud-kit.mts). Told which projects
   // are on her phone each pass; asked whether this computer leaves its
   // threads ready for the cloud (said on the project); and handed each run
   // the cloud server started for a reply, to make it the thread's own
@@ -295,7 +295,7 @@ export function createPhoneInbox({
   // to make its row and folder and join it (Supervisor#adoptCloudNewThread).
   newThreadKits = null,
   adoptNew = null,
-  // THE MAC'S OWN ROWS WITH THE LID SHUT (shared/cloud-carry.mjs): whether it
+  // THE MAC'S OWN ROWS WITH THE LID SHUT (shared/cloud-carry.mts): whether it
   // is in a dark wake, the rows it would have started, and the supervisor told
   // of each hand-over written and each taken back.
   asleep = () => false,
@@ -561,7 +561,7 @@ export function createPhoneInbox({
 
   // What a command already did, if this computer did it before it stopped:
   // the line or the row that carries the command's own id (`fromPhone`,
-  // shared/work-items.mjs). Nothing else counts, however alike its words.
+  // shared/work-items.mts). Nothing else counts, however alike its words.
   function landed(cmd: PhoneCommand, item: string | null | undefined) {
     if (cmd.kind === 'reply') return historyOf(cmd.project, item!, { all: true }).some((l) => l?.patch?.fromPhone === cmd.id) ? item : null;
     if (cmd.kind === 'new') return listItems(cmd.project).find((i) => i.fromPhone === cmd.id)?.id ?? null;
@@ -779,7 +779,7 @@ export function createPhoneInbox({
   }
 
   // EACH ROW A SLEEPING MAC WOULD HAVE STARTED, written as its own command for
-  // the cloud server to start (shared/cloud-carry.mjs). The supervisor is told
+  // the cloud server to start (shared/cloud-carry.mts). The supervisor is told
   // before the write, so a pass meanwhile cannot write it twice, and told it
   // is taken back when the write fails.
   async function handOver() {

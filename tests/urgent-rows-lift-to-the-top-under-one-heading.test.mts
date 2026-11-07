@@ -7,7 +7,7 @@
 // WHY A LIFT AND NOT A HIGHER SCORE, which is the part a later session will be
 // tempted to simplify away. The inbox sorts by `byRunningOrder(score)`, and
 // that score is the user's order over their PROJECTS: a place in it is worth a
-// hundred item points (RANK_STEP, shared/rank.mjs), while an item's own
+// hundred item points (RANK_STEP, shared/rank.mts), while an item's own
 // priority runs 0..9. So an urgent row on the fifth project can never
 // out-score an ordinary row on the first, whatever number is put on it. No amount of tuning the
 // priority scale fixes that, because the two quantities are an order of
@@ -29,7 +29,7 @@ import { dayGroups, List } from '../renderer/src/components/List';
 import { PriorityIcon } from '../renderer/src/components/Priority';
 import { REST_HEADING, URGENT_HEADING } from '../renderer/src/list-rules';
 import { isUrgentRow } from '../renderer/src/interrupt';
-import { isUrgent, itemPriority, RANK_STEP, productRankScore } from '../shared/rank.mjs';
+import { isUrgent, itemPriority, RANK_STEP, productRankScore } from '../shared/rank.mts';
 
 const row = (id, priority, extra = {}) => ({
   id, priority, status: 'open', updatedAt: 1, title: id, ...extra,
@@ -40,7 +40,7 @@ const row = (id, priority, extra = {}) => ({
 const inboxLabel = (item) => (isUrgentRow(item) ? URGENT_HEADING : '');
 
 describe('what counts as urgent', () => {
-  it('is the one predicate in shared/rank.mjs, not a second copy', () => {
+  it('is the one predicate in shared/rank.mts, not a second copy', () => {
     const hers = row('a', 9);
     expect(isUrgentRow(hers)).toBe(true);
     expect(isUrgent(hers)).toBe(true);

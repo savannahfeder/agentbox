@@ -5,8 +5,8 @@
 // with reviewKind and servable: neither the view nor the window could read one.
 import { it, expect, describe } from 'vitest';
 import zlib from 'node:zlib';
-import { readDeck, readSlide } from '../shared/pptx-slides.mjs';
-import { reviewKind } from '../shared/artifact-marks.mjs';
+import { readDeck, readSlide } from '../shared/pptx-slides.mts';
+import { reviewKind } from '../shared/artifact-marks.mts';
 import { servable } from '../main/img-scheme.mts';
 
 function zip(files) {

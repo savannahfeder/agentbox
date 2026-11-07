@@ -1,4 +1,4 @@
-// Types for shared/codex-modes.mjs, for the window side.
+// Types for shared/codex-modes.mts, for the window side.
 //
 // The three ids are `CodexModeId` in renderer/src/types.ts, which is where that
 // union already lives; this file states the shape around them rather than a

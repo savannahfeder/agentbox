@@ -9,7 +9,7 @@
 // founder has answered: Testing a thread :)", the other a fresh one.
 //
 // The tick never runs a conversation, a teammate's row or a row a person
-// holds: `mayRunHere` (shared/team-rules.mjs) refuses all three. Resuming by
+// holds: `mayRunHere` (shared/team-rules.mts) refuses all three. Resuming by
 // name never asked it, so ⌘K "Resume Agents" over a selection that happened to
 // include a chat put an agent in the middle of it. Now it asks the same rule.
 // It does not ban agents from talk: an @-mention in a chat starts its own

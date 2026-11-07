@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { recoverShellPath, loginShellAttempts } from '../main/shell-path.mjs';
+import { recoverShellPath, loginShellAttempts } from '../main/shell-path.mts';
 
 const hasBash = fs.existsSync('/bin/bash');
 const SESSION_PATH = '/usr/local/bin:/usr/bin:/bin';

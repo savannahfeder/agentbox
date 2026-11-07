@@ -18,7 +18,7 @@
 // as before.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { phoneSettingsOf } from '../shared/phone-settings.mjs';
+import { phoneSettingsOf } from '../shared/phone-settings.mts';
 import { computerAgents, webEngines, codexFromSettings } from '../renderer/src/web-settings';
 import { agentChoices } from '../renderer/src/threads/composer-rules';
 import { newThreadChoices, openingFor } from '../mobile/src/lib/compose';

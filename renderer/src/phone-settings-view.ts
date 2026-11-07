@@ -1,5 +1,5 @@
 // What a Settings row reads while a change from the phone or the web app is on
-// its way: the copy the computer sent (shared/phone-settings.mjs), with the
+// its way: the copy the computer sent (shared/phone-settings.mts), with the
 // commands left for it laid over it until a newer copy arrives.
 import type { PhoneRows } from './phone-rows';
 

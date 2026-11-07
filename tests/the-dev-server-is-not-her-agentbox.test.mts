@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hotWindowVerdict, storeHasWork } from '../main/dev-window.mjs';
+import { hotWindowVerdict, storeHasWork } from '../main/dev-window.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -123,7 +123,7 @@ describe('npm run dev says the same thing before it starts anything', () => {
 
 describe('the screen she was describing', () => {
   it('is what App draws with no snapshot, which is why a rebuilt App shows it', () => {
-    // If this line moves, the diagnosis in main/dev-window.mjs stops being true
+    // If this line moves, the diagnosis in main/dev-window.mts stops being true
     // and starts lying to whoever reads it next.
     expect(read('renderer/src/App.tsx')).toMatch(/if \(!snap\) return <Booting \/>;/);
     // Since w-eb1e55360c the boot screen is the moving logo, not the name.
@@ -140,7 +140,7 @@ describe('the screen she was describing', () => {
 // her straight back in. A fixed port is what makes that possible.
 describe('a dev server never inherits a window it did not open', () => {
   it('picks a port nothing is holding, so no waiting window is answered', async () => {
-    const { chooseDevPort } = await import('../main/dev-window.mjs');
+    const { chooseDevPort } = await import('../main/dev-window.mts');
     const net = await import('node:net');
 
     // Stand in for her window's old port: something already bound.

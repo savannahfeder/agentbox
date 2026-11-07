@@ -23,14 +23,14 @@ const inherited = process.env.ZERO_ITEM;
 
 beforeEach(async () => {
   delete process.env.ZERO_ITEM;
-  const home = (await import('../main/store/home.mjs')).appHome();
+  const home = (await import('../main/store/home.mts')).appHome();
   process.env.STORE_ACCOUNT_ID = 'acct-own-claim';
   fs.mkdirSync(path.join(home, 'accounts', 'acct-own-claim'), { recursive: true });
-  const { resolveAccount } = await import('../mcp/core/account.mjs');
+  const { resolveAccount } = await import('../mcp/core/account.mts');
   resolveAccount();
-  const { createProduct } = await import('../mcp/core/products.mjs');
+  const { createProduct } = await import('../mcp/core/products.mts');
   product = createProduct(`Claims ${Math.random().toString(36).slice(2, 8)}`);
-  work = await import('../mcp/core/work.mjs');
+  work = await import('../mcp/core/work.mts');
 });
 afterEach(() => {
   for (const b of built) b.claims._stop();
@@ -40,7 +40,7 @@ afterEach(() => {
 });
 
 const tools = async (opts) => {
-  const b = (await import('../mcp/tools.mjs')).buildTools({ holder: `test-${Math.random()}`, ...opts });
+  const b = (await import('../mcp/tools.mts')).buildTools({ holder: `test-${Math.random()}`, ...opts });
   built.push(b);
   return (args) => b.tools.find((t) => t.name === 'claim_work_item').run(args).then((r) => JSON.parse(r.content[0].text));
 };

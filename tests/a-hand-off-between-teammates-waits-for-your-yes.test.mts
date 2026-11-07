@@ -8,7 +8,7 @@
 // Now it is the default; a teammate the person tells to take hand-offs
 // straight away saves `handoffsNeedYes: false`.
 import { describe, it, expect } from 'vitest';
-import { planWakes, runIdFor, seenKey, teammateLabel, DEFAULT_LIMIT, foldTeammates } from '../shared/teammates.mjs';
+import { planWakes, runIdFor, seenKey, teammateLabel, DEFAULT_LIMIT, foldTeammates } from '../shared/teammates.mts';
 
 const NOW = new Date(2026, 9, 26, 15, 43).getTime();
 const base = { status: 'active', paused: false, served: '', limit: DEFAULT_LIMIT, works: null, product: 'kestrel', memory: [] };

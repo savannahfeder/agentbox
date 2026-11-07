@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadCloudConfig } from '../main/team/session.mjs';
+import { loadCloudConfig } from '../main/team/session.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
@@ -32,7 +32,7 @@ describe('the team cloud config', () => {
   });
 
   // The file that points a copy at another Agentbox Cloud stays on its machine.
-  // The real cloud's public address and key ship in shared/cloud-address.mjs
+  // The real cloud's public address and key ship in shared/cloud-address.mts
   // (2026-10-26), as they already did inside every download; holding them does
   // not make a copy the team version.
   it('the file that points a copy at another cloud is never tracked either', () => {
@@ -54,7 +54,7 @@ describe('the team cloud config', () => {
 
   // A MAC WITH NO KEY ON IT EITHER, which is what a stranger cloning this has.
   // Since 2026-10-04 the key may also live on the Mac rather than in the folder
-  // (main/team/session.mjs teamConfigOnThisMac), so the home is a throwaway
+  // (main/team/session.mts teamConfigOnThisMac), so the home is a throwaway
   // here: reading the real one would make this test pass or fail depending on
   // whether whoever ran it is on a team.
   it('leaves a checkout without the file as the single-person app', () => {

@@ -2,7 +2,7 @@
 // THAT FINDS IT ACTUALLY RUNS.
 //
 // The rename of 2026-09-22 turned `process.env.ASTRAL_HOME` into `readEnv('HOME')`
-// in main/store/project.mjs and did not import `readEnv`. Nothing in 7,335 tests
+// in main/store/project.mts and did not import `readEnv`. Nothing in 7,335 tests
 // called `legacyRoot()`, so the whole suite was green, the change was merged and
 // pushed, and the store MCP server died on startup with one line:
 //
@@ -21,8 +21,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { legacyRoot } from '../main/store/project.mjs';
-import { appHome, defaultStoreRoot, storeRootEnv } from '../main/store/home.mjs';
+import { legacyRoot } from '../main/store/project.mts';
+import { appHome, defaultStoreRoot, storeRootEnv } from '../main/store/home.mts';
 import { WAS, ENV_PREFIX, envName, envNames, nameSlug, readEnv } from '../shared/product-name.mjs';
 
 const held = {};

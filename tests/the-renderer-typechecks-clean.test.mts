@@ -5,7 +5,7 @@
 // and got 19 errors, every one of them already on main (w-a170ad72b8). Four
 // shared modules the screen imports had no declaration beside them, so
 // `bridge-map`, `codex-modes` and `schemes` all came through as `any`;
-// `unleaked` was exported by shared/agents.mjs and missing from its .d.mts;
+// `unleaked` was exported by shared/agents.mts and missing from its .d.mts;
 // and `isSaid` in item-thread.ts returned a plain boolean, so eleven reads of
 // `.who` and `.text` were taken off an event that might have been a tool call.
 // Nothing crashed, because Vite does not typecheck: the renderer built and

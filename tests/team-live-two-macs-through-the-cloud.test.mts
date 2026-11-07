@@ -1,7 +1,7 @@
 // TWO TEAMMATES, END TO END, THROUGH THE REAL CLOUD.
 //
 // Everything below the screen, for real: two stores (two "Macs"), each signed
-// in through the app's own session code (main/team/session.mjs) to the hosted
+// in through the app's own session code (main/team/session.mts) to the hosted
 // agentbox-team project, each running the app's own team service
 // (main/team/index.mts). Maya starts a team and invites Theo; Theo says yes,
 // his Mac joins the project Maya shares, Maya's message lands in his inbox,
@@ -19,10 +19,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Store } from '../main/store.mts';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { supabaseSession } from '../main/team/session.mjs';
-import { inMyInbox, handedOnByReply } from '../shared/team-rules.mjs';
+import { supabaseSession } from '../main/team/session.mts';
+import { inMyInbox, handedOnByReply } from '../shared/team-rules.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const live = !!process.env.TEAM_SERVICE_KEY;
@@ -109,7 +109,7 @@ describe.skipIf(!live)('two Macs through the hosted cloud', () => {
   }, 60_000);
 
   // A teammate's words reach you as a message, never as a task in a shared
-  // project (shared/team-rules.mjs whatATeammateMaySet).
+  // project (shared/team-rules.mts whatATeammateMaySet).
   it('carries Maya\'s message to Theo\'s inbox and his answer back to hers', async () => {
     const { maya, theo } = macs;
     disk.setLineAuthor(maya.id);

@@ -1,6 +1,6 @@
 // The Team chip said teammates see "its summary on the Team board", but Sofia
 // opened Dev's thread from Search and read his whole message and his agent's
-// whole answer. Measured in main/team/thread-share.mjs:
+// whole answer. Measured in main/team/thread-share.mts:
 // a shared thread sends its newest 40 messages and the files they name, not a
 // summary. So the words say what is shared.
 import { it, expect } from 'vitest';

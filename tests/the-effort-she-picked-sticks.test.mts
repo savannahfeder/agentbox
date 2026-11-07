@@ -31,7 +31,7 @@ import {
   writeLastEffort,
 } from '../renderer/src/effort.ts';
 import { CODEX_OWN } from '../renderer/src/models.ts';
-import { buildLine, foldWorkItems, pickFields } from '../shared/work-items.mjs';
+import { buildLine, foldWorkItems, pickFields } from '../shared/work-items.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { parseSessionArgs } from '../main/settings.mts';
 import { codexModelLevels, codexModels } from '../main/codex-models.mts';
@@ -194,7 +194,7 @@ describe('remembering it', () => {
 });
 
 describe('on the work item', () => {
-  // The ledger keeps only the fields it knows (shared/work-items.mjs), so the
+  // The ledger keeps only the fields it knows (shared/work-items.mts), so the
   // field has to be one of them or the card's pick is dropped on the floor the
   // way the model once was.
   it('is a field the ledger keeps', () => {

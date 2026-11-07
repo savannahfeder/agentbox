@@ -25,9 +25,9 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Supervisor } from '../main/supervisor.mts';
-import { answer, approvalPublicKey, listPending, spoolDir } from '../main/approvals.mjs';
+import { answer, approvalPublicKey, listPending, spoolDir } from '../main/approvals.mts';
 import { streamInputArgs } from '../main/claude-input.mts';
-import { harnessDefinition } from '../shared/harness-definitions.mjs';
+import { harnessDefinition } from '../shared/harness-definitions.mts';
 import { stripTypesFlags } from '../main/strip-types.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));

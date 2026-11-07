@@ -56,7 +56,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 describe('what the web app is built from', () => {
   it('is the screens, the shared code, its legal pages, its build and its icon', () => {
     expect(siteChanged(['renderer/src/App.tsx'])).toBe(true);
-    expect(siteChanged(['shared/phone-snapshot.mjs'])).toBe(true);
+    expect(siteChanged(['shared/phone-snapshot.mts'])).toBe(true);
     expect(siteChanged(['phone-legal/privacy.html', 'scripts/build-phone-site.mjs'])).toBe(true);
     expect(siteChanged(['main/phone-icon.png'])).toBe(true);
     expect(SITE_PATHS).toContain('renderer/');

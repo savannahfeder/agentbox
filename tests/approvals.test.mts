@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { listPending, answer, spoolDir } from '../main/approvals.mjs';
+import { listPending, answer, spoolDir } from '../main/approvals.mts';
 
 const root = () => fs.mkdtempSync(path.join(os.tmpdir(), 'zero-approvals-'));
 

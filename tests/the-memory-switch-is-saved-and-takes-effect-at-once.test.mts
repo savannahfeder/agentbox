@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadConfig } from '../main/config.mjs';
+import { loadConfig } from '../main/config.mts';
 import { setWorkspaceSetting, memoryGateSettings } from '../main/settings.mts';
 import { NAME } from '../shared/product-name.mjs';
 import { totalmem } from 'node:os';

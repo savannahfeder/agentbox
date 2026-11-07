@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { appFilesPlace } from '../main/files-place.mjs';
+import { appFilesPlace } from '../main/files-place.mts';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'team-look-edit-'));
 afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));

@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readRunTraces } from '../main/run-traces.mjs';
+import { readRunTraces } from '../main/run-traces.mts';
 import { withEveryRun } from '../renderer/src/every-run.ts';
 import { itemThread } from '../renderer/src/item-thread.ts';
 

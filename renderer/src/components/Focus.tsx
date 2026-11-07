@@ -52,7 +52,7 @@ import {
   CODEX_MODE_STATUS,
   exactCodexMode,
   nextCodexMode,
-} from '../../../shared/codex-modes.mjs';
+} from '../../../shared/codex-modes.mts';
 /*
  * THE ROW'S TWO WORDS COME FROM `rowSays` NOW, not from six constants pulled
    apart here. One list, one row shape (w-23a7b3f568, 2026-08-27). */
@@ -60,14 +60,14 @@ import { commandBeingWritten, enterWaitsForWords, holdingHint, rowKey, rowSays, 
 import { commandDraft } from '../../../shared/claude-commands.mts';
 import { CompactionResult, runCompaction, runCommand } from './CompactionResult';
 import { codexCommand, COMPACTION_COPY } from '../../../shared/codex-commands.mts';
-import { DEFAULT_ENGINE } from '../../../shared/engines.mjs';
+import { DEFAULT_ENGINE } from '../../../shared/engines.mts';
 import { dayLabel, itemOptions, offerIsLive, optionsFrom, parseOptions, parseRepeat, repeatsLine, stripOptionsSection, type ParsedOption } from '../format';
-import { ruleIdOf } from '../../../shared/repeats.mjs';
-import { shownPriority } from '../../../shared/rank.mjs';
+import { ruleIdOf } from '../../../shared/repeats.mts';
+import { shownPriority } from '../../../shared/rank.mts';
 import { WhenPicker } from './When';
 import { ReplyModel } from './ReplyModel';
 import type { ModelChoice } from '../models';
-import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mjs';
+import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mts';
 import { fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { onPictureLinks, pictureLinksVersion, pictureUrl, sentPictureLink } from '../picture';
 import { Listening, MicButton, useWebDictation } from './WebDictation';
@@ -77,22 +77,22 @@ import { diagramSource } from '../diagram-fence';
 import { DiagramBlock } from './DiagramBlock';
 import { NeedCard, NeedPlace, HELD, setHeld } from './NeedCard';
 import { NEED_BLOCK, isNewestAnswer, keyFromReply, keyLooksWrong, keySavedWords, needsAsBlocks } from '../key-asks';
-import { connectedReply, needsIn, needId, keysOf, type Need } from '../../../shared/cloud-needs.mjs';
-import { keyLabel, keyWords } from '../../../shared/cloud-keys.mjs';
+import { connectedReply, needsIn, needId, keysOf, type Need } from '../../../shared/cloud-needs.mts';
+import { keyLabel, keyWords } from '../../../shared/cloud-keys.mts';
 import { referencedFiles, isImagePath } from '../referenced-files';
 import { pictureRoots } from '../message-folders';
 import { changePathFor } from '../code-artifact';
 import { fileCount, figuresFrom, figuresLabel, signed, type ChangeFigures } from '../change-figures';
 import { embeddedDocuments, isBookkeeping, messageDocuments } from '../message-artifacts';
 import { remarkMediaUnderSentences } from '../media-row';
-import { newestOfFamily } from '../../../shared/artifact-marks.mjs';
+import { newestOfFamily } from '../../../shared/artifact-marks.mts';
 import { PictureView, picturesFor, type Picture } from './PictureView';
 import { opensAsPicture } from '../picture-view';
 import { ThreadArtifacts } from './ThreadArtifacts';
 import type { ArtifactOpen } from './ArtifactView';
-import { fileNewsFor, shownName, viewKind } from '../../../shared/artifact-marks.mjs';
+import { fileNewsFor, shownName, viewKind } from '../../../shared/artifact-marks.mts';
 import { opensInTheLargeViewer } from '../artifact-layout';
-import { carryLine, type CarryState } from '../../../shared/carried-files.mjs';
+import { carryLine, type CarryState } from '../../../shared/carried-files.mts';
 import { watchScrollGutter } from '../scroll-gutter';
 import { CODE_PATH, artifactUrlTransform, isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
 import { api } from '../api';
@@ -101,7 +101,7 @@ import { ReplyLater } from './ReplyLater';
 import { effortSaid, pickOnTheRow, pickToSend, replyOpensOn } from '../reply-pick';
 import { withQuote } from '../team/chat-quote';
 import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, threadToOpen } from '../team/chat-threads';
-import { heldByAPerson, isGivenTask, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mjs';
+import { heldByAPerson, isGivenTask, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mts';
 import { FormatBar } from '../team/FormatBar';
 import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type Recorded, type VoiceControl } from '../team/useVoiceRecorder';
 import { VoiceNote } from '../team/VoiceNote';
@@ -117,7 +117,7 @@ import { optionIsClipped, optionPeek } from '../option-peek';
 import { changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
 import { MOVED_PX, THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw } from '../pick-settles';
 import { askHeading, askFull, askIsClipped } from '../ask-line';
-import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mjs';
+import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mts';
 import { recapFor } from '../recap';
 import type { LedgerLine } from '../thread-history';
 import type { LiveFacts } from '../live-line';
@@ -151,7 +151,7 @@ import { useThreadMentions } from './ThreadMentions';
 import { AGENT_SCHEME } from '../team/agent-mentions';
 import { defaultModelFor, engineModelLabel } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortShown } from '../effort';
-import { ENGINES } from '../../../shared/engines.mjs';
+import { ENGINES } from '../../../shared/engines.mts';
 import { lookAgainAfter } from '../picture-looks-again';
 import { OPEN_WITHIN_MS } from '../opening-wait';
 import { focusAtEnd } from '../focus-at-end';
@@ -225,7 +225,7 @@ function CodePre({ children }: { children?: ReactNode }) {
 // It opens the way the chip already does, which sends a png to Preview.
 //
 // AND WHEN EVERY ROOT MISSES, IT ASKS MAIN BEFORE IT GIVES UP (2026-10-04).
-// `find` is the same finder a click goes through (main/artifact-path.mjs),
+// `find` is the same finder a click goes through (main/artifact-path.mts),
 // which also hunts the project for the name. A picture a click could open and
 // the window drew as "missing image" was the screenshot on w-7fe215448b.
 /** A picture sent to this message that cannot be fetched: where it would be, by name. */
@@ -1381,7 +1381,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     const findMedia = (src: string) => api.resolveDoc({ product, src, thread: item.id }).then((r) => (r.ok && r.opened ? r.opened : null));
 
     // Clicks resolve in the main process, across the roots a worker might have
-    // meant WITHIN THIS CARD'S OWN PRODUCT (main/artifact-path.mjs): a
+    // meant WITHIN THIS CARD'S OWN PRODUCT (main/artifact-path.mts): a
     // single-root file:// href opened nothing, silently, when the worker wrote
     // it against a different root, and reaching into other products opened the
     // wrong file, which is worse.
@@ -2875,7 +2875,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // tag DISPLAYS the item's real level, though: an urgent thread's reply box
   // showing "medium" read as the reply demoting it.
   const [prio, setPrio] = useState<PriorityId | null>(null);
-  // The level it runs at (shared/rank.mjs shownPriority). A conversation is
+  // The level it runs at (shared/rank.mts shownPriority). A conversation is
   // offered no tag at all, so this is only ever a work thread's.
   const itemPrio: PriorityId = priorityIdOf(shownPriority(item));
   const shown = prio ?? itemPrio;

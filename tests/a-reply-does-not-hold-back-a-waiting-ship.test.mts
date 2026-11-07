@@ -79,7 +79,7 @@ describe('which of several waiting threads goes first', () => {
   });
 
   it('reads a row with no priority as nought, the way every other list here does', () => {
-    // shared/work-items.mjs sorts the queue a puller sees by `priority ?? 0`.
+    // shared/work-items.mts sorts the queue a puller sees by `priority ?? 0`.
     const items = [
       row('w-a', { wrote: { labels: { ts: 10 } } }),
       row('w-b', { priority: 1, wrote: { labels: { ts: 90 } } }),

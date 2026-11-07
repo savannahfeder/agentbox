@@ -8,7 +8,7 @@
 // Both are now among the snapshot's queued rows, so they read "Queued".
 import { describe, it, expect } from 'vitest';
 import { phoneView, phoneSlug } from '../renderer/src/phone-rows';
-import { madeHere } from '../shared/phone-snapshot.mjs';
+import { madeHere } from '../shared/phone-snapshot.mts';
 import { liveLine } from '../renderer/src/live-line';
 
 const NOW = Date.parse('2026-10-26T12:00:00Z');

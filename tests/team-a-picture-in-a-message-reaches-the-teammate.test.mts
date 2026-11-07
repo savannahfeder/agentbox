@@ -16,17 +16,17 @@
 // reader's pass after that.
 //
 // ONLY IN A CONVERSATION. An ordinary shared project's words do not cross
-// (shared/team-rules.mjs), so neither does anything they link to.
+// (shared/team-rules.mts), so neither does anything they link to.
 import { it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
+import { memorySession } from '../main/team/session.mts';
 import { MAX_MESSAGE_FILE_BYTES, filesNamedIn } from '../main/team/sync.mts';
 
 // One copy of the app. `storeRoot` again is the same Mac started afresh, which

@@ -4,7 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { createHarnessRegistry, harnessFor, HARNESS_OPERATIONS } from '../main/harnesses.mts';
-import { harnessDefinition } from '../shared/harness-definitions.mjs';
+import { harnessDefinition } from '../shared/harness-definitions.mts';
 import { installCommand, signInCommand, statusCommand } from '../main/engine-setup.mts';
 import { signInFiles } from '../main/sign-in-files.mts';
 import { Supervisor } from '../main/supervisor.mts';

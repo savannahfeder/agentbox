@@ -4,7 +4,7 @@
 // "Build the seat picker for group", "Find why Northside Clinic sees double",
 // "Draw onboarding direction B as one" and "Write the words for a slot", and a
 // short one kept its full stop, "Fix the flaky calendar-sync test.". Measured
-// in shared/thread-title.mjs: a sentence was cut at its sixth word wherever
+// in shared/thread-title.mts: a sentence was cut at its sixth word wherever
 // that fell, and only a small list of last words (a, the, to...) was trimmed,
 // so a noun's modifier ("group", "double", "one") was left hanging; a line of
 // six words or fewer came back as typed, full stop and all.
@@ -13,7 +13,7 @@
 // before a preposition or conjunction, up to eight words; and no title ends on
 // a full stop.
 import { describe, it, expect } from 'vitest';
-import { shortTitle } from '../shared/thread-title.mjs';
+import { shortTitle } from '../shared/thread-title.mts';
 
 describe('the five titles that were cut', () => {
   it.each([

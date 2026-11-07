@@ -10,8 +10,8 @@
 // is "named you" news, the same as an @mention.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { fileNewsFor, marksOf } from '../shared/artifact-marks.mjs';
-import { groupFileRow } from '../shared/room-needs-you.mjs';
+import { fileNewsFor, marksOf } from '../shared/artifact-marks.mts';
+import { groupFileRow } from '../shared/room-needs-you.mts';
 
 const FILE = 'october-investor-deck.pdf';
 const note = (text, extra = {}) => ({ do: 'note', id: 'n1', file: FILE, place: { kind: 'whole' }, text, by: 'sofia', ts: 10, owner: 'sofia', ...extra });
@@ -67,5 +67,5 @@ it('every Needs you door passes your name', () => {
   const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
   expect(read('renderer/src/App.tsx')).toMatch(/fileNewsFor\(i, team\?\.me \?\? null, \{ myName \}\)/);
   expect(read('main/team/rooms.mts')).toMatch(/groupFileRow\(\{[^}]*myName/);
-  expect(read('main/team/thread-share.mjs')).toMatch(/createdBy: owner \}, me, \{ myName: myName\(\) \}\)/);
+  expect(read('main/team/thread-share.mts')).toMatch(/createdBy: owner \}, me, \{ myName: myName\(\) \}\)/);
 });

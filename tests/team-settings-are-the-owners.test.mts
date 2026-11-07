@@ -115,11 +115,11 @@ describe('team settings', () => {
 
 // The same actions through the app's own team service, over the in-memory cloud.
 import os from 'node:os';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
+import { memorySession } from '../main/team/session.mts';
 
 async function aMac(cloud, personId) {
   const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'team-settings-'));

@@ -26,7 +26,7 @@ import {
   troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, accountSentence,
   deadRunSentence, deadRunCause, runStoppedLine, causeWord, causeWhat, causeNext, causeAct, causeBreakdown,
 } from '../shared/spawn-trouble.mts';
-import { readPlan, slotsForPlans } from '../main/claude-plan.mjs';
+import { readPlan, slotsForPlans } from '../main/claude-plan.mts';
 import { Supervisor } from '../main/supervisor.mts';
 
 const REFUSAL = 'Your organization has disabled Claude subscription access for Claude Code · Use an Anthropic API key instead, or ask your admin to enable access';
@@ -165,7 +165,7 @@ describe('the fleet, on a real refusal', () => {
     expect(sup._profileTrouble.default?.cause).toBe('subscription-ended');
     const file = path.join(home, '.claude.json');
     fs.writeFileSync(file, JSON.stringify({ oauthAccount: paying }));
-    // THE PLAN IS CACHED ON THIS FILE'S mtime (main/claude-plan.mjs). Both
+    // THE PLAN IS CACHED ON THIS FILE'S mtime (main/claude-plan.mts). Both
     // writes here land inside one millisecond often enough that the second
     // read came back from the cache still lapsed, and this test failed about
     // two runs in three. A real renewal is minutes apart; the clock is moved

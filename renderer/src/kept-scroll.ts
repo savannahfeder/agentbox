@@ -1,7 +1,7 @@
 // WHERE AN OPEN FILE WAS LEFT, so reopening it, or opening its next version,
 // lands there rather than at the top. Kept for as long as the window is open.
 import { useLayoutEffect } from 'react';
-import { baseName } from '../../shared/artifact-marks.mjs';
+import { baseName } from '../../shared/artifact-marks.mts';
 
 const kept = new Map<string, number>();
 

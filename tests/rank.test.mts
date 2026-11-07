@@ -13,7 +13,7 @@ import path from 'node:path';
 import {
   RANK_STEP, DEFAULT_PRIORITY, itemPriority,
   normalizeOrder, productRankScore, orderFromTiers, moveProduct, landingIndex,
-} from '../shared/rank.mjs';
+} from '../shared/rank.mts';
 import { Supervisor } from '../main/supervisor.mts';
 
 describe('the order itself', () => {

@@ -10,10 +10,10 @@ import { it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { writeFreeze } from '../main/freeze-recorder.mts';
-import { FreezeWatch, FREEZE_LABEL } from '../main/freeze-watch.mjs';
+import { FreezeWatch, FREEZE_LABEL } from '../main/freeze-watch.mts';
 
 const DAY = 86_400_000;
 const NOON_NOV_2 = new Date(2026, 10, 2, 12).getTime();
@@ -37,9 +37,9 @@ async function aComputer({ appsOwnRepo = true } = {}) {
   store = await new Store({ storeRoot: path.join(root, 'store'), accountId: 'a', accountRoot, products: [] }).init();
 }
 
-const froze = (at, ms, where = 'filesInLines shared/artifact-marks.mjs:404') => writeFreeze(logDir, {
+const froze = (at, ms, where = 'filesInLines shared/artifact-marks.mts:404') => writeFreeze(logDir, {
   at: new Date(at).toISOString(), ms, samples: ms / 10, busy: 0.9, gc: 0.05, where,
-  stacks: [{ share: 0.6, frames: [where, 'allFiles main/files-place.mjs:367', 'lineFor main/files-place.mjs:707'] }],
+  stacks: [{ share: 0.6, frames: [where, 'allFiles main/files-place.mts:367', 'lineFor main/files-place.mts:707'] }],
 }, { keepDays: 30 });
 const watch = (now) => new FreezeWatch({ store, userDir, appDir, logDir, now: () => now, log: { warn() {}, info() {} } });
 const rows = () => store.listItems().filter((i) => i.labels?.includes(FREEZE_LABEL));
@@ -56,8 +56,8 @@ it('a day with a hold of a second or more files one thread that starts on its ow
   expect(row.labels).toContain('founder');
   expect(row.status).toBe('open');
   expect(row.title).toBe('The app froze 2 times on 2026-11-01, longest 1.2 s');
-  expect(row.body).toContain('filesInLines shared/artifact-marks.mjs:404');
-  expect(row.body).toContain('lineFor main/files-place.mjs:707');
+  expect(row.body).toContain('filesInLines shared/artifact-marks.mts:404');
+  expect(row.body).toContain('lineFor main/files-place.mts:707');
   expect(row.body).toContain('_tick main/supervisor.mts:7477');
   expect(row.body.indexOf('filesInLines')).toBeLessThan(row.body.indexOf('_tick'));
 });

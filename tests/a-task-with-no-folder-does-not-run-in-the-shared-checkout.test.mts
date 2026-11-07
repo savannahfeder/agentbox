@@ -14,7 +14,7 @@
 //   spawnWorker        resolved the cwd after the permission files were
 //                      written, so a throw there leaked them.
 //
-// WHY A CONSOLE LINE IS NOT GOOD ENOUGH. main/git-change.mjs, in its own words:
+// WHY A CONSOLE LINE IS NOT GOOD ENOUGH. main/git-change.mts, in its own words:
 // "In a checkout two agents share, a file the other one wrote inside this run's
 // window is inside this run's window, and no reading of the disk can tell them
 // apart." So the review card a person reads can carry another agent's edits,

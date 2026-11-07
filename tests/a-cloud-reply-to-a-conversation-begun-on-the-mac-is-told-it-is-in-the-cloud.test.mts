@@ -29,7 +29,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
 import { cloudRun, claudeLineForTheCloud, CLOUD_NOTE, PLAIN_CLOUD_NOTE } from '../main/cloud/run.mts';
-import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
+import { HAND_BACK } from '../shared/cloud-hand-back.mts';
 
 const user = (content) => JSON.stringify({ type: 'user', uuid: 'u-1', message: { role: 'user', content }, parent_tool_use_id: null, session_id: '' });
 

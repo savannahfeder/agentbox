@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadCloudConfig, teamConfigOnThisMac } from '../main/team/session.mjs';
+import { loadCloudConfig, teamConfigOnThisMac } from '../main/team/session.mts';
 import { alphaFeatures, setWorkspaceSetting } from '../main/settings.mts';
 import { teamForWindow } from '../main/team/index.mts';
 

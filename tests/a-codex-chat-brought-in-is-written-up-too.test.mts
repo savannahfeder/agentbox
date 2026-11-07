@@ -82,7 +82,7 @@ describe('the engine it is carried on with', () => {
   // opened is ignored (`engineChoiceOnRowIsStale`): the reply still went to
   // Claude Code. It is written at the moment of the import.
   it('is written when the chat comes in, not when the chat last moved', async () => {
-    const { engineChoiceOnRowIsStale } = await import('../shared/engines.mjs');
+    const { engineChoiceOnRowIsStale } = await import('../shared/engines.mts');
     const { s, slug, folder } = await world();
     const opened = new Date(Date.now() - 1000).toISOString();
     s.importCodexThreads(slug, [thread(folder, 'Anchor it?', Date.now() - 3600e3)], { now: Date.now() });

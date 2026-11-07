@@ -2,12 +2,12 @@
 //
 // Two sharers in the power test (2026-11-04, round 3) missed comments on their
 // links: the only sign was a dot on the file's Share mark, and nothing reached
-// the inbox. Measured on main/team/link-comments.mjs with the memory cloud and
+// the inbox. Measured on main/team/link-comments.mts with the memory cloud and
 // a stand-in thread store: which comments become a note, on which thread, in
 // what words, and that none is said twice.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
-import { noticeLinkComments, threadOfSource, noteFor } from '../main/team/link-comments.mjs';
+import { noticeLinkComments, threadOfSource, noteFor } from '../main/team/link-comments.mts';
 
 let cloud, maya, chris, lena, clock, cursor, notes, items;
 const run = () => noticeLinkComments({
@@ -112,10 +112,10 @@ describe('in the app', () => {
     const fs = await import('node:fs');
     const os = await import('node:os');
     const path = await import('node:path');
-    const disk = await import('../main/store/work-items.mjs');
+    const disk = await import('../main/store/work-items.mts');
     const { Store } = await import('../main/store.mts');
     const { createTeamService } = await import('../main/team/index.mts');
-    const { memorySession } = await import('../main/team/session.mjs');
+    const { memorySession } = await import('../main/team/session.mts');
     disk._internals.forgetFolds();
     const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'link-comments-'));
     const accountRoot = path.join(storeRoot, 'accounts', 'a');
@@ -152,7 +152,7 @@ describe('in the app', () => {
 describe('in the thread', () => {
   it('is a line naming who commented and on which file, with their words, and never the agent checking in', async () => {
     const { threadEvents } = await import('../renderer/src/thread-history.ts');
-    const { pickFields } = await import('../shared/work-items.mjs');
+    const { pickFields } = await import('../shared/work-items.mts');
     const line = { id: 'w-1', ts: 1, source: 'system', patch: { note: 'Chris Novak commented on q1-roadmap.md. "Hi"', linkComment: { name: 'Chris Novak', file: 'q1-roadmap.md', text: 'Hi' } } };
     const events = threadEvents([{ id: 'w-1', ts: 0, source: 'founder', patch: { title: 'Plan', status: 'open' } }, line]);
     const said = events.find((e) => /commented/.test(e.said ?? ''));
@@ -176,7 +176,7 @@ describe('in the thread', () => {
 // (screenshots, 2026-11-04).
 describe('the cloud call', () => {
   it('keeps a comment\'s time to the millisecond, whether the database hands back text or a Date', async () => {
-    const { supabaseBackend } = await import('../main/team/supabase-backend.mjs');
+    const { supabaseBackend } = await import('../main/team/supabase-backend.mts');
     for (const created of ['2026-11-04T10:14:39.697Z', new Date('2026-11-04T10:14:39.697Z')]) {
       const client = {
         auth: { getUser: async () => ({ data: { user: { id: 'me' } }, error: null }) },

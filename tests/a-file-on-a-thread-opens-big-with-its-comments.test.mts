@@ -9,7 +9,7 @@
 import { it, expect, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { reviewKind } from '../shared/artifact-marks.mjs';
+import { reviewKind } from '../shared/artifact-marks.mts';
 import { REQUEST_CHANNELS } from '../shared/bridge-map.mts';
 
 const root = path.join(import.meta.dirname, '..');

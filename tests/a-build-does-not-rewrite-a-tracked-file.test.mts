@@ -3,7 +3,7 @@
 // MEASURED 2026-10-07 (w-5952e6de3e, then w-6bbb709b1f). `npm run build` ran
 // scripts/read-claude-commands.mjs and scripts/read-claude-models.mjs, and both
 // wrote over TRACKED files: shared/claude-commands.generated.mts and
-// shared/claude-models.generated.mjs. So every folder that had ever run the app
+// shared/claude-models.generated.mts. So every folder that had ever run the app
 // reported itself dirty. `releaseTaskFolder` answered "uncommitted" and never
 // reclaimed a folder, `parkTaskFolder` committed nobody's work, `cloneCheckout`
 // refused the block-sharing clone, and the diff in a change card carried two
@@ -40,8 +40,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as commands from '../scripts/read-claude-commands.mjs';
 import * as models from '../scripts/read-claude-models.mjs';
-import { claudeModels, forget } from '../main/claude-models.mjs';
-import { CLAUDE_MODELS } from '../shared/claude-models.generated.mjs';
+import { claudeModels, forget } from '../main/claude-models.mts';
+import { CLAUDE_MODELS } from '../shared/claude-models.generated.mts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -49,7 +49,7 @@ const CATALOG = fs.readFileSync(path.join(HERE, 'fixtures', 'claude-catalog-2.1.
 
 function tmp() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-generated-'));
-  return { dir, out: path.join(dir, 'table.generated.mjs'), local: path.join(dir, 'table.local.json') };
+  return { dir, out: path.join(dir, 'table.generated.mts'), local: path.join(dir, 'table.local.json') };
 }
 
 /** A file shaped like the bundle, with a record for every command WANTED. */
@@ -139,12 +139,13 @@ describe('the models reader leaves the committed table alone', () => {
     expect(wrote.models.find((m) => m.alias === 'opus')).toMatchObject({ label: 'Opus 5.5' });
   });
 
-  it('does rewrite the tracked table, and its types, when somebody asks', () => {
+  it('does rewrite the tracked table, typed, when somebody asks', () => {
     const { out, local } = tmp();
     fs.writeFileSync(out, models.moduleText({ readFrom: '2.1.286', readAt: '2026-10-01', models: [] }));
     models.run({ bin: catalogBin(), out, local, snapshot: true, log: () => {} });
-    expect(fs.readFileSync(out, 'utf8')).toContain('"label":"Opus 5.5"');
-    expect(fs.existsSync(out.replace(/\.mjs$/, '.d.mts'))).toBe(true);
+    const text = fs.readFileSync(out, 'utf8');
+    expect(text).toContain('"label":"Opus 5.5"');
+    expect(text).toContain('export const CLAUDE_MODELS: readonly ClaudeModel[] = [');
   });
 });
 

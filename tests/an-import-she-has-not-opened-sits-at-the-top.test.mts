@@ -1,7 +1,7 @@
 // A conversation she has just imported, and where it goes.
 //
 // WHY IT WAS NEAR THE BOTTOM, measured on her own store on 2026-09-19 rather
-// than argued: the inbox sorts on the score in shared/rank.mjs, where a step in
+// than argued: the inbox sorts on the score in shared/rank.mts, where a step in
 // her running order over her projects is worth a hundred points and the row's
 // own priority breaks ties. An import lands in the project whose folder the
 // conversation ran in and comes in at the default priority of 5. The row in her
@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { justImported, JUST_IMPORTED_WORD } from '../renderer/src/import-row.ts';
-import { productRankScore, itemPriority } from '../shared/rank.mjs';
+import { productRankScore, itemPriority } from '../shared/rank.mts';
 import { byRunningOrder } from '../renderer/src/list-rules.ts';
 
 const imported = (over = {}) => ({

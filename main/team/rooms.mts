@@ -7,14 +7,14 @@ import path from 'node:path';
 import { wallCards, myPresence, displayNameOf, withoutHidden } from '../../shared/room-cards.mts';
 import type { WallCard, TeamCardLike } from '../../shared/room-cards.mts';
 import type { AgentHoursSummary } from '../../shared/agent-hours.mts';
-import { groupFileRow, groupRow } from '../../shared/room-needs-you.mjs';
-import type { GroupRow } from '../../shared/room-needs-you.mjs';
-import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mjs';
-import { carryIntoRoom } from './carry-files.mjs';
-import { readRoomMessage } from '../../shared/agent-voice.mjs';
-import { cleanMark } from '../../shared/artifact-marks.mjs';
-import { TEAM_LOOK, TEAM_LOOK_POSTED, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../../shared/team-look.mjs';
-import { ROOM_MAX_BYTES, ROOM_PART_BYTES, partName, partList, partsOf, readPartList } from '../../shared/room-file-parts.mjs';
+import { groupFileRow, groupRow } from '../../shared/room-needs-you.mts';
+import type { GroupRow } from '../../shared/room-needs-you.mts';
+import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mts';
+import { carryIntoRoom } from './carry-files.mts';
+import { readRoomMessage } from '../../shared/agent-voice.mts';
+import { cleanMark } from '../../shared/artifact-marks.mts';
+import { TEAM_LOOK, TEAM_LOOK_POSTED, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../../shared/team-look.mts';
+import { ROOM_MAX_BYTES, ROOM_PART_BYTES, partName, partList, partsOf, readPartList } from '../../shared/room-file-parts.mts';
 
 /** A room as `roomOut` shapes it. */
 export interface RoomRow {

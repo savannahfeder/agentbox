@@ -12,7 +12,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { appFilesPlace } from '../main/files-place.mjs';
+import { appFilesPlace } from '../main/files-place.mts';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'picture-by-version-'));
 afterAll(() => fs.rmSync(root, { recursive: true, force: true }));

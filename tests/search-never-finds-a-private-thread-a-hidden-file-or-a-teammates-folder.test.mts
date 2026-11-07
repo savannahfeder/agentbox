@@ -10,7 +10,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { appFinder, readableSharedThreads } from '../main/everything-found.mjs';
+import { appFinder, readableSharedThreads } from '../main/everything-found.mts';
 
 describe('which teammates threads may be searched', () => {
   const folders = [

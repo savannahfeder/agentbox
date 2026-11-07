@@ -15,7 +15,7 @@
 // the other person writes again, when it is back in your inbox.
 import { it, expect, describe } from 'vitest';
 import fs from 'node:fs';
-import { iSpokeLast, inMyInbox } from '../shared/team-rules.mjs';
+import { iSpokeLast, inMyInbox } from '../shared/team-rules.mts';
 
 const ME = 'p-me';
 const MAYA = 'p-maya';

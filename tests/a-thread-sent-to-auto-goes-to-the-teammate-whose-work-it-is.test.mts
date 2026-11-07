@@ -8,13 +8,13 @@
 // an agent when nobody's job covers it, or asks the person when two fit. Your
 // words go through as written, and the model you picked is the one it runs on.
 //
-// These are the pure rules (shared/auto-route.mjs): the question asked, the
+// These are the pure rules (shared/auto-route.mts): the question asked, the
 // reply read back, and what the thread's row becomes.
 import { describe, it, expect } from 'vitest';
 import {
   AUTO_LABEL, AGENT_WHY, isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch,
-} from '../shared/auto-route.mjs';
-import { cleanRouted } from '../shared/work-items.mjs';
+} from '../shared/auto-route.mts';
+import { cleanRouted } from '../shared/work-items.mts';
 
 const mate = (id, name, extra = {}) => ({ id, name, role: null, job: null, goal: null, duties: [], status: 'active', paused: false, ...extra });
 const video = mate('t-video', 'Video producer', { job: 'Makes the clips and owns the engine that renders them.' });

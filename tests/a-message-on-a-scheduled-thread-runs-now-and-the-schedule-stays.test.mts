@@ -9,7 +9,7 @@
 // her 0 outranked the agent's later attempt to book Monday again.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { foldWorkItems, isDue, wordWaits } from '../shared/work-items.mjs';
+import { foldWorkItems, isDue, wordWaits } from '../shared/work-items.mts';
 
 const MONDAY = 10_000_000;
 const fold = (...lines) => foldWorkItems([{ id: 'w', ts: 1, source: 'founder', patch: { title: 'Monday check', body: 'Check on Monday.' } }, ...lines], 5_000).get('w');

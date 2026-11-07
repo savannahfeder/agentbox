@@ -16,10 +16,10 @@ import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { documentsWithFolders, fileWrittenDocument, teamRead } from '../mcp/core/reach.mjs';
-import { readDocument } from '../mcp/core/documents.mjs';
-import { filesFoldersBrief, foldFolders, readFolderLog } from '../shared/file-folders.mjs';
-import { readTeamView, writeTeamView } from '../main/store/teammates-files.mjs';
+import { documentsWithFolders, fileWrittenDocument, teamRead } from '../mcp/core/reach.mts';
+import { readDocument } from '../mcp/core/documents.mts';
+import { filesFoldersBrief, foldFolders, readFolderLog } from '../shared/file-folders.mts';
+import { readTeamView, writeTeamView } from '../main/store/teammates-files.mts';
 
 let t; let run; let dir; let project;
 const shelf = () => foldFolders(readFolderLog(dir));

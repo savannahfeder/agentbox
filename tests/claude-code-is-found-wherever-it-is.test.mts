@@ -15,7 +15,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   findClaudeBin, candidatePaths, askShell, resolveClaudeBin, forgetClaudeBin, INSTALL_URL,
-} from '../main/claude-bin.mjs';
+} from '../main/claude-bin.mts';
 import { claudeState } from '../main/settings.mts';
 
 const HOME = '/Users/stranger';

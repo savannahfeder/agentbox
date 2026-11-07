@@ -8,7 +8,7 @@
 // on the phone's own lists.
 import { describe, it, expect } from 'vitest';
 import { phoneView, phoneSlug } from '../renderer/src/phone-rows';
-import { madeHere } from '../shared/phone-snapshot.mjs';
+import { madeHere } from '../shared/phone-snapshot.mts';
 import { phoneTabs } from '../mobile/src/lib/tabs';
 import { isUnread, markSeen, readSeen, SEEN_AT_KEY, UNREAD_SINCE_KEY } from '../mobile/src/lib/unread';
 

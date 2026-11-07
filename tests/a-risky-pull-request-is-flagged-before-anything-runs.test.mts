@@ -34,8 +34,8 @@ const flagsOf = (files, diff = '') => scanPullRequest({ files: files.map((path) 
 
 describe('what holds a pull request back from running on this Mac', () => {
   it('passes an ordinary source change with nothing flagged', () => {
-    const diff = diffOf('main/codex-approvals.mjs', ['  if (!isInside(root, target)) return null;']);
-    const flags = scanPullRequest({ files: [{ path: 'main/codex-approvals.mjs', additions: 8, deletions: 0 }], diff });
+    const diff = diffOf('main/codex-approvals.mts', ['  if (!isInside(root, target)) return null;']);
+    const flags = scanPullRequest({ files: [{ path: 'main/codex-approvals.mts', additions: 8, deletions: 0 }], diff });
     expect(flags).toEqual([]);
     expect(mayRunHere(flags)).toBe(true);
   });

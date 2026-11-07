@@ -21,8 +21,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { setAppHome, clearAppHome } from './app-home.mts';
-import * as wi from '../main/store/work-items.mjs';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import * as wi from '../main/store/work-items.mts';
+import { foldWorkItems } from '../shared/work-items.mts';
 
 const WINDOW = 8 * 1024 * 1024;
 const T0 = Date.parse('2026-10-06T21:04:00Z');

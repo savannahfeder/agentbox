@@ -15,7 +15,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { runLines, statusOf, teammateLabel } from '../shared/teammates.mjs';
+import { runLines, statusOf, teammateLabel } from '../shared/teammates.mts';
 
 vi.mock('../renderer/src/api', () => ({ api: new Proxy({}, { get: () => async () => ({ ok: false }) }) }));
 const { TeammatesPage } = await import('../renderer/src/teammates/TeammatesPage.tsx');

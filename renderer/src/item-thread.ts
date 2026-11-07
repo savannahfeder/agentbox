@@ -30,10 +30,10 @@
 // protecting: every node here carries the moment the ledger or the trace
 // stamped it, and nothing is invented, dropped or merged to put them in order.
 
-import { changedFile, commandWork, isBookkeeping, plainCommand, saidCount, shortPath, threadWindow, unleaked, workVerb } from '../../shared/agents.mjs';
+import { changedFile, commandWork, isBookkeeping, plainCommand, saidCount, shortPath, threadWindow, unleaked, workVerb } from '../../shared/agents.mts';
 import { said, traceLines } from './terminal';
-import { handsBack } from '../../shared/cloud-hand-back.mjs';
-import { editOfLine, resolveEdits, type EditLine } from '../../shared/message-edits.mjs';
+import { handsBack } from '../../shared/cloud-hand-back.mts';
+import { editOfLine, resolveEdits, type EditLine } from '../../shared/message-edits.mts';
 import type { TraceSession } from './notes';
 import { pickedLine, threadEvents, withRuns, type LedgerLine, type ThreadEvent } from './thread-history';
 import type { AgentEvent, AgentSaid, AgentTurn, AgentWork } from './types';
@@ -324,7 +324,7 @@ function placedIsSaid(p: Placed): p is Placed & { node: AgentSaid } {
 }
 
 // Tool-call scaffolding that leaked into the prose, cut off it. The rule and
-// the row it comes from are in shared/agents.mjs, next to the write that stops
+// the row it comes from are in shared/agents.mts, next to the write that stops
 // it being stored in the first place; it is applied here as well because the
 // rows that already carry it are still on her screen.
 

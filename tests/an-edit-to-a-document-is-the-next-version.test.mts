@@ -8,8 +8,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { cleanMark, editClash, editedFilesLine, filesInLines, marksOf, newestOfFamily, sharedByWords, threadFiles } from '../shared/artifact-marks.mjs';
-import { saveNextVersion } from '../main/file-version.mjs';
+import { cleanMark, editClash, editedFilesLine, filesInLines, marksOf, newestOfFamily, sharedByWords, threadFiles } from '../shared/artifact-marks.mts';
+import { saveNextVersion } from '../main/file-version.mts';
 
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 const said = (over = {}) => ({ id: 'w-1', ts: 1, source: 'agent', by: 'owner', patch: { result: 'I wrote [plan.md](designs/w-1/plan.md).' }, ...over });

@@ -11,10 +11,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
-import { appFilesPlace } from '../main/files-place.mjs';
-import { versionLine } from '../main/version-line.mjs';
+import { appFilesPlace } from '../main/files-place.mts';
+import { versionLine } from '../main/version-line.mts';
 
 const PNG = (n) => Buffer.from(`89504e470d0a1a0a0000000d49484452000000${String(n).padStart(4, '0')}`, 'hex');
 

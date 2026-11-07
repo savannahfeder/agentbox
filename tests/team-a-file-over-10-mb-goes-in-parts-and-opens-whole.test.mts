@@ -17,8 +17,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { aMac, aProject, conversation, createMemoryCloud, disk, memoryBackend, opened, signUpMemory, until, write } from './lib/two-macs-over-one-cloud.mts';
-import { MAX_CARRIED_BYTES, MAX_SENT_BYTES, PART_BYTES, carryLine, overTheLimit, tooBigToSend } from '../shared/carried-files.mjs';
-import { pieceSizes } from '../main/team/carry-files.mjs';
+import { MAX_CARRIED_BYTES, MAX_SENT_BYTES, PART_BYTES, carryLine, overTheLimit, tooBigToSend } from '../shared/carried-files.mts';
+import { pieceSizes } from '../main/team/carry-files.mts';
 
 const MB = 1024 * 1024;
 const sha = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');

@@ -2,7 +2,7 @@
 //
 // `appHome` reads `AGENTBOX_HOME` first and falls back through the older
 // spellings, because a shell, a launchd job or a process started before a
-// rename still exports the old one (main/store/home.mjs). A test that sets only
+// rename still exports the old one (main/store/home.mts). A test that sets only
 // ONE of those names therefore does not decide where the code writes: it
 // decides it only on a machine where no newer spelling is set.
 //

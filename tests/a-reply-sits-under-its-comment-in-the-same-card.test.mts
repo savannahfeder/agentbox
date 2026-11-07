@@ -7,8 +7,8 @@
 // ledger: a mark could be a note, a resolve or an approval, never an answer to
 // a note, so there was nowhere for a reply to live.
 import { it, expect, describe } from 'vitest';
-import { cleanMark, fileNewsFor, marksOf } from '../shared/artifact-marks.mjs';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { cleanMark, fileNewsFor, marksOf } from '../shared/artifact-marks.mts';
+import { foldWorkItems } from '../shared/work-items.mts';
 import { threadEvents } from '../renderer/src/thread-history';
 
 const SOFIA = 'p-sofia';

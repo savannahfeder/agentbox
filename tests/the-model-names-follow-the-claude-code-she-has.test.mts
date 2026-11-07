@@ -5,7 +5,7 @@
 // day it starts. Nothing here changes that and nothing here should.
 //
 // WHAT BROKE IS THE WORD ON THE SCREEN. The picker's labels came out of
-// `shared/claude-models.generated.mjs`, written by
+// `shared/claude-models.generated.mts`, written by
 // `scripts/read-claude-models.mjs` while Agentbox was being BUILT. That file
 // exists to stop a typed label drifting from the model that runs and it does,
 // in one direction only: a table frozen at build time cannot see her run
@@ -29,8 +29,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { claudeModels, claudeModelRows, forget, readAliases, rowsFrom, scan } from '../main/claude-models.mjs';
-import { CLAUDE_MODELS } from '../shared/claude-models.generated.mjs';
+import { claudeModels, claudeModelRows, forget, readAliases, rowsFrom, scan } from '../main/claude-models.mts';
+import { CLAUDE_MODELS } from '../shared/claude-models.generated.mts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CATALOG_2_1_280 = fs.readFileSync(path.join(HERE, 'fixtures', 'claude-catalog-2.1.280.txt'), 'utf8');

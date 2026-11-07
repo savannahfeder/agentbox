@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   periodKey, isOwed, servedOf, occurrenceId, foldRepeats, nextRunAt, isCleanRun, ruleIdOf,
-} from '../shared/repeats.mjs';
+} from '../shared/repeats.mts';
 
 const rule = (over = {}) => ({ id: 'r-3f9a21bc44', every: 'day', at: '09:00', served: '', ...over });
 const at = (y, m, d, h, min = 0) => new Date(y, m - 1, d, h, min, 0, 0).getTime();

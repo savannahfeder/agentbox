@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { whereAFileLinkGoes } from '../renderer/src/file-links.ts';
-import { leavesTheApp } from '../main/app-window-stays.mjs';
+import { leavesTheApp } from '../main/app-window-stays.mts';
 
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 

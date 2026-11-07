@@ -15,8 +15,8 @@
 // order (a pull is a page of a teammate's lines, newest-first is possible)
 // cannot resurrect a reaction that was taken back later.
 import { describe, it, expect } from 'vitest';
-import { foldWorkItems, pickFields } from '../shared/work-items.mjs';
-import { whatATeammateMaySet } from '../shared/team-rules.mjs';
+import { foldWorkItems, pickFields } from '../shared/work-items.mts';
+import { whatATeammateMaySet } from '../shared/team-rules.mts';
 
 const ID = 'w-1234567890';
 const MSG = 'u-msg-one';
@@ -93,7 +93,7 @@ describe('a reaction reaches the other Mac', () => {
   });
 
   // AND NOWHERE ELSE. Outside a conversation a teammate's line may set only the
-  // summary and who acts next (shared/team-rules.mjs); a reaction is not one of
+  // summary and who acts next (shared/team-rules.mts); a reaction is not one of
   // them, and nothing in the app draws one there.
   it('is dropped from a teammate’s line on an ordinary shared task', () => {
     const line = { id: ID, ts: 1, source: 'founder', by: 'p-maya', uid: 'u-1', patch: { react: { on: MSG, emoji: '👀' } } };

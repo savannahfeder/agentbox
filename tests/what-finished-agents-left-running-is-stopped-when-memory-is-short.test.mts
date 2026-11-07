@@ -365,7 +365,7 @@ describe('the app', () => {
 describe('the Settings page', () => {
   it('turning it on is remembered with the moment it went on, and starts the cleaner now', async () => {
     const { setWorkspaceSetting, leftoverSettings } = await import('../main/settings.mts');
-    const { loadConfig } = await import('../main/config.mjs');
+    const { loadConfig } = await import('../main/config.mts');
     const appDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-settings-'));
     fs.writeFileSync(path.join(appDir, 'zero.config.json'), '{}');
     const config = loadConfig(appDir);

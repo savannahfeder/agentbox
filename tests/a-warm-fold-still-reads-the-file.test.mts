@@ -7,8 +7,8 @@ import { it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
-import { LEASE_MS } from '../shared/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
+import { LEASE_MS } from '../shared/work-items.mts';
 
 let dir;
 beforeEach(() => {

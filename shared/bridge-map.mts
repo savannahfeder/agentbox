@@ -161,9 +161,9 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   setWorkspaceSetting: 'zero:settings-set-workspace',
   // The cloud setup's sign-in for one account, made in the cloud (main/cloud/logins.mts).
   cloudSignIn: 'zero:cloud-signin',
-  // A key kept in the cloud for every cloud run (main/cloud/keys.mjs).
+  // A key kept in the cloud for every cloud run (main/cloud/keys.mts).
   cloudKey: 'zero:cloud-key',
-  // A file or a one-time code a cloud run asked for (shared/cloud-needs.mjs).
+  // A file or a one-time code a cloud run asked for (shared/cloud-needs.mts).
   cloudSendFile: 'zero:cloud-send-file',
   cloudSendCode: 'zero:cloud-send-code',
   cloudFileInfo: 'zero:cloud-file-info',

@@ -750,7 +750,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   useEffect(() => { onFileAt(current?.path ?? null); }, [current?.path]);
 
   // Opening at a file named by a chip. The chip is drawn only when the change
-  // holds the file (fileInChange, shared/work-lines.mjs).
+  // holds the file (fileInChange, shared/work-lines.mts).
   useEffect(() => {
     if (startAt) goTo(startAt);
   }, [startAt, startAtFrom, files]);

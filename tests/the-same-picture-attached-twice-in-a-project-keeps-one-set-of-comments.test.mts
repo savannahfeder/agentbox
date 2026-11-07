@@ -15,9 +15,9 @@ import { it, expect, beforeEach, describe } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
-import { appFilesPlace } from '../main/files-place.mjs';
+import { appFilesPlace } from '../main/files-place.mts';
 
 const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000010', 'hex');
 const OTHER = Buffer.from('89504e470d0a1a0a0000000d4948445200000020', 'hex');

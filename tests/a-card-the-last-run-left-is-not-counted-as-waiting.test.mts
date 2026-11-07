@@ -26,7 +26,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { dropCardsFromTheLastRun, listPending, spoolDir } from '../main/approvals.mjs';
+import { dropCardsFromTheLastRun, listPending, spoolDir } from '../main/approvals.mts';
 
 const dirs = [];
 function spool() {

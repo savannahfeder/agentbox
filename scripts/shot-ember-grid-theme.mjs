@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { openInbox } from './lib/inbox-harness.mjs';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 
 const [dist = 'renderer/dist', out = '/tmp/ember-grid-shots', skin = 'ember-grid'] = process.argv.slice(2);
 fs.mkdirSync(out, { recursive: true });

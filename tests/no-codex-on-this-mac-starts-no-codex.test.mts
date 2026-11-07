@@ -6,7 +6,7 @@
 // Codex. The window asks both agents to refresh their model lists when it
 // opens (components/AgentUpdates.tsx), and the Codex refresh spawned
 // `config.codexBin`, which is null by design when Codex is not installed
-// (main/config.mjs), so `spawn(null)` threw. Codex is optional; a Mac without
+// (main/config.mts), so `spawn(null)` threw. Codex is optional; a Mac without
 // it should hear nothing about it.
 import { it, expect } from 'vitest';
 import os from 'node:os';

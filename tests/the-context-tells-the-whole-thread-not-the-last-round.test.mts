@@ -25,7 +25,7 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 const raw = read('briefs/worker.md');
 // The brief is wrapped; its sentences are read as one line.
 const brief = raw.replace(/\s+/g, ' ');
-const tools = read('mcp/tools.mjs');
+const tools = read('mcp/tools.mts');
 const defaults = JSON.parse(read('shared/instruction-defaults.json'));
 
 describe('the worker brief', () => {

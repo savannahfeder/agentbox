@@ -113,7 +113,7 @@ describe('what she cut is gone from the file we ship', () => {
   });
 
   // Nothing in Agentbox reads a branch name: the code artifact she opens is built
-  // from the session's own transcript, never from git (main/code-change.mjs).
+  // from the session's own transcript, never from git (main/code-change.mts).
   // So a developer with his own convention keeps it.
   it('our branch name is no longer imposed', () => {
     expect(template()).not.toContain('agentbox/<item-id>');
@@ -186,7 +186,7 @@ describe('the brief says its own length is not the instruction', () => {
 
 // Narrating each step stays, because it is what the row shows while a task
 // runs. Priority comes off the agents entirely and the app stamps it
-// (shared/rank.mjs, itemPriority). The proposal rule and the blocking rule
+// (shared/rank.mts, itemPriority). The proposal rule and the blocking rule
 // each say the same thing in one sentence instead of six: nothing in the app
 // ever read the "Blocked on:" wording, and the Waiting on button in
 // Focus.tsx draws off a live CHILD item, which is the half worth demanding.

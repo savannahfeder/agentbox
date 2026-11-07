@@ -16,8 +16,8 @@
 // moment, for you. Your own message reopening it keeps that. Undoing the close
 // takes it back, and anything said after the close still counts.
 import { describe, it, expect } from 'vitest';
-import { foldWorkItems } from '../shared/work-items.mjs';
-import { inMyInbox, iSpokeLast, whatWaits } from '../shared/team-rules.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
+import { inMyInbox, iSpokeLast, whatWaits } from '../shared/team-rules.mts';
 
 const ID = 'w-0123456789';
 const ME = 'p-me', MAYA = 'p-maya';

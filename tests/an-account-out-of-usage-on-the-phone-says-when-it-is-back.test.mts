@@ -7,7 +7,7 @@
 // when it resets", with no time at all. The computer now sends when the account
 // resets, and the phone says it with its day.
 import { describe, it, expect } from 'vitest';
-import { phoneSettingsOf } from '../shared/phone-settings.mjs';
+import { phoneSettingsOf } from '../shared/phone-settings.mts';
 import { backAt } from '../mobile/src/lib/back-at';
 
 const at = (s) => new Date(s).getTime();

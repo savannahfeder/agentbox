@@ -17,7 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createPhoneInbox, phoneDevice } from '../main/phone-inbox.mts';
-import { threadSnapshot, threadsWorthCarrying, checkCommand, madeHere, bytesOf, hideSecrets, SNAPSHOT_LIMITS } from '../shared/phone-snapshot.mjs';
+import { threadSnapshot, threadsWorthCarrying, checkCommand, madeHere, bytesOf, hideSecrets, SNAPSHOT_LIMITS } from '../shared/phone-snapshot.mts';
 
 const DAY = 24 * 3600_000;
 const NOW = Date.parse('2026-10-14T12:00:00Z');

@@ -1,7 +1,7 @@
 // MP-05 audit: exitedReviewMode carries the review string, not agentMessage.text.
 // Dropping it makes a successful native review look like an unanswered turn.
 import {it,expect} from 'vitest';
-import {captureCodexEvent,traceCodexEvent} from '../main/codex.mjs';
+import {captureCodexEvent,traceCodexEvent} from '../main/codex.mts';
 const review='[P1] Reject negative quantities — cart.js:4';
 it('uses the completed review as the final result and trace',()=>{
  const session={};const params={item:{type:'exitedReviewMode',review}};

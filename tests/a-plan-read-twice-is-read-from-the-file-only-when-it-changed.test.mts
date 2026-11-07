@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { readPlan } from '../main/claude-plan.mjs';
+import { readPlan } from '../main/claude-plan.mts';
 
 let dir;
 let file;

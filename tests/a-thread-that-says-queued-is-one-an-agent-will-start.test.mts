@@ -37,7 +37,7 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
-vi.mock('../main/account-tooling.mjs', async (importActual) => ({
+vi.mock('../main/account-tooling.mts', async (importActual) => ({
   ...(await importActual()),
   linkAccountTooling: () => null,
 }));

@@ -74,10 +74,10 @@ describe('against a real directory', () => {
     // listing it would cry wolf on every rebuild.
     fs.mkdirSync(path.join(dir, 'renderer', 'src'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'renderer', 'src', 'App.tsx'), '// ui');
-    fs.writeFileSync(path.join(dir, 'shared', 'rank.mjs'), '// shared');
+    fs.writeFileSync(path.join(dir, 'shared', 'rank.mts'), '// shared');
     _resetCacheForTests();
     const verdict = restartNeeded(dir, Date.now() - 60_000);
-    expect(verdict.files).toContain('shared/rank.mjs');
+    expect(verdict.files).toContain('shared/rank.mts');
     expect(verdict.files.some((f) => f.includes('App.tsx'))).toBe(false);
   });
 

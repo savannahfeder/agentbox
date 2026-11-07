@@ -1,10 +1,10 @@
 import { useContext, useState, type ReactNode } from 'react';
 import type { WorkItem } from '../types';
-import { needId, needsLeft, type Need } from '../../../shared/cloud-needs.mjs';
+import { needId, needsLeft, type Need } from '../../../shared/cloud-needs.mts';
 import { HELD, focusNeedOnOpen } from '../components/NeedCard';
 import { rowTitle } from '../list-rules';
 import { SavedKeysContext } from './Pages';
-import { keyWords } from '../../../shared/cloud-keys.mjs';
+import { keyWords } from '../../../shared/cloud-keys.mts';
 import { DARK_INK, logoOf } from '../connections/logos';
 
 type Row = { key: string; need: string; mark: string | null; glyph: 'key' | 'file'; title: string; act: string; items: WorkItem[] };

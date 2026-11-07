@@ -15,8 +15,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { harnessFor, supportsHarnessOperation, HARNESS_OPERATIONS } from '../main/harnesses.mts';
-import { harnessDefinition, HARNESS_DEFINITIONS } from '../shared/harness-definitions.mjs';
-import { ENGINES, ENGINE_IDS, DEFAULT_ENGINE, isEngine, engineFor } from '../shared/engines.mjs';
+import { harnessDefinition, HARNESS_DEFINITIONS } from '../shared/harness-definitions.mts';
+import { ENGINES, ENGINE_IDS, DEFAULT_ENGINE, isEngine, engineFor } from '../shared/engines.mts';
 
 const root = path.join(import.meta.dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
@@ -93,7 +93,7 @@ describe('adding OpenCode touched no existing engine branch', () => {
     }
     // The renderer-safe definitions file must stay free of processes, keys and
     // transports, which is the promise written at the top of it.
-    const definitions = read('shared/harness-definitions.mjs');
+    const definitions = read('shared/harness-definitions.mts');
     expect(definitions).not.toMatch(/require\(|child_process|node:fs|node:http|fetch\(/);
     expect(HARNESS_DEFINITIONS).toHaveLength(3);
     expect(Object.isFrozen(harnessDefinition('opencode'))).toBe(true);

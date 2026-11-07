@@ -31,7 +31,7 @@
 //
 // 2. A REQUEST NOBODY IS WAITING ON IS REAPED. Both engines give up on a card
 //    after fifteen minutes -- main/approval-prompt-server.mts's own deadline,
-//    main/codex-approvals.mjs's `timeoutMs` -- and both delete the pair when
+//    main/codex-approvals.mts's `timeoutMs` -- and both delete the pair when
 //    they do. A request file still there well after that is either a forgery or
 //    the leftovers of a worker that died before its own deadline, and in both
 //    cases the card is a question nothing can answer. It goes, on Agentbox's
@@ -47,7 +47,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { answer, listPending, spoolDir, REQUEST_TTL_MS } from '../main/approvals.mjs';
+import { answer, listPending, spoolDir, REQUEST_TTL_MS } from '../main/approvals.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -174,7 +174,7 @@ describe('a request nobody is waiting on any more', () => {
   // tests/a-permission-card-nobody-has-answered-waits-for-you; this is the
   // clock that must not come back.
   it('is not a deadline either engine shadows', () => {
-    const codex = fs.readFileSync(path.join(here, '..', 'main', 'codex-approvals.mjs'), 'utf8');
+    const codex = fs.readFileSync(path.join(here, '..', 'main', 'codex-approvals.mts'), 'utf8');
     const claude = fs.readFileSync(path.join(here, '..', 'main', 'approval-prompt-core.mts'), 'utf8');
 
     expect(codex).not.toMatch(/setTimeout\(\(\) => entry\.decide/);

@@ -9,9 +9,9 @@
 // owner's own words, and a line that merely claims to be from the owner's agent.
 import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { teamTell, teamTask } from '../mcp/core/reach.mjs';
-import { REACH_LABEL, repliesToAgents } from '../shared/teammate-reach.mjs';
-import { isTaskRow } from '../shared/team-rules.mjs';
+import { teamTell, teamTask } from '../mcp/core/reach.mts';
+import { REACH_LABEL, repliesToAgents } from '../shared/teammate-reach.mts';
+import { isTaskRow } from '../shared/team-rules.mts';
 
 let t; let chief; let run;
 
@@ -68,7 +68,7 @@ describe('a reply', () => {
     await reply('Yes.');
     await t.tick();
     const convo = dmOf(t.maya)[0];
-    const { inMyInbox } = await import('../shared/team-rules.mjs');
+    const { inMyInbox } = await import('../shared/team-rules.mts');
     const product = t.maya.store.listProducts().find((p) => p.slug === convo.product);
     expect(inMyInbox(convo, product, t.maya.personId)).toBe(true);
   });

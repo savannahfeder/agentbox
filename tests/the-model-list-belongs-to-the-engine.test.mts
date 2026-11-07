@@ -83,7 +83,7 @@ describe('the list on the card is the list that engine can run', () => {
 
   // A row with no engine is a Claude Code row, which is every card on every Mac
   // that has never opened the gate. The default has to be the safe one here for
-  // the same reason it is in shared/engines.mjs.
+  // the same reason it is in shared/engines.mts.
   it('reads no engine as Claude Code', () => {
     expect(engineModelChoices(null, null, { codexModels: CODEX }).map((m) => m.id))
       .toEqual(modelChoices(null).map((m) => m.id));

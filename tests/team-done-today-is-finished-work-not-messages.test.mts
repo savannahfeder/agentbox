@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { boardColumns, DEFAULT_COLUMN_ORDER, DEFAULT_DISPLAY } from '../renderer/src/threads/page-rules.ts';
 import { stackRows } from '../renderer/src/threads/stack-rules.ts';
-import { GIVEN_TASK } from '../shared/team-rules.mjs';
+import { GIVEN_TASK } from '../shared/team-rules.mts';
 import { readFileSync } from 'node:fs';
 
 const now = new Date(2026, 9, 30, 15).getTime();

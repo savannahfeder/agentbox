@@ -11,7 +11,7 @@
 import { it, expect, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { carriedNotes, marksOf, threadFiles } from '../shared/artifact-marks.mjs';
+import { carriedNotes, marksOf, threadFiles } from '../shared/artifact-marks.mts';
 import { pinLabel, pinsToDraw, notePlaceWords } from '../renderer/src/artifact-pins.ts';
 
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');

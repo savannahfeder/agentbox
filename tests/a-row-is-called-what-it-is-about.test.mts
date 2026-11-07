@@ -20,7 +20,7 @@
 //      essay that pushes the whole right end of the row off the card.
 
 import { describe, it, expect } from 'vitest';
-import { foldWorkItems, WORK_ITEM_FIELDS } from '../shared/work-items.mjs';
+import { foldWorkItems, WORK_ITEM_FIELDS } from '../shared/work-items.mts';
 import { rowTitle } from '../renderer/src/list-rules';
 import { cleanName, namePrompt, wantsName, NAME_MAX } from '../main/row-label.mts';
 

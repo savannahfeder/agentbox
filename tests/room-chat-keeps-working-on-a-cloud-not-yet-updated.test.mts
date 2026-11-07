@@ -9,7 +9,7 @@
 // still works, and reactions read as none rather than as an error. And the
 // case that must not change: on an updated cloud the new columns are asked for.
 import { describe, it, expect } from 'vitest';
-import { roomsSupabase } from '../main/team/rooms-supabase.mjs';
+import { roomsSupabase } from '../main/team/rooms-supabase.mts';
 
 const NEW = ['edited_at', 'deleted_at'];
 const row = { id: 'm1', room_id: 'r1', by_person: 'p1', body: 'hi', in_reply_to: null, mentions: [], created_at: '2026-10-21T10:00:00Z' };

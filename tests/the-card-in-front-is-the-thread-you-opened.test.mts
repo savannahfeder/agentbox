@@ -32,7 +32,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (...p) => fs.readFileSync(path.join(here, '..', ...p), 'utf8');
 
 const card = (id, item, product = 'sandbox-1') => ({ id, product, item, tool: 'Bash', input: { command: 'git commit' } });
-// The spool's own order: oldest first (main/approvals.mjs).
+// The spool's own order: oldest first (main/approvals.mts).
 const ASKING = [card('a', 'w-ascii', 'str-utils-py'), card('b', 'w-reverse'), card('c', 'w-is-blank')];
 const ids = (list) => list.map((r) => r.id);
 

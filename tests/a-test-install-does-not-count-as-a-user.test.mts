@@ -26,7 +26,7 @@ import {
   HOMES,
   freshEnv,
   runningAsAFreshUser,
-} from '../shared/fresh-user-home.mjs';
+} from '../shared/fresh-user-home.mts';
 import { nameSlug } from '../shared/product-name.mjs';
 
 const tmpdir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-test-install-'));

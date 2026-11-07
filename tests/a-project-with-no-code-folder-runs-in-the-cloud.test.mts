@@ -26,9 +26,9 @@ import { Supervisor } from '../main/supervisor.mts';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
 import { cloudRun, IMPORT_FAILED, PLAIN_CLOUD_NOTE, CLOUD_NOTE, argvForTheCloud } from '../main/cloud/run.mts';
 import { writeMarker, readMarker, cloudWorkPending } from '../main/cloud/marker.mts';
-import { noteImageCaps } from '../main/cloud/config.mjs';
+import { noteImageCaps } from '../main/cloud/config.mts';
 import { taskFolderPath } from '../main/task-folders.mts';
-import { fillNewThreadKit, NEW_THREAD, NEW_ITEM_MARK, newThreadKitKey, startPayload } from '../shared/cloud-kit.mjs';
+import { fillNewThreadKit, NEW_THREAD, NEW_ITEM_MARK, newThreadKitKey, startPayload } from '../shared/cloud-kit.mts';
 import { markerForCloudRun } from '../main/cloud/kit.mts';
 import { waitFor } from './waiting.mts';
 

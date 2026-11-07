@@ -10,12 +10,12 @@ import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
-import { inMyInbox, isWorkThread } from '../shared/team-rules.mjs';
+import { memorySession } from '../main/team/session.mts';
+import { inMyInbox, isWorkThread } from '../shared/team-rules.mts';
 import { messageMore } from '../renderer/src/team/message-more.ts';
 
 async function aMac(cloud, personId) {

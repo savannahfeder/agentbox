@@ -25,7 +25,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { Supervisor } from '../main/supervisor.mts';
-import { stoppedByHer } from '../shared/answers.mjs';
+import { stoppedByHer } from '../shared/answers.mts';
 
 const REPLIED = 1_790_865_701_000; // 07:41:41, the reply steered into the run
 const STOPPED = 1_790_865_805_983; // 07:43:25, her stop

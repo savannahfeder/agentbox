@@ -79,7 +79,7 @@ import { EventEmitter } from 'node:events';
 import { Name } from '../shared/product-name.mjs';
 import {
   createCodexAppServer, APPROVAL_DECISIONS, REFUSAL_DECISION,
-} from '../main/codex-app-server.mjs';
+} from '../main/codex-app-server.mts';
 
 /**
  * A `codex app-server` that is really a notepad.
@@ -137,7 +137,7 @@ function fakeCodex() {
 
 // ONE TIMER TURN AND THEN ONE IMMEDIATE, AND THE SECOND HALF IS NOT DECORATION.
 //
-// `fail` in main/codex-app-server.mjs marks the connection dead synchronously
+// `fail` in main/codex-app-server.mts marks the connection dead synchronously
 // and finishes it on a `setImmediate`, so that the tracing tail explaining the
 // death is complete rather than whatever had arrived by the moment `exit`
 // fired. A bare `setTimeout(0)` races that immediate: Node runs the timers
@@ -480,7 +480,7 @@ describe('every way of not getting an answer is a refusal, never an accept and n
     // They are answered in their own vocabulary now -- `{decision:
     // ReviewDecision}`, which is approved / approved_for_session /
     // {denied:{rejection}} / abort and NOT our four words -- and the mapping is
-    // `LEGACY_DECISIONS` in main/codex-app-server.mjs. Pinned in
+    // `LEGACY_DECISIONS` in main/codex-app-server.mts. Pinned in
     // tests/every-request-codex-can-send-has-an-answer-or-a-refusal.test.mjs.
     ['some/method/from/a/newer/codex', { threadId: 'T-A' }],
   ])('answers %s with a refusal rather than leaving it open', async (method, params) => {

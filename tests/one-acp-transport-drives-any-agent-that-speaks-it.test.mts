@@ -3,7 +3,7 @@
 // instead of one adapter each (github.com/savannahfeder/agentbox/issues/21).
 //
 // WHAT IS PINNED HERE IS THE PART THAT CAN BE WRONG WHILE A DEMO STILL LOOKS
-// PERFECT, which is every lesson main/codex-app-server.mjs paid for already:
+// PERFECT, which is every lesson main/codex-app-server.mts paid for already:
 //
 // - A permission request must ALWAYS be answered. A promise nobody settles is
 //   a worker parked forever with nothing on the row, and on this protocol the

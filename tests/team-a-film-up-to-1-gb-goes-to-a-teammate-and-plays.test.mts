@@ -16,10 +16,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { aMac, aProject, conversation, createMemoryCloud, disk, opened, signUpMemory, until, write } from './lib/two-macs-over-one-cloud.mts';
-import { MAX_SENT_BYTES, PART_BYTES, carryLine, overTheLimit, sizeWords, tooBigToSend, whyWords } from '../shared/carried-files.mjs';
-import { ROOM_MAX_BYTES } from '../shared/room-file-parts.mjs';
-import { createFileCarrier, pieceSizes } from '../main/team/carry-files.mjs';
-import { partFile, validEntry } from '../main/team/carried-shelf.mjs';
+import { MAX_SENT_BYTES, PART_BYTES, carryLine, overTheLimit, sizeWords, tooBigToSend, whyWords } from '../shared/carried-files.mts';
+import { ROOM_MAX_BYTES } from '../shared/room-file-parts.mts';
+import { createFileCarrier, pieceSizes } from '../main/team/carry-files.mts';
+import { partFile, validEntry } from '../main/team/carried-shelf.mts';
 
 const MB = 1024 * 1024;
 const GB = 1024 * MB;

@@ -15,7 +15,7 @@
 // app accusing her of forging her own approval. The thing waiting is Agentbox
 // itself, so nothing on that path ever reads an answer file, and a
 // `<id>.answer.json` that appears for a request still waiting is by definition
-// a worker's forgery (main/codex-approvals.mjs). Her click on Allow therefore
+// a worker's forgery (main/codex-approvals.mts). Her click on Allow therefore
 // went: file written -> within 2s `sweepForgery` deletes it and logs "an answer
 // file appeared for approval <id> that the founder did not write" -> her card
 // comes back -> the worker sits there until the fifteen-minute deadline denies

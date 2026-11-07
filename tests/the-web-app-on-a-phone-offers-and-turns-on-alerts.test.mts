@@ -16,8 +16,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { cloudAlertsVia } from '../renderer/src/cloud-alerts';
 import { ALERTS_SAY } from '../renderer/src/phone-alerts';
-import { checkSetting } from '../shared/phone-settings.mjs';
-import { WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY } from '../shared/web-alerts.mjs';
+import { checkSetting } from '../shared/phone-settings.mts';
+import { WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY } from '../shared/web-alerts.mts';
 import { buildPhoneSite } from '../scripts/build-phone-site.mjs';
 
 const A = '0a1b2c3d4e5f';

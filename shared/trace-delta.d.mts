@@ -1,4 +1,4 @@
-// Types for shared/trace-delta.mjs, for the window side.
+// Types for shared/trace-delta.mts, for the window side.
 
 export interface TraceReader {
   /** The stamps of the logs held for `product/id`, or nothing. */

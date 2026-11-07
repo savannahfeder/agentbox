@@ -11,7 +11,7 @@
 // fields, and only those, to the same handlers the window uses.
 import { describe, it, expect } from 'vitest';
 import { commandFor, phoneSlug } from '../renderer/src/cloud-bridge';
-import { phoneChoices } from '../shared/phone-snapshot.mjs';
+import { phoneChoices } from '../shared/phone-snapshot.mts';
 import { applyThrough } from '../main/phone-inbox.mts';
 
 const DEV = 'a1b2c3d4e5f6';

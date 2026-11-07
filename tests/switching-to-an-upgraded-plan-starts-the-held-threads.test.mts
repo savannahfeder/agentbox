@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
 import { setWorkspaceSetting } from '../main/settings.mts';
-import { forgetDiscovery } from '../main/account-discovery.mjs';
+import { forgetDiscovery } from '../main/account-discovery.mts';
 
 // The line Claude Code prints, with a reset three hours from now on this
 // machine's clock, so the bench is real wherever the suite runs.

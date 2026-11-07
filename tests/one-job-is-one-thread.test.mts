@@ -141,10 +141,10 @@ describe('the filing tool says the same thing as the brief', () => {
   let tools;
 
   beforeEach(async () => {
-    const home = (await import('../main/store/home.mjs')).appHome();
+    const home = (await import('../main/store/home.mts')).appHome();
     process.env.STORE_ACCOUNT_ID = 'acct-tools';
     fs.mkdirSync(path.join(home, 'accounts', 'acct-tools'), { recursive: true });
-    ({ tools } = (await import('../mcp/tools.mjs')).buildTools({ holder: 'test' }));
+    ({ tools } = (await import('../mcp/tools.mts')).buildTools({ holder: 'test' }));
   });
   afterEach(() => { delete process.env.STORE_ACCOUNT_ID; });
 
@@ -179,14 +179,14 @@ describe('a second thread filed in one run', () => {
   let product; let work; let claims;
 
   beforeEach(async () => {
-    const home = (await import('../main/store/home.mjs')).appHome();
+    const home = (await import('../main/store/home.mts')).appHome();
     process.env.STORE_ACCOUNT_ID = 'acct';
     fs.mkdirSync(path.join(home, 'accounts', 'acct'), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     product = createProduct(`Threads ${Math.random().toString(36).slice(2, 8)}`);
-    work = await import('../mcp/core/work.mjs');
+    work = await import('../mcp/core/work.mts');
     claims = work.createClaimRegistry({ holder: 'test-worker', heartbeatMs: 60_000 });
   });
   afterEach(() => { claims._stop(); delete process.env.STORE_ACCOUNT_ID; });

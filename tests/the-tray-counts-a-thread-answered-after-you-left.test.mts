@@ -8,13 +8,13 @@
 // left, looked older than your leaving and was never counted. That is how most
 // threads reach Needs you.
 //
-// Measured with the store's own lines and fold (shared/work-items.mjs): the
+// Measured with the store's own lines and fold (shared/work-items.mts): the
 // status moment of such a thread is the claim, minutes before the answer.
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildClaimLine, buildLine, buildReleaseLine, foldWorkItems } from '../shared/work-items.mjs';
+import { buildClaimLine, buildLine, buildReleaseLine, foldWorkItems } from '../shared/work-items.mts';
 import { newSince } from '../shared/corner-tag.mts';
 import { waitingSince } from '../renderer/src/unread.ts';
 

@@ -7,9 +7,9 @@
 // Measured on the lines a run writes: each is read once, wherever the agent
 // put it, and nothing else is taken for one.
 import { describe, it, expect } from 'vitest';
-import { keyAsks, isKeyAsk, KEY_ASK, savedReply as sharedSavedReply } from '../shared/cloud-keys.mjs';
-import { threadsKeysFree } from '../shared/cloud-needs.mjs';
-import { handsBack } from '../shared/cloud-hand-back.mjs';
+import { keyAsks, isKeyAsk, KEY_ASK, savedReply as sharedSavedReply } from '../shared/cloud-keys.mts';
+import { threadsKeysFree } from '../shared/cloud-needs.mts';
+import { handsBack } from '../shared/cloud-hand-back.mts';
 import { keyAsksAsBlocks, keyBlock, savedReply, keyFromReply, keySavedWords, isNewestAnswer, keyLooksWrong, KEY_BLOCK } from '../renderer/src/key-asks.ts';
 import { plainText, searchText } from '../renderer/src/format.ts';
 

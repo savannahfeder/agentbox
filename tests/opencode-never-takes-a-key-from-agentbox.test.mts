@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { harnessFor } from '../main/harnesses.mts';
-import { harnessDefinition } from '../shared/harness-definitions.mjs';
+import { harnessDefinition } from '../shared/harness-definitions.mts';
 import { openCodePermissionConfig } from '../main/opencode.mts';
 import { writePermissionConfig } from '../main/harnesses/opencode.mts';
 import { splitModel } from '../main/opencode-server.mts';

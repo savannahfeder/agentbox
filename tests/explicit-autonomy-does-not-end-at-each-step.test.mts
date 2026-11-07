@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Supervisor } from '../main/supervisor.mts';
 import { argvForTheCloud } from '../main/cloud/run.mts';
-import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
+import { HAND_BACK } from '../shared/cloud-hand-back.mts';
 
 const repo = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 let root;

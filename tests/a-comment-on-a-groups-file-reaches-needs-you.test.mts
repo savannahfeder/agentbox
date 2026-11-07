@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
-import { groupFileRow } from '../shared/room-needs-you.mjs';
+import { groupFileRow } from '../shared/room-needs-you.mts';
 
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 const timers = { setTimeout: (fn) => { const h = { off: false }; queueMicrotask(() => { if (!h.off) fn(); }); return h; }, clearTimeout: (h) => { if (h) h.off = true; } };

@@ -5,7 +5,7 @@ import {afterEach,expect,it} from 'vitest';
 import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {Compose} from '../renderer/src/components/Compose.tsx';
-import {ENGINES} from '../shared/engines.mjs';
+import {ENGINES} from '../shared/engines.mts';
 import {readLastEngine,writeLastEngine} from '../renderer/src/engines.ts';
 const saved=globalThis.localStorage;
 afterEach(()=>{globalThis.localStorage=saved;});

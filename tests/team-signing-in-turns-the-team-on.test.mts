@@ -15,10 +15,10 @@ import { it, expect, describe, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
+import { memorySession } from '../main/team/session.mts';
 import { teamOf } from '../main/team/projects.mts';
 
 // The slice of the store the service reads: the products in an account folder.
@@ -181,7 +181,7 @@ describe('sharing a project', () => {
     const joined = storeAt(theo.accountRoot).listProducts().filter((p) => p.team);
     expect(joined.map((p) => p.name)).toEqual(['Website']);
     // A row's words stay on the Mac they were written on (review 2026-10-01,
-    // shared/team-rules.mjs whatATeammateMaySet); its summary is what travels.
+    // shared/team-rules.mts whatATeammateMaySet); its summary is what travels.
     expect(disk.readWorkItems(joined[0].dir)).toEqual([]);
   });
 });

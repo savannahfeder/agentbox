@@ -3,7 +3,7 @@
 // The spinning wheel came up for 5 to 10 seconds in a thread while its
 // pictures were loading. The app's own freeze log (memory-log/freeze-*.jsonl)
 // had the window's thread held every 62 to 65 seconds from launch, every time
-// in one line: the login shell `main/engine-bin.mjs` runs with execFileSync to
+// in one line: the login shell `main/engine-bin.mts` runs with execFileSync to
 // find Claude Code and Codex. Usually 1 to 3 s; 6.5 s, 9.3 s and 6.5 s at
 // 16:02, 16:03 and 16:04 while a stress test held memory at "tight". Pictures
 // are answered on that same thread (protocol.handle in main/main.mts), so they
@@ -48,9 +48,9 @@ vi.mock('node:child_process', async (importActual) => {
 });
 
 const { readSettings, lookAgainFor } = await import('../main/settings.mts');
-const { forgetClaudeBin } = await import('../main/claude-bin.mjs');
-const { forgetCodexBin } = await import('../main/codex-bin.mjs');
-const { resolveEngine } = await import('../main/engine-bin.mjs');
+const { forgetClaudeBin } = await import('../main/claude-bin.mts');
+const { forgetCodexBin } = await import('../main/codex-bin.mts');
+const { resolveEngine } = await import('../main/engine-bin.mts');
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -74,7 +74,7 @@ const supervisor = {
   _codexProfiles: () => [],
 };
 
-// What main/config.mjs found at launch on a Mac with both engines.
+// What main/config.mts found at launch on a Mac with both engines.
 const both = () => ({
   accountRoot: path.join(os.tmpdir(), 'no-store', 'accounts', 'a'), storeRoot: path.join(os.tmpdir(), 'no-store'),
   appDir: os.tmpdir(), maxConcurrentSessions: 3, sessionArgs: [], authProfiles: [],

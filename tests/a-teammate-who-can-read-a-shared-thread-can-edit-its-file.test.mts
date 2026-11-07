@@ -8,12 +8,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
-import { filesInLines, threadFiles } from '../shared/artifact-marks.mjs';
+import { memorySession } from '../main/team/session.mts';
+import { filesInLines, threadFiles } from '../shared/artifact-marks.mts';
 
 async function aMac(cloud, personId) {
   const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'file-edit-'));

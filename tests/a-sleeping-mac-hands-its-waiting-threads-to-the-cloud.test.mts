@@ -20,12 +20,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { macAsleep, carryCommand, isCarried, CARRIED, ASLEEP_SETTLE_MS, SLEPT_GAP_MS } from '../shared/cloud-carry.mjs';
+import { macAsleep, carryCommand, isCarried, CARRIED, ASLEEP_SETTLE_MS, SLEPT_GAP_MS } from '../shared/cloud-carry.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend, claimForTheCloud } from '../main/team/memory-cloud.mts';
 import { createPhoneInbox } from '../main/phone-inbox.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { kitCopyPath } from '../main/cloud/kit.mts';
-import { NEW_THREAD } from '../shared/cloud-kit.mjs';
+import { NEW_THREAD } from '../shared/cloud-kit.mts';
 import { phoneView, phoneSlug } from '../renderer/src/phone-rows';
 
 const MIN = 60_000;

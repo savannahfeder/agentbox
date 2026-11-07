@@ -9,11 +9,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
+import { appHome } from '../main/store/home.mts';
 import { loadStore } from '../main/store-modules.mts';
 import { Teammates } from '../main/teammates.mts';
-import { STARTERS } from '../shared/teammates.mjs';
-import { writeTeammate } from '../main/store/teammates-files.mjs';
+import { STARTERS } from '../shared/teammates.mts';
+import { writeTeammate } from '../main/store/teammates-files.mts';
 
 describe('a teammate\'s name', () => {
   it('is its role for every starter', () => {
@@ -29,9 +29,9 @@ describe('teammates on a team', () => {
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = `acct-${Math.random().toString(36).slice(2, 8)}`;
     fs.mkdirSync(path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     product = createProduct(`Shop ${Math.random().toString(36).slice(2, 8)}`);
     dir = path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID, product.id);
     const mods = await loadStore();
@@ -83,7 +83,7 @@ describe('teammates on a team', () => {
     const run = store.modules.workItemsDisk.createWorkItem(dir, { title: 'Set up its job', labels: ['founder', `teammate:${teammate.id}`, 'hop:0'] }, { source: 'system' });
     process.env.ZERO_ITEM = run.id;
     process.env.ZERO_PRODUCT = product.id;
-    const core = await import('../mcp/core/teammates.mjs');
+    const core = await import('../mcp/core/teammates.mts');
     core.teamSetup({ name: 'Video producer', role: 'Video producer' });
     expect(team.get(teammate.id)).toMatchObject({ name: 'Video producer', letter: 'V' });
     const brief = team.briefFor({ id: run.id, labels: run.labels });
@@ -96,7 +96,7 @@ describe('teammates on a team', () => {
     const run = store.modules.workItemsDisk.createWorkItem(dir, { title: 'x', labels: ['founder', `teammate:${t.id}`, 'hop:0'] }, { source: 'system' });
     process.env.ZERO_ITEM = run.id;
     process.env.ZERO_PRODUCT = product.id;
-    const core = await import('../mcp/core/teammates.mjs');
+    const core = await import('../mcp/core/teammates.mts');
     core.teamSetup({ asksFirst: 'Before any refund over $20' });
     const said = team.chat().messages.filter((m) => m.kind === 'act' && m.from === t.id && m.verb === 'updated');
     expect(said).toHaveLength(1);

@@ -22,18 +22,18 @@
 // status, which on an ordinary shared row is what starts an agent (mayRunHere
 // believes a line whose writer is you, because it is you). Two copies of your
 // app would then both start one on the same row. A message record never runs an
-// agent at all (shared/team-rules.mjs), so this is the one place your own words
+// agent at all (shared/team-rules.mts), so this is the one place your own words
 // may cross, and the last test here pins the other place shut.
 import { it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
+import { memorySession } from '../main/team/session.mts';
 
 // ONE COPY OF THE APP: its own store folder, its own sync cursors. Two copies
 // signed in as one person is exactly the shape that lost the message.
@@ -60,7 +60,7 @@ function talk(copy) {
 }
 
 // Every line in a project's ledger, as written. The ledger does not live in the
-// project folder (main/store/home.mjs), so the store is asked for it.
+// project folder (main/store/home.mts), so the store is asked for it.
 const ledger = (dir) => disk.readLinesFrom(dir, 0).lines;
 
 let cloud, laptop, copy, theo, me;

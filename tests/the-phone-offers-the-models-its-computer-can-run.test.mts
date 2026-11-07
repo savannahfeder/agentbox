@@ -3,7 +3,7 @@
 // the send boundary, including stale choices from another computer.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { phoneSettingsOf } from '../shared/phone-settings.mjs';
+import { phoneSettingsOf } from '../shared/phone-settings.mts';
 import { webSettingsModel, phoneEngines, phoneModelRefusal } from '../renderer/src/web-settings';
 
 const codexModels = [{ id: 'gpt-test', label: 'GPT Test', levels: ['low', 'high'], defaultLevel: 'high' }];

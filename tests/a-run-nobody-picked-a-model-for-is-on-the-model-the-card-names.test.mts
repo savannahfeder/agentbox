@@ -12,7 +12,7 @@
 //
 // The row carried no model, so `spawnPlan` left the `--model` sitting in
 // sessionArgs alone, and that flag says `claude-opus-5` -- Opus 5, a generation
-// behind the `opus` alias, which shared/claude-models.generated.mjs resolves to
+// behind the `opus` alias, which shared/claude-models.generated.mts resolves to
 // claude-opus-5-5. Nothing in the app can draw that flag: Settings has had no
 // Model row since 2026-09-23 (tests/the-card-is-the-only-place-the-model-is-
 // asked), so it is a fossil from an older build that no screen shows and no
@@ -42,9 +42,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Supervisor } from '../main/supervisor.mts';
-import { DEFAULT_CLAUDE_MODEL } from '../shared/engines.mjs';
+import { DEFAULT_CLAUDE_MODEL } from '../shared/engines.mts';
 import { DEFAULT_MODEL } from '../renderer/src/models.ts';
-import { CLAUDE_MODELS } from '../shared/claude-models.generated.mjs';
+import { CLAUDE_MODELS } from '../shared/claude-models.generated.mts';
 
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const FOSSIL = ['--model', 'claude-opus-5', '--allowedTools', 'mcp__agentbox', '--permission-mode', 'bypassPermissions'];

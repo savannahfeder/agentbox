@@ -29,7 +29,7 @@ function belongsTo(request: Request | null | undefined, looking: Looking): boole
 /**
  * The pending approvals, with the open thread's own in front.
  *
- * @param pending the spool's order, oldest first (main/approvals.mjs)
+ * @param pending the spool's order, oldest first (main/approvals.mts)
  * @param looking `{ product, id }` of the thread on screen, or null for the
  *                inbox, settings, a dialog -- anywhere that is not one thread
  */

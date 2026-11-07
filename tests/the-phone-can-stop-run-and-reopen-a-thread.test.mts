@@ -19,7 +19,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { emptyDatabase } from './an-empty-test-database.mts';
 import { commandFor, phoneSlug } from '../renderer/src/cloud-bridge';
 import { cloudClient } from '../renderer/src/cloud-rest';
-import { checkCommand } from '../shared/phone-snapshot.mjs';
+import { checkCommand } from '../shared/phone-snapshot.mts';
 import { applyThrough } from '../main/phone-inbox.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

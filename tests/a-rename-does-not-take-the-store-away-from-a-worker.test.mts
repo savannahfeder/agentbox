@@ -15,7 +15,7 @@
 //   the resume is a deep merge over the thread's own config, so a thread that
 //   started before the rename still carries the server under the old slug. The
 //   model reads its own transcript and calls the tool by the name it used last
-//   time. `codex-approvals.mjs` compared that name with one string, so the app
+//   time. `codex-approvals.mts` compared that name with one string, so the app
 //   failed to recognise its own store and put its own plumbing in front of her
 //   as a card, or refused it.
 //
@@ -35,8 +35,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { nameSlug, nameSlugs, WAS_SLUGS, isOurSlug } from '../shared/product-name.mjs';
 import { storeGrantUnderAnyOfOurNames } from '../main/supervisor.mts';
-import { createCodexApprovals, isStoreElicitation } from '../main/codex-approvals.mjs';
-import { listPending } from '../main/approvals.mjs';
+import { createCodexApprovals, isStoreElicitation } from '../main/codex-approvals.mts';
+import { listPending } from '../main/approvals.mts';
 
 const ELICIT = 'mcpServer/elicitation/request';
 const WAS_CALLED = WAS_SLUGS[0];

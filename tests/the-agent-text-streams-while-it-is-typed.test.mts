@@ -26,7 +26,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { streamingText } from '../main/supervisor.mts';
 import { workerArgsFrom } from '../main/harnesses/common.mts';
-import { harnessDefinition } from '../shared/harness-definitions.mjs';
+import { harnessDefinition } from '../shared/harness-definitions.mts';
 import { itemThread } from '../renderer/src/item-thread.ts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

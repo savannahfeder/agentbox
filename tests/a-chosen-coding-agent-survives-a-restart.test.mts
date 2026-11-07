@@ -17,10 +17,10 @@ import { describe, it, expect, afterAll, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadConfig } from '../main/config.mjs';
+import { loadConfig } from '../main/config.mts';
 import { pointAtEngineBin, searchForEngineBin, claudeState, codexState } from '../main/settings.mts';
-import { forgetClaudeBin } from '../main/claude-bin.mjs';
-import { forgetCodexBin } from '../main/codex-bin.mjs';
+import { forgetClaudeBin } from '../main/claude-bin.mts';
+import { forgetCodexBin } from '../main/codex-bin.mts';
 
 const made = [];
 afterAll(() => { for (const d of made) { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } } });
@@ -96,7 +96,7 @@ describe('choosing it, and finding it still chosen next launch', () => {
     expect(onDisk(dir)[key]).toBe(chosen);
 
     expect(searchForEngineBin(c, engine)).toMatchObject({ ok: true });
-    // REMOVED, not emptied: main/config.mjs only reads a non-empty string as
+    // REMOVED, not emptied: main/config.mts only reads a non-empty string as
     // chosen, so an empty one left behind would mean something else entirely.
     expect(key in onDisk(dir)).toBe(false);
 

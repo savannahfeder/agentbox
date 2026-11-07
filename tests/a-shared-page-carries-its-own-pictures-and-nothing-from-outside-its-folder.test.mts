@@ -2,14 +2,14 @@
 //
 // Shareable files (w-d7e61eb261): a page an agent made usually names pictures
 // beside it (designs/w-1/index.html with shot.png), and the copy on the web has
-// no folder beside it, so main/file-link.mjs puts them inside the page. The
+// no folder beside it, so main/file-link.mts puts them inside the page. The
 // danger is the other way: a page that names ../../.ssh/id_rsa, or a link that
 // points out of the folder, would put a private file on a public page.
 import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileForLink, linkKindOf, linkSource, linkAddress, linkCopyOf, LINK_MAX_BYTES } from '../main/file-link.mjs';
+import { fileForLink, linkKindOf, linkSource, linkAddress, linkCopyOf, LINK_MAX_BYTES } from '../main/file-link.mts';
 
 let dir, page;
 const write = (rel, data) => { const f = path.join(dir, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, data); return f; };

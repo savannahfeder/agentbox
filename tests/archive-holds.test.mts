@@ -29,8 +29,8 @@ beforeAll(async () => {
     schemaVersion: 1, id: 'testprod', name: 'Test Product',
   }));
   const { Store } = await import('../main/store.mts');
-  disk = await import('../main/store/work-items.mjs');
-  shared = await import('../shared/work-items.mjs');
+  disk = await import('../main/store/work-items.mts');
+  shared = await import('../shared/work-items.mts');
   store = await new Store({
     storeRoot: tmp, accountId: 'test-account', accountRoot, products: [],
   }).init();

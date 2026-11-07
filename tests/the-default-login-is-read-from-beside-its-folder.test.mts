@@ -17,8 +17,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { accountIdentity } from '../main/account-tooling.mjs';
-import { effectiveProfiles } from '../main/account-discovery.mjs';
+import { accountIdentity } from '../main/account-tooling.mts';
+import { effectiveProfiles } from '../main/account-discovery.mts';
 
 const login = (file, uuid) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });

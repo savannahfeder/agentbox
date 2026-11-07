@@ -3,7 +3,7 @@
 // What broke (2026-10-16, 5:43pm): the app hung for 180 s and only a force quit
 // closed it. The system's hang report showed the main thread inside a
 // synchronous spawn, waiting on /bin/zsh: the login shell the app asks where
-// Claude Code is (main/engine-bin.mjs) before starting an agent, at most once
+// Claude Code is (main/engine-bin.mts) before starting an agent, at most once
 // every 30 s. The shell ran past its 4 s limit, so Node sent it SIGTERM; zsh's
 // handler ran an exit hook from the shell's own setup, which waited on a job
 // that never ended, and a synchronous spawn waits for the child to EXIT, not
@@ -15,7 +15,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { shellRunner } from '../main/engine-bin.mjs';
+import { shellRunner } from '../main/engine-bin.mts';
 
 const dirs = [];
 afterEach(() => { while (dirs.length) fs.rmSync(dirs.pop(), { recursive: true, force: true }); });
@@ -47,7 +47,7 @@ describe('a login shell that runs out of time', () => {
   });
 
   it('the shell asked for the PATH at start is stopped the same way', () => {
-    const src = fs.readFileSync(new URL('../main/shell-path.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/shell-path.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/killSignal: 'SIGKILL'/);
   });
 });

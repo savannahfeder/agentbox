@@ -75,7 +75,7 @@ vi.mock('node:child_process', async (importActual) => {
 });
 
 import { Supervisor } from '../main/supervisor.mts';
-import { machineryPath } from '../main/store/home.mjs';
+import { machineryPath } from '../main/store/home.mts';
 
 const CLAUDE_BIN = '/nonexistent/claude-code/claude';
 const dirs = [];

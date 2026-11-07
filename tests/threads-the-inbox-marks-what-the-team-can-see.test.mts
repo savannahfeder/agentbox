@@ -3,7 +3,7 @@
 // Found on the team build (2026-10-01): a person's threads could all be
 // missing from the Team page, and nothing in the inbox said so or offered a
 // way to change it. Every thread from before you joined stays yours unless you
-// share it (shared/thread-cards.mjs shownToTeam), and a store can hold
+// share it (shared/thread-cards.mts shownToTeam), and a store can hold
 // hundreds of them, so the inbox now says it with the least ink that works:
 //   - a small people mark after the title of a thread the team can see, and
 //     nothing at all on the rest (usually most rows), so the mark means one

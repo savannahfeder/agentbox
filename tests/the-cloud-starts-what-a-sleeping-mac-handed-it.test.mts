@@ -8,7 +8,7 @@
 // aborted due to timeout".
 //
 // Now a sleeping Mac writes each waiting row into the command table, marked as
-// its own (shared/cloud-carry.mjs). The server starts a row nobody has run
+// its own (shared/cloud-carry.mts). The server starts a row nobody has run
 // from its project's new-thread kit under the row's own id, and a row with a
 // reply from the thread's kit, both at once: the Mac said it is asleep, so
 // there is no minute to wait for it. The phone's own Run now is still the
@@ -16,8 +16,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   KIT_VERSION, NEW_ITEM_MARK, NEW_TITLE_MARK, NEW_BODY_MARK, newThreadKitKey, kitKey, runOfClaim,
-} from '../shared/cloud-kit.mjs';
-import { CARRIED } from '../shared/cloud-carry.mjs';
+} from '../shared/cloud-kit.mts';
+import { CARRIED } from '../shared/cloud-carry.mts';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';

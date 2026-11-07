@@ -1,5 +1,5 @@
 // PURE. The files a thread made, for the Files button over it.
-import { filesInLines, threadFiles } from '../../../shared/artifact-marks.mjs';
+import { filesInLines, threadFiles } from '../../../shared/artifact-marks.mts';
 
 export interface ThreadFile { src: string; name: string; notes: number; at: number }
 

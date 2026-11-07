@@ -9,11 +9,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
+import { appHome } from '../main/store/home.mts';
 import { loadStore } from '../main/store-modules.mts';
 import { Teammates } from '../main/teammates.mts';
-import { teammateIdOf, passedFromOf, hopOf, runIdFor } from '../shared/teammates.mjs';
-import { isCleanRun } from '../shared/repeats.mjs';
+import { teammateIdOf, passedFromOf, hopOf, runIdFor } from '../shared/teammates.mts';
+import { isCleanRun } from '../shared/repeats.mts';
 import { threadEvents } from '../renderer/src/thread-history';
 
 describe('teammates through the store', () => {
@@ -23,9 +23,9 @@ describe('teammates through the store', () => {
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = `acct-${Math.random().toString(36).slice(2, 8)}`;
     fs.mkdirSync(path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     product = createProduct(`Shop ${Math.random().toString(36).slice(2, 8)}`);
     dir = path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID, product.id);
     mods = await loadStore();
@@ -38,7 +38,7 @@ describe('teammates through the store', () => {
       listItems: (now) => work.readWorkItems(dir, now).map((i) => ({ ...i, product: product.id })),
     };
     team = new Teammates(store);
-    core = await import('../mcp/core/teammates.mjs');
+    core = await import('../mcp/core/teammates.mts');
   });
 
   afterEach(() => {
@@ -169,7 +169,7 @@ describe('teammates through the store', () => {
     core.teamPass({ to: 'Maintainer', title: 'Fix it', details: 'steps' });
     await tick(Date.now());
     const felixRun = store.listItems().find((i) => teammateIdOf(i) === felix.id);
-    const { updateItem } = await import('../mcp/core/work.mjs');
+    const { updateItem } = await import('../mcp/core/work.mts');
     updateItem(felixRun.id, { labels: ['clean'], status: 'done' }, { product: product.id });
     const after = store.listItems().find((i) => i.id === felixRun.id);
     expect(after.labels).toEqual(expect.arrayContaining(['clean', 'founder', `teammate:${felix.id}`, 'hop:1', `from:${ada.id}`]));
@@ -244,7 +244,7 @@ describe('teammates through the store', () => {
     const all = () => listed.flatMap((p) => work.readWorkItems(p.dir).map((i) => ({ ...i, product: p.slug })));
     const here = new Teammates({ config: { storeRoot: root, accountId: 'acct-origin' }, modules: mods, listProducts: () => listed, productDir: (slug) => dirs[slug], listItems: all });
     const nico = here.create({ starter: 'maintainer', name: 'Nico', product: 'web' });
-    const { writeChat } = await import('../main/store/teammates-files.mjs');
+    const { writeChat } = await import('../main/store/teammates-files.mts');
     writeChat(here.dir(), { kind: 'pass', from: 'you', to: nico.id, title: 'Cap the cursor length', details: '', product: 'api', via: 'w-x', viaProduct: 'api' }, Date.now());
     writeChat(here.dir(), { kind: 'pass', from: 'you', to: nico.id, title: 'Somewhere gone', details: '', product: 'nope' }, Date.now() + 1);
     await here.tick({ items: all(), now: Date.now() + 2 });
@@ -307,7 +307,7 @@ describe('teammates through the store', () => {
   it('work held after too many hand-offs goes ahead, whole, when you say so', async () => {
     const felix = team.create({ starter: 'maintainer' });
     const ada = team.create({ starter: 'quality' });
-    const { writeChat } = await import('../main/store/teammates-files.mjs');
+    const { writeChat } = await import('../main/store/teammates-files.mts');
     const held = writeChat(team.dir(), { kind: 'pass', from: ada.id, to: felix.id, title: 'Every booking is lost', details: 'Steps: book twice, restart.', hop: 99, product: product.id }, Date.now());
     await tick(Date.now());
     expect(store.listItems().filter((i) => teammateIdOf(i) === felix.id)).toHaveLength(0);
@@ -327,7 +327,7 @@ describe('teammates through the store', () => {
     const ada = team.create({ starter: 'quality' });
     const felix = team.create({ starter: 'maintainer' });
     // Told to take hand-offs straight away; one held for your yes does not queue.
-    const { writeTeammate } = await import('../main/store/teammates-files.mjs');
+    const { writeTeammate } = await import('../main/store/teammates-files.mts');
     writeTeammate(team.dir(), felix.id, { handoffsNeedYes: false }, Date.now());
     const go = team.post({ text: 'go', to: [ada.id] });
     const also = team.post({ text: 'and this', to: [ada.id], fresh: true });

@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { noteImageCaps } from '../main/cloud/config.mjs';
+import { noteImageCaps } from '../main/cloud/config.mts';
 import { threadPlace } from '../renderer/src/cloud-menu.ts';
 
 const CAPS = ['offline', 'setup', 'kept', 'base', 'plain'];

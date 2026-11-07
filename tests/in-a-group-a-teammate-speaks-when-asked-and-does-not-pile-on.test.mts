@@ -9,12 +9,12 @@ import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { teamTell } from '../mcp/core/reach.mjs';
-import { reachTick } from '../main/teammate-reach.mjs';
-import { readChat, readOutbox, writeOutbox } from '../main/store/teammates-files.mjs';
-import { roomBody } from '../shared/agent-voice.mjs';
-import { CHAT_LABEL } from '../shared/teammates.mjs';
-import { GROUP_QUIET_MS, MOST_IN_A_ROW, asksInGroups, groupTurn } from '../shared/teammate-reach.mjs';
+import { teamTell } from '../mcp/core/reach.mts';
+import { reachTick } from '../main/teammate-reach.mts';
+import { readChat, readOutbox, writeOutbox } from '../main/store/teammates-files.mts';
+import { roomBody } from '../shared/agent-voice.mts';
+import { CHAT_LABEL } from '../shared/teammates.mts';
+import { GROUP_QUIET_MS, MOST_IN_A_ROW, asksInGroups, groupTurn } from '../shared/teammate-reach.mts';
 
 const NOW = 1_800_000_000_000;
 const person = (at, names = []) => ({ by: 'p-dev', at, agent: null, names });

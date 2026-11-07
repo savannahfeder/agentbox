@@ -20,7 +20,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Supervisor } from '../main/supervisor.mts';
 import { createPhoneInbox, applyThrough } from '../main/phone-inbox.mts';
-import { PHONE_COMMANDS } from '../shared/phone-snapshot.mjs';
+import { PHONE_COMMANDS } from '../shared/phone-snapshot.mts';
 import { REQUEST_CHANNELS } from '../shared/bridge-map.mts';
 import { threadPlace } from '../renderer/src/cloud-menu.ts';
 import { ThreadMenu } from '../renderer/src/threads/ThreadMenu.tsx';

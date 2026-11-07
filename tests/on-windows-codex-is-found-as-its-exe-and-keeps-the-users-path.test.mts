@@ -38,7 +38,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { findEngine } from '../main/engine-bin.mjs';
+import { findEngine } from '../main/engine-bin.mts';
 import { codexLaunchEnv } from '../main/codex-launch-env.mts';
 
 const w = path.win32;

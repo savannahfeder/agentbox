@@ -9,9 +9,9 @@
 import { it, expect, describe } from 'vitest';
 import {
   cleanMark, fileNewsFor, filesInLines, findQuote, marksOf, nextVersionName, notesForTheAgent, placeWords, threadFiles, whoseIsTheFile,
-} from '../shared/artifact-marks.mjs';
-import { foldWorkItems, buildLine } from '../shared/work-items.mjs';
-import { whatATeammateMaySet } from '../shared/team-rules.mjs';
+} from '../shared/artifact-marks.mts';
+import { foldWorkItems, buildLine } from '../shared/work-items.mts';
+import { whatATeammateMaySet } from '../shared/team-rules.mts';
 import { threadEvents } from '../renderer/src/thread-history';
 
 const MAYA = 'p-maya';

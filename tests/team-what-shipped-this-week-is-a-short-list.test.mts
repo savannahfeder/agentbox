@@ -7,9 +7,9 @@
 // thread finished on Tuesday could not be on any list by Wednesday.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { cardsFor, shippedAtOf } from '../shared/thread-cards.mjs';
-import { shippedNote } from '../shared/shipped-note.mjs';
-import { buildLine, foldWorkItems } from '../shared/work-items.mjs';
+import { cardsFor, shippedAtOf } from '../shared/thread-cards.mts';
+import { shippedNote } from '../shared/shipped-note.mts';
+import { buildLine, foldWorkItems } from '../shared/work-items.mts';
 import { shippedThisWeek, shippedWords } from '../renderer/src/team/shipped.ts';
 import { statusCell } from '../renderer/src/status-word.ts';
 import { threadMenuRows } from '../renderer/src/threads/ThreadMenu.tsx';
@@ -84,7 +84,7 @@ describe('the card a teammate reads', () => {
     expect((await maya.listCards())[0].shippedAt).toBe(now - 1);
   });
   it('the hosted cloud has a column for it, and an older cloud still takes the cards', () => {
-    const backend = readFileSync(new URL('../main/team/supabase-backend.mjs', import.meta.url), 'utf8');
+    const backend = readFileSync(new URL('../main/team/supabase-backend.mts', import.meta.url), 'utf8');
     expect(backend).toContain('shipped_at');
     expect(backend).toMatch(/PGRST204|42703/);
     expect(readFileSync(new URL('../cloud/supabase/migrations/20261031000050_threads_say_when_they_shipped.sql', import.meta.url), 'utf8'))

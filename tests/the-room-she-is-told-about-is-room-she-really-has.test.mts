@@ -41,7 +41,7 @@ import { Supervisor } from '../main/supervisor.mts';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 // A HOME WITH NOBODY SIGNED IN ON IT. The fleet's account list is what the
-// config names plus whatever is signed in on disk (main/account-discovery.mjs),
+// config names plus whatever is signed in on disk (main/account-discovery.mts),
 // so a developer with a second Claude subscription would otherwise get twice
 // every number here.
 const ONE_ACCOUNT_HOME = '/nonexistent-home-with-no-second-account';
@@ -88,7 +88,7 @@ describe('the room she is told about is room a row can really reach', () => {
   });
 
   // THE BOUNDARY ON THE OTHER SIDE: the gate is open and Agentbox cannot see
-  // Codex. `config.codexBin` is null exactly there (main/config.mjs), and the
+  // Codex. `config.codexBin` is null exactly there (main/config.mts), and the
   // binary was always the fact this method refused on.
   it('counts no codex slots when the gate is open and codex is not on the mac', () => {
     expect(sup({ codexBin: null, engineChoice: OPENED })._capacity()).toBe(3);

@@ -5,7 +5,7 @@
 // words out of a message cut the name they had typed at its comma. Measured
 // through shownTitle with the fields a rename writes.
 import { describe, it, expect } from 'vitest';
-import { shownTitle } from '../shared/thread-title.mjs';
+import { shownTitle } from '../shared/thread-title.mts';
 
 const renamed = (label, extra = {}) => ({ title: 'Sumarise what chnaged this week', label, wrote: { title: { ts: 10, source: 'founder' }, label: { ts: 20, source: 'founder' } }, ...extra });
 

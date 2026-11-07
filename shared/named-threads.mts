@@ -2,7 +2,7 @@
 // it (w-c110f2371d). A message names one as `[Its name](w-…)` (# in a text
 // box) or as a bare id; the store has no way to read one thread by id, so
 // without this the agent holds a name and nothing behind it.
-import { doneSteps, shownToPeople, visibilityOf } from './thread-cards.mjs';
+import { doneSteps, shownToPeople, visibilityOf } from './thread-cards.mts';
 
 type Row = Parameters<typeof visibilityOf>[0];
 type Seen = Parameters<typeof visibilityOf>[1];

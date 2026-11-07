@@ -12,7 +12,7 @@
 // also carry `saveUrl`, and the server swapped it for a link that writes
 // under `logins/`, which never expires.
 //
-// Measured by reading cloud/gateway/gateway.mjs and main/cloud/aws.mjs (no
+// Measured by reading cloud/gateway/gateway.mjs and main/cloud/aws.mts (no
 // size, no plan check, LINK_MAX_SECONDS 12 h). Now: no plan, no link that
 // writes; a sign-in is saved only by a sign-in; and the sweep lists the
 // `runs/` of whoever was handed such a link, refuses new ones at the cap,

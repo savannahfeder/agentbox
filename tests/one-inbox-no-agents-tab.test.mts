@@ -7,7 +7,7 @@
 //
 //   3. The phantom sidebar, which is pinned in the-panel-is-hers-to-open.
 //
-// The rules themselves live in shared/agents.mjs and are pinned in
+// The rules themselves live in shared/agents.mts and are pinned in
 // her-agents-in-her-inbox. What is pinned HERE is the two things that have no
 // symptom anywhere else: that the tab is really gone from the app rather than
 // merely hidden, and that the reader really does pull a session's own title off

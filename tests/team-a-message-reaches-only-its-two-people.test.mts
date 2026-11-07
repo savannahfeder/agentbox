@@ -9,14 +9,14 @@ import { it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
-import { inMyInbox, mayRunHere, handedOnByReply } from '../shared/team-rules.mjs';
+import { memorySession } from '../main/team/session.mts';
+import { inMyInbox, mayRunHere, handedOnByReply } from '../shared/team-rules.mts';
 import { joinSharedProject } from '../main/team/projects.mts';
-import { cardsFor } from '../shared/thread-cards.mjs';
+import { cardsFor } from '../shared/thread-cards.mts';
 
 async function aMac(cloud, personId) {
   const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'team-msg-'));

@@ -13,8 +13,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
-import { cardsFor } from '../shared/thread-cards.mjs';
+import { appHome } from '../main/store/home.mts';
+import { cardsFor } from '../shared/thread-cards.mts';
 
 const CHAT = ['p-me', 'p-alice'];
 
@@ -25,11 +25,11 @@ describe('a task an agent files', () => {
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = 'acct';
     fs.mkdirSync(path.join(home, 'accounts', 'acct'), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     product = createProduct(`Privacy ${Math.random().toString(36).slice(2, 8)}`);
-    work = await import('../mcp/core/work.mjs');
+    work = await import('../mcp/core/work.mts');
     claims = work.createClaimRegistry({ holder: 'test-worker', heartbeatMs: 60_000 });
   });
 
@@ -86,7 +86,7 @@ describe('a task an agent files', () => {
 
 describe('the filing tool goes through that rule', () => {
   it('create_work_item files through the session, not around it', () => {
-    const tools = fs.readFileSync(new URL('../mcp/tools.mjs', import.meta.url), 'utf8');
+    const tools = fs.readFileSync(new URL('../mcp/tools.mts', import.meta.url), 'utf8');
     expect(tools).toContain('json(claims.file(product, fields))');
   });
 });

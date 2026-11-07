@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
-import { prepareHome, freshEnv } from '../shared/fresh-user-home.mjs';
+import { prepareHome, freshEnv } from '../shared/fresh-user-home.mts';
 
 const roots = [];
 afterEach(() => {

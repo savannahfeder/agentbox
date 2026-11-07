@@ -1,9 +1,9 @@
-// The back end is moving from .mjs to .mts, a slice at a time (2026-10-29).
-// GitHub called the repo JavaScript because main/ was untyped, and nothing ran
-// a type check on main/ at all: `npm run typecheck` covered only the renderer,
-// and CI ran no typecheck. These hold the two things a migrated file needs:
+// The back end moved from .mjs to .mts, a slice at a time from 2026-10-29 and
+// the rest at once on 2026-11-06. GitHub called the repo JavaScript because
+// main/ was untyped, and nothing ran a type check on main/ at all. These hold
+// what that needs:
 //
-// - Every main/**/*.mts passes `tsc -p main/tsconfig.json`, which is strict.
+// - Every .mts in main/, shared/ and mcp/ passes `tsc -p main/tsconfig.json`, which is strict.
 //   This is the one place the back end's types are checked; CI runs it on
 //   every push like any other test.
 // - Every main/**/*.mts is plain TypeScript that Node strips at load, because
@@ -27,7 +27,7 @@ function mtsUnder(dir) {
 }
 
 describe('the back end is TypeScript that runs as it is', () => {
-  const files = [...mtsUnder('main'), ...mtsUnder('shared')];
+  const files = [...mtsUnder('main'), ...mtsUnder('shared'), ...mtsUnder('mcp')];
 
   it('has migrated files to check', () => {
     expect(files.length).toBeGreaterThan(0);
@@ -68,41 +68,60 @@ describe('the Node it asks for can load it', () => {
   });
 });
 
-// The push check, ship, the build, the store server and the cloud machines
-// run on whatever node is on PATH, and on 2026-11-01 that was 22.14 on the
-// Mac the agents share. Until that is known to be 22.18 or newer, nothing
-// they load may be .mts, or every push and every agent's store tools fail.
-describe('what plain Node on the Mac loads stays .mjs for now', () => {
+describe('the back end keeps no JavaScript it does not need', () => {
+  const left = (dir) => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) => {
+    const rel = path.join(dir, e.name);
+    if (e.isDirectory()) return ['node_modules', 'build'].includes(e.name) ? [] : left(rel);
+    return /\.m?js$|\.d\.mts$/.test(e.name) ? [rel] : [];
+  });
+
+  it('is .mts but for the entry, the name Expo reads, and declarations for untyped packages', () => {
+    expect([...left('main'), ...left('shared'), ...left('mcp')].sort()).toEqual([
+      'main/start.mjs',             // package.json main, the file Electron starts
+      'main/untyped-packages.d.mts',
+      'shared/product-name.d.mts',
+      'shared/product-name.mjs',    // mobile/app.config.ts, loaded by Expo's own config reader
+    ]);
+  });
+});
+
+// On a node below 22.18 an import of a .mts fails before a script's first line
+// runs, and on 2026-11-01 the Mac the agents share had 22.14. So whatever
+// starts a script that reaches one passes the flag when that node needs it.
+describe('a script plain Node starts can load the back end', () => {
   const SPEC = /(?:\bfrom\s*|\bimport\s*\(?\s*|new URL\(\s*)['"](\.[^'"\n]*)['"]/g;
   const imports = (file) => [...fs.readFileSync(path.join(root, file), 'utf8').matchAll(SPEC)]
     .map((m) => path.normalize(path.join(path.dirname(file), m[1])))
     .filter((p) => fs.existsSync(path.join(root, p)) && fs.statSync(path.join(root, p)).isFile());
-  const under = (dir) => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) => {
-    const rel = path.join(dir, e.name);
-    if (e.isDirectory()) return e.name === 'node_modules' ? [] : under(rel);
-    return /\.m?js$/.test(e.name) ? [rel] : [];
-  });
-  const named = ['scripts/hooks/pre-push', 'scripts/hooks/pre-commit', 'package.json', '.github/workflows/tests.yml']
-    .flatMap((f) => fs.readFileSync(path.join(root, f), 'utf8').match(/scripts\/[\w/.-]+\.mjs/g) ?? []);
-  // cloud/standin is the stand-in cloud the tests import into vitest, which
-  // loads .mts itself; nothing runs it under plain node.
-  const roots = [...new Set([...named, ...under('mcp'), ...under('cloud').filter((f) => !f.startsWith('cloud/standin/'))])].filter((f) => fs.existsSync(path.join(root, f)));
+  const reachesTypeScript = (start) => {
+    const seen = new Set([start]);
+    const stack = [start];
+    while (stack.length) for (const next of imports(stack.pop())) if (!seen.has(next)) { seen.add(next); stack.push(next); }
+    return [...seen].some((f) => f.endsWith('.mts'));
+  };
+  const plainNodeRuns = (text) => [...text.matchAll(/\bnode\s+(?:"\$[\w]+"\s+)?(scripts\/[\w/.-]+\.mjs)/g)].map((m) => m[1]);
 
-  function reached() {
-    const seen = new Set();
-    const stack = [...roots];
-    while (stack.length) {
-      for (const next of imports(stack.pop())) if (!seen.has(next)) { seen.add(next); stack.push(next); }
-    }
-    return [...seen];
-  }
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const commands = [
+    ...Object.entries(pkg.scripts).map(([name, cmd]) => [`npm run ${name}`, cmd]),
+    ...['scripts/hooks/pre-push', 'scripts/hooks/pre-commit'].map((f) => [f, fs.readFileSync(path.join(root, f), 'utf8')]),
+  ];
 
-  it('starts from the scripts those run', () => {
-    expect(roots).toContain('scripts/ship.mjs');
-    expect(roots).toContain('mcp/stdio.mjs');
+  it('goes through scripts/run.mjs from npm and the git hooks', () => {
+    const bare = commands.flatMap(([where, text]) => plainNodeRuns(text)
+      .filter((s) => s !== 'scripts/run.mjs' && reachesTypeScript(s))
+      .map((s) => `${where}: node ${s}`));
+    expect(bare, 'start these as `node scripts/run.mjs <script>`').toEqual([]);
   });
 
-  it('reaches no .mts', () => {
-    expect(reached().filter((f) => f.endsWith('.mts'))).toEqual([]);
+  it('sees the scripts that do reach it', () => {
+    expect(reachesTypeScript('scripts/dev.mjs')).toBe(true);
+    expect(plainNodeRuns(pkg.scripts.dev)).toEqual(['scripts/run.mjs']);
+  });
+
+  it('includes the store server, whose launcher passes the flag', () => {
+    const launcher = fs.readFileSync(path.join(root, 'mcp', 'agentbox-mcp.sh'), 'utf8');
+    expect(launcher).toMatch(/process\.features\.typescript/);
+    expect(launcher).toMatch(/^exec node \$strip .*\/stdio\.mts"/m);
   });
 });

@@ -3,7 +3,7 @@ import type { ChildProcess } from 'node:child_process';
 import { instructionsFor } from './instructions-file.mts';
 import type { InstructionsContext, InstructionsAnswer } from './instructions-file.mts';
 import type { OpenCodeProperties } from '../opencode.mts';
-import type { ToolingResult } from '../account-tooling.mjs';
+import type { ToolingResult } from '../account-tooling.mts';
 
 export type Env = NodeJS.ProcessEnv;
 

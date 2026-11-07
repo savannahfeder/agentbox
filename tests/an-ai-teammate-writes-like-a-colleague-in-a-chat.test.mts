@@ -13,10 +13,10 @@ import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { teamTell } from '../mcp/core/reach.mjs';
-import { teamPost } from '../mcp/core/teammates.mjs';
-import { readChat } from '../main/store/teammates-files.mjs';
-import { CHAT_MOST, howYouWrite, voiceOf } from '../shared/teammates.mjs';
+import { teamTell } from '../mcp/core/reach.mts';
+import { teamPost } from '../mcp/core/teammates.mts';
+import { readChat } from '../main/store/teammates-files.mts';
+import { CHAT_MOST, howYouWrite, voiceOf } from '../shared/teammates.mts';
 
 describe('what the brief tells it', () => {
   const lines = howYouWrite({ id: 't-abc123' });

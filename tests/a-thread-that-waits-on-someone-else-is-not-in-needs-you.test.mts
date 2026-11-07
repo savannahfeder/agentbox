@@ -13,10 +13,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
-import { legacyRoot } from '../main/store/project.mjs';
-import { teamDir, writeTeamView } from '../main/store/teammates-files.mjs';
-import { personWait, cardWait, setByPerson, endedWaits, waitWords, WAIT_GIVES_UP_MS } from '../shared/thread-waits.mjs';
+import { appHome } from '../main/store/home.mts';
+import { legacyRoot } from '../main/store/project.mts';
+import { teamDir, writeTeamView } from '../main/store/teammates-files.mts';
+import { personWait, cardWait, setByPerson, endedWaits, waitWords, WAIT_GIVES_UP_MS } from '../shared/thread-waits.mts';
 import { belongsInInbox, belongsInProgress, waitCameBack } from '../renderer/src/list-rules.ts';
 
 const now = new Date(2026, 9, 31, 8).getTime();
@@ -84,10 +84,10 @@ describe('the store tool', () => {
   beforeEach(async () => {
     process.env.STORE_ACCOUNT_ID = `acct-${Math.random().toString(36).slice(2, 8)}`;
     fs.mkdirSync(path.join(appHome(), 'accounts', process.env.STORE_ACCOUNT_ID), { recursive: true });
-    (await import('../mcp/core/account.mjs')).resolveAccount();
-    const product = (await import('../mcp/core/products.mjs')).createProduct(`Lumen ${Math.random().toString(36).slice(2, 8)}`);
+    (await import('../mcp/core/account.mts')).resolveAccount();
+    const product = (await import('../mcp/core/products.mts')).createProduct(`Lumen ${Math.random().toString(36).slice(2, 8)}`);
     dir = path.join(appHome(), 'accounts', process.env.STORE_ACCOUNT_ID, product.id);
-    work = await import('../mcp/core/work.mjs');
+    work = await import('../mcp/core/work.mts');
     row = work.createItem(product.id, { title: 'Double booking race', labels: ['founder'] }, { source: 'founder' });
     writeTeamView(teamDir(legacyRoot(), process.env.STORE_ACCOUNT_ID), {
       at: Date.now(), me: { id: 'dev' },
@@ -95,11 +95,11 @@ describe('the store tool', () => {
     });
     process.env.ZERO_ITEM = row.id;
     process.env.ZERO_PRODUCT = product.id;
-    ({ tools } = (await import('../mcp/tools.mjs')).buildTools({ holder: 'test-worker', ownItem: row.id }));
+    ({ tools } = (await import('../mcp/tools.mts')).buildTools({ holder: 'test-worker', ownItem: row.id }));
   });
   afterEach(() => { delete process.env.STORE_ACCOUNT_ID; delete process.env.ZERO_ITEM; delete process.env.ZERO_PRODUCT; });
   const update = (patch) => tools.find((t) => t.name === 'update_work_item').run({ id: row.id, ...patch });
-  const stored = async () => (await import('../main/store/work-items.mjs')).readWorkItem(dir, row.id);
+  const stored = async () => (await import('../main/store/work-items.mts')).readWorkItem(dir, row.id);
 
   it('takes a wait on a person by name, as the id the lists read', async () => {
     await update({ status: 'blocked', blockedBy: ['person:Sofia'] });

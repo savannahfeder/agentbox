@@ -15,10 +15,10 @@
 import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { teamRead } from '../mcp/core/reach.mjs';
-import { carriedNotes, marksOf, threadFiles } from '../shared/artifact-marks.mjs';
+import { teamRead } from '../mcp/core/reach.mts';
+import { carriedNotes, marksOf, threadFiles } from '../shared/artifact-marks.mts';
 
 let t; let chief; let run;
 const onRun = (id) => { process.env.ZERO_ITEM = id; process.env.ZERO_PRODUCT = t.product.id; };

@@ -5,7 +5,7 @@
 // threads and codex". A Claude Code thread left a kit after each turn and the
 // cloud server started her reply from it; a Codex thread left none, because a
 // Codex cloud run is `codex app-server` driven over its input by the
-// computer's own Codex client (main/codex-app-server.mjs), and a Codex turn
+// computer's own Codex client (main/codex-app-server.mts), and a Codex turn
 // ended only with the computer.
 //
 // Now a finished Codex turn leaves a Codex kit: the app-server command, and
@@ -36,11 +36,11 @@ import { kitFrom } from '../main/cloud/run-cli.mts';
 import {
   KIT_VERSION, REPLY_MARK, kitKey, checkKit, startPayload, replyFrame, runOfClaim,
   codexOpenLines, codexTurnLines, codexReadLines, codexAnswersIn, codexAnswerIn,
-} from '../shared/cloud-kit.mjs';
+} from '../shared/cloud-kit.mts';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { threadSnapshot } from '../shared/phone-snapshot.mjs';
+import { threadSnapshot } from '../shared/phone-snapshot.mts';
 import { ANSWERED_OUTCOME } from '../cloud/gateway/phone.mjs';
 import { Supervisor } from '../main/supervisor.mts';
 import { Store } from '../main/store.mts';

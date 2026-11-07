@@ -18,8 +18,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { filesOf } from '../main/files-place.mjs';
-import { familyName, familyOfName, threadFiles } from '../shared/artifact-marks.mjs';
+import { filesOf } from '../main/files-place.mts';
+import { familyName, familyOfName, threadFiles } from '../shared/artifact-marks.mts';
 
 const say = (ts, note, source = 'agent') => ({ ts, source, patch: { note } });
 const edit = (ts, file, p) => ({ ts, by: 'maya', source: 'founder', patch: { artifact: { do: 'edit', file, path: p } } });

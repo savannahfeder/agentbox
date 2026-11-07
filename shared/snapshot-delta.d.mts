@@ -1,4 +1,4 @@
-// Types for shared/snapshot-delta.mjs, for the window side.
+// Types for shared/snapshot-delta.mts, for the window side.
 
 export interface SnapshotReader {
   /** What to send with the next read: the last answer held, or nothing. */

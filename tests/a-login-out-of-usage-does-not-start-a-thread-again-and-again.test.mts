@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { captureCodexEvent } from '../main/codex.mjs';
+import { captureCodexEvent } from '../main/codex.mts';
 import { liveLine } from '../renderer/src/live-line.ts';
 
 const T0 = new Date(2026, 9, 20, 21, 38, 0).getTime();

@@ -12,17 +12,17 @@
 // has never heard of) hung the turn the same way.
 //
 // Now each approval goes on the phone as the computer's Codex client cards it
-// (main/codex-approvals.mjs), her answer goes back on the run's input in
+// (main/codex-approvals.mts), her answer goes back on the run's input in
 // Codex's own words, and whatever no card can answer is refused at once in the
 // words the computer's client refuses it with.
 import { describe, it, expect } from 'vitest';
-import { KIT_VERSION, kitKey, runOfClaim, askId } from '../shared/cloud-kit.mjs';
+import { KIT_VERSION, kitKey, runOfClaim, askId } from '../shared/cloud-kit.mts';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { threadSnapshot } from '../shared/phone-snapshot.mjs';
-import { cardDigest } from '../shared/approval-card.mjs';
-import { LEGACY_DECISIONS, refusalTo } from '../main/codex-app-server.mjs';
+import { threadSnapshot } from '../shared/phone-snapshot.mts';
+import { cardDigest } from '../shared/approval-card.mts';
+import { LEGACY_DECISIONS, refusalTo } from '../main/codex-app-server.mts';
 
 const DEVICE = 'a1b2c3d4e5f6';
 const MIN = 60_000;

@@ -21,8 +21,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
-import { Repeats } from '../main/repeats.mjs';
+import { appHome } from '../main/store/home.mts';
+import { Repeats } from '../main/repeats.mts';
 import { loadStore } from '../main/store-modules.mts';
 
 const at = (y, m, d, h) => new Date(y, m - 1, d, h, 0, 0, 0).getTime();
@@ -34,15 +34,15 @@ describe('an agent on a run of a repeating task', () => {
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = 'acct';
     fs.mkdirSync(path.join(home, 'accounts', 'acct'), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     product = createProduct(`Repeats ${Math.random().toString(36).slice(2, 8)}`);
     dir = path.join(home, 'accounts', 'acct', product.id);
     mods = await loadStore();
     repeats = new Repeats(mods);
-    core = await import('../mcp/core/repeats.mjs');
-    work = await import('../main/store/work-items.mjs');
+    core = await import('../mcp/core/repeats.mts');
+    work = await import('../main/store/work-items.mts');
   });
 
   afterEach(() => {

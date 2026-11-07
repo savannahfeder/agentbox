@@ -38,7 +38,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { findEngine } from '../main/engine-bin.mjs';
+import { findEngine } from '../main/engine-bin.mts';
 
 const HOME = '/Users/stranger';
 const only = (...paths) => (p) => paths.includes(p);

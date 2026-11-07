@@ -15,7 +15,7 @@
 // outranks a prose hit. Nothing is dropped for ranking low.
 
 import { searchText } from './format';
-import { fold, withHumps, wordStart } from '../../shared/word-match.mjs';
+import { fold, withHumps, wordStart } from '../../shared/word-match.mts';
 import { rowSummary, SUMMARY_BUDGET } from './list-rules';
 import { ticketQuery } from './ticket-references';
 

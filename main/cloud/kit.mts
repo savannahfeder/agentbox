@@ -1,11 +1,11 @@
-// THE COMPUTER'S SIDE OF A KIT (shared/cloud-kit.mjs): where its copy is kept
+// THE COMPUTER'S SIDE OF A KIT (shared/cloud-kit.mts): where its copy is kept
 // here, and the marker that makes a run the cloud server started from it this
 // thread's own, so the import path joins it or brings it home
 // (main/cloud/run.mts `joining`, Supervisor#adoptCloudRun).
 import fs from 'node:fs';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
-import { cloudSessionId, APPROVALS_SERVER } from '../../shared/cloud-kit.mjs';
+import { cloudSessionId, APPROVALS_SERVER } from '../../shared/cloud-kit.mts';
 import { serveApprovals } from '../approval-prompt-core.mts';
 
 export interface CloudKit {

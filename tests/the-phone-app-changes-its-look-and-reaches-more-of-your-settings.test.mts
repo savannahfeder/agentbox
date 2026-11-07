@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import { DARK, LIGHT, color, wear } from '../mobile/src/ui/theme';
 import { lookOf, wornOf, LOOK_KEY, PHONE_LOOKS } from '../mobile/src/lib/look';
 import { LOOKS } from '../renderer/src/skins';
-import { phoneSettingsOf, checkSetting, settingRoute } from '../shared/phone-settings.mjs';
+import { phoneSettingsOf, checkSetting, settingRoute } from '../shared/phone-settings.mts';
 
 const read = (p) => fs.readFileSync(new URL(`../mobile/${p}`, import.meta.url), 'utf8');
 

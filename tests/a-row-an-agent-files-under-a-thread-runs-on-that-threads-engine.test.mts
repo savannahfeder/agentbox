@@ -14,14 +14,14 @@ let work;
 let product;
 
 beforeEach(async () => {
-  const home = (await import('../main/store/home.mjs')).appHome();
+  const home = (await import('../main/store/home.mts')).appHome();
   process.env.STORE_ACCOUNT_ID = 'acct-filed-engine';
   fs.mkdirSync(path.join(home, 'accounts', 'acct-filed-engine'), { recursive: true });
-  const { resolveAccount } = await import('../mcp/core/account.mjs');
+  const { resolveAccount } = await import('../mcp/core/account.mts');
   resolveAccount();
-  const { createProduct } = await import('../mcp/core/products.mjs');
+  const { createProduct } = await import('../mcp/core/products.mts');
   product = createProduct(`Filed ${Math.random().toString(36).slice(2, 8)}`);
-  work = await import('../mcp/core/work.mjs');
+  work = await import('../mcp/core/work.mts');
 });
 afterEach(() => { delete process.env.STORE_ACCOUNT_ID; });
 

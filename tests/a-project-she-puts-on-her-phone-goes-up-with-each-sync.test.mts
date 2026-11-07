@@ -8,13 +8,13 @@ import { it, expect, describe, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
+import { memorySession } from '../main/team/session.mts';
 import { applyThrough } from '../main/phone-inbox.mts';
-import { loadConfig } from '../main/config.mjs';
+import { loadConfig } from '../main/config.mts';
 import { readSettings, setProjectSetting, setWorkspaceSetting } from '../main/settings.mts';
 import { Supervisor } from '../main/supervisor.mts';
 
@@ -215,7 +215,7 @@ describe('the switch on a project', () => {
     finally { process.env.AGENTBOX_PERSON_ID = was; }
   });
   it('reads a choice saved the first way, a list of projects on, as all but the rest', async () => {
-    const { phoneProjectsOf } = await import('../shared/phone-snapshot.mjs');
+    const { phoneProjectsOf } = await import('../shared/phone-snapshot.mts');
     expect(phoneProjectsOf({ owner: 'p', slugs: ['a', 'b'] }, 'p', ['a', 'b', 'c', 'd'])).toEqual(['a', 'b']);
     expect(phoneProjectsOf(null, 'p', ['a', 'b'])).toEqual(['a', 'b']);
     expect(phoneProjectsOf({ owner: 'q', all: false }, 'p', ['a'])).toEqual(['a']);

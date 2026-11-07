@@ -12,7 +12,7 @@
 // and adding one step: every block's old name changed.
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { threadWindow, groupWork } from '../shared/agents.mjs';
+import { threadWindow, groupWork } from '../shared/agents.mts';
 import { lineIds, blockKeys } from '../renderer/src/thread-keys.ts';
 
 const T0 = Date.UTC(2026, 10, 4, 20, 0);

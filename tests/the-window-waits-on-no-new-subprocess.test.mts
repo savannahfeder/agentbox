@@ -5,7 +5,7 @@
 // picture in a thread. The spinning wheel of 10-22 was one of these, a login
 // shell asked once a minute, held 6.5 s, 9.3 s and 6.5 s while the Mac was
 // busy (tests/finding-a-coding-agent-never-holds-the-window). The freeze log
-// also had git at 0.8 s in main/git-change.mjs.
+// also had git at 0.8 s in main/git-change.mts.
 //
 // So the ones that remain are listed here with when they run, and a new one
 // fails this test. Turning one into an async call means lowering its number.
@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const ALLOWED = {
-  'main/engine-bin.mjs': [1, 'at launch, and when someone undoes a file they picked; every other look is in the background'],
+  'main/engine-bin.mts': [1, 'at launch, and when someone undoes a file they picked; every other look is in the background'],
   'main/source-updater.mts': [1, 'at launch'],
   'main/first-run.mts': [1, 'once, during the walk'],
   'main/supervisor.mts': [1, 'once per Mac, behind a flag file'],
@@ -29,7 +29,7 @@ const ALLOWED = {
   'main/worktree-include.mts': [3, 'when a task folder is made'],
   'main/harnesses/instructions-file.mts': [1, 'when a run starts'],
   'main/task-terminals.mts': [1, "when a task's terminal closes, two second deadline"],
-  'main/git-change.mjs': [1, 'a change card reading git; 0.8 s seen in the freeze log, next to move'],
+  'main/git-change.mts': [1, 'a change card reading git; 0.8 s seen in the freeze log, next to move'],
   'main/cloud/org.mts': [1, "reading the cloud account's settings repository"],
   'main/cloud/host.mts': [1, 'runs in its own process, not the window\'s'],
   'scripts/brand-electron.mjs': [1, 'codesign, just before the app restarts itself from source'],

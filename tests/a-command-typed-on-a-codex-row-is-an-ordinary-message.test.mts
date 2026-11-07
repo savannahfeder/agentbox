@@ -46,7 +46,7 @@ import { staysOnTheTask } from '../renderer/src/stay-with-a-command';
 import { threadEvents } from '../renderer/src/thread-history';
 import { itemThread } from '../renderer/src/item-thread';
 import { commandPrompt, CLAUDE_COMMANDS } from '../shared/claude-commands.mts';
-import { DEFAULT_ENGINE } from '../shared/engines.mjs';
+import { DEFAULT_ENGINE } from '../shared/engines.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');

@@ -7,7 +7,7 @@ import { it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { machineryPath } from '../main/store/home.mjs';
+import { machineryPath } from '../main/store/home.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { setAppHome, clearAppHome } from './app-home.mts';
 

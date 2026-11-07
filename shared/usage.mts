@@ -29,7 +29,7 @@
 // names its own limits, in plain words, and this file prints the name it is
 // given.
 
-import { DEFAULT_ENGINE } from './engines.mjs';
+import { DEFAULT_ENGINE } from './engines.mts';
 
 export interface UsageLimit {
   span: 'session' | 'week';

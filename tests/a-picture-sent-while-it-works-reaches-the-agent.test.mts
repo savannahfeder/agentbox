@@ -23,7 +23,7 @@ import { Supervisor } from '../main/supervisor.mts';
 import { submitReply, liveReplyBrief } from '../main/live-replies.mts';
 import { filesNamedIn } from '../main/cloud/run.mts';
 import { createCodexWorker } from '../main/codex-session.mts';
-import { createCodexAppServer } from '../main/codex-app-server.mjs';
+import { createCodexAppServer } from '../main/codex-app-server.mts';
 
 const dirs = [];
 afterAll(() => { for (const d of dirs) fs.rmSync(d, { recursive: true, force: true }); });

@@ -27,7 +27,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { instructionsTarget, writeInstructions, carriesInstructions, INSTRUCTIONS_BEGIN, INSTRUCTIONS_END } from '../main/harnesses/instructions-file.mts';
-import { harnessDefinition } from '../shared/harness-definitions.mjs';
+import { harnessDefinition } from '../shared/harness-definitions.mts';
 import { harnessFor, createHarnessRegistry } from '../main/harnesses.mts';
 
 const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'instructions-'));

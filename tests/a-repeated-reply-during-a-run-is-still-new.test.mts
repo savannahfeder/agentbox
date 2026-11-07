@@ -3,7 +3,7 @@
 // continuations. Delivery identity must include when the reply was written.
 import {it,expect} from 'vitest';
 import {Supervisor} from '../main/supervisor.mts';
-import {isDue} from '../shared/work-items.mjs';
+import {isDue} from '../shared/work-items.mts';
 function probe(before,after){
  const s=Object.create(Supervisor.prototype);
  // The real store's isDue: a reply set for later waits (a-reply-can-wait-for-a-time).

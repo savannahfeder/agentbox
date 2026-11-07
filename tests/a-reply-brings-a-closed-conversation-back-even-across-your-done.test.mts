@@ -10,8 +10,8 @@
 // Both crossings: a reply stamped after the Done, and one stamped before it that
 // reached this Mac after it.
 import { describe, it, expect } from 'vitest';
-import { foldWorkItems } from '../shared/work-items.mjs';
-import { inMyInbox, iSpokeLast, whatWaits } from '../shared/team-rules.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
+import { inMyInbox, iSpokeLast, whatWaits } from '../shared/team-rules.mts';
 
 const ID = 'w-0123456789';
 const DEV = 'p-dev', JORDAN = 'p-jordan', MAYA = 'p-maya';

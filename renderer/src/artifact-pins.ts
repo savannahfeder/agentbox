@@ -1,7 +1,7 @@
 // PURE. How the big file view (components/ArtifactView.tsx) draws its pins,
 // zooms a picture, and what it offers for the file it found.
-import { noteGoesTo, notesForTheAgent, placeWords } from '../../shared/artifact-marks.mjs';
-import type { FileVersion } from '../../shared/artifact-marks.mjs';
+import { noteGoesTo, notesForTheAgent, placeWords } from '../../shared/artifact-marks.mts';
+import type { FileVersion } from '../../shared/artifact-marks.mts';
 import { MAX_ZOOM } from './picture-view';
 import type { FileMarks, FileNote, NotePlace } from './types';
 

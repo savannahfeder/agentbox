@@ -25,8 +25,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { recoverShellPath } from '../main/shell-path.mjs';
-import { askShell, shellRunner } from '../main/engine-bin.mjs';
+import { recoverShellPath } from '../main/shell-path.mts';
+import { askShell, shellRunner } from '../main/engine-bin.mts';
 
 const hasZsh = fs.existsSync('/bin/zsh');
 const DOCK = '/usr/bin:/bin:/usr/sbin:/sbin';

@@ -19,7 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { runToOpen } from '../shared/repeats.mjs';
+import { runToOpen } from '../shared/repeats.mts';
 import { SummaryPanel } from '../renderer/src/threads/Summary.tsx';
 globalThis.React = React;
 

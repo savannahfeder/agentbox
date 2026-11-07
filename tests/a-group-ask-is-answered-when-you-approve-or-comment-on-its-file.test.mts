@@ -5,7 +5,7 @@
 // writing in the group or Mark done ended the row. Measured with groupRow on
 // the message, then on the same message with an approval of yours after it.
 import { describe, it, expect } from 'vitest';
-import { groupRow } from '../shared/room-needs-you.mjs';
+import { groupRow } from '../shared/room-needs-you.mts';
 
 const PEOPLE = [{ id: 'p-maya', name: 'Maya' }, { id: 'p-sofia', name: 'Sofia' }];
 const ask = { id: 'm1', by: 'p-sofia', body: 'Maya, onboarding direction B as a picture. I think B wins.', at: 1000, mentions: [] };

@@ -48,7 +48,7 @@ import {
   WORKER_APPROVAL_POLICY,
   WORKER_SANDBOX,
 } from '../main/codex-session.mts';
-import { createCodexAppServer } from '../main/codex-app-server.mjs';
+import { createCodexAppServer } from '../main/codex-app-server.mts';
 
 /**
  * Let every queued microtask and immediate run, which is where this facade
@@ -568,7 +568,7 @@ describe('finding the rollout one codex session wrote', () => {
 /* ============ and all of it against the real transport, once ============= */
 
 // Everything above runs on a notepad in the client's shape. This block proves
-// the same facade works over main/codex-app-server.mjs itself, so nothing here
+// the same facade works over main/codex-app-server.mts itself, so nothing here
 // is only true of the notepad: a real JSON-RPC frame off a real stdout pipe
 // reaches `event`, and a real `turn/completed` ends the worker.
 describe('the same worker, over the real app-server client', () => {

@@ -83,7 +83,7 @@ export function findFolder(place: Place, src: string): { folder: string; keys: s
 
 /**
  * What a path a message gives stands for, looked for where the Mac looks
- * (main/artifact-path.mjs resolveArtifact): in full, then under the project's
+ * (main/artifact-path.mts resolveArtifact): in full, then under the project's
  * folders, then by its name alone, the newest first.
  */
 export function findFile(places: Map<string, Place>, product: string, src: string): { key: string; entry: FileEntry; file: string; place: Place } | null {

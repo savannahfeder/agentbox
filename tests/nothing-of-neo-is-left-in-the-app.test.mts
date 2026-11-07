@@ -11,7 +11,7 @@ import path from 'node:path';
 import { alphaFeatures, setWorkspaceSetting } from '../main/settings.mts';
 import { SETTINGS_PAGES, searchSettings } from '../renderer/src/settings-search.ts';
 import { REQUEST_CHANNELS, PUSH_CHANNELS, DESKTOP_ONLY } from '../shared/bridge-map.mts';
-import { phoneSettingsOf } from '../shared/phone-settings.mjs';
+import { phoneSettingsOf } from '../shared/phone-settings.mts';
 
 const root = path.join(import.meta.dirname, '..');
 const SOURCE = ['main', 'renderer', 'shared', 'mobile/src', 'mcp', 'bin', 'scripts', 'cloud'];

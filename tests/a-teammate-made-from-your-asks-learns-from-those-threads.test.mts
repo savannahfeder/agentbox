@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { offerFrom, OFFER_LABEL, OFFER_MAKE } from '../shared/teammates.mjs';
+import { offerFrom, OFFER_LABEL, OFFER_MAKE } from '../shared/teammates.mts';
 
 const NOW = new Date(2026, 9, 24, 9, 0).getTime();
 const DAY = 86_400_000;
@@ -82,7 +82,7 @@ describe('making a teammate from the offer', () => {
     expect(brief).toMatch(/read every file under "The threads you come from"[^\n]*write your method/i);
 
     // Once it has written its method, its runs carry the method, not the threads again.
-    const { methodFile } = await import('../main/store/teammates-files.mjs');
+    const { methodFile } = await import('../main/store/teammates-files.mts');
     fs.mkdirSync(path.dirname(methodFile(team.dir(), mate.id)), { recursive: true });
     fs.writeFileSync(methodFile(team.dir(), mate.id), '# Method\n- Group by what users notice.\n');
     const next = team.briefFor({ id: 'w-next', labels: ['founder', `teammate:${mate.id}`, 'hop:0'] }, now);

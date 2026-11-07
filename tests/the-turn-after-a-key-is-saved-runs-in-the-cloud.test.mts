@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { KEY_ASK } from '../shared/cloud-keys.mjs';
+import { KEY_ASK } from '../shared/cloud-keys.mts';
 
 let tmp; let sup; let puts; let items;
 const asking = (id, ...names) => ({ id, product: 'team', status: 'open', result: names.map((n) => `${KEY_ASK} ${n} the key`).join('\n'), wrote: { result: { ts: 10 } } });

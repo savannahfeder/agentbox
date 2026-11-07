@@ -8,7 +8,7 @@
 // computer to pause or resume through the same teammate door, which the computer
 // carries out with the update it already does for its own Pause switch.
 import { describe, it, expect } from 'vitest';
-import { checkSetting, settingRoute } from '../shared/phone-settings.mjs';
+import { checkSetting, settingRoute } from '../shared/phone-settings.mts';
 
 const ask = (value) => ({ scope: 'teammate', key: 'pause', value });
 

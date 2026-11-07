@@ -66,7 +66,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { answer, approvalPublicKey, answerIsHers, listPending, spoolDir } from '../main/approvals.mjs';
+import { answer, approvalPublicKey, answerIsHers, listPending, spoolDir } from '../main/approvals.mts';
 import { NAME } from '../shared/product-name.mjs';
 import { stripTypesFlags } from '../main/strip-types.mts';
 

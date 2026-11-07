@@ -1,7 +1,7 @@
 // Is Codex on this Mac, and where. Nothing here spawns it.
 //
 // The second engine is coming back in stages and this is the stage that only
-// LOOKS. `shared/engines.mjs` already takes a `found` map and decides which
+// LOOKS. `shared/engines.mts` already takes a `found` map and decides which
 // engine a row runs on; until this file's subject existed, nothing on the
 // machine could produce that map for Codex, so the second row of that map was
 // permanently absent and the gate above it was arguing with nobody.
@@ -43,10 +43,10 @@ import { describe, it, expect } from 'vitest';
 import {
   findCodexBin, candidatePaths, versionedPaths, evidencePaths, installEvidence,
   resolveCodexBin, forgetCodexBin, INSTALL_URL,
-} from '../main/codex-bin.mjs';
+} from '../main/codex-bin.mts';
 import {
   askShell, shellProbes, findClaudeBin, candidatePaths as claudeCandidatePaths,
-} from '../main/claude-bin.mjs';
+} from '../main/claude-bin.mts';
 
 const HOME = '/Users/stranger';
 const only = (...paths) => (p) => paths.includes(p);

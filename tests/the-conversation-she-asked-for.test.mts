@@ -20,7 +20,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { conversation } from '../main/agents.mts';
-import { TRAIL_OPENING, TRAIL_TURNS, conversationGap, conversationWindow } from '../shared/agents.mjs';
+import { TRAIL_OPENING, TRAIL_TURNS, conversationGap, conversationWindow } from '../shared/agents.mts';
 import { Name } from '../shared/product-name.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

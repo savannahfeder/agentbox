@@ -20,10 +20,10 @@ import { it, expect, describe } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { mayRunHere, whatATeammateMaySet } from '../shared/team-rules.mjs';
+import { mayRunHere, whatATeammateMaySet } from '../shared/team-rules.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamSync, memorySyncState } from '../main/team/sync.mts';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 
 const ME = 'p-me';
 const MAYA = 'p-maya';

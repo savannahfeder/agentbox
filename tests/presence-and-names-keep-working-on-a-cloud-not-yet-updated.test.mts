@@ -8,7 +8,7 @@
 // reads, without activity, and names answer null so the wall and chat keep to
 // the cards. On an updated cloud activity is sent and names are read.
 import { describe, it, expect, vi } from 'vitest';
-import { roomsSupabase } from '../main/team/rooms-supabase.mjs';
+import { roomsSupabase } from '../main/team/rooms-supabase.mts';
 
 function cloud(state) {
   const writes = [];

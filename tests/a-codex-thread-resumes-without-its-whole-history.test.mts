@@ -19,7 +19,7 @@
 // without it, once per connection.
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { createCodexAppServer } from '../main/codex-app-server.mjs';
+import { createCodexAppServer } from '../main/codex-app-server.mts';
 
 function fakeCodex() {
   const child = new EventEmitter();

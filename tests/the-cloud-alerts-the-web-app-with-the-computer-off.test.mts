@@ -15,9 +15,9 @@ import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { supabaseRest } from '../cloud/gateway/phone.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { KIT_VERSION, kitKey, runOfClaim } from '../shared/cloud-kit.mjs';
-import { threadSnapshot } from '../shared/phone-snapshot.mjs';
-import { WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY, webAlertsOn } from '../shared/web-alerts.mjs';
+import { KIT_VERSION, kitKey, runOfClaim } from '../shared/cloud-kit.mts';
+import { threadSnapshot } from '../shared/phone-snapshot.mts';
+import { WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY, webAlertsOn } from '../shared/web-alerts.mts';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const DEVICE = 'a1b2c3d4e5f6';

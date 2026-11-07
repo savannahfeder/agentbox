@@ -9,10 +9,10 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { defaultStoreRoot, appHome } from '../main/store/home.mjs';
-import { loadConfig } from '../main/config.mjs';
-import { legacyRoot } from '../main/store/project.mjs';
-import { freshEnv } from '../shared/fresh-user-home.mjs';
+import { defaultStoreRoot, appHome } from '../main/store/home.mts';
+import { loadConfig } from '../main/config.mts';
+import { legacyRoot } from '../main/store/project.mts';
+import { freshEnv } from '../shared/fresh-user-home.mts';
 import { Name, nameSlug, envNames } from '../shared/product-name.mjs';
 import { fileURLToPath } from 'node:url';
 

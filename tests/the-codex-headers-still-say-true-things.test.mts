@@ -14,7 +14,7 @@
 //   codex-app-server.mjs said "NOTHING IMPORTS THIS FILE YET. It is inert on
 //   purpose" -- the supervisor imports it and spawns it.
 //
-//   shared/engines.mjs said the reason Codex is not the default is that there
+//   shared/engines.mts said the reason Codex is not the default is that there
 //   is "no card, no spool, no picker, nothing importing it". The card and the
 //   spool were built first; the picker followed on 2026-09-04, and with it the
 //   last of that list stopped being true. The default did not move -- it is
@@ -26,8 +26,8 @@
 //
 //   supervisor.mts said the Mac's aggregate ceiling was an unreachable conjunct
 //   -- a cooldown shrinking capacity under live sessions reaches it -- and said
-//   `codexBin` "is not written by main/config.mjs at all yet", which is now the
-//   second thing main/config.mjs resolves.
+//   `codexBin` "is not written by main/config.mts at all yet", which is now the
+//   second thing main/config.mts resolves.
 //
 // These are asserted against the source because there is nothing else to assert
 // them against. A header is not behaviour; it is a promise about behaviour, and
@@ -39,7 +39,7 @@ import fs from 'node:fs';
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
 describe('the transport header', () => {
-  const source = read('main/codex-app-server.mjs');
+  const source = read('main/codex-app-server.mts');
 
   it('no longer says nothing imports it', () => {
     expect(source).not.toMatch(/NOTHING IMPORTS THIS/i);
@@ -57,7 +57,7 @@ describe('the transport header', () => {
 });
 
 describe('the engine-choice header', () => {
-  const source = read('shared/engines.mjs');
+  const source = read('shared/engines.mts');
 
   it('no longer says there is no card and no spool', () => {
     expect(source).not.toMatch(/no card, no spool/i);

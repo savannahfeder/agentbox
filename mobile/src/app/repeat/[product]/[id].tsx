@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { readRule, repeatPresets, stamp } from '../../../../../renderer/src/format';
 import { repeatRow, repeatTag } from '../../../../../renderer/src/repeat-words';
-import { isCleanRun, ruleIdOf, ruleLabel } from '../../../../../shared/repeats.mjs';
+import { isCleanRun, ruleIdOf, ruleLabel } from '../../../../../shared/repeats.mts';
 import { useCloud } from '../../../state/cloud';
 import { Back, Repeat } from '../../../ui/icons';
 import { TimeBox, TypingSheet } from '../../../ui/Later';

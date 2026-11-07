@@ -1,7 +1,7 @@
 // AN OPEN FILE READS ITS PROJECT'S COPIES ONCE, NOT ONCE PER COPY.
 //
 // The app froze for 0.6 to 1 second at a time, back to back, for hours: 810
-// freezes in one day, every one in sameFile (main/files-place.mjs) by way of
+// freezes in one day, every one in sameFile (main/files-place.mts) by way of
 // store.listProducts. An open file asks, on every change in the app, for the
 // comments on other copies of each file its thread names. Each ask resolved
 // every copy in the project on disk again, and each resolve read every project
@@ -13,9 +13,9 @@ import { it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
-import { appFilesPlace } from '../main/files-place.mjs';
+import { appFilesPlace } from '../main/files-place.mts';
 
 const PNG = (n) => Buffer.from(`89504e470d0a1a0a0000000d49484452000000${String(n).padStart(2, '0')}`, 'hex');
 const COPIES = 12;

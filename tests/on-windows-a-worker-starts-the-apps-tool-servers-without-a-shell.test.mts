@@ -42,7 +42,7 @@ describe('on Windows', () => {
 
   it('runs the store server the same way', () => {
     expect(onWindows(STORE)).toEqual({
-      command: RUNTIME, args: [w.join(APP, 'mcp', 'stdio.mjs')], env: { ELECTRON_RUN_AS_NODE: '1' },
+      command: RUNTIME, args: [w.join(APP, 'mcp', 'stdio.mts')], env: { ELECTRON_RUN_AS_NODE: '1' },
     });
   });
 
@@ -87,7 +87,7 @@ describe('the config the supervisor hands a worker', () => {
       args: [w.join(REPO, 'main', 'approval-prompt-server.mts')],
       env: { ELECTRON_RUN_AS_NODE: '1', ZERO_APPROVALS_DIR: expect.any(String) },
     });
-    expect(got[nameSlug]).toMatchObject({ command: process.execPath, args: [w.join(REPO, 'mcp', 'stdio.mjs')], env: { ELECTRON_RUN_AS_NODE: '1' } });
+    expect(got[nameSlug]).toMatchObject({ command: process.execPath, args: [w.join(REPO, 'mcp', 'stdio.mts')], env: { ELECTRON_RUN_AS_NODE: '1' } });
   });
 
   it.each(['darwin', 'linux'])('is the launchers on %s, with nothing added', (platform) => {

@@ -1,6 +1,6 @@
 // THE MODELS CODEX OFFERS ARE READ OFF THIS MAC, NOT LISTED IN A FILE OF OURS.
 //
-// `shared/claude-models.generated.mjs` can be a committed file because Claude
+// `shared/claude-models.generated.mts` can be a committed file because Claude
 // Code's `--model` takes an ALIAS: `opus` is whatever Opus is on the day the
 // task runs, resolved by the CLI at spawn. Codex has no aliases. `-m` and
 // `thread/start`'s `model` want the exact slug of one specific model, OpenAI
@@ -261,7 +261,7 @@ describe('which codex home is read', () => {
 
   // The installer's own line, read 2026-09-04:
   // `CODEX_HOME_DIR="${CODEX_HOME:-$HOME/.codex}"`. Same precedence, and
-  // main/codex-bin.mjs already looks under it for signs of an install.
+  // main/codex-bin.mts already looks under it for signs of an install.
   it('is CODEX_HOME when the environment sets one', () => {
     expect(codexHome({ env: { CODEX_HOME: '/opt/codex-home' }, home: '/Users/you' })).toBe('/opt/codex-home');
   });

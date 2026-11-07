@@ -1,4 +1,4 @@
-// Types for shared/answers.mjs, which stays .mjs while plain Node on the Mac loads it.
+// Types for shared/answers.mts, which stays .mjs while plain Node on the Mac loads it.
 export interface AnsweredItem {
     answer?: string;
     answeredThrough?: number;

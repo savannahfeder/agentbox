@@ -33,7 +33,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
 import { PRACTICE_BACKDROP, PRACTICE_SLUG } from '../shared/first-run-practice.mts';
-import { threadState } from '../shared/thread-cards.mjs';
+import { threadState } from '../shared/thread-cards.mts';
 import { belongsInInbox } from '../renderer/src/list-rules.ts';
 import { START, advance, walkRows } from '../renderer/src/onboarding.ts';
 

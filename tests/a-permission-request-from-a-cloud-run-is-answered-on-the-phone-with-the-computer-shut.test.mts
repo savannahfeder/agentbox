@@ -33,10 +33,10 @@ import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 import {
   KIT_VERSION, kitKey, runOfClaim, APPROVALS_SERVER, askId, approvalAnswerLine, DECLINED, startPayload,
-} from '../shared/cloud-kit.mjs';
-import { cardDigest } from '../shared/approval-card.mjs';
-import { cardDigest as appCardDigest } from '../main/approvals.mjs';
-import { threadSnapshot, checkCommand } from '../shared/phone-snapshot.mjs';
+} from '../shared/cloud-kit.mts';
+import { cardDigest } from '../shared/approval-card.mts';
+import { cardDigest as appCardDigest } from '../main/approvals.mts';
+import { threadSnapshot, checkCommand } from '../shared/phone-snapshot.mts';
 import { approvalsHandshakes, asksPermission } from '../main/cloud/kit.mts';
 import { serveApprovals } from '../main/approval-prompt-core.mts';
 

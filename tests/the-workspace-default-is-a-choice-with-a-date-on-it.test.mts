@@ -4,7 +4,7 @@
 // "Codex may be chosen FROM NOW ON", and `engineChoiceOnRowIsStale` is what
 // makes that mean something -- a row whose `wrote.engine.ts` predates the moment
 // is a choice she made before there was a way to make one, so it is not
-// honoured. That is the whole design (shared/engines.mjs).
+// honoured. That is the whole design (shared/engines.mts).
 //
 // TWO THINGS WERE WRONG WITH IT AND THEY POINT THE SAME WAY: both of them move
 // work ONTO the second engine, which is the one direction the gate exists to
@@ -61,8 +61,8 @@ import { join } from 'node:path';
 import {
   ENGINE_CHOICE_ENABLED, DEFAULT_ENGINE,
   engineFor, engineChoiceOnRowIsStale, engineDefaultIsStale,
-} from '../shared/engines.mjs';
-import { loadConfig } from '../main/config.mjs';
+} from '../shared/engines.mts';
+import { loadConfig } from '../main/config.mts';
 import { setWorkspaceSetting } from '../main/settings.mts';
 
 const OPEN = { enabled: ENGINE_CHOICE_ENABLED };

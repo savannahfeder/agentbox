@@ -12,11 +12,11 @@ import { MainTests } from './main-went-red.mts';
 import { folderJob } from './task-folders-offthread.mts';
 import { gitJob } from './git-change-offthread.mts';
 import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
-import { resolveAnsweredNotes, wakeForNotes } from './notes-wake.mjs';
-import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mjs';
-import { editedFilesLine } from '../shared/artifact-marks.mjs';
-import { readItemHistory, updateWorkItem } from './store/work-items.mjs';
-import { reconcileRows } from './version-reconcile.mjs';
+import { resolveAnsweredNotes, wakeForNotes } from './notes-wake.mts';
+import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mts';
+import { editedFilesLine } from '../shared/artifact-marks.mts';
+import { readItemHistory, updateWorkItem } from './store/work-items.mts';
+import { reconcileRows } from './version-reconcile.mts';
 import { taskCommand } from './task-commands.mts';
 import { providerCommand, reviewTarget, nativeCommandNames } from '../shared/provider-commands.mts';
 import {agentInstructionsUnified, readSystemTemplate, writeInstruction} from './instruction-settings.mts';
@@ -50,43 +50,43 @@ import { stripTypesFlags } from './strip-types.mts';
 import { cloudWorkPending, takeCloudNews, writeMarker, readMarker } from './cloud/marker.mts';
 import { cloudClients } from './cloud/clients.mts';
 import { kitCopyPath, kitFramePath, readKitCopy, markerForCloudRun } from './cloud/kit.mts';
-import { REPLY_MARK, replyFrame, serverJoinedKey } from '../shared/cloud-kit.mjs';
-import { NEW_THREAD, NEW_THREAD_CODEX, NEW_ITEM_MARK, NEW_TITLE_MARK, NEW_BODY_MARK, fillNewThreadKit } from '../shared/cloud-kit.mjs';
-import { macAsleep, carryCommand, CARRY_AHEAD_MS, handOverSpent, notBeforeOf } from '../shared/cloud-carry.mjs';
+import { REPLY_MARK, replyFrame, serverJoinedKey } from '../shared/cloud-kit.mts';
+import { NEW_THREAD, NEW_THREAD_CODEX, NEW_ITEM_MARK, NEW_TITLE_MARK, NEW_BODY_MARK, fillNewThreadKit } from '../shared/cloud-kit.mts';
+import { macAsleep, carryCommand, CARRY_AHEAD_MS, handOverSpent, notBeforeOf } from '../shared/cloud-carry.mts';
 import { execFile as execFileCb } from 'node:child_process';
 import { CLOSED_UNSHIPPED, closedBeforeItShipped, shippedAs } from '../shared/not-shipped.mts';
-import { handBackWhat, handsBack } from '../shared/cloud-hand-back.mjs';
+import { handBackWhat, handsBack } from '../shared/cloud-hand-back.mts';
 import { CLOUD_SENT, readSent } from '../shared/cloud-start.mts';
-import { readCloudConfig, cloudAccountConfig, OLD_TOKEN_SERVICE, imageCapsToTry } from './cloud/config.mjs';
+import { readCloudConfig, cloudAccountConfig, OLD_TOKEN_SERVICE, imageCapsToTry } from './cloud/config.mts';
 import { cloudVersionGaps } from '../shared/cloud-versions.mts';
-import { saveCloudKey, removeCloudKey, cloudKeyNames } from './cloud/keys.mjs';
-import { threadsKeysFree } from '../shared/cloud-needs.mjs';
-import { fileToSend } from '../shared/cloud-sent-files.mjs';
+import { saveCloudKey, removeCloudKey, cloudKeyNames } from './cloud/keys.mts';
+import { threadsKeysFree } from '../shared/cloud-needs.mts';
+import { fileToSend } from '../shared/cloud-sent-files.mts';
 import { cloudLoginState, mayRunOn, startCloudSignIn, renewCloudCodexLogin, sweepRetiredLogins, forgetOldCloudTokens, listCloudLogins, removeCloudLogin, newCloudAccountKey, lookAtCloudLogin, cloudLimits, markCloudLogin, cloudLoginInUse, cloudAccountsFrom, CLOUD_ACCOUNT_ENV } from './cloud/logins.mts';
 import type { CloudLimitReading } from './cloud/logins.mts';
 import type { TickInput } from './teammates.mts';
 import { execFileSync } from 'node:child_process';
 import { holdUntilHome } from './cloud/codex-cloud.mts';
 import { hostSocketPath, perlRunsTheShim, HOST_ALREADY_THERE } from './cloud/host.mts';
-import { runHostSocket, spoolFiles, HOST_ALREADY_THERE as RUN_HOST_ALREADY_THERE } from './run-host.mjs';
-import { HostedRun, HOST_LOST } from './hosted-run.mjs';
+import { runHostSocket, spoolFiles, HOST_ALREADY_THERE as RUN_HOST_ALREADY_THERE } from './run-host.mts';
+import { HostedRun, HOST_LOST } from './hosted-run.mts';
 import { readCloudUsage, summarizeCloudUsage } from './cloud/usage.mts';
 import { buildSessionArgs, CLAUDE_MODES, parseSessionArgs, permissionMode } from './settings.mts';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, placedScore, productRankScore } from '../shared/rank.mjs';
+import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, placedScore, productRankScore } from '../shared/rank.mts';
 import { keysForAgents } from '../shared/shortcuts.mts';
-import { isCleanRun, ruleIdOf, nextRunAt, periodKey, occurrenceId } from '../shared/repeats.mjs';
-import { occurrenceFields } from './repeats.mjs';
-import { teammateIdOf, mentionsIn, teammatesOn, primaryOf, OFFER_LABEL, CHAT_LABEL, howYourRunEnds } from '../shared/teammates.mjs';
-import { REACH_LABEL } from '../shared/teammate-reach.mjs';
-import { mayRunHere } from '../shared/team-rules.mjs';
+import { isCleanRun, ruleIdOf, nextRunAt, periodKey, occurrenceId } from '../shared/repeats.mts';
+import { occurrenceFields } from './repeats.mts';
+import { teammateIdOf, mentionsIn, teammatesOn, primaryOf, OFFER_LABEL, CHAT_LABEL, howYourRunEnds } from '../shared/teammates.mts';
+import { REACH_LABEL } from '../shared/teammate-reach.mts';
+import { mayRunHere } from '../shared/team-rules.mts';
 
 // WHO IS SIGNED IN, handed to the store server a worker talks through. An MCP
 // server starts with only the variables it is given, not the app's, and every
 // line it writes for a shared project has to say whose Mac wrote it
-// (main/store/work-items.mjs stamps it from this).
+// (main/store/work-items.mts stamps it from this).
 function teamPersonEnv() {
   return process.env.AGENTBOX_PERSON_ID ? { AGENTBOX_PERSON_ID: process.env.AGENTBOX_PERSON_ID } : {};
 }
@@ -111,24 +111,24 @@ function whoHasIt(made: { taken?: boolean; reason?: string; heldBy?: number | nu
   if (made?.taken !== false) return '';
   return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
-import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mjs';
-import { DEFAULT_SESSIONS_AT_ONCE } from './config.mjs';
-import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mjs';
-import type { AccountIdentity } from './account-tooling.mjs';
-import { effectiveProfiles } from './account-discovery.mjs';
+import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mts';
+import { DEFAULT_SESSIONS_AT_ONCE } from './config.mts';
+import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mts';
+import type { AccountIdentity } from './account-tooling.mts';
+import { effectiveProfiles } from './account-discovery.mts';
 import { referencedFiles, isImagePath } from '../shared/referenced-files.mts';
 import { namedThreadsBlock } from '../shared/named-threads.mts';
-import { changePath } from './code-change.mjs';
-import { noteAgentWrites } from './store/written-elsewhere.mjs';
-import { snapshotRepo } from './git-change.mjs';
+import { changePath } from './code-change.mts';
+import { noteAgentWrites } from './store/written-elsewhere.mts';
+import { snapshotRepo } from './git-change.mts';
 import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mts';
 import { readTranscriptHead } from './agent-sessions.mts';
 import { claudeSessionOpen } from './claude-session-open.mts';
-import { planStamp, readPlan } from './claude-plan.mjs';
+import { planStamp, readPlan } from './claude-plan.mts';
 import { troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown } from '../shared/spawn-trouble.mts';
 import { readDeadRunTrace, traceShowsASilentDeath, tracesAToolCall, STOPPED_ON_REQUEST } from '../shared/dead-run-trace.mts';
 import { commandPrompt } from '../shared/claude-commands.mts';
-import { machineryPath, storeRootEnv } from './store/home.mjs';
+import { machineryPath, storeRootEnv } from './store/home.mts';
 import { answerModesFile } from './answer-modes.mts';
 import { isInside } from './doc-file.mts';
 import { setModelArg } from './settings.mts';
@@ -152,25 +152,25 @@ import {
   engineFor, engineLabel, engineChoiceSince, engineChoiceOnRowIsStale,
   availableEngines, isEngine, modelForEngine, homeEngine,
   ENGINE_CHOICE_ENABLED, DEFAULT_ENGINE, DEFAULT_CLAUDE_MODEL, ENGINE_IDS,
-} from '../shared/engines.mjs';
-import { createCodexAppServer } from './codex-app-server.mjs';
-import { CLAUDE_MODELS } from '../shared/claude-models.generated.mjs';
-import { claudeModelRows } from './claude-models.mjs';
+} from '../shared/engines.mts';
+import { createCodexAppServer } from './codex-app-server.mts';
+import { CLAUDE_MODELS } from '../shared/claude-models.generated.mts';
+import { claudeModelRows } from './claude-models.mts';
 import { codexLaunchEnv } from './codex-launch-env.mts';
 import { CodexUsage, codexAccountReadings } from './codex-usage.mts';
 import { createCodexWorker, mcpServerNames, resumeThreadParams, workerThreadParams } from './codex-session.mts';
 import type { CodexServerClient, ConnectionServer, ConnectionServers } from './codex-session.mts';
-import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mjs';
+import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mts';
 import { cloudCodexMode } from './cloud-permission.mts';
-import { createCodexApprovals } from './codex-approvals.mjs';
-import { approvalPublicKey, listPending } from './approvals.mjs';
-import { connectionLine, filesComeFirst } from '../shared/connections-catalog.mjs';
+import { createCodexApprovals } from './codex-approvals.mts';
+import { approvalPublicKey, listPending } from './approvals.mts';
+import { connectionLine, filesComeFirst } from '../shared/connections-catalog.mts';
 import { codexDefaultModel, codexHome, codexKnownSlugs, codexModelLevels, codexModels } from './codex-models.mts';
 import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.mts';
 import { accountName } from '../shared/account-names.mts';
 import { nameRow, wantsName, askSmallModel } from './row-label.mts';
 import { catchUpRow, catchUpResult } from './catch-up.mts';
-import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mjs';
+import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
 import { signInFiles, signInStamp } from './sign-in-files.mts';
@@ -178,29 +178,29 @@ import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
 import { startDecision, readMacPressureNow, SETTLE_MS } from './start-hold.mts';
 import { MemoryLog } from './memory-log.mts';
-import { StartBudget } from './cloud/start-budget.mjs';
-import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mjs';
-import type { MergeHomeResult } from './cloud/merge-home.mjs';
+import { StartBudget } from './cloud/start-budget.mts';
+import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mts';
+import type { MergeHomeResult } from './cloud/merge-home.mts';
 import { autoSlots, DEFAULTS as MEMORY_GATE, pressureFrom } from './memory-gate.mts';
 import { LeftoverCleaner } from './leftovers.mts';
 import { syncCodexMemoryGate } from './codex-memory-gate.mts';
-import { autoAgents } from './machine.mjs';
+import { autoAgents } from './machine.mts';
 import { runEndedProps } from './analytics.mts';
 import { appendRun, runLedgerPath } from './run-ledger.mts';
 import { toolServerLaunch } from './tool-server-launch.mts';
 import type { ChildProcess, SpawnOptions as ChildSpawnOptions } from 'node:child_process';
 import type { WriteStream } from 'node:fs';
 import type { PressureSample } from './start-hold.mts';
-import type { RepeatRule } from '../shared/repeats.mjs';
-import type { CarriedCommand } from '../shared/cloud-carry.mjs';
-import type { RouteDecision, RouteMate } from '../shared/auto-route.mjs';
+import type { RepeatRule } from '../shared/repeats.mts';
+import type { CarriedCommand } from '../shared/cloud-carry.mts';
+import type { RouteDecision, RouteMate } from '../shared/auto-route.mts';
 import type { LatestMessage } from './message-priority.mts';
 import type { ActiveTool } from './agent-activity.mts';
 import type { ShipItem, ShipProduct } from './ship-queue.mts';
 import type { CloudKit } from './cloud/kit.mts';
 import type { CatchUpCard } from './catch-up.mts';
 import type { QueuedLine, ReplyPayload } from './live-replies.mts';
-import type { Kit } from '../shared/cloud-kit.mjs';
+import type { Kit } from '../shared/cloud-kit.mts';
 
 type MergeOutcome = MergeHomeResult;
 
@@ -268,7 +268,7 @@ export interface Product {
   team?: { projectId?: string; sharedBy?: string | null; direct?: unknown } | null;
 }
 
-/** What the workspace config (zero.config.json, read by main/config.mjs) holds that the supervisor reads. */
+/** What the workspace config (zero.config.json, read by main/config.mts) holds that the supervisor reads. */
 export interface SupervisorConfig {
   home?: string;
   storeRoot: string;
@@ -632,7 +632,7 @@ export interface ConnectionTool {
   endsAt?: number | null;
 }
 
-/** A tool's files kept in Files (main/connections/copies.mjs). */
+/** A tool's files kept in Files (main/connections/copies.mts). */
 export interface ConnectionCopy {
   name: string;
   folder: string;
@@ -641,7 +641,7 @@ export interface ConnectionCopy {
   okAt?: number | null;
 }
 
-/** What main/connections/start.mjs hands the supervisor. */
+/** What main/connections/start.mts hands the supervisor. */
 export interface SupervisorConnections {
   catalog: { id: string; name: string }[];
   workingNow(): { id: string }[];
@@ -1180,7 +1180,7 @@ export function storeGrantUnderAnyOfOurNames(args: unknown, storeServer: string 
 // `_engineFor` answered. A `_liveSessions` or `_rowSessions` record written
 // before the second engine existed carries NOTHING, and every one of those was
 // Claude Code. And a work item carries whatever the ledger holds, which is a
-// free string validated against nothing (shared/work-items.mjs).
+// free string validated against nothing (shared/work-items.mts).
 //
 // So anything that is not the literal 'codex' is the default engine. That is
 // the same refusal `readersFor` makes at the bottom of this file and for the
@@ -1192,7 +1192,7 @@ function engineOf(engine: unknown): string {
 }
 
 // A Codex run's output is app-server JSON-RPC, a line each; Codex's readers
-// take a notification's method and params (main/codex.mjs). For a Codex run
+// take a notification's method and params (main/codex.mts). For a Codex run
 // coming home, read line by line as Claude Code's stream is.
 interface CodexNote { method: string; params?: unknown; id?: unknown }
 type FrameReader<R> = (...frame: unknown[]) => R;
@@ -2090,7 +2090,7 @@ export class Supervisor {
     for (const item of items) {
       if (item.status !== 'blocked' || !Array.isArray(item.blockedBy) || !item.blockedBy.length) continue;
       if (this.sessions.has(item.id) || stoppedByHer(item)) continue;
-      // A wait a person set comes back to them; it starts nothing (shared/thread-waits.mjs).
+      // A wait a person set comes back to them; it starts nothing (shared/thread-waits.mts).
       if (item.wrote?.blockedBy?.source === 'founder') continue;
       const blockers = item.blockedBy.map((id) => byId.get(`${item.product}:${id}`));
       if (blockers.some((b) => !b || b.status !== 'done')) continue;
@@ -2622,7 +2622,7 @@ export class Supervisor {
    * RUN THIS ONE NOW: the three-dot menu's row on a waiting task.
    *
    * Her tag on a task could not do this. A project's place in her order is
-   * worth a hundred times any tag (shared/rank.mjs), so an Urgent task in a
+   * worth a hundred times any tag (shared/rank.mts), so an Urgent task in a
    * lower project waited behind a Low one in a higher project and could not
    * interrupt it either; lowering the other tasks only reordered the waiting
    * line, never a running one. So this is not a priority at all. It is a
@@ -3114,7 +3114,7 @@ export class Supervisor {
     //
     // This used to answer a failure with the shared checkout and a
     // `console.warn`, which is the one back door under every other guarantee in
-    // this file. main/git-change.mjs says the cost in its own words: "In a
+    // this file. main/git-change.mts says the cost in its own words: "In a
     // checkout two agents share, a file the other one wrote inside this run's
     // window is inside this run's window, and no reading of the disk can tell
     // them apart." So the card somebody reads can carry another agent's edits,
@@ -4036,7 +4036,7 @@ export class Supervisor {
       // AND WRITE IT ON THE ITEM, not only in here. This memory is invisible to
       // her inbox and is wiped by every resume, so a finished thread read as a
       // stranded one everywhere she could actually see it: out of the inbox,
-      // red in In progress, and respawnable forever (shared/answers.mjs).
+      // red in In progress, and respawnable forever (shared/answers.mts).
       try { this.store.settleAnswer?.(item.product, item.id, carried); }
       catch (e) { console.warn('zero: could not record the settled answer:', (e as Error).message); }
       return 'delivered';
@@ -4310,7 +4310,7 @@ export class Supervisor {
 
   /**
    * IN ONE OF A SHUT MAC'S FEW-SECOND WAKES, where a run started dies at the
-   * next one (shared/cloud-carry.mjs). Nothing starts then; the phone pass
+   * next one (shared/cloud-carry.mts). Nothing starts then; the phone pass
    * hands the waiting rows to the cloud instead (`carryWhileAsleep`).
    * `idleMs` is the window's reading of the keyboard and mouse.
    */
@@ -4381,7 +4381,7 @@ export class Supervisor {
   }
 
   // Each repeating task's next run inside CARRY_AHEAD_MS, as the row it will
-  // be made as (main/repeats.mjs occurrenceFields), not yet on disk.
+  // be made as (main/repeats.mts occurrenceFields), not yet on disk.
   _repeatsAhead(now: number, items: WorkItem[]) {
     if (!this.store.repeats?.list) return [];
     const have = new Set(items.map((i) => i.id));
@@ -4767,7 +4767,7 @@ export class Supervisor {
   }
 
   /**
-   * GIVE A THREAD SENT TO AUTO TO WHOEVER'S WORK IT IS (shared/auto-route.mjs).
+   * GIVE A THREAD SENT TO AUTO TO WHOEVER'S WORK IT IS (shared/auto-route.mts).
    * Paced like the namer: one call at a time, oldest thread first, never awaited
    * by the tick. Each thread gets one question. No teammate to give it to, no
    * answer, or an answer that is not one all send it to an agent and say so on
@@ -5077,7 +5077,7 @@ export class Supervisor {
   // Ties break oldest-first so nothing starves. The item's own number counts
   // whoever set it (itemPriority), and it is the number every screen shows.
   // A THREAD DRAGGED IN THE LIST RUNS WHERE IT WAS PUT (w-6e5b532a95): its
-  // place replaces the score outright (`placedScore`, shared/rank.mjs).
+  // place replaces the score outright (`placedScore`, shared/rank.mts).
   _score(item: WorkItem) {
     return placedScore(this.threadPlaces[item.id], productRankScore(this.productOrder, item.product) + itemPriority(item));
   }
@@ -5230,7 +5230,7 @@ export class Supervisor {
     }
   }
 
-  // A CLOUD RUN THAT ENDED ON THE MARKED LINE (shared/cloud-hand-back.mjs):
+  // A CLOUD RUN THAT ENDED ON THE MARKED LINE (shared/cloud-hand-back.mts):
   // its request needs this Mac. Nothing it said goes on the row, and the same
   // request runs again here, told why (`replyBrief`). True when it was one.
   // A plain merge into main is tried by the app first (`_mergeHome`), and the
@@ -5356,7 +5356,7 @@ export class Supervisor {
   // checked against. A profile whose spawns keep dying instantly (expired
   // plan, broken login) quarantines itself for 30 minutes.
   // THE CONFIGURED ONES FIRST, THEN WHATEVER IS SIGNED IN ON THE DISK. One
-  // copy of that rule, in main/account-discovery.mjs, so the fleet and the
+  // copy of that rule, in main/account-discovery.mts, so the fleet and the
   // Agents page can never disagree about which accounts exist.
   // A tick asks once per waiting thread, so within one it is read at most once a second.
   _profiles() {
@@ -5909,7 +5909,7 @@ export class Supervisor {
    * THE NUMBER FOR THE WHOLE COMPUTER, or null when the number is still a
    * per-login one (a Claude plan that allows one at a time, or a config
    * written before `agentsAtOnce` existed and never loaded through
-   * main/config.mjs). Automatic's own answer, or the one picked on the menu.
+   * main/config.mts). Automatic's own answer, or the one picked on the menu.
    */
   _machineTotalFor(engine: string = DEFAULT_ENGINE): number | null {
     const planSpokeForClaude = engineOf(engine) !== DEFAULT_ENGINE && !!this.config.planSlotsFrom;
@@ -5925,7 +5925,7 @@ export class Supervisor {
    * HOW MANY SESSIONS ONE ACCOUNT MAY RUN, AND NEVER A NUMBER THAT STOPS HER
    * FLEET IN SILENCE.
    *
-   * `zero.config.json` is spread verbatim into `config` (main/config.mjs keeps
+   * `zero.config.json` is spread verbatim into `config` (main/config.mts keeps
    * unknown keys on purpose), so `maxConcurrentSessions` is whatever is in that
    * file: a null, a string, a zero. It used to fail SAFE, because the spawn
    * test was `load >= capacity` and a NaN comparison is false, so the spawn went
@@ -5939,7 +5939,7 @@ export class Supervisor {
    * chose. Her own number, whenever it is a real one, is untouched.
    *
    * AND A CLAUDE PLAN'S ANSWER IS NOT AN ANSWER ABOUT CODEX. When nobody sets
-   * `maxConcurrentSessions`, main/config.mjs reads the tier out of Claude
+   * `maxConcurrentSessions`, main/config.mts reads the tier out of Claude
    * Code's own `.claude.json` and lowers the number for a plan that is not Max.
    *
    * The cap exists because ONE plan's rate limit is split between whatever is
@@ -6281,9 +6281,9 @@ export class Supervisor {
     return cloudClients(config, { home: this.config.home });
   }
 
-  // A KEY SAVED FOR CLOUD RUNS (main/cloud/keys.mjs): pasted where a cloud
+  // A KEY SAVED FOR CLOUD RUNS (main/cloud/keys.mts): pasted where a cloud
   // run asked for it, or in Settings, and given to every cloud run after.
-  // Saving answers with the threads it frees (shared/cloud-keys.mjs
+  // Saving answers with the threads it frees (shared/cloud-keys.mts
   // threadsKeysFree), for the caller to reply to; each one's next turn goes
   // to the cloud, where the key is, even when this Mac has room for it.
   // With the cloud off nothing is freed: its threads run here, where no key is.
@@ -6892,7 +6892,7 @@ export class Supervisor {
   // Resume, Restart, Send Back and Run now are a person's word on the row, as
   // a reply is. `_heldFromStarting` cannot see them: none writes a field
   // `lastFounderWrite` counts, because a reopen is filed as the app's
-  // (`authorityOf` in shared/work-items.mjs).
+  // (`authorityOf` in shared/work-items.mts).
   forgetDeadStarts(item: WorkItem) {
     const key = `${item?.product}:${item?.id}`;
     if (!this._heldStarts?.[key] && !this._deadStarts?.[key]) return;
@@ -6922,7 +6922,7 @@ export class Supervisor {
 
   /** The plan the cloud server says this Mac is on; a paid one ends a wait for a plan. */
   cloudPlanSeen(plan: { signedIn?: boolean; plan?: unknown } | null | undefined) {
-    // The last plan read, for the web app's settings copy (shared/phone-settings.mjs); a failed read keeps it.
+    // The last plan read, for the web app's settings copy (shared/phone-settings.mts); a failed read keeps it.
     if (plan?.signedIn === false) this.cloudPlan = null;
     else if (typeof plan?.plan === 'string') this.cloudPlan = plan.plan;
     if (this._cloudNoRoom?.error === 'plan' && plan?.plan && plan.plan !== 'none') {
@@ -7092,7 +7092,7 @@ export class Supervisor {
     return path.join(this.userDir, 'run-spool');
   }
 
-  // THE RUN HOST'S SOCKET (main/run-host.mjs), starting one if none of this
+  // THE RUN HOST'S SOCKET (main/run-host.mts), starting one if none of this
   // code's is running. It outlives the app, so a quit leaves its runs going.
   // A host that lost a run before it started is not used again for ten
   // minutes: runs start directly, as they did before there was one.
@@ -7104,7 +7104,7 @@ export class Supervisor {
     if (running || (had?.exitCode === RUN_HOST_ALREADY_THERE && fs.existsSync(this._runHostSock))) return this._runHostSock;
     try {
       const log = fs.openSync(path.join(this.userDir, 'run-host.log'), 'a');
-      const proc = spawn(process.execPath, [...stripTypesFlags(), fileURLToPath(new URL('./run-host.mjs', import.meta.url)), this._runHostSock, this._runSpool()], {
+      const proc = spawn(process.execPath, [...stripTypesFlags(), fileURLToPath(new URL('./run-host.mts', import.meta.url)), this._runHostSock, this._runSpool()], {
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
         detached: true,
         stdio: ['ignore', log, log],
@@ -7217,7 +7217,7 @@ export class Supervisor {
   }
 
   // Whether the cloud image takes a run with no repository, as its last start
-  // said or, before any, to be tried (main/cloud/config.mjs `imageCapsToTry`),
+  // said or, before any, to be tried (main/cloud/config.mts `imageCapsToTry`),
   // read at most every minute.
   _cloudTakesPlain(now = Date.now()) {
     if (!this._plainCapsAt || now - this._plainCapsAt > 60_000) {
@@ -8730,7 +8730,7 @@ export class Supervisor {
     // A SHARED PROJECT'S ROW RUNS ON ITS RUNNER'S MAC AND NOWHERE ELSE, and a
     // row a person has been given runs nowhere until they hand it back. Every
     // teammate's supervisor sees every shared row; without this each would
-    // start its own worker on it. shared/team-rules.mjs is the rule, and the
+    // start its own worker on it. shared/team-rules.mts is the rule, and the
     // window reads the same one to decide whose inbox a row is in.
     const productBySlug = new Map(products.map((p) => [p.slug, p]));
     const me = process.env.AGENTBOX_PERSON_ID || null;
@@ -8853,7 +8853,7 @@ export class Supervisor {
      */
     const spent = new Set<string>();
 
-    // A SHUT MAC STARTS NOTHING (shared/cloud-carry.mjs): what it would have
+    // A SHUT MAC STARTS NOTHING (shared/cloud-carry.mts): what it would have
     // started is kept for the phone pass to hand to the cloud.
     const asleep = this.asleep();
     // The git under a thread's folder has no deadline of its own (main/task-folders.mts).
@@ -8955,7 +8955,7 @@ export class Supervisor {
     // finds, on Monday, exactly one digest owed, because six were never
     // representable: there is no queue of missed firings to catch up on, only
     // a condition that is currently false. It is also why the one repeat rule
-    // the app does have (main/repeats.mjs) is an invariant and not a chain. A
+    // the app does have (main/repeats.mts) is an invariant and not a chain. A
     // chain in which each digest books the next one stops forever the first
     // time a run dies, and the thing that would have noticed is the run that
     // died. Nothing here books anything: a period is owed, or it is not.
@@ -9492,7 +9492,7 @@ export class Supervisor {
     // its slug to whichever CLI happened to be running -- measured 2026-09-05:
     // `engine: "codex", model: "gpt-5.6-sol"` on a Mac with no Codex resolved to
     // `--model gpt-5.6-sol` on a Claude Code command line. `modelForEngine` in
-    // shared/engines.mjs is the rule and says why the two fields are one choice.
+    // shared/engines.mts is the rule and says why the two fields are one choice.
     // Nothing here runs on a null it produces: `spawnWorker` refuses the row
     // before this method is reached, so the only null that gets this far is a
     // row with no model on it at all.
@@ -9737,7 +9737,7 @@ export class Supervisor {
     ].join('\n');
   }
 
-  // Only a project holding the team's look hears about it (shared/team-look.mjs).
+  // Only a project holding the team's look hears about it (shared/team-look.mts).
   teamLookLine(slug: string, product: Product | null = null) {
     const dir = product?.dir ?? this.store.listProducts().find((p) => p.slug === slug)?.dir;
     return dir && fs.existsSync(path.join(dir, TEAM_LOOK)) ? TEAM_LOOK_LINE : null;
@@ -10014,7 +10014,7 @@ export class Supervisor {
    *
    * AND IT IS THE ONE PLACE THAT HOLDS THE CAPABILITY TOKEN. `engineFor`
    * returns Claude Code for every input unless the caller hands it the Symbol
-   * from shared/engines.mjs; this hands it over only when
+   * from shared/engines.mts; this hands it over only when
    * `config.engineChoice` names the moment she opened the gate, which is a line
    * somebody writes in zero.config.json on purpose. Nothing else in main/ or
    * renderer/src names the Symbol, and the last block of
@@ -10027,7 +10027,7 @@ export class Supervisor {
    *   default whatever the row and the workspace say.
    *
    *   THE BINARY. `found` is a real question now rather than a vacuous one:
-   *   main/config.mjs resolves `codexBin` through main/codex-bin.mjs -- a
+   *   main/config.mts resolves `codexBin` through main/codex-bin.mts -- a
    *   finder, an existence check, and her setting kept apart from what was
    *   found -- and answers null on a Mac with no Codex. She may have opted in
    *   on the laptop that has it and be reading the same store on one that does
@@ -10040,7 +10040,7 @@ export class Supervisor {
    *   honoured and the workspace default answers instead. That is what makes
    *   the opt-in mean "Codex may be chosen from now on" rather than "every row
    *   that ever said codex is now live", and it is the hazard the whole gate
-   *   exists for. See `engineChoiceSince` in shared/engines.mjs.
+   *   exists for. See `engineChoiceSince` in shared/engines.mts.
    *
    * AND THE THIRD ONE IS SAID OUT LOUD, because a row that asked for something
    * and did not get it is the system doing something she did not ask for, and
@@ -10086,7 +10086,7 @@ export class Supervisor {
   /**
    * WHICH CODING AGENTS SHE MAY ACTUALLY BE OFFERED ON THIS MAC.
    *
-   * `availableEngines` in shared/engines.mjs is UNGATED, and its own header says
+   * `availableEngines` in shared/engines.mts is UNGATED, and its own header says
    * why that is a live hazard: "A future renderer could draw a picker out of
    * them, and the gate would not stop it -- she would be offered a choice that
    * `engineFor` then refuses, which is its own kind of lie." This is that
@@ -10116,9 +10116,9 @@ export class Supervisor {
   }
 
   /**
-   * WHICH CODING AGENTS ARE ON THIS MAC, as the shape `shared/engines.mjs`
+   * WHICH CODING AGENTS ARE ON THIS MAC, as the shape `shared/engines.mts`
    *  reads. `claude` is false only when the search said it is not here
-   *  (main/config.mjs `claudeFound`); a config that never said leaves it true,
+   *  (main/config.mts `claudeFound`); a config that never said leaves it true,
    *  which is what it always meant. */
   _enginesFound() {
     const codex = !!this.config.codexBin;
@@ -10238,7 +10238,7 @@ export class Supervisor {
    * `engine` has been on the work-item contract the whole time and `zero:compose`
    * has accepted it since before the removal, while `composeItem` quietly
    * dropped it -- so nothing has ever been written and the question of who may
-   * write it was left, in shared/engines.mjs, to "the slice that draws a
+   * write it was left, in shared/engines.mts, to "the slice that draws a
    * picker". This is that slice and this is the answer.
    *
    * A CHOICE SHE COULD NOT HAVE BEEN OFFERED IS REFUSED AT THE DOOR. The picker
@@ -10285,7 +10285,7 @@ export class Supervisor {
    * the OTHER HARNESS'S SLUG still on the row.
    *
    * AND THAT ROW IS WORSE THAN THE ONE THE GATE REFUSED. With no `engine` on it,
-   * `modelForEngine` in shared/engines.mjs has nothing to compare against, so
+   * `modelForEngine` in shared/engines.mts has nothing to compare against, so
    * the cross-harness guard in `spawnWorker` cannot see it either -- the row goes
    * straight to `claude --model gpt-5.6-sol`. Correcting one half of a pair and
    * keeping the other is how a refusal becomes a worse row than no refusal.
@@ -10455,7 +10455,7 @@ export class Supervisor {
       // WHICH MCP SERVER IS THE STORE, so a worker's own claim and checkpoint
       // are not cards she has to press before it can speak. Null where there is
       // no store server, and never a name a worker chooses: see the argument in
-      // main/codex-approvals.mjs.
+      // main/codex-approvals.mts.
       storeServer: storeServer?.name ?? null,
       connectionServers: Object.keys(plan.connectionServers ?? {}),
       // Where a refusal Agentbox cannot draw a card for goes: the worker's own
@@ -10475,7 +10475,7 @@ export class Supervisor {
       resumeThreadId: plan.resumeId,
       // The card, which is the other half of what a worker needs to be able to
       // do its job at all. Same spool, same shape, and the same wait as a
-      // Claude Code worker's: for her, not for a clock (main/codex-approvals.mjs).
+      // Claude Code worker's: for her, not for a clock (main/codex-approvals.mts).
       onApproval: cards.handle,
       // A worker that cannot write to her store does not run.
       requireMcpServer: storeServer?.name ?? null,
@@ -10542,7 +10542,7 @@ export class Supervisor {
    * USER and __CF_USER_TEXT_ENCODING -- and nothing else at all.
    *
    * Null on every install that has no store MCP configured, which is every
-   * downloaded copy of Agentbox (`storeMcpCommand` is null in main/config.mjs).
+   * downloaded copy of Agentbox (`storeMcpCommand` is null in main/config.mts).
    * `speaksForTheSession` already covers that case for both engines.
    */
   /**
@@ -10953,7 +10953,7 @@ export class Supervisor {
         this._unknownCodexRequests ??= new Set();
         if (this._unknownCodexRequests.has(method)) return;
         this._unknownCodexRequests.add(method);
-        console.warn(`zero: codex app-server asked for "${method}", which this version of ${NAME} does not recognise, so it was refused. If Codex now needs it, main/codex-app-server.mjs is where it is decided.`);
+        console.warn(`zero: codex app-server asked for "${method}", which this version of ${NAME} does not recognise, so it was refused. If Codex now needs it, main/codex-app-server.mts is where it is decided.`);
       },
     });
     const handshake = client.initialize();
@@ -11099,7 +11099,7 @@ export class Supervisor {
    *
    * It is the ONLY way a Codex approval is ever allowed: nothing on this path
    * reads an answer off the disk, which is what makes a file a worker wrote
-   * for itself worth nothing (main/codex-approvals.mjs). False for a Claude
+   * for itself worth nothing (main/codex-approvals.mts). False for a Claude
    * Code worker's card, which this spool has never heard of.
    */
   settleCodexApproval(id: string, allow: boolean, note?: string) {
@@ -11442,7 +11442,7 @@ export class Supervisor {
     // below runs with none of the person's own tooling and nothing says so.
     // Three symlinks back to the first login, made once and then found already
     // made; it never overwrites anything and never throws. See
-    // main/account-tooling.mjs for what is shared and what deliberately is not.
+    // main/account-tooling.mts for what is shared and what deliberately is not.
     // AND IT IS CLAUDE CODE'S TOOLING, SO IT IS NOT MADE FOR THE OTHER ENGINE.
     // `linkAccountTooling` symlinks `~/.claude/{skills,commands,agents}` into an
     // account folder; a Codex worker reads none of those three and has no
@@ -11461,7 +11461,7 @@ export class Supervisor {
     // main/cloud/run-cli.mts with the same arguments (main/harnesses/claude.mts),
     // Codex's talks to an app-server in the sandbox (`_spawnCodexWorker`).
     // A LOCAL RUN IS HELD BY THE RUN HOST, so a quit or a restart leaves it
-    // and its helpers going (main/run-host.mjs).
+    // and its helpers going (main/run-host.mts).
     const hosted = !!this.hostRuns && where !== 'cloud' && !remoteOnly && !plan.command;
     const child: WorkerChild = adopted?.child ?? harness.spawn(this, plan, { cwd, item, profile, env, cloud: where === 'cloud', host: hosted ? this._runHost() : null }) as WorkerChild;
     if (child instanceof HostedRun && !adopted) child.once('exit', (code) => { if (code === HOST_LOST && !Number.isInteger(child.pid)) this._runHostBroken = Date.now(); });
@@ -11803,7 +11803,7 @@ export class Supervisor {
       // checkout is read for what actually moved on the disk, and the two are
       // written together to `runs/<item>/the-change-it-made.change` inside the
       // product. The disk half is what makes a run that used sed show anything
-      // at all; see the top of main/git-change.mjs for why both are read.
+      // at all; see the top of main/git-change.mts for why both are read.
       //
       // BEFORE `trace.end`, because the chip on her card is found by reading
       // the run's own trace for paths (renderer/src/run-files.ts). Writing the
@@ -12516,7 +12516,7 @@ export class Supervisor {
   /* ------------- THE PHONE'S THREADS, READY FOR THE CLOUD ------------- */
   // docs/cloud/PHONE-PLAN.md step 2. After each turn of a thread on her phone
   // this computer leaves its next turn ready in her cloud storage (a kit,
-  // shared/cloud-kit.mjs), so a reply she sends with the lid shut is started
+  // shared/cloud-kit.mts), so a reply she sends with the lid shut is started
   // there by the cloud server; waking, this computer joins that run
   // (`adoptCloudRun`). Only on the managed cloud, the one with a server to
   // start it. A Codex thread's kit opens its app-server thread in the cloud and
@@ -12621,7 +12621,7 @@ export class Supervisor {
     child.once('exit', done);
   }
 
-  // A CODEX THREAD'S KIT (shared/cloud-kit.mjs): the app-server a cloud run of
+  // A CODEX THREAD'S KIT (shared/cloud-kit.mts): the app-server a cloud run of
   // it starts (`_cloudCodexServer`), and, in a file read once, the thread to
   // resume with the params this computer would give it and the turn's own
   // settings; the relay rewrites them for the cloud (main/cloud/run.mts
@@ -12644,7 +12644,7 @@ export class Supervisor {
 
   /* ---------- A NEW THREAD FROM THE PHONE, READY FOR THE CLOUD ---------- */
   // Each project on her phone keeps a kit for a fresh thread beside its
-  // threads' kits (shared/cloud-kit.mjs fillNewThreadKit): a new thread's own
+  // threads' kits (shared/cloud-kit.mts fillNewThreadKit): a new thread's own
   // command line and brief, planned for a stand-in row whose id, title and
   // body are marks, packed from main. Left each pass of the phone at most
   // every NEW_KIT_EVERY_MS, and as soon as main has moved (looked at every
@@ -13240,7 +13240,7 @@ export class Supervisor {
   /**
    * WHICH ROW A CODEX THREAD IS DOING, asked by the gate on every command a
    * Codex worker runs. `session.sessionId` is set from `thread/started` in
-   * main/codex.mjs, and the hook's `session_id` was measured to be that same
+   * main/codex.mts, and the hook's `session_id` was measured to be that same
    * string. A thread this app is not running answers null, and its command is
    * let through.
    */
@@ -13476,7 +13476,7 @@ export class Supervisor {
           // of Agentbox's own key: it verifies and cannot sign, so handing it
           // down a channel the worker can read costs nothing. Without it the
           // server denies everything rather than believing a file, which is the
-          // right way round. main/approvals.mjs holds the argument.
+          // right way round. main/approvals.mts holds the argument.
           ZERO_APPROVALS_PUBKEY: approvalPublicKey(),
           // THE RUNTIME THAT SERVER IS STARTED ON, which is this app's own
           // binary. Run from source the launcher used to need node on PATH and

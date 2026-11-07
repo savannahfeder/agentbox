@@ -1,4 +1,4 @@
-// Types for shared/thread-cards.mjs, for the window side.
+// Types for shared/thread-cards.mts, for the window side.
 import type { ThreadStateWord, WorkItem } from '../renderer/src/types';
 
 export const THREAD_STATES: ThreadStateWord[];

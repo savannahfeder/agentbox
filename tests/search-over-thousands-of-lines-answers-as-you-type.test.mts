@@ -8,7 +8,7 @@
 // numbers are printed so a commit can quote them; the bounds are loose enough
 // for a busy shared Mac.
 import { describe, it, expect } from 'vitest';
-import { createFinder } from '../main/everything-found.mjs';
+import { createFinder } from '../main/everything-found.mts';
 
 const THREADS = 600;
 const PER_THREAD = 40;

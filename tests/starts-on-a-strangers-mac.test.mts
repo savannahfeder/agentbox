@@ -19,8 +19,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { loadConfig } from '../main/config.mjs';
-import { defaultStoreRoot } from '../main/store/home.mjs';
+import { loadConfig } from '../main/config.mts';
+import { defaultStoreRoot } from '../main/store/home.mts';
 import { nameSlug } from '../shared/product-name.mjs';
 
 let root, dir;

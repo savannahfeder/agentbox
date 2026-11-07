@@ -1,10 +1,10 @@
 // THE COMPUTER'S SETTINGS ON THE WEB APP, read from the copy it uploads
-// (phone_settings, shared/phone-settings.mjs) and changed by leaving it a
+// (phone_settings, shared/phone-settings.mts) and changed by leaving it a
 // 'setting' command, as the phone app does (mobile/src/state/settings.tsx).
-import { checkSetting } from '../../shared/phone-settings.mjs';
+import { checkSetting } from '../../shared/phone-settings.mts';
 import { settingCommand, splitSlug, type PhoneRows } from './phone-rows';
-import { DEFAULT_ENGINE, ENGINES, isEngine, type Engine } from '../../shared/engines.mjs';
-import { CLAUDE_MODELS } from '../../shared/claude-models.generated.mjs';
+import { DEFAULT_ENGINE, ENGINES, isEngine, type Engine } from '../../shared/engines.mts';
+import { CLAUDE_MODELS } from '../../shared/claude-models.generated.mts';
 import { Name } from '../../shared/product-name.mjs';
 import { computerOf, type Change, type SettingsRow } from './phone-settings-view';
 import type { ModelChoice } from './models';

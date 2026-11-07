@@ -23,8 +23,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
-import * as disk from '../main/store/work-items.mjs';
-import { ENGINE_CHOICE_ENABLED, engineFor, modelForEngine } from '../shared/engines.mjs';
+import * as disk from '../main/store/work-items.mts';
+import { ENGINE_CHOICE_ENABLED, engineFor, modelForEngine } from '../shared/engines.mts';
 import { pickToSend } from '../renderer/src/reply-pick';
 
 describe('what a reply says about the agent it runs on', () => {

@@ -6,8 +6,8 @@
 // of words at all, `dueWords` knew only a picked day and said "Overdue Oct 2",
 // and nothing put a task past its day back in front of the person holding it.
 import { describe, it, expect } from 'vitest';
-import { deadlineIn, deadlineOf, dueSaid, isLate, dayDeadline, lateForMe } from '../shared/team-tasks.mjs';
-import { inMyInbox, GIVEN_TASK } from '../shared/team-rules.mjs';
+import { deadlineIn, deadlineOf, dueSaid, isLate, dayDeadline, lateForMe } from '../shared/team-tasks.mts';
+import { inMyInbox, GIVEN_TASK } from '../shared/team-rules.mts';
 
 const at = (h, m = 0, day = 31) => new Date(2026, 9, day, h, m).getTime();
 const word = (d, now, o) => dueSaid(d, now, o)?.word ?? null;

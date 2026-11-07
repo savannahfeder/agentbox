@@ -3,7 +3,7 @@
 // On 2026-10-24 the founder said the phone must work "with your computer
 // completely closed": a reply sent from a bus has to reach an agent then, not
 // when the laptop opens. The computer now leaves each phone thread's next turn
-// ready in the cloud (shared/cloud-kit.mjs), and this is the server's half
+// ready in the cloud (shared/cloud-kit.mts), and this is the server's half
 // (cloud/gateway/phone.mjs): every minute it looks for replies no computer
 // has claimed for a minute, claims one as `cloud:<run id>`, starts the run
 // from the kit through the same path a Mac's start takes (the plan, the
@@ -20,8 +20,8 @@ import { lambdaHandler } from '../cloud/gateway/lambda.mjs';
 import { rolePolicy, serviceKeyOf } from '../scripts/cloud-gateway-setup.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { KIT_VERSION, kitKey, serverRunKey, runOfClaim, cloudSessionId } from '../shared/cloud-kit.mjs';
-import { threadSnapshot } from '../shared/phone-snapshot.mjs';
+import { KIT_VERSION, kitKey, serverRunKey, runOfClaim, cloudSessionId } from '../shared/cloud-kit.mts';
+import { threadSnapshot } from '../shared/phone-snapshot.mts';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const DEVICE = 'a1b2c3d4e5f6';

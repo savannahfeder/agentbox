@@ -47,13 +47,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Repeats } from '../main/repeats.mjs';
+import { Repeats } from '../main/repeats.mts';
 import { loadStore } from '../main/store-modules.mts';
-import { foldRepeats } from '../shared/repeats.mjs';
+import { foldRepeats } from '../shared/repeats.mts';
 import { Name } from '../shared/product-name.mjs';
 import {
   ENGINE_CHOICE_ENABLED, engineFor, modelForEngine,
-} from '../shared/engines.mjs';
+} from '../shared/engines.mts';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');

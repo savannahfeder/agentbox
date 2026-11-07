@@ -991,7 +991,7 @@ export function createSandbox({
     }
   }
 
-  // THE KEYS THEY SAVED FOR CLOUD RUNS (main/cloud/keys.mjs), each fetched
+  // THE KEYS THEY SAVED FOR CLOUD RUNS (main/cloud/keys.mts), each fetched
   // by its own link and given to the agent as the variable it is named for.
   // Never a reason to stop the run: one that cannot be fetched is left out,
   // and the agent asks for it as if it had never been saved.

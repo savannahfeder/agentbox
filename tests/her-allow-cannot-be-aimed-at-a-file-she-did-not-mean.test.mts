@@ -1,7 +1,7 @@
 // HER CLICK IS A WRITE FROM THE MAIN PROCESS, AND A WORKER USED TO CHOOSE
 // WHERE IT LANDED (2026-09-04).
 //
-// `main/approvals.mjs`'s `answer` was a bare
+// `main/approvals.mts`'s `answer` was a bare
 // `fs.writeFileSync(path.join(dir, `${id}.answer.json`), ...)`. The spool lives
 // at `<storeRoot>/.approvals`, the store root is in `additionalDirectories` and
 // `worker-permissions.json` allows Bash broadly, so a Claude Code worker can
@@ -32,8 +32,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { answer, listPending, spoolDir } from '../main/approvals.mjs';
-import { createCodexApprovals } from '../main/codex-approvals.mjs';
+import { answer, listPending, spoolDir } from '../main/approvals.mts';
+import { createCodexApprovals } from '../main/codex-approvals.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -190,7 +190,7 @@ describe('an answer the spool will not take at all', () => {
 // On a Codex card nothing ever READS an answer file: the worker is parked on a
 // promise inside Agentbox, her decision arrives through `settle`, and a
 // `<id>.answer.json` that turns up for a card still waiting is by definition a
-// worker's (main/codex-approvals.mjs). `sweepForgery` deletes it. Her own
+// worker's (main/codex-approvals.mts). `sweepForgery` deletes it. Her own
 // answer is written by the same door a beat before `settle` runs, so the two
 // live one line apart and getting it wrong in either direction is loud: sweep
 // her answer and Agentbox accuses her of forging her own approval (which it did,

@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { installLinuxLauncher } from '../scripts/linux-launcher.mjs';
-import { defaultStoreRoot } from '../main/store/home.mjs';
+import { defaultStoreRoot } from '../main/store/home.mts';
 import { Name, nameSlug } from '../shared/product-name.mjs';
 
 const repo = path.join(path.dirname(new URL(import.meta.url).pathname), '..');

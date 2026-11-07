@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Supervisor } from '../main/supervisor.mts';
-import { buildTools } from '../mcp/tools.mjs';
+import { buildTools } from '../mcp/tools.mts';
 import { appHomeEnv } from './app-home.mts';
 
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

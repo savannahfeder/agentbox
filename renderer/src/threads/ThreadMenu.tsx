@@ -40,7 +40,7 @@ import { chord } from '../this-keyboard';
 import { DONE } from '../done-word';
 import { onPhone } from '../phone-screen';
 import { PlaceButton, type PlaceFacts } from './PlaceButton';
-import { nameWait } from '../../../shared/thread-waits.mjs';
+import { nameWait } from '../../../shared/thread-waits.mts';
 import { Face } from '../team/people';
 import type { Person } from '../types';
 

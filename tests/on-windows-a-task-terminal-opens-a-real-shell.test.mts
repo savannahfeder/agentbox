@@ -23,7 +23,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { terminalShell } from '../main/shell-path.mjs';
+import { terminalShell } from '../main/shell-path.mts';
 import { TaskTerminals, disposeTerminalProcess } from '../main/task-terminals.mts';
 
 const w = path.win32;

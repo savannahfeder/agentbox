@@ -32,8 +32,8 @@ import { createSandbox } from '../cloud/sandbox/server.mjs';
 import { cloudRun } from '../main/cloud/run.mts';
 import { pickBase, periodOf, CACHE_PERIOD_MS, sendConversation, sentRecordPath, MIN_JOIN_BYTES } from '../main/cloud/reuse.mts';
 import { transcriptFolderName } from '../main/cloud/run.mts';
-import { copyRanges } from '../main/cloud/aws.mjs';
-import { imageCaps, noteImageCaps } from '../main/cloud/config.mjs';
+import { copyRanges } from '../main/cloud/aws.mts';
+import { imageCaps, noteImageCaps } from '../main/cloud/config.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');

@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
-import { CONTEXT_WORDS, wordsIn } from '../shared/thread-cards.mjs';
+import { CONTEXT_WORDS, wordsIn } from '../shared/thread-cards.mts';
 import { MainTests, redTitle, whatTheRunnerSaid } from '../main/main-went-red.mts';
 
 let root; let userDir;

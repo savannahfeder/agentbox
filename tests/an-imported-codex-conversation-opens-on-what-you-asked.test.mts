@@ -101,7 +101,7 @@ describe('a Codex conversation brought in by the store', () => {
     const store = await new Store({ storeRoot: root, accountId: 'test-account', accountRoot, products: [] }).init();
     const { slug } = store.createProduct({ name: 'Orders Api', repoPath: path.join(root, 'orders') });
     store.importCodexThreads(slug, [{ id: 'abc', source: 'codex', folder: path.join(root, 'orders'), title: 'Kitchen summary', prompt: PROMPT, last: 'Want it at 6am or 7am?', waiting: true }]);
-    const { readLinesFrom } = await import('../main/store/work-items.mjs');
+    const { readLinesFrom } = await import('../main/store/work-items.mts');
     const lines = readLinesFrom(store.productDir(slug)).lines.map((l) => (typeof l === 'string' ? JSON.parse(l) : l));
     const said = threadEvents(lines).map((e) => e.said);
     expect(said).not.toContain('You sent it back');

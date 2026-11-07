@@ -26,7 +26,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EnginePicker } from '../renderer/src/components/EnginePicker.tsx';
-import { ENGINES } from '../shared/engines.mjs';
+import { ENGINES } from '../shared/engines.mts';
 
 const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');

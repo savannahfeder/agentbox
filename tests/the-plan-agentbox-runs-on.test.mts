@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { planFile, planLabel, isMaxTier, readPlan, readPlans, slotsForPlans } from '../main/claude-plan.mjs';
+import { planFile, planLabel, isMaxTier, readPlan, readPlans, slotsForPlans } from '../main/claude-plan.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 let home;

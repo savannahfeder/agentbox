@@ -10,9 +10,9 @@
 // What must NOT cross: a note on a different file, and the conversation's notes
 // for an AI teammate its owner has not let read direct messages.
 import { it, expect, beforeEach, afterEach, describe } from 'vitest';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { teamRead } from '../mcp/core/reach.mjs';
+import { teamRead } from '../mcp/core/reach.mts';
 
 let t; let run;
 const PNG = Buffer.from('89504e470d0a1a0a', 'hex').toString('base64');

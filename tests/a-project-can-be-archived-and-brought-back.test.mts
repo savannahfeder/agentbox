@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { Store } from '../main/store.mts';
 import { listSharedProjects } from '../main/team/projects.mts';
 import { readSettings } from '../main/settings.mts';
-import { loadConfig } from '../main/config.mjs';
+import { loadConfig } from '../main/config.mts';
 import { Supervisor } from '../main/supervisor.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

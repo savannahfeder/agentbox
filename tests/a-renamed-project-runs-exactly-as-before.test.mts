@@ -24,7 +24,7 @@ import path from 'node:path';
 import { Store } from '../main/store.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { setProjectName } from '../main/project-identity.mts';
-import { resolveAccount, resolveProduct } from '../mcp/core/account.mjs';
+import { resolveAccount, resolveProduct } from '../mcp/core/account.mts';
 import { envName } from '../shared/product-name.mjs';
 
 const dirs = [];

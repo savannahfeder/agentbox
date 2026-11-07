@@ -12,7 +12,7 @@
 //
 // WHAT "THE THREE IT ALWAYS HAD" MEANS CHANGED ON 2026-09-22. The number a plan
 // falls back to is no longer a flat 3; it is what the hardware suggests
-// (main/machine.mjs, one agent per 4 GB), because a Max subscription on an 8 GB
+// (main/machine.mts, one agent per 4 GB), because a Max subscription on an 8 GB
 // laptop is exactly the case a plan reading cannot see. So the checks below are
 // written against `machineSlots()` rather than against a literal: a literal
 // would pass on the Mac it was written on and fail on the next one. The claim
@@ -22,8 +22,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadConfig } from '../main/config.mjs';
-import { machineSlots } from '../main/machine.mjs';
+import { loadConfig } from '../main/config.mts';
+import { machineSlots } from '../main/machine.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 let home;

@@ -5,7 +5,7 @@
 // later by opening Done threads, and one answer sat out for 37 minutes. A close is
 // one shared status, so the author's Done took the words off the reader's list too.
 import { describe, it, expect } from 'vitest';
-import { closedOverWords, inMyInbox, GIVEN_TASK } from '../shared/team-rules.mjs';
+import { closedOverWords, inMyInbox, GIVEN_TASK } from '../shared/team-rules.mts';
 import { taskWords } from '../renderer/src/team/company.ts';
 import fs from 'node:fs';
 

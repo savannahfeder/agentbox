@@ -13,7 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createPhoneInbox, applyThrough } from '../main/phone-inbox.mts';
-import { checkSetting } from '../shared/phone-settings.mjs';
+import { checkSetting } from '../shared/phone-settings.mts';
 import { phoneSlug, phoneView } from '../renderer/src/phone-rows';
 import { phoneSender } from '../renderer/src/phone-send';
 import { planFor, runSteps } from '../mobile/src/lib/actions';

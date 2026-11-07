@@ -12,8 +12,8 @@ import { it, expect, describe, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { PAGE } from '../main/team/sign-in.mjs';
-import { loadCloudConfig, supabaseSession, headlessSessionFile } from '../main/team/session.mjs';
+import { PAGE } from '../main/team/sign-in.mts';
+import { loadCloudConfig, supabaseSession, headlessSessionFile } from '../main/team/session.mts';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'team-reach-'));
 

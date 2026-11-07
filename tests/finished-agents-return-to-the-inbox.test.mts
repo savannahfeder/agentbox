@@ -8,9 +8,9 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { Store } from '../main/store.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { belongsInInbox, belongsInProgress } from '../renderer/src/list-rules.ts';
-import { appHome } from '../main/store/home.mjs';
+import { appHome } from '../main/store/home.mts';
 
 let root, dir, store, sup, item, session, claim;
 beforeEach(async () => {
@@ -159,10 +159,10 @@ describe('finished agents return to the inbox', () => {
     process.env.STORE_ACCOUNT_ID = 'test-account';
     const account = path.join(appHome(), 'accounts', 'test-account');
     fs.mkdirSync(account, { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
-    const work = await import('../mcp/core/work.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
+    const work = await import('../mcp/core/work.mts');
     const product = createProduct('Completed claims');
     const productDir = path.join(account, product.id);
     const row = work.createItem(product.id, { title: 'Check the build' });

@@ -1350,7 +1350,7 @@ export const COPY = {
    a condition inside a component, so the rule can be tested without a window.
 
    THE GATE ONLY EVER CLOSES ON A CERTAIN ANSWER, and that is the safety of it.
-   `missing` is true only after `main/engine-bin.mjs` has asked up to three
+   `missing` is true only after `main/engine-bin.mts` has asked up to three
    login shells and had every one of them exit properly, looked in sixteen
    places, read the version manager folders, looked inside the Claude desktop
    app, and found no trace of Claude Code anywhere

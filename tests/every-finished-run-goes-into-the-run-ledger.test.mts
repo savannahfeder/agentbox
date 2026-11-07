@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { appendRun, readRuns, runsFromCloudUsage, backfillRuns, allRuns, runLedgerPath } from '../main/run-ledger.mts';
-import { machineryDir } from '../main/store/home.mjs';
+import { machineryDir } from '../main/store/home.mts';
 import { Supervisor } from '../main/supervisor.mts';
 
 const tmp = (p) => fs.mkdtempSync(path.join(os.tmpdir(), p));

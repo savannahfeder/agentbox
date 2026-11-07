@@ -10,10 +10,10 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
-import { appFilesPlace } from '../main/files-place.mjs';
-import { filesInLines, otherFilesInLines } from '../shared/artifact-marks.mjs';
+import { appFilesPlace } from '../main/files-place.mts';
+import { filesInLines, otherFilesInLines } from '../shared/artifact-marks.mts';
 
 const said = (result) => [{ ts: 1, source: 'agent', patch: { result } }];
 

@@ -13,9 +13,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createMemoryCloud, memoryBackend, signUpMemory } from '../main/team/memory-cloud.mts';
-import { versionLine } from '../main/version-line.mjs';
+import { versionLine } from '../main/version-line.mts';
 import { startStandinCloud } from '../cloud/standin/server.mjs';
-import { standinBackend } from '../main/team/standin-backend.mjs';
+import { standinBackend } from '../main/team/standin-backend.mts';
 
 const tmp = (what) => fs.mkdtempSync(path.join(os.tmpdir(), `line-${what}-`));
 const put = (dir, name, bytes) => { const f = path.join(dir, name); fs.writeFileSync(f, bytes); return f; };

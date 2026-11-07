@@ -30,9 +30,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { findClaudeBin } from '../main/claude-bin.mjs';
+import { findClaudeBin } from '../main/claude-bin.mts';
 import { claudeState, recheckClaude } from '../main/settings.mts';
-import { forgetClaudeBin } from '../main/claude-bin.mjs';
+import { forgetClaudeBin } from '../main/claude-bin.mts';
 import { Onboarding } from '../renderer/src/components/Onboarding.tsx';
 import { COPY, RUN_START, finishCard, mayOpenInbox } from '../renderer/src/onboarding.ts';
 

@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { readState, doctor, cleanEnv, RUNS, REPO } = await import(path.join(here, 'live.mjs'));
-const { findClaudeBin } = await import(path.join(REPO, 'main', 'claude-bin.mjs'));
+const { findClaudeBin } = await import(path.join(REPO, 'main', 'claude-bin.mts'));
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : fallback; };

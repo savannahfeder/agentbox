@@ -12,7 +12,7 @@
 // that merge on its own: the shape of the loss, the boundaries either side of
 // it, and the case that must NOT merge, where both changed the same lines.
 import { describe, it, expect } from 'vitest';
-import { mergeThree } from '../shared/doc-merge.mjs';
+import { mergeThree } from '../shared/doc-merge.mts';
 
 const doc = (one) => [
   '# Agentbox', '', '## What', '', 'We build an inbox for agents.', '',

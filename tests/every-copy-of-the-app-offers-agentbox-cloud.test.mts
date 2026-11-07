@@ -7,15 +7,15 @@
 // null for a checkout holding only the team file, and the npm package that
 // `npx agentbox-app` runs (0.1.16) carried no address at all. The address and
 // its key are public and already sit in every download, so they now ship in
-// shared/cloud-address.mjs.
+// shared/cloud-address.mts.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { cloudAccountConfig } from '../main/cloud/config.mjs';
-import { CLOUD_ADDRESS } from '../shared/cloud-address.mjs';
+import { cloudAccountConfig } from '../main/cloud/config.mts';
+import { CLOUD_ADDRESS } from '../shared/cloud-address.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { loadCloudConfig } from '../main/team/session.mjs';
+import { loadCloudConfig } from '../main/team/session.mts';
 
 let home; let app; let setUpFile;
 const suiteSetUpFile = process.env.AGENTBOX_CLOUD_CONFIG;

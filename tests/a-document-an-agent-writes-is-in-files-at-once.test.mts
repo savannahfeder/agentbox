@@ -4,21 +4,21 @@
 // updates/october-investor-update.md and told her it was "in the Company docs
 // under updates/"; the Pricing researcher said "the Competitor pricing
 // document". Neither was in Files until she asked the agent to save it again.
-// Measured here: Files (main/files-place.mjs) and a shared thread's copy
-// (main/team/thread-share.mjs) list only the files a thread's words name, and
+// Measured here: Files (main/files-place.mts) and a shared thread's copy
+// (main/team/thread-share.mts) list only the files a thread's words name, and
 // write_document put nothing on the thread, so a document the agent wrote but
 // called by its title was in no list. The launch posts landed because that
 // agent happened to write the file's name in its answer.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
-import { filesOf } from '../main/files-place.mjs';
+import { appHome } from '../main/store/home.mts';
+import { filesOf } from '../main/files-place.mts';
 
 let tools; let product; let dir; let work; let store; let row;
 
 const build = async (ownItem) => {
-  ({ tools } = (await import('../mcp/tools.mjs')).buildTools({ holder: 'test-worker', ownItem }));
+  ({ tools } = (await import('../mcp/tools.mts')).buildTools({ holder: 'test-worker', ownItem }));
 };
 const write = (fields) => tools.find((t) => t.name === 'write_document').run({ product: product.id, ...fields });
 const said = (r) => JSON.parse(r.content[0].text);
@@ -28,13 +28,13 @@ const inFiles = () => filesOf([{ ref: { kind: 'thread', product: product.id, id:
 beforeEach(async () => {
   process.env.STORE_ACCOUNT_ID = 'acct-docs-in-files';
   fs.mkdirSync(path.join(appHome(), 'accounts', 'acct-docs-in-files'), { recursive: true });
-  const { resolveAccount } = await import('../mcp/core/account.mjs');
+  const { resolveAccount } = await import('../mcp/core/account.mts');
   resolveAccount();
-  const { createProduct } = await import('../mcp/core/products.mjs');
+  const { createProduct } = await import('../mcp/core/products.mts');
   product = createProduct(`Company ${Math.random().toString(36).slice(2, 8)}`);
   dir = path.join(appHome(), 'accounts', 'acct-docs-in-files', product.id);
-  work = await import('../mcp/core/work.mjs');
-  store = await import('../main/store/work-items.mjs');
+  work = await import('../mcp/core/work.mts');
+  store = await import('../main/store/work-items.mts');
   row = work.createItem(product.id, { title: 'Draft our October investor update', labels: ['founder'] }, { source: 'founder' });
   process.env.ZERO_PRODUCT = product.id;
 });

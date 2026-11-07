@@ -23,7 +23,7 @@ import { PassThrough } from 'node:stream';
 import { Supervisor } from '../main/supervisor.mts';
 import { Store } from '../main/store.mts';
 import { CLOUD_NOTE, PLAIN_CLOUD_NOTE } from '../main/cloud/run.mts';
-import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
+import { HAND_BACK } from '../shared/cloud-hand-back.mts';
 
 let tmp; let store; let sup; let row; let folder; let relays;
 

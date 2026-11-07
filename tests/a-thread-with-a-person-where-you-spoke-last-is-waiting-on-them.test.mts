@@ -6,7 +6,7 @@
 // spoke last on now says on whom it waits, and comes back when they answer.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { iSpokeLast, inMyInbox } from '../shared/team-rules.mjs';
+import { iSpokeLast, inMyInbox } from '../shared/team-rules.mts';
 import { waitingWord } from '../renderer/src/threads/page-rules.ts';
 
 const ME = 'jordan';

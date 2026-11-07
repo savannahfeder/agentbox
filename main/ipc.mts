@@ -1,11 +1,11 @@
 import { openSourceFile } from './open-source-file.mts';
 import {submitReply} from './live-replies.mts';
-import { noteToItsAgent } from './notes-wake.mjs';
+import { noteToItsAgent } from './notes-wake.mts';
 import { CHANGED_HERE, ranHere, whyItCannotMove } from '../shared/move-thread.mts';
-import { whereTheWorkStands } from './git-change.mjs';
+import { whereTheWorkStands } from './git-change.mts';
 import { taskFolderPath } from './task-folders.mts';
-import { GROUPS } from '../shared/connections-catalog.mjs';
-import { projectSeenBy } from '../shared/thread-cards.mjs';
+import { GROUPS } from '../shared/connections-catalog.mts';
+import { projectSeenBy } from '../shared/thread-cards.mts';
 import { createEngineSetup } from './engine-setup.mts';
 // IPC: a thin, typed-by-convention surface. The renderer asks; the main
 // process derives from files and answers. Pushes go one way: "state changed,
@@ -38,18 +38,18 @@ import { looksLikeClaudeCode } from '../shared/claude-code-shape.mts';
 import fsWatch from 'node:fs';
 import { listFolders } from './folders.mts';
 import { feedbackUrl, sendFeedback } from './feedback.mts';
-import { feedbackPayload } from '../shared/feedback.mjs';
-import * as approvals from './approvals.mjs';
+import { feedbackPayload } from '../shared/feedback.mts';
+import * as approvals from './approvals.mts';
 import { cardsInFront } from '../shared/which-card-is-in-front.mts';
 import { restartNeeded } from './staleness.mts';
-import { artifactRoots, resolveArtifact } from './artifact-path.mjs';
+import { artifactRoots, resolveArtifact } from './artifact-path.mts';
 import { folderPictures } from './folder-pictures.mts';
 import { docUrl } from './doc-scheme.mts';
 import { readDoc, writeDoc } from './doc-file.mts';
-import { linkCopyOf, linkSource } from './file-link.mjs';
-import { familyKeyOf } from '../shared/artifact-marks.mjs';
-import { readItemHistory } from './store/work-items.mjs';
-import { readChange } from './code-change.mjs';
+import { linkCopyOf, linkSource } from './file-link.mts';
+import { familyKeyOf } from '../shared/artifact-marks.mts';
+import { readItemHistory } from './store/work-items.mts';
+import { readChange } from './code-change.mts';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
 import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
@@ -57,11 +57,11 @@ import { addClaudeAccount, addCodexAccount, alphaFeatures, cornerTagTurnedOff, c
 import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './project-identity.mts';
 import { ClaudeUsage } from './claude-usage.mts';
 import { AccountUsage } from './account-usage.mts';
-import { effectiveProfiles } from './account-discovery.mjs';
-import { accountIdentity } from './account-tooling.mjs';
+import { effectiveProfiles } from './account-discovery.mts';
+import { accountIdentity } from './account-tooling.mts';
 import { usageEngine } from '../shared/usage.mts';
-import { DEFAULT_ENGINE, isEngine } from '../shared/engines.mjs';
-import { routedPatch, PICKED_WHY } from '../shared/auto-route.mjs';
+import { DEFAULT_ENGINE, isEngine } from '../shared/engines.mts';
+import { routedPatch, PICKED_WHY } from '../shared/auto-route.mts';
 import * as agents from './agents.mts';
 import { findAgentFolders, readAgentFiles, readFolderAgents } from './agent-files.mts';
 import { readCodexThreadsOffThread } from './codex-threads.mts';
@@ -74,20 +74,20 @@ import { checkProjectFolder, chooserStartsIn } from '../shared/project-folder-ch
 import { openFreshUser } from './fresh-user.mts';
 import { openDemo } from './demo.mts';
 import { AgentSchedule } from './agent-schedule.mts';
-import { agentKey } from '../shared/agents.mjs';
-import { machineryPath } from './store/home.mjs';
+import { agentKey } from '../shared/agents.mts';
+import { machineryPath } from './store/home.mts';
 import { EVENT_NAMES } from '../shared/analytics-events.mts';
-import { appFinder } from './everything-found.mjs';
-import { appFilesPlace } from './files-place.mjs';
+import { appFinder } from './everything-found.mts';
+import { appFilesPlace } from './files-place.mts';
 import { Name } from '../shared/product-name.mjs';
-import { handedOnByReply, isGivenTask } from '../shared/team-rules.mjs';
+import { handedOnByReply, isGivenTask } from '../shared/team-rules.mts';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mts';
-import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mjs';
-import { traceAnswer } from '../shared/trace-delta.mjs';
+import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mts';
+import { traceAnswer } from '../shared/trace-delta.mts';
 import { saveAttachments } from './save-attachments.mts';
 import { stageAttachment, stageAttachmentPart } from './stage-attachment.mts';
 import type { StagedPart } from './stage-attachment.mts';
-import { readRunTraces } from './run-traces.mjs';
+import { readRunTraces } from './run-traces.mts';
 import type { AnswerInput, ComposeInput, Store, StoreConfig } from './store.mts';
 import type { Supervisor, SupervisorConfig } from './supervisor.mts';
 import type { SettingsConfig } from './settings.mts';
@@ -324,7 +324,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // and is told directly: a worker that can write into the store root could
   // otherwise write itself an approval, and on this engine there is a channel
   // that cannot be forged, so that is the one its decision travels down
-  // (main/codex-approvals.mjs). The file is still written either way, because
+  // (main/codex-approvals.mts). The file is still written either way, because
   // it is what takes the card out of `listPending` and what the audit line is
   // made of.
   //
@@ -638,7 +638,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
 
   // `ask.since` names the last answer the screen holds, and the threads that
-  // did not change since are left out (shared/snapshot-delta.mjs).
+  // did not change since are left out (shared/snapshot-delta.mts).
   const snapshots = snapshotSender();
   ipcMain.handle('zero:snapshot', (_e, ask?: { since?: string; open?: { id?: string; product?: string } | null }) => {
     const now = Date.now();
@@ -822,7 +822,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // Her replies from Agentbox ride in beside the transcript for the same
       // reason the card needs them: they are not IN the transcript as hers.
       // The key is DERIVED here rather than sent, because what identifies an
-      // agent is a rule with one copy of it (shared/agents.mjs) and the
+      // agent is a rule with one copy of it (shared/agents.mts) and the
       // renderer already hands over both halves it needs.
       const key = agentKey({ sessionId: payload?.sessionId as string | undefined, pid: Number(payload?.pid), startedAt: payload?.startedAt });
       return await agents.conversation({ ...(payload ?? {}), spoke: agentSchedule.spoke(key) });
@@ -876,7 +876,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     if (id && status === 'done') supervisor.setThreadPins({ [id]: null });
     // A REPLY IN A THREAD (w-920461cbe6) only means something in a conversation
     // between people, which is the only place a thread is drawn and the only
-    // record the mark crosses to a teammate in (shared/team-rules.mjs). Anywhere
+    // record the mark crosses to a teammate in (shared/team-rules.mts). Anywhere
     // else it is dropped and the words go in as an ordinary reply.
     const thread = typeof inReplyTo === 'string' && inReplyTo && productOf(product)?.team?.direct ? inReplyTo : undefined;
     // A CODEX CONVERSATION'S YES OR NO NEVER REACHES A WORKER. The row asking
@@ -904,7 +904,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       }
     }
     // ARCHIVING ENDS THE WORK, not just the row. Her archive now outranks
-    // anything a straggler writes (shared/work-items.mjs, authorityOf), but a
+    // anything a straggler writes (shared/work-items.mts, authorityOf), but a
     // worker left running on work she has ended is still burning her plan on
     // it, so it stops here rather than being merely overruled.
     if (status === 'done') supervisor.stopSession(id);
@@ -915,7 +915,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // take the task. `answerItem` writes both, and it writes the model first.
     // A REPLY SET FOR LATER is these words with the row set for its time. The
     // time goes in after the words, so it is newer than them: a word said after
-    // a thread's moment runs now (shared/answers.mjs wordWaits), and this one
+    // a thread's moment runs now (shared/answers.mts wordWaits), and this one
     // must wait. Both writes are one synchronous step, so no pass reads between.
     const later = Number(runAt) > Date.now() && status !== 'done';
     const out = await submitReply(supervisor,{product,id,answer,status,permissionMode,now:!!now,later},()=>{
@@ -925,7 +925,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     });
     // A REPLY ON A ROW A TEAMMATE GAVE YOU HANDS IT BACK TO THEM, so the
     // conversation moves to their inbox instead of sitting in both
-    // (shared/team-rules.mjs handedOnByReply). Archiving hands nothing on.
+    // (shared/team-rules.mts handedOnByReply). Archiving hands nothing on.
     if (team && status !== 'done' && typeof answer === 'string' && answer.trim()) handOnByReply(product, id);
     // THAT the user replied and THAT something finished. Never a word of either:
     // in Agentbox the answer IS the prompt (privacy page, section 4).
@@ -951,7 +951,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
 
   // A THREAD DRAGGED TO A PLACE OF ITS OWN in the list (w-6e5b532a95): the
-  // places the drop worked out (`dropPlaces`, shared/rank.mjs), id to number.
+  // places the drop worked out (`dropPlaces`, shared/rank.mts), id to number.
   ipcMain.handle('zero:set-thread-places', (_e, { places }: { places: Record<string, number | null> }) => {
     supervisor.setThreadPlaces(places);
     push();
@@ -1201,7 +1201,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // PUT A REACTION ON ONE MESSAGE, OR TAKE YOURS BACK (w-560647d4db). Only in a
   // conversation between people, because a chip is only ever drawn in one: the
   // sync carries a reaction across in a message record and nowhere else
-  // (shared/team-rules.mjs), so one written anywhere else would sit on this Mac
+  // (shared/team-rules.mts), so one written anywhere else would sit on this Mac
   // alone and look to its author like it had reached somebody.
   ipcMain.handle('zero:team-react', teamCall(async ({ product, id, on, emoji, off }: { product: string; id: string; on: string; emoji: string; off?: boolean }) => {
     const me = teamMe();
@@ -1311,7 +1311,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
 
   // HER PICK OF WHO TAKES A THREAD: the answer when Auto asked, or giving one
-  // to someone else after (shared/auto-route.mjs). `to` is 'agent' or one of
+  // to someone else after (shared/auto-route.mts). `to` is 'agent' or one of
   // her teammates as 'mate:<id>'; anyone else is refused rather than written.
   ipcMain.handle('zero:route-thread', (_e, { product, id, to }: { product: string; id: string; to: string }) => {
     const item = store.readItem(product, id);
@@ -1420,7 +1420,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // back.
   //
   // The KEY comes from the agent, never from the row id: `agent:<pid>` is what
-  // the list draws with and a pid is not an identity (shared/agents.mjs).
+  // the list draws with and a pid is not an identity (shared/agents.mts).
   ipcMain.handle('zero:schedule-agent', (_e, { key, runAt }: { key?: unknown; runAt: number }) => {
     const set = agentSchedule.set(String(key ?? ''), runAt);
     push();
@@ -1450,7 +1450,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // engine she was never shown, and `modelOffered` refuses the model of an
   // engine that was just refused. Both were absent here because neither field
   // reached this handler at all: the whole pair was dropped four times over on
-  // the way from her card (main/repeats.mjs says where).
+  // the way from her card (main/repeats.mts says where).
   ipcMain.handle('zero:compose-repeat', (_e, { product, title, body, priority, rule, engine, model, startsNext }: { product: string; startsNext?: boolean; title: string; body?: string; priority?: number; rule: { every: string; at: string; on?: number }; engine?: unknown; model?: string }) => {
     const made = store.composeRepeat(product, {
       title,
@@ -1468,7 +1468,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // THE ONE HANDLER THAT TAKES A FREE-FORM PATCH, so it is the one that has to
   // gate the two new fields by hand. `patchRule` appends whatever it is given
-  // and the fold now carries `engine` and `model` (shared/repeats.mjs), so
+  // and the fold now carries `engine` and `model` (shared/repeats.mts), so
   // without this the renderer could mark a rule for Codex without ever passing
   // `engineOffered` -- the capability gate, bypassed by the edit screen. A patch
   // that names neither is forwarded exactly as it arrived.
@@ -2432,7 +2432,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // mode 'resolve' returns the found path without opening it, so the renderer
   // can render hrefs that are true (Copy Link must hand out a URL that works).
   //
-  // EVERY GUESS STAYS INSIDE THE CARD'S OWN PRODUCT (main/artifact-path.mjs).
+  // EVERY GUESS STAYS INSIDE THE CARD'S OWN PRODUCT (main/artifact-path.mts).
   // It used to fall through to every other product's folders, which is how nine
   // of eleven chips on one card opened two other products' files (her answer,
   // 2026-08-19). When it finds nothing it now hands back a sentence she can
@@ -2440,7 +2440,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // A teammate's shared thread keeps its copied files in a folder of its own.
   // Reading goes through this list and writing does not, so they stay read-only.
   const readableProducts = () => [...store.listProducts(), ...(team?.sharedThreadProducts?.() ?? [])];
-  // WHAT A QUERY FINDS INSIDE THREADS (main/everything-found.mjs): made on the
+  // WHAT A QUERY FINDS INSIDE THREADS (main/everything-found.mts): made on the
   // first ask, read ahead when the search opens.
   let finder: ReturnType<typeof appFinder> | null = null;
   const finderNow = () => (finder ??= appFinder({ store, team, readableProducts, accountRoot: config.accountRoot, storeRoot: config.storeRoot }));
@@ -2618,7 +2618,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return { ...readDoc({ file: found.path }), ...(found.carry ? { carry: found.carry } : {}) };
   });
 
-  // A LINK ANYONE CAN OPEN, to one of this person's files (main/file-link.mjs).
+  // A LINK ANYONE CAN OPEN, to one of this person's files (main/file-link.mts).
   // One link per file of a thread, whichever of its versions is on screen.
   type LinkArg = { product?: string; thread?: unknown; src?: unknown; token?: unknown; text?: unknown };
   const linkOf = ({ product, thread, src }: LinkArg = {}) => linkSource(product, thread, familyKeyOf(String(src ?? '')));
@@ -2740,8 +2740,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // The trace: what each session on this item actually did, from the logs the
   // supervisor persists under <product>/sessions/<item-id>/. Read-only.
   // `whole` is a thread's middle being asked for: every log, whole, once
-  // (main/run-traces.mjs). Otherwise the newest, and `have` holds the stamps
-  // of the logs the screen already has (shared/trace-delta.mjs).
+  // (main/run-traces.mts). Otherwise the newest, and `have` holds the stamps
+  // of the logs the screen already has (shared/trace-delta.mts).
   ipcMain.handle('zero:session-trace', async (_e, { product, id, have, whole }: { product: string; id: string; have?: Record<string, string>; whole?: boolean } = {} as { product: string; id: string }) => {
     const fs = await import('node:fs');
     const path = await import('node:path');

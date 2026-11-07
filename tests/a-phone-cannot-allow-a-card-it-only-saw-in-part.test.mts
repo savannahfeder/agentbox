@@ -20,8 +20,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { phoneApproval, checkCommand } from '../shared/phone-snapshot.mjs';
-import { cardShown, cardStillShown, listPending, spoolDir } from '../main/approvals.mjs';
+import { phoneApproval, checkCommand } from '../shared/phone-snapshot.mts';
+import { cardShown, cardStillShown, listPending, spoolDir } from '../main/approvals.mts';
 
 const HOME = '/Users/someone';
 const KEY = 'sk-ant-oat01-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789'; // a made-up key, to prove it is hidden. public-check: allow

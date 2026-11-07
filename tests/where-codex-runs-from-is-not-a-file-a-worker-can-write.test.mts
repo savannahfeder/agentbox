@@ -1,6 +1,6 @@
 // WHERE CODEX RUNS FROM IS NOT A FILE A WORKER CAN WRITE.
 //
-// `main/config.mjs` spreads `zero.config.json` verbatim -- unknown keys are
+// `main/config.mts` spreads `zero.config.json` verbatim -- unknown keys are
 // kept on purpose, so a setting nobody has taught the app about still survives
 // a round trip. That is right for settings and wrong for a PATH THAT GETS
 // SPAWNED, and `codexBin` was landing on `config` by exactly that route:
@@ -13,7 +13,7 @@
 // with no finder, no existence check and no `configured` split, while
 // `claudeBin` -- the older, better-guarded twin two lines above it -- goes
 // through `resolveClaudeBin` and keeps what she SET apart from what we FOUND.
-// `main/codex-bin.mjs` is that finder, it has been written and tested since the
+// `main/codex-bin.mts` is that finder, it has been written and tested since the
 // slice before this one, and it was imported by nothing.
 //
 // THE POINT IS NOT THAT THE CHECK STOPS AN ATTACKER. A worker that can write
@@ -34,7 +34,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadConfig } from '../main/config.mjs';
+import { loadConfig } from '../main/config.mts';
 
 const dirs = [];
 afterAll(() => { for (const d of dirs) { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } } });
@@ -109,10 +109,10 @@ describe('the codex path the app would spawn', () => {
 });
 
 describe('the finder that was written and then imported by nothing', () => {
-  const source = fs.readFileSync(new URL('../main/codex-bin.mjs', import.meta.url), 'utf8');
+  const source = fs.readFileSync(new URL('../main/codex-bin.mts', import.meta.url), 'utf8');
 
   it('is imported by the config that spawns it', () => {
-    const config = fs.readFileSync(new URL('../main/config.mjs', import.meta.url), 'utf8');
+    const config = fs.readFileSync(new URL('../main/config.mts', import.meta.url), 'utf8');
     expect(config).toMatch(/resolveCodexBin/);
   });
 

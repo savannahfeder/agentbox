@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CODEX_OWN, DEFAULT_MODEL, engineModelPicked } from '../renderer/src/models.ts';
-import { DEFAULT_ENGINE } from '../shared/engines.mjs';
+import { DEFAULT_ENGINE } from '../shared/engines.mts';
 import { setModelArg } from '../main/settings.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

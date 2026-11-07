@@ -5,7 +5,7 @@
 // marked High and two marked Medium waited.
 //
 // The fleet was not out of order. The screen was. The fleet ranks every row by
-// `itemPriority` (shared/rank.mjs), which counts a level an agent wrote for
+// `itemPriority` (shared/rank.mts), which counts a level an agent wrote for
 // nothing and reads a row nobody tagged (0) as Medium. The list, the board,
 // the summary, the reply box and the filters all drew the raw stored number
 // instead, through `priorityIdOf`, which reads 0 as Low and an agent's 8 as
@@ -27,8 +27,8 @@
 // message sorter's (main/message-priority.mts), written as an agent on
 // purpose, and a conversation never spawns, so it keeps the number it carries.
 import { describe, it, expect } from 'vitest';
-import { isUrgent, itemPriority, shownPriority } from '../shared/rank.mjs';
-import { cardsFor } from '../shared/thread-cards.mjs';
+import { isUrgent, itemPriority, shownPriority } from '../shared/rank.mts';
+import { cardsFor } from '../shared/thread-cards.mts';
 import { keeps, rankScore, sorted, teamEntries } from '../renderer/src/threads/page-rules.ts';
 import { filterBox, filterMenu } from '../renderer/src/box-filter.ts';
 import { priorityCommands, priorityIdOf } from '../renderer/src/priority.ts';

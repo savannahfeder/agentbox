@@ -3,7 +3,7 @@
 // holds what each rule is for.
 
 import { checkProjectFolder } from '../../shared/project-folder-check.mts';
-import { repeatLabel, type RepeatShape } from '../../shared/repeats.mjs';
+import { repeatLabel, type RepeatShape } from '../../shared/repeats.mts';
 import { projectNameFor } from './agent-import-card';
 
 export type Screen = 'welcome' | 'chats';

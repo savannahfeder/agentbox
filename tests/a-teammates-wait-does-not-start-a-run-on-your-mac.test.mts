@@ -7,7 +7,7 @@
 // writer, i.e. your own agent or solo) does.
 import { describe, it, expect, afterEach } from 'vitest';
 import { Supervisor } from '../main/supervisor.mts';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 
 const ME = 'p-me';
 const prev = process.env.AGENTBOX_PERSON_ID;

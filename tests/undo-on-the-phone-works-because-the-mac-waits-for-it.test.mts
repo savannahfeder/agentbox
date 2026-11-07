@@ -5,14 +5,14 @@
 // looked every five seconds and claimed on sight, while the Undo stayed up for
 // six. So Undo lost the race most of the time and read "Your computer already
 // has it". Now the Mac leaves anything Undo can take back alone for eight
-// seconds (shared/phone-undo.mjs), and takes it on the first pass after.
+// seconds (shared/phone-undo.mts), and takes it on the first pass after.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createPhoneInbox } from '../main/phone-inbox.mts';
-import { heldForUndo, PHONE_UNDO_HOLD_MS, PHONE_UNDO_MS } from '../shared/phone-undo.mjs';
+import { heldForUndo, PHONE_UNDO_HOLD_MS, PHONE_UNDO_MS } from '../shared/phone-undo.mts';
 import { TOAST_GOES_MS } from '../mobile/src/lib/overlays';
 
 const T0 = Date.parse('2026-10-29T12:00:00Z');

@@ -9,8 +9,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { startStandinCloud, pack, unpack } from '../cloud/standin/server.mjs';
-import { standinSession } from '../main/team/standin-backend.mjs';
-import { supabaseSession } from '../main/team/session.mjs';
+import { standinSession } from '../main/team/standin-backend.mts';
+import { supabaseSession } from '../main/team/session.mts';
 
 const stops = [];
 afterEach(async () => { while (stops.length) await stops.pop()(); });

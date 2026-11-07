@@ -19,9 +19,9 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadConfig, saveConfig } from '../main/config.mjs';
+import { loadConfig, saveConfig } from '../main/config.mts';
 import { outsideAgentsMode } from '../main/settings.mts';
-import { listed, onTheRail, reachesInbox } from '../shared/agents.mjs';
+import { listed, onTheRail, reachesInbox } from '../shared/agents.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 let dir;

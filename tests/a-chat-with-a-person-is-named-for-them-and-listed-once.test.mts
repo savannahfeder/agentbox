@@ -15,7 +15,7 @@ import { groupChoices } from '../renderer/src/team/rooms/GroupList.tsx';
 import { directConversations } from '../renderer/src/team/rooms/conversations.ts';
 import { conversationName } from '../renderer/src/threads/page-rules.ts';
 import { replyName } from '../renderer/src/reply-keys.ts';
-import { nameIsAPersons, teamPeopleShown } from '../shared/team-rules.mjs';
+import { nameIsAPersons, teamPeopleShown } from '../shared/team-rules.mts';
 
 const chat = (key, people, at, name = 'x') => ({ key, kind: key.startsWith('room') ? 'group' : 'direct', id: key, name, people, faces: people.map((p) => ({ name: p, url: null })), last: '', at, unread: false });
 

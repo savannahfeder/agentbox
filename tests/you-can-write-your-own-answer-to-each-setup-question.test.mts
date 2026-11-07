@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { answerTo, answersMessage, questionOf } from '../renderer/src/teammates/chat-lines.ts';
-import { appHome } from '../main/store/home.mjs';
+import { appHome } from '../main/store/home.mts';
 import { Teammates } from '../main/teammates.mts';
 
 const ADA = 't-aaaaaaaaaa';

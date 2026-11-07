@@ -1,6 +1,6 @@
 // THE CLOUD THROUGH OUR SERVER, FOR A MAC WITH NO AWS ACCOUNT OF ITS OWN.
 //
-// The same two interfaces as main/cloud/aws.mjs (the session and the bucket),
+// The same two interfaces as main/cloud/aws.mts (the session and the bucket),
 // spoken to the cloud server (cloud/gateway/) with this Mac's cloud key. Files
 // go straight to and from the bucket on links the server signs; the server
 // only ever sees names. A sign-in is never read from here: a link to one is
@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { LOGIN_NAME } from '../../shared/cloud-login-name.mjs';
+import { LOGIN_NAME } from '../../shared/cloud-login-name.mts';
 
 export { LOGIN_NAME };
 

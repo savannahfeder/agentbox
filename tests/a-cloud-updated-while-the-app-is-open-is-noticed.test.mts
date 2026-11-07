@@ -12,7 +12,7 @@
 // The case that must not change: a cloud still old is not asked again before
 // the minute.
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { roomsSupabase } from '../main/team/rooms-supabase.mjs';
+import { roomsSupabase } from '../main/team/rooms-supabase.mts';
 
 const NEW = ['edited_at', 'deleted_at'];
 const row = { id: 'm1', room_id: 'r1', by_person: 'p1', body: 'hi', in_reply_to: null, mentions: [], created_at: '2026-10-21T10:00:00Z' };

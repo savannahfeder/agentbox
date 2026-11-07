@@ -17,7 +17,7 @@
 // whole point, and they stay free to use the character as much as they like.
 //
 // 2026-10-31: the search fold table moved from renderer/src/search.ts to
-// shared/word-match.mjs, and shared/thread-title.mjs cuts a title at a dash,
+// shared/word-match.mts, and shared/thread-title.mts cuts a title at a dash,
 // so both are named in ALLOWED as strippers.
 
 import { describe, it, expect } from 'vitest';
@@ -75,39 +75,39 @@ const ALLOWED = [
       + 'not a word.',
   },
   {
-    file: 'shared/teammates.mjs',
+    file: 'shared/teammates.mts',
     fragment: 'const rest = words.slice',
     why: "partFor, which trims the punctuation between a teammate's @name and "
       + 'what was asked of it, so the run title starts on the words. '
       + 'A dash is one of the marks it removes.',
   },
   {
-    file: 'shared/word-match.mjs',
+    file: 'shared/word-match.mts',
     fragment: "'—': '-'",
     why: "The fold table, so a search for a hyphen still finds a row somebody "
       + 'else typed with a dash in it. Removing this would make search worse, '
       + 'not cleaner.',
   },
   {
-    file: 'shared/word-match.mjs',
+    file: 'shared/word-match.mts',
     fragment: 'toLowerCase',
     why: 'The character class the fold table is applied through. Same reason.',
   },
   {
-    file: 'shared/thread-title.mjs',
+    file: 'shared/thread-title.mts',
     fragment: 't = t.split(',
     why: 'shortTitle, which ends a fallback title at the first clause; a dash '
       + 'between words is one of the marks a clause ends on, and is cut off.',
   },
   {
-    file: 'shared/cloud-keys.mjs',
+    file: 'shared/cloud-keys.mts',
     fragment: 'const ASK_LINE',
     why: "The line a cloud run asks for a key on. The dash is in the class of "
       + "marks allowed between the key's name and what it is for, so that an "
       + 'agent that wrote one does not end up with it inside the field label.',
   },
   {
-    file: 'shared/cloud-needs.mjs',
+    file: 'shared/cloud-needs.mts',
     fragment: 'const tidy',
     why: 'tidy, which takes the punctuation off the front of what a need says '
       + 'it is for. A dash is one of the marks it removes.',
@@ -116,7 +116,7 @@ const ALLOWED = [
     file: 'renderer/src/format.ts',
     fragment: 'AGENTBOX-NEEDS-A-KEY',
     why: 'flatten, which rewrites that marked line as the words it asks for. '
-      + 'Same class of marks as the pattern in shared/cloud-keys.mjs, matched '
+      + 'Same class of marks as the pattern in shared/cloud-keys.mts, matched '
       + 'here so the dash never reaches the row.',
   },
 ];
@@ -144,7 +144,7 @@ function files(dir) {
  * three regexes named in ALLOWED, and that is a small enough set to read.
  *
  * The first cut of this file DID try to track string state, and it was wrong
- * within an hour. A template literal in `shared/agents.mjs:564` interpolates a
+ * within an hour. A template literal in `shared/agents.mts:564` interpolates a
  * `join(', ')` inside `${}`, the tracker went out of step on the quotes inside
  * the braces, and eleven COMMENT lines further down that file were reported as
  * text she could see. Doing less is what makes this trustworthy.

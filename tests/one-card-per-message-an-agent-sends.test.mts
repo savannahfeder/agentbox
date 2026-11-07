@@ -12,9 +12,9 @@
 // Measured on two copies over the memory cloud, the way the app's tick runs.
 import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { teamTell } from '../mcp/core/reach.mjs';
-import { REACH_LABEL, UNDO_HOLD_MS, reachAudienceOf } from '../shared/teammate-reach.mjs';
-import { isTaskRow } from '../shared/team-rules.mjs';
+import { teamTell } from '../mcp/core/reach.mts';
+import { REACH_LABEL, UNDO_HOLD_MS, reachAudienceOf } from '../shared/teammate-reach.mts';
+import { isTaskRow } from '../shared/team-rules.mts';
 import { sendingWords } from '../renderer/src/team/agent-sending.ts';
 
 let t; let chief; let run;
@@ -61,7 +61,7 @@ describe('the card the owner answers', () => {
   });
 
   it('says a task goes as a task', async () => {
-    const { teamTask } = await import('../mcp/core/reach.mjs');
+    const { teamTask } = await import('../mcp/core/reach.mts');
     teamTask({ to: 'Dev', title: 'Turn on the booking API', details: 'Staging first.' });
     await t.tick();
     expect(askRows()[0].body).toBe('A task for Dev Patel, in your messages with them.');

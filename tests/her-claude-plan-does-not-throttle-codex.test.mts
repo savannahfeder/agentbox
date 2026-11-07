@@ -1,10 +1,10 @@
 // A SENTENCE ABOUT THE WRONG SUBSCRIPTION, AND A CAP TO MATCH IT.
 //
-// `readPlans`/`slotsForPlans` (main/claude-plan.mjs) read
+// `readPlans`/`slotsForPlans` (main/claude-plan.mts) read
 // `oauthAccount.organizationRateLimitTier` out of Claude Code's own
 // `.claude.json` and, when nobody has set a number, lower
 // `config.maxConcurrentSessions` to one for a plan that is not Max. That is
-// right, and main/claude-plan.mjs is correctly Claude-only.
+// right, and main/claude-plan.mts is correctly Claude-only.
 //
 // WHAT WAS WRONG IS WHERE THE ANSWER WAS APPLIED.
 //
@@ -42,7 +42,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Supervisor } from '../main/supervisor.mts';
-import { DEFAULT_SESSIONS_AT_ONCE } from '../main/config.mjs';
+import { DEFAULT_SESSIONS_AT_ONCE } from '../main/config.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -69,9 +69,9 @@ const sup = (extra = {}) => new Supervisor(
 
 // THE NUMBER THE APP HAS ALWAYS USED WHEN NOBODY HAS SAID, read from the one
 // place that defines it rather than typed here. A literal would be a second
-// copy that could drift from main/config.mjs without a word.
+// copy that could drift from main/config.mts without a word.
 describe('the default this file rests on', () => {
-  it('is the one main/config.mjs defines', () => {
+  it('is the one main/config.mts defines', () => {
     expect(DEFAULT_SESSIONS_AT_ONCE).toBe(3);
   });
 });

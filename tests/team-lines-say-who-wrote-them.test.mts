@@ -14,7 +14,7 @@
 // 2026-09-30: true for every field written at distinct times, which is what
 // these tests pin.
 import { it, expect, describe } from 'vitest';
-import { foldWorkItems, normalizeLine, buildLine } from '../shared/work-items.mjs';
+import { foldWorkItems, normalizeLine, buildLine } from '../shared/work-items.mts';
 
 const maya = 'p-maya';
 const theo = 'p-theo';

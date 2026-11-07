@@ -48,7 +48,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { EnginePicker } from '../renderer/src/components/EnginePicker.tsx';
-import { ENGINES } from '../shared/engines.mjs';
+import { ENGINES } from '../shared/engines.mts';
 import { codexModels as readCodexModels } from '../main/codex-models.mts';
 import { engineModelChoices } from '../renderer/src/models.ts';
 import {
@@ -133,7 +133,7 @@ describe('?engines=missing is the Mac the connection card was built for', () => 
 });
 
 describe('?engines=claude is the Mac the moment she opens the gate', () => {
-  it('offers both agents, in the order shared/engines.mjs draws them', async () => {
+  it('offers both agents, in the order shared/engines.mts draws them', async () => {
     const api = await apiAt('?fixtures&engines=claude');
     const snap = await api.snapshot();
     expect(snap.engines.choices).toEqual(ENGINES);
@@ -266,8 +266,8 @@ describe('the two worlds compose with the worlds that already existed', () => {
 });
 
 describe('the words are read off the app rather than typed here twice', () => {
-  it('takes the engine ids and labels from shared/engines.mjs', () => {
-    expect(source('renderer/src/fixtures.ts')).toContain("from '../../shared/engines.mjs'");
+  it('takes the engine ids and labels from shared/engines.mts', () => {
+    expect(source('renderer/src/fixtures.ts')).toContain("from '../../shared/engines.mts'");
   });
 
   // The models are the shapes main/codex-models.mts really produces: the six
@@ -296,10 +296,10 @@ describe('the words are read off the app rather than typed here twice', () => {
   // The install link is the one the button really opens. It is typed into
   // fixtures.ts rather than imported, because the renderer never imports from
   // main/, so this is what holds the two in step. The link has moved once
-  // already (main/codex-bin.mjs: developers.openai.com answers 308 now), and a
+  // already (main/codex-bin.mts: developers.openai.com answers 308 now), and a
   // fixture pointing at a redirect is a screenshot of a link she cannot trust.
   it('sends the card at the install link main really hands over', async () => {
-    const { INSTALL_URL } = await import('../main/codex-bin.mjs');
+    const { INSTALL_URL } = await import('../main/codex-bin.mts');
     const api = await apiAt('?fixtures&engines=missing');
     expect((await api.settings()).workspace.codex.url).toBe(INSTALL_URL);
   });

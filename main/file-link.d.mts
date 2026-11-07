@@ -1,4 +1,4 @@
-// Types for main/file-link.mjs.
+// Types for main/file-link.mts.
 type LinkFs = Pick<typeof import('node:fs'), 'readFileSync' | 'realpathSync'>;
 
 export type LinkKind = 'markdown' | 'page' | 'image' | 'pdf';

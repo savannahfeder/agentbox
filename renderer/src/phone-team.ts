@@ -1,7 +1,7 @@
 // THE TEAM PAGE FROM A PHONE, straight to the account with no computer between.
 // The database decides who may rename, remove and cancel
 // (20261001000600_team_settings.sql), as it does for the Mac
-// (main/team/supabase-backend.mjs), so these only ask.
+// (main/team/supabase-backend.mts), so these only ask.
 import type { cloudClient } from './cloud-rest';
 
 type Rest = Pick<ReturnType<typeof cloudClient>, 'session' | 'select' | 'insert' | 'remove' | 'rpc'>;

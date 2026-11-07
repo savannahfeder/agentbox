@@ -1,11 +1,11 @@
 // A CODEX WORKER'S GATED COMMAND REACHES THE SAME CARD A CLAUDE ONE DOES.
 //
-// main/codex-app-server.mjs already turns a server request into a callback
+// main/codex-app-server.mts already turns a server request into a callback
 // that waits for her and denies on every failure path. It was
 // written with nobody on the other end of that callback, and said so: "the
 // slice that builds the card is the slice that passes a handler". This is that
 // slice, and the handler is joined to the spool Agentbox already has
-// (main/approvals.mjs, main/approval-prompt-server.mts) rather than to a
+// (main/approvals.mts, main/approval-prompt-server.mts) rather than to a
 // second one: `{id, at, product, item, tool, input}`, one file per request,
 // and `renderer/src/App.tsx` draws the `<pre>` off `input` without knowing or
 // caring which engine asked.
@@ -47,14 +47,14 @@
 // off disk -- a forged answer is not a weaker approval, it is not an approval.
 // The residue is honest and stated in the tests below: a forged file makes the
 // card blink out of `listPending` until the next poll deletes it, because
-// `listPending` is main/approvals.mjs's rule and this slice does not change it.
+// `listPending` is main/approvals.mts's rule and this slice does not change it.
 
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createCodexApprovals, codexApprovalCard } from '../main/codex-approvals.mjs';
-import { listPending, answer, spoolDir } from '../main/approvals.mjs';
+import { createCodexApprovals, codexApprovalCard } from '../main/codex-approvals.mts';
+import { listPending, answer, spoolDir } from '../main/approvals.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 const dirs = [];
@@ -184,7 +184,7 @@ describe('an approval that reaches the spool', () => {
     spool.settle('card-1', false, 'not that one');
 
     // `decline` and not `cancel`: a refusal should cost the command, not the
-    // work item (main/codex-app-server.mjs, REFUSAL_DECISION).
+    // work item (main/codex-app-server.mts, REFUSAL_DECISION).
     await expect(asked).resolves.toBe('decline');
   });
 
@@ -329,7 +329,7 @@ describe('a worker that writes its own answer file', () => {
   //
   // It read: "between the forged write and the poll that deletes it,
   // `listPending` hides the card, because that rule belongs to
-  // main/approvals.mjs and is shared with the Claude path." True at the time,
+  // main/approvals.mts and is shared with the Claude path." True at the time,
   // and worse than it sounded -- a worker rewriting the forgery on a loop keeps
   // ANY card, its own or another worker's, off her screen for as long as the
   // worker it belongs to stays parked on it.

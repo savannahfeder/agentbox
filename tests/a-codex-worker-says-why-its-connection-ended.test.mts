@@ -6,14 +6,14 @@
 // A frame past MAX_FRAME_LENGTH ends the connection on our side, so Codex's
 // tracing has nothing about it, and every Codex task on the login stopped with
 // no word in its trace of why. The client already words the reason (`cause`
-// in main/codex-app-server.mjs); it never reached the worker.
+// in main/codex-app-server.mts); it never reached the worker.
 //
 // The reason goes first and the tracing last, because the account books read
 // the last stderr line for a cause, and Codex's own words (a 401, a limit) are
 // the ones that can name one.
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { createCodexAppServer } from '../main/codex-app-server.mjs';
+import { createCodexAppServer } from '../main/codex-app-server.mts';
 import { createCodexWorker } from '../main/codex-session.mts';
 import { troubleCause } from '../shared/spawn-trouble.mts';
 

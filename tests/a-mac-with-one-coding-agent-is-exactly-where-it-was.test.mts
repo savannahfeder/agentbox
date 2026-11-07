@@ -32,7 +32,7 @@ import {
   DEFAULT_ENGINE, ENGINE_CHOICE_ENABLED,
   engineChoiceSince, engineChoiceOnRowIsStale, engineDefaultIsStale,
   engineFor, isEngine, modelForEngine,
-} from '../shared/engines.mjs';
+} from '../shared/engines.mts';
 
 /* ------------------------- the rules as they were ------------------------ */
 // Copied from the 2026-09-04 source, not paraphrased.
@@ -139,7 +139,7 @@ describe('a Mac with no Codex and a shut gate', () => {
 // AND THE SAME MAC WITH THE GATE OPEN AND NO BINARY, which is the other shape
 // this constraint covers: she opened the gate on her laptop and is reading the
 // same store here. The routing is unchanged there too -- `engineFor` still falls
-// back and RUNS, which is the behaviour shared/engines.mjs is explicit about
+// back and RUNS, which is the behaviour shared/engines.mts is explicit about
 // keeping.
 describe('a Mac with no Codex where the gate has been opened', () => {
   const OPEN = { enabled: ENGINE_CHOICE_ENABLED };

@@ -27,7 +27,7 @@
 //   ONCE. A row interrupts once, ever. She came back to the task she was on
 //   because she chose to; putting her back on the urgent row a second time
 //   would be the app arguing with her.
-import { itemPriority, URGENT_PRIORITY } from '../../shared/rank.mjs';
+import { itemPriority, URGENT_PRIORITY } from '../../shared/rank.mts';
 import type { WorkItem } from './types';
 
 export function isUrgentRow(item: WorkItem | null | undefined): boolean {

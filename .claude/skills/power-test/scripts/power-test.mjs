@@ -51,7 +51,7 @@ const BROWSE = path.join(VERIFY, 'browse.mjs');
 const DIARY = path.join(here, 'diary.mjs');
 const { cleanEnv, RUNS, REPO, instanceDir } = await import(LIVE);
 const { machinery } = await import(path.join(VERIFY, 'drives.mjs'));
-const { findClaudeBin } = await import(path.join(REPO, 'main', 'claude-bin.mjs'));
+const { findClaudeBin } = await import(path.join(REPO, 'main', 'claude-bin.mts'));
 
 const MIN = 60_000;
 const args = process.argv.slice(2);

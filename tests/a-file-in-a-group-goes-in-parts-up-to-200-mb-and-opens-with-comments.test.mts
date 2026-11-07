@@ -17,8 +17,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
-import { ROOM_PART_BYTES, ROOM_MAX_BYTES, partName, partsOf, readPartList, partList } from '../shared/room-file-parts.mjs';
-import { marksOf } from '../shared/artifact-marks.mjs';
+import { ROOM_PART_BYTES, ROOM_MAX_BYTES, partName, partsOf, readPartList, partList } from '../shared/room-file-parts.mts';
+import { marksOf } from '../shared/artifact-marks.mts';
 
 const MB = 1024 * 1024;
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');

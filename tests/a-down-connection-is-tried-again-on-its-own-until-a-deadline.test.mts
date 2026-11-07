@@ -12,9 +12,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { startToolsFixture } from '../cloud/standin/tools-mcp.mjs';
-import { createConnections, nextTryAt, RETRY_FOR_MS, RETRY_STEPS_MS } from '../main/connections/index.mjs';
-import { recoveryProduct, recoveryRow } from '../main/connections/start.mjs';
-import { catalogFor, STATES } from '../shared/connections-catalog.mjs';
+import { createConnections, nextTryAt, RETRY_FOR_MS, RETRY_STEPS_MS } from '../main/connections/index.mts';
+import { recoveryProduct, recoveryRow } from '../main/connections/start.mts';
+import { catalogFor, STATES } from '../shared/connections-catalog.mts';
 
 const key = crypto.randomBytes(32);
 const cipher = {
@@ -214,7 +214,7 @@ describe('when it works again', () => {
   });
 
   it('is wired: the app files it with fileItem, which waits in Needs you', () => {
-    const src = fs.readFileSync(path.resolve(import.meta.dirname, '../main/connections/start.mjs'), 'utf8');
+    const src = fs.readFileSync(path.resolve(import.meta.dirname, '../main/connections/start.mts'), 'utf8');
     expect(src).toMatch(/onRecovered:[\s\S]*supervisor\.store\.fileItem\(slug, recoveryRow\(back\)\)/);
     expect(src).toMatch(/connections\.startRetrying\(\)/);
   });

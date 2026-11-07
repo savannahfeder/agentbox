@@ -15,10 +15,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadConfig, saveConfig } from '../main/config.mjs';
+import { loadConfig, saveConfig } from '../main/config.mts';
 import { outsideAgentsMode, parseSessionArgs, permissionMode, buildSessionArgs, readSettings, setModelArg, setProjectSetting, setWorkspaceSetting } from '../main/settings.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { machineSlots } from '../main/machine.mjs';
+import { machineSlots } from '../main/machine.mts';
 
 // A real supervisor over an empty store, for the one assertion that has to go
 // through the screen's own reader rather than through the config object: what

@@ -5,7 +5,7 @@
 // the moment, whoever set it. The cost, in use: Maya's message on the
 // chief of staff's thread cleared the Monday 8:30 check it was parked for, and
 // the agent could not book it again. Now the reply runs at once by itself
-// (`wordWaits`, shared/work-items.mjs, pinned in
+// (`wordWaits`, shared/work-items.mts, pinned in
 // a-message-on-a-scheduled-thread-runs-now-and-the-schedule-stays), so a reply
 // lifts only a reminder and the moment to run stays.
 

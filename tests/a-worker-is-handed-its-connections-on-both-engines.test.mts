@@ -14,13 +14,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
 import { mcpIsolation, resumeThreadParams, workerThreadParams } from '../main/codex-session.mts';
-import { createCodexApprovals } from '../main/codex-approvals.mjs';
+import { createCodexApprovals } from '../main/codex-approvals.mts';
 import { codexLineForTheCloud, KEPT_WHILE_AWAY, mcpConfigForTheCloud, servedHere, toolEnv } from '../main/cloud/run.mts';
-import { connectionServerName } from '../shared/connections-catalog.mjs';
-import { listPending } from '../main/approvals.mjs';
+import { connectionServerName } from '../shared/connections-catalog.mts';
+import { listPending } from '../main/approvals.mts';
 
 const NAME = connectionServerName('test-tracker');
-const SERVER = { command: '/app/node', args: ['/app/mcp/connection-proxy.mjs'], env: { ELECTRON_RUN_AS_NODE: '1', AGENTBOX_CONNECTION_RUN: 'run-key', AGENTBOX_CONNECTION: 'test-tracker', AGENTBOX_CONNECTIONS_SOCK: '/tmp/x.sock' } };
+const SERVER = { command: '/app/node', args: ['/app/mcp/connection-proxy.mts'], env: { ELECTRON_RUN_AS_NODE: '1', AGENTBOX_CONNECTION_RUN: 'run-key', AGENTBOX_CONNECTION: 'test-tracker', AGENTBOX_CONNECTIONS_SOCK: '/tmp/x.sock' } };
 const SERVERS = { [NAME]: SERVER };
 
 const fakeSupervisor = (over = {}) => Object.assign(Object.create(Supervisor.prototype), {
@@ -160,7 +160,7 @@ describe('a cloud run', () => {
   });
 
   it('a proxy started the way the relay starts one, with its app gone, says so', async () => {
-    const entry = { command: process.execPath, args: [path.resolve(import.meta.dirname, '../mcp/connection-proxy.mjs')], env: { ...SERVER.env, AGENTBOX_CONNECTION_NAME: 'Test tracker', AGENTBOX_CONNECTIONS_SOCK: path.join(os.tmpdir(), 'nobody-here.sock') } };
+    const entry = { command: process.execPath, args: [path.resolve(import.meta.dirname, '../mcp/connection-proxy.mts')], env: { ...SERVER.env, AGENTBOX_CONNECTION_NAME: 'Test tracker', AGENTBOX_CONNECTIONS_SOCK: path.join(os.tmpdir(), 'nobody-here.sock') } };
     const child = spawn(entry.command, entry.args, { env: toolEnv({ PATH: process.env.PATH, ...entry.env }), stdio: ['pipe', 'pipe', 'inherit'] });
     let out = '';
     child.stdout.setEncoding('utf8');

@@ -93,7 +93,7 @@ describe('errors in the app\'s log', () => {
       'zero: leftovers: could not list processes: Command failed: /bin/ps -E -ww -axo pid=',
       'zero: leftovers: could not list processes: Command failed: /bin/ps -E -ww -axo pid=',
       'TypeError: Cannot read properties of undefined (reading \'id\') at w-1a2b3c4d5e',
-      '    at fold (/x/shared/work-items.mjs:12:3)',
+      '    at fold (/x/shared/work-items.mts:12:3)',
       'TypeError: Cannot read properties of undefined (reading \'id\') at w-9f9f9f9f9f',
     ].join('\n');
     const found = errorLines(text);

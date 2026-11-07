@@ -17,8 +17,8 @@ import { describe, it, expect } from 'vitest';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { KIT_VERSION, kitKey, runOfClaim } from '../shared/cloud-kit.mjs';
-import { threadSnapshot } from '../shared/phone-snapshot.mjs';
+import { KIT_VERSION, kitKey, runOfClaim } from '../shared/cloud-kit.mts';
+import { threadSnapshot } from '../shared/phone-snapshot.mts';
 import { ANSWERED_OUTCOME } from '../cloud/gateway/phone.mjs';
 
 const A = '11111111-1111-4111-8111-111111111111';

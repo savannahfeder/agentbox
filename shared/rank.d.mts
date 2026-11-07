@@ -1,4 +1,4 @@
-// Types for shared/rank.mjs, which is plain ESM so that main (Node) and the
+// Types for shared/rank.mts, which is plain ESM so that main (Node) and the
 // renderer (Vite) can share one copy of the ranking rule.
 
 export const RANK_STEP: number;

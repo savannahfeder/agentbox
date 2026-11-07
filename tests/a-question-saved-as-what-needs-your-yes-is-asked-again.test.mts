@@ -7,7 +7,7 @@
 // the rule is missing, to ask the person in the chat and save their answer.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { yesFirst } from '../shared/teammates.mjs';
+import { yesFirst } from '../shared/teammates.mts';
 
 const Q = 'When a check turns up nothing, do you want to hear about it at all, or only when there\'s something?';
 
@@ -28,17 +28,17 @@ describe('what needs your yes first', () => {
 
 describe('a teammate that saved a question there', () => {
   it('is told in its brief to ask you in the chat and save your answer as the rule', async () => {
-    const { appHome } = await import('../main/store/home.mjs');
+    const { appHome } = await import('../main/store/home.mts');
     const { loadStore } = await import('../main/store-modules.mts');
     const { Teammates } = await import('../main/teammates.mts');
-    const { writeTeammate } = await import('../main/store/teammates-files.mjs');
+    const { writeTeammate } = await import('../main/store/teammates-files.mts');
     const path = await import('node:path');
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = `acct-${Math.random().toString(36).slice(2, 8)}`;
     fs.mkdirSync(path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     const product = createProduct(`Shop ${Math.random().toString(36).slice(2, 8)}`);
     const dir = path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID, product.id);
     const mods = await loadStore();

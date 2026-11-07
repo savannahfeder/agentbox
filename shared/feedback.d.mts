@@ -1,4 +1,4 @@
-// Types for shared/feedback.mjs, which is plain ESM so the Feedback card and
+// Types for shared/feedback.mts, which is plain ESM so the Feedback card and
 // the main process read one copy of the limits.
 
 export const FEEDBACK_LIMITS: Readonly<{ text: number; files: number; bytes: number }>;

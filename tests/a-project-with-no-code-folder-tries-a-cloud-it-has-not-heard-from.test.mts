@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { imageCaps, imageCapsToTry, noteImageCaps } from '../main/cloud/config.mjs';
+import { imageCaps, imageCapsToTry, noteImageCaps } from '../main/cloud/config.mts';
 
 const savedConfigEnv = process.env.AGENTBOX_CLOUD_CONFIG;
 let tmp; let docs; let notes; let cloudConfig; let env;

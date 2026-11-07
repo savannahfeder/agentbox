@@ -15,7 +15,7 @@
 //     from one project's ledger to another, and a menu here would have to
 //     invent that.
 //   - None of her hundreds of threads from before she joined is on the Team
-//     page (shared/thread-cards.mjs shownToTeam), but the panel still said
+//     page (shared/thread-cards.mts shownToTeam), but the panel still said
 //     "Team" on every one of them, because it read the word on disk rather
 //     than the rule. It says "Only you" now, and changing it writes 'team' or
 //     'private' through the same threadEdit path as every other field.

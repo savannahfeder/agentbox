@@ -4,7 +4,7 @@
 // Needs you, In progress, Later and Done, and no way into Groups at all. Groups
 // is an alpha feature switched on in the computer's Settings, Alpha features
 // (`alphaRooms`), and the phone learns it only from the settings copy the
-// computer sends (shared/phone-settings.mjs `alpha.rooms`). Measured with
+// computer sends (shared/phone-settings.mts `alpha.rooms`). Measured with
 // settings rows in the shape a computer sends: the tab is there after Done
 // when the newest computer says on, and not when it says off, says nothing,
 // or no computer has sent settings yet.

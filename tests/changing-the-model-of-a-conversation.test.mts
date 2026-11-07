@@ -45,7 +45,7 @@ describe('the pick lands on the row, where the next run reads it', () => {
   it("clears it back to the engine's own choice when she unpicks", () => {
     // Null from the drawer means "nothing chosen". It is stored as '' because
     // that is how "no model" is said everywhere else here: `modelForEngine`
-    // (shared/engines.mjs) reads the empty string as nothing chosen, where a
+    // (shared/engines.mts) reads the empty string as nothing chosen, where a
     // JSON null would have to be special-cased in both engines' argv builders.
     const { item } = answer({ model: 'opus' }, { answer: 'carry on', model: null });
     expect(item.model).toBe('');

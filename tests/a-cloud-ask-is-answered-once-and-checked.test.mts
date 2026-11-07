@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { NEED, needsIn, needsLeft, needsWord, threadsKeysFree } from '../shared/cloud-needs.mjs';
+import { NEED, needsIn, needsLeft, needsWord, threadsKeysFree } from '../shared/cloud-needs.mts';
 import { keyFromReply, keyLooksWrong, codeLooksWrong, keySavedWords } from '../renderer/src/key-asks.ts';
 import { plainText, searchText } from '../renderer/src/format.ts';
 
@@ -123,8 +123,8 @@ describe('a card that has been answered', async () => {
 // was kept for every cloud thread; search's lines still showed the ask line.
 describe('round seven', async () => {
   const { NeedCard, NeedPlace } = await import('../renderer/src/components/NeedCard.tsx');
-  const { messagesOf } = await import('../main/everything-found.mjs');
-  const { needId } = await import('../shared/cloud-needs.mjs');
+  const { messagesOf } = await import('../main/everything-found.mts');
+  const { needId } = await import('../shared/cloud-needs.mts');
   const needs = needsIn(`${NEED} sign-in stripe | to read the MRR\n${NEED} file ~/Movies/launch-film-original.mov | to attach it\n${NEED} code npm | to publish`);
   const base = { itemId: 'w-1', saved: [], given: [], live: true, needs, saveKeys: async () => null, sendFile: async () => null, sendCode: async () => null, onComputer: () => {}, openLink: () => {} };
   const draw = (n, o = {}) => renderToStaticMarkup(h(NeedPlace.Provider, { value: { ...base, ...o } }, h(NeedCard, { source: JSON.stringify(needs[n]), fallback: null })));

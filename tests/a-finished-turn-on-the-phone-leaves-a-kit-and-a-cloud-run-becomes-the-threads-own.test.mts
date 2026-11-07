@@ -20,7 +20,7 @@ import { Supervisor } from '../main/supervisor.mts';
 import { Store } from '../main/store.mts';
 import { readMarker, writeMarker } from '../main/cloud/marker.mts';
 import { kitCopyPath } from '../main/cloud/kit.mts';
-import { REPLY_MARK, replyPrompt, cloudSessionId } from '../shared/cloud-kit.mjs';
+import { REPLY_MARK, replyPrompt, cloudSessionId } from '../shared/cloud-kit.mts';
 
 const DEVICE = 'a1b2c3d4e5f6';
 let tmp; let store; let sup; let row; let folder; let relays; let joins;

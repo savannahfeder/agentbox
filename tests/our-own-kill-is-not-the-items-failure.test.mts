@@ -31,7 +31,7 @@ import { Supervisor } from '../main/supervisor.mts';
 
 // A MAC WITH ONE CLAUDE LOGIN ON IT. Since 2026-08-31 the fleet's account list
 // is what is signed in on the disk and not only what the config names
-// (main/account-discovery.mjs), so a Supervisor built with no `home` reads
+// (main/account-discovery.mts), so a Supervisor built with no `home` reads
 // whoever is signed in on the machine running the suite — and a developer with
 // a second subscription would silently get twice the capacity these tests are
 // about. A home with nothing in it is the machine every one of them means.

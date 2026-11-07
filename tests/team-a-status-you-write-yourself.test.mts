@@ -22,8 +22,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
-import { cleanStatus, holdEnds, holdsUntil, hasLapsed, liveStatus, STATUS_MAX } from '../shared/team-status.mjs';
+import { memorySession } from '../main/team/session.mts';
+import { cleanStatus, holdEnds, holdsUntil, hasLapsed, liveStatus, STATUS_MAX } from '../shared/team-status.mts';
 
 const DAY = 86_400_000;
 

@@ -7,7 +7,7 @@
 // leading name ("Sam, approved"), and "Thanks," looked like one, so the words
 // it tested were "v6 reads well.", which no thank-you pattern matched.
 import { it, expect, describe } from 'vitest';
-import { noteGoesTo } from '../shared/artifact-marks.mjs';
+import { noteGoesTo } from '../shared/artifact-marks.mts';
 
 const people = [{ id: 'p-sofia', name: 'Sofia Reyes' }, { id: 'p-dev', name: 'Dev Rao' }];
 const goes = (text) => noteGoesTo({ text, place: { kind: 'whole' } }, people).to;

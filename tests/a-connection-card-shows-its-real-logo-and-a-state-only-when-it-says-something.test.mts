@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { catalogFor } from '../shared/connections-catalog.mjs';
+import { catalogFor } from '../shared/connections-catalog.mts';
 import { cardState } from '../renderer/src/connections/connections-shown';
 import { DARK_INK, logoOf } from '../renderer/src/connections/logos';
 

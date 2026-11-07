@@ -25,12 +25,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { buildLine, foldWorkItems, normalizeLine, pickFields, CLAUDE_PERMISSION_MODES } from '../shared/work-items.mjs';
-import { machineryPath } from '../main/store/home.mjs';
+import { buildLine, foldWorkItems, normalizeLine, pickFields, CLAUDE_PERMISSION_MODES } from '../shared/work-items.mts';
+import { machineryPath } from '../main/store/home.mts';
 import { answerModesFile } from '../main/answer-modes.mts';
 import { buildSessionArgs, parseSessionArgs, permissionMode } from '../main/settings.mts';
 import { nameSlug } from '../shared/product-name.mjs';
-import { DEFAULT_CLAUDE_MODEL } from '../shared/engines.mjs';
+import { DEFAULT_CLAUDE_MODEL } from '../shared/engines.mts';
 
 let appDir;
 let storeRoot;

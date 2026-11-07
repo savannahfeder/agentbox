@@ -53,9 +53,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
-import { createCodexAppServer, REFUSAL_DECISION } from '../main/codex-app-server.mjs';
-import { createCodexApprovals, codexApprovalCard, mcpToolCard } from '../main/codex-approvals.mjs';
-import { listPending } from '../main/approvals.mjs';
+import { createCodexAppServer, REFUSAL_DECISION } from '../main/codex-app-server.mts';
+import { createCodexApprovals, codexApprovalCard, mcpToolCard } from '../main/codex-approvals.mts';
+import { listPending } from '../main/approvals.mts';
 
 const ELICIT = 'mcpServer/elicitation/request';
 const STORE = 'agentbox';

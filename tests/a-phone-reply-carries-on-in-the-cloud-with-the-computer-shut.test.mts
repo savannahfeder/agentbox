@@ -12,7 +12,7 @@
 // minute from it and claims the command `cloud:<run id>`, writes the agent's
 // answer into the phone's copy of the thread, and the computer joins the run
 // when it wakes. This file holds the parts all three share
-// (shared/cloud-kit.mjs, shared/phone-snapshot.mjs withCloudTurn) and the
+// (shared/cloud-kit.mts, shared/phone-snapshot.mts withCloudTurn) and the
 // database's rule that only the server names a cloud claim, run against every
 // migration in PGlite.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -24,8 +24,8 @@ import { emptyDatabase } from './an-empty-test-database.mts';
 import {
   REPLY_MARK, KIT_VERSION, CLOUD_TAKES_AFTER_MS, cloudClaim, runOfClaim, cloudSessionId, kitKey, serverRunKey,
   replyFrame, replyPrompt, cloudUserLine, checkKit, startPayload, lastAnswerIn,
-} from '../shared/cloud-kit.mjs';
-import { withCloudTurn, threadSnapshot } from '../shared/phone-snapshot.mjs';
+} from '../shared/cloud-kit.mts';
+import { withCloudTurn, threadSnapshot } from '../shared/phone-snapshot.mts';
 
 const NOW = Date.parse('2026-10-24T12:00:00Z');
 const kit = (over = {}) => ({

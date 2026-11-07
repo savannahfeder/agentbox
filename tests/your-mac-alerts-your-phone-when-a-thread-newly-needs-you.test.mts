@@ -8,11 +8,11 @@
 // them through Expo's push service to the phones in push_devices, by the
 // same rules: nothing while you have used this Mac in the last five minutes,
 // once per stretch away and once more for a permission card
-// (shared/notify-rules.mjs), several close together folded into one. Each
+// (shared/notify-rules.mts), several close together folded into one. Each
 // thread is alerted once per state and a token Expo calls dead is dropped.
 // An alert is headed by the thread's title, as asked on 2026-10-13 and again
 // on 2026-10-23 ("I want titles back for notifs"), with the desktop's sentence
-// under it (shared/notify-rules.mjs phoneBanner), and carries nothing else of
+// under it (shared/notify-rules.mts phoneBanner), and carries nothing else of
 // the thread. Measured here with the in-memory cloud and a stand-in for Expo.
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -21,13 +21,13 @@ import path from 'node:path';
 import http from 'node:http';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createPhoneInbox } from '../main/phone-inbox.mts';
-import { sendToExpo, FOLD_MS, EXPO_PUSH } from '../main/phone-alerts.mjs';
+import { sendToExpo, FOLD_MS, EXPO_PUSH } from '../main/phone-alerts.mts';
 import { phoneSlug } from '../renderer/src/phone-rows';
-import { AWAY_AFTER_MS } from '../shared/notify-rules.mjs';
-import * as disk from '../main/store/work-items.mjs';
+import { AWAY_AFTER_MS } from '../shared/notify-rules.mts';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
+import { memorySession } from '../main/team/session.mts';
 import { installNotifier } from '../main/notify.mts';
 import { WRAPPED_ARGS } from '../shared/bridge-map.mts';
 

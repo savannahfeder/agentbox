@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { closesTheTask, leavesItOnTheBranch } from '../renderer/src/format.ts';
-import { fileNewsFor } from '../shared/artifact-marks.mjs';
+import { fileNewsFor } from '../shared/artifact-marks.mts';
 import { shipOfferLive } from '../renderer/src/ship-offer.ts';
 
 describe('an option that asks for no work closes the thread without a run', () => {

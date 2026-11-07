@@ -22,7 +22,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Supervisor } from '../main/supervisor.mts';
-import { agentSpokeSince, answerSettled } from '../shared/answers.mjs';
+import { agentSpokeSince, answerSettled } from '../shared/answers.mts';
 import { belongsInInbox, belongsInProgress } from '../renderer/src/list-rules';
 
 const ANSWERED = 1_786_735_939_755; // 2026-08-14 12:32:19, "merge it"

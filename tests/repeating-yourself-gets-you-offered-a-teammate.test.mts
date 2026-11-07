@@ -4,7 +4,7 @@
 // agent runs. These pin when it is offered and when it is not: one-offs, a
 // teammate's own runs, an offer already made or turned down, two open at once.
 import { describe, it, expect } from 'vitest';
-import { offerFrom, offerAnswer, OFFER_LABEL, OFFER_MAKE, OFFER_NOT_NOW } from '../shared/teammates.mjs';
+import { offerFrom, offerAnswer, OFFER_LABEL, OFFER_MAKE, OFFER_NOT_NOW } from '../shared/teammates.mts';
 
 const NOW = new Date(2026, 9, 24, 9, 0).getTime();
 const DAY = 86_400_000;
@@ -116,7 +116,7 @@ describe('the offer in the store', () => {
     // today, it read as offered again (power test of 2026-10-25).
     expect(closed.title).toMatch(/^Made a teammate for things like “.+”$/);
     // And out of Needs you: the second power test found it there, done and counted.
-    const { isCleanRun } = await import('../shared/repeats.mjs');
+    const { isCleanRun } = await import('../shared/repeats.mts');
     expect(isCleanRun(closed)).toBe(true);
     const made = team.list();
     expect(made).toHaveLength(1);

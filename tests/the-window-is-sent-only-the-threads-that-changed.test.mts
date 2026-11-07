@@ -21,9 +21,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { snapshotSender, snapshotReader, lightRunning } from '../shared/snapshot-delta.mjs';
+import { snapshotSender, snapshotReader, lightRunning } from '../shared/snapshot-delta.mts';
 import { bootHeadless } from '../main/serve.mts';
-import { encodeProjectPath } from '../main/store/home.mjs';
+import { encodeProjectPath } from '../main/store/home.mts';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const row = (id, extra = {}) => ({ id, product: 'p', productName: 'P', title: `Thread ${id}`, status: 'open', body: `the ask of ${id}`, labels: [], ...extra });

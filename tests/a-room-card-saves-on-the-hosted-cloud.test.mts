@@ -14,7 +14,7 @@
 // The stand-in client below refuses what the hosted cloud refuses: any upsert,
 // and any update that names a key column.
 import { describe, it, expect } from 'vitest';
-import { roomsSupabase } from '../main/team/rooms-supabase.mjs';
+import { roomsSupabase } from '../main/team/rooms-supabase.mts';
 
 const KEYS = { room_profiles: ['person_id'], room_presence: ['person_id', 'device'] };
 

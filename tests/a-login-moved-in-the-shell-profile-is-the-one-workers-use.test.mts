@@ -3,14 +3,14 @@
 // WHAT BROKE. Somebody with `export CLAUDE_CONFIG_DIR="$HOME/.config/claude"`
 // in .zshrc signs in from their terminal, and their login lives in that
 // folder. An app opened from the Dock never sees .zshrc, and the shell's answer
-// (main/shell-path.mjs) was only ever used to find sessions to import. Workers
+// (main/shell-path.mts) was only ever used to find sessions to import. Workers
 // ran on an empty ~/.claude and every task said Claude Code could not sign in.
 // Measured by the setups check (verify-agentbox, setup `config-dir-from-zshrc`)
 // on the real Claude Code 2.1.301, 2026-10-15: no task on that home answered.
 //
 // THE SAME FOLDER NAMED OUT LOUD IS NOT THE DEFAULT. Claude Code names its
 // keychain entry after CLAUDE_CONFIG_DIR (measured 2026-10-05, see
-// shared/fresh-user-home.mjs), so `export CLAUDE_CONFIG_DIR=~/.claude` signs in
+// shared/fresh-user-home.mts), so `export CLAUDE_CONFIG_DIR=~/.claude` signs in
 // under a different entry than no variable at all. A worker started with no
 // variable reads the other one and is signed out. So a folder the shell names
 // is passed as a folder, even when it is ~/.claude.
@@ -23,7 +23,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { effectiveProfiles, forgetDiscovery } from '../main/account-discovery.mjs';
+import { effectiveProfiles, forgetDiscovery } from '../main/account-discovery.mts';
 import { codexHome } from '../main/codex-models.mts';
 
 let home;

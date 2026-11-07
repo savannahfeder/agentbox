@@ -1,14 +1,14 @@
 // A RUN OF CHANGES READS AS "THINGS IT CHANGED".
 //
 // w-a358961e3e, 2026-10-15, found while trimming comments in
-// shared/work-lines.mjs. Edits were renamed "changed" in workVerb, but the
+// shared/work-lines.mts. Edits were renamed "changed" in workVerb, but the
 // list of verbs that read plainly on their own still said "edited". So a run
 // that only changed files folded to "5 things it did · changed 5" instead of
 // "5 things it changed". Measured: runSummary of five Edit calls returned the
 // first form before the fix.
 
 import { describe, it, expect } from 'vitest';
-import { runSummary, workVerb } from '../shared/work-lines.mjs';
+import { runSummary, workVerb } from '../shared/work-lines.mts';
 
 const calls = (tool, n) => Array.from({ length: n }, () => ({ verb: workVerb(tool) }));
 

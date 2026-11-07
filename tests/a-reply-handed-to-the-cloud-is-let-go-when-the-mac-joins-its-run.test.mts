@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CARRIED } from '../shared/cloud-carry.mjs';
+import { CARRIED } from '../shared/cloud-carry.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend, claimForTheCloud } from '../main/team/memory-cloud.mts';
 import { createPhoneInbox } from '../main/phone-inbox.mts';
 import { Supervisor } from '../main/supervisor.mts';

@@ -13,7 +13,7 @@
 //      unrun. `_engineFor` is deliberately the single line that decides, so
 //      overriding it is overriding exactly the decision and nothing else.
 //
-//   2. AND NOTHING ROUTES TO IT. The gate in shared/engines.mjs is closed --
+//   2. AND NOTHING ROUTES TO IT. The gate in shared/engines.mts is closed --
 //      `engineFor` answers Claude Code unless the caller hands it a capability
 //      Symbol no file under main/ holds -- so a row she marked `engine: "codex"`
 //      between 2026-08-25 and 08-27 still spawns Claude Code, and now that is
@@ -132,7 +132,7 @@ vi.mock('node:child_process', async (importActual) => {
 });
 
 const toolingCalls = vi.hoisted(() => []);
-vi.mock('../main/account-tooling.mjs', async (importActual) => {
+vi.mock('../main/account-tooling.mts', async (importActual) => {
   const actual = await importActual();
   return {
     ...actual,
@@ -141,9 +141,9 @@ vi.mock('../main/account-tooling.mjs', async (importActual) => {
 });
 
 import { Supervisor, readersFor } from '../main/supervisor.mts';
-import { captureCodexEvent, codexStreamingText, summarizeCodexEvent, traceCodexEvent } from '../main/codex.mjs';
+import { captureCodexEvent, codexStreamingText, summarizeCodexEvent, traceCodexEvent } from '../main/codex.mts';
 import { troubleCause, deadRunSentence } from '../shared/spawn-trouble.mts';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 const CLAUDE_BIN = '/nonexistent/claude-code/claude';

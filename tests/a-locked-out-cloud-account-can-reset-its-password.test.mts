@@ -20,9 +20,9 @@ import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { cloudAccountSession, cloudSignIn } from '../main/cloud/account.mts';
-import { readCloudKey } from '../main/cloud/config.mjs';
-import { sendPasswordReset, cancelGoogleSignIn, signInWithGoogle } from '../main/team/sign-in.mjs';
-import { plainAuthError } from '../main/team/session.mjs';
+import { readCloudKey } from '../main/cloud/config.mts';
+import { sendPasswordReset, cancelGoogleSignIn, signInWithGoogle } from '../main/team/sign-in.mts';
+import { plainAuthError } from '../main/team/session.mts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');

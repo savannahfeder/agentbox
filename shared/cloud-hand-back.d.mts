@@ -1,4 +1,4 @@
-// Types for shared/cloud-hand-back.mjs, read by the supervisor and the thread.
+// Types for shared/cloud-hand-back.mts, read by the supervisor and the thread.
 
 /** The line a cloud run ends on when its request needs this computer. */
 export const HAND_BACK: string;

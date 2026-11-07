@@ -24,7 +24,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { formOf, lookupKeyOf } from '../cloud/gateway/stripe.mjs';
-import { readCloudConfig } from '../main/cloud/config.mjs';
+import { readCloudConfig } from '../main/cloud/config.mts';
 import { STRIPE_SECRET_NAME, GATEWAY_FUNCTION } from './cloud-gateway-setup.mjs';
 
 // SaaS sold to businesses (Stripe's tax codes).

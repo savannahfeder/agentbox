@@ -10,7 +10,7 @@
 // on her machine and the wrong thing on everybody else's.
 //
 // One was really there when this file was written. `shortPath` in
-// shared/work-lines.mjs took `home = '/Users/you'`, and `workSubject` called it
+// shared/work-lines.mts took `home = '/Users/you'`, and `workSubject` called it
 // without a home, so a work line under a running agent read
 //
 //   ~/notes.md              on her Mac
@@ -26,7 +26,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { firstRunNeeded, forcedStep } from '../renderer/src/onboarding.ts';
-import { workSubject } from '../shared/work-lines.mjs';
+import { workSubject } from '../shared/work-lines.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
@@ -88,7 +88,7 @@ describe('a home directory nobody typed', () => {
 
   it('finds real source to look at, so a broken walk cannot pass this quietly', () => {
     expect(files.length).toBeGreaterThan(40);
-    expect(files).toContain('shared/work-lines.mjs');
+    expect(files).toContain('shared/work-lines.mts');
     expect(files).toContain('renderer/src/onboarding.ts');
   });
 

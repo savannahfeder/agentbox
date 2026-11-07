@@ -19,7 +19,7 @@ import path from 'node:path';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 import { cloudSignIn } from '../main/cloud/account.mts';
-import { readCloudKey } from '../main/cloud/config.mjs';
+import { readCloudKey } from '../main/cloud/config.mts';
 
 const P = '88888888-8888-4888-8888-888888888888';
 

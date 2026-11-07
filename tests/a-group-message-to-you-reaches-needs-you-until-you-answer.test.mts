@@ -14,7 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { addressedByOpening, mentionsIn, groupRow } from '../shared/room-needs-you.mjs';
+import { addressedByOpening, mentionsIn, groupRow } from '../shared/room-needs-you.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
 import { MentionRows } from '../renderer/src/team/rooms/MentionRows.tsx';

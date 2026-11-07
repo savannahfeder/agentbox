@@ -8,11 +8,11 @@
 // agent thread read as its whole first sentence until the namer ran. Each title
 // came from a different place (the namer, firstSentence for tasks and messages,
 // the first line for threads, the raw card on a teammate's copy), so the list
-// read in three styles. One rule now: shared/thread-title.mjs.
+// read in three styles. One rule now: shared/thread-title.mts.
 import { describe, it, expect } from 'vitest';
-import { shortTitle, shownTitle } from '../shared/thread-title.mjs';
+import { shortTitle, shownTitle } from '../shared/thread-title.mts';
 import { rowTitle } from '../renderer/src/list-rules';
-import { cardsFor } from '../shared/thread-cards.mjs';
+import { cardsFor } from '../shared/thread-cards.mts';
 
 const count = (s) => s.split(/\s+/).filter(Boolean).length;
 

@@ -2,7 +2,7 @@
 // file if you can", it said "I can't create a real version of the old file",
 // sent "-v2" as a separate file, and the reviewers' comments split between the
 // two (Dev and Sofia). Measured: versions are worked out
-// from names (shared/artifact-marks.mjs threadFiles), and nothing told an agent
+// from names (shared/artifact-marks.mts threadFiles), and nothing told an agent
 // the rule; team_tell and team_task sent a file under whatever name it had,
 // "onboarding-b-v2-built-pins-fixed.png" among them.
 //
@@ -13,10 +13,10 @@ import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { teamTell, teamTask } from '../mcp/core/reach.mjs';
-import { REACH_LABEL } from '../shared/teammate-reach.mjs';
-import { isTaskRow } from '../shared/team-rules.mjs';
-import { threadFiles } from '../shared/artifact-marks.mjs';
+import { teamTell, teamTask } from '../mcp/core/reach.mts';
+import { REACH_LABEL } from '../shared/teammate-reach.mts';
+import { isTaskRow } from '../shared/team-rules.mts';
+import { threadFiles } from '../shared/artifact-marks.mts';
 
 let t; let run;
 const askRows = () => t.rows(t.maya).filter((i) => (i.labels ?? []).includes(REACH_LABEL));
@@ -94,7 +94,7 @@ describe('what is refused', () => {
 
 describe('what an agent is told', () => {
   it('the tools say how to send a new version', () => {
-    const tools = read('mcp/tools.mjs');
+    const tools = read('mcp/tools.mts');
     expect(tools.match(/versionOf: z\.string\(\)\.optional\(\)/g)).toHaveLength(3);
   });
 

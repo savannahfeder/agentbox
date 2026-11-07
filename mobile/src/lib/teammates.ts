@@ -1,11 +1,11 @@
 // Your AI teammates on the phone: the copy the computer sends with its settings
-// (shared/phone-snapshot.mjs `phoneTeammatesOf`), read by the desktop's own
+// (shared/phone-snapshot.mts `phoneTeammatesOf`), read by the desktop's own
 // rules (renderer/src/teammates/chat-lines.ts), with your messages shown the
 // moment you send them.
 import {
   answerOf, asksYou, chatWith, clockOf, dayOf, heldFor, heldTitle, idleLine, matesInOrder, nameOf, SAVED_VERBS, type ChatEntry,
 } from '../../../renderer/src/teammates/chat-lines';
-import { MAX_HOPS, teammateIdOf } from '../../../shared/teammates.mjs';
+import { MAX_HOPS, teammateIdOf } from '../../../shared/teammates.mts';
 import { phoneSlug, type PhoneRows } from '../../../renderer/src/phone-rows';
 import type { Teammate, TeamChatLine, TeamRunLine, TeammatesView } from '../../../renderer/src/types';
 

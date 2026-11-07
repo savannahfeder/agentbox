@@ -20,7 +20,7 @@ import { belongsInInbox, belongsInProgress, belongsOnTheRail } from '../renderer
 
 const NOW = 1_791_336_308_000;
 
-// Shaped as the fold hands them over (shared/work-items.mjs).
+// Shaped as the fold hands them over (shared/work-items.mts).
 const blockedByItsAgent = (extra) => ({
   id: 'w-ac7f0c0cbb', status: 'blocked', kind: 'bug', labels: ['bug'],
   title: 'The agent reads questions sent while it works but never answers them',

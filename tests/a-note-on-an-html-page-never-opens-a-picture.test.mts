@@ -6,7 +6,7 @@
 // never linked, so the view found no version for it and fell back to the
 // thread's last file. A press now lands on the file it names or on nothing.
 import { describe, it, expect } from 'vitest';
-import { filesInLines, otherFilesInLines, threadFiles, whereAPressLands } from '../shared/artifact-marks.mjs';
+import { filesInLines, otherFilesInLines, threadFiles, whereAPressLands } from '../shared/artifact-marks.mts';
 
 const said = (ts, result) => ({ ts, source: 'agent', patch: { result } });
 const picture = said(1, 'The desktop shot: [seat-picker-open1-desktop.png](designs/seat-picker-open1-desktop.png)');

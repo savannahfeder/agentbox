@@ -16,7 +16,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 import { guard, sweep } from './lib/chrome-guard.mjs';
 import { STORE_ROOT } from './lib/machine-paths.mjs';
 

@@ -12,7 +12,7 @@ import path from 'node:path';
 import { applySplices, postImage, editableRows, savedLine, unsavedIn } from '../renderer/src/code-edit.ts';
 import { hunkViewAt, hunkView } from '../renderer/src/code-artifact.ts';
 import { findFile, canWriteCode, writeCodeFile, readCodeFile } from '../main/code-file.mts';
-import { changeFromTranscript } from '../main/code-change.mjs';
+import { changeFromTranscript } from '../main/code-change.mts';
 
 const FILE = [
   'export function greet(name) {',

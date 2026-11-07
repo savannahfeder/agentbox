@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { recoverShellPath } from '../main/shell-path.mjs';
+import { recoverShellPath } from '../main/shell-path.mts';
 
 // This one runs a real zsh. GitHub's Linux runner has none, which kept it red
 // on every push from 2026-10-09 to 2026-10-13 ("spawn /bin/zsh ENOENT"); the

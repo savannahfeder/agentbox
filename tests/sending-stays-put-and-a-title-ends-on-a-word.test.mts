@@ -4,7 +4,7 @@
 // project thread could be renamed, leaving conversations named by a first sentence.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { firstSentence } from '../shared/thread-cards.mjs';
+import { firstSentence } from '../shared/thread-cards.mts';
 import { tabAfterSending } from '../renderer/src/threads/composer-rules';
 import { threadCommands } from '../renderer/src/thread-commands';
 

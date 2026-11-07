@@ -9,7 +9,7 @@
 // answer "what is Sofia doing". Built here from the store's own shapes.
 import { describe, it, expect } from 'vitest';
 import { teamToday, linesToStep } from '../renderer/src/team/today.ts';
-import { cardWait, personWait } from '../shared/thread-waits.mjs';
+import { cardWait, personWait } from '../shared/thread-waits.mts';
 
 const NOW = new Date(2026, 9, 31, 16, 0).getTime();
 const at = (h, d = 0) => new Date(2026, 9, 31 + d, h, 0).getTime();

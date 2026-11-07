@@ -116,14 +116,14 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
-vi.mock('../main/account-tooling.mjs', async (importActual) => {
+vi.mock('../main/account-tooling.mts', async (importActual) => {
   const actual = await importActual();
   return { ...actual, linkAccountTooling: () => null };
 });
 
 import { Supervisor } from '../main/supervisor.mts';
-import { foldWorkItems } from '../shared/work-items.mjs';
-import { loadConfig, saveConfig } from '../main/config.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
+import { loadConfig, saveConfig } from '../main/config.mts';
 import { readSettings, setWorkspaceSetting } from '../main/settings.mts';
 
 const CODEX_BIN = '/nonexistent/codex/codex';

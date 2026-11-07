@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { HAND_BACK, handsBack } from '../shared/cloud-hand-back.mjs';
+import { HAND_BACK, handsBack } from '../shared/cloud-hand-back.mts';
 import { argvForTheCloud, CLOUD_NOTE } from '../main/cloud/run.mts';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');

@@ -7,7 +7,7 @@
 // line's writer, and an agent's line on its owner's own Mac has none, so it
 // read as "you".
 import { describe, it, expect } from 'vitest';
-import { filesInLines, sharedByWords, threadFiles } from '../shared/artifact-marks.mjs';
+import { filesInLines, sharedByWords, threadFiles } from '../shared/artifact-marks.mts';
 
 const SOFIA = 'p-sofia';
 const MAYA = 'p-maya';

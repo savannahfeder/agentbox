@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { tokenFromLink, joinLink, JOIN_SCHEME } from '../shared/room-links.mjs';
+import { tokenFromLink, joinLink, JOIN_SCHEME } from '../shared/room-links.mts';
 import { nameSlug } from '../shared/product-name.mjs';
 
 const TOKEN = '3f9c2a7be41d4c0f9a8e2b6d1c5f7a90';

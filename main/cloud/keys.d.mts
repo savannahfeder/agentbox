@@ -1,4 +1,4 @@
-export { keyLabel } from '../../shared/cloud-keys.mjs';
+export { keyLabel } from '../../shared/cloud-keys.mts';
 
 /** The bucket the keys go to: anything that can put and delete an object by name. */
 export interface KeyStorage {

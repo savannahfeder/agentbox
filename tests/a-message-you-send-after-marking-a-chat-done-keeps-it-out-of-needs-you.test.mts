@@ -21,10 +21,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
-import { foldWorkItems } from '../shared/work-items.mjs';
-import { inMyInbox, iSpokeLast, whatWaits } from '../shared/team-rules.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
+import { inMyInbox, iSpokeLast, whatWaits } from '../shared/team-rules.mts';
 
 const ID = 'w-0123456789';
 const ME = 'p-me', MAYA = 'p-maya';

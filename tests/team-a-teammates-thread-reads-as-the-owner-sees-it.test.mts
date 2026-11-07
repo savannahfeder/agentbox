@@ -13,8 +13,8 @@ import { it, expect, describe } from 'vitest';
 import { itemThread } from '../renderer/src/item-thread';
 import { earlierWords, commentLine, teammateThreadsFound } from '../renderer/src/threads/teammate-thread';
 import { belongsInInbox } from '../renderer/src/list-rules';
-import { foldWorkItems } from '../shared/work-items.mjs';
-import { cardsFor } from '../shared/thread-cards.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
+import { cardsFor } from '../shared/thread-cards.mts';
 import { wallCards } from '../shared/room-cards.mts';
 
 const OWNER = 'owner-id';

@@ -28,16 +28,16 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
+import { appHome } from '../main/store/home.mts';
 import { loadStore } from '../main/store-modules.mts';
 import { Teammates } from '../main/teammates.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { queuedReplyText } from '../main/live-replies.mts';
-import { planWakes, runIdFor, seenKey, teammateLabel, teammateIdOf, workOf, handOffText, foldChat, DEFAULT_LIMIT, MAX_HOPS } from '../shared/teammates.mjs';
-import { foldWorkItems } from '../shared/work-items.mjs';
-import { toldBy, heldForHer, stoppedByHer } from '../shared/answers.mjs';
+import { planWakes, runIdFor, seenKey, teammateLabel, teammateIdOf, workOf, handOffText, foldChat, DEFAULT_LIMIT, MAX_HOPS } from '../shared/teammates.mts';
+import { foldWorkItems } from '../shared/work-items.mts';
+import { toldBy, heldForHer, stoppedByHer } from '../shared/answers.mts';
 import { threadEvents } from '../renderer/src/thread-history';
-import { threadState } from '../shared/thread-cards.mjs';
+import { threadState } from '../shared/thread-cards.mts';
 
 const NOW = new Date(2026, 9, 26, 15, 43).getTime();
 const base = { status: 'active', paused: false, served: '', limit: DEFAULT_LIMIT, works: null, product: 'kestrel', memory: [] };
@@ -339,9 +339,9 @@ describe('through the store', () => {
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = `acct-${Math.random().toString(36).slice(2, 8)}`;
     fs.mkdirSync(path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     product = createProduct(`Shop ${Math.random().toString(36).slice(2, 8)}`);
     dir = path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID, product.id);
     mods = await loadStore();
@@ -354,7 +354,7 @@ describe('through the store', () => {
       listItems: (now) => work.readWorkItems(dir, now).map((i) => ({ ...i, product: product.id })),
     };
     team = new Teammates(store);
-    core = await import('../mcp/core/teammates.mjs');
+    core = await import('../mcp/core/teammates.mts');
   });
 
   afterEach(() => {
@@ -375,7 +375,7 @@ describe('through the store', () => {
   it('a hand-off lands on the other teammate\'s thread as theirs, and talk lands nowhere', async () => {
     const growth = team.create({ name: 'Growth marketer' });
     const video = team.create({ name: 'Video producer' });
-    const { writeChat, writeTeammate } = await import('../main/store/teammates-files.mjs');
+    const { writeChat, writeTeammate } = await import('../main/store/teammates-files.mts');
     const T = Date.now();
     // The person told it to take hand-offs straight away.
     writeTeammate(team.dir(), growth.id, { handoffsNeedYes: false }, T);
@@ -410,13 +410,13 @@ describe('through the store', () => {
   it('a hand-off to a teammate that needs your yes waits blocked in your inbox', async () => {
     const growth = team.create({ name: 'Growth marketer' });
     const video = team.create({ name: 'Video producer' });
-    const { writeChat } = await import('../main/store/teammates-files.mjs');
+    const { writeChat } = await import('../main/store/teammates-files.mts');
     writeChat(team.dir(), { kind: 'pass', from: 'you', to: growth.id, title: 'Run a daily clip', details: '', via: 'w-xaccount', viaProduct: product.id }, Date.now());
     await tick(Date.now());
     const lane = store.listItems().find((i) => teammateIdOf(i) === growth.id);
     onRun(lane.id);
     // The Video producer saved the person's rule.
-    const { writeTeammate } = await import('../main/store/teammates-files.mjs');
+    const { writeTeammate } = await import('../main/store/teammates-files.mts');
     writeTeammate(team.dir(), video.id, { handoffsNeedYes: true }, Date.now());
     expect(core.teamPass({ to: 'Video producer', title: 'Make the Hyperfocus clip', details: '' }).note).toMatch(/only with the person's yes/);
     await tick(Date.now());

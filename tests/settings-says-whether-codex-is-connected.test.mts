@@ -14,9 +14,9 @@
 // case is exactly what Claude Code's third state exists for next door, and a
 // tester's session is the whole argument for having it.
 //
-// The facts were already computed and read by nobody: `main/codex-bin.mjs`
+// The facts were already computed and read by nobody: `main/codex-bin.mts`
 // exports `findCodexBin`, `installEvidence`, `evidencePaths` and an install URL,
-// and answers found/certain/path exactly as `claude-bin.mjs` does.
+// and answers found/certain/path exactly as `claude-bin.mts` does.
 //
 // ---------------------------------------------------------------------------
 // THE VISIBILITY RULE, WHICH IS THE JUDGEMENT IN THIS SLICE.
@@ -64,7 +64,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { codexState, readSettings, recheckCodex } from '../main/settings.mts';
-import { forgetCodexBin, INSTALL_URL } from '../main/codex-bin.mjs';
+import { forgetCodexBin, INSTALL_URL } from '../main/codex-bin.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 

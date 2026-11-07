@@ -7,7 +7,7 @@
 // `mt0reku0-ab12cd-Screenshot-2026-10-28-at-3` (a Mac screenshot) both read as
 // one, and the link pointed at a file called `[hidden].png`.
 import { describe, it, expect } from 'vitest';
-import { hideSecrets } from '../shared/phone-snapshot.mjs';
+import { hideSecrets } from '../shared/phone-snapshot.mts';
 
 describe('a picture name reaches the phone whole', () => {
   it('leaves the names of saved and drawn files alone', () => {

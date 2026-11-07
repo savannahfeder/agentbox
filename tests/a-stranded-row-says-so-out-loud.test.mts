@@ -22,7 +22,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { readDeadRunTrace, traceShowsASilentDeath } from '../shared/dead-run-trace.mts';
 import { troubleCause } from '../shared/spawn-trouble.mts';
-import { machineryPath } from '../main/store/home.mjs';
+import { machineryPath } from '../main/store/home.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 import { setAppHome, clearAppHome } from './app-home.mts';

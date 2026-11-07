@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { OCCURRENCE_PROTOCOL } from '../main/repeats.mjs';
+import { OCCURRENCE_PROTOCOL } from '../main/repeats.mts';
 
 const brief = fs.readFileSync(new URL('../briefs/worker.md', import.meta.url), 'utf8');
 

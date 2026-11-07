@@ -23,7 +23,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { findClaudeBin, candidatePaths, evidencePaths, askShell, shellProbes } from '../main/claude-bin.mjs';
+import { findClaudeBin, candidatePaths, evidencePaths, askShell, shellProbes } from '../main/claude-bin.mts';
 import { Onboarding } from '../renderer/src/components/Onboarding.tsx';
 import { COPY, RUN_START } from '../renderer/src/onboarding.ts';
 import { NAME, Name } from '../shared/product-name.mjs';

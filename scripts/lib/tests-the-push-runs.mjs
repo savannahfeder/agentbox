@@ -2,7 +2,7 @@
 //
 // `vitest related <files>` runs every test that imports what changed, which
 // for a core file here is most of the suite: 362 of the 1,869 test files reach
-// main/engine-bin.mjs. That set is the right one to run and the wrong one to
+// main/engine-bin.mts. That set is the right one to run and the wrong one to
 // wait for, so over the cap this hands back the test files that are most about
 // the change and leaves the rest to GitHub, which runs the whole suite on
 // every push.

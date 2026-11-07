@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
 import { Supervisor, awaitingHer } from '../main/supervisor.mts';
-import { isDue } from '../shared/work-items.mjs';
+import { isDue } from '../shared/work-items.mts';
 import { belongsInInbox, hiddenUntil, replyClearsSchedule } from '../renderer/src/list-rules';
 import { threadEvents } from '../renderer/src/thread-history';
 import { registerIpc } from '../main/ipc.mts';

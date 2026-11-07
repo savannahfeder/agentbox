@@ -10,8 +10,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { snapshotRepo, changeFromRepo, filesFromPatch } from '../main/git-change.mjs';
-import { mergeChange, changeFromTranscript, writeChangeForRun } from '../main/code-change.mjs';
+import { snapshotRepo, changeFromRepo, filesFromPatch } from '../main/git-change.mts';
+import { mergeChange, changeFromTranscript, writeChangeForRun } from '../main/code-change.mts';
 import { Name } from '../shared/product-name.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

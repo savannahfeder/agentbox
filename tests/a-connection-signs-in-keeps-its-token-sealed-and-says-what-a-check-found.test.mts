@@ -11,9 +11,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { startToolsFixture } from '../cloud/standin/tools-mcp.mjs';
-import { connectionVault } from '../main/connections/vault.mjs';
-import { createConnections } from '../main/connections/index.mjs';
-import { catalogFor, LINEAR, stateWords, STATES } from '../shared/connections-catalog.mjs';
+import { connectionVault } from '../main/connections/vault.mts';
+import { createConnections } from '../main/connections/index.mts';
+import { catalogFor, LINEAR, stateWords, STATES } from '../shared/connections-catalog.mts';
 
 let fx; let dir; let conn; let opened;
 const key = crypto.randomBytes(32);

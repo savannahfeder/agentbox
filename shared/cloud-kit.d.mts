@@ -1,4 +1,4 @@
-// Types for shared/cloud-kit.mjs, the kit a cloud run is started from.
+// Types for shared/cloud-kit.mts, the kit a cloud run is started from.
 //
 // The screen asks it one thing, `runOfClaim` (renderer/src/phone-rows.ts), and
 // a declaration that stopped there would come through as `any` the day the

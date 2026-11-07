@@ -5,7 +5,7 @@
 // did any document under 50 KB. Found by the browser test in
 // a-thread-reply-survives-leaving-and-coming-back, whose chip lookup broke on it.
 import { it, expect } from 'vitest';
-import { sizeWords } from '../shared/carried-files.mjs';
+import { sizeWords } from '../shared/carried-files.mts';
 
 const KB = 1024, MB = 1024 * KB;
 

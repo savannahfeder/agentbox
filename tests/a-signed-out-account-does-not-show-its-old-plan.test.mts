@@ -7,7 +7,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PlaceTiles, accountTile } from '../renderer/src/components/Settings.tsx';
 import { accountsOnce } from '../renderer/src/accounts-once.ts';
-import { planLabel, readPlan } from '../main/claude-plan.mjs';
+import { planLabel, readPlan } from '../main/claude-plan.mts';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

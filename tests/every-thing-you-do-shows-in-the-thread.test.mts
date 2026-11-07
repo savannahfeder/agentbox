@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { threadEvents, snoozeWords } from '../renderer/src/thread-history.ts';
 import { itemThread } from '../renderer/src/item-thread.ts';
 import { withoutTrailingWork } from '../renderer/src/trailing-work.ts';
-import { groupWork } from '../shared/work-lines.mjs';
+import { groupWork } from '../shared/work-lines.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');

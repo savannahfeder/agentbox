@@ -6,7 +6,7 @@
 // users of Agentbox to easily send me feedback", with the entry point in the
 // sidebar "just like another sidebar tab". That feature is a Feedback row in
 // the sidebar's foot opening a card (FeedbackCard.tsx), and it reuses the
-// ordinary names `main/feedback.mts`, `shared/feedback.mjs`, "Send feedback"
+// ordinary names `main/feedback.mts`, `shared/feedback.mts`, "Send feedback"
 // and `onFeedback`, so those are no longer banned here.
 //
 // What is still banned is the thing she asked three times to be rid of: the
@@ -36,7 +36,7 @@
 // channel, the modal name, or the label itself.
 //
 // IT KEYS ON THE FEATURE'S OWN NAMES, NOT ON THE WORD "feedback", which is
-// ordinary English and appears legitimately in this tree: `shared/contracts.mjs`
+// ordinary English and appears legitimately in this tree: `shared/contracts.mts`
 // carries the Agents Tray review pipeline, and `renderer/src/fixtures.ts` lists
 // a sample Claude agent that gives feedback on screenshots.
 // Neither of those is this.
@@ -47,7 +47,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/** The old card's file. `main/feedback.mts` and `shared/feedback.mjs` were
+/** The old card's file. `main/feedback.mts` and `shared/feedback.mts` were
  *  the old feature's too and are the new one's now (see the head of the file). */
 const FILES = [
   'renderer/src/components/Feedback.tsx',

@@ -2,14 +2,14 @@
 // cards, and nothing else.
 //
 // The names, the default and the rule about which engine a row runs on live in
-// ../../shared/engines.mjs, because main and the renderer both need them and a
+// ../../shared/engines.mts, because main and the renderer both need them and a
 // second copy is a copy that can disagree with the running fleet. WHETHER THERE
 // IS A CHOICE AT ALL is not here either: that needs the capability gate and is
 // answered by main, on the snapshot. This file is only the localStorage, and it
 // is the exact shape ../models.ts uses for the model, on purpose: two controls
 // that behave the same in her hand should be two files that read the same.
 
-import { DEFAULT_ENGINE, isEngine, type Engine } from '../../shared/engines.mjs';
+import { DEFAULT_ENGINE, isEngine, type Engine } from '../../shared/engines.mts';
 
 export const LAST_ENGINE_KEY = 'zero.lastEngine';
 

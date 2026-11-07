@@ -10,7 +10,7 @@
 // thread has no gap, and a result an agent closed on leads with no label.
 import { describe, it, expect } from 'vitest';
 import { phoneView, phoneSlug } from '../renderer/src/phone-rows';
-import { conversationGap, TRAIL_OPENING, TRAIL_TURNS } from '../shared/agents.mjs';
+import { conversationGap, TRAIL_OPENING, TRAIL_TURNS } from '../shared/agents.mts';
 import { actWords } from '../renderer/src/act-line';
 import { threadOf } from '../mobile/src/lib/thread';
 

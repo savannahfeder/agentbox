@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { paidPage } from '../cloud/gateway/gateway.mjs';
-import { ourLink, JOIN_SCHEME } from '../shared/room-links.mjs';
+import { ourLink, JOIN_SCHEME } from '../shared/room-links.mts';
 import { CloudPlanCards } from '../renderer/src/components/CloudPlanCards.tsx';
 import { SETUP } from '../renderer/src/cloud-setup.ts';
 

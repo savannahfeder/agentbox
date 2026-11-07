@@ -10,9 +10,9 @@ import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { teamFile, teamRead, teamTell } from '../mcp/core/reach.mjs';
-import { fileKeyIn, readFolderLog, foldFolders } from '../shared/file-folders.mjs';
-import { readTeamView, writeTeamView } from '../main/store/teammates-files.mjs';
+import { teamFile, teamRead, teamTell } from '../mcp/core/reach.mts';
+import { fileKeyIn, readFolderLog, foldFolders } from '../shared/file-folders.mts';
+import { readTeamView, writeTeamView } from '../main/store/teammates-files.mts';
 
 let t; let chief; let run; let dir; let project;
 beforeEach(async () => {

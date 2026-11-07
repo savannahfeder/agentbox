@@ -8,8 +8,8 @@
 // on, so it now reaches them too. A comment still reaches only its owner and
 // whoever it names, and the one who approved hears nothing.
 import { describe, it, expect } from 'vitest';
-import { fileNewsFor } from '../shared/artifact-marks.mjs';
-import { groupFileRow } from '../shared/room-needs-you.mjs';
+import { fileNewsFor } from '../shared/artifact-marks.mts';
+import { groupFileRow } from '../shared/room-needs-you.mts';
 
 const FILE = 'onboarding-b.png';
 const approval = { file: FILE, by: 'maya', ts: 10, owner: 'sofia' };

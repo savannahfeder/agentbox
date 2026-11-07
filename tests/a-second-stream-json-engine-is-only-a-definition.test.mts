@@ -14,7 +14,7 @@
 // at all (Codex, which is driven over RPC) is handed none.
 import { describe, it, expect } from 'vitest';
 import { workerArgsFrom, definitionMethods } from '../main/harnesses/common.mts';
-import { harnessDefinition } from '../shared/harness-definitions.mjs';
+import { harnessDefinition } from '../shared/harness-definitions.mts';
 import { harnessFor } from '../main/harnesses.mts';
 import { streamInputArgs } from '../main/claude-input.mts';
 

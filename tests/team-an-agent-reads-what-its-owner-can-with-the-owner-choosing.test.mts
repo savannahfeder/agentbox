@@ -15,7 +15,7 @@ import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { teamThreads, teamRead } from '../mcp/core/reach.mjs';
+import { teamThreads, teamRead } from '../mcp/core/reach.mts';
 
 let t; let chief; let run; let quality;
 const onRun = (id) => { process.env.ZERO_ITEM = id; process.env.ZERO_PRODUCT = t.product.id; };

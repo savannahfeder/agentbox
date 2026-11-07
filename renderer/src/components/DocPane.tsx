@@ -50,7 +50,7 @@ import { DocText } from './DocText';
 import { CodeArtifact } from './CodeArtifact';
 import type { Change } from '../code-artifact';
 import { NAME } from '../../../shared/product-name.mjs';
-import { shownName } from '../../../shared/artifact-marks.mjs';
+import { shownName } from '../../../shared/artifact-marks.mts';
 import { onPhone } from '../phone-screen';
 import { scrollKey, useKeptScroll } from '../kept-scroll';
 

@@ -44,7 +44,7 @@
 // answer -- which is why the memory is fed from `item/started` and from nothing
 // else. The item carries `changes: [{path, kind: {type, move_path}, diff}]`,
 // paths absolute, and the `diff` of an `add` is RAW FILE CONTENT rather than a
-// unified diff. main/codex.mjs's own header records the same thing.
+// unified diff. main/codex.mts's own header records the same thing.
 //
 // So: remember the fileChange items as they arrive, and when the approval comes
 // draw a card naming the files and showing the change. The refusal stays
@@ -62,9 +62,9 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   createCodexApprovals, codexApprovalCard, fileChangeCard, CARD_CAP, REMEMBERED_CHANGES,
-} from '../main/codex-approvals.mjs';
-import { REFUSAL_DECISION } from '../main/codex-app-server.mjs';
-import { listPending } from '../main/approvals.mjs';
+} from '../main/codex-approvals.mts';
+import { REFUSAL_DECISION } from '../main/codex-app-server.mts';
+import { listPending } from '../main/approvals.mts';
 import { approvalReads, UNREADABLE } from '../renderer/src/approval-card.ts';
 
 const dirs = [];
@@ -123,7 +123,7 @@ describe('the card a file change is drawn as', () => {
 
   // BOTH ENDS OF A MOVE, because the path she would go looking for is the one
   // it is at now and the one beside it is the one it left. `move_path` lives
-  // only on the `update` kind (main/codex.mjs, measurement 6).
+  // only on the `update` kind (main/codex.mts, measurement 6).
   it('says both ends of a rename', () => {
     const card = fileChangeCard({ type: 'fileChange', id: 'call_1', changes: [moved(`${REPO}/old.txt`, `${REPO}/new.txt`, '')] });
     expect(card.tool).toBe('Move');
@@ -310,7 +310,7 @@ describe('what one worker remembers of its own changes', () => {
   });
 
   // AND IT IS BOUNDED, because a turn can edit in a loop and each diff can be
-  // the whole of a file. Same reasoning as CHANGE_FRAME_CAP in main/codex.mjs,
+  // the whole of a file. Same reasoning as CHANGE_FRAME_CAP in main/codex.mts,
   // and the boundary is tested either side of the number rather than near it.
   it('keeps the last changes and forgets the oldest rather than growing', async () => {
     const cards = store();

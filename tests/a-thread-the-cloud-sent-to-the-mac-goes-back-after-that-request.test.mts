@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
-import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
+import { HAND_BACK } from '../shared/cloud-hand-back.mts';
 import { KEEP_ON_MAC, IMPORT_FAILED } from '../main/cloud/run.mts';
 
 const product = { slug: 'p', dir: '', repoPath: '/r' };

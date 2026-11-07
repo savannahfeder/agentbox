@@ -17,7 +17,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { Supervisor } from '../main/supervisor.mts';
 import { EFFORT_LEVELS as THE_APPS_LEVELS } from '../shared/effort-levels.mts';
-import { EFFORT_LEVELS, effortWord, modelWord } from '../shared/model-words.mjs';
+import { EFFORT_LEVELS, effortWord, modelWord } from '../shared/model-words.mts';
 
 describe('the words an agent may write', () => {
   it('are the app\'s own effort levels', () => {
@@ -25,9 +25,9 @@ describe('the words an agent may write', () => {
   });
 
   // Merged onto the move to TypeScript, this file imported a level list that
-  // had become .mts, and mcp/tools.mjs could not load: no agent had store tools.
+  // had become .mts, and mcp/tools.mts could not load: no agent had store tools.
   it('load on plain Node, where the store tools start', () => {
-    const tools = new URL('../mcp/tools.mjs', import.meta.url).href;
+    const tools = new URL('../mcp/tools.mts', import.meta.url).href;
     const run = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(tools)})`], { encoding: 'utf8', timeout: 30_000 });
     expect(run.stderr).toBe('');
     expect(run.status).toBe(0);
@@ -60,11 +60,11 @@ describe('the store tools', () => {
   let built = [];
   let product;
   beforeEach(async () => {
-    const home = (await import('../main/store/home.mjs')).appHome();
+    const home = (await import('../main/store/home.mts')).appHome();
     process.env.STORE_ACCOUNT_ID = 'acct-switch-model';
     fs.mkdirSync(path.join(home, 'accounts', 'acct-switch-model'), { recursive: true });
-    (await import('../mcp/core/account.mjs')).resolveAccount();
-    product = (await import('../mcp/core/products.mjs')).createProduct(`Switch ${Math.random().toString(36).slice(2, 8)}`);
+    (await import('../mcp/core/account.mts')).resolveAccount();
+    product = (await import('../mcp/core/products.mts')).createProduct(`Switch ${Math.random().toString(36).slice(2, 8)}`);
   });
   afterEach(() => {
     for (const b of built) b.claims._stop();
@@ -72,7 +72,7 @@ describe('the store tools', () => {
     delete process.env.STORE_ACCOUNT_ID;
   });
   const tool = async (name, ownItem = null) => {
-    const b = (await import('../mcp/tools.mjs')).buildTools({ holder: `test-${Math.random()}`, ownItem });
+    const b = (await import('../mcp/tools.mts')).buildTools({ holder: `test-${Math.random()}`, ownItem });
     built.push(b);
     const t = b.tools.find((x) => x.name === name);
     const said = (args) => Promise.resolve(t.run(args)).then((r) => r.content[0].text);
@@ -80,7 +80,7 @@ describe('the store tools', () => {
   };
 
   it('update_work_item sets the thread\'s model and effort as an agent', async () => {
-    const work = await import('../mcp/core/work.mjs');
+    const work = await import('../mcp/core/work.mts');
     const row = work.createItem(product.id, { title: 'Demo video', labels: ['founder'] }, { source: 'founder' });
     const update = await tool('update_work_item', row.id);
     expect(Object.keys(update.schema)).toEqual(expect.arrayContaining(['model', 'effort']));
@@ -90,7 +90,7 @@ describe('the store tools', () => {
   });
 
   it('update_work_item refuses a word that would stop the run', async () => {
-    const work = await import('../mcp/core/work.mjs');
+    const work = await import('../mcp/core/work.mts');
     const row = work.createItem(product.id, { title: 'Demo video', labels: ['founder'] }, { source: 'founder' });
     const update = await tool('update_work_item', row.id);
     expect(await update.said({ id: row.id, model: 'the best one' })).toMatch(/^error: .*not a model/);

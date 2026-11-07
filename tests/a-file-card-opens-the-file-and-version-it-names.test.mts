@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { filesInLines, threadFiles, versionForPath } from '../shared/artifact-marks.mjs';
+import { filesInLines, threadFiles, versionForPath } from '../shared/artifact-marks.mts';
 
 const said = (ts, result) => ({ ts, source: 'agent', patch: { result } });
 
@@ -56,7 +56,7 @@ describe('the big view lands where the card points', () => {
   const view = fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/components/ArtifactView.tsx'), 'utf8');
   it('finds the press through the one landing rule, which reads versionForPath', () => {
     expect(view).toContain('whereAPressLands(families, { path: open.path');
-    expect(fs.readFileSync(path.join(import.meta.dirname, '..', 'shared/artifact-marks.mjs'), 'utf8')).toContain('const v = versionForPath(families, path);');
+    expect(fs.readFileSync(path.join(import.meta.dirname, '..', 'shared/artifact-marks.mts'), 'utf8')).toContain('const v = versionForPath(families, path);');
   });
   it('does not fall back to the last file when a path was asked for', () => {
     expect(view).not.toMatch(/\?\? flat\[flat\.length - 1\];/);

@@ -1,8 +1,8 @@
 // Mirrors of what the main process derives. The fold itself lives in
-// shared/work-items.mjs; these are just the shapes that cross the bridge.
+// shared/work-items.mts; these are just the shapes that cross the bridge.
 
-import type { Engine } from '../../shared/engines.mjs';
-import type { AgentVoice } from '../../shared/agent-voice.mjs';
+import type { Engine } from '../../shared/engines.mts';
+import type { AgentVoice } from '../../shared/agent-voice.mts';
 
 export type { AgentVoice };
 
@@ -23,12 +23,12 @@ export interface WorkItem {
   needsMac?: string;
   // WHAT PEOPLE PUT ON EACH MESSAGE IN A CONVERSATION (w-560647d4db): by the
   // message's line uid, then by emoji, then the people on it. Folded out of the
-  // presses the ledger holds (shared/work-items.mjs); absent on every row
+  // presses the ledger holds (shared/work-items.mts); absent on every row
   // nobody has reacted on, which is every row outside a chat.
   reactions?: Record<string, Record<string, string[]>>;
   // WHO SAID WHAT, AND WHERE, in a conversation between people (w-920461cbe6):
   // the main chat and each thread, oldest first. What decides whose inbox a
-  // busy chat is in and what its row says (`whatWaits`, shared/team-rules.mjs).
+  // busy chat is in and what its row says (`whatWaits`, shared/team-rules.mts).
   // Absent on every row without people on it.
   talk?: {
     chat: { by: string; ts: number; text: string; voice?: AgentVoice; forAgent?: AgentVoice }[];
@@ -40,7 +40,7 @@ export interface WorkItem {
   title: string;
   // The short written name the LIST draws instead of the title, when a session
   // has written one. The title stays the user's own words; see WORK_ITEM_FIELDS in
-  // shared/work-items.mjs for why this is a field of its own. Not to be
+  // shared/work-items.mts for why this is a field of its own. Not to be
   // confused with `labels` below, which is a tag list and always was.
   label?: string;
   body?: string;
@@ -62,7 +62,7 @@ export interface WorkItem {
   runAt?: number;
   // When the existing answer returns to the human inbox. Never starts work.
   snoozedUntil?: number;
-  /** Teammates' comments its owner has not yet dealt with (shared/work-items.mjs). */
+  /** Teammates' comments its owner has not yet dealt with (shared/work-items.mts). */
   waitingComments?: { by: string; ts: number; text: string }[];
   /** Comments and approvals on this thread's files. */
   artifacts?: FileMarks;
@@ -74,7 +74,7 @@ export interface WorkItem {
   // Which model this runs on, when she chose one on the card: a Claude Code
   // alias, depending on the engine beside it. The two vocabularies do not
   // overlap, which is why the pair only means anything read together
-  // (`modelForEngine`, ../../shared/engines.mjs). Absent means the workspace
+  // (`modelForEngine`, ../../shared/engines.mts). Absent means the workspace
   // default.
   model?: string;
   // How hard it thinks, when she picked a level in the model drawer: one of
@@ -92,9 +92,9 @@ export interface WorkItem {
   // Per field, who set the value that survived the fold and when. The fold's own
   // bookkeeping, handed over rather than discarded, because an agent's `done`
   // and her archive are the same word for opposite events and the inbox has to
-  // tell them apart (shared/work-items.mjs).
+  // tell them apart (shared/work-items.mts).
   wrote?: Record<string, { ts: number; source: string; by?: string; voice?: AgentVoice; forAgent?: AgentVoice } | undefined>;
-  // THE TEAM FIELDS (shared/work-items.mjs). Absent on every private row.
+  // THE TEAM FIELDS (shared/work-items.mts). Absent on every private row.
   // `createdBy` is the person who started the row, `assignee` the person who
   // has to act next (or 'agent'), `runner` whose Mac runs its agents, `due` a
   // calendar day, `people` who is on the conversation.
@@ -103,9 +103,9 @@ export interface WorkItem {
   runner?: string;
   due?: string;
   people?: string[];
-  /** Sent to Auto: who it went to and why, or the two it asks her to pick from (shared/auto-route.mjs). */
+  /** Sent to Auto: who it went to and why, or the two it asks her to pick from (shared/auto-route.mts). */
   routed?: { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you' };
-  // THE THREAD'S OWN FIELDS (approved 2026-10-01, shared/work-items.mjs).
+  // THE THREAD'S OWN FIELDS (approved 2026-10-01, shared/work-items.mts).
   // `visibility` absent reads as 'team'. The summary is shared: the agent keeps
   // it current and the person can edit it, and the later write wins.
   // 'people' is shared with the people in `visibleTo` and nobody else
@@ -119,9 +119,9 @@ export interface WorkItem {
   blocks?: string[];
   /** When a person said it shipped; 0 is taken back. */
   shippedAt?: number;
-  /** What ended a wait a person set (shared/thread-waits.mjs). */
+  /** What ended a wait a person set (shared/thread-waits.mts). */
   waitEnded?: { said: string; at: number };
-  /** Where it went when someone left the team (main/team/departures.mjs). */
+  /** Where it went when someone left the team (main/team/departures.mts). */
   handedOver?: { said: string; at: number };
   // Set only on the synthesized rows that stand for a running Claude Code
   // agent. Its presence is what every action path checks: an agent row is drawn
@@ -166,7 +166,7 @@ export interface Product {
   personal?: boolean;
   // WHO SEES THIS PROJECT'S THREADS on the Team page (w-b989839656):
   // 'private' is Just you, 'people' names `seenByPeople`, and none at all is
-  // the team. shared/thread-cards.mjs projectSeenBy is the one reading of it.
+  // the team. shared/thread-cards.mts projectSeenBy is the one reading of it.
   seenBy?: 'private' | 'team' | 'people';
   seenByPeople?: string[];
   // SHARED OR PRIVATE (main/team/projects.mts). Null or absent is private.
@@ -196,7 +196,7 @@ export interface Person {
 /** A file a message to a person carries: pasted bytes or a path on this Mac. */
 export interface TeamMessageFile { name: string; dataBase64?: string; srcPath?: string }
 
-/** Where a comment sits on a file (shared/artifact-marks.mjs). */
+/** Where a comment sits on a file (shared/artifact-marks.mts). */
 export type NotePlace =
   | { kind: 'pin'; x: number; y: number }
   | { kind: 'time'; s: number; x?: number; y?: number }
@@ -270,7 +270,7 @@ export interface FileMarks {
   edits?: Array<{ file: string; path: string; by: string | null; ts: number }>;
 }
 
-/** A place a file was sent in: your thread, a chat, or a teammate's thread (main/files-place.mjs). */
+/** A place a file was sent in: your thread, a chat, or a teammate's thread (main/files-place.mts). */
 export interface FileSentIn {
   kind: 'thread' | 'chat' | 'shared' | 'room';
   roomId?: string;
@@ -369,7 +369,7 @@ export interface SharedFileNews {
   ts: number;
 }
 
-/** A teammate's shared thread as this copy holds it (main/team/thread-share.mjs). */
+/** A teammate's shared thread as this copy holds it (main/team/thread-share.mts). */
 export interface TeammateThreadWork {
   shared: boolean;
   lines: { id: string; ts: number; source: string; by?: string; uid?: string; patch?: Record<string, unknown> | null }[];
@@ -402,7 +402,7 @@ export interface FoundWhere {
 export interface FoundLine extends FoundWhere { uid: string; by: string | null; source: 'founder' | 'agent' | 'system'; at: number; comment: boolean; text: string }
 export interface FoundFile extends FoundWhere { how: 'name' | 'contents'; src: string; name: string; by: string | null; at: number; text: string }
 export interface FoundComment extends FoundWhere { src: string; name: string; by: string | null; at: number; resolved: boolean; noteId: string; fileId: string; text: string }
-/** What the finder in main answers (main/everything-found.mjs). */
+/** What the finder in main answers (main/everything-found.mts). */
 export interface FoundInThreads {
   ok?: boolean;
   lines: FoundLine[];
@@ -432,7 +432,7 @@ export interface ThreadCard {
   updatedAt: number;
   /** When it shipped. */
   shippedAt?: number;
-  /** A task its holder publishes: who gave it, and when it is due (shared/team-tasks.mjs). */
+  /** A task its holder publishes: who gave it, and when it is due (shared/team-tasks.mts). */
   task?: { from: string | null; dueAt?: number; clock?: boolean };
 }
 
@@ -471,9 +471,9 @@ export interface TeamState {
   /** Invites waiting for your confirmed email, while you are in no team. Joining one needs your yes. */
   invites?: TeamInvite[];
   people: Person[];
-  /** Every card in the team, yours included (shared/thread-cards.mjs). */
+  /** Every card in the team, yours included (shared/thread-cards.mts). */
   cards: ThreadCard[];
-  /** Other people's AI teammates (shared/mate-cards.mjs). */
+  /** Other people's AI teammates (shared/mate-cards.mts). */
   teamMates?: TeamMate[];
   /** Notes on teammates' threads that name you and wait on you. */
   sharedFileNews?: SharedFileNews[];
@@ -1001,9 +1001,9 @@ export interface AgentSession {
   runAt?: number;
   runAtSetAt?: number;
   // The moment she closed the row. Any value above zero means closed and it
-  // stays closed whatever the session does next (`putAway` in shared/agents.mjs).
+  // stays closed whatever the session does next (`putAway` in shared/agents.mts).
   doneThrough?: number;
-  /** When she last spoke to it from Agentbox. See tookHerReply in shared/agents.mjs. */
+  /** When she last spoke to it from Agentbox. See tookHerReply in shared/agents.mts. */
   repliedAt?: number;
   /** The session's own stamp on its own status. */
   statusAt?: number;
@@ -1044,7 +1044,7 @@ export interface AgentTurn {
   // A REPLY IN A THREAD: the uid of the message it answers (w-920461cbe6).
   // In a chat, `itemThread` lifts these out of the stream into `replies`.
   inReplyTo?: string;
-  /** When its author last edited it (shared/message-edits.mjs). */
+  /** When its author last edited it (shared/message-edits.mts). */
   edited?: number;
   /** A reply set for later: when it goes. */
   sendsAt?: number;
@@ -1081,7 +1081,7 @@ export interface AgentTurn {
   // AND, ON THE PHONE WITH THE MAC SHUT, WHY HER MAC DID NOT TAKE IT
   // (renderer/src/cloud-bridge.ts). Absent on every other message.
   refused?: string;
-  // Or that Agentbox Cloud took it with the computer shut (shared/cloud-kit.mjs).
+  // Or that Agentbox Cloud took it with the computer shut (shared/cloud-kit.mts).
   cloud?: boolean;
   // Or that it was taken and its thread's copy has not shown it yet (phone-rows.ts `copyShows`).
   sent?: boolean;
@@ -1294,7 +1294,7 @@ export type View = 'inbox' | 'snoozed' | 'progress' | 'done';
 // How many of her own Claude Code sessions the inbox takes. 'all' so she can go
 // through them once and close them, 'waiting' for only the ones stopped on a
 // question, 'off' for somebody who processes their agents somewhere else
-// entirely. The values are AGENT_MODES in shared/agents.mjs, which is the one
+// entirely. The values are AGENT_MODES in shared/agents.mts, which is the one
 // place that decides what any of them means.
 export type AgentMode = 'all' | 'waiting' | 'off';
 
@@ -1312,7 +1312,7 @@ export type AgentMode = 'all' | 'waiting' | 'off';
  * CODEX'S THREE, and they are not permission modes. Claude Code's six and these
  *  do not map onto each other in either direction: each of these is a SANDBOX
  *  plus an approval policy, which is one choice on that engine and two on this
- *  one. shared/codex-modes.mjs is the list and the reasoning; this is only the
+ *  one. shared/codex-modes.mts is the list and the reasoning; this is only the
  *  type, because .mjs cannot carry one.
  */
 export type CodexModeId = 'read-only' | 'auto' | 'full-access';
@@ -1361,7 +1361,7 @@ export interface AccountSetting {
   running: number;
   /**
    * The Claude plan this subscription is on, read out of Claude Code's own
-   *  config file (main/claude-plan.mjs). Null when it cannot be read, and then
+   *  config file (main/claude-plan.mts). Null when it cannot be read, and then
    *  no screen says anything about a plan at all. Optional so an older payload
    *  still typechecks. */
   plan?: { label: string | null; max: boolean } | null;
@@ -1395,7 +1395,7 @@ export interface ProjectSettings {
 }
 
 export interface WorkspaceSettings {
-  /** Every project on her phone, unless she turned it off (shared/phone-snapshot.mjs). */
+  /** Every project on her phone, unless she turned it off (shared/phone-snapshot.mts). */
   phoneAll?: boolean;
   agentsRunning: boolean;
   sessionsAtOnce: number;
@@ -1407,7 +1407,7 @@ export interface WorkspaceSettings {
   sessionsAtOnceFromPlan?: string | null;
   /**
    * How many agents we SUGGEST for this Mac, worked out from its memory and its
-   * cores (main/machine.mjs). It chooses the number somebody starts on and it
+   * cores (main/machine.mts). It chooses the number somebody starts on and it
    * is what `machineNote` recommends. IT IS NOT A CEILING: these are developers
    * using the tool as they want, and nothing clamps to it. */
   slotsSuggested?: number;
@@ -1478,7 +1478,7 @@ export interface WorkspaceSettings {
    * `claude update` reaches her picker without a release. `id` is the alias
    * Agentbox sends; `model` is what it resolves to today. Always present and
    * never empty: main falls back to the committed table on a Mac with no
-   * Claude Code. See main/claude-models.mjs. */
+   * Claude Code. See main/claude-models.mts. */
   claudeModels?: Array<{ id: string; label: string; model?: string; defaultLevel?: string | null }>;
   /**
    * What SHE has set for the whole workspace, when she has set anything: the
@@ -1557,7 +1557,7 @@ export interface WorkspaceSettings {
   // Whether the search for Claude Code got an answer at all, as opposed to
   // failing to reach the machine. Nothing may say "missing" without it.
   claudeCertain: boolean;
-  // Where to send someone who does not have it. One copy, in main/engine-bin.mjs.
+  // Where to send someone who does not have it. One copy, in main/engine-bin.mts.
   claudeInstallUrl: string;
   // Whether somebody pointed at this file themselves rather than it being
   // found. A chosen path is never searched around, so the row that offers the

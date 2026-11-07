@@ -19,7 +19,7 @@ import { belongsInInbox, statusForReply } from '../renderer/src/list-rules';
 
 const T = 1_786_000_000_000;
 
-// Shaped exactly as the fold hands them over (shared/work-items.mjs).
+// Shaped exactly as the fold hands them over (shared/work-items.mts).
 const hersAndAnswered = {
   id: 'w-d6d138a2ea', product: 'harbour-new', status: 'done', kind: 'directive',
   labels: ['founder'], priority: 9, title: 'can you check our metrics?',

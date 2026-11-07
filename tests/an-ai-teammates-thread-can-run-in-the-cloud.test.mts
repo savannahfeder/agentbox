@@ -11,13 +11,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
+import { appHome } from '../main/store/home.mts';
 import { loadStore } from '../main/store-modules.mts';
 import { Teammates } from '../main/teammates.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { filesNamedIn } from '../main/cloud/run.mts';
 import { threadPlace } from '../renderer/src/cloud-menu.ts';
-import { teammateIdOf, YOU } from '../shared/teammates.mjs';
+import { teammateIdOf, YOU } from '../shared/teammates.mts';
 
 const product = { slug: 'p', repoPath: '/r' };
 const RUN = { id: 'w-t1', product: 'p', labels: ['founder', 'teammate:t-abcdef1234', 'hop:0'] };
@@ -84,9 +84,9 @@ describe('the team tools in a cloud run, served from one shared process', () => 
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = `acct-${Math.random().toString(36).slice(2, 8)}`;
     fs.mkdirSync(path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     p = createProduct(`Shop ${Math.random().toString(36).slice(2, 8)}`);
     dir = path.join(home, 'accounts', process.env.STORE_ACCOUNT_ID, p.id);
     const mods = await loadStore();
@@ -115,7 +115,7 @@ describe('the team tools in a cloud run, served from one shared process', () => 
     return store.listItems().find((i) => teammateIdOf(i) === mate.id);
   };
   const toolsFor = async (ownItem) => {
-    const b = (await import('../mcp/tools.mjs')).buildTools({ holder: `test-${Math.random()}`, ownItem, ownProduct: p.id });
+    const b = (await import('../mcp/tools.mts')).buildTools({ holder: `test-${Math.random()}`, ownItem, ownProduct: p.id });
     built.push(b);
     return async (name, args = {}) => {
       const r = await b.tools.find((t) => t.name === name).run(args);
@@ -123,7 +123,7 @@ describe('the team tools in a cloud run, served from one shared process', () => 
       return JSON.parse(r.content[0].text);
     };
   };
-  const plainThread = async (title) => (await import('../mcp/core/work.mjs')).createItem(p.id, { title, labels: ['founder'] }, { source: 'founder' });
+  const plainThread = async (title) => (await import('../mcp/core/work.mts')).createItem(p.id, { title, labels: ['founder'] }, { source: 'founder' });
 
   it('post as the run\'s own teammate when the process names no thread', async () => {
     const ada = team.create({ starter: 'quality' });

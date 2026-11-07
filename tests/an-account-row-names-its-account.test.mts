@@ -29,7 +29,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { accountIdentity, duplicateAccountNote } from '../main/account-tooling.mjs';
+import { accountIdentity, duplicateAccountNote } from '../main/account-tooling.mts';
 
 // Two accounts, uuids made up and shortened but distinct the way real ones are.
 const WORK = { emailAddress: 'work@example.com', accountUuid: 'bbbb2222-work' };

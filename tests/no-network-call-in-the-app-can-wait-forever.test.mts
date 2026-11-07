@@ -41,7 +41,7 @@ describe('every network call the app makes', () => {
     const clients = lines.filter((l) => /new (S3|BedrockAgentCore|[A-Z]\w*)Client\(/.test(l.line) && /@aws-sdk|requestHandler|region/.test(l.line));
     expect(clients.length).toBeGreaterThan(0);
     for (const c of clients) expect(c.line, `${c.rel}:${c.n}`).toMatch(/requestHandler: http\(/);
-    const aws = fs.readFileSync(path.join(root, 'main/cloud/aws.mjs'), 'utf8');
+    const aws = fs.readFileSync(path.join(root, 'main/cloud/aws.mts'), 'utf8');
     expect(aws).toMatch(/throwOnRequestTimeout: true/);
   });
 
@@ -59,7 +59,7 @@ describe('every network call the app makes', () => {
 describe('the deadline the account database\'s client fetches with', () => {
   it('ends a request that never answers, and leaves one that answers alone', async () => {
     const http = await import('node:http');
-    const { withDeadline } = await import('../main/team/session.mjs');
+    const { withDeadline } = await import('../main/team/session.mts');
     const server = http.createServer((req, res) => { if (req.url === '/ok') res.end('fine'); });
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const base = `http://127.0.0.1:${server.address().port}`;

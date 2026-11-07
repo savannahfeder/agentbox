@@ -9,7 +9,7 @@
 // fix it named the hand-back for any merge into main and said nothing of `ship`.
 import { describe, it, expect } from 'vitest';
 import { CLOUD_NOTE, PLAIN_CLOUD_NOTE } from '../main/cloud/run.mts';
-import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
+import { HAND_BACK } from '../shared/cloud-hand-back.mts';
 import { SHIP_LABEL } from '../main/ship-queue.mts';
 
 const branches = CLOUD_NOTE.split('\n\n').find((p) => p.startsWith('Only this task\'s own branch comes back'));

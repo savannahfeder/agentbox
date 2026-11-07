@@ -22,7 +22,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Thread } from '../renderer/src/components/Thread.tsx';
-import { firstSentence, summaryOf } from '../shared/thread-cards.mjs';
+import { firstSentence, summaryOf } from '../shared/thread-cards.mts';
 
 const COMMAND = 'grep -r foo . --include=*.md --include=*.json';
 
@@ -106,7 +106,7 @@ describe('the sentence the summary panel shows', () => {
 
   it('does not end a sentence in the middle of a number or a file name', () => {
     expect(firstSentence('It costs $96,400.50 today. Tomorrow who knows.')).toBe('It costs $96,400.50 today.');
-    expect(firstSentence('Open shared/thread-cards.mjs and read it.')).toBe('Open shared/thread-cards.mjs and read it.');
+    expect(firstSentence('Open shared/thread-cards.mts and read it.')).toBe('Open shared/thread-cards.mts and read it.');
   });
 
   it('ends a sentence only where a capital or the end follows', () => {

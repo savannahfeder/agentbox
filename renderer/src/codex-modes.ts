@@ -1,6 +1,6 @@
 // CODEX'S THREE MODES, FOR THE SCREENS THAT DRAW THEM.
 //
-// The list itself lives in `shared/codex-modes.mjs`, because main/ needs it too
+// The list itself lives in `shared/codex-modes.mts`, because main/ needs it too
 // and a second copy is how the picker and the run come to disagree.
 //
 // THIS FILE USED TO BE WHERE THE RENDERER STATED THE SHAPE, because that .mjs
@@ -20,4 +20,4 @@ export {
   CODEX_MODES,
   CODEX_MODE_ORDER,
   type CodexMode,
-} from '../../shared/codex-modes.mjs';
+} from '../../shared/codex-modes.mts';

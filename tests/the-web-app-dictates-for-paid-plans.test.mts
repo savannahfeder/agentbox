@@ -6,7 +6,7 @@
 // Listening row with Stop and Send, Stop keeping the words to edit, Send
 // sending them. The web app listens with the browser's own speech recognition
 // (Safari on an iPhone: Apple's). It knows the plan from the copy of settings
-// a computer already sends (shared/phone-settings.mjs), which now carries the
+// a computer already sends (shared/phone-settings.mts), which now carries the
 // Agentbox Cloud plan that computer last read; pro, plus and max are paid.
 // The site's own header refused every page the microphone, so it now allows
 // the page itself. Measured here on the pieces: the plan's way from the
@@ -18,10 +18,10 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadConfig } from '../main/config.mjs';
+import { loadConfig } from '../main/config.mts';
 import { readSettings } from '../main/settings.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { phoneSettingsOf } from '../shared/phone-settings.mjs';
+import { phoneSettingsOf } from '../shared/phone-settings.mts';
 import { buildPhoneSite } from '../scripts/build-phone-site.mjs';
 import { dictationAllowed, webSpeech } from '../renderer/src/web-speech';
 import { dictation } from '../renderer/src/dictation';

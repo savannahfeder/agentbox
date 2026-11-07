@@ -15,7 +15,7 @@
 // lock lives in $CODEX_HOME/thread-writer-locks/<id>.lock.
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { createCodexAppServer } from '../main/codex-app-server.mjs';
+import { createCodexAppServer } from '../main/codex-app-server.mts';
 import { createCodexWorker } from '../main/codex-session.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import {

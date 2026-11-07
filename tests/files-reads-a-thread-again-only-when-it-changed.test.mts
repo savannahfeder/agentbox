@@ -8,7 +8,7 @@
 // loop. A store with thousands of threads and an agent writing a line a second
 // kept the main process busy. Measured here by counting the parses.
 import { describe, it, expect } from 'vitest';
-import { filesOf, filesOfInternals } from '../main/files-place.mjs';
+import { filesOf, filesOfInternals } from '../main/files-place.mts';
 
 const thread = (i, extra = []) => ({
   ref: { kind: 'thread', product: 'company', id: `w-${i}` },
@@ -48,7 +48,7 @@ describe('reading threads for their files', () => {
     const fs = await import('node:fs');
     const strip = fs.readFileSync(new URL('../renderer/src/components/ThreadArtifacts.tsx', import.meta.url), 'utf8');
     expect(strip).toMatch(/useFileLine\(item\.product, item\.id, lines\.length, false\)/);
-    const place = fs.readFileSync(new URL('../main/files-place.mjs', import.meta.url), 'utf8');
+    const place = fs.readFileSync(new URL('../main/files-place.mts', import.meta.url), 'utf8');
     expect(place).not.toMatch(/filesOf\(threads\(\)\)/);
   });
 

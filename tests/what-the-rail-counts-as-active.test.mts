@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { belongsOnTheRail } from '../renderer/src/list-rules';
-import { onTheRail } from '../shared/agents.mjs';
+import { onTheRail } from '../shared/agents.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

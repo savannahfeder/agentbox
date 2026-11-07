@@ -15,11 +15,11 @@
 // leaving the team asks every time.
 import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { teamTell, teamTask } from '../mcp/core/reach.mjs';
-import { REACH_LABEL, reachAnswer } from '../shared/teammate-reach.mjs';
-import { voiceName } from '../shared/agent-voice.mjs';
+import { teamTell, teamTask } from '../mcp/core/reach.mts';
+import { REACH_LABEL, reachAnswer } from '../shared/teammate-reach.mts';
+import { voiceName } from '../shared/agent-voice.mts';
 import { messageLine } from '../renderer/src/threads/page-rules';
-import { isTaskRow } from '../shared/team-rules.mjs';
+import { isTaskRow } from '../shared/team-rules.mts';
 import { itemThread } from '../renderer/src/item-thread';
 
 let t; let chief; let run;

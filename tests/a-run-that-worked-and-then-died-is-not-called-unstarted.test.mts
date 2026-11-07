@@ -23,7 +23,7 @@ import { Supervisor } from '../main/supervisor.mts';
 import { deadRunSentence, deadRunCause } from '../shared/spawn-trouble.mts';
 import { readDeadRunTrace } from '../shared/dead-run-trace.mts';
 import { Name } from '../shared/product-name.mjs';
-import { machineryPath } from '../main/store/home.mjs';
+import { machineryPath } from '../main/store/home.mts';
 import { setAppHome, clearAppHome } from './app-home.mts';
 
 const UNSTARTED = /stopped before it did anything|has not been started|nothing has been done|keep failing/;

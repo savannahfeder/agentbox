@@ -2,7 +2,7 @@
 //
 // What broke (w-87ff499077, 2026-10-02): the only way to get a waiting task
 // running was to raise its tag to Urgent and lower the others, and that often
-// did nothing. Read off main/supervisor.mts and shared/rank.mjs, three reasons:
+// did nothing. Read off main/supervisor.mts and shared/rank.mts, three reasons:
 //
 //   1. A project's place in the running order is worth 100 and a tag 2 to 9,
 //      so an Urgent task in a lower project still sorts below a Low one in a

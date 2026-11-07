@@ -7,7 +7,7 @@
 // back as a conversation to import. Its session_meta carried no thread_source
 // (the reader then treats any string `source` as a person's), and
 // `originator: "agentbox"`, which is the clientInfo name the app hands Codex
-// (main/codex-app-server.mjs CLIENT_INFO). So every task on a Codex Mac would
+// (main/codex-app-server.mts CLIENT_INFO). So every task on a Codex Mac would
 // have asked to be imported back into the inbox it came from.
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';

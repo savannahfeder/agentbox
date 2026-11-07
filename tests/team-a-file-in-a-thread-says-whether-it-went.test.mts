@@ -9,12 +9,12 @@
 //
 // Now an answer about a carried name carries `carry`: Sent / On its way / Not
 // delivered with a plain reason (and Try again for the sender) / waiting for the
-// sender's computer, which the tile draws (shared/carried-files.mjs carryLine).
+// sender's computer, which the tile draws (shared/carried-files.mts carryLine).
 import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { aMac, aProject, bytesOf, conversation, createMemoryCloud, disk, opened, signUpMemory, until, write } from './lib/two-macs-over-one-cloud.mts';
-import { carryLine } from '../shared/carried-files.mjs';
+import { carryLine } from '../shared/carried-files.mts';
 
 let cloud, maya, dev, mine, refuse;
 const say = async (words) => {

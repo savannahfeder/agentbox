@@ -15,10 +15,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { traceReader } from '../shared/trace-delta.mjs';
+import { traceReader } from '../shared/trace-delta.mts';
 import { withRuns } from '../renderer/src/thread-history';
 import { bootHeadless } from '../main/serve.mts';
-import { encodeProjectPath, machineryPath } from '../main/store/home.mjs';
+import { encodeProjectPath, machineryPath } from '../main/store/home.mts';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const plain = (x) => JSON.parse(JSON.stringify(x));

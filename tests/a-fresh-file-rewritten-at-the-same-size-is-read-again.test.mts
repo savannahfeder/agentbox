@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { versionLine } from '../main/version-line.mjs';
+import { versionLine } from '../main/version-line.mts';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'racy-'));
 

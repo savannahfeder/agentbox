@@ -1,7 +1,7 @@
 // THE COMPUTER NEVER DOES A REPLY THE CLOUD TOOK, AND JOINS ITS RUN ON WAKING.
 //
 // With the lid shut, a reply from the phone is started in the cloud by the
-// cloud server, which claims the command `cloud:<run id>` (shared/cloud-kit.mjs).
+// cloud server, which claims the command `cloud:<run id>` (shared/cloud-kit.mts).
 // Before this, a computer reading a claimed, untaken command took it for its
 // own claim from before a restart ('ours') and did it again: the same reply
 // twice, once in the cloud and once here. Now a cloud claim is never done or

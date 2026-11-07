@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { otherFilesInLines, viewKind } from '../shared/artifact-marks.mjs';
+import { otherFilesInLines, viewKind } from '../shared/artifact-marks.mts';
 import { coverFit, coverPageWidth, marksOnPages, otherFilesOpen, stripFor } from '../renderer/src/artifact-pins.ts';
 import { whereALinkGoes } from '../renderer/src/link-click.ts';
 

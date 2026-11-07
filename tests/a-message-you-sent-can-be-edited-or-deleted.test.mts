@@ -9,8 +9,8 @@
 // your message changes nothing; and the edit crosses to a teammate in a
 // conversation but not on an ordinary shared task.
 import { describe, it, expect } from 'vitest';
-import { foldWorkItems, pickFields } from '../shared/work-items.mjs';
-import { whatATeammateMaySet } from '../shared/team-rules.mjs';
+import { foldWorkItems, pickFields } from '../shared/work-items.mts';
+import { whatATeammateMaySet } from '../shared/team-rules.mts';
 import { itemThread } from '../renderer/src/item-thread.ts';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';

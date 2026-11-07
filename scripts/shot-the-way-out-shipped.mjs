@@ -15,8 +15,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { foldWorkItems } from '../shared/work-items.mjs';
-import { resolveArtifact } from '../main/artifact-path.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
+import { resolveArtifact } from '../main/artifact-path.mts';
 import { guard, sweep } from './lib/chrome-guard.mjs';
 import { ACCOUNT_ROOT } from './lib/machine-paths.mjs';
 

@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { cardsFor, shownToTeam, shownToPeople, visibilityOf, projectSeenBy } from '../shared/thread-cards.mjs';
+import { cardsFor, shownToTeam, shownToPeople, visibilityOf, projectSeenBy } from '../shared/thread-cards.mts';
 import { rowSharing } from '../renderer/src/threads/page-rules.ts';
 import { whoSees } from '../renderer/src/threads/summary-rules.ts';
 import { startingVisibility, startingChosen } from '../renderer/src/threads/composer-rules.ts';

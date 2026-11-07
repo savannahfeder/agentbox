@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { alphaFeatures } from '../main/settings.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { teammatesOn } from '../shared/teammates.mjs';
+import { teammatesOn } from '../shared/teammates.mts';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const FELIX = { id: 't-felix00001', name: 'Felix', status: 'active' };
@@ -26,7 +26,7 @@ describe('the switch', () => {
   it('sits in Settings, Alpha features, and the phone may set it too', () => {
     expect(read('renderer/src/components/Settings.tsx')).toMatch(/<Switch label="Teammates" on=\{!!w\.alpha\?\.teammates\} onChange=\{\(v\) => setWorkspace\('alphaTeammates', v\)\} \/>/);
     expect(read('main/settings.mts')).toMatch(/case 'alphaTeammates':\n\s+saveConfig\(config, \{ alphaTeammates: !!value \}\);/);
-    expect(read('shared/phone-settings.mjs')).toMatch(/alphaTeammates: bool,/);
+    expect(read('shared/phone-settings.mts')).toMatch(/alphaTeammates: bool,/);
   });
 });
 
@@ -65,15 +65,15 @@ describe('the team tools an agent is offered', () => {
   afterEach(() => { process.env = { ...saved }; });
 
   it('are there only once there is a teammate to talk to', async () => {
-    const { appHome } = await import('../main/store/home.mjs');
+    const { appHome } = await import('../main/store/home.mts');
     const account = `acct-alpha-${Math.random().toString(36).slice(2, 8)}`;
     process.env.STORE_ACCOUNT_ID = account;
     fs.mkdirSync(path.join(appHome(), 'accounts', account), { recursive: true });
-    const { buildTools } = await import('../mcp/tools.mjs');
+    const { buildTools } = await import('../mcp/tools.mts');
     const names = () => buildTools({ holder: 't' }).tools.map((t) => t.name);
     expect(names().filter((n) => n.startsWith('team_'))).toEqual([]);
-    const { writeTeammate, teamDir } = await import('../main/store/teammates-files.mjs');
-    const { legacyRoot } = await import('../main/store/project.mjs');
+    const { writeTeammate, teamDir } = await import('../main/store/teammates-files.mts');
+    const { legacyRoot } = await import('../main/store/project.mts');
     writeTeammate(teamDir(legacyRoot(), account), 't-fe11c00001', { name: 'Felix', status: 'active' }, Date.now());
     expect(names().filter((n) => n.startsWith('team_')).sort()).toEqual(['team_hire', 'team_method', 'team_pass', 'team_playbook', 'team_post', 'team_remember', 'team_roster', 'team_setup']);
   });

@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { prepareHome, makeHome } from '../shared/fresh-user-home.mjs';
+import { prepareHome, makeHome } from '../shared/fresh-user-home.mts';
 import { readAgentFiles } from '../main/agent-files.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

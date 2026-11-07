@@ -24,7 +24,7 @@ import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
 import { envName } from '../shared/product-name.mjs';
 import { Store } from '../main/store.mts';
-import { threadOf } from '../shared/work-items.mjs';
+import { threadOf } from '../shared/work-items.mts';
 
 let root;
 let store;

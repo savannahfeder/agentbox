@@ -28,7 +28,7 @@
 // nothing reaches the ledger at all, so there is no withdrawal to misread.
 
 import { describe, it, expect } from 'vitest';
-import { buildLine, foldWorkItems } from '../shared/work-items.mjs';
+import { buildLine, foldWorkItems } from '../shared/work-items.mts';
 import { answeredHerAsk, belongsInInbox, belongsInProgress } from '../renderer/src/list-rules';
 
 const ID = 'w-8c41d0a2b7';

@@ -9,7 +9,7 @@
 // A CODEX RUN HAD ONLY THE DISK HALF. `changeFromTranscript` speaks Claude
 // Code's JSONL transcript and nothing else, and a Codex rollout fed to it
 // yields zero files, so the conversation half of a Codex card was always empty.
-// `changeFromCodexTurn` (main/codex.mjs) has existed since the reader slice and
+// `changeFromCodexTurn` (main/codex.mts) has existed since the reader slice and
 // nothing called it, because calling it needs a change writer that takes a
 // change somebody else prepared. That is what this adds, and these are the
 // three things it has to be true of:
@@ -28,7 +28,7 @@
 //   ordinary one -- it reads and edits by running shell commands.
 //
 // The last block is about one number rather than the artifact. `SAYING_CAP`
-// was written twice on purpose (main/codex.mjs:111 said so) while the reader
+// was written twice on purpose (main/codex.mts:111 said so) while the reader
 // slice was not allowed to edit the supervisor. CLAUDE.md is right that two
 // copies of a rule become two different rules within a week, and the visible
 // cost of these two drifting apart is a live sentence that one engine drops at
@@ -102,11 +102,11 @@ vi.mock('node:child_process', async (importActual) => {
 });
 
 import { Supervisor, readersFor } from '../main/supervisor.mts';
-import { writeChangeForRun, readChange, changePath } from '../main/code-change.mjs';
-import { changeFromCodexTurn, SAYING_CAP } from '../main/codex.mjs';
-import { machineryPath } from '../main/store/home.mjs';
+import { writeChangeForRun, readChange, changePath } from '../main/code-change.mts';
+import { changeFromCodexTurn, SAYING_CAP } from '../main/codex.mts';
+import { machineryPath } from '../main/store/home.mts';
 import { __gitJobsIdle } from '../main/git-change-offthread.mts';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dirs = [];
@@ -401,6 +401,6 @@ describe('the cap on the sentence an agent is typing', () => {
     const claudeReader = fs.readFileSync(path.join(repoRoot, 'main', 'harnesses', 'claude-stream.mts'), 'utf8');
     expect(claudeReader).not.toMatch(/(const|let|var)\s+SAYING_CAP\s*=/);
     expect(claudeReader).toMatch(/import\s*\{\s*SAYING_CAP\s*\}\s*from\s*['"]\.\.\/codex\.mjs['"]/);
-    expect(fs.readFileSync(path.join(repoRoot, 'main', 'codex.mjs'), 'utf8')).toMatch(/export const SAYING_CAP\s*=/);
+    expect(fs.readFileSync(path.join(repoRoot, 'main', 'codex.mts'), 'utf8')).toMatch(/export const SAYING_CAP\s*=/);
   });
 });

@@ -37,7 +37,7 @@
 //
 // AND THE LINE IS DRAWN AT THE MODEL, NOT AT THE ENGINE. A row that names Codex
 // and NO model still runs here on Claude Code, unchanged and unremarked. That
-// fallback is deliberate and documented in shared/engines.mjs: "she may have
+// fallback is deliberate and documented in shared/engines.mts: "she may have
 // chosen Codex on her laptop and be reading the row on a machine without it,
 // and a session that never starts tells her nothing about why". There is no
 // word of hers to swallow on such a row, so there is nothing to refuse. The
@@ -81,14 +81,14 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
-vi.mock('../main/account-tooling.mjs', async (importActual) => {
+vi.mock('../main/account-tooling.mts', async (importActual) => {
   const actual = await importActual();
   return { ...actual, linkAccountTooling: () => null };
 });
 
 import { Supervisor } from '../main/supervisor.mts';
-import { foldWorkItems } from '../shared/work-items.mjs';
-import { modelForEngine, DEFAULT_CLAUDE_MODEL } from '../shared/engines.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
+import { modelForEngine, DEFAULT_CLAUDE_MODEL } from '../shared/engines.mts';
 
 const CLAUDE_BIN = '/nonexistent/claude-code/claude';
 const CODEX_BIN = '/nonexistent/codex/codex';

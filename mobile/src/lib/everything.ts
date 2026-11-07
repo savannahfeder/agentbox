@@ -3,7 +3,7 @@
 // phone can read, and whose work goes under the card that is lit.
 import { buildMembers, mateRunsOf, moreLine, orderMembers, personCardsOf, readOrder, rowsShown, teamRunsOf, type Member } from '../../../renderer/src/team/everything/members';
 import { flipEvView, readEvView, writeEvView, type EvView } from '../../../renderer/src/team/everything/whose-board';
-import { teammateIdOf } from '../../../shared/teammates.mjs';
+import { teammateIdOf } from '../../../shared/teammates.mts';
 import type { Room, RoomMessage, Teammate, ThreadCard } from '../../../renderer/src/types';
 import { groupName } from './groups';
 import type { KeptStore } from './compose';

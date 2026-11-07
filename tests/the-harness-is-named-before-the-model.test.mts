@@ -22,7 +22,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Compose } from '../renderer/src/components/Compose.tsx';
-import { ENGINES } from '../shared/engines.mjs';
+import { ENGINES } from '../shared/engines.mts';
 
 const saved = globalThis.localStorage;
 afterEach(() => { globalThis.localStorage = saved; });

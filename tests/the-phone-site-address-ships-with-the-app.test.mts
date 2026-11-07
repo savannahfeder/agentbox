@@ -3,7 +3,7 @@
 // A tester on the 0.1.17 download, signed in with Cloud on, read Settings ›
 // Phone: "Not set up yet. The phone site has no address yet." with no way on.
 // The site was up (agentbox-phone.pages.dev answered 200, and its bundle signs
-// in to the same database shared/cloud-address.mjs ships). The address only
+// in to the same database shared/cloud-address.mts ships). The address only
 // reached an installed app if the releasing Mac's team.config.json named it as
 // `phoneSite`, and that build was baked without one. Now the address ships in
 // the code beside the database it belongs to, and fills in for any config
@@ -12,8 +12,8 @@ import { it, expect, describe, afterEach, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadCloudConfig } from '../main/team/session.mjs';
-import { CLOUD_ADDRESS, PHONE_SITE } from '../shared/cloud-address.mjs';
+import { loadCloudConfig } from '../main/team/session.mts';
+import { CLOUD_ADDRESS, PHONE_SITE } from '../shared/cloud-address.mts';
 
 const tmp = (name) => fs.mkdtempSync(path.join(os.tmpdir(), `phone-ships-${name}-`));
 const OURS = { url: CLOUD_ADDRESS.supabaseUrl, anonKey: CLOUD_ADDRESS.anonKey };

@@ -34,11 +34,11 @@ const NO_APP_CHANGE = { live: false, setups: false, real: false, installed: fals
 
 describe('which layers a branch gets', () => {
   it('a change to how Codex is found runs the machine check and every app layer', () => {
-    expect(runs(['main/codex-bin.mjs'])).toEqual({ 'this-machine': true, machines: true, ...APP_CHANGE });
+    expect(runs(['main/codex-bin.mts'])).toEqual({ 'this-machine': true, machines: true, ...APP_CHANGE });
   });
 
   it('every file that decides how a tool is found or started counts', () => {
-    for (const f of ['main/shell-path.mjs', 'main/claude-bin.mjs', 'main/codex-launch-env.mts', 'main/harnesses/common.mts', 'main/harnesses.mts', 'main/config.mjs', 'package.json']) {
+    for (const f of ['main/shell-path.mts', 'main/claude-bin.mts', 'main/codex-launch-env.mts', 'main/harnesses/common.mts', 'main/harnesses.mts', 'main/config.mts', 'package.json']) {
       expect(runs([f]).machines, f).toBe(true);
     }
   });

@@ -11,7 +11,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { resolveArtifact } from '../main/artifact-path.mjs';
+import { resolveArtifact } from '../main/artifact-path.mts';
 
 const TODAY = 'w-aaaa111111';
 const YESTERDAY = 'w-bbbb222222';

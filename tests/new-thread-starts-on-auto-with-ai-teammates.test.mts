@@ -1,6 +1,6 @@
 // NEW THREAD STARTS ON AUTO WITH AI TEAMMATES (w-b5f23cff71).
 //
-// The screen's half of Auto (shared/auto-route.mjs). Approved as drawn
+// The screen's half of Auto (shared/auto-route.mts). Approved as drawn
 // (designs 83 to 88): To opens on Auto when there is an AI teammate to give a
 // thread to, and Model stays, so what it runs on is still yours ("For auto
 // mode you can still choose the model ... That's great."). The row says
@@ -13,7 +13,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { autoOffered, headRows } from '../renderer/src/threads/composer-rules.ts';
 import { statusCell } from '../renderer/src/status-word.ts';
 import { RouteLine } from '../renderer/src/components/RouteLine.tsx';
-import { AGENT_WHY } from '../shared/auto-route.mjs';
+import { AGENT_WHY } from '../shared/auto-route.mts';
 
 const card = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
 const video = { id: 't-video', name: 'Video producer', letter: 'V', role: null, paused: false, status: 'active' };

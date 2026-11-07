@@ -14,8 +14,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { stoppedByHer, toldBy } from '../shared/answers.mjs';
-import { MAX_HOPS, HOP_LABEL_PREFIX } from '../shared/teammates.mjs';
+import { stoppedByHer, toldBy } from '../shared/answers.mts';
+import { MAX_HOPS, HOP_LABEL_PREFIX } from '../shared/teammates.mts';
 
 let work; let disk; let product; let built = [];
 const inherited = process.env.ZERO_ITEM;
@@ -23,15 +23,15 @@ const FAULTS = 'Seven new faults on the password screen; picture attached.';
 
 beforeEach(async () => {
   delete process.env.ZERO_ITEM;
-  const home = (await import('../main/store/home.mjs')).appHome();
+  const home = (await import('../main/store/home.mts')).appHome();
   process.env.STORE_ACCOUNT_ID = 'acct-agent-note';
   fs.mkdirSync(path.join(home, 'accounts', 'acct-agent-note'), { recursive: true });
-  const { resolveAccount } = await import('../mcp/core/account.mjs');
+  const { resolveAccount } = await import('../mcp/core/account.mts');
   resolveAccount();
-  const { createProduct } = await import('../mcp/core/products.mjs');
+  const { createProduct } = await import('../mcp/core/products.mts');
   product = createProduct(`Notes ${Math.random().toString(36).slice(2, 8)}`);
-  work = await import('../mcp/core/work.mjs');
-  disk = await import('../main/store/work-items.mjs');
+  work = await import('../mcp/core/work.mts');
+  disk = await import('../main/store/work-items.mts');
   product.dir = path.join(home, 'accounts', 'acct-agent-note', product.id);
 });
 afterEach(() => {
@@ -42,7 +42,7 @@ afterEach(() => {
 });
 
 const update = async (ownItem, args) => {
-  const b = (await import('../mcp/tools.mjs')).buildTools({ holder: `test-${Math.random()}`, ownItem });
+  const b = (await import('../mcp/tools.mts')).buildTools({ holder: `test-${Math.random()}`, ownItem });
   built.push(b);
   const out = await b.tools.find((t) => t.name === 'update_work_item').run(args);
   return JSON.parse(out.content[0].text);

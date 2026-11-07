@@ -15,10 +15,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { HOMES, existingHomes, freshEnv, makeHome, prepareHome } from '../shared/fresh-user-home.mjs';
+import { HOMES, existingHomes, freshEnv, makeHome, prepareHome } from '../shared/fresh-user-home.mts';
 import { openFreshUser, relaunchCommand } from '../main/fresh-user.mts';
-import { configDir } from '../main/config.mjs';
-import { DEMO_ENV } from '../shared/demo-world.mjs';
+import { configDir } from '../main/config.mts';
+import { DEMO_ENV } from '../shared/demo-world.mts';
 import { NAME, Name, envNames } from '../shared/product-name.mjs';
 
 let realHome;

@@ -56,7 +56,7 @@ describe('nothing can add a person to an existing conversation', () => {
     const cloud = createMemoryCloud();
     const backend = memoryBackend(cloud, signUpMemory(cloud, { id: 'maya', email: 'maya@x.test', name: 'maya' }));
     expect(backend).not.toHaveProperty('addPeople');
-    expect(read('main/team/supabase-backend.mjs')).not.toContain('async addPeople(');
+    expect(read('main/team/supabase-backend.mts')).not.toContain('async addPeople(');
     expect(fs.readdirSync(new URL('../cloud/supabase/migrations/', import.meta.url)).filter((f) => f.includes('anyone_in_a_conversation'))).toEqual([]);
   });
   it('the menu does not warn about history, because nobody reads it', () => {

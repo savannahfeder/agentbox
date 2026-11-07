@@ -66,7 +66,7 @@ async function startOn(platform) {
   fake.state.windows.length = 0;
   fake.state.quit = 0;
   vi.resetModules();
-  const { startHubClient } = await import('../main/hub-client.mjs');
+  const { startHubClient } = await import('../main/hub-client.mts');
   startHubClient(HUB);
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(fake.state.windows).toHaveLength(1);

@@ -3,7 +3,7 @@
 // of threads written for nobody but themselves. The first sign-in must not put
 // a summary of every one of them on the team's board.
 import { it, expect, describe } from 'vitest';
-import { cardsFor, shownToTeam } from '../shared/thread-cards.mjs';
+import { cardsFor, shownToTeam } from '../shared/thread-cards.mts';
 import { memorySyncState } from '../main/team/sync.mts';
 import { teamEntries } from '../renderer/src/threads/page-rules.ts';
 

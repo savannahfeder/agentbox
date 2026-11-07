@@ -7,7 +7,7 @@
 // the app came back as "didn't finish". Measured before this change: a worker
 // was a child of the app with its input on a pipe, and nothing outlived a quit.
 //
-// Now the run host (main/run-host.mjs) holds the worker. The app lets go of it
+// Now the run host (main/run-host.mts) holds the worker. The app lets go of it
 // on a quit and reads on from where it stopped when it starts again. These run
 // the host in this process with a stand-in worker and a real socket.
 import { afterEach, describe, expect, it } from 'vitest';
@@ -15,8 +15,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { serveRuns, spoolFiles } from '../main/run-host.mjs';
-import { HostedRun, HOST_LOST } from '../main/hosted-run.mjs';
+import { serveRuns, spoolFiles } from '../main/run-host.mts';
+import { HostedRun, HOST_LOST } from '../main/hosted-run.mts';
 import { attachClaudeInput } from '../main/claude-input.mts';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

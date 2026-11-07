@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import { taskWords } from '../renderer/src/team/company.ts';
 import { teamEntries } from '../renderer/src/threads/page-rules.ts';
 import { waitsInLater } from '../renderer/src/list-rules.ts';
-import { inMyInbox } from '../shared/team-rules.mjs';
+import { inMyInbox } from '../shared/team-rules.mts';
 
 const MAYA = 'p-maya';
 const DEV = 'p-dev';

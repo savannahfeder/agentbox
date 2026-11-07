@@ -1,11 +1,11 @@
 // A TEAMMATE SEES THE SUMMARY AND NOTHING MORE.
 //
 // The rule for the teammate's card, 2026-10-01: it carries the same
-// information as the thread's summary and nothing new. Each Mac publishes one card per thread (shared/thread-cards.mjs). A private
+// information as the thread's summary and nothing new. Each Mac publishes one card per thread (shared/thread-cards.mts). A private
 // thread's card says who and in what state, never a word of it. Messages
 // between two people are never carded. States are the four predefined ones.
 import { describe, it, expect } from 'vitest';
-import { threadState, summaryOf, cardsFor, firstSentence } from '../shared/thread-cards.mjs';
+import { threadState, summaryOf, cardsFor, firstSentence } from '../shared/thread-cards.mts';
 
 const NOW = Date.parse('2026-10-01T15:00:00');
 const item = (o) => ({ id: 'w-1', title: 'Acme renewal terms', status: 'open', labels: ['founder'], kind: 'directive', updatedAt: NOW - 60_000, ...o });

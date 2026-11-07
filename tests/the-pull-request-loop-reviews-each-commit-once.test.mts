@@ -111,9 +111,9 @@ describe('filing a finished review', () => {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify({ schemaVersion: 2, id: 'acme', name: 'Acme' }));
     process.env.AGENTBOX_HOME = home;
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount({ accountId: ACCOUNT });
-    work = await import('../mcp/core/work.mjs');
+    work = await import('../mcp/core/work.mts');
   });
   afterEach(() => {
     delete process.env.AGENTBOX_HOME;

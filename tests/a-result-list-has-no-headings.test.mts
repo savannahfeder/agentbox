@@ -10,7 +10,7 @@
 // guards is visual: a day label that comes back, a heading that comes back, or
 // an empty label div that draws a band of nothing above the first result.
 //
-// A row prints its short title now (shared/thread-title.mjs), not the whole
+// A row prints its short title now (shared/thread-title.mts), not the whole
 // first sentence, so a row is looked for by rowTitle and in the words alone.
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';

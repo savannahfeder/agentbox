@@ -6,7 +6,7 @@
 // and "send back to agent" under a stopped one (components/Focus.tsx,
 // Thread.tsx, run-now.ts). Its live line names the newest step, how long the
 // run has been up and how many steps came before (Live.tsx, live-line.ts). An
-// untagged thread reads Medium, as it runs (shared/rank.mjs `shownPriority`).
+// untagged thread reads Medium, as it runs (shared/rank.mts `shownPriority`).
 // Its summary strips the bullet marks an agent wrote and says when it was last
 // updated (Summary.tsx). The app offered none of the four presses, showed only
 // the first step, drew an untagged thread as Low, and doubled the bullets.

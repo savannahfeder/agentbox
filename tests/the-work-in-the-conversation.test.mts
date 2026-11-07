@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import {
   TRAIL_OPENING, TRAIL_TURNS, WORK_RUN, WORK_TOTAL,
   capRuns, outputCut, runOverflow, saidCount, threadWindow, workSubject, workVerb,
-} from '../shared/agents.mjs';
+} from '../shared/agents.mts';
 
 const said = (i, who = i % 2 ? 'it' : 'you') => ({ at: i, who, text: `message ${i}` });
 const ran = (i, over = {}) => ({
@@ -45,7 +45,7 @@ describe('what the work line says it did', () => {
   // spells a space, and this line is read by a person: `list work items` is
   // the name, `list_work_items` is the jargon the design law forbids. The
   // prefix strip was also broken and is fixed in the same place; both live in
-  // shared/work-lines.mjs now, with the count of how often it showed.
+  // shared/work-lines.mts now, with the count of how often it showed.
   it('falls back to the tool name, without the plumbing on the front', () => {
     expect(workVerb('mcp__agentbox__list_work_items')).toBe('list work items');
     expect(workVerb('SomethingNew')).toBe('somethingnew');

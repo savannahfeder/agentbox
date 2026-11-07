@@ -8,7 +8,7 @@
 //   the menu closed, and the same key went on to the app, which left the page.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { planWakes, runLines, teammateLabel, DEFAULT_LIMIT } from '../shared/teammates.mjs';
+import { planWakes, runLines, teammateLabel, DEFAULT_LIMIT } from '../shared/teammates.mts';
 
 const NOW = new Date(2026, 9, 26, 9, 30).getTime();
 const felix = { id: 't-ffffff', name: 'Felix', letter: 'F', status: 'active', paused: false, served: '', limit: DEFAULT_LIMIT, works: null, product: 'kestrel', memory: [] };

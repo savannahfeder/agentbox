@@ -11,7 +11,7 @@ import path from 'node:path';
 import { connectionLinkOf, keepConnectionLinks, stateLine, toolWords, whoHasIt } from '../renderer/src/connections/connections-shown';
 import { artifactUrlTransform } from '../renderer/src/remark-artifact-paths';
 import { createMemoryCloud, memoryBackend, signUpMemory } from '../main/team/memory-cloud.mts';
-import { cleanConnections, MAX_CONNECTIONS } from '../shared/team-connections.mjs';
+import { cleanConnections, MAX_CONNECTIONS } from '../shared/team-connections.mts';
 
 const root = path.resolve(import.meta.dirname, '..');
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
@@ -146,7 +146,7 @@ describe('what crosses to the team', () => {
   });
 
   it('an app newer than the database still reads its team', () => {
-    const src = read('main/team/supabase-backend.mjs');
+    const src = read('main/team/supabase-backend.mts');
     expect(src).not.toMatch(/PERSON_COLS = '[^']*connections/);
     expect(src).toMatch(/select\('id,connections'\)/);
   });
@@ -174,7 +174,7 @@ describe('where the page is', () => {
   });
 
   it('nothing the page reads carries a token', () => {
-    const service = read('main/connections/index.mjs');
+    const service = read('main/connections/index.mts');
     const tile = service.slice(service.indexOf('const tileOf'), service.indexOf('// One refresh per connection'));
     expect(tile).not.toMatch(/token|client|metadata/i);
   });

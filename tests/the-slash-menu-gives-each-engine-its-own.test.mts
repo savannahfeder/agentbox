@@ -7,7 +7,7 @@ import { providerCommands, CODEX_COMMANDS } from '../shared/provider-commands.mt
 // commands are no longer gated on the engine, since every row reaches Claude
 // Code now." That sentence was true when it was written. It stopped being true
 // on this branch, which brings the second engine back —
-// `main/codex-app-server.mjs`, `main/codex-approvals.mjs`, a picker in the
+// `main/codex-app-server.mts`, `main/codex-approvals.mts`, a picker in the
 // composer and a row in Settings — and nothing put the gate back.
 //
 // SO ON A CODEX ROW TODAY, "/" DRAWS FOURTEEN ROWS AND NOT ONE OF THEM WORKS.
@@ -42,7 +42,7 @@ import { providerCommands, CODEX_COMMANDS } from '../shared/provider-commands.mt
 // on a measurement error, corrected the same day: not carding and not stopping
 // are different things, and under `workspace-write` the sandbox refuses on its
 // own. So there really are three postures worth choosing between, they live in
-// shared/codex-modes.mjs, and each is a sandbox and an approval policy that
+// shared/codex-modes.mts, and each is a sandbox and an approval policy that
 // reach `thread/start`.
 //
 // SO A CODEX ROW NOW OFFERS CODEX'S THREE AND CODEX'S COMMANDS, and never a
@@ -57,7 +57,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Supervisor } from '../main/supervisor.mts';
 import { CLAUDE_COMMANDS } from '../shared/claude-commands.mts';
-import { DEFAULT_ENGINE } from '../shared/engines.mjs';
+import { DEFAULT_ENGINE } from '../shared/engines.mts';
 import { slashRows } from '../renderer/src/slash-menu.ts';
 import { MODE_ORDER } from '../renderer/src/modes.ts';
 import { WORKER_APPROVAL_POLICY, WORKER_SANDBOX } from '../main/codex-session.mts';

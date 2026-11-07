@@ -15,13 +15,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { startToolsFixture } from '../cloud/standin/tools-mcp.mjs';
-import { createConnections } from '../main/connections/index.mjs';
-import { createBroker, WRITE_CARD_TOOL } from '../main/connections/broker.mjs';
-import { connectionVault } from '../main/connections/vault.mjs';
-import { answer, listPending, spoolDir } from '../main/approvals.mjs';
-import { catalogFor, connectionServerName, STATES } from '../shared/connections-catalog.mjs';
+import { createConnections } from '../main/connections/index.mts';
+import { createBroker, WRITE_CARD_TOOL } from '../main/connections/broker.mts';
+import { connectionVault } from '../main/connections/vault.mts';
+import { answer, listPending, spoolDir } from '../main/approvals.mts';
+import { catalogFor, connectionServerName, STATES } from '../shared/connections-catalog.mts';
 
-const PROXY = path.resolve(import.meta.dirname, '../mcp/connection-proxy.mjs');
+const PROXY = path.resolve(import.meta.dirname, '../mcp/connection-proxy.mts');
 const key = crypto.randomBytes(32);
 const cipher = {
   available: () => true,

@@ -8,7 +8,7 @@
 // Here: the real ledger fold, the pane's rule for taking a newer copy, and the
 // name the heading draws.
 import { describe, it, expect } from 'vitest';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 import { freshCopy } from '../renderer/src/stay-with-a-command';
 import { pageTitle } from '../renderer/src/one-thing-at-a-time';
 import { itemThread } from '../renderer/src/item-thread';

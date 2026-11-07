@@ -1,6 +1,6 @@
 // A CORE CHANGE DOES NOT HAND THE PUSH MORE TESTS THAN IT CAN RUN.
 //
-// WHAT BROKE. A one-function change to main/engine-bin.mjs bounced three ships
+// WHAT BROKE. A one-function change to main/engine-bin.mts bounced three ships
 // in a row, each time with "the test run died without naming a failing test"
 // and a different last line of stderr: a React warning, a console.warn from
 // the supervisor, a component frame. Nothing was red. Measured here on the
@@ -11,7 +11,7 @@
 // three minutes a ship is allowed. For that change `named` was 11, under the
 // cap, so the gate took the `related` road: it handed the changed files to
 // `vitest related`, which expands them through the import graph and runs the
-// lot. main/engine-bin.mjs is reached by 362 of the 1,869 test files, six
+// lot. main/engine-bin.mts is reached by 362 of the 1,869 test files, six
 // times the cap, and that run is what kept being killed.
 //
 // So the cap guarded the small road and not the big one. The gap is
@@ -50,7 +50,7 @@ const put = (dir, rel, text) => {
  * `howMany` test files that reach main/core.mjs only through main/wrapper.mjs,
  * so none of them quotes the changed file's name and `testsThatRead` finds
  * none of them. That indirection is the real shape: of the 362 that reach
- * main/engine-bin.mjs, 11 name it.
+ * main/engine-bin.mts, 11 name it.
  */
 function reachingThroughAWrapper(howMany) {
   const dir = repo();
@@ -142,9 +142,9 @@ describe('the walk itself', () => {
 describe('the change that bounced three ships', () => {
   it('is capped rather than handed over whole', () => {
     const root = path.resolve(import.meta.dirname, '..');
-    const reached = testsThatImport(['main/engine-bin.mjs'], root);
+    const reached = testsThatImport(['main/engine-bin.mts'], root);
     // Said out loud so a repo that shrinks cannot quietly pass this.
     expect(reached.length).toBeGreaterThan(GATE_CAP);
-    expect(gateFor(['main/engine-bin.mjs'], root).mode).toBe('capped');
+    expect(gateFor(['main/engine-bin.mts'], root).mode).toBe('capped');
   });
 });

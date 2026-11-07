@@ -35,7 +35,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { Name, nameSlug } from '../shared/product-name.mjs';
-import { defaultStoreRoot } from '../main/store/home.mjs';
+import { defaultStoreRoot } from '../main/store/home.mts';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 

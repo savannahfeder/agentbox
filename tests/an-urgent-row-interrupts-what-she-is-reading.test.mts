@@ -92,7 +92,7 @@ describe('when an urgent row may take the screen', () => {
 
   // Her compose box stamps priority as 'system', not 'founder'. Reading only
   // 'founder' anywhere in this app throws away the Urgent tag on her own rows,
-  // which is the trap shared/rank.mjs is written to avoid.
+  // which is the trap shared/rank.mts is written to avoid.
   it('takes an urgent row her compose box stamped as system', () => {
     const hers = row('w-hers', 9, { wrote: { priority: { ts: NOW, source: 'system' } } });
     expect(ask({ reading: row('w-medium', 5), inbox: [hers] })).toBe(hers);

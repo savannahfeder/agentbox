@@ -22,7 +22,7 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const NOW = 1_786_918_820_000;
 const HOUR = 3_600_000;
 
-// Shaped as the fold hands them over (shared/work-items.mjs).
+// Shaped as the fold hands them over (shared/work-items.mts).
 const hers = (extra) => ({
   id: 'w-2fe5a7c3c1', status: 'open', kind: 'directive', labels: ['founder'],
   title: 'It would be very nice to be able to stop a task', updatedAt: NOW, ...extra,

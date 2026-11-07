@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { GENERAL_ROOM } from '../main/team/rooms-memory.mts';
-import { decisionsDoc, writeDecisionDocs } from '../main/team/decisions-doc.mjs';
+import { decisionsDoc, writeDecisionDocs } from '../main/team/decisions-doc.mts';
 import { decisionsOf, decisionRows } from '../renderer/src/team/decisions.ts';
 import { messageMore } from '../renderer/src/team/message-more.ts';
 
@@ -84,7 +84,7 @@ describe('marking', () => {
     expect(sql).toMatch(/public\.in_room\(room_id\)/);
     expect(sql).toMatch(/mark_room_decision/);
     expect(sql).toMatch(/enable row level security/);
-    const hosted = readFileSync(new URL('../main/team/rooms-supabase.mjs', import.meta.url), 'utf8');
+    const hosted = readFileSync(new URL('../main/team/rooms-supabase.mts', import.meta.url), 'utf8');
     expect(hosted).toContain("'mark_room_decision'");
     expect(hosted).toContain("from('room_decisions')");
   });

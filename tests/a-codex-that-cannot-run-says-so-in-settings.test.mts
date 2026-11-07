@@ -51,7 +51,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readSettings } from '../main/settings.mts';
-import { forgetCodexBin } from '../main/codex-bin.mjs';
+import { forgetCodexBin } from '../main/codex-bin.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { engineTroubleNote } from '../shared/spawn-trouble.mts';
 

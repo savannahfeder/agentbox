@@ -13,10 +13,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { startToolsFixture } from '../cloud/standin/tools-mcp.mjs';
-import { createBroker } from '../main/connections/broker.mjs';
-import { createConnections } from '../main/connections/index.mjs';
-import { closeSignInRows } from '../main/connections/start.mjs';
-import { catalogFor, connectionLine, STATES } from '../shared/connections-catalog.mjs';
+import { createBroker } from '../main/connections/broker.mts';
+import { createConnections } from '../main/connections/index.mts';
+import { closeSignInRows } from '../main/connections/start.mts';
+import { catalogFor, connectionLine, STATES } from '../shared/connections-catalog.mts';
 import { failureLine, peopleOnCard, stateLine, whenLine } from '../renderer/src/connections/connections-shown';
 
 const key = crypto.randomBytes(32);

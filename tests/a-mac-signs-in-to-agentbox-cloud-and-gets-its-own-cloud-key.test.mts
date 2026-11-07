@@ -14,8 +14,8 @@ import path from 'node:path';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 import { cloudAccountConfig, currentCloudTerms, signInToCloud, signOutOfCloud } from '../main/cloud/account.mts';
-import { cloudConfigPath, cloudKeyPath, readCloudConfig, readCloudKey } from '../main/cloud/config.mjs';
-import { CLOUD_ADDRESS } from '../shared/cloud-address.mjs';
+import { cloudConfigPath, cloudKeyPath, readCloudConfig, readCloudKey } from '../main/cloud/config.mts';
+import { CLOUD_ADDRESS } from '../shared/cloud-address.mts';
 
 const P = '66666666-6666-4666-8666-666666666666';
 let home; let server; let gateway; const env = {};

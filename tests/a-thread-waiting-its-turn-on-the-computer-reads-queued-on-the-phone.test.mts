@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createPhoneInbox } from '../main/phone-inbox.mts';
-import { phoneWaitsOf } from '../shared/phone-snapshot.mjs';
+import { phoneWaitsOf } from '../shared/phone-snapshot.mts';
 import { phoneView, phoneSlug, waitFacts } from '../renderer/src/phone-rows';
 import { liveLine } from '../renderer/src/live-line';
 import { statusCell, factsFor } from '../renderer/src/status-word';

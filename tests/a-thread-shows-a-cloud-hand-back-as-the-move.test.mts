@@ -10,7 +10,7 @@
 import { it, expect } from 'vitest';
 import { runNodes } from '../renderer/src/item-thread.ts';
 import { activitySummary } from '../renderer/src/activity-summary.ts';
-import { HAND_BACK, handsBack } from '../shared/cloud-hand-back.mjs';
+import { HAND_BACK, handsBack } from '../shared/cloud-hand-back.mts';
 
 const T = new Date(2026, 9, 17, 10).getTime();
 const trace = (text) => ({ startedAt: T, text });

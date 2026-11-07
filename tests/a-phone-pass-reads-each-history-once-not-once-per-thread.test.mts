@@ -17,10 +17,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createPhoneInbox } from '../main/phone-inbox.mts';
-import { threadSnapshot } from '../shared/phone-snapshot.mjs';
+import { threadSnapshot } from '../shared/phone-snapshot.mts';
 
 let root, store, ids;
 

@@ -27,7 +27,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { agentKey, putOff, putAway, listed, reachesInbox } from '../shared/agents.mjs';
+import { agentKey, putOff, putAway, listed, reachesInbox } from '../shared/agents.mts';
 import { AgentSchedule } from '../main/agent-schedule.mts';
 import { NAME } from '../shared/product-name.mjs';
 

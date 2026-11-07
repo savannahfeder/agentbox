@@ -7,7 +7,7 @@
 // message is the only copy."
 //
 // Why. The store keeps its ledgers under the app's home, which it reads from
-// the app's home variable at call time (main/store/home.mjs). The desktop door
+// the app's home variable at call time (main/store/home.mts). The desktop door
 // points that variable at `storeRoot` from zero.config.json before it opens the
 // store (main/main.mts). The headless door never did. So the copy wrote its
 // ledgers wherever the variable it inherited happened to point (on the test
@@ -32,7 +32,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { bootHeadless } from '../main/serve.mts';
-import { createWorkItem } from '../main/store/work-items.mjs';
+import { createWorkItem } from '../main/store/work-items.mts';
 import { setAppHome } from './app-home.mts';
 import { nameSlug, envNames } from '../shared/product-name.mjs';
 

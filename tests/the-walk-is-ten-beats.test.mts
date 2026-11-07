@@ -20,7 +20,7 @@ import {
   advance, coach, forcedStep, inboxCleared, ring, START, STEPS, walkRows,
 } from '../renderer/src/onboarding.ts';
 import { EXAMPLES, stampsFor } from '../shared/first-run-examples.mts';
-import * as workItems from '../main/store/work-items.mjs';
+import * as workItems from '../main/store/work-items.mts';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

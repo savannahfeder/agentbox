@@ -8,7 +8,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { CHROME, guard, sweep } from './chrome-guard.mjs';
-import { foldWorkItems } from '../../shared/work-items.mjs';
+import { foldWorkItems } from '../../shared/work-items.mts';
 import { STORE_ROOT } from './machine-paths.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');

@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REQUEST_CHANNELS } from '../shared/bridge-map.mts';
-import { signInWithGoogle, cancelGoogleSignIn } from '../main/team/sign-in.mjs';
+import { signInWithGoogle, cancelGoogleSignIn } from '../main/team/sign-in.mts';
 import { createTeamService } from '../main/team/index.mts';
 
 const freePort = () => new Promise((resolve) => {

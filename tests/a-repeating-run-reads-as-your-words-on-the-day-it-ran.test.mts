@@ -7,7 +7,7 @@
 // "· Mon, Oct 26", a day three days gone, because a run made late was stamped
 // with the period it served rather than the day it ran.
 import { describe, it, expect } from 'vitest';
-import { OCCURRENCE_PROTOCOL, occurrenceFields } from '../main/repeats.mjs';
+import { OCCURRENCE_PROTOCOL, occurrenceFields } from '../main/repeats.mts';
 
 const { askLine } = await import('../renderer/src/one-thing-at-a-time.ts');
 

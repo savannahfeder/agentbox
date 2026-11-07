@@ -36,7 +36,7 @@ import {
   AGENT_MODES, agentRow, agentTitle, asksSomething, byRecency, herWords, howLong,
   howItEnded, lastAsk, lastWord, listed, reachesInbox, replyIsSwallowed, replyReaches,
   sameInstant, startedByZero, whatItIs, whereItRuns,
-} from '../shared/agents.mjs';
+} from '../shared/agents.mts';
 import { outsideAgentsMode } from '../main/settings.mts';
 import { clipToSentence, SUMMARY_BUDGET } from '../renderer/src/list-rules';
 import { previewText } from '../renderer/src/format';

@@ -17,7 +17,7 @@ import { belongsInProgress } from '../renderer/src/list-rules';
 const NOW = 1_786_136_280_000;
 const HOUR = 3_600_000;
 
-// Shaped as the fold hands them over (shared/work-items.mjs).
+// Shaped as the fold hands them over (shared/work-items.mts).
 const hers = (extra) => ({
   id: 'w-9b799cd1c0', status: 'open', kind: 'directive', labels: ['founder'],
   title: 'a couple of issues that I am observing', updatedAt: NOW, ...extra,

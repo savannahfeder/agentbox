@@ -9,7 +9,7 @@
 //   2. `Compose` sent `...(engine ? { engine }: {})`, so a null engine put no
 //      field on the payload at all, on the reading that "a row marked with the
 //      engine it would have run on anyway carries no news".
-//   3. `engineFor` (shared/engines.mjs) answers the WORKSPACE DEFAULT for a row
+//   3. `engineFor` (shared/engines.mts) answers the WORKSPACE DEFAULT for a row
 //      that names no engine -- and that default is `config.engine`, which she
 //      sets in Settings and which may be Codex.
 //

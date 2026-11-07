@@ -7,7 +7,7 @@
 //   Error invoking remote method '<str>': Error: patch had no recognized
 //   work item fields
 //
-// which is `buildLine` in shared/work-items.mjs refusing a patch that
+// which is `buildLine` in shared/work-items.mts refusing a patch that
 // `pickFields` emptied.
 //
 // HOW IT HAPPENS, from the reply box. The drawer hands its pick back as `null`
@@ -36,8 +36,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
-import * as workItemsDisk from '../main/store/work-items.mjs';
-import { buildLine, foldWorkItems, pickFields } from '../shared/work-items.mjs';
+import * as workItemsDisk from '../main/store/work-items.mts';
+import { buildLine, foldWorkItems, pickFields } from '../shared/work-items.mts';
 
 let dir;
 beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-unpick-')); });

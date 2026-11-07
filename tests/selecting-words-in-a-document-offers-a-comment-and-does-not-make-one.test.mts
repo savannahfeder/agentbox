@@ -13,7 +13,7 @@
 // Copy; a comment starts only from the bar. A quote keeps up to 3,000 characters.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { cleanMark } from '../shared/artifact-marks.mjs';
+import { cleanMark } from '../shared/artifact-marks.mts';
 import { barSpot, pickedIn, quoteFrom, quotesKey, MAX_QUOTE_CHARS } from '../renderer/src/selection-bar.ts';
 
 const root = { contains: (n) => n?.inside === true };

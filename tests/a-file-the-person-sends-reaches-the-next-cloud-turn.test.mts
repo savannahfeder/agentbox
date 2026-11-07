@@ -15,7 +15,7 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { createSandbox, pickBaseEnv } from '../cloud/sandbox/server.mjs';
 import { cloudRun } from '../main/cloud/run.mts';
-import { fileToSend, filesSentFor, SENT_FILE_MAX } from '../shared/cloud-sent-files.mjs';
+import { fileToSend, filesSentFor, SENT_FILE_MAX } from '../shared/cloud-sent-files.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { TOKEN } from './fixtures/cloud/fake-vendor-cli.mjs';
 

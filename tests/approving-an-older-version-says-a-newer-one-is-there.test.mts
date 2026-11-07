@@ -9,7 +9,7 @@
 // What must NOT ask: the newest version with nothing open on it.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { approveAsk, threadFiles } from '../shared/artifact-marks.mjs';
+import { approveAsk, threadFiles } from '../shared/artifact-marks.mts';
 
 const [fam] = threadFiles(['seat.png', 'seat-v2.png', 'seat-v3.png'].map((path, i) => ({ path, at: i })));
 const pin = (id, file, resolved = false) => ({ id, file, resolved, place: { kind: 'pin', x: 0.5, y: 0.5 } });

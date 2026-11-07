@@ -6,7 +6,7 @@ import type { AgentSession, FolderListing, Snapshot, WorkspaceSettings } from '.
 // The engine ids, labels and the default are read off the one file that holds
 // them rather than typed again here. A fixture that spelled "Claude Code" for
 // itself is a fixture that could go on saying it after the app had stopped.
-import { DEFAULT_ENGINE, ENGINES } from '../../shared/engines.mjs';
+import { DEFAULT_ENGINE, ENGINES } from '../../shared/engines.mts';
 import { BUILT_MODELS } from './models';
 import { CODEX_DEFAULT_MODE } from './codex-modes';
 
@@ -442,7 +442,7 @@ export const fixtureSnapshot: Snapshot = {
     },
   ],
   // ONE CODING AGENT, WHICH IS THE MAC SHE RUNS. The capability gate in
-  // shared/engines.mjs is shut until she writes the moment into
+  // shared/engines.mts is shut until she writes the moment into
   // zero.config.json, so `Supervisor#engineChoices` hands over one entry on
   // every Mac that exists today, and the composer's clause, the byline's engine
   // word and the Settings row all draw nothing off it. That is the founder rule
@@ -1084,7 +1084,7 @@ export const fixtureCodexModels: NonNullable<WorkspaceSettings['codexModels']> =
  *  to check the model list against. */
 export const fixtureCodexModelDefault = 'gpt-5.6-sol';
 
-// main/codex-bin.mjs's `INSTALL_URL`, typed rather than imported because the
+// main/codex-bin.mts's `INSTALL_URL`, typed rather than imported because the
 // renderer never imports from main/. The suite holds the two in step.
 const CODEX_INSTALL_URL = 'https://learn.chatgpt.com/docs/codex/cli';
 const CODEX_BIN = '/Users/you/.local/bin/codex';

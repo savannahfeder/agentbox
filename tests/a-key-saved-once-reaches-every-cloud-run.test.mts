@@ -18,9 +18,9 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { createSandbox, pickBaseEnv, REDACTED } from '../cloud/sandbox/server.mjs';
 import { cloudRun, cloudNote, CLOUD_NOTE } from '../main/cloud/run.mts';
-import { saveCloudKey, removeCloudKey, keysCarried, cloudKeyNames, cloudKeysPath, keyLabel } from '../main/cloud/keys.mjs';
-import { keyNameRefused, keyObjectKey } from '../shared/cloud-keys.mjs';
-import { NEED as KEY_ASK } from '../shared/cloud-needs.mjs';
+import { saveCloudKey, removeCloudKey, keysCarried, cloudKeyNames, cloudKeysPath, keyLabel } from '../main/cloud/keys.mts';
+import { keyNameRefused, keyObjectKey } from '../shared/cloud-keys.mts';
+import { NEED as KEY_ASK } from '../shared/cloud-needs.mts';
 import { TOKEN } from './fixtures/cloud/fake-vendor-cli.mjs';
 
 const git = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim();
@@ -250,7 +250,7 @@ describe('the note a cloud run reads', () => {
 describe('the name rule', () => {
   it('is the same file on the Mac and in the cloud image', () => {
     const read = (p) => fs.readFileSync(new URL(p, import.meta.url), 'utf8');
-    expect(read('../cloud/sandbox/key-names.mjs')).toBe(read('../shared/cloud-key-names.mjs'));
+    expect(read('../cloud/sandbox/key-names.mjs')).toBe(read('../shared/cloud-key-names.mts'));
     expect(read('../cloud/sandbox/Dockerfile')).toMatch(/COPY [^\n]*key-names\.mjs/);
     expect(read('../scripts/cloud-setup.mjs')).toMatch(/IMAGE_FILES = \[[^\]]*'key-names\.mjs'/);
   });

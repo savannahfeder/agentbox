@@ -6,7 +6,7 @@
 // publishes a card that reaches exactly the people named on it.
 //
 // Measured here from both ends: the rule that builds the cards
-// (shared/thread-cards.mjs), and three Macs over the in-memory cloud through
+// (shared/thread-cards.mts), and three Macs over the in-memory cloud through
 // the real sync engine, where Maya shares one thread with Theo, and Jun, who
 // is on the same team, must not see it. The hosted database enforces the same
 // thing in its own row level security, which is tested on PGlite in
@@ -16,10 +16,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamSync, memorySyncState } from '../main/team/sync.mts';
-import { cardsFor, shownToTeam, shownToPeople } from '../shared/thread-cards.mjs';
+import { cardsFor, shownToTeam, shownToPeople } from '../shared/thread-cards.mts';
 
 const tmp = (name) => fs.mkdtempSync(path.join(os.tmpdir(), `chosen-${name}-`));
 

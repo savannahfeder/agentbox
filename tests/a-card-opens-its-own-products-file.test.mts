@@ -12,8 +12,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { resolveArtifact, artifactRoots } from '../main/artifact-path.mjs';
-import { machineryDir, machineryPath } from '../main/store/home.mjs';
+import { resolveArtifact, artifactRoots } from '../main/artifact-path.mts';
+import { machineryDir, machineryPath } from '../main/store/home.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 // A store on disk with two products: ours has no code repo (Agentbox's real

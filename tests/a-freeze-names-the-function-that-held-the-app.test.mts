@@ -89,11 +89,11 @@ function aProfile(stacks, { stepUs = 10_000 } = {}) {
 
 describe('reading what held it off the profile', () => {
   const app = '/Applications/Agentbox.app/Contents/Resources/app';
-  const git = [['settleExit', `file://${app}/main/supervisor.mts`, 8990], ['changeFromRepo', `file://${app}/main/git-change.mjs`, 262], ['execFileSync', 'node:child_process', 941], ['spawn']];
+  const git = [['settleExit', `file://${app}/main/supervisor.mts`, 8990], ['changeFromRepo', `file://${app}/main/git-change.mts`, 262], ['execFileSync', 'node:child_process', 941], ['spawn']];
 
   it('names our own deepest function, not the native call under it', () => {
     const read = freezeFrom([{ profile: aProfile(Array(50).fill(git)) }], { fromUs: 0, toUs: 1e9, appDir: app });
-    expect(read.where).toBe('changeFromRepo main/git-change.mjs:262');
+    expect(read.where).toBe('changeFromRepo main/git-change.mts:262');
     expect(read.busy).toBe(1);
   });
 
@@ -124,9 +124,9 @@ describe('reading what held it off the profile', () => {
 
   it('knows the app by either of its paths', () => {
     const real = '/private/var/app';
-    const mine = [['changeFromRepo', `file://${real}/main/git-change.mjs`, 262]];
+    const mine = [['changeFromRepo', `file://${real}/main/git-change.mts`, 262]];
     const read = freezeFrom([{ profile: aProfile(Array(10).fill(mine)) }], { fromUs: 0, toUs: 1e9, appDir: ['/var/app', real] });
-    expect(read.where).toBe('changeFromRepo main/git-change.mjs:262');
+    expect(read.where).toBe('changeFromRepo main/git-change.mts:262');
     const other = freezeFrom([{ profile: aProfile(Array(10).fill(mine)) }], { fromUs: 0, toUs: 1e9, appDir: ['/var/app'] });
     expect(other.where).toBe('changeFromRepo');
   });

@@ -16,7 +16,7 @@
 // ---------------------------------------------------------------------------
 // (1) SIGNED OUT: MEASURED DIRECTLY, ON A REAL RUN.
 //
-// `codex app-server` was driven the way main/codex-app-server.mjs drives it --
+// `codex app-server` was driven the way main/codex-app-server.mts drives it --
 // initialize, thread/start, turn/start -- with `CODEX_HOME` pointed at an empty
 // scratch directory, so there was no auth.json and the real ~/.codex login was
 // neither read nor written. The turn retried five times over WebSocket, fell
@@ -72,7 +72,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { troubleCause } from '../shared/spawn-trouble.mts';
-import { createCodexAppServer } from '../main/codex-app-server.mjs';
+import { createCodexAppServer } from '../main/codex-app-server.mts';
 import { createCodexWorker } from '../main/codex-session.mts';
 
 /* ===================== (1) the signed-out run, verbatim =================== */

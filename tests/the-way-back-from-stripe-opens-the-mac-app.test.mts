@@ -11,7 +11,7 @@
 // use, and is carried from the name module like every other name field.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { JOIN_SCHEME } from '../shared/room-links.mjs';
+import { JOIN_SCHEME } from '../shared/room-links.mts';
 import { NAME, WAS_SLUGS } from '../shared/product-name.mjs';
 import { drift, expected } from '../scripts/product-name.mjs';
 import { paidPage } from '../cloud/gateway/gateway.mjs';

@@ -3,7 +3,7 @@
 import { it, expect } from 'vitest';
 import { runNodes, itemThread } from '../renderer/src/item-thread.ts';
 import { threadEvents } from '../renderer/src/thread-history.ts';
-import { groupWork } from '../shared/work-lines.mjs';
+import { groupWork } from '../shared/work-lines.mts';
 import { filesFromRuns } from '../renderer/src/run-files.ts';
 
 const T = new Date(2026, 9, 7, 10).getTime();

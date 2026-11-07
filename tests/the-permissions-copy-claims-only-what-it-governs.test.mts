@@ -33,7 +33,7 @@
 // So the founder's own request -- that users switch modes on both engines the
 // way they naturally would -- is buildable after all, and is built: three
 // modes, each a sandbox and an approval policy together, in
-// shared/codex-modes.mjs.
+// shared/codex-modes.mts.
 //
 // WHAT THIS FILE STILL GUARDS, and it is the important half: the Codex control
 // is its OWN control with its OWN three words, never a seventh row bolted onto
@@ -174,7 +174,7 @@ describe('nothing was invented to stand in for the six', () => {
 
   it('gives Codex its own list, read from the one place that holds it', () => {
     // ONE picker, for the workspace, off CODEX_MODE_OPTIONS, which is built
-    // from shared/codex-modes.mjs and nowhere else. The project picker went
+    // from shared/codex-modes.mts and nowhere else. The project picker went
     // with the Claude Code one (w-d19d6d387c, 2026-09-23): a project that
     // carries a mode of its own says so in a sentence and offers the way back.
     expect(settings).toContain("from '../codex-modes'");

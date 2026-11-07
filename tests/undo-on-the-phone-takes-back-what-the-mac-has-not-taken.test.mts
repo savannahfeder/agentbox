@@ -12,7 +12,7 @@
 // says so. A new thread answers with the row the inbox draws for it.
 import { describe, it, expect } from 'vitest';
 import { takeBack, phoneSlug } from '../renderer/src/cloud-bridge';
-import { madeHere } from '../shared/phone-snapshot.mjs';
+import { madeHere } from '../shared/phone-snapshot.mts';
 
 const NOW = Date.parse('2026-10-19T12:00:00Z');
 const iso = (ms) => new Date(ms).toISOString();

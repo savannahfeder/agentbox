@@ -8,13 +8,13 @@
 // person comes back on its own after three days.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { personWait, cardWait, waitParts, setByPerson, endedWaits, waitWords, waitChoices, WAIT_GIVES_UP_MS } from '../shared/thread-waits.mjs';
+import { personWait, cardWait, waitParts, setByPerson, endedWaits, waitWords, waitChoices, WAIT_GIVES_UP_MS } from '../shared/thread-waits.mts';
 import { belongsInInbox, waitsInLater } from '../renderer/src/list-rules.ts';
-import { buildLine, foldWorkItems } from '../shared/work-items.mjs';
-import { cardsFor } from '../shared/thread-cards.mjs';
+import { buildLine, foldWorkItems } from '../shared/work-items.mts';
+import { cardsFor } from '../shared/thread-cards.mts';
 import { threadMenuRows } from '../renderer/src/threads/ThreadMenu.tsx';
 import { threadCommands } from '../renderer/src/thread-commands.ts';
-import { noticeEndedWaits } from '../main/team/waits.mjs';
+import { noticeEndedWaits } from '../main/team/waits.mts';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TeammateCard, TeammateStanding } from '../renderer/src/threads/Summary.tsx';

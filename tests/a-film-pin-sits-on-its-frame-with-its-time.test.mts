@@ -6,7 +6,7 @@
 // now a time and a spot on one note: pause, click, write.
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { carriedNotes, cleanMark, marksOf, notesForTheAgent, placeWords, threadFiles } from '../shared/artifact-marks.mjs';
+import { carriedNotes, cleanMark, marksOf, notesForTheAgent, placeWords, threadFiles } from '../shared/artifact-marks.mts';
 import { filmClickDoes, filmMarks, filmPinsAt, filmPins, hasSpot, notePlaceWords } from '../renderer/src/artifact-pins.ts';
 
 const note = (id, file, place, ts = 1, by = 'sofia') => ({ do: 'note', id, file, place, text: `said ${id}`, by, ts });

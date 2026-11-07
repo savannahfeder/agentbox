@@ -44,13 +44,13 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
-vi.mock('../main/account-tooling.mjs', async (importActual) => ({
+vi.mock('../main/account-tooling.mts', async (importActual) => ({
   ...(await importActual()),
   linkAccountTooling: () => null,
 }));
 
 const { Supervisor } = await import('../main/supervisor.mts');
-const { engineFor, availableEngines, homeEngine } = await import('../shared/engines.mjs');
+const { engineFor, availableEngines, homeEngine } = await import('../shared/engines.mts');
 
 const CLAUDE_BIN = '/nonexistent/claude-code/claude';
 const CODEX_BIN = '/nonexistent/codex/codex';

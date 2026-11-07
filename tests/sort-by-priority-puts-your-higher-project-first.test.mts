@@ -13,7 +13,7 @@
 // agent's own number is thrown away, so levels inside one project read out of
 // order. This keeps that fix: inside one project the levels still run Urgent,
 // High, Medium, Low by the number the row shows. The project's place comes
-// before it, the same rule shared/rank.mjs gives the fleet: a project one place
+// before it, the same rule shared/rank.mts gives the fleet: a project one place
 // higher outranks anything in one lower, whatever its level.
 //
 // A project you have never placed sits below every placed one, so with no

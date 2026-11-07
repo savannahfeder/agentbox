@@ -7,7 +7,7 @@
 // be found at all. This measures the new finder on the lines inside threads:
 // the matching line, who wrote it and when, and the id the thread opens at.
 import { describe, it, expect } from 'vitest';
-import { createFinder, messagesOf } from '../main/everything-found.mjs';
+import { createFinder, messagesOf } from '../main/everything-found.mts';
 
 const say = (uid, ts, by, patch, source = 'founder') => ({ id: 'w-1', uid, ts, by, source, patch });
 

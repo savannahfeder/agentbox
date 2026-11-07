@@ -9,7 +9,7 @@
 // exactly one file, main/supervisor.mts. So the supervisor answers once and
 // hands the answer over on the snapshot.
 //
-// THE HAZARD THIS FILE EXISTS FOR IS THE PICKER THAT LIES. shared/engines.mjs
+// THE HAZARD THIS FILE EXISTS FOR IS THE PICKER THAT LIES. shared/engines.mts
 // says it out loud about its own ungated helpers: "A future renderer could draw
 // a picker out of them, and the gate would not stop it -- she would be offered
 // a choice that `engineFor` then refuses, which is its own kind of lie." That is
@@ -42,8 +42,8 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
-import { foldWorkItems } from '../shared/work-items.mjs';
-import { engineChoiceOnRowIsStale } from '../shared/engines.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
+import { engineChoiceOnRowIsStale } from '../shared/engines.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 
@@ -414,7 +414,7 @@ describe('the door asks the supervisor rather than deciding', () => {
   // exactly one handler wrote one, and said nothing at all about WHERE the other
   // three were. `zero:compose-repeat` now writes one too -- a repeating task
   // dropped both the engine and the model on the way from her card, so every
-  // occurrence ran on the workspace default (main/repeats.mjs) -- and a budget
+  // occurrence ran on the workspace default (main/repeats.mts) -- and a budget
   // is the wrong guard for that: it goes red on a correct second door and stays
   // green on an incorrect first one.
   //

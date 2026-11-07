@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { setAppHome, clearAppHome } from './app-home.mts';
-import * as wi from '../main/store/work-items.mjs';
+import * as wi from '../main/store/work-items.mts';
 
 let home; let dir;
 beforeEach(() => {

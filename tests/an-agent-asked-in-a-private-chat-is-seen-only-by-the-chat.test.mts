@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { chatTaskSharing } from '../renderer/src/team/agent-mentions.ts';
-import { cardsFor } from '../shared/thread-cards.mjs';
+import { cardsFor } from '../shared/thread-cards.mts';
 
 const ME = 'p-me';
 const ALICE = 'p-alice';

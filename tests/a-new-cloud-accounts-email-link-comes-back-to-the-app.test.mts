@@ -24,7 +24,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { cloudAccountSession, cloudSignIn, waitForEmailConfirmation } from '../main/cloud/account.mts';
-import { readCloudKey } from '../main/cloud/config.mjs';
+import { readCloudKey } from '../main/cloud/config.mts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');

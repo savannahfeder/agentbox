@@ -21,8 +21,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store } from '../main/store.mts';
-import { appHome, encodeProjectPath, isMachineryDir, machineryDir, machineryPath } from '../main/store/home.mjs';
-import * as workItems from '../main/store/work-items.mjs';
+import { appHome, encodeProjectPath, isMachineryDir, machineryDir, machineryPath } from '../main/store/home.mts';
+import * as workItems from '../main/store/work-items.mts';
 import { WAS, envNames, nameSlug } from '../shared/product-name.mjs';
 
 let tmp;

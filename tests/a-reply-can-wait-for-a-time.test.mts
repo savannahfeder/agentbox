@@ -13,7 +13,7 @@
 // before it ended, whatever time the row was set for.
 //
 // The store already holds the rule this leans on: a row whose `runAt` is ahead
-// is not due, and nothing starts on it (shared/work-items.mjs isDue). So a
+// is not due, and nothing starts on it (shared/work-items.mts isDue). So a
 // reply that waits is the reply written now with the row set for its time.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -21,10 +21,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { submitReply } from '../main/live-replies.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { isDue } from '../shared/work-items.mjs';
+import { isDue } from '../shared/work-items.mts';
 import { applyThrough } from '../main/phone-inbox.mts';
 import { commandFor, phoneSlug } from '../renderer/src/phone-rows';
-import { phoneChoices } from '../shared/phone-snapshot.mjs';
+import { phoneChoices } from '../shared/phone-snapshot.mts';
 import { clearDraft, readDraftWhen, restoreDraft, saveDraft, saveDraftWhen, readDraft } from '../renderer/src/drafts';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -104,7 +104,7 @@ describe('the window\'s handler', () => {
 
   // Two power testers on 2026-11-04 set a reply for later and watched the
   // agent start on it at once. Main had learned that a word said after a
-  // thread's moment runs now (shared/answers.mjs, wordWaits), and this handler
+  // thread's moment runs now (shared/answers.mts, wordWaits), and this handler
   // wrote the moment first and the words after it. The reply's own time is
   // written after its words now, in the same synchronous step.
   it('writes the words, then their time, with nothing between them', () => {

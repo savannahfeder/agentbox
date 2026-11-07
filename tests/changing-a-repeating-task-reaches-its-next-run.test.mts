@@ -5,7 +5,7 @@
 //
 // The box that answers it is in RepeatFocus, and the sentence under that box
 // says "Every run after this one reads this." This file is why that sentence is
-// allowed to be there. `main/repeats.mjs` briefs each run with
+// allowed to be there. `main/repeats.mts` briefs each run with
 // `rule.body ?? rule.title`, and nothing but this test stops a later edit from
 // caching the brief at creation, which would leave the box changing a screen
 // and not a run.
@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Repeats } from '../main/repeats.mjs';
+import { Repeats } from '../main/repeats.mts';
 import { loadStore } from '../main/store-modules.mts';
 import { splitMessage, joinMessage } from '../renderer/src/message-split';
 import { NAME } from '../shared/product-name.mjs';

@@ -10,7 +10,7 @@
 // applies to it (`phoneChoices`).
 import { describe, it, expect } from 'vitest';
 import { phoneView, phoneSlug } from '../renderer/src/phone-rows';
-import { madeHere } from '../shared/phone-snapshot.mjs';
+import { madeHere } from '../shared/phone-snapshot.mts';
 import { phoneTabs } from '../mobile/src/lib/tabs';
 
 const NOW = Date.parse('2026-11-02T22:40:00Z');

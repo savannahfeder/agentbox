@@ -6,8 +6,8 @@
 // "tomorrow" for a Friday rule. The run's body carries those rules for the
 // agent; the thread and the inbox line now show only the instruction, as yours.
 import { describe, it, expect } from 'vitest';
-import { OCCURRENCE_PROTOCOL } from '../main/repeats.mjs';
-import { instructionOf } from '../shared/repeats.mjs';
+import { OCCURRENCE_PROTOCOL } from '../main/repeats.mts';
+import { instructionOf } from '../shared/repeats.mts';
 
 const { threadEvents } = await import('../renderer/src/thread-history.ts');
 const { rowSummary } = await import('../renderer/src/list-rules.ts');

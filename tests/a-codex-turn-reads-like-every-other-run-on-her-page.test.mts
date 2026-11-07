@@ -4,7 +4,7 @@
 // the supervisor already runs over every Claude Code line (`captureStream`,
 // `streamingText`, `traceStreamLine`, `summarizeStreamLine`,
 // main/supervisor.mts:4085-4290) and the change reader (`changeFromTranscript`,
-// main/code-change.mjs), each given a Codex-shaped twin that produces THE SAME
+// main/code-change.mts), each given a Codex-shaped twin that produces THE SAME
 // OUTPUT SHAPE. A later slice swaps them per engine; nothing downstream may
 // notice which engine it was.
 //
@@ -69,7 +69,7 @@ import {
   changeFromCodexTurn,
   NOT_CODE,
   SCRATCH,
-} from '../main/codex.mjs';
+} from '../main/codex.mts';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -659,7 +659,7 @@ describe('nothing here may take the supervisor down', () => {
 describe('what the run changed, in the shape the artifact already draws', () => {
   const change = (events, opts = {}) => changeFromCodexTurn(events, { roots: [WORK], ...opts });
 
-  // main/code-change.mjs is the contract: `{files:[{path, abs, hunks:[{rows,
+  // main/code-change.mts is the contract: `{files:[{path, abs, hunks:[{rows,
   // plus, minus, said?, at?}], plus, minus, at}], roots, plus, minus,
   // editCount, withProse, startedAt, endedAt}`. The pane that draws it
   // (renderer/src/components/CodeArtifact.tsx) and the arithmetic under it
@@ -728,7 +728,7 @@ describe('what the run changed, in the shape the artifact already draws', () => 
     expect(out.files[0].hunks[0].rows).toEqual([['-', 'gone']]);
   });
 
-  // Filed under where it now IS, which is the rule main/git-change.mjs already
+  // Filed under where it now IS, which is the rule main/git-change.mts already
   // states for a rename. A change she opens has to lead to a file that exists.
   it('files a rename under the path it moved to', () => {
     const out = change([renamed(`${WORK}/a.js`, `${WORK}/b.js`, '@@ -1 +1 @@\n-one\n+two\n')]);
@@ -824,9 +824,9 @@ describe('the two guards this file had to copy', () => {
   //
   // THE SLICE THAT SWAPS READERS PER ENGINE SHOULD EXPORT `collector` FROM
   // code-change.mjs AND DELETE BOTH COPIES, and then this test with them.
-  const source = readFileSync(join(repo, 'main', 'code-change.mjs'), 'utf8');
+  const source = readFileSync(join(repo, 'main', 'code-change.mts'), 'utf8');
 
-  it('still matches the copies in main/code-change.mjs, character for character', () => {
+  it('still matches the copies in main/code-change.mts, character for character', () => {
     expect(source).toContain(`const NOT_CODE = ${NOT_CODE.toString()};`);
     expect(source).toContain(`const SCRATCH = ${SCRATCH.toString()};`);
   });
@@ -835,13 +835,13 @@ describe('the two guards this file had to copy', () => {
 /* ========================== and it stays inert =========================== */
 
 describe('Codex readers stay behind the engine and approval boundary', () => {
-  // shared/engines.mjs is CLOSED behind a capability token and
+  // shared/engines.mts is CLOSED behind a capability token and
   // tests/a-codex-row-from-august-still-runs-on-claude.test.mts holds that
   // nothing in main/ or renderer/src references it. This module is the
   // translation layer, not the wiring, and importing it from the supervisor is
   // the slice that has to answer for her approval path.
   it('opens no gate of its own', () => {
-    const codex = readFileSync(join(repo, 'main', 'codex.mjs'), 'utf8');
+    const codex = readFileSync(join(repo, 'main', 'codex.mts'), 'utf8');
     expect(codex).not.toContain('ENGINE_CHOICE_ENABLED');
     expect(codex).not.toContain('availableEngines');
   });
@@ -864,7 +864,7 @@ describe('Codex readers stay behind the engine and approval boundary', () => {
   // renderer/src at all.
   //
   // THERE ARE TWO IMPORTERS NOW AND THE SECOND IS ARGUED FOR HERE, which is
-  // what this test asked of whoever added one. main/codex-approvals.mjs takes
+  // what this test asked of whoever added one. main/codex-approvals.mts takes
   // `fileVerbWord` and nothing else: the four words a file change is described
   // by are drawn on her approval card BEFORE the patch is applied and in her
   // trace after it, and a second copy of that mapping is one edit away from a
@@ -894,19 +894,19 @@ describe('Codex readers stay behind the engine and approval boundary', () => {
       ...sources(join(repo, 'main')),
       ...sources(join(repo, 'renderer', 'src')),
       ...sources(join(repo, 'shared')),
-    ].filter((f) => !f.endsWith(join('main', 'codex.mjs')));
-    const target = join(repo, 'main', 'codex.mjs');
+    ].filter((f) => !f.endsWith(join('main', 'codex.mts')));
+    const target = join(repo, 'main', 'codex.mts');
     const importers = app.filter((f) => [...readFileSync(f, 'utf8').matchAll(/from\s+['"]([^'"]+)['"]/g)]
       .some((m) => join(dirname(f), m[1]) === target));
     expect(importers.sort()).toEqual([
-      join(repo, 'main', 'codex-approvals.mjs'),
+      join(repo, 'main', 'codex-approvals.mts'),
       join(repo, 'main', 'harnesses', 'claude-stream.mts'),
       join(repo, 'main', 'harnesses', 'codex.mts'),
     ]);
   });
 
   it('lends the approvals path the one word rule and no reader at all', () => {
-    const source = readFileSync(join(repo, 'main', 'codex-approvals.mjs'), 'utf8');
+    const source = readFileSync(join(repo, 'main', 'codex-approvals.mts'), 'utf8');
     const block = source.match(/import\s*\{([^}]*)\}\s*from\s+'\.\/codex\.mjs'/);
     expect(block).toBeTruthy();
     expect(block[1].split(',').map((n) => n.trim()).filter(Boolean)).toEqual(['fileVerbWord']);
@@ -923,7 +923,7 @@ describe('Codex readers stay behind the engine and approval boundary', () => {
   //   (tests/a-codex-run-shows-her-the-code-it-changed.test.mts).
   //
   //   `SAYING_CAP` moves the other way: the number went OUT of the supervisor
-  //   and into this module, which is what the note at main/codex.mjs:111 asked
+  //   and into this module, which is what the note at main/codex.mts:111 asked
   //   for. It was a module-private const in both files for exactly as long as
   //   the reader slice was not allowed to edit the supervisor.
   it('lends the Codex adapter the four readers and both halves of the change', () => {

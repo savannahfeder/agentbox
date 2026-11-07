@@ -10,10 +10,10 @@
 import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { appHome } from '../main/store/home.mjs';
+import { appHome } from '../main/store/home.mts';
 import { loadStore } from '../main/store-modules.mts';
 import { Teammates } from '../main/teammates.mts';
-import { STARTERS, dutySlot } from '../shared/teammates.mjs';
+import { STARTERS, dutySlot } from '../shared/teammates.mts';
 
 let team; let store;
 
@@ -22,9 +22,9 @@ beforeEach(async () => {
   const accountId = `acct-${Math.random().toString(36).slice(2, 8)}`;
   process.env.STORE_ACCOUNT_ID = accountId;
   fs.mkdirSync(path.join(home, 'accounts', accountId), { recursive: true });
-  const { resolveAccount } = await import('../mcp/core/account.mjs');
+  const { resolveAccount } = await import('../mcp/core/account.mts');
   resolveAccount();
-  const { createProduct } = await import('../mcp/core/products.mjs');
+  const { createProduct } = await import('../mcp/core/products.mts');
   const product = createProduct(`Shop ${Math.random().toString(36).slice(2, 8)}`);
   const dir = path.join(home, 'accounts', accountId, product.id);
   const mods = await loadStore();

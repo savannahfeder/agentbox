@@ -11,7 +11,7 @@ import { it, expect, describe, afterEach, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadCloudConfig } from '../main/team/session.mjs';
+import { loadCloudConfig } from '../main/team/session.mts';
 
 const tmp = (name) => fs.mkdtempSync(path.join(os.tmpdir(), `phone-site-${name}-`));
 const CLOUD = { url: 'https://hers.test', anonKey: 'anon' };

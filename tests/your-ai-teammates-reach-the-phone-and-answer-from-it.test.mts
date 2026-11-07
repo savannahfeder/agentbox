@@ -14,8 +14,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createPhoneInbox, applyThrough } from '../main/phone-inbox.mts';
-import { checkSetting, settingRoute } from '../shared/phone-settings.mjs';
-import { phoneChoices, phoneTeammatesOf, TEAMMATES_LIMITS } from '../shared/phone-snapshot.mjs';
+import { checkSetting, settingRoute } from '../shared/phone-settings.mts';
+import { phoneChoices, phoneTeammatesOf, TEAMMATES_LIMITS } from '../shared/phone-snapshot.mts';
 
 const NOW = Date.parse('2026-10-30T12:00:00Z');
 const HOME = '/Users/someone';

@@ -31,7 +31,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { NAME, Name, nameSlug } from '../shared/product-name.mjs';
-import { JOIN_SCHEME } from '../shared/room-links.mjs';
+import { JOIN_SCHEME } from '../shared/room-links.mts';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const WRITE = process.argv.includes('--write');

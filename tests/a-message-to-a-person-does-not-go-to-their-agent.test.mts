@@ -8,7 +8,7 @@
 // message that asks the person something takes their answer, and a message
 // that opens on the owner's name is the owner's.
 import { describe, it, expect } from 'vitest';
-import { repliesToAgents } from '../shared/teammate-reach.mjs';
+import { repliesToAgents } from '../shared/teammate-reach.mts';
 
 const voice = { id: 't-aaaaaa', name: 'Seat picker', run: 'w-run' };
 const chat = (...said) => [{ id: 'w-convo', product: 'direct', status: 'open', talk: { chat: said, threads: {} } }];

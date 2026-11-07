@@ -110,7 +110,7 @@ describe('the app reads the filtered inbox when it advances', () => {
   });
 
   it('filters the list on screen through the same rule', () => {
-    // `directSlugs` lets a conversation keep its own level (shared/rank.mjs shownPriority).
+    // `directSlugs` lets a conversation keep its own level (shared/rank.mts shownPriority).
     expect(app).toContain('filterBox(wholeBox, boxFilter, directSlugs)');
     expect(app).toContain('filterBox(inbox, boxFilter, directSlugs)');
   });

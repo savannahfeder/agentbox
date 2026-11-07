@@ -1,5 +1,5 @@
-import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/repeats.mjs';
-import { isShippedNote } from '../../shared/shipped-note.mjs';
+import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/repeats.mts';
+import { isShippedNote } from '../../shared/shipped-note.mts';
 import { readMoment } from './when-words';
 // Time and grouping, Superhuman-style: terse, scannable, never a full date
 // where "3m" will do.
@@ -452,7 +452,7 @@ function flatten(body: string, headings: 'drop' | 'keep'): string {
     .replace(/^#{1,4}\s.*$/gm, (line) => (headings === 'keep' ? line.replace(/^#{1,4}\s*/, '') : ''))
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    // A cloud run's key ask reads as what it asks for (shared/cloud-keys.mjs).
+    // A cloud run's key ask reads as what it asks for (shared/cloud-keys.mts).
     // Its other asks are cards in the thread, and machine words anywhere else (round six: search showed them).
     .replace(/^\s*`?AGENTBOX-NEEDS:\s*(sign-in|key|file|code)\s.*$/gim, '')
     .replace(/^\s*`?AGENTBOX-NEEDS-A-KEY:\s*([A-Z][A-Z0-9_]+)\b[\s:\u2014\u2013-]*(.*?)`?\s*$/gm, (_l, name: string, what: string) => what || name)

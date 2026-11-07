@@ -162,7 +162,7 @@ describe('setup goes straight on, and the card stays off', () => {
 });
 
 // THE TWO GAPS THIS FILE FIRST PINNED, CLOSED on the founder's pick
-// (2026-10-11): main/importable-threads.mts and main/shell-path.mjs.
+// (2026-10-11): main/importable-threads.mts and main/shell-path.mts.
 describe('setup also shows the import card', () => {
   it('when the newest session is eleven days old', async () => {
     claudeSession(path.join(home, '.claude'), { when: NOW - 11 * DAY });

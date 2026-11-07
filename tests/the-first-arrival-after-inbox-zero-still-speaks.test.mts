@@ -21,7 +21,7 @@
 // `null` is never-looked, an empty Set is an inbox she has seen and cleared.
 
 import { describe, it, expect } from 'vitest';
-import { isNew } from '../shared/notify-rules.mjs';
+import { isNew } from '../shared/notify-rules.mts';
 
 describe('what counts as news', () => {
   it('says nothing about the inbox it is seeing for the first time', () => {

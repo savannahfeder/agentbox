@@ -15,10 +15,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { aTeamWithAgents } from './lib/a-team-with-agents.mts';
-import { teamTell, teamTask } from '../mcp/core/reach.mjs';
-import { REACH_LABEL, UNDO_HOLD_MS } from '../shared/teammate-reach.mjs';
-import { isTaskRow } from '../shared/team-rules.mjs';
-import { resolveArtifact } from '../main/artifact-path.mjs';
+import { teamTell, teamTask } from '../mcp/core/reach.mts';
+import { REACH_LABEL, UNDO_HOLD_MS } from '../shared/teammate-reach.mts';
+import { isTaskRow } from '../shared/team-rules.mts';
+import { resolveArtifact } from '../main/artifact-path.mts';
 
 let t; let run;
 

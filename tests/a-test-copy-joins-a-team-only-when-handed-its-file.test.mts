@@ -12,8 +12,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadCloudConfig } from '../main/team/session.mjs';
-import { FRESH_USER_ENV } from '../shared/fresh-user-home.mjs';
+import { loadCloudConfig } from '../main/team/session.mts';
+import { FRESH_USER_ENV } from '../shared/fresh-user-home.mts';
 
 const KEY = { url: 'https://team.test', anonKey: 'k' };
 const MAC_KEY = { url: 'https://hers.test', anonKey: 'h' };

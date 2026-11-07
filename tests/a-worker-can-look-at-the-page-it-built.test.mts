@@ -20,7 +20,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { localTarget, findChrome, lookAtPage } from '../mcp/core/page.mjs';
+import { localTarget, findChrome, lookAtPage } from '../mcp/core/page.mts';
 import { envName } from '../shared/product-name.mjs';
 
 const dirs = [];

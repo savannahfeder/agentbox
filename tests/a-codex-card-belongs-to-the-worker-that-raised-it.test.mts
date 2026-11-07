@@ -50,7 +50,7 @@
 // in-workspace patch RAISES `item/fileChange/requestApproval`, so refusing that
 // shape was a Codex worker that could not write a file at all. It is carded now
 // -- the `item/started` for the same itemId goes past first carrying the paths
-// and the diff, and main/codex-approvals.mjs draws the card off that. The
+// and the diff, and main/codex-approvals.mts draws the card off that. The
 // approval policy did not move and must not:
 // tests/a-codex-file-change-reaches-her-as-something-she-can-read.test.mts is
 // where that whole path is pinned.
@@ -65,9 +65,9 @@ import { mkdtempSync, rmSync, readdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import fs from 'node:fs';
-import { createCodexApprovals, codexApprovalCard, CARD_CAP } from '../main/codex-approvals.mjs';
-import { spoolDir, listPending } from '../main/approvals.mjs';
-import { REFUSAL_DECISION } from '../main/codex-app-server.mjs';
+import { createCodexApprovals, codexApprovalCard, CARD_CAP } from '../main/codex-approvals.mts';
+import { spoolDir, listPending } from '../main/approvals.mts';
+import { REFUSAL_DECISION } from '../main/codex-app-server.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 const dirs = [];

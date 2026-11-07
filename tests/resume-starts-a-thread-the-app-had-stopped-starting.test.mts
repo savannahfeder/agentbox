@@ -9,7 +9,7 @@
 // to open at 22:47, filed as the app's write, and nothing else moved.
 //
 // The hold only let go for the person's own word on the row, and the reopen
-// Resume writes is filed as the app's (`authorityOf` in shared/work-items.mjs),
+// Resume writes is filed as the app's (`authorityOf` in shared/work-items.mts),
 // so the hold never saw it. Resume then marked the reply delivered and the door
 // turned the run away, which is what made the rows read Stopped. Restart the
 // Agent, Send Back and Run now were turned away the same way.

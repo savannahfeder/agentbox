@@ -23,8 +23,8 @@ import { execFileSync } from 'node:child_process';
 import {
   KIT_VERSION, NEW_THREAD, NEW_ITEM_MARK, NEW_TITLE_MARK, NEW_BODY_MARK, REPLY_MARK,
   newThreadKitKey, fillNewThreadKit, checkKit, startPayload, runOfClaim, replyPrompt,
-} from '../shared/cloud-kit.mjs';
-import { madeHere, threadSnapshot, withCloudTurn, newThreadSnapshot } from '../shared/phone-snapshot.mjs';
+} from '../shared/cloud-kit.mts';
+import { madeHere, threadSnapshot, withCloudTurn, newThreadSnapshot } from '../shared/phone-snapshot.mts';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
@@ -551,7 +551,7 @@ describe('end to end, through the real sandbox', () => {
     const { createSandbox } = await import('../cloud/sandbox/server.mjs');
     const { writeMarker } = await import('../main/cloud/marker.mts');
     const { markerForCloudRun } = await import('../main/cloud/kit.mts');
-    const { cloudUserLine, lastAnswerIn } = await import('../shared/cloud-kit.mjs');
+    const { cloudUserLine, lastAnswerIn } = await import('../shared/cloud-kit.mts');
     const here = (p) => fileURLToPath(new URL(p, import.meta.url));
     const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'new-e2e-')));
     const objects = new Map();

@@ -16,7 +16,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { filesInLines, threadFiles } from '../shared/artifact-marks.mjs';
+import { filesInLines, threadFiles } from '../shared/artifact-marks.mts';
 import { opensForTyping, savedVersionArrived, wordsToSave } from '../renderer/src/edit-sitting.ts';
 
 const view = fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/components/ArtifactView.tsx'), 'utf8');
@@ -55,7 +55,7 @@ describe('opening a document from its thread', () => {
     expect(focus).toMatch(/markdownActions\.current = \{[^}]*edits: item\.artifacts\?\.edits/);
   });
   it('a press on a file with no edits opens the file it names', async () => {
-    const { newestOfFamily } = await import('../shared/artifact-marks.mjs');
+    const { newestOfFamily } = await import('../shared/artifact-marks.mts');
     expect(newestOfFamily('docs/plan.md', [])).toBe('docs/plan.md');
     expect(newestOfFamily('docs/plan.md', [{ path: 'designs/w-1/plan-v2.md' }])).toBe('designs/w-1/plan-v2.md');
     expect(newestOfFamily('docs/other.md', [{ path: 'designs/w-1/plan-v2.md' }])).toBe('docs/other.md');

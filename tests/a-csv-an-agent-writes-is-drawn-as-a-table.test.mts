@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { parseDelimited, readTable, isTablePath, tagTone, logoFor, sortRows, filterRows, dateOf } from '../renderer/src/table-file.ts';
 import { besideDocument, messageDocuments } from '../renderer/src/message-artifacts.ts';
 import { readsInPlace } from '../renderer/src/components/OneThingAtATime.tsx';
-import { viewKind, opensBigInAGroup } from '../shared/artifact-marks.mjs';
+import { viewKind, opensBigInAGroup } from '../shared/artifact-marks.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

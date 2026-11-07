@@ -1,4 +1,4 @@
-// Types for shared/phone-snapshot.mjs, for the phone with the computer closed.
+// Types for shared/phone-snapshot.mts, for the phone with the computer closed.
 export const SNAPSHOT_LIMITS: { lines: number; textChars: number; items: number; bytes: number };
 export const PHONE_COMMANDS: string[];
 export const WAIT_STATES: string[];

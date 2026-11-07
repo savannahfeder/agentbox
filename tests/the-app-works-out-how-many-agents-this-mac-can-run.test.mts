@@ -28,7 +28,7 @@
 // already settled on by hand.
 
 import { describe, it, expect } from 'vitest';
-import { autoAgents, perAccountAgents, MAX_SLOTS, BASELINE_SLOTS } from '../main/machine.mjs';
+import { autoAgents, perAccountAgents, MAX_SLOTS, BASELINE_SLOTS } from '../main/machine.mts';
 
 const GB = 1024 ** 3;
 const mac = (gb, cores) => ({ memBytes: gb * GB, cores });

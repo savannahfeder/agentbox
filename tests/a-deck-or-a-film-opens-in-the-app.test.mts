@@ -10,7 +10,7 @@ import { glanceFile } from '../renderer/src/file-glance';
 import { linkArtifactPaths } from '../renderer/src/artifact-paths';
 import { whereALinkGoes } from '../renderer/src/link-click';
 import { servable } from '../main/img-scheme.mts';
-import { filesNamedInWords, isCarriedKind } from '../shared/carried-files.mjs';
+import { filesNamedInWords, isCarriedKind } from '../shared/carried-files.mts';
 
 describe('where a click goes', () => {
   it('opens a pdf and a film in the pane', () => {

@@ -1,4 +1,4 @@
-// Types for shared/team-rules.mjs, read by the renderer.
+// Types for shared/team-rules.mts, read by the renderer.
 type Row = { createdBy?: string | null; assignee?: string; runner?: string; people?: string[]; status?: string };
 type ProductLike = { team?: { projectId?: string; sharedBy?: string | null; direct?: unknown } | null } | null | undefined;
 

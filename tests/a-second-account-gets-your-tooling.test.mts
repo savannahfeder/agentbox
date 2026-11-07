@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { linkAccountTooling, toolingLine, SHARED_DIRS } from '../main/account-tooling.mjs';
+import { linkAccountTooling, toolingLine, SHARED_DIRS } from '../main/account-tooling.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 

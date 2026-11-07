@@ -18,7 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { Supervisor } from '../main/supervisor.mts';
-import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
+import { HAND_BACK } from '../shared/cloud-hand-back.mts';
 
 const MOVED = /moved from the cloud to this computer/;
 let tmp;

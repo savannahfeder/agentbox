@@ -20,7 +20,7 @@
 
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
-import { findEngine, pathDirs, envValue, lookAgain, warmShellAnswers, ENGINES } from '../main/engine-bin.mjs';
+import { findEngine, pathDirs, envValue, lookAgain, warmShellAnswers, ENGINES } from '../main/engine-bin.mts';
 
 const w = path.win32;
 const HOME = 'C:\\Users\\Some One';

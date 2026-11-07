@@ -25,7 +25,7 @@ import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/ga
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 import { cloudClients } from '../main/cloud/clients.mts';
 import { cloudPlan, signOutOtherMacs } from '../main/cloud/account.mts';
-import { cloudConfigPath, readCloudConfig, readCloudKey, writeCloudKey } from '../main/cloud/config.mjs';
+import { cloudConfigPath, readCloudConfig, readCloudKey, writeCloudKey } from '../main/cloud/config.mts';
 import { adminEvent } from '../scripts/cloud-gateway-admin.mjs';
 
 const A = '11111111-1111-4111-8111-111111111111';

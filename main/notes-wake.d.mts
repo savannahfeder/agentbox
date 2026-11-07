@@ -1,4 +1,4 @@
-// Types for main/notes-wake.mjs.
+// Types for main/notes-wake.mts.
 import type { ReplySupervisor } from './live-replies.mts';
 
 type Person = { id: string; name?: string | null };

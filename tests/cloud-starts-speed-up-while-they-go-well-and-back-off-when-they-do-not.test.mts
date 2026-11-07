@@ -7,7 +7,7 @@
 // already short. So the number is earned, the way the memory check judges a
 // command by what it measured and not by its name.
 import { describe, it, expect } from 'vitest';
-import { StartBudget } from '../main/cloud/start-budget.mjs';
+import { StartBudget } from '../main/cloud/start-budget.mts';
 
 const calm = { pressure: 'normal', stallMs: 0 };
 

@@ -83,14 +83,14 @@ describe('every team sign-up names the phone website', () => {
   });
 
   it('the desktop names the website its team settings carry', () => {
-    expect(fs.readFileSync('main/team/session.mjs', 'utf8')).toMatch(/emailRedirectTo: typeof cloudConfig\.phoneSite === 'string' \? cloudConfig\.phoneSite : undefined/);
+    expect(fs.readFileSync('main/team/session.mts', 'utf8')).toMatch(/emailRedirectTo: typeof cloudConfig\.phoneSite === 'string' \? cloudConfig\.phoneSite : undefined/);
   });
 
   // The desktop's client signs in with a one-time proof (PKCE), whose link
   // comes back as a code only the Mac that asked can spend; the website would
   // say "started somewhere else" over an account that had just been confirmed.
   it("the desktop's sign-up asks for a link the website can finish", () => {
-    const src = fs.readFileSync('main/team/session.mjs', 'utf8');
+    const src = fs.readFileSync('main/team/session.mts', 'utf8');
     const signUp = src.slice(src.indexOf('async signUp({ email, password, name })'), src.indexOf('cancelSignIn'));
     expect(signUp).toMatch(/flowType: 'implicit'/);
     expect(signUp).toMatch(/persistSession: false/);

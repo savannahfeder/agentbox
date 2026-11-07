@@ -12,9 +12,9 @@
 // tests/a-named-folder-shows-its-pictures.test.mts holds every edge.
 import fsDefault from 'node:fs';
 import path from 'node:path';
-import { resolveArtifact } from './artifact-path.mjs';
+import { resolveArtifact } from './artifact-path.mts';
 import { servable } from './img-scheme.mts';
-import type { ArtifactFs, ArtifactProduct } from './artifact-path.mjs';
+import type { ArtifactFs, ArtifactProduct } from './artifact-path.mts';
 
 export type FolderFs = ArtifactFs & Pick<typeof fsDefault, 'statSync' | 'readdirSync'>;
 

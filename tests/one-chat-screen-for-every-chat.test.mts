@@ -103,7 +103,7 @@ describe('her own task, read as the conversation it already is', () => {
 
   // WHAT IT RAN, QUIET, UNDER WHAT IT SAID, which is design shape B applied
   // here. The verb is a plain word and the subject is the command with its scaffolding
-  // peeled off, both out of shared/work-lines.mjs, which is what makes these
+  // peeled off, both out of shared/work-lines.mts, which is what makes these
   // read the same as the ones on a Claude Code row.
   it('puts the tool calls between the messages, in her words', () => {
     const tools = events

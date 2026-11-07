@@ -13,10 +13,10 @@ import { it, expect, beforeEach, describe } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
-import { noteToItsAgent } from '../main/notes-wake.mjs';
-import { cleanMark, marksOf, noteGoesTo, notesForItsAgent } from '../shared/artifact-marks.mjs';
+import { noteToItsAgent } from '../main/notes-wake.mts';
+import { cleanMark, marksOf, noteGoesTo, notesForItsAgent } from '../shared/artifact-marks.mts';
 
 const SOFIA = 'p-sofia';
 const MAYA = 'p-maya';

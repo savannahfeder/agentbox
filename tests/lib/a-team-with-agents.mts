@@ -4,13 +4,13 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../../main/store/work-items.mjs';
-import { appHome } from '../../main/store/home.mjs';
+import * as disk from '../../main/store/work-items.mts';
+import { appHome } from '../../main/store/home.mts';
 import { Store } from '../../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../../main/team/memory-cloud.mts';
 import { createTeamService } from '../../main/team/index.mts';
-import { memorySession } from '../../main/team/session.mjs';
-import { UNDO_HOLD_MS } from '../../shared/teammate-reach.mjs';
+import { memorySession } from '../../main/team/session.mts';
+import { UNDO_HOLD_MS } from '../../shared/teammate-reach.mts';
 
 const rand = () => Math.random().toString(36).slice(2, 8);
 
@@ -34,9 +34,9 @@ export async function aTeamWithAgents({ ownMates = null } = {}) {
   process.env.STORE_ACCOUNT_ID = accountId;
   const accountRoot = path.join(home, 'accounts', accountId);
   fs.mkdirSync(accountRoot, { recursive: true });
-  const { resolveAccount } = await import('../../mcp/core/account.mjs');
+  const { resolveAccount } = await import('../../mcp/core/account.mts');
   resolveAccount();
-  const { createProduct } = await import('../../mcp/core/products.mjs');
+  const { createProduct } = await import('../../mcp/core/products.mts');
   const product = createProduct(`Lumen ${rand()}`);
 
   const mayaId = signUpMemory(cloud, { email: `maya-${rand()}@lumen.test`, name: 'Maya Chen' });

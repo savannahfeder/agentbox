@@ -24,8 +24,8 @@ import { execFileSync } from 'node:child_process';
 import {
   KIT_VERSION, NEW_THREAD, NEW_THREAD_CODEX, NEW_ITEM_MARK, NEW_TITLE_MARK, NEW_BODY_MARK,
   newThreadKitKey, fillNewThreadKit, checkKit, codexReadLines, codexTurnLines, runOfClaim,
-} from '../shared/cloud-kit.mjs';
-import { madeHere } from '../shared/phone-snapshot.mjs';
+} from '../shared/cloud-kit.mts';
+import { madeHere } from '../shared/phone-snapshot.mts';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';

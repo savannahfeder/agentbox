@@ -12,7 +12,7 @@
 // is what a click opens on a computer, never got that list.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { filesInLines, stepsThrough, threadFiles, whereAPressLands, nextStep } from '../shared/artifact-marks.mjs';
+import { filesInLines, stepsThrough, threadFiles, whereAPressLands, nextStep } from '../shared/artifact-marks.mts';
 import { picturesFor } from '../renderer/src/components/PictureView.tsx';
 
 const said = (ts, text) => ({ id: `l${ts}`, ts, source: 'agent', patch: { result: text } });

@@ -1,7 +1,7 @@
 // A TEAM'S FOLDERS CROSS TO TEAMMATES UNDER THE RULES OF THE FILES IN THEM.
 //
 // "I don't see a good organizational system." Files was one flat page per
-// project: measured on the list main/files-place.mjs hands the page, a file had
+// project: measured on the list main/files-place.mts hands the page, a file had
 // no place at all, so nobody could file anything for anybody.
 //
 // What must NOT cross: a folder made in a project only its owner sees, and the
@@ -10,12 +10,12 @@ import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import { memorySession } from '../main/team/session.mjs';
-import { appFilesPlace } from '../main/files-place.mjs';
+import { memorySession } from '../main/team/session.mts';
+import { appFilesPlace } from '../main/files-place.mts';
 
 const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
 

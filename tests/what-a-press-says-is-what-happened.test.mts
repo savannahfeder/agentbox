@@ -13,8 +13,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pickSentWords, sentLineSays } from '../renderer/src/advance.ts';
-import { DONT_SEND, SEND_ONCE, saidToSendTo, mayGoNow } from '../shared/teammate-reach.mjs';
-import { hasCode } from '../shared/has-code.mjs';
+import { DONT_SEND, SEND_ONCE, saidToSendTo, mayGoNow } from '../shared/teammate-reach.mts';
+import { hasCode } from '../shared/has-code.mts';
 import { codeProjectFor } from '../renderer/src/compose-project.ts';
 import { liveLine } from '../renderer/src/teammates/chat-lines.ts';
 

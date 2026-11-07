@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readPlan } from '../main/claude-plan.mjs';
+import { readPlan } from '../main/claude-plan.mts';
 
 const lapsed = { billingType: 'none', organizationType: 'claude_max', organizationRateLimitTier: 'default_claude_max_20x' };
 const paying = { billingType: 'stripe_subscription', organizationType: 'claude_max', organizationRateLimitTier: 'default_claude_max_20x' };

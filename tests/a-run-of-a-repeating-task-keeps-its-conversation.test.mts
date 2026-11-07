@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
-import { dateKey } from '../shared/repeats.mjs';
+import { dateKey } from '../shared/repeats.mts';
 
 let root, store, runId;
 

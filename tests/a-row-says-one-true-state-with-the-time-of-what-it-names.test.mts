@@ -8,7 +8,7 @@
 // the chat shows nothing new), Today listed a task that was in Needs you as
 // blocked as well, and Dev's card for the same task as his work.
 import { describe, it, expect } from 'vitest';
-import { whatWaits, inMyInbox } from '../shared/team-rules.mjs';
+import { whatWaits, inMyInbox } from '../shared/team-rules.mts';
 import { taskWords } from '../renderer/src/team/company.ts';
 import { teamToday } from '../renderer/src/team/today.ts';
 

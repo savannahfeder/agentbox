@@ -17,8 +17,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseRepeat } from '../renderer/src/format';
 import { readWhen } from '../renderer/src/components/When';
-import { isRepeatRule, ruleLabel } from '../shared/repeats.mjs';
-import { Repeats } from '../main/repeats.mjs';
+import { isRepeatRule, ruleLabel } from '../shared/repeats.mts';
+import { Repeats } from '../main/repeats.mts';
 
 // A Thursday noon, so "thursday at 8am" has a next Thursday to land on.
 const THURSDAY_NOON = new Date(2026, 7, 27, 12, 0, 0, 0).getTime();

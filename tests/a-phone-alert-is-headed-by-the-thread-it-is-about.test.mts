@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { banner, phoneBanner } from '../shared/notify-rules.mjs';
+import { banner, phoneBanner } from '../shared/notify-rules.mts';
 import { createPhoneLink } from '../main/phone-link.mts';
 
 describe('what a phone alert says', () => {

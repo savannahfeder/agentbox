@@ -36,7 +36,7 @@ vi.mock('node:child_process', async (importActual) => {
 });
 
 const { Supervisor } = await import('../main/supervisor.mts');
-const { AUTO_LABEL, AGENT_WHY, FAILED_WHY, NOBODY_WHY, PRIMARY_WHY, PRIMARY_TIE_WHY, routePrompt, readRoute, routeCandidates } = await import('../shared/auto-route.mjs');
+const { AUTO_LABEL, AGENT_WHY, FAILED_WHY, NOBODY_WHY, PRIMARY_WHY, PRIMARY_TIE_WHY, routePrompt, readRoute, routeCandidates } = await import('../shared/auto-route.mts');
 
 const mate = (id, name, extra = {}) => ({ id, name, role: null, job: `${name}'s job.`, status: 'active', paused: false, duties: [], ...extra });
 const video = mate('t-video', 'Video producer');

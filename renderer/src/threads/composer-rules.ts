@@ -15,9 +15,9 @@ import { splitMessage } from '../message-split';
 import { parseWhen } from '../format';
 import { firstName } from '../team/company';
 import type { Person } from '../types';
-import { projectSeenBy } from '../../../shared/thread-cards.mjs';
-import { isRepeatRule, ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
-import { clockWords, dayDeadline } from '../../../shared/team-tasks.mjs';
+import { projectSeenBy } from '../../../shared/thread-cards.mts';
+import { isRepeatRule, ruleLabel, type RepeatShape } from '../../../shared/repeats.mts';
+import { clockWords, dayDeadline } from '../../../shared/team-tasks.mts';
 
 export type Harness = 'claude' | 'codex';
 
@@ -36,7 +36,7 @@ type CodexRow = Pick<ModelChoice, 'id'> & Partial<ModelChoice>;
  * Where a model runs. Claude Code's own rows are asked first, by alias and by
  * full id, then the Codex list read off this Mac. A slug neither list knows is
  * read by its shape: a GPT name is Codex, anything else is Claude Code, which is
- * the default everywhere else in the app too (shared/engines.mjs says why).
+ * the default everywhere else in the app too (shared/engines.mts says why).
  */
 export function harnessOf(model: string, codexModels: readonly CodexRow[] = []): Harness {
   if (claudeModelRows().some((m) => m.id === model || m.model === model)) return 'claude';
@@ -500,7 +500,7 @@ export function writeVisibility(v: Visibility, store?: KeyStore, project?: strin
 // the same gesture gives one to a teammate. The store already knew how to hold
 // that — `assignee` means the person who has to act next, a row held by a
 // person never starts an agent, and it sits in that one person's inbox until
-// it is done (shared/team-rules.mjs). The card simply had no way to say it.
+// it is done (shared/team-rules.mts). The card simply had no way to say it.
 //
 // So a card addressed to a person asks one more question, SEND AS, and a task
 // gets one more row, DUE ON. Everything general stays on the bar: the project,
@@ -716,7 +716,7 @@ export function agentOnThisWork<T extends { status?: string; labels?: string[]; 
 }
 
 /**
- * Whether To offers Auto (shared/auto-route.mjs): only with an AI teammate that
+ * Whether To offers Auto (shared/auto-route.mts): only with an AI teammate that
  * is working to give a thread to, and only where the box can reach teammates.
  * Auto keeps the Model row, so what it runs on is still yours to pick.
  */

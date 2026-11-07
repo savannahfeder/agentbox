@@ -30,7 +30,7 @@
 
 import { liveLine, shortSpan, shortWord, type LiveFacts, type LiveState } from './live-line';
 import { ago } from './format';
-import { engineLabel } from '../../shared/engines.mjs';
+import { engineLabel } from '../../shared/engines.mts';
 import { engineModelLabel, type ModelChoice } from './models';
 import type { WorkItem } from './types';
 
@@ -79,7 +79,7 @@ export const WHERE_LINE: Record<Where, string> = {
 // It indicated nothing. `item.updatedAt` is the timestamp of the NEWEST LINE in
 // the ledger for that row, and the MCP server appends a keep-alive line every
 // hundred seconds for as long as a worker holds the claim (`buildClaimLine` and
-// LEASE_MS in shared/work-items.mjs; the fold in that file bumps `updatedAt`
+// LEASE_MS in shared/work-items.mts; the fold in that file bumps `updatedAt`
 // for a heartbeat exactly as it does for a real write). MEASURED on her own
 // Agentbox ledger, 2026-08-28, on this very row: 215 lines, 161 of them
 // heartbeats, median gap 100.0 seconds over 148 gaps. So "last moved 1m ago"

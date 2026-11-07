@@ -12,9 +12,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { startToolsFixture } from '../cloud/standin/tools-mcp.mjs';
-import { createConnections } from '../main/connections/index.mjs';
+import { createConnections } from '../main/connections/index.mts';
 import { checkResultLine, stateLine, whenLine } from '../renderer/src/connections/connections-shown';
-import { catalogFor, CHECK_LIMIT } from '../shared/connections-catalog.mjs';
+import { catalogFor, CHECK_LIMIT } from '../shared/connections-catalog.mts';
 
 const key = crypto.randomBytes(32);
 const cipher = {
@@ -126,7 +126,7 @@ describe('a down tile', () => {
   });
 
   it('the old "Check again in a while" is gone', () => {
-    const src = fs.readFileSync(path.resolve(import.meta.dirname, '../shared/connections-catalog.mjs'), 'utf8');
+    const src = fs.readFileSync(path.resolve(import.meta.dirname, '../shared/connections-catalog.mts'), 'utf8');
     expect(src).not.toMatch(/again in a while/i);
   });
 });

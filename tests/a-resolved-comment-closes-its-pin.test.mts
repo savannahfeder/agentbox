@@ -7,7 +7,7 @@
 //
 // A resolved pin shows again only while its card is picked from the resolved list.
 import { it, expect, describe } from 'vitest';
-import { marksOf } from '../shared/artifact-marks.mjs';
+import { marksOf } from '../shared/artifact-marks.mts';
 import { pinsToDraw } from '../renderer/src/artifact-pins.ts';
 
 const marks = marksOf([

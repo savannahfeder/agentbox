@@ -13,10 +13,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { cloudAccountSession } from '../main/cloud/account.mts';
-import { supabaseSession, memorySession } from '../main/team/session.mjs';
+import { supabaseSession, memorySession } from '../main/team/session.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 
 const ROOT = path.join(import.meta.dirname, '..');

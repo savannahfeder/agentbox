@@ -17,9 +17,9 @@ import { COPY as walk } from '../renderer/src/onboarding.ts';
 import { CARD } from '../renderer/src/agent-import-card.ts';
 import { checkProjectFolder } from '../shared/project-folder-check.mts';
 import { troubleSentence } from '../shared/spawn-trouble.mts';
-import { CODEX_MODES } from '../shared/codex-modes.mjs';
+import { CODEX_MODES } from '../shared/codex-modes.mts';
 import { agentImportRow } from '../shared/agent-import.mts';
-import { machineNote } from '../main/machine.mjs';
+import { machineNote } from '../main/machine.mts';
 
 const APPLE = /\bMac\b|macOS|\bApple\b|\biPhone\b|\biPad\b|\bFinder\b/;
 
@@ -40,9 +40,9 @@ const SPOKEN_FILES = [
   'shared/project-folder-check.mts',
   'shared/spawn-trouble.mts',
   'shared/agent-import.mts',
-  'shared/codex-modes.mjs',
-  'shared/demo-world.mjs',
-  'main/machine.mjs',
+  'shared/codex-modes.mts',
+  'shared/demo-world.mts',
+  'main/machine.mts',
   'main/memory-gate.mts',
   'main/settings.mts',
   'main/supervisor.mts',
@@ -51,7 +51,7 @@ const SPOKEN_FILES = [
   'main/team/index.mts',
   'main/notify.mts',
   'main/ship-queue.mts',
-  'mcp/core/page.mjs',
+  'mcp/core/page.mts',
 ];
 
 function codeOnly(src) {
@@ -101,7 +101,7 @@ describe('the sentences a person reads', () => {
   });
 
   it('keeps the Chrome bundle path, which is a file and not a sentence', () => {
-    const page = fs.readFileSync(new URL('../mcp/core/page.mjs', import.meta.url), 'utf8');
+    const page = fs.readFileSync(new URL('../mcp/core/page.mts', import.meta.url), 'utf8');
     expect(page).toContain('Contents/MacOS/Google Chrome');
     expect(literals(page).filter((s) => APPLE.test(s))).toEqual([]);
   });

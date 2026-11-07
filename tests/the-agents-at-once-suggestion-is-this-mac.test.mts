@@ -3,7 +3,7 @@
 // IT SHIPPED AS A CEILING AND THAT WAS THE WRONG READING. It is a suggestion.
 //
 // THE LADDER IS LAID OUT BY HAND, with named machines, so a change to the
-// arithmetic in main/machine.mjs has to say out loud which of them it moved.
+// arithmetic in main/machine.mts has to say out loud which of them it moved.
 //
 // THESE ARE OBSERVED NUMBERS AND NOT A MEASUREMENT, which is the thing to know
 // before touching any of them. The first version of this file held what the
@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { machineSlots, machineNote, MAX_SLOTS, BASELINE_SLOTS } from '../main/machine.mjs';
+import { machineSlots, machineNote, MAX_SLOTS, BASELINE_SLOTS } from '../main/machine.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const gb = (n) => n * (1024 ** 3);
@@ -137,7 +137,7 @@ describe('the suggestion stops nobody', () => {
   });
 
   it('chooses the number nobody set, and leaves a number she set alone', () => {
-    const config = fs.readFileSync(path.join(root, 'main/config.mjs'), 'utf8');
+    const config = fs.readFileSync(path.join(root, 'main/config.mts'), 'utf8');
     // Inside the same `nobody said` branch the plan cap is in, so the two
     // compose instead of one undoing the other.
     // THE MACHINE IS THE PLAN'S FALLBACK, not a second `Math.min` after it.

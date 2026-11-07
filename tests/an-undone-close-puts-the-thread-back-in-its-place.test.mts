@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createWorkItem, updateWorkItem, readWorkItem, setLineAuthor } from '../main/store/work-items.mjs';
+import { createWorkItem, updateWorkItem, readWorkItem, setLineAuthor } from '../main/store/work-items.mts';
 import { sorted, DEFAULT_DISPLAY } from '../renderer/src/threads/page-rules.ts';
 import { byRunningOrder, placedAt } from '../renderer/src/list-rules.ts';
 

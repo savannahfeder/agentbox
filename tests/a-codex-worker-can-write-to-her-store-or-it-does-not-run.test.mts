@@ -51,7 +51,7 @@
 //
 // The last block is the case that must NOT match: an install with no store MCP
 // configured, which is every downloaded copy of Agentbox (`storeMcpCommand` is
-// null in main/config.mjs). There is nothing to wait for there, so the worker
+// null in main/config.mts). There is nothing to wait for there, so the worker
 // must start exactly as it does today rather than hang on a server nobody
 // asked for.
 //
@@ -72,7 +72,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { storeRootEnv } from '../main/store/home.mjs';
+import { storeRootEnv } from '../main/store/home.mts';
 import { join } from 'node:path';
 
 // The one seam, the same one tests/the-supervisor-can-run-a-codex-worker uses:
@@ -150,7 +150,7 @@ vi.mock('node:child_process', async (importActual) => {
 
 import { Supervisor } from '../main/supervisor.mts';
 import { workerThreadParams, resumeThreadParams } from '../main/codex-session.mts';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 // The store server answers to the app's own name since 2026-09-22. This file
 // spelled it 'agentbox' throughout, which is the name it carried while it lived
 // in another product's repo.
@@ -337,7 +337,7 @@ describe('a codex worker that has her store', () => {
     expect(servers[nameSlug].command).toBe(sup.launcher);
     // The store root goes under EVERY name this app has had, because a store
     // server or a script written against an older one is still out there
-    // reading it (main/store/home.mjs).
+    // reading it (main/store/home.mts).
     expect(servers[nameSlug].env).toEqual({
       STORE_ACCOUNT_ID: ACCOUNT,
       ...storeRootEnv(sup.dir),

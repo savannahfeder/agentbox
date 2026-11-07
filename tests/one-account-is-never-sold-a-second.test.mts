@@ -56,7 +56,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { duplicateAccountNote } from '../main/account-tooling.mjs';
+import { duplicateAccountNote } from '../main/account-tooling.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -209,7 +209,7 @@ describe('the Agents page explains parallelism without teaching the multiplier',
   /* THE MULTIPLIER IS GONE RATHER THAN HIDDEN (w-e5225b62ba). These two used to
      check that "Per account" appeared only once a second account existed, and
      that one account got a plain number instead. Automatic answers for the
-     MACHINE now and main/machine.mjs shares that number out, so the page has no
+     MACHINE now and main/machine.mts shares that number out, so the page has no
      per-account sentence left to get right in either case — which is the
      strongest version of this file's rule, not a retreat from it. The number
      shown does not move when an account is added, so there is nothing on the

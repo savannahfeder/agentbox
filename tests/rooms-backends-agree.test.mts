@@ -14,9 +14,9 @@
 import { it, expect, describe, beforeAll, afterAll } from 'vitest';
 import crypto from 'node:crypto';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
-import { supabaseBackend } from '../main/team/supabase-backend.mjs';
+import { supabaseBackend } from '../main/team/supabase-backend.mts';
 import { GENERAL_ROOM } from '../main/team/rooms-memory.mts';
-import { FILE_EXISTS } from '../main/team/rooms-shape.mjs';
+import { FILE_EXISTS } from '../main/team/rooms-shape.mts';
 
 const NAMES = ['Maya', 'Theo', 'Jun', 'Ana'];
 

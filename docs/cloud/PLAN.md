@@ -147,7 +147,7 @@ each vendor's own sign-in, kept between runs.
 ## Codex in the cloud (added 2026-10-13: "a fundamental requirement")
 
 On the Mac, every Codex thread of one login runs inside one shared
-`codex app-server`, spoken to over JSON-RPC (main/codex-app-server.mjs). A
+`codex app-server`, spoken to over JSON-RPC (main/codex-app-server.mts). A
 cloud Codex thread gets an app-server of its OWN, in its sandbox:
 
 - **The connection.** `createCodexAppServer` already takes any process that
@@ -525,7 +525,7 @@ input. In order:
    **Built for the Mac's own work, 2026-10-28 (w-10990b7de2).** Overnight on
    10-26 the lid was shut from 10:07pm to 12:23pm; the Mac woke for 2 to 21 s
    every quarter hour, started due rows in those wakes, and each died at the
-   next wake with a fetch timeout. Now (shared/cloud-carry.mjs):
+   next wake with a fetch timeout. Now (shared/cloud-carry.mts):
    - A pass after a two-minute gap counts as asleep until a minute passes or
      someone touches the keyboard or mouse. Asleep, nothing starts: the queue,
      `spawnWorker` and the wake sweep all hold.
@@ -644,7 +644,7 @@ Settled, not to be reopened:
 - **The record.** Ordered messages and events, runs, file versions and approvals
   live in the database, and file bytes and transcripts in S3 under the person.
   `phone_threads` stays as a copy the function writes under its own device id for
-  phones not yet updated. It truncates (shared/phone-snapshot.mjs:16), so it cannot
+  phones not yet updated. It truncates (shared/phone-snapshot.mts:16), so it cannot
   be the truth. Clients write to it by device (`owner,device,project,item`), so an old
   app does not overwrite a cloud thread.
 - **Approvals.** The run holds a card for up to 15 minutes in `waiting`, with the
@@ -664,7 +664,7 @@ Settled, not to be reopened:
 - **The window.** A person with only cloud threads runs the Electron shell with the
   app's own bundled screens on `renderer/src/cloud-bridge.ts`, the bridge the phone
   site already uses to read rows and leave commands, extended to do everything a
-  cloud thread needs. main/hub-client.mjs today loads a page from a hub, and Lambda
+  cloud thread needs. main/hub-client.mts today loads a page from a hub, and Lambda
   hosts no page, so its window code changes but its shell stays. A person with both
   runs the full app, which shows cloud threads from the database as it shows phone
   rows today.
@@ -681,7 +681,7 @@ Settled, not to be reopened:
 
 ### Asking for things: one tool, whatever is missing
 
-`request_cloud_resource` and the hand-back line (shared/cloud-hand-back.mjs) are
+`request_cloud_resource` and the hand-back line (shared/cloud-hand-back.mts) are
 the start of this. They become one tool the agent calls with what it needs and why:
 a file or folder, a saved sign-in, or (where allowed) running something on the
 computer. Every call answers within a deadline:
@@ -805,7 +805,7 @@ Electron, and the window already runs over http (renderer/src/browser-bridge.ts)
   is refused. A Mac that names a hub never falls back to running agents. Rollback
   is the same protocol in reverse from the hub's current state.
 - **The window.** `main/start.mjs` picks: with `~/.agentbox/hub.json` the process
-  is main/hub-client.mjs and loads no store or supervisor. Alerts, the Dock count
+  is main/hub-client.mts and loads no store or supervisor. Alerts, the Dock count
   and web links stay on the Mac; the rest goes to the hub. Every door refuses to
   run agents on a machine that names a hub, a damaged file included. Still to do
   before anyone runs on it: the client updating itself (main/main.mjs starts the
@@ -829,7 +829,7 @@ Electron, and the window already runs over http (renderer/src/browser-bridge.ts)
   suggest 30 to 60 changes an hour, not 200 instant ships.
 - **Hub limits.** Stream parsing and folding move to workers with bounded queues;
   one shared versioned projection, client deltas from it. Starts are earned
-  (main/cloud/start-budget.mjs). The hub talks to sandboxes over AgentCore
+  (main/cloud/start-budget.mts). The hub talks to sandboxes over AgentCore
   WebSockets with replay cursors, out of the Lambda path, whose reserved 200 would
   be filled by 200 long polls; the gateway keeps authorization, accounting and
   revocation. AgentCore stays the sandbox.
@@ -906,7 +906,7 @@ approved:
 
 A Lambda behind a function URL, in the same account and region as the
 runtime (`cloud/gateway/`). The Mac's two interfaces (transport and storage,
-`main/cloud/aws.mjs`) get a second implementation that talks to it
+`main/cloud/aws.mts`) get a second implementation that talks to it
 (`main/cloud/managed.mts`); `run.mts` and `logins.mts` do not change.
 
 - **Who is asking.** A Mac trades the person's signed-in session for a cloud

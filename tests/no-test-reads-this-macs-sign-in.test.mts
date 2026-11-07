@@ -40,7 +40,7 @@ import { it, expect, describe } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 
 describe('a suite running on a Mac somebody is signed into', () => {
   // The reported case at its source: whatever this Mac's sign-in is, the test

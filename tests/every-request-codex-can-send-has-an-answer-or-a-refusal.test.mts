@@ -3,7 +3,7 @@
 // MEASURED 2026-10-09. `codex app-server generate-json-schema --out` on
 // codex-cli 0.160.0, then every `method` const in `ServerRequest.json` -- the
 // schema's own list of what the server may send a client. Ten of them, and
-// `main/codex-app-server.mjs` knew four.
+// `main/codex-app-server.mts` knew four.
 //
 // DENY BY DEFAULT IS THE RIGHT RULE AND IT IS NOT WEAKENED HERE. An approval
 // shape nobody has measured must not be granted. What was wrong is that the rule
@@ -45,7 +45,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createCodexAppServer, REFUSAL_DECISION, APPROVAL_DECISIONS,
   LEGACY_DECISIONS, SERVER_REQUESTS,
-} from '../main/codex-app-server.mjs';
+} from '../main/codex-app-server.mts';
 import { EventEmitter } from 'node:events';
 
 /** Every `method` the 0.160.0 schema lets a server send a client. */

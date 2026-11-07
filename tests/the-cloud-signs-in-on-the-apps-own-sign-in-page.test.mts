@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { Supervisor } from '../main/supervisor.mts';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { cloudAccountSession, cloudSignIn } from '../main/cloud/account.mts';
-import { readCloudKey, readCloudConfig, writeCloudKey, cloudConfigPath } from '../main/cloud/config.mjs';
+import { readCloudKey, readCloudConfig, writeCloudKey, cloudConfigPath } from '../main/cloud/config.mts';
 import { REQUEST_CHANNELS } from '../shared/bridge-map.mts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

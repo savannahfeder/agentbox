@@ -6,7 +6,7 @@
 // rules; the test is tests/a-room-wall-shows-each-person-as-they-chose.
 import { localDate, streakOf } from './agent-hours.mts';
 import type { AgentHoursSummary } from './agent-hours.mts';
-import { visibilityOf } from './thread-cards.mjs';
+import { visibilityOf } from './thread-cards.mts';
 
 type Row = Parameters<typeof visibilityOf>[0];
 type Seen = Parameters<typeof visibilityOf>[1];

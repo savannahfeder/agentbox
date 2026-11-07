@@ -24,7 +24,7 @@ beforeAll(async () => {
   }));
 
   ({ Store } = await import('../main/store.mts'));
-  disk = await import('../main/store/work-items.mjs');
+  disk = await import('../main/store/work-items.mts');
 
   const config = {
     storeRoot: tmp,

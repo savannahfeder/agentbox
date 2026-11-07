@@ -1,5 +1,5 @@
 // GROUPS FROM A PHONE, straight to the account with no computer between: the
-// reads and writes main/team/rooms-supabase.mjs makes, over the phones' plain
+// reads and writes main/team/rooms-supabase.mts makes, over the phones' plain
 // REST client (cloud-rest.ts). Row level security decides who sees and posts
 // what (20261021000000_rooms.sql and the room migrations after it), so these
 // only ask. A phone runs no agents, so it never publishes presence or hours,
@@ -17,7 +17,7 @@ const wallCards = wallCardsJs as unknown as (o: Record<string, unknown>) => Room
 
 export type GroupsRest = Pick<ReturnType<typeof cloudClient>, 'session' | 'select' | 'insert' | 'rpc'>;
 
-// The columns main/team/rooms-shape.mjs reads; the phone bundles cannot reach main/.
+// The columns main/team/rooms-shape.mts reads; the phone bundles cannot reach main/.
 const PROFILE_FIELDS = ['display_name', 'avatar_url', 'headline', 'bio', 'show_working', 'show_agents', 'show_level', 'show_status', 'show_activity', 'invisible_until', 'status_text', 'status_until'];
 const PRESENCE_FIELDS = ['gone', 'agents_running', 'working_on', 'working_private', 'working_at', 'hours_total', 'hours_week', 'week_start', 'hours_today', 'day', 'streak_days', 'active_days', 'hours_by_month', 'activity'];
 export const GROUP_COLS = {
@@ -307,7 +307,7 @@ export function phoneGroups(c: GroupsRest, { now = Date.now }: { now?: () => num
   return { state: () => state, refresh, send, markRead, older, door, forget: () => { held = null; ready = false; state = NO_GROUPS; } };
 }
 
-/** Groups is on when the computer heard from last says so in its settings copy (shared/phone-settings.mjs). */
+/** Groups is on when the computer heard from last says so in its settings copy (shared/phone-settings.mts). */
 export function groupsOn(rows: readonly SettingsRow[] | null | undefined): boolean {
   return computerOf([...(rows ?? [])])?.settings?.workspace?.alpha?.rooms === true;
 }

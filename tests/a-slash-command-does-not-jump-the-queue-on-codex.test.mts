@@ -40,7 +40,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Supervisor } from '../main/supervisor.mts';
-import { DEFAULT_ENGINE } from '../shared/engines.mjs';
+import { DEFAULT_ENGINE } from '../shared/engines.mts';
 import { commandPrompt } from '../shared/claude-commands.mts';
 
 const ONE_ACCOUNT_HOME = '/nonexistent-home-with-no-second-account';

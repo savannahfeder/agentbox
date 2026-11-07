@@ -11,7 +11,7 @@
 //   iOS may freeze before it lands.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { SNAPSHOT_LIMITS, threadSnapshot } from '../shared/phone-snapshot.mjs';
+import { SNAPSHOT_LIMITS, threadSnapshot } from '../shared/phone-snapshot.mts';
 import { phoneView } from '../renderer/src/cloud-bridge';
 
 describe('a thread\'s copy', () => {

@@ -4,7 +4,7 @@
 // settings was in the account the phone reads, and the Mac took only thread
 // commands (main/phone-inbox.mts ROUTES, ten kinds, each naming a project).
 // Now each pass sends the Mac's settings as one row for this computer
-// (shared/phone-settings.mjs, no paths), and a `setting` command goes through
+// (shared/phone-settings.mts, no paths), and a `setting` command goes through
 // the window's own handler, as every other phone command does. Measured here
 // with the in-memory cloud and a stand-in for the window's channels.
 import { describe, it, expect } from 'vitest';
@@ -13,7 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createPhoneInbox, applyThrough } from '../main/phone-inbox.mts';
-import { checkCommand } from '../shared/phone-snapshot.mjs';
+import { checkCommand } from '../shared/phone-snapshot.mts';
 
 const NOW = Date.parse('2026-10-21T12:00:00Z');
 const HOME = '/Users/someone';

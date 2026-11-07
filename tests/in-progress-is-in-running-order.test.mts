@@ -13,7 +13,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { byRunningOrder } from '../renderer/src/list-rules';
-import { productRankScore } from '../shared/rank.mjs';
+import { productRankScore } from '../shared/rank.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 const t = (iso) => Date.parse(iso);

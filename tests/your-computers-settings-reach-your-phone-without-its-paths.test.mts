@@ -3,7 +3,7 @@
 // The phone app's Settings showed two rows, sign out and alerts, against the
 // desktop's fourteen pages ("Settings also only shows two things rather than
 // the full coherent settings", 2026-10-21). Nothing of the Mac's settings
-// reached the account the phone reads: shared/phone-snapshot.mjs carries
+// reached the account the phone reads: shared/phone-snapshot.mts carries
 // threads only. Now the Mac sends a copy of what the phone's pages draw, and
 // the phone asks for a change as a command the Mac's own handlers carry out.
 //
@@ -13,7 +13,7 @@
 // instructions. None of that goes to the cloud, so a login travels as the last
 // part of its folder's name and the Mac turns that back into the folder.
 import { describe, it, expect } from 'vitest';
-import { phoneSettingsOf, checkSetting, settingRoute, accountIdOf, SETTINGS_VERSION } from '../shared/phone-settings.mjs';
+import { phoneSettingsOf, checkSetting, settingRoute, accountIdOf, SETTINGS_VERSION } from '../shared/phone-settings.mts';
 
 const HOME = '/Users/someone';
 const model = () => ({

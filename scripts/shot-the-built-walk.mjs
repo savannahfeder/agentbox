@@ -74,7 +74,7 @@ const snapshot = {
   // The sessions Agentbox finds by itself, which are nothing to do with the
   // import on the finish card: they are Claude Code running elsewhere on the
   // machine. `startedByZero` absent means they are somebody else's, which is
-  // what `listed` in shared/agents.mjs asks.
+  // what `listed` in shared/agents.mts asks.
   agents: LIVE
     ? [
       { pid: 90101, name: 'agentbox-bb', product: 'agentbox', productName: 'Agentbox', startedAt: Date.now() - 90_000, lastActiveAt: Date.now() - 60_000 },

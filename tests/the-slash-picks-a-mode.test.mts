@@ -18,7 +18,7 @@ import {
   MODE_ORDER, MODE_WORDS, MODE_COMMAND, MODE_SENTENCE, MODE_HINT, MODE_STATUS,
   MODE_CYCLE, MENU_TITLE, RULES_ALWAYS_APPLY, slashQuery, modeMatches, exactMode, nextMode,
 } from '../renderer/src/modes.ts';
-import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mjs';
+import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mts';
 
 describe('the six are Claude Code\'s six', () => {
   // THE MEASUREMENT THIS ENCODES, so nobody has to trust the list:

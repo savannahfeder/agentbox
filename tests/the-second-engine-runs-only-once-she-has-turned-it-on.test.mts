@@ -1,6 +1,6 @@
 // THE SWITCH THAT COULD OPEN THE GATE, BUILT AND LEFT OFF.
 //
-// `shared/engines.mjs` has answered Claude Code for every row on every machine
+// `shared/engines.mts` has answered Claude Code for every row on every machine
 // since it came back, because `engineFor` refuses without `ENGINE_CHOICE_ENABLED`
 // and nothing anywhere held that Symbol. This is the slice that builds the way
 // it CAN be handed over, and it deliberately changes no default: with nothing
@@ -13,7 +13,7 @@
 // FILE.
 //
 // `engine` survived the 2026-08-27 removal on the work-item contract
-// (`WORK_ITEM_FIELDS`, shared/work-items.mjs:95), and the fold drops nothing, so
+// (`WORK_ITEM_FIELDS`, shared/work-items.mts:95), and the fold drops nothing, so
 // an existing store may still hold rows marked `engine: "codex"` between 08-25
 // and 08-27. They cannot be counted from here; on a machine with a store it is
 // `grep -rho '"engine":"[a-z]*"' ~/Zero | sort | uniq -c`. A boolean
@@ -25,8 +25,8 @@
 //
 // THE TWO ARE SEPARABLE, AND THE LEDGER ALREADY HOLDS WHAT SEPARATES THEM. The
 // fold records `wrote[field] = { ts, source }` per field and stops deleting it
-// on the way out precisely because readers needed it (shared/work-items.mjs:324;
-// shared/answers.mjs reads `wrote.answer.ts` the same way). So "Codex may be
+// on the way out precisely because readers needed it (shared/work-items.mts:324;
+// shared/answers.mts reads `wrote.answer.ts` the same way). So "Codex may be
 // chosen from now on" is a real, checkable statement: honour a row's `engine`
 // only when `wrote.engine.ts` is at or after the moment she opened the gate.
 // An August row is not a choice she is making now, so it is not honoured, and
@@ -70,9 +70,9 @@ vi.mock('node:child_process', async (importActual) => {
   };
 });
 
-import { engineChoiceSince, engineChoiceOnRowIsStale, engineFor, ENGINE_CHOICE_ENABLED } from '../shared/engines.mjs';
-import { foldWorkItems } from '../shared/work-items.mjs';
-import { loadConfig } from '../main/config.mjs';
+import { engineChoiceSince, engineChoiceOnRowIsStale, engineFor, ENGINE_CHOICE_ENABLED } from '../shared/engines.mts';
+import { foldWorkItems } from '../shared/work-items.mts';
+import { loadConfig } from '../main/config.mts';
 import { Supervisor } from '../main/supervisor.mts';
 
 const AUGUST = Date.parse('2026-08-26T11:00:00Z');
@@ -251,7 +251,7 @@ describe('opting in on a mac with no codex is claude code, and nothing dies', ()
   });
 
   // AND WHERE THAT null COMES FROM. `codexBin` is not taken on trust from
-  // `zero.config.json`: main/config.mjs runs it through the real finder, which
+  // `zero.config.json`: main/config.mts runs it through the real finder, which
   // stats it, and a path that is not there resolves to null rather than to a
   // process that dies on arrival. Asserted through `loadConfig` on a path that
   // exists and one that does not, so it holds on a Mac with Codex and on one

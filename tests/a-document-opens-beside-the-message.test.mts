@@ -239,8 +239,8 @@ describe('the pane and the app finder agree on where to look', () => {
     // THE SIXTH IS THE APP'S OWN HOME, where
     // `runs/<item>/the-change-it-made.change` now lives. It is last, so nothing
     // of hers is ever shadowed by one of ours.
-    const { artifactRoots } = await import('../main/artifact-path.mjs');
-    const { machineryDir } = await import('../main/store/home.mjs');
+    const { artifactRoots } = await import('../main/artifact-path.mts');
+    const { machineryDir } = await import('../main/store/home.mts');
     expect(artifactRoots(AGENTBOX)).toEqual([
       '/acct/agentbox',
       path.join('/acct/agentbox', 'designs'),

@@ -40,7 +40,7 @@
 // New thread box (tests/the-tutorial-walks-you-through-your-first-real-thread).
 import { describe, it, expect } from 'vitest';
 import { listKey, chatChoices, chatsHeadline, projectsToMake, ideasFor } from '../renderer/src/first-run.ts';
-import { isRepeatRule } from '../shared/repeats.mjs';
+import { isRepeatRule } from '../shared/repeats.mts';
 
 const key = (k, mods = {}) => ({ key: k, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...mods });
 

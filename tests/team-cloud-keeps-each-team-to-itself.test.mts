@@ -194,7 +194,7 @@ describe('thread cards, what a teammate sees of your threads', () => {
   });
 
   // The second wall only: since 2026-10-01 the app sends no card at all for a
-  // private thread (shared/thread-cards.mjs, both backends' putCards).
+  // private thread (shared/thread-cards.mts, both backends' putCards).
   it('refuses words on a private card, so a private title can never leave the Mac', async () => {
     expect(await refused(MAYA, insert, card(MAYA, 'w-secret', { visible: false, title: 'Board deck numbers' }))).toBe(true);
     await as(MAYA, insert, card(MAYA, 'w-secret', { visible: false }));
@@ -236,7 +236,7 @@ describe('thread cards, what a teammate sees of your threads', () => {
 
     // FAIL CLOSED. An empty list would have to mean both "everyone" and
     // "nobody", so the table refuses to store one; the app never sends one
-    // either (shared/thread-cards.mjs publishes no card for a thread shared
+    // either (shared/thread-cards.mts publishes no card for a thread shared
     // with nobody).
     it('refuses a card that names nobody, rather than letting it mean everybody', async () => {
       expect(await refused(MAYA, chosen, [MAYA, team.id, 'w-nobody', 'Named nobody', []])).toBe(true);

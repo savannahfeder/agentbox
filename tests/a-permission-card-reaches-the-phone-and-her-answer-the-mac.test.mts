@@ -15,8 +15,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createPhoneInbox, applyThrough } from '../main/phone-inbox.mts';
-import { checkCommand } from '../shared/phone-snapshot.mjs';
-import * as approvals from '../main/approvals.mjs';
+import { checkCommand } from '../shared/phone-snapshot.mts';
+import * as approvals from '../main/approvals.mts';
 import { phoneView, approvalCommand, phoneSlug } from '../renderer/src/cloud-bridge';
 
 const NOW = Date.parse('2026-10-19T12:00:00Z');

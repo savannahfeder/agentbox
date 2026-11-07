@@ -20,7 +20,7 @@
 //
 // So one recoverable copy failure silently turns off the isolation this whole
 // file exists to provide, and the only trace is a line in a console nobody has
-// open. main/git-change.mjs says what that costs: the review card a person
+// open. main/git-change.mts says what that costs: the review card a person
 // reads can then carry another agent's edits.
 //
 // WHAT TRIGGERS STEP 3 IN REAL LIFE. Anything that stops the copy finishing.

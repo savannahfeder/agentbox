@@ -14,7 +14,7 @@
 // conversation on this Mac (scripts/build-change-for-item.mjs)
 //   REAL  the markdown and the html page, her own files, read off disk
 //   REAL  the change file itself, at runs/<item>/the-change-it-made.change,
-// written by main/code-change.mjs out of that run's own transcript,
+// written by main/code-change.mts out of that run's own transcript,
 // which is the same code the supervisor now runs on every exit
 //   STUB  ONE trace line naming that file. The supervisor writes this line for
 // real at exit; the shot writes it here because the shot does not run
@@ -25,11 +25,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { foldWorkItems } from '../shared/work-items.mjs';
-import { resolveArtifact } from '../main/artifact-path.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
+import { resolveArtifact } from '../main/artifact-path.mts';
 import { readDoc } from '../main/doc-file.mts';
 import { referencedFiles } from '../shared/referenced-files.mts';
-import { machineryPath } from '../main/store/home.mjs';
+import { machineryPath } from '../main/store/home.mts';
 import { guard, sweep } from './lib/chrome-guard.mjs';
 import { ACCOUNT_ROOT } from './lib/machine-paths.mjs';
 
@@ -54,7 +54,7 @@ fs.mkdirSync(outDir, { recursive: true });
 
 /* ------------------------- her store, read-only --------------------------- */
 // THE LEDGER AND THE RUNS ARE NOT IN THE FOLDER SHE UPLOADS FILES TO ANY MORE.
-// They moved to the app's own home in main/store/home.mjs, and this script was
+// They moved to the app's own home in main/store/home.mts, and this script was
 // still reading `<account>/<slug>/work-items.jsonl` and throwing ENOENT before
 // it drew a pixel. `machineryPath` is what the app itself calls, so it finds
 // them wherever that file decides they live.

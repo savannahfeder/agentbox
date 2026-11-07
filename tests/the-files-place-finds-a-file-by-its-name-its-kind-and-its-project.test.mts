@@ -2,7 +2,7 @@
 //
 // Sofia, on what Drive still does better: "a file browser with
 // search". The app had no list of files to search at all. Measured on the list
-// main/files-place.mjs hands the page: what the box and the kind filter leave,
+// main/files-place.mts hands the page: what the box and the kind filter leave,
 // and the words each tile says.
 import { describe, it, expect } from 'vitest';
 import { filesShown, kindsIn, changedBy, versionWord, docBlocks } from '../renderer/src/files/files-shown';

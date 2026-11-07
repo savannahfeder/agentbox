@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
 import { kitCopyPath } from '../main/cloud/kit.mts';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 
 const MIN = 60_000;
 const ID = 'w-1';

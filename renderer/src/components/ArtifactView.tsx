@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent a
 import { createPortal } from 'react-dom';
 import {
   addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, nextStep, noteGoesTo, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, threadFiles, versionForPath, viewKind, whereAPressLands, whoseIsTheFile,
-} from '../../../shared/artifact-marks.mjs';
-import type { FileVersion } from '../../../shared/artifact-marks.mjs';
+} from '../../../shared/artifact-marks.mts';
+import type { FileVersion } from '../../../shared/artifact-marks.mts';
 import { api } from '../api';
 import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { firstName, Face } from '../team/people';

@@ -13,7 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
 import { recordCloudLogin, markCloudLogin } from '../main/cloud/logins.mts';
-import { forgetDiscovery } from '../main/account-discovery.mjs';
+import { forgetDiscovery } from '../main/account-discovery.mts';
 import { whyWords } from '../renderer/src/where-why.ts';
 
 const dirs = [];

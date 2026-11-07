@@ -37,7 +37,7 @@ Group what you find into classes. A class counts once it has happened twice.
 ## Fix each class at the highest level that works
 
 1. **Remove it with structure.** One owner for each piece of state, one
-   supported way to do each task, one copy of each rule (as `shared/rank.mjs`
+   supported way to do each task, one copy of each rule (as `shared/rank.mts`
    is for ranking). Delete the old way and any dead code an agent would copy.
 2. **Make the wrong thing fail loudly.** A type, a runtime check, a git hook,
    or a check in `scripts/` whose error names the file or function to use

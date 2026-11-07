@@ -10,7 +10,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { appFinder } from '../main/everything-found.mjs';
+import { appFinder } from '../main/everything-found.mts';
 
 let root;
 const mine = { slug: 'lumen', name: 'Lumen' };

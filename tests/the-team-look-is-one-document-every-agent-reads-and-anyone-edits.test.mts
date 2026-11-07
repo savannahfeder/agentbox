@@ -12,8 +12,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
-import { writeTeamLookDocs } from '../main/team/team-look-doc.mjs';
-import { TEAM_LOOK, TEAM_LOOK_LINE, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../shared/team-look.mjs';
+import { writeTeamLookDocs } from '../main/team/team-look-doc.mts';
+import { TEAM_LOOK, TEAM_LOOK_LINE, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../shared/team-look.mts';
 import { Supervisor } from '../main/supervisor.mts';
 
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');

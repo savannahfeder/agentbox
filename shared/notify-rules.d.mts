@@ -1,4 +1,4 @@
-// Types for shared/notify-rules.mjs, which is plain ESM so that main (Node)
+// Types for shared/notify-rules.mts, which is plain ESM so that main (Node)
 // and the screen (Vite) can share one copy of the rule about when Agentbox is
 // allowed to interrupt you. The screen asks only `isNew`, which is the
 // question before "are you away"; the rest is main's.

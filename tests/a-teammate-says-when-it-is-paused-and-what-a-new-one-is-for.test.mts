@@ -10,7 +10,7 @@
 //   same words asked nine times were listed once, with nothing saying so.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { offerFrom } from '../shared/teammates.mjs';
+import { offerFrom } from '../shared/teammates.mts';
 
 const { rowName, titleAside } = await import('../renderer/src/teammates/chat-lines.ts');
 const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');

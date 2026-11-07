@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { headlessSessionFile } from '../main/team/session.mjs';
+import { headlessSessionFile } from '../main/team/session.mts';
 
 const inside = (file, root) => {
   const f = path.resolve(file);

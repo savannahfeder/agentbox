@@ -57,7 +57,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(40), source: 'founder', patch: { body: 'Draw five sign-in screens on the real app.' } },
       ], {
         live: { since: at(12), at: STILL_GOING, where: 'cloud', doing: [{ label: 'Read the sign-in page', startedAt: at(9) }, { label: 'Wrote the five screens', startedAt: at(6) }, { label: 'Ran the screenshot script', startedAt: at(3) }, { label: 'Drawing the third screen', startedAt: at(1) }] },
-        // A permission it is waiting on, as main/phone-inbox.mts sends one (shared/phone-snapshot.mjs `phoneApproval`).
+        // A permission it is waiting on, as main/phone-inbox.mts sends one (shared/phone-snapshot.mts `phoneApproval`).
         approvals: [{ id: 'ap-preview-1', at: at(1), tool: 'Bash', input: { command: 'npx eas-cli init --non-interactive', description: 'Link this folder to the Expo project' }, card: 'cHJldmlldy1jYXJk' }],
       }),
       // Two threads the phone plan filed: one waiting on you, one finished.
@@ -113,7 +113,7 @@ export function previewRows(now = Date.now()): PhoneRows {
   };
 }
 
-/** Settings as a Mac sends them (shared/phone-settings.mjs phoneSettingsOf). */
+/** Settings as a Mac sends them (shared/phone-settings.mts phoneSettingsOf). */
 export function previewSettings(now = Date.now()) {
   return {
     device: DEV, name: 'Studio', updated_at: new Date(now - MIN).toISOString(),
@@ -137,7 +137,7 @@ export function previewSettings(now = Date.now()) {
         { slug: 'film', name: 'Launch film', onPhone: true, autonomous: false, permission: 'plan', codexMode: 'workspace', account: 'any', running: 1 },
         { slug: 'site', name: 'Website', onPhone: true, autonomous: false, permission: 'workspace', codexMode: 'workspace', account: 'any', running: 0 },
       ],
-      // The repeating tasks a Mac sends with its settings (shared/phone-snapshot.mjs phoneRepeatsOf).
+      // The repeating tasks a Mac sends with its settings (shared/phone-snapshot.mts phoneRepeatsOf).
       repeats: [
         { product: 'agentbox', id: 'r-preview-1', title: 'Daily report', body: 'Write the daily report: sign-ups, failed runs, and anything that needs me. Say "nothing new" if nothing changed.', priority: 5, every: 'weekday', at: '09:00', createdAt: now - 9 * 24 * 60 * MIN, served: '', lastOccurrence: 'w-r2b3c4d5e6' },
         { product: 'site', id: 'r-preview-2', title: 'Check the launch page numbers', body: 'Check the launch page numbers and tell me what moved.', priority: 5, every: 'week', on: 4, at: '08:00', createdAt: now - 20 * 24 * 60 * MIN, served: '' },
@@ -147,7 +147,7 @@ export function previewSettings(now = Date.now()) {
   };
 }
 
-/** Your AI teammates as a Mac sends them (shared/phone-snapshot.mjs phoneTeammatesOf). Every name is made up. */
+/** Your AI teammates as a Mac sends them (shared/phone-snapshot.mts phoneTeammatesOf). Every name is made up. */
 export function previewTeammates(now = Date.now()) {
   const at = (m: number) => now - m * MIN;
   const morning = new Date(now).setHours(9, 0, 0, 0);

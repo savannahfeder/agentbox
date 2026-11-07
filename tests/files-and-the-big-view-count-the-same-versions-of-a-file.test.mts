@@ -9,16 +9,16 @@
 //
 // Maya's investor update inside its own thread showed v5 after v6 was made on
 // another thread. The root was that each copy counted for itself.
-// Every surface now reads the file's version line (shared/version-line.mjs), so
+// Every surface now reads the file's version line (shared/version-line.mts), so
 // a name whose bytes no computer has is no version, and a thread's view gets
 // every version the line holds.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as disk from '../main/store/work-items.mjs';
+import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
-import { appFilesPlace } from '../main/files-place.mjs';
+import { appFilesPlace } from '../main/files-place.mts';
 
 async function aMac() {
   const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'files-count-'));
@@ -102,7 +102,7 @@ describe("a thread's big view opens what it was sent, with a way to the newest",
     const own = read('renderer/src/components/ThreadArtifacts.tsx');
     expect(own).toContain('useFileLine(');
     expect(read('renderer/src/file-numbers.ts')).toContain('api.fileLine(');
-    expect(read('shared/artifact-marks.mjs')).toMatch(/newer: true/);
+    expect(read('shared/artifact-marks.mts')).toMatch(/newer: true/);
   });
   it('offers the newest from an older version', () => {
     const view = read('renderer/src/components/ArtifactView.tsx');

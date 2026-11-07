@@ -14,8 +14,8 @@ import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ArtifactImg } from '../renderer/src/components/Focus.tsx';
-import { bringPicturesHome } from '../mcp/core/pictures-home.mjs';
-import { appHome } from '../main/store/home.mjs';
+import { bringPicturesHome } from '../mcp/core/pictures-home.mts';
+import { appHome } from '../main/store/home.mts';
 
 const draw = (props) => renderToStaticMarkup(React.createElement(ArtifactImg, { roots: ['/p'], onOpen: () => {}, ...props }));
 
@@ -79,11 +79,11 @@ describe('an agent writing to its thread', () => {
     const home = appHome();
     process.env.STORE_ACCOUNT_ID = 'acct';
     fs.mkdirSync(path.join(home, 'accounts', 'acct'), { recursive: true });
-    const { resolveAccount } = await import('../mcp/core/account.mjs');
+    const { resolveAccount } = await import('../mcp/core/account.mts');
     resolveAccount();
-    const { createProduct } = await import('../mcp/core/products.mjs');
+    const { createProduct } = await import('../mcp/core/products.mts');
     const product = createProduct(`Pictures ${Math.random().toString(36).slice(2, 8)}`);
-    const work = await import('../mcp/core/work.mjs');
+    const work = await import('../mcp/core/work.mts');
     const claims = work.createClaimRegistry({ holder: 'thread', heartbeatMs: 60_000 });
     try {
       const row = work.createItem(product.id, { title: 'Check the page' }, { source: 'founder' });

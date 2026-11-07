@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { filesInLines, threadFiles, whereAPressLands } from '../shared/artifact-marks.mjs';
+import { filesInLines, threadFiles, whereAPressLands } from '../shared/artifact-marks.mts';
 
 const said = (ts, note, extra = {}) => ({ ts, source: 'agent', patch: { note, ...extra } });
 

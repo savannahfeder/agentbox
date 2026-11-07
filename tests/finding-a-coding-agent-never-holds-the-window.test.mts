@@ -3,7 +3,7 @@
 // The spinning wheel came up for 5 to 10 seconds while a thread's pictures
 // loaded. The app's freeze log (memory-log/freeze-*.jsonl, 10-21 and 10-22)
 // put 57 of its 74 freezes, roughly 104 s of 114 s, on one line: the login
-// shell main/engine-bin.mjs ran with execFileSync to find Claude Code and
+// shell main/engine-bin.mts ran with execFileSync to find Claude Code and
 // Codex whenever its thirty-second answer had run out. On 10-22 the caller was
 // the phone link's read every minute, and each launch added two; opening
 // Settings asks the same way. Pictures are answered on the same thread, so
@@ -18,7 +18,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { resolveEngine, forgetEngine, lookAgain, askShell, askShellLater, shellRunner, shellRunnerLater } from '../main/engine-bin.mjs';
+import { resolveEngine, forgetEngine, lookAgain, askShell, askShellLater, shellRunner, shellRunnerLater } from '../main/engine-bin.mts';
 
 const HOME = '/Users/stranger';
 const never = () => false;

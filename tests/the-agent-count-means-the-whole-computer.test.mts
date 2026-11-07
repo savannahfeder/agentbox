@@ -15,7 +15,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
 import { setWorkspaceSetting } from '../main/settings.mts';
-import { loadConfig } from '../main/config.mjs';
+import { loadConfig } from '../main/config.mts';
 import { agentCountOptions } from '../renderer/src/components/Settings.tsx';
 
 const dirs = [];

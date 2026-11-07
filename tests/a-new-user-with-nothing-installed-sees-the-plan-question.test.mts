@@ -19,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { prepareHome, freshEnv } from '../shared/fresh-user-home.mjs';
+import { prepareHome, freshEnv } from '../shared/fresh-user-home.mts';
 import { openFreshUser } from '../main/fresh-user.mts';
 
 function fakeRealHome() {

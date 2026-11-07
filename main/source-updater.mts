@@ -35,7 +35,7 @@ import fs from 'node:fs';
 import type { PathLike } from 'node:fs';
 import { describe } from './updater.mts';
 import type { UpdaterState, UpdaterView } from './updater.mts';
-import { loginShell } from './shell-path.mjs';
+import { loginShell } from './shell-path.mts';
 
 const FIRST_CHECK_MS = 20_000;
 const EVERY_MS = 30 * 60 * 1000;
@@ -116,7 +116,7 @@ function collect(bin: string, args: string[], { cwd, timeout }: { cwd: string; t
 // WHICH npm. Started with `npm start`, the process carries npm's own path in
 // its environment, so that one is used and nvm or a version manager never
 // matters. Started any other way, their login shell is asked, the way
-// main/claude-bin.mjs finds Claude Code, and only a shell this machine has: a
+// main/claude-bin.mts finds Claude Code, and only a shell this machine has: a
 // Linux launcher start carries no SHELL, so the old `|| '/bin/zsh'` was a path
 // to nothing and every update on a box without zsh failed in two seconds. With
 // no shell at all, npm on PATH is the better guess. The arguments are fixed

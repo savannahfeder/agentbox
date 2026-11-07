@@ -1,12 +1,12 @@
 // A ROW SHE MARKED `codex` IN AUGUST MUST NOT START RUNNING ON CODEX BECAUSE
 // WE PUT THE ENGINE RULE BACK.
 //
-// Fourteen files went, this module's `shared/engines.mjs` among them (counted
+// Fourteen files went, this module's `shared/engines.mts` among them (counted
 // with `git diff-tree --diff-filter=D -r 258d71d`; her commit message says
 // thirteen).
 //
 // WHAT DID NOT GO IS THE FIELD. `engine` is still a live name on the work-item
-// contract — `WORK_ITEM_FIELDS` at shared/work-items.mjs:95, accepted by the
+// contract — `WORK_ITEM_FIELDS` at shared/work-items.mts:95, accepted by the
 // patch validator at :290, which stores it as a free string and deliberately
 // validates nothing because "nothing here reads them". So the ledger has been
 // able to carry `engine: "codex"` continuously since 08-25. That is a claim
@@ -72,8 +72,8 @@ import {
   engineChoiceExists,
   engineFor,
   enginePicked,
-} from '../shared/engines.mjs';
-import { foldWorkItems } from '../shared/work-items.mjs';
+} from '../shared/engines.mts';
+import { foldWorkItems } from '../shared/work-items.mts';
 import { Supervisor } from '../main/supervisor.mts';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -423,7 +423,7 @@ describe('nothing in the app can reach the second engine yet', () => {
   // `availableEngines`, `engineChoiceExists` and `enginePicked` are UNGATED, so
   // they would happily describe a two-engine Mac to a picker that never
   // imported the token -- "she would be offered a choice that `engineFor` then
-  // refuses, which is its own kind of lie" (shared/engines.mjs). This line read
+  // refuses, which is its own kind of lie" (shared/engines.mts). This line read
   // `toEqual([])` three times and said the slice that drew a picker had to come
   // here and deal with it. That slice is 2026-09-04, and this is the dealing.
   //
@@ -445,7 +445,7 @@ describe('nothing in the app can reach the second engine yet', () => {
     expect(calling('availableEngines')).toEqual([join(repo, 'main', 'supervisor.mts')]);
   });
 
-  // AND `enginePicked` NOW HAS NO CALLER OUTSIDE shared/engines.mjs, WHICH IS A
+  // AND `enginePicked` NOW HAS NO CALLER OUTSIDE shared/engines.mts, WHICH IS A
   // TIGHTENING RATHER THAN A LOSS (2026-09-05). This line read
   // `[main/supervisor.mts]`, because `engineOffered` and `modelOffered` asked
   // it -- and what it answers is "not Claude Code", which those two were using
@@ -455,7 +455,7 @@ describe('nothing in the app can reach the second engine yet', () => {
   // the row then ran on Codex
   // (tests/choosing-claude-code-is-not-the-same-as-choosing-nothing.test.mts).
   // Both now ask `_engineFor(null)` -- the row's own answer -- and the helper is
-  // left to the two staleness rules inside shared/engines.mjs that really do
+  // left to the two staleness rules inside shared/engines.mts that really do
   // mean "not the default". The invariant this block is about is unharmed and
   // stronger: nothing outside that module derives a second opinion, and the
   // renderer still derives none at all.

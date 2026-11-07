@@ -86,7 +86,7 @@ export interface CloudStatus {
   plan?: string | null;
   /** Runs on this Mac the cloud could take now (supervisor `_movableToCloud`). */
   movable?: string[];
-  /** The keys saved for cloud runs, by name only (main/cloud/keys.mjs). */
+  /** The keys saved for cloud runs, by name only (main/cloud/keys.mts). */
   keys?: { name: string; savedAt: number | null; label?: string | null }[];
 }
 

@@ -63,21 +63,21 @@ import { readMarker, writeMarker, clearMarker, addCloudNews, commonGitDirOf } fr
 import { Name, nameSlug } from '../../shared/product-name.mjs';
 import { KEPT_ASIDE } from '../../shared/not-shipped.mts';
 import { codexTranscriptFile } from '../codex-session.mts';
-import { CLIENT_INFO } from '../codex-app-server.mjs';
+import { CLIENT_INFO } from '../codex-app-server.mts';
 import { appendCloudUsage } from './usage.mts';
 import { docsFolderFor, docsToSend, tarDocs, layDocs } from './docs.mts';
 import type { LaidFile } from './docs.mts';
 import { troubleCause, limitResetMoment } from '../../shared/spawn-trouble.mts';
-import { HAND_BACK } from '../../shared/cloud-hand-back.mjs';
-import { NEED, SERVICES } from '../../shared/cloud-needs.mjs';
-import { filesSentFor } from '../../shared/cloud-sent-files.mjs';
+import { HAND_BACK } from '../../shared/cloud-hand-back.mts';
+import { NEED, SERVICES } from '../../shared/cloud-needs.mts';
+import { filesSentFor } from '../../shared/cloud-sent-files.mts';
 import { sentLine } from '../../shared/cloud-start.mts';
 import { referencedFiles } from '../../shared/referenced-files.mts';
 import { serveApprovals } from '../approval-prompt-core.mts';
 import { cacheKey, folderKey, sendOnce, pickBase, bundlePast, refsAt, sendConversation, sentRecordPath } from './reuse.mts';
-import { KIT_VERSION, checkKit, kitKey } from '../../shared/cloud-kit.mjs';
-import { NEW_ITEM_MARK } from '../../shared/cloud-kit.mjs';
-import { APPROVALS_SERVER } from '../../shared/cloud-kit.mjs';
+import { KIT_VERSION, checkKit, kitKey } from '../../shared/cloud-kit.mts';
+import { NEW_ITEM_MARK } from '../../shared/cloud-kit.mts';
+import { APPROVALS_SERVER } from '../../shared/cloud-kit.mts';
 import { asksPermission, approvalsHandshakes } from './kit.mts';
 import { snapshotSkills, filesInFolder } from './skills.mts';
 import { createResourceRequests, resourceContextFor, accountFolderFor } from './resources.mts';
@@ -246,7 +246,7 @@ export interface NewThreadAsk {
   defaultEngine?: 'claude' | 'codex';
 }
 
-/** A kit for the phone, not a run (shared/cloud-kit.mjs). */
+/** A kit for the phone, not a run (shared/cloud-kit.mts). */
 export interface CloudKit {
   device: string;
   project: string;
@@ -824,7 +824,7 @@ export function tarOf(dir: string) {
 const withoutKeys = <T extends { key?: string }>(list: T[]) => list.map(({ key: _k, ...rest }) => rest);
 
 // A NEW THREAD'S KIT is packed in the project's checkout and named for the
-// task folder the thread will have (shared/cloud-kit.mjs fillNewThreadKit):
+// task folder the thread will have (shared/cloud-kit.mts fillNewThreadKit):
 // its transcripts' folder, and what was sent into the checkout's, are that
 // folder's.
 function newThreadNames(n: NewThreadAsk, { cwd, startSha, files, joins, bringDirs }: { cwd: string; startSha: string | null; files: PackedFile[]; joins: Record<string, unknown>; bringDirs: BringDir[] }) {
@@ -911,7 +911,7 @@ export async function cloudRun({
   // past a base the bucket already has (./reuse.mts).
   imageCaps = [],
   onCaps = () => {},
-  // A KIT FOR THE PHONE, not a run (shared/cloud-kit.mjs): { device, project,
+  // A KIT FOR THE PHONE, not a run (shared/cloud-kit.mts): { device, project,
   // item, frame, copy }. The pack goes up under the thread's kit and the kit
   // names it; nothing starts, and this folder's marker is left alone.
   kit = null,
@@ -2132,8 +2132,8 @@ export async function cloudRun({
   }
 }
 
-// A CODEX KIT'S OPENING LINES (shared/cloud-kit.mjs): what the computer's own
-// client (main/codex-app-server.mjs) sends to open the thread, the resume
+// A CODEX KIT'S OPENING LINES (shared/cloud-kit.mts): what the computer's own
+// client (main/codex-app-server.mts) sends to open the thread, the resume
 // rewritten here as a run's is, so the store is the sandbox's stub and the
 // rollout the resume needs goes with the pack. The ids are the kit's own.
 export const CODEX_RESUME_ID = 2;
@@ -2301,7 +2301,7 @@ async function gitIdentity(cwd: string) {
 function alive(pid: number) { try { process.kill(pid, 0); return true; } catch { return false; } }
 
 // A stored object straight to a file, and a file straight to storage, when the
-// storage can (main/cloud/aws.mjs); a stand-in that cannot goes through memory.
+// storage can (main/cloud/aws.mts); a stand-in that cannot goes through memory.
 async function fetchToFile(storage: CloudStorage, k: string, file: string) {
   if (storage.getToFile) return storage.getToFile(k, file);
   const body = await storage.get(k);
@@ -2392,7 +2392,7 @@ export function servedHere(cfg: Partial<ServerConfig> | undefined, env: NodeJS.P
     // Named here: runs share this process, so its own ZERO_ITEM is whichever run set it last.
     const ownItem = cfg!.env?.ZERO_ITEM || env.ZERO_ITEM || null;
     const ownProduct = cfg!.env?.ZERO_PRODUCT || env.ZERO_PRODUCT || null;
-    return channel(async (io) => (await import('../../mcp/stdio.mjs')).serveStore({ ...io, holder: `mcp-cloud-${holder}`, ownItem, ownProduct, requestCloudResource } as {}));
+    return channel(async (io) => (await import('../../mcp/stdio.mts')).serveStore({ ...io, holder: `mcp-cloud-${holder}`, ownItem, ownProduct, requestCloudResource } as {}));
   }
   return null;
 }

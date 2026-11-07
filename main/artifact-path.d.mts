@@ -1,4 +1,4 @@
-// Types for main/artifact-path.mjs, which stays .mjs while plain Node on the Mac loads it.
+// Types for main/artifact-path.mts, which stays .mjs while plain Node on the Mac loads it.
 import fsDefault from 'node:fs';
 export interface ArtifactProduct {
     slug?: string;

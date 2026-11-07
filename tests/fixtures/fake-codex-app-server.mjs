@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // A STAND-IN FOR `codex app-server`, signed out until a login lands.
 //
-// Speaks the slice of the JSON-RPC the supervisor uses (main/codex-app-server.mjs):
+// Speaks the slice of the JSON-RPC the supervisor uses (main/codex-app-server.mts):
 // initialize, thread/start, thread/resume, turn/start, and the notifications a
 // turn produces. Whether it is signed in is read ONCE, at startup, from
 // `$CODEX_HOME/auth.json`, which is the cautious model of the real server: if

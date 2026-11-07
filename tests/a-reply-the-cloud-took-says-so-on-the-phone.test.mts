@@ -4,7 +4,7 @@
 // here goes to your computer, which hands it to the coding agent") and said
 // the phone has to work with the computer shut in a backpack. A reply the
 // computer leaves for a minute is now started in Agentbox Cloud, which claims
-// the command `cloud:<run id>` (shared/cloud-kit.mjs, migration
+// the command `cloud:<run id>` (shared/cloud-kit.mts, migration
 // 20261026000000). Before this the phone said every reply was "Waiting for
 // your computer" and, with the computer away, "What you send waits for it",
 // which stops being true for a computer that leaves its threads ready for the

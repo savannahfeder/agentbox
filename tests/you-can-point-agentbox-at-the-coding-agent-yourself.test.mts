@@ -4,7 +4,7 @@
 // install on the person's computer, and we keep having bug reports and then
 // patching that specific case. We want to solve this in a generalist way."
 //
-// Asking the login shell first (main/engine-bin.mjs) covers every installer a
+// Asking the login shell first (main/engine-bin.mts) covers every installer a
 // person's own PATH knows about, which is most of them. It cannot cover the rest:
 // a wrapper script somewhere nobody would guess, a tool on a volume, a machine
 // whose login shell will not start at all. For those, every fix used to be a
@@ -35,8 +35,8 @@ import { fileURLToPath } from 'node:url';
 import {
   pointAtEngineBin, searchForEngineBin, claudeState, codexState,
 } from '../main/settings.mts';
-import { forgetClaudeBin } from '../main/claude-bin.mjs';
-import { forgetCodexBin } from '../main/codex-bin.mjs';
+import { forgetClaudeBin } from '../main/claude-bin.mts';
+import { forgetCodexBin } from '../main/codex-bin.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');

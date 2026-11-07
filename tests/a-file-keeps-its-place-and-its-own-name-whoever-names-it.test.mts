@@ -14,9 +14,9 @@ import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { appFilesPlace } from '../main/files-place.mjs';
-import { familyOfName, shownName } from '../shared/artifact-marks.mjs';
-import { writeFolderLog } from '../shared/file-folders.mjs';
+import { appFilesPlace } from '../main/files-place.mts';
+import { familyOfName, shownName } from '../shared/artifact-marks.mts';
+import { writeFolderLog } from '../shared/file-folders.mts';
 import { foldersMatching, missingWords } from '../renderer/src/files/files-shown.ts';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'keeps-place-'));

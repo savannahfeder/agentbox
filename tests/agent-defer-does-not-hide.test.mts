@@ -19,7 +19,7 @@ const NOW = 1_786_480_000_000;   // Tue 2026-08-11, late morning
 const HOUR = 3_600_000;
 const LATER = NOW + 12 * HOUR;
 
-// Shaped as the fold hands them over (shared/work-items.mjs), including the
+// Shaped as the fold hands them over (shared/work-items.mts), including the
 // `wrote` map, which is where "who set this field" has always been recorded.
 const by = (source, ts = NOW - HOUR) => ({ runAt: { ts, source } });
 

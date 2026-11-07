@@ -1,4 +1,4 @@
-// Types for shared/repeats.mjs, which is plain ESM so that main (Node) and the
+// Types for shared/repeats.mts, which is plain ESM so that main (Node) and the
 // renderer (Vite) can share one copy of the scheduling rule.
 
 // The SCHEDULE, apart from the rule that carries it: the composer and the reply

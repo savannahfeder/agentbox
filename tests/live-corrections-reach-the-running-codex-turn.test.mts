@@ -10,7 +10,7 @@ it('does not report success for transport failures',async()=>{const s=await setu
 
 it('sends the documented turn/steer frame through the real transport',async()=>{
  const {EventEmitter}=await import('node:events');
- const {createCodexAppServer}=await import('../main/codex-app-server.mjs');
+ const {createCodexAppServer}=await import('../main/codex-app-server.mts');
  const child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdin=new EventEmitter();child.kill=()=>{};
  let sent;child.stdin.write=(chunk,cb)=>{sent=JSON.parse(String(chunk));cb?.();return true;};
  const server=createCodexAppServer({transport:child});const pending=server.steerTurn('T','V','literal \\path\nsecond line');

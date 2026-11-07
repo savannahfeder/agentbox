@@ -13,7 +13,7 @@ import {
   CODEX_MODE_ORDER,
   codexPosture,
   isCodexMode,
-} from '../shared/codex-modes.mjs';
+} from '../shared/codex-modes.mts';
 import { workerThreadParams, WORKER_APPROVAL_POLICY, WORKER_SANDBOX } from '../main/codex-session.mts';
 
 describe('the three modes are Codex\'s own settings', () => {

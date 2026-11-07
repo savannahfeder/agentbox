@@ -11,7 +11,7 @@
 // rather than written by the teammate: each run's title, what the person said
 // on it word for word, and the first line of what it answered.
 import { describe, it, expect } from 'vitest';
-import { recordOf } from '../shared/teammates.mjs';
+import { recordOf } from '../shared/teammates.mts';
 
 const NOW = new Date(2026, 9, 29, 9, 0).getTime();
 const DAY = 86_400_000;

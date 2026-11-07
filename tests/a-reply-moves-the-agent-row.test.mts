@@ -32,7 +32,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   agentKey, agentRow, agentTitle, reachesInbox, progressAfterReply, stoppedSince, tookHerReply,
-} from '../shared/agents.mjs';
+} from '../shared/agents.mts';
 import { AgentSchedule } from '../main/agent-schedule.mts';
 
 const SPOKE = Date.parse('2026-08-17T18:52:00Z');

@@ -8,8 +8,8 @@ import { it, expect, describe } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { carryIntoRoom } from '../main/team/carry-files.mjs';
-import { filesNamedInWords, MAX_CARRIED_BYTES } from '../shared/carried-files.mjs';
+import { carryIntoRoom } from '../main/team/carry-files.mts';
+import { filesNamedInWords, MAX_CARRIED_BYTES } from '../shared/carried-files.mts';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'room-'));
 const file = (name, bytes = 'x') => { const f = path.join(dir, name); fs.writeFileSync(f, bytes); return { file: f, size: Buffer.byteLength(bytes) }; };

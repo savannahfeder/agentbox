@@ -1,7 +1,7 @@
 // THE PICTURES, FILMS, SOUNDS AND PAGES A THREAD NAMES, FOR HER PHONE WITH THE
 // MAC SHUT.
 //
-// A thread's copy online is its words (shared/phone-snapshot.mjs), and a path
+// A thread's copy online is its words (shared/phone-snapshot.mts), and a path
 // in those words is a file on this Mac that the hosted phone site cannot open.
 // So for each thread carried, this finds the files its words name, inside that
 // project's own folders only, uploads each once to her own private storage
@@ -16,7 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { hideSecrets } from '../shared/phone-snapshot.mjs';
+import { hideSecrets } from '../shared/phone-snapshot.mts';
 import { readPictureShapeSync } from './picture-shape.mts';
 import type { PictureShape } from './picture-shape.mts';
 

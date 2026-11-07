@@ -12,7 +12,7 @@
 // So the thread says who it is instead. Measured on this Mac 2026-10-04,
 // codex-cli 0.160.0: the `session_id` a PreToolUse hook is handed is the
 // app-server's own `thread.id`, the same string `thread/started` reports and
-// the same one main/codex.mjs already keeps as `session.sessionId`.
+// the same one main/codex.mts already keeps as `session.sessionId`.
 //
 // AND A SESSION NOBODY CLAIMS IS LET STRAIGHT THROUGH. The user's own
 // `codex` in a terminal reads the same hooks.json, so it would ask too. It is

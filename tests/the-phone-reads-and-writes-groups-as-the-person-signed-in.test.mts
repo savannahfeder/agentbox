@@ -1,7 +1,7 @@
 // THE PHONE READS AND WRITES GROUPS AS THE PERSON SIGNED IN.
 //
 // What was missing (2026-10-28, w-9f9c2570e2): Groups lived only on the Mac.
-// main/team/rooms-supabase.mjs reads and posts through supabase-js, which
+// main/team/rooms-supabase.mts reads and posts through supabase-js, which
 // neither phone app carries, so the web app and the iPhone app had no group
 // list, no chat and no People. renderer/src/phone-groups.ts is the same
 // queries over the phones' plain REST client (cloud-rest.ts), measured here
@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import {
   GROUP_COLS, groupMessages, groupPeople, groupsState, markGroupRead, myGroups, phoneGroups, sendToGroup,
 } from '../renderer/src/phone-groups';
-import { MSG_COLS, PROFILE_COLS, PRESENCE_COLS, OLD_PRESENCE_COLS } from '../main/team/rooms-shape.mjs';
+import { MSG_COLS, PROFILE_COLS, PRESENCE_COLS, OLD_PRESENCE_COLS } from '../main/team/rooms-shape.mts';
 
 const ME = '00000000-0000-4000-8000-000000000001';
 const SAM = '00000000-0000-4000-8000-000000000002';

@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import {
   TRAIL_OPENING, TRAIL_TURNS, WORK_TOTAL,
   conversationGap, gapIndex, saidCount, threadWindow,
-} from '../shared/agents.mjs';
+} from '../shared/agents.mts';
 import { itemThread } from '../renderer/src/item-thread.ts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));

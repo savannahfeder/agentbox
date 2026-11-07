@@ -23,6 +23,6 @@ describe('a message naming a TypeScript back-end file', () => {
   });
 
   it('is listed among the files a message names', () => {
-    expect(referencedFiles('I changed main/supervisor.mts and shared/rank.mjs')).toEqual(['main/supervisor.mts', 'shared/rank.mjs']);
+    expect(referencedFiles('I changed main/supervisor.mts and shared/rank.mts')).toEqual(['main/supervisor.mts', 'shared/rank.mts']);
   });
 });

@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ACCESS, catalogFor } from '../shared/connections-catalog.mjs';
+import { ACCESS, catalogFor } from '../shared/connections-catalog.mts';
 
 const root = path.resolve(import.meta.dirname, '..');
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
@@ -36,8 +36,8 @@ describe('the summary of its tools', () => {
   });
 
   it('reaches the sheet with the tile', () => {
-    expect(read('main/connections/index.mjs')).toMatch(/said: entry\.said \?\? null/);
-    expect(read('main/connections/index.mjs')).toMatch(/hint: entry\.hint \?\? null/);
+    expect(read('main/connections/index.mts')).toMatch(/said: entry\.said \?\? null/);
+    expect(read('main/connections/index.mts')).toMatch(/hint: entry\.hint \?\? null/);
   });
 
   it('the sheet shows the summary, and the full list only behind a disclosure', () => {

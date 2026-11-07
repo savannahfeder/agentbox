@@ -18,7 +18,7 @@
 // a naming (`rowTitle`).
 
 import { describe, it, expect } from 'vitest';
-import { foldWorkItems } from '../shared/work-items.mjs';
+import { foldWorkItems } from '../shared/work-items.mts';
 
 const T0 = 1_792_000_000_000;
 const MIN = 60_000;
