@@ -25,7 +25,7 @@
 //      file reads as the first of three rather than as the whole story.
 
 import { describe, it, expect } from 'vitest';
-import { failureNote, failureReply } from '../main/ship-queue.mjs';
+import { failureNote, failureReply } from '../main/ship-queue.mts';
 
 const PREFIX = 'It did not ship, and it went back to its agent: ';
 const why = (out) => failureNote(out).replace(PREFIX, '');

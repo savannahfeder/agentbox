@@ -68,7 +68,7 @@ export interface Kit {
    *  and what that kit runs, which a phone's choices have to match. */
   newThread?: {
     brief: string;
-    mainSha: string;
+    mainSha: string | null;
     model?: string | null;
     effort?: string | null;
     defaultEngine?: 'claude' | 'codex';
@@ -214,6 +214,6 @@ export function newThreadKitKey(device: string | null | undefined, project: stri
 export function fillNewThreadKit(kit: Kit | null | undefined, who: { itemId: string; title?: string; body?: string }): {
   kit: Kit;
   prompt: string;
-  refs: Record<string, string>;
-  mainSha: string;
+  refs: Record<string, string> | null;
+  mainSha: string | null;
 } | null;

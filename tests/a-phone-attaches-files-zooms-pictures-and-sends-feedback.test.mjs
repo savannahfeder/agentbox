@@ -3,7 +3,7 @@
 // - "I can't upload files in mobile". A reply to an agent took files by paste
 //   and by drop and had no button, and a phone has neither. And the phone posts
 //   a picture whole, as base64, so the server's 8 MB cap on a body was a 6 MB
-//   photo (main/serve.mjs readBody).
+//   photo (main/serve.mts readBody).
 // - "there is too much white space when I'm typing ... the white space expands
 //   when I'm typing". With the keyboard up the page was held to the visual
 //   viewport's height but not its place: iOS scrolls the window to keep the
@@ -34,15 +34,15 @@ const last = (piece, prop) => {
 describe('on a phone, a reply to an agent', () => {
   it('has a button to attach a file or a picture', () => {
     const focus = read('renderer/src/components/Focus.tsx');
-    expect(focus).toMatch(/!talkTo\?\.length && onPhone\(\) \?/);
-    expect(focus).toMatch(/aria-label="Attach a file or picture"[^>]*onClick=\{pickFiles\}/);
+    // Every reply box has the new thread card's paperclip since w-54cdf7c768.
+    expect(focus).toMatch(/\{!talkTo\?\.length && \(\s*<button type="button" className="tc-icon dock-clip"[^>]*onClick=\{pickFiles\}/);
   });
   it('drawn as an icon like the others, not a white box', () => {
-    expect(last('.compose-attach', 'background')).toBe('none');
-    expect(last('.compose-attach', 'border')).toBe('0');
+    expect(last('.dock-clip', 'background')).toBe('none');
+    expect(last('.dock-clip', 'border')).toBe('0');
   });
   it('and the phone\'s server takes a photo of more than 8 MB', () => {
-    const limit = /body\.length > (\d+) \* 1024 \* 1024/.exec(read('main/serve.mjs'));
+    const limit = /body\.length > (\d+) \* 1024 \* 1024/.exec(read('main/serve.mts'));
     expect(Number(limit[1])).toBeGreaterThanOrEqual(32);
   });
 });

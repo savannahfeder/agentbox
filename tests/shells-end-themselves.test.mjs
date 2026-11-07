@@ -7,7 +7,7 @@
 // waits for anything.
 
 import { describe, it, expect, vi } from 'vitest';
-import { TaskTerminals } from '../main/task-terminals.mjs';
+import { TaskTerminals } from '../main/task-terminals.mts';
 
 const MINUTE = 60000;
 

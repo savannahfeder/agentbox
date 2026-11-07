@@ -64,7 +64,7 @@ function sources(dir, out = []) {
       if (!SKIP_DIRS.has(e.name)) sources(rel, out);
       continue;
     }
-    if (!/\.(mjs|cjs|ts|tsx)$/.test(e.name)) continue;
+    if (!/\.(mjs|mts|cjs|ts|tsx)$/.test(e.name)) continue;
     if (SKIP_FILES.has(rel)) continue;
     out.push(rel);
   }

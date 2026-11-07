@@ -3,7 +3,7 @@
 // REPORTED 2026-10-14 by a teammate trying the team version: "attachments do
 // not open in threads and DM". A file in a conversation crosses on its own,
 // after the line that names it whenever the cloud does not have it yet: the
-// reader's Mac keeps asking for it once a minute (main/team/sync.mjs). But the
+// reader's Mac keeps asking for it once a minute (main/team/sync.mts). But the
 // picture in the message asked for its file ONCE. Measured by reading
 // `ArtifactImg` in renderer/src/components/Focus.tsx on this branch: `find`
 // ran when every root missed, `found` became null, and nothing ever set it
@@ -69,11 +69,12 @@ describe('the picture in the message', () => {
   });
 
   // THE CASE THAT MUST NOT CHANGE: a picture that is there is drawn exactly as
-  // before, and one with no finder to ask stays plain words.
-  it('still draws a picture it can find, and plain words when there is no finder', () => {
+  // before, and one with no finder to ask is a tile that cannot be pressed.
+  it('still draws a picture it can find, and a still tile when there is no finder', () => {
     const drawn = renderToStaticMarkup(createElement(ArtifactImg, { src: 'attachments/a.png', roots: ['/x'], onOpen: () => {} }));
     expect(drawn).toMatch(/<img/);
     const words = renderToStaticMarkup(createElement(ArtifactImg, { src: 'attachments/a.png', roots: [] }));
-    expect(words).toMatch(/<span class="missing-artifact">missing image: attachments\/a.png<\/span>/);
+    expect(words).toMatch(/<span class="message-file" title="[^"]*"><span class="message-file-face picture-tile-face">/);
+    expect(words).toContain('>a.png<');
   });
 });

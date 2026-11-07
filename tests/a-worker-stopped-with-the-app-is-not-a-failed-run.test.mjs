@@ -21,8 +21,8 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { bootHeadless } from '../main/serve.mjs';
-import { diedOfAStopSignal, QUIT_GRACE_MS } from '../main/supervisor.mjs';
+import { bootHeadless } from '../main/serve.mts';
+import { diedOfAStopSignal, QUIT_GRACE_MS } from '../main/supervisor.mts';
 import { setAppHome } from './app-home.mjs';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');

@@ -33,9 +33,31 @@ const KEYS = {
   Tab: { code: 'Tab', keyCode: 9 },
   ArrowDown: { code: 'ArrowDown', keyCode: 40 },
   ArrowUp: { code: 'ArrowUp', keyCode: 38 },
+  ArrowLeft: { code: 'ArrowLeft', keyCode: 37 },
+  ArrowRight: { code: 'ArrowRight', keyCode: 39 },
+  Home: { code: 'Home', keyCode: 36 },
+  End: { code: 'End', keyCode: 35 },
+  PageUp: { code: 'PageUp', keyCode: 33 },
+  PageDown: { code: 'PageDown', keyCode: 34 },
+  Backspace: { code: 'Backspace', keyCode: 8 },
+  Delete: { code: 'Delete', keyCode: 46 },
+  F2: { code: 'F2', keyCode: 113 },
   ' ': { code: 'Space', keyCode: 32 },
 };
 const MODIFIERS = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
+const MODIFIER_NAMES = { control: 'ctrl', cmd: 'meta', command: 'meta', option: 'alt' };
+
+/** The modifiers a tester named, and the words that name none, which must be refused rather than dropped. */
+export function readModifiers(words) {
+  const mods = [];
+  const unknown = [];
+  for (const word of words) {
+    const name = MODIFIER_NAMES[word.toLowerCase()] ?? word.toLowerCase();
+    if (name in MODIFIERS) mods.push(name);
+    else unknown.push(word);
+  }
+  return { mods, unknown };
+}
 
 /** The editing command a Mac keyboard sends with a shortcut: a key event alone selects or undoes nothing. */
 export function editingCommands(key, mods = []) {
@@ -44,6 +66,9 @@ export function editingCommands(key, mods = []) {
   if (held === 'meta' && k === 'a') return ['selectAll'];
   if (held === 'meta' && k === 'z') return ['undo'];
   if (held === 'meta+shift' && k === 'z') return ['redo'];
+  // Copy, cut and paste with ⌘ on a Mac or Ctrl elsewhere, where the app says Ctrl.
+  const clip = { c: 'copy', x: 'cut', v: 'paste' }[k];
+  if (clip && (held === 'meta' || held === 'ctrl')) return [clip];
   return [];
 }
 
@@ -55,10 +80,22 @@ export function holdersOf(profile, list = processes, chrome = CHROME) {
 }
 
 /** Stop any Chrome still on this profile: one that will not answer keeps its lock, and every Chrome after it exits. */
-export function freeProfile(profile) {
-  const pids = holdersOf(profile);
+export function freeProfile(profile, bin = CHROME) {
+  const pids = holdersOf(profile, processes, bin);
   for (const pid of pids) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
   return pids.length;
+}
+
+/**
+ * End a drive: stop the browser, its helpers, and delete its throwaway profile.
+ *
+ * The helpers outlive a kill of the one process Node started and keep writing
+ * into that folder, so a delete in the next statement hits ENOTEMPTY.
+ */
+export function stopChrome(chrome, profile, { bin = CHROME } = {}) {
+  if (chrome?.pid) { try { process.kill(chrome.pid, 'SIGKILL'); } catch { /* gone */ } }
+  if (profile) freeProfile(profile, bin);
+  if (profile) fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }
 
 /**
@@ -143,6 +180,9 @@ export async function connect(wsUrl, { width = 1440, height = 900, targetId: exi
   const call = (m, p) => send(m, p, sessionId);
   await call('Page.enable');
   await call('Runtime.enable');
+  // A tab the app opened (a sign-in, Open outside) leaves this one hidden, and
+  // Chrome loads no film in a hidden tab: black, 0:00 / 0:00, for good.
+  await call('Page.bringToFront');
   await call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 2, mobile: false });
   // Dark, because that is how the people who use this read it.
   await call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
@@ -169,7 +209,7 @@ export async function connect(wsUrl, { width = 1440, height = 900, targetId: exi
     const base = named
       ? { key, code: named.code, windowsVirtualKeyCode: named.keyCode }
       : { key, code: `Key${key.toUpperCase()}`, windowsVirtualKeyCode: key.toUpperCase().charCodeAt(0) };
-    const text = !named && !mods.length ? key : key === 'Enter' && !mods.length ? '\r' : undefined;
+    const text = !named && !mods.length ? key : key === 'Enter' && !mods.length ? '\r' : key === ' ' && !mods.length ? ' ' : undefined;
     const commands = editingCommands(key, mods);
     await call('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', modifiers, ...base, ...(text ? { text } : {}), ...(commands.length ? { commands } : {}) });
     await call('Input.dispatchKeyEvent', { type: 'keyUp', modifiers, ...base });

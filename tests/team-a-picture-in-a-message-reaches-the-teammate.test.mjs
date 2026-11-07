@@ -23,11 +23,11 @@ import os from 'node:os';
 import path from 'node:path';
 
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamService } from '../main/team/index.mjs';
+import { Store } from '../main/store.mts';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
-import { MAX_MESSAGE_FILE_BYTES, filesNamedIn } from '../main/team/sync.mjs';
+import { MAX_MESSAGE_FILE_BYTES, filesNamedIn } from '../main/team/sync.mts';
 
 // One copy of the app. `storeRoot` again is the same Mac started afresh, which
 // is what updating the app is; `writes` stands in for its disk.
@@ -45,7 +45,7 @@ async function aMac(cloud, personId, { storeRoot = fs.mkdtempSync(path.join(os.t
 }
 
 const conversation = (mac) => mac.store.listProducts().find((p) => p.team?.direct) ?? null;
-// What the reply box does on send (main/ipc.mjs zero:save-attachments): the
+// What the reply box does on send (main/ipc.mts zero:save-attachments): the
 // file goes in the project's attachments folder and the message links to it.
 function paste(mac, name, bytes) {
   const dir = conversation(mac).dir;
@@ -233,13 +233,17 @@ it('never replaces a file the reader already has under that name', async () => {
   expect(onDisk(theo, 'clash.png').toString()).toBe('theirs');
 });
 
-it('leaves a picture too big to send on the sender\'s Mac, and still sends the words', async () => {
+// A picture over one call's 10 MB used to stay on the sender's Mac. It now goes
+// in parts (tests/team-a-file-over-10-mb-goes-in-parts-and-opens-whole), so no
+// single cloud call is over the limit, and the words go either way.
+it('sends a picture over 10 MB in parts of no more than 10 MB, and still sends the words', async () => {
   const md = paste(maya, 'huge.png', Buffer.alloc(MAX_MESSAGE_FILE_BYTES + 1));
   await maya.on(() => maya.service.message(theo.personId, `big one\n\n${md}`));
   await maya.service.syncNow();
   await theo.service.syncNow();
-  expect(cloud.files.size).toBe(0);
-  expect(onDisk(theo, 'huge.png')).toBeNull();
+  const sizes = [...cloud.pieces.values()].map((f) => f.bytes.length);
+  expect(sizes.length).toBeGreaterThan(1);
+  expect(Math.max(...sizes)).toBeLessThanOrEqual(MAX_MESSAGE_FILE_BYTES);
   const row = theo.store.listItems().find((i) => i.product === conversation(theo).slug);
   expect(row.answer).toContain('big one');
 });

@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const ORG_BLOCKED = 'Your organization has disabled Claude subscription access for Claude Code';
 const SIGNED_OUT = 'Failed to authenticate: OAuth session expired and could not be refreshed';

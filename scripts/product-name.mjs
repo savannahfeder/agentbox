@@ -31,6 +31,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { NAME, Name, nameSlug } from '../shared/product-name.mjs';
+import { JOIN_SCHEME } from '../shared/room-links.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const WRITE = process.argv.includes('--write');
@@ -67,6 +68,9 @@ export function expected() {
     [['productName'], NAME],
     [['build', 'productName'], NAME],
     [['build', 'dmg', 'title'], NAME],
+    // macOS hands a link on the app's scheme only to an app whose Info.plist
+    // declares it; setAsDefaultProtocolClient alone does nothing there.
+    [['build', 'protocols'], [{ name: NAME, schemes: [JOIN_SCHEME] }]],
     ...Object.entries(USAGE).map(([key, template]) => [
       ['build', 'mac', 'extendInfo', key], fill(template),
     ]),
@@ -88,7 +92,7 @@ export function drift(pkg) {
   const out = [];
   for (const [keys, want] of expected()) {
     const has = at(pkg, keys);
-    if (has !== want) out.push([keys.join('.'), has, want]);
+    if (JSON.stringify(has) !== JSON.stringify(want)) out.push([keys.join('.'), has, want]);
   }
   return out;
 }

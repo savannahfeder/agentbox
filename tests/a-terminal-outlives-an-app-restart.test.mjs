@@ -2,21 +2,21 @@
 //
 // What broke: a phone app's dev server was meant to run for hours, and it kept
 // stopping. Task terminals were children of the app, and the app's quit ended
-// every shell and everything under it (main/ipc.mjs `before-quit` ->
+// every shell and everything under it (main/ipc.mts `before-quit` ->
 // TaskTerminals.shutdown), so each Restart after a ship, and each restart an
 // agent did to deploy, took every running server with it.
 //
 // Measured here with a real shell: a background `sleep` started in a task
 // terminal, the app's connection dropped the way a quit drops it, and a fresh
-// app instance opening the same terminal. Before main/terminal-host.mjs there
+// app instance opening the same terminal. Before main/terminal-host.mts there
 // was no host to find, and the shell died with the app.
 import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { TaskTerminals, terminalEnv } from '../main/task-terminals.mjs';
-import { TerminalHosts } from '../main/terminal-hosts.mjs';
-import { serveTerminals, terminalHostSocket, PROTOCOL } from '../main/terminal-host.mjs';
+import { TaskTerminals, terminalEnv } from '../main/task-terminals.mts';
+import { TerminalHosts } from '../main/terminal-hosts.mts';
+import { serveTerminals, terminalHostSocket, PROTOCOL } from '../main/terminal-host.mts';
 
 async function until(fn, ms = 7000) {
   const end = Date.now() + ms;
@@ -167,7 +167,7 @@ describe('when no host will start', () => {
     const local = fakeTerminals();
     let t = 0;
     const launch = vi.fn();
-    const app = new TerminalHosts({ local: local.terminals, dir, launch, startMs: 300, now: () => t });
+    const app = new TerminalHosts({ local: local.terminals, dir, launch, startMs: 300, now: () => t, platform: 'darwin' });
     try {
       const state = await app.open('k', place);
       expect(state.data).toContain('This terminal ends when Agentbox quits');
@@ -189,7 +189,7 @@ describe('when no host will start', () => {
 describe('when no host will start, quickly', () => {
   it('a host that stops as it starts is given up on at once, not after the whole wait', async () => {
     const dir = shortDir();
-    const app = new TerminalHosts({ local: fakeTerminals().terminals, dir, launch: () => ({ exitCode: 1 }), startMs: 8000 });
+    const app = new TerminalHosts({ local: fakeTerminals().terminals, dir, launch: () => ({ exitCode: 1 }), startMs: 8000, platform: 'darwin' });
     const at = Date.now();
     try {
       const state = await app.open('k', place);
@@ -272,7 +272,7 @@ describe('the host ends itself', () => {
     const mute = net.createServer((s) => s.resume());
     const mutePath = terminalHostSocket({ stamp: 'mute', dir });
     await new Promise((r) => mute.listen(mutePath, r));
-    const { connectTerminalHost } = await import('../main/terminal-hosts.mjs');
+    const { connectTerminalHost } = await import('../main/terminal-hosts.mts');
     const conn = await connectTerminalHost(mutePath, { callMs: 200 });
     const at = Date.now();
     try {

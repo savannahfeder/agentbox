@@ -9,6 +9,8 @@
 // drew no `.gr-page`, no `.cx-list` and no `.gr-side`; pressing Maya drew all
 // three. Now a direct record is drawn in the group's page, its row lit in the
 // list, its people listed the way a group lists them.
+// Its box says Reply to, and names the agent when an agent's message is the one
+// being answered (talkAnswer, from a-half-typed-mention-does-not-glue-itself...).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React, { createElement } from 'react';
@@ -41,12 +43,12 @@ describe('who a chat with a teammate lists beside it', () => {
   it('everyone in a chat with two teammates', () => {
     expect(directPeople({ people: ['p-priya', 'p-maya'], rooms, team, meId: 'p-me' }).wall.map((c) => c.id)).toEqual(['p-me', 'p-priya', 'p-maya']);
   });
-  it('a teammate not on Groups yet is still listed, and says so', () => {
+  it('a teammate who has not opened Agentbox yet is still listed, and says so', () => {
     const { wall } = directPeople({ people: ['p-marg'], rooms, team, meId: 'p-me' });
     expect(wall[1]).toMatchObject({ id: 'p-marg', name: 'Margarette Pineda', away: true });
     const html = renderToStaticMarkup(createElement(PeoplePanel, { room: { members: 2, wall }, onPerson: () => {} }));
     expect(html).toContain('Margarette Pineda');
-    expect(html).toContain('Not on Groups yet');
+    expect(html).toContain('Hasn’t opened Agentbox yet');
   });
   it('nobody who is not in the chat', () => {
     const ids = directPeople({ people: ['p-priya'], rooms, team, meId: 'p-me' }).wall.map((c) => c.id);
@@ -75,9 +77,9 @@ describe('the page it opens on', () => {
     const css = read('../renderer/src/team/rooms/rooms.css');
     expect(css).toContain('.cx-frame-main:has(> .gr-side) { flex-direction: row; }');
   });
-  it('its box says Message, as a group’s does', () => {
-    expect(focus).toContain("talkWord={inChats ? 'Message' : undefined}");
-    expect(focus).toMatch(/inChats && !said\.draft && talkNames\?\.length \? \{ \.\.\.said, text: `Message \$\{joinNames\(talkNames\)\}` \}/);
+  it('its box says Reply to, wherever it was opened from', () => {
+    expect(focus).not.toContain("talkWord={inChats ? 'Message' : undefined}");
+    expect(focus).toMatch(/!said\.draft && talkNames\?\.length \? \{ \.\.\.said, text: `Reply to \$\{talkAnswer \?\? joinNames\(talkNames\)\}` \}/);
   });
   it('says nothing about agents until one is working in it', () => {
     expect(focus).toContain('{!heldByPerson && !(inChats && !session) && <Live');

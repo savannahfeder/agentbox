@@ -44,15 +44,18 @@ describe('on a phone, a row', () => {
 describe('on a phone, View and filters', () => {
   it('is one icon: the faces stay in its menu, not on its button', () => {
     expect(last('.th-disp .th-faces', 'display')).toBe('none');
-    expect(last('.topbar .th-disp', 'width')).toBe('40px');
+    // 44, the thumb's floor, since QA batch 005 F-121 measured these three
+    // corner icons as the ones a finger kept missing.
+    expect(last('.topbar .th-disp', 'width')).toBe('44px');
   });
 });
 
 describe('on a phone, the inboxes along the bottom', () => {
   it('stand on the same ground as the list above them', () => {
     // The list stands on the wall itself since 2026-10-12, with no card wash
-    // (a-phone-shows-the-wall-scrolls-documents-straight-and-keeps-its-corner-clear).
-    expect(last('.list-pane > .th-bar', 'background')).toBe('var(--bg)');
+    // (a-phone-shows-the-wall-scrolls-documents-straight-and-keeps-its-corner-clear),
+    // and the bar lets that wall through (w-33511040d7).
+    expect(last('.list-pane > .th-bar', 'background')).toBe('transparent');
   });
 });
 

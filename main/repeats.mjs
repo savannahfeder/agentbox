@@ -114,8 +114,10 @@ export class Repeats {
   // word may be written at all is decided at the door, by
   // `Supervisor#engineOffered` and `#modelOffered`, so a rule cannot be marked
   // for an engine this Mac never offered her.
+  // `startsNext`: the rule is made from a thread that already ran, so the
+  // period it is in counts as served and the first run comes at its next time.
   setRule(productDir, {
-    title, body, priority = 5, every = 'day', at, on, engine, model,
+    title, body, priority = 5, every = 'day', at, on, engine, model, startsNext = false,
   }, now = Date.now()) {
     // Refused here rather than stored and ignored later: a rule that cannot be
     // kept has to fail while the user is still looking at what they typed.
@@ -132,12 +134,14 @@ export class Repeats {
       ...(every === 'week' ? { on } : {}),
       ...(engine ? { engine: String(engine) } : {}),
       ...(model ? { model: String(model) } : {}),
-      createdAt: now, served: '', misses: 0, alerted: 0,
+      createdAt: now, served: startsNext ? periodKey({ every, at, on }, now) ?? '' : '', misses: 0, alerted: 0,
     }, now);
     return this.get(productDir, id, now);
   }
 
-  patchRule(productDir, id, patch, now = Date.now()) {
+  // `startsNext` as in `setRule`: the period the new schedule is in counts as
+  // served, so moving a rule from a run that just answered starts nothing now.
+  patchRule(productDir, id, { startsNext = false, ...patch }, now = Date.now()) {
     // `on` joins the other two: changing a daily rule to a Thursday one sends
     // every, at AND on, and checking the first two alone refused the change for
     // the same reason a new weekly rule was refused.
@@ -150,6 +154,7 @@ export class Repeats {
         on: patch.on ?? current.on,
       };
       if (!isRepeatRule(next)) throw new Error(`not a schedule ${NAME} can keep: ${describeRule(next)}`);
+      if (startsNext) patch.served = periodKey(next, now) ?? '';
     }
     this._append(productDir, id, patch, now);
     return this.get(productDir, id, now);
@@ -216,21 +221,11 @@ export class Repeats {
         }
       }
 
-      const { created } = workItemsDisk.createWorkItemIfAbsent(productDir, id, {
-        title: `${rule.title} · ${dayStamp(key)}`,
-        body: `${OCCURRENCE_PROTOCOL.replace('<REPEAT_LABEL>', repeatLabel(ruleId))}\n\n${standingInstruction(rule)}`,
-        kind: 'directive',
-        priority: rule.priority ?? 5,
-        labels: ['founder', repeatLabel(ruleId)],
-        // WHICH CODING AGENT AND WHICH MODEL, off the rule, at the moment the
-        // run is made. A run is an ordinary work item, so this is the same pair
-        // `composeItem` writes for a task she types by hand and it is read by
-        // the same `engineFor` -- the occurrence needs no rule-shaped special
-        // case anywhere downstream. Absent on a rule that names neither, which
-        // is every rule on her disk today.
-        ...(rule.engine ? { engine: rule.engine } : {}),
-        ...(rule.model ? { model: rule.model } : {}),
-      }, { source: 'system', now });
+      // WHICH CODING AGENT AND WHICH MODEL come off the rule at the moment the
+      // run is made (`occurrenceFields`). A run is an ordinary work item, so
+      // this is the same pair `composeItem` writes for a task she types by
+      // hand and it is read by the same `engineFor`.
+      const { created } = workItemsDisk.createWorkItemIfAbsent(productDir, id, occurrenceFields({ ...rule, id: ruleId }, key, now), { source: 'system', now });
 
       // Told once per streak, and that is a durable fact rather than an
       // intention: a crash after filing cannot file it twice, and one before it
@@ -248,9 +243,26 @@ export class Repeats {
   }
 }
 
-function dayStamp(key) {
+/** The row a period's run is made as, before it exists (a sleeping Mac hands it over, shared/cloud-carry.mjs). */
+export function occurrenceFields(rule, key, now) {
+  return {
+    title: `${rule.title} · ${dayStamp(key, now)}`,
+    body: `${OCCURRENCE_PROTOCOL.replace('<REPEAT_LABEL>', repeatLabel(rule.id))}\n\n${standingInstruction(rule)}`,
+    kind: 'directive',
+    priority: rule.priority ?? 5,
+    labels: ['founder', repeatLabel(rule.id)],
+    ...(rule.engine ? { engine: rule.engine } : {}),
+    ...(rule.model ? { model: rule.model } : {}),
+  };
+}
+
+// A run made after the day it serves (the first run of a new rule, or a Mac
+// asleep through it) is named for the day it ran.
+function dayStamp(key, now) {
   const [y, m, d] = key.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  const served = new Date(y, m - 1, d);
+  const day = now != null && now > served.getTime() + 86_400_000 ? new Date(now) : served;
+  return day.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 // The period keys the misses covered, oldest first, for the alert's wording.

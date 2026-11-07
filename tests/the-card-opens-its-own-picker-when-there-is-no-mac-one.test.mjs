@@ -53,7 +53,13 @@ describe('the picker the app draws itself', () => {
   });
 });
 
-describe('the two screens that ask where the code is', () => {
+// THE FIRST TASK'S OWN FOLDER BUTTON WAS NOT IN THIS LIST, and it is the one a
+// brand-new person presses first (F-127, QA on Linux, 2026-10-28: four clicks,
+// no dialog, no picker, nothing said). Driven again in a Chromium tab against
+// this branch on Linux, the button opens the drawn picker, a typed path is
+// taken, and the task lands in the inbox against its project.
+// The first task's own folder screen went in w-31c71743b5; its folder comes from the new project card.
+describe('the screens that ask where the code is', () => {
   for (const [what, file] of [
     ['the new project card', ['renderer', 'src', 'components', 'NewProject.tsx']],
     ['the first run', ['renderer', 'src', 'components', 'Onboarding.tsx']],
@@ -83,7 +89,7 @@ describe('the answer the screen is reading', () => {
   });
 
   it('is on both doors, because the map both doors read has the channel', async () => {
-    const { REQUEST_CHANNELS } = await import('../shared/bridge-map.mjs');
+    const { REQUEST_CHANNELS } = await import('../shared/bridge-map.mts');
     expect(REQUEST_CHANNELS.listFolders).toBe('zero:list-folders');
   });
 });

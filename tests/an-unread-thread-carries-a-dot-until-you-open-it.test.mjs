@@ -67,7 +67,10 @@ describe('a thread is read', () => {
 describe('the list draws it', () => {
   it('as a class on the row, in Needs You only', () => {
     const list = read('components/List.tsx');
-    expect(list).toMatch(/view === 'inbox' && unread\?\.\(item\) \? ' unread' : ''/);
+    // The row's own tab since Your threads stacks its sections in one list
+    // (w-b5f23cff71); none of those sections is Needs you, so the rule holds.
+    expect(list).toMatch(/const tab = group\.section\?\.tab \?\? view;/);
+    expect(list).toMatch(/tab === 'inbox' && unread\?\.\(item\) \? ' unread' : ''/);
   });
   it('as a dot in the row gutter and a heavier title', () => {
     const css = read('threads/pages.css');

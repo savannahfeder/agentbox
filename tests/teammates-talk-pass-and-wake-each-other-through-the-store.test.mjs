@@ -10,9 +10,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { appHome } from '../main/store/home.mjs';
-import { loadStore } from '../main/store-modules.mjs';
-import { Teammates } from '../main/teammates.mjs';
-import { teammateIdOf, passedFromOf, hopOf } from '../shared/teammates.mjs';
+import { loadStore } from '../main/store-modules.mts';
+import { Teammates } from '../main/teammates.mts';
+import { teammateIdOf, passedFromOf, hopOf, runIdFor } from '../shared/teammates.mjs';
 import { isCleanRun } from '../shared/repeats.mjs';
 import { threadEvents } from '../renderer/src/thread-history';
 
@@ -225,8 +225,9 @@ describe('teammates through the store', () => {
     const here = new Teammates({ config: { storeRoot: root, accountId: 'acct-projects' }, modules: mods, listProducts: () => listed, listItems: () => [] });
     const hugo = here.create({ starter: 'fundraising', product: 'company' });
     const brief = here.briefFor({ id: 'w-h', product: 'company', labels: ['founder', `teammate:${hugo.id}`, 'hop:0'] });
-    expect(brief).toContain('- Company (yours): no code, docs at /d/company');
+    expect(brief).toContain('- Company (yours): no code');
     expect(brief).toContain('- Product: code at /r/product');
+    expect(brief).toContain('list_documents');
     expect(brief).not.toContain('Practice');
     // With one project there is nothing to list.
     const one = new Teammates({ config: { storeRoot: root, accountId: 'acct-one' }, modules: mods, listProducts: () => [listed[1]], listItems: () => [] });
@@ -320,13 +321,20 @@ describe('teammates through the store', () => {
     expect(hopOf(run)).toBe(0);
   });
 
+  // Two passes about different work: two from one thread are one piece of
+  // work and share a thread (talk-between-teammates-stays-in-the-thread-it-is-about).
   it('a second pass while the teammate is busy is queued, then released when it is free', async () => {
     const ada = team.create({ starter: 'quality' });
     const felix = team.create({ starter: 'maintainer' });
-    team.post({ text: 'go', to: [ada.id] });
+    // Told to take hand-offs straight away; one held for your yes does not queue.
+    const { writeTeammate } = await import('../main/store/teammates-files.mjs');
+    writeTeammate(team.dir(), felix.id, { handoffsNeedYes: false }, Date.now());
+    const go = team.post({ text: 'go', to: [ada.id] });
+    const also = team.post({ text: 'and this', to: [ada.id], fresh: true });
     await tick(Date.now());
-    onRun(store.listItems().find((i) => teammateIdOf(i) === ada.id).id);
+    onRun(runIdFor(`${go.id}>${ada.id}`));
     core.teamPass({ to: 'Maintainer', title: 'first', details: '' });
+    onRun(runIdFor(`${also.id}>${ada.id}`));
     core.teamPass({ to: 'Maintainer', title: 'second', details: '' });
     await tick(Date.now());
     const runs = store.listItems().filter((i) => teammateIdOf(i) === felix.id).sort((a, b) => a.createdAt - b.createdAt);

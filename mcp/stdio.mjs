@@ -30,11 +30,11 @@ console.log = (...args) => console.error(LOG, ...args);
 
 /**
  * One store server over `input` and `output`: this process's own stdio, or one
- * cloud run's connection when many share a process (main/cloud/run.mjs), each
+ * cloud run's connection when many share a process (main/cloud/run.mts), each
  * holding its own claims (`holder`). Returns a close that gives them back.
  */
-export async function serveStore({ input = process.stdin, output = process.stdout, holder, ownItem } = {}) {
-  const { account, tools, claims } = buildTools({ holder, ...(ownItem !== undefined ? { ownItem } : {}) });
+export async function serveStore({ input = process.stdin, output = process.stdout, holder, ownItem, ownProduct, requestCloudResource } = {}) {
+  const { account, tools, claims } = buildTools({ holder, requestCloudResource, ...(ownItem !== undefined ? { ownItem } : {}), ...(ownProduct !== undefined ? { ownProduct } : {}) });
 
   const server = new McpServer(
     { name: nameSlug, version: '1.0.0' },

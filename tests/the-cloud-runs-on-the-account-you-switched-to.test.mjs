@@ -19,17 +19,18 @@
 //
 // Now the cloud runs on the same account as this Mac whenever that account is
 // signed in to the cloud, the check and the run ask one rule, and a run that
-// finds its account at its limit says so.
+// finds its account at its limit says so. (Since 2026-10-26, when it is not
+// signed in there, the cloud runs nothing rather than another account.)
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import {
   recordCloudLogin, markCloudLogin, pickCloudLogin, cloudLoginInUse, cloudAccountFrom,
   noCloudAccountSentence, CLOUD_ACCOUNT_ENV,
-} from '../main/cloud/logins.mjs';
-import { loginForCloudRun } from '../main/cloud/run-cli.mjs';
+} from '../main/cloud/logins.mts';
+import { loginForCloudRun } from '../main/cloud/run-cli.mts';
 import { cloudAccountInUse, cloudFootLine } from '../renderer/src/cloud-menu';
 
 let home;
@@ -59,8 +60,10 @@ describe('the cloud account a run takes', () => {
     expect(picks).toEqual(['acct-work', 'acct-work', 'acct-work']);
   });
 
-  it('is the first one signed in when this Mac\'s account is not in the cloud', () => {
-    expect(pickCloudLogin('claude', { home, now, prefer: 'acct-elsewhere' })?.key).toBe('acct-me');
+  // Since 2026-10-26 the cloud runs on no other account than this Mac's
+  // (switching-to-an-account-not-in-the-cloud-runs-nothing-there-on-another).
+  it('is none when this Mac\'s account is not in the cloud, and the first one signed in when nothing names this Mac\'s', () => {
+    expect(pickCloudLogin('claude', { home, now, prefer: 'acct-elsewhere' })).toBe(null);
     expect(pickCloudLogin('claude', { home, now })?.key).toBe('acct-me');
   });
 
@@ -78,9 +81,9 @@ describe('the cloud account a run takes', () => {
     expect(pickCloudLogin('claude', { home, now })).toBe(null);
   });
 
-  it('passes over the account you are on when its cloud sign-in has stopped working, as for any other', () => {
+  it('takes no other account when the cloud sign-in of the one you are on has stopped working', () => {
     markCloudLogin('claude', 'acct-work', 'id-work', { broken: 'signed out' }, { home });
-    expect(pickCloudLogin('claude', { home, now, prefer: 'acct-work' })?.key).toBe('acct-me');
+    expect(pickCloudLogin('claude', { home, now, prefer: 'acct-work' })).toBe(null);
   });
 
   it('is narrowed by a test copy\'s list before anything is preferred', () => {
@@ -122,7 +125,7 @@ describe('a run that finds no account to take', () => {
 /* -------------------------- the app's side of it -------------------------- */
 const login = (dir, email, org) => {
   fs.mkdirSync(path.join(home, dir), { recursive: true });
-  fs.writeFileSync(path.join(home, dir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: `u-${dir}`, organizationUuid: org } }));
+  fs.writeFileSync(path.join(home, dir === '.claude' ? '' : dir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: `u-${dir}`, organizationUuid: org } }));
 };
 const make = (activeAccount = {}) => {
   login('.claude', 'me@example.test', 'org-me');
@@ -217,7 +220,7 @@ describe('the screen', () => {
 
   it('still says the account in use is out when it is', () => {
     const accounts = [account('acct-me', { inUse: false }), account('acct-work', { state: 'limited', ready: false, limitedUntil: at(15, 40), inUse: true })];
-    expect(cloudFootLine(cloud(accounts), now)).toBe('Your cloud account is at its usage limit until 3:40pm. Threads run on this Mac until then.');
+    expect(cloudFootLine(cloud(accounts), now)).toBe('The Claude account the cloud runs on is at its usage limit until 3:40pm. Threads run on this Mac until then.');
   });
 
   it('names none when the app marks none', () => {

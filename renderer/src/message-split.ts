@@ -39,21 +39,6 @@ const MARK = /^(?:[-*•]|\d{1,2}[.)])\s+/;
 
 const unmarked = (line: string) => line.replace(MARK, '').trim() || line;
 
-/**
- * A MESSAGE THAT IS A LIST OF PEERS, as one task per line, or nothing.
- *
- * Narrow on purpose: every line has to carry its own mark at the same indent,
- * so a paragraph over the bullets (context belonging to all of them), a nested
- * list and a continuation line all read as the one thread Send has always made.
- */
-export function listedTasks(message: string): string[] {
-  const lines = (message ?? '').trim().split('\n').filter((l) => l.trim());
-  if (lines.length < 2) return [];
-  if (lines.some((l) => /^\s/.test(l) || !MARK.test(l))) return [];
-  const items = lines.map((l) => l.replace(MARK, '').trim()).filter(Boolean);
-  return items.length === lines.length ? items : [];
-}
-
 // A label for a first line too long to be one. Failing that, as much as fits,
 // clipped the way a row summary is, which at least stops on a word.
 function titleFor(head: string): string {

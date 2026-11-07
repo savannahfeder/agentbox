@@ -22,9 +22,9 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun, INPUT_CLOSED_IN_CLOUD } from '../main/cloud/run.mjs';
-import { attachClaudeInput } from '../main/claude-input.mjs';
-import { readMarker } from '../main/cloud/marker.mjs';
+import { cloudRun, INPUT_CLOSED_IN_CLOUD } from '../main/cloud/run.mts';
+import { attachClaudeInput } from '../main/claude-input.mts';
+import { readMarker } from '../main/cloud/marker.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');
@@ -186,9 +186,9 @@ describe('a cloud run while this Mac sleeps', () => {
 
 describe('what the Mac names', () => {
   it('the writes to a thread and its documents, and nothing that reads or claims', async () => {
-    const { KEPT_WHILE_AWAY } = await import('../main/cloud/run.mjs');
+    const { KEPT_WHILE_AWAY } = await import('../main/cloud/run.mts');
     const tools = Object.values(KEPT_WHILE_AWAY).flat();
-    expect(tools).toEqual(expect.arrayContaining(['update_work_item', 'create_work_item', 'write_document']));
-    for (const t of ['claim_work_item', 'release_work_item', 'list_work_items', 'read_document', 'look_at_page']) expect(tools).not.toContain(t);
+    expect(tools).toEqual(expect.arrayContaining(['update_work_item', 'create_work_item', 'write_document', 'team_post', 'team_pass', 'team_method']));
+    for (const t of ['claim_work_item', 'release_work_item', 'list_work_items', 'read_document', 'look_at_page', 'team_roster']) expect(tools).not.toContain(t);
   });
 });

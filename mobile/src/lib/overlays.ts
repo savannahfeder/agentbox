@@ -4,9 +4,11 @@
 import { approvalReads } from '../../../renderer/src/approval-card';
 import { approvalStage, type Answered } from '../../../renderer/src/approval-stage';
 import { toastOpens, type ToastGoes } from '../../../renderer/src/toast-parts';
+import { PHONE_UNDO_MS } from '../../../shared/phone-undo.mjs';
 
-// App.tsx's TOAST_GOES_MS, its plain toast's 2500, and APPROVAL_EXIT_MS.
-export const TOAST_GOES_MS = 6000;
+// App.tsx's TOAST_GOES_MS, its plain toast's 2500, and APPROVAL_EXIT_MS. The
+// toast's Undo lasts as long as her Mac waits for it, less a margin (shared/phone-undo.mjs).
+export const TOAST_GOES_MS = PHONE_UNDO_MS;
 const TOAST_PLAIN_MS = 2500;
 export const APPROVAL_EXIT_MS = 420;
 
@@ -14,6 +16,19 @@ export interface Approval { id: string; at: number; product: string; item: strin
 type Here = { product: string; id: string } | null;
 
 export const toastLife = (toast: { goes?: ToastGoes }) => (toast.goes ? TOAST_GOES_MS : TOAST_PLAIN_MS);
+
+/** How far a toast is swiped down before it goes. */
+export const TOAST_SWIPE_PX = 24;
+// What a thread keeps at its foot: the reply box, 51 tall at the bottom of the screen.
+const OVER_THE_REPLY_BOX = 64;
+const OVER_THE_FOOT = 20;
+
+/**
+ * How high off the foot the toast sits: just over a thread's reply box, where
+ * the screen holds nothing she is reading; elsewhere just over the edge. Her
+ * pick of three placements (w-e08ebeb562, 2026-10-29): "toast-1 bottom bar".
+ */
+export const toastLift = (onThread: boolean) => (onThread ? OVER_THE_REPLY_BOX : OVER_THE_FOOT);
 export const toastTapOpens = (toast: { goes?: ToastGoes }, here: Here) => toastOpens(toast, here);
 
 /** The thread the screen shows, read from the route. */

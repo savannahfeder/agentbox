@@ -6,16 +6,15 @@ import type { Room, RoomCard, RoomProfile } from '../../types';
 import { PersonHover, ProfilePage } from './RoomPerson';
 import { LiveMark } from '../../components/LiveMark';
 import { I } from './icons';
-import { RoomFace } from './RoomFace';
+import { Face } from '../people';
 import { agentsWords, cardName, invisibleNotice } from './room-rules';
-import { joinLink } from '../../../../shared/room-links.mjs';
 
 /** The wall, the room's ranks, or one person's page. */
 export type RoomPane = 'wall' | 'ranks' | `person:${string}`;
 
-export function RoomPage({ room, rooms, ranks, me, now, pane, link, chat, board = null, picked, onPick, onPane, onComeBack, onMessage, onCopyLink, onRoom, onSaveBio }: {
+export function RoomPage({ room, rooms, ranks, me, now, pane, chat, board = null, picked, onPick, onPane, onComeBack, onMessage, onRoom, onSaveBio }: {
   room: Room; rooms: Room[]; ranks: Record<string, number>;
-  me: RoomProfile | null; now: number; pane: RoomPane; link: string | null;
+  me: RoomProfile | null; now: number; pane: RoomPane;
   /** The chat panel beside the wall: this room's, or a chat switched to. */
   chat: ReactNode;
   /** Their threads as a board, drawn in place of the wall while the room's view is Board. */
@@ -27,7 +26,6 @@ export function RoomPage({ room, rooms, ranks, me, now, pane, link, chat, board 
   onMessage?: (personIds: string[]) => void;
   onPane: (p: RoomPane) => void;
   onComeBack: () => void;
-  onCopyLink: () => void;
 }) {
   const notice = invisibleNotice(me?.invisible_until, now);
   const alone = room.wall.length <= 1 && room.members <= 1;
@@ -40,9 +38,6 @@ export function RoomPage({ room, rooms, ranks, me, now, pane, link, chat, board 
   const person = pane.startsWith('person:') ? room.wall.find((c) => c.id === pane.slice(7)) ?? null : null;
   const justYou = alone && room.kind !== 'group' && <div className="rm-empty">
     <span className="t">It is just you in {room.name}.</span>
-    <span className="s">{room.listed ? 'Anyone on the app can find it and join.' : 'Anyone with the link can join.'}</span>
-    <div className="rm-field"><span className="rm-input">{I.link()}<span className="v">{link ? joinLink(link).replace(/^https:\/\//, '') : 'Making a link…'}</span></span>
-      <button type="button" className="rm-btn" disabled={!link} onClick={onCopyLink}>Copy link</button></div>
   </div>;
   if (person) {
     return <div className="rm-split"><div className="rm-main wide">
@@ -82,7 +77,7 @@ function PickedBar({ cards, onMessage, onClear }: { cards: RoomCard[]; onMessage
   const names = cards.map(cardName);
   const said = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
   return <div className="rm-selbar rm-pop" role="status">
-    <span className="faces">{cards.slice(0, 4).map((c) => <RoomFace key={c.id} name={c.name} url={c.avatarUrl} size={20} />)}</span>
+    <span className="faces">{cards.slice(0, 4).map((c) => <Face key={c.id} name={c.name} url={c.avatarUrl} size={20} />)}</span>
     <span>{said}</span>
     {onMessage && <button type="button" className="rm-btn" onClick={onMessage}>{I.chat()}Message</button>}
     <button type="button" className="x" aria-label="Clear" onClick={onClear}>{I.x()}</button>
@@ -103,8 +98,8 @@ export function WallCard({ card, sel = false, onClick, onPoint }: { card: RoomCa
     onClick={onClick ? (e) => onClick(e.shiftKey || e.metaKey || e.ctrlKey) : undefined} onKeyDown={onClick ? (e) => { if (e.key === 'Enter') onClick(false); } : undefined}
     onMouseEnter={onPoint ? (e) => onPoint(e.currentTarget) : undefined} onMouseLeave={onPoint ? () => onPoint(null) : undefined}>
     {sel && <span className="rm-check">{I.check()}</span>}
-    <RoomFace name={card.name} url={card.avatarUrl} size={64} />
-    <span className="rm-nm"><span className="n">{cardName(card)}</span>{card.level != null && <span className="rm-quiet">{card.level}</span>}</span>
+    <Face name={card.name} url={card.avatarUrl} size={64} />
+    <span className="rm-nm"><span className="n">{cardName(card)}</span></span>
     <span className="rm-on rm-one">{card.away ? <span className="rm-priv">Not on Rooms yet</span> : card.workingOn ?? (card.workingPrivate ? <span className="rm-priv">Private thread</span> : card.status ? <span className="rm-priv">{card.status}</span> : ' ')}</span>
     {card.away
       ? <span className="rm-ag" aria-hidden="true">{' '}</span>
@@ -130,8 +125,8 @@ function Ranks({ room, onBack, onPerson }: { room: Room; onBack: () => void; onP
     <div className="rm-ranks">
       <div className="hd"><span className="rm-label">Rank</span><span /><span className="rm-label">Person</span><span className="rm-label">{when === 'week' ? 'Agent hours this week' : 'Agent hours today'}</span><span /></div>
       {rows.map((c, i) => <div key={c.id} className={`rm-rrow${c.me ? ' me' : ''}`} role="button" tabIndex={0} onClick={() => onPerson(c.id)}>
-        <span className="r">{i + 1}</span><RoomFace name={c.name} url={c.avatarUrl} size={28} />
-        <span className="rm-nm"><span className="n">{cardName(c)}</span>{c.level != null && <span className="rm-quiet">{c.level}</span>}</span>
+        <span className="r">{i + 1}</span><Face name={c.name} url={c.avatarUrl} size={28} />
+        <span className="rm-nm"><span className="n">{cardName(c)}</span></span>
         <span className="bar"><i style={{ width: `${(hours(c) / max) * 100}%` }} /></span><span className="v">{fmt(hours(c))}</span>
       </div>)}
     </div>

@@ -132,6 +132,6 @@ describe('the app is wired to all three', () => {
     expect(app).toMatch(/wayOut\(following, focused\) !== 'inbox'/);
     expect(app).toMatch(/setFollowing\(null\);\s*\n\s*setView\('inbox'\);/);
     // Escape and the back arrow are untouched: both still only close the task.
-    expect(app).toMatch(/if \(e\.key === 'Escape'\) \{ if \(escapeClosesDoc\(openDoc\)\) closeArtifact\(\); else setFocused\(null\); \}/);
+    expect(app).toMatch(/if \(e\.key === 'Escape'\) \{ if \(escapeClosesDoc\(openDoc, fullScreenDoc\)\) closeArtifact\(\); else setFocused\(null\); \}/);
   });
 });

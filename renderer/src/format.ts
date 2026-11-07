@@ -195,8 +195,20 @@ export function liveOption(item: HasFields & { answer?: string }, n: number): Pa
 // alone or with a reason after them: "Ship it, then close the task" and "Close
 // this task, then file the follow-up" are still replies.
 const CLOSES = /^close (?:this|the) (?:task|thread)(?:$|\s*[,:;\p{Pd}](?!\s*(?:then|and|also)\b)|\s+(?:since|because|as|now that)\b)/iu;
+// "Keep it as sent and close this task" asks for no work either. Keeping something
+// in particular ("Keep the first layout and close this task") does.
+const KEEPS_AND_CLOSES = /^(?:keep|leave) (?:it|this|them|that)(?: as (?:is|sent|it is))?\s*,?\s+and close (?:this|the) (?:task|thread)$/i;
+// "Looks right, close this task" is a close too.
+const RIGHT_FIRST = /^(?:(?:that|it|this|all)\s+)?(?:looks\s+|is\s+)?(?:right|good|fine|great|perfect|correct)\s*[,.;:!]?\s+(?:and\s+|so\s+)?(?=close\b)/i;
 export function closesTheTask(option: string): boolean {
-  return CLOSES.test(bareOption(option));
+  const words = bareOption(option).replace(RIGHT_FIRST, '');
+  return CLOSES.test(words) || KEEPS_AND_CLOSES.test(words);
+}
+
+// "Keep it on the branch" is the same, and leaves the work off main on purpose.
+const STAYS_ON_BRANCH = /^(?:keep|leave)\s+(?:(?:it|this|them|that|the (?:change|changes|work|commits?))\s+)?(?:on|in)\s+(?:(?:the|its|this|a)\s+)?branch(?:\s+for now)?$/i;
+export function leavesItOnTheBranch(option: string): boolean {
+  return STAYS_ON_BRANCH.test(bareOption(option));
 }
 
 const bareOption = (option: string) => option.replace(/\s*\(recommended\)\s*/i, '').trim().replace(/[.!]+$/, '');
@@ -221,9 +233,28 @@ const asksToShip = (option: string) => SHIPS.test(bareOption(option).replace(/^[
 // instead of sending is the wrong surprise on an option that said enough.
 const SAYS_NOTHING = /^(?:change|revise|edit|adjust|tweak|amend|rework|redo|fix)\s+(?:something|anything|it|this|that|some of it|a few things|this (?:part|bit)|parts?|bits?)(?:\s+first)?$/i;
 
+// THE OPTION THAT THROWS THE WORK AWAY, which asks first because nothing takes
+// it back (./discard-asks-first.ts says the rest).
+//
+// THE WHOLE OPTION, OR NONE OF IT. "Discard the first layout and ship the
+// second" is an instruction that happens to begin with the word, and a
+// question in front of it would be the app second-guessing a sentence it did
+// not write.
+const DISCARDS = /^(?:discard|bin|delete|drop|throw away|throw out)\s+(?:it|them|this|that|the (?:change|changes|work|edits|diff|lot))(?:\s+away)?$|^(?:discard|throw (?:it|them|the (?:change|changes|lot)) (?:all )?away)$/i;
+
+export function discardsTheChange(option: string): boolean {
+  return DISCARDS.test(bareOption(option));
+}
+
+// AND THE APP'S OWN OFFER WHERE GIT CANNOT NAME AN AUTHOR (F-139,
+// ./ship-offer.ts). The name and email are the whole point of the press, so
+// sending it as it stands says nothing; it opens the box with its own words in
+// it, exactly as "Change something first" does.
+const NAMES_NOBODY = /^commit it and ship, as the name and email below$/i;
+
 export function needsYourWords(option: string): boolean {
   const words = bareOption(option);
-  return SAYS_NOTHING.test(words) || /^(?:something|anything) else$/i.test(words);
+  return SAYS_NOTHING.test(words) || NAMES_NOBODY.test(words) || /^(?:something|anything) else$/i.test(words);
 }
 
 // What Enter means in the schedule box, in one place so the key handler and the
@@ -313,6 +344,21 @@ export function parseRepeat(raw: string): RepeatParse {
   return null;
 }
 
+// Repeat's presets, with "Once" first as the way back off rather than as a
+// thing to notice. The When picker, the New thread card's "Repeat it" and the
+// phone app all offer these, and two lists of them would drift the way the two
+// priority lists once did.
+export function repeatPresets(now = Date.now()): Array<{ label: string; rule: RepeatRuleValue | null }> {
+  const weekday = new Date(now).getDay();
+  const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][weekday];
+  return [
+    { label: 'Once', rule: null },
+    { label: 'Every morning at 8:00am', rule: { every: 'day', at: '08:00' } as RepeatRuleValue },
+    { label: 'Every weekday at 9:00am', rule: { every: 'weekday', at: '09:00' } as RepeatRuleValue },
+    { label: `Every ${dayName} at 9:00am`, rule: { every: 'week', on: weekday, at: '09:00' } as RepeatRuleValue },
+  ];
+}
+
 /**
  * A rule typed ALONE in a box, which is every picker that asks how often: the
  * When picker (`readWhen`) and the composer's Repeat it page. The same grammar
@@ -354,6 +400,8 @@ function timeOf(text: string): string | null {
   if (mer === 'am' && hour === 12) hour = 0;
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
+
+export const repeatsLine = (rule: RepeatRuleValue): string => `Repeats ${ruleLabel(rule)}`;
 
 function repeatRule(rule: RepeatRuleValue): RepeatParse {
   return { rule, label: ruleLabel(rule) };
@@ -404,7 +452,12 @@ function flatten(body: string, headings: 'drop' | 'keep'): string {
     .replace(/^#{1,4}\s.*$/gm, (line) => (headings === 'keep' ? line.replace(/^#{1,4}\s*/, '') : ''))
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/[*_`>#]/g, '')
+    // A cloud run's key ask reads as what it asks for (shared/cloud-keys.mjs).
+    // Its other asks are cards in the thread, and machine words anywhere else (round six: search showed them).
+    .replace(/^\s*`?AGENTBOX-NEEDS:\s*(sign-in|key|file|code)\s.*$/gim, '')
+    .replace(/^\s*`?AGENTBOX-NEEDS-A-KEY:\s*([A-Z][A-Z0-9_]+)\b[\s:\u2014\u2013-]*(.*?)`?\s*$/gm, (_l, name: string, what: string) => what || name)
+    // An underscore inside a word is part of it (STRIPE_SECRET_KEY), not emphasis.
+    .replace(/[*`>#]|(?<![A-Za-z0-9])_+|_+(?![A-Za-z0-9])/g, '')
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)

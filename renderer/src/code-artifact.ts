@@ -43,6 +43,9 @@ export type Change = {
   startedAt?: number;
   endedAt?: number;
   editCount?: number;
+  /** Where the folder stood when the run ended (main/git-change.mjs). */
+  committed?: boolean | null;
+  uncommitted?: boolean | null;
 };
 
 export function isChangePath(path: string | undefined | null): boolean {
@@ -157,6 +160,18 @@ export function fileCount(n: number): string {
 export function changeSummary(change: Change): string {
   const files = change.files?.length ?? 0;
   return `${fileCount(files)} +${change.plus ?? 0} −${change.minus ?? 0}`;
+}
+
+/**
+ * "not committed", beside the figures, when the work in front of her never
+ * reached a commit (F-79). The diff of loose edits read exactly like the diff
+ * of a commit, so there was no way to tell which one a press would ship.
+ *
+ * Empty for anything else, including a change whose folder could not be read:
+ * a product with no repository has no commits to be short of.
+ */
+export function standingLabel(change: Change): string {
+  return change.committed === false && change.uncommitted === true ? 'not committed' : '';
 }
 
 /** How long the run took, in words. Empty when it is not known. */

@@ -15,8 +15,8 @@ import { fileURLToPath } from 'node:url';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { signInToCloud } from '../main/cloud/account.mjs';
-import { bootHeadless, nodeHost } from '../main/serve.mjs';
+import { signInToCloud } from '../main/cloud/account.mts';
+import { bootHeadless, nodeHost } from '../main/serve.mts';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const P = '88888888-8888-4888-8888-888888888888';

@@ -22,12 +22,15 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun, IMPORT_FAILED, PLAIN_CLOUD_NOTE, CLOUD_NOTE, argvForTheCloud } from '../main/cloud/run.mjs';
-import { writeMarker, readMarker, cloudWorkPending } from '../main/cloud/marker.mjs';
+import { cloudRun, IMPORT_FAILED, PLAIN_CLOUD_NOTE, CLOUD_NOTE, argvForTheCloud } from '../main/cloud/run.mts';
+import { writeMarker, readMarker, cloudWorkPending } from '../main/cloud/marker.mts';
 import { noteImageCaps } from '../main/cloud/config.mjs';
-import { taskFolderPath } from '../main/task-folders.mjs';
+import { taskFolderPath } from '../main/task-folders.mts';
+import { fillNewThreadKit, NEW_THREAD, NEW_ITEM_MARK, newThreadKitKey, startPayload } from '../shared/cloud-kit.mjs';
+import { markerForCloudRun } from '../main/cloud/kit.mts';
+import { waitFor } from './waiting.mjs';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');
@@ -208,6 +211,32 @@ describe('a cloud run with no repository', () => {
     expect(argvForTheCloud(['-p'])).toEqual(['-p', '--append-system-prompt', CLOUD_NOTE]);
   });
 
+  it('packs a new phone thread without Git, runs it with the Mac shut, and brings its documents home', async () => {
+    fs.mkdirSync(configDir, { recursive: true });
+    const mcpFile = path.join(tmp, 'mac', 'mcp.json');
+    fs.writeFileSync(mcpFile, JSON.stringify({ mcpServers: { agentbox: { command: process.execPath, args: [FAKE_STORE], env: { FAKE_STORE_LOG: path.join(tmp, 'store.log') } } } }));
+    const env = { ...process.env, ZERO_ITEM: NEW_ITEM_MARK, ZERO_PRODUCT: 'notes', CLAUDE_CONFIG_DIR: configDir, AGENTBOX_HOME: path.join(tmp, 'mac', 'store'), AGENTBOX_DOCS: docs, AGENTBOX_CLOUD_MARKER: marker };
+    const common = { cwd: docs, storage: storage(), remoteCommand: process.execPath, stubPath: STUB, imageCaps: NOW_CAPS, watchParent: false, signals: new EventEmitter(), homeDir: path.join(tmp, 'home'), stdout: new PassThrough(), stderr: new PassThrough() };
+    const device = 'a1b2c3d4e5f6';
+    expect(await cloudRun({ ...common, argv: [FAKE_CLAUDE, '-p', '--output-format', 'stream-json', '--mcp-config', mcpFile], env, transport: transport(), login: LOGIN,
+      kit: { device, project: 'notes', item: NEW_THREAD, frame: { before: 'Re: ', after: '' }, newThread: { cwd: docs, brief: `IDLE DOCS:${docs}` } },
+    })).toBe(0);
+    const template = JSON.parse(objects.get(newThreadKitKey(device, 'notes')));
+    const { kit, prompt, refs } = fillNewThreadKit(template, { itemId: 'w-newphone' });
+    expect(kit).toMatchObject({ plain: true, cwd: docs, startSha: null });
+    expect(refs).toBeNull();
+    const runId = 'new-documents-run';
+    const payload = await startPayload(kit, { runId, getUrl: storage().getUrl, putUrl: storage().putUrl, loginName: (k) => `${s3Url}/${encodeURIComponent(k)}`, offlineAfterMs: 300, away: true });
+    expect((await transport().invoke('phone', payload)).ok).toBe(true);
+    await transport().invoke('phone', { action: 'stdin', runId, n: 1, data: Buffer.from(JSON.stringify({ type: 'user', message: { role: 'user', content: prompt } }) + '\n').toString('base64') });
+    await waitFor('the new documents thread to finish in the cloud', () => objects.has(`runs/${runId}/done.json`));
+    const place = { folder: docs, file: marker };
+    writeMarker(place, markerForCloudRun(kit, runId));
+    expect(await cloudRun({ ...common, importOnly: true, argv: [], env: { ...env, ZERO_ITEM: 'w-newphone' }, transport: transport(), login: null, resultsWaitMs: 8000 })).toBe(0);
+    expect(fs.readFileSync(path.join(docs, 'notes.md'), 'utf8')).toBe('the cloud wrote this\n');
+    expect(fs.existsSync(path.join(docs, '.git'))).toBe(false);
+  });
+
   it('is not sent to an image that has not said it takes one', async () => {
     const run = launch({ caps: ['offline', 'setup', 'kept', 'base'] });
     expect(await run.done).toBe(IMPORT_FAILED);
@@ -220,6 +249,8 @@ describe('a cloud run with no repository', () => {
     const run = launch({ answer: { ok: false, error: 'bad-start', message: 'branch is required' }, heard });
     expect(await run.done).toBe(IMPORT_FAILED);
     expect(heard).toEqual([[]]);
+    // In the words the supervisor reads as the image, not the cloud failing.
+    expect(run.err()).toMatch(/cannot take a project with no repository/);
     expect(readMarker({ folder: docs, file: marker })).toBe(null);
   });
 

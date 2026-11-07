@@ -2,7 +2,7 @@
 // EVERY THREAD THERE FIRST.
 //
 // Two things broke the "cloud when full" promise once main's memory gate
-// (main/start-hold.mjs) landed beside cloud runs (docs/cloud/PLAN.md):
+// (main/start-hold.mts) landed beside cloud runs (docs/cloud/PLAN.md):
 //   - a Mac with a free slot but no memory held the row, so it waited even
 //     though a cloud slot was free: the gate is about this Mac's memory and
 //     must never hold a cloud run;
@@ -17,8 +17,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { Supervisor } from '../main/supervisor.mjs';
-import { taskFolderPath } from '../main/task-folders.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { taskFolderPath } from '../main/task-folders.mts';
 
 let tmp; let repo; let folder; let product; let sup;
 const savedConfigEnv = process.env.AGENTBOX_CLOUD_CONFIG;

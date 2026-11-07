@@ -1,19 +1,31 @@
 // ALERTS AND THE ICON COUNT, ON A PHONE.
 //
-// The computer sends each alert (main/phone-link.mjs); this is the phone's
+// The computer sends each alert (main/phone-link.mts); this is the phone's
 // half. It registers the worker that shows alerts while the app is closed
 // (main/phone-sw.js), asks to turn them on when somebody taps for it, keeps the
 // icon's count while the app is open, and opens the thread an alert was about.
 //
 // iOS gives a web app alerts only when it was opened from the home screen and
-// only over https, which for this app is the Tailscale address. Each state the
+// only over https. Each state the
 // phone can be in has its own sentence, so a button never just does nothing.
 
 import { Name } from '../../shared/product-name.mjs';
+import { phoneSized } from './phone-screen';
 
 export type AlertsState = 'on' | 'off' | 'blocked' | 'needs-home-screen' | 'needs-secure' | 'unsupported';
 
+/** Who keeps this phone's subscription and sends to it: the computer serving
+ *  the page, or every computer of the account for the web app (cloud-alerts.ts). */
+export interface AlertsVia {
+  on(): Promise<boolean>;
+  key(): Promise<string>;
+  subscribe(sub: { endpoint: string; keys: { p256dh: string; auth: string } }): Promise<void>;
+  unsubscribe(): Promise<void>;
+  test(): Promise<boolean>;
+}
+
 let auth: { token: string; device: string } | null = null;
+let via: AlertsVia | null = null;
 let openItem: ((id: string) => void) | null = null;
 
 const IOS = () => /iPhone|iPad/.test(navigator.userAgent);
@@ -33,22 +45,27 @@ async function ask(action: string, extra: Record<string, unknown> = {}) {
   return said;
 }
 
-// THROUGH THE RELAY the page is already run by the relay's worker, which
-// carries every request to the Mac and handles alerts too (relay/phone/sw.mjs).
-// Registering /phone-sw.js over it would replace it and cut the phone off.
-const RELAY_WORKER = '/relay-sw.js';
-const worker = async () => {
-  const running = await navigator.serviceWorker.getRegistration('/');
-  if (running?.active?.scriptURL && new URL(running.active.scriptURL).pathname === RELAY_WORKER) return running;
-  return navigator.serviceWorker.register('/phone-sw.js', { scope: '/' });
+const computerServing: AlertsVia = {
+  on: async () => !!(await ask('state')).on,
+  key: async () => (await ask('key')).publicKey,
+  subscribe: async (subscription) => { await ask('subscribe', { subscription }); },
+  unsubscribe: async () => { await ask('unsubscribe'); },
+  test: async () => !!(await ask('test')).sent,
 };
 
+const keyOf = (sub: PushSubscription) => {
+  const k = sub.options?.applicationServerKey;
+  return k ? btoa(String.fromCharCode(...new Uint8Array(k))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') : null;
+};
+
+const worker = () => navigator.serviceWorker.register('/phone-sw.js', { scope: '/' });
+
 export async function alertsState(): Promise<AlertsState> {
-  if (!auth) return 'unsupported';
+  if (!via) return 'unsupported';
   if (!isSecureContext) return 'needs-secure';
   if (!pushable()) return IOS() && !standalone() ? 'needs-home-screen' : 'unsupported';
   if (Notification.permission === 'denied') return 'blocked';
-  try { return (await ask('state')).on && Notification.permission === 'granted' ? 'on' : 'off'; } catch { return 'off'; }
+  try { return (await via.on()) && Notification.permission === 'granted' ? 'on' : 'off'; } catch { return 'off'; }
 }
 
 /** Must run inside a tap: iOS only asks for permission from one. */
@@ -57,12 +74,15 @@ export async function turnOnAlerts(): Promise<AlertsState> {
   if (state !== 'off') return state;
   const allowed = await Notification.requestPermission();
   if (allowed !== 'granted') return allowed === 'denied' ? 'blocked' : 'off';
-  const { publicKey } = await ask('key');
+  const publicKey = await via!.key();
   const reg = await worker();
   await navigator.serviceWorker.ready;
-  const had = await reg.pushManager.getSubscription();
+  let had = await reg.pushManager.getSubscription();
+  // A subscription belongs to the key it was made with.
+  if (had && keyOf(had) !== publicKey) { await had.unsubscribe().catch(() => {}); had = null; }
   const sub = had ?? await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: fromBase64Url(publicKey) });
-  await ask('subscribe', { subscription: sub.toJSON() });
+  const json = sub.toJSON();
+  await via!.subscribe({ endpoint: json.endpoint!, keys: { p256dh: json.keys!.p256dh, auth: json.keys!.auth } });
   return 'on';
 }
 
@@ -71,19 +91,19 @@ export async function turnOffAlerts(): Promise<AlertsState> {
     const reg = await navigator.serviceWorker.getRegistration('/');
     await (await reg?.pushManager.getSubscription())?.unsubscribe();
   } catch { /* the computer forgets it either way */ }
-  await ask('unsubscribe');
+  await via?.unsubscribe();
   return 'off';
 }
 
 export async function testAlert(): Promise<boolean> {
-  return !!(await ask('test')).sent;
+  return !!(await via?.test());
 }
 
 export const ALERTS_SAY: Record<AlertsState, string> = {
   on: 'Alerts are on. This phone hears when an agent needs you, and the icon shows how many threads are waiting.',
   off: 'Get an alert when an agent needs you, and a count on the icon.',
   blocked: 'Alerts are blocked for this app. Turn them on in the phone\'s Settings, under Notifications.',
-  'needs-home-screen': 'To get alerts, add this page to your home screen (Share, then Add to Home Screen) and open it from there.',
+  'needs-home-screen': `To get alerts, add ${Name} to your home screen and open it from there. In Safari, tap Share, then Add to Home Screen.`,
   'needs-secure': 'Alerts need a secure connection. On the computer, open Settings, then Phone, pick Anywhere, and scan the new code.',
   unsupported: 'This browser cannot show alerts from a web app.',
 };
@@ -102,8 +122,9 @@ export function setIconCount(n: number) {
  * Called once by the bridge on the phone door. `open` opens a thread the way
  * the desktop's own notification does (`zero:open-item`).
  */
-export function startPhoneAlerts(given: { token: string; device: string }, open: (id: string) => boolean) {
-  auth = given;
+export function startPhoneAlerts(given: { token: string; device: string } | AlertsVia, open: (id: string) => boolean) {
+  if ('key' in given) via = given;
+  else { auth = given; via = computerServing; }
   openItem = (id) => {
     // The screen may not be listening yet on a cold start; try for a while.
     let tries = 0;
@@ -129,6 +150,8 @@ const DISMISSED = 'agentbox-alerts-not-now';
 
 /** One quiet line above the bottom bar, until it is answered. */
 async function offerAlerts() {
+  // A phone's offer; a laptop's browser keeps its own screen.
+  if (!phoneSized()) return;
   const state = await alertsState();
   if (state !== 'off' && state !== 'needs-home-screen') return;
   try { if (localStorage.getItem(DISMISSED) === state) return; } catch { /* private mode */ }

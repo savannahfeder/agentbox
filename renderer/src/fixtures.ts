@@ -14,6 +14,27 @@ const now = Date.now();
 const min = 60_000;
 const hr = 3_600_000;
 
+// An answer with its list written as a markdown table, the way agents write
+// one in a message. Invented figures.
+const TABLE_IN_A_MESSAGE = [
+  '**Stripe is the biggest by volume, about twice the next one.**',
+  '',
+  'Figures are each company\'s own latest yearly number, so treat close ones as tied.',
+  '',
+  '| # | Company | What they do | Volume per year | Stage | Website |',
+  '|---|---|---|---|---|---|',
+  '| 1 | Stripe | Online payments | ~$1.4T | Private | stripe.com |',
+  '| 2 | Adyen | Payments for large merchants | ~$1.2T | Public | adyen.com |',
+  '| 3 | Block | Square and Cash App | ~$240B | Public | block.xyz |',
+  '| 4 | Wise | Money sent abroad | ~$150B | Public | wise.com |',
+  '| 5 | Ramp | Corporate cards | ~$55B | Private | ramp.com |',
+  '| 6 | Brex | Corporate cards | ~$40B | Private | brex.com |',
+  '| 7 | Mercury | Business banking | ~$30B | Private | mercury.com |',
+  '| 8 | Plaid | Bank connections | $10B+ | Private | plaid.com |',
+  '',
+  'Just outside the list are Rippling and Deel, which move payroll rather than payments.',
+].join('\n');
+
 export const fixtureSnapshot: Snapshot = {
   products: [
     { slug: 'kestrel', dir: '/fixtures/kestrel', name: 'Kestrel', oneLiner: 'Collectible card games, made beautiful', repoPath: '/Users/you/Desktop/dev/kestrel' },
@@ -255,6 +276,23 @@ export const fixtureSnapshot: Snapshot = {
       progress: 'First row waits for your reply\nTests pass\nOn its branch, ready to merge',
     },
     {
+      // A TABLE WRITTEN IN THE MESSAGE, as markdown, which is drawn as one too.
+      id: 'w-t2', product: 'onboard', productName: 'Onboard', status: 'open', kind: 'question',
+      title: 'Biggest payment companies by volume',
+      body: TABLE_IN_A_MESSAGE,
+      labels: [], priority: 5, epoch: 1, claim: null,
+      createdAt: now - 40 * min, updatedAt: now - 9 * min,
+    },
+    {
+      // A TABLE: a lead list as a csv on a line of its own (w-690551d7ea).
+      id: 'w-t1', product: 'onboard', productName: 'Onboard', status: 'open', kind: 'question',
+      title: 'Fintech companies to reach out to',
+      body: '**Pick who I write to first, or tell me who to drop.**\n\nI put 16 fintech companies in a table with a note and a status for each. Two already have a meeting booked and two replied. I would start with the five marked New.\n\nleads/fintech-leads.csv',
+      labels: [], priority: 5, epoch: 1, claim: null,
+      createdAt: now - 30 * min, updatedAt: now - 5 * min,
+      problem: 'Building a list of fintech companies to reach out to. 16 so far, waiting on which to contact first.',
+    },
+    {
       // STOPPED: she answered, a worker took it, and that worker died without
       // finishing. Three of these were on her screen at once, which is what
       // resuming-by-selection is for. Needs you shows them, since nothing will
@@ -420,7 +458,7 @@ export const fixtureSnapshot: Snapshot = {
 
 /* --------------------------- the working notes --------------------------- */
 // Session traces, in the exact shape the supervisor writes them (main/
-// supervisor.mjs, traceStreamLine): "HH:MM:SS  " and then either the agent's
+// supervisor.mts, traceStreamLine): "HH:MM:SS  " and then either the agent's
 // own sentence or "[Tool] the thing it acted on", a "== RESULT" block at the
 // end, and an exit line. The notes panel reads nothing else, so a fixture in
 // this shape exercises the real parser rather than a stand-in for it.
@@ -528,6 +566,19 @@ export const fixtureHistory: Record<string, Array<Record<string, any>>> = {
         title: 'The first row a new project makes is fixed and needs your yes',
         status: 'open', kind: 'review', priority: 5,
         body: '**Merge the first row change, or pick different words for it.**\n\nMaking a project used to compose a row the fleet took as work, so an agent started before you had said anything. It asks now, and nothing runs until you reply.\n\nThe page shows the row before and after:\n\n/fixtures/onboard/designs/w-n13/the-first-row.html',
+      },
+    },
+  ],
+  'w-t2': [
+    { id: 'w-t2', ts: now - 9 * min, source: 'agent', patch: { title: 'Biggest payment companies by volume', status: 'open', kind: 'question', priority: 5, body: TABLE_IN_A_MESSAGE } },
+  ],
+  'w-t1': [
+    {
+      id: 'w-t1', ts: now - 5 * min, source: 'agent',
+      patch: {
+        title: 'Fintech companies to reach out to',
+        status: 'open', kind: 'question', priority: 5,
+        body: '**Pick who I write to first, or tell me who to drop.**\n\nI put 16 fintech companies in a table with a note and a status for each. Two already have a meeting booked and two replied. I would start with the five marked New.\n\nleads/fintech-leads.csv',
       },
     },
   ],
@@ -847,7 +898,7 @@ export const fixtureSettings = {
     sessionsAtOnce: 3,
     memoryGate: { on: false, slots: null, slotsAuto: 2, slotsMax: 12, now: null },
     leftovers: { on: false, now: 'Right now finished agents have left 40 programs running; turning this on stops them when you close their tasks.' },
-    // COPIES OF A PROJECT NOBODY'S TASK OWNS (main/settings.mjs,
+    // COPIES OF A PROJECT NOBODY'S TASK OWNS (main/settings.mts,
     // `strayFolderSettings`). A fixture because the row is absent whenever there
     // are none, which is most of the time and all of a fresh install: without
     // one there is no way to look at the sentence before it is true for somebody.
@@ -856,7 +907,7 @@ export const fixtureSettings = {
     running: 2,
     model: 'claude-opus-5',
     permission: 'bypassPermissions',
-    // What main sends when the config names none (main/settings.mjs,
+    // What main sends when the config names none (main/settings.mts,
     // `outsideAgentsMode`). Absent, the Running page drew an empty picker over
     // a sentence ending in "undefined".
     outsideAgents: 'off',
@@ -882,7 +933,7 @@ export const fixtureSettings = {
     claudeInstallUrl: 'https://code.claude.com/docs/en/setup',
     // AND THE SAME ONE CODING AGENT THE SNAPSHOT ABOVE REPORTS. Six keys, all
     // of them the answer a Mac with the gate shut really gives (main/
-    // settings.mjs): one choice, so the Coding agent row is not drawn and the
+    // settings.mts): one choice, so the Coding agent row is not drawn and the
     // Model row still speaks for every agent; and `codex` says Codex is not on
     // this Mac, because the Codex page is drawn on every Mac (w-d5d632e503)
     // and a Mac with Codex on it opens the choice. They are written out rather than left
@@ -986,9 +1037,14 @@ export const fixtureSettings = {
 //   ?engines=codex    two agents, workspace moved to Codex. The screen the
 //                     shipped bug was on.
 
-export type FixtureEngineWorld = 'missing' | 'claude' | 'codex' | 'nowhere' | 'chosen' | 'signedout' | 'ready';
+//   ?engines=installing  nothing on the machine and the install you pressed
+//                     still running. No url could draw that, which is how the
+//                     gate shipped asking you to press for the whole of one
+//                     (F-145).
 
-const ENGINE_WORLDS: FixtureEngineWorld[] = ['missing', 'claude', 'codex', 'nowhere', 'chosen', 'signedout', 'ready'];
+export type FixtureEngineWorld = 'missing' | 'claude' | 'codex' | 'nowhere' | 'chosen' | 'signedout' | 'ready' | 'installing';
+
+const ENGINE_WORLDS: FixtureEngineWorld[] = ['missing', 'claude', 'codex', 'nowhere', 'chosen', 'signedout', 'ready', 'installing'];
 
 /**
  * The world one url asks for, or null for the Mac she has. A word nothing
@@ -1003,7 +1059,7 @@ export function fixtureEngineWorld(asked: string | null): FixtureEngineWorld | n
  *
  * Not invented: these are the six that carry `visibility: "list"` in the
  * `models_cache.json` codex-cli maintains, in the CLI's own ascending
- * `priority` order, reduced to `{ id, label }` exactly as main/codex-models.mjs
+ * `priority` order, reduced to `{ id, label }` exactly as main/codex-models.mts
  * reduces them. Measured off a real 198,977-byte cache written by codex-cli
  * 0.148.0, which also carries two hidden models this list correctly drops.
  *
@@ -1051,9 +1107,9 @@ const OFF_THE_WORKSPACE: Record<'claude' | 'codex', Record<string, string>> = {
 // none: it is absent until a figure lands, and adding one would put a pill on
 // every picture ever taken of this app. The two shapes are genuinely different
 // and both are copied from the readers that produce them. Claude Code prints a
-// clock time in a named zone (shared/claude-usage.mjs); Codex prints no clock
+// clock time in a named zone (shared/claude-usage.mts); Codex prints no clock
 // time and names no zone, it hands over the instant, so every text field is
-// null (shared/codex-usage.mjs). The Codex percentages are the ones in that
+// null (shared/codex-usage.mts). The Codex percentages are the ones in that
 // file's own recorded capture.
 const CLAUDE_LIMITS: NonNullable<Snapshot['usage']>['limits'] = [
   {
@@ -1138,7 +1194,7 @@ export function fixtureEngineSettings(world: FixtureEngineWorld | null): Partial
     return {
       claudeFound: false, claudeCertain: true, claudeBin: '/Users/you/.local/bin/claude',
       // THE THREE FLAT KEYS THE WALK'S LAST CARD READS, which no fixture world
-      // had set before. `codexFoundState` in main/settings.mjs sends them
+      // had set before. `codexFoundState` in main/settings.mts sends them
       // alongside the `codex` object below, and App.tsx reads THEM rather than
       // the object -- so a world that set only the object left `codexCertain`
       // undefined, `noCodingAgent` false, and the gate undrawable in fixtures.
@@ -1170,7 +1226,7 @@ export function fixtureEngineSettings(world: FixtureEngineWorld | null): Partial
     // She has set no workspace Codex model, so the row draws her config.toml's
     // own and nothing is sent at spawn. That is what her Mac says today.
     codexModel: null,
-    // Main's own default when the config names no mode (main/settings.mjs),
+    // Main's own default when the config names no mode (main/settings.mts),
     // and the one login a Codex Mac has. Without them the Codex page drew an
     // empty picker and no account.
     codexMode: CODEX_DEFAULT_MODE,
@@ -1198,7 +1254,9 @@ export function fixtureSecondEngine(snap: Snapshot, world: FixtureEngineWorld | 
   // already up (w-ce8c1a9275).
   // `ready` belongs with them: it says what is on the machine, not which agent
   // any row runs on.
-  if (!world || world === 'missing' || world === 'nowhere' || world === 'chosen' || world === 'signedout' || world === 'ready') return snap;
+  // `installing` belongs with them too: it is the gate waiting on a machine
+  // with nothing on it, and there are no rows behind it yet.
+  if (!world || world === 'missing' || world === 'nowhere' || world === 'chosen' || world === 'signedout' || world === 'ready' || world === 'installing') return snap;
   const byItem = OFF_THE_WORKSPACE[world];
   const engineOf = (id: string) => byItem[id] ?? world;
   return {
@@ -1241,7 +1299,7 @@ export function fixtureConversation() {
 }
 
 // A plausible set of Claude Code agent files, in the shape
-// main/agent-files.mjs reads them: four of the user's own and four in one
+// main/agent-files.mts reads them: four of the user's own and four in one
 // project. It stands in for the real ones when there is no main process.
 export function fixtureAgentFiles() {
   return {
@@ -1262,7 +1320,7 @@ export function fixtureAgentFiles() {
 }
 
 // A plausible set of Claude Code threads, in the shape
-// main/agent-sessions.mjs reads them.
+// main/agent-sessions.mts reads them.
 //
 // `when` is written as an offset from the moment the fixture is asked for, so
 // the row under each name ("today", "yesterday", "on Monday") stays true rather

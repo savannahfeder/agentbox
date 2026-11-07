@@ -15,6 +15,10 @@
 // state machine and only ever looks at two places: inside a string literal,
 // and in the plain text between JSX tags. Comments are skipped, which is the
 // whole point, and they stay free to use the character as much as they like.
+//
+// 2026-10-31: the search fold table moved from renderer/src/search.ts to
+// shared/word-match.mjs, and shared/thread-title.mjs cuts a title at a dash,
+// so both are named in ALLOWED as strippers.
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -30,7 +34,7 @@ const EM_DASH = '—';
 // by another name. `fixtures.ts` IS included, because she never runs on
 // fixtures but every screenshot an agent sends her is drawn from them.
 const ROOTS = ['renderer/src', 'main', 'shared'];
-const EXTS = new Set(['.ts', '.tsx', '.mjs', '.js']);
+const EXTS = new Set(['.ts', '.tsx', '.mjs', '.mts', '.js']);
 
 // THE ONES THAT STAY, EACH A DECISION AND NOT AN OVERSIGHT. Matched on the
 // fragment rather than a line number, so the allowance cannot drift onto some
@@ -43,15 +47,15 @@ const ALLOWED = [
       + 'cannot be misread as a zero. Not punctuation in a sentence.',
   },
   {
-    file: 'shared/claude-commands.generated.mjs',
+    file: 'shared/claude-commands.generated.mts',
     fragment: 'Set a goal',
     why: "Claude Code's own words, read out of the installed binary by the build "
       + '(w-23a7b3f568). Editing it here is undone by the next build and makes '
       + 'the record stop matching the binary. Stripped at the render boundary '
-      + 'instead, by commandHint in shared/claude-commands.mjs.',
+      + 'instead, by commandHint in shared/claude-commands.mts.',
   },
   {
-    file: 'main/main.mjs',
+    file: 'main/main.mts',
     fragment: 'recovery',
     why: 'A console.log to the terminal. She never sees it.',
   },
@@ -59,13 +63,13 @@ const ALLOWED = [
   // reads, and every one exists to TAKE the character out. A guard that made
   // them give up their dash would be a guard that switched the strippers off.
   {
-    file: 'shared/claude-commands.mjs',
+    file: 'shared/claude-commands.mts',
     fragment: 'menuDescription',
     why: 'commandHint, which is what takes the dash out of the slash menu as it '
       + 'draws each line. The dash in it is the thing being removed.',
   },
   {
-    file: 'shared/dashboard.mjs',
+    file: 'shared/dashboard.mts',
     fragment: '.replace(',
     why: 'The same removal on the dashboard side. The dash in it is the pattern, '
       + 'not a word.',
@@ -78,16 +82,42 @@ const ALLOWED = [
       + 'A dash is one of the marks it removes.',
   },
   {
-    file: 'renderer/src/search.ts',
+    file: 'shared/word-match.mjs',
     fragment: "'—': '-'",
     why: "The fold table, so a search for a hyphen still finds a row somebody "
       + 'else typed with a dash in it. Removing this would make search worse, '
       + 'not cleaner.',
   },
   {
-    file: 'renderer/src/search.ts',
+    file: 'shared/word-match.mjs',
     fragment: 'toLowerCase',
     why: 'The character class the fold table is applied through. Same reason.',
+  },
+  {
+    file: 'shared/thread-title.mjs',
+    fragment: 't = t.split(',
+    why: 'shortTitle, which ends a fallback title at the first clause; a dash '
+      + 'between words is one of the marks a clause ends on, and is cut off.',
+  },
+  {
+    file: 'shared/cloud-keys.mjs',
+    fragment: 'const ASK_LINE',
+    why: "The line a cloud run asks for a key on. The dash is in the class of "
+      + "marks allowed between the key's name and what it is for, so that an "
+      + 'agent that wrote one does not end up with it inside the field label.',
+  },
+  {
+    file: 'shared/cloud-needs.mjs',
+    fragment: 'const tidy',
+    why: 'tidy, which takes the punctuation off the front of what a need says '
+      + 'it is for. A dash is one of the marks it removes.',
+  },
+  {
+    file: 'renderer/src/format.ts',
+    fragment: 'AGENTBOX-NEEDS-A-KEY',
+    why: 'flatten, which rewrites that marked line as the words it asks for. '
+      + 'Same class of marks as the pattern in shared/cloud-keys.mjs, matched '
+      + 'here so the dash never reaches the row.',
   },
 ];
 

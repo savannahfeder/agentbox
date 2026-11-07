@@ -1,6 +1,6 @@
 // A MODEL SHE PICKED FOR CODEX NEVER RUNS ON CLAUDE CODE.
 //
-// THE MIRROR THAT WAS MISSING. `codexModelRefusal` (main/supervisor.mjs, and
+// THE MIRROR THAT WAS MISSING. `codexModelRefusal` (main/supervisor.mts, and
 // tests/a-model-she-picked-for-codex-is-honoured-or-the-run-says-why.test.mjs)
 // stops a CLAUDE alias reaching a CODEX run. Nothing stopped the other
 // direction, and the other direction is the one that happens by itself:
@@ -58,7 +58,7 @@
 // is the staleness-banner failure again (CLAUDE.md, 2026-08-12).
 //
 // AND HER REPLY IS NOT SWALLOWED BY THE REFUSAL. The queue writes the delivery
-// mark BEFORE it calls `spawnWorker` (main/supervisor.mjs, the fresh-work
+// mark BEFORE it calls `spawnWorker` (main/supervisor.mts, the fresh-work
 // pass), and that mark is persisted in the supervisor's state. A refusal that
 // left it standing would mean her words were recorded as delivered to a worker
 // that never existed, which is the exact failure CLAUDE.md is built around. So
@@ -86,9 +86,9 @@ vi.mock('../main/account-tooling.mjs', async (importActual) => {
   return { ...actual, linkAccountTooling: () => null };
 });
 
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { foldWorkItems } from '../shared/work-items.mjs';
-import { modelForEngine } from '../shared/engines.mjs';
+import { modelForEngine, DEFAULT_CLAUDE_MODEL } from '../shared/engines.mjs';
 
 const CLAUDE_BIN = '/nonexistent/claude-code/claude';
 const CODEX_BIN = '/nonexistent/codex/codex';
@@ -260,15 +260,33 @@ describe('a codex row carrying a codex model, on a mac with no codex', () => {
 
 /* ===================== the boundaries either side of it ================== */
 
+describe('a legacy phone model on Codex', () => {
+  it('explains a legacy phone Claude alias before starting Codex or blaming its plan', () => {
+    const sup = build({ codex: true, engine: 'codex' });
+    sup.spawnWorker(row({ model: 'opus' }));
+    expect(spawns).toEqual([]);
+    expect(sup.written).toHaveLength(1);
+    expect(sup.written[0].patch.result).toContain('Claude Code');
+    expect(sup.written[0].patch.result).toContain('opus');
+    expect(sup.written[0].patch.result).not.toContain("account's plan");
+    expect(sup.written[0].patch.result).toBe('This task chose Claude Code model "opus", but this computer would run it with Codex. Nothing has been done. Pick a Codex model to continue, or use a computer with Claude Code.');
+  });
+});
+
 describe('what is not refused', () => {
   // THE FALLBACK ITSELF, WHICH IS CORRECT AND STAYS. A row marked for Codex on
   // her laptop, read on a Mac without it, still gets worked.
+  // It runs on the model the app names, which is what every Claude Code run
+  // with nothing on its row is pinned to since 2026-11-04
+  // (tests/a-run-nobody-picked-a-model-for-is-on-the-model-the-card-names).
+  // There is still no word of hers being swallowed here: this row names a
+  // model for neither engine.
   it('runs a codex row that names no model, on claude code, saying nothing', () => {
     const sup = build();
     sup.spawnWorker(row({ engine: 'codex' }));
 
     expect(claudeArgs()).toHaveLength(1);
-    expect(modelFlag(claudeArgs()[0])).toBe(null);
+    expect(modelFlag(claudeArgs()[0])).toBe(DEFAULT_CLAUDE_MODEL);
     expect(sup.written).toEqual([]);
   });
 

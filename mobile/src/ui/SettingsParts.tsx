@@ -1,7 +1,7 @@
 // Settings' pieces, as the phone layout draws the desktop's (`.set-*` in
 // renderer/src/components/settings.css and phone.css): a page's title, plates
 // of rows, and at a row's end a switch, a chip that opens a sheet, or a stepper.
-import { router } from 'expo-router';
+import { router } from '../lib/router';
 import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,19 +9,25 @@ import Svg, { Path } from 'react-native-svg';
 import type { Reading } from '../lib/settings-view';
 import { Back, Caret } from './icons';
 import { Sheet, SheetHead, SheetRow, T, Wall } from './parts';
-import { color, font, size } from './theme';
+import { color, corner, font, size } from './theme';
 
-export function Page({ title, lede, back = 'Settings', children }: { title: string; lede?: string; back?: string; children: ReactNode }) {
+export function Page({ title, lede, back = 'Settings', right, head, children }: { title: string; lede?: string; back?: string; /** At the right of the Back row. */ right?: ReactNode; /** Takes the Back row's place (Settings' search field). */ head?: ReactNode; children: ReactNode }) {
   const inset = useSafeAreaInsets();
   const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
   return (
     <Wall>
       <View style={{ paddingTop: inset.top }}>
-        <View style={{ height: size.topBar, flexDirection: 'row', alignItems: 'center', paddingLeft: size.inset, paddingRight: 8 }}>
-          <Pressable onPress={leave} accessibilityRole="button" style={{ height: 40, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 10 }}>
-            <Back size={14} />
-            <T style={{ fontSize: 13, letterSpacing: 0.52, color: color.dim }}>{back}</T>
-          </Pressable>
+        <View style={{ height: size.topBar, flexDirection: 'row', alignItems: 'center', paddingLeft: head ? 12 : size.inset, paddingRight: head ? 12 : 8 }}>
+          {head ?? (
+            <>
+              <Pressable onPress={leave} accessibilityRole="button" style={{ height: 40, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 10 }}>
+                <Back size={14} />
+                <T style={{ fontSize: 13, letterSpacing: 0.52, color: color.dim }}>{back}</T>
+              </Pressable>
+              <View style={{ flex: 1 }} />
+              {right}
+            </>
+          )}
         </View>
       </View>
       <ScrollView contentContainerStyle={{ paddingTop: 20, paddingHorizontal: size.inset, paddingBottom: 40 + inset.bottom }}>
@@ -51,7 +57,7 @@ export function Row({ label, desc, control, first = false, reading, badge, stack
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <T style={{ fontSize: 13.5, fontFamily: font.medium, letterSpacing: -0.04 }}>{label}</T>
-          {badge ? <T style={{ fontSize: 11, color: color.dim, borderWidth: 1, borderColor: color.line, paddingHorizontal: 6, paddingVertical: 1 }}>{badge}</T> : null}
+          {badge ? <T style={{ fontSize: 11, color: color.dim, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, paddingHorizontal: 6, paddingVertical: 1 }}>{badge}</T> : null}
         </View>
         {desc ? <T style={{ fontSize: 12.5, lineHeight: 18.75, color: color.faint, marginTop: 3 }}>{desc}</T> : null}
         {note ? (
@@ -81,7 +87,7 @@ export function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boo
 export function Chip({ label, now, onPress }: { label: string; now: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${label}: ${now}`}
-      style={({ pressed }) => ({ height: 28, maxWidth: 240, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderColor: pressed ? color.lineStrong : color.line, backgroundColor: color.fill })}>
+      style={({ pressed }) => ({ height: 28, maxWidth: 240, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderRadius: corner.small, borderColor: pressed ? color.lineStrong : color.line, backgroundColor: color.fill })}>
       <T numberOfLines={1} style={{ fontSize: 13, flexShrink: 1 }}>{now}</T>
       <Caret size={11} tint={color.faint} />
     </Pressable>
@@ -118,7 +124,7 @@ export function Stepper({ value, min, max, onChange, label }: { value: number; m
     </Pressable>
   );
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: color.lineStrong }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong }}>
       {chip(value - 1, 'M2.5 6h7', value <= min, 'fewer')}
       <T style={{ width: 28, textAlign: 'center', fontSize: 13.5, fontFamily: font.medium }}>{value}</T>
       {chip(value + 1, 'M2.5 6h7M6 2.5v7', value >= max, 'more')}
@@ -130,7 +136,7 @@ export function Stepper({ value, min, max, onChange, label }: { value: number; m
 export function Button({ title, onPress, disabled }: { title: string; onPress: () => void; disabled?: boolean }) {
   return (
     <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button"
-      style={({ pressed }) => ({ height: 28, paddingHorizontal: 11, justifyContent: 'center', borderWidth: 1, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: disabled ? 0.5 : 1 })}>
+      style={({ pressed }) => ({ height: 28, paddingHorizontal: 11, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: disabled ? 0.5 : 1 })}>
       <T style={{ fontSize: 13, color: color.dim }}>{title}</T>
     </Pressable>
   );

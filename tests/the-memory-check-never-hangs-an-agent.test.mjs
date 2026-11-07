@@ -24,8 +24,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { MemoryGateServer } from '../main/memory-gate-server.mjs';
-import { CommandHistory } from '../main/memory-gate-history.mjs';
+import { MemoryGateServer } from '../main/memory-gate-server.mts';
+import { CommandHistory } from '../main/memory-gate-history.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const HOOK = path.join(root, 'scripts', 'memory-gate-hook.sh');

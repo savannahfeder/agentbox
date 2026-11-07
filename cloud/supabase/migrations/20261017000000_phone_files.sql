@@ -1,5 +1,5 @@
 -- THE PICTURES, FILMS, SOUNDS AND PAGES YOUR THREADS NAME, FOR YOUR PHONE WITH
--- THE COMPUTER CLOSED (main/phone-uploads.mjs).
+-- THE COMPUTER CLOSED (main/phone-uploads.mts).
 --
 -- A private bucket. Each person's files are in a folder named by their own id,
 -- under the computer that sent them: `<owner>/<device>/<sha256>.<ext>`. Only

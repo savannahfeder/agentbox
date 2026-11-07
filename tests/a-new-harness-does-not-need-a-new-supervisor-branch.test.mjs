@@ -3,11 +3,11 @@
 // real transports, login isolation, old records, and unsupported operations.
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { createHarnessRegistry, harnessFor, HARNESS_OPERATIONS } from '../main/harnesses.mjs';
+import { createHarnessRegistry, harnessFor, HARNESS_OPERATIONS } from '../main/harnesses.mts';
 import { harnessDefinition } from '../shared/harness-definitions.mjs';
-import { installCommand, signInCommand, statusCommand } from '../main/engine-setup.mjs';
-import { signInFiles } from '../main/sign-in-files.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { installCommand, signInCommand, statusCommand } from '../main/engine-setup.mts';
+import { signInFiles } from '../main/sign-in-files.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 describe('one adapter boundary for every harness', () => {
   it('keeps missing engines on Claude but refuses an unknown explicit engine', () => {

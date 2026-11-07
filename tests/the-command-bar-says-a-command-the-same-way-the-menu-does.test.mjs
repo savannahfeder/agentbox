@@ -29,8 +29,10 @@ describe('a command offered in both places', () => {
     place: 'cloud', open: { summary: 'shut', change: true },
   }));
 
-  it('reads the same on both, for the place a thread runs in', () => {
-    expect(bar.place).toBe(menu.place);
+  // Where it runs left the ⋯ menu for the top bar's place button on
+  // 2026-10-29; ⌘K reads the same words that button's choices are named for.
+  it('reads the place a thread runs in off the one table', () => {
+    expect(menu.place).toBeUndefined();
     expect(bar.place).toBe(PLACE_ROW.cloud.label);
   });
 

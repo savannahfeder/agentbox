@@ -1,7 +1,7 @@
 // A FILE HER PHONE SENT WITH A REPLY OR A NEW THREAD: put in her storage, in
 // the folder of the computer the thread is on, named by what is in it
 // (renderer/src/phone-sends-files.ts), and linked in her words. The computer
-// (main/phone-inbox.mjs) and the cloud server (cloud/gateway/phone.mjs) each
+// (main/phone-inbox.mts) and the cloud server (cloud/gateway/phone.mjs) each
 // put it in the project's attachments under the same name, made from what is
 // in it, so a turn the cloud ran and the row the computer keeps link one file.
 
@@ -14,7 +14,7 @@ export function phoneFilesIn(text) {
   return [...String(text ?? '').matchAll(PHONE_FILE)].map((m) => ({ link: m[0], picture: m[1] === '!', label: m[2], name: m[3] }));
 }
 
-/** The name it goes under, as main/save-attachments.mjs makes one safe. */
+/** The name it goes under, as main/save-attachments.mts makes one safe. */
 export const phoneFileSafeName = (f) => String(String(f.label ?? '').trim() || f.name).replace(/[^\w.-]+/g, '-').slice(0, 80);
 
 /** Where it goes in the project's documents folder: the same file, the same place. */

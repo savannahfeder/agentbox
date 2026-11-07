@@ -1,4 +1,4 @@
-import {limitRows} from '../../../shared/usage.mjs';
+import {limitRows} from '../../../shared/usage.mts';
 import {agoQuiet} from '../format';
 import type {Usage} from '../types';
 export function UsageOverview({readings,now}: {readings:Usage[];now:number}) {

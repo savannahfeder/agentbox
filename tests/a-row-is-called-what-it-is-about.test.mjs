@@ -22,7 +22,7 @@
 import { describe, it, expect } from 'vitest';
 import { foldWorkItems, WORK_ITEM_FIELDS } from '../shared/work-items.mjs';
 import { rowTitle } from '../renderer/src/list-rules';
-import { cleanName, namePrompt, wantsName, NAME_MAX } from '../main/row-label.mjs';
+import { cleanName, namePrompt, wantsName, NAME_MAX } from '../main/row-label.mts';
 
 const line = (patch, { id = 'w-1', ts = 1000, source = 'agent' } = {}) => ({ id, ts, source, patch });
 
@@ -58,9 +58,9 @@ describe('what the list calls a row', () => {
       .toBe('The positioning line');
   });
 
-  it('draws her title when there is not, which is every row until one is named', () => {
+  it('draws her title, held to a few words, when there is not, which is every row until one is named', () => {
     expect(rowTitle({ title: 'I can no longer open the settings page.' }))
-      .toBe('I can no longer open the settings page.');
+      .toBe('Cannot open the settings page');
   });
 
   it('NEVER draws a nameless row, whatever whitespace arrives in the field', () => {

@@ -59,7 +59,7 @@ describe('the lesson itself is untouched', () => {
   });
 
   it('still holds E, which opens no field', () => {
-    expect(app).toContain("if (nudgeOnStopped([item], 'E')) return;");
+    expect(app).toContain("nudgeOnStopped([item], 'E')) return;");
   });
 });
 

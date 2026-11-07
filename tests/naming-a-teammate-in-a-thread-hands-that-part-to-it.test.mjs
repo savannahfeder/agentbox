@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const FELIX = { id: 't-felix00001', name: 'Felix', status: 'active' };
 const DRAFT = { id: 't-draft00001', name: 'Iris', status: 'draft' };
@@ -26,6 +26,15 @@ describe('a teammate named in a thread', () => {
     expect(block).toMatch(/Felix/);
     expect(block).toMatch(/team_pass/);
     expect(block).toMatch(/do not do that part yourself/);
+  });
+
+  // "@Felix learn from this thread" is how a thread that went well teaches a
+  // teammate: the hand-off carries this thread's id, and the teammate's run is
+  // given the thread whole (a-teammate-works-from-one-method...).
+  it('tells the thread\'s agent to put this thread\'s id in the hand-off', () => {
+    const block = make().namedThreadsBlock(thread, { slug: 'p' }, ['@Felix learn how I want bugs filed from this thread']);
+    expect(block).toContain('w-1');
+    expect(block).toMatch(/learn from this thread/);
   });
 
   it('says nothing for a name that is no started teammate, an email, or no name at all', () => {

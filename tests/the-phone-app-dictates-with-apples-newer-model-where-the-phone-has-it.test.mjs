@@ -17,7 +17,7 @@
 // leave no microphone on.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { dictation, engineFor } from '../mobile/src/lib/dictation';
+import { dictation, engineFor } from '../renderer/src/dictation';
 import { phoneSpeechOf } from '../mobile/src/lib/speech-engines';
 
 const src = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');

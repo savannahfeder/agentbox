@@ -9,14 +9,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamService } from '../main/team/index.mjs';
+import { Store } from '../main/store.mts';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
-import { applyThrough } from '../main/phone-inbox.mjs';
+import { applyThrough } from '../main/phone-inbox.mts';
 import { loadConfig } from '../main/config.mjs';
-import { readSettings, setProjectSetting, setWorkspaceSetting } from '../main/settings.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { readSettings, setProjectSetting, setWorkspaceSetting } from '../main/settings.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 let cloud, me, store, service, onPhone, calls, dir, phone;
 
@@ -37,7 +37,7 @@ beforeEach(async () => {
   const channels = new Map([
     ['zero:answer', async (_e, args) => { calls.push(['zero:answer', args]); return { id: args.id }; }],
     ['zero:snooze', async (_e, args) => { calls.push(['zero:snooze', args]); return { id: args.id }; }],
-    ['zero:compose', async (_e, args) => { calls.push(['zero:compose', args]); return { id: 'w-new' }; }],
+    ['zero:compose', async (_e, args) => { calls.push(['zero:compose', args]); return store.composeItem(args.product, args); }],
   ]);
   service = createTeamService({
     session: memorySession(() => memoryBackend(cloud, me)),
@@ -123,6 +123,10 @@ describe('her choice is hers', () => {
 });
 
 describe('what her phone left goes through the window\'s own handlers', () => {
+  // Sent a minute ago, past the phone's Undo, which her Mac waits out
+  // (tests/undo-on-the-phone-works-because-the-mac-waits-for-it).
+  beforeEach(() => { cloud.now = () => Date.now() - 60_000; });
+
   it('a reply, a close, a snooze and a new thread, each to its handler', async () => {
     const a = store.composeItem('alpha', { title: 'Fix the login page', body: 'It loops.' });
     await phone.addPhoneCommand({ device: await device(), project: 'alpha', item: a.id, kind: 'reply', payload: { text: 'Use the new cookie.' } });

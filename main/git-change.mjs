@@ -115,6 +115,75 @@ export function snapshotRepo(cwd) {
   return { root, head, before, at: Date.now() };
 }
 
+// The branch a task branch is cut from, in the order worth trying. A checkout
+// with no remote (every repository the QA box makes) still has `main` or
+// `master` locally, and that is the whole reading there.
+const CUT_FROM = ['refs/remotes/origin/HEAD', 'refs/remotes/origin/main', 'refs/remotes/origin/master', 'refs/heads/main', 'refs/heads/master'];
+
+/** The commit this branch was cut from, or null where there is nothing to be
+ *  ahead of: no default branch, or a checkout sitting on it. */
+function cutFrom(root) {
+  const here = tryGit(root, ['rev-parse', '--abbrev-ref', 'HEAD'])?.trim();
+  for (const ref of CUT_FROM) {
+    const sha = tryGit(root, ['rev-parse', '--verify', '--quiet', ref])?.trim();
+    if (!sha) continue;
+    const name = ref.replace(/^refs\/(?:heads|remotes)\//, '');
+    if (here && (here === name || `origin/${here}` === name)) return null;
+    const base = tryGit(root, ['merge-base', 'HEAD', sha])?.trim();
+    if (base) return base;
+  }
+  return null;
+}
+
+/**
+ * WHETHER THERE IS ANYTHING HERE TO SHIP, read when the run ends.
+ *
+ * Two facts, and both are about the FOLDER rather than about the run: a
+ * thread's second round answers a question and commits nothing while the first
+ * round's commit is still sitting there unshipped, and a round that discards
+ * the work leaves a folder with nothing in it either way.
+ *
+ * `committed` is whether this branch holds a commit the branch it was cut from
+ * does not. `uncommitted` is whether anything is still loose in the tree.
+ * Either comes back null where it cannot be read honestly — no repository, a
+ * folder already let go, or a checkout on the default branch itself — and null
+ * is what makes the offer fall back to the one it made before this existed.
+ */
+export function whereTheWorkStands(root) {
+  const unread = { committed: null, uncommitted: null };
+  if (!root) return unread;
+  const status = tryGit(root, ['status', '--porcelain']);
+  if (status === null) return unread;
+  const uncommitted = status.trim() !== '';
+  const head = tryGit(root, ['rev-parse', '--verify', '--quiet', 'HEAD'])?.trim();
+  if (!head) return { committed: false, uncommitted };
+  const base = cutFrom(root);
+  if (!base) return { committed: null, uncommitted };
+  const ahead = tryGit(root, ['rev-list', '--count', `${base}..HEAD`])?.trim();
+  if (ahead === null || ahead === undefined || ahead === '') return { committed: null, uncommitted };
+  return { committed: Number(ahead) > 0, uncommitted };
+}
+
+/**
+ * WHETHER GIT HERE CAN NAME AN AUTHOR, read when the run ends.
+ *
+ * Deliberately the same strict form of the question main/worker-git.mts makes
+ * every worker ask: `user.useConfigOnly` turns off the identity git makes up
+ * out of the account and the host name, so a yes here means the worker gets a
+ * yes too. A looser reading would leave the app recommending a commit the
+ * worker then refuses to make, which is the loop a new user's first task ended
+ * in (F-139).
+ *
+ * Null where there is nothing to read, which is every product with no
+ * repository, and null leaves the offer where it was.
+ */
+export function gitKnowsYou(root) {
+  if (!root) return null;
+  if (tryGit(root, ['rev-parse', '--git-dir']) === null) return null;
+  const named = (who) => tryGit(root, ['-c', 'user.useConfigOnly=true', 'var', who]) !== null;
+  return named('GIT_AUTHOR_IDENT') && named('GIT_COMMITTER_IDENT');
+}
+
 /**
  * WHERE A HUNK STARTS IN EACH FILE, off its `@@` header —.
  *
@@ -260,7 +329,10 @@ function patchBetweenTexts(before, after) {
  *   every line green.
  */
 export function changeFromRepo(snapshot) {
-  if (!snapshot?.root) return { files: [], plus: 0, minus: 0, root: snapshot?.root ?? null };
+  if (!snapshot?.root) {
+    const root = snapshot?.root ?? null;
+    return { files: [], plus: 0, minus: 0, root, stands: whereTheWorkStands(root), knowsYou: gitKnowsYou(root) };
+  }
   const { root, head, before } = snapshot;
   const files = new Map();
   const add = (file) => {
@@ -321,6 +393,12 @@ export function changeFromRepo(snapshot) {
     plus: out.reduce((n, f) => n + f.plus, 0),
     minus: out.reduce((n, f) => n + f.minus, 0),
     root,
+    // Whether any of this reached a commit, which the hunks above cannot say
+    // and the ship offer has to know (renderer/src/ship-offer.ts).
+    stands: whereTheWorkStands(root),
+    // And whether a commit could be made here at all, which decides what the
+    // offer over loose work asks for (renderer/src/ship-offer.ts).
+    knowsYou: gitKnowsYou(root),
     // When the photograph was taken, which is the run's own start and the only
     // honest answer to "how long did this take" for a run whose conversation
     // carried no edits at all.

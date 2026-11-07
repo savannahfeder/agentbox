@@ -51,6 +51,27 @@ describe('the cloud sign-in screen', () => {
   });
 });
 
+// AND THE HEADING STANDS ON ITS OWN (2026-10-26, w-aaedc8f711). "Then your
+// agents run in the cloud." sat under Create your account: "it just feels a
+// little cluttered with text". The heading says what the card is for, and
+// both tabs keep the same height without it.
+describe('the cloud card has no line under its heading', () => {
+  const signIn = draw({ purpose: 'cloud', onClose: () => {} });
+  const signUp = draw({ purpose: 'cloud', startOn: 'sign-up', onClose: () => {} });
+  it('on either tab', () => {
+    expect(signIn).not.toContain('si-lede');
+    expect(signUp).not.toContain('si-lede');
+    expect(text(signUp)).not.toContain('Then your agents run in the cloud');
+  });
+  it('so the heading carries the gap the line used to leave', () => {
+    expect(css).toMatch(/\.si-card:not\(:has\(\.si-lede\)\) h1 \{[^}]*margin-bottom/);
+  });
+  it('and the team and phone sign-ins keep theirs, which say what they get you', () => {
+    expect(draw({ purpose: 'team' })).toContain('si-lede');
+    expect(draw({ purpose: 'phone', onClose: () => {} })).toContain('si-lede');
+  });
+});
+
 describe('the line is set to be read', () => {
   const rule = (sel) => css.slice(css.indexOf(`${sel} {`), css.indexOf('}', css.indexOf(`${sel} {`)));
   it('in the dimmer body colour, not the faintest', () => {

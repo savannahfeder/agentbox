@@ -8,9 +8,9 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { alphaFeatures, setWorkspaceSetting } from '../main/settings.mjs';
+import { alphaFeatures, setWorkspaceSetting } from '../main/settings.mts';
 import { SETTINGS_PAGES, searchSettings } from '../renderer/src/settings-search.ts';
-import { REQUEST_CHANNELS, PUSH_CHANNELS, DESKTOP_ONLY } from '../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS, PUSH_CHANNELS, DESKTOP_ONLY } from '../shared/bridge-map.mts';
 import { phoneSettingsOf } from '../shared/phone-settings.mjs';
 
 const root = path.join(import.meta.dirname, '..');
@@ -44,8 +44,8 @@ describe('Neo is gone from the code', () => {
   });
 
   it('the microphone helper voice notes use is still there', () => {
-    expect(fs.existsSync(path.join(root, 'main/mic.mjs'))).toBe(true);
-    expect(fs.readFileSync(path.join(root, 'main/main.mjs'), 'utf8')).toMatch(/import \{ getMic \} from '\.\/mic\.mjs'/);
+    expect(fs.existsSync(path.join(root, 'main/mic.mts'))).toBe(true);
+    expect(fs.readFileSync(path.join(root, 'main/main.mts'), 'utf8')).toMatch(/import \{ getMic \} from '\.\/mic\.mts'/);
   });
 
   it('no bridge channel is about it', () => {
@@ -81,6 +81,7 @@ describe('nothing a person sees offers it', () => {
 
   it('the phone is not handed a Neo switch', () => {
     const model = { ok: true, workspace: { alpha: { neo: true, rooms: true } }, projects: [] };
-    expect(phoneSettingsOf(model, { version: '1.0.0' }).workspace.alpha).toEqual({ rooms: true });
+    // The phone has Teammates and Multiplayer too since w-40b72c3f35; Neo is never among them.
+    expect(phoneSettingsOf(model, { version: '1.0.0' }).workspace.alpha).toEqual({ rooms: true, teammates: false, multiplayer: false });
   });
 });

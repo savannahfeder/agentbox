@@ -20,7 +20,7 @@
 // WHAT IT REALLY DOES, and this is the part that is not pretend:
 //
 //   IT ANSWERS ON THE REAL STDOUT CONTRACT. `session_id` on its first line and
-//   a `type: "result"` frame at the end are exactly what main/supervisor.mjs's
+//   a `type: "result"` frame at the end are exactly what main/supervisor.mts's
 //   `captureStream` reads, and they are what make a run resumable and readable.
 //
 //   IT RAISES A REAL APPROVAL. Given `approval` in its plan it reads the
@@ -31,7 +31,7 @@
 //   Nothing about the gate is simulated; only the reason for asking is.
 //
 //   IT DIES LIKE THE REAL ONE. The CLI traps SIGTERM and exits 143 under its
-//   own power, which is why main/supervisor.mjs's `_kill` writes the intent
+//   own power, which is why main/supervisor.mts's `_kill` writes the intent
 //   down instead of reading a signal. This does the same, so a proof about a
 //   kill is a proof about the same numbers.
 //
@@ -43,7 +43,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { readWorld, worldTurn, worldAnswer, titleIn } from './stand-in-world.mjs';
+import { readWorld, worldTurn, worldAnswer, titleIn, stepEvery, workStep } from './stand-in-world.mjs';
 
 const argv = process.argv.slice(2);
 const say = (obj) => process.stdout.write(JSON.stringify(obj) + '\n');
@@ -74,7 +74,7 @@ if (plan.receipts) {
 say({ type: 'system', subtype: 'init', session_id: sessionId, tools: [], model: 'stub' });
 
 // OUR OWN KILL, ANSWERED THE WAY THE REAL CLI ANSWERS IT. 143 and not a signal:
-// see the note at the top, and main/supervisor.mjs `_kill`.
+// see the note at the top, and main/supervisor.mts `_kill`.
 let stopping = false;
 process.on('SIGTERM', () => { stopping = true; process.exit(143); });
 process.on('SIGINT', () => { stopping = true; process.exit(143); });
@@ -82,7 +82,7 @@ process.on('SIGINT', () => { stopping = true; process.exit(143); });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // THE INPUT PROTOCOL, WHEN AGENTBOX SPEAKS IT. A worker spawned with
-// `--input-format stream-json --replay-user-messages` (main/claude-input.mjs)
+// `--input-format stream-json --replay-user-messages` (main/claude-input.mts)
 // gets its prompt as a `user` line on stdin, and Agentbox waits for Claude Code
 // to replay that line, by uuid, before it will treat a result as the end of the
 // run. A stand-in that never replayed it left every run "unfinished": the app
@@ -211,6 +211,25 @@ async function actAsTeammate(brief, prompt, answer) {
 
 let said = plan.say ?? 'the stub worker ran';
 
+// [[stub:act:<name>]] makes the store-tool calls its plan lists under
+// acts.<name> ({ calls: [{ tool, args }], say }), so a proof can have an agent
+// write a document or attach a file. A refused call is said in the answer.
+async function actFromPlan({ calls = [], say: words }) {
+  const server = Object.entries(mcpServers()).find(([name, s]) => name !== 'zero-approvals' && s?.env?.STORE_ACCOUNT_ID)?.[1];
+  if (!server) return 'the stub had no store tools to act with';
+  const session = mcpSession(server);
+  const refused = [];
+  try {
+    for (const { tool, args } of calls) {
+      const r = await session.call(tool, args ?? {});
+      if (r?.error || r?.result?.isError) refused.push(`${tool}: ${r?.error?.message ?? r?.result?.content?.[0]?.text ?? 'refused'}`);
+    }
+  } finally {
+    session.close();
+  }
+  return [words ?? 'Done.', ...refused].join('\n\n');
+}
+
 // WHAT THE TASK ITSELF ASKS OF THE STAND-IN. A proof that runs several threads
 // at once needs each worker to behave differently, and one plan file is shared
 // by all of them, so the task's own words carry the script:
@@ -223,9 +242,11 @@ let said = plan.say ?? 'the stub worker ran';
 //   [[stub:limit-first]] run out on the first attempt only, so a retry or a
 //                        second login can finish it
 //   [[stub:work-then-die]] run a tool, then die with no answer
+//   [[stub:file:leads/x.csv]] end the answer with that path on a line of its
+//                        own, as an agent hands over a file it made
 //
 // The words a limit is reported in are the CLI's own ("You've hit your session
-// limit · resets …"), which is what shared/spawn-trouble.mjs reads.
+// limit · resets …"), which is what shared/spawn-trouble.mts reads.
 const promptText = (() => {
   const c = firstUserLine?.message?.content;
   const fromStdin = typeof c === 'string' ? c : Array.isArray(c) ? c.map((b) => b?.text ?? '').join('\n') : '';
@@ -262,6 +283,67 @@ const limitOn = directive('stub:limit-on')?.[1];
 const world = argv.includes('-p') ? readWorld(plan.world) : {};
 const turn = worldTurn(world, loginName);
 if (Object.keys(world).length) said = worldAnswer(said, turn, titleIn(promptText), attempt);
+// WHAT ONLY THE PERSON CAN GIVE, ASKED FOR THE WAY A CLOUD RUN IS TOLD TO
+// (main/cloud/run.mjs cloudNote, shared/cloud-needs.mjs), and only by a run that
+// was told it may. The task's own words say what it needs: a service names a
+// sign-in, found in the environment once saved; "the original film" a file;
+// "npm publish" a one-time code; Xcode or the simulator the computer itself.
+const SIGN_INS = [
+  [/supabase/i, 'supabase', 'Supabase', ['SUPABASE_ACCESS_TOKEN'], 'to apply the change to the database'],
+  [/vercel/i, 'vercel', 'Vercel', ['VERCEL_TOKEN'], 'to deploy the site'],
+  [/stripe/i, 'stripe', 'Stripe', ['STRIPE_SECRET_KEY'], 'to run it against Stripe test mode'],
+  [/\bexpo\b|\beas\b/i, 'expo', 'Expo', ['EXPO_TOKEN'], 'to start the build'],
+  [/\baws\b|\bs3\b/i, 'aws', 'AWS', ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'], 'to upload to S3'],
+  [/sentry/i, 'sentry', 'Sentry', ['SENTRY_AUTH_TOKEN'], 'to read the errors'],
+  [/github/i, 'github', 'GitHub', ['GH_TOKEN'], 'to open the pull request'],
+];
+// Round six: testers asking in their own words ("the launch film", "the .mov") got no file card.
+const FILE_ASK = /\b(film|video|footage|recording|\.mov|\.mp4)\b|\bfrom my (movies|desktop|downloads)\b/i;
+const FILM = '~/Movies/launch-film-original.mov';
+const CODE_ASK = /\bnpm\b.*\bpublish|\bpublish\b.*\bnpm\b|one-time|\botp\b|\b2fa\b|verification code/i;
+const COMPUTER_ASK = /\bxcode\b|simulator|testflight/i;
+{
+  const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
+  // Only a cloud run is told it may ask; on the computer the person's own sign-ins and files are there.
+  const inCloud = `${brief}\n${promptText}`.includes('# You are running on a cloud machine');
+  const told = inCloud && `${brief}\n${promptText}`.includes('AGENTBOX-NEEDS:');
+  const task = promptText.match(/^Title: [\s\S]*?(?=\n# |(?![\s\S]))/m)?.[0] ?? '';
+  const asked = promptText.match(/# The founder has answered[\s\S]*?\n> (.*)/)?.[1] ?? '';
+  const title = titleIn(promptText) ?? 'this';
+  const services = SIGN_INS.filter(([re]) => re.test(task));
+  // A file the person named is asked for by name (round eight: a signed pdf was asked for as the launch film).
+  const named = `${task}\n${asked}`.match(/\b([\w-]+\.(pdf|sql|csv|mov|mp4|zip|png|jpe?g|docx?|xlsx?|json|txt))\b/i)?.[1];
+  const file = named ? `~/${/\.(mov|mp4)$/i.test(named) ? 'Movies' : 'Downloads'}/${named}` : FILM;
+  const wantsFile = !!named || FILE_ASK.test(task) || FILE_ASK.test(asked);
+  // The file the person named is on their (stand-in) computer, as it would be, so the card can send it.
+  if (named && process.env.STUB_PERSON_HOME) {
+    const there = path.join(process.env.STUB_PERSON_HOME, file.slice(2));
+    if (!fs.existsSync(there)) { fs.mkdirSync(path.dirname(there), { recursive: true }); fs.writeFileSync(there, `stand-in ${named}\n`); }
+  }
+  const wantsCode = CODE_ASK.test(task) || CODE_ASK.test(asked);
+  // Only the card's own way out, not any reply that mentions the computer (round six).
+  const onComputer = /^do it (from|on) my computer( instead)?\.?$/i.test(asked.trim());
+  if (inCloud && COMPUTER_ASK.test(task)) said = 'AGENTBOX-NEEDS-THE-COMPUTER: Xcode and the iOS simulator';
+  else if (!inCloud && onComputer) said = `Did it on your computer${services.length ? ` with your own ${services.map((x) => x[2]).join(' and ')} sign-in` : ''}. It is done.`;
+  else if (told && onComputer) said = `AGENTBOX-NEEDS-THE-COMPUTER: ${services[0]?.[2] ?? 'your'} sign-in, on your computer`;
+  else if (told && (services.length || wantsFile || wantsCode)) {
+    // Earlier answers on the thread say what the person already gave.
+    const gaveFile = /I sent \S/.test(promptText);
+    const gaveCode = /code is [A-Za-z0-9-]{4,}/.test(promptText);
+    const missingSignIns = services.filter((x) => x[3].some((k) => !process.env[k]));
+    const lines = [
+      ...missingSignIns.map(([, id, , , why]) => `AGENTBOX-NEEDS: sign-in ${id} | ${why}`),
+      ...(wantsFile && !gaveFile ? [`AGENTBOX-NEEDS: file ${file} | ${named ? 'it is on your computer, not in the repository' : 'the cut is made from the original'}`] : []),
+      ...(wantsCode && !gaveCode ? ['AGENTBOX-NEEDS: code npm | the one-time password for npm publish'] : []),
+    ];
+    const what = [...missingSignIns.map((x) => `your ${x[2]} sign-in`), ...(wantsFile && !gaveFile ? [named ? `${named} from your computer` : 'the original film from your computer'] : []), ...(wantsCode && !gaveCode ? ['the npm one-time password'] : [])];
+    said = lines.length
+      ? [`**I need ${what.length > 1 ? `${what.slice(0, -1).join(', ')} and ${what.at(-1)}` : what[0]} to finish.**`, '', 'Everything that does not need it is done.', '', ...lines].join('\n')
+      : `Finished "${title}" with ${[...services.map((x) => `your saved ${x[2]} sign-in`), ...(wantsFile ? [named ? `the ${named} you sent` : 'the film you sent'] : []), ...(wantsCode ? ['the code you sent'] : [])].join(', ')}. It is done.`;
+  }
+}
+const handsOver = directive('stub:file')?.[1];
+if (handsOver) said = `${said}\n\n${handsOver}\n`;
 if (directive('stub:limit') || (directive('stub:limit-first') && attempt === 1) || (limitOn && limitOn === loginName) || turn.limit) {
   say({ type: 'result', subtype: 'success', result: "You've hit your session limit · resets 11:59pm", is_error: true, session_id: sessionId });
   await Promise.race([inputEnded, wait(2000)]);
@@ -279,12 +361,25 @@ if (directive('stub:hang') || turn.hang) {
 const slow = Number(directive('stub:slow')?.[1]) || turn.delayMs;
 if (slow > 0) {
   const until = Date.now() + slow;
-  while (!stopping && Date.now() < until) await wait(50);
+  // The world's pace stands in for real work, and real work shows its steps.
+  const every = directive('stub:slow') ? 0 : stepEvery(world);
+  let next = every ? Date.now() + every : Infinity;
+  let step = 0;
+  while (!stopping && Date.now() < until) {
+    if (Date.now() >= next) {
+      step += 1;
+      next += every;
+      say({ type: 'assistant', session_id: sessionId, message: { content: [workStep(step, titleIn(promptText))] } });
+    }
+    await wait(50);
+  }
 }
 
 try {
   const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
   if (brief.includes('team_post') && process.env.ZERO_ITEM) await actAsTeammate(brief, promptText, said);
+  const act = directive('stub:act')?.[1];
+  if (act && plan.acts?.[act]) said = await actFromPlan(plan.acts[act]);
   if (plan.approval) {
     const decision = await askTheFounder(plan.approval);
     say({ type: 'assistant', message: { content: [{ type: 'text', text: `the founder said: ${decision.behavior}` }] } });

@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { codexAccount, codexAuthFile } from '../main/codex-account.mjs';
+import { codexAccount, codexAuthFile } from '../main/codex-account.mts';
 
 /** A JWT's middle is plain base64url JSON, and that is all this builds. */
 const jwt = (claims) => ['x', Buffer.from(JSON.stringify(claims)).toString('base64url'), 'y'].join('.');

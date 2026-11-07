@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # A CLOUD RUN, AS THE SUPERVISOR SEES IT: one small process standing in for a
-# run whose relay lives in the shared host (main/cloud/host.mjs). It carries
+# run whose relay lives in the shared host (main/cloud/host.mts). It carries
 # its input, output, signals and exit code there and back. Perl, because every
 # Mac has it and a stand-in in it costs a few megabytes.
 #

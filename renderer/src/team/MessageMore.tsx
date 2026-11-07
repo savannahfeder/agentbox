@@ -62,6 +62,10 @@ export function MoreMenu({ at, items, onClose }: { at: DOMRect; items: MoreItem[
 
 /** Asked once before a message is taken back for everyone. */
 export function DeleteMessage({ onDelete, onClose }: { onDelete: () => void; onClose: () => void }) {
+  return <AskBeforeDeleting title="Delete this message?" body="It is taken back for everyone in the conversation." label="Delete message" onDelete={onDelete} onClose={onClose} />;
+}
+
+export function AskBeforeDeleting({ title, body, label, onDelete, onClose }: { title: string; body: string; label: string; onDelete: () => void; onClose: () => void }) {
   const yes = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     yes.current?.focus();
@@ -71,9 +75,9 @@ export function DeleteMessage({ onDelete, onClose }: { onDelete: () => void; onC
   }, [onClose]);
   return createPortal(
     <div className="chat-confirm-back" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="chat-confirm" role="alertdialog" aria-label="Delete message">
-        <div className="chat-confirm-title">Delete this message?</div>
-        <div className="chat-confirm-body">It is taken back for everyone in the conversation.</div>
+      <div className="chat-confirm" role="alertdialog" aria-label={label}>
+        <div className="chat-confirm-title">{title}</div>
+        <div className="chat-confirm-body">{body}</div>
         <div className="chat-confirm-foot">
           <button type="button" className="chat-confirm-no" onClick={onClose}>Cancel</button>
           <button type="button" className="chat-confirm-yes" ref={yes} onClick={() => { onClose(); onDelete(); }}>Delete</button>

@@ -10,12 +10,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamService } from '../main/team/index.mjs';
+import { Store } from '../main/store.mts';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
 import { inMyInbox, mayRunHere, handedOnByReply } from '../shared/team-rules.mjs';
-import { joinSharedProject } from '../main/team/projects.mjs';
+import { joinSharedProject } from '../main/team/projects.mts';
 import { cardsFor } from '../shared/thread-cards.mjs';
 
 async function aMac(cloud, personId) {
@@ -60,7 +60,7 @@ it('lands in the recipient\'s inbox and nobody else\'s', async () => {
   await theo.service.syncNow();
   await jun.service.syncNow();
   const got = inbox(theo);
-  expect(got.map((i) => i.title)).toEqual(['Can you take the Acme call on Thursday?']);
+  expect(got.map((i) => i.title)).toEqual(['Take the Acme call on Thursday']);
   expect(got[0].wrote.body.by).toBe(maya.personId);
   expect(jun.store.listProducts().filter((p) => p.team?.direct)).toEqual([]);
   expect(inbox(maya)).toEqual([]);

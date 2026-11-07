@@ -23,11 +23,11 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun, IMPORT_FAILED } from '../main/cloud/run.mjs';
-import { readMarker, writeMarker } from '../main/cloud/marker.mjs';
+import { cloudRun, IMPORT_FAILED } from '../main/cloud/run.mts';
+import { readMarker, writeMarker } from '../main/cloud/marker.mts';
 import { nameSlug } from '../shared/product-name.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { taskFolderPath } from '../main/task-folders.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { taskFolderPath } from '../main/task-folders.mts';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');

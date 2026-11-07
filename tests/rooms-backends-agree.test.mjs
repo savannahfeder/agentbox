@@ -1,6 +1,6 @@
 // THE IN-MEMORY ROOMS AND THE REAL ONES KEEP THE SAME RULES (w-3d0fa23ffb, 2026-10-20).
 //
-// The rooms service is tested against main/team/rooms-memory.mjs, which is
+// The rooms service is tested against main/team/rooms-memory.mts, which is
 // only worth anything while it keeps the rules of
 // 20261021000000_rooms.sql. tests/rooms-cloud-shows-each-room-only-to-its-people
 // proves those rules in the database itself; this runs one scenario, through
@@ -13,9 +13,9 @@
 //     npx vitest run tests/rooms-backends-agree.test.mjs
 import { it, expect, describe, beforeAll, afterAll } from 'vitest';
 import crypto from 'node:crypto';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { supabaseBackend } from '../main/team/supabase-backend.mjs';
-import { GENERAL_ROOM } from '../main/team/rooms-memory.mjs';
+import { GENERAL_ROOM } from '../main/team/rooms-memory.mts';
 import { FILE_EXISTS } from '../main/team/rooms-shape.mjs';
 
 const NAMES = ['Maya', 'Theo', 'Jun', 'Ana'];
@@ -188,6 +188,16 @@ describe.each(worlds)('rooms on %s', (_kind, make) => {
     expect((await w.maya.roomMessages(teamRoom.id)).find((x) => x.id === m.id)).toMatchObject({ id: m.id, by: w.theo.personId, body: '', mentions: [], deleted: true, at: m.at });
     expect((await w.maya.roomMentions()).map((x) => x.id)).not.toContain(m.id);
     await refused(w.theo.editRoomMessage(m.id, { body: 'back again' }));
+  });
+
+  it('decisions: only people in the room, the message’s own words, and one taken back stays as off', async () => {
+    const target = (await w.maya.roomMessages(teamRoom.id)).find((x) => x.body === 'hey');
+    await w.theo.markRoomDecision(teamRoom.id, { messageId: target.id, kind: 'decision', body: 'not these', on: true });
+    await refused(w.ana.markRoomDecision(teamRoom.id, { messageId: target.id, kind: 'decision', on: true }));
+    const [row] = await w.maya.roomDecisions(teamRoom.id);
+    expect(row).toMatchObject({ roomId: teamRoom.id, messageId: target.id, kind: 'decision', body: 'hey', saidBy: target.by, by: w.theo.personId, on: true, project: null });
+    await w.maya.markRoomDecision(teamRoom.id, { messageId: target.id, kind: 'decision', on: false });
+    expect((await w.theo.roomDecisions(teamRoom.id))[0].on).toBe(false);
   });
 
   it('reactions: only people in the room, one turned off stays as off, and a deleted message loses its own', async () => {

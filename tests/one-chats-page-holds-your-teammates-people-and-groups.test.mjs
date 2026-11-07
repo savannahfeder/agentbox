@@ -111,15 +111,17 @@ describe('the sidebar', () => {
     expect(hook).not.toMatch(/<TeammatesRail /);
     expect(page).not.toMatch(/tm-tabs|function Roster\(/);
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+    // With a team on too: every chat is on this page (w-2b3e1a85e5).
     expect(app).toMatch(/<ChatsContext\.Provider value=\{chatsValue\}>/);
   });
 });
 
 describe('a teammate\'s page', () => {
   const page = fs.readFileSync(new URL('../renderer/src/teammates/TeammatesPage.tsx', import.meta.url), 'utf8');
-  it('puts About, Log and Pause behind one ⋯ button, not buttons of their own', () => {
+  it('puts Log and Pause behind one ⋯ button, with About one quiet word beside it', () => {
     expect(page).toMatch(/aria-label="Teammate options"/);
-    for (const w of ['About', 'Log', 'Pause', 'Resume']) expect(page).toContain(`'${w}'`);
+    for (const w of ['Log', 'Pause', 'Resume']) expect(page).toContain(`'${w}'`);
+    expect(page).toMatch(/tq-about-key[^\n]*>About</);
   });
 
   it('writes to it in the app\'s own chat box', () => {

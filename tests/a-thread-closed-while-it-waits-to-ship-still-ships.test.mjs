@@ -12,9 +12,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { SHIP_LABEL, ShipQueue, nextToShip } from '../main/ship-queue.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { ensureTaskFolder } from '../main/task-folders.mjs';
+import { SHIP_LABEL, ShipQueue, nextToShip } from '../main/ship-queue.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { ensureTaskFolder } from '../main/task-folders.mts';
 
 let tmp; let repo; let userDir;
 const git = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim();

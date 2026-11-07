@@ -3,18 +3,18 @@
 //
 // Three crash reports arrived from 0.1.13 installs, all of them the same stack:
 //
-//   main/main.mjs:1190  window-all-closed -> app.quit()
-//   main/main.mjs:761   before-quit -> phone.close()
-//   main/phone-link.mjs:525  close() -> relay.stop()
+//   main/main.mts:1190  window-all-closed -> app.quit()
+//   main/main.mts:761   before-quit -> phone.close()
+//   main/phone-link.mts:525  close() -> relay.stop()
 //   main/relay-client.mjs:236  stop() -> onChange()
-//   main/main.mjs:750   onChange -> window.isDestroyed()
+//   main/main.mts:750   onChange -> window.isDestroyed()
 //   TypeError: Cannot read properties of null (reading 'isDestroyed')
 //
 // Closing the main window runs its `closed` handler, which sets `window = null`,
 // and THEN `window-all-closed` quits. By the time `phone.close()` tells the
 // relay to stop, and the relay reports the change back, there is no window left
 // to ask. Measured on an Electron harness (scripts/scratch, one-off): the throw
-// aborts the rest of the `before-quit` listeners, `main/crash-report.mjs`
+// aborts the rest of the `before-quit` listeners, `main/crash-report.mts`
 // rethrows it as designed, and the process dies fatally. `updater.stop()` never
 // ran, `will-quit` never fired, and so `analytics.flush()` NEVER RAN.
 //
@@ -26,17 +26,16 @@
 // it. Exactly one install in the cohort relaunched, and it is the only one that
 // delivered the crash.
 //
-// So two things have to hold, and the second is the one that matters even when
-// some other step throws for some other reason: the phone's change handler must
-// survive a window that has gone, and NO quit step may be able to take down the
-// app before the counts are flushed.
+// The phone link and its relay have since left the app (2026-10-16, and the
+// relay's code 2026-11-01). What still has to hold, whatever step throws for
+// whatever reason: NO quit step may be able to take down the app before the
+// counts are flushed.
 
 import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
-import { createPhoneLink } from '../main/phone-link.mjs';
-import { createAnalytics } from '../main/analytics.mjs';
-import { quitStep, flushBeforeQuit, FLUSH_DEADLINE_MS } from '../main/quit-sequence.mjs';
+import { createAnalytics } from '../main/analytics.mts';
+import { quitStep, flushBeforeQuit, FLUSH_DEADLINE_MS } from '../main/quit-sequence.mts';
 
 /** Electron's `app`, as far as quitting goes: before-quit, then will-quit, then quit. */
 function fakeApp() {
@@ -49,27 +48,6 @@ function fakeApp() {
   };
   return app;
 }
-
-describe('the relay reports back on the way out', () => {
-  it('closing the phone link tells its onChange, so a dead window is reached', () => {
-    const onChange = vi.fn();
-    const link = createPhoneLink({
-      file: '/nowhere/phone-link.json',
-      channels: new Map(),
-      listeners: new Set(),
-      relayUrl: 'wss://relay.example/room',
-      onChange,
-      interfaces: () => ({}),
-      log: { warn() {} },
-      tailscale: null,
-    });
-    onChange.mockClear();
-    link.close();
-    // THE CASE THAT MUST NOT BE WISHED AWAY. If this ever stops being true the
-    // guard below is dead code, and someone will delete it.
-    expect(onChange).toHaveBeenCalled();
-  });
-});
 
 describe('a quit step cannot take the app down with it', () => {
   it('a step that throws does not stop the steps after it', () => {
@@ -205,10 +183,10 @@ describe('a flush the quit now waits for still honours the switch', () => {
 });
 
 describe('and the app is wired that way', () => {
-  const main = fs.readFileSync(new URL('../main/main.mjs', import.meta.url), 'utf8');
+  const main = fs.readFileSync(new URL('../main/main.mts', import.meta.url), 'utf8');
 
   it('every quit step goes through the wrapper, and the flush holds the quit', () => {
-    expect(main).toMatch(/import \{[^}]*flushBeforeQuit[^}]*\} from '\.\/quit-sequence\.mjs'/);
+    expect(main).toMatch(/import \{[^}]*flushBeforeQuit[^}]*\} from '\.\/quit-sequence\.mts'/);
     expect(main).toMatch(/flushBeforeQuit\(app, \(\) => analytics\.flush\(\)/);
     // No bare quit listeners left: a step added without the wrapper is a step
     // that can kill the app on the way out again.

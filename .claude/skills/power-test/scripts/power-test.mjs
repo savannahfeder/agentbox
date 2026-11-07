@@ -14,6 +14,7 @@
 //     --tester-login inherit                           testers sign in with this session's variables
 //     --testers external                               the agent that started this runs each stretch itself
 //     --keep                                           leave the copies up afterwards
+//     --files <dir>                                    copied into every project's documents in every copy (a table, a deck under test)
 //     --team <file> --room <name>                      one tester signs in to a real team (live.mjs --team) and talks in that room
 //
 // For each person: a copy of the app of their own (live.mjs with
@@ -40,6 +41,7 @@ import { fileURLToPath } from 'node:url';
 import { readPeople, pickPeople, chaosPlan, worldAt, nextRound, restartAgain, roundOutcome, coverage, testerPrompt, projectNamedIn } from './plan.mjs';
 import { createWatcher, freeMemoryMb, readAllLines, keepEvidence, sleepTargets } from './watch.mjs';
 import { writeReport } from './report.mjs';
+import { seedArtifacts } from './artifacts.mjs';
 import { readDiary } from './diary.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -67,6 +69,8 @@ const totalMs = ((Number(opt('hours', 0)) * 60) + Number(opt('minutes', 0))) * M
 const roundMs = Math.max(2, Number(opt('round-minutes', 20))) * MIN;
 const chaos = opt('chaos', 'normal');
 const cloud = flag('cloud');
+const standInCloud = flag('stand-in-cloud');
+if (standInCloud && (cloud || flag('real'))) stop('--stand-in-cloud is the stand-ins\' own cloud; it cannot go with --real or --cloud.');
 const real = flag('real') || cloud;
 const cloudAccounts = opt('cloud-accounts');
 if (cloudAccounts && !cloud) stop('--cloud-accounts narrows the cloud\'s accounts: add --cloud.');
@@ -77,6 +81,8 @@ const inherit = opt('tester-login') === 'inherit';
 const external = opt('testers') === 'external';
 const team = opt('team');
 const room = opt('room');
+const files = opt('files') ? path.resolve(opt('files')) : null;
+if (files && !fs.existsSync(files)) stop(`--files: there is no folder at ${files}.`);
 if (team && people.length !== 1) stop('--team signs one account in, so it runs one tester: name them with --who.');
 if (room && !team) stop('--room needs --team: a copy with no team is in no room.');
 try { chaosPlan(chaos, totalMs); } catch (err) { stop(err.message); }
@@ -115,7 +121,9 @@ const live = (name, ...verb) => {
 function layCommands(dir, name) {
   const q = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
   for (const [cmd, script] of [['app', BROWSE], ['diary', DIARY]]) {
-    fs.writeFileSync(path.join(dir, cmd), `#!/bin/sh\nexport VERIFY_INSTANCE=${q(name)} BREAKER_OUT=${q(dir)} POWER_OUT=${q(dir)}\nexec ${q(node)} ${q(script)} "$@"\n`, { mode: 0o755 });
+    // A machine whose Chrome is not at the Mac's path names it in CHROME (scripts/lib/chrome-guard.mjs).
+    const chrome = process.env.CHROME ? ` CHROME=${q(process.env.CHROME)}` : '';
+    fs.writeFileSync(path.join(dir, cmd), `#!/bin/sh\nexport VERIFY_INSTANCE=${q(name)} BREAKER_OUT=${q(dir)} POWER_OUT=${q(dir)}${chrome}\nexec ${q(node)} ${q(script)} "$@"\n`, { mode: 0o755 });
   }
   return { browse: path.join(dir, 'app'), diary: path.join(dir, 'diary') };
 }
@@ -152,6 +160,14 @@ function seedCode(state) {
   }));
 }
 
+/** `--files <dir>`: what is under test, laid into every project's documents, so a tester meets it as their own. */
+function layFiles(state, from) {
+  for (const d of fs.readdirSync(state.accountRoot)) {
+    const docs = path.join(state.accountRoot, d);
+    if (fs.existsSync(path.join(docs, 'project.json'))) fs.cpSync(from, docs, { recursive: true });
+  }
+}
+
 /** An inbox with a past: done, waiting and put-off threads from the last month, written as the app writes them. */
 function seedHistory(state, person, count) {
   const ids = new Set();
@@ -173,6 +189,10 @@ function seedHistory(state, person, count) {
     if (r === 0) lines.push({ id, ts: at + 6 * MIN, source: 'founder', patch: { runAt: now + 24 * 60 * MIN } });
     else if (r > 2) lines.push({ id, ts: at + 20 * MIN, source: 'founder', patch: { status: 'done' } });
   }
+  const first = slugs[0];
+  const withFiles = seedArtifacts({ accountRoot: state.accountRoot, slug: first, picture: path.join(REPO, 'docs', 'readme', 'priority-palette.png'), now });
+  for (const l of withFiles) ids.add(l.id);
+  byProject.get(first).push(...withFiles);
   for (const [slug, lines] of byProject) {
     const dir = machinery(state, slug);
     fs.mkdirSync(dir, { recursive: true });
@@ -188,12 +208,13 @@ for (const person of people) {
   fs.mkdirSync(dir, { recursive: true });
   const shape = real ? [] : ['--logins', String(person.logins), ...(person.codex ? [] : ['--no-codex'])];
   say(`${person.name}: starting a copy of the app shaped like their setup`);
-  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(alpha ? ['--alpha', alpha] : []));
+  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(alpha ? ['--alpha', alpha] : []));
   fs.writeFileSync(path.join(dir, 'up.log'), up.out);
   const stateFile = path.join(instanceDir(name), 'instance.json');
   const state = readJson(stateFile);
   if (up.code !== 0 || !state) { setups.push({ person, name, dir, failed: `its copy did not start: ${up.out.trim().split('\n').pop()}` }); continue; }
   await seedCode(state);
+  if (files) layFiles(state, files);
   const seeded = person.history ? seedHistory(state, person, person.history) : new Set();
   if (seeded.size) await live(name, 'restart');
   setups.push({ person, name, dir, stateFile, seeded, cmds: layCommands(dir, name) });

@@ -1,7 +1,7 @@
 // A CLOUD RUN BRINGS THE AGENT'S WORK HOME, AND THE APP CANNOT TELL IT FROM A
 // LOCAL ONE.
 //
-// main/cloud/run.mjs stands in for `claude` when a thread runs in the cloud
+// main/cloud/run.mts stands in for `claude` when a thread runs in the cloud
 // (docs/cloud/PLAN.md). The supervisor reads its stdout as the agent's stream,
 // writes the prompt to its stdin, and when it exits expects the task folder to
 // hold the agent's work, because the change card, the ship queue and the next
@@ -26,8 +26,8 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun, IMPORT_FAILED } from '../main/cloud/run.mjs';
-import { readMarker, writeMarker, cloudWorkPending } from '../main/cloud/marker.mjs';
+import { cloudRun, IMPORT_FAILED } from '../main/cloud/run.mts';
+import { readMarker, writeMarker, cloudWorkPending } from '../main/cloud/marker.mts';
 import { waitFor } from './waiting.mjs';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
@@ -50,7 +50,7 @@ beforeEach(async () => {
   await new Promise((r) => s3.listen(0, '127.0.0.1', r));
   s3Url = `http://127.0.0.1:${s3.address().port}`;
   sandbox = createSandbox({ workRoot: path.join(tmp, 'vm-work'), pathRoot: path.join(tmp, 'vm'), bridgeSocket: path.join(tmp, 'bridge.sock') });
-  // The account's Claude sign-in, kept in the cloud (main/cloud/logins.mjs).
+  // The account's Claude sign-in, kept in the cloud (main/cloud/logins.mts).
   macReads = [];
   objects.set(LOGIN.key, Buffer.from(JSON.stringify({ engine: 'claude', token: 'tok-123-cloud-signin-only' })));
   const addr = await sandbox.listen(0, '127.0.0.1');
@@ -127,6 +127,11 @@ const resultOf = (out) => JSON.parse(JSON.parse(out.split('\n').find((l) => l.in
 
 // The run has left with the folder as it was: only a change after this is one made while it was away.
 const untilAway = () => waitFor('the run to be away in the cloud', () => readMarker(mac)?.state === 'running');
+// And it stays away until this says so, rather than for a moment this Mac has
+// to get its own change in under. The file is outside the folder, so the only
+// change in there is the one the test is about.
+const whileAway = () => `SLOW:${path.join(tmp, 'go.txt')} please`;
+const letItHome = () => fs.writeFileSync(path.join(tmp, 'go.txt'), 'come home\n');
 
 describe('a cloud run', () => {
   it('streams the agent, runs its store call on the Mac, and lays its commit, its loose file and its transcript into the task folder', async () => {
@@ -247,10 +252,11 @@ describe('a cloud run', () => {
 
   // What happens to the run's work then: tests/a-cloud-run-that-cannot-be-laid-in-never-blocks-its-thread.
   it('will not lay the run over a folder that changed on this Mac while it was away, and keeps the run\'s commits', async () => {
-    const run = launch({ message: 'SLOW please' });
+    const run = launch({ message: whileAway() });
     // Something on the Mac writes into the folder while the agent works.
     await untilAway();
     fs.writeFileSync(path.join(mac, 'local-edit.txt'), 'made here meanwhile\n');
+    letItHome();
     expect(await run.done).toBe(0);
     expect(run.err()).toMatch(/changed on this Mac/);
     // The local edit is untouched, and the run's commit is kept on its branch.
@@ -260,11 +266,12 @@ describe('a cloud run', () => {
   });
 
   it('notices a change staged on this Mac meanwhile, even one whose file was put back', async () => {
-    const run = launch({ message: 'SLOW please' });
+    const run = launch({ message: whileAway() });
     await untilAway();
     fs.writeFileSync(path.join(mac, 'a.txt'), 'staged meanwhile\n');
     git(mac, 'add', 'a.txt');
     fs.writeFileSync(path.join(mac, 'a.txt'), 'one\n');
+    letItHome();
     expect(await run.done).toBe(0);
     expect(run.err()).toMatch(/changed on this Mac/);
     expect(git(mac, 'diff', '--cached', '--name-only')).toBe('a.txt');

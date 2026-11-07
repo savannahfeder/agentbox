@@ -16,8 +16,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { phoneStatusLine, macSeenOf } from '../renderer/src/cloud-bridge';
 import { cloudClient } from '../renderer/src/cloud-rest';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createPhoneInbox } from '../main/phone-inbox.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createPhoneInbox } from '../main/phone-inbox.mts';
 
 const NOW = Date.parse('2026-10-19T12:00:00Z');
 const MIN = 60_000;
@@ -28,11 +28,12 @@ describe('the line over her inbox', () => {
     expect(phoneStatusLine({ error: 'Failed to fetch', fetchedAt: 0, macSeen: 0 }, NOW)).toBe('Can\'t reach your inbox online.');
   });
 
-  it('says when her Mac was last online, once it has been away a while', () => {
-    expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - 3 * 24 * 60 * MIN }, NOW)).toBe('Your Mac was last online 3 days ago. What you send waits for it.');
-    expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - 40 * MIN }, NOW)).toBe('Your Mac was last online 40 minutes ago. What you send waits for it.');
-    expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - 9 * MIN }, NOW)).toBe(null);
-    // No Mac has ever put anything here: the empty inbox says so itself.
+  it('says when her computer was last online, once it has been away a while', () => {
+    expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - 3 * 24 * 60 * MIN }, NOW)).toBe('Your computer was last online 3 days ago. What you send waits for it.');
+    expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - 40 * MIN }, NOW)).toBe('Your computer was last online 40 minutes ago. What you send waits for it.');
+    expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - MIN }, NOW)).toBe(null);
+    // No computer has ever put anything here: the inbox asks for one instead
+    // (tests/the-web-app-says-when-no-computer-has-connected.test.mjs).
     expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: 0 }, NOW)).toBe(null);
   });
 
@@ -43,7 +44,7 @@ describe('the line over her inbox', () => {
 });
 
 describe('her Mac', () => {
-  it('says it is still there every few minutes, even with nothing new to send', async () => {
+  it('says it is still there every thirty seconds, even with nothing new to send', async () => {
     const cloud = createMemoryCloud();
     let now = NOW;
     cloud.now = () => now;
@@ -56,12 +57,12 @@ describe('her Mac', () => {
     const seen = async () => (await memoryBackend(cloud, me).phoneProjects())[0].updatedAt;
     await inbox.syncOnce();
     expect(await seen()).toBe(NOW);
-    now += MIN;
+    now += 29_999;
     await inbox.syncOnce();
     expect(await seen()).toBe(NOW);
-    now += 5 * MIN;
+    now += 1;
     await inbox.syncOnce();
-    expect(await seen()).toBe(NOW + 6 * MIN);
+    expect(await seen()).toBe(NOW + 30_000);
   });
 
   it('takes the other commands when one reply\'s file cannot be fetched just now, and that one next time', async () => {
@@ -146,16 +147,20 @@ describe('the bridge', () => {
 // A reply her Mac had taken left the screen at once, and stayed gone until
 // the thread's next copy arrived, which a copy in retry could hold back an hour.
 describe('a reply her Mac has taken', () => {
-  it('stays on the screen until a copy of the thread from after it arrives, for two hours at most', async () => {
+  // Since 2026-10-31 (w-3e955eadb4) until a copy that HOLDS it arrives: a newer
+  // copy without it was how a message the cloud answered vanished.
+  it('stays on the screen until a copy of the thread that holds it arrives', async () => {
     const { phoneView, phoneSlug } = await import('../renderer/src/cloud-bridge');
     const DEV = 'a1b2c3d4e5f6';
     const iso = (ms) => new Date(ms).toISOString();
-    const thread = (updated) => ({ device: DEV, project: 'alpha', item: 'w-1', updated_at: iso(updated), snapshot: { v: 3, item: { id: 'w-1', title: 'T', status: 'blocked', updatedAt: updated }, history: [] } });
+    const thread = (updated, history = []) => ({ device: DEV, project: 'alpha', item: 'w-1', updated_at: iso(updated), snapshot: { v: 3, item: { id: 'w-1', title: 'T', status: 'blocked', updatedAt: updated }, history } });
+    const holds = [{ id: 'w-1', ts: NOW - 2 * MIN, source: 'founder', patch: { answer: 'go' } }];
     const reply = { id: 'c1', device: DEV, project: 'alpha', item: 'w-1', kind: 'reply', payload: { text: 'go' }, created_at: iso(NOW - 3 * MIN), claimed_at: iso(NOW - 2 * MIN), taken_at: iso(NOW - 2 * MIN), outcome: 'done' };
     const view = (t, now = NOW) => phoneView({ projects: [{ device: DEV, project: 'alpha', name: 'Alpha' }], threads: [t], commands: [reply] }, now);
     expect(view(thread(NOW - 10 * MIN)).waiting.map((w) => w.text)).toEqual(['go']);
-    expect(view(thread(NOW - MIN)).waiting).toEqual([]);
-    expect(view(thread(NOW - 10 * MIN), NOW + 3 * 60 * MIN).waiting).toEqual([]);
+    expect(view(thread(NOW - MIN)).waiting.map((w) => w.text)).toEqual(['go']);
+    expect(view(thread(NOW - MIN, holds)).waiting).toEqual([]);
+    expect(view(thread(NOW - 10 * MIN), NOW + 3 * 60 * MIN).waiting.map((w) => w.text)).toEqual(['go']);
     expect(phoneSlug(DEV, 'alpha')).toBe('alpha@a1b2c3d4e5f6');
   });
 });

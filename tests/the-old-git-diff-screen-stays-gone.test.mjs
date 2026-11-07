@@ -25,7 +25,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
 describe('the code an agent wrote comes out of the conversation, never out of git', () => {
   it('has no zero:diff channel in the main process', () => {
-    expect(read('main/ipc.mjs')).not.toContain('zero:diff');
+    expect(read('main/ipc.mts')).not.toContain('zero:diff');
   });
 
   it('does not expose a diff call on the window', () => {
@@ -60,14 +60,14 @@ describe('the code an agent wrote comes out of the conversation, never out of gi
   // they are refusing to do. Matching the prose made writing down the reason
   // fail the test.
   it('reads git in one file and nowhere else in the main process', () => {
-    const files = fs.readdirSync(path.join(ROOT, 'main')).filter((f) => f.endsWith('.mjs'));
+    const files = fs.readdirSync(path.join(ROOT, 'main')).filter((f) => /\.m[jt]s$/.test(f));
     const code = (src) => src
       .replace(/\/\*[\s\S]*?\*\//g, ' ')
       .split('\n').map((l) => l.replace(/(^|\s)\/\/.*$/, '')).join('\n');
     for (const f of files) {
       // 2026-09-16: an explicit /diff command is approved migration parity.
       // The automatic task diff screen remains absent.
-      if (f === 'git-change.mjs' || f === 'task-commands.mjs') continue;
+      if (f === 'git-change.mjs' || f === 'task-commands.mts') continue;
       const src = code(read(path.join('main', f)));
       expect(src, `${f} runs git diff`).not.toMatch(/'diff'|"diff"|git diff/);
     }

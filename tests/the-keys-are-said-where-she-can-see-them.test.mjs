@@ -44,6 +44,8 @@ const pages = read('renderer/src/threads/Pages.tsx');
 const summary = read('renderer/src/threads/Summary.tsx');
 // The up and down arrows on a thread in Needs you (w-65bcefb857).
 const queue = read('renderer/src/components/OneThingAtATime.tsx');
+// The Done half beside the thread's dots (w-bca8a6466f).
+const threadMenu = read('renderer/src/threads/ThreadMenu.tsx');
 
 // The list's own key switch, which is the only place the row keys are run.
 // Everything above it belongs to modals, chords and full-screen reading.
@@ -140,7 +142,9 @@ describe('the hint is drawn on the row the keys act on', () => {
   });
 
   it('gives ⌘K the same row, so the menu cannot mean a different task', () => {
-    expect(app).toMatch(/const target = focused \?\? pointed;/);
+    // A phone draws no pointed row, so there it is the open thread or none
+    // (command-k-on-a-phone).
+    expect(app).toMatch(/const target = focused \?\? \(onPhone\(\) \? null : pointed\);/);
   });
 
   it('takes the hover from a pointer that MOVES, never from one that rests', () => {
@@ -203,7 +207,9 @@ describe('Tab walks the tabs the Inbox draws', () => {
 describe('only a component that does not already show its key carries a hint', () => {
   it('wears a data-hint for every id the list knows, and knows every id worn', () => {
     const worn = new Set();
-    for (const file of [app, list, nav1, terminal, focus, pages, summary, queue]) {
+    // The icon buttons over a thread that name themselves on the plate (2026-11-02).
+    const named = ['team/TeamFocus.tsx', 'threads/ThreadFiles.tsx', 'threads/PlaceButton.tsx'].map((f) => fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src', f), 'utf8'));
+    for (const file of [app, list, nav1, terminal, focus, pages, summary, queue, threadMenu, ...named]) {
       // The row writes its own as a spread, because it is only worn in the
       // inbox and only off an ordinary row.
       for (const m of file.matchAll(/data-hint(?:="|': ')([a-z-]+)/g)) worn.add(m[1]);

@@ -34,19 +34,20 @@ export function checkFeedback({ text = '', files = [] } = {}) {
 }
 
 // Exactly what travels: the words trimmed, each file as name, type and its
-// base64, and the app's version so a report can be matched to a release.
+// base64, the app's version so a report can be matched to a release, and the
+// random install id so reports from one install read as one sender.
 // Nothing else the card happened to hold rides along.
 export function feedbackPayload({ text = '', files = [], app = {} } = {}) {
   return {
     text: String(text ?? '').trim(),
     files: (files ?? []).map(({ name, type, data }) => ({ name: String(name ?? 'file'), type: String(type || 'application/octet-stream'), data: String(data ?? '') })),
-    app: { version: String(app.version ?? ''), os: String(app.os ?? '') },
+    app: { version: String(app.version ?? ''), os: String(app.os ?? ''), install: String(app.install ?? '').slice(0, 64) },
   };
 }
 
 // Answers { ok: true } or { ok: false, error } with the error as a sentence.
 // It never throws, so the card always has something to say. The Mac sends
-// through it (main/feedback.mjs) and so does the phone website (cloud-bridge.ts).
+// through it (main/feedback.mts) and so does the phone website (cloud-bridge.ts).
 export async function sendFeedback({ url, payload, fetchImpl = globalThis.fetch, timeoutMs = 60_000 }) {
   if (!url) return { ok: false, error: `Feedback is not set up in this copy of ${Name}.` };
   // Checked again here, off the bytes that would actually travel, since the

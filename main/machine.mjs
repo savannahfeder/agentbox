@@ -75,7 +75,12 @@ export const BASELINE_SLOTS = 4;
  * baseline rather than a reading, which is what stops the row claiming a Mac
  * has 0 GB.
  */
-export function machineSlots({ memBytes = os.totalmem(), cores = os.cpus().length } = {}) {
+// Read once: they cannot change while the app runs, and the agents' clock asks
+// for every waiting thread on every tick.
+let thisMachine = null;
+const machineNow = () => (thisMachine ??= { memBytes: os.totalmem(), cores: os.cpus().length });
+
+export function machineSlots({ memBytes = machineNow().memBytes, cores = machineNow().cores } = {}) {
   const memGb = Math.round((Number(memBytes) || 0) / (1024 ** 3));
   const cpu = Math.max(0, Math.round(Number(cores) || 0));
   // NOTHING TO GO ON IS ITS OWN ANSWER, not a small one. `os.totalmem()` coming

@@ -123,8 +123,8 @@ describe('walking the matches', () => {
 });
 
 describe('the key reaches the box from anywhere', () => {
-  const mainProc = read('main', 'main.mjs');
-  const menu = read('main', 'menu.mjs');
+  const mainProc = read('main', 'main.mts');
+  const menu = read('main', 'menu.mts');
   const preload = read('preload.cjs');
   const app = read('renderer', 'src', 'App.tsx');
   const bar = read('renderer', 'src', 'components', 'FindBar.tsx');

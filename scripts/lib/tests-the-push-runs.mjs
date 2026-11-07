@@ -1,11 +1,17 @@
 // THE TESTS A PUSH WAITS FOR, AND THE MOST IT WILL WAIT FOR (w-9e4d3f3cc1).
 //
 // `vitest related <files>` runs every test that imports what changed, which
-// for a core file here is most of the suite: 216 of the 1,207 test files name
-// main/supervisor.mjs. That set is the right one to run and the wrong one to
-// wait for, so over the cap this hands back the test files that name the
-// change most and leaves the rest to GitHub, which runs the whole suite on
+// for a core file here is most of the suite: 362 of the 1,869 test files reach
+// main/engine-bin.mjs. That set is the right one to run and the wrong one to
+// wait for, so over the cap this hands back the test files that are most about
+// the change and leaves the rest to GitHub, which runs the whole suite on
 // every push.
+//
+// A test reaches the change by importing it, by importing something that does
+// (scripts/lib/tests-that-import.mjs), or by reading it as text
+// (scripts/lib/tests-that-read.mjs). All three count towards the cap: until
+// they did, a change to a core file was measured by the few tests that quote
+// its name and the ship waited for the hundreds that run.
 //
 // Usage: node scripts/lib/tests-the-push-runs.mjs <changed files...>
 //   prints the vitest arguments, one per line, and says what it chose on
@@ -14,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { testsThatRead } from './tests-that-read.mjs';
+import { testsThatImport } from './tests-that-import.mjs';
 
 // WHY SIXTY. Nearly all of a gate's cost is per FILE, not per test: of the
 // 77 s a 93-file run took at load 16, fork time was 102 s collecting and 36 s
@@ -46,7 +53,11 @@ function namesItHowOften(testFile, changed, root) {
  */
 export function gateFor(changed, root = process.cwd(), { cap = GATE_CAP } = {}) {
   const code = changed.filter(Boolean);
-  const named = [...new Set([...code.filter(isTest), ...testsThatRead(code, root)])];
+  // All three roads in, because all three are what `related` would run and so
+  // what a ship would wait for.
+  const named = [...new Set([
+    ...code.filter(isTest), ...testsThatRead(code, root), ...testsThatImport(code, root),
+  ])];
   if (named.length <= cap) {
     return {
       mode: 'related',
@@ -70,7 +81,7 @@ export function gateFor(changed, root = process.cwd(), { cap = GATE_CAP } = {}) 
     files,
     named: named.length,
     left: named.length - cap,
-    say: `${named.length} test files name what this push changes, which is more than a ship can wait for `
+    say: `${named.length} test files reach what this push changes, which is more than a ship can wait for `
       + `on this Mac. Running the ${cap} that are most about it; GitHub runs those ${named.length - cap} `
       + 'and the rest of the suite.',
   };

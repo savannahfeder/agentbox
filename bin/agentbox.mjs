@@ -15,11 +15,13 @@ import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { bootHeadless, createServer, newToken, picturesTheAppOwns } from '../main/serve.mjs';
+import { bootHeadless, createServer, newToken, picturesTheAppOwns } from '../main/serve.mts';
 import { appHome } from '../main/store/home.mjs';
+import { NO_TERMINAL, ptyIsHere } from '../main/pty.mts';
 import { learnShellDataDirs } from '../main/shell-path.mjs';
-import { startFreezeRecorder } from '../main/freeze-recorder.mjs';
-import { watchNewChatsFor } from '../main/new-chats-watch.mjs';
+import { startFreezeRecorder } from '../main/freeze-recorder.mts';
+import { readHubAddress } from '../main/hub-address.mjs';
+import { watchNewChatsFor } from '../main/new-chats-watch.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.dirname(here);
@@ -57,6 +59,13 @@ if (args.includes('--help') || args.includes('-h')) {
 const dataDir = path.resolve(
   flag('dir', process.env.AGENTBOX_HOME ?? appHome()),
 );
+// A store has one owner: a machine that is a window onto a hub runs no agents,
+// whichever door it is opened through (main/hub-address.mjs).
+const hub = readHubAddress();
+if (hub) {
+  console.error(`This machine names a hub (${hub.url ?? hub.invalid}), so it will not run agents itself.`);
+  process.exit(1);
+}
 fs.mkdirSync(dataDir, { recursive: true });
 
 const dist = path.join(appDir, 'renderer', 'dist');
@@ -66,7 +75,7 @@ if (!fs.existsSync(path.join(dist, 'index.html'))) {
 }
 
 // The login folders the shell profile names, read before the first worker can
-// start, as main/main.mjs does. The worker scrub keeps CLAUDE_CONFIG_DIR and
+// start, as main/main.mts does. The worker scrub keeps CLAUDE_CONFIG_DIR and
 // CODEX_HOME from reaching a worker by inheritance, so without this a copy's
 // workers signed in to ~/.claude and ~/.codex (w-6d8c543a43).
 await learnShellDataDirs();
@@ -77,14 +86,14 @@ startFreezeRecorder({
   appDir,
   onFreeze: (f) => console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`),
 });
-// ZERO_NO_SUPERVISOR: the desktop already honors this (main/main.mjs). This
+// ZERO_NO_SUPERVISOR: the desktop already honors this (main/main.mts). This
 // entry is the same inbox, so a launch that asks for no agents must not start
 // them here either.
 let newChatsWatch = null;
 if (!process.env.ZERO_NO_SUPERVISOR) {
   // Whoever was signed in to the team last time is signed in again.
   booted.team?.start().then(() => booted.supervisor.wake?.()).catch((err) => console.warn(`team: ${err.message}`));
-  // AND THE AGENTS' CLOCK, as the desktop starts it (main/main.mjs). Without it a
+  // AND THE AGENTS' CLOCK, as the desktop starts it (main/main.mts). Without it a
   // tab only moved work when something woke the supervisor: a queued thread sat
   // queued and a scheduled one never fired (found 2026-10-01 on a test copy).
   booted.supervisor.start();
@@ -110,6 +119,9 @@ server.listen(wanted, '127.0.0.1', () => {
   // ran this line expecting that one has to be told here: the README is not
   // what they are looking at.
   console.log(`\n  agentbox is running in your browser.\n\n  ${url}\n\n  Store: ${dataDir}\n  The desktop app is built from the repository: https://github.com/savannahfeder/agentbox#install\n  Stop it with control-C.\n`);
+  // The install that skipped node-pty may be one npm cached for this command,
+  // run once and long scrolled past, so this is said at every start.
+  if (!ptyIsHere()) console.log(`  ${NO_TERMINAL}\n`);
   if (!args.includes('--no-open')) open(url);
 });
 
@@ -128,7 +140,11 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
     console.log('\n  Stopping.');
     newChatsWatch?.stop();
     booted.host.app.quit();
-    server.close(() => process.exit(0));
+    // The quit count and whatever is still queued, or a copy opened once is
+    // never heard from. `shutdown` rather than `flush`, because flush does not
+    // wait for a count captured a moment ago. The timer below still ends it.
+    const sent = booted.analytics?.enabled ? booted.analytics.shutdown() : null;
+    Promise.resolve(sent).catch(() => {}).finally(() => server.close(() => process.exit(0)));
     setTimeout(() => process.exit(0), 3000).unref();
   });
 }

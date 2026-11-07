@@ -63,9 +63,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { codexState, readSettings, recheckCodex } from '../main/settings.mjs';
+import { codexState, readSettings, recheckCodex } from '../main/settings.mts';
 import { forgetCodexBin, INSTALL_URL } from '../main/codex-bin.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -267,7 +267,7 @@ describe('the three states are the finder\'s answer, not a guess', () => {
 
 describe('Check again really looks again', () => {
   it('throws the remembered shell answer away before searching', () => {
-    expect(read('main/settings.mjs')).toContain('export function recheckCodex(config) {\n  forgetCodexBin();');
+    expect(read('main/settings.mts')).toContain('export function recheckCodex(config: SettingsConfig) {\n  forgetCodexBin();');
   });
 
   // AND IT IS WORTH PRESSING, which is the half a Claude Code copy would miss:
@@ -286,7 +286,7 @@ describe('Check again really looks again', () => {
 
   it('is wired end to end, so the button is not a button over nothing', () => {
     expect(preload).toContain("codexRecheck: () => ipcRenderer.invoke('zero:codex-recheck')");
-    expect(read('main/ipc.mjs')).toContain("ipcMain.handle('zero:codex-recheck'");
+    expect(read('main/ipc.mts')).toContain("ipcMain.handle('zero:codex-recheck'");
     expect(api).toContain('async recheckCodex(');
     expect(block).toContain('const r = await check();');
     expect(block).toContain('await onChecked();');
@@ -330,7 +330,7 @@ describe('the card is drawn on every Mac', () => {
     expect(open.engineChoiceOpened()).toBe(true);
     expect(shut.engineChoices()).toHaveLength(1);
     expect(open.engineChoices()).toHaveLength(1);
-    expect(read('main/settings.mjs')).toContain('...codexState(config, {}, { search })');
+    expect(read('main/settings.mts')).toContain('...codexState(config, {}, { search })');
   });
 
   // The renderer reads main's fields rather than deriving its own.

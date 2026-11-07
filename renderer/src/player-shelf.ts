@@ -19,7 +19,10 @@
 //
 // tests/a-film-keeps-playing-while-the-thread-moves.test.mjs
 
-export type ShelfPlayer = { paused: boolean; play(): unknown; pause(): void };
+/** A film's address asking for its first frame: iPhone Safari draws no frame for metadata alone. */
+export const firstFrameSrc = (url: string) => (url.includes('#') ? url : `${url}#t=0.001`);
+
+export type ShelfPlayer ={ paused: boolean; play(): unknown; pause(): void };
 
 type Kept = { url: string; held: boolean; wasPlaying: boolean; turn: number };
 

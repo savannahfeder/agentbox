@@ -1,10 +1,10 @@
-import { artifactSampleChange, artifactSampleNotes, reviewSampleChange } from './artifact-fixtures';
+import { artifactSampleChange, artifactSampleNotes, reviewSampleChange, tableSample, tableSamplePath } from './artifact-fixtures';
 import {updateFixture} from './agent-update-fixture';
 // One seam between the UI and the world. Real mode talks to the preload
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
-import type { AccountUsageReading, AgentConversation, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FolderListing, FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, UsageLimit, WorkItem } from './types';
+import type { AccountUsageReading, AgentConversation, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, UsageLimit, WorkItem } from './types';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
@@ -13,10 +13,25 @@ import { fixtureAgents, fixtureSnapshot, fixtureDashboards, fixtureRepeats, fixt
 import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine } from './fixtures';
 import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
-import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
-import { USAGE_UNREADABLE } from '../../shared/usage.mjs';
-import { accountSentence } from '../../shared/spawn-trouble.mjs';
-import { MOVE_SAY } from '../../shared/where-it-runs-from.mjs';
+import type { CarryState } from '../../shared/carried-files.mjs';
+
+export interface FileLinkAsk { product: string; thread: string; src: string }
+/** `current`: the link holds the copy of the file on screen now. */
+/** `ahead`: the link holds a later version of the file than the one on screen. */
+export interface FileLink { token: string; url: string; version: number; createdAt: number; updatedAt: number; comments: number; current: boolean; ahead?: boolean }
+export interface PublicLink { token: string; url: string; source: string; name: string; kind: string; createdAt: number; updatedAt: number; comments: number }
+export interface LinkComment { id: string; byName: string; byAvatar: string | null; text: string; at: number; mine: boolean; byOwner: boolean }
+/** `site` null: this copy's cloud has no website, so there is nothing to share on. */
+export interface FileLinkState { ok: boolean; error?: string; site?: string | null; signedIn?: boolean; link?: FileLink | null }
+import { checkProjectFolder } from '../../shared/project-folder-check.mts';
+import { whileSystemWindowIsOpen } from './system-window';
+import { USAGE_SAME_AS_ANOTHER, USAGE_UNREADABLE } from '../../shared/usage.mts';
+import { accountSentence } from '../../shared/spawn-trouble.mts';
+import { MOVE_SAY } from '../../shared/where-it-runs-from.mts';
+import { cardsInFront } from '../../shared/which-card-is-in-front.mts';
+import { snapshotReader } from '../../shared/snapshot-delta.mjs';
+import { traceReader } from '../../shared/trace-delta.mjs';
+import { withoutFileHomes } from '../../shared/file-home.mjs';
 // THE SECOND FRONT DOOR, AND IT HAS TO BE BUILT BEFORE THE LINE BELOW RUNS.
 // `useFixtures` reads `window.zero` once, at module load, and on the desktop
 // preload.cjs has already put it there. In a browser tab nothing has, so this
@@ -25,9 +40,11 @@ import { MOVE_SAY } from '../../shared/where-it-runs-from.mjs';
 // remember to, and no import order anywhere can get it wrong.
 import { installBrowserBridge } from './browser-bridge';
 import { installCloudBridge } from './cloud-bridge';
+import { onASharedFilePage } from './shared-file/route';
 
 // The Mac's own page first; the phone with the Mac shut only on its own site.
-if (!installBrowserBridge()) installCloudBridge();
+// A shared file's page is neither: it is for people with no app at all.
+if (!onASharedFilePage() && !installBrowserBridge()) installCloudBridge();
 
 // A team call, in words: a build or a window with no team door says so rather
 // than throwing somewhere the person cannot see. Below the bridge's install,
@@ -36,6 +53,13 @@ async function teamCall(fn: () => Promise<TeamCallResult>): Promise<TeamCallResu
   if (!window.zero?.teamSignIn) return { ok: false, error: 'This build has no team cloud set up.' };
   try { return await fn(); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
 }
+
+// The inbox and the open threads' agent logs as last answered, so each read
+// asks only for what changed since.
+const snapshots = snapshotReader();
+const traces = traceReader();
+// Which thread is on screen: only its agent's live detail is sent.
+let openThread: { product: string | null; id: string } | null = null;
 
 // READ SAFELY, BECAUSE THIS MODULE IS NOW REACHED FROM A COMPONENT THE TESTS
 // RENDER WITHOUT A WINDOW. The walk's last card is <ImportAgents> now, so
@@ -54,11 +78,18 @@ const emptyFixtures = params.get('fixtures') === 'empty';
 // "Three agents working." without this.
 // The number is hers to pass; nothing else about the fixture changes.
 const workingFixtures = Math.max(0, Math.min(99, Number(params.get('working') ?? 0) || 0));
+// ?waiting=2 puts two threads in Needs you with nothing running, which is
+// where a first task sits once its agent has finished and asked a question.
+// Without it the In progress tab's empty line, all of F-142, cannot be
+// photographed: the empty fixture has no inbox and the full one is never idle.
+const waitingFixtures = Math.max(0, Math.min(99, Number(params.get('waiting') ?? 0) || 0));
 // ?fixtures=crowded reproduces a real crowded picker: twenty two projects,
 // duplicates and scratch included. That is the only shape where the composer's
 // chips WRAP, and ranking-by-dragging was written against a single row, so it
 // silently did nothing across rows. This is the case that catches that.
 const crowdedFixtures = params.get('fixtures') === 'crowded';
+// The thread on screen, in fixtures only: see `lookingAt` below.
+let fixtureLooking: { product: string | null; id: string } | null = null;
 // ?fixtures=mock is the reference design, with its own copy, so the built
 // app can be put beside the picture and measured rather than remembered.
 const mockFixtures = params.get('fixtures') === 'mock';
@@ -203,6 +234,10 @@ if (twoLogins) {
   if (accountTrouble === 'at-limit' && first) {
     first.trouble = { cause: 'at-limit', since: Date.now(), note: accountSentence('at-limit') };
   }
+  // &account=stale-limit: that mark is ten minutes old and the login read since has nothing full.
+  if (accountTrouble === 'stale-limit' && first) {
+    first.trouble = { cause: 'at-limit', since: Date.now() - 600_000, at: Date.now() - 600_000, note: accountSentence('at-limit') };
+  }
 }
 
 function fixtureAccountUsage(): AccountUsageReading[] {
@@ -215,11 +250,17 @@ function fixtureAccountUsage(): AccountUsageReading[] {
   const [first, second] = fixtureSettingsState.workspace.accounts;
   const week = now + 6 * 86_400_000;
   // &usagefail: the first login's last refresh failed, so it keeps a reading two hours old.
-  const failed = params.has('usagefail') ? { at: now - 2 * 3_600_000, error: USAGE_UNREADABLE } : { at: now - 60_000 };
+  const failed = params.has('usagefail') ? { at: now - 2 * 3_600_000, error: USAGE_UNREADABLE }
+    // &usagereset: the first login was read 40 minutes ago and its session has reset since.
+    : params.has('usagereset') ? { at: now - 40 * 60_000 } : { at: now - 60_000 };
+  // &usagematched: both logins answered with one set of numbers, so main sent neither.
+  if (params.has('usagematched')) return [first, second].map((a) => ({ profile: a.profile, unconfirmed: true, error: USAGE_SAME_AS_ANOTHER }));
+  const session = params.has('usagereset') ? now - 10 * 60_000 : at(17, 9);
   // &fablefull: the first login has room in its session and week and none left on Fable.
   const firstLimits = params.has('fablefull')
-    ? [limit('session', 30, '5:09pm', at(17, 9)), limit('week', 60, '11:59am', week, 'all models'), limit('week', 100, '11:59am', week, 'Fable')]
-    : [limit('session', twoLogins ? 100 : 42, '5:09pm', at(17, 9)), limit('week', 15, '11:59am', week, 'all models'), limit('week', 24, '11:59am', week, 'Fable')];
+    ? [limit('session', 30, '5:09pm', session), limit('week', 60, '11:59am', week, 'all models'), limit('week', 100, '11:59am', week, 'Fable')]
+    : accountTrouble === 'stale-limit' ? [limit('session', 4, '5:09pm', session), limit('week', 13, '11:59am', week, 'all models'), limit('week', 2, '11:59am', week, 'Fable')]
+    : [limit('session', twoLogins ? 100 : 42, '5:09pm', session), limit('week', 15, '11:59am', week, 'all models'), limit('week', 24, '11:59am', week, 'Fable')];
   return [
     { profile: first.profile, ...failed, limits: firstLimits },
     { profile: second.profile, at: now - 60_000, limits: [limit('session', 5, '8pm', at(20)), limit('week', 9, '4pm', week, 'all models'), limit('week', 6, '4pm', week, 'Fable')] },
@@ -253,7 +294,7 @@ function fixtureWrite(scope: 'project' | 'workspace', p: any): Settings {
     } else if (p.key === 'memoryGateSlots' && w.memoryGate) {
       w.memoryGate = { ...w.memoryGate, slots: p.value === null ? null : Math.max(1, Math.min(w.memoryGate.slotsMax, Number(p.value) || 1)) };
     } else if (p.key === 'activeAccount') {
-      // The account picked is the one marked chosen, as main/settings.mjs
+      // The account picked is the one marked chosen, as main/settings.mts
       // answers it, so the In use row can be seen in a preview.
       const list = p.value?.engine === 'codex' ? w.codex?.accounts ?? [] : w.accounts;
       for (const a of list) a.chosen = a.profile === p.value?.profile;
@@ -287,7 +328,7 @@ export function updateShape(wanted: string): UpdateState {
     // moment it is read.
     ready: { phase: 'ready', newVersion: '0.2.0', percent: 100, ready: true, readyAt: Date.now() - 62 * 60_000 },
     downloading: { phase: 'downloading', newVersion: '0.2.0', percent: 47 },
-    // A copy run from source (main/source-updater.mjs): versions are commit
+    // A copy run from source (main/source-updater.mts): versions are commit
     // ids, and the row lists what changed.
     source: {
       phase: 'ready', ready: true, source: true, currentVersion: '5c6afa7', newVersion: '9e1b204',
@@ -301,7 +342,7 @@ export function updateShape(wanted: string): UpdateState {
     current: { phase: 'current' },
     error: { phase: 'error', error: 'Could not reach the internet.' },
     // A COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS
-    // (shared/where-it-runs-from.mjs). This is the state two real installs
+    // (shared/where-it-runs-from.mts). This is the state two real installs
     // were in for a week, and the only way to look at the card and the row
     // without a disk image and a packaged build.
     'disk-image': { phase: 'error', error: MOVE_SAY.cannotUpdateHere, canMove: true, place: 'disk-image' },
@@ -311,7 +352,7 @@ export function updateShape(wanted: string): UpdateState {
       moveError: 'The move did not work.',
     },
     // WHY A COPY DOES NOT UPDATE ITSELF AT ALL, which is the state most
-    // teammates' checkouts are actually in (main/source-updater.mjs SAY).
+    // teammates' checkouts are actually in (main/source-updater.mts SAY).
     unsupported: {
       phase: 'unsupported', source: true, currentVersion: '5c6afa7',
       error: 'This folder has changes of your own in it, so it does not update itself.',
@@ -335,7 +376,7 @@ export const api = {
 
   // IS A SCREEN READER RUNNING. Asked by the terminal pane before it builds an
   // xterm, so the accessibility tree is built for the people it is for rather
-  // than for everybody (main/ipc.mjs 'zero:assistiveTech').
+  // than for everybody (main/ipc.mts 'zero:assistiveTech').
   //
   // Every failure is "no": fixtures, a preload from before this channel
   // existed, or a refused call. A terminal that cannot ask the question still
@@ -347,6 +388,10 @@ export const api = {
   async snapshot(): Promise<Snapshot> {
     if (emptyFixtures) {
       const empty = { ...structuredClone(fixtureSnapshot), items: [], approvals: [], supervisor: { paused: false, running: [], capacity: 3 } };
+      // ?noProjects IS A STORE NOBODY HAS USED, which is the only world the
+      // first run draws in: it opens on a count of projects, and the empty
+      // fixture still carries Kestrel and the rest.
+      if (params.has('noProjects')) empty.products = [];
       // AND THE AGENTS THE BAR COUNTS. Real running entries rather than a number
       // poked in, so the bar counts the same array the app counts everywhere
       // else. The inbox stays empty, which is what keeps the idle page up.
@@ -355,6 +400,16 @@ export const api = {
           itemId: `w-working-${i + 1}`, product: 'kestrel', startedAt: Date.now() - (i + 1) * 60_000,
           tail: ['tool: Read'],
         })) as typeof empty.supervisor.running;
+      }
+      if (waitingFixtures) {
+        const now = Date.now();
+        empty.items = Array.from({ length: waitingFixtures }, (_x, i) => ({
+          id: `w-waiting-${i + 1}`, product: 'kestrel', productName: 'Kestrel',
+          status: 'open', kind: 'task', title: 'README usage section with example call',
+          labels: [], priority: 1, epoch: 1, claim: null,
+          result: 'Which name and email should the commit use?',
+          createdAt: now - (i + 1) * 60_000, updatedAt: now - (i + 1) * 60_000,
+        })) as typeof empty.items;
       }
       // AND THE SECOND CODING AGENT, LAST, OVER WHICHEVER WORLD IS UP. It is
       // applied at all four exits rather than once around them because each
@@ -396,7 +451,7 @@ export const api = {
       // be looked at.
       if (params.has('stale')) {
         base.restartNeeded = {
-          files: ['main/supervisor.mjs', 'main/ipc.mjs', 'preload.cjs', 'shared/rank.mjs'],
+          files: ['main/supervisor.mts', 'main/ipc.mts', 'preload.cjs', 'shared/rank.mjs'],
           since: Date.now() - 2.9 * 24 * 3_600_000,
         };
       }
@@ -410,6 +465,7 @@ export const api = {
       // is a real state worth being able to look at, and it is not the state
       // every other fixtures screenshot wants a card floating over.
       if (!params.has('approvals')) base.approvals = [];
+      else base.approvals = cardsInFront(base.approvals, fixtureLooking);
       // &cloud=mac|full|all draws the cloud button set up, two accounts in,
       // three threads running there, so its menu can be looked at.
       const cloud = params.get('cloud');
@@ -472,7 +528,7 @@ export const api = {
         base.cloud = { setUp: false, offered: true, mode: 'full', whenOn: 'full', running: 0, month: { runs: 0, agentHours: 0, estimatedCost: 0, costPerAgentHour: 0 }, accounts: [], signIns: [] } as typeof base.cloud;
       } else if (cloud === 'mac' || cloud === 'full' || cloud === 'all') {
         base.cloud = {
-          setUp: true, mode: cloud, whenOn: cloud === 'all' ? 'all' : 'full', running: 3,
+          setUp: true, mode: cloud, whenOn: cloud === 'all' ? 'all' : 'full', running: 3, projects: base.products.map((p) => p.slug),
           month: { runs: 6, agentHours: 2.4, estimatedCost: 0.31, costPerAgentHour: 0.13 },
           accounts: [
             { engine: 'claude', key: 'a1', name: 'me@example.com', ready: true, state: 'ready' },
@@ -499,6 +555,17 @@ export const api = {
           const kept = base.items.find((i) => i.id === first.itemId);
           if (kept) kept.onMac = true;
         }
+        // &needs draws the top thread in Needs you handed back for a key only this Mac has.
+        if (params.has('needs')) {
+          const first = base.items.find((i) => /^The first row a new project/.test(i.title));
+          if (first) Object.assign(first, { onMac: true, needsMac: 'your Stripe key' });
+        }
+        // &moving draws the other running threads on this Mac, all of which the cloud could take now.
+        if (params.has('moving') && base.cloud) {
+          const here = base.supervisor.running.filter((r) => (r as { where?: string }).where !== 'cloud').map((r) => r.itemId);
+          base.cloud.movable = here;
+          if (cloud === 'all') base.supervisor.whyNotCloud = Object.fromEntries(here.map((id) => [id, { at: 'mac' as const, why: 'moving' }]));
+        }
       }
       // &cloud=managed draws Agentbox Cloud signed in through its server, and
       // &noroom=hours|agents the server saying it had no room a moment ago.
@@ -515,7 +582,24 @@ export const api = {
       }
       return fixtureSecondEngine(base, engineFixtures);
     }
-    return window.zero!.snapshot();
+    // A document's holder thread is the app's, so no list of threads draws it.
+    const shown = (s: Snapshot) => ({ ...s, items: withoutFileHomes(s.items) });
+    const got = snapshots.take(await window.zero!.snapshot({ ...snapshots.ask(), open: openThread }));
+    if (got) return shown(got);
+    // Built on a list this window no longer holds: a whole one, which take() never refuses.
+    return shown(snapshots.take(await window.zero!.snapshot({ open: openThread })) as Snapshot);
+  },
+
+  // WHERE YOU ARE, FOR THE ONE THING THAT DEPENDS ON IT: the approval card in
+  // front is the open thread's own, and the chord that answers it is caught in
+  // the main process. A build with no such channel keeps the oldest card in
+  // front, which is what it did before.
+  async lookingAt(at: { product: string | null; id: string } | null): Promise<void> {
+    // Fixtures have no main process to order the cards, and ?approvals is how
+    // this card is reviewed, so the same shared rule is applied here.
+    openThread = at?.id ? { product: at.product, id: at.id } : null;
+    if (useFixtures) { fixtureLooking = at; return; }
+    try { await window.zero?.looking?.({ product: at?.product ?? null, id: at?.id ?? null }); } catch { /* the card simply stays where it was */ }
   },
 
   async refreshUsage(engine: 'claude' | 'codex' = 'claude'): Promise<{ ok: boolean; reading?: Usage; error?: string }> {
@@ -563,7 +647,7 @@ export const api = {
   },
 
   // MOVING THE APP INTO APPLICATIONS, for a copy that cannot update itself
-  // from where it is (shared/where-it-runs-from.mjs). A real move relaunches
+  // from where it is (shared/where-it-runs-from.mts). A real move relaunches
   // the app, so fixtures answer the only interesting half: `?update=move-failed`
   // is the refusal, which is the one state that has anything left to draw.
   async updateMove(): Promise<{ moved: boolean; error: string | null }> {
@@ -604,9 +688,15 @@ export const api = {
   // The session traces behind the working notes. It comes through the seam
   // like everything else, so the notes can be built, reviewed and screenshotted
   // from fixtures instead of only against a live fleet.
-  async sessionTrace(p: { product: string; id: string }): Promise<{ sessions: Array<{ startedAt: number; text: string }> }> {
+  async sessionTrace(p: { product: string; id: string; whole?: boolean }):Promise<{ sessions: Array<{ startedAt: number; text: string }> }> {
     if (useFixtures) return { sessions: (fixtureTraces as any)[p.id] ?? [] };
-    return (window.zero as any)?.sessionTrace?.(p) ?? { sessions: [] };
+    const zero = window.zero as any;
+    if (!zero?.sessionTrace) return { sessions: [] };
+    // Read once and kept by the thread page, so the newest logs' copy stays as it is.
+    if (p.whole) return (await zero.sessionTrace(p)) ?? { sessions: [] };
+    const key = `${p.product}/${p.id}`;
+    const got = traces.take(key, await zero.sessionTrace({ ...p, have: traces.have(key) }));
+    return got ?? traces.take(key, await zero.sessionTrace(p)) ?? { sessions: [] };
   },
 
   // THE DOCUMENT PANE'S THREE. All of them go through the app's own finder in
@@ -623,20 +713,61 @@ export const api = {
   // the pane points its frame at, so the page's own pictures load (main/
   // doc-scheme.mjs). An older preload has no such field, and the pane says so
   // rather than drawing a page with holes in it.
-  async resolveDoc(p: { product: string; src: string }): Promise<{ ok: boolean; opened?: string; url?: string; error?: string }> {
+  async resolveDoc(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; opened?: string; url?: string; error?: string; coming?: boolean; waits?: boolean; note?: string; carry?: CarryState }> {
     if (useFixtures && ['artifact-layout-sample.change', 'review-bundle.change'].includes(p.src)) return { ok: true, opened: p.src };
     if (useFixtures && p.src === 'artifact-layout-sample.md') return { ok: true, opened: p.src };
+    if (useFixtures && p.src === tableSamplePath) return { ok: true, opened: p.src };
     if (useFixtures && p.product === 'onboard' && ['designs/w-n13/the-first-row.html', '/fixtures/onboard/designs/w-n13/the-first-row.html'].includes(p.src)) return { ok: true, opened: p.src, url: '/fixtures/onboard/designs/w-n13/the-first-row.html' };
     const zero = window.zero as any;
     if (!zero?.openArtifact) return { ok: false, error: `quit and reopen ${NAME} to open documents here` };
     return zero.openArtifact({ ...p, mode: 'resolve' });
   },
 
-  async readDoc(p: { product: string; src: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string }> {
+  async readDoc(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string; coming?: boolean; waits?: boolean; carry?: CarryState }> {
     if (useFixtures && p.src === 'artifact-layout-sample.md') return {ok:true,text:artifactSampleNotes,mtime:0};
+    if (useFixtures && p.src === tableSamplePath) return { ok: true, text: tableSample, mtime: 0 };
     const zero = window.zero as any;
     if (!zero?.readDoc) return { ok: false, error: `quit and reopen ${NAME} to open documents here` };
     return zero.readDoc(p);
+  },
+
+  /** A link anyone can open, to one of this person's files (main/file-link.mjs). */
+  async fileLink(p: FileLinkAsk): Promise<FileLinkState> {
+    const zero = window.zero as any;
+    if (!zero?.fileLink) return { ok: false, error: 'not here' };
+    return zero.fileLink(p);
+  },
+  async fileLinkShare(p: FileLinkAsk): Promise<FileLinkState> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinkShare) return { ok: false, error: `quit and reopen ${NAME} to share files` };
+    return zero.fileLinkShare(p);
+  },
+  async fileLinkStop(p: { token: string }): Promise<{ ok: boolean; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinkStop) return { ok: false, error: `quit and reopen ${NAME} to share files` };
+    return zero.fileLinkStop(p);
+  },
+  /** Every live link of this person's, for the list of what they made public. */
+  async fileLinks(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinks) return { ok: false, error: 'not here' };
+    return zero.fileLinks();
+  },
+  async fileLinkComments(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinkComments) return { ok: false, error: 'not here' };
+    return zero.fileLinkComments(p);
+  },
+  async fileLinkComment(p: { token: string; text: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
+    const zero = window.zero as any;
+    if (!zero?.fileLinkComment) return { ok: false, error: `quit and reopen ${NAME} to answer comments` };
+    return zero.fileLinkComment(p);
+  },
+
+  /** "Try again" on a file in a conversation that was not delivered. */
+  async retryFile(p: { product: string; src: string }): Promise<boolean> {
+    const zero = window.zero as any;
+    return zero?.retryFile ? !!(await zero.retryFile(p)) : false;
   },
 
   // THE CHANGE A RUN MADE, read out of the conversation rather than out of
@@ -667,7 +798,7 @@ export const api = {
     return zero.saveCodeFile(p);
   },
 
-  async writeDoc(p: { product: string; src: string; text: string; mtime: number }): Promise<{ ok: boolean; mtime?: number; error?: string }> {
+  async writeDoc(p: { product: string; src: string; text: string; mtime: number; thread?: string }): Promise<{ ok: boolean; mtime?: number; error?: string; stale?: boolean }> {
     const zero = window.zero as any;
     if (!zero?.writeDoc) return { ok: false, error: `quit and reopen ${NAME} to save this file` };
     return zero.writeDoc(p);
@@ -761,10 +892,10 @@ export const api = {
   // choice. `engine` is set by ⌘K (w-c9da359466) and by the reply box's menu,
   // which lists both agents' models (w-e1a42f6b21).
   // `now` cuts the running agent's current step so this message is answered at
-  // once instead of after it (main/claude-input.mjs `interrupt`).
+  // once instead of after it (main/claude-input.mts `interrupt`).
   // `inReplyTo` is the uid of the message a reply in a thread answers
   // (w-920461cbe6); main keeps it only in a conversation between people.
-  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean }): Promise<WorkItem | null> {
+  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; runAt?: number; putAway?: boolean }): Promise<WorkItem | null> {
     if (useFixtures) return null;
     return window.zero!.answer(p);
   },
@@ -775,7 +906,7 @@ export const api = {
   },
 
   /* --------------------------------- feedback ------------------------------- */
-  // Answers { ok } or { ok: false, error } in words (main/feedback.mjs).
+  // Answers { ok } or { ok: false, error } in words (main/feedback.mts).
   async sendFeedback(p: { text: string; files: { name: string; type: string; size: number; data: string }[] }): Promise<{ ok: boolean; error?: string }> {
     if (useFixtures) return { ok: true };
     if (!window.zero?.sendFeedback) return { ok: false, error: `Restart ${Name} to send feedback.` };
@@ -794,7 +925,7 @@ export const api = {
   async teamAcceptInvite(teamId: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamAcceptInvite({ teamId })); },
   async teamInvite(email: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamInvite({ email })); },
   async teamRename(name: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRename({ name })); },
-  async teamRemoveMember(personId: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRemoveMember({ personId })); },
+  async teamRemoveMember(personId: string, handover: { handTo: string; mates: { id: string; to: string | null }[] } | null = null): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRemoveMember({ personId, ...(handover ?? {}) })); },
   async teamLeave(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamLeave()); },
   async teamCancelInvite(email: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamCancelInvite({ email })); },
   // A line you write about yourself. Saying nothing clears it.
@@ -805,15 +936,100 @@ export const api = {
   async teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRoute(p)); },
   // A chip put on or taken off one message. `on` is the uid of the ledger line
   // the message was written as (w-560647d4db).
+  async teamThreadWork(p: { personId: string; threadId: string }): Promise<TeammateThreadWork> {
+    if (!window.zero?.teamThreadWork) return { shared: false, lines: [], earlier: 0, product: null, dir: null };
+    return window.zero.teamThreadWork(p);
+  },
+  // Lines, files and comments inside threads (main/everything-found.mjs).
+  async findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number } }): Promise<FoundInThreads> {
+    const none: FoundInThreads = { lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 } };
+    if (!window.zero?.findInThreads) return none;
+    const got = await window.zero.findInThreads(p).catch(() => none);
+    return got.ok === false ? none : got;
+  },
+  warmFindInThreads(): void { void window.zero?.warmFindInThreads?.()?.catch?.(() => {}); },
+  async teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamComment(p)); },
   async teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamReact(p)); },
+  async fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }> {
+    if (!window.zero?.fileMark) return { ok: false, error: `quit and reopen ${NAME} to comment here` };
+    return window.zero.fileMark(p);
+  },
+  async fileNewVersion(p: { product: string; id: string; path: string; text: string; since?: string | null }): Promise<{ ok: boolean; path?: string; error?: string }> {
+    if (!window.zero?.fileNewVersion) return { ok: false, error: `quit and reopen ${NAME} to edit here` };
+    return window.zero.fileNewVersion(p);
+  },
+  async teamMarkFile(p: { personId: string; threadId: string; mark: ArtifactMark }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMarkFile(p)); },
+  async connections(): Promise<ConnectionsList> {
+    return (await window.zero?.connections?.().catch(() => null)) ?? { tiles: [], canEncrypt: false, projects: [], groups: [] };
+  },
+  async connectionsConnect(p: ConnectAsk): Promise<ConnectAnswer> {
+    if (!window.zero?.connectionsConnect) return { ok: false, error: `quit and reopen ${NAME} to connect this` };
+    return window.zero.connectionsConnect(p);
+  },
+  async connectionsAdd(p: { address: string; key?: string }): Promise<ConnectAnswer> {
+    if (!window.zero?.connectionsAdd) return { ok: false, error: `quit and reopen ${NAME} to connect this` };
+    return window.zero.connectionsAdd(p);
+  },
+  async connectionsChoose(p: { id: string; names: string[] }): Promise<ConnectionTile | null> { return (await window.zero?.connectionsChoose?.(p).catch(() => null)) ?? null; },
+  async connectionsCopy(p: CopyAct): Promise<{ ok: boolean; error?: string }> {
+    if (!window.zero?.connectionsCopy) return { ok: false, error: `quit and reopen ${NAME} to do this` };
+    return window.zero.connectionsCopy(p);
+  },
+  async connectionsCancel(p: { id: string }): Promise<void> { await window.zero?.connectionsCancel?.(p); },
+  async connectionsCheck(p: { id: string }): Promise<ConnectionTile | null> { return (await window.zero?.connectionsCheck?.(p).catch(() => null)) ?? null; },
+  async connectionsDisconnect(p: { id: string }): Promise<void> { await window.zero?.connectionsDisconnect?.(p); },
+  async connectionsAccept(p: { id: string }): Promise<void> { await window.zero?.connectionsAccept?.(p); },
+  async filesPlace(): Promise<FilesPlaceList> {
+    return (await window.zero?.filesPlace?.().catch(() => null)) ?? { files: [], projects: [], folders: [] };
+  },
+  async filesPlaceFolder(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null }> {
+    if (!window.zero?.filesPlaceFolder) return { ok: false, error: `quit and reopen ${NAME} to use folders` };
+    return window.zero.filesPlaceFolder(p);
+  },
+  async filesPlaceNew(p: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }> {
+    if (!window.zero?.filesPlaceNew) return { ok: false, error: `Quit and reopen ${NAME} to make a document here.` };
+    return window.zero.filesPlaceNew(p);
+  },
+  async filesPlaceUpload(p: { project: string; folder: string | null }): Promise<FilesUploaded> {
+    if (!window.zero?.filesPlaceUpload) return { ok: false, error: `Quit and reopen ${NAME} to add files here.` };
+    return window.zero.filesPlaceUpload(p);
+  },
+  async filesPlaceOpen(p: { key: string }): Promise<FilesPlaceView | null> {
+    return (await window.zero?.filesPlaceOpen?.(p).catch(() => null)) ?? null;
+  },
+  /** Each file a thread names, as its version line numbers it. */
+  async fileLine(p: { product: string; id: string }): Promise<FileLine[]> {
+    return (await window.zero?.fileLine?.(p).catch(() => null)) ?? [];
+  },
+  /** One answer per copy, in the order asked. */
+  async fileElsewhere(p: { product: string; id: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]> {
+    const got = await window.zero?.fileElsewhere?.(p).catch(() => null);
+    return Array.isArray(got) ? got : p.copies.map(() => ({ key: null, notes: [], approvals: [] }));
+  },
+  async filesPlaceEdit(p: { key: string; text: string }): Promise<{ ok: boolean; error?: string; goes?: 'sent'; to?: string }> {
+    if (!window.zero?.filesPlaceEdit) return { ok: false, error: `Quit and reopen ${NAME} to save this.` };
+    return window.zero.filesPlaceEdit(p);
+  },
+  async filesPlaceMark(p: { key: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }> {
+    if (!window.zero?.filesPlaceMark) return { ok: false, error: `quit and reopen ${NAME} to comment here` };
+    return window.zero.filesPlaceMark(p);
+  },
   async teamEdit(p: { product: string; id: string; on: string; text?: string; gone?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamEdit(p)); },
   // A MESSAGE TO A PERSON (people get messages, never tasks), at the level the
   // sender picked. The level counts on the first message of a conversation and
-  // is ignored after, which is the main process's rule (main/team/index.mjs).
+  // is ignored after, which is the main process's rule (main/team/index.mts).
   // And the files the card carries, saved into the conversation once the main
   // process knows which one it is.
-  async teamMessage(to: string | string[], body: string, priority?: number, files?: TeamMessageFile[]): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessage({ to, body, priority, files })); },
-  // Rooms (alpha): every call goes through one door (main/ipc.mjs ROOM_OPS).
+  async teamMessage(to: string | string[], body: string, priority?: number, files?: TeamMessageFile[], subject?: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessage({ to, body, priority, files, ...(subject ? { subject } : {}) })); },
+  async teamGiveTask(p: { to: string; title?: string; body: string; priority?: number; due?: string; files?: TeamMessageFile[]; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; blockedBy?: string[] }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamGiveTask(p)); },
+  async teamSeen(p: { product: string; id: string }): Promise<boolean> { try { return !!(await window.zero?.teamSeen?.(p)); } catch { return false; } },
+  async teamMoveToThread(p: { product: string; id: string; on: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMoveToThread(p)); },
+  async teamMessageMate(p: { owner: string; mate: string; text: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessageMate(p)); },
+  async teamHandOn(p: { product: string; id: string; to: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamHandOn(p)); },
+  async teamTaskBrief(p: { product: string; id: string }) { return window.zero!.teamTaskBrief(p); },
+  async teamContinueBrief(p: { personId: string; threadId: string }) { return window.zero!.teamContinueBrief(p); },
+  async teamContinued(p: { personId: string; threadId: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamContinued(p)); },
+  // Rooms (alpha): every call goes through one door (main/ipc.mts ROOM_OPS).
   async teammates<T = unknown>(op: string, args: Record<string, unknown> = {}): Promise<TeammatesResult<T>> {
     if (!window.zero?.teammates) return { ok: false, error: 'Teammates are not available here.' };
     try { return (await window.zero.teammates({ op, args })) as TeammatesResult<T>; } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
@@ -827,7 +1043,7 @@ export const api = {
     if (useFixtures || !window.zero?.threadEdit) return { ok: true };
     try { return await window.zero.threadEdit({ product, id, patch }); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   },
-  // Move a thread to another project (shared/move-thread.mjs). Answers with
+  // Move a thread to another project (shared/move-thread.mts). Answers with
   // the row it became there, or with the reason in words: only a thread
   // nothing has ever run on can go, and main asks that again before it writes.
   async moveItem(product: string, id: string, to: string): Promise<{ ok: boolean; error?: string; item?: WorkItem; from?: string; to?: string }> {
@@ -852,7 +1068,18 @@ export const api = {
     await window.zero.setThreadOnMac({ onMac });
   },
 
-  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem | null> {
+  /**
+   * Move runs on this Mac to the cloud as it has room; how many will go. One
+   * thread names its project too, which the phone's command needs.
+   */
+  async moveToCloud(ids: string[], product?: string): Promise<number> {
+    if (useFixtures || !window.zero?.moveToCloud) return 0;
+    const out = await window.zero.moveToCloud({ ids, ...(product && ids.length === 1 ? { product, id: ids[0] } : {}) });
+    // The phone leaves a command for the computer, which says nothing back yet.
+    return out?.moving ?? (out?.ok ? ids.length : 0);
+  },
+
+  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem | null> {
     // FIXTURES ANSWER WITH THE TASK, the way the real store does. Returning
     // null here meant the send had nothing to point at, and the caller reads
     // that as "no task was made" and puts no way back on the undo pile — so the
@@ -882,6 +1109,12 @@ export const api = {
       };
     }
     return window.zero!.compose(p);
+  },
+
+  /** Who takes a thread sent to Auto: 'agent' or a teammate as 'mate:<id>' (shared/auto-route.mjs). */
+  async routeThread(p: { product: string; id: string; to: string }): Promise<void> {
+    if (useFixtures || !window.zero?.routeThread) return;
+    await window.zero.routeThread(p);
   },
 
   /* ------------------------------ the first run ---------------------------- */
@@ -950,7 +1183,7 @@ export const api = {
 
   // BEING A BRAND NEW USER ON THE APP SHE DOWNLOADED.A second Agentbox opens in
   // a throwaway home beside hers; nothing of hers is deleted and her own
-  // window keeps running (main/fresh-user.mjs).
+  // window keeps running (main/fresh-user.mts).
   //
   // IT SAYS WHY IT COULD NOT RATHER THAN FALLING BACK QUIETLY. A missing
   // channel here means a main process older than this build, which is exactly
@@ -1047,13 +1280,13 @@ export const api = {
   // object carrying anything else.
   async composeRepeat(p: {
     product: string; title: string; body?: string; priority?: number; rule: RepeatShape;
-    engine?: string; model?: string;
+    engine?: string; model?: string; startsNext?: boolean;
   }): Promise<RepeatRule | null> {
     if (useFixtures) return null;
     return window.zero!.composeRepeat(p);
   },
 
-  async setRepeat(p: { product: string; id: string; rule: Partial<RepeatShape & { title: string; body: string; priority: number }> }): Promise<RepeatRule | null> {
+  async setRepeat(p: { product: string; id: string; rule: Partial<RepeatShape & { title: string; body: string; priority: number; startsNext: boolean }> }): Promise<RepeatRule | null> {
     // FIXTURES CAN CHANGE A RULE, because changing one is now a thing she does
     // on screen rather than a thing that only happens on disk. It used to
     // answer null, so in the fixture app the box would take the words, close,
@@ -1192,7 +1425,7 @@ export const api = {
     const zero = window.zero as any;
     if (!zero?.engineBin) return { ...emptySettings, ok: false, error: RESTART_NOTE };
     try {
-      return await zero.engineBin({ engine, ...(action ? { action } : {}) });
+      return await whileSystemWindowIsOpen(() => zero.engineBin({ engine, ...(action ? { action } : {}) }));
     } catch (err) {
       return { ...emptySettings, ok: false, error: String((err as Error)?.message ?? err) };
     }
@@ -1214,6 +1447,13 @@ export const api = {
     if (useFixtures && engineFixtures === 'nowhere') {
       return { engine, phase: 'idle', error: null, log: '', found: false, signedIn: false };
     }
+    // AND THE SAME MACHINE WITH AN INSTALL RUNNING ON IT. The first probe is
+    // `ready`, which has to answer empty or the gate never opens; every action
+    // after it is the press, and it stays where it is so the screen can be
+    // photographed waiting.
+    if (useFixtures && engineFixtures === 'installing') {
+      return { engine, phase: action === 'ready' ? 'idle' : 'installing', error: null, log: '', found: false, signedIn: false };
+    }
     /*
      * AND THE MACHINE MOST PEOPLE ARRIVE ON (w-e217e577e5): Claude signed in
      * already, nothing else here. Every fixture copy answers `assumeReady` for
@@ -1233,14 +1473,17 @@ export const api = {
     if (!zero?.engineSetup) return assumeReady;
     try {
       const r = await zero.engineSetup({ action, engine });
-      if (!r?.ok) return { ...assumeReady, phase: 'failed', found: false, signedIn: false, error: r?.error ?? 'Setup could not start.' };
+      // A PROBE THAT DID NOT RUN IS NOT A COMPUTER WITH NOTHING ON IT. The
+      // setup card reads this as failed and says so; the inbox bar reads
+      // `certain` and stays down.
+      if (!r?.ok) return { ...assumeReady, phase: 'failed', found: false, signedIn: false, certain: false, error: r?.error ?? 'Setup could not start.' };
       return {
         engine, phase: r.phase ?? 'idle', error: r.error ?? null, log: r.log ?? '',
-        found: !!r.found, signedIn: !!r.signedIn,
+        found: !!r.found, signedIn: !!r.signedIn, certain: r.certain !== false,
         bin: r.bin ?? null, already: !!r.already,
       };
     } catch (e) {
-      return { ...assumeReady, phase: 'failed', found: false, signedIn: false, error: String((e as Error)?.message ?? e) };
+      return { ...assumeReady, phase: 'failed', found: false, signedIn: false, certain: false, error: String((e as Error)?.message ?? e) };
     }
   },
 
@@ -1274,7 +1517,7 @@ export const api = {
     if (useFixtures) return { ...emptySettings, ok: true, canceled: true };
     const zero = window.zero as any;
     if (!zero?.projectIcon) return { ...emptySettings, ok: false, error: RESTART_NOTE };
-    return zero.projectIcon(p);
+    return whileSystemWindowIsOpen(() => zero.projectIcon(p));
   },
 
   async clearProjectIcon(p: { product: string }): Promise<Settings> {
@@ -1360,6 +1603,32 @@ export const api = {
     return zero.cloudSignIn(p);
   },
 
+  /** A file a cloud run asked for, sent from this computer (or one picked instead) to the thread's next cloud turn. */
+  async cloudSendFile(p: { product: string; id: string; path?: string; choose?: boolean; hold?: boolean; also?: string }): Promise<{ ok: boolean; path?: string; canceled?: boolean; held?: boolean; words?: string; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudSendFile) return { ok: false, error: RESTART_NOTE };
+    return zero.cloudSendFile(p);
+  },
+  /** A one-time code a cloud run asked for, sent as the reply that carries it on. */
+  /** Whether a file a cloud run asked for is on this computer to send, and its size. */
+  async cloudFileInfo(p: { path: string }): Promise<{ ok: boolean; size?: number; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudFileInfo) return { ok: true };
+    return zero.cloudFileInfo(p);
+  },
+  async cloudSendCode(p: { product: string; id: string; about: string; code: string; also?: string }): Promise<{ ok: boolean; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudSendCode) return { ok: false, error: RESTART_NOTE };
+    return zero.cloudSendCode(p);
+  },
+
+  /** A key kept in the cloud for every cloud run: saved under its name, or removed. */
+  async cloudKey(p: { action: 'save' | 'remove'; name: string; value?: string; label?: string; reply?: { product: string; id: string; answer: string } }): Promise<{ ok: boolean; keys?: { name: string; savedAt: number | null; label?: string | null }[]; freed?: string[]; cloudOff?: boolean; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudKey) return { ok: false, error: RESTART_NOTE };
+    return zero.cloudKey(p);
+  },
+
   /** Signing in to Agentbox Cloud itself, on the app's sign-in page: Google, email, a new account and its link again, or a password reset. */
   async cloudAccountSignIn(p: { method: 'google' | 'email' | 'sign-up' | 'resend' | 'agree' | 'reset' | 'reset-wait' | 'new-password'; email?: string; password?: string; name?: string; acceptTerms?: boolean }): Promise<{ ok: boolean; confirm?: boolean; needsTerms?: boolean; sent?: boolean; opened?: boolean; error?: string; cancelled?: boolean }> {
     const zero = window.zero as any;
@@ -1423,7 +1692,7 @@ export const api = {
   },
 
   // `ofMany` says this one is part of a press that connects several folders and
-  // will count itself once (main/ipc.mjs); it changes nothing about the project.
+  // will count itself once (main/ipc.mts); it changes nothing about the project.
   async createProduct(p: { name: string; repoPath?: string | null; ofMany?: boolean }) {
     if (useFixtures) return null;
     return window.zero!.createProduct(p);
@@ -1446,11 +1715,17 @@ export const api = {
         const turnedDown = checkProjectFolder('~');
         return { path: null, refused: turnedDown.ok ? undefined : turnedDown.say };
       }
+      // A browser tab's answer, so the picker the app draws can be shot too.
+      if (params.has('drawnPicker')) return { path: null, browse: true };
       return { path: '/Users/you/Desktop/dev/house' };
     }
     const zero = window.zero as any;
     if (!zero?.chooseFolder) return { path: null };
-    const r = await zero.chooseFolder({ startIn });
+    // Nothing typed at the chooser is typed into the screen behind it. See
+    // renderer/src/system-window.ts: on Linux the keys came through.
+    const r = await whileSystemWindowIsOpen<{ path?: string | null; refused?: string; browse?: boolean }>(
+      () => zero.chooseFolder({ startIn }),
+    );
     // `browse` is a tab with no Mac dialog behind it. It is not a refusal and
     // it is not a cancel: the screen opens <FolderPicker> instead, which walks
     // this machine's disk through listFolders below and comes back with a real
@@ -1616,7 +1891,7 @@ export const api = {
     return window.zero!.onChanged(fn);
   },
 
-  /** The phone door (main/phone-link.mjs). Null where there is none: the
+  /** The phone door (main/phone-link.mts). Null where there is none: the
    *  fixtures, and a browser tab, whose server has no such channel. */
   async phoneLink(p: { action: 'status' | 'on' | 'off' | 'reset' | 'via' | 'stop-alerts'; via?: PhoneRoute; device?: string }): Promise<PhoneLink | null> {
     if (useFixtures) return null;

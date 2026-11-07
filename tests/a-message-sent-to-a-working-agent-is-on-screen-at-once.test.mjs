@@ -2,10 +2,10 @@
 //
 // WHERE THE DELAY WAS, measured in the code that causes it. A reply typed while
 // a worker is up does not go to the row first. `submitReply`
-// (main/live-replies.mjs) hands it to the running session and writes the ledger
+// (main/live-replies.mts) hands it to the running session and writes the ledger
 // only once the provider has acknowledged it. Claude acknowledges by replaying
 // the message back, which it does at its next break, and `attachClaudeInput`
-// (main/claude-input.mjs) waits for it for as long as the session lives. The
+// (main/claude-input.mts) waits for it for as long as the session lives. The
 // conversation is drawn off the ledger. the reply box had closed
 // behind them and the thread had never heard of them.
 //
@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { itemThread } from '../renderer/src/item-thread.ts';
-import { attachClaudeInput } from '../main/claude-input.mjs';
+import { attachClaudeInput } from '../main/claude-input.mts';
 import { EventEmitter } from 'node:events';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -66,7 +66,7 @@ describe('a message sent to a working agent', () => {
     // a chat's head calls as well, so the line is matched without its indent.
     // (And on the phone with the computer closed, that it waits for the
     // computer, or why the computer turned it down: renderer/src/cloud-bridge.ts.)
-    expect(src).toMatch(/e\.pending\n\s+\? <span className=\{`msg-when msg-sending\$\{e\.refused \? ' msg-refused' : ''\}`\}>\{e\.refused \? `Not sent: \$\{e\.refused\}` : e\.held \? 'Sending… press Z to undo' : onCloudPhone\(\) \? \(e\.cloud \? `Working in \$\{Name\} Cloud` : 'Waiting for your computer'\) : cutting \? 'Sending now…' : onSendNow \? 'Waiting for its current step' : 'Sending…'\}<\/span>/);
+    expect(src).toMatch(/e\.pending\n\s+\? <span className=\{`msg-when msg-sending\$\{e\.refused \? ' msg-refused' : ''\}`\}>\{e\.refused \? `Not sent: \$\{e\.refused\}` : e\.held \? 'Sending… press Z to undo' : onCloudPhone\(\) \? \(e\.sent \? 'Sent' : e\.cloud \? `Working in \$\{Name\} Cloud` : 'Waiting for your computer'\) : cutting \? 'Sending now…' : onSendNow \? 'Waiting for its current step' : 'Sending…'\}<\/span>/);
   });
 
   it('keeps three of them apart, in the order she sent them', () => {
@@ -158,7 +158,7 @@ describe('what the wait actually is', () => {
   // back to the row and made her re-send a message the agent then took twice
   // (w-d92559b84f). The wait now ends only when the session does.
   it('has no clock of its own to give up on', () => {
-    expect(read('main/claude-input.mjs')).not.toContain('ackMs');
+    expect(read('main/claude-input.mts')).not.toContain('ackMs');
   });
   it('never switches her to the row when a live reply fails', () => {
     const app = read('renderer/src/App.tsx');
@@ -189,7 +189,8 @@ describe('the pane it is drawn in', () => {
     expect(failed.slice(0, 400)).toContain('setSending((q) => q.filter((s) => s !== mine && s !== gone))');
     expect(failed.slice(0, 400)).toContain('putBack(error)');
     const putBack = app.slice(app.indexOf('    const putBack = (error: unknown) => {'));
-    expect(putBack.slice(0, 300)).toContain('restoreFailedDraft(item, sent?.words ?? text, sent?.attachments ?? [])');
+    // With the time a reply set for later had, so it comes back set for it.
+    expect(putBack.slice(0, 300)).toContain('restoreFailedDraft(item, sent?.words ?? text, sent?.attachments ?? [], undefined, keepsTime)');
   });
 
   // THE CONVERSATION IS NOT EMPTIED UNDER HER WHEN THE ROW IS WRITTEN TO.

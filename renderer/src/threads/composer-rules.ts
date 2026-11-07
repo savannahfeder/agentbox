@@ -16,6 +16,8 @@ import { parseWhen } from '../format';
 import { firstName } from '../team/company';
 import type { Person } from '../types';
 import { projectSeenBy } from '../../../shared/thread-cards.mjs';
+import { isRepeatRule, ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
+import { clockWords, dayDeadline } from '../../../shared/team-tasks.mjs';
 
 export type Harness = 'claude' | 'codex';
 
@@ -238,6 +240,55 @@ export function momentFromWords(text: string, now = Date.now()): { ts: number; h
   return { ts: when.ts, hint: laterHint(when.ts) };
 }
 
+/** What a row of Send later sets. Picking one sets it; only Send sends. */
+export type SendWhen = { runAt: number } | { start: 'later' } | { repeat: RepeatShape } | null;
+
+type DraftWhen = { runAt: number; repeat: unknown; later?: boolean };
+
+/** The pick a saved card opens on. A moment gone by while it was closed is dropped. */
+export function startingWhen(when: DraftWhen | undefined, now = Date.now()): SendWhen {
+  if (!when) return null;
+  if (when.later) return { start: 'later' };
+  if (isRepeatRule(when.repeat)) return { repeat: when.repeat as RepeatShape };
+  return when.runAt > now ? { runAt: when.runAt } : null;
+}
+
+export function whenOnDraft(when: SendWhen): DraftWhen {
+  if (when && 'start' in when) return { runAt: 0, repeat: null, later: true };
+  if (when && 'repeat' in when) return { runAt: 0, repeat: when.repeat };
+  return { runAt: when && 'runAt' in when ? when.runAt : 0, repeat: null };
+}
+
+/** The pick in the words its menu row uses, or null when there is none. */
+export function whenWords(when: SendWhen): string | null {
+  if (!when) return null;
+  if ('start' in when) return 'Later';
+  if ('repeat' in when) { const s = ruleLabel(when.repeat); return s[0].toUpperCase() + s.slice(1); }
+  return laterHint(when.runAt);
+}
+
+/** What Send carries. A moment that went by while the card sat open starts now. */
+export function whenToSend(when: SendWhen, now = Date.now()): { runAt?: number; start?: 'later'; repeat?: RepeatShape } {
+  if (!when) return {};
+  if ('start' in when) return { start: 'later' };
+  if ('repeat' in when) return { repeat: when.repeat };
+  return when.runAt > now ? { runAt: when.runAt } : {};
+}
+
+/** When a reply set for later goes, or 0. Its time and its words are written
+ *  a few milliseconds apart (main/ipc.mts); a row put off on its own is not one. */
+export function replyWaitsUntil(
+  row: { answer?: string | null; runAt?: number | null; wrote?: Record<string, { ts: number; source: string } | undefined> },
+  now = Date.now(),
+): number {
+  const runAt = row.runAt ?? 0;
+  const set = row.wrote?.runAt;
+  const said = row.wrote?.answer;
+  if (runAt <= now || !set || !said || set.source !== 'founder') return 0;
+  if (!row.answer?.trim() || row.answer === '(withdrawn)') return 0;
+  return Math.abs(said.ts - set.ts) <= 5_000 ? runAt : 0;
+}
+
 /* -------------------------------- message --------------------------------- */
 
 /**
@@ -262,7 +313,7 @@ export function threadMessage(
 /* -------------------------------- projects -------------------------------- */
 
 // `team` is read loosely on purpose: main writes `direct` on a Direct project's
-// team record (main/team/projects.mjs), and the renderer's Product type has not
+// team record (main/team/projects.mts), and the renderer's Product type has not
 // grown the field yet, so the rule asks for it rather than assuming it.
 interface ProjectLike { slug: string; practice?: boolean; team?: object | null }
 const isDirect = (p: ProjectLike) => (p.team as { direct?: unknown } | null | undefined)?.direct === true;
@@ -290,6 +341,18 @@ export function startingProject<T extends ProjectLike>(
     ?? offered.find((p) => !p.practice)
     ?? offered[0]
     ?? null;
+}
+
+/**
+ * The project the card shows now: the one picked on it, else the starting
+ * rule. Asked on every draw, because the box on the page is drawn before the
+ * team's projects arrive and a choice made then would miss the remembered one.
+ */
+export function cardProject<T extends ProjectLike>(
+  offered: readonly T[],
+  { picked, defaultProduct, remembered }: { picked: string | null; defaultProduct?: string | null; remembered?: string | null },
+): T | null {
+  return offered.find((p) => p.slug === picked) ?? startingProject(offered, { defaultProduct, remembered });
 }
 
 // Projects carry no colour of their own yet, so the swatch is read off the slug:
@@ -320,6 +383,33 @@ export function findPeople(people: readonly Person[], query: string): Person[] {
   return people.filter((p) => p.name.toLowerCase().includes(q) || p.email.toLowerCase().startsWith(q));
 }
 
+/** Invites out to people who have not joined, matched as `findPeople` matches an
+ *  email. Only on a search: the list is the team, and they cannot be written to yet. */
+export function findInvited(
+  sent: readonly { email: string }[] | undefined, people: readonly Pick<Person, 'email'>[], query: string,
+): string[] {
+  const q = (query ?? '').trim().toLowerCase();
+  if (!q) return [];
+  const joined = new Set(people.map((p) => p.email?.toLowerCase()));
+  return (sent ?? []).map((s) => s.email).filter((e) => !joined.has(e.toLowerCase()) && e.toLowerCase().startsWith(q));
+}
+
+export type ToSection = 'people' | 'auto' | 'agents' | 'mates';
+
+/** The To menu, top to bottom: the people on the team first, then the agents and AI teammates. */
+export function toSections({ people, auto, mates, adding }: { people: boolean; auto: boolean; mates: boolean; adding: boolean }): ToSection[] {
+  if (adding) return people ? ['people'] : [];
+  return [...(people ? ['people' as const] : []), ...(auto ? ['auto' as const] : []), 'agents', ...(mates ? ['mates' as const] : [])];
+}
+
+/** What the reply box on an open thread asks: the people in a conversation, the agent where one runs, else a note. */
+export function replyBoxAsk({ talkTo = null, talkWord = 'Reply to', answering = null, agentRuns }: {
+  talkTo?: readonly string[] | null; talkWord?: string; answering?: string | null; agentRuns: boolean;
+}): string {
+  if (talkTo?.length) return `${talkWord} ${answering ?? joinNames(talkTo)}`;
+  return agentRuns ? 'What should the agent do next?' : 'Add a note';
+}
+
 export function placeholderFor(person: Person | null | undefined): string {
   return person ? `Message ${firstName(person)}` : 'What do you need done?';
 }
@@ -342,8 +432,8 @@ export const VISIBILITY_KEY = 'threads.composer.visibility';
 // two it already had, because
 // that is where it sits in how much it shares.
 export const VISIBILITY_ROWS: ReadonlyArray<{ id: Visibility; label: string; line: string }> = [
-  { id: 'team', label: 'Team', line: 'Teammates see its summary on the Team board.' },
-  { id: 'people', label: 'Chosen people', line: 'Only the people you pick see its summary.' },
+  { id: 'team', label: 'Team', line: 'Teammates can open it and read it, with its files.' },
+  { id: 'people', label: 'Chosen people', line: 'Only the people you pick can open and read it.' },
   { id: 'private', label: 'Private', line: 'Only you see it. It is not on the Team board.' },
 ];
 
@@ -418,6 +508,9 @@ export function writeVisibility(v: Visibility, store?: KeyStore, project?: strin
 
 export type SendAs = 'message' | 'task';
 
+/** What BLOCKED BY reads when nothing blocks the task. */
+export const NOT_BLOCKED = 'Not blocked';
+
 /** What DUE ON reads when nobody has set a day. Her words, her capitals. */
 export const NO_DEADLINE = 'No Deadline';
 
@@ -426,17 +519,18 @@ const dayKey = (d: Date) =>
 
 /**
  * The days the picker offers: today, tomorrow, and the rest of the week by
- * name. A calendar day, never a time — a task is due ON a day, and an hour is
- * a promise neither Mac can keep across two time zones.
+ * name. A time of day is typed under them (`dueFromWords`), and is read on
+ * each reader's own clock.
  */
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 export function dueChoices(now = new Date()): { key: string | null; label: string }[] {
   const out: { key: string | null; label: string }[] = [{ key: null, label: NO_DEADLINE }];
   for (let i = 0; i < 7; i += 1) {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
-    out.push({
-      key: dayKey(d),
-      label: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString(undefined, { weekday: 'long' }),
-    });
+    const day = `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+    out.push({ key: dayKey(d), label: i === 0 ? `Today, ${day}` : i === 1 ? `Tomorrow, ${day}` : day });
   }
   return out;
 }
@@ -452,7 +546,10 @@ export function dueChoices(now = new Date()): { key: string | null; label: strin
  */
 export function dueWords(due: string | null, now = new Date()): string {
   if (!due) return NO_DEADLINE;
-  return dueChoices(now).find((c) => c.key === due)?.label ?? due;
+  const [day, time] = due.split('T');
+  const label = dueChoices(now).find((c) => c.key === day)?.label ?? day;
+  const d = time ? dayDeadline(due) : null;
+  return d ? `${label} at ${clockWords(d.at)}` : label;
 }
 
 /**
@@ -514,13 +611,132 @@ export function writingMovesToTheDialog({ waiting, onScreen, writing }: { waitin
   return waiting > 0 && onScreen && writing;
 }
 
+/* ------------------------------ the card's draft -------------------------- */
+
+export interface HandFrom { product: string; id: string; message: string }
+
+/** Which draft a card opens in (../drafts.ts). None is the plain card's. */
+export function cardDraftPlace(start: { to?: string; also?: string[]; handFrom?: HandFrom; continueFrom?: { personId: string; threadId: string }; moved?: boolean } | null | undefined): string | undefined {
+  if (!start || start.moved) return undefined;
+  if (start.handFrom) return `hand:${start.handFrom.product}:${start.handFrom.id}:${start.handFrom.message}`;
+  if (start.continueFrom) return `continue:${start.continueFrom.personId}:${start.continueFrom.threadId}`;
+  if (start.to && start.to !== 'agent') return `to:${[start.to, ...(start.also ?? [])].sort().join(',')}`;
+  return undefined;
+}
+
+/** The words a card writes down: what it was opened with, unchanged, is not a draft. */
+export function cardDraftToKeep(text: string, start: { body?: string; handFrom?: HandFrom; continueFrom?: unknown } | null | undefined): string {
+  return (start?.handFrom || start?.continueFrom) && text.trim() === (start.body ?? '').trim() ? '' : text;
+}
+
+/* ---------------------------------- @ -------------------------------------- */
+
+/** The @word the caret is in, if any. An address has letters before its @. */
+export function atWordAt(text: string, caret: number): { from: number; word: string } | null {
+  const m = /(?:^|\s)@([\p{L}\p{N}._-]*)$/u.exec(text.slice(0, caret));
+  return m ? { from: caret - m[1].length - 1, word: m[1] } : null;
+}
+
+export type AtOffer = { id: string; name: string; kind: 'person' | 'mate' };
+
+/** People first, then teammates, with a word in their name starting with what was typed. */
+export function atOffers(word: string, people: readonly { id: string; name: string }[], mates: readonly { id: string; name: string }[] = []): AtOffer[] {
+  const q = word.toLowerCase();
+  const hit = (name: string) => !q || name.toLowerCase().split(/\s+/).some((w) => w.startsWith(q));
+  return [
+    ...people.filter((p) => hit(p.name)).map((p): AtOffer => ({ id: p.id, name: p.name, kind: 'person' })),
+    ...mates.filter((t) => hit(t.name)).map((t): AtOffer => ({ id: t.id, name: t.name, kind: 'mate' })),
+  ];
+}
+
+/** The box once an @word has become a recipient. */
+export function withoutAtWord(text: string, at: { from: number; word: string }): { text: string; caret: number } {
+  const after = text.slice(at.from + at.word.length + 1).replace(/^ /, '');
+  return { text: text.slice(0, at.from) + after, caret: at.from };
+}
+
+/* ----------------------------- where a send leaves you ---------------------- */
+
+/** On a team the tab stays: Needs you is the list being worked. Alone, it follows the row. */
+export function tabAfterSending({ team, kind, first = false, later, view, covered }: { team: boolean; kind: string; first?: boolean; later: boolean; view: string; covered: boolean }): 'snoozed' | 'progress' | null {
+  const follows = kind === 'task' || (first && kind === 'repeat');
+  if (team || !follows || covered || !['inbox', 'progress', 'snoozed'].includes(view)) return null;
+  return later ? 'snoozed' : 'progress';
+}
+
+/* ----------------------------- hand to an agent ----------------------------- */
+
+const FILE_LINK = /!?\[([^\]]*)\]\((attachments\/[^)\s]+)\)/g;
+
+/** What the card opens on for the message pressed: its words, who wrote them, and its files. */
+export function handOffStart({ product, id, message, nameOf, dir }: {
+  product: string; id: string;
+  message: { uid?: string; at?: number; text?: string; by?: string | null };
+  nameOf: (person: string) => string | null | undefined;
+  dir?: string | null;
+}) {
+  const raw = message.text ?? '';
+  const attachments = dir ? [...raw.matchAll(FILE_LINK)].map((m) => ({ name: m[1] || m[2].split('/').pop()!, srcPath: `${dir}/${m[2]}`, image: m[0].startsWith('!') })) : [];
+  const words = (dir ? raw.replace(FILE_LINK, '') : raw).trim();
+  const who = message.by ? nameOf(message.by) : null;
+  return {
+    to: 'agent',
+    body: `${who ? `${who} wrote: ` : ''}${words}\n\n`,
+    attachments,
+    handFrom: { product, id, message: message.uid ?? String(message.at ?? 'first') },
+  };
+}
+
+/** The same for a task, whose files come from its brief because a new thread cannot read the record. */
+export function taskHandOff({ from, brief, message, nameOf, handFrom }: {
+  from: string | null | undefined;
+  brief: { body: string; files: { name: string; srcPath: string }[] };
+  message: { text?: string; by?: string | null } | null;
+  nameOf: (person: string) => string | null | undefined;
+  /** The task, so the task can say which agent has it. */
+  handFrom?: HandFrom;
+}) {
+  const attachments = brief.files.map((f) => ({ ...f, image: /\.(png|jpe?g|gif|webp)$/i.test(f.name) }));
+  const pressed = (message?.text ?? '').replace(FILE_LINK, '').trim();
+  const from_ = handFrom ? { handFrom } : {};
+  if (pressed && pressed !== brief.body.trim()) {
+    const who = message?.by ? nameOf(message.by) : null;
+    return { to: 'agent', body: `${who ? `${who} wrote: ` : ''}${pressed}\n\n`, attachments, ...from_ };
+  }
+  return { to: 'agent', body: from ? `${from} asked:\n\n${brief.body}\n\n` : `${brief.body}\n\n`, attachments, ...from_ };
+}
+
+export const handedFromLabel = (product: string, id: string) => `handed-from:${product}:${id}`;
+
+/** The newest thread still open that was handed from this conversation. */
+export function agentOnThisWork<T extends { status?: string; labels?: string[]; updatedAt?: number }>(items: readonly T[], from: { product: string; id: string }): T | null {
+  const label = handedFromLabel(from.product, from.id);
+  return items.filter((i) => i.status !== 'done' && i.labels?.includes(label))
+    .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0] ?? null;
+}
+
+/**
+ * Whether To offers Auto (shared/auto-route.mjs): only with an AI teammate that
+ * is working to give a thread to, and only where the box can reach teammates.
+ * Auto keeps the Model row, so what it runs on is still yours to pick.
+ */
+export function autoOffered(mates: readonly { paused?: boolean }[] | null | undefined, canReachTeammates: boolean): boolean {
+  return canReachTeammates && !!mates?.some((t) => !t.paused);
+}
+
 /**
  * Which rows the head draws. To an agent it is still To and Model, untouched.
  * To a person it is To and Send As, and the day appears only once it is a
  * task, because a message has nothing to be due.
  */
+// A message carries a Subject: with one it is a thread of its own, without one
+// it goes on the end of the conversation those people already have.
 export function headRows({ person, kind }: { person: boolean; kind: SendAs }):
-  ('to' | 'model' | 'sendAs' | 'dueOn')[] {
+  ('to' | 'model' | 'sendAs' | 'dueOn' | 'blockedBy' | 'subject')[] {
   if (!person) return ['to', 'model'];
-  return kind === 'task' ? ['to', 'sendAs', 'dueOn'] : ['to', 'sendAs'];
+  return kind === 'task' ? ['to', 'sendAs', 'dueOn', 'blockedBy'] : ['to', 'sendAs', 'subject'];
+}
+
+export function messageSubject(subject: string | null | undefined): string {
+  return String(subject ?? '').replace(/\s+/g, ' ').trim();
 }

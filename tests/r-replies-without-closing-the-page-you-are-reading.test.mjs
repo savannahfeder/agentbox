@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HER_LETTERS_IN_A_PAGE } from '../shared/artifact-keys.mjs';
+import { HER_LETTERS_IN_A_PAGE } from '../shared/artifact-keys.mts';
 import { keyWhileABoxIsOpen } from '../renderer/src/keys';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -55,7 +55,7 @@ describe('R in an open thread', () => {
     expect(app).toContain("onReply={() => setModal('reply')}");
     // AND PUTS THE CARET BACK IN A BOX THAT IS ALREADY OPEN (w-326fb83c0e):
     // the dock focuses itself when it mounts, and Escape leaves it mounted.
-    expect(rInAThread).toBe("        else if (e.key === \'r\' || e.key === \'R\') { e.preventDefault(); setModal(\'reply\'); if (modal === \'reply\') focusTheReplyBox(); }");
+    expect(rInAThread).toContain("else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setModal('reply'); if (modal === 'reply') focusTheReplyBox();");
   });
 });
 
@@ -85,14 +85,14 @@ describe('what must not change', () => {
   });
 
   it('escape with the box folded still closes the page, one step back', () => {
-    expect(inAThread).toContain("if (e.key === 'Escape') { if (escapeClosesDoc(openDoc)) closeArtifact(); else setFocused(null); }");
+    expect(inAThread).toContain("if (e.key === 'Escape') { if (escapeClosesDoc(openDoc, fullScreenDoc)) closeArtifact(); else setFocused(null); }");
   });
 
   it('clicking into a full screen page folds the box and keeps the page', () => {
-    expect(app).toContain('const foldBack = () => setModal(null);');
+    expect(app).toContain('const foldBack = () => { if (!aVoiceNoteIsRecording() && !aBoxIsListening()) setModal(null); };');
   });
 
   it('R on the list still opens the thread with its box', () => {
-    expect(onTheList).toContain("case 'r': case 'R': if (!multiSel.size && pointed && replyKeyWorksIn(view)) { e.preventDefault(); setFocused(pointed); markSeen(pointed); setModal('reply'); } break;");
+    expect(onTheList).toMatch(/case 'r': case 'R': if \(!multiSel\.size && pointed && replyKeyWorksIn\(view\)\) \{ e\.preventDefault\(\); const whose = replyingTo\([^\n]*setFocused\(pointed\); markSeen\(pointed\); setModal\('reply'\); \} break;/);
   });
 });

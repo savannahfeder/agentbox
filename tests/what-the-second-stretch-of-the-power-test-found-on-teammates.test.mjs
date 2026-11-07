@@ -31,7 +31,7 @@ describe('a new thread to a teammate', () => {
 
   it('is sent from the New thread box as fresh, and the store keeps that', () => {
     expect(fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8')).toMatch(/\{ text, to: \[to\], fresh: true \}/);
-    expect(fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8')).toMatch(/mates\.post\(\{ text: a\.text, to: a\.to, fresh: a\.fresh === true \}\)/);
+    expect(fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8')).toMatch(/mates\.post\(\{ text: a\.text, to: a\.to, fresh: a\.fresh === true[,}]/);
   });
 });
 
@@ -41,11 +41,10 @@ describe('what a teammate sent you, in its chat', () => {
     expect(sent.said).toBe('Should I bring you everything, or only what needs a decision?');
   });
 
-  // Since 2026-10-26 it is the thread's inbox row, which leads with the same
-  // first line (rowTitle); without the thread loaded the row uses `said`.
-  it('is shown on its row, and its title only when it said nothing', () => {
+  // Since 2026-11-01 it is one quiet line, which leads with what it said.
+  it('is shown on its line, and its title only when it said nothing', () => {
     const page = fs.readFileSync(new URL('../renderer/src/teammates/TeammatesPage.tsx', import.meta.url), 'utf8');
-    expect(page).toMatch(/<RowCells title=\{r\.said \|\| r\.title\}/);
+    expect(page).toMatch(/<span className="t">\{r\.said \|\| r\.title\}<\/span>/);
   });
 });
 

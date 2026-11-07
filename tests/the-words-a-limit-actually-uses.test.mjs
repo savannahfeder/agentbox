@@ -24,7 +24,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   troubleCause, limitResetsAt, deadRunSentence, troubleSentence, troubleRemedy, accountSentence, needsHerHands,
-} from '../shared/spawn-trouble.mjs';
+} from '../shared/spawn-trouble.mts';
 
 // Every one of these is copied out of a real trace log.
 const HER_SESSION_LIMIT = "You've hit your session limit · resets 6pm (America/Los_Angeles)";
@@ -67,9 +67,9 @@ describe('the sentence her limit was always meant to get', () => {
     expect(said).toMatch(/starts again on its own at 6pm/);
   });
 
-  it('keeps the old wording when there is no hour to give', () => {
+  it('says it waits for the reset when there is no hour to give', () => {
     const said = deadRunSentence({ engineWord: 'Claude Code', cause: 'at-limit', runs: 2 });
-    expect(said).toMatch(/starts again on its own when the limit resets/);
+    expect(said).toMatch(/starts again on its own when your Claude plan's limit resets/);
   });
 
   it('never tells her a limit will keep failing until she fixes it', () => {

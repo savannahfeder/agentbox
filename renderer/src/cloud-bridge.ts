@@ -15,20 +15,27 @@
 // in the page (`<meta name="agentbox-cloud">`, scripts/build-phone-site.mjs).
 // The desktop window and the Mac's own phone page never have that.
 
-import { REQUEST_CHANNELS, PUSH_CHANNELS, DESKTOP_ONLY } from '../../shared/bridge-map.mjs';
-import { feedbackPayload, sendFeedback } from '../../shared/feedback.mjs';
+import { REQUEST_CHANNELS, PUSH_CHANNELS, DESKTOP_ONLY } from '../../shared/bridge-map.mts';
+import { feedbackAddressOn, sendPhoneFeedback, type FeedbackFiles } from './phone-feedback';
 import { cloudClient, type CloudClient, type CloudConfig } from './cloud-rest';
 import { installPhoneScreen } from './phone-screen';
 import { atMostEvery } from './phone-polls';
-import { setPictureLinks } from './picture';
+import { pictureLinksChanged, setPictureLinks } from './picture';
 import { SEND_MAX_BYTES, sendFiles, sentFileName } from './phone-sends-files';
 import { LINK_RENEW_MS, fileOnPhone, linkForFile, linkOfEntry as linkOfName, objectsToSign, phonePage, renewLinks, type Links } from './phone-links';
 import { BUCKET, cloudPlaces, findFile, findFolder, installCloudFiles, type Place } from './cloud-files';
 import {
-  LIVE_FOR_MS, NOT_HERE, PROJECTS_SELECT, cloudCarriesOn, macSeenOf, phoneHistory, phoneSlug, phoneStatusLine,
-  phoneView, readCommands, readThreads, splitSlug, type Aliases, type PhoneRows,
+  LIVE_FOR_MS, NOT_HERE, PROJECTS_SELECT, cloudCarriesOn, macSeenOf, phoneConnectState, phoneHistory, phoneSlug, phoneStatusLine,
+  phoneView, readCommands, readSettingsRows, readThreads, splitSlug, type Aliases, type PhoneRows,
 } from './phone-rows';
+import { dictationAllowed, setDictationAllowed } from './web-speech';
 import { phoneSender } from './phone-send';
+import { phoneRepeats } from './phone-repeats';
+import { setIconCount, startPhoneAlerts } from './phone-alerts';
+import { cloudAlertsVia } from './cloud-alerts';
+import { computerOf, type Change, type SettingsRow } from './phone-settings-view';
+import { computerAgents, webSettingChange, webSettingsModel, phoneEngines, phoneModelRefusal } from './web-settings';
+import { groupsOn, groupsSnapshot, phoneGroups } from './phone-groups';
 
 export {
   NOT_HERE, UNDONE, approvalCommand, closeToTakeBack, commandFor, macSeenOf, phoneHistory, phoneSlug, phoneStatusLine,
@@ -49,8 +56,22 @@ const READS = new Set([
   'cloudClipboardCode', 'projectInstructionsRead', 'codeFile', 'railNote',
   'agentConversation', 'phoneLink', 'teamStatus',
   // Where she dragged a row or a project to: kept on this page, not sent.
-  'setThreadPlaces', 'setThreadPins', 'setProductOrder', 'setProductHidden',
+  'setThreadPlaces', 'setProductOrder', 'setProductHidden',
 ]);
+// The reads whose callers take a field off the answer: each gets an empty
+// answer of its own shape, not null (tests/the-done-tab-opens-on-the-web-app).
+const ON_COMPUTER = 'This is on your computer.';
+export const EMPTY_READS = {
+  olderItems: async () => ({ items: [], more: false }),
+  commandCatalog: async () => [],
+  codeFile: async () => ({ ok: false, error: ON_COMPUTER }),
+  railNote: async () => ({ ok: false, error: ON_COMPUTER }),
+  agentConversation: async () => ({ ok: false, reason: ON_COMPUTER }),
+  refreshUsage: async () => ({ ok: false, error: ON_COMPUTER }),
+  // Settings opens on the pages a browser keeps; the computer's own are not drawn here.
+  settingsRead: async () => ({ ok: true, workspace: null, projects: [] }),
+};
+
 export function readCloudConfig(doc: Document = document): CloudConfig | null {
   const raw = doc.querySelector('meta[name="agentbox-cloud"]')?.getAttribute('content');
   if (!raw) return null;
@@ -60,21 +81,25 @@ export function readCloudConfig(doc: Document = document): CloudConfig | null {
   } catch { return null; }
 }
 
-// The same server function the Mac's card posts to (main/feedback.mjs), on the
-// cloud this site was built for, which is also the one origin its page may reach.
-export const feedbackAddressOn = (cfg: CloudConfig) => new URL('/functions/v1/feedback', cfg.url).href;
-
-type FeedbackFiles = { name: string; type: string; data: string }[];
-export function sendPhoneFeedback(cfg: CloudConfig, { text, files }: { text: string; files: FeedbackFiles }, fetchImpl: (url: string, init: RequestInit) => Promise<{ ok: boolean }> = (u, i) => fetch(u, i)) {
-  return sendFeedback({ url: feedbackAddressOn(cfg), payload: feedbackPayload({ text, files, app: { version: '', os: 'phone website' } }), fetchImpl });
+/** The commit this site was built from, stamped by scripts/build-phone-site.mjs. */
+export function readBuildStamp(doc: Pick<Document, 'querySelector'> = document): { sha: string; at: number } | null {
+  const m = /^([0-9a-f]{40}) (\S+)$/.exec(doc.querySelector('meta[name="agentbox-build"]')?.getAttribute('content') ?? '');
+  const at = m ? Date.parse(m[2]) : NaN;
+  return m && Number.isFinite(at) ? { sha: m[1].slice(0, 7), at } : null;
 }
 
+// The cloud this site was built for is also the one origin its page may reach.
+export { feedbackAddressOn, sendPhoneFeedback };
+
+// How often the computer's settings copy is read for the agents To offers.
+const AGENTS_EVERY_MS = 5 * 60_000;
 const SUPERVISOR = { paused: false, pausedProducts: [], running: [], stalled: [], queued: [], scheduled: [], productOrder: [], hiddenProducts: [], personalProducts: [], capacity: 0 };
 const EMPTY_ROWS: PhoneRows = { projects: [], threads: [], commands: [] };
 
 export function installCloudBridge(cfg: CloudConfig | null = typeof document === 'undefined' ? null : readCloudConfig()): boolean {
   if (!cfg || typeof window === 'undefined' || (window as any).zero) return false;
-  const client: CloudClient = cloudClient(cfg, { storage: localStorage, fetchImpl: (u, i) => fetch(u, i) });
+  const client: CloudClient = cloudClient(cfg, { storage: localStorage, fetchImpl: (u, i) => fetch(u, { ...i, signal: AbortSignal.timeout(15_000) }) });
+  const build = readBuildStamp();
   document.documentElement.dataset.door = 'phone';
   document.documentElement.dataset.via = 'cloud';
   document.documentElement.dataset.shell = 'tab';
@@ -83,6 +108,14 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
   try { localStorage.setItem('zero.firstRun.done', '1'); } catch { /* private mode */ }
 
   let rows: PhoneRows = EMPTY_ROWS;
+  let settingsRows: SettingsRow[] = [];
+  // The desktop's Groups, read straight from the account while the computer has them on.
+  const groups = phoneGroups(client);
+  // This phone's alerts go to every computer of the account, newest first (cloud-alerts.ts).
+  const computers = () => [...rows.projects]
+    .sort((a, b) => (Date.parse(b.updated_at ?? '') || 0) - (Date.parse(a.updated_at ?? '') || 0))
+    .map((p) => p.device).filter((d, i, all) => all.indexOf(d) === i);
+  const alertsVia = cloudAlertsVia({ computers, send: (cmd) => client.insertCommand(cmd), storage: localStorage, subtle: crypto.subtle });
   let started = false;
   // The screen ids of threads that share an id with another computer's.
   let aliases: Aliases = {};
@@ -99,7 +132,10 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
     const owner = client.session()?.user.id;
     if (!owner) return;
     const asked = client.generation();
-    await renewLinks((paths, seconds) => client.signFiles(BUCKET, paths, seconds), objectsToSign(places, rows.commands, links, owner), links, () => client.generation() === asked);
+    const want = objectsToSign(places, rows.commands, links, owner);
+    if (!want.length) return;
+    await renewLinks((paths, seconds) => client.signFiles(BUCKET, paths, seconds), want, links, () => client.generation() === asked);
+    pictureLinksChanged();
   }
   const linkOfEntry = (n?: string) => linkOfName(links, n);
   const linkFor = (file: string) => linkForFile(places, links, file);
@@ -113,6 +149,25 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
 
   const commands = () => readCommands((table, query) => client.select(table, query));
 
+  // Whether this account dictates, by the plan its computer last read (web-speech.ts).
+  const PLAN_READ_MS = 60_000;
+  let planReadAt = -Infinity;
+  async function readPlan() {
+    if (!client.signedIn()) { planReadAt = -Infinity; settingsRows = []; setDictationAllowed(false); return; }
+    if (Date.now() - planReadAt < PLAN_READ_MS) return;
+    planReadAt = Date.now();
+    const asked = client.generation();
+    try {
+      const next = await readSettingsRows((table, query) => client.select(table, query));
+      if (client.generation() === asked) {
+        const different = JSON.stringify(next) !== JSON.stringify(settingsRows);
+        settingsRows = next;
+        setDictationAllowed(dictationAllowed(next));
+        if (different) window.dispatchEvent(new Event('agent-models-changed'));
+      }
+    } catch { /* the microphone stays as it was until the next read */ }
+  }
+
   // One read at a time: on a slow network a read can outlast the five seconds between them.
   let reading: Promise<void> | null = null;
   // Her threads' copies as last fetched; a read fetches only what changed since.
@@ -124,6 +179,7 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
     return reading;
   }
   async function readRows() {
+    await readPlan();
     if (!client.signedIn()) { rows = EMPTY_ROWS; return; }
     const asked = client.generation();
     try {
@@ -131,6 +187,8 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
         client.select('phone_projects', PROJECTS_SELECT),
         readThreads((table, query) => client.select(table, query), threadCache),
         commands(),
+        // Its own failures are said on its own page (RoomsState.error), not over the inbox.
+        groupsOn(settingsRows) ? groups.refresh() : null,
       ]);
       // Read for a sign-in that has since ended: not hers to show.
       if (client.generation() !== asked) { threadCache.clear(); return; }
@@ -138,6 +196,7 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
       places = cloudPlaces(threads, phoneSlug);
       error = null;
       fetchedAt = Date.now();
+      void alertsVia.catchUp().catch(() => { /* tried again at the next read */ });
       // Links before the screens draw, so a picture is pointed at its file the moment it is drawn.
       await signLinks().catch(() => { /* the pictures say missing, the words still read */ });
     } catch (err) {
@@ -147,7 +206,9 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
     }
     // A run going stale changes nothing online, and still has to stop being drawn.
     const fresh = rows.threads.map((t) => !!t.snapshot?.live && Date.now() - Number(t.snapshot.live.at) < LIVE_FOR_MS);
-    const key = JSON.stringify([rows.threads.map((t) => [t.item, t.updated_at]), fresh, links.size, rows.commands.map((c) => [c.id, c.taken_at, c.claimed_by ?? null]), rows.projects, error, client.signedIn(), phoneStatusLine({ error, fetchedAt, macSeen: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects) })]);
+    const g = groups.state();
+    const groupsKey = g.rooms.map((r) => [r.id, r.lastAt, r.unread, r.wall, (g.messages[r.id] ?? []).map((m) => [m.id, m.editedAt ?? 0, !!m.deleted])]);
+    const key = JSON.stringify([groupsKey, g.error, rows.threads.map((t) => [t.item, t.updated_at]), fresh, links.size, rows.commands.map((c) => [c.id, c.taken_at, c.claimed_by ?? null]), rows.projects, settingsRows, error, client.signedIn(), phoneStatusLine({ error, fetchedAt, macSeen: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects) })]);
     if (key !== last) { last = key; changed(null); }
   }
 
@@ -182,7 +243,62 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
     ? null
     : { configured: true, started, signedIn: false, signingIn: null, me: null, team: null, invites: [], sent: [], people: [], cards: [], lastSyncAt: null, error });
 
-  const sender = phoneSender({ client, rows: () => rows, setRows: (next) => { rows = next; }, aliases: () => aliases, changed: () => changed(null) });
+  const sender = phoneSender({ client: {
+    generation: () => client.generation(),
+    update: (table, query, patch) => client.update(table, query, patch),
+    insertCommand: async (row) => {
+      if (row.kind === 'new' || row.kind === 'reply') {
+        await readPlan();
+        const w = settingsRows.find(r => r.device === row.device)?.settings?.workspace;
+        const payload = row.payload as { engine?: string; model?: string | null };
+        const thread = rows.threads.find(t => t.device === row.device && t.project === row.project && t.item === row.item)?.snapshot?.item;
+        const engine = payload.engine ?? (w?.engines?.length === 1 ? w.engines[0] : thread?.engine);
+        const why = phoneModelRefusal(w, { ...thread, ...payload, engine });
+        if (why) throw new Error(why);
+      }
+      return client.insertCommand(row);
+    },
+  }, rows: () => rows, setRows: (next) => { rows = next; }, aliases: () => aliases, changed: () => changed(null) });
+
+  // THE COMPUTER'S SETTINGS (web-settings.ts): its copy, read while Settings is
+  // open, and the changes left for it, shown as waiting until it takes them.
+  let settingCommands: PhoneRows['commands'] = [];
+  const sentSettings: PhoneRows['commands'] = [];
+  const failedSettings = (error: string) => ({ ...webSettingsModel(settingsRows, settingCommands, sentSettings, rows.projects), ok: false as const, error });
+  async function readWebSettings() {
+    await boot;
+    if (!client.signedIn()) return webSettingsModel([], [], []);
+    try {
+      [settingsRows, settingCommands] = await Promise.all([readSettingsRows((table, query) => client.select(table, query)), commands()]);
+    } catch (err) { return failedSettings(String((err as Error)?.message ?? err)); }
+    return webSettingsModel(settingsRows, settingCommands, sentSettings, rows.projects);
+  }
+  // THE AGENTS To OFFERS come off the same copy (w-24119e8784), so it is read
+  // once she is signed in, not only while Settings is open, and again every few
+  // minutes; the card is told when what it offers changed.
+  let agentsReadAt = -Infinity;
+  let agentsKey = JSON.stringify(computerAgents(null));
+  const readAgents = () => {
+    if (!client.signedIn() || Date.now() - agentsReadAt < AGENTS_EVERY_MS) return;
+    agentsReadAt = Date.now();
+    void readWebSettings().then(() => {
+      const key = JSON.stringify(computerAgents(computerOf(settingsRows)));
+      if (key === agentsKey) return;
+      agentsKey = key;
+      window.dispatchEvent(new Event('agent-models-changed'));
+      changed(null);
+    });
+  };
+  async function changeSetting(change: Change) {
+    const out = webSettingChange(computerOf(settingsRows), change);
+    if (!out.ok) return failedSettings(out.error);
+    const row = { id: crypto.randomUUID(), ...out.row };
+    try {
+      const made = await client.insertCommand(row);
+      sentSettings.push({ created_at: new Date().toISOString(), claimed_at: null, taken_at: null, outcome: null, ...row, ...made });
+    } catch (err) { return failedSettings(String((err as Error)?.message ?? err)); }
+    return readWebSettings();
+  }
   const signedInThen = async (fn: () => Promise<unknown>) => {
     try { await fn(); error = null; await refresh(); changed(null); return { ok: true }; } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   };
@@ -201,16 +317,24 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
     };
   }
 
-  Object.assign(bridge, {
+  Object.assign(bridge, EMPTY_READS, {
     async snapshot() {
       await boot;
       const view = phoneView(rows);
       aliases = view.aliases;
+      readAgents();
+      const g = groupsSnapshot({ settingsRows, session: client.session(), groups: groups.state() });
       return {
+        alpha: g.alpha,
         products: view.products, items: view.items, phoneWaiting: view.waiting,
         phoneStatus: client.signedIn() ? phoneStatusLine({ error, fetchedAt, macSeen: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects) }) : null,
-        team: team(), agents: [], approvals: view.approvals, supervisor: { ...SUPERVISOR, running: view.running, productOrder: view.products.map((p) => p.slug) },
-        engines: null, runsOn: null, restartNeeded: null, cloud: null,
+        phoneConnect: phoneConnectState({ signedIn: client.signedIn(), started, error, projects: rows.projects, email: client.session()?.user.email }),
+        phoneAccount: client.signedIn() ? { email: client.session()?.user.email ?? null, seenAt: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects), build } : null,
+        team: g.team ?? team(), agents: [], approvals: view.approvals,
+        // What the computer says of each thread it has not started (w-24119e8784), so waiting reads Queued, not Nothing running.
+        supervisor: { ...SUPERVISOR, running: view.running, queued: view.queued, runNow: view.runNow, signInNeeded: view.signInNeeded, atLimit: view.atLimit, stalled: view.stalled, shipping: view.shipping, paused: view.paused, productOrder: view.products.map((p) => p.slug) },
+        // The coding agents the computer offers, from its settings copy, so To offers Codex there too.
+        engines: phoneEngines(settingsRows, rows.projects, view.items), runsOn: null, restartNeeded: null, cloud: null,
         config: { browserHome: '', browserPins: [], outsideAgents: 'off' },
       };
     },
@@ -222,7 +346,18 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
     // starting one is the computer's to do.
     agentUpdate: async (p: any) => { if (p?.action === 'start') throw new Error(NOT_HERE); return null; },
     sessionTrace: async () => ({ sessions: [] }),
-    repeats: async () => [],
+    settingsRead: () => readWebSettings(),
+    setWorkspaceSetting: (p: { key: string; value: unknown }) => changeSetting({ scope: 'workspace', key: p?.key, value: p?.value }),
+    setProjectSetting: (p: { product: string; key: string; value: unknown }) => changeSetting({ scope: 'project', product: p?.product, key: p?.key, value: p?.value }),
+    // Each computer's repeating tasks ride with its settings copy (phone-repeats.ts).
+    repeats: async () => {
+      await boot;
+      if (!client.signedIn()) return [];
+      try { settingsRows = await readSettingsRows((table, query) => client.select(table, query)); } catch { /* the last copy read stands */ }
+      return phoneRepeats(settingsRows, rows.commands, rows.projects);
+    },
+    // The screens draw Groups from the snapshot, so it is read again after each answer.
+    rooms: (p: { op: string; args?: unknown[] }) => groups.door(p).finally(() => changed(null)),
     // Her Mac runs the agents; nothing here asks her to set one up.
     engineSetup: async () => ({ ok: true, phase: 'ready', found: true, signedIn: true }),
     dashboard: async () => null,
@@ -230,7 +365,7 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
     // What a press leaves for her Mac, the same doors the phone app sends through (phone-send.ts).
     ...sender,
     sendFeedback: (p: { text: string; files: FeedbackFiles }) => sendPhoneFeedback(cfg, p),
-    badge: async () => null,
+    badge: async (count: unknown) => { setIconCount(Number(count) || 0); return null; },
     notify: async () => null,
     track: async () => null,
     crash: async () => null,
@@ -243,8 +378,8 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
       if (out.confirm) throw new Error('Check your email to confirm it, then sign in here.');
     }),
     teamSignOut: async () => {
-      client.signOut(); rows = EMPTY_ROWS; error = null; threadCache.clear();
-      places = new Map(); links.clear();
+      client.signOut(); rows = EMPTY_ROWS; error = null; threadCache.clear(); groups.forget();
+      places = new Map(); links.clear(); planReadAt = -Infinity; setDictationAllowed(false);
       for (const key of [...pages.keys()]) dropPage(key);
       changed(null);
       return { ok: true };
@@ -254,7 +389,17 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
       const where = splitSlug(product);
       const owner = client.session()?.user.id;
       if (!where || !owner) throw new Error(NOT_HERE);
-      return sendFiles({ put: (object, bytes, type) => client.putFile(BUCKET, object, bytes, type), owner, device: where.device, files, maxBytes: SEND_MAX_BYTES });
+      const sent = await sendFiles({ put: (object, bytes, type) => client.putFile(BUCKET, object, bytes, type), owner, device: where.device, files, maxBytes: SEND_MAX_BYTES });
+      // Drawn from the bytes just sent until the next read signs its link;
+      // `until: 0` is what asks for that link.
+      sent.forEach((s, i) => {
+        const name = sentFileName(s.rel);
+        const data = files[i]?.dataBase64;
+        if (!name || !data || links.has(name)) return;
+        links.set(name, { url: URL.createObjectURL(new Blob([Uint8Array.from(atob(data), (c) => c.charCodeAt(0))])), until: 0 });
+      });
+      pictureLinksChanged();
+      return sent;
     },
     // HER FILES, from the links her Mac's list gives (cloud-files.ts).
     openArtifact: async (p: { product: string; src: string; mode?: string }) => {
@@ -309,5 +454,12 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
   });
 
   (window as any).zero = bridge;
+  // A tapped alert opens its thread, as on the desktop.
+  startPhoneAlerts(alertsVia, (id) => {
+    const set = listeners.get(PUSH_CHANNELS.onOpenItem);
+    if (!set?.size) return false;
+    for (const fn of set) { try { fn({ id }); } catch { /* its own fault */ } }
+    return true;
+  });
   return true;
 }

@@ -6,7 +6,7 @@
 //
 // 1. WHY IT WILL NOT TAKE THIS. She sent a task into the practice project and
 // it was accepted, filed, and never run. Nobody misbehaved. The supervisor skips
-// practice projects in four separate places on purpose (main/supervisor.mjs): a
+// practice projects in four separate places on purpose (main/supervisor.mts): a
 // practice project is not a project anybody works in, it points at no folder,
 // and starting a real session in it is the thing that must never happen. The
 // defect is that the CARD did not know that, so it took the task, filed it, and
@@ -31,7 +31,7 @@
 
 /**
  * As much of a project as either sentence needs. The practice mark is written
- *  by main/store.mjs off `project.json` (PRACTICE_FLAG) rather than matched on
+ *  by main/store.mts off `project.json` (PRACTICE_FLAG) rather than matched on
  *  a name, because "Practice" is a name somebody could reasonably give a real
  *  project of their own, and a refusal aimed at real work is worse than the
  *  bug it fixes. */
@@ -59,7 +59,7 @@ export const PRACTICE_REFUSAL =
  * `scripted` IS THE ONE EXEMPTION AND IT IS NOT A LOOPHOLE. The first run's own
  * example task really is sent into the practice project, and it really is
  * answered a couple of seconds later — by the app itself, out of a pre-written
- * line (main/store.mjs finishFirstRunTask, shared/first-run-practice.mjs), with
+ * line (main/store.mts finishFirstRunTask, shared/first-run-practice.mts), with
  * no session behind it. That task is the only one in the practice project with
  * something waiting to answer it, and the card can tell it apart with no
  * guessing: it is the one the walk typed in itself, so it is the one arriving
@@ -83,7 +83,7 @@ export function practiceRefusal(
  * product and there was not one, and the only tooltip the button had was the
  * practice refusal, which had nothing to say about this.
  *
- * My Workspace is made for everybody at boot now (main/main.mjs), so this
+ * My Workspace is made for everybody at boot now (main/main.mts), so this
  * should be unreachable. "Should be" is why the sentence exists: making that
  * folder can fail on a full or locked disk, and the old failure mode was a log
  * line nobody reads and a dead button. The wording is the one approved on
@@ -95,12 +95,14 @@ export const NO_PROJECT_ACTION = 'Make your first project';
 
 export function noProjectYet(
   product: ComposeTarget | null | undefined,
-  opts: { person?: boolean } = {},
+  opts: { person?: boolean; noComputer?: boolean } = {},
 ): { reason: string; action: string } | null {
   // A message to a teammate is not filed anywhere, so it is never waiting on a
   // project and must never be told that it is.
   if (opts.person) return null;
   if (product) return null;
+  // The web app's projects are a computer's; it cannot make one of its own.
+  if (opts.noComputer) return { reason: 'No computer is connected yet.', action: '' };
   return { reason: NO_PROJECT_REASON, action: NO_PROJECT_ACTION };
 }
 
@@ -125,14 +127,9 @@ export function noProjectYet(
  */
 export function sentLine(p: {
   to: string; when?: string | null; held?: boolean;
-  /** How many threads a pasted list went out as, when it was split. */
-  threads?: number;
   /** The new row's entry in `supervisor.atLimit`: every login of its tool is out of usage. */
   limit?: { tool: string; until: number } | null; now?: number;
 }): string {
-  // A split says how many went: it is a thing you did on purpose, and the fact
-  // you want back is that three rows exist. One thread counts nothing.
-  if ((p.threads ?? 1) > 1 && !p.held && !p.when) return `Started ${p.threads} threads in ${p.to} · Z to undo`;
   // "Started in", because "Sent to Office admin" read as a message to a person.
   // And "Added to Later" for the one answer on the Send later menu with no
   // moment in it (w-afb66e6661): it did not start, so saying it did is a lie,
@@ -160,10 +157,9 @@ export function sentLine(p: {
  * toast that replaces it reads as the same sentence finishing. No Z yet:
  * nothing has been written for Z to take back.
  */
-export function sendingLine(p: { kind: 'task' | 'repeat' | 'message'; to: string; held?: boolean; scheduled?: boolean; threads?: number }): string {
+export function sendingLine(p: { kind: 'task' | 'repeat' | 'message'; to: string; held?: boolean; scheduled?: boolean }): string {
   if (p.kind === 'message') return p.to ? `Sending to ${p.to}…` : 'Sending…';
   if (p.held) return `Adding to Later in ${p.to}…`;
   if (p.scheduled || p.kind === 'repeat') return `Scheduling in ${p.to}…`;
-  if ((p.threads ?? 1) > 1) return `Starting ${p.threads} threads in ${p.to}…`;
   return `Starting in ${p.to}…`;
 }

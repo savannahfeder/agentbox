@@ -42,8 +42,26 @@ it. Three are habits on every change:
 - `blast-radius` when a change touches `main/`, `shared/`, the store or how
   workers start.
 
-`correct` (turn a repeated mistake into a check that fails) and `interrogate`
-(Claude and Codex both review a diff) run when someone asks.
+`correct` (turn a repeated mistake into a check that fails), `interrogate`
+(Claude and Codex both review a diff) and `handoff` (the best Codex model tests
+your change and you fix only what is likely and bad) run when someone asks.
+
+Do not design for rare or future cases nobody asked about.
+
+Never add explanatory or filler text on screen to get around a design problem; fix the design.
+
+## THE TRAY'S LOOK IS APPROVED. DO NOT CHANGE IT ON YOUR OWN (2026-11-02)
+
+After it was approved, the corner tray (its glass, tint, ink, list, and when it
+goes light or dark) was reworked about fifteen times, each time to fix one
+thing. The last rework left it a grey slab over dark windows, and only its
+owner's screen showed it. `tests/the-trays-approved-look-stays-as-approved`
+now pins every part of that look. A change to the tray page, its styles, the
+Mac glass code or the light-or-dark rule fails until the person approves a
+picture of the real tray over a dark window and a light one. A bug fix in
+those files still counts as a change to the look. Never move the fingerprints in
+`tests/fixtures/the-trays-approved-look.json` without that approval. Taking
+those pictures puts windows on their screen, so ask before you do it.
 
 ## NOTHING RETRIES FOR EVER, NOTHING WAITS FOR EVER, NOTHING FAILS IN SILENCE (2026-10-19)
 
@@ -85,6 +103,13 @@ whole suite after the push (`scripts/lib/tests-the-push-runs.mjs`). So run
 `npm run test:changed` yourself before you say a branch is ready; the ship is
 not where you find out.
 
+A RED MAIN FIXES ITSELF (2026-10-29). When GitHub's whole-suite run on main
+goes red, the app files a thread that starts on its own, fixes the break or
+reverts the commit, and ships without review (`main/main-went-red.mts`). After
+two fixes that leave main red, the next one waits in Needs you. While main is
+red, a push is refused only for tests it turned red itself: the ones already
+red on main are left out (`AGENTBOX_RED_ON_MAIN` in the pre-push hook).
+
 Local `main` only ever points at something that is on the public `main`. Moving
 it onto a branch is refused (`scripts/hooks/reference-transaction`), because a
 fast-forward writes no commit and so walked straight past the commit guards: on
@@ -94,6 +119,29 @@ nowhere else. That folder follows the public main on its own:
 
 Whether you ask before shipping is set by the person's own instructions, not
 by this file.
+
+## SYNTHETIC USERS, AND THE THREAD THAT SETS THE STANDARD (2026-11-01)
+
+When a change wants synthetic users before it ships, they are `power-test`,
+with the people the change is for. Team and Rooms changes get several testers
+at once on one team. The phone app's testers are `product-loop`.
+
+The standard for the tester loop is thread w-e5f506ccb3: a synthetic team
+used the multiplayer build for whole workdays, logged what broke, agents
+fixed it on the branch, and the team tested the fixes. The person only chose
+between finished screens. Run a big change the same way: real use for
+hours, real people from `power-test/people/`, fixes tested again by the same
+testers, and screenshots of the result.
+
+## RELEASING IS ONE COMMAND: `npm run deploy` (2026-10-26)
+
+A release (the Mac app, npm, the agentbox.ac download and update feed, the
+cloud server) is `cd ~/Desktop/dev/agentbox-team && npm run deploy`, run by
+the person, because it signs with their Apple account. Hand them that line
+and nothing else. Do not write out the steps it runs: hand-written release
+steps went wrong in a dozen ways, which is why it exists. To see what it would
+do without changing anything, run `npm run deploy -- --check`. If it stops,
+fix what it names in `scripts/deploy.mjs` rather than giving a workaround.
 
 ## MAIN WAS REWRITTEN ON 2026-10-06
 

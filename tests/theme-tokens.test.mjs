@@ -51,7 +51,7 @@ describe('every token exists in both themes', () => {
     // --tag-radius joined them for a sharper version of the same reason: a tag
     // is square in every theme AND under every skin, so it is declared exactly
     // once and re-declaring it anywhere is the bug.
-    const SHARED = new Set(['--mono', '--radius', '--tag-radius']);
+    const SHARED = new Set(['--mono', '--radius', '--tag-radius', '--mate-corner', '--artifact-corner', '--artifact-corner-small']);
     const missing = [...light].filter((t) => !dark.has(t) && !SHARED.has(t));
     expect(missing).toEqual([]);
   });
@@ -210,6 +210,10 @@ describe('no raw colour outside the token blocks', () => {
       // is one rule and the two rows it serves are different sizes; measured, a
       // literal per row is how they ended up 2.79px apart.
       '--tick-line',
+      // Which step of the waiting logo's lap a dot starts on, written per dot
+      // by components/LogoOrbit.tsx so the orange runs round the ring in order.
+      // A time, never a colour.
+      '--orbit-delay',
       // The two the header band on a task is built out of, shipped 2026-08-29.
       // Both are geometry and neither names a colour: the band's only colour is
       // --line, the hairline, which every theme answers.
@@ -235,6 +239,13 @@ describe('no raw colour outside the token blocks', () => {
       // ../renderer/src/scroll-gutter.ts so the reply box centres in the same
       // width as the words. Geometry only the running window knows.
       '--scroll-gutter',
+      // How tall the approval card is, written onto the page by
+      // ../renderer/src/room-for-the-card.ts so the list ends above it.
+      // Geometry only the running window knows.
+      '--approval-room', '--approval-lift',
+      // Where the open file's card sits in its pane, written by
+      // ../renderer/src/components/DocPane.tsx so the divider lands on its edge.
+      '--doc-card-x', '--doc-card-y', '--doc-card-h', '--doc-card-r',
       '--did-mark', '--did-gap', '--did-hang']);
     expect([...used].filter((t) => !light.has(t) && !local.has(t))).toEqual([]);
   });

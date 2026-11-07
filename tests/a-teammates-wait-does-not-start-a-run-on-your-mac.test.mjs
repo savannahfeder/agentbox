@@ -6,7 +6,7 @@
 // teammate-authored wait resumed; after, only a wait you wrote (or one with no
 // writer, i.e. your own agent or solo) does.
 import { describe, it, expect, afterEach } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { foldWorkItems } from '../shared/work-items.mjs';
 
 const ME = 'p-me';

@@ -83,18 +83,18 @@ describe('the card is wired to it', () => {
       const send = composer.slice(composer.indexOf(mark), composer.indexOf('\n  };', composer.indexOf(mark)));
       // Stamped as sending, still not taken
       // (tests/a-new-thread-box-opened-right-after-send-starts-empty).
-      expect(send).toMatch(/const taken = markComposeDraftSending\(\);/);
-      expect(send.indexOf('const taken = markComposeDraftSending()')).toBeLessThan(send.indexOf('await '));
-      expect(send).toMatch(/dropComposeDraft\(taken\)/);
+      expect(send).toMatch(/const taken = takeTheDraft\(\);/);
+      expect(send.indexOf('const taken = takeTheDraft()')).toBeLessThan(send.indexOf('await '));
+      expect(send).toMatch(/dropComposeDraft\(taken, undefined, place\)/);
       // The copy is dropped only after something has answered, which is the
       // whole of the change: a `dropComposeDraft` before the first await would
       // be the old behaviour under a new name.
-      expect(send.indexOf('dropComposeDraft(taken)')).toBeGreaterThan(send.indexOf('await '));
+      expect(send.indexOf('dropComposeDraft(taken, undefined, place)')).toBeGreaterThan(send.indexOf('await '));
     });
   }
 
   it('a failed send leaves whatever is in the box rather than overwriting it', () => {
     expect(composer).not.toMatch(/saveComposeDraft\(taken\)/);
-    expect(composer).toMatch(/restoreComposeDraft\(taken\)/);
+    expect(composer).toMatch(/restoreComposeDraft\(taken, undefined, place\)/);
   });
 });

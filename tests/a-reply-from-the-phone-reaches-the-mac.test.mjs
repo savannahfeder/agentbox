@@ -1,6 +1,6 @@
 // What broke: nothing yet, then four things Codex found (review of step 1,
 // 2026-10-14). Her phone only worked while the computer was awake (it talked
-// to it directly, main/phone-link.mjs). Step 1 of docs/cloud/PHONE-PLAN.md:
+// to it directly, main/phone-link.mts). Step 1 of docs/cloud/PHONE-PLAN.md:
 // the computer writes a copy of each thread of a project she put on her phone
 // to her own rows online, and takes the replies, new threads, snoozes and
 // closes her phone left there while it was shut. Codex then showed a copy
@@ -9,18 +9,20 @@
 // took the first one's commands (4), a reply to a thread started on the phone
 // went nowhere (8), and one big thread stopped the rest being sent (9).
 // Measured with the in-memory cloud, which keeps the database's rules.
+// New-thread receipts also wait for their snapshots: failed uploads and a
+// restart must leave the command visible without creating another thread.
 import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createPhoneInbox, phoneDevice } from '../main/phone-inbox.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createPhoneInbox, phoneDevice } from '../main/phone-inbox.mts';
 import { threadSnapshot, threadsWorthCarrying, checkCommand, madeHere, bytesOf, hideSecrets, SNAPSHOT_LIMITS } from '../shared/phone-snapshot.mjs';
 
 const DAY = 24 * 3600_000;
 const NOW = Date.parse('2026-10-14T12:00:00Z');
 
-function setup({ items = {}, chosen = [{ slug: 'alpha', name: 'Alpha' }], apply, cloud = createMemoryCloud(), me, dir = fs.mkdtempSync(path.join(os.tmpdir(), 'phone-inbox-')), history } = {}) {
+function setup({ items = {}, chosen = [{ slug: 'alpha', name: 'Alpha' }], apply, cloud = createMemoryCloud(), me, dir = fs.mkdtempSync(path.join(os.tmpdir(), 'phone-inbox-')), history, now = () => NOW } = {}) {
   // The database's clock and this computer's agree here, at NOW.
   cloud.now = () => NOW;
   me ??= signUpMemory(cloud, { email: `owner-${Math.random()}@example.com` });
@@ -38,7 +40,7 @@ function setup({ items = {}, chosen = [{ slug: 'alpha', name: 'Alpha' }], apply,
     apply: apply ?? (async (cmd) => { applied.push(cmd); }),
     stateFile: path.join(dir, 'phone-inbox.json'),
     home: '/Users/someone',
-    now: () => NOW,
+    now,
   });
   const inbox = make();
   // What her phone sends: a command for the computer the project lives on.
@@ -260,6 +262,43 @@ describe('the computer takes what her phone left', () => {
     await u.inbox.syncOnce();
     expect(u.applied.map((c) => [c.kind, c.item])).toEqual([['new', null], ['reply', 'w-real00001']]);
     expect((await u.phone.phoneCommands()).map((c) => c.outcome)).toEqual(['done', 'done']);
+  });
+
+  it('publishes a new thread before telling the phone to remove its waiting copy', async () => {
+    const u = setup({ items: { alpha: [] }, apply: async (cmd) => {
+      u.applied.push(cmd);
+      u.state.items.alpha.push(item('w-real00001', { fromPhone: cmd.id }));
+      return { id: 'w-real00001' };
+    } });
+    await u.send({ project: 'alpha', kind: 'new', payload: { title: 'Keep my thread' } });
+    const mark = u.mac.markPhoneCommand;
+    u.mac.markPhoneCommand = async (...args) => {
+      expect((await u.phone.phoneThreads()).map((r) => r.item)).toContain('w-real00001');
+      return mark(...args);
+    };
+    await u.inbox.syncOnce();
+    expect((await u.phone.phoneCommands())[0].outcome).toBe('done');
+  });
+
+  it('keeps a new command waiting after an upload fails, then publishes after restart without creating twice', async () => {
+    let clock = NOW;
+    const u = setup({ items: { alpha: [] }, now: () => clock, apply: async (cmd) => {
+      u.applied.push(cmd);
+      u.state.items.alpha.push(item('w-real00001', { fromPhone: cmd.id }));
+      return { id: 'w-real00001' };
+    } });
+    await u.send({ project: 'alpha', kind: 'new', payload: { title: 'Keep my thread' } });
+    const put = u.mac.putPhoneThreads;
+    u.mac.putPhoneThreads = async () => { throw new Error('offline'); };
+    await u.inbox.syncOnce();
+    expect((await u.phone.phoneCommands())[0].takenAt).toBeNull();
+    expect(await u.phone.phoneThreads()).toEqual([]);
+    u.mac.putPhoneThreads = put;
+    clock += 60_000;
+    await u.make().syncOnce();
+    expect((await u.phone.phoneThreads()).map((r) => r.item)).toEqual(['w-real00001']);
+    expect((await u.phone.phoneCommands())[0].outcome).toBe('done');
+    expect(u.applied).toHaveLength(1);
   });
 
   it('remembers a done command across a restart of the computer', async () => {

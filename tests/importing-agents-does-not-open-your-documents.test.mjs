@@ -11,7 +11,7 @@
 // So a folder inside `~/Desktop` is still offered, because Claude ran there,
 // and `~/Documents` is not opened, because nothing says she works in it.
 //
-// The window is the one `agent-sessions.mjs` already puts on threads, which is
+// The window is the one `agent-sessions.mts` already puts on threads, which is
 // her own "recent = last few days".
 
 import { describe, expect, it } from 'vitest';
@@ -20,8 +20,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   claudeProjectFolders, findAgentFolders, readAgentFiles, readFolderAgents,
-} from '../main/agent-files.mjs';
-import { GUARDED } from '../shared/project-folder-check.mjs';
+} from '../main/agent-files.mts';
+import { GUARDED } from '../shared/project-folder-check.mts';
 
 const DAY = 24 * 60 * 60 * 1000;
 

@@ -9,7 +9,7 @@
 // whether my personal account got billed for work."
 //
 // An account is named by the rule the Settings page already uses, which is now
-// shared (shared/account-names.mjs): the email the vendor gave, else a counted
+// shared (shared/account-names.mts): the email the vendor gave, else a counted
 // name. Only the login that was spent is named: w-dac993a554 took away the
 // move to a second account, so there is no "which one answered next".
 //
@@ -20,10 +20,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { accountName } from '../shared/account-names.mjs';
-import { deadRunCause, deadRunSentence } from '../shared/spawn-trouble.mjs';
-import { Store } from '../main/store.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { accountName } from '../shared/account-names.mts';
+import { deadRunCause, deadRunSentence } from '../shared/spawn-trouble.mts';
+import { Store } from '../main/store.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 describe('what one account is called', () => {
   it('is the email the vendor gave', () => {
@@ -51,7 +51,7 @@ describe('the sentence on a thread whose login ran out', () => {
     const said = limit({ account: 'alex@work.com', resetsAt: '6pm' });
     expect(said).toBe(
       'Claude Code is at its usage limit on alex@work.com, so nothing has been done on this task.'
-      + ' It starts again on its own at 6pm.',
+      + " It starts again on its own at 6pm, when your Claude plan's limit resets.",
     );
     expect(said).not.toContain('which has room');
   });
@@ -59,25 +59,26 @@ describe('the sentence on a thread whose login ran out', () => {
   it('names the account it ran out on while it waits for the reset', () => {
     expect(limit({ account: 'alex@work.com', resetsAt: '6pm' })).toBe(
       'Claude Code is at its usage limit on alex@work.com, so nothing has been done on this task.'
-      + ' It starts again on its own at 6pm.',
+      + " It starts again on its own at 6pm, when your Claude plan's limit resets.",
     );
   });
 
   it('says so on a run that had already done some work', () => {
     expect(limit({ account: 'alex@work.com', worked: true, resetsAt: '6pm' })).toBe(
       'Claude Code hit its usage limit on alex@work.com partway through, so this task is not finished.'
-      + ' It starts again on its own at 6pm.',
+      + " It starts again on its own at 6pm, when your Claude plan's limit resets.",
     );
   });
 
   // The one-login Mac, and every row written before this landed.
-  it('is word for word what it was when no account is named', () => {
+  it('opens word for word as it did when no account is named', () => {
     expect(limit({ resetsAt: '6pm' })).toBe(
-      'Claude Code is at its usage limit, so nothing has been done on this task. It starts again on its own at 6pm.',
+      'Claude Code is at its usage limit, so nothing has been done on this task.'
+      + " It starts again on its own at 6pm, when your Claude plan's limit resets.",
     );
     expect(limit({})).toBe(
       'Claude Code is at its usage limit, so nothing has been done on this task.'
-      + ' It starts again on its own when the limit resets.',
+      + " It starts again on its own when your Claude plan's limit resets.",
     );
   });
 
@@ -102,7 +103,8 @@ describe('the supervisor names its own logins', () => {
   let root, sup;
   const signedIn = (dir, email) => {
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: email } }));
+    const beside = path.basename(dir) === '.claude' ? path.dirname(dir) : dir;
+    fs.writeFileSync(path.join(beside, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: email } }));
   };
   beforeEach(async () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'limit-login-'));

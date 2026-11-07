@@ -52,6 +52,6 @@ describe('App.tsx asks it', () => {
     expect(app).toMatch(/const stay = staysOnTheTask\(item, text, engine\) \|\| talking \|\| !movesOn\(item\);/);
   });
   it('for a picked option', () => {
-    expect(app).toMatch(/`Option \$\{option\.n\} sent → \$\{item\.productName\}`, takeBack, !movesOn\(item\),/);
+    expect(app).toMatch(/pickSentWords\([^\n]*takeBack, !movesOn\(item\) \|\|/);
   });
 });

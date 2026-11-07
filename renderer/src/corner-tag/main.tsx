@@ -1,7 +1,7 @@
 // THE CORNER TAG'S PAGES (w-dafae58a23). One page, drawn twice: `?part=tag` is
 // the tag itself and `?part=card` is the list that opens beside it, each in its
-// own window (main/corner-tag.mjs), each window exactly the size of what it
-// shows, drawing its own glass. shared/corner-tag.mjs owns the
+// own window (main/corner-tag.mts), each window exactly the size of what it
+// shows, drawing its own glass. shared/corner-tag.mts owns the
 // words and the rules; this is the drawing and the pointer.
 //
 // THE POINTER, settled with Codex and then with real mouse events:
@@ -14,7 +14,7 @@
 // - Off both the tag and the list for a moment, and the list shuts.
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { GRIPS, Grip, HIDE_CHOICES, cardLines, cardScale, inPoints, tagSays } from '../../../shared/corner-tag.mjs';
+import { Grip, HIDE_CHOICES, cardLines, cardScale, inPoints, tagSays } from '../../../shared/corner-tag.mts';
 import { NAME } from '../../../shared/product-name.mjs';
 import { Lattice, Move, markMoves } from './lattice';
 import { MoveButton, PlacePicker } from './place';
@@ -41,8 +41,7 @@ type Bridge = {
   clickable: (on: boolean) => Promise<unknown>;
   hover: (part: Part, inside: boolean) => Promise<unknown>;
   toggle: () => Promise<unknown>;
-  // grip and corner say the press landed on one of the four resize corners.
-  press: (x: number, y: number, grip?: boolean, corner?: Grip) => Promise<unknown>;
+  press: (x: number, y: number) => Promise<unknown>;
   release: (cancelled?: boolean) => Promise<unknown>;
   go: (id: string | null) => Promise<unknown>;
   dismiss: (id: string) => Promise<unknown>;
@@ -83,7 +82,7 @@ function useTagState() {
   const [state, setState] = useState<State>(demo?.state ?? { ready: [], working: 0, now: Date.now() });
   useEffect(() => bridge?.onState((s) => setState(s)), []);
   // ONE NUMBER IS THE WHOLE SIZE. The main process reads the width of the
-  // screen the tag rests on (shared/corner-tag.mjs, tagScale) and sends it
+  // screen the tag rests on (shared/corner-tag.mts, tagScale) and sends it
   // here; everything in the tag and its list is written against it, so they
   // grow together on a 32" and stay small on a laptop.
   // The nine dots are the exception: they are whole pixels off that height,
@@ -199,7 +198,7 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
   // ours. Moves keep arriving either way, because the window forwards them.
   const overUs = (e: React.PointerEvent) => {
     const el = document.elementFromPoint(e.clientX, e.clientY);
-    return !!el?.closest('.ct-tag, .ct-grip');
+    return !!el?.closest('.ct-tag');
   };
 
   return (
@@ -235,47 +234,6 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
       <Mark scale={state.scale ?? 1} says={{ kind: says.kind, count: counts.ready }} />
       <span className="ct-count">{text}</span>
     </div>
-      {/* EVERY CORNER TAKES A DRAG, AND DRAWS NOTHING (2026-10-13). First a
-          ledge, then an arrow on each corner: "you accidentally see something
-          flash and you're like, oh wait, what was that... it really kills the
-          vibes". So the corners are bare: the pointer turning into the resize
-          arrow over them is the system's own affordance, and nothing in the
-          corner of her screen moves. Making it discoverable is the open
-          question, proposed rather than guessed at. The press goes through the
-          same door as a move, flagged as the grip, so the main process reads
-          the cursor exactly as it does for a drag. */}
-      {GRIPS.map((corner) => (
-        <span
-          key={corner}
-          className={`ct-grip ct-grip-${corner}`}
-          data-corner={corner}
-          aria-hidden
-          title="Drag to resize"
-          onPointerDown={(e) => {
-            if (e.button !== 0) return;
-            e.stopPropagation();
-            e.currentTarget.setPointerCapture(e.pointerId);
-            pressed.current = true;
-            bridge?.press(e.screenX, e.screenY, true, corner);
-          }}
-          onPointerUp={(e) => {
-            e.stopPropagation();
-            letGo(false);
-            if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
-          }}
-          onPointerCancel={() => letGo(true)}
-          onLostPointerCapture={() => letGo(true)}
-        >
-          {/* NOTHING IS DRAWN HERE ANY MORE (2026-10-13). An arrow that
-              appears as the pointer crosses a corner reads as a glitch:
-              "you accidentally see something flash and you're like, oh wait,
-              what was that... it really kills the vibes". The corner still
-              takes a drag and the pointer still turns into the resize arrow
-              over it, which is the system's own affordance and costs the tag
-              nothing. How somebody is meant to FIND that is a separate
-              question, and an open one. */}
-        </span>
-      ))}
     </div>
   );
 }

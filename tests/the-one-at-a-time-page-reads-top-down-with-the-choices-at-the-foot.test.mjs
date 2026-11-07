@@ -79,23 +79,25 @@ describe('a page or a note the answer names is read in place', () => {
   const md = (t) => h('div', null, t);
   it('heads it with its name and a way to open it full screen', () => {
     const html = renderToStaticMarkup(h(QueueFile, { product: 'p', path: '/a/designs/w-1/review.html', md, onOpen: noop }));
-    expect(visible(html)).toBe('review.html Open full screen');
+    expect(visible(html)).toBe('review.html');
+    expect(html).toContain('aria-label="Open full screen"');
     expect(html).toContain('one-file one-page');
   });
   it('tells a note from a page', () => {
     expect(renderToStaticMarkup(h(QueueFile, { product: 'p', path: 'reports/listings.md', md, onOpen: noop }))).toContain('one-file one-note');
   });
-  it('and the thread page draws them in this mode in place of the tiles', () => {
+  it('but the thread page no longer draws them; the answer names them (w-658f249bb9)', () => {
     const focus = read('renderer/src/components/Focus.tsx');
-    expect(focus).toContain('inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => <QueueFile');
+    expect(focus).not.toContain('<QueueFile');
     expect(focus).toContain('{!page && inlineArtifacts && !previewSample && <MessageFiles');
   });
 });
 
 describe('the corner', () => {
-  it('says where you are and steps up and down', () => {
+  // The "2 of 5" beside the arrows went in w-1c1092f465, as clutter.
+  it('steps up and down', () => {
     const html = renderToStaticMarkup(h(QueueNav, { spot: { pos: 2, total: 5, index: 1 }, onStep: noop }));
-    expect(visible(html)).toBe('2 of 5');
+    expect(visible(html)).toBe('');
     expect(html).toContain('aria-label="Previous thread (K)"');
     expect(html).toContain('aria-label="Next thread (J)"');
   });
@@ -134,10 +136,14 @@ describe('where the app wires it', () => {
     expect(focus).toMatch(/const summaryOffered = [^\n]*!page/);
   });
   it('the choices go to the foot, apart from the reply box, without their heading', () => {
-    expect(focus).toContain('{offerInPane && (page || closeAsk ? null : (');
+    expect(focus).toContain('{offerInPane && (page || closeAsk || answered ? null : (');
     // Under a full screen page they come up with the box instead
     // (tests/a-full-screen-page-in-one-at-a-time-shows-no-options-until-the-box-opens).
-    expect(focus).toMatch(/\{page && stripShown && !fullScreenDoc && !closeAsk && \(\s*<div className=\{`one-choices[^`]*`\}>\s*<OptionsOffer[^/]{0,600}\bbare\s*\/>/);
+    //
+    // The heading comes back for the one offer the app makes that says
+    // something the page does not, which is the change nobody committed
+    // (tests/a-change-nobody-committed-is-not-offered-for-shipping).
+    expect(focus).toMatch(/\{page && stripShown && !fullScreenDoc && !closeAsk && !answered && \(\s*<div className=\{`one-choices[^`]*`\}>\s*<OptionsOffer[^/]{0,600}\bbare=\{!shipAsk\?\.headed\}\s*\/>/);
   });
   it('the conversation folds behind the summary', () => {
     expect(thread).toMatch(/<QueueSummary/);

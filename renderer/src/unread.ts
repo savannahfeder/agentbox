@@ -1,9 +1,12 @@
 import type { WorkItem } from './types';
+import { isTaskRow, taskNewsAt } from '../../shared/team-rules.mjs';
 
-type Dated = Pick<WorkItem, 'id' | 'createdAt' | 'wrote'>;
+type Dated = Pick<WorkItem, 'id' | 'createdAt' | 'wrote'> & Partial<Pick<WorkItem, 'labels' | 'talk'>>;
 
-/** When a thread last had something new for you: its latest answer, or when it was made. */
-export const arrivedAt = (i: Dated): number => i.wrote?.result?.ts ?? i.createdAt ?? 0;
+/** When a thread last had something new for you: its latest answer, or when it
+ *  was made. On a task between two people, the other person's newest words. */
+export const arrivedAt = (i: Dated, me: string | null = null): number =>
+  (isTaskRow(i) ? taskNewsAt(i, me) : i.wrote?.result?.ts ?? i.createdAt ?? 0);
 
 /**
  * When a thread in Needs you started waiting on you, for the corner tag: its
@@ -18,8 +21,8 @@ export const waitingSince = (i: Partial<Pick<WorkItem, 'wrote' | 'updatedAt'>>):
  * `since` stands in for threads with no opened time, so the first launch
  * does not dot everything you already had; Mark Unread stores 0.
  */
-export const isUnread = (i: Dated, seenAt: Readonly<Record<string, number>>, since: number): boolean =>
-  arrivedAt(i) > (seenAt[i.id] ?? since);
+export const isUnread = (i: Dated, seenAt: Readonly<Record<string, number>>, since: number, me: string | null = null): boolean =>
+  arrivedAt(i, me) > (seenAt[i.id] ?? since);
 
 /** Which of Mark Read and Mark Unread would change one of these threads, judged by the same rule as the dot. */
 export const readMoves = (items: readonly Dated[], seenAt: Readonly<Record<string, number>>, since: number) => ({

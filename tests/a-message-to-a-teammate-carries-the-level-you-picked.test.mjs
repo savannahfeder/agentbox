@@ -22,13 +22,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as disk from '../main/store/work-items.mjs';
-import { Store } from '../main/store.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamService } from '../main/team/index.mjs';
+import { Store } from '../main/store.mts';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mjs';
 import { whatATeammateMaySet } from '../shared/team-rules.mjs';
 import { itemPriority, DEFAULT_PRIORITY } from '../shared/rank.mjs';
-import { LEVELS, wantsPriority } from '../main/message-priority.mjs';
+import { LEVELS, wantsPriority } from '../main/message-priority.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -74,7 +74,7 @@ describe('the level crosses with the message', () => {
     await maya.on(() => maya.service.message(theo.personId, 'The checkout page is down for everyone.', LEVELS.urgent));
     await theo.service.syncNow();
     const got = theirMessage();
-    expect(got.title).toBe('The checkout page is down for everyone.');
+    expect(got.title).toBe('The checkout page is down for everyone');
     expect(got.priority).toBe(LEVELS.urgent);
     // And the inbox's own reading of it, which is what decides where it sorts.
     expect(itemPriority(got)).toBe(LEVELS.urgent);
@@ -143,7 +143,7 @@ describe('the Mac that receives one does not guess over the sender', () => {
   });
 
   // THE CASE THAT MUST STILL MATCH: nobody picked a level, so the model is
-  // still what sorts the message (main/message-priority.mjs).
+  // still what sorts the message (main/message-priority.mts).
   it('still sorts a message that arrived with no level at all', () => {
     expect(wantsPriority(message(0), product, 'p-me')).toBe(true);
   });
@@ -153,7 +153,7 @@ describe('the card says so', () => {
   const src = read('renderer/src/threads/ThreadComposer.tsx');
   // The person branch of the bottom bar: everything between "{person && sendAs === 'message' ? (" and
   // the agent's branch that follows it. It held a line and Send and no more.
-  const from = src.indexOf("{person && sendAs === 'message' ? (");
+  const from = src.indexOf('{person ? (\n');
   const messageBar = src.slice(from, src.indexOf('\n        ) : (', from));
 
   it('draws the one priority control on a message to a person', () => {

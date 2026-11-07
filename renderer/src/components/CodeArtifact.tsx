@@ -7,7 +7,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { chord } from '../this-keyboard';
 import {
-  BATCH_ROWS, changeSummary, filesInTreeOrder, fillNext, foldsFor, firstBatch, hiddenLines, hunkView, hunkViewAt, linesSkipped, marked, rowSlices, sliceGuessPx, stepInTree, toggled, tokenize, tookLabel, treeRows, visibleRows, wordChanges,
+  BATCH_ROWS, changeSummary, filesInTreeOrder, fillNext, foldsFor, firstBatch, hiddenLines, hunkView, hunkViewAt, linesSkipped, marked, rowSlices, sliceGuessPx, standingLabel, stepInTree, toggled, tokenize, tookLabel, treeRows, visibleRows, wordChanges,
   type Change, type ChangedFile, type Hunk,
 } from '../code-artifact';
 import { copiedText, linesToCopy } from '../code-copy';
@@ -868,6 +868,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   }, [files, measureFiles]);
 
   const took = tookLabel(change);
+  const stands = standingLabel(change);
   const unsaved = useMemo(() => new Set(dirtyFiles()), [dirtyAt, saving]);
 
   return (
@@ -883,6 +884,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       <div className="code-tree">
         <div className="code-tree-head">
           <span className="code-tree-count">{changeSummary(change)}</span>
+          {stands && <span className="code-tree-stands">{stands}</span>}
           {took && <span className="code-tree-took">in {took}</span>}
         </div>
         <div className="code-tree-rows" ref={treeRef}>

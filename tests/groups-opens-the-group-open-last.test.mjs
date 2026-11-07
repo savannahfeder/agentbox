@@ -9,6 +9,8 @@
 // and any group, from anywhere, opens as the Groups page. Since 2026-10-24
 // Groups is a row in the narrow sidebar rather than a tab
 // (tests/with-groups-the-sidebar-stays-narrow-and-widens-when-pointed-at).
+// A mention on a group's file also says which file to open on (f3502f31) and
+// still opens through openRoom.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { groupInTab } from '../renderer/src/team/rooms/room-rules.ts';
@@ -37,10 +39,9 @@ describe('every group opens as the Groups page', () => {
   it('which then holds it', () => {
     expect(hook).toMatch(/const openRoom = \(id: string\) => \{[^}]*setOpenId\(id\);[^}]*setLastId\(id\); writeRoomTab\(id\);/);
   });
-  it('a mention, a chat started from someone’s page, a group joined or started all go through it', () => {
-    expect(hook).toContain('const openMention = (m: RoomMention) => openRoom(m.roomId);');
+  it('a mention and a chat started from someone’s page both go through it', () => {
+    expect(hook).toMatch(/const openMention = \(m: RoomMention\) => \{[^}]*\}\);\s*openRoom\(m\.roomId\);\s*\};/);
     expect(hook).toMatch(/id = res\.value;\s*\}\s*openRoom\(id\);\s*\};/);
-    expect(hook.match(/if \(res\.value\) openRoom\(res\.value\);/g)).toHaveLength(2);
   });
   it('a teammate’s direct record opens in its own view, over the group', () => {
     expect(hook).toMatch(/if \(key\.startsWith\('direct:'\)\) onOpenDirect\(key\.slice\('direct:'\.length\)\);/);
@@ -48,14 +49,13 @@ describe('every group opens as the Groups page', () => {
 });
 
 describe('stepping back', () => {
-  it('goes from everyone’s threads, Find groups or a person’s page to the group, and from the group out', () => {
+  it('goes from everyone’s threads or a person’s page to the group, and from the group out', () => {
     const close = hook.slice(hook.indexOf('const close = () => {'), hook.indexOf('const leave = '));
-    const order = ['if (finding)', 'if (boardOn)', "if (pane !== 'wall')", 'setOpenId(null)'].map((s) => close.indexOf(s));
+    const order = ['if (boardOn)', "if (pane !== 'wall')", 'setOpenId(null)'].map((s) => close.indexOf(s));
     expect(order.every((at) => at > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
   it('those pages say where back goes', () => {
-    expect(hook).toContain("title: backTitle('Find groups')");
     expect(hook).toContain('heading = { title: backTitle(nameOf(open)) };');
   });
 });

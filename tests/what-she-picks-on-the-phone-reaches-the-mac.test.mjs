@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import { commandFor, phoneSlug } from '../renderer/src/cloud-bridge';
 import { phoneChoices } from '../shared/phone-snapshot.mjs';
-import { applyThrough } from '../main/phone-inbox.mjs';
+import { applyThrough } from '../main/phone-inbox.mts';
 
 const DEV = 'a1b2c3d4e5f6';
 const A = phoneSlug(DEV, 'alpha');

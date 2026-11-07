@@ -4,12 +4,21 @@
 // with the arrows beside the menu.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api';
-import { onPhone } from '../phone-screen';
 import { splitHeadline, type Spot } from '../one-thing-at-a-time';
+import { ArtifactControlGlyph } from './ArtifactControlGlyph';
+import { DocumentPreview } from './DocumentPreview';
+import { HtmlPreview } from './HtmlPreview';
+import { TableView } from './TableView';
+import { isTablePath } from '../table-file';
 import '../one-thing-at-a-time.css';
+import './doc-reading.css';
+import { TeammateMark } from '../teammates/TeammatesRail';
+import { clock, dayHeading } from '../thread-history';
+import { shownName } from '../../../shared/artifact-marks.mjs';
+import type { Teammate } from '../types';
 
-/** What this page reads in place rather than as a tile: a page an agent made, or a note. */
-export const readsInPlace = (path: string) => /\.(html?|md|markdown)$/i.test(path);
+/** What this page reads in place rather than as a tile: a page an agent made, a note, or a table. */
+export const readsInPlace = (path: string) => /\.(html?|md|markdown|csv|tsv)$/i.test(path);
 
 export function QueueSummary({ title, context, earlier, steps = false, open, onToggle }: {
   title?: string;
@@ -21,6 +30,18 @@ export function QueueSummary({ title, context, earlier, steps = false, open, onT
   open: boolean;
   onToggle: () => void;
 }) {
+  const summary = useRef<HTMLDivElement>(null);
+  const opening = useRef(false);
+  const toggleHistory = () => {
+    opening.current = !open;
+    onToggle();
+  };
+  useLayoutEffect(() => {
+    if (!open || !opening.current) return;
+    opening.current = false;
+    const box = summary.current?.closest('.focus-scroll');
+    if (box) box.scrollTop = box.scrollHeight;
+  }, [open]);
   const toggle = earlier > 0
     ? (open ? 'Hide earlier messages' : `Show ${earlier} earlier ${earlier === 1 ? 'message' : 'messages'}`)
     : steps ? (open ? 'Hide what the agent did' : 'Show what the agent did') : null;
@@ -39,11 +60,11 @@ export function QueueSummary({ title, context, earlier, steps = false, open, onT
   const opens = cut || whole;
   const flip = () => setWhole((w) => !w);
   return (
-    <div className="one-sum">
+    <div className="one-sum" ref={summary}>
       {title && <h2 className="one-title">{title}</h2>}
       {toggle && (
         <div className="one-head">
-          <button type="button" className="one-earlier" onClick={onToggle}>{toggle}</button>
+          <button type="button" className="one-earlier" onClick={toggleHistory}>{toggle}</button>
         </div>
       )}
       {context && (
@@ -65,12 +86,18 @@ export function QueueSummary({ title, context, earlier, steps = false, open, onT
 
 const sameLine = (a: string, b: string) => a.replace(/\s+/g, ' ').trim().toLowerCase() === b.replace(/\s+/g, ' ').trim().toLowerCase();
 
-export function QueueAnswer({ text, md, name = '' }: { text: string; md: (text: string) => ReactNode; name?: string }) {
+export function QueueAnswer({ text, md, name = '', by = null }: {
+  text: string;
+  md: (text: string) => ReactNode;
+  name?: string;
+  /** The teammate that wrote it, which signs it. */
+  by?: { t: Pick<Teammate, 'letter' | 'name'>; at: number } | null;
+}) {
   const { headline, rest } = splitHeadline(text);
-  // A teammate's thread is named after this same line, so it is not said twice.
   const shown = headline && !sameLine(headline, name) ? headline : null;
   return (
     <div className="outcome one-answer">
+      {by && <div className="one-by"><TeammateMark t={by.t} size="hd" /><span>{by.t.name}</span><em>{`${dayHeading(by.at)} ${clock(by.at)}`}</em></div>}
       {shown && <h1 className="one-q">{shown}</h1>}
       {rest.trim() && md(rest)}
     </div>
@@ -84,13 +111,16 @@ export function QueueAnswer({ text, md, name = '' }: { text: string; md: (text: 
  * none) keeps its name and the way to open it; a note that cannot be read
  * draws nothing, and the answer still names it.
  */
-export function QueueFile({ product, path, md, onOpen }: { product: string; path: string; md: (text: string) => ReactNode; onOpen: () => void }) {
+export function QueueFile({ product, path, md, onOpen, onFullScreen }: { product: string; path: string; md: (text: string) => ReactNode; onOpen: () => void; onFullScreen?: () => void }) {
   const page = /\.html?$/i.test(path);
   const [url, setUrl] = useState<string | null | undefined>(undefined);
   const [text, setText] = useState<string | null | undefined>(undefined);
+  const [folded, setFolded] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   useEffect(() => {
     let live = true;
     setUrl(undefined); setText(undefined);
+    setFolded(false); setExpanded(false);
     if (page) {
       api.resolveDoc({ product, src: path })
         .then((r) => { if (live) setUrl(r.ok && r.url ? r.url : null); })
@@ -102,19 +132,42 @@ export function QueueFile({ product, path, md, onOpen }: { product: string; path
     }
     return () => { live = false; };
   }, [product, path, page]);
-  const [folded, setFolded] = useState(false);
   if (text === null) return null;
+  const table = isTablePath(path);
   return (
-    <section className={`${page ? 'one-file one-page' : 'one-file one-note'}${folded ? ' one-folded' : ''}`}>
-      <div className="one-filehead">
-        <button type="button" className="one-filefold" aria-expanded={!folded} onClick={() => setFolded((f) => !f)}>
-          {chevron(!folded)}<span className="one-filename">{path.split('/').pop()}</span>
-        </button>
-        <button type="button" className="one-fileopen" onClick={onOpen}>Open full screen</button>
-      </div>
-      {!folded && page && url && <iframe className="one-frame" src={url} title={path} sandbox={onPhone() ? 'allow-scripts' : 'allow-scripts allow-same-origin'} />}
-      {!folded && !page && text != null && <div className="markdown one-notebody">{md(text)}</div>}
+    <section className={`${page ? 'one-file one-page' : table ? 'one-file one-table' : 'one-file one-note'}${folded ? ' one-folded' : expanded ? ' one-expanded' : ''}`}>
+      <FilePreviewHeader path={path} folded={folded} expanded={expanded}
+        onFold={() => { setExpanded(false); setFolded((f) => !f); }}
+        onCondense={() => setExpanded(false)} onOpen={onFullScreen ?? onOpen} onSide={onFullScreen && onOpen} />
+      {!folded && page && url && <HtmlPreview key={`${product}:${path}`} url={url} path={path} expanded={expanded} onExpandedChange={setExpanded} />}
+      {!folded && table && text != null && <TableView text={text} path={path} mode="preview" onShowAll={onOpen} />}
+      {!folded && !page && !table && text != null && <DocumentPreview key={`${product}:${path}`} expanded={expanded} onExpandedChange={setExpanded} onOpen={onOpen}><div className="markdown one-notebody doc-prose">{md(text)}</div></DocumentPreview>}
     </section>
+  );
+}
+
+export function FilePreviewHeader({ path, folded, expanded, onFold, onCondense, onOpen, onSide }: {
+  path: string; folded: boolean; expanded: boolean;
+  onFold: () => void; onCondense: () => void; onOpen: () => void; onSide?: () => void;
+}) {
+  const name = useRef<HTMLButtonElement>(null);
+  return (
+    <div className="one-filehead" onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') event.stopPropagation(); }}>
+      <button ref={name} type="button" className="one-filefold" aria-expanded={!folded} onClick={onFold}>
+        {chevron(!folded)}<span className="one-filename">{shownName(path)}</span>
+      </button>
+      <div className="one-fileactions">
+        {expanded && !folded && <button type="button" className="one-filecondense"
+          onClick={() => { onCondense(); name.current?.focus({ preventScroll: true }); }}>Show preview</button>}
+        {onSide && <button type="button" className="one-fileopen" aria-label="Open on the side" title="Open on the side" onClick={onSide}>
+          <ArtifactControlGlyph><rect x="3" y="4" width="14" height="12" rx=".5" /><path d="M11 4v12" /></ArtifactControlGlyph>
+        </button>}
+        {/* The same corners the open file's own full screen mark draws (FocusControl). */}
+        <button type="button" className="one-fileopen" aria-label="Open full screen" title="Open full screen" onClick={onOpen}>
+          <ArtifactControlGlyph><path d="M7 3H3v4m10-4h4v4M3 13v4h4m6 0h4v-4" /></ArtifactControlGlyph>
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -150,7 +203,6 @@ export function ChoicesShow({ count, onShow }: { count: number; onShow: () => vo
 export function QueueNav({ spot, onStep }: { spot: Spot; onStep: (dir: 1 | -1) => void }) {
   return (
     <span className="one-nav">
-      <span className="one-pos">{spot.pos} of {spot.total}</span>
       <button type="button" className="ts-more one-step" data-hint="previous-thread" data-hint-align="right" aria-label="Previous thread (K)" disabled={spot.index <= 0} onClick={() => onStep(-1)}>{chevron(true)}</button>
       <button type="button" className="ts-more one-step" data-hint="next-thread" data-hint-align="right" aria-label="Next thread (J)" disabled={spot.pos >= spot.total} onClick={() => onStep(1)}>{chevron(false)}</button>
     </span>

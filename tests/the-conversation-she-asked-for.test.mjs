@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { conversation } from '../main/agents.mjs';
+import { conversation } from '../main/agents.mts';
 import { TRAIL_OPENING, TRAIL_TURNS, conversationGap, conversationWindow } from '../shared/agents.mjs';
 import { Name } from '../shared/product-name.mjs';
 
@@ -391,7 +391,7 @@ describe('the thread in the pane', () => {
 // worst was 1ms late. The reader must stay streamed.
 describe('reading a huge transcript does not freeze the window', () => {
   it('streams the file rather than reading it whole', () => {
-    const src = read('main/agents.mjs');
+    const src = read('main/agents.mts');
     const body = src.slice(src.indexOf('export async function conversation'));
     expect(body).toContain('readline.createInterface');
     expect(body).toContain('fs.createReadStream');

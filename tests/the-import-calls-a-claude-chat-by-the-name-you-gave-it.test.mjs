@@ -10,7 +10,7 @@ import { it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readSessionThreads, readTranscriptTail } from '../main/agent-sessions.mjs';
+import { readSessionThreads, readTranscriptTail } from '../main/agent-sessions.mts';
 
 const NOW = Date.UTC(2026, 9, 26, 12);
 let home;

@@ -20,7 +20,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { dropPlaces } from '../shared/rank.mjs';
 import { sorted, rankScore, sortedEntries, entryScore, placesForDrop, overlayPlaces, PLACE_WAIT } from '../renderer/src/threads/page-rules.ts';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { chipHome, edgeScroll, grabWithin, shiftFor, slotOffset, stays } from '../renderer/src/threads/row-drag.ts';
 
 const NOW = Date.UTC(2026, 9, 7, 12);

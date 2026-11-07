@@ -29,9 +29,9 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun } from '../main/cloud/run.mjs';
-import { pickBase, periodOf, CACHE_PERIOD_MS, sendConversation, sentRecordPath, MIN_JOIN_BYTES } from '../main/cloud/reuse.mjs';
-import { transcriptFolderName } from '../main/cloud/run.mjs';
+import { cloudRun } from '../main/cloud/run.mts';
+import { pickBase, periodOf, CACHE_PERIOD_MS, sendConversation, sentRecordPath, MIN_JOIN_BYTES } from '../main/cloud/reuse.mts';
+import { transcriptFolderName } from '../main/cloud/run.mts';
 import { copyRanges } from '../main/cloud/aws.mjs';
 import { imageCaps, noteImageCaps } from '../main/cloud/config.mjs';
 
@@ -207,7 +207,7 @@ describe('the account\'s skills', () => {
     const skill = path.join(configDir(), 'skills', 'writing', 'SKILL.md');
     fs.mkdirSync(path.dirname(skill), { recursive: true });
     fs.writeFileSync(skill, 'write plainly\n');
-    const folders = () => puts.filter((p) => /^runs\/cache\/\d+\/folder-[0-9a-f]{64}\.tgz$/.test(p.key));
+    const folders = () => puts.filter((p) => /^runs\/cache\/\d+\/skills-[0-9a-f]{64}\.tgz$/.test(p.key));
 
     expect(await launch().done).toBe(0);
     expect(folders()).toHaveLength(1);

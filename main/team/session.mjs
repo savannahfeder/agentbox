@@ -10,8 +10,10 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { nameSlug } from '../../shared/product-name.mjs';
+import { CLOUD_ADDRESS, PHONE_SITE } from '../../shared/cloud-address.mjs';
 import { runningAsAFreshUser } from '../../shared/fresh-user-home.mjs';
 import { supabaseBackend } from './supabase-backend.mjs';
+import { standinSession } from './standin-backend.mjs';
 import { signInWithGoogle, cancelGoogleSignIn } from './sign-in.mjs';
 import { plainAuthError } from './auth-words.mjs';
 
@@ -69,7 +71,18 @@ export function teamConfigOnThisMac(home = os.homedir()) {
 // A FRESH COPY HANDED A TEAM FILE IS A SECOND PERSON ON THAT TEAM (2026-10-21):
 // a power tester in her room. It loads that file and no other, so the ⌘K
 // window, which is handed none, stays the single-person app.
-export function loadCloudConfig(appDir, { packaged = isPackagedElectron(), home = os.homedir(), env = process.env } = {}) {
+export function loadCloudConfig(appDir, options = {}) {
+  return withPhoneSite(cloudConfigFound(appDir, options));
+}
+
+// A config for our own database without a site address gets the one that ships.
+function withPhoneSite(c) {
+  if (!c || c.phoneSite) return c;
+  const ours = (u) => String(u).replace(/\/+$/, '') === CLOUD_ADDRESS.supabaseUrl;
+  return ours(c.url) ? { ...c, phoneSite: PHONE_SITE } : c;
+}
+
+function cloudConfigFound(appDir, { packaged = isPackagedElectron(), home = os.homedir(), env = process.env } = {}) {
   if (packaged) return bakedTeam(appDir);
   if (runningAsAFreshUser(env) && !env.AGENTBOX_TEAM_CONFIG) return null;
   const tries = runningAsAFreshUser(env) ? [env.AGENTBOX_TEAM_CONFIG] : [
@@ -134,6 +147,7 @@ export const withDeadline = (ms = DATABASE_DEADLINE_MS) => (url, init = {}) =>
 export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decrypt = null, openExternal, packaged = isPackagedElectron(), testLogin = process.env.AGENTBOX_TEAM_TEST_LOGIN }) {
   const configured = !!cloudConfig;
   if (packaged) testLogin = null;
+  if (cloudConfig?.standin && !packaged) return standinSession({ cloudConfig, testLogin });
   let client = null;
 
   async function getClient() {
@@ -218,6 +232,17 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
       return { backend: supabaseBackend(c) };
     },
 
+    // The session an Agentbox Cloud sign-in made (main/cloud/account.mts), so
+    // one sign-in connects the phone too. Null for another database's.
+    async adoptSession(s) {
+      const same = (u) => String(u ?? '').replace(/\/+$/, '');
+      if (!configured || !s?.access_token || !s.refresh_token || same(s.supabaseUrl) !== same(cloudConfig.url)) return null;
+      const c = await getClient();
+      const { error } = await c.auth.setSession({ access_token: s.access_token, refresh_token: s.refresh_token });
+      if (error) throw new Error(plainAuthError(error.message));
+      return supabaseBackend(c);
+    },
+
     cancelSignIn: () => cancelGoogleSignIn(),
     // Only ever the link this sign-in made; the window never names one.
     reopen: (url) => openExternal(url),
@@ -246,7 +271,7 @@ function configHome({ home, env }) {
   return given && path.isAbsolute(given) ? given : path.join(home, '.config');
 }
 
-function sessionFileOutsideStore({ dir, name, storeRoot, home = os.homedir(), env = process.env }) {
+export function sessionFileOutsideStore({ dir, name, storeRoot, home = os.homedir(), env = process.env }) {
   let file = path.join(dir, name);
   if (isInside(file, storeRoot)) {
     const tag = crypto.createHash('sha256').update(path.resolve(storeRoot)).digest('hex').slice(0, 16);
@@ -281,6 +306,7 @@ export function memorySession(backendFor) {
     async restore() { return signedIn; },
     async signIn() { signedIn = backendFor(); return signedIn; },
     async signInWithPassword() { signedIn = backendFor(); return signedIn; },
+    async adoptSession() { signedIn = backendFor(); return signedIn; },
     async signUp() { return { confirm: true }; },
     async signOut() { signedIn = null; },
   };

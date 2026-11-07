@@ -26,7 +26,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CODE_PATH, linkArtifactPaths, isMediaPath, productPath } from '../renderer/src/remark-artifact-paths.ts';
 import os from 'node:os';
-import { servable, byteRange, mediaResponse, mediaType } from '../main/img-scheme.mjs';
+import { servable, byteRange, mediaResponse, mediaType } from '../main/img-scheme.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
@@ -79,8 +79,8 @@ describe('a full path into the product folder', () => {
   it('becomes a link to the short path the rest of the app understands', () => {
     const tree = run(`It is at ${DIR}/designs/w-3a/latest.html now.`, { dir: DIR });
     expect(links(tree)).toEqual(['designs/w-3a/latest.html']);
-    // What she reads is what the worker wrote.
-    expect(only(tree)[1].children[0].value).toBe(`${DIR}/designs/w-3a/latest.html`);
+    // What she reads is the file's name, as the phone has it ("no file paths in what I read").
+    expect(only(tree)[1].children[0].value).toBe('latest.html');
     expect(only(tree)[2].value).toBe(' now.');
   });
 
@@ -141,7 +141,7 @@ describe('a local address with no http in front', () => {
 
 describe('what stays text, because pressing it would go nowhere she wants', () => {
   it('source files and scripts', () => {
-    expect(links(run('The fold is in renderer/src/list-rules.ts, main/store.mjs and scripts/land.sh.'))).toEqual([]);
+    expect(links(run('The fold is in renderer/src/list-rules.ts, main/store.mts and scripts/land.sh.'))).toEqual([]);
   });
 });
 
@@ -149,7 +149,11 @@ describe('the pane draws a player for audio and video', () => {
   const focus = read('renderer/src/components/Focus.tsx');
 
   it('hands a media link to the player before it becomes plain blue text', () => {
-    const a = focus.slice(focus.indexOf('a: ({ href, children }'), focus.indexOf('img: ({ src, alt }'));
+    const whole = focus.slice(focus.indexOf('a: ({ href, children'), focus.indexOf('img: ({ src, alt }'));
+    // One link stays its name: the row under the sentence plays that one (media-row.ts).
+    const nameOnly = whole.split('\n').find((line) => line.includes('if (nameOnly && href)'));
+    expect(nameOnly).toContain('<ArtifactLink');
+    const a = whole.replace(nameOnly, '');
     expect(a).toContain('ArtifactMedia');
     expect(a.indexOf('ArtifactMedia')).toBeLessThan(a.indexOf('ArtifactLink'));
   });
@@ -241,7 +245,7 @@ describe('a sound or a film is answered in the piece the player asks for', () =>
   });
 
   it('is what the app answers a sound or a film with, and only those', () => {
-    const main = read('main/main.mjs');
+    const main = read('main/main.mts');
     expect(main).toMatch(/mediaType\(file\)\s*\?\s*await mediaResponse\(file, request\.headers\.get\('range'\)\)/);
     expect(mediaType('/a/b.mp4')).toBe('video/mp4');
     expect(mediaType('/a/b.png')).toBe(null);

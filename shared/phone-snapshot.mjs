@@ -23,7 +23,7 @@ const ROW_FIELDS = [
   'id', 'title', 'label', 'body', 'kind', 'labels', 'priority', 'parent', 'status',
   'result', 'note', 'answer', 'runAt', 'snoozedUntil', 'answeredThrough',
   'engine', 'model', 'start', 'due', 'problem', 'progress', 'solution',
-  'createdAt', 'updatedAt',
+  'createdAt', 'updatedAt', 'pinned',
 ];
 // The fields a line in a thread's history may carry in its patch: what the
 // thread view draws as the conversation and its state changes.
@@ -78,12 +78,25 @@ function hideNamed(text) {
 // more, upper and lower case and digits all present. A commit id or a uuid is
 // one case of hex and is left alone.
 const KEYLIKE = /\b(?=[A-Za-z0-9_-]{32,}\b)(?=[A-Za-z0-9_-]*[a-z])(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*[0-9])[A-Za-z0-9_-]{32,}\b/g;
+// A file's path is not a key, however long its name: a saved picture is a
+// random prefix joined to the file's own name, and hidden, its link leads nowhere.
+// Bounded so a long run with no extension costs little.
+const FILE_PATH = /[\w./~-]{0,300}\.(?:png|jpe?g|gif|webp|heic|svg|mp4|mov|webm|m4a|mp3|wav|pdf|txt|md|html?|csv|json|zip)(?![\w])/gi;
+function hideKeyLike(text) {
+  let out = '';
+  let at = 0;
+  for (const m of text.matchAll(FILE_PATH)) {
+    out += text.slice(at, m.index).replace(KEYLIKE, '[hidden]') + m[0];
+    at = m.index + m[0].length;
+  }
+  return out + text.slice(at).replace(KEYLIKE, '[hidden]');
+}
 export function hideSecrets(text, { home = null } = {}) {
   let out = String(text);
   for (const re of SECRETS) out = out.replace(re, (m, bearer) => (typeof bearer === 'string' && /^(Bearer|Basic)/i.test(bearer) ? `${bearer}[hidden]` : '[hidden]'));
   out = hideNamed(out);
-  out = out.replace(KEYLIKE, '[hidden]');
-  // Her home folder is ~ online, as it is in a crash report (shared/crash-scrub.mjs).
+  out = hideKeyLike(out);
+  // Her home folder is ~ online, as it is in a crash report (shared/crash-scrub.mts).
   if (home && home.length > 1) out = out.split(home).join('~');
   return out;
 }
@@ -112,6 +125,60 @@ function pick(obj, fields, n, ctx) {
 }
 
 export const bytesOf = (value) => new TextEncoder().encode(JSON.stringify(value)).length;
+
+// THE REPEATING TASKS OF THE PROJECTS ON HER PHONE, cleaned as a thread's
+// words are, riding with the computer's settings copy.
+const REPEAT_FIELDS = ['id', 'title', 'body', 'priority', 'every', 'on', 'at', 'engine', 'model', 'createdAt', 'updatedAt', 'served', 'lastOccurrence'];
+export const REPEATS_MAX = 200;
+export function phoneRepeatsOf(rules, slugs, { home = null } = {}) {
+  const on = new Set(slugs);
+  return (Array.isArray(rules) ? rules : [])
+    .filter((r) => r && !r.endedAt && on.has(r.product) && typeof r.id === 'string')
+    .slice(0, REPEATS_MAX)
+    .map((r) => ({ product: r.product, ...pick(r, REPEAT_FIELDS, 4000, { home }) }));
+}
+
+// YOUR AI TEAMMATES, AND YOUR CHAT WITH THEM (main/teammates.mts `view`),
+// riding with the settings copy as the repeating tasks do. Named fields only;
+// the method, memory and playbooks stay on the computer.
+const MATE_FIELDS = ['id', 'name', 'letter', 'role', 'job', 'primary', 'paused', 'status', 'product', 'engine', 'model', 'now', 'queued', 'runsThisWeek', 'worksLabel', 'createdAt'];
+const CHAT_FIELDS = ['id', 'kind', 'from', 'to', 'text', 'title', 'details', 'verb', 'ref', 'options', 'ts', 'via', 'setup', 'start', 'product'];
+const RUN_FIELDS = ['id', 'kind', 'teammate', 'item', 'product', 'title', 'verb', 'by', 'byName', 'waiting', 'answered', 'text', 'ts', 'said'];
+export const TEAMMATES_LIMITS = { mates: 40, lines: 300, textChars: 3000, bytes: 120_000 };
+const ref = (r, ctx) => (r && typeof r.id === 'string' && typeof r.product === 'string' ? { id: r.id, product: r.product, title: clip(String(r.title ?? ''), 300, ctx) } : null);
+
+export function phoneTeammatesOf(view, { home = null, limits = TEAMMATES_LIMITS } = {}) {
+  if (!view || !Array.isArray(view.list)) return null;
+  const ctx = { home };
+  const n = limits.textChars;
+  const list = view.list.filter((t) => t && typeof t.id === 'string' && !t.endedAt).slice(0, limits.mates).map((t) => ({
+    ...pick(t, MATE_FIELDS, 600, ctx),
+    running: ref(t.running ? { ...t.running, title: '' } : null, ctx),
+    waiting: (Array.isArray(t.waiting) ? t.waiting : []).slice(0, 20).map((r) => ref(r, ctx)).filter(Boolean),
+    duties: (Array.isArray(t.duties) ? t.duties : []).slice(0, 12).map((d) => pick(d, ['id', 'what', 'when'], 300, ctx)),
+  }));
+  const lines = (all, fields) => (Array.isArray(all) ? all : []).filter((l) => l && typeof l.id === 'string' && Number.isFinite(l.ts)).slice(-limits.lines).map((l) => {
+    const out = pick(l, fields, n, ctx);
+    if (l.answers && typeof l.answers === 'object' && !Array.isArray(l.answers)) {
+      out.answers = Object.fromEntries(Object.entries(l.answers).filter(([, a]) => typeof a === 'string').slice(0, 20).map(([q, a]) => [String(q).slice(0, 80), clip(a, 2000, ctx)]));
+    }
+    return out;
+  });
+  const chat = lines(view.chat, CHAT_FIELDS);
+  const runs = lines(view.runs, RUN_FIELDS);
+  const out = { list, chat: [], runs: [], ...(typeof view.trouble === 'string' ? { trouble: clip(view.trouble, 300, ctx) } : {}) };
+  // The newest lines first, until it would not fit beside the settings.
+  let left = limits.bytes - bytesOf(out);
+  const newestFirst = [...chat.map((l, i) => ({ l, i })), ...runs.map((l, i) => ({ l, i }))].sort((a, b) => b.l.ts - a.l.ts || b.i - a.i).map((x) => x.l);
+  for (const l of newestFirst) {
+    left -= bytesOf(l) + 1;
+    if (left < 0) break;
+    (l.kind === 'run' ? out.runs : out.chat).push(l);
+  }
+  out.chat.reverse();
+  out.runs.reverse();
+  return out;
+}
 
 // `item` is the folded row; `history` is store.readHistory for it. `home` is
 // her home folder, written ~ in the copy.
@@ -203,7 +270,7 @@ export function withPhoneAll(saved, personId, on, every = []) {
 
 // A NEW THREAD STARTED ON THE PHONE has a row there before the Mac makes it,
 // under this id, and a reply to it before then is a reply to this id. The Mac
-// remembers which real row it became (main/phone-inbox.mjs) (Codex's review of
+// remembers which real row it became (main/phone-inbox.mts) (Codex's review of
 // step 1, finding 8). Shaped like a row id, so every screen takes it.
 export const madeHere = (commandId) => `w-${String(commandId).replace(/[^0-9a-f]/gi, '').slice(0, 10).toLowerCase()}`;
 
@@ -215,6 +282,26 @@ export function threadsWorthCarrying(items, { now = Date.now(), limits = SNAPSHO
     .filter((i) => i && !i.agent && (i.status !== 'done' || now - (i.updatedAt ?? 0) < fortnight))
     .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
     .slice(0, limits.items);
+}
+
+// WHY A THREAD NOTHING IS RUNNING ON IS WAITING, as the Mac's own status says
+// it (Supervisor#status), for the copy it sends up (w-24119e8784). Without it
+// the phone read every thread waiting its turn as "Nothing running". The order
+// is the desktop's: a dead worker first, then a ship owed, then a tool that
+// cannot start anything, then the queue. `paused` is the whole fleet's, and the
+// publisher lays it on each open thread with no other reason.
+export const WAIT_STATES = ['queued', 'next', 'signin', 'limit', 'paused', 'stalled', 'shipping'];
+export function phoneWaitsOf(status) {
+  const byId = {};
+  if (!status) return { byId, paused: false };
+  const set = (id, wait) => { if (typeof id === 'string' && id && !byId[id]) byId[id] = wait; };
+  for (const id of status.stalled ?? []) set(id, { state: 'stalled' });
+  for (const id of status.shipping ?? []) set(id, { state: 'shipping' });
+  for (const [id, tool] of Object.entries(status.signInNeeded ?? {})) set(id, { state: 'signin', tool: String(tool) });
+  for (const [id, l] of Object.entries(status.atLimit ?? {})) set(id, { state: 'limit', tool: String(l?.tool ?? ''), until: Number(l?.until) || 0 });
+  const next = new Set(status.runNow ?? []);
+  for (const id of status.queued ?? []) set(id, { state: next.has(id) ? 'next' : 'queued' });
+  return { byId, paused: !!status.paused };
 }
 
 // A cheap, stable fingerprint, so a thread that did not change is not sent.
@@ -229,7 +316,7 @@ export function snapshotKey(snapshot) {
 // one of these, or names a project she did not put on her phone, or a thread
 // that is not in it, is refused and says why.
 // A `setting` belongs to the computer, not a project (shared/phone-settings.mjs).
-export const PHONE_COMMANDS = ['reply', 'new', 'snooze', 'close', 'stop', 'run-now', 'send-now', 'reopen', 'schedule', 'approve', 'setting'];
+export const PHONE_COMMANDS = ['reply', 'new', 'snooze', 'close', 'stop', 'run-now', 'send-now', 'reopen', 'schedule', 'approve', 'setting', 'move-to-cloud'];
 
 // A PERMISSION CARD AS HER PHONE DRAWS IT: what the agent asks to do, with the
 // secrets in it hidden as a thread's words are, and the fingerprint of the card
@@ -263,7 +350,7 @@ export function phoneApproval(request, card, ctx = {}) {
 }
 
 // WHAT SHE PICKED WITH A REPLY OR A NEW THREAD, as the window's own handlers
-// take it (main/ipc.mjs zero:answer, zero:compose): only these fields, each
+// take it (main/ipc.mts zero:answer, zero:compose): only these fields, each
 // only in its right shape. Null on a reply clears a choice, as in the window.
 const WORD = /^[A-Za-z][\w.:-]{0,79}$/;
 const word = (v, n = 80) => typeof v === 'string' && v.length <= n && WORD.test(v);
@@ -272,6 +359,7 @@ const CHOICES = {
   reply: {
     permissionMode: orNull((v) => word(v, 40)), model: orNull(word), effort: orNull((v) => word(v, 20)),
     priority: (v) => Number.isInteger(v) && v >= 0 && v <= 10, now: (v) => v === true, unschedule: (v) => v === true,
+    runAt: (v) => Number.isFinite(v) && v > 0,
   },
   new: {
     runAt: (v) => Number.isFinite(v) && v > 0, start: (v) => v === 'later' || v === 'now',
@@ -279,6 +367,8 @@ const CHOICES = {
     assignee: (v) => typeof v === 'string' && v.length >= 1 && v.length <= 80, due: (v) => typeof v === 'string' && v.length <= 40,
     visibility: (v) => ['team', 'people', 'private'].includes(v),
     visibleTo: (v) => Array.isArray(v) && v.length <= 50 && v.every((x) => typeof x === 'string' && x.length <= 80),
+    // To Auto (shared/auto-route.mjs), and no other label.
+    labels: (v) => Array.isArray(v) && v.length === 1 && v[0] === 'auto',
   },
 };
 export function phoneChoices(kind, p) {
@@ -309,7 +399,7 @@ export function checkCommand(cmd, { projects, hasItem }) {
 // A TURN THE CLOUD TOOK WITH THE COMPUTER SHUT, written into the thread's copy
 // by the cloud server (cloud/gateway/phone.mjs), as the computer would have
 // written it: her reply, the agent's answer and the row waiting on her
-// (main/store.mjs recordSessionResult). The computer's own copy replaces this
+// (main/store.mts recordSessionResult). The computer's own copy replaces this
 // one once it is back and has brought the run home.
 export function withCloudTurn(snapshot, { reply, answer, repliedAt, answeredAt, status = 'blocked' }, limits = SNAPSHOT_LIMITS) {
   if (!snapshot || typeof snapshot !== 'object' || !snapshot.item?.id) return null;

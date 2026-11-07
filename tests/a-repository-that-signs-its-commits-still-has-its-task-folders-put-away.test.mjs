@@ -11,7 +11,7 @@
 // `parkTaskFolder` never returned, killed at 25 seconds with the stub still
 // running as `gpg-stub.sh --status-fd=2 -bsau`. The same with `gpg.format=ssh`
 // and `gpg.ssh.program` (`ssh-stub.sh -Y sign -n git`). Folder jobs run one at a
-// time on one thread (main/task-folders-offthread.mjs), so one park stuck on a
+// time on one thread (main/task-folders-offthread.mts), so one park stuck on a
 // signer is every later task in every project left without a folder until the
 // app restarts. A signer that refuses outright (a locked 1Password) is the
 // milder half: the park came back `refused` and the folder was never reclaimed.
@@ -28,7 +28,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   ensureTaskFolder, parkTaskFolder, restoreTaskFolder, PARKED,
-} from '../main/task-folders.mjs';
+} from '../main/task-folders.mts';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 

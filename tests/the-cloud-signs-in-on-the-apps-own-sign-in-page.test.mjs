@@ -6,18 +6,18 @@
 // sign-in. We already have a sign-in page built." So the cloud uses that page,
 // team/SignInPage.tsx, with Google or an email and a password, a way back,
 // and one line saying continuing accepts the terms. Signing in there gets this
-// Mac its cloud key (main/cloud/account.mjs), and the cloud button is drawn on
+// Mac its cloud key (main/cloud/account.mts), and the cloud button is drawn on
 // any Mac the cloud is offered to, not only one set up on its own AWS.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/gateway.mjs';
-import { cloudAccountSession, cloudSignIn } from '../main/cloud/account.mjs';
+import { cloudAccountSession, cloudSignIn } from '../main/cloud/account.mts';
 import { readCloudKey, readCloudConfig, writeCloudKey, cloudConfigPath } from '../main/cloud/config.mjs';
-import { REQUEST_CHANNELS } from '../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS } from '../shared/bridge-map.mts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
@@ -138,7 +138,7 @@ describe('the page and the wiring', () => {
     expect(REQUEST_CHANNELS.cloudAccountSignIn).toBe('zero:cloud-account-sign-in');
     expect(REQUEST_CHANNELS.cloudAccountCancel).toBe('zero:cloud-account-cancel');
     expect(read('preload.cjs')).toContain("cloudAccountSignIn: (payload) => ipcRenderer.invoke('zero:cloud-account-sign-in', payload)");
-    expect(read('main/ipc.mjs')).toContain("ipcMain.handle('zero:cloud-account-sign-in'");
+    expect(read('main/ipc.mts')).toContain("ipcMain.handle('zero:cloud-account-sign-in'");
   });
 
   it('is the app\'s own sign-in page, with Google and email, a way back, and the terms line, never new screens', () => {
@@ -153,10 +153,12 @@ describe('the page and the wiring', () => {
 
   // The owner first said the cloud's sign-up needed no name (2026-10-20), then
   // that a third field is what tells sign-up from sign-in (2026-10-23).
+  // The rule moved out of the dimmed button and into what-is-missing.ts
+  // (w-aaedc8f711): an empty name is now said rather than drawn as a dead
+  // button (tests/the-cloud-sign-in-page-says-what-it-waits-on).
   it('creating an account asks a name, for the cloud as for the team', () => {
-    const page = read('renderer/src/team/SignInPage.tsx');
-    expect(page).toContain("{mode === 'sign-up' && (");
-    expect(page).toContain("(mode !== 'sign-up' || !!name.trim())");
+    expect(read('renderer/src/team/SignInPage.tsx')).toContain("{mode === 'sign-up' && (");
+    expect(read('renderer/src/team/what-is-missing.ts')).toContain("mode === 'sign-up' && !name.trim()");
   });
 
   it('the cloud button is drawn on any Mac the cloud is offered to', () => {

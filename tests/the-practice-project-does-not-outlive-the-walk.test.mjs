@@ -28,15 +28,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Store } from '../main/store.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { PRACTICE_ROWS, PRACTICE_SLUG } from '../shared/first-run-practice.mjs';
+import { Store } from '../main/store.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { PRACTICE_ROWS, PRACTICE_SLUG } from '../shared/first-run-practice.mts';
 import { needsStaging, walkStageKey } from '../renderer/src/walk-staging.ts';
 import { practiceRemembered, rememberProject, rememberedProject, resolveProject } from '../renderer/src/compose-project.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = fs.readFileSync(path.join(root, 'renderer/src/App.tsx'), 'utf8');
-const supervisorSrc = fs.readFileSync(path.join(root, 'main/supervisor.mjs'), 'utf8');
+const supervisorSrc = fs.readFileSync(path.join(root, 'main/supervisor.mts'), 'utf8');
 
 async function freshStore() {
   const account = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-outlive-'));
@@ -295,11 +295,13 @@ describe('D: an agent can never run in a practice project', () => {
     // — had none of them.
     expect(supervisorSrc).not.toMatch(/if \(product\.practice\) continue;/);
     // One definition and four uses. It was five until the drive loop was
-    // deleted (w-d19d6d387c, 2026-09-22), which had one of its own.
-    expect(supervisorSrc.match(/worksHere\(/g) ?? []).toHaveLength(5);
+    // deleted (w-d19d6d387c, 2026-09-22), which had one of its own. Five uses
+    // since a sleeping Mac hands repeating tasks to the cloud (`_repeatsAhead`).
+    // Six since a pass that stops early counts the rows it held (`_noteWaitingRows`).
+    expect(supervisorSrc.match(/worksHere\(/g) ?? []).toHaveLength(7);
     // And the refusal is before the plan is built, because a plan for a practice
     // project already carries a working directory that is not a repository.
-    const spawn = supervisorSrc.slice(supervisorSrc.indexOf('  spawnWorker(item, {'));
+    const spawn = supervisorSrc.slice(supervisorSrc.indexOf('  spawnWorker(item'));
     expect(spawn.indexOf('if (!this.worksHere(product))'))
       .toBeLessThan(spawn.indexOf('const plan = this.spawnPlan('));
   });

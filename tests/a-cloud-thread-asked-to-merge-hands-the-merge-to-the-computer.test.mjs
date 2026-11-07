@@ -10,7 +10,7 @@
 // Codex cloud runs were told nothing about the cloud at all: the note rode only
 // on Claude Code's command line, so a Codex run could not know to hand back.
 import { describe, it, expect } from 'vitest';
-import { CLOUD_NOTE, PLAIN_CLOUD_NOTE, codexLineForTheCloud } from '../main/cloud/run.mjs';
+import { CLOUD_NOTE, PLAIN_CLOUD_NOTE, codexLineForTheCloud } from '../main/cloud/run.mts';
 import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
 
 describe('what a cloud run is told about branches', () => {
@@ -19,7 +19,20 @@ describe('what a cloud run is told about branches', () => {
     expect(CLOUD_NOTE).toMatch(/main or any other branch[^.]*thrown away/i);
     expect(CLOUD_NOTE).toContain(`${HAND_BACK} merging into main`);
     // The hand-back paragraph stays last, where the plain note takes it from.
-    expect(CLOUD_NOTE.split('\n\n').at(-1)).toMatch(/^If this request needs something only their computer has/);
+    const handback = CLOUD_NOTE.split('\n\n').at(-1);
+    expect(handback).toMatch(/^For a missing installed skill or task file, first use the store tool request_cloud_resource/);
+    expect(handback).toMatch(/something the work can do without[^.]*finish the rest and say exactly what is missing/);
+    expect(handback).toContain(`End your turn with one line and nothing else: ${HAND_BACK}`);
+  });
+
+  // w-6771163ced: a launch-video run could not fetch the intro film its request
+  // named, was told to "finish independent work", and built a whole film
+  // around a guessed style and its own music.
+  it('hands back an input the request names that cannot be fetched, rather than building around a guess', () => {
+    const handback = CLOUD_NOTE.split('\n\n').at(-1);
+    expect(handback).toMatch(/a file, folder or skill the request names or needs that request_cloud_resource cannot deliver, stop at once/);
+    expect(handback).toMatch(/any path under the account's documents/);
+    expect(PLAIN_CLOUD_NOTE.split('\n\n').at(-1)).toBe(handback);
   });
 
   // A cloud run asked about the project's branches listed two; the computer

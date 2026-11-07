@@ -185,7 +185,7 @@ export const REVIEW_INSTRUCTIONS = [
   '   - On this Mac: only when your verdict is SAFE TO RUN and the scan says running here is allowed. Check memory first (`memory_pressure`); if the Mac is short, rely on GitHub\'s run and say so. Then, in a throwaway folder outside every checkout:',
   '       git -C <REPO_PATH> fetch origin pull/<N>/head:refs/remotes/pr/<N>',
   '       git -C <REPO_PATH> worktree add --detach <SCRATCH> refs/remotes/pr/<N>',
-  '     When running here is allowed its dependencies are unchanged, so link the base checkout\'s rather than installing: `ln -s <REPO_PATH>/node_modules <SCRATCH>/node_modules`, and the same for any nested one its tests need.',
+  '     When running here is allowed its dependencies are unchanged, so link the base checkout\'s rather than installing: `[ -e <SCRATCH>/node_modules ] || ln -s <REPO_PATH>/node_modules <SCRATCH>/node_modules` (run where one exists, `ln` puts the link inside it), and the same for any nested one its tests need.',
   '     Run EVERY command that executes its code through the sandbox, which takes away the network and every private folder in the home folder:',
   '       <SANDBOX> <SCRATCH> -- <the command>',
   '     Run the project\'s test runner itself on the tests that cover the changed files (a wrapper script that asks git or the network will not work in there; for this repository, `node node_modules/vitest/vitest.mjs related --run --cache=false <files>`). Never run its code outside the sandbox.',

@@ -18,8 +18,8 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { analyticsKey, createAnalytics, diagnosticsOn } from '../main/analytics.mjs';
-import { EVENTS, EVENT_NAMES, sanitize } from '../shared/analytics-events.mjs';
+import { analyticsKey, createAnalytics, diagnosticsOn } from '../main/analytics.mts';
+import { EVENTS, EVENT_NAMES, sanitize } from '../shared/analytics-events.mts';
 import { Name } from '../shared/product-name.mjs';
 
 const tmpdir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-analytics-'));
@@ -41,7 +41,7 @@ describe('the renderer cannot send anything', () => {
       return e.isDirectory() ? walk(full) : [full];
     });
     const offenders = walk(root)
-      .filter((f) => /\.(ts|tsx|js|jsx|mjs|cjs|html)$/.test(f))
+      .filter((f) => /\.(ts|tsx|js|jsx|mjs|mts|cjs|html)$/.test(f))
       .filter((f) => /posthog-js|from ['"]posthog|amplitude|mixpanel|@sentry/i.test(fs.readFileSync(f, 'utf8')));
     expect(offenders).toEqual([]);
   });
@@ -61,7 +61,9 @@ describe('the list of what may be sent', () => {
   // And since 2026-10-16 five about the minutes after setup
   // (tests/what-people-do-after-setup-is-counted.test.mjs) and the switch
   // going off (tests/turning-counts-off-sends-one-last-count.test.mjs).
-  it('is her eighteen and no more', () => {
+  // And since 2026-10-29 why an agent could not start
+  // (tests/a-start-that-is-turned-away-is-counted-and-said.test.mjs).
+  it('is her nineteen and no more', () => {
     expect(Object.values(EVENTS)).toEqual([
       `${Name} was opened`,
       'First run finished',
@@ -81,6 +83,7 @@ describe('the list of what may be sent', () => {
       'Setup offered agents to import',
       'Setup imported agents',
       'Counts were turned off',
+      'An agent could not start yet',
     ]);
   });
 
@@ -208,7 +211,7 @@ describe('crash reports', () => {
     ts: '2026-08-19T19:00:00.000Z',
     upMs: 4321,
     app: { name: Name, version: '1.2.3' },
-    error: { name: 'Error', code: 'ENOENT', syscall: 'open', message: 'could not read <~+4>', stack: 'app:main/store.mjs:142' },
+    error: { name: 'Error', code: 'ENOENT', syscall: 'open', message: 'could not read <~+4>', stack: 'app:main/store.mts:142' },
   };
 
   it('sends the scrubbed report through the same switch', () => {
@@ -259,7 +262,7 @@ describe('crash reports', () => {
 
 describe('the door the renderer knocks on', () => {
   it('accepts only the approved names', () => {
-    const src = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
     expect(src).toMatch(/ipcMain\.handle\('zero:track'/);
     // The handler checks the name against the shared list before anything else.
     expect(src).toMatch(/if \(!EVENT_NAMES\.includes\(name\)\) return false;/);
@@ -300,8 +303,8 @@ describe('the README, which is where the privacy notice lives', () => {
       .replace(Name.toLowerCase(), 'the app'));
     const missing = said.filter((sentence) => !text.includes(sentence));
     expect(missing).toEqual([]);
-    expect(text).toContain('eighteen things');
-    expect(EVENT_NAMES).toHaveLength(18);
+    expect(text).toContain('nineteen things');
+    expect(EVENT_NAMES).toHaveLength(19);
   });
 
   it('promises no content leaves, which is what sanitize enforces', () => {

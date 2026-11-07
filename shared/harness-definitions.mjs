@@ -18,11 +18,11 @@ export const HARNESS_DEFINITIONS = freeze([
     // 2.1.71 (2026-03-06) is the first that takes `--permission-mode auto`,
     // which every worker is started with; 2.1.70 and older die in under a
     // second on it. Every other flag is older still (`--effort` arrived after
-    // 2.1.8, `--include-partial-messages` after 1.0.90). shared/spawn-trouble.mjs
+    // 2.1.8, `--include-partial-messages` after 1.0.90). shared/spawn-trouble.mts
     // names it when an older one refuses the line.
     minVersion: '2.1.71',
     // HOW A WORKER IS STARTED, AS DATA. This was six hardcoded flag names in
-    // main/supervisor.mjs, which made the cheapest possible new engine — one
+    // main/supervisor.mts, which made the cheapest possible new engine — one
     // that speaks this same stream-json and differs by a binary and the
     // `outputFormat` value, as Grok Build does in
     // github.com/savannahfeder/agentbox/issues/21 — a supervisor edit. A key
@@ -39,7 +39,10 @@ export const HARNESS_DEFINITIONS = freeze([
       // Replies arrive on stdin, so the prompt leaves the line when they do.
       input: ['--input-format', 'stream-json', '--replay-user-messages'],
     },
-    scrubPatterns: ['^ANTHROPIC_', '^CLAUDE_CODE_', '^CLAUDECODE$', '^CLAUDE_PID$', '^CLAUDE_EFFORT$', '^CLAUDE_CONFIG_DIR$'],
+    // CLAUDE_SECURESTORAGE_CONFIG_DIR, set or empty, picks the keychain login
+    // ahead of CLAUDE_CONFIG_DIR, and Claude Code hands it to the sessions it
+    // starts (tests/a-usage-check-reads-only-the-login-of-the-folder-it-names).
+    scrubPatterns: ['^ANTHROPIC_', '^CLAUDE_CODE_', '^CLAUDECODE$', '^CLAUDE_PID$', '^CLAUDE_EFFORT$', '^CLAUDE_CONFIG_DIR$', '^CLAUDE_SECURESTORAGE_CONFIG_DIR$'],
     capabilities: { nativeCommands: true, fork: true, nativeReview: false, remoteControl: true, inlineImages: false, claudeEffort: true },
     imageInstruction: 'Open each one with the Read tool, at the absolute path below.',
   },
@@ -53,7 +56,7 @@ export const HARNESS_DEFINITIONS = freeze([
     // app-server RPC: the prompt is a turn's `input`, the system block a
     // thread's `developerInstructions`, the resume a thread id. An engine with
     // no command line is handed none rather than handed Claude Code's.
-    scrubPatterns: ['^ANTHROPIC_', '^CLAUDE_CODE_', '^CLAUDECODE$', '^CLAUDE_PID$', '^CLAUDE_EFFORT$', '^CLAUDE_CONFIG_DIR$', '^OPENAI_', '^CODEX_'],
+    scrubPatterns: ['^ANTHROPIC_', '^CLAUDE_CODE_', '^CLAUDECODE$', '^CLAUDE_PID$', '^CLAUDE_EFFORT$', '^CLAUDE_CONFIG_DIR$', '^CLAUDE_SECURESTORAGE_CONFIG_DIR$', '^OPENAI_', '^CODEX_'],
     capabilities: { nativeCommands: false, fork: false, nativeReview: true, remoteControl: false, inlineImages: true, claudeEffort: false },
     imageInstruction: 'Each one is attached to this message as an image, and is also on disk at the absolute path below.',
   },
@@ -83,7 +86,7 @@ export const HARNESS_DEFINITIONS = freeze([
     loginArgs: ['auth', 'login'], statusArgs: ['auth', 'list'],
     credentialFiles: ['auth.json'],
     scrubPatterns: [
-      '^ANTHROPIC_', '^CLAUDE_CODE_', '^CLAUDECODE$', '^CLAUDE_PID$', '^CLAUDE_EFFORT$', '^CLAUDE_CONFIG_DIR$',
+      '^ANTHROPIC_', '^CLAUDE_CODE_', '^CLAUDECODE$', '^CLAUDE_PID$', '^CLAUDE_EFFORT$', '^CLAUDE_CONFIG_DIR$', '^CLAUDE_SECURESTORAGE_CONFIG_DIR$',
       '^OPENAI_', '^CODEX_', '^OPENCODE_', '^OPENROUTER_', '^GEMINI_', '^GOOGLE_',
       '^AWS_', '^AZURE_', '^GROQ_', '^MISTRAL_', '^DEEPSEEK_', '^XAI_', '^CEREBRAS_',
       '^TOGETHER_', '^FIREWORKS_', '^DEEPINFRA_', '^BASETEN_', '^NVIDIA_', '^GITLAB_TOKEN$',
@@ -100,7 +103,7 @@ export const HARNESS_DEFINITIONS = freeze([
     // docs/harnesses.md: "A provider is not offered until that path works", and
     // "a new provider's networking or permission scope requires the
     // corresponding product policy review before admission." The transport is
-    // verified (see main/opencode-server.mjs for what was measured and how);
+    // verified (see main/opencode-server.mts for what was measured and how);
     // whether OpenCode appears in the picker is a product call, so this stays
     // false until somebody turns it on deliberately.
     admitted: false,

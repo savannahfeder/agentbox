@@ -282,7 +282,8 @@ describe('the database client', () => {
     await db.waitingReplies({ after: Date.UTC(2026, 9, 23), before: Date.UTC(2026, 9, 24), limit: 50 });
     const u = asked[0].url;
     expect(u).toMatch(/^https:\/\/db\.test\/rest\/v1\/phone_commands\?/);
-    for (const f of ['kind=in.(reply,new)', 'taken_at=is.null', 'claimed_at=is.null', 'created_at=gt.2026-10-23', 'created_at=lt.2026-10-24', 'order=created_at.asc', 'limit=50']) expect(u).toContain(f);
+    // run-now: a sleeping computer's own rows (tests/the-cloud-starts-what-a-sleeping-mac-handed-it).
+    for (const f of ['kind=in.(reply,new,run-now)', 'taken_at=is.null', 'claimed_at=is.null', 'created_at=gt.2026-10-23', 'created_at=lt.2026-10-24', 'order=created_at.asc', 'limit=50']) expect(u).toContain(f);
     expect(asked[0].init.headers.authorization).toBe('Bearer svc');
   });
   it('claims only an unclaimed command, and gives back only its own claim', async () => {

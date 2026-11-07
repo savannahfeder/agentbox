@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { signInAsk, SIGN_IN_SKIPPED } from '../renderer/src/sign-in-ask.ts';
-import { createTeamService, teamForWindow } from '../main/team/index.mjs';
+import { createTeamService, teamForWindow } from '../main/team/index.mts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');

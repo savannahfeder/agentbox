@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { memoryFolderFor, transcriptFolderName } from '../main/cloud/run.mjs';
+import { memoryFolderFor, transcriptFolderName } from '../main/cloud/run.mts';
 
 const dirs = [];
 afterEach(() => { while (dirs.length) fs.rmSync(dirs.pop(), { recursive: true, force: true }); });

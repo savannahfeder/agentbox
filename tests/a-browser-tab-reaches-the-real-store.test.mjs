@@ -20,7 +20,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { bootHeadless, createServer, newToken } from '../main/serve.mjs';
+import { bootHeadless, createServer, newToken } from '../main/serve.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(here, '..');
@@ -87,7 +87,7 @@ describe('a browser tab, pointed at a local agentbox', () => {
     // Everything preload exposes: the ones asked for, the ones listened on, and
     // the one only a desktop can answer. Counted off the map rather than typed,
     // because a number typed here is edited to pass rather than read.
-    const { REQUEST_CHANNELS, PUSH_CHANNELS, DESKTOP_ONLY } = await import('../shared/bridge-map.mjs');
+    const { REQUEST_CHANNELS, PUSH_CHANNELS, DESKTOP_ONLY } = await import('../shared/bridge-map.mts');
     const expected = Object.keys(REQUEST_CHANNELS).length
       + Object.keys(PUSH_CHANNELS).length
       + DESKTOP_ONLY.length;

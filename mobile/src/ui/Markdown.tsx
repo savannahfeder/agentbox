@@ -4,13 +4,16 @@
 // lib/markdown.ts; this only draws it.
 import { Geist_400Regular_Italic, Geist_600SemiBold_Italic, useFonts } from '@expo-google-fonts/geist';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Image, Linking, Pressable, ScrollView, Text, View, type TextStyle } from 'react-native';
+import { Image } from 'expo-image';
+import { Linking, Pressable, ScrollView, Text, View, type TextStyle } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { isImagePath, referencedFiles } from '../../../renderer/src/referenced-files';
+import { pictureSource, shapeOfDrawn } from '../lib/files';
 import { inlineSpans, messageBlocks, type Block, type MentionKind, type Span } from '../lib/markdown';
+import { offerLink } from './LinkMenu';
 import { T } from './parts';
 import { Player } from './Player';
-import { color, font } from './theme';
+import { color, corner, font } from './theme';
 
 /** How a message reaches the files it names; the thread screen gives it. */
 export interface MessageFiles {
@@ -18,6 +21,8 @@ export interface MessageFiles {
   picture(src: string): string | null | undefined;
   /** Open the file, the folder or the page it names; `among` are the pictures to step through from a picture. */
   open(src: string, among?: string[]): void;
+  /** A long press: offer to open it in the browser or share it (LinkMenu.ts). */
+  hold?(src: string): void;
   /** A folder's pictures as full paths on the phone, and what the folder goes by; null when the phone does not have it. */
   folder?(src: string): { title: string; pictures: string[]; total: number } | null;
   /** The link a film or a sound plays from, or null when the phone does not have it. */
@@ -28,10 +33,10 @@ export interface MessageFiles {
 
 // The thread's reading type (`.focus-body .markdown`): 16px on 25.6px; a
 // document opened on its own reads at 15 on 24 (`.doc-card .markdown`).
-const BODY: TextStyle = { fontSize: 16, lineHeight: 25.6, color: color.text };
-const DOC_BODY: TextStyle = { fontSize: 15, lineHeight: 24, color: color.text };
-// The theme's `--bg-raised`, which a picture's box and a code span sit on.
-const RAISED = '#2f2d2c';
+// The colour is a getter so it is read as the text draws, in the look worn then.
+const BODY: TextStyle = { fontSize: 16, lineHeight: 25.6, get color() { return color.text; } };
+const DOC_BODY: TextStyle = { fontSize: 15, lineHeight: 24, get color() { return color.text; } };
+// A picture's box and a code span sit on the theme's `--bg-raised`, `color.raised`.
 const WEB = /^https?:/i;
 
 interface Drawing { files?: MessageFiles; italics: boolean; body: TextStyle; doc: boolean; pictures: string[]; quiet: boolean }
@@ -62,6 +67,12 @@ function open(src: string, files?: MessageFiles, among?: string[]) {
   else if (WEB.test(src) || /^mailto:/i.test(src)) void Linking.openURL(src);
 }
 
+// A long press on a link: open it in the browser or share it. A site needs no files to find its address.
+function hold(src: string, files?: MessageFiles) {
+  if (files?.hold) files.hold(src);
+  else if (WEB.test(src) || /^mailto:/i.test(src)) offerLink(src, src, () => {});
+}
+
 /** Spans, as the nested words of one line of text. */
 function Words({ spans }: { spans: Span[] }) {
   const { files, italics } = useContext(Draw);
@@ -75,13 +86,13 @@ function Words({ spans }: { spans: Span[] }) {
           ...(family ? { fontFamily: family } : {}),
           ...(s.italic && !italics ? { fontStyle: 'italic' } : {}),
           ...(s.strike ? { textDecorationLine: 'line-through' } : {}),
-          ...(s.code ? { fontSize: 13, color: color.text, backgroundColor: 'rgba(255, 255, 255, 0.07)' } : {}),
+          ...(s.code ? { fontSize: 13, color: color.text, backgroundColor: color.film } : {}),
         };
         if (s.mention) {
           const { kind, src } = s.mention;
           const can = WEB.test(src) || /^mailto:/i.test(src) || !!files;
           return (
-            <Text key={i} onPress={can ? () => open(src, files) : undefined} accessibilityRole={can ? 'link' : undefined}
+            <Text key={i} onPress={can ? () => open(src, files) : undefined} onLongPress={can ? () => hold(src, files) : undefined} accessibilityRole={can ? 'link' : undefined}
               style={[style, { color: can ? color.text : color.dim },
                 can && { textDecorationLine: 'underline', textDecorationColor: color.lineStrong }]}>
               <MentionIcon kind={kind} tint={color.faint} />{s.text}
@@ -106,24 +117,24 @@ function Picture({ src, alt }: { src: string; alt: string }) {
     setSize(known); setBroken(false);
     if (!uri || known) return;
     let live = true;
-    Image.getSize(uri, (w, h) => { if (live && w && h) setSize({ w, h }); }, () => { if (live) setBroken(true); });
+    shapeOfDrawn(() => Image.loadAsync(pictureSource(uri))).then(({ w, h }) => { if (live && w && h) setSize({ w, h }); }, () => { if (live) setBroken(true); });
     return () => { live = false; };
   }, [uri, known?.w, known?.h]);
   if (uri === null || broken) {
     return (
-      <View style={{ alignSelf: 'flex-start', borderWidth: 1, borderStyle: 'dashed', borderColor: color.line, paddingVertical: 2, paddingHorizontal: 8 }}>
+      <View style={{ alignSelf: 'flex-start', borderWidth: 1, borderRadius: corner.small, borderStyle: 'dashed', borderColor: color.line, paddingVertical: 2, paddingHorizontal: 8 }}>
         <T style={{ fontFamily: font.mono, fontSize: 12.5, lineHeight: 18, color: color.faint }}>missing image: {src}</T>
       </View>
     );
   }
   // Holds the picture's place while it is looked for: at its own shape when its computer listed one, else the site's 4:3 box.
-  if (uri === undefined || !size) return <View style={size ? { width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, backgroundColor: RAISED } : { width: '100%', aspectRatio: 4 / 3, backgroundColor: RAISED }} />;
+  if (uri === undefined || !size) return <View style={size ? { width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, backgroundColor: color.raised } : { width: '100%', aspectRatio: 4 / 3, backgroundColor: color.raised }} />;
   const drawn = (
-    <Image source={{ uri }} accessibilityLabel={alt} resizeMode="contain" onError={() => setBroken(true)}
-      style={{ width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, borderWidth: 1, borderColor: color.line, backgroundColor: RAISED }} />
+    <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={alt} contentFit="contain" onError={() => setBroken(true)}
+      style={{ width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, backgroundColor: color.raised }} />
   );
   if (/^data:/i.test(src)) return drawn;
-  return <Pressable accessibilityRole="imagebutton" accessibilityLabel={alt || src} onPress={() => open(src, files, pictures)}>{drawn}</Pressable>;
+  return <Pressable accessibilityRole="imagebutton" accessibilityLabel={alt || src} onPress={() => open(src, files, pictures)} onLongPress={() => hold(src, files)}>{drawn}</Pressable>;
 }
 
 // MentionIcon's folder at the folder line's 15px (`.folder-preview-name .mention-icon`).
@@ -175,15 +186,12 @@ function Shot({ file, all, width }: { file: string; all: string[]; width: number
   const { files } = useContext(Draw);
   const uri = files?.picture(file);
   const base = file.split('/').pop() ?? file;
-  const [ratio, setRatio] = useState(0);
-  const tall = ratio > 0 && ratio < 16 / 10;
   return (
     <Pressable onPress={() => open(file, files, all)} accessibilityRole="imagebutton" accessibilityLabel={base} style={{ width }}>
-      <View style={{ width: '100%', aspectRatio: 16 / 10, borderWidth: 1, borderColor: color.line, backgroundColor: RAISED, overflow: 'hidden' }}>
+      <View style={{ width: '100%', aspectRatio: 16 / 10, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, backgroundColor: color.raised, overflow: 'hidden' }}>
         {!!uri && (
-          <Image source={{ uri }} accessibilityLabel={base} resizeMode="cover"
-            onLoad={(e) => { const { width: w = 0, height: h = 0 } = e.nativeEvent?.source ?? {}; if (w && h) setRatio(w / h); }}
-            style={tall ? { position: 'absolute', top: 0, left: 0, width: '100%', aspectRatio: ratio } : { width: '100%', height: '100%' }} />
+          <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={base} contentFit="cover" contentPosition="top"
+            style={{ width: '100%', height: '100%' }} />
         )}
       </View>
       <T numberOfLines={1} style={{ marginTop: 4, fontSize: 13.12, lineHeight: 21, color: color.faint }}>{base}</T>
@@ -200,11 +208,11 @@ function Media({ src, label }: { src: string; label: string }) {
   const film = FILM.test(src);
   return (
     <View>
-      <Text onPress={() => open(src, files)} accessibilityRole="link" style={[BODY, { alignSelf: 'flex-start', marginBottom: 6, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }]}>
+      <Text onPress={() => open(src, files)} onLongPress={() => hold(src, files)} accessibilityRole="link" style={[BODY, { alignSelf: 'flex-start', marginBottom: 6, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }]}>
         <MentionIcon kind="media" tint={color.faint} />{label}
       </Text>
       {link && (film
-        ? <Player link={link} film style={{ width: '100%', height: 360, backgroundColor: RAISED, borderWidth: 1, borderColor: color.line }} />
+        ? <Player link={link} film style={{ width: '100%', height: 360, backgroundColor: color.raised, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line }} />
         : <Player link={link} film={false} style={{ width: '100%', maxWidth: 420, height: 36 }} />)}
     </View>
   );
@@ -292,9 +300,9 @@ function Table({ block }: { block: Extract<Block, { kind: 'table' }> }) {
                     ...(c === columns - 1 ? { borderRightWidth: 1 } : {}),
                     ...(r === all.length - 1 ? { borderBottomWidth: 1 } : {}),
                     // `th`: half the raised grey.
-                    ...(r === 0 ? { backgroundColor: 'rgba(47, 45, 44, 0.5)' } : {}),
+                    ...(r === 0 ? { backgroundColor: color.film } : {}),
                   }}>
-                    <T style={cellText(r, c)}><Words spans={row[c] ?? []} /></T>
+                    <T selectable style={cellText(r, c)}><Words spans={row[c] ?? []} /></T>
                   </View>
                 ))}
               </View>
@@ -307,7 +315,7 @@ function Table({ block }: { block: Extract<Block, { kind: 'table' }> }) {
 }
 
 // `.markdown h2, h3` are the site's small capitals; the others are the browser's own sizes.
-const SMALL_CAPS: TextStyle = { fontSize: 12, lineHeight: 19.2, letterSpacing: 0.84, textTransform: 'uppercase', color: color.faint, fontFamily: font.semibold };
+const SMALL_CAPS: TextStyle = { fontSize: 12, lineHeight: 19.2, letterSpacing: 0.84, textTransform: 'uppercase', get color() { return color.faint; }, fontFamily: font.semibold };
 const HEADING: Record<number, TextStyle> = {
   1: { fontSize: 32, lineHeight: 51.2, fontFamily: font.semibold },
   2: SMALL_CAPS,
@@ -357,14 +365,15 @@ function One({ block: b, tone, depth }: { block: Block; tone?: string; depth: nu
   const ink = tone ? { color: tone } : null;
   const headings = doc ? DOC_HEADING : HEADING;
   switch (b.kind) {
-    case 'p': return <T style={[body, ink]}><Words spans={b.spans} /></T>;
-    case 'h': return <T style={[body, ink, headings[b.depth] ?? headings[4]]}><Words spans={b.spans} /></T>;
+    // Selectable, so a hold selects words to copy (from the phone app, 2026-10-29: "I can't select text").
+    case 'p': return <T selectable style={[body, ink]}><Words spans={b.spans} /></T>;
+    case 'h': return <T selectable style={[body, ink, headings[b.depth] ?? headings[4]]}><Words spans={b.spans} /></T>;
     case 'code':
       return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          style={{ backgroundColor: 'rgba(40, 38, 37, 0.9)', borderWidth: 1, borderColor: color.line }}
+          style={{ backgroundColor: color.raised, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line }}
           contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: 14, flexGrow: 1 }}>
-          <T style={{ fontFamily: font.mono, fontSize: 13, lineHeight: 20.8, color: color.text }}>{b.text}</T>
+          <T selectable style={{ fontFamily: font.mono, fontSize: 13, lineHeight: 20.8, color: color.text }}>{b.text}</T>
         </ScrollView>
       );
     case 'quote':

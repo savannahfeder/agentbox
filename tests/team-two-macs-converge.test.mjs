@@ -9,7 +9,7 @@
 // its owner never wrote. Words travel between two people as messages.
 //
 // Two "Macs" here are two folders and two sync engines over one in-memory
-// cloud (main/team/memory-cloud.mjs, kept honest against the real database by
+// cloud (main/team/memory-cloud.mts, kept honest against the real database by
 // tests/team-cloud-backends-agree.test.mjs).
 import { it, expect, beforeEach, describe } from 'vitest';
 import fs from 'node:fs';
@@ -17,8 +17,8 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import * as disk from '../main/store/work-items.mjs';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createTeamSync, memorySyncState, MAX_SHARED_PROJECTS } from '../main/team/sync.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createTeamSync, memorySyncState, MAX_SHARED_PROJECTS } from '../main/team/sync.mts';
 
 const tmp = (name) => fs.mkdtempSync(path.join(os.tmpdir(), `two-macs-${name}-`));
 

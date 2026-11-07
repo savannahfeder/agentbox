@@ -363,14 +363,14 @@ describe('what one worker remembers of its own changes', () => {
 
 // READ OUT OF THE SOURCE, the way this repo pins its other unrunnable facts
 // (tests/a-codex-approval-reaches-her-on-the-same-card.test.mjs does it for
-// main/ipc.mjs, and for the same reason). `_spawnCodexWorker` needs a whole
+// main/ipc.mts, and for the same reason). `_spawnCodexWorker` needs a whole
 // Supervisor and a live app-server; what it must never lose is the ONE line
 // that feeds the worker's notifications into the memory its cards are drawn
 // from. Without it every fileChange approval is refused again and a Codex
 // worker silently stops being able to write a file -- which is exactly the
 // failure this slice exists to end, and it has no symptom on any screen.
 describe('the line that joins a running worker to its own memory', () => {
-  const supervisor = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+  const supervisor = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
 
   it('feeds every notification on the thread into the scope that draws its cards', () => {
     expect(supervisor).toMatch(/worker\.on\('event',\s*cards\.remember\)/);

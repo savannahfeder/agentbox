@@ -17,7 +17,7 @@
 //   claude auth status --json / codex login status   exit 0 signed in, 1 not
 
 import { describe, it, expect } from 'vitest';
-import { createEngineSetup, installCommand, signInCommand, statusCommand } from '../main/engine-setup.mjs';
+import { createEngineSetup, installCommand, signInCommand, statusCommand } from '../main/engine-setup.mts';
 
 // A pretend machine. `found` is what the finder says, `signedIn` is what the
 // status command answers each time it is asked, and every spawn is recorded.
@@ -179,13 +179,16 @@ describe('setting up a plan', () => {
   it('says whether a tool is ready without installing or signing in anything', async () => {
     const signedOut = machine({ found: true, signedIn: [false] });
     const a = createEngineSetup({ ...quick, find: signedOut.find, spawn: signedOut.spawn });
-    expect(await a.readiness('claude')).toEqual({ engine: 'claude', found: true, signedIn: false });
+    // `certain` since F-132: a reading says whether it established anything,
+    // and these three all did
+    // (tests/the-plan-bar-only-says-agents-cannot-start-when-that-is-true).
+    expect(await a.readiness('claude')).toEqual({ engine: 'claude', found: true, signedIn: false, certain: true });
     const ready = machine({ found: true, signedIn: [true] });
     const b = createEngineSetup({ ...quick, find: ready.find, spawn: ready.spawn });
-    expect(await b.readiness('codex')).toEqual({ engine: 'codex', found: true, signedIn: true });
+    expect(await b.readiness('codex')).toEqual({ engine: 'codex', found: true, signedIn: true, certain: true });
     const none = machine({ found: false });
     const c = createEngineSetup({ ...quick, find: none.find, spawn: none.spawn });
-    expect(await c.readiness('claude')).toEqual({ engine: 'claude', found: false, signedIn: false });
+    expect(await c.readiness('claude')).toEqual({ engine: 'claude', found: false, signedIn: false, certain: true });
     for (const m of [signedOut, ready, none]) {
       expect(m.calls.every((x) => x.args.join(' ').match(/status/))).toBe(true);
     }

@@ -9,6 +9,7 @@
 .agent-update-status {padding:10px 20px;color:var(--text-dim);font-size:13px;}
 .agent-update-status button {text-decoration:underline;}
 .agent-update-panel .task-terminal-side {position:static;width:auto;height:280px;}
+.agent-update-panel .task-terminal-bottom {max-height:calc(60vh - 40px);}
 /* the app: generous rows, soft contrast, the text as the interface. Two themes on
    one token set. EVERY COLOUR IN THIS FILE IS A TOKEN, and every token is
    defined in BOTH themes. A raw rgba(255,255,255,x) wash is invisible on a
@@ -87,6 +88,10 @@
   */
   --row-line: .375;
   --line-strong: rgba(17, 25, 48, 0.14);
+  /* A board card's fill is invisible on a white page, so in Light its edge is
+     all that marks it, and --line alone was too faint to read. */
+  --card-line: var(--line-strong);
+  --card-line-hover: rgba(17, 25, 48, 0.24);
   /* THE GLOW IS ONE LIGHT, NOT A HIGHLIGHTER. The walk has no colour of its own
      anywhere and this is the app's own light. On a light window a cool white
      bloom is invisible, so the ring's glow there is the page's own ink at low
@@ -180,6 +185,11 @@
      accent is always this orange. The selected-row bar, link underlines and
      the asks-you chip wear it, as they do in Dark. */
   --accent: #ee6018;
+  /* THE LOGO'S OWN TWO COLOURS, for the waiting logo (.logo-orbit): the app
+     icon's grey dots and its orange one. They do NOT follow the theme, because
+     the logo is the same mark on every theme. */
+  --logo-dot: #5f5e5c;
+  --logo-orange: #ee6018;
   /* THE READING SURFACE IN THE SETUP PICTURE, and the only place in the app
      that paints paper rather than a theme surface. The values are the landing
      page's own (~/dd-landing/index.html), because the article Agentbox offers you
@@ -206,6 +216,7 @@
   --shadow-card: 0 1px 2px rgba(17, 25, 48, 0.04), 0 6px 20px rgba(17, 25, 48, 0.045);
   --shadow-md: 0 8px 24px rgba(17, 25, 48, 0.09);
   --shadow-lg: 0 24px 60px rgba(17, 25, 48, 0.16);
+  --artifact-lift: 0 0 0 1px var(--line), 0 8px 24px rgba(17, 25, 48, 0.08);
   --scrim: rgba(17, 25, 48, 0.28);
   /* The chess set, and the one place in this file where a colour is not a
      surface of the app. A chess board's SQUARES are the app's greys; its
@@ -230,26 +241,16 @@
      right-side details while the original font stays everywhere else. The body stays Avenir Next; only what reads var(--mono)
      takes Geist Mono. Its @font-face sits with Ember's block below. */
   --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, 'DejaVu Sans Mono', monospace;
-  /* Before this there were TEN different corner sizes on one opened task at the
-     same time (13, 9, 8, 7, 6, 4, 20, two two-corner shapes and 50%), measured
-     in the running app, not counted off the file. Now there is one number and a
-     short list of things that are deliberately not a rectangle. WHAT STAYS AT
-     0, and it is a deliberate exception, not a leftover: the inbox's own surfaces
-     (.list-pane, .tab, .rail, .modal, .shelf-card) and the reply card
-     (.dock-card and its parts). Those were already square and stay so. WHAT STAYS ROUND: true circles (dots, avatars, the switch knob),
-     the settings switch track, and pictures, which take no corner at all
-     because content stays square while the box around it softens. Change this
-     ONE line to change every corner in the app.
-  */
-  --radius: 3px;
-  /* A TAG IS SQUARE IN EVERY THEME. The chips in the Display menu, the Share
-     button at the end of a row, the composer's chips and the Summary button
-     all took --radius, which is 3px here and 0 only under the Ember Grid
-     skin, so they were rounded in every theme but one. This is a SECOND token
-     on purpose: cards, menus, fields and the app's other corners keep their
-     3px, and no skin may re-declare this one, which is what makes a tag
-     square whatever is worn. */
-  --tag-radius: 0px;
+  /* Three corners: the small one for what you press or type in, the artifact
+     one for cards, sheets, menus and what somebody made, and round for faces.
+     Rows, dividers, tabs and the window's panels stay square. --radius is the
+     small corner under its old name, so the Ember Grid skin can still square it. */
+  --artifact-corner: 10px;
+  --artifact-corner-small: 6px;
+  --radius: var(--artifact-corner-small);
+  /* An AI teammate is round like a person; its dashed ring tells it apart. */
+  --mate-corner: 50%;
+  --tag-radius: var(--radius);
   /* THE PICTURE THEMES ANSWER HERE TOO, with no picture (see skins.ts). A skin
      is a second axis laid over dark, not a third theme, and these five tokens
      are the whole of its surface. They are declared in BOTH themes and set to
@@ -426,6 +427,8 @@
      eighths of its own --line too. See the light block for the reasoning. */
   --row-line: .375;
   --line-strong: rgba(255, 255, 255, 0.19);
+  --card-line: var(--line);
+  --card-line-hover: var(--line-strong);
   /* THE WALK'S RING AND ITS CARD. See the light block for the reasoning. These four
      are what every shot on the round four page was taken with: the glow is the
      cool light on both the ring and the card, the edge is what holds the card
@@ -500,6 +503,9 @@
      wore before that, so anything painting dark without the picture got it.
      tests/every-theme-wears-the-one-orange.test.mjs reads every declaration. */
   --accent: #ee6018;
+  /* The logo's own two colours, the same as light's: the logo does not theme. */
+  --logo-dot: #5f5e5c;
+  --logo-orange: #ee6018;
   /* THE READING SURFACE IN THE SETUP PICTURE, and the only place in the app
      that paints paper rather than a theme surface. The values are the landing
      page's own (~/dd-landing/index.html), because the article Agentbox offers you
@@ -533,6 +539,7 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24), 0 6px 20px rgba(0, 0, 0, 0.22);
   --shadow-md: 0 10px 32px rgba(0, 0, 0, 0.38);
   --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.55);
+  --artifact-lift: 0 0 0 1px var(--line), 0 18px 48px rgba(0, 0, 0, 0.32);
   --scrim: rgba(0, 0, 0, 0.45);
   /* The chess set, and the one place in this file where a colour is not a
      surface of the app. A chess board's SQUARES are the app's greys; its
@@ -745,7 +752,6 @@
   /* Darker than dark's 0.45: over rows this near black, a lighter scrim left
      the new-task card reading as one more row rather than a card on top. */
   --scrim: rgba(0, 0, 0, 0.72);
-  --radius: 0px;
   --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, 'DejaVu Sans Mono', monospace;
 }
 :root[data-skin="ember-grid"] body { font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, 'DejaVu Sans', sans-serif; }
@@ -828,11 +834,13 @@ body {
   color: var(--text-faint);
 }
 
-/* The one sentence the boot screen says when nothing comes back. It stands
-   where the wordmark stood, in reading type rather than in the wordmark's
-   tracking. */
+/* The one sentence the boot screen says when nothing comes back. It hangs
+   28px under the moving logo, in reading type, and the logo does not move up
+   to make room for it: it stays on the spot it was already on. */
+.boot-stuck { position: relative; }
 .boot-stuck p {
-  margin: 0;
+  position: absolute; top: calc(50% + 45px + 28px); left: 24px; right: 24px;
+  margin: 0 auto;
   max-width: 560px;
   text-align: center;
   font-size: 15px;
@@ -840,6 +848,37 @@ body {
   letter-spacing: normal;
   line-height: 1.6;
   color: var(--text-dim);
+}
+
+/* THE LOGO, ITS ORANGE DOT RUNNING ROUND THE RING (logo-orbit.ts). The app
+   icon's proportions at 90px: 24px dots, 9px gaps. Each dot is the logo's
+   grey under an orange layer whose opacity runs ORBIT_KEYS, and a test holds
+   the percentages below to them. The logo's own colours, so the same in
+   every theme. */
+.logo-orbit {
+  display: grid; grid-template-columns: repeat(3, 24px); gap: 9px;
+}
+.logo-orbit-dot {
+  position: relative; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--logo-dot);
+}
+.logo-orbit-dot::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  background: var(--logo-orange); opacity: 0;
+  animation: logo-orbit 1488ms linear infinite;
+  animation-delay: var(--orbit-delay, 0ms);
+}
+.logo-orbit-dot[data-still]::after { animation: none; }
+@keyframes logo-orbit {
+  0% { opacity: 1; }
+  6% { opacity: 1; }
+  14% { opacity: 0.45; }
+  26% { opacity: 0; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-orbit-dot::after { animation: none; opacity: 0; }
+  .logo-orbit-dot[data-corner]::after { opacity: 1; }
 }
 
 /* --read-w is the width of the sheet an opened task is set on: the reading
@@ -1075,7 +1114,7 @@ body {
 .usage-lim { margin-bottom: 11px; }
 .usage-lim:last-of-type { margin-bottom: 0; }
 .usage-lim-top {
-  display: flex; justify-content: space-between; align-items: baseline;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; white-space: nowrap;
   font-size: 12.5px; margin-bottom: 5px;
 }
 .usage-lim-name { color: var(--text-dim); }
@@ -1624,26 +1663,31 @@ body {
 }
 .live-word { color: var(--text-dim); font-weight: 500; }
 .live-span { color: var(--text-faint); font-variant-numeric: tabular-nums; }
+/* Try again (w-d08dcbb6fc): the row's Share button, on this line. */
+.live-retry { display: inline-flex; align-items: center; height: 24px; margin-left: 4px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; }
+.live-retry:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
+.live-retry:focus-visible { outline: none; border-color: var(--line-strong); }
 /* THE SHIMMER. A soft band travelling through predominantly full ink, which is what
    Claude Code and Codex both do to say "this word is live" without moving the
-   word. It is clipped to the glyphs, so nothing is drawn outside the text and
-   there is no box to notice. Off entirely under reduced motion, where it falls
-   back to plain dim ink rather than to a colour nothing else in the app uses. */
+   word. The letters keep solid ink and the band is a moving mask over them, so
+   a browser that draws no mask still draws the word: in transparent ink with a
+   clipped gradient, Safari on an iPhone drew nothing at all
+   (tests/the-thinking-word-is-never-drawn-in-clear-ink). Off under reduced
+   motion, in plain dim ink. */
 .live-word.is-shimmering {
-  background: linear-gradient(100deg,
-    var(--text) 0%, var(--text) 32%,
-    var(--text-faint) 50%,
-    var(--text) 68%, var(--text) 100%);
-  background-size: 260% 100%;
-  -webkit-background-clip: text; background-clip: text;
-  color: transparent; -webkit-text-fill-color: transparent;
+  color: var(--text);
+  -webkit-mask-image: linear-gradient(100deg, #000 0%, #000 32%, color-mix(in srgb, #000 45%, transparent) 50%, #000 68%, #000 100%);
+  mask-image: linear-gradient(100deg, #000 0%, #000 32%, color-mix(in srgb, #000 45%, transparent) 50%, #000 68%, #000 100%);
+  -webkit-mask-size: 260% 100%; mask-size: 260% 100%;
   animation: live-shimmer 2.6s linear infinite;
 }
-@keyframes live-shimmer { from { background-position: 160% 0; } to { background-position: -60% 0; } }
+@keyframes live-shimmer {
+  from { -webkit-mask-position: 160% 0; mask-position: 160% 0; }
+  to { -webkit-mask-position: -60% 0; mask-position: -60% 0; }
+}
 @media (prefers-reduced-motion: reduce) {
   .live-word.is-shimmering {
-    animation: none; background: none; color: var(--text-dim);
-    -webkit-text-fill-color: currentColor;
+    animation: none; -webkit-mask-image: none; mask-image: none; color: var(--text-dim);
   }
 }
 
@@ -1869,6 +1913,9 @@ body {
    foot animates, per the 2026-09-19 lattice + shimmer selection.
 */
 .focus-meta.by-lead { gap: 7px; }
+.th-continued { margin: 0 0 14px; color: var(--text-faint); font-size: 13px; }
+.th-continued button { padding: 0; border: 0; background: none; font: inherit; color: var(--text-dim); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-strong); cursor: pointer; }
+.th-continued button:hover { color: var(--text); }
 .by-lead .live-word { font-size: 13px; }
 /* THE DOT ONLY EXISTS WHEN SOMETHING LEADS. On a row with nothing running there
    is no mark and no word, and the line opens on "In your inbox" with no orphan
@@ -2012,7 +2059,7 @@ body {
 /* Half the raised grey: the full one pulled the eye to the header first. */
 .markdown th { background: color-mix(in srgb, var(--bg-raised) 50%, transparent); font-weight: 650; }
 .markdown td:first-child { font-weight: 600; }
-.inline-image { max-width: 100%; border-radius: 0; border: 1px solid var(--line); margin: 8px 0; }
+.inline-image { max-width: 100%; border-radius: var(--artifact-corner); border: 1px solid var(--line); margin: 8px 0; }
 
 
 .inline-image-open {
@@ -2021,6 +2068,7 @@ body {
 }
 .inline-image-open:hover .inline-image { border-color: var(--text-faint); }
 .inline-image-open:focus-visible .inline-image { outline: 1px solid var(--text-faint); outline-offset: 2px; }
+.inline-image-name { display: block; margin: -2px 0 8px; font-size: 12px; line-height: 16px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* A PICTURE HOLDS ITS PLACE WHILE IT LOADS, as a shimmering box, then fades
    in, in every window. Without it a picture with no bytes yet is a 2 x 2 dot
@@ -2073,9 +2121,29 @@ body {
 .inline-media-player { display: block; }
 .inline-media audio { display: block; width: min(420px, 100%); height: 36px; }
 .inline-media-missing .inline-media-name.mention { display: inline; margin: 0 -3px; }
+/* What a sentence names, together under it, one height so the row reads as one. */
+.media-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px; margin: 2px 0 18px; }
+.media-row > * { flex: 0 1 auto; min-width: 0; max-width: 100%; margin: 0; }
+.media-row .inline-image { display: block; height: 240px; width: auto; max-width: 100%; object-fit: cover; margin: 0; }
+.media-row .inline-image-name { margin: 6px 0 0; }
+.media-row .inline-media { display: flex; flex-direction: column-reverse; margin: 0; width: 356px; }
+.media-row .inline-media-name.mention { margin: 6px 0 0; padding: 0; font-size: 12px; line-height: 16px; color: var(--text-dim); }
+.media-row .inline-media-name.mention svg { display: none; }
+.media-row .inline-media-name.mention .mention-name { border: 0; text-decoration: none; }
+.media-row .inline-media video { display: block; width: 100%; height: 240px; object-fit: cover; }
 /* The column's width at a fixed height from the first frame: before its size is
    known a film is the browser's 300 x 150, and it resized once it was. */
-.inline-media video { display: block; width: 100%; height: 360px; object-fit: contain; background: var(--bg-raised); border: 1px solid var(--line); }
+.inline-media video { display: block; width: 100%; height: 360px; object-fit: contain; background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--artifact-corner); }
+/* A film in a thread is one card: the picture and our bar. Beside a picture, the two come to its height. */
+.inline-film { position: relative; display: block; overflow: hidden; background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--artifact-corner); }
+.inline-film video, .media-row .inline-film video { border: 0; border-radius: 0; cursor: pointer; }
+.media-row .inline-film video { height: 198px; object-fit: contain; }
+.inline-film .film-bar { padding: 4px 10px; height: 40px; box-sizing: border-box; }
+.inline-film .film-play { width: 28px; height: 28px; }
+.inline-film-poster { position: absolute; left: 0; top: 0; width: 100%; height: calc(100% - 40px); object-fit: contain; background: var(--bg-raised); pointer-events: none; }
+.inline-film:fullscreen { display: flex; flex-direction: column; background: #000; }
+.inline-film:fullscreen .inline-media-player { flex: 1; min-height: 0; }
+.inline-film:fullscreen video { height: 100%; }
 
 /* A folder a worker named on its own line: its name, then its newest pictures,
    three across (FolderPreview in Focus.tsx). Spans, because it sits in a <p>. */
@@ -2104,9 +2172,9 @@ body {
 }
 .folder-preview-shot img {
   display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top;
-  border: 1px solid var(--line); background: var(--bg-raised);
+  border: 1px solid var(--line); border-radius: var(--artifact-corner-small); background: var(--bg-raised);
 }
-.folder-preview-shot.arriving { aspect-ratio: 16 / 10; border: 1px solid var(--line); cursor: default; }
+.folder-preview-shot.arriving { aspect-ratio: 16 / 10; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); cursor: default; }
 .folder-preview-shot:hover img { border-color: var(--text-faint); }
 .folder-preview-shot:focus-visible img { outline: 1px solid var(--text-faint); outline-offset: 2px; }
 .folder-preview-label {
@@ -2147,13 +2215,10 @@ body {
 /* Sections appended below the body: your answer, the result. Same typographic
    system as the body, no cards, no border stripes. */
 .appendix { margin-top: 26px; }
-.appendix-label {
-  font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em;
-  color: var(--text-faint); margin-bottom: 7px; font-weight: 600;
-}
+.appendix-label { font-size: 12.5px; color: var(--text-faint); margin-bottom: 7px; }
 /* What wrote it, after the label's own word: quieter than the label, because
    the label says what this block IS and this says where it came from. */
-.appendix-ran { font-weight: 400; opacity: 0.72; }
+.appendix-ran { opacity: 0.72; }
 .appendix-unshipped::before {
   content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent); margin-right: 7px; vertical-align: 1px;
@@ -2236,6 +2301,8 @@ body {
 }
 .focus-actions button:hover { color: var(--text); border-color: var(--text-faint); }
 .focus-actions b { color: var(--text); margin-right: 4px; }
+.focus-actions { align-items: center; }
+.focus-when { font-size: 13px; color: var(--text-faint); }
 /* Where the stopped task goes, said on the button rather than only in the
    toast that follows it. Scoped to this button on purpose: the unschedule
    button beside it writes the same `dim` span and has never had a rule, so a
@@ -2325,6 +2392,9 @@ body {
 */
 .focus-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; height: 100%; position: relative; }
 .focus-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+/* A long thread needs a bar to grab. A set `scrollbar-color` overrides the
+   `::-webkit-scrollbar-thumb` hover rule, so the colour has to be set here. */
+.focus-scroll:hover { scrollbar-color: color-mix(in srgb, var(--text-faint) 60%, transparent) transparent; }
 /* THE DOCK FADES TO WHATEVER IT SITS ON, and one edge across the middle of an
    opened task is the bug both halves of this rule exist to prevent: a
    different white in the lower half of every opened task. It has named --bg and --surface by turns as the ground
@@ -2344,11 +2414,6 @@ body {
      width here or the box starts 5.5px right of the words (w-a9b77c7b57).
      Measured by ../scroll-gutter.ts; 0 when the scrollbar overlays. */
   padding-right: calc(32px + var(--scroll-gutter, 0px));
-}
-.focus-dock::before {
-  /* the task fades out above the dock instead of hitting a hard edge */
-  content: ""; position: absolute; left: 0; right: 0; top: -34px; height: 34px;
-  background: linear-gradient(to bottom, transparent, var(--surface)); pointer-events: none;
 }
 /* THE REPLY BOX BEGINS WHERE THE WORDS BEGIN. --read-w is the width of the
    SHEET, and .focus spends 32px of it on each side as padding, so a dock card
@@ -2380,7 +2445,7 @@ body {
 .focus-dock kbd {
   font-family: var(--mono); font-size: 10.5px; color: var(--text-dim);
   background: var(--wash); border: 1px solid var(--line-strong);
-  border-radius: 0; padding: 1.5px 5.5px;
+  border-radius: var(--radius); padding: 1.5px 5.5px;
 }
 .dock-pill { display: flex; align-items: center; width: 100%; background: transparent; border: none; font: inherit; cursor: text; }
 .dock-pill-text { padding: 11px 16px; color: var(--text-faint); font-size: 14.5px; flex: 1; text-align: left; }
@@ -2412,7 +2477,7 @@ body {
 }
 .dock-stop svg { width: 9px; height: 9px; display: block; }
 .dock-stop:hover { color: var(--text); background: var(--wash); border-color: var(--text-faint); }
-.dock-stop:active { transform: translateY(1px); }
+.dock-stop:active { filter: brightness(.88); }
 /* IN THE OPEN COMPOSER IT RIDES ON THE FOOTER, beside Send. `.dock-send` takes
    the free space with its own auto margin, so the stop is pushed out by the
    same margin and the two travel together at the right-hand end of the row. */
@@ -2546,15 +2611,26 @@ body {
   white-space: pre-wrap;
 }
 .dock-ghost-typed { visibility: hidden; }
+/* Whose thread this goes to, over the box. */
+.dock-to { display: flex; align-items: center; gap: 6px; padding: 10px 22px 0; font-size: 11.5px; line-height: 16px; color: var(--text-faint); white-space: nowrap; overflow: hidden; }
+.dock-to > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+/* A person is the one to notice before a send: their face, their name in the text's own colour. */
+.dock-to-person { font-size: 12.5px; color: var(--text); }
+.dock-to-person > * { flex: none; }
 
 /* Approval cards: a worker is frozen mid-action until the user answers,
    so these sit above everything, bottom-right, and say exactly what runs. */
 .approvals {
-  position: fixed; right: 22px; bottom: 22px; z-index: 90; width: 440px;
+  position: fixed; right: 22px; bottom: var(--approval-lift, 22px); z-index: 90; width: 440px;
 }
 /* One card in front, the queue as stacked edges peeking above it. The ghosts
    are pure chrome: depth without height, so ten pending asks occupy the same
    screen as one. */
+/* Extra scroll room belongs after the inbox, never inside an opened thread. */
+.app.asking .list-pane:not(.pinned)::after {
+  content: ''; display: block;
+  height: calc(var(--approval-room, 149px) + 16px);
+}
 .approval-stack { position: relative; }
 .approval-ghost {
   position: absolute; left: 0; right: 0; height: 40px;
@@ -2720,7 +2796,7 @@ body {
 .approval-cmd {
   font-family: var(--mono); font-size: 12px; line-height: 1.5; color: var(--text);
   background: var(--bg); border-radius: var(--radius); padding: 9px 11px; margin-bottom: 10px;
-  white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow-y: auto;
+  white-space: pre-wrap; word-break: break-all; max-height: min(45vh, 360px); overflow-y: auto;
   user-select: text;
 }
 /* AND THE BLOCK INSIDE IT IS A FILM, NOT THE GROUND. `--bg` is the window's own
@@ -2763,6 +2839,9 @@ body {
 .approval-card.answered .approval-opens,
 .approval-card.answered .approval-meta { animation: approval-recede 420ms ease-out forwards; }
 .approval-card.answered.allow { border-color: var(--text-faint); }
+/* Deny moves its edge too (F-115): Allow lightened the card and Deny changed
+   nothing, so the quieter decision was the one with no sign it had landed. */
+.approval-card.answered.deny { border-color: var(--line-strong); }
 
 .approval-verdict {
   position: absolute; inset: 0; z-index: 1;
@@ -2771,8 +2850,8 @@ body {
 }
 .approval-verdict-mark { font-size: 21px; line-height: 1; color: var(--text); }
 .approval-verdict-word { font-size: 13.5px; font-weight: 650; letter-spacing: 0.2px; color: var(--text); }
-.approval-card.answered.deny .approval-verdict-mark,
-.approval-card.answered.deny .approval-verdict-word { color: var(--text-dim); }
+/* Both verdicts are stamped in the card's own ink. Deny had --text-dim here, a
+   step quieter than a mark already on screen for a sixth of a second (F-115). */
 
 /* The press, then a beat holding the verdict, then away. The hold is the whole
    point: an exit that starts fading immediately is the same abrupt
@@ -3010,7 +3089,8 @@ body {
   transition: background 0.15s, border-color 0.15s, transform 0.05s;
 }
 .dock-send:hover { background: var(--wash-strong); border-color: var(--text-faint); }
-.dock-send:active { transform: translateY(1px); }
+/* Darkens rather than moves: a button that moves under a press loses a press on its edge. */
+.dock-send:active { filter: brightness(.88); }
 
 /* THE OFFER IS A BLOCK IN THE THREAD NOW, NOT A LID ON THE REPLY CARD
    (w-560647d4db). It used to be the top edge of the dock, so one hairline along
@@ -3133,6 +3213,20 @@ body {
 .opt-row a { pointer-events: none; }
 .opt-rec { font-size: 11.5px; color: var(--text-faint); flex-shrink: 0; padding-left: 8px; }
 
+/* The tasks a close question is about, named so one filed far up the thread
+   can be found. The dot matches the filed list's (threads-made.css). */
+.opt-named { margin: 0 0 6px; }
+.close-ask-at-task > .opt-strip { margin-top: 12px; }
+.opt-named-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 30px; padding: 0 16px;
+  appearance: none; background: transparent; border: 0; cursor: pointer; text-align: left;
+  font: inherit; font-size: 14px; color: var(--text); transition: background 0.15s;
+}
+.opt-named-row:hover { background: var(--wash); }
+.opt-named-row:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
+.opt-named-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.opt-named-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .reply-dock { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 16px; }
 .reply-dock textarea {
   width: 100%;
@@ -3151,37 +3245,43 @@ body {
 .reply-dock textarea:focus { border-color: var(--text-faint); }
 .reply-hint { margin-top: 8px; color: var(--text-faint); font-size: 12px; }
 
-.attach-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 18px 0; }
+.attach-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; padding: 8px 18px 0; }
 .reply-dock .attach-row { padding: 8px 0 0; }
 .attach-chip {
   background: var(--bg-raised);
   border: 1px solid var(--line);
   color: var(--text-dim);
-  border-radius: var(--radius);
+  border-radius: var(--artifact-corner-small);
   padding: 3px 10px;
   font-size: 12px;
   cursor: pointer;
   font-family: inherit;
 }
 .attach-chip:hover { color: var(--text); border-color: var(--text-faint); }
+.attach-chip.attach-too-big { color: var(--text); border-color: var(--text-faint); white-space: normal; text-align: left; }
+.attach-size { color: var(--text-faint); font-variant-numeric: tabular-nums; }
+/* On its way in: the chip fills from the left as the pieces land. */
+.attach-chip.attach-coming { position: relative; overflow: hidden; cursor: default; }
+.attach-coming .attach-bar { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--text-faint); transition: width 0.2s linear; }
+.compose-note.attach-problem { color: var(--text-dim); padding-top: 6px; }
+.reply-dock .compose-note.attach-problem { padding-left: 0; padding-right: 0; }
 
 .attach-thumb { position: relative; }
 .attach-thumb img {
   height: 84px;
   max-width: 220px;
   object-fit: cover;
-  border-radius: 0;
+  border-radius: var(--artifact-corner-small);
   border: 1px solid var(--line);
   display: block;
 }
-/* Card A squares this too, and tucks it INTO the picture's corner instead of
-   hanging it off the corner as a circle. A circle bolted to a square thumbnail
-   was the loudest round thing left in the composer. */
+/* Sits inside the picture's rounded corner: flush with it, its own square corner
+   would poke out past the curve. */
 .attach-remove {
   position: absolute;
-  top: 0; right: 0;
+  top: 4px; right: 4px;
   width: 18px; height: 18px;
-  border-radius: 0;
+  border-radius: var(--radius);
   background: var(--surface);
   border: 1px solid var(--line-strong);
   color: var(--text-dim);
@@ -3648,6 +3748,26 @@ img.product-mark { object-fit: cover; opacity: 1; }
   border-top: 1px solid var(--line);
 }
 
+/* DICTATION IN THE WEB APP (components/WebDictation.tsx): the microphone, and
+   the row that takes the footer's place while it listens. */
+.dictate-mic {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0;
+  border: 0; border-radius: var(--radius); background: none; box-shadow: none; color: var(--text-dim); cursor: pointer;
+}
+.dictate-mic:hover, .dictate-mic:focus-visible { color: var(--text); outline: none; }
+.dictate-row { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 30px; }
+.dictate-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.dictate-level { flex: none; display: inline-flex; align-items: center; gap: 2.5px; height: 14px; }
+.dictate-level i { width: 2px; background: var(--text-dim); transition: height .08s linear; }
+.dictate-word { flex: 1; min-width: 0; font-size: 13px; color: var(--text-dim); }
+.dictate-button {
+  flex: none; height: 29px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none;
+  font: inherit; font-size: 13px; font-weight: 500; color: var(--text-dim); cursor: pointer;
+}
+.dictate-button.strong { padding: 0 16px; font-weight: 600; color: var(--text); background: var(--wash); }
+.dictate-button:hover:not(:disabled) { border-color: var(--text-faint); }
+.dictate-button:disabled { opacity: .5; cursor: default; }
+
 /* THE QUIET FOOTER (chosen 2026-08-20, the hover version, out of fifteen
    drawn mechanisms). At rest the line says one thing, the project, and the rest
    of it is here and invisible. Point at the footer and the whole sentence is
@@ -3983,6 +4103,32 @@ img.product-mark { object-fit: cover; opacity: 1; }
   font: 500 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--agent-ink);
 }
 .palette-k .palette-foot b { font-weight: 500; color: var(--text-faint); }
+.palette-k .palette-section {
+  padding: 14px 18px 6px; font: 500 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--agent-ink);
+}
+.palette-k .palette-section:first-child { padding-top: 8px; }
+/* A long title gives way, never the project's name. */
+.palette-k .palette-thread .palette-hint { flex: none; }
+/* A line, file, comment or decision found inside something: its words, then who
+   and where under them in the faint ink. Two lines, so the row is taller. */
+.palette-k .palette-found { height: auto; min-height: 50px; padding: 7px 18px; align-items: flex-start; }
+.palette-k .palette-found .palette-glyph { padding-top: 3px; }
+.palette-k .palette-found .palette-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.palette-k .palette-found .palette-sub { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.palette-k .palette-found .palette-file { margin-right: 8px; color: var(--text); font-weight: 500; }
+.palette-k .palette-found .hit { color: var(--text); font-weight: 600; }
+
+/* A found line, landed on from the results: marked for a moment. */
+[data-line] { transition: background-color .5s ease, box-shadow .5s ease; }
+[data-line].line-found { background: var(--wash); box-shadow: inset 2px 0 0 var(--accent); }
+
+/* The search page's own groups of what was found besides threads. */
+.found-inside { padding-bottom: 12px; }
+.found-inside .found-who { margin-right: 8px; color: var(--text-faint); }
+.found-inside .found-row { cursor: pointer; }
+.found-inside .found-row:hover .subject { text-decoration-color: var(--line-strong); }
+.found-inside .found-more { padding: 6px var(--row-r) 0 var(--text-x); font-size: 12px; color: var(--text-faint); }
+.found-inside .found-group:first-child > .day-label { margin-top: 24px; }
 
 .snooze-input-row { position: relative; display: flex; align-items: center; }
 .snooze-input { flex: 1; }
@@ -4004,7 +4150,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 .artifact-embed {
   margin: 18px 0;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--artifact-corner);
   overflow: hidden;
 }
 .artifact-embed-bar {
@@ -4364,6 +4510,12 @@ img.product-mark { object-fit: cover; opacity: 1; }
 /* A message with no task: its sentence is the whole card. */
 .toast-plain { width: auto; max-width: 360px; display: flex; gap: 12px; padding: 11px 16px; }
 .toast-plain .toast-line { font-size: 13.5px; color: var(--text); white-space: normal; }
+/* An agent's message in its Undo seconds: who it goes to over the words. */
+.agent-sending { display: grid; grid-template-columns: 1fr auto; column-gap: 14px; row-gap: 3px; align-items: center; }
+.agent-sending .toast-title { grid-column: 1; font-size: 12px; color: var(--text-faint); }
+.agent-sending .toast-line { grid-column: 1; }
+.agent-sending .toast-keys { grid-column: 2; grid-row: 1 / span 2; }
+.agent-sending-raised { bottom: 96px; }
 
 
 /* It keeps the top bar's own 22px right margin so it lines up with the settings
@@ -4392,8 +4544,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 }
 .zoom-readout.up { opacity: 1; }
 
-/* ⌘F. A small panel over whatever is on screen, in the toast's shape. Above
-   the zoom readout and below the toasts. The field is a tint of the theme,
+/* ⌘F. A small panel over whatever is on screen, in the toast's shape. The field is a tint of the theme,
    never white (the light-component rule, 2026-09-23).
 
    98 POINTS DOWN, AND NEVER HIGHER THAN 44. It sat at 10 and not one of its
@@ -4405,7 +4556,10 @@ img.product-mark { object-fit: cover; opacity: 1; }
    changes it; turning every drag strip off while the box was up (the first
    fix) left the buttons exactly as dead. 98 also clears the terminal, New task
    and Commands buttons, which sit 54 to 89 points down at the right edge in
-   every task layout, so the box never covers a control. */
+   every task layout, so the box never covers a control.
+
+   Its z-index is over the full-screen file views (.artifact-view at 9400 and
+   its selection bar at 9450) and under the 10000 screens that lock the app. */
 .find-bar {
   position: fixed;
   top: 98px;
@@ -4421,7 +4575,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
   border-radius: var(--radius);
   font-size: 13.5px;
   box-shadow: var(--shadow-md);
-  z-index: 95;
+  z-index: 9500;
   user-select: none;
 }
 .find-input {
@@ -5047,7 +5201,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 }
 
 /* The gutter only bites under a 920 window: the nav is a fixed 236px and the
-   column 620, and the window goes down to 720 (main/main.mjs), where the pane
+   column 620, and the window goes down to 720 (main/main.mts), where the pane
    is 483 and the words would otherwise touch the nav. */
 .set-pane { flex: 1; min-width: 0; overflow-y: auto; background: var(--bg); position: relative; padding: 0 32px; }
 /* The screen is the ground here and nothing inside it paints a second one, or
@@ -5414,6 +5568,16 @@ img.product-mark { object-fit: cover; opacity: 1; }
   padding: 6px 12px; font: 13.5px inherit; font-family: inherit; color: var(--text); cursor: pointer;
 }
 a.set-ghost { text-decoration: none; display: inline-block; }
+.set-row.set-key-replace { display: flex; align-items: center; gap: 9px; }
+.set-key-input {
+  flex-grow: 1; min-width: 0; height: 32px; padding: 0 10px; box-sizing: border-box; background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: var(--radius); outline: 0; font: inherit; font-size: 13px; color: var(--text);
+}
+.set-key-input:focus { border-color: var(--text-faint); }
+.set-key-replace { flex-wrap: wrap; }
+.set-key-name { flex-basis: 100%; font-size: 14px; color: var(--text); }
+.set-key-said { flex-basis: 100%; font-size: 12.5px; line-height: 17px; color: var(--text-dim); }
+.set-key-input::placeholder { color: var(--text-faint); }
 .set-ghost:hover { background: var(--bg-hover); }
 .set-ghost:disabled { color: var(--text-faint); cursor: default; }
 
@@ -5592,12 +5756,6 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 }
 :root[data-skin] .app.flat .focus-dock { background: transparent; }
 :root[data-skin] .app.flat .focus-dock::before { background: none; }
-:root[data-skin] .app.flat .focus-scroll {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), transparent);
-}
-:root[data-skin] .app.flat .dock-card { background: transparent; }
-:root[data-skin] .app.flat .dock-card:focus-within { background: var(--skin-pane); }
 
 /* That round's reasoning is kept in decisions.md rather than here, because the
    question it was answering is closed. IT WAS THE LAST SLAB ON THE SCREEN.
@@ -6736,6 +6894,9 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
   animation: cs-spin .8s linear infinite;
 }
 @keyframes cs-spin { to { transform: rotate(360deg); } }
+/* The one line this step has sits in the middle, with nothing under it to
+   leave room for. */
+.cs-loading .fr-lede { margin: 0; }
 .ps-acts .cs-go { display: inline-flex; align-items: center; gap: 10px; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .ps-acts .cs-go:hover { background: color-mix(in srgb, var(--accent) 24%, transparent); }
 
@@ -6876,7 +7037,7 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
    `100vw - 260px`, so whatever it holds it always leaves at least 130px of
    clear strip on each side of it. This sits 16px in from the right edge and is
    one short word wide. The narrowest window the app will open is 980
-   (main/main.mjs), and 130 > 16 + a word at every width above that. NOT
+   (main/main.mts), and 130 > 16 + a word at every width above that. NOT
    DRAGGABLE, AND THAT WAS NEVER ENOUGH ON ITS OWN. `-webkit-app-region:
    no-drag` here does say "a press of this is a press", and in Electron it was
    overruled anyway: the band's own drag rectangle was reported to the window
@@ -6924,7 +7085,7 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
    ways, option 1 was chosen, and then it was reduced to the mark alone the same
    evening: a small icon with no esc text. AND THE WHOLE ROW SITS UNDER THE
    WINDOW BUTTONS, NOT BESIDE THEM. The reason is worth writing down. The window is `titleBarStyle: 'hiddenInset'`
-   (main/main.mjs), so the red, amber and green buttons own the very corner, and
+   (main/main.mts), so the red, amber and green buttons own the very corner, and
    `.fr-brand`'s 64px looks like it is there to clear them. It is not: at top 44
    this row is already well BELOW them, so there was never anything to the left
    of it to avoid, and the arrow inherited a gutter that had no reason behind
@@ -7324,36 +7485,26 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
    a drag is under way the whole window takes the cursor, or crossing the
    document's own iframe changes it back halfway. THE LINE IS GONE, CHOSEN
    2026-08-22: three quarters, and no line down the middle.
-   Only the always-on 1px went. The 9 point reach stays, so the divider is
-   dragged exactly where it was dragged before, and the line comes back under
-   the pointer, because a divider with no state at all cannot be found by feel.
-   The capsule handle below stays for the same reason and was chosen on
-   2026-08-21.
+   The grip covers the file card's own left border (measured by DocPane), so
+   the edge you see is the edge you drag. A divider with no state at all cannot
+   be found by feel, so the pointer finds a faint pill centred on that border,
+   chosen 2026-11-04; the border itself does not change. The pill stays for
+   the whole drag, or it vanishes under the pointer the moment it is used.
+   A code file's card has no border, so ::before draws its hairline, stopping
+   where the corners curve.
 */
-.doc-grip { position: absolute; left: -4px; top: 0; bottom: 0; width: 9px; z-index: 6; cursor: col-resize; }
-.doc-grip::before { content: ''; position: absolute; left: 4px; top: 0; bottom: 0; width: 1px; background: transparent; }
-.doc-grip:hover::before { background: var(--text-faint); }
-/* THE HANDLE IN THE MIDDLE OF THE LINE.A brightening hairline was all there
-   was, and a hairline that goes from rgba(255,255,255,0.19) to #979ca6 is not a
-   thing you notice at the edge of your eye. So the common one: a small capsule
-   centred on the line, in the same ink the line brightens to, so the whole
-   hover state is one colour. It is 7 wide over a 1px line, hence left 1px
-   inside a grip that starts 4px left of it, it takes the app's one corner like
-   every other box, and it appears with no fade, like everything else in this
-   app. It stays lit for the whole drag, or the handle vanishes under the
-   pointer the moment it is used.
-*/
+.doc-grip { position: absolute; left: calc(var(--doc-card-x, 0px) - 4px); top: var(--doc-card-y, 0px); height: var(--doc-card-h, 100%); width: 9px; z-index: 6; cursor: col-resize; }
+.doc-grip::before { content: ''; position: absolute; left: 4px; top: var(--doc-card-r, 0px); bottom: var(--doc-card-r, 0px); width: 1px; background: transparent; }
 .doc-grip::after {
   content: '';
   position: absolute;
   left: 1px; top: 50%;
   width: 7px; height: 30px; margin-top: -15px;
   border-radius: var(--radius);
-  background: var(--text-faint);
+  background: var(--line-strong);
   opacity: 0;
 }
 .doc-grip:hover::after, .doc-pane.dragging .doc-grip::after { opacity: 1; }
-.doc-pane.dragging .doc-grip::before { background: var(--text-faint); }
 .doc-pane.dragging { user-select: none; }
 .doc-pane.dragging .doc-view { pointer-events: none; }
 
@@ -7490,38 +7641,25 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
    scaling down to fit is the only way to see it whole. It never scales UP
    past its own size, which would turn a small icon into a blur.
 */
-.doc-pane.doc-image .doc-card { background: var(--doc-page); }
+.doc-pane.doc-image .doc-card { background: var(--doc-page); padding-bottom: 16px; }
+/* Sized to the picture, with margin rather than padding: a box that fills the
+   pane would round the empty air around a letterboxed picture, not the picture. */
 .doc-picture {
+  flex: 0 1 auto; width: auto; height: auto; min-height: 0;
   object-fit: contain;
   align-self: center;
-  max-width: 100%; max-height: 100%;
-  padding: 0 16px 16px;
-  box-sizing: border-box;
+  max-width: calc(100% - 32px); max-height: calc(100% - 16px);
+  margin: auto 16px;
+  border-radius: var(--artifact-corner);
 }
 
 
-.doc-rich { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 40px 40px; }
+/* The reading look itself is components/doc-reading.css, shared with the big view. */
+.doc-rich { flex: 1; min-height: 0; overflow-y: auto; padding: 0; }
 .doc-rich-content { outline: none; }
 .doc-rich .ProseMirror { outline: none; min-height: 100%; }
-.doc-rich .ProseMirror h1 { font-size: 23px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 2px; color: var(--text); }
-.doc-rich .ProseMirror h2 { font-size: 17px; font-weight: 600; margin: 20px 0 6px; color: var(--text); }
-.doc-rich .ProseMirror h3 { font-size: 15px; font-weight: 600; margin: 16px 0 4px; color: var(--text); }
-.doc-rich .ProseMirror p { margin: 8px 0; }
-.doc-rich .ProseMirror ul, .doc-rich .ProseMirror ol { margin: 8px 0 8px 22px; }
-.doc-rich .ProseMirror li { margin: 3px 0; }
-.doc-rich .ProseMirror li p { margin: 0; }
-.doc-rich .ProseMirror blockquote { margin: 10px 0; padding-left: 14px; border-left: 2px solid var(--line-strong); color: var(--text-dim); }
-.doc-rich .ProseMirror hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
-.doc-rich .ProseMirror code { font-family: var(--mono); font-size: 13px; background: var(--bg-raised); padding: 1px 5px; border-radius: var(--radius); }
-.doc-rich .ProseMirror pre { background: var(--bg-raised); padding: 12px 14px; border-radius: var(--radius); overflow-x: auto; margin: 10px 0; }
-.doc-rich .ProseMirror pre code { background: none; padding: 0; }
-.doc-rich .ProseMirror a { color: var(--accent); text-decoration: none; cursor: pointer; }
-.doc-rich .ProseMirror a:hover { text-decoration: underline; }
-.doc-rich .ProseMirror table { border-collapse: collapse; margin: 12px 0; }
+.doc-rich .ProseMirror a { cursor: pointer; }
 .doc-rich .ProseMirror th, .doc-rich .ProseMirror td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; }
-.doc-rich .ProseMirror ul[data-type="taskList"] { list-style: none; margin-left: 0; padding: 0; }
-.doc-rich .ProseMirror ul[data-type="taskList"] li { display: flex; gap: 8px; align-items: flex-start; }
-.doc-rich .ProseMirror ul[data-type="taskList"] li > label { margin-top: 3px; }
 .doc-rich .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--text-faint);
 }
@@ -7966,11 +8104,15 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
   display: flex; flex-direction: column;
   border-right: 1px solid var(--line);
 }
+/* It wraps rather than breaking its words: three readings in 232px put "not
+   committed" and "in 6 minutes" each over two lines, which reads as four
+   columns of nothing. */
 .code-tree-head {
-  flex: 0 0 auto; display: flex; align-items: baseline; gap: 8px;
+  flex: 0 0 auto; display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px;
   padding: 4px 12px 10px 18px;
   font-size: 11.5px; color: var(--text-faint);
 }
+.code-tree-head > span { white-space: nowrap; }
 .code-tree-count { color: var(--text-dim); }
 .code-tree-rows { flex: 1; min-height: 0; overflow: auto; padding-bottom: 8px; }
 .code-node {
@@ -8756,6 +8898,11 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .live-mark { width: 14px; height: 14px; gap: 1.5px; }
 .live-disclosure { gap: 6px; line-height: 20px; }
 .live-disclosure .live-span { flex: none; }
+/* Where it runs, with the list's why card (threads/pages.css) on hover,
+   opening upward because the reply box sits right under this line. */
+.live-place.has-card { position: relative; cursor: help; }
+.live-place .th-why-card { top: auto; bottom: calc(100% + 10px); }
+.live-place.has-card:hover .th-why-card { display: block; }
 .live-details { margin: 8px 0 0; }
 .live-command { margin: 0; color: var(--text-dim); }
 .live-command summary { display: flex; align-items: center; gap: 7px; height: 28px; cursor: pointer; list-style: none; }
@@ -9066,7 +9213,11 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 
 .fp-up {
   flex: none;
-  padding: 6px 12px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  align-self: stretch;
+  padding: 0;
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--film-strong);
@@ -9092,18 +9243,25 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 
 /* A fixed height, so walking into a folder with two things in it does not
    resize the card under the cursor that is about to click the next row. */
+/* The negative margin is the rows' own padding, so a folder's icon lines up
+   with the title and the path above it. */
 .fp-list {
   height: 320px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  margin: 0 -14px;
   padding: 4px;
   border-radius: var(--radius);
   background: var(--bg-raised);
 }
 
 .fp-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   text-align: left;
   padding: 7px 10px;
   border: 0;
@@ -9114,14 +9272,16 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
   cursor: pointer;
 }
 .fp-row:hover { background: var(--film-strong); }
+.fp-icon { flex: none; color: var(--text-faint); }
+.fp-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .fp-note { margin: 12px 10px; color: var(--text-faint); }
 
-.fp-refused { margin: 0 2px; color: var(--text-dim); }
+.fp-refused { margin: 0; color: var(--text-dim); }
 
 .fp-foot { display: flex; gap: 8px; align-items: center; }
 
-.fp-where {
+.fp-hint {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -9146,6 +9306,17 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 /* THE PHONE WHOSE KEY WAS RESET (renderer/src/browser-bridge.ts). */
 #phone-locked-out { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 32px; background: var(--surface); color: var(--text); font: 16px/1.45 system-ui, sans-serif; text-align: center; }
 #phone-locked-out p { margin-top: 8px; opacity: .8; }
+/* THE TAB WHOSE ADDRESS NEVER HAD A KEY ON IT (renderer/src/browser-bridge.ts).
+   The app is not drawn at all behind this one, so it is the whole page. */
+#needs-its-key { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 32px; background: var(--surface); color: var(--text); text-align: center; }
+#needs-its-key > div { max-width: 30em; }
+#needs-its-key strong { display: block; font-size: 17px; font-weight: 600; }
+#needs-its-key p { margin-top: 10px; color: var(--text-dim); font-size: 14px; line-height: 1.5; }
+#needs-its-key code { font-family: var(--mono); font-size: .95em; }
+/* THE SCREEN THAT DIED TWICE (renderer/src/main.tsx). The same sentence the
+   boundary shows, in plain html: React has unmounted the root by now, so
+   `.boot-stuck` has nothing left to draw it. */
+#screen-died { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 32px; background: var(--surface); color: var(--text-dim); font-size: 14px; line-height: 1.5; text-align: center; }
 /* Her Mac turned a reply from the phone down (renderer/src/cloud-bridge.ts). */
 .msg-sending.msg-refused { color: var(--code-minus); }
 
@@ -9156,10 +9327,13 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
    whatever is painted on them. It wins because the view is the last thing on the page. */
 .picture-view { position: fixed; inset: 0; z-index: 9400; outline: none; overflow: hidden;
   background: var(--read-ground); color: var(--read-paper); animation: pv-in .22s ease-out;
-  -webkit-app-region: no-drag; }
+  -webkit-app-region: no-drag; touch-action: none; }
+/* Fingers belong to the view (PictureView.tsx fingerDown); only the strip of pictures scrolls. */
+.pv-strip { touch-action: pan-x; }
+.pv-chrome button, .pv-tools button { touch-action: manipulation; }
 @keyframes pv-in { from { opacity: 0; } }
 .pv-stage { position: absolute; inset: 86px 104px 116px; z-index: 1; display: flex; align-items: center; justify-content: center; }
-.pv-img { display: block; flex: none; cursor: zoom-in; user-select: none; border-radius: var(--radius); will-change: transform;
+.pv-img { display: block; flex: none; cursor: zoom-in; user-select: none; border-radius: var(--artifact-corner); will-change: transform;
   transition: transform .2s cubic-bezier(.2, .8, .2, 1); animation: pv-pic-in .32s cubic-bezier(.2, .8, .2, 1); }
 @keyframes pv-pic-in { from { opacity: 0; scale: .97; } }
 .pv-img.pv-zoomed { cursor: grab; transition: none; }
@@ -9173,8 +9347,10 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .pv-idle { cursor: none; }
 .pv-idle .pv-chrome { opacity: 0; pointer-events: none; }
 
-.pv-top { position: absolute; top: 16px; left: 16px; right: 16px; height: 46px; display: flex; align-items: center; justify-content: space-between;
+/* `left` clears the Mac window's buttons, which sit over this corner. */
+.pv-top { position: absolute; top: 16px; left: 84px; right: 16px; height: 46px; display: flex; align-items: center; justify-content: space-between;
   gap: 16px; }
+:root[data-window="flat"] .pv-top { left: 16px; }
 .pv-title { display: flex; align-items: center; gap: 12px; min-width: 0; height: 46px; padding: 0 18px; }
 .pv-name { font-size: 13px; letter-spacing: .01em; color: color-mix(in srgb, var(--read-paper) 86%, transparent);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -9188,7 +9364,7 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 
 .pv-strip { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px;
   max-width: calc(100% - 64px); overflow-x: auto; }
-.pv-thumb { flex: none; width: 72px; height: 45px; padding: 0; border: 0; border-radius: var(--radius); overflow: hidden; cursor: pointer;
+.pv-thumb { flex: none; width: 72px; height: 45px; padding: 0; border: 0; border-radius: var(--artifact-corner-small); overflow: hidden; cursor: pointer;
   background: color-mix(in srgb, var(--read-paper) 6%, transparent); opacity: .38;
   outline: 1px solid transparent; outline-offset: 3px; transition: opacity .2s, outline-color .2s; }
 .pv-thumb:hover { opacity: .75; }
@@ -9238,3 +9414,12 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .cloud-plan-bar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
 .cloud-counts { margin: 0; padding: 4px 0 0 18px; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.55; color: var(--text-dim); user-select: text; -webkit-user-select: text; }
 .cloud-plans-say { margin: 14px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--text-faint); user-select: text; -webkit-user-select: text; }
+
+/* What a message is, beside its time: Comment, Checkpoint, Note on a file. */
+.msg-kind { display: inline-flex; align-items: baseline; gap: 6px; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: var(--tag-radius); background: none; font: 11px var(--mono); letter-spacing: .02em; color: var(--text-dim); text-align: left; }
+.msg-kind-why { color: var(--text-faint); letter-spacing: 0; }
+.msg-kind-why::before { content: '\00b7'; margin-right: 6px; }
+button.msg-kind { cursor: pointer; }
+button.msg-kind:hover { color: var(--text); border-color: var(--text-faint); }
+/* A comment is said beside the work, not to the agent: it reads at the size of what it answers. */
+.msg.yours:has(> .msg-head > .msg-kind) .msg-body { font-size: 15px; line-height: 1.6; font-weight: 400; }

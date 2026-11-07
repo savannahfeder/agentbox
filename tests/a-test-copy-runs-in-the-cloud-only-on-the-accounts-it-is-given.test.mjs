@@ -16,9 +16,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { recordCloudLogin, pickCloudLogin, cloudAccountsFrom } from '../main/cloud/logins.mjs';
+import { recordCloudLogin, pickCloudLogin, cloudAccountsFrom } from '../main/cloud/logins.mts';
 import { cloudAccountKeys } from '../.claude/skills/verify-agentbox/scripts/live.mjs';
-import { loginForCloudRun } from '../main/cloud/run-cli.mjs';
+import { loginForCloudRun } from '../main/cloud/run-cli.mts';
 
 let home;
 beforeEach(() => {
@@ -77,7 +77,7 @@ describe('the list a run carries', () => {
   it('is the keys of the accounts the emails name, a Claude one found through its organization as the menu finds it', () => {
     const login = (dir, email, org) => {
       fs.mkdirSync(path.join(home, dir), { recursive: true });
-      fs.writeFileSync(path.join(home, dir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: `u-${dir}`, organizationUuid: org } }));
+      fs.writeFileSync(path.join(home, dir === '.claude' ? '' : dir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: `u-${dir}`, organizationUuid: org } }));
     };
     login('.claude', 'fresh@example.com', 'org-fresh');
     login('.claude-2', 'work@example.com', 'org-work');
@@ -91,7 +91,7 @@ describe('the list a run carries', () => {
 
   it('is read by the cloud run from the run\'s own environment', () => {
     expect(loginForCloudRun('claude', { AGENTBOX_CLOUD_ACCOUNTS: 'work@example.com' }, { home, now: 3000 }).rec.email).toBe('work@example.com');
-    const cli = fs.readFileSync(path.join(import.meta.dirname, '..', 'main', 'cloud', 'run-cli.mjs'), 'utf8');
+    const cli = fs.readFileSync(path.join(import.meta.dirname, '..', 'main', 'cloud', 'run-cli.mts'), 'utf8');
     expect(cli).toMatch(/loginForCloudRun\(engine, env\)/);
   });
 });

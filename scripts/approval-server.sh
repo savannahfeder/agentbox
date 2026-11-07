@@ -5,7 +5,7 @@
 # this file is the copy electron-builder's `asarUnpack` leaves in
 # `app.asar.unpacked/scripts`, because macOS cannot exec a path inside the
 # archive. The old line then walked one directory up and asked for
-# `app.asar.unpacked/main/approval-prompt-server.mjs`, which has never existed:
+# `app.asar.unpacked/main/approval-prompt-server.mts`, which has never existed:
 # only `scripts/` and `worker-permissions.json` are unpacked, never `main/`.
 # node threw MODULE_NOT_FOUND, the MCP server never came up, and the Claude CLI
 # refuses to start a session at all when the tool named by
@@ -25,6 +25,8 @@
 # the one file in MacOS/, because a bundle has exactly one and a Mac without
 # PlistBuddy should still start her agents.
 here="$(cd "$(dirname "$0")" && pwd)"
+# The server is .mts, which a Node below 22.18 loads only when asked (main/strip-types.mts).
+strip_flags() { ELECTRON_RUN_AS_NODE=1 "$1" -e 'process.exit(process.features.typescript ? 0 : 1)' >/dev/null 2>&1 || echo --experimental-strip-types --disable-warning=ExperimentalWarning; }
 case "$here" in
   *app.asar.unpacked/scripts)
     res="$(cd "$here/../.." && pwd)"
@@ -36,7 +38,7 @@ case "$here" in
     if [ ! -f "$app/MacOS/$exe" ] || [ ! -x "$app/MacOS/$exe" ]; then
       exe="$(ls "$app/MacOS" 2>/dev/null | head -1)"
     fi
-    exec env ELECTRON_RUN_AS_NODE=1 "$app/MacOS/$exe" "$res/app.asar/main/approval-prompt-server.mjs"
+    exec env ELECTRON_RUN_AS_NODE=1 "$app/MacOS/$exe" "$res/app.asar/main/approval-prompt-server.mts"
     ;;
   *)
     # RUNNING FROM SOURCE, AND THIS LINE USED TO ASSUME NVM. It prepended
@@ -50,9 +52,9 @@ case "$here" in
     # So the app hands its own binary down in ZERO_APPROVALS_RUNTIME, and
     # ELECTRON_RUN_AS_NODE=1 makes that binary a node, exactly as the packaged
     # branch above does. Nothing on the machine is needed.
-    server="$(cd "$here/.." && pwd)/main/approval-prompt-server.mjs"
+    server="$(cd "$here/.." && pwd)/main/approval-prompt-server.mts"
     if [ -f "$ZERO_APPROVALS_RUNTIME" ] && [ -x "$ZERO_APPROVALS_RUNTIME" ]; then
-      exec env ELECTRON_RUN_AS_NODE=1 "$ZERO_APPROVALS_RUNTIME" "$server"
+      exec env ELECTRON_RUN_AS_NODE=1 "$ZERO_APPROVALS_RUNTIME" $(strip_flags "$ZERO_APPROVALS_RUNTIME") "$server"
     fi
     # Nobody handed one down, so this is somebody running the script by hand.
     # A node already on PATH wins; nvm's newest is the last resort, for the
@@ -62,6 +64,6 @@ case "$here" in
       newest="$(ls "$nvm" 2>/dev/null | tail -1)"
       [ -n "$newest" ] && export PATH="$nvm/$newest/bin:$PATH"
     fi
-    exec node "$server"
+    exec node $(strip_flags node) "$server"
     ;;
 esac

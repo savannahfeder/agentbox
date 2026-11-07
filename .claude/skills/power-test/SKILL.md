@@ -51,12 +51,14 @@ node $P --who startup-engineer,founder --hours 2 --focus "replies after switchin
 | `--focus` | what the team shipped and wants leaned on, in a sentence | none |
 | `--alpha` | alpha features on in every copy, e.g. `teammates` or `teammates,rooms` | off, as for anyone new |
 | `--real` | the Claude Code and Codex this computer has, on their plans | stand-ins |
+| `--stand-in-cloud` | every thread runs in a stand-in Agentbox Cloud of the copy's own (the real cloud server and sandbox, here, with the stand-in agent); a task naming Supabase, Vercel, Stripe, Expo, AWS or Sentry asks for its key | no cloud |
 | `--chaos` | `none`, `light`, `normal`, `heavy` | `normal` |
 | `--round-minutes` | one tester session before it is restarted with its diary | 20 |
 | `--model` | the testers' model | Claude Code's default |
 | `--testers external` | you run each stretch yourself (below) | testers are `claude -p` |
 | `--tester-login inherit` | testers get this session's sign-in variables | their own login |
 | `--keep` | leave the copies up afterwards | taken down |
+| `--files <dir>` | copied into every project's documents in every copy, so testers meet the thing under test (a table, a deck) as their own | none |
 | `--team <file>` / `--room <name>` | one tester on a real team, talking in that room (below) | no team |
 
 Evidence goes to `/tmp/agentbox-verify/runs/<time>-power/`, one folder per

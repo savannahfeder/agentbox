@@ -28,9 +28,9 @@ import { PassThrough } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
-import { cloudRun } from '../main/cloud/run.mjs';
-import { readMarker } from '../main/cloud/marker.mjs';
-import { docsToSend, tarDocs, layDocs, docsFolderFor } from '../main/cloud/docs.mjs';
+import { cloudRun } from '../main/cloud/run.mts';
+import { readMarker } from '../main/cloud/marker.mts';
+import { docsToSend, tarDocs, layDocs, docsFolderFor } from '../main/cloud/docs.mts';
 import { waitFor } from './waiting.mjs';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
@@ -264,6 +264,38 @@ describe('laying documents in', () => {
     expect(out.beside).toEqual([]);
     expect(fs.readFileSync(path.join(docs, 'notes.md'), 'utf8')).toBe('she changed it after');
     expect(fs.existsSync(path.join(docs, 'notes (cloud).md'))).toBe(false);
+  });
+
+  // WHAT BROKE (w-27a7ae314a): a YC application thread had the one document
+  // beside itself five times, "(cloud)" through "(cloud 5)", so nobody could
+  // say which was current. A run lays its copy beside a file somebody changed
+  // here, and every later version of its own work laid another one. The copy
+  // beside is the run's own, so its next version belongs in it.
+  it('writes its later work into the copy it already left beside, not a sixth one', async () => {
+    const laid = {};
+    const sentAt = Date.now() - 1000;
+    fs.writeFileSync(path.join(docs, 'notes.md'), 'she changed it after the run left');
+    const first = await layDocs({ tgz: await archive({ 'notes.md': 'round one' }), dir: docs, sentAt, laid, sent: ['notes.md'] });
+    expect(first.beside).toEqual(['notes (cloud).md']);
+    const again = await layDocs({ tgz: await archive({ 'notes.md': 'round two' }), dir: docs, sentAt, laid, sent: ['notes.md'] });
+    expect(again.beside).toEqual(['notes (cloud).md']);
+    expect(fs.readFileSync(path.join(docs, 'notes (cloud).md'), 'utf8')).toBe('round two');
+    expect(fs.existsSync(path.join(docs, 'notes (cloud 2).md'))).toBe(false);
+    expect(fs.readFileSync(path.join(docs, 'notes.md'), 'utf8')).toBe('she changed it after the run left');
+  });
+
+  // And the case that must NOT be written over: the copy beside is a document
+  // like any other once somebody has edited it.
+  it('leaves a copy beside alone once it has been edited here, and makes the next one', async () => {
+    const laid = {};
+    const sentAt = Date.now() - 1000;
+    fs.writeFileSync(path.join(docs, 'notes.md'), 'hers');
+    await layDocs({ tgz: await archive({ 'notes.md': 'round one' }), dir: docs, sentAt, laid, sent: ['notes.md'] });
+    fs.writeFileSync(path.join(docs, 'notes (cloud).md'), 'round one, and her note on it');
+    const again = await layDocs({ tgz: await archive({ 'notes.md': 'round two' }), dir: docs, sentAt, laid, sent: ['notes.md'] });
+    expect(again.beside).toEqual(['notes (cloud 2).md']);
+    expect(fs.readFileSync(path.join(docs, 'notes (cloud).md'), 'utf8')).toBe('round one, and her note on it');
+    expect(fs.readFileSync(path.join(docs, 'notes (cloud 2).md'), 'utf8')).toBe('round two');
   });
 
   it('leaves a link in the folder alone rather than writing through it, and keeps the run\'s copy beside it', async () => {

@@ -3,7 +3,7 @@
 // What broke (found reading the code, 2026-10-19): on the hosted phone Stop
 // said to stop it on the computer; Run now and changing a schedule threw, Send
 // now failed in silence, and Reopen was hidden. Her Mac has a handler for each
-// (main/ipc.mjs); the phone's commands were only reply, new, snooze and close.
+// (main/ipc.mts); the phone's commands were only reply, new, snooze and close.
 // And a send whose answer was lost on a poor network, sent again, arrived
 // twice, because only the database chose a command's id.
 //
@@ -16,10 +16,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 import { commandFor, phoneSlug } from '../renderer/src/cloud-bridge';
 import { cloudClient } from '../renderer/src/cloud-rest';
 import { checkCommand } from '../shared/phone-snapshot.mjs';
-import { applyThrough } from '../main/phone-inbox.mjs';
+import { applyThrough } from '../main/phone-inbox.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEV = 'a1b2c3d4e5f6';
@@ -83,7 +84,7 @@ describe('the database', () => {
   }
   const refused = async (person, sql, params) => { try { await as(person, sql, params); return false; } catch { return true; } };
   beforeAll(async () => {
-    db = new PGlite();
+    db = new PGlite(await emptyDatabase());
     await db.exec(`create schema auth;
 create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz, raw_user_meta_data jsonb default '{}'::jsonb);
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;

@@ -31,7 +31,7 @@
 // it no longer counts against it. `h` and `m` still do.
 
 import { describe, it, expect } from 'vitest';
-import { CommandHistory } from '../main/memory-gate-history.mjs';
+import { CommandHistory } from '../main/memory-gate-history.mts';
 
 /** A history whose record for `key` is exactly `obs`, letter for letter. */
 function withRecord(records) {

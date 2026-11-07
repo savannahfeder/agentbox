@@ -1,7 +1,7 @@
 // CLOSING A TASK ENDS ITS TERMINAL (w-7b5b89d886).
 //
 // What broke: nothing tied a terminal to its task. A shell running something
-// was never ended by the app (main/task-terminals.mjs only ends idle ones), so
+// was never ended by the app (main/task-terminals.mts only ends idle ones), so
 // a closed task's dev server ran until the app quit, and the app quitting was
 // also the only thing that ended the servers people still needed. The rule
 // asked for is one a person can predict: a terminal lives while its task is
@@ -13,10 +13,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TaskTerminals, ENDED } from '../main/task-terminals.mjs';
-import { TerminalHosts, closedTerminals, taskClosed, CLOSE_GRACE_MS } from '../main/terminal-hosts.mjs';
-import { serveTerminals, terminalHostSocket } from '../main/terminal-host.mjs';
-import { SETTINGS_TERMINAL } from '../shared/settings-terminal.mjs';
+import { TaskTerminals, ENDED } from '../main/task-terminals.mts';
+import { TerminalHosts, closedTerminals, taskClosed, CLOSE_GRACE_MS } from '../main/terminal-hosts.mts';
+import { serveTerminals, terminalHostSocket } from '../main/terminal-host.mts';
+import { SETTINGS_TERMINAL } from '../shared/settings-terminal.mts';
 
 const MIN = 60_000;
 const key = (id, product = 'p') => JSON.stringify({ product, id });

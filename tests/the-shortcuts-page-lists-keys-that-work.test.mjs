@@ -43,7 +43,7 @@ const focus = read('renderer/src/components/Focus.tsx');
 // The summary panel owns S in its own capture-phase listener (2026-10-01), so
 // that row's handler is here rather than in App.tsx.
 const summary = read('renderer/src/threads/Summary.tsx');
-const mainProc = read('main/main.mjs');
+const mainProc = read('main/main.mts');
 const css = read('renderer/src/styles.css');
 
 // The window key handler, cut into the three states it actually has. Every
@@ -85,7 +85,7 @@ const HANDLED = {
   'B': [[list, "case 'b': case 'B':"], [list, 'setInboxDisplay(flipView(inboxDisplay))']],
   'esc': [
     // One step back out: the document, then the task, then the list.
-    [focused, "if (e.key === 'Escape') { if (escapeClosesDoc(openDoc)) closeArtifact(); else setFocused(null); }"],
+    [focused, "if (e.key === 'Escape') { if (escapeClosesDoc(openDoc, fullScreenDoc)) closeArtifact(); else setFocused(null); }"],
   ],
 
   // --- answering an agent ---
@@ -93,7 +93,7 @@ const HANDLED = {
   // The send chord lives in the two boxes she types in, not on the window.
   '⌘↵': [
     [compose, "if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') send();"],
-    [focus, "if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') send();"],
+    [focus, "if (pressed === 'send') { e.preventDefault(); send(); return; }"],
   ],
   // The number picks AND sends, except in the 800ms after the app itself put a
   // new thread in front of you, where it is held and says so rather than
@@ -112,7 +112,7 @@ const HANDLED = {
   // The arrows walk the options, and Enter sends the one showing.
   '⌘Y': [
     [mainProc, "if (key !== 'y' && key !== 'n') return;"],
-    [mainProc, "ipc.answerApproval(oldest.id, key === 'y');"],
+    [mainProc, "ipc.answerApproval(front.id, key === 'y');"],
   ],
   '⌘N': [[mainProc, "if (key !== 'y' && key !== 'n') return;"]],
   // ⌘J shows and hides the open task's terminal (w-ef92663cb1). It sits ABOVE
@@ -147,7 +147,7 @@ const HANDLED = {
     [summary, 'if (!e.repeat) onToggle();'],
     [summary, "window.addEventListener('keydown', onKey, true);"],
   ],
-  'Z': [[focused, "e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }"], [list, "case 'z': case 'Z': undo(); break;"]],
+  'Z': [[focused, "e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }"], [list, "case 'z': case 'Z': e.preventDefault(); undo(); break;"]],
   '⌘A': [
     [chords, "e.key.toLowerCase() === 'a' && !inInput && !modal"],
     // Pressing it again with everything ticked clears the ticks, which the
@@ -260,7 +260,7 @@ describe('what the page refuses to say', () => {
 
   it('says out loud, in the file itself, why each of those is missing', () => {
     // The list moved to shared/ so agents are told the same keys (w-7ec8553e23).
-    const src = read('shared/shortcuts.mjs');
+    const src = read('shared/shortcuts.mts');
     expect(src).toContain('WHAT IS DELIBERATELY NOT HERE');
     expect(src).toContain('⌘1..4');
     expect(src).toContain('Y, N and I on a row in the list');
@@ -373,7 +373,7 @@ describe('the page stays a page and not a wall', () => {
     for (const g of SHORTCUTS) {
       expect(Object.keys(g).sort()).toEqual(['keys', 'label']);
     }
-    expect(read('shared/shortcuts.d.mts')).not.toMatch(/^\s*note\?:/m);
+    expect(read('shared/shortcuts.mts')).not.toMatch(/^\s*note\?:/m);
     // Scoped to this pane's own markup: `.set-group-note` is a real class that
     // other panes in Settings still use, so a whole-file search proves nothing.
     const pane = settings.slice(

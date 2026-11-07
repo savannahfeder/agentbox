@@ -97,7 +97,7 @@ fs.rmSync(iconset, { recursive: true, force: true });
 // AND THE SAME DRAWING AS A PNG, because a notification banner cannot use the
 // .icns. Measured 2026-10-07 in the Electron the app runs from:
 // nativeImage.createFromPath on build/icon.icns returns an empty 0x0 image, so
-// the mark main/notify.mjs attaches to a banner has to be a png. It is written
+// the mark main/notify.mts attaches to a banner has to be a png. It is written
 // here, from the same rasterised source, so it cannot drift from the icns the
 // way a hand-exported file would.
 const mark = path.join(repo, 'build', 'notification-icon.png');

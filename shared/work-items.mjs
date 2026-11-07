@@ -30,9 +30,15 @@
 // This is what lets the app write an answer while a worker still holds the
 // claim: the answer lands, the worker's own status keeps flowing under its
 // epoch, and neither erases the other. Same rule as beats in
-// shared/dashboard.mjs.
+// shared/dashboard.mts.
 
 import { resolveEdits } from './message-edits.mjs';
+import { cleanVoice } from './agent-voice.mjs';
+import { cleanMark, isBookkeepingMark, marksOf } from './artifact-marks.mjs';
+import { isContinuedNote } from './thread-continued.mjs';
+import { wordWaits } from './answers.mjs';
+
+export { wordWaits };
 
 /* ------------------------------- lifecycle ------------------------------- */
 // The only states the claim machinery reasons about. Everything else about what
@@ -54,7 +60,7 @@ export const WORK_ITEM_SOURCES = ['agent', 'founder', 'system'];
 // CLAUDE CODE'S OWN SIX PERMISSION MODES, by its own values. Read off
 // `claude --help` on 2.1.241 and off code.claude.com/docs/en/permission-modes,
 // 2026-08-23, and every one of them handed to the real CLI to check it starts.
-// The renderer, main/settings.mjs and main/answer-modes.mjs each have their own
+// The renderer, main/settings.mts and main/answer-modes.mts each have their own
 // reason to know this list. IT IS NOT A LEDGER FIELD ANY MORE: what one reply is
 // allowed to do moved out of this file entirely; the note further down says
 // why. This list stays here because it is a plain browser-safe constant and
@@ -77,7 +83,7 @@ export const CLAUDE_PERMISSION_MODES = [
 // a scratch ledger, 2026-08-24.
 //
 // So the grant left rather than being guarded harder. It is kept in the app's
-// own storage now, written by main and by nothing else (main/answer-modes.mjs),
+// own storage now, written by main and by nothing else (main/answer-modes.mts),
 // which is the convention Claude Code uses for its standing policy. Everything
 // on the ledger today is a claim about the WORK, and a forged line can still
 // fake the founder's archive or answer, which is true of any append-only log
@@ -124,7 +130,7 @@ export const WORK_ITEM_FIELDS = [
   //             handed it back to the agents
   //   runner    the person whose Mac runs agents on this row; without one it
   //             is whoever started it (`createdBy`)
-  //   due       a calendar day, YYYY-MM-DD, or 'none' to clear one
+  //   due       a calendar day, YYYY-MM-DD, or with a time, YYYY-MM-DDTHH:MM, or 'none' to clear one
   //   people    who is on the conversation
   'assignee', 'runner', 'due', 'people',
   // THE THREAD'S OWN FIELDS (the team version, approved 2026-10-01).
@@ -161,12 +167,52 @@ export const WORK_ITEM_FIELDS = [
   // where `on` is the message's line uid. A delta like `react`, read back as
   // `edits` and only from the message's own author (shared/message-edits.mjs).
   'edit',
+  // A TEAMMATE'S WORDS ON A THREAD: `{ teammate, name }`, on the line of the
+  // `answer` the app wrote for it. A mark on one line like `inReplyTo`. The
+  // reply is the teammate's, so it starts a turn as yours does, but it is not
+  // yours: the line is the app's, and it carries none of your authority.
+  'from',
+  // AN AGENT'S MESSAGE, ON THE LINE ITS OWNER'S COPY WROTE: `{ id, name, run }`
+  // (shared/agent-voice.mjs), and SOMEONE'S MESSAGE MEANT FOR AN AI TEAMMATE:
+  // `{ id, name }`. Marks on one line, like `from`.
+  'voice', 'forAgent',
+  // THE NOTES ON A FILE THIS ANSWER HANDS THE AGENT, by note id. A mark on one
+  // line: the thread draws the notes themselves, not the instruction made of them.
+  'fromNotes',
   // WHICH COMMAND FROM HER PHONE WROTE THIS LINE (docs/cloud/PHONE-PLAN.md):
   // the command's id, on the line of the reply or the new thread it made. It
   // is how the computer, starting again after stopping half way through a
   // command, knows for certain whether that command already landed, rather
   // than guessing from the words (Codex's third review of step 1, finding 5).
   'fromPhone',
+  // WHO A THREAD SENT TO AUTO WENT TO, AND WHY, as one line on the thread:
+  // `{ to: 'mate:<id>' | 'agent', why, at, by }`, or `{ ask: [two of those], ... }`
+  // while it waits for the person to pick (shared/auto-route.mjs).
+  'routed',
+  // WHEN A PERSON SAID THIS THREAD SHIPPED (shippedAtOf, shared/thread-cards.mjs).
+  // 0 is a person taking it back, which also outranks the app's merge note.
+  'shippedAt',
+  // WHAT ENDED A WAIT A PERSON SET: `{ said, at }`. It puts the thread back in
+  // its owner's Needs you, saying so, until they next act on it (shared/thread-waits.mjs).
+  'waitEnded',
+  // WHERE A THREAD WENT WHEN SOMEONE LEFT THE TEAM: `{ said, at }`, the line
+  // each copy writes on what it moved (main/team/departures.mjs).
+  'handedOver',
+  // SOMEONE'S COMMENT ON THE THREAD'S FILE THROUGH ITS PUBLIC LINK:
+  // `{ name, file, text }`, beside the note that says it (main/team/link-comments.mjs).
+  'linkComment',
+  // WORDS A TEAMMATE LEFT ON A SHARED THREAD: `{ text }`, on a line the sync
+  // writes from the cloud's own comment (main/team/thread-share.mjs). A delta
+  // like `react`, read back as `waitingComments` until the owner deals with
+  // them. Nothing starts an agent on it, and a pulled line may not carry it.
+  'comment',
+  // A COMMENT, RESOLVE, APPROVAL OR "SEEN" ON ONE FILE OF THE THREAD
+  // (shared/artifact-marks.mjs). A delta like `react`, read back as `artifacts`.
+  'artifact',
+  // E ON A TASK BETWEEN PEOPLE: true puts it out of the writer's own Needs you
+  // until someone else writes, false takes that back. Never the task's status,
+  // which both people share (`settledBy`); a pulled line may not carry it.
+  'putAway',
 ];
 
 // THE SUMMARY IS SHARED BETWEEN THE PERSON AND THE AGENT. Everywhere else the
@@ -177,12 +223,27 @@ export const WORK_ITEM_FIELDS = [
 const SHARED_FIELDS = new Set(['problem', 'progress', 'solution', 'blockedBy', 'blocks']);
 const MAX_SUMMARY = 1200;
 
+const ROUTE_TO = /^(agent|mate:[A-Za-z0-9_-]{1,64})$/;
+/** The `routed` field as it is kept, or undefined for anything else. */
+export function cleanRouted(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const why = typeof value.why === 'string' ? value.why.slice(0, 200) : '';
+  const at = Number.isFinite(value.at) ? Math.trunc(value.at) : 0;
+  const by = value.by === 'you' ? 'you' : 'auto';
+  if (Array.isArray(value.ask)) {
+    const ask = [...new Set(value.ask.filter((x) => typeof x === 'string' && ROUTE_TO.test(x)))].slice(0, 3);
+    return ask.length ? { ask, why, at, by } : undefined;
+  }
+  return typeof value.to === 'string' && ROUTE_TO.test(value.to) ? { to: value.to, why, at, by } : undefined;
+}
+
 // A person id or a line id: short, plain, never an object a writer slipped in.
 const MAX_PERSON_CHARS = 64;
 function shortId(value) {
   return typeof value === 'string' && value && value.length <= MAX_PERSON_CHARS ? value : null;
 }
-const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+// A day, or a day and a time on the reader's clock: "2026-11-01T10:00".
+const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})(?:T([01]\d|2[0-3]):([0-5]\d))?$/;
 function calendarDay(value) {
   if (value === 'none') return 'none';
   const m = typeof value === 'string' ? DAY_RE.exec(value) : null;
@@ -392,7 +453,7 @@ function coerceField(field, value) {
     // The written name the list draws. Bounded the same way the title is and no
     // tighter: what a NAME may be (three to seven words, 64 characters) is a
     // rule about how the app writes, and it lives with the writer in
-    // main/row-label.mjs. This module holds no taxonomy, only storage.
+    // main/row-label.mts. This module holds no taxonomy, only storage.
     case 'label': return str(value, MAX_TITLE);
     case 'body': case 'result': case 'note': case 'answer': return str(value, MAX_TEXT_BYTES);
     // kind and product are free strings on purpose: the taxonomy of work is the
@@ -405,7 +466,7 @@ function coerceField(field, value) {
     // Claude Code for any name it does not know, so an unrecognised value is a
     // working session rather than a row that silently never runs. `effort` (HOW
     // HARD IT THINKS) is the same kind of word: the five the CLI takes live in
-    // shared/effort-levels.mjs, and the spawn gates on them, so a value this
+    // shared/effort-levels.mts, and the spawn gates on them, so a value this
     // module does not recognise is a run at Claude Code's own choice rather
     // than a row that never runs.
     case 'kind': case 'product': case 'parent': return str(value, MAX_SHORT);
@@ -482,6 +543,22 @@ function coerceField(field, value) {
       return value.off === true ? { on, emoji, off: true } : { on, emoji };
     }
     case 'inReplyTo': return shortId(value) ?? undefined;
+    case 'comment': {
+      const text = value && typeof value === 'object' ? str(value.text, MAX_TEXT_BYTES) : undefined;
+      return text ? { text } : undefined;
+    }
+    case 'artifact': return cleanMark(value);
+    case 'from': {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+      const teammate = shortId(value.teammate);
+      const name = str(value.name, MAX_SHORT);
+      return teammate && name ? { teammate, name } : undefined;
+    }
+    case 'voice': case 'forAgent': return cleanVoice(value) ?? undefined;
+    case 'fromNotes': {
+      const ids = Array.isArray(value) ? value.map(shortId).filter(Boolean).slice(0, MAX_LABELS) : [];
+      return ids.length ? ids : undefined;
+    }
     case 'edit': {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
       const on = shortId(value.on);
@@ -505,6 +582,21 @@ function coerceField(field, value) {
     case 'blockedBy': case 'blocks': {
       if (!Array.isArray(value)) return undefined;
       return [...new Set(value.map(shortId).filter(Boolean))].slice(0, MAX_LABELS);
+    }
+    case 'routed': return cleanRouted(value);
+    case 'putAway': return typeof value === 'boolean' ? value : undefined;
+    case 'shippedAt': return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : undefined;
+    case 'linkComment': {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+      const name = str(value.name, MAX_SHORT);
+      const file = str(value.file, MAX_SHORT);
+      const text = str(value.text, MAX_TEXT_BYTES);
+      return name && file && text ? { name, file, text } : undefined;
+    }
+    case 'waitEnded': case 'handedOver': {
+      if (!value || typeof value !== 'object' || !Number.isFinite(value.at)) return undefined;
+      const said = str(value.said, MAX_SUMMARY);
+      return said ? { said, at: Math.trunc(value.at) } : undefined;
     }
     default: return undefined;
   }
@@ -574,6 +666,11 @@ export function finishItem(raw, now = Date.now()) {
     delete item.reacts;
     if (chips) item.reactions = chips;
   }
+  if (item.artifactLines) {
+    item.artifacts = marksOf(item.artifactLines);
+    delete item.artifactLines;
+  }
+  delete item.closedFrom;
   const closes = item.closes;
   delete item.closes;
   const editLines = item.editLines;
@@ -591,16 +688,27 @@ export function finishItem(raw, now = Date.now()) {
       item.talk = talkOf(said);
       const settled = settledBy(closes ?? [], said);
       if (settled) item.talk.settled = settled;
+      reopenIfWrittenPastTheClose(item, said);
     }
   }
   return item;
 }
 
-/** A line that writes the row's short name and nothing else (see the fold's foot). */
-function onlyTheName(line) {
+// The owner replied, closed it or put it off. Read in ledger order, not by
+// clock, because a comment's time is the cloud's and a reply's is this Mac's.
+function dealsWithComments({ source, patch }) {
+  if (source !== 'founder' || !patch) return false;
+  return (typeof patch.answer === 'string' && !!patch.answer.trim() && patch.answer !== WITHDRAWN)
+    || patch.status === 'done' || patch.start === 'later'
+    || Number(patch.runAt) > 0 || Number(patch.snoozedUntil) > 0;
+}
+
+/** A line that writes the row's short name, or who has seen what, and nothing else (see the fold's foot). */
+function isNotNews(line) {
   if (line.claim || line.release || line.heartbeat) return false;
   const fields = Object.keys(line.patch ?? {});
-  return fields.length === 1 && fields[0] === 'label';
+  if (fields.length !== 1) return false;
+  return fields[0] === 'label' || fields[0] === 'putAway' || (fields[0] === 'artifact' && isBookkeepingMark(line.patch.artifact));
 }
 
 /** Lines folded onto `items` in place, unfinished: `finishItem` makes each one readable. */
@@ -663,14 +771,20 @@ export function foldRawInto(items, lines, touched = null) {
     // the result (see the end of the fold).
     const words = typeof patch.answer === 'string' && patch.answer !== WITHDRAWN ? patch.answer
       : typeof patch.body === 'string' ? patch.body : null;
-    if (line.by && words && words.trim()) {
-      (item.said ??= []).push({ uid: line.uid ?? null, by: line.by, ts: line.ts, text: words.trim().slice(0, TALK_TEXT), inReplyTo: patch.inReplyTo ?? null, body: typeof patch.answer !== 'string' });
+    // A teammate's reply, written by the app on this Mac and so stamped with
+    // this person's `by`, is not something this person said.
+    const told = line.source === 'system' && patch.from && typeof patch.answer === 'string' ? patch.from : null;
+    if (line.by && words && words.trim() && !told && !patch.fromNotes) {
+      const close = item.status === 'done' ? item.wrote.status : null;
+      const crossed = close?.by && close.by !== line.by && line.ts < close.ts && !item.said?.some((s) => s.uid && s.uid === line.uid);
+      (item.said ??= []).push({ uid: line.uid ?? null, by: line.by, ts: line.ts, text: words.trim().slice(0, TALK_TEXT), inReplyTo: patch.inReplyTo ?? null, body: typeof patch.answer !== 'string', ...(crossed ? { crossed: close.ts } : {}), ...(patch.voice ? { voice: patch.voice } : {}), ...(patch.forAgent ? { forAgent: patch.forAgent } : {}) });
     }
     // Who closed the chat and when, so `whatWaits` can tell a reopen by your own
     // message (still settled) from an undo of the close (not).
     if (line.by && typeof patch.status === 'string') {
       (item.closes ??= []).push({ by: line.by, ts: line.ts, done: patch.status === 'done', spoke: !!(words && words.trim()) });
     }
+    if (line.by && typeof patch.putAway === 'boolean') (item.closes ??= []).push({ by: line.by, ts: line.ts, done: patch.putAway, spoke: false });
 
     for (const [field, value] of Object.entries(patch)) {
       // A REACTION IS ACCUMULATED, NOT HELD. Every other field below keeps one
@@ -691,7 +805,15 @@ export function foldRawInto(items, lines, touched = null) {
       }
       // WHICH MESSAGE A REPLY ANSWERS belongs to that reply's line alone. Held
       // as a value, the row would carry the newest reply's parent forever.
-      if (field === 'inReplyTo') continue;
+      if (field === 'inReplyTo' || field === 'from' || field === 'voice' || field === 'forAgent' || field === 'fromNotes' || field === 'putAway') continue;
+      if (field === 'comment') {
+        if (line.by && String(line.uid ?? '').startsWith('comment-') && !isContinuedNote(value.text)) (item.waitingComments ??= []).push({ by: line.by, ts: line.ts, text: value.text });
+        continue;
+      }
+      if (field === 'artifact') {
+        (item.artifactLines ??= []).push({ ...value, by: line.by ?? null, ts: line.ts, uid: line.uid ?? null });
+        continue;
+      }
       if (field === 'edit') {
         (item.editLines ??= []).push({ on: value.on, by: line.by ?? null, ts: line.ts, ...(value.gone ? { gone: true } : { text: value.text }) });
         continue;
@@ -702,10 +824,20 @@ export function foldRawInto(items, lines, touched = null) {
       // ledger any more (see the note beside WORK_ITEM_FIELDS), so
       // the plain rule is the only rule: a weaker writer never overwrites a
       // stronger one's value.
-      if (held && !beats(line, held, field)) continue;
+      // The newest reply is the one a turn answers, whoever wrote it, so a
+      // teammate's later reply moves past one of yours. Yours still always
+      // moves past a teammate's.
+      const toldNow = told && field === 'answer';
+      if (held && !(toldNow && line.ts >= held.ts) && !beats(line, held, field)) continue;
       item[field] = value;
       item.wrote[field] = { ts: line.ts, source: authorityOf(line, field, value) };
       if (line.by) item.wrote[field].by = line.by;
+      if (toldNow) Object.assign(item.wrote[field], { from: told.name, teammate: told.teammate });
+      // On the field the words are held in, so a row can say who wrote its newest.
+      if ((field === 'answer' || field === 'body') && line.by) {
+        if (patch.voice) item.wrote[field].voice = patch.voice;
+        if (patch.forAgent) item.wrote[field].forAgent = patch.forAgent;
+      }
     }
 
     // THE APP WRITING A ROW'S NAME IS NOT NEWS ABOUT THE ROW. Lists break ties
@@ -714,7 +846,22 @@ export function foldRawInto(items, lines, touched = null) {
     // the heartbeat rule above is, because the lines that did it are in the
     // ledger already. Only the name ALONE: a line that carries it with anything
     // else carries that too.
-    if (!onlyTheName(line)) item.updatedAt = Math.max(item.updatedAt, line.ts);
+    //
+    // NOR, FOR WHERE A ROW SITS, IS A CLOSE TAKEN STRAIGHT BACK. A bare reopen
+    // by whoever closed it, with no news between, sets `placedAt` to where the
+    // close found the row, and the lists sort on it. `updatedAt` still only
+    // moves forward: team sync and the caches read it as "something changed".
+    const bareStatus = line.source === 'founder' && Object.keys(patch).length === 1 ? patch.status : undefined;
+    if (bareStatus === 'open' && item.closedFrom && item.closedFrom.by === line.by) {
+      item.placedAt = item.closedFrom.at;
+      delete item.closedFrom;
+    } else if (!isNotNews(line)) {
+      if (bareStatus === 'done') item.closedFrom ??= { at: item.placedAt ?? item.updatedAt, by: line.by };
+      else delete item.closedFrom;
+      delete item.placedAt;
+    }
+    if (!isNotNews(line)) item.updatedAt = Math.max(item.updatedAt, line.ts);
+    if (item.waitingComments && dealsWithComments(line)) delete item.waitingComments;
     if (line.ts < item.createdAt) item.createdAt = line.ts;
   }
 
@@ -749,7 +896,7 @@ const TALK_KEEP = 100;
  * they reopened it since without saying anything (an undo). A reopen that
  * carries their words keeps the moment: speaking is not taking the close back.
  * So does one that follows their words since the close, because sending
- * writes the message and the reopen as two lines (`answerItem`, main/store.mjs).
+ * writes the message and the reopen as two lines (`answerItem`, main/store.mts).
  */
 function settledBy(closes, said = []) {
   const at = {};
@@ -761,6 +908,24 @@ function settledBy(closes, said = []) {
   return Object.keys(at).length ? at : null;
 }
 
+/** The mark on a task given to a person (shared/team-rules.mjs). */
+export const GIVEN_TASK = 'given-task';
+/** The mark on a thread about one piece of work, started with a subject in a message record. */
+export const WORK_THREAD = 'work-thread';
+
+// A reply reopens a closed chat only if its sender's Mac saw the close, since
+// that is what writes the reopen. One that did not (stamped after the close, or
+// before it but reaching this Mac after) reopens it here, or it is on no list.
+function reopenIfWrittenPastTheClose(item, said) {
+  const close = item.status === 'done' ? item.wrote.status : null;
+  if (!close?.by) return;
+  const others = said.filter((s) => s.by !== close.by && !s.body);
+  const crossed = others.filter((s) => s.crossed === close.ts);
+  if (!crossed.length && !others.some((s) => s.ts > close.ts)) return;
+  item.status = 'open';
+  if (crossed.length && item.talk.settled?.[close.by]) item.talk.settled[close.by] = Math.min(...crossed.map((s) => s.ts)) - 1;
+}
+
 function talkOf(said) {
   const lines = [...said].sort((a, b) => a.ts - b.ts);
   const chat = [];
@@ -770,10 +935,10 @@ function talkOf(said) {
   for (const s of lines) {
     // A rename that sends the same opening words again is not a new message.
     if (s.body) { if (bodies.has(s.text)) continue; bodies.add(s.text); }
-    const said1 = { by: s.by, ts: s.ts, text: s.text };
+    const said1 = { by: s.by, ts: s.ts, text: s.text, ...(s.voice ? { voice: s.voice } : {}), ...(s.forAgent ? { forAgent: s.forAgent } : {}) };
     const parent = s.inReplyTo ? parents.get(s.inReplyTo) : null;
     if (parent) {
-      (threads[s.inReplyTo] ??= { by: parent.by, text: parent.text, replies: [] }).replies.push(said1);
+      (threads[s.inReplyTo] ??= { by: parent.by, text: parent.text, replies: [], ...(parent.voice ? { voice: parent.voice } : {}) }).replies.push(said1);
       continue;
     }
     // A reply to a message this chat does not hold is drawn in the chat, so it
@@ -815,7 +980,8 @@ export function threadOf(lines, id) {
     for (const field of THREAD_FIELDS) {
       const text = line.patch?.[field];
       if (typeof text !== 'string' || !text.trim()) continue;
-      turns.push({ ts: line.ts, source: authorityOf(line, field, text), field, text });
+      const from = field === 'answer' && line.source === 'system' ? line.patch.from?.name : null;
+      turns.push({ ts: line.ts, source: authorityOf(line, field, text), field, text, ...(from ? { from } : {}) });
     }
   }
   // Stable by time. Within one millisecond THREAD_FIELDS order decides, so an
@@ -847,6 +1013,8 @@ export function threadOf(lines, id) {
 // as it should.
 function authorityOf(line, field, value) {
   if (line.source === 'founder' && field === 'status' && value === 'open') return 'system';
+  // Her clearing a moment is not a moment she set, so the agent may book one again.
+  if (line.source === 'founder' && field === 'runAt' && !value) return 'system';
   return line.source;
 }
 
@@ -877,7 +1045,7 @@ function beats(incoming, held, field) {
 // session, not in the inbox. Pressing start on the thread writes 'now'.
 export function isDue(item, now = Date.now()) {
   if (item?.start === 'later') return false;
-  return !item?.runAt || item.runAt <= now;
+  return !item?.runAt || item.runAt <= now || wordWaits(item);
 }
 
 /** Written down and deliberately not begun. */

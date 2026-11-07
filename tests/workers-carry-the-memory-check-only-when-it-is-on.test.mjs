@@ -17,8 +17,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Supervisor } from '../main/supervisor.mjs';
-import { DEFAULTS as GATE } from '../main/memory-gate.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { DEFAULTS as GATE } from '../main/memory-gate.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const made = [];

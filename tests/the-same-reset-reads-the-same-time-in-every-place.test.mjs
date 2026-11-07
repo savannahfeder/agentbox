@@ -11,8 +11,8 @@
 // kept the old number while the tile said Ready.
 import { describe, expect, it } from 'vitest';
 import { hourWords, meterPair } from '../renderer/src/account-words.ts';
-import { readUsageReport } from '../shared/claude-usage.mjs';
-import { resetDay } from '../shared/usage.mjs';
+import { readUsageReport } from '../shared/claude-usage.mts';
+import { resetDay } from '../shared/usage.mts';
 
 const at = (d, h, m = 0, s = 0, ms = 0) => new Date(2026, 9, d, h, m, s, ms).getTime();
 const NOW = at(21, 15, 0);
@@ -48,8 +48,10 @@ describe('a reset is said to the nearest minute', () => {
 const session = (percent, resetsAt, extra = {}) => ({ span: 'session', qualifier: null, name: 'This session', percent, resetsText: null, resetsOn: null, resetsAt, zone: null, ...extra });
 
 describe('a window that has reset', () => {
-  it('the reported case:a session read at 100% that reset since reads 0, with no time', () => {
-    expect(meterPair([session(100, NOW - 60_000)], NOW)[0]).toMatchObject({ percent: 0, resets: null });
+  // Since 2026-10-31 it has no number rather than 0, which nobody read
+  // (tests/a-meter-past-its-reset-shows-no-number).
+  it('the reported case:a session read at 100% that reset since has no number, and says it reset', () => {
+    expect(meterPair([session(100, NOW - 60_000)], NOW)[0]).toMatchObject({ percent: null, resets: 'Reset' });
   });
 
   it('must NOT empty a window that has yet to reset, or one whose reset is not known', () => {

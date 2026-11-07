@@ -16,9 +16,9 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { HAND_BACK } from '../shared/cloud-hand-back.mjs';
-import { KEEP_ON_MAC, IMPORT_FAILED } from '../main/cloud/run.mjs';
+import { KEEP_ON_MAC, IMPORT_FAILED } from '../main/cloud/run.mts';
 
 const product = { slug: 'p', dir: '', repoPath: '/r' };
 const dirs = [];
@@ -64,10 +64,11 @@ describe('a thread the cloud handed back', () => {
     expect(mayGoToTheCloud(sup)).toBe(false);
   });
 
-  it('is not the person\'s keep, so the thread\'s menu still offers to keep it here', () => {
+  // Not kept: the row carries only what the cloud needed, for its cloud button.
+  it('is not the person\'s keep, so the row says what it needs and nothing more', () => {
     const sup = make(tmp());
     sup._noteCloudHandBack(item, handedBack());
-    expect(sup.withPlaces([{ id: 'w-a' }])).toEqual([{ id: 'w-a' }]);
+    expect(sup.withPlaces([{ id: 'w-a' }])).toEqual([{ id: 'w-a', needsMac: 'the AWS keys' }]);
   });
 
   it('survives a restart until a run here carries the request', () => {
@@ -157,7 +158,7 @@ describe('a supervisor built without its saved state', () => {
 
 describe('the plumbing', () => {
   it('spends the move where every run ends, after the run is judged', () => {
-    const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
+    const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
     const spend = src.indexOf('this._spendMoveToMac(item, session)');
     expect(spend).toBeGreaterThan(src.indexOf('session.exitFailed = !!('));
     expect(spend).toBeGreaterThan(src.indexOf('this._cloudKeptOnMac(item, session, code, signal)'));

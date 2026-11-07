@@ -9,7 +9,7 @@
 // tiles they make.
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { codexAccountReadings } from '../main/codex-usage.mjs';
+import { codexAccountReadings } from '../main/codex-usage.mts';
 import { codexAccountsOnce } from '../renderer/src/accounts-once.ts';
 
 const DAY = 24 * 60;
@@ -71,7 +71,7 @@ describe('the tiles', () => {
 
   it('the page asks main for every Codex account\'s reading', () => {
     const settings = fs.readFileSync(new URL('../renderer/src/components/Settings.tsx', import.meta.url), 'utf8');
-    const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
+    const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
     expect(settings).toContain("api.accountUsage({ engine: 'codex'");
     expect(ipc).toContain('supervisor.codexAccountUsage()');
   });

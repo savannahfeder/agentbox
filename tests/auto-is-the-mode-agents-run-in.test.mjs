@@ -14,8 +14,8 @@
 // plan.
 
 import { describe, it, expect } from 'vitest';
-import { permissionMode, buildSessionArgs, parseSessionArgs } from '../main/settings.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { permissionMode, buildSessionArgs, parseSessionArgs } from '../main/settings.mts';
+import { Supervisor } from '../main/supervisor.mts';
 import { nameSlug } from '../shared/product-name.mjs';
 
 const HERS = [

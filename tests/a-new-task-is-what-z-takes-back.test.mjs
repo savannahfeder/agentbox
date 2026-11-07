@@ -120,22 +120,23 @@ describe('the wiring, which is the half a pure test cannot see', () => {
   });
 
   it('withdrawing stops the worker as well as closing the row', () => {
-    // main/ipc.mjs kills the session on any archive, so one call does both.
-    const ipc = fs.readFileSync(path.join(here, '..', 'main', 'ipc.mjs'), 'utf8');
+    // main/ipc.mts kills the session on any archive, so one call does both.
+    const ipc = fs.readFileSync(path.join(here, '..', 'main', 'ipc.mts'), 'utf8');
     expect(ipc).toMatch(/if \(status === 'done'\) supervisor\.stopSession\(id\)/);
     // 2026-09-27: the second argument is the plain phrase a late Z asks with,
     // "press Z again to take back the task you just made" (renderer/src/undo-window.ts).
     // 2026-10-16: it reads the row first, and an answered one is not closed
     // (tests/taking-back-a-task-the-agent-already-answered-says-it-was-too-late).
-    // 2026-10-24 (F-26): a pasted list can go out as several threads, and that
-    // is still ONE send and one Z, so the close runs over the threads the send
-    // made rather than over the one id. The three facts asserted are the ones
+    // 2026-10-24 (F-26) this ran over a list, because a pasted list could go
+    // out as several threads on one send. That offer was taken out on
+    // 2026-10-26 (tests/a-pasted-lists-title-loses-its-mark), so one send is
+    // one row again and so is one Z. The three facts asserted are the ones
     // that were asserted before: the words the toast carries, the phrase a late
-    // Z asks with, and that the way back closes rows with `api.answer`.
+    // Z asks with, and that the way back closes the row with `api.answer`.
     expect(app).toMatch(/`Withdrawn: \$\{clipToSentence\(made\.title, TOAST_TITLE\)\}`/);
-    expect(app).toMatch(/noteNewTask\(label, [^\n]*'take back the task you just made', sent, async \(\) => \{[\s\S]{0,600}?await api\.answer\(\{ product: one\.product, id: one\.id, status: 'done' \}\)/);
-    // And the list it closes always starts with the thread the send returned.
-    expect(app).toMatch(/const all = \[\{ product: made\.product, id: made\.id \}, \.\.\.\(how\?\.alsoMade \?\? \[\]\)\]/);
+    expect(app).toMatch(/noteNewTask\([^\n]*'take back the task you just made', sent, async \(\) => \{[\s\S]{0,600}?await api\.answer\(\{ product: one\.product, id: one\.id, status: 'done' \}\)/);
+    // And the row it closes is the thread the send returned.
+    expect(app).toMatch(/const one = \{ product: made\.product, id: made\.id \};/);
   });
 
   it('a repeating task is undoable too, or Z means two different things on one card', () => {

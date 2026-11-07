@@ -16,10 +16,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ProfilePage } from '../renderer/src/team/rooms/RoomPerson.tsx';
-import { myPresence, wallCards } from '../shared/room-cards.mjs';
+import { myPresence, wallCards } from '../shared/room-cards.mts';
 globalThis.React = React;
 
 const card = (id, o = {}) => ({ id, me: false, name: id, avatarUrl: null, headline: null, bio: null, agents: 0, level: 3, hoursTotal: 1, hoursWeek: 1, hoursToday: 0, streak: 1, byMonth: [], teammate: true, showActivity: true, activity: null, status: null, workingOn: null, workingPrivate: false, ...o });
@@ -101,7 +102,7 @@ create publication supabase_realtime;
     on conflict (person_id, device) do update set activity = excluded.activity, agents_running = excluded.agents_running`, [id, LIST]);
 
   beforeAll(async () => {
-    db = new PGlite();
+    db = new PGlite(await emptyDatabase());
     await db.exec(STAND_IN);
     await db.exec(sql(files.filter((f) => f < THIS)));
     for (const id of [OLD, NEW]) {

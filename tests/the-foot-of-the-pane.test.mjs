@@ -87,17 +87,19 @@ describe('the shortcuts are off the screen and the verbs are not', () => {
     // in the chat message, so it is on the reply card now, and the three tests
     // below hold it there.
     const row = focus.slice(focus.indexOf('<div className="focus-actions">'), focus.indexOf('focus-dock'));
-    expect(row).toContain('back to inbox');
-    expect(row).toContain('let it run now');
-    expect(row).toContain('take me to it');
-    expect(row).toContain('send back to agent');
+    expect(row).toContain('Back to inbox');
+    expect(row).toContain('Let it run now');
+    expect(row).toContain('Take me to it');
+    expect(row).toContain('Send back to agent');
   });
 
   it('does not draw an empty row on a finished task', () => {
     // On a finished task none of the remaining buttons apply, and a bar with a
     // rule over it and nothing in it is 51px of nothing.
     const guard = focus.slice(focus.lastIndexOf('{((', focus.indexOf('<div className="focus-actions">')), focus.indexOf('<div className="focus-actions">'));
-    expect(guard).toContain('(scheduledUntil ?? 0) > 0 && !!onUnschedule');
+    // `scheduledHere` is a scheduled thread that is not closed (w-54cdf7c768).
+    expect(guard).toContain('scheduledHere && !!onUnschedule');
+    expect(focus).toMatch(/const scheduledHere = item\.status !== 'done' && \(scheduledUntil \?\? 0\) > 0;/);
     expect(guard).toContain('!!agent && !agentTakesReply && !!onReveal');
     expect(guard).toContain("item.status === 'blocked'");
     // And an In progress task no longer opens this row by itself, because the
@@ -296,13 +298,17 @@ describe('the corner carries the task on a task and the app on a list', () => {
 // THE MARK HUNG A PLATE UNTIL IT BECAME A ROW (w-e731ca9376, 2026-10-01). A
 // row in the thread's menu prints its key beside its words, and a component
 // that already shows its key carries no plate, so the plate's line went too.
-describe('the Done row says its key the way its plate did', () => {
+// AND IT IS A BUTTON AGAIN (w-bca8a6466f, 2026-10-26), in its own box just
+// left of the thread's dots. It prints only its word, so it wears
+// the plate again, and Mark done is no longer a row in the menu.
+describe('the Done button says its key the way its plate did', () => {
   const plate = fs.readFileSync(path.join(root, 'renderer', 'src', 'hint-plate.ts'), 'utf8');
 
-  it('prints E on its row and wears no plate', () => {
+  it('wears the E plate on the button, and the menu rows still print their keys', () => {
     expect(focus).not.toContain('data-hint="done"');
-    expect(plate).not.toContain("done: [{ key: 'E', what: 'Mark done' }],");
-    // `chord` draws the key in this keyboard's own glyphs (shared/key-caps.mjs);
+    expect(menu).toContain('data-hint="done"');
+    expect(plate).toContain("done: [{ key: 'E', what: 'Mark done' }],");
+    // `chord` draws the key in this keyboard's own glyphs (shared/key-caps.mts);
     // the row still prints its key beside its words, which is what this guards.
     expect(menu).toContain('<kbd>{chord(row.key)}</kbd>');
   });

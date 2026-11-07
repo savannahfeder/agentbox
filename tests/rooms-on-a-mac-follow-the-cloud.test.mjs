@@ -1,6 +1,6 @@
 // ROOMS ON A MAC FOLLOW THE CLOUD, AND ONLY WHILE SWITCHED ON (w-3d0fa23ffb, 2026-10-20).
 //
-// main/team/rooms.mjs keeps the rooms I am in, their walls and chat, and the
+// main/team/rooms.mts keeps the rooms I am in, their walls and chat, and the
 // presence row this Mac publishes. Rooms is an alpha feature: until it is
 // switched on, this Mac must publish nothing at all, and switching it off
 // must tell everyone this Mac has gone.
@@ -12,9 +12,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mjs';
-import { createRooms, roomPrefsFile } from '../main/team/rooms.mjs';
-import { GENERAL_ROOM } from '../main/team/rooms-memory.mjs';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
 
 const T0 = Date.parse('2026-10-22T15:00:00-07:00');
 const flush = async () => { for (let i = 0; i < 20; i += 1) await new Promise((r) => setImmediate(r)); };
@@ -107,10 +106,10 @@ describe('switched on', () => {
     expect(w.theo.rooms.state().rooms[0].agents).toBe(2);
   });
 
-  it('someone with no team starts in General, pinned', async () => {
+  it('someone with no team starts in no group (groups are only ever a team)', async () => {
     w.jun.on = true;
     await w.jun.rooms.tick();
-    expect(w.jun.rooms.state().rooms.map((r) => [r.id, r.pinned])).toEqual([[GENERAL_ROOM, true]]);
+    expect(w.jun.rooms.state().rooms).toEqual([]);
   });
 
   it('a message reaches the room at once, counts as unread, and a mention of me is a row of its own', async () => {
@@ -124,14 +123,14 @@ describe('switched on', () => {
     expect(w.maya.rooms.state().rooms[0].unread).toBe(0);
     await w.theo.rooms.markRead(room);
     expect(w.theo.rooms.state().rooms[0].unread).toBe(0);
-    expect(w.theo.rooms.state().mentions).toEqual([]);
+    expect(w.theo.rooms.state().mentions).toHaveLength(1);
     await w.theo.rooms.refresh();
     expect(w.theo.rooms.state().rooms[0].unread).toBe(0);
   });
 
   // Codex's review of the build: mentions were read only from the newest 200
   // messages held, so a busy room buried an older one out of Needs you.
-  it('a mention stays in Needs you under two hundred newer messages, until read', async () => {
+  it('a mention stays in Needs you under two hundred newer messages, until marked done', async () => {
     const room = w.maya.rooms.state().rooms[0].id;
     await w.maya.rooms.send(room, '@Theo B. can you look at this?', { mentions: [w.theo.id] });
     for (let i = 0; i < 210; i += 1) {
@@ -139,8 +138,11 @@ describe('switched on', () => {
       await w.maya.backend.sendRoomMessage(room, { body: `note ${i}` });
     }
     await w.theo.rooms.refresh();
-    expect(w.theo.rooms.state().mentions.map((m) => m.body)).toEqual(['@Theo B. can you look at this?']);
+    expect(w.theo.rooms.state().mentions).toHaveLength(1);
     await w.theo.rooms.markRead(room);
+    await w.theo.rooms.refresh();
+    expect(w.theo.rooms.state().mentions).toHaveLength(1);
+    await w.theo.rooms.markDone(room);
     await w.theo.rooms.refresh();
     expect(w.theo.rooms.state().mentions).toEqual([]);
   });
@@ -219,7 +221,7 @@ describe('switched on', () => {
   });
 
   it('pins and mutes are mine, kept, and leaving a room drops them', async () => {
-    const room = await w.maya.rooms.create({ name: 'Launch' });
+    const room = await w.maya.rooms.create({ name: 'Theo', kind: 'group', people: [w.theo.id] });
     expect(w.maya.rooms.state().rooms.find((r) => r.id === room)).toMatchObject({ pinned: true });
     w.maya.rooms.pin(room, false);
     w.maya.rooms.mute(room, true);

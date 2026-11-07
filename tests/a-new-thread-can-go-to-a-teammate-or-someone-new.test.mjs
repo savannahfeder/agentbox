@@ -8,8 +8,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Teammates } from '../main/teammates.mjs';
-import { loadStore } from '../main/store-modules.mjs';
+import { Teammates } from '../main/teammates.mts';
+import { loadStore } from '../main/store-modules.mts';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
@@ -62,14 +62,15 @@ describe('starting one from the Teammates page', () => {
   // own words both go through one call, in the project picked beside it. The
   // agent it runs on is chosen in its settings, with its model and effort.
   it('makes it in the project picked, from a tapped starter or your own words', () => {
-    expect(page).toMatch(/call\('describe', \{ \.\.\.args, greeted: true, product: where\.slug \}\)/);
+    expect(page).toMatch(/call\('describe', \{ \.\.\.args, \.\.\.voice, greeted: true, product: where\.slug \}\)/);
     expect(page).toMatch(/onClick=\{\(\) => \{ void make\(\{ starter: a\.starter \}\); \}\}/);
     expect(page).toMatch(/onSend=\{\(text\) => make\(\{ text \}\)\}/);
     // The agent is picked in its About now, beside the model (round 6).
     expect(page).toMatch(/<dt>Runs on<\/dt>/);
   });
   it('says when it works, and on which agent, beside its goal', () => {
-    expect(page).toMatch(/`Works \$\{t\.worksLabel\}` : 'Works when someone writes to it'/);
+    expect(page).toContain("label: 'Only when someone writes to it'");
+    expect(page).toContain('<When every={t.works?.every ?? null}');
   });
 });
 

@@ -32,7 +32,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 import { COPY, START, advance, firstRunNeeded, stepTo, whyNotMade } from '../renderer/src/onboarding.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

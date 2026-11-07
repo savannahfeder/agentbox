@@ -262,7 +262,8 @@ describe('the coaching card promises no dead key either', () => {
     // (hers: "it's actually R to reply"). The app answers R in an open thread.
     const said = [...new Set([...keys, ...tourKeys])];
     expect(said.sort()).toEqual(['1', 'N', 'E', 'L', 'B', 'R', '↵', '⌘K', '⌘↵', '⇥'].sort());
-    expect(app).toContain("else if (e.key === \'r\' || e.key === \'R\') { e.preventDefault(); setModal(\'reply\'); if (modal === \'reply\') focusTheReplyBox(); }");
+    // It may also say whose box it is (sayWhoseBox); it still opens the reply.
+    expect(app).toContain("else if (e.key === \'r\' || e.key === \'R\') { e.preventDefault(); setModal(\'reply\'); if (modal === \'reply\') focusTheReplyBox();");
   });
 
   it('B flips the inbox to the board, which is what the board beat says', () => {
@@ -314,7 +315,7 @@ describe('the coaching card promises no dead key either', () => {
 
   it('1 sends the option under it, which is what beat fourteen says', () => {
     // The stopped row's answer is one key because its offer is in its result
-    // (shared/first-run-practice.mjs) and a digit on a focused row picks AND
+    // (shared/first-run-practice.mts) and a digit on a focused row picks AND
     // sends. If this ever became select-then-Enter the card would be promising
     // one key for a two-key move.
     // IT MAY BE HELD AND IT MAY NOT BECOME TWO KEYS. The branch holds the key

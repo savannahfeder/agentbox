@@ -125,7 +125,7 @@ describe('what a press leaves for your Mac', () => {
   it('each raises the toast the site raises, with Undo where the site has one', () => {
     expect(planFor({ kind: 'reply', text: 'Go' }, item).toast).toBe('Sent → Alpha · press Z to undo');
     expect(planFor({ kind: 'close' }, item).toast).toBe(`${DONE.verb}: Plan the phone app · press Z to undo`);
-    expect(planFor({ kind: 'stop' }, item).toast).toBe('Stop sent. Your Mac stops the agent when it gets it.');
+    expect(planFor({ kind: 'stop' }, item).toast).toBe('Stop sent. Your computer stops the agent when it gets it.');
   });
 });
 

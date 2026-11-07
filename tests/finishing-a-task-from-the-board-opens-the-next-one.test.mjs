@@ -61,9 +61,11 @@ describe('the way back from a task opened on the board', () => {
     expect(crumb).toMatch(/onBoard \? 'Threads'/);
   });
 
-  // In the list it still names the tab, as w-922f66bb06 approved.
+  // In the list it still names a tab, as w-922f66bb06 approved. Which tab is
+  // the thread's own since w-474ac45a33 (`crumbTab`): the one holding it now,
+  // not the one the list happens to be on.
   it('still names the tab in the list', () => {
-    expect(crumb).toContain("INBOX_TABS.find((t) => t.view === view)?.label");
+    expect(crumb).toContain("INBOX_TABS.find((t) => t.view === crumbTabNow)?.label");
     expect(crumb.indexOf("onBoard ? 'Threads'")).toBeLessThan(crumb.indexOf('INBOX_TABS.find'));
   });
 });

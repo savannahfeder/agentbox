@@ -13,7 +13,7 @@ import { it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createServer, newToken } from '../main/serve.mjs';
+import { createServer, newToken } from '../main/serve.mts';
 
 let server, base, token, dist;
 

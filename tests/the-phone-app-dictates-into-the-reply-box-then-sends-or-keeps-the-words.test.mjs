@@ -16,7 +16,7 @@
 // permission wording and the privacy policy.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { dictation, joinWords, languageFor, levelOf, START_MS, FINISH_MS } from '../mobile/src/lib/dictation';
+import { dictation, joinWords, languageFor, levelOf, START_MS, FINISH_MS } from '../renderer/src/dictation';
 
 const src = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 
@@ -296,9 +296,11 @@ describe('the voice stays on the phone when the phone can do it', () => {
 describe('the screens, the wording and the policy', () => {
   const thread = () => src('mobile/src/app/thread/[product]/[id].tsx');
   const ui = () => src('mobile/src/ui/Dictation.tsx');
+  // The New thread page and the empty inbox share one form.
+  const newThread = () => src('mobile/src/app/new.tsx') + src('mobile/src/ui/NewThreadForm.tsx');
 
   it('a thread and a new thread both have the microphone', () => {
-    for (const screen of [thread(), src('mobile/src/app/new.tsx')]) {
+    for (const screen of [thread(), newThread()]) {
       expect(screen).toMatch(/useDictation\(/);
       expect(screen).toMatch(/<MicButton\b/);
       expect(screen).toMatch(/<Listening\b/);
@@ -310,7 +312,7 @@ describe('the screens, the wording and the policy', () => {
     expect(ui()).toContain('"Send what you said"');
     expect(thread()).toMatch(/talk\.on \? \(\s*<Listening talk=\{talk\}/);
     // The new thread's own Send, at the top, waits for the last words too.
-    expect(src('mobile/src/app/new.tsx')).toMatch(/talk\.on \? talk\.send\(\) : void send\(\)/);
+    expect(newThread()).toMatch(/talk\.on \? talk\.send\(\) : void send\(\)/);
   });
 
   it('lets go of the microphone when the screen is left or the app is put away', () => {

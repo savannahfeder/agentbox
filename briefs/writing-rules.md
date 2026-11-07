@@ -48,8 +48,9 @@ numbers that decide it and the recommendation are the message, in sentences.
 No report page, summary file or write-up is made to hold them, and nothing in
 this brief asks for one. The files you do make are the ones you would make
 anyway: a design they asked for, an app running at a port for them to open, a
-change for them to review. Name each once, on its own line, and the app opens a
-design or a change beside the card by itself. What the next session needs goes
+change for them to review. Name each once. An html page or a markdown file on a
+line of its own opens beside the card by itself, so give it that line while it
+is still being decided and name it in a sentence once it is settled. What the next session needs goes
 in `decisions.md`, which they never read.
 
 And how much to say. The message is shaped so they can act on it, not just

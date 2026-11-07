@@ -31,7 +31,7 @@ get an app approved.
 - **The renderer's language.** React and TypeScript. The app has its own
   dependencies, because Expo SDK 58 needs React 19.3 and the desktop is on
   React 18 (package.json). It imports only the shared modules that run without
-  Node: some import Node's own modules (`shared/install-id.mjs`).
+  Node: some import Node's own modules (`shared/install-id.mts`).
 - **iPhone and Android from one code base.**
 
 Not chosen:
@@ -75,7 +75,7 @@ adds no server of its own except the alert sender.
   size, a rate limit and blocks, then writes the line. A message between
   people then needs no Mac awake.
 - **The sync cursor is fixed first, for the desktop too.** A pull sets
-  `pulledSeq` to the last row it saw (main/team/sync.mjs), so a line whose
+  `pulledSeq` to the last row it saw (main/team/sync.mts), so a line whose
   lower `seq` commits late is skipped for good. Phones add writers and make
   that likelier. Either sequence numbers are handed out one at a time per
   project, or the pull rereads a window behind its cursor. Edits made at the
@@ -131,7 +131,7 @@ and the Edge Function, is still to build.
   where it came from. Two things write it:
   - the Mac, for its own threads, from the same arrivals that make a desktop
     banner today (`shared/notify-rules.mjs`, and the arrivals
-    main/phone-link.mjs fed to web push);
+    main/phone-link.mts fed to web push);
   - the database, when a line for a person is written: a Direct message, an
     @mention, a task given to them. These have to buzz with every Mac shut.
 - **One rule on the server decides what is sent**, for both: duplicates,
@@ -139,7 +139,7 @@ and the Edge Function, is still to build.
   they are at a computer. The desk rule stays: no buzz while they have used a
   Mac in the last five minutes (`shared/notify-rules.mjs`), read from an
   activity record each Mac renews and that expires on its own. Alerts close
-  together are folded into one, as main/phone-link.mjs does.
+  together are folded into one, as main/phone-link.mts does.
 - **History is never an alert.** Lines brought in from history get a fresh
   insert time, so their age cannot tell them apart; a line is marked as an
   import when it is written, and imports are never sent.
@@ -353,6 +353,23 @@ made-up threads), not yet on a phone:
   Monday morning, or a typed time (composer-rules.ts).
 - Not yet on the phone: search and View and filters (the site's search draws
   nothing without a Mac), Repeat it, and messages between people.
+- AI teammates (2026-10-30): the computer's settings copy carries them and
+  their chat (`phoneTeammatesOf`, in whatever room the copy has left under
+  its 200KB check), and the phone's asks of them ride as `setting` commands
+  with scope `teammate` (post, describe, goAhead) into `zero:teammates`. The
+  app has Chats as its fifth tab (teammates, then groups), a chat per
+  teammate, a New teammate page, Auto and teammates in To, and signed
+  answers. Talking to a teammate needs the computer awake: teammates run
+  there. Still only on the desktop: editing a teammate, its method, pausing it
+  and making it primary. Also caught up: group mentions in Needs you, Mark
+  unread, and "in the cloud" on a cloud run's working line.
+- Caught up with the web app (2026-10-30): a thread as one page
+  (`lib/one-page.ts`), Needs you, Everything else and Chats with a team on
+  (`lib/everything.ts`, by the desktop's own card rules, without dragging or
+  hiding a card), commands behind the magnifier (`lib/palette.ts`), Minimize
+  and Review on a permission card, files and pictures in group messages (read,
+  not sent), and Settings search. A page or a note an answer names still opens
+  from its tile rather than reading in place under the answer.
 
 Tests: tests/the-phone-app-*.test.mjs pin the tabs, the thread and its
 commands, sign-in and the kept session, the request deadline and the

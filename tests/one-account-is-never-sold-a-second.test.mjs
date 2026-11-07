@@ -306,7 +306,7 @@ describe('two folders that are one account still say so', () => {
 
   /*
    * AND IT DOES NOT CLAIM THE SECOND FOLDER ADDS NOTHING, because
-     `_capacity()` in main/supervisor.mjs multiplies by live PROFILES, so the
+     `_capacity()` in main/supervisor.mts multiplies by live PROFILES, so the
      app really does start double against the one subscription. Saying "not
      adding any capacity" described the intention rather than the behaviour. */
   it('says the number is too high rather than that nothing was added', () => {

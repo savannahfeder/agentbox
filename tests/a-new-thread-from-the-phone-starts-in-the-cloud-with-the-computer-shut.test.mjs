@@ -28,12 +28,12 @@ import { madeHere, threadSnapshot, withCloudTurn, newThreadSnapshot } from '../s
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
-import { cloudRun } from '../main/cloud/run.mjs';
-import { kitFrom } from '../main/cloud/run-cli.mjs';
-import { readKitCopy, kitCopyPath } from '../main/cloud/kit.mjs';
-import { readMarker } from '../main/cloud/marker.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { Store } from '../main/store.mjs';
+import { cloudRun } from '../main/cloud/run.mts';
+import { kitFrom } from '../main/cloud/run-cli.mts';
+import { readKitCopy, kitCopyPath } from '../main/cloud/kit.mts';
+import { readMarker } from '../main/cloud/marker.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { Store } from '../main/store.mts';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const DEVICE = 'a1b2c3d4e5f6';
@@ -392,6 +392,35 @@ describe('the supervisor and a new thread', () => {
     expect(writers()).toHaveLength(1);
   });
 
+  it.each(['claude', 'codex'])('prepares and adopts a new %s thread in a project without a repository', async (engine) => {
+    sup._cloudReady = (which = 'claude') => which === engine;
+    if (engine === 'codex') {
+      sup.codexThreadParamsFor = (_plan, cwd) => ({ cwd });
+      sup.codexTurnParamsFor = () => ({ effort: 'high' });
+    }
+    const products = store.listProducts.bind(store);
+    store.listProducts = () => products().map((p) => ({ ...p, repoPath: null }));
+    const docs = store.listProducts()[0].dir;
+    await sup._leaveNewThreadKit('team');
+    expect(writers()).toHaveLength(1);
+    const { opts } = writers()[0];
+    expect(opts.cwd).toBe(docs);
+    expect(opts.env.AGENTBOX_CLOUD_MARKER).toBeTruthy();
+    expect(JSON.parse(fs.readFileSync(opts.env.AGENTBOX_KIT_NEW, 'utf8')).cwd).toBe(docs);
+    const template = projectKit(Date.now(), {
+      project: 'team', engine, plain: true, cwd: docs, branch: undefined, startSha: null, bundleKey: null,
+      marker: { plain: true, engine, docs },
+      newThread: { ...projectKit().newThread, mainSha: null },
+    });
+    sup._newThreadCopyFor = () => template;
+    sup._makeTaskFolder = () => { throw new Error('a documents project needs no task folder'); };
+    const out = await sup.adoptCloudNewThread({ product: 'team', itemId: 'w-0123456789', runId: 'plain-run', title: 'Write a plan', command: 'phone-1' });
+    expect(out).toBe('adopted');
+    expect(homecomings).toEqual([{ folder: docs, file: sup._plainMarker('team', 'w-0123456789') }]);
+    expect(readMarker(homecomings[0])).toMatchObject({ runId: 'plain-run', plain: true });
+    expect(sup._liveSessions['w-0123456789'].cwd).toBe(docs);
+  });
+
   it('none for a project not on her phone, or a computer not on the managed cloud', async () => {
     await sup._leaveNewThreadKit('other');
     sup._cloudConfig = { bucket: 'her-own-aws' };
@@ -446,8 +475,8 @@ describe('the supervisor and a new thread', () => {
 
 describe('the phone\'s pass, waking to a new thread the cloud started', () => {
   async function inboxWorld({ adoptNewAs = () => 'adopted', home = () => true } = {}) {
-    const { createMemoryCloud, signUpMemory, memoryBackend, claimForTheCloud } = await import('../main/team/memory-cloud.mjs');
-    const { createPhoneInbox } = await import('../main/phone-inbox.mjs');
+    const { createMemoryCloud, signUpMemory, memoryBackend, claimForTheCloud } = await import('../main/team/memory-cloud.mts');
+    const { createPhoneInbox } = await import('../main/phone-inbox.mts');
     const cloud = createMemoryCloud();
     let clock = Date.parse('2026-10-24T12:00:00Z');
     cloud.now = () => clock;
@@ -520,8 +549,8 @@ describe('end to end, through the real sandbox', () => {
     const crypto = await import('node:crypto');
     const { fileURLToPath } = await import('node:url');
     const { createSandbox } = await import('../cloud/sandbox/server.mjs');
-    const { writeMarker } = await import('../main/cloud/marker.mjs');
-    const { markerForCloudRun } = await import('../main/cloud/kit.mjs');
+    const { writeMarker } = await import('../main/cloud/marker.mts');
+    const { markerForCloudRun } = await import('../main/cloud/kit.mts');
     const { cloudUserLine, lastAnswerIn } = await import('../shared/cloud-kit.mjs');
     const here = (p) => fileURLToPath(new URL(p, import.meta.url));
     const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'new-e2e-')));

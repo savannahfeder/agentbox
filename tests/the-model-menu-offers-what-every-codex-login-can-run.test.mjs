@@ -24,10 +24,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
-import { codexModelsAcross } from '../main/codex-models.mjs';
-import { codexFreePlan } from '../main/codex-account.mjs';
-import { refreshAgentModels } from '../main/refresh-agent-models.mjs';
+import { Supervisor } from '../main/supervisor.mts';
+import { codexModelsAcross } from '../main/codex-models.mts';
+import { codexFreePlan } from '../main/codex-account.mts';
+import { refreshAgentModels } from '../main/refresh-agent-models.mts';
 
 const PAID = ['gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5'];
 const FREE = ['gpt-6-luna', 'gpt-5.6-terra', 'gpt-5.6-luna'];
@@ -144,6 +144,7 @@ describe('every signed-in login\'s catalog is refreshed, and one failing does no
   const client = (answer) => ({
     initialize: async () => ({}),
     request: async (method) => {
+      if (method === 'account/read') return {account:null};
       if (method !== 'model/list') throw new Error(`unexpected ${method}`);
       if (answer instanceof Error) throw answer;
       return { data: answer.map((model) => ({ model, displayName: model, hidden: false, supportedReasoningEfforts: [] })), nextCursor: null };

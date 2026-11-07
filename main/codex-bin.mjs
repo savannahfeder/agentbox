@@ -8,7 +8,7 @@
 // are literally "one more install location".
 //
 // WHAT IS KEPT HERE is the vocabulary the rest of the app already imports --
-// main/config.mjs, main/settings.mjs and main/codex-launch-env.mjs, which builds
+// main/config.mjs, main/settings.mts and main/codex-launch-env.mts, which builds
 // the PATH a Codex opened from the desktop needs out of `candidatePaths` and
 // `versionedPaths`.
 //

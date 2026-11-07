@@ -1,6 +1,9 @@
 // Types for shared/phone-snapshot.mjs, for the phone with the computer closed.
 export const SNAPSHOT_LIMITS: { lines: number; textChars: number; items: number; bytes: number };
 export const PHONE_COMMANDS: string[];
+export const WAIT_STATES: string[];
+export interface PhoneWait { state: string; tool?: string; until?: number }
+export function phoneWaitsOf(status: unknown): { byId: Record<string, PhoneWait>; paused: boolean };
 export function hideSecrets(text: string, opts?: { home?: string | null }): string;
 export function bytesOf(value: unknown): number;
 export function threadSnapshot(item: Record<string, unknown>, history?: unknown[], limits?: typeof SNAPSHOT_LIMITS, opts?: { home?: string | null }): { v: number; item: Record<string, unknown>; history: unknown[]; olderLines: number };

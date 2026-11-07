@@ -10,6 +10,10 @@
 // list offers for a query, how a picked name is found again in the text (a
 // restored draft included), and that the sent message carries a link both the
 // agent and the thread view can read.
+//
+// The long-name case moved on 2026-10-31: titles are now held to about six
+// words before the list sees them, so it is checked on a short name of long
+// words, and a long sentence is checked to come out as its first six.
 import { describe, it, expect } from 'vitest';
 import {
   threadQuery, threadRows, threadName, findThreadMentions, encodeThreadMentions, withThreadNames,
@@ -66,8 +70,10 @@ describe('what the list offers', () => {
     expect(threadRows(all, 'tag other').map((r) => r.id)).toEqual([labelled.id]);
   });
   it('cuts a long name at a word', () => {
-    const long = thread('w-a000000008', 'One two three four five six seven eight nine ten eleven twelve thirteen', T);
-    expect(threadName(long)).toBe('One two three four five six seven eight nine ten eleven…');
+    const long = thread('w-a000000008', 'Reconcile quarterly subscription invoices against warehouse shipping manifests', T);
+    expect(threadName(long)).toBe('Reconcile quarterly subscription invoices against warehouse…');
+    const sentence = thread('w-a000000009', 'One two three four five six seven eight nine ten eleven twelve thirteen', T);
+    expect(threadName(sentence)).toBe('One two three four five six');
   });
   it('finds a thread by its id too', () => {
     expect(threadRows(all, 'w-a000000001').map((r) => r.id)).toEqual([login.id]);

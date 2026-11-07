@@ -1,6 +1,6 @@
 // ALERTS ON HER PHONE'S LOCK SCREEN, SENT BY THIS MAC.
 //
-// The arrivals are the desktop banner's (main/notify.mjs, from App.tsx's
+// The arrivals are the desktop banner's (main/notify.mts, from App.tsx's
 // inbox), and so are the rules (shared/notify-rules.mjs): nothing while she
 // has used this Mac in the last five minutes, once per stretch away, once
 // more for a permission card. They go out from the phone pass, after it has
@@ -10,12 +10,26 @@
 //
 // The words are the phone banner's (phoneBanner): the thread's title in bold,
 // asked for on 2026-10-13 and again on 2026-10-23, and nothing else of it.
+import webpush from 'web-push';
 import { atTheComputer, shouldSpeak, phoneBanner } from '../shared/notify-rules.mjs';
+import { WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY } from '../shared/web-alerts.mjs';
+import { Name } from '../shared/product-name.mjs';
 
 export const EXPO_PUSH = 'https://exp.host/--/api/v2/push/send';
+// Who signs a Web Push, as the push services ask: the product, never a person.
+const PUSH_SUBJECT = 'https://agentbox.ac';
+export const webPushOf = (sub, body, opts) => webpush.sendNotification(sub, body, opts);
 // Arrivals this close together are one alert.
 export const FOLD_MS = 3000;
 const DEADLINE_MS = 10_000;
+export const TEST_ALERT = { title: Name, body: 'Alerts reach this phone.' };
+
+/** One alert to the web app on a phone, signed with the keys it made (shared/web-alerts.mjs), from a computer or the cloud. */
+export const sendWebAlert = (web, payload, send = webPushOf) => send(
+  { endpoint: web.endpoint, keys: web.keys },
+  JSON.stringify({ tag: 'agentbox', ...payload }),
+  { vapidDetails: { subject: PUSH_SUBJECT, publicKey: web.vapid.publicKey, privateKey: web.vapid.privateKey }, TTL: 6 * 3600, urgency: 'high', timeout: DEADLINE_MS },
+);
 const ALERTED_KEPT_MS = 30 * 24 * 3600_000;
 
 // renderer/src/phone-rows.ts phoneSlug, which the phone opens a thread by.
@@ -30,8 +44,10 @@ export async function sendToExpo(messages, { fetchImpl = fetch, url = EXPO_PUSH,
   return said.data;
 }
 
-export function createPhoneAlerts({ backend, owner, device, state, save, now, log, idleMs, send = sendToExpo, still = () => {} }) {
+export function createPhoneAlerts({ backend, owner, device, state, save, now, log, idleMs, send = sendToExpo, sendWebPush = webPushOf, still = () => {} }) {
   state.alerted ??= {};
+  // The web app's subscriptions, by endpoint (shared/web-alerts.mjs).
+  state.webAlerts ??= {};
   // In memory, as the desktop's banner keeps them: an arrival is news once.
   const queued = new Map();
   let firstAt = 0;
@@ -46,6 +62,36 @@ export function createPhoneAlerts({ backend, owner, device, state, save, now, lo
     queued.clear();
     spoke = false;
     spokeAsk = false;
+  }
+
+  /** One alert to one web app; false when its push service has forgotten it, which forgets it here. */
+  async function pushWeb(web, payload) {
+    try {
+      await sendWebAlert(web, payload, sendWebPush);
+      return true;
+    } catch (err) {
+      if (err?.statusCode === 404 || err?.statusCode === 410) {
+        delete state.webAlerts[web.endpoint];
+        save();
+      } else once(`web:${err?.statusCode ?? err?.message}`, `phone: could not send an alert to the web app: ${err?.message ?? err}`);
+      return false;
+    }
+  }
+
+  const takesSetting = (p) => p?.key === WEB_ALERTS_KEY || p?.key === WEB_ALERTS_TEST_KEY;
+  /** The web app turning its alerts on or off, or asking for a test. */
+  async function setting(p) {
+    const v = p.value;
+    if (p.key === WEB_ALERTS_TEST_KEY) {
+      const web = state.webAlerts[v.endpoint];
+      if (!web) throw new Error('alerts are not on for this phone on this computer');
+      if (!(await pushWeb(web, TEST_ALERT))) throw new Error('the phone\'s push service did not take the alert');
+      return { ok: true };
+    }
+    if (v.on) state.webAlerts[v.endpoint] = { endpoint: v.endpoint, keys: v.keys, vapid: v.vapid, at: now() };
+    else delete state.webAlerts[v.endpoint];
+    save();
+    return { ok: true };
   }
 
   /** What the desktop's notifier was told arrived, and the inbox it arrived in. */
@@ -77,9 +123,10 @@ export function createPhoneAlerts({ backend, owner, device, state, save, now, lo
     queued.clear();
     if (!fresh.length || !shouldSpeak({ spoke, spokeAsk, waiting: fresh.map((f) => ({ kind: f.ask ? 'approval' : 'item' })) })) return;
     still();
-    let phones;
-    try { phones = await backend.pushDevices(owner); } catch (err) { once('read', `phone: could not read the phones to alert: ${err?.message ?? err}`); return; }
-    if (!phones.length) return;
+    let phones = [];
+    try { phones = await backend.pushDevices(owner); } catch (err) { once('read', `phone: could not read the phones to alert: ${err?.message ?? err}`); }
+    const webs = Object.values(state.webAlerts);
+    if (!phones.length && !webs.length) return;
     const threads = [...new Set(fresh.map((f) => `${f.product}\0${f.item}`))];
     const [product, item] = threads[0].split('\0');
     const badge = new Set(needsYou.filter((r) => carried(r.product, r.id)).map((r) => `${r.product}\0${r.id}`)).size;
@@ -89,16 +136,20 @@ export function createPhoneAlerts({ backend, owner, device, state, save, now, lo
       : { kind: 'item', title: f.title || f.named })));
     const messages = phones.map((p) => ({ to: p.token, title: say.title, body: say.body, sound: 'default', badge, priority: 'high', channelId: 'default', data }));
     still();
-    let tickets;
-    try { tickets = await send(messages); } catch (err) { once('send', `phone: could not send an alert: ${err?.message ?? err}`); return; }
     let reached = 0;
-    for (const [i, t] of (tickets ?? []).entries()) {
-      if (t?.status === 'ok') { reached += 1; continue; }
-      const why = t?.details?.error ?? t?.message ?? 'no answer';
-      if (why === 'DeviceNotRegistered') {
-        try { await backend.dropPushDevice(messages[i].to, owner); } catch (err) { once('drop', `phone: could not forget a phone that stopped taking alerts: ${err?.message ?? err}`); }
-      } else once(`ticket:${why}`, `phone: Expo did not take an alert: ${why}`);
+    if (messages.length) {
+      let tickets = [];
+      try { tickets = await send(messages); } catch (err) { once('send', `phone: could not send an alert: ${err?.message ?? err}`); }
+      for (const [i, t] of (tickets ?? []).entries()) {
+        if (t?.status === 'ok') { reached += 1; continue; }
+        const why = t?.details?.error ?? t?.message ?? 'no answer';
+        if (why === 'DeviceNotRegistered') {
+          try { await backend.dropPushDevice(messages[i].to, owner); } catch (err) { once('drop', `phone: could not forget a phone that stopped taking alerts: ${err?.message ?? err}`); }
+        } else once(`ticket:${why}`, `phone: Expo did not take an alert: ${why}`);
+      }
     }
+    // The web app opens a thread by its id (renderer/src/phone-alerts.ts).
+    for (const web of webs) if (await pushWeb(web, { title: say.title, body: say.body, count: badge, open: data.id ?? null })) reached += 1;
     if (!reached) return;
     said.clear();
     spoke = true;
@@ -111,6 +162,8 @@ export function createPhoneAlerts({ backend, owner, device, state, save, now, lo
   return {
     arrived,
     pass,
+    takesSetting,
+    setting,
     /** She answered from her phone, so she has seen what it holds. */
     phoneUsed: () => { spoke = false; spokeAsk = false; },
   };

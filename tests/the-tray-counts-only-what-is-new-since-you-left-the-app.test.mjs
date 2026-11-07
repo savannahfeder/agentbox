@@ -8,7 +8,7 @@
 // that counts as having looked: the tray already steps aside while the app is
 // in front, so whatever waited then has been seen.
 //
-// Measured against shared/corner-tag.mjs and against main/corner-tag.mjs with
+// Measured against shared/corner-tag.mts and against main/corner-tag.mts with
 // a pretend app window: the moment either side of your last look, an approval
 // that has no moment of its own, a restart, and the first run before you have
 // ever looked. The list cases come from the test this replaces
@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cardLines, newSince, readyNow, tagSays, tagShows } from '../shared/corner-tag.mjs';
+import { cardLines, newSince, readyNow, tagSays, tagShows } from '../shared/corner-tag.mts';
 import { cornerTagRig } from './helpers/corner-tag-rig.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

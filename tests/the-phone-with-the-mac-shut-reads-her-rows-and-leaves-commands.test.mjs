@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { phoneView, phoneHistory, commandFor, readCloudConfig, phoneSlug, splitSlug, closeToTakeBack, UNDONE } from '../renderer/src/cloud-bridge';
-import { REQUEST_CHANNELS } from '../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS } from '../shared/bridge-map.mts';
 import { cloudClient } from '../renderer/src/cloud-rest';
 
 const NOW = Date.parse('2026-10-14T12:00:00Z');
@@ -60,11 +60,13 @@ describe('what the inbox draws', () => {
     expect(made.id).toMatch(/^w-[0-9a-f]{10}$/);
   });
 
-  it('a reply waits, then goes once her Mac has taken it and sent the thread again', () => {
+  it('a reply waits, then goes once her Mac has taken it and sent the thread with it', () => {
     expect(phoneView(rows([cmd('c1', 'reply', { payload: { text: 'Yes, ship it.' } })]), NOW).waiting)
       .toEqual([{ product: A, id: 'w-1', at: NOW - 1000, text: 'Yes, ship it.' }]);
     const taken = rows([cmd('c1', 'reply', { payload: { text: 'x' }, taken_at: iso(NOW), outcome: 'done' })]);
-    expect(phoneView({ ...taken, threads: taken.threads.map((t) => ({ ...t, updated_at: iso(NOW + 1) })) }, NOW).waiting).toEqual([]);
+    const withIt = (t) => ({ ...t, snapshot: { ...t.snapshot, history: [...(t.snapshot.history ?? []), { id: 'w-1', ts: NOW - 1000, source: 'founder', patch: { answer: 'x' } }] } });
+    expect(phoneView({ ...taken, threads: taken.threads.map((t) => ({ ...t, updated_at: iso(NOW + 1) })) }, NOW).waiting.map((w) => w.text)).toEqual(['x']);
+    expect(phoneView({ ...taken, threads: taken.threads.map((t) => withIt({ ...t, updated_at: iso(NOW + 1) })) }, NOW).waiting).toEqual([]);
   });
 
   it('a reply still waiting is shown however old it is', () => {
@@ -276,7 +278,7 @@ describe('the doors the phone does not have', () => {
     expect(src).toMatch(/agentUpdate: async \(p: any\) => \{ if \(p\?\.action === 'start'\) throw new Error\(NOT_HERE\); return null; \}/);
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     // A stop from the phone says it was sent, not that it stopped.
-    expect(app).toMatch(/showToast\('Stop sent\. Your Mac stops the agent when it gets it\.'\)/);
+    expect(app).toMatch(/showToast\('Stop sent\. Your computer stops the agent when it gets it\.'\)/);
   });
 });
 

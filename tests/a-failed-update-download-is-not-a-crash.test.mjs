@@ -20,7 +20,7 @@
 // result object as `downloadPromise` (electron-updater's AppUpdater.js), where
 // `downloadUpdate` dispatches the error event and then RE-THROWS. Nobody was
 // holding that promise. So a failed download became an unhandledRejection,
-// `main/crash-report.mjs` filed it as a crash, and an app that had not crashed
+// `main/crash-report.mts` filed it as a crash, and an app that had not crashed
 // reported itself as having done so every six hours for as long as it was open.
 //
 // The three facts that decide the fix: the person already sees the right
@@ -29,7 +29,7 @@
 // after the error event has already carried the news to the screen.
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { createUpdater } from '../main/updater.mjs';
+import { createUpdater } from '../main/updater.mts';
 
 const quiet = { info() {}, warn() {}, error() {}, debug() {} };
 const app = { getVersion: () => '0.1.12' };

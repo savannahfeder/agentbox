@@ -17,8 +17,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { deadRunSentence, limitResetsAt } from '../shared/spawn-trouble.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { deadRunSentence, limitResetsAt } from '../shared/spawn-trouble.mts';
+import { Supervisor } from '../main/supervisor.mts';
 
 // Tuesday Oct 20 2026, 2:30pm, in the zone the tests run in.
 const now = new Date(2026, 9, 20, 14, 30).getTime();
@@ -67,7 +67,7 @@ describe('the sentence on a row whose run died', () => {
 
   it('puts no ladder time on a cause that waits for her or for the account', () => {
     expect(deadRunSentence({ engineWord: 'Claude Code', cause: 'signed-out', retryAt, now })).not.toContain('3:15pm');
-    expect(deadRunSentence({ engineWord: 'Claude Code', cause: 'at-limit', resetsAt: '6pm', retryAt, now })).toMatch(/at 6pm\.$/);
+    expect(deadRunSentence({ engineWord: 'Claude Code', cause: 'at-limit', resetsAt: '6pm', retryAt, now })).toMatch(/at 6pm, when your Claude plan's limit resets\.$/);
     expect(deadRunSentence({ engineWord: 'Claude Code', cause: 'unknown', gaveUp: true, retryAt, now })).not.toContain('3:15pm');
   });
 });

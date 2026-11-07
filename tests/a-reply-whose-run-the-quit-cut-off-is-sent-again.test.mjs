@@ -18,10 +18,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
-vi.mock('../main/task-folders-offthread.mjs', () => ({ folderJob: vi.fn(() => new Promise(() => {})) }));
-vi.mock('../main/git-change-offthread.mjs', () => ({ gitJob: vi.fn(() => new Promise(() => {})) }));
+vi.mock('../main/task-folders-offthread.mts', () => ({ folderJob: vi.fn(() => new Promise(() => {})) }));
+vi.mock('../main/git-change-offthread.mts', () => ({ gitJob: vi.fn(() => new Promise(() => {})) }));
 
 let root, item, product, supervisors;
 beforeEach(() => {

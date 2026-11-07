@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { recapFor, askedBefore } from '../renderer/src/recap';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 

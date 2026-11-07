@@ -5,8 +5,13 @@
 //   node browse.mjs look                 what is on screen: text, and numbered things to press
 //   node browse.mjs click <n>            press thing number n from the last look
 //   node browse.mjs click "<words>"      press the first thing whose words start so
+//   node browse.mjs click <n> shift      press it holding keys (shift, meta, ctrl, alt)
+//   node browse.mjs dblclick <n> | rightclick <n>
+//   node browse.mjs drag <n> <m>         press on n, drag to m, let go (a block of cells)
+//   node browse.mjs drag <n> +140        drag n's right edge 140px across (a column's width)
 //   node browse.mjs type "<text>"        type into whatever has the cursor
 //   node browse.mjs press <key> [meta] [shift] [ctrl] [alt]   one key: n, Enter, Escape, ArrowDown…
+//   node browse.mjs attach <file...>     hand files to the file picker on screen
 //   node browse.mjs shot <name>          a picture, saved beside the findings
 //   node browse.mjs away <minutes>       step away (up to 9), then look at what changed
 //   node browse.mjs reload | close
@@ -23,7 +28,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { launchChrome, connect, freeProfile } from './cdp.mjs';
+import { launchChrome, connect, freeProfile, readModifiers } from './cdp.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { readState, INSTANCE } = await import(path.join(here, 'live.mjs'));
@@ -56,11 +61,18 @@ setTimeout(() => {
 
 /** Number every thing a person could press or type into, and describe the screen. */
 const LOOK = `(() => {
+  // Only what a person could press: on screen, and not behind another view (a
+  // table's side pane stays drawn under the full page opened over it).
   const seen = (el) => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
-    return r.width > 1 && r.height > 1 && s.visibility !== 'hidden' && s.display !== 'none' && r.bottom > 0 && r.top < innerHeight; };
+    if (!(r.width > 1 && r.height > 1 && s.visibility !== 'hidden' && s.display !== 'none' && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth)) return false;
+    const x = Math.min(Math.max(r.left + r.width / 2, 1), innerWidth - 1); const y = Math.min(Math.max(r.top + r.height / 2, 1), innerHeight - 1);
+    const top = document.elementFromPoint(x, y);
+    return !top || top === el || el.contains(top) || top.contains(el); };
   document.querySelectorAll('[data-breaker-ref]').forEach((e) => e.removeAttribute('data-breaker-ref'));
-  const things = [...document.querySelectorAll('button, a[href], input, textarea, select, [role="button"], [role="tab"], [role="option"], [role="menuitem"], [data-item], [data-item-id], [tabindex]:not([tabindex="-1"])')]
-    .filter(seen).slice(0, 120);
+  // A table's cells and headers are things a person presses too; without them a
+  // tester could not pick, open or edit a single cell.
+  const things = [...document.querySelectorAll('button, a[href], input, textarea, select, [role="button"], [role="tab"], [role="option"], [role="menuitem"], [role="cell"], [role="columnheader"], [data-rn], [data-item], [data-item-id], [tabindex]:not([tabindex="-1"])')]
+    .filter(seen).slice(0, 220);
   const list = things.map((el, i) => {
     el.setAttribute('data-breaker-ref', String(i + 1));
     const words = (el.getAttribute('aria-label') || el.innerText || el.textContent || el.getAttribute('placeholder') || el.getAttribute('title') || '').replace(/\\s+/g, ' ').trim().slice(0, 70);
@@ -123,6 +135,35 @@ const catchErrors = `window.__breakerErrors = window.__breakerErrors || [];
     addEventListener('error', (e) => __breakerErrors.push('error: ' + e.message));
     addEventListener('unhandledrejection', (e) => __breakerErrors.push('rejection: ' + (e.reason && e.reason.message || e.reason))); }`;
 
+/** A numbered or named thing from the last look, scrolled into view, with where to press it. */
+async function thingAt(t, which, clickIfCovered, scroll = true) {
+  return t.evaluate(`(() => {
+    const w = ${JSON.stringify(String(which))};
+    const el = /^\\d+$/.test(w) ? document.querySelector('[data-breaker-ref="' + w + '"]')
+      : [...document.querySelectorAll('[data-breaker-ref]')].find((e) => (e.getAttribute('aria-label') || e.innerText || e.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase().startsWith(w.toLowerCase()));
+    if (!el) return null;
+    const at = () => { const r = el.getBoundingClientRect(); const x = r.left + r.width / 2; const y = r.top + r.height / 2;
+      const top = document.elementFromPoint(x, y); return { r, x, y, reachable: !!top && (top === el || el.contains(top) || top.contains(el)) }; };
+    if (${scroll}) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    // Scrolled only to the nearest edge, a cell can sit under a table's frozen first column; a person would scroll it clear.
+    let { r, x, y, reachable } = at();
+    if (!reachable && ${scroll}) { el.scrollIntoView({ block: 'center', inline: 'center' }); ({ r, x, y, reachable } = at()); }
+    if (!reachable && ${clickIfCovered}) el.click();
+    if (el.matches('input, textarea, select, [contenteditable]')) el.focus();
+    return { x, y, right: r.right, reachable, words: (el.getAttribute('aria-label') || el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 60) };
+  })()`);
+}
+
+const MOD_BITS = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
+async function mouse(t, at, { button = 'left', times = 1, mods = [] } = {}) {
+  const modifiers = mods.reduce((n, m) => n | (MOD_BITS[m] ?? 0), 0);
+  await t.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y, button: 'none', modifiers });
+  for (let n = 1; n <= times; n++) {
+    await t.call('Input.dispatchMouseEvent', { type: 'mousePressed', x: at.x, y: at.y, button, clickCount: n, modifiers });
+    await t.call('Input.dispatchMouseEvent', { type: 'mouseReleased', x: at.x, y: at.y, button, clickCount: n, modifiers });
+  }
+}
+
 async function report(t, what) {
   await t.wait(600);
   waited += 600;
@@ -144,31 +185,87 @@ if (verb === 'open') {
   const errs = await errorsSince(t);
   if (errs.length) console.log(`\nPAGE ERRORS: ${errs.join(' | ')}`);
   t.detach();
-} else if (verb === 'click') {
+} else if (['click', 'dblclick', 'rightclick'].includes(verb)) {
+  // `click 12 shift`: a press with keys held, as a person Shift- or ⌘-clicks to pick more.
+  const { mods, unknown } = readModifiers(args.slice(1));
+  const which = unknown.length ? args.join(' ') : args[0] ?? '';
+  const held = unknown.length ? [] : mods;
   const t = await tab();
-  const which = args.join(' ');
-  const hit = await t.evaluate(`(() => {
-    const w = ${JSON.stringify(which)};
-    const el = /^\\d+$/.test(w) ? document.querySelector('[data-breaker-ref="' + w + '"]')
-      : [...document.querySelectorAll('[data-breaker-ref]')].find((e) => (e.getAttribute('aria-label') || e.innerText || e.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase().startsWith(w.toLowerCase()));
-    if (!el) return null;
-    el.scrollIntoView({ block: 'center' });
-    el.click();
-    if (el.matches('input, textarea, select, [contenteditable]')) el.focus();
-    return (el.getAttribute('aria-label') || el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 60);
-  })()`);
-  await report(t, hit === null ? `Nothing numbered or named "${which}" on screen. Run look again.` : `Pressed "${hit}".`);
+  const hit = await thingAt(t, which, verb === 'click');
+  // A real press, because only a real press may start a film with sound.
+  if (hit?.reachable) await mouse(t, hit, { button: verb === 'rightclick' ? 'right' : 'left', times: verb === 'dblclick' ? 2 : 1, mods: held });
+  const said = verb === 'dblclick' ? 'Double-clicked' : verb === 'rightclick' ? 'Right-clicked' : 'Pressed';
+  await report(t, hit === null ? `Nothing numbered or named "${which}" on screen. Run look again.`
+    : !hit.reachable && verb !== 'click' ? `"${hit.words}" is covered by something else on screen.`
+      : `${said} "${hit.words}"${held.length ? ` holding ${held.join('+')}` : ''}.`);
+  t.detach();
+} else if (verb === 'drag') {
+  // `drag 12 30`: from one numbered thing to another (a block of cells, rows).
+  // `drag 12 +140`: from the right edge of thing 12, that far across (a column's width).
+  const [from, to] = args;
+  const t = await tab();
+  const a = await thingAt(t, from, false, false);
+  const across = /^[+-]\d+$/.test(to ?? '') ? Number(to) : null;
+  const b = across === null ? await thingAt(t, to ?? '', false, false) : null;
+  if (!a || (across === null && !b)) { console.log('Give two numbers from the last look, or a number and +pixels. Run look again.'); process.exit(1); }
+  const start = across === null ? a : { x: a.right - 2, y: a.y };
+  const end = across === null ? b : { x: start.x + across, y: start.y };
+  await t.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: start.x, y: start.y, button: 'none' });
+  await t.call('Input.dispatchMouseEvent', { type: 'mousePressed', x: start.x, y: start.y, button: 'left', buttons: 1, clickCount: 1 });
+  for (let i = 1; i <= 8; i++) {
+    await t.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: start.x + ((end.x - start.x) * i) / 8, y: start.y + ((end.y - start.y) * i) / 8, button: 'left', buttons: 1 });
+  }
+  await t.call('Input.dispatchMouseEvent', { type: 'mouseReleased', x: end.x, y: end.y, button: 'left', buttons: 0, clickCount: 1 });
+  await report(t, across === null ? `Dragged from "${a.words}" to "${b.words}".` : `Dragged the right edge of "${a.words}" ${across} pixels.`);
   t.detach();
 } else if (verb === 'type') {
   const t = await tab();
-  await t.type(args.join(' '));
+  // With no box under the cursor a person's keys still go somewhere, so they are
+  // pressed one by one; inserted text would vanish where a key press would not.
+  const inBox = await t.evaluate('(() => { const e = document.activeElement; return !!e && (e.matches("input, textarea, select") || e.isContentEditable); })()');
+  if (inBox) await t.type(args.join(' '));
+  else {
+    // Only until a box takes the keyboard: the app keeps a first key in one, and the rest are words.
+    const words = args.join(' ');
+    const boxNow = '(() => { const e = document.activeElement; return !!e && (e.matches("input, textarea, select") || e.isContentEditable); })()';
+    let at = 0;
+    while (at < words.length && !(await t.evaluate(boxNow))) { await t.press(words[at]); at += 1; }
+    if (at < words.length) await t.type(words.slice(at));
+  }
   await report(t, `Typed ${args.join(' ').length} characters into ${await t.evaluate('document.activeElement ? document.activeElement.tagName.toLowerCase() : "nothing"')}.`);
   t.detach();
 } else if (verb === 'press') {
+  const [key, ...words] = args;
+  const { mods, unknown } = readModifiers(words);
+  if (unknown.length) {
+    console.log(`Nothing pressed: ${unknown.join(', ')} is not a key to hold. Use meta, ctrl, shift or alt.`);
+    process.exit(1);
+  }
   const t = await tab();
-  const [key, ...mods] = args;
-  await t.press(key, mods.filter((m) => ['meta', 'shift', 'ctrl', 'alt'].includes(m)));
+  await t.press(key, mods);
   await report(t, `Pressed ${[...mods, key].join('+')}.`);
+  t.detach();
+} else if (verb === 'pressat') {
+  // A press on a spot, for what has no button: a pin on a picture, a place on a timeline.
+  const t = await tab();
+  const [x, y] = args.map(Number);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) { console.log('Give an x and a y, as seen in a shot of the 1440x900 window.'); process.exit(1); }
+  for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+    await t.call('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: type === 'mouseMoved' ? 0 : 1 });
+  }
+  await report(t, `Pressed the spot at ${x}, ${y}.`);
+  t.detach();
+} else if (verb === 'attach') {
+  // A file picker cannot be driven headless, so the newest hidden picker on
+  // screen is handed the files, as if a person chose them in it.
+  const t = await tab();
+  const files = args.map((f) => path.resolve(f)).filter((f) => fs.existsSync(f));
+  if (!files.length) { console.log('No such file. Give a path that exists.'); process.exit(1); }
+  const doc = await t.call('DOM.getDocument', { depth: 0 });
+  const { nodeIds } = await t.call('DOM.querySelectorAll', { nodeId: doc.root.nodeId, selector: 'input[type="file"]' });
+  if (!nodeIds?.length) { console.log('There is no way to attach a file on this screen.'); process.exit(0); }
+  await t.call('DOM.setFileInputFiles', { nodeId: nodeIds[nodeIds.length - 1], files });
+  await report(t, `Attached ${files.map((f) => path.basename(f)).join(', ')}.`);
   t.detach();
 } else if (verb === 'shot') {
   const t = await tab();

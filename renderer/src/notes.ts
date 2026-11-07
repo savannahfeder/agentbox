@@ -15,6 +15,8 @@
 // Nothing is summarised, inferred or smoothed. If the run said little, the
 // panel says little (the fix for that is briefs/worker.md, not this file).
 
+import { SERVER_BUSY } from '../../shared/spawn-trouble.mts';
+
 export interface Step {
   // Wall-clock, as the trace recorded it: "5:16pm".
   time: string;
@@ -64,7 +66,7 @@ function clock(h: number, m: number): string {
 }
 
 // THE TRACE'S CLOCK IS UTC AND CARRIES NO DATE. The supervisor stamps every
-// line with `new Date.toISOString.slice(11, 19)` (supervisor.mjs), so a step
+// line with `new Date.toISOString.slice(11, 19)` (supervisor.mts), so a step
 // she watched at 10:01pm is written "05:01:32", and printing those digits
 // straight out put her own evening seven hours into the morning: the fold on
 // read 5:01am, 6:39am, 12:15am, 4:29am for one continuous run. The session's
@@ -118,6 +120,9 @@ function sameOpening(a: string, b: string): boolean {
 export function humanFailure(text: string): string {
   const raw = text.trim();
   if (!raw) return 'The run stopped without saying why.';
+  if (SERVER_BUSY.some((re) => re.test(raw))) {
+    return "Claude's servers turned the request away for a moment. This is not your plan's limit.";
+  }
   if (/usage limit|rate.?limit|quota/i.test(raw)) {
     const reset = raw.match(/resets? at ([^.\n]+)/i)?.[1];
     return `Claude turned the session away: the usage limit is used up${reset ? `, and resets at ${reset.trim()}` : ''}.`;

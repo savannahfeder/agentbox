@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 
 let store, item;
 
@@ -58,8 +58,8 @@ describe('where the engine is written', () => {
   // pick Codex and watch Claude Code take the thread. The model has sat above
   // the answer for that reason since launch week; the engine joins it there.
   it('is above the answer, where the model already is', () => {
-    const source = fs.readFileSync(new URL('../main/store.mjs', import.meta.url), 'utf8');
-    const body = source.slice(source.indexOf('answerItem(slug, id,'), source.indexOf('composeItem(slug,'));
+    const source = fs.readFileSync(new URL('../main/store.mts', import.meta.url), 'utf8');
+    const body = source.slice(source.indexOf('answerItem(slug'), source.indexOf('composeItem(slug'));
     const engine = body.indexOf("{ engine: engine ?? '' }");
     expect(engine).toBeGreaterThan(-1);
     expect(engine).toBeLessThan(body.indexOf("{ model: model ?? '' }"));

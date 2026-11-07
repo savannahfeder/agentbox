@@ -27,9 +27,30 @@ export const UNREADABLE = `${Name} could not read what this asks for.`;
 export type ApprovalReading = {
   /** The half-sentence after the product's name in the card's head. */
   what: string;
-  /** The body of the card's `<pre>`. */
+  /** What is authorised, exact. */
   body: string;
 };
+
+/** The thread that asks, which is what a person knows it by; else its project. */
+export const approvalAsker = (thread: string | null | undefined, project: string) => thread || project;
+
+/**
+ * The body as the card's `<pre>` draws it. A tool call's lines break where the
+ * agent broke them; every other escape stays visible, so a yes is about what it
+ * says. A native card's body is not JSON and is drawn as it came.
+ */
+export const approvalShown = (body: string, tool?: string) => (/^mcp__/.test(tool ?? '')
+  ? body.replace(/\\[\s\S]/g, (pair) => (pair === '\\n' ? '\n' : pair))
+  : body);
+
+/**
+ * WHAT A PHONE IS TOLD AFTER IT ANSWERS (F-115). The stamp on the leaving card
+ * is at full strength for about 170ms, which a laptop catches and a phone does
+ * not; the toast outlasts it. It says what follows from the press rather than
+ * the word alone, because "Denied" leaves open whether the agent heard.
+ */
+export const approvalAnswered = (allow: boolean) =>
+  (allow ? 'Allowed. The agent carries on.' : 'Denied. The agent carries on without it.');
 
 /**
  * One approval's `input`, as the two lines her eye actually lands on.

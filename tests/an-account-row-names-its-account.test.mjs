@@ -67,9 +67,9 @@ describe('which account a folder is signed in as', () => {
     });
   });
 
-  it('falls back to the default home when no folder is named, because that is what the default row is', () => {
+  it('reads the file beside ~/.claude when no folder is named, because that is what the default row is', () => {
     fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
-    write(path.join(home, '.claude'), PERSONAL);
+    write(home, PERSONAL);
     expect(accountIdentity(null, { home })?.email).toBe('you@example.com');
   });
 
@@ -114,7 +114,7 @@ describe('two rows that turned out to be one subscription', () => {
     expect(note).not.toMatch(/uuid|accountUuid|aaaa1111/i);
     /* * THE WORD PINNED HERE USED TO BE "capacity", inside a sentence claiming the second
        folder added none. That claim was wrong about our own scheduler: `_capacity()` in
-       main/supervisor.mjs multiplies by live PROFILE FOLDERS, so a duplicated machine
+       main/supervisor.mts multiplies by live PROFILE FOLDERS, so a duplicated machine
        really is told it can run double and really does start double, all against one
        subscription. The clause after it told the reader to sign one of them in as their
        other account, which they could not do from that screen and which reads to anybody else as a
@@ -146,7 +146,7 @@ describe('two rows that turned out to be one subscription', () => {
   });
 
   it('reads a list of account rows straight out of settings, uuid field and all', () => {
-    // The shape main/settings.mjs actually passes, so a rename there fails here.
+    // The shape main/settings.mts actually passes, so a rename there fails here.
     const accounts = [
       { profile: 'default', email: 'you@example.com', accountUuid: 'same' },
       { profile: '/Users/you/.claude-second', email: 'you@example.com', accountUuid: 'same' },

@@ -23,9 +23,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { deadRunSentence, deadRunCause } from '../shared/spawn-trouble.mjs';
+import { deadRunSentence, deadRunCause } from '../shared/spawn-trouble.mts';
 import { machineryPath } from '../main/store/home.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 
 const TWENTY_MINUTES = 20 * 60_000;
@@ -183,7 +183,7 @@ describe('the sentence reads back as the thing it says', () => {
     // The openers moved into a map so they could be read back. Nothing she
     // reads may have changed by a character.
     expect(deadRunSentence({ engineWord: 'Claude Code', cause: 'at-limit', runs: 2, resetsAt: '6pm' }))
-      .toBe('Claude Code is at its usage limit, so nothing has been done on this task. This has happened 2 times on this task. It starts again on its own at 6pm.');
+      .toBe('Claude Code is at its usage limit, so nothing has been done on this task. This has happened 2 times on this task. It starts again on its own at 6pm, when your Claude plan\'s limit resets.');
     expect(deadRunSentence({ engineWord: 'Claude Code', cause: 'signed-out' }))
       .toBe('Claude Code could not sign in, so nothing has been done on this task. Sign that account back in and it picks straight up.');
     expect(deadRunSentence({ engineWord: 'Claude Code', cause: 'workspace' }))

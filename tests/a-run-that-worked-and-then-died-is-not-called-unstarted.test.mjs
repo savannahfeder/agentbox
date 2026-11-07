@@ -18,10 +18,10 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { bootHeadless } from '../main/serve.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { deadRunSentence, deadRunCause } from '../shared/spawn-trouble.mjs';
-import { readDeadRunTrace } from '../shared/dead-run-trace.mjs';
+import { bootHeadless } from '../main/serve.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { deadRunSentence, deadRunCause } from '../shared/spawn-trouble.mts';
+import { readDeadRunTrace } from '../shared/dead-run-trace.mts';
 import { Name } from '../shared/product-name.mjs';
 import { machineryPath } from '../main/store/home.mjs';
 import { setAppHome, clearAppHome } from './app-home.mjs';
@@ -171,7 +171,9 @@ describe('end to end, with the stand-in worker', () => {
   afterEach(async () => {
     try { booted?.supervisor.killAll(); booted?.supervisor.stop?.(); } catch { /* done */ }
     await wait(100);
-    if (dir) fs.rmSync(dir, { recursive: true, force: true });
+    // The killed worker can still be writing under `dir` when this walks it,
+    // which on macOS ends the rmdir in ENOTEMPTY; a retry sees it empty.
+    if (dir) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     dir = null; booted = null;
   });
 
@@ -196,10 +198,13 @@ describe('end to end, with the stand-in worker', () => {
     booted.supervisor.start();
 
     const said = () => String(booted.store.readItem('sandbox', it.id)?.result ?? '');
-    const end = Date.now() + 15_000;
+    // LONGER THAN ONE SWEEP OF THE SUPERVISOR. The budget was 15 s, which is
+    // the poll interval itself, so a run its first tick missed was measured
+    // landing at 15.5 s and the file went red on macOS with nothing wrong.
+    const end = Date.now() + 50_000;
     while (!said() && Date.now() < end) await wait(50);
 
     expect(said()).toMatch(/partway through/);
     expect(said()).not.toMatch(UNSTARTED);
-  }, 20_000);
+  }, 60_000);
 });

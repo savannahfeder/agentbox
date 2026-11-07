@@ -3,7 +3,7 @@
 // WHY, 2026-10-19. `npm run ship` ran `vitest related` on the changed files and
 // then pushed, and the push runs the pre-push hook, which ran `vitest related`
 // on the same files again. Every ship paid for its gate twice. Measured that
-// evening: the 93 files a change to main/store.mjs pulls in took 77 s at load
+// evening: the 93 files a change to main/store.mts pulls in took 77 s at load
 // 16, so the pair cost about 160 s before anything left the Mac, and at the
 // load this Mac actually runs at — 60 to 160 with twenty agents — a core
 // change cost 12 minutes. Of 25 ships attempted in four hours, 12 landed.

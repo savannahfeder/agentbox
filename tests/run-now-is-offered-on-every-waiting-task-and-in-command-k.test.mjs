@@ -19,7 +19,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { offersRunNow, runNowCommands } from '../renderer/src/run-now.ts';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const task = (extra = {}) => ({
   id: 'w-1', product: 'p', status: 'open', kind: 'directive', title: 't',

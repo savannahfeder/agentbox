@@ -9,10 +9,12 @@
 //
 // Every migration runs in an in-process Postgres (PGlite) with Supabase's auth
 // schema stood in, as in rooms-cloud-shows-each-room-only-to-its-people.
+// The files limit went from 30 to 80 in ten minutes on purpose (a film in parts).
 import { it, expect, beforeAll, afterAll, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 
 const migrationsDir = path.join(import.meta.dirname, '..', 'cloud/supabase/migrations');
 const migration = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort()
@@ -66,7 +68,7 @@ const say = async (person, body, mentions = []) => (await one(person,
 const asRoot = async (sql, params) => (await db.query(sql, params)).rows;
 
 beforeAll(async () => {
-  db = new PGlite();
+  db = new PGlite(await emptyDatabase());
   await db.exec(SUPABASE_STAND_IN);
   await db.exec(migration);
   await db.exec(GRANTS);
@@ -159,6 +161,44 @@ describe('deleting a message', () => {
     const m = await say(MAYA, '[voice](attachments/voice-1.webm) and [theirs](attachments/theirs.png)');
     await as(MAYA, `select public.delete_room_message($1)`, [m]);
     expect((await rows(THEO, `select name from public.room_files where room_id = $1 order by name`, [room])).map((r) => r.name)).toEqual(['kept.png', 'theirs.png']);
+  });
+});
+
+describe('decisions', () => {
+  const mark = `select public.mark_room_decision($1, $2, 'decision')`;
+  it('anyone in the room marks one, with the message’s own words and author', async () => {
+    const m = await say(MAYA, 'No waitlist for v1.');
+    await as(THEO, `select public.mark_room_decision($1, $2, 'decision', 'something else', $3)`, [room, m, THEO]);
+    expect(await rows(MAYA, `select body, said_by, marked_by, is_on from public.room_decisions where message_id = $1`, [m]))
+      .toEqual([{ body: 'No waitlist for v1.', said_by: MAYA, marked_by: THEO, is_on: true }]);
+  });
+  it('someone outside the room can neither mark nor read', async () => {
+    const m = await say(MAYA, 'not for Jun');
+    await as(MAYA, mark, [room, m]);
+    expect(await refused(JUN, mark, [room, m])).toBe(true);
+    expect(await rows(JUN, `select * from public.room_decisions where message_id = $1`, [m])).toEqual([]);
+  });
+  it('nobody writes the table directly', async () => {
+    const m = await say(MAYA, 'direct');
+    await as(MAYA, mark, [room, m]);
+    expect(await refused(MAYA, `update public.room_decisions set body = 'changed' where message_id = $1`, [m])).toBe(true);
+  });
+  it('a deleted message and a kind that is not one of the two are refused', async () => {
+    const m = await say(MAYA, 'going');
+    expect(await refused(MAYA, `select public.mark_room_decision($1, $2, 'todo')`, [room, m])).toBe(true);
+    await as(MAYA, `select public.delete_room_message($1)`, [m]);
+    expect(await refused(MAYA, mark, [room, m])).toBe(true);
+  });
+  it('taking one back leaves the row, marked off', async () => {
+    const m = await say(MAYA, 'back');
+    await as(MAYA, mark, [room, m]);
+    await as(THEO, `select public.mark_room_decision($1, $2, 'decision', null, null, null, false)`, [room, m]);
+    expect(await rows(MAYA, `select is_on from public.room_decisions where message_id = $1`, [m])).toEqual([{ is_on: false }]);
+  });
+  it('a project’s decision takes the caller’s words, since no message holds them', async () => {
+    await as(THEO, `select public.mark_room_decision($1, 'item:w-1:5', 'decision', 'Ship on Render', $2, 'Lumen app')`, [room, THEO]);
+    expect(await rows(MAYA, `select body, project from public.room_decisions where message_id = 'item:w-1:5'`, []))
+      .toEqual([{ body: 'Ship on Render', project: 'Lumen app' }]);
   });
 });
 
@@ -275,14 +315,16 @@ describe('files on a message', () => {
     expect((await one(MAYA, `select data from public.room_files where name = 'note-2.webm'`)).data).toBe('QUJD');
   });
 
-  it('thirty files in ten minutes from one person, then no more', async () => {
+  // Eighty since a 200 MB film goes as 26 parts
+  // (20261101120000_a_group_file_goes_in_parts_and_carries_comments.sql).
+  it('eighty files in ten minutes from one person, then no more', async () => {
     const before = (await one(JUN, `select count(*)::int as n from public.room_files where by_person = $1`, [JUN])).n;
     expect(before).toBe(0);
     let refusedAt = null;
-    for (let i = 0; i < 35 && refusedAt === null; i += 1) {
+    for (let i = 0; i < 85 && refusedAt === null; i += 1) {
       if (await refused(JUN, `insert into public.room_files (room_id, name, by_person, data) values ($1, $2, $3, 'AAAA')`, [GENERAL, `f${i}.png`, JUN])) refusedAt = i;
     }
-    expect(refusedAt).toBe(30);
+    expect(refusedAt).toBe(80);
   });
 });
 

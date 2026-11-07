@@ -30,7 +30,7 @@ import { LATER_KEYWORDS, matchesQuery, rankMatches } from '../renderer/src/palet
 import { threadEvents } from '../renderer/src/thread-history.ts';
 import { actWords } from '../renderer/src/act-line.ts';
 import { rowKeys } from '../renderer/src/list-rules.ts';
-import { SHORTCUTS } from '../shared/shortcuts.mjs';
+import { SHORTCUTS } from '../shared/shortcuts.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -128,9 +128,15 @@ function sources(dir) {
   return fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) => {
     const rel = path.join(dir, e.name);
     if (e.isDirectory()) return sources(rel);
-    return /\.(tsx?|mjs)$/.test(e.name) ? [rel] : [];
+    return /\.(tsx?|mjs|mts)$/.test(e.name) ? [rel] : [];
   });
 }
+
+// A / here opens a regular expression rather than dividing, judged by the last
+// thing the code said: nothing yet, an operator, or an opening bracket all want
+// a value next. A quote inside that expression is a character to match, not a
+// string opening, so the walk below steps over the whole literal.
+const WANTS_A_VALUE = /(^|[([{,;:=!&|?+\-*%^~<>]|\b(return|typeof|case|in|of|do|else|void|delete|yield|await))\s*$/;
 
 // One walk over the text: comments dropped, each string literal collected, and
 // the code that is left with its strings blanked so JSX text can be read on its
@@ -152,6 +158,19 @@ function split(text) {
     }
     if (c === '/' && text[i + 1] === '/') { while (i < text.length && text[i] !== '\n') i++; code += '\n'; continue; }
     if (c === '/' && text[i + 1] === '*') { const end = text.indexOf('*/', i + 2); i = end < 0 ? text.length : end + 1; continue; }
+    if (c === '/' && WANTS_A_VALUE.test(code)) {
+      let inClass = false;
+      for (i++; i < text.length; i++) {
+        const r = text[i];
+        if (r === '\\') { i++; continue; }
+        if (r === '\n') break;
+        if (inClass) { if (r === ']') inClass = false; continue; }
+        if (r === '[') { inClass = true; continue; }
+        if (r === '/') break;
+      }
+      code += '0';
+      continue;
+    }
     if (c === "'" || c === '"' || c === '`') { quote = c; s = ''; classes = /className=\{?`?$/.test(code.slice(-12)); continue; }
     code += c;
   }
@@ -176,7 +195,7 @@ describe('the sweep', () => {
   });
 
   it('nor in the error the store gives back', () => {
-    expect(visibleSnoozes('main/store.mjs')).toEqual([]);
+    expect(visibleSnoozes('main/store.mts')).toEqual([]);
   });
 
   it('would catch one if it came back', () => {

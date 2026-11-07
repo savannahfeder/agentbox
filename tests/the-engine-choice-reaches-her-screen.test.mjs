@@ -6,7 +6,7 @@
 // out. Whether a choice is real needs the capability gate
 // (`ENGINE_CHOICE_ENABLED`) and the staleness rule (`engineChoiceOnRowIsStale`),
 // and tests/a-codex-row-from-august-still-runs-on-claude.test.mjs pins both to
-// exactly one file, main/supervisor.mjs. So the supervisor answers once and
+// exactly one file, main/supervisor.mts. So the supervisor answers once and
 // hands the answer over on the snapshot.
 //
 // THE HAZARD THIS FILE EXISTS FOR IS THE PICKER THAT LIES. shared/engines.mjs
@@ -31,7 +31,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-// main/supervisor.mjs imports `spawn` at module scope; this is the only seam
+// main/supervisor.mts imports `spawn` at module scope; this is the only seam
 // between the app's choice of executable and a real process, and it is the same
 // one every sibling engine test uses.
 vi.mock('node:child_process', async (importActual) => {
@@ -44,7 +44,7 @@ vi.mock('node:child_process', async (importActual) => {
 
 import { foldWorkItems } from '../shared/work-items.mjs';
 import { engineChoiceOnRowIsStale } from '../shared/engines.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { Name } from '../shared/product-name.mjs';
 
 const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
@@ -268,7 +268,7 @@ describe('a choice she made on the card is on the row afterwards', () => {
     writeFileSync(join(dir, 'project.json'), JSON.stringify({
       schemaVersion: 1, id: 'agentbox', name: Name, repoPath: null,
     }));
-    const { Store } = await import('../main/store.mjs');
+    const { Store } = await import('../main/store.mts');
     const store = await new Store({ storeRoot: tmp, accountId: 'test-account', accountRoot, products: [] }).init();
 
     const before = Date.now();
@@ -296,7 +296,7 @@ describe('a choice she made on the card is on the row afterwards', () => {
     writeFileSync(join(dir, 'project.json'), JSON.stringify({
       schemaVersion: 1, id: 'agentbox', name: Name, repoPath: null,
     }));
-    const { Store } = await import('../main/store.mjs');
+    const { Store } = await import('../main/store.mts');
     const store = await new Store({ storeRoot: tmp, accountId: 'test-account', accountRoot, products: [] }).init();
 
     const made = store.composeItem('agentbox', { title: 'an ordinary task', engine: null });
@@ -316,7 +316,7 @@ describe('what the settings payload says about the second engine', () => {
   };
 
   const payload = async (config) => {
-    const { readSettings } = await import('../main/settings.mjs');
+    const { readSettings } = await import('../main/settings.mts');
     const sup = build(config);
     return readSettings({
       config: {
@@ -359,7 +359,7 @@ describe('what the settings payload says about the second engine', () => {
   });
 
   // The hidden ones are Codex's internals and a person who picked one would get
-  // a session that behaves nothing like a coding agent (main/codex-models.mjs).
+  // a session that behaves nothing like a coding agent (main/codex-models.mts).
   it('never offers the models Codex hides from its own picker', async () => {
     const home = codexHomeWith(MODELS, 'model = "gpt-5.6-sol"\n');
     const w = await payload({ codexBin: CODEX_BIN, engineChoice: OPENED, codexHome: home });
@@ -388,16 +388,16 @@ describe('what the settings payload says about the second engine', () => {
 });
 
 /* ========================= and it reaches the door ======================= */
-// The two handlers are asserted as source because `main/ipc.mjs` imports
+// The two handlers are asserted as source because `main/ipc.mts` imports
 // electron at module scope and cannot be loaded here. What is checked is the
 // only thing worth checking: that neither handler makes its own decision.
 
 describe('the door asks the supervisor rather than deciding', () => {
-  const ipc = readFileSync(join(ROOT, 'main', 'ipc.mjs'), 'utf8');
+  const ipc = readFileSync(join(ROOT, 'main', 'ipc.mts'), 'utf8');
 
   // IT WAS `engines: supervisor.engineFacts(...)` ON THE LITERAL UNTIL
   // 2026-09-05, and the value is now bound a few lines above it because the
-  // corner's own rule needs the same answer (`usageEngine`, shared/usage.mjs):
+  // corner's own rule needs the same answer (`usageEngine`, shared/usage.mts):
   // deriving the workspace engine a second time inside the snapshot would be a
   // second copy of exactly the rule this describe block exists to keep in one
   // place. The claim is unchanged and is asserted in two halves -- the answer

@@ -32,7 +32,7 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 describe('the right-click menu', () => {
-  const main = read('main/main.mjs');
+  const main = read('main/main.mts');
 
   it('offers what she selected above anything about a link', () => {
     const copy = main.indexOf("{ label: 'Copy', accelerator: 'CommandOrControl+C'");
@@ -82,7 +82,7 @@ describe('the right-click menu', () => {
 });
 
 describe('a picture put on the clipboard', () => {
-  const main = read('main/main.mjs');
+  const main = read('main/main.mts');
 
   it('is written as the image and nothing else, so no html flavour can win', () => {
     expect(main).toMatch(/clipboard\.writeImage\(picture\)/);
@@ -101,7 +101,7 @@ describe('a picture put on the clipboard', () => {
 });
 
 describe('a picture can be read back out of the window', () => {
-  const main = read('main/main.mjs');
+  const main = read('main/main.mts');
   const focus = read('renderer/src/components/Focus.tsx');
 
   // All three are needed together. Measured: without corsEnabled the <img>
@@ -181,7 +181,7 @@ describe('the title of the thing she is reading', () => {
 // `osascript -e 'the clipboard as record'` reads back as «class furl», and
 // which Finder, Mail and a browser paste as a file rather than as a path.
 describe('a file she right-clicks', () => {
-  const main = read('main/main.mjs');
+  const main = read('main/main.mts');
   const focus = read('renderer/src/components/Focus.tsx');
 
   it('goes on the clipboard as the file itself, not as its address', () => {
@@ -189,7 +189,7 @@ describe('a file she right-clicks', () => {
   });
 
   it('is only ever a file inside a root the app already owns', () => {
-    const body = main.slice(main.indexOf('const copyFile = (file)'));
+    const body = main.slice(main.indexOf('const copyFile = (file'));
     expect(body.slice(0, body.indexOf('};'))).toMatch(/if \(!file \|\| !servable\(file, imageRoots\(\)\)\) return false;/);
   });
 

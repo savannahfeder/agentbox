@@ -12,10 +12,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Store } from '../main/store.mjs';
-import { canMove, movedAway, movedHere, MOVE_KEYWORDS, RAN_ALREADY, whatMoves, whyItCannotMove } from '../shared/move-thread.mjs';
+import { Store } from '../main/store.mts';
+import { canMove, movedAway, movedHere, MOVE_KEYWORDS, whatMoves, whyItCannotMove } from '../shared/move-thread.mts';
 import { matchesQuery } from '../renderer/src/palette-rows.ts';
-import { REQUEST_CHANNELS } from '../shared/bridge-map.mjs';
+import { REQUEST_CHANNELS } from '../shared/bridge-map.mts';
 
 let store, root;
 
@@ -37,10 +37,11 @@ describe('which threads may move', () => {
     expect(whyItCannotMove({ status: 'open', epoch: 0 })).toBe(null);
   });
 
-  it('not one an agent has ever had', () => {
-    expect(whyItCannotMove({ status: 'open', epoch: 1 })).toBe(RAN_ALREADY);
-    expect(whyItCannotMove({ status: 'open', epoch: 0, result: 'Done.' })).toBe(RAN_ALREADY);
-    expect(whyItCannotMove({ status: 'open', epoch: 0, note: 'Reading the repo.' })).toBe(RAN_ALREADY);
+  // One an agent has had moves too since w-8b637c7802, and starts over there
+  // (tests/a-thread-that-already-ran-can-move-and-starts-over-there).
+  it('one an agent has had', () => {
+    expect(whyItCannotMove({ status: 'open', epoch: 1 })).toBe(null);
+    expect(whyItCannotMove({ status: 'open', epoch: 0, result: 'Done.' })).toBe(null);
   });
 
   it('not one a worker is inside right now, which no field on the row can say', () => {
@@ -54,7 +55,7 @@ describe('which threads may move', () => {
   });
 
   it('says why in a sentence every time it refuses', () => {
-    for (const item of [null, { status: 'done' }, { epoch: 2 }, { agent: {} }]) {
+    for (const item of [null, { status: 'done' }, { agent: {} }]) {
       expect(typeof whyItCannotMove(item)).toBe('string');
     }
   });
@@ -132,11 +133,10 @@ describe('the move itself', () => {
     expect(store.readItem('infra', out.item.id).body).toContain(movedHere('Web app'));
   });
 
-  it('refuses a thread an agent has had, in the words the screen uses', () => {
+  it('refuses a finished thread, in the words the screen uses', () => {
     const made = store.composeItem('web-app', { title: 'Tidy the settings page' });
-    store.answerItem('web-app', made.id, { status: 'blocked' });
-    store.modules.workItemsDisk.updateWorkItem(store.productDir('web-app'), made.id, { result: 'Half done.' }, { source: 'agent' });
-    expect(() => store.moveItem('web-app', made.id, 'infra')).toThrow(RAN_ALREADY);
+    store.answerItem('web-app', made.id, { status: 'done' });
+    expect(() => store.moveItem('web-app', made.id, 'infra')).toThrow(/finished/);
   });
 
   it('refuses a move to the project it is already in', () => {

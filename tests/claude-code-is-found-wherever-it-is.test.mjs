@@ -16,7 +16,7 @@ import path from 'node:path';
 import {
   findClaudeBin, candidatePaths, askShell, resolveClaudeBin, forgetClaudeBin, INSTALL_URL,
 } from '../main/claude-bin.mjs';
-import { claudeState } from '../main/settings.mjs';
+import { claudeState } from '../main/settings.mts';
 
 const HOME = '/Users/stranger';
 const only = (...paths) => (p) => paths.includes(p);
@@ -36,7 +36,9 @@ describe('finding Claude Code', () => {
     ['Homebrew on Apple Silicon', '/opt/homebrew/bin/claude'],
     ['Homebrew on Intel, and npm -g', '/usr/local/bin/claude'],
   ])('finds it after %s', (_how, where) => {
-    const found = findClaudeBin({ home: HOME, exists: only(where), shellLookup: noShell });
+    // `env: {}` because this is about the list: /usr/local/bin is also on the
+    // PATH of whatever machine runs the suite, which is a source of its own.
+    const found = findClaudeBin({ home: HOME, env: {}, exists: only(where), shellLookup: noShell });
     expect(found).toMatchObject({ path: where, found: true, from: 'disk' });
   });
 

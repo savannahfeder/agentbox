@@ -20,7 +20,8 @@ export const SETUP = {
   homeHead: 'Run your agents in the cloud',
   // NOT "Add more any time" (w-dac993a554): the cloud runs on one account, so
   // inviting a second one was the screen asking for something it will not use.
-  homeLede: 'Add the account it should use.',
+  // Named, because right after the Agentbox sign-in "the account" read as that one.
+  homeLede: 'Add the Claude or Codex account your agents run on.',
   addClaude: 'Add Claude account',
   addCodex: 'Add Codex account',
   addOne: 'Add account',
@@ -46,7 +47,11 @@ export const SETUP = {
   inviteHead: 'Run your agents in the cloud',
   inviteLine: 'They keep working with your laptop closed, and as many run at once as you need.',
   inviteGo: 'Set up the cloud',
-  inviteNote: 'About a minute to set up',
+  // THE WAIT BEFORE THE PLAN IS KNOWN SAYS SO (F-96, w-aaedc8f711). Reading
+  // it from the cloud server took 5 to 9 seconds after a sign-in, and the
+  // screen stood empty for all of it. No heading, so none flashes before
+  // "Choose a plan" replaces it.
+  loadingLede: 'Checking your account…',
   payHead: 'Choose a plan',
   payLede: 'Pay on Stripe, then add the Claude or Codex account it runs on.',
   payWaitLede: 'Finish paying in your browser. This moves on by itself once you’ve paid.',
@@ -73,6 +78,39 @@ export function menuSetupLine(status: CloudStatus): { say: string; go: string | 
   if (adding) return { say: SETUP.menuAdding(adding.engine), go: null };
   if (accounts.some((a) => a.state === 'broken')) return { say: SETUP.menuBroken, go: SETUP.menuFix };
   return null;
+}
+
+// THE BUTTON SAYS "Sign in again" while an account has stopped working and the
+// menu that says so has not been opened since. Opening it is seeing it, so an
+// account someone meant to let go does not ask for ever. Seen accounts are
+// kept as engine:key.
+export const BROKEN_SEEN_KEY = 'zero.cloudBrokenSeen';
+
+export const brokenAccounts = (status: CloudStatus): string[] =>
+  (status.accounts || []).filter((a) => a.state === 'broken').map((a) => `${a.engine}:${a.key}`);
+
+export const buttonAsksSignIn = (status: CloudStatus, seen: string[]): boolean =>
+  brokenAccounts(status).some((k) => !seen.includes(k));
+
+// What was seen, with what the menu showed (`looked`). An account that works
+// again or is gone drops out, so it asks again if it stops later. With no
+// accounts known yet, nothing is dropped.
+export function seenAfter(status: CloudStatus, seen: string[], looked: string[]): string[] {
+  const all = [...new Set([...seen, ...looked])];
+  if (!status.accounts?.length) return all;
+  const broken = brokenAccounts(status);
+  return all.filter((k) => broken.includes(k));
+}
+
+export function readBrokenSeen(): string[] {
+  try {
+    const kept = JSON.parse(localStorage.getItem(BROKEN_SEEN_KEY) ?? '[]');
+    return Array.isArray(kept) ? kept.filter((k) => typeof k === 'string') : [];
+  } catch { return []; }
+}
+
+export function writeBrokenSeen(seen: string[]): void {
+  try { localStorage.setItem(BROKEN_SEEN_KEY, JSON.stringify(seen)); } catch { /* private mode */ }
 }
 
 // HER PART OF A SIGN-IN HOLDS THE SCREEN, AND NOTHING ELSE DOES (2026-10-15:

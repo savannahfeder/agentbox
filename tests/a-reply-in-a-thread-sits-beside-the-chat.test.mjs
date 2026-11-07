@@ -34,7 +34,7 @@ import { threadLine, clampThreadWidth, THREAD_WIDTH } from '../renderer/src/team
 import { Thread } from '../renderer/src/components/Thread.tsx';
 import { ThreadPanel } from '../renderer/src/team/ThreadPanel.tsx';
 import { TeamContext } from '../renderer/src/team/people.tsx';
-import { Store } from '../main/store.mjs';
+import { Store } from '../main/store.mts';
 
 const ID = 'w-1234567890';
 const ME = 'p-me', MAYA = 'p-maya', THEO = 'p-theo', JUN = 'p-jun';
@@ -256,10 +256,10 @@ describe('where the panel sits, and its look', () => {
     expect(css).toMatch(/\.focus-pane\[data-thread="open"\] > \.focus-scroll,\s*\.focus-pane\[data-thread="open"\] > \.focus-dock \{ margin-right: var\(--chat-thread-w\)/);
   });
 
-  it('is square, like everything else in a chat', () => {
+  it('sits flush as a panel, and its reply box takes the small corner like every box you type in', () => {
     const rule = (name) => { const s = css.slice(css.indexOf(`${name} {`)); return s.slice(0, s.indexOf('}')); };
     expect(rule('.chat-thread-panel')).toContain('border-radius: 0');
-    expect(rule('.chat-thread-box')).toContain('border-radius: 0');
+    expect(rule('.chat-thread-box')).toContain('border-radius: var(--radius)');
   });
 });
 

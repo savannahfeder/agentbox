@@ -22,7 +22,19 @@
 //
 // Worktrees belong in /tmp, which is where the other ninety are. Nothing here
 // deletes the two in wt/; they are somebody else's live work.
+import os from 'node:os';
 import { configDefaults, defineConfig } from 'vitest/config';
+
+/**
+ * One worker per 4 GB of memory, at most the cores less one, at least one.
+ * Vitest's own default is the cores less one, which on a busy 16 GB Mac with
+ * ten cores ran nine files at once, some near a gigabyte each
+ * (tests/a-test-run-takes-workers-by-the-memory-it-has).
+ */
+export function workersFor({ memBytes, cpus }) {
+  const byMemory = Math.floor((Number(memBytes) || 0) / 4 / 1024 ** 3);
+  return Math.max(1, Math.min(byMemory, (Number(cpus) || 1) - 1));
+}
 
 export const SUITE_INCLUDE = ['tests/**/*.test.mjs'];
 
@@ -42,6 +54,9 @@ export default defineConfig({
     // Every test file gets its own throwaway ~/.astral, so nothing in the suite
     // can touch the real one. See tests/agentbox-home.setup.mjs.
     setupFiles: ['tests/agentbox-home.setup.mjs'],
+    // `--maxWorkers`, `--no-file-parallelism` and VITEST_MAX_FORKS still win.
+    maxWorkers: workersFor({ memBytes: os.totalmem(), cpus: os.availableParallelism?.() ?? os.cpus().length }),
+    minWorkers: 1,
     // ROOM FOR A MAC THAT IS NEVER IDLE (w-c121bd85e6, 2026-10-04). Vitest's
     // defaults, 5 s for a test and 10 s for a hook, are written for a laptop
     // running one suite. A dozen agents share this one, and the end-to-end

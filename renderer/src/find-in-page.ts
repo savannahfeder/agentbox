@@ -103,6 +103,22 @@ export function matchesAcrossRuns(runs: TextRun[], query: string): RunMatch[] {
   });
 }
 
+/**
+ * The part of the window ⌘F reads. A file opened full screen covers the page
+ * without hiding it, so its text still passes `checkVisibility`; reading the
+ * whole page would count words under the file that nobody can see.
+ */
+export function whereToFind<T>(doc: { body: T; querySelectorAll(selector: string): ArrayLike<T> }): T {
+  const layers = doc.querySelectorAll('[data-find-layer]');
+  return layers.length ? layers[layers.length - 1] : doc.body;
+}
+
+/** Was this key pressed in the find box? A view that takes keys first leaves those alone. */
+export function pressedInTheFindBox(target: unknown): boolean {
+  const closest = (target as { closest?: (s: string) => unknown } | null)?.closest;
+  return typeof closest === 'function' && !!closest.call(target, '[data-find-bar]');
+}
+
 /** The next match along, wrapping at both ends. -1 when there are none. */
 export function stepIndex(current: number, count: number, direction: 1 | -1): number {
   if (count <= 0) return -1;

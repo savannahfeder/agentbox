@@ -9,7 +9,7 @@
 // that turns down `~/Documents/my-app` would be worse than no check at all.
 
 import { describe, expect, it } from 'vitest';
-import { GUARDED, checkProjectFolder, proposeParent } from '../shared/project-folder-check.mjs';
+import { GUARDED, checkProjectFolder, proposeParent } from '../shared/project-folder-check.mts';
 
 const HOME = '/Users/esther';
 

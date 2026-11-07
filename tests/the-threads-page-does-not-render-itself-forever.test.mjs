@@ -43,6 +43,6 @@ it('a thread landing after you looked still lights the tab', () => {
 
 it('App stamps through it, never with a bare Date.now()', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-  expect(app).toMatch(/setNeedsLookedAt\(\(at\) => lookedAtNow\(inbox, at, Date\.now\(\)\)\)/);
+  expect(app).toMatch(/setNeedsLookedAt\(\(at\) => lookedAtNow\(arrivals, at, Date\.now\(\)\)\)/);
   expect(app).not.toMatch(/setNeedsLookedAt\(Date\.now\(\)\)/);
 });

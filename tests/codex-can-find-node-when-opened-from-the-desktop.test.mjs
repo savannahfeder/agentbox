@@ -8,12 +8,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createEngineSetup } from '../main/engine-setup.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
-import { refreshAgentModels } from '../main/refresh-agent-models.mjs';
-import { askSmallModel } from '../main/row-label.mjs';
-import { installedAgent } from '../main/agent-updates.mjs';
-import { codexLaunchEnv } from '../main/codex-launch-env.mjs';
+import { createEngineSetup } from '../main/engine-setup.mts';
+import { Supervisor } from '../main/supervisor.mts';
+import { refreshAgentModels } from '../main/refresh-agent-models.mts';
+import { askSmallModel } from '../main/row-label.mts';
+import { installedAgent } from '../main/agent-updates.mts';
+import { codexLaunchEnv } from '../main/codex-launch-env.mts';
 import { waitFor } from './waiting.mjs';
 
 const dirs = [];
@@ -77,7 +77,7 @@ describe('Codex opened from the desktop', () => {
     setups.push(setup);
     setup.start('codex');
     expect((await settled(setup)).phase).toBe('ready');
-    expect(await setup.readiness('codex')).toEqual({ engine: 'codex', found: true, signedIn: true });
+    expect(await setup.readiness('codex')).toEqual({ engine: 'codex', found: true, signedIn: true, certain: true });
     expect(m.env.PATH).toBe('/usr/bin:/bin');
   });
 

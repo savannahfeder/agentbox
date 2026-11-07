@@ -4,7 +4,7 @@
 // of the notes off that call are about one card. Two of them are pinned here.
 //
 // 1. A TASK INTO THE PRACTICE PROJECT WAS ACCEPTED AND NEVER RAN.Nothing was
-// broken. main/supervisor.mjs skips practice projects in four separate places
+// broken. main/supervisor.mts skips practice projects in four separate places
 // on purpose — nobody works in one and it points at no folder — and the card
 // did not know, so it took her task, filed it, and left her watching a row
 // that could never move. The status she saw flapping was the same fault from
@@ -21,6 +21,9 @@
 // The words themselves are tested, not only the plumbing, because copy is part
 // of the design here (CLAUDE.md) and a refusal nobody finishes reading is a
 // refusal that did not happen.
+//
+// canSend may wait on more than the refusal after it (files still attaching,
+// 2b4d937f); the refusal is still one of its conditions.
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -31,7 +34,7 @@ const compose = source('../renderer/src/components/Compose.tsx');
 const app = source('../renderer/src/App.tsx');
 const css = source('../renderer/src/styles.css');
 
-// The two shapes the card ever holds, as main/store.mjs really hands them over:
+// The two shapes the card ever holds, as main/store.mts really hands them over:
 // the practice mark is written off project.json, never matched on a name.
 const practice = { name: 'Practice', practice: true };
 const real = { name: 'Kestrel' };
@@ -89,7 +92,7 @@ describe('the card cannot send a refused task by any route', () => {
   // The button is one route and ⌘↵ is the other, and the keyboard is how this
   // card is actually used. A guard on the button alone is not a guard.
   it('disables Start it and returns before the send', () => {
-    expect(compose).toMatch(/const canSend = \(.*\) && !refusal;/);
+    expect(compose).toMatch(/const canSend = \(.*\) && !refusal( && .*)?;/);
     expect(compose).toMatch(/if \(refusal\) return;/);
   });
 

@@ -20,7 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { isWebsiteAddress, canFrameAWebsite, WEBSITE_PARTITION } from '../shared/websites.mjs';
+import { isWebsiteAddress, canFrameAWebsite, WEBSITE_PARTITION } from '../shared/websites.mts';
 import { addressParts } from '../renderer/src/components/BrowserChrome.tsx';
 import { docKind, opensInPane } from '../renderer/src/doc-pane.ts';
 import { whereALinkGoes } from '../renderer/src/link-click.ts';
@@ -84,7 +84,7 @@ describe('what the pane does with one', () => {
     expect(docKind('STATE.md')).toBe('markdown');
     expect(docKind('attachments/shot.png')).toBe('image');
     expect(docKind('runs/w-1.change')).toBe('code');
-    expect(docKind('reports/audit.pdf')).toBeNull();
+    expect(docKind('reports/audit.xlsx')).toBeNull();
     // A local app keeps no kind of its own: DocPane falls back to a frame.
     expect(docKind('http://localhost:3006/')).toBeNull();
   });
@@ -151,9 +151,12 @@ describe('the thread hands a web link to the pane', () => {
     expect(read('renderer/src/components/Focus.tsx')).toContain('whereALinkGoes(href, click');
   });
 
-  it('still hands a pdf and a source file to the app that owns them', () => {
-    expect(opensInPane('reports/audit.pdf')).toBe(false);
-    expect(opensInPane('main/ipc.mjs')).toBe(false);
+  it('still hands a spreadsheet to the app that owns it; a script draws in the pane', () => {
+    expect(opensInPane('reports/audit.xlsx')).toBe(false);
+    expect(opensInPane('main/ipc.mjs')).toBe(true);
+    // The back end is .mts since 2026-11-01, so that is what agents name.
+    expect(opensInPane('main/ipc.mts')).toBe(true);
+    expect(opensInPane('scripts/build.cjs')).toBe(true);
   });
 });
 

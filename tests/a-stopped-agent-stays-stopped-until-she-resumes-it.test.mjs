@@ -24,7 +24,7 @@
 // wakes it.
 
 import { describe, it, expect } from 'vitest';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 import { stoppedByHer } from '../shared/answers.mjs';
 
 const REPLIED = 1_790_865_701_000; // 07:41:41, the reply steered into the run

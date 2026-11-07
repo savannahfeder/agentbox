@@ -2,14 +2,16 @@
 // in a dark room as the phone site's PictureView does; a document reads in
 // place and a page draws in place, as its document pane does; a film or a
 // sound plays.
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { router } from '../lib/router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Image } from 'expo-image';
+import { FlatList, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { MAX_ZOOM, fitScale } from '../../../renderer/src/picture-view';
-import { docOnPhone, openingOf, pageOnPhone, pictureLink } from '../lib/files';
+import { docOnPhone, openingOf, pageOnPhone, pictureLink, pictureSource, shapeOfDrawn } from '../lib/files';
 import { useCloud } from '../state/cloud';
 import { readLink, useMessageFiles } from '../ui/Files';
 import { Back } from '../ui/icons';
@@ -17,7 +19,8 @@ import { Markdown } from '../ui/Markdown';
 import { PageFrame } from '../ui/PageFrame';
 import { IconButton, T, TopBar, Wall } from '../ui/parts';
 import { Player } from '../ui/Player';
-import { color } from '../ui/theme';
+import { Skeleton } from '../ui/Skeleton';
+import { color, corner } from '../ui/theme';
 
 const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 const nameOf = (src: string) => src.split('/').pop() ?? src;
@@ -37,11 +40,11 @@ function OnItsOwn({ product, src }: { product: string; src: string }) {
   const card = { flex: 1, margin: 12, marginBottom: 12 + inset.bottom };
   let body;
   if (o.kind === 'doc') body = <Doc product={product} src={src} style={{ ...card, borderWidth: 1, borderColor: color.lineStrong, borderRadius: 3 }} />;
-  else if (o.kind === 'page') body = <Page product={product} src={src} style={{ ...card, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)', backgroundColor: PAGE }} />;
+  else if (o.kind === 'page') body = <Page product={product} src={src} style={{ ...card, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: 'rgba(255, 255, 255, 0.1)', backgroundColor: PAGE }} />;
   else if (o.kind === 'media') {
     const film = /\.(mp4|mov|m4v|webm)$/i.test(src);
     body = (
-      <View style={{ ...card, borderWidth: 1, borderColor: color.line, backgroundColor: RAISED, justifyContent: film ? undefined : 'center', padding: film ? 0 : 16 }}>
+      <View style={{ ...card, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line, backgroundColor: RAISED, justifyContent: film ? undefined : 'center', padding: film ? 0 : 16 }}>
         <Player link={o.link} film={film} style={film ? { flex: 1 } : { height: 36 }} />
       </View>
     );
@@ -73,6 +76,7 @@ function Doc({ product, src, style }: { product: string; src: string; style: obj
       <ScrollView contentContainerStyle={{ paddingTop: 6, paddingHorizontal: 16, paddingBottom: 40 }}>
         {doc && ('text' in doc ? <Markdown doc text={doc.text} dir={dir} files={files} /> : <Said words={doc.error} />)}
       </ScrollView>
+      {!doc && <View style={StyleSheet.absoluteFill}><Skeleton /></View>}
     </View>
   );
 }
@@ -85,7 +89,7 @@ function Page({ product, src, style }: { product: string; src: string; style: ob
     pageOnPhone(c.view.places, c.links, product, src, readLink).then((r) => { if (live) setPage(r.ok ? { html: r.html } : { error: r.error }); });
     return () => { live = false; };
   }, [product, src, c.signedAt]);
-  return <View style={style}>{page && ('html' in page ? <PageFrame html={page.html} style={{ flex: 1 }} /> : <Said words={page.error} />)}</View>;
+  return <View style={style}>{page ? ('html' in page ? <PageFrame html={page.html} style={{ flex: 1 }} /> : <Said words={page.error} />) : <Skeleton />}</View>;
 }
 
 // The dark room's own ink, `--read-paper` over `--read-ground`.
@@ -120,7 +124,7 @@ function PictureRoom({ product, pictures, start }: { product: string; pictures: 
     <View style={{ flex: 1, backgroundColor: GROUND }}>
       <Stack.Screen options={{ animation: 'fade' }} />
       {/* The picture's own colours, blurred, light the room. */}
-      {!!url && <Image source={{ uri: url }} blurRadius={80} resizeMode="cover" style={{ position: 'absolute', left: -width * 0.12, top: -height * 0.12, width: width * 1.24, height: height * 1.24, opacity: 0.7 }} />}
+      {!!url && <Image source={pictureSource(url)} cachePolicy="memory-disk" blurRadius={80} contentFit="cover" style={{ position: 'absolute', left: -width * 0.12, top: -height * 0.12, width: width * 1.24, height: height * 1.24, opacity: 0.7 }} />}
       <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
         <Defs><RadialGradient id="room" cx="0.5" cy="0.5" r="0.5"><Stop offset="0.55" stopColor={GROUND} stopOpacity={0} /><Stop offset="1" stopColor={GROUND} stopOpacity={0.7} /></RadialGradient></Defs>
         <Rect width="100%" height="100%" fill="url(#room)" />
@@ -154,9 +158,9 @@ function PictureRoom({ product, pictures, start }: { product: string; pictures: 
               const thumb = linkOf(p);
               return (
                 <Pressable key={p} onPress={() => go(i)} accessibilityRole="imagebutton" accessibilityLabel={nameOf(p)}
-                  style={{ padding: 3, borderWidth: 1, borderColor: i === index ? paper(0.85) : 'transparent', margin: -4 }}>
+                  style={{ padding: 3, borderWidth: 1, borderRadius: corner.small, borderColor: i === index ? paper(0.85) : 'transparent', margin: -4 }}>
                   <View style={{ width: 72, height: 45, backgroundColor: paper(0.06), opacity: i === index ? 1 : 0.38, overflow: 'hidden' }}>
-                    {!!thumb && <Image source={{ uri: thumb }} resizeMode="cover" style={{ width: 72, height: 45 }} />}
+                    {!!thumb && <Image source={pictureSource(thumb)} cachePolicy="memory-disk" contentFit="cover" style={{ width: 72, height: 45 }} />}
                   </View>
                 </Pressable>
               );
@@ -174,7 +178,7 @@ function Shown({ uri, name, width, height, stage }: { uri: string | null | undef
   useEffect(() => {
     if (!uri) return;
     let live = true;
-    Image.getSize(uri, (w, h) => { if (live) setNatural({ w, h }); }, () => {});
+    shapeOfDrawn(() => Image.loadAsync(pictureSource(uri))).then((shape) => { if (live) setNatural(shape); }, () => {});
     return () => { live = false; };
   }, [uri]);
   const box = { w: width - 32, h: height - stage.top - stage.bottom };
@@ -184,8 +188,8 @@ function Shown({ uri, name, width, height, stage }: { uri: string | null | undef
       <ScrollView style={{ position: 'absolute', top: stage.top, left: 16, width: box.w, height: box.h }} contentContainerStyle={{ width: box.w, height: box.h, alignItems: 'center', justifyContent: 'center' }}
         maximumZoomScale={MAX_ZOOM} minimumZoomScale={1} centerContent showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false}>
         {!!uri && natural.w > 0 && (
-          <Image source={{ uri }} accessibilityLabel={name} resizeMode="contain"
-            style={{ width: natural.w * fit, height: natural.h * fit, borderWidth: 1, borderColor: paper(0.08) }} />
+          <Image source={pictureSource(uri)} cachePolicy="memory-disk" accessibilityLabel={name} contentFit="contain"
+            style={{ width: natural.w * fit, height: natural.h * fit, borderWidth: 1, borderRadius: corner.card, borderColor: paper(0.08) }} />
         )}
       </ScrollView>
     </View>

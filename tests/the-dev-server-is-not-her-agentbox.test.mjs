@@ -75,15 +75,15 @@ describe('whether a store root has anybody work under it', () => {
 });
 
 describe('the guard is wired into the only place every dev window passes', () => {
-  it('is asked for in main.mjs before the window is loaded', () => {
-    const main = read('main/main.mjs');
+  it('is asked for in main.mts before the window is loaded', () => {
+    const main = read('main/main.mts');
     expect(main).toMatch(/import \{ hotWindowVerdict, storeHasWork \} from '\.\/dev-window\.mjs'/);
     expect(main).toMatch(/const verdict = hotWindowVerdict\(/);
     expect(main.indexOf('const verdict = hotWindowVerdict(')).toBeLessThan(main.indexOf('pageReady = true'));
   });
 
   it('still opens a window when it refuses, rather than showing nothing', () => {
-    expect(read('main/main.mjs')).toMatch(/if \(fs\.existsSync\(built\)\) await window\.loadFile\(built/);
+    expect(read('main/main.mts')).toMatch(/if \(fs\.existsSync\(built\)\) await window\.loadFile\(built/);
   });
 });
 
@@ -126,7 +126,8 @@ describe('the screen she was describing', () => {
     // If this line moves, the diagnosis in main/dev-window.mjs stops being true
     // and starts lying to whoever reads it next.
     expect(read('renderer/src/App.tsx')).toMatch(/if \(!snap\) return <Booting \/>;/);
-    expect(read('renderer/src/App.tsx')).toMatch(/<div className="boot"><span>\{NAME\}<\/span><\/div>/);
+    // Since w-eb1e55360c the boot screen is the moving logo, not the name.
+    expect(read('renderer/src/App.tsx')).toMatch(/<div className="boot" role="status" aria-label=\{`\$\{NAME\} is loading`\}><LogoOrbit \/><\/div>/);
   });
 });
 

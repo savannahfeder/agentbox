@@ -13,7 +13,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { servedHere } from '../main/cloud/run.mjs';
+import { servedHere } from '../main/cloud/run.mts';
 
 let tmp;
 const ACCOUNT = 'acct-test';
@@ -76,6 +76,20 @@ describe('the approvals channel', () => {
 });
 
 describe('the store', () => {
+  it('offers the resource tool only when this cloud run supplied its own resolver', async () => {
+    const env = { STORE_ACCOUNT_ID: ACCOUNT, AGENTBOX_HOME: path.join(tmp, 'store') };
+    const calls = [];
+    const a = servedHere({ command: '/nowhere/mcp/agentbox-mcp.sh', env }, env, 'resource-a', { requestCloudResource: async (args) => { calls.push(args); return { status: 'delivered', path: '/tmp/resource-a/file' }; } });
+    const b = servedHere({ command: '/nowhere/mcp/agentbox-mcp.sh', env }, env, 'resource-b');
+    const [[, toolsA], [, toolsB]] = await Promise.all([talk(a, [hello, list]), talk(b, [hello, list])]);
+    expect(toolsA.result.tools.map((t) => t.name)).toContain('request_cloud_resource');
+    expect(toolsB.result.tools.map((t) => t.name)).not.toContain('request_cloud_resource');
+    const [answer] = await talk(a, [{ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'request_cloud_resource', arguments: { kind: 'file', scope: 'documents', path: 'plan.md' } } }]);
+    expect(JSON.parse(answer.result.content[0].text)).toEqual({ status: 'delivered', path: '/tmp/resource-a/file' });
+    expect(calls).toEqual([{ kind: 'file', scope: 'documents', path: 'plan.md' }]);
+    for (const p of [a, b]) { const closed = new Promise((r) => p.on('close', r)); p.stdin.end(); await closed; }
+  });
+
   it('answers in this process, each connection with its own claims', async () => {
     const env = { STORE_ACCOUNT_ID: ACCOUNT, AGENTBOX_HOME: path.join(tmp, 'store') };
     const a = servedHere({ command: '/nowhere/mcp/agentbox-mcp.sh', env }, env, 'r-c1');

@@ -14,7 +14,7 @@
 // it. That is a bug you cannot hit on the machine that made it.
 //
 // So this reads the runtime code and demands the two lists agree. The subtlety
-// worth keeping: main/analytics.mjs and main/updater.mjs load theirs with a
+// worth keeping: main/analytics.mts and main/updater.mts load theirs with a
 // `require()` at the moment of use, not with an import at the top, so a search
 // for import statements finds neither. The scan below covers both shapes, and
 // posthog-node is the package that proved it needs to.
@@ -34,7 +34,7 @@ function runtimeFiles(dir, out = []) {
   for (const entry of fs.readdirSync(path.join(here, dir), { withFileTypes: true })) {
     const rel = `${dir}/${entry.name}`;
     if (entry.isDirectory()) runtimeFiles(rel, out);
-    else if (/\.(mjs|cjs|js)$/.test(entry.name)) out.push(rel);
+    else if (/\.(mjs|mts|cjs|js)$/.test(entry.name) && !entry.name.endsWith('.d.mts')) out.push(rel);
   }
   return out;
 }
@@ -66,7 +66,7 @@ function packageOf(spec) {
 
 /**
  * COMMENTS COME OUT FIRST, and this file is heavily commented so that matters.
- * `* from "opus" to a Codex slug` in main/supervisor.mjs is prose about a model
+ * `* from "opus" to a Codex slug` in main/supervisor.mts is prose about a model
  * alias, and it read as a package called opus.
  *
  * Only whole comment lines are dropped, never a `//` found mid-line: that would
@@ -95,12 +95,16 @@ for (const file of files) {
 
 // Electron is the one package the runtime names and must NOT depend on. The
 // desktop app is started BY Electron, which supplies it; the browser door never
-// loads main/main.mjs at all. Making it a dependency would put 297 MB into
+// loads main/main.mts at all. Making it a dependency would put 297 MB into
 // every `npx` run to satisfy a file that run never opens.
 const SUPPLIED_BY_THE_HOST = new Set(['electron']);
 
 describe('the dependency list', () => {
-  const declared = new Set(Object.keys(pkg.dependencies));
+  // node-pty is declared optional rather than required: it compiles on install
+  // and a Linux machine with no compiler cannot build it, which used to fail
+  // the whole install (tests/an-install-with-no-compiler-still-starts). The app
+  // asks for it at run time all the same, so it counts as declared here.
+  const declared = new Set([...Object.keys(pkg.dependencies), ...Object.keys(pkg.optionalDependencies ?? {})]);
 
   it('has every package the code that runs asks for', () => {
     const missing = [...wanted]
@@ -132,7 +136,8 @@ describe('the dependency list', () => {
   });
 
   it('says which node it was tested on rather than guessing lower', () => {
-    expect(pkg.engines?.node).toBe('>=22');
+    // The exact floor is held by tests/a-clean-install-prints-no-deprecation-warnings.
+    expect(pkg.engines?.node).toMatch(/^>=22(\.\d+)*$/);
   });
 });
 

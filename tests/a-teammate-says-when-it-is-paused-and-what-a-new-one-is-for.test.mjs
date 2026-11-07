@@ -30,7 +30,11 @@ describe('a paused teammate', () => {
   });
 
   it('says Paused on its row in the Chats list, unless something waits on you there', () => {
-    expect(read('renderer/src/teammates/ChatsColumn.tsx')).toMatch(/waitsOnYou\(t\) \? <i className="cx-need"[^>]*\/> : t\.paused \? <span className="cx-st">Paused<\/span> : null/);
+    expect(read('renderer/src/teammates/ChatsColumn.tsx')).toMatch(/waitsOnYou\(t\) \? <i className="cx-need"[^>]*\/> : t\.paused \? <span className="cx-st">Paused<\/span> : t\.primary \? <span className="cx-st">Primary<\/span> : null/);
+  });
+
+  it('says Primary on the primary\'s row, below Paused and anything waiting on you', () => {
+    expect(read('renderer/src/teammates/ChatsColumn.tsx')).toContain('t.primary ? <span className="cx-st">Primary</span>');
   });
 });
 
@@ -64,6 +68,6 @@ describe('the offer of a teammate', () => {
     const items = [1, 2, 3, 4].map((d) => ask('Onboarding is confusing people, fix the first screen', d)).concat([ask('Onboarding confusing people, fix the screen', 5)]);
     const offer = offerFrom({ items, now: NOW });
     expect(offer.asked).toEqual([{ title: 'Onboarding is confusing people, fix the first screen', n: 4 }, { title: 'Onboarding confusing people, fix the screen', n: 1 }]);
-    expect(read('main/teammates.mjs')).toMatch(/offer\.asked\.map\(\(\{ title, n \}\) => `- \$\{title\}\$\{n > 1 \? ` \(\$\{n\} times\)` : ''\}`\)/);
+    expect(read('main/teammates.mts')).toMatch(/offer\.asked\.map\(\(\{ title, n \}\) => `- \$\{title\}\$\{n > 1 \? ` \(\$\{n\} times\)` : ''\}`\)/);
   });
 });

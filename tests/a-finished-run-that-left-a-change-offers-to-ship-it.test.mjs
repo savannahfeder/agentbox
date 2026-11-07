@@ -93,7 +93,7 @@ describe('the decision a finished run left behind', () => {
   });
 
   it('calls the label what the ship queue calls it', async () => {
-    const { SHIP_LABEL: queue } = await import('../main/ship-queue.mjs');
+    const { SHIP_LABEL: queue } = await import('../main/ship-queue.mts');
     expect(SHIP_LABEL).toBe(queue);
   });
 });
@@ -108,13 +108,15 @@ describe('where the app asks it', () => {
   // for exactly this: `showOptions` stays the whole question of whether the
   // agent offered, because it is also what takes the list out of the message.
   it('stands in the same strip as an offer the agent wrote', () => {
-    expect(focus).toContain('const shipOffer = shipOfferLive(item,');
+    expect(focus).toContain('shipOfferLive(item, { change: !!figures, running: !!session || !!agent })');
     expect(focus).toContain('const stripShown = showOptions || shipOffer;');
     expect(focus).toContain('const showOptions = offerIsLive(item);');
   });
 
+  // Which words it asks in is a second question, answered off the folder the
+  // run worked in (tests/a-change-nobody-committed-is-not-offered-for-shipping).
   it('never draws beside the agent\'s own offer', () => {
-    expect(focus).toContain('const options = showOptions ? itemOptions(item) : shipOffer ? SHIP_OFFER : [];');
+    expect(focus).toContain('const options = showOptions ? itemOptions(item) : shipAsk ? shipAsk.options : [];');
   });
 
   it('is answered by the same keys and the same pick', () => {

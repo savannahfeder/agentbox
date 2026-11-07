@@ -3,7 +3,7 @@
 // scripts/cloud-setup.mjs writes ~/.agentbox/cloud.json (the bucket, the
 // runtime, the profile it signs as); it is never in git, because it names an
 // AWS account. Each account's sign-in for the cloud is made and kept in the
-// cloud, never on this Mac (main/cloud/logins.mjs).
+// cloud, never on this Mac (main/cloud/logins.mts).
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -58,10 +58,22 @@ const capsPath = (env, home) => path.join(path.dirname(cloudConfigPath(env, home
 const cloudId = (config) => String(config?.runtimeArn || config?.gateway || '');
 
 export function imageCaps(config, env = process.env, home = os.homedir()) {
+  return heardCaps(config, env, home) ?? [];
+}
+
+// Null when this cloud has never answered a start from this Mac.
+function heardCaps(config, env, home) {
   try {
     const caps = JSON.parse(fs.readFileSync(capsPath(env, home), 'utf8'))[cloudId(config)]?.caps;
-    return Array.isArray(caps) ? caps.filter((c) => typeof c === 'string') : [];
-  } catch { return []; }
+    return Array.isArray(caps) ? caps.filter((c) => typeof c === 'string') : null;
+  } catch { return null; }
+}
+
+// What a run goes by. A cloud never heard from is tried with no repository:
+// a project without one would otherwise never start the run that asks. An
+// image that cannot take one refuses the start, and that answer is kept.
+export function imageCapsToTry(config, env = process.env, home = os.homedir()) {
+  return heardCaps(config, env, home) ?? ['plain'];
 }
 
 export function noteImageCaps(config, caps, env = process.env, home = os.homedir()) {
@@ -104,5 +116,5 @@ export function writeCloudKey(key, env = process.env, home = os.homedir()) {
 }
 
 // The keychain service the first cloud build kept its own Claude tokens
-// under. Nothing writes it now; main/cloud/logins.mjs deletes what is left.
+// under. Nothing writes it now; main/cloud/logins.mts deletes what is left.
 export const OLD_TOKEN_SERVICE = `${Name} cloud: Claude sign-in`;

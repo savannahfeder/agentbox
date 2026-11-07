@@ -1,7 +1,7 @@
-// THE PHONE'S TWO SPEECH MODELS AS ONE Speech (lib/dictation.ts): Apple's
+// THE PHONE'S TWO SPEECH MODELS AS ONE Speech (renderer/src/dictation.ts): Apple's
 // newer one (modules/apple-dictation) where the phone has it, else the
 // keyboard's (expo-speech-recognition). Both run on the phone and cost nothing.
-import { engineFor, languageFor, type Speech, type SpeechEvents } from './dictation';
+import { engineFor, languageFor, type Speech, type SpeechEvents } from '../../../renderer/src/dictation';
 
 type Sub = { remove(): void };
 type Allowed = { granted: boolean; canAskAgain: boolean };

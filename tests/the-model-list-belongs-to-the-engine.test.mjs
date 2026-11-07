@@ -4,13 +4,13 @@
 // `modelChoices(id)` drew them whatever the engine was. Those four are CLAUDE
 // CODE ALIASES: `--model opus` is resolved by that CLI at spawn. Codex has no
 // aliases at all; `thread/start`'s `model` wants an exact slug (`gpt-5.6-sol`),
-// and main/supervisor.mjs `codexModelRefusal` now REFUSES to start a run whose
+// and main/supervisor.mts `codexModelRefusal` now REFUSES to start a run whose
 // model this Mac's Codex does not know. So the old picker did not merely read
 // wrong on a Codex row: it produced a row that cannot run.
 //
 // THE TWO LISTS SHARE NO WORD, and that is what every assertion below leans on.
 // Nothing here pins Codex's names: they are read off this Mac out of the cache
-// codex-cli maintains (main/codex-models.mjs says why a hardcoded list is wrong
+// codex-cli maintains (main/codex-models.mts says why a hardcoded list is wrong
 // the week after it is written), so the fixture stands in for that read and the
 // only thing asserted is that a list from one engine never reaches the other.
 //
@@ -47,7 +47,7 @@ const fakeStore = () => {
   };
 };
 
-// WHAT `codexModels({home})` HANDS BACK, in the shape main/codex-models.mjs
+// WHAT `codexModels({home})` HANDS BACK, in the shape main/codex-models.mts
 // builds it: Codex's own display names, in its own `priority` order. Two rows
 // is enough for every question below and keeps the fixture from looking like a
 // list anybody should maintain.
@@ -106,7 +106,7 @@ describe('what the word says when she has picked nothing', () => {
     expect(defaultModelFor(null, null)).toBe(DEFAULT_MODEL);
   });
 
-  // Her own ~/.codex/config.toml, handed down from main/codex-models.mjs. A
+  // Her own ~/.codex/config.toml, handed down from main/codex-models.mts. A
   // default that disagreed with what `codex` in her terminal runs would be a
   // fleet she cannot reason about.
   it('is whatever her own Codex config names, on Codex', () => {
@@ -117,7 +117,7 @@ describe('what the word says when she has picked nothing', () => {
 
   // AND ON A CODEX THAT NAMES NOTHING, THE CARD SAYS SO RATHER THAN GUESSING.
   // `codexDefaultModel` answers null for a Codex nobody has configured, and
-  // main/codex-models.mjs is explicit that turning that null into the first row
+  // main/codex-models.mts is explicit that turning that null into the first row
   // of the offer list would print our sort order as her default. Opus would be
   // worse still: a Claude alias on a Codex card is the bug this file is about.
   it('says Codex\'s own when this Mac\'s Codex names no model', () => {

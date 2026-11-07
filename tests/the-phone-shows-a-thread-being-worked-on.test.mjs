@@ -16,9 +16,9 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createPhoneInbox } from '../main/phone-inbox.mjs';
+import { createPhoneInbox } from '../main/phone-inbox.mts';
 import { phoneView } from '../renderer/src/cloud-bridge.ts';
-import { Supervisor } from '../main/supervisor.mjs';
+import { Supervisor } from '../main/supervisor.mts';
 
 const T = Date.UTC(2026, 9, 17, 18, 0);
 const row = (id) => ({ id, title: `thread ${id}`, status: 'claimed', createdAt: T - 60_000, updatedAt: T - 60_000 });
@@ -90,6 +90,20 @@ describe('the Mac\'s copy of a thread being worked on', () => {
     p.tick(3 * 60_000);
     await p.inbox.syncOnce();
     expect(p.sent.map((s) => s.item)).toEqual(['w-aaaaaaaaaa']);
+  });
+
+  it('keeps the cloud run identity, including when it arrives after the initial running marker', async () => {
+    let runId;
+    const p = publisher({ live: (id) => id === 'w-aaaaaaaaaa' ? { since: T, where: 'cloud', doing: [], runId } : null });
+    await p.inbox.syncOnce();
+    runId = 'cloud-run-1';
+    p.tick(1000);
+    await p.inbox.syncOnce();
+    expect(p.sent.at(-1).live.runId).toBe('cloud-run-1');
+    runId = undefined;
+    p.tick(3 * 60_000);
+    await p.inbox.syncOnce();
+    expect(p.sent.at(-1).live.runId).toBe('cloud-run-1');
   });
 });
 

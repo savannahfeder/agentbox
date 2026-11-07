@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cloudLoginInUse, cloudLoginState, listCloudLogins, markCloudLogin, pickCloudLogin, recordCloudLogin } from '../main/cloud/logins.mjs';
+import { cloudLoginInUse, cloudLoginState, listCloudLogins, markCloudLogin, pickCloudLogin, recordCloudLogin } from '../main/cloud/logins.mts';
 import { cloudAccountInUse, cloudFootLine } from '../renderer/src/cloud-menu';
 import { cloudPlaceAccounts } from '../renderer/src/components/Settings';
 
@@ -62,7 +62,7 @@ describe('a cloud with two Claude accounts signed in', () => {
     expect([first.inUse, first.about]).toEqual([true, ['At its limit, back at 5:10pm']]);
     expect([second.inUse, second.about]).toEqual([false, ['Signed in']]);
     expect(cloudFootLine(cloud(onScreen(), 2), now))
-      .toBe('Your cloud account is at its usage limit until 5:10pm. Threads run on this Mac until then.');
+      .toBe('The Claude account the cloud runs on is at its usage limit until 5:10pm. Threads run on this Mac until then.');
   });
 
   it('must NOT say the cloud is out when the one it runs on has room', () => {
@@ -79,7 +79,7 @@ describe('a cloud with two Claude accounts signed in', () => {
 });
 
 describe('a cloud with one Claude account', () => {
-  // Marked, as this computer's one account is (main/settings.mjs `chosen`):
+  // Marked, as this computer's one account is (main/settings.mts `chosen`):
   // the badge says which subscription is being spent, and with one account
   // that is still worth saying once.
   it('marks it, and it is simply ready', () => {

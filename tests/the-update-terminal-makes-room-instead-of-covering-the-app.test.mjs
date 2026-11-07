@@ -22,6 +22,9 @@ const decls = (selector) => {
 };
 
 describe('the update terminal makes room instead of covering the app', () => {
+  it('caps a saved terminal height against the window rather than its own content-sized panel', () => {
+    expect(decls('.agent-update-panel .task-terminal-bottom')).toMatchObject({'max-height':'calc(60vh - 40px)'});
+  });
   it('puts the app inside a column it shares with the panel', () => {
     const html = renderToStaticMarkup(createElement(AgentUpdates, null, createElement('div', { className: 'app' })));
     expect(html).toMatch(/^<div class="agent-update-host"><div class="agent-update-app"><div class="app"><\/div><\/div><\/div>$/);
