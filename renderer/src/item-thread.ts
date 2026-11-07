@@ -208,9 +208,13 @@ export function runNodes(session: TraceSession): AgentEvent[] {
       // The supervisor saves a diff for the code viewer. Its trace entry keeps
       // that file discoverable, but it is not a file the agent wrote.
       if (parts?.[1] === 'Write' && /(?:^|\/)runs\/[^/]+\/the-change-it-made\.change$/.test(parts[2].trim())) continue;
-      out.push(parts
-        ? workLine(line.at, parts[1], parts[2])
-        : workLine(line.at, '', line.text));
+      const work = parts ? workLine(line.at, parts[1], parts[2]) : workLine(line.at, '', line.text);
+      if (line.output != null) {
+        work.output = line.output;
+        work.lines = line.outputLines ?? 0;
+        work.failed = !!line.failed;
+      }
+      out.push(work);
       continue;
     }
     out.push({ at: line.at, who: 'it', text: line.text });
