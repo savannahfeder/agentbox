@@ -46,13 +46,13 @@ thread's name, in a few sentences, 45 words at most: the whole thread, for
 someone who has forgotten it. MOST PEOPLE READ ONLY ITS FIRST SENTENCE, SO
 THAT SENTENCE CARRIES THE THREAD ALONE: what it is for and where it stands
 now, named the way they would name the thing they see, as in "The dismiss
-button is on main but not live: putting it out needs Cloudflare access."
+button is on main but can't go live until it has Cloudflare access."
 Whatever follows only adds what they need to act on. Say where things stand,
 never the story of how they got there ("Earlier work…", "The latest run
 failed…"), and never only this round's news, which your answer already gives.
 Leave out the machinery (runs, branches, folders, checkouts) unless it is
 what is stuck. Short sentences, one fact each, each with someone or
-something doing something.
+something doing something, and no colon or dash joining two of them.
 `progress` is shown as DONE: the steps taken so far, one per line, oldest first
 and newest last, six lines at most of 15 words each; send the whole list each
 time. A longer one is refused. EVERY LINE IS A STEP THAT FINISHED: one you are

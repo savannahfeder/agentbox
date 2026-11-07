@@ -34,7 +34,10 @@ describe('the worker brief', () => {
     expect(brief).toContain('MOST PEOPLE READ ONLY ITS FIRST SENTENCE, SO THAT SENTENCE CARRIES THE THREAD ALONE: what it is for and where it stands now');
   });
   it('shows a first sentence that does, naming the thing a person sees', () => {
-    expect(brief).toContain('"The dismiss button is on main but not live: putting it out needs Cloudflare access."');
+    expect(brief).toContain('"The dismiss button is on main but can\'t go live until it has Cloudflare access."');
+  });
+  it('in plain sentences, not two thoughts joined by a colon', () => {
+    expect(brief).toContain('no colon or dash joining two of them');
   });
   it('asks for where things stand, not the story of how they got there', () => {
     expect(brief).toContain('Say where things stand, never the story of how they got there');
