@@ -21,4 +21,5 @@ export declare function toldBy(item: AnsweredItem | null | undefined): {
     teammate: string | null;
 } | null;
 export declare function heldForHer(item: AnsweredItem | null | undefined): boolean;
+export declare function wakesItselfAt(item: (AnsweredItem & { runAt?: number; kind?: string }) | null | undefined): number;
 export declare function wordWaits(item: AnsweredItem | null | undefined): boolean;

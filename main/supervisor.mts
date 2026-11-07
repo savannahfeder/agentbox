@@ -112,7 +112,7 @@ function whoHasIt(made: { taken?: boolean; reason?: string; heldBy?: number | nu
   if (made?.taken !== false) return '';
   return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
-import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mjs';
+import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson, wakesItselfAt } from '../shared/answers.mjs';
 import { DEFAULT_SESSIONS_AT_ONCE } from './config.mjs';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mjs';
 import type { AccountIdentity } from './account-tooling.mjs';
@@ -4241,7 +4241,8 @@ export class Supervisor {
     // the two cases a write-time cap would miss: the strikes a row earned
     // before she raised it, which is the usual way a row becomes urgent, and
     // the ones already sitting in the state file from before this landed.
-    const rungs = isUrgent(item) ? 1 : runs;
+    // Nor a thread at the moment its agent set: the agent chose the gap.
+    const rungs = isUrgent(item) || wakesItselfAt(item) ? 1 : runs;
     const rest = FRUITLESS_RESTS_MS[Math.min(rungs, FRUITLESS_RESTS_MS.length) - 1];
     return (seen.endedAt ?? 0) + rest;
   }
@@ -8592,7 +8593,9 @@ export class Supervisor {
       // from her moves `lastFounderWrite` past it and the row is fresh again.
       // EXCEPT when the words are OURS and promised a retry
       // (`_weSaidItRunsAgain`): those are not an answer to her.
-      && (!awaitingHer(item) || this._weSaidItRunsAgain(item))
+      // AND EXCEPT when the agent set a moment for the thread to run again
+      // and it has come: that answer said the thread would run then.
+      && (!awaitingHer(item) || this._weSaidItRunsAgain(item) || wakesDue(item, now))
       // A row a worker already took and gave nothing back rests before it is
       // handed to another one. This pass had no memory whatsoever, which is
       // the whole of the every-tick loop (FRUITLESS_RESTS_MS).
@@ -13582,6 +13585,11 @@ function lastFounderWrite(item: WorkItem | null | undefined) {
 // worker's finished word, and a finished word on a row still open is a thing
 // waiting on her by definition. See `isFresh` for what it costs and why it
 // costs her nothing.
+function wakesDue(item: WorkItem, now: number) {
+  const at = wakesItselfAt(item);
+  return at > 0 && at <= now;
+}
+
 export function awaitingHer(item: WorkItem | null | undefined) {
   const wrote = item?.wrote?.result;
   if (!wrote || wrote.source !== 'agent') return false;

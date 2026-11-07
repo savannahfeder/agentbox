@@ -83,6 +83,7 @@ import { Name } from '../shared/product-name.mjs';
 import { handedOnByReply, isGivenTask } from '../shared/team-rules.mjs';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mts';
 import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mjs';
+import { wakesItselfAt } from '../shared/answers.mjs';
 import { traceAnswer } from '../shared/trace-delta.mjs';
 import { saveAttachments } from './save-attachments.mts';
 import { stageAttachment, stageAttachmentPart } from './stage-attachment.mts';
@@ -1402,7 +1403,12 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:schedule', (_e, { product, id, runAt }: { product: string; id: string; runAt: number }) => {
     if (isAgentRow(id)) return { ok: false };
     if (runAt > Date.now()) supervisor.stopSession(id);
-    return store.scheduleItem(product, id, runAt);
+    const before = runAt > 0 ? null : store.readItem(product, id);
+    const out = store.scheduleItem(product, id, runAt);
+    // Let it run now: the queue walks past the agent's answer, so clearing the
+    // moment alone starts nothing.
+    if (before && wakesItselfAt(before) > Date.now()) supervisor.runNow(product, id);
+    return out;
   });
 
   // Snooze changes when a person sees the thread, never what an agent does.

@@ -239,9 +239,10 @@ export function saidToClose(item, words) {
 /*
  * A PUT-OFF THE USER ASKED FOR IS THEIRS (w-d6ea290028).
  *
- * A runAt an agent writes brakes workers and never hides the row
- * (`parkedByAgent`, list-rules.ts), so an agent cannot take its own question
- * out of the inbox. But "remind me in 4 days" asks for exactly that, and the
+ * A runAt an agent writes starts the thread again then, and hides the row only
+ * while its answer offers no options (`runsAgainOnItsOwn`, list-rules.ts), so
+ * an agent cannot take its own question out of the inbox. "Remind me in 4
+ * days" asks for a row that comes back without a run, and the
  * row sat in Needs you wearing Scheduled until Sunday, with the user unsure
  * whether closing it would lose the reminder.
  *
@@ -250,7 +251,7 @@ export function saidToClose(item, words) {
  * as the user's. That is what hides a row until it comes due, puts it in
  * Scheduled, and lets the user's L move it again.
  */
-const DEFERRED_AS_AGENT = 'The put-off was saved as YOURS, not theirs, so the row stays in their inbox until then: the words in deferBecause are not ones they wrote on this row. If they did ask for it to be put off, send runAt again with deferBecause set to their exact words.';
+const DEFERRED_AS_AGENT = 'The put-off was saved as YOURS, not theirs, so the thread runs again then, and stays in their inbox meanwhile if your answer offers options: the words in deferBecause are not ones they wrote on this row. If they did ask for it to be put off, send runAt again with deferBecause set to their exact words.';
 
 /*
  * A SUMMARY LINE IS SHORT ENOUGH TO READ (w-b51b2e1c86). An agent's problem,

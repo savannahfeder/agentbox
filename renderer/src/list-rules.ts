@@ -2,13 +2,13 @@
 // box means.
 import { instructionOf, isCleanRun } from '../../shared/repeats.mjs';
 import { teammateIdOf } from '../../shared/teammates.mjs';
-import { answerSettled, filedByThePerson } from '../../shared/answers.mjs';
+import { answerSettled, filedByThePerson, wakesItselfAt } from '../../shared/answers.mjs';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import { notShippedLine } from '../../shared/not-shipped.mts';
 import { setByPerson } from '../../shared/thread-waits.mjs';
 import { isTaskRow } from '../../shared/team-rules.mjs';
 import { shownTitle } from '../../shared/thread-title.mjs';
-import { firstRealLine, previewText, searchText } from './format';
+import { firstRealLine, offerIsLive, previewText, searchText } from './format';
 import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
 
@@ -127,11 +127,21 @@ export function gaveUpOnTheAnswer(i: InboxItem): boolean {
 // Who deferred a row decides what the deferral means. A future runAt an agent
 // wrote stops workers respawning (`isDue` in shared/work-items.mjs) but does
 // not hide the row, or an agent could take its own question away from the
-// person it asked. An agent parking a row is a reason to show it, because what
+// person it asked (the one exception is `runsAgainOnItsOwn` below). An agent parking a row is a reason to show it, because what
 // happens next is the user's call.
 export function parkedByAgent(i: InboxItem, now = Date.now()): boolean {
   if (i.status === 'done') return false;
   return (i.runAt ?? 0) > now && i.wrote?.runAt?.source !== 'founder';
+}
+
+// EXCEPT A THREAD ITS AGENT WILL RUN AGAIN ITSELF, ASKING NOTHING MEANWHILE
+// (w-8b38137b7f). The next move is the agent's, so it waits in Scheduled until
+// the moment and is In progress after it. An answer that offers a choice keeps
+// it in Needs you, which is what stops an agent hiding its own question.
+// Returns the moment, or 0.
+export function runsAgainOnItsOwn(i: InboxItem): number {
+  if (!hers(i) || offerIsLive(i)) return 0;
+  return wakesItselfAt(i);
 }
 
 // The moment the user put this row away until. The inbox and Scheduled both
@@ -144,7 +154,7 @@ export function hiddenUntil(i: InboxItem, legacySnooze = 0): number {
   const spokeSince = (i.wrote?.answer?.ts ?? 0) > (i.wrote?.runAt?.ts ?? 0);
   const mine = i.wrote?.runAt?.source === 'founder' && !spokeSince ? i.runAt ?? 0 : 0;
   const reminder = i.wrote?.snoozedUntil?.source === 'founder' ? i.snoozedUntil ?? 0 : 0;
-  return Math.max(mine, reminder, legacySnooze);
+  return Math.max(mine, reminder, legacySnooze, runsAgainOnItsOwn(i));
 }
 
 /** What a person said this thread waits on has ended, and they have not acted on it since. */
@@ -201,6 +211,7 @@ export function belongsInInbox(
   // that can end counts (`waitsThatCanEnd`), so a loop of waits stays here.
   if (waitsInLater(i, waitingOn)) return false;
   if (waitCameBack(i)) return true;
+  if (runsAgainOnItsOwn(i)) return false;
   if (parkedByAgent(i, now)) return true; // an agent stopped: what happens next is hers
   // The agent finished acting on her answer and left the thread open, as a
   // standing workstream thread does. That is news. The branches below would
@@ -359,6 +370,7 @@ export function belongsInProgress(
   // A session acted on her answer and finished, so nothing is coming and the
   // inbox shows it instead. Both lists read the same fact.
   if (answerSettled(i)) return false;
+  if (runsAgainOnItsOwn(i)) return true; // its moment has come: the queue starts it
   // Her ask is answered and she has not replied, so the next move is hers and
   // the inbox shows it.
   if (answeredHerAsk(i)) return false;
