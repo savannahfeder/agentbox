@@ -908,6 +908,8 @@ const SWITCH_RESTARTS = 3;
 const SWITCH_WINDOW_MS = 30 * 60_000;
 // The reasons a queued thread's line names (`status().cannotStart`).
 const SAID_WHY_NOT_STARTED = new Set(['setup', 'asleep', 'cloud-carried', 'engine', 'login', 'memory', 'slow-folder', 'error', 'brake']);
+// Refusals that waiting will not fix, so Try again reports them instead of queueing the thread.
+const NEVER_CLEARS = new Set(['model', 'project', 'practice', 'folder']);
 // Making a thread's folder takes seconds; past this it is said to be slow.
 const SLOW_FOLDER_MS = 2 * 60_000;
 // A project's kit for a new thread from the phone: left again at most this
@@ -2040,8 +2042,13 @@ export class Supervisor {
       if (this._roomFor(this._engineFor(item), item, { asked: true })) {
         // A start that throws is said on the press, not lost with the rest of the selection.
         try {
-          this._spawnResume(item);
-          out.resumed += 1;
+          const turnedAway = this._spawnResume(item);
+          if (!turnedAway) out.resumed += 1;
+          else if (NEVER_CLEARS.has(turnedAway)) out.failed += 1;
+          else {
+            this._resumeQueue.add(item.id);
+            out.queued += 1;
+          }
         } catch (error) {
           this._noteNotStarting(item, 'error', this._engineFor(item));
           out.failed += 1;
@@ -2132,7 +2139,8 @@ export class Supervisor {
       // waits behind the OTHER subscription is a resume that never happens.
       if (!this._roomFor(this._engineFor(item), item, { asked: true })) continue;
       this._resumeQueue.delete(item.id);
-      this._spawnResume(item);
+      const turnedAway = this._spawnResume(item);
+      if (turnedAway && !NEVER_CLEARS.has(turnedAway)) this._resumeQueue.add(item.id);
     }
   }
 
@@ -2140,11 +2148,18 @@ export class Supervisor {
   // worker has not answered: that is what puts "the founder has answered" in
   // the brief instead of briefing a stranger about a thread she is mid-way
   // through. Otherwise it is an ordinary session on the item.
-  _spawnResume(item: WorkItem) {
+  //
+  // Returns the reason spawnWorker turned the row away (it does not throw for
+  // one), or null when a run is on it or on its way.
+  _spawnResume(item: WorkItem): string | null {
     const live = item.answer && item.answer !== '(withdrawn)';
     if (live) this._handledAnswers.add(this._answerKey(item));
+    const before = this._notStarting?.get(item.id);
     // She resumed it by name, and its launch asks memory the way its queue did.
     this.spawnWorker(item, { continuation: !!live, asked: true });
+    if (this.sessions.has(item.id) || this._preparing?.has(item.id)) return null;
+    const noted = this._notStarting?.get(item.id);
+    return noted && noted !== before ? noted.why : null;
   }
 
   // The recovery command. When every worker dies at once (the founder's plan
