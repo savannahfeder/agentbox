@@ -2,6 +2,7 @@
 // Each file is one tile however many threads it went to; opening it is the big
 // view with every comment from every copy, and the places it was sent in.
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { fitMenu } from '../keep-in-window';
 import { ago } from '../format';
@@ -181,8 +182,9 @@ function MoveMenu({ file, name, keys, folders, act, onNewFolder }: {
 type Making = 'document' | 'folder';
 
 /** "New": a document or a folder, here or, from every file, in a project you pick. */
-function NewMenu({ project, projects, canDocument, canFolder, onPick }: {
+function NewMenu({ project, projects, canDocument, canFolder, onPick, look = 'button', opens = 'left' }: {
   project: string | null; projects: string[]; canDocument: boolean; canFolder: boolean; onPick: (what: Making, project: string) => void;
+  look?: 'button' | 'header' | 'plus'; opens?: 'left' | 'right';
 }) {
   const [open, setOpen] = useState(false);
   const [what, setWhat] = useState<Making | null>(null);
@@ -194,9 +196,14 @@ function NewMenu({ project, projects, canDocument, canFolder, onPick }: {
     else setWhat(w);
   };
   if ((!project && !projects.length) || (!canDocument && !canFolder)) return null;
-  return <div className="fp-new-box" ref={box}>
-    <button type="button" className="fp-new" aria-haspopup="menu" aria-expanded={open} onClick={() => { setOpen(!open); setWhat(null); }}>New</button>
-    {open && <div className="fp-menu" role="menu">
+  const toggle = () => { setOpen(!open); setWhat(null); };
+  return <div className={`fp-new-box is-${look}`} ref={box}>
+    {look === 'header'
+      ? <button type="button" className="th-new" aria-haspopup="menu" aria-expanded={open} onClick={toggle}><PlusGlyph />New</button>
+      : look === 'plus'
+        ? <button type="button" className="fp-plus" aria-label="New document or folder" title="New document or folder" aria-haspopup="menu" aria-expanded={open} onClick={toggle}><PlusGlyph /></button>
+        : <button type="button" className="fp-new" aria-haspopup="menu" aria-expanded={open} onClick={toggle}>New</button>}
+    {open && <div className={`fp-menu${opens === 'right' ? ' opens-right' : ''}`} role="menu">
       {what
         ? <>
           <div className="fp-menu-head">{what === 'document' ? 'New document in' : 'New folder in'}</div>
@@ -207,6 +214,43 @@ function NewMenu({ project, projects, canDocument, canFolder, onPick }: {
           {canFolder && <button type="button" role="menuitem" className="fp-menu-item" onClick={() => choose('folder')}><FolderGlyph />Folder</button>}
         </>}
     </div>}
+  </div>;
+}
+
+type NewAt = 'header' | 'title' | 'crumbs' | 'search' | 'tiles' | 'toolbar';
+const newAt = (): NewAt => {
+  try { const v = localStorage.getItem('agentbox.filesNewAt'); if (v && ['header', 'title', 'crumbs', 'search', 'tiles', 'toolbar'].includes(v)) return v as NewAt; } catch { /* no storage */ }
+  return 'header';
+};
+
+/** An element the window's header draws for this page, once it is there. */
+function useSlot(id: string) {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  useEffect(() => { setEl(document.getElementById(id)); }, [id]);
+  return el;
+}
+
+/** "New folder" or "New document" drawn where it will appear. From every file it asks which project. */
+function GhostNew({ what, project, projects, onPick }: { what: Making; project: string | null; projects: string[]; onPick: (what: Making, project: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useClosesOutside(open, () => setOpen(false));
+  const go = () => { if (project) onPick(what, project); else if (projects.length === 1) onPick(what, projects[0]); else setOpen(!open); };
+  const words = what === 'folder' ? 'New folder' : 'New document';
+  const menu = open && <div className="fp-menu opens-right" role="menu">
+    <div className="fp-menu-head">{words} in</div>
+    <div className="fp-menu-list">{projects.map((p) => <button type="button" key={p} role="menuitem" className="fp-menu-item" onClick={() => { setOpen(false); onPick(what, p); }}>{p}</button>)}</div>
+  </div>;
+  if (what === 'folder') {
+    return <div className="fp-folder fp-ghost" ref={box}>
+      <button type="button" className="fp-folder-open" onClick={go}><PlusGlyph /><span className="fp-folder-words"><span className="fp-folder-name">{words}</span></span></button>
+      {menu}
+    </div>;
+  }
+  return <div className="fp-tile fp-ghost" ref={box}>
+    <button type="button" className="fp-open-file" onClick={go}>
+      <span className="fp-face"><span className="fp-ghost-words"><PlusGlyph />{words}</span></span>
+    </button>
+    {menu}
   </div>;
 }
 
@@ -261,6 +305,7 @@ function FolderCard({ folder, count, onOpen, onDropFile, onRename }: {
 }
 
 const FolderGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M2 4.6c0-.6.5-1.1 1.1-1.1h2.7c.3 0 .6.1.8.3l1 1h5.3c.6 0 1.1.5 1.1 1.1v6c0 .6-.5 1.1-1.1 1.1H3.1c-.6 0-1.1-.5-1.1-1.1z" strokeLinejoin="round" /></svg>;
+const PlusGlyph = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>;
 const DocGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M4 2.5h5l3 3v8H4z M9 2.5v3h3 M6 8.5h4 M6 10.8h4" strokeLinejoin="round" strokeLinecap="round" /></svg>;
 const MoreGlyph = () => <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.2" /><circle cx="8" cy="8" r="1.2" /><circle cx="12.5" cy="8" r="1.2" /></svg>;
 const PenGlyph = () => <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M3 13l.7-2.8 7-7a1.2 1.2 0 0 1 1.7 0l.4.4a1.2 1.2 0 0 1 0 1.7l-7 7z" strokeLinejoin="round" /></svg>;
@@ -384,8 +429,17 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
   const empty = looking ? 'No file matches.'
     : folder ? 'Nothing in this folder yet.'
       : project ? `No files in ${project} yet.` : 'Nothing in Files yet.';
+  const at = newAt();
+  const canDocument = project ? isMine(project) : true;
+  const canFolder = project ? canNest : true;
+  const pick = (what: Making, p: string) => { if (p !== project) onProject(p); setNaming({ what, project: p }); };
+  const newMenu = (look: 'button' | 'header' | 'plus', opens: 'left' | 'right') => !looking && <NewMenu project={project} projects={mine} canDocument={canDocument} canFolder={canFolder} onPick={pick} look={look} opens={opens} />;
+  const headSlot = useSlot('fp-head-slot');
+  const titleSlot = useSlot('fp-title-slot');
 
   return <div className="fp-page">
+    {at === 'header' && headSlot && createPortal(newMenu('header', 'left'), headSlot)}
+    {at === 'title' && titleSlot && createPortal(newMenu('plus', 'right'), titleSlot)}
     <div className="fp-bar">
       <nav className="fp-crumbs" aria-label="Where you are">
         {crumbs.map((c, i) => {
@@ -398,11 +452,15 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
           </span>;
         })}
       </nav>
-      <label className="fp-find">
-        <SearchIcon />
-        <input ref={box} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search files" aria-label="Search files"
-          onKeyDown={(e) => { if (e.key === 'Escape' && query) { e.stopPropagation(); setQuery(''); } }} />
-      </label>
+      {at === 'crumbs' && newMenu('plus', 'right')}
+      <div className="fp-find-row">
+        <label className="fp-find">
+          <SearchIcon />
+          <input ref={box} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search files" aria-label="Search files"
+            onKeyDown={(e) => { if (e.key === 'Escape' && query) { e.stopPropagation(); setQuery(''); } }} />
+        </label>
+        {at === 'search' && newMenu('plus', 'left')}
+      </div>
     </div>
     <div className="fp-tools">
       <div className="fp-kinds" role="group" aria-label="Show">
@@ -421,15 +479,15 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
           <button type="button" className={`fp-kind fp-view-icon${asList ? '' : ' is-on'}`} aria-pressed={!asList} aria-label="Grid" title="Grid" onClick={() => setAsList(false)}><GridGlyph /></button>
           <button type="button" className={`fp-kind fp-view-icon${asList ? ' is-on' : ''}`} aria-pressed={asList} aria-label="List" title="List" onClick={() => setAsList(true)}><ListGlyph /></button>
         </div>
-        {!looking && <NewMenu project={project} projects={mine} canDocument={project ? isMine(project) : true} canFolder={project ? canNest : true}
-          onPick={(what, p) => { if (p !== project) onProject(p); setNaming({ what, project: p }); }} />}
+        {at === 'toolbar' && newMenu('button', 'left')}
       </div>
     </div>
-    {(cards.length > 0 || projectCards.length > 0 || naming?.what === 'folder') && <div className="fp-folders">
+    {(cards.length > 0 || projectCards.length > 0 || naming?.what === 'folder' || (at === 'tiles' && !looking && canFolder)) && <div className="fp-folders">
       {projectCards.map((p) => <FolderCard key={p} folder={{ name: p }} count={filesBelow(all.files, folders, { project: p, folder: null }).length} onOpen={() => onProject(p)} />)}
       {cards.map((f) => <FolderCard key={f.id} folder={f} count={countIn(f.id)} onOpen={() => setFolderId(f.id)}
         onDropFile={(key) => move(key, f.id)} onRename={(name) => { void act({ do: 'rename', id: f.id, name }); }} />)}
       {naming?.what === 'folder' && project && <div className="fp-folder is-new"><div className="fp-folder-open"><FolderGlyph /><span className="fp-folder-words"><NameBox placeholder="Folder name" onCancel={() => setNaming(null)} onDone={(name) => { setNaming(null); void act({ do: 'make', project, name, parent: folder }); }} /></span></div></div>}
+      {at === 'tiles' && !looking && canFolder && naming?.what !== 'folder' && <GhostNew what="folder" project={project} projects={mine} onPick={pick} />}
     </div>}
     {list && !shown.length && !scratch.length && !cards.length && !projectCards.length && !naming && <p className="fp-empty">{empty}</p>}
     <div className={asList ? 'fp-lines' : 'fp-grid'}>
@@ -439,6 +497,7 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
           <span className="fp-name"><NameBox placeholder="Document name" onCancel={() => setNaming(null)} onDone={makeDocument} /></span>
         </div>
       </div>}
+      {at === 'tiles' && !looking && canDocument && naming?.what !== 'document' && !asList && <GhostNew what="document" project={project} projects={mine} onPick={pick} />}
       {shown.map(tile)}
     </div>
     {scratch.length > 0 && <div className="fp-scratch-row">
