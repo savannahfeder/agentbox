@@ -7,9 +7,10 @@ import { router } from '../lib/router';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { InboxComposer } from '../ui/NewThreadForm';
-import { phoneBoard, shownTabs, TABS, type Row, type TabId } from '../lib/tabs';
+import { COUNT_GAP, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsTighten, type Row, type TabId } from '../lib/tabs';
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
 import { EverythingPlace } from '../ui/Everything';
 import { bottomTabs, type PlaceId } from '../lib/groups';
@@ -78,6 +79,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
         {/* Sent from the phone and not yet taken: the web app's status word (status-word.ts). */}
         {row.queued && <><T style={{ ...small, color: color.dim }}>Queued</T><T style={small}>·</T></>}
+        {row.priority && <View accessibilityLabel={row.priority === 'urgent' ? 'Urgent' : 'High priority'}><PriorityBars level={row.priority === 'urgent' ? 4 : 3} /></View>}
         <T numberOfLines={1} style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 20, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim, flexShrink: 1 }}>{row.projectName}</T>
         <T style={small}>·</T>
         <T style={small}>{row.when}</T>
@@ -172,18 +174,37 @@ function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: an
  * without messing much with spacing". The bar's line along their top is gone,
  * since the title bar's is under them; they scroll sideways when they do not fit. */
 function Tabs({ on, counts, pick, team }: { on: PlaceId; counts: Record<PlaceId, number>; pick: (t: PlaceId) => void; team: boolean }) {
+  const [span, setSpan] = useState({ view: 0, content: 0, x: 0 });
+  const tabs = bottomTabs(team);
+  const counted = tabs.filter((t) => t.id !== 'done' && counts[t.id] > 0).length;
+  const [tight, setTight] = useState(false);
+  useEffect(() => { setTight((now) => tabsTighten(span, now, { tabs: tabs.length, counted })); }, [span.view, span.content, tabs.length, counted]);
   return (
     <View style={{ height: size.tabs, flexDirection: 'row', alignItems: 'center' }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', paddingLeft: size.inset, paddingRight: 8, gap: 22 }}>
-        {bottomTabs(team).map((t) => (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', paddingLeft: size.inset, paddingRight: 8, gap: tight ? TAB_GAP.tight : TAB_GAP.loose }}
+        onLayout={(e) => { const view = e.nativeEvent.layout.width; setSpan((s) => ({ ...s, view })); }}
+        onContentSizeChange={(content) => setSpan((s) => ({ ...s, content }))}
+        onScroll={(e) => { const x = e.nativeEvent.contentOffset.x; setSpan((s) => ({ ...s, x })); }} scrollEventThrottle={32}>
+        {tabs.map((t) => (
           <Pressable key={t.id} onPress={() => pick(t.id)} accessibilityRole="tab" accessibilityState={{ selected: on === t.id }}
             style={{ height: 32, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: on === t.id ? color.accent : 'transparent' }}>
             <T style={{ fontSize: 15, lineHeight: 30, color: on === t.id ? color.text : color.dim }}>{t.label}</T>
-            {t.id !== 'done' && counts[t.id] > 0 && <T style={{ fontSize: 11, lineHeight: 30, fontFamily: font.medium, marginLeft: 13, color: color.faint }}>{counts[t.id]}</T>}
+            {t.id !== 'done' && counts[t.id] > 0 && <T style={{ fontSize: 11, lineHeight: 30, fontFamily: font.medium, marginLeft: tight ? COUNT_GAP.tight : COUNT_GAP.loose, color: color.faint }}>{counts[t.id]}</T>}
           </Pressable>
         ))}
       </ScrollView>
+      {moreToTheRight(span) && <EdgeFade />}
     </View>
+  );
+}
+
+/** Tabs still past the edge fade out there, so the row reads as one that scrolls. */
+function EdgeFade() {
+  return (
+    <Svg style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 32 }} width={32} height="100%" pointerEvents="none">
+      <Defs><LinearGradient id="tabs-fade" x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor={color.bg} stopOpacity={0} /><Stop offset="1" stopColor={color.bg} stopOpacity={1} /></LinearGradient></Defs>
+      <Rect width="100%" height="100%" fill="url(#tabs-fade)" />
+    </Svg>
   );
 }
 
