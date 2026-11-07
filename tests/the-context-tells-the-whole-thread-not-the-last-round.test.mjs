@@ -31,7 +31,8 @@ const defaults = JSON.parse(read('shared/instruction-defaults.json'));
 describe('the worker brief', () => {
   it('says the Context is about the whole thread, and opens with what it is for', () => {
     expect(brief).toMatch(/`problem` is shown as CONTEXT[^.]*: the whole thread, for someone who has forgotten it\./);
-    expect(brief).toContain('Open with what the thread is for, then where it stands overall');
+    // The order within that opening is tests/the-contexts-first-sentence-says-what-the-thread-is-and-where-it-stands.
+    expect(brief).toContain('what it is for and where it stands now');
   });
   it('and that the latest round is the answer\'s, not the Context\'s', () => {
     expect(brief).toContain("never only this round's news, which your answer already gives");
@@ -46,7 +47,7 @@ describe('the worker brief', () => {
 
 describe('the store tool\'s own words', () => {
   it('say the same', () => {
-    expect(tools).toMatch(/the summary's CONTEXT[^`]*the whole thread for someone who has forgotten it: what the thread is for, then where it stands overall\. Never only the latest round/);
+    expect(tools).toMatch(/the summary's CONTEXT[^`]*the whole thread for someone who has forgotten it\. The first sentence alone says what the thread is for and where it stands now[^`]*Never only the latest round/);
     expect(tools).not.toContain('what was asked, what was found, the facts needed to decide');
   });
 });
