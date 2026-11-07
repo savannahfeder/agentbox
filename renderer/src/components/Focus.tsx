@@ -1942,7 +1942,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
         <rect x="1.5" y="1.5" width="9" height="9" fill="currentColor" />
       </svg>
-      Stop
+      <span className="dock-stop-word">Stop</span>
     </button>
   ) : null;
 
