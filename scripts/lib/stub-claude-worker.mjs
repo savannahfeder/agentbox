@@ -44,6 +44,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { readWorld, worldTurn, worldAnswer, titleIn, stepEvery, workStep } from './stand-in-world.mjs';
+import { makeArtifacts } from './stand-in-artifacts.mjs';
 
 const argv = process.argv.slice(2);
 const say = (obj) => process.stdout.write(JSON.stringify(obj) + '\n');
@@ -344,6 +345,17 @@ const COMPUTER_ASK = /\bxcode\b|simulator|testflight/i;
 }
 const handsOver = directive('stub:file')?.[1];
 if (handsOver) said = `${said}\n\n${handsOver}\n`;
+// A task that asks for something to look at gets real files, saved where a real agent saves them.
+if (plan.makesFiles && process.env.ZERO_ITEM && argv.includes('-p')) {
+  const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
+  const docsDir = `${brief}\n${promptText}`.match(/^Product docs live in: (.+)$/m)?.[1]?.trim();
+  const task = promptText.match(/^Title: [\s\S]*?(?=\n# |(?![\s\S]))/m)?.[0] ?? '';
+  const asked = promptText.match(/# The founder has answered[\s\S]*?\n> (.*)/)?.[1] ?? '';
+  try {
+    const files = makeArtifacts({ docsDir, item: process.env.ZERO_ITEM, task, asked, promptText });
+    if (files.length) said = `${said}\n\n${files.join('\n')}\n`;
+  } catch { /* a stand-in's file is never worth its answer */ }
+}
 if (directive('stub:limit') || (directive('stub:limit-first') && attempt === 1) || (limitOn && limitOn === loginName) || turn.limit) {
   say({ type: 'result', subtype: 'success', result: "You've hit your session limit · resets 11:59pm", is_error: true, session_id: sessionId });
   await Promise.race([inputEnded, wait(2000)]);

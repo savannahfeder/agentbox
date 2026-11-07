@@ -16,6 +16,8 @@
 //     --keep                                           leave the copies up afterwards
 //     --files <dir>                                    copied into every project's documents in every copy (a table, a deck under test)
 //     --team <file> --room <name>                      one tester signs in to a real team (live.mjs --team) and talks in that room
+//     --stand-in-team "<name>"                         every tester on one team, through a stand-in team cloud of the run's own;
+//                                                      the first starts it, invites the rest and shares their first project
 //
 // For each person: a copy of the app of their own (live.mjs with
 // VERIFY_INSTANCE=power-<who>), shaped like their setup; a watcher reading it
@@ -43,6 +45,7 @@ import { createWatcher, freeMemoryMb, readAllLines, keepEvidence, sleepTargets }
 import { writeReport } from './report.mjs';
 import { seedArtifacts } from './artifacts.mjs';
 import { readDiary } from './diary.mjs';
+import { writeTeamFiles, namePeople, doorOf, formTeam, teamWords } from './team.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const VERIFY = path.resolve(here, '../../verify-agentbox/scripts');
@@ -83,6 +86,9 @@ const team = opt('team');
 const room = opt('room');
 const files = opt('files') ? path.resolve(opt('files')) : null;
 if (files && !fs.existsSync(files)) stop(`--files: there is no folder at ${files}.`);
+const standInTeam = opt('stand-in-team');
+if (standInTeam && team) stop('--stand-in-team makes a team of its own: leave out --team.');
+if (standInTeam && people.length < 2) stop('--stand-in-team is two or more testers on one team: name them with --who.');
 if (team && people.length !== 1) stop('--team signs one account in, so it runs one tester: name them with --who.');
 if (room && !team) stop('--room needs --team: a copy with no team is in no room.');
 try { chaosPlan(chaos, totalMs); } catch (err) { stop(err.message); }
@@ -201,6 +207,17 @@ function seedHistory(state, person, count) {
   return ids;
 }
 
+let teamCloud = null;
+let teamFiles = {};
+if (standInTeam) {
+  const { startStandinCloud } = await import(path.join(REPO, 'cloud', 'standin', 'server.mjs'));
+  fs.mkdirSync(path.join(root, 'team-cloud'), { recursive: true });
+  teamCloud = await startStandinCloud({ file: path.join(root, 'team-cloud', 'cloud.json') });
+  teamFiles = writeTeamFiles({ root, url: teamCloud.url, people });
+  await namePeople({ url: teamCloud.url, people });
+  say(`${standInTeam}: a stand-in team cloud at ${teamCloud.url} for ${people.map((p) => p.name).join(', ')}`);
+}
+
 const setups = [];
 for (const person of people) {
   const name = `power-${person.slug}`;
@@ -208,7 +225,7 @@ for (const person of people) {
   fs.mkdirSync(dir, { recursive: true });
   const shape = real ? [] : ['--logins', String(person.logins), ...(person.codex ? [] : ['--no-codex'])];
   say(`${person.name}: starting a copy of the app shaped like their setup`);
-  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(alpha ? ['--alpha', alpha] : []));
+  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(teamFiles[person.slug] ? ['--team', teamFiles[person.slug]] : []), ...(alpha ? ['--alpha', alpha] : []));
   fs.writeFileSync(path.join(dir, 'up.log'), up.out);
   const stateFile = path.join(instanceDir(name), 'instance.json');
   const state = readJson(stateFile);
@@ -218,6 +235,26 @@ for (const person of people) {
   const seeded = person.history ? seedHistory(state, person, person.history) : new Set();
   if (seeded.size) await live(name, 'restart');
   setups.push({ person, name, dir, stateFile, seeded, cmds: layCommands(dir, name) });
+}
+
+let teamMade = null;
+if (standInTeam) {
+  const ready = setups.filter((s) => !s.failed);
+  if (ready.length < 2) stop(`only ${ready.length} copy started, and a team needs two: ${setups.map((s) => s.failed).filter(Boolean).join('; ')}`);
+  try {
+    teamMade = await formTeam({
+      teamName: standInTeam,
+      copies: ready.map((s, i) => {
+        const st = readJson(s.stateFile);
+        return { person: s.person, call: doorOf(st), project: i === 0 ? Object.keys(st.repos)[0] : null };
+      }),
+    });
+  } catch (err) {
+    for (const s of setups) await live(s.name, 'down');
+    await teamCloud.stop();
+    stop(`the team did not form: ${err.message}`);
+  }
+  say(`${standInTeam}: formed, ${teamMade.shared ? `${teamMade.shared} shared` : 'nothing shared'}`);
 }
 
 const startedAt = Date.now();
@@ -365,7 +402,7 @@ async function runPerson({ person, name, dir, stateFile, seeded, failed, cmds })
       const cov = coverage({ actions: readJsonl(path.join(dir, 'actions.jsonl')), lines: readAllLines(state()), seeded, maxAtOnce: watcher.maxAtOnce, person });
       fs.writeFileSync(path.join(dir, 'clock.json'), JSON.stringify({ round, deadline, roundEnd: next.endsAt }));
       const prompt = testerPrompt({
-        person, focus, room, browse: cmds.browse, diary: cmds.diary, shots: dir, round, real,
+        person, focus, room, team: standInTeam ? teamWords({ teamName: standInTeam, me: person, people, shared: teamMade?.shared }) : null, browse: cmds.browse, diary: cmds.diary, shots: dir, round, real,
         totalMinutes: Math.round(totalMs / MIN), minutesLeft: Math.round((deadline - now) / MIN), roundMinutes: Math.round((next.endsAt - now) / MIN),
         fraction: (now - startedAt) / totalMs, diaryTail: diaryTail(dir),
         issues: issues.map((i) => `#${i.n} [${i.severity}] ${i.title} (seen ${i.seen})`), notYet: cov.notYet, stoppedEarlyMin: early,
@@ -418,6 +455,7 @@ wake();
 
 const { file, counts } = writeReport({ root, startedAt, endedAt: Date.now(), focus, real, chaos, people: results });
 if (!flag('keep')) for (const s of setups) await live(s.name, 'down');
+if (teamCloud && !flag('keep')) await teamCloud.stop();
 say(`done: ${counts.issues} issue(s) from the testers (${counts.seenTwice} seen more than once), ${counts.machine} from the watcher.`);
 for (const r of results) if (r.stopped) say(`${r.name} stopped early: ${r.stopped}`);
 say(`report: ${file}`);
