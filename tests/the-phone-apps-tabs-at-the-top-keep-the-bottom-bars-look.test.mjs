@@ -15,6 +15,7 @@ import fs from 'node:fs';
 
 const inbox = fs.readFileSync('mobile/src/app/index.tsx', 'utf8');
 const theme = fs.readFileSync('mobile/src/ui/theme.ts', 'utf8');
+const rules = fs.readFileSync('mobile/src/lib/tabs.ts', 'utf8');
 const tabs = inbox.slice(inbox.indexOf('function Tabs('), inbox.indexOf('\n}\n', inbox.indexOf('function Tabs(')));
 
 describe("the phone app's tabs, now at the top", () => {
@@ -24,8 +25,11 @@ describe("the phone app's tabs, now at the top", () => {
     expect(tabs).not.toMatch(/border(Top|Bottom)Width: 1/);
     expect(tabs).not.toMatch(/foot/);
   });
+  // Closer only on a screen too narrow for all of them (QA M-33,
+  // tests/the-phones-tab-row-shows-it-goes-on-past-the-edge).
   it('sit 22pt apart from the title\'s left edge, as they did at the bottom', () => {
-    expect(tabs).toMatch(/paddingLeft: size\.inset, paddingRight: 8, gap: 22/);
+    expect(rules).toMatch(/TAB_GAP = \{ loose: 22,/);
+    expect(tabs).toMatch(/paddingLeft: size\.inset, paddingRight: 8, gap: tight \? TAB_GAP\.tight : TAB_GAP\.loose/);
     expect(tabs).not.toMatch(/gap: 18/);
   });
   it('draw each word at 15pt in regular, picked or not', () => {
@@ -33,7 +37,8 @@ describe("the phone app's tabs, now at the top", () => {
     expect(tabs).not.toMatch(/font\.medium : font\.regular/);
   });
   it('keep each count 13pt from its word, at 11pt', () => {
-    expect(tabs).toMatch(/fontSize: 11, lineHeight: 30, fontFamily: font\.medium, marginLeft: 13, color: color\.faint/);
+    expect(rules).toMatch(/COUNT_GAP = \{ loose: 13,/);
+    expect(tabs).toMatch(/fontSize: 11, lineHeight: 30, fontFamily: font\.medium, marginLeft: tight \? COUNT_GAP\.tight : COUNT_GAP\.loose, color: color\.faint/);
   });
   it('underline the picked word itself, not the bar', () => {
     expect(tabs).toMatch(/height: 32, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: on === t\.id \? color\.accent : 'transparent'/);

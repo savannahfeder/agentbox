@@ -2074,12 +2074,20 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // says to check the inbox, and the sign-in finishes here, so the page moves
   // on by itself. Behind the handler, which it would hold for a quarter hour.
   let confirming: Promise<void> | null = null;
+  // One sign-in for both: the phone side has its own session and would
+  // otherwise stay signed out after a cloud sign-in.
+  const connectThePhone = async (acct: CloudAccountHold) => {
+    const s = acct.session.takeSession();
+    if (!team || !s) return;
+    try { await team.adoptSession(s); } catch (err) { console.warn(`cloud account: the phone did not sign in with it: ${(err as Error)?.message ?? err}`); }
+  };
   const waitForTheLink = async (acct: CloudAccountHold) => {
     if (confirming) return;
     const { waitForEmailConfirmation } = await import('./cloud/account.mts');
     confirming = waitForEmailConfirmation({ config: acct.value, session: acct.session, home: supervisor.config.home || os.homedir() })
-      .then((out) => {
+      .then(async (out) => {
         if (!out.ok) { console.log(`cloud account: the confirmation link did not finish: ${out.error}`); return; }
+        await connectThePhone(acct);
         try { if (window?.isMinimized?.()) window.restore?.(); window?.show?.(); } catch { /* no window to raise */ }
         push();
       })
@@ -2092,6 +2100,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const out = await cloudSignIn({ config: acct.value, session: acct.session, method, email, password, name, acceptTerms: acceptTerms === true, home: supervisor.config.home || os.homedir() });
     if (method === 'google') { try { if (window?.isMinimized?.()) window.restore?.(); window?.show?.(); } catch { /* no window to raise */ } }
     if (out.ok && out.confirm) void waitForTheLink(acct);
+    else if (out.ok) await connectThePhone(acct);
     push();
     return out;
   });
@@ -2457,6 +2466,23 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       if (!out) return { ok: false, error: 'that cannot be done here' };
       push();
       return { ok: true, folder: out.id ?? null };
+    } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+  });
+  ipcMain.handle('zero:files-place-new', async (_e, { project, name, kind, folder }: { project?: unknown; name?: unknown; kind?: unknown; folder?: unknown } = {}) => {
+    try {
+      const out = await filesPlaceNow().newDocument({ project: String(project ?? ''), name: String(name ?? ''), kind: kind === 'table' ? 'table' : 'document', folder: typeof folder === 'string' ? folder : null });
+      push();
+      return { ok: true, key: out.key };
+    } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+  });
+  ipcMain.handle('zero:files-place-upload', async (_e, { project, folder }: { project?: unknown; folder?: unknown } = {}) => {
+    try {
+      const r = await dialog.showOpenDialog(window as unknown as ElectronWindow, { title: `Add files to ${String(project ?? '')}`, buttonLabel: 'Add', properties: ['openFile', 'multiSelections'] });
+      if (r.noDialog) return { ok: false, error: `Adding files needs the ${Name} app on this computer.` };
+      if (r.canceled || !r.filePaths?.length) return { ok: true, added: 0, refused: [], keys: [] };
+      const out = await filesPlaceNow().addFiles({ project: String(project ?? ''), folder: typeof folder === 'string' ? folder : null, paths: r.filePaths });
+      if (out.added) push();
+      return { ok: true, ...out };
     } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   });
   ipcMain.handle('zero:files-place-open', async (_e, { key }: { key?: unknown } = {}) => {

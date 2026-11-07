@@ -225,8 +225,9 @@ describe('teammates through the store', () => {
     const here = new Teammates({ config: { storeRoot: root, accountId: 'acct-projects' }, modules: mods, listProducts: () => listed, listItems: () => [] });
     const hugo = here.create({ starter: 'fundraising', product: 'company' });
     const brief = here.briefFor({ id: 'w-h', product: 'company', labels: ['founder', `teammate:${hugo.id}`, 'hop:0'] });
-    expect(brief).toContain('- Company (yours): no code, docs at /d/company');
+    expect(brief).toContain('- Company (yours): no code');
     expect(brief).toContain('- Product: code at /r/product');
+    expect(brief).toContain('list_documents');
     expect(brief).not.toContain('Practice');
     // With one project there is nothing to list.
     const one = new Teammates({ config: { storeRoot: root, accountId: 'acct-one' }, modules: mods, listProducts: () => [listed[1]], listItems: () => [] });

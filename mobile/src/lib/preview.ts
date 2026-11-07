@@ -403,6 +403,10 @@ export function previewCloud(now = () => Date.now()) {
     async putFile() {},
     async googleUrl() { return ''; },
     async finishGoogle() { signedIn = true; signedInAt = now(); return session()!; },
+    async askPasswordReset() {},
+    resetAsked: () => false,
+    async finishReset() { signedIn = true; signedInAt = now(); return session()!; },
+    async setPassword() {},
     signOut() { signedIn = false; },
   };
 }

@@ -3,7 +3,7 @@
 // message under them, and attaching a file or picture at the foot. The New
 // thread page wears it whole; the empty inbox draws it open on the page, as
 // the web app does (Pages.tsx `InboxClear`).
-import { router } from 'expo-router';
+import { router } from '../lib/router';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Platform, Pressable, TextInput, View } from 'react-native';
 import { readRule, repeatPresets } from '../../../renderer/src/format';

@@ -90,7 +90,7 @@ describe('a click after the app moved you on', () => {
 
   it('and the pane\'s own pick goes through that guard', () => {
     expect(app).toContain('const pickAimedHere = useCallback((item: WorkItem, n: number) => {');
-    expect(app).toContain('if (!pickLandsHere(arrived.current, keyOf(item), Date.now())) { showToast(AIMED_AT_THE_THREAD_YOU_LEFT); return; }');
+    expect(app).toContain('if (!clickAimedHere(arrived.current, keyOf(item), Date.now(), pointer.current)) {');
     expect(app).toContain('onPick={(n) => pickAimedHere(focused, n)}');
   });
 

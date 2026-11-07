@@ -115,6 +115,9 @@
 }
 .tbl .tbl-link a { color: var(--text-dim); text-decoration: none; }
 .tbl .tbl-link a:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+/* A name that opens its row's link still reads as the name. */
+.tbl .tbl-name a, .tbl-sheet-name a { color: inherit; text-decoration: none; }
+.tbl .tbl-name a:hover, .tbl-sheet-name a:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--text-dim); }
 
 .tbl-tag {
   display: inline-flex; align-items: center; gap: 6px;

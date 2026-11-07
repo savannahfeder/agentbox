@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
+import { emptyDatabase } from './an-empty-test-database.mjs';
 import { commandFor, phoneSlug } from '../renderer/src/cloud-bridge';
 import { cloudClient } from '../renderer/src/cloud-rest';
 import { checkCommand } from '../shared/phone-snapshot.mjs';
@@ -83,7 +84,7 @@ describe('the database', () => {
   }
   const refused = async (person, sql, params) => { try { await as(person, sql, params); return false; } catch { return true; } };
   beforeAll(async () => {
-    db = new PGlite();
+    db = new PGlite(await emptyDatabase());
     await db.exec(`create schema auth;
 create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz, raw_user_meta_data jsonb default '{}'::jsonb);
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
