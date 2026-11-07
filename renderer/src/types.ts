@@ -817,7 +817,8 @@ export interface UsageLimit {
 /** The Agentbox Cloud plan this Mac is signed in to, as the cloud server counts it. */
 export interface CloudPlan {
   signedIn: boolean;
-  plan?: 'none' | 'pro' | 'plus' | 'max';
+  /** 'free' is no plan with free hours left (main/cloud/account.mts cloudPlanOf). */
+  plan?: 'none' | 'free' | 'pro' | 'plus' | 'max';
   unlimited?: boolean;
   /** Agents at once; null when unlimited. */
   agents?: number | null;
