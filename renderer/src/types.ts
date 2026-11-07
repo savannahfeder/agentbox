@@ -289,6 +289,8 @@ export interface PlacedFile {
   project: string | null;
   name: string;
   kind: FileKind | null;
+  /** Made in Files and nothing written in it yet. */
+  blank?: boolean;
   versions: number;
   at: number;
   by: string | null;
@@ -314,7 +316,8 @@ export type FileFolderAct =
   | { do: 'rename'; id: string; name: string }
   | { do: 'move'; key: string; folder: string | null };
 
-export interface FilesPlaceList { files: PlacedFile[]; projects: string[]; folders?: FileFolder[] }
+export interface FilesUploaded { ok: boolean; error?: string; added?: number; refused?: string[]; keys?: string[] }
+export interface FilesPlaceList { files: PlacedFile[]; projects: string[]; folders?: FileFolder[]; mine?: string[] }
 export type ConnectionState = 'not_connected' | 'works' | 'not_signed_in' | 'not_allowed' | 'nothing_to_read' | 'down' | 'unreachable' | 'choose_reads';
 export type ConnectionAccess = 'sign_in' | 'own_client' | 'key' | 'vendor_approval';
 export interface ConnectionFailure { at: number; tool: string; wrote: boolean; why: string }
@@ -1723,6 +1726,8 @@ declare global {
       filesPlaceEdit?(p: { key: string; text: string }): Promise<{ ok: boolean; error?: string; goes?: 'sent'; to?: string }>;
       filesPlaceMark?(p: { key: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
       filesPlaceFolder?(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null }>;
+      filesPlaceNew?(p: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }>;
+      filesPlaceUpload?(p: { project: string; folder: string | null }): Promise<FilesUploaded>;
       fileElsewhere?(p: { product: string; id: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]>;
       fileLine?(p: { product: string; id: string }): Promise<FileLine[]>;
       teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult>;

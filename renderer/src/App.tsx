@@ -7585,6 +7585,7 @@ export default function App() {
               here, on a phone only (searchInTheList). It ended the tabs row
               (w-3c51d02de5) until an iPhone clipped it out of sight there,
               because that row scrolls sideways (w-33511040d7). */}
+          {filesShown && !focused && <div className="th-right" id="fp-head-slot" />}
           {!focused && !settingsOpen && !teamShown && !filesShown && !connectionsShown && (teammatesShown && !evOn ? teammatesUi.right : roomShown && roomsUi.heading?.right !== undefined ? roomsUi.heading.right : (
             <HeaderActions
               page="inbox"
