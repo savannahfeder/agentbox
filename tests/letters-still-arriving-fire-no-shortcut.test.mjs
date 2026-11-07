@@ -11,18 +11,17 @@ describe('letters straight after a send', () => {
   const call = (o) => s.decide({ key: 'n', inInput: false, chord: false, boxThere: false, openingThere: false, ...o });
   beforeEach(() => s.reset());
 
-  it('the rest of the sentence fires nothing', () => {
-    s.sent(1000);
-    expect(call({ now: 1010, key: ' ' })).toBe('drop');
+  // The first key after a send may be O, which goes back to the thread replied to.
+  it('only the first key acts; the N of " name" and the rest fire nothing', () => {
+    expect(call({ now: 1010, key: ' ' })).toBe('shortcut');
     expect(call({ now: 1030, key: 'n' })).toBe('drop');
     expect(call({ now: 1050, key: 'a' })).toBe('drop');
   });
   it('a shortcut a beat after the send still works', () => {
-    s.sent(1000);
+    expect(call({ now: 1000, key: ' ' })).toBe('shortcut');
     expect(call({ now: 1000 + BURST_MS + 1, key: 'j' })).toBe('shortcut');
   });
   it('a box opening after the send still takes the letters', () => {
-    s.sent(1000);
     s.opening('reply', 1005);
     expect(call({ now: 1020, openingThere: true })).toBe('into-opening-box');
   });

@@ -28,8 +28,6 @@ export class StrayLetters {
   opening(box: BoxKind, now: number) { this.openedAt = now; this.openingBox = box; }
   /** Escape, a press or ⌘↵: the person chose to leave the box. */
   reset() { this.typedAt = -Infinity; this.openedAt = -Infinity; this.looseAt = -Infinity; }
-  /** ⌘↵ sent the box. Letters still arriving after it are the sentence, not shortcuts. */
-  sent(now: number) { this.reset(); this.looseAt = now; this.looseKey = ''; this.inBurst = true; }
   /** A held letter turned out to be typing: it and the rest of the burst act on nothing. */
   burst(now: number) { this.looseAt = now; this.inBurst = true; }
 
@@ -93,7 +91,7 @@ export function installStrayLetters(win: Window = window, replay: Replay = copyK
     if ((e.target as HTMLElement | null)?.dataset?.keysOnly !== undefined) return;
     if (editable(e.target)) {
       // Plain Enter is a new line in a brief; ⌘↵ sends, so the next letter starts something new.
-      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { strayLetters.sent(now); return; }
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { strayLetters.reset(); return; }
       if (!chord && e.key.length === 1) { strayLetters.typed(now); lastBox = e.target; }
       return;
     }
