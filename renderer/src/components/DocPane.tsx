@@ -53,7 +53,7 @@ import { NAME } from '../../../shared/product-name.mjs';
 import { shownName } from '../../../shared/artifact-marks.mjs';
 import { onPhone } from '../phone-screen';
 import { scrollKey, useKeptScroll } from '../kept-scroll';
-import { pageForNotes } from '../notes-sidebar';
+import { pageForNotes, pageTextForNotes } from '../notes-sidebar';
 
 const COMING_LOOKS_MS = 3000;
 
@@ -105,8 +105,9 @@ export type OpenDoc = { product: string; src: string; auto?: boolean; at?: strin
 const Beside = ({ aside, children }: { aside?: ReactNode; children: ReactNode }) =>
   aside ? <div className="doc-notes-split"><div className="doc-notes-page">{children}</div>{aside}</div> : <>{children}</>;
 
+// Pins go on a page only once it is drawn whole; until then it scrolls inside its frame and a pin would drift.
 const PinSheet = ({ on, height, children }: { on: boolean; height: number | null; children: ReactNode }) =>
-  on ? <div className="doc-pin-sheet" style={height ? { height } : undefined}>{children}</div> : <>{children}</>;
+  on ? <div className="doc-pin-sheet" data-whole={height ? '' : undefined} style={height ? { height } : undefined}>{children}</div> : <>{children}</>;
 
 function paneKindClass(kind: PaneKind): string {
   if (kind === 'html') return 'doc-html';
@@ -173,9 +174,10 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   const pageFrame = useRef<HTMLIFrameElement | null>(null);
   const [pageHeight, setPageHeight] = useState<number | null>(null);
   const besideNotes = !!aside;
+  const fromText = !url && text !== null;
   useEffect(() => {
     setPageHeight(null);
-    if (!url || !besideNotes) return undefined;
+    if (!(url || fromText) || !besideNotes) return undefined;
     const hear = (e: MessageEvent) => {
       if (e.source !== pageFrame.current?.contentWindow || e.data?.type !== 'agentbox-document-height') return;
       const h = e.data.height;
@@ -183,7 +185,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
     };
     window.addEventListener('message', hear);
     return () => window.removeEventListener('message', hear);
-  }, [url, besideNotes]);
+  }, [url, fromText, besideNotes]);
   const frameReady = app.local ? previewShows(loaded, app.phase) : loaded;
   const liveStatus = app.local && url ? previewStatus(app.phase, url, app.waited) : null;
   // The change a run made, when the artifact is one.
@@ -458,7 +460,8 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
                 sandbox={app.local ? LOCAL_APP_SANDBOX : onPhone() ? 'allow-scripts' : 'allow-scripts allow-same-origin'} title={crumb.join('/')}
               /></PinSheet>}</div>
             : text !== null
-              ? <div className="preview-frame"><PinSheet on={!!aside} height={null}><iframe className="doc-view" srcDoc={text} sandbox="allow-scripts" title={crumb.join('/')} /></PinSheet></div>
+              ? <div className={`preview-frame${aside ? ' doc-pin-scroll' : ''}`}><PinSheet on={!!aside} height={pageHeight}><iframe ref={pageFrame} className="doc-view"
+                srcDoc={aside ? pageTextForNotes(text) : text} scrolling={aside && pageHeight ? 'no' : undefined} sandbox="allow-scripts" title={crumb.join('/')} /></PinSheet></div>
               : <PreviewLoading />) : <PreviewLoading />
         ) : text === null ? (
           <PreviewLoading />

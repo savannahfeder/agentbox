@@ -98,6 +98,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
   const [pageAt, setPageAt] = useState(0);
   // A page is drawn in a frame on a sheet as tall as itself (DocPane PinSheet); pins go on the sheet.
   const [sheet, setSheet] = useState<HTMLElement | null>(null);
+  const [whole, setWhole] = useState(false);
   const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
   const [sheetSize, setSheetSize] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -108,11 +109,12 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
       if (found !== page.current) { page.current = found; setPageAt((n) => n + 1); }
       const on = card.querySelector<HTMLElement>('.doc-pin-sheet');
       setSheet(on);
+      setWhole(!!on?.hasAttribute('data-whole'));
       setFrame(on?.querySelector('iframe') ?? null);
     };
     find();
     const watch = new MutationObserver(find);
-    watch.observe(card, { childList: true, subtree: true });
+    watch.observe(card, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-whole'] });
     return () => watch.disconnect();
   }, []);
   useLayoutEffect(() => {
@@ -125,6 +127,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
   }, [sheet]);
 
   const points = notesCanPoint(src);
+  const pinsHere = points.spots && whole ? sheet : null;
   const [activeId, setActiveId] = useState<string | null>(null);
   const [quote, setQuote] = useState<string | null>(null);
   const [spot, setSpot] = useState<{ x: number; y: number } | null>(null);
@@ -158,9 +161,9 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
 
   const goTo = (note: FileNote) => {
     setActiveId(note.id);
-    if (note.place.kind === 'pin' && sheet) {
-      const box = sheet.parentElement;
-      box?.scrollTo({ top: note.place.y * sheet.clientHeight - box.clientHeight / 2, behavior: 'smooth' });
+    if (note.place.kind === 'pin' && pinsHere) {
+      const box = pinsHere.parentElement;
+      box?.scrollTo({ top: note.place.y * pinsHere.clientHeight - box.clientHeight / 2, behavior: 'smooth' });
       return;
     }
     ranges.current.get(note.id)?.startContainer.parentElement?.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -265,7 +268,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
           )}
           <textarea ref={box} rows={1} value={words} aria-label="Note"
             placeholder={spot ? 'Your note on this spot' : quote ? 'Your note on these words' : pinning ? 'Click a spot on the page'
-              : points.spots ? 'Add a note, select words or pin a spot' : points.words ? 'Add a note, or select words in the page' : 'Add a note on this file'}
+              : pinsHere ? 'Add a note, select words or pin a spot' : points.words ? 'Add a note, or select words in the page' : 'Add a note on this file'}
             onChange={(e) => setWords(e.target.value)}
             onPaste={canAttach ? async (e) => {
               if (![...e.clipboardData.items].some((i) => i.kind === 'file')) return;
@@ -282,7 +285,7 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
               <button type="button" className="sb-icon" title="Attach files" aria-label="Attach files" onClick={() => fileInput.current?.click()}><Glyph d="M10.5 4.5 5.2 9.8a1.6 1.6 0 0 0 2.3 2.3l5.6-5.6a3 3 0 0 0-4.2-4.2L3.3 7.9a4.4 4.4 0 0 0 6.2 6.2l4-4" /></button>
               <input ref={fileInput} type="file" multiple hidden onChange={async (e) => { await addFiles(e.target.files); e.target.value = ''; }} />
             </>}
-            {points.spots && sheet && (
+            {pinsHere && (
               <button type="button" className={`sb-icon${pinning ? ' is-on' : ''}`} aria-pressed={pinning}
                 title={pinning ? 'Click a spot on the page' : 'Pin a spot'} aria-label="Pin a spot" onClick={() => setPinning(!pinning)}>
                 <Glyph d="M8 9.2V14M3.5 7a4.5 4.5 0 0 1 9 0M10.2 7a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0" />
@@ -298,12 +301,12 @@ export function NotesSidebar({ item, src }: { item: WorkItem; src: string }) {
       </form>
       <SelectionBar page={page} onComment={(q) => pointAt(q, null)} />
       {points.words && frame && <FrameWordsBar frame={frame} onComment={(q) => pointAt(q, null)} />}
-      {points.spots && sheet && createPortal(<>
+      {pinsHere && createPortal(<>
         {pinning && <div className="doc-pin-catch" onClick={(e) => pointAt(null, spotIn(e.currentTarget, e))} />}
         <div className="doc-pin-marks">
           <PinMarks pins={pins} draft={spot} draftLabel={String(pinNotes.length + 1)} size={sheetSize} onPick={(id) => setActiveId(id)} />
         </div>
-      </>, sheet)}
+      </>, pinsHere)}
     </aside>
   );
 }

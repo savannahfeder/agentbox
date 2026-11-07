@@ -1,4 +1,4 @@
-import { DOC_SCHEMES, isScheme } from '../shared/schemes.mts';
+import { DOC_SCHEMES, isScheme } from './schemes.mts';
 
 /** A page beside the notes sidebar asks for this; the app cannot read a selection inside another origin. */
 export function wantsSelectedWords(url: string): boolean {

@@ -14,8 +14,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
-import { notesCanPoint, pageForNotes, takesNotesSidebar } from '../renderer/src/notes-sidebar.ts';
-import { reportSelectedWords, wantsSelectedWords } from '../main/frame-selected-words.mts';
+import { notesCanPoint, pageForNotes, pageTextForNotes, takesNotesSidebar } from '../renderer/src/notes-sidebar.ts';
+import { reportSelectedWords, wantsSelectedWords } from '../shared/frame-selected-words.mts';
+import { reportDocumentHeight } from '../shared/frame-document-height.mts';
 import { quietTheFramesScrollbars } from '../main/frame-scrollbars.mts';
 
 const read = (p) => fs.readFileSync(new URL(`../renderer/src/${p}`, import.meta.url), 'utf8');
@@ -44,6 +45,59 @@ describe('what a note can point at', () => {
   });
   it('on a picture, a PDF, a film or a table, the whole file', () => {
     for (const f of ['shot.png', 'deck.pdf', 'launch.mp4', 'leads.csv']) expect(notesCanPoint(f), f).toEqual({ words: false, spots: false });
+  });
+});
+
+// Measured in the browser copy: the full-screen frame loaded at 0 by 0, grew to
+// its box, and the height script took that growth for its own and never spoke,
+// so the page scrolled inside its frame and a pin stayed put while it moved.
+describe('a page whose frame had no size when it loaded', () => {
+  const page = (scrollHeight, innerHeight) => {
+    let resize;
+    const postMessage = vi.fn();
+    const p = {
+      innerHeight,
+      document: { documentElement: { scrollHeight }, body: { scrollHeight } },
+      parent: { postMessage },
+      ResizeObserver: class { constructor(cb) { resize = cb; } observe() {} disconnect() {} },
+      addEventListener: vi.fn(),
+    };
+    return { p, postMessage, resize: () => resize() };
+  };
+  it('reports its height once the frame is laid out', () => {
+    const { p, postMessage, resize } = page(0, 0);
+    reportDocumentHeight(p);
+    expect(postMessage).not.toHaveBeenCalled();
+    p.innerHeight = 875;
+    p.document.documentElement.scrollHeight = 1098;
+    resize();
+    expect(postMessage).toHaveBeenLastCalledWith({ type: 'agentbox-document-height', height: 1098 }, '*');
+  });
+  it('still does not grow again because its frame grew to fit it', () => {
+    const { p, postMessage, resize } = page(1098, 875);
+    reportDocumentHeight(p);
+    p.innerHeight = 1098;
+    p.document.documentElement.scrollHeight = 1114;
+    resize();
+    expect(postMessage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('a page drawn from its text', () => {
+  it('carries both asks, and a closing script tag inside them cannot end its script early', () => {
+    const out = pageTextForNotes('<p>Hi</p>');
+    expect(out.startsWith('<p>Hi</p>')).toBe(true);
+    expect(out).toContain('agentbox-document-height');
+    expect(out).toContain('agentbox-selected-words');
+    expect(out.match(/<\/script>/gi)).toHaveLength(1);
+  });
+  it('is drawn whole in the pane only beside the notes', () => {
+    const pane = read('components/DocPane.tsx');
+    expect(pane).toContain('srcDoc={aside ? pageTextForNotes(text) : text}');
+  });
+  it('takes pins only once it is drawn whole', () => {
+    expect(read('components/DocPane.tsx')).toContain("data-whole={height ? '' : undefined}");
+    expect(read('components/NotesSidebar.tsx')).toContain('const pinsHere = points.spots && whole ? sheet : null;');
   });
 });
 

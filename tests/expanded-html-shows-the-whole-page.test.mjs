@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { EventEmitter } from 'node:events';
-import { reportDocumentHeight, wantsDocumentHeight } from '../main/frame-document-height.mts';
+import { reportDocumentHeight, wantsDocumentHeight } from '../shared/frame-document-height.mts';
 import { quietTheFramesScrollbars } from '../main/frame-scrollbars.mts';
 import { HtmlPreview } from '../renderer/src/components/HtmlPreview.tsx';
 

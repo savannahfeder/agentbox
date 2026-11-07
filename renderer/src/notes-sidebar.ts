@@ -1,4 +1,6 @@
 import { noteGoesTo } from '../../shared/artifact-marks.mjs';
+import { DOCUMENT_HEIGHT_SCRIPT } from '../../shared/frame-document-height.mts';
+import { SELECTED_WORDS_SCRIPT } from '../../shared/frame-selected-words.mts';
 import type { FileNote } from './types';
 import { isLocalPreview } from './artifact-layout';
 import { docKind, isPlainText } from './doc-pane';
@@ -44,6 +46,13 @@ export function pageForNotes(url: string): string {
     u.searchParams.set('agentbox-notes', '1');
     return u.href;
   } catch { return url; }
+}
+
+/** The same asks for a page drawn from its text, where nothing outside the frame can run a script in it. */
+export function pageTextForNotes(html: string): string {
+  // `<\/script>` inside a script's own text would end it early.
+  const run = `${DOCUMENT_HEIGHT_SCRIPT};\n${SELECTED_WORDS_SCRIPT};`.replace(/<\/script/gi, '<\\/script');
+  return `${html}\n<script>${run}</script>`;
 }
 
 /** The open notes on one document, split into those Send would tell the agent and the rest. */

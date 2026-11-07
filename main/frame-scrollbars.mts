@@ -19,8 +19,8 @@
 // and that one is told not to scroll at all (ArtifactThumbnail.tsx).
 import type { WebContents, WebFrameMain } from 'electron';
 import { DOC_SCHEMES, isScheme } from '../shared/schemes.mts';
-import { DOCUMENT_HEIGHT_SCRIPT, wantsDocumentHeight } from './frame-document-height.mts';
-import { SELECTED_WORDS_SCRIPT, wantsSelectedWords } from './frame-selected-words.mts';
+import { DOCUMENT_HEIGHT_SCRIPT, wantsDocumentHeight } from '../shared/frame-document-height.mts';
+import { SELECTED_WORDS_SCRIPT, wantsSelectedWords } from '../shared/frame-selected-words.mts';
 
 const RULES = (thumb: string) => `@layer agentbox-scrollbars {
   ::-webkit-scrollbar { width: 10px; height: 10px; }

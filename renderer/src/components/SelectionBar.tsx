@@ -12,7 +12,7 @@ const CommentGlyph = () => (
   </svg>
 );
 
-/** The same bar over words selected inside a page's own frame, which says what they are (main/frame-selected-words.mts). */
+/** The same bar over words selected inside a page's own frame, which says what they are (shared/frame-selected-words.mts). */
 export function FrameWordsBar({ frame, onComment }: { frame: HTMLIFrameElement | null; onComment: (quote: string) => void }) {
   const bar = useRef<HTMLDivElement | null>(null);
   const [picked, setPicked] = useState<{ words: string; first: Box; all: Box } | null>(null);
