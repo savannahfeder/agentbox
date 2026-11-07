@@ -355,6 +355,18 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
   // Teammates with the same document open type into one live copy of it.
   const liveTicket = useLiveTicket(editing ? { product, project, name: editing.base.name } : null);
   const liveSession = useLiveSession(liveTicket);
+  // A version this sitting did not save (an agent's) is merged into the live words by the keeper.
+  const [incoming, setIncoming] = useState<string | null>(null);
+  const newestNow = family?.versions[family.versions.length - 1];
+  useEffect(() => {
+    if (!editing || !liveSession?.keeper || !newestNow || newestNow.id === editing.base.id) return undefined;
+    let gone = false;
+    const read = fromElsewhere
+      ? fromElsewhere.readText(newestNow.path).catch(() => null)
+      : api.readDoc({ product, src: newestNow.path, thread }).then((r) => (r.ok ? r.text ?? null : null)).catch(() => null);
+    void read.then((t) => { if (!gone && t !== null && t !== posted.current) setIncoming(t); });
+    return () => { gone = true; };
+  }, [newestNow?.id, liveSession?.keeper, !!editing]);
   const waitingForEditor = opensForTyping({ canEdit, compare, editing: !!editing, unreadable, version: version?.id ?? null }) || (!!editing && liveTicket === undefined);
 
   // A save asked for while one is on its way waits for it, then posts what is newer.
@@ -697,7 +709,7 @@ export function ArtifactView({ product, project = null, thread, shareThread, thr
           )}
           {editing && !compare && liveTicket !== undefined && (
             <div className="av-pane" key={`editing-${editing.base.id}`} ref={editPane} onClick={pickInEditor}>
-              <DocText product={product} src={editing.base.path} text={editing.text} mtime={0} folder={editing.folder} onSaved={() => {}} onNotice={setTold} live={liveSession}
+              <DocText product={product} src={editing.base.path} text={incoming ?? editing.text} mtime={0} folder={editing.folder} onSaved={() => {}} onNotice={setTold} live={liveSession}
                 versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, draft: editing.draft, byline: bylineOf(version ?? editing.base) }} />
               {offers.comment && <SelectionBar page={editPane} onComment={(quote) => { setWholeAsked(false); setDraftPlace({ kind: 'quote', text: quote }); box.current?.focus(); }} />}
             </div>

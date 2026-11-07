@@ -21,6 +21,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import { buildExtensions } from '../editor/extensions';
 import { mdToPmDoc, pmDocToMd } from '../editor/markdown';
 import { patchOriginal } from '../editor/patch-md';
+import { mergeText } from '../../../shared/text-merge.mjs';
 import { theAppKeepsThisKey } from '../../../shared/artifact-keys.mts';
 import { api } from '../api';
 import { asksForANewTab } from '../link-click';
@@ -178,7 +179,20 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   // The document changed under her (an agent rewrote it): take it only when she
   // is not mid-edit, and skip our own save echoing back.
   useEffect(() => {
-    if (!editor || liveNow.current || text === onDisk.current || dirty.current) return;
+    if (!editor || text === onDisk.current) return;
+    const room = liveNow.current;
+    if (room) {
+      // In a live file a new version is merged in once, by the keeper.
+      const was = onDisk.current;
+      onDisk.current = text;
+      baseMd.current = pmDocToMd(mdToPmDoc(text));
+      if (!room.keeper) return;
+      const now = pmDocToMd(editor.getJSON());
+      const merged = mergeText(was, now, text, { overlap: 'mine' }).text;
+      if (merged !== now) editor.commands.setContent(mdToPmDoc(merged));
+      return;
+    }
+    if (dirty.current) return;
     const doc = mdToPmDoc(text);
     onDisk.current = text;
     baseMd.current = pmDocToMd(doc);

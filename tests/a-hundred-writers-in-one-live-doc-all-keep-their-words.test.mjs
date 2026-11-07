@@ -89,6 +89,17 @@ describe('a live doc', () => {
     expect([b.room().keeper, c.room().keeper]).toEqual([false, true]);
   });
 
+  it('gives keeping to the file owner over a teammate who joined first', async () => {
+    const room = createRoom({ tickMs: 5 });
+    rooms.push(room);
+    const make = (hello) => connectLive({ doc: new Y.Doc(), hello: { name: 'x', ...hello }, open: () => pairedSockets(room), flushMs: 5 });
+    const mate = make({ canSave: true });
+    await new Promise((r) => setTimeout(r, 30));
+    const owner = make({ canSave: true, owner: true });
+    await new Promise((r) => setTimeout(r, 60));
+    expect([mate.room().keeper, owner.room().keeper]).toEqual([false, true]);
+  });
+
   it('tells everyone who is in the room, and forgets someone who left', async () => {
     const { room, writers } = setUp(4);
     await settle(writers, room);
