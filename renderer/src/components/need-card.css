@@ -39,3 +39,6 @@
 .need-done .need-why { margin-top: 1px; font-size: 13px; }
 .need-link { flex: none; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--text-dim); text-decoration: underline; text-underline-offset: 3px; cursor: default; }
 .need-link:hover { color: var(--text); }
+
+/* The inbox's ask card (threads/AskCard.tsx) has no folder beside the thread, so the thread sits under the heading. */
+.ask-cards .approval-task { margin-left: 0; justify-content: flex-start; text-align: left; }
