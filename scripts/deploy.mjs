@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { leftFromARelease, nextVersion, serverConfig, whatIsLive } from './lib/deploy-rules.mjs';
+import { leftFromARelease, nextVersion, serverConfig, whatIsLive, withVersion } from './lib/deploy-rules.mjs';
 import { RELEASE_REPO } from './lib/live-download.mjs';
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -87,7 +87,7 @@ const behind = Number(quiet('git', ['rev-list', '--count', 'HEAD..refs/remotes/o
 if (!checkOnly && behind > 0 && !quiet('git', ['merge', '--ff-only', '--quiet', 'refs/remotes/origin/main']).ok) {
   stop('Could not bring this folder up to main. Run: git merge --ff-only refs/remotes/origin/main');
 }
-const commit = checkOnly ? quiet('git', ['rev-parse', 'refs/remotes/origin/main']).out : quiet('git', ['rev-parse', 'HEAD']).out;
+let commit = checkOnly ? quiet('git', ['rev-parse', 'refs/remotes/origin/main']).out : quiet('git', ['rev-parse', 'HEAD']).out;
 console.log(`  main is at ${commit.slice(0, 8)}${checkOnly && behind ? ` (this folder is ${behind} behind; a real run catches it up)` : ''}`);
 
 // ---------------------------------------------------------------------------
@@ -175,10 +175,42 @@ signIns.forEach(signIn);
 
 if (checkOnly) {
   signIn(npmSignIn);
-  console.log(`\nA real run would put out ${version} from ${commit.slice(0, 8)}${signedOut.length ? `, after signing in to ${signedOut.length === 1 ? 'one thing' : `${signedOut.length} things`}` : ''}.`);
+  console.log(`\nA real run would put out ${version} from ${version === mainVersion ? commit.slice(0, 8) : `a commit on main setting it to ${version}`}${signedOut.length ? `, after signing in to ${signedOut.length === 1 ? 'one thing' : `${signedOut.length} things`}` : ''}.`);
   console.log('Nothing was changed. Run npm run deploy to do it.');
   process.exit(0);
 }
+
+// THE COMMIT A RELEASE IS BUILT FROM SAYS ITS VERSION. Main used to keep the
+// old number, so a copy built from that commit called itself an older release.
+function shipTheVersion(v) {
+  say(`putting ${v} into main, so the commit this release is built from says ${v}`);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `agentbox-release-${v}-`));
+  const branch = `agentbox/release-${v}`;
+  let failed = null;
+  if (!quiet('git', ['worktree', 'add', '-q', '-B', branch, dir, 'refs/remotes/origin/main']).ok) {
+    failed = 'Could not make a folder to commit the version in.';
+  } else {
+    for (const f of ['package.json', 'package-lock.json']) {
+      const file = path.join(dir, f);
+      fs.writeFileSync(file, withVersion(fs.readFileSync(file, 'utf8'), v));
+    }
+    fs.symlinkSync(path.join(repo, 'node_modules'), path.join(dir, 'node_modules'));
+    const committed = spawnSync('git', ['commit', '-q', '-am', `Agentbox ${v}`], { cwd: dir, encoding: 'utf8' });
+    if (committed.status !== 0) failed = `Could not commit the version: ${(committed.stderr || committed.stdout).trim()}`;
+    else if (spawnSync('npm', ['run', 'ship'], { cwd: dir, stdio: 'inherit' }).status !== 0) {
+      failed = `${v} could not be shipped to main; the reason is above. Nothing was released.`;
+    }
+  }
+  quiet('git', ['worktree', 'remove', '--force', dir]);
+  quiet('git', ['branch', '-D', branch]);
+  if (failed) stop(failed);
+  if (!quiet('git', ['fetch', 'origin', '--quiet'], 60_000).ok
+    || !quiet('git', ['merge', '--ff-only', '--quiet', 'refs/remotes/origin/main']).ok) {
+    stop(`${v} is on main, but this folder could not follow it. Run: git fetch origin && git merge --ff-only refs/remotes/origin/main`);
+  }
+  return quiet('git', ['rev-parse', 'HEAD']).out;
+}
+if (version !== mainVersion) commit = shipTheVersion(version);
 
 // The version and the counting key go into package.json for this run only,
 // because every step below reads the version from there and `npm publish` packs
@@ -257,15 +289,6 @@ for (const l of lines) console.log(`  ${l.ok ? '✓' : '✗'} ${l.part.padEnd(17
 console.log(`  ${imageOk ? '✓' : '✗'} ${'cloud machine'.padEnd(17)} ${imageOk ? 'up to date' : 'not rebuilt'}`);
 if (lines.every((l) => l.ok) && imageOk) {
   console.log(`\nAgentbox ${version} is out everywhere. Restart Agentbox to run it yourself.`);
-  // MAIN'S OWN NUMBER DOES NOT FOLLOW A RELEASE, and nothing said so (F-147).
-  // The version is written into package.json for this run and taken back out
-  // at step 6, because this folder may not commit (scripts/hooks/pre-commit).
-  // Main went two releases behind in silence, so a clone built from the README
-  // called itself a version that was out before it.
-  if (version !== mainVersion) {
-    console.log(`\nmain still says ${mainVersion}, so anyone who clones it builds a copy calling itself that.`);
-    console.log(`Ship a branch setting "version": "${version}" in package.json and package-lock.json to catch it up.`);
-  }
   console.log('');
 } else {
   stop('Not every place has the new version yet; the ✗ lines above say which.',
