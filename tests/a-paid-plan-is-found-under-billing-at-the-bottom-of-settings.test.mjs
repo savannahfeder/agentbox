@@ -49,7 +49,7 @@ describe('what the page says about the plan', () => {
       name: 'Agentbox Cloud Max', price: '$200 a month', who: 'Billed monthly by Stripe', manage: true,
       period: 'This month', change: 'Change plan',
       agents: { line: '3 running, no limit', percent: 0 },
-      hours: { line: '86 of 3,000 hours', percent: 3 },
+      hours: { label: 'Hours used', line: '86 of 3,000 hours', percent: 3 },
     });
     expect(planSummary(pro)).toMatchObject({ agents: { line: '4 of 10 running', percent: 40 }, hours: { line: '100 of 400 hours', percent: 25 } });
   });

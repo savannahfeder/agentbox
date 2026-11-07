@@ -149,13 +149,20 @@ describe('the screens, on the free hours', () => {
     expect(setupStep({ managed: true, plan: { ...free, plan: 'none' } })).toBe('pay');
   });
 
-  it('Settings says what is free and how much is used, out of all five hours', () => {
+  // The owner's note on the first picture: no separate free-hours section,
+  // say the hours left, and the plan is Free, not Agentbox Cloud.
+  it('Settings shows the Free plan like any plan, with the hours left out of five', () => {
     expect(planSummary(free)).toMatchObject({
-      name: 'Agentbox Cloud', price: 'Free', who: '5 hours to try it', manage: false,
-      period: 'Your free hours', change: 'Choose a plan',
+      name: 'Free', price: '$0', who: '5 cloud hours to try it', manage: false,
+      period: 'Usage', change: 'Change plan',
       agents: { line: '1 of 2 running', percent: 50 },
-      hours: { line: '1.5 of 5 hours', percent: 30 },
+      hours: { label: 'Hours left', line: '3.5 of 5', percent: 70 },
     });
+  });
+
+  it('every free hour used leaves none, never a negative', () => {
+    expect(planSummary({ ...free, usedSeconds: 5 * 3600 }).hours).toMatchObject({ line: '0 of 5', percent: 0 });
+    expect(planSummary({ ...free, usedSeconds: 6 * 3600 }).hours).toMatchObject({ line: '0 of 5', percent: 0 });
   });
 
   it('every paid plan is a plan to choose, none marked as yours, with no billing row', () => {

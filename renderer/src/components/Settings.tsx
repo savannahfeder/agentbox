@@ -1031,7 +1031,7 @@ function CloudPlansPage({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: (
           </div>
         </Group>
         <Group id="cloud-use" label={sum.period} bare>
-          <div className="bill-meters">{meter('Agents in the cloud', sum.agents)}{meter('Hours used', sum.hours)}</div>
+          <div className="bill-meters">{meter('Agents in the cloud', sum.agents)}{meter(sum.hours.label, sum.hours)}</div>
         </Group>
         <Group id="cloud-plans" label={sum.change} bare><div className="bill-cards">{cards}</div></Group>
         {lines}

@@ -79,7 +79,7 @@ export interface PlanSummary {
   /** Over the meters, and over the cards. */
   period: string; change: string;
   agents: { line: string; percent: number };
-  hours: { line: string; percent: number };
+  hours: { label: string; line: string; percent: number };
 }
 
 /** The top of Settings › Plan and Billing: the plan paid for, and this month's agents and hours as meters. */
@@ -99,26 +99,26 @@ export function planSummary(plan: CloudPlan | null): PlanSummary | null {
     agents: plan.unlimited
       ? { line: `${running} running, no limit`, percent: 0 }
       : { line: `${running} of ${plan.agents ?? 0} running`, percent: Math.min(100, Math.round((running / Math.max(1, plan.agents ?? 1)) * 100)) },
-    hours: { line: `${n(Math.floor((plan.usedSeconds ?? 0) / 3600))} of ${n(hoursAll)} hours`, percent: usedPercent(plan) },
+    hours: { label: 'Hours used', line: `${n(Math.floor((plan.usedSeconds ?? 0) / 3600))} of ${n(hoursAll)} hours`, percent: usedPercent(plan) },
   };
 }
 
-// The free hours are spent once, so their meter is out of all of them, not the month's.
+// The Free plan's hours never renew, so it says what is left rather than the month's use.
 function freeSummary(plan: CloudPlan): PlanSummary {
   const running = plan.running ?? 0;
   const agents = plan.agents ?? 0;
   const hours = plan.hoursPerMonth ?? 0;
+  const left = Math.max(0, hours * 3600 - (plan.usedSeconds ?? 0)) / 3600;
   return {
-    name: `${Name} Cloud`,
-    price: 'Free',
-    who: `${n(hours)} hours to try it`,
+    name: 'Free',
+    price: '$0',
+    who: `${n(hours)} cloud hours to try it`,
     manage: false,
-    period: 'Your free hours', change: 'Choose a plan',
+    period: 'Usage', change: 'Change plan',
     agents: { line: `${running} of ${agents} running`, percent: Math.min(100, Math.round((running / Math.max(1, agents)) * 100)) },
-    hours: { line: `${hoursUsed(plan.usedSeconds ?? 0)} of ${n(hours)} hours`, percent: usedPercent(plan) },
+    hours: { label: 'Hours left', line: `${Math.floor(left * 10) / 10} of ${n(hours)}`, percent: Math.round((left / Math.max(1, hours)) * 100) },
   };
 }
-const hoursUsed = (seconds: number) => String(Math.floor((seconds / 3600) * 10) / 10);
 
 /** Whether Settings › Plan and Billing offers Stripe's billing page, and what it says instead. */
 export function cloudBilling(plan: CloudPlan | null): { row: boolean; says: string | null } {
