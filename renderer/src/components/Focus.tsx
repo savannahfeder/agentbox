@@ -8,7 +8,7 @@ import {DirectReview} from './DirectReview';
 import {MessageFiles} from './MessageFiles';
 import {withoutBareTwins} from '../file-glance';
 import {reviewLabEnabled, reviewContextDraft} from '../review-lab';
-import { sourceReference } from '../source-reference.mjs';
+import { sourceReference } from '../source-reference.ts';
 import { remarkTicketReferences, resolveTicket, ticketReference, TICKET_HREF } from '../ticket-references';
 import { TicketItems, TicketLink, TicketNavigation } from './TicketReference';
 import { Mention, MentionIcon } from './Mention';

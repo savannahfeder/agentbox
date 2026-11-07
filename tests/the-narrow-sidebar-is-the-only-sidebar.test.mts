@@ -49,7 +49,7 @@ describe('every install gets the narrow sidebar', () => {
     expect(app).toMatch(/\n {6}<WorkspaceNavigation\n/);
     expect(app).toContain("className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft");
     expect(app).not.toContain('workspaceNavigation');
-    expect(read('renderer/src/workspace-navigation.mjs')).not.toContain('workspaceNavigationShown');
+    expect(read('renderer/src/workspace-navigation.ts')).not.toContain('workspaceNavigationShown');
   });
 
   it('keeps the phone on its own top bar', () => {

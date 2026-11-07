@@ -7,7 +7,7 @@
 // true, that an empty Scheduled page never bounces her out of itself.
 import { it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { workspaceDestinations, workspacePageTitle } from '../renderer/src/workspace-navigation.mjs';
+import { workspaceDestinations, workspacePageTitle } from '../renderer/src/workspace-navigation.ts';
 import { DONE } from '../renderer/src/done-word';
 const app = readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
 const keys = (state) => workspaceDestinations(state).map(([key]) => key);

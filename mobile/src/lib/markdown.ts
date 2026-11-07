@@ -9,7 +9,7 @@ import { gfmFromMarkdown } from 'mdast-util-gfm';
 import { gfm } from 'micromark-extension-gfm';
 import { CODE_PATH, isMediaPath, linkArtifactPaths, productPath } from '../../../renderer/src/artifact-paths';
 import { mentionKind, mentionLabel, mentionName, type MentionKind } from '../../../renderer/src/mentions';
-import { sourceReference } from '../../../renderer/src/source-reference.mjs';
+import { sourceReference } from '../../../renderer/src/source-reference.ts';
 
 export type { MentionKind };
 

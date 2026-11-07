@@ -52,11 +52,11 @@ describe('the renderer typechecks clean', () => {
     expect(out).toBe('');
   });
 
-  // THE BOUNDARY EITHER SIDE OF THE FIX. The errors were not spread evenly:
-  // seven of the 19 were one fault, a shared .mjs the screen imports with no
-  // .d.mts beside it. A new one of those would be a new TS7016, so it is named
-  // here in words rather than left to a code in a wall of output.
-  it('has a declaration beside every shared module the screen imports', () => {
+  // THE BOUNDARY EITHER SIDE OF THE FIX. Seven of the 19 were one fault: a
+  // shared .mjs the screen imported with no .d.mts beside it. shared/ is .mts
+  // now, typed in its own source, so the screen imports it as .mts and a
+  // hand-kept declaration has nothing left to drift from.
+  it('imports shared modules as typed .mts, never as untyped .mjs', () => {
     const files = [];
     const walk = (dir) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -67,17 +67,23 @@ describe('the renderer typechecks clean', () => {
     };
     walk(join(root, 'renderer', 'src'));
 
-    const imported = new Set();
+    const typed = new Set<string>();
+    const untyped = new Set<string>();
     for (const file of files) {
       const text = readFileSync(file, 'utf8');
-      for (const m of text.matchAll(/from '(?:\.\.\/)+shared\/([\w.-]+)\.mjs'/g)) imported.add(m[1]);
+      for (const m of text.matchAll(/from '(?:\.\.\/)+shared\/([\w./-]+)\.(mts|mjs)'/g)) {
+        (m[2] === 'mts' ? typed : untyped).add(m[1]);
+      }
     }
     // The screen does import from shared/, so an empty set would be this test
     // passing by finding nothing.
-    expect(imported.size).toBeGreaterThan(5);
-
-    const untyped = [...imported].filter((name) => !existsSync(join(root, 'shared', `${name}.d.mts`))).sort();
-    expect(untyped).toEqual([]);
+    expect(typed.size).toBeGreaterThan(5);
+    const declared = [...typed].filter((name) => existsSync(join(root, 'shared', `${name}.d.mts`))).sort();
+    expect(declared, 'a .d.mts beside a .mts is a second copy of its types').toEqual([]);
+    // product-name stays .mjs because Expo's own config reader loads it; its
+    // declaration is the one .d.mts shared/ keeps.
+    expect([...untyped].sort()).toEqual(['product-name']);
+    expect(existsSync(join(root, 'shared', 'product-name.d.mts'))).toBe(true);
   });
 
   // AND THE CASE THAT MUST NOT COMPILE. Each marked line of the fixture names

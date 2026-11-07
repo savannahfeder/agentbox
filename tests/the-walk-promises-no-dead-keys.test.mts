@@ -15,7 +15,7 @@
 import { describe, expect, it } from 'vitest';
 import { COACHED, coach, teamTab } from '../renderer/src/onboarding.ts';
 import { rowKeys, walkRowKeys } from '../renderer/src/list-rules.ts';
-import { workspaceDestinations } from '../renderer/src/workspace-navigation.mjs';
+import { workspaceDestinations } from '../renderer/src/workspace-navigation.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

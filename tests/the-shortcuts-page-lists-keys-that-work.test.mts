@@ -358,7 +358,7 @@ describe('the page stays a page and not a wall', () => {
   // The check is the honest way round: every noun a heading uses for a PLACE
   // has to be a place the sidebar draws.
   it('names a place in a heading only if the sidebar draws that place', () => {
-    const nav = read('renderer/src/workspace-navigation.mjs');
+    const nav = read('renderer/src/workspace-navigation.ts');
     const drawn = [...nav.matchAll(/\['[a-z]+', '([^']+)'\]/g)].map((m) => m[1].toLowerCase());
     expect(drawn).toContain('inbox');
     const headings = SHORTCUTS.map((g) => g.label.toLowerCase());

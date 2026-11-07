@@ -13,7 +13,7 @@
 // the task still goes back to the results with the query still in the box.
 
 import { describe, expect, it } from 'vitest';
-import { searchFieldInStrip } from '../renderer/src/workspace-navigation.mjs';
+import { searchFieldInStrip } from '../renderer/src/workspace-navigation.ts';
 
 describe('what the strip carries', () => {
   it('draws the field on the list, which is every search she has ever run', () => {

@@ -22,7 +22,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as nav from '../renderer/src/workspace-navigation.mjs';
+import * as nav from '../renderer/src/workspace-navigation.ts';
 import { HINTS, capsFor, capWord } from '../renderer/src/hint-plate';
 import { SHORTCUTS } from '../renderer/src/shortcuts';
 import { TEAM_TABS, TEAM_TAB_NAMES, coach, keyName, keyToken } from '../renderer/src/onboarding';

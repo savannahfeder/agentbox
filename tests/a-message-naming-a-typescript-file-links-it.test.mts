@@ -2,11 +2,11 @@
 // like main/supervisor.mts in their answers. The two rules that turn a named
 // file into something you can open knew .mjs and .cjs but not .mts or .cts:
 // the source-file rule both the website and the phone app use
-// (renderer/src/source-reference.mjs), and the referenced-files list
+// (renderer/src/source-reference.ts), and the referenced-files list
 // (shared/referenced-files.mts). A test on the phone's markdown found it, when
 // its sample `main/main.mts` came back as plain text.
 import { describe, it, expect } from 'vitest';
-import { sourceReference } from '../renderer/src/source-reference.mjs';
+import { sourceReference } from '../renderer/src/source-reference.ts';
 import { referencedFiles } from '../shared/referenced-files.mts';
 
 describe('a message naming a TypeScript back-end file', () => {

@@ -3,8 +3,9 @@
 // best word. So the word comes from `done-word.ts`, where the button, the row
 // hint and the palette read the same one. Of six pairs, the Done button and its
 // matching name were chosen.
-export function workspacePageTitle(view, doneNoun = 'Closed') {
-  return { inbox: 'Inbox', snoozed: 'Scheduled', progress: 'In progress', done: doneNoun }[view] ?? 'Inbox';
+export function workspacePageTitle(view: string, doneNoun = 'Closed'): string {
+  const titles: Record<string, string> = { inbox: 'Inbox', snoozed: 'Scheduled', progress: 'In progress', done: doneNoun };
+  return titles[view] ?? 'Inbox';
 }
 
 // WHICH DESTINATIONS THE SIDEBAR DRAWS, AND IN WHAT ORDER.
@@ -23,12 +24,14 @@ export function workspacePageTitle(view, doneNoun = 'Closed') {
 //
 // This list is also what Tab rotates through (App.tsx), so a hidden Scheduled
 // is skipped rather than landed on.
-export function workspaceDestinations({ scheduledCount = 0, view = 'inbox', doneNoun = 'Closed' } = {}) {
+export type Destination = [view: string, label: string];
+
+export function workspaceDestinations({ scheduledCount = 0, view = 'inbox', doneNoun = 'Closed' }: { scheduledCount?: number; view?: string; doneNoun?: string } = {}): Destination[] {
   const scheduled = Number.isFinite(scheduledCount) ? Math.max(0, Math.floor(scheduledCount)) : 0;
   return [
     ['inbox', 'Inbox'],
     ['progress', 'In progress'],
-    ...(scheduled > 0 || view === 'snoozed' ? [['snoozed', 'Scheduled']] : []),
+    ...(scheduled > 0 || view === 'snoozed' ? [['snoozed', 'Scheduled'] as Destination] : []),
     ['done', doneNoun],
   ];
 }
@@ -48,7 +51,7 @@ export function workspaceDestinations({ scheduledCount = 0, view = 'inbox', done
 // query is untouched, so escape out of the task puts her back on her results
 // with what the user typed still in the box. On the list itself, where the strip has
 // nothing else to carry, nothing changes at all.
-export function searchFieldInStrip({ searching = false, focused = false, settingsOpen = false } = {}) {
+export function searchFieldInStrip({ searching = false, focused = false, settingsOpen = false }: { searching?: boolean; workspaceNavigation?: boolean; focused?: boolean; settingsOpen?: boolean } = {}): boolean {
   if (!searching) return false;
   return !(focused && !settingsOpen);
 }

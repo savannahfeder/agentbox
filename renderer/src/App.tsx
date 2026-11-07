@@ -7,7 +7,7 @@ import { holdsReplies, writeHeldWhenHidden } from './phone-holds';
 import { pollEvery } from './phone-polls';
 import type {FocusControlStyle} from './focus-control';
 import {reviewLabEnabled} from './review-lab';
-import { deliverReply } from './deliver-reply.mjs';
+import { deliverReply } from './deliver-reply.ts';
 import { ArtifactSurface } from './components/ArtifactSurface';
 import { artifactPlacement, artifactFraction, type ArtifactMode } from './artifact-layout';
 import { besideDocument } from './message-artifacts';
@@ -143,7 +143,7 @@ import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, read
 import { boardItems, cardOpens, evColumns, flipEvView, readEvView, whoseBoard, writeEvView, type EvTab, type EvView } from './team/everything/whose-board';
 import { needsByWho, readFolded, readNeedsGroup, stackRows, toggleFolded, whoIsWaiting, writeNeedsGroup, type NeedsGroup, type StackKey } from './threads/stack-rules';
 import { FeedbackCard } from './components/FeedbackCard';
-import { searchFieldInStrip, workspaceDestinations, workspacePageTitle } from './workspace-navigation.mjs';
+import { searchFieldInStrip, workspaceDestinations, workspacePageTitle } from './workspace-navigation.ts';
 import { UsagePill } from './components/UsagePill';
 import { engineWordFor } from './byline';
 import { lastUsedEngine } from './usage-last-used';
@@ -7488,7 +7488,7 @@ export default function App() {
             become what she is typing, in the tab row's own size and weight, and
             escape puts them back. */}
         {/* AND IT STEPS ASIDE FOR AN OPENED TASK (w-d883b38446, 2026-09-18).
-            `searchFieldInStrip` in workspace-navigation.mjs is the rule and
+            `searchFieldInStrip` in workspace-navigation.ts is the rule and
             carries the measurement: this strip is where an opened task's header
             is drawn, and the field was tested before it, so opening a result
             left her with an empty 88 point bar and a second header inside the

@@ -28,7 +28,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ANCHOR, COACHED, TEAM_TAB_NAMES, coach } from '../renderer/src/onboarding.ts';
 import { rowKeys, walkRowKeys } from '../renderer/src/list-rules.ts';
-import { workspaceDestinations } from '../renderer/src/workspace-navigation.mjs';
+import { workspaceDestinations } from '../renderer/src/workspace-navigation.ts';
 import { DONE } from '../renderer/src/done-word.ts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
