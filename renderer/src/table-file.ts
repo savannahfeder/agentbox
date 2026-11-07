@@ -106,18 +106,25 @@ export function amountOf(v: string): number {
   return Number.isFinite(oneAmount(low)) ? oneAmount(low) : oneAmount(s);
 }
 
+// Date.UTC rolls 2026-13-40 over into February; a day that is not on the calendar is not a date.
+const realDay = (y: number, m: number, d: number) => {
+  const t = Date.UTC(y, m - 1, d);
+  const at = new Date(t);
+  return at.getUTCMonth() === m - 1 && at.getUTCDate() === d ? t : NaN;
+};
+
 /** When a cell is, in ms, or NaN. A bare number is not a date. */
 export function dateOf(v: string): number {
   const s = v.trim();
   if (!s || NUMBER.test(s)) return NaN;
   const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (iso) return Date.UTC(+iso[1], +iso[2] - 1, +iso[3]);
+  if (iso) return realDay(+iso[1], +iso[2], +iso[3]);
   const us = s.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})$/);
   if (us) {
     const year = us[3].length === 2 ? 2000 + +us[3] : +us[3];
     // 25/03/2025 can only be day first; 03/04/2025 is read the American way.
     const [month, day] = +us[1] > 12 ? [+us[2], +us[1]] : [+us[1], +us[2]];
-    return Date.UTC(year, month - 1, day);
+    return realDay(year, month, day);
   }
   if (!MONTH.test(s)) return NaN;
   // "Jan 5" has no year, and Date.parse would put it in 2001.

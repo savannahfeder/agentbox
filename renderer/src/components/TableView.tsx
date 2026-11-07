@@ -212,6 +212,7 @@ const sortWords = (c: Column, dir: 'asc' | 'desc') => {
 const rowsWord = (n: number) => `${n.toLocaleString()} ${n === 1 ? 'row' : 'rows'}`;
 const typingIn = (el: Element | null) => !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable);
 const CMD = MAC ? '⌘' : 'Ctrl+';
+const ALT = MAC ? '⌥' : 'Alt+';
 
 function Menu({ label, icon, on, children }: { label: string; icon: ReactNode; on: boolean; children: (close: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -363,7 +364,9 @@ function TagPicker({ column, value, typed, onPick, onClose, hands }: {
     ...(find && !exact ? [{ kind: 'add' as const, v: q.trim() }] : []),
     ...(value.trim() && !find ? [{ kind: 'clear' as const, v: '' }] : []),
   ];
-  const now = Math.min(hi, Math.max(0, items.length - 1));
+  // -1 stands for the cell's own tag, found again once a rename has redrawn the list.
+  const own = items.findIndex((it) => it.kind === 'tag' && it.v.toLowerCase() === value.trim().toLowerCase());
+  const now = hi < 0 ? Math.max(0, own) : Math.min(hi, Math.max(0, items.length - 1));
   useEffect(() => { setHi(Math.max(0, tags.findIndex((v) => v.toLowerCase() === value.trim().toLowerCase()) * (find ? 0 : 1))); }, [find]);
   useEffect(() => { list.current?.querySelector('.hi')?.scrollIntoView({ block: 'nearest' }); }, [now]);
   const take = (n: number, move?: 'down' | 'right' | 'left') => { const it = items[n]; if (it) onPick(it.v, move); else onClose(); };
@@ -381,7 +384,7 @@ function TagPicker({ column, value, typed, onPick, onClose, hands }: {
     onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onClose(); }}>
     {shown !== undefined && hands
       ? <TagEditor key={shown} column={column} tag={shown} hands={hands}
-        onBack={(renamed) => { setEditingTag(null); if (renamed) setHi(Math.max(0, column.values.findIndex((v) => v.toLowerCase() === renamed.toLowerCase()))); requestAnimationFrame(() => findBox.current?.focus()); }} />
+        onBack={() => { setEditingTag(null); setHi(-1); requestAnimationFrame(() => findBox.current?.focus()); }} />
       : <>
         <div className="when-type-row"><input ref={findBox} className="when-type" autoFocus placeholder="Find or add a tag" value={q}
           onChange={(e) => { setQ(e.target.value); setHi(0); }} /></div>
@@ -1045,6 +1048,17 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     const meta = e.metaKey || e.ctrlKey;
     const k = e.key;
     const stop = () => { e.preventDefault(); e.stopPropagation(); };
+    if (k === 'Escape' && (drag.current === 'moverows' || drag.current === 'movecols')) {
+      stop(); drag.current = null; pressedPick.current = null; setDrop(null); return;
+    }
+    // Alt and an arrow moves the rows or columns picked, as the menus' Move does.
+    if (e.altKey && !meta && editable && sel && /^Arrow(Up|Down|Left|Right)$/.test(k)) {
+      stop();
+      if (k === 'ArrowUp') moveRowsTo(sel.r0 - 1);
+      else if (k === 'ArrowDown') moveRowsTo(sel.r1 + 2);
+      else if (sel.c0 >= first) moveColsTo(sel.c0, sel.c1, k === 'ArrowLeft' ? sel.c0 - 1 : sel.c1 + 2);
+      return;
+    }
     if (meta && (k === 'z' || k === 'Z')) { stop(); if (e.shiftKey) redo(); else undo(); return; }
     if (meta && (k === 'y' || k === 'Y')) { stop(); redo(); return; }
     if (meta && (k === 'a' || k === 'A')) { stop(); if (order.length) setPick({ a: { r: 0, c: first }, b: { r: order.length - 1, c: last } }); return; }
@@ -1170,6 +1184,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     if (!hit || !el.contains(hit)) {
       const rows = docRef.current.order.length;
       if (kind === 'row' && y > el.getBoundingClientRect().top + headH()) return { kind, place: rows, at: headH() + rows * ROW_H };
+      const end = el.querySelector(`[data-hc="${last}"]`) as HTMLElement | null;
+      if (kind === 'col' && end && x > end.getBoundingClientRect().right) return { kind, place: last + 1, at: end.offsetLeft + end.offsetWidth };
       return null;
     }
     const r = hit.getBoundingClientRect();
@@ -1441,7 +1457,11 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
                     }} />
                   : <><span className="tbl-ell">{c.name}</span>{arrow}</>}
                 <button type="button" className="tbl-th-menu" tabIndex={-1} aria-label={`${c.name} column`} onPointerDown={(e) => e.preventDefault()}
-                  onClick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setFloat({ x: r.left, y: r.bottom + 4, col: i }); }}>{CARET}</button>
+                  onClick={(e) => {
+                    if (open.current) endEdit(open.current.pop === 'tag' ? null : open.current.draft);
+                    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    setFloat({ x: r.left, y: r.bottom + 4, col: i });
+                  }}>{CARET}</button>
                 <span className="tbl-resize" aria-hidden="true" onPointerDown={(e) => onGrip(e, i)} onDoubleClick={(e) => { e.stopPropagation(); fitColumn(i); }} />
               </div>;
             })}
@@ -1526,8 +1546,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             {!(table.ranked && float.col === 0) && <MenuRow label="Type" hint={`${typeName(floatCol.kind)} ›`} onClick={() => setFloat({ ...float, page: 'type' })} />}
             <MenuRow label="Insert column left" onClick={() => { const at = Math.max(first, float.col!); changeColumns(addColumn(docRef.current.table, at), at); setRenaming(at); closeFloat(); }} />
             <MenuRow label="Insert column right" onClick={() => { const at = float.col! + 1; changeColumns(addColumn(docRef.current.table, at), at); setRenaming(at); closeFloat(); }} />
-            <MenuRow label={'Move left'} off={float.col! <= first} onClick={() => { const c = float.col!; closeFloat(); moveColsTo(c, c, c - 1); }} />
-            <MenuRow label={'Move right'} off={float.col! >= last} onClick={() => { const c = float.col!; closeFloat(); moveColsTo(c, c, c + 2); }} />
+            <MenuRow label={'Move left'} hint={`${ALT}←`} off={float.col! <= first} onClick={() => { const c = float.col!; closeFloat(); moveColsTo(c, c, c - 1); }} />
+            <MenuRow label={'Move right'} hint={`${ALT}→`} off={float.col! >= last} onClick={() => { const c = float.col!; closeFloat(); moveColsTo(c, c, c + 2); }} />
             <MenuRow label="Fit to its contents" onClick={() => { fitColumn(float.col!); closeFloat(); }} />
             <span className="when-sep" />
             <MenuRow label="Delete column" off={table.columns.length - first <= 1} onClick={() => { changeColumns(dropColumn(docRef.current.table, float.col!)); closeFloat(); }} />
@@ -1553,8 +1573,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             <span className="when-sep" />
             <MenuRow label="Insert row above" onClick={() => { closeFloat(); addRowAt(sel.r0); }} />
             <MenuRow label="Insert row below" hint="⇧↵" onClick={() => { closeFloat(); addRowAt(sel.r1 + 1); }} />
-            <MenuRow label={'Move up'} hint={sort ? 'Sorted' : undefined} off={!!sort || sel.r0 <= 0} onClick={() => { closeFloat(); moveRowsTo(sel.r0 - 1); }} />
-            <MenuRow label={'Move down'} hint={sort ? 'Sorted' : undefined} off={!!sort || sel.r1 >= order.length - 1} onClick={() => { closeFloat(); moveRowsTo(sel.r1 + 2); }} />
+            <MenuRow label={'Move up'} hint={sort ? 'Sorted' : `${ALT}↑`} off={!!sort || sel.r0 <= 0} onClick={() => { closeFloat(); moveRowsTo(sel.r0 - 1); }} />
+            <MenuRow label={'Move down'} hint={sort ? 'Sorted' : `${ALT}↓`} off={!!sort || sel.r1 >= order.length - 1} onClick={() => { closeFloat(); moveRowsTo(sel.r1 + 2); }} />
             <MenuRow label="Clear" hint="⌫" onClick={() => { closeFloat(); clearPicked(); focusKeys(); }} />
             <span className="when-sep" />
             <MenuRow label={n > 1 ? `Delete ${n} rows` : 'Delete row'} onClick={() => { closeFloat(); dropPicked(); focusKeys(); }} />

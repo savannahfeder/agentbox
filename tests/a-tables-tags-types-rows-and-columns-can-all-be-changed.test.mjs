@@ -156,6 +156,12 @@ describe('a day picked from the calendar is written the way the column writes da
     expect(readTable('Goal,By\nA,Mon Nov 9\nB,Sat Nov 7\nC,Thu Nov 12\n', 'x.csv').columns[1].kind).toBe('date');
     expect(readTable('Goal,Due\nA,2026-11-12T10:30:00Z\nB,2026-11-13\n', 'x.csv').columns[1].kind).toBe('date');
   });
+  // A tester typed 2026-13-40; it was read as Feb 9 2027 and sorted as the newest due date.
+  it('a day that is not on the calendar is not a date', () => {
+    for (const v of ['2026-13-40', '2/30/2026', '2026-02-29', '13/13/2026']) expect(dateOf(v)).toBeNaN();
+    expect(dateOf('2028-02-29')).toBe(Date.UTC(2028, 1, 29));
+    expect(dateOf('25/03/2025')).toBe(Date.UTC(2025, 2, 25));
+  });
   it('reads every way of writing a day as the same day, so the calendar marks the right one', () => {
     for (const v of ['2026-11-12', '11/12/2026', 'Nov 12, 2026', 'November 12 2026', 'Thu Nov 12 2026']) expect(dateOf(v)).toBe(day);
     expect(dateOf(dateWords(day, []))).toBe(day);
