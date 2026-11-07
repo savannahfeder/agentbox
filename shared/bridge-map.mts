@@ -205,6 +205,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   codeFile: 'zero:code-file',
   saveCodeFile: 'zero:save-code-file',
   writeDoc: 'zero:write-doc',
+  liveRoom: 'zero:live-room',
   railNote: 'zero:rail-note',
   saveRailNote: 'zero:save-rail-note',
   agentReply: 'zero:agent-reply',

@@ -283,6 +283,7 @@ contextBridge.exposeInMainWorld('zero', {
   codeFile: (payload) => ipcRenderer.invoke('zero:code-file', payload),
   saveCodeFile: (payload) => ipcRenderer.invoke('zero:save-code-file', payload),
   writeDoc: (payload) => ipcRenderer.invoke('zero:write-doc', payload),
+  liveRoom: (payload) => ipcRenderer.invoke('zero:live-room', payload),
   railNote: (payload) => ipcRenderer.invoke('zero:rail-note', payload),
   saveRailNote: (payload) => ipcRenderer.invoke('zero:save-rail-note', payload),
   // The shelf: what this product has made, and whether each thing is still the

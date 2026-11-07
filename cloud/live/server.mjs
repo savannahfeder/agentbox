@@ -15,10 +15,9 @@ import { createRoom } from '../../shared/live/room.mjs';
 const ROOM_ID = /^[A-Za-z0-9_.:-]{8,200}$/;
 const ALLOW_DEADLINE_MS = 10_000;
 
-export function startLiveRelay({ port = 0, host = '127.0.0.1', tickMs = 40, allow = null } = {}) {
+/** Rooms on an http server's upgrades to /room/<id>. */
+export function attachLiveRooms(server, { tickMs = 40, allow = null } = {}) {
   const rooms = new Map();
-  const startedCpu = process.cpuUsage();
-  const startedAt = Date.now();
   const roomFor = (id) => {
     let room = rooms.get(id);
     if (!room) {
@@ -27,29 +26,11 @@ export function startLiveRelay({ port = 0, host = '127.0.0.1', tickMs = 40, allo
     }
     return room;
   };
-
-  const server = http.createServer((req, res) => {
-    if (req.url === '/health') { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('ok'); return; }
-    if (req.url === '/stats' && (req.socket.remoteAddress === '127.0.0.1' || req.socket.remoteAddress === '::1')) {
-      const cpu = process.cpuUsage(startedCpu);
-      const body = {
-        rooms: [...rooms].map(([id, r]) => ({ id, ...r.stats() })),
-        cpuMs: Math.round((cpu.user + cpu.system) / 1000),
-        upMs: Date.now() - startedAt,
-        rssMb: Math.round(process.memoryUsage().rss / 1e6),
-      };
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(body));
-      return;
-    }
-    res.writeHead(404); res.end();
-  });
-
   const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 * 1024, perMessageDeflate: false });
   server.on('upgrade', async (req, socket, head) => {
     const id = /^\/room\/([^/?#]+)/.exec(req.url ?? '')?.[1];
-    if (!id || !ROOM_ID.test(decodeURIComponent(id))) { socket.destroy(); return; }
-    const roomId = decodeURIComponent(id);
+    const roomId = id ? decodeURIComponent(id) : '';
+    if (!ROOM_ID.test(roomId)) { socket.destroy(); return; }
     let ok = !allow;
     if (allow) {
       ok = await Promise.race([
@@ -65,15 +46,38 @@ export function startLiveRelay({ port = 0, host = '127.0.0.1', tickMs = 40, allo
       ws.on('error', () => ws.close());
     });
   });
+  return { rooms, close: () => { for (const room of rooms.values()) room.close(); wss.close(); } };
+}
 
+export function startLiveRelay({ port = 0, host = '127.0.0.1', tickMs = 40, allow = null } = {}) {
+  const startedCpu = process.cpuUsage();
+  const startedAt = Date.now();
+  let live = null;
+  const server = http.createServer((req, res) => {
+    if (req.url === '/health') { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('ok'); return; }
+    if (req.url === '/stats' && (req.socket.remoteAddress === '127.0.0.1' || req.socket.remoteAddress === '::1')) {
+      const cpu = process.cpuUsage(startedCpu);
+      const body = {
+        rooms: [...live.rooms].map(([id, r]) => ({ id, ...r.stats() })),
+        cpuMs: Math.round((cpu.user + cpu.system) / 1000),
+        upMs: Date.now() - startedAt,
+        rssMb: Math.round(process.memoryUsage().rss / 1e6),
+      };
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(body));
+      return;
+    }
+    res.writeHead(404); res.end();
+  });
+  live = attachLiveRooms(server, { tickMs, allow });
   return new Promise((resolve) => {
     server.listen(port, host, () => {
       const at = server.address().port;
       resolve({
         port: at,
         url: `ws://${host}:${at}`,
-        rooms,
-        close: () => new Promise((r) => { for (const room of rooms.values()) room.close(); wss.close(); server.close(() => r()); server.closeAllConnections?.(); }),
+        rooms: live.rooms,
+        close: () => new Promise((r) => { live.close(); server.close(() => r()); server.closeAllConnections?.(); }),
       });
     });
   });

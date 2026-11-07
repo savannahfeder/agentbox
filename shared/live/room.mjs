@@ -45,7 +45,8 @@ export function createRoom({ tickMs = 40, onEmpty = () => {} } = {}) {
   function roles() {
     const ready = seats.filter((s) => s.hello);
     const nextSeeder = empty() ? (ready.includes(seeder) ? seeder : ready[0] ?? null) : null;
-    const nextKeeper = ready.find((s) => s.hello.canSave) ?? null;
+    // The owner's copy writes straight onto the file; anyone else's goes through the owner.
+    const nextKeeper = ready.find((s) => s.hello.canSave && s.hello.owner) ?? ready.find((s) => s.hello.canSave) ?? null;
     seeder = nextSeeder;
     keeper = nextKeeper;
     for (const s of ready) {
