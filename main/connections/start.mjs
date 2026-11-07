@@ -9,11 +9,20 @@ import { sessionFileOutsideStore } from '../team/session.mjs';
 import { createBroker } from './broker.mjs';
 import { createCopies } from './copies.mjs';
 import { createConnections } from './index.mjs';
+import { channelDir } from '../local-channel.mjs';
 
 /** Keeps to macOS's 104 bytes for a socket path, and to this store's copy of the app. */
 export function brokerSocketPath(storeRoot) {
   const tag = crypto.createHash('sha256').update(path.resolve(storeRoot)).digest('hex').slice(0, 16);
   return path.join(os.tmpdir(), `agentbox-conn-${tag}.sock`);
+}
+
+/** Windows has no unix socket to listen on, so there the broker serves the local channel, one per store. Elsewhere null. */
+export function brokerChannel(storeRoot, { platform = process.platform, env = process.env, home = os.homedir() } = {}) {
+  if (platform !== 'win32') return null;
+  const { dir, reason } = channelDir({ platform, env, home });
+  const stamp = crypto.createHash('sha256').update(path.win32.resolve(storeRoot)).digest('hex').slice(0, 16);
+  return dir ? { dir, stamp } : { dir: null, problem: reason };
 }
 
 // A browser copy has no keychain, so it refuses a real connection. A copy on the
@@ -103,6 +112,7 @@ export function startConnections({ config, supervisor, appDir, userDir, cipher =
   const broker = createBroker({
     connections, storeRoot: config.storeRoot, socketPath: brokerSocketPath(config.storeRoot),
     proxyFile: path.join(appDir, 'mcp', 'connection-proxy.mjs'),
+    channel: brokerChannel(config.storeRoot, { env }),
   });
   // A run that starts before this is listening finds its tool says offline, and the next call finds it back.
   broker.listen().catch((err) => console.warn('zero: connections are not reachable by agents:', err?.message ?? err));
