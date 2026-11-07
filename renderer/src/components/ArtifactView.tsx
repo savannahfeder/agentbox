@@ -27,6 +27,7 @@ import { FileLinkBrowser } from './FileLinkBrowser';
 import { OpeningWait } from './OpeningWait';
 import { CrossIcon } from './CrossIcon';
 import { DocText } from './DocText';
+import { useLiveSession, useLiveTicket } from '../live/live-session';
 import { FileNoteCard } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
 import { ShareLink, canShareFile } from './ShareLink';
@@ -46,7 +47,9 @@ const KIND_WORD = { image: 'Picture', film: 'Film', pdf: 'PDF', deck: 'Slides', 
 
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-export function ArtifactView({ product, thread, shareThread, threadName, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, below, files: fromElsewhere }: {
+export function ArtifactView({ product, project = null, thread, shareThread, threadName, lines, numbers, marks, me, people, open, ownerOfRow, write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, below, files: fromElsewhere }: {
+  /** The project the file belongs to, when it is not `product`'s own (a teammate's thread). */
+  project?: string | null;
   /** Each path's number on its file's version line, which every surface counts by. */
   numbers?: Record<string, number>;
   /** What to say of a version with no bytes on this computer, by who made it. */
@@ -349,7 +352,10 @@ export function ArtifactView({ product, thread, shareThread, threadName, lines, 
   useEffect(() => {
     if (opensForTyping({ canEdit, compare, editing: !!editing, unreadable, version: version?.id ?? null })) void startEdit();
   }, [canEdit, compare, !!editing, unreadable, version?.id]);
-  const waitingForEditor = opensForTyping({ canEdit, compare, editing: !!editing, unreadable, version: version?.id ?? null });
+  // Teammates with the same document open type into one live copy of it.
+  const liveTicket = useLiveTicket(editing ? { product, project, name: editing.base.name } : null);
+  const liveSession = useLiveSession(liveTicket);
+  const waitingForEditor = opensForTyping({ canEdit, compare, editing: !!editing, unreadable, version: version?.id ?? null }) || (!!editing && liveTicket === undefined);
 
   // A save asked for while one is on its way waits for it, then posts what is newer.
   const inFlight = useRef<Promise<boolean> | null>(null);
@@ -689,9 +695,9 @@ export function ArtifactView({ product, thread, shareThread, threadName, lines, 
               <button type="button" className="av-btn" onClick={() => setApproveAsked(null)}>Not yet</button>
             </p>
           )}
-          {editing && !compare && (
+          {editing && !compare && liveTicket !== undefined && (
             <div className="av-pane" key={`editing-${editing.base.id}`} ref={editPane} onClick={pickInEditor}>
-              <DocText product={product} src={editing.base.path} text={editing.text} mtime={0} folder={editing.folder} onSaved={() => {}} onNotice={setTold}
+              <DocText product={product} src={editing.base.path} text={editing.text} mtime={0} folder={editing.folder} onSaved={() => {}} onNotice={setTold} live={liveSession}
                 versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, draft: editing.draft, byline: bylineOf(version ?? editing.base) }} />
               {offers.comment && <SelectionBar page={editPane} onComment={(quote) => { setWholeAsked(false); setDraftPlace({ kind: 'quote', text: quote }); box.current?.focus(); }} />}
             </div>

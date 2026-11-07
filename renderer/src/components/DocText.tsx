@@ -28,9 +28,13 @@ import { pictureUrl } from '../picture';
 import { agoWords } from '../threads/summary-rules';
 import { DocOutline } from './DocOutline';
 import { scrollKey, useKeptScroll } from '../kept-scroll';
+import type { LiveSession } from '../live/live-session';
+import { LivePresence, liveExtensions, presenceLook } from '../live/presence';
 import './doc-reading.css';
 
 const SAVE_DEBOUNCE_MS = 900;
+// The copy that keeps a live file saves at least this often while people keep typing.
+const LIVE_SAVE_EVERY_MS = 60_000;
 
 // A link in the editor never navigates on its own; she gets a hover card with
 // the real actions instead. A typed or pasted bare domain becomes a proper URL
@@ -60,8 +64,10 @@ export interface DocVersions {
   byline?: string | null;
 }
 
-export function DocText({ product, src, text, mtime, folder = null, onSaved, onNotice, readOnly = false, versions }: {
+export function DocText({ product, src, text, mtime, folder = null, onSaved, onNotice, readOnly = false, versions, live = null }: {
   readOnly?: boolean;
+  /** The file's live room: everyone's typing merges, and only the keeper saves. */
+  live?: LiveSession | null;
   versions?: DocVersions;
   product: string;
   src: string;
@@ -91,22 +97,55 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   asVersions.current = versions;
   useEffect(() => { lastMtime.current = mtime; }, [mtime]);
 
+  // Until the room has answered, the file's own words show, so nothing blanks.
+  const collab = live?.synced ? live : null;
+  const liveNow = useRef(collab);
+  liveNow.current = collab;
+  const firstUnsaved = useRef<number | null>(null);
+
   // A picture the document names beside itself, on the window's picture scheme:
   // the page's own address is no folder, so it drew as a broken picture.
   const extensions = useMemo(() => buildExtensions('Write anything…', {
     drawnFrom: folder ? (from) => (/^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(from) ? from : pictureUrl(new URL(from, `file://${folder}/`).pathname)) : null,
-  }), [folder]);
+    live: collab ? liveExtensions(collab) : null,
+  }), [folder, collab?.doc]);
 
   const editor = useEditor({
     extensions,
-    content: mdToPmDoc(versions?.draft ?? text),
-    editable: !readOnly,
+    ...(collab ? {} : { content: mdToPmDoc(versions?.draft ?? text) }),
+    editable: !readOnly && !(live && !collab),
     onUpdate: () => {
+      const room = liveNow.current;
+      // Everyone else's words are in the room, and the keeper saves them.
+      if (room && !room.keeper) return;
       dirty.current = true;
       if (saveTimer.current != null) window.clearTimeout(saveTimer.current);
       saveTimer.current = window.setTimeout(save, SAVE_DEBOUNCE_MS);
+      if (room) {
+        firstUnsaved.current ??= Date.now();
+        if (Date.now() - firstUnsaved.current > LIVE_SAVE_EVERY_MS) {
+          firstUnsaved.current = null;
+          window.setTimeout(() => asVersions.current?.saveNow(), SAVE_DEBOUNCE_MS + 50);
+        }
+      }
     },
-  });
+  }, [extensions]);
+
+  // An empty room is filled once, by the copy the room picked, from the file.
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (!editor || !collab?.seed || seeded.current) return;
+    if (collab.doc.getXmlFragment('default').length > 0) return;
+    seeded.current = true;
+    editor.commands.setContent(mdToPmDoc(versions?.draft ?? text));
+  }, [editor, collab?.seed, collab?.doc]);
+  // Becoming the keeper with words nobody saved yet: save them.
+  useEffect(() => {
+    if (!editor || !collab?.keeper) return;
+    dirty.current = true;
+    if (saveTimer.current != null) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(save, SAVE_DEBOUNCE_MS);
+  }, [editor, collab?.keeper]);
 
   const save = async () => {
     if (!editor || !dirty.current) return;
@@ -139,7 +178,7 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   // The document changed under her (an agent rewrote it): take it only when she
   // is not mid-edit, and skip our own save echoing back.
   useEffect(() => {
-    if (!editor || text === onDisk.current || dirty.current) return;
+    if (!editor || liveNow.current || text === onDisk.current || dirty.current) return;
     const doc = mdToPmDoc(text);
     onDisk.current = text;
     baseMd.current = pmDocToMd(doc);
@@ -254,6 +293,7 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
     return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey, true); };
   }, [linkPop?.pinned]);
 
+  const [look] = useState(presenceLook);
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   useKeptScroll(scroller, scrollKey(product, src));
   const [column, setColumn] = useState<HTMLDivElement | null>(null);
@@ -263,6 +303,10 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
     if (!live || !editor) return undefined;
     live.flush.current = () => {
       if (saveTimer.current != null) { window.clearTimeout(saveTimer.current); saveTimer.current = null; }
+      const room = liveNow.current;
+      // Words the room has are the keeper's to save; only words it never got are this copy's.
+      if (room && !room.keeper && room.live.state() === 'live' && !room.live.pending()) { dirty.current = false; return null; }
+      firstUnsaved.current = null;
       const md = pmDocToMd(editor.getJSON());
       dirty.current = false;
       return md === baseMd.current ? null : patchOriginal(onDisk.current, baseMd.current, md) ?? md;
@@ -324,8 +368,9 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
         openFor(a, true);
       }}
     >
-      <div className="doc-sheet">
+      <div className={`doc-sheet${collab ? ` lv-look-${look}` : ''}`}>
         <div className="doc-column" ref={setColumn}>
+          {collab && <LivePresence session={collab} editor={editor} column={column} look={look} />}
           {versions?.byline && <p className="doc-byline">{versions.byline}</p>}
           {!versions && mtime > 0 && <p className="doc-byline">Edited {agoWords(mtime, now).replace(/^Y/, 'y')}</p>}
           <EditorContent editor={editor} className="doc-rich-content doc-prose" />
