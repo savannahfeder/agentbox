@@ -50,7 +50,7 @@ beforeAll(async () => {
 afterAll(async () => {
   vi.unstubAllEnvs();
   await booted?.supervisor?.stopAll?.().catch?.(() => {});
-  if (dir) fs.rmSync(dir, { recursive: true, force: true });
+  if (dir) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 // AND IT FINDS A CHAT NEWER THAN THE FIRST SEARCH. The search is read once
