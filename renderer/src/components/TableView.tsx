@@ -12,7 +12,7 @@ import { dateOf, dateWords, filterRows, hrefOf, logoFor, readTable, shownLink, s
 import {
   addColumn, addRows, boxOf, filterChoices, likeItsColumn, cellsIn, dropColumn, dropRows, fromClipboard, inBox, moved, orderAfterAdd, orderAfterDrop,
   pasteInto, renameColumn, shapeOf, toClipboard, writeCells, writeTable, type At, type Box, type Pick,
-  dropTag, lookKind, lookRenameColumn, lookRenameTag, lookTone, moveColumns, moveRows, NO_LOOKS, renameTag, withLooks, type Looks,
+  dropTag, lookKind, lookRenameColumn, lookRenameTag, lookTone, moveColumns, moveRows, newTone, NO_LOOKS, pinTones, renameTag, withLooks, type Looks,
 } from '../table-edit';
 import { api } from '../api';
 import { MAC } from '../this-keyboard';
@@ -198,6 +198,11 @@ function keepLooks(path: string, looks: Looks) {
 const TYPES: Array<[ColumnKind, string]> = [['text', 'Text'], ['tag', 'Tags'], ['number', 'Number'], ['date', 'Date'], ['link', 'Link'], ['email', 'Email']];
 const typeName = (kind: ColumnKind) => TYPES.find(([k]) => k === kind)?.[1] ?? 'Text';
 const TONES: Tone[] = ['grey', 'blue', 'purple', 'teal', 'green', 'amber', 'rose'];
+/** A date typed in words, written the way the column writes its dates; anything else as typed. */
+const asDate = (value: string, was: string, cells: string[]) => {
+  const day = value.trim() === was.trim() ? NaN : dateOf(value);
+  return Number.isFinite(day) ? dateWords(day, cells) : value;
+};
 const popOf = (kind: ColumnKind | undefined) => (kind === 'tag' ? 'tag' : kind === 'date' ? 'date' : null);
 
 const sortWords = (c: Column, dir: 'asc' | 'desc') => {
@@ -304,7 +309,7 @@ function FilterMenu({ table, choices, picked, onToggle, onClear }: {
   </>;
 }
 
-export type TagHands = { rename: (from: string, to: string) => void; tone: (tag: string, tone: Tone) => void; drop: (tag: string) => void };
+export type TagHands = { rename: (from: string, to: string) => void; tone: (tag: string, tone: Tone) => void; drop: (tag: string) => void; count: (tag: string) => number };
 
 /** One tag's name, colour and a way to delete it, in place of the list. */
 function TagEditor({ column, tag, hands, onBack }: { column: Column; tag: string; hands: TagHands; onBack: (renamed?: string) => void }) {
@@ -336,7 +341,7 @@ function TagEditor({ column, tag, hands, onBack }: { column: Column; tag: string
     </div>
     <span className="when-sep" />
     <button type="button" className="when-row tbl-danger" tabIndex={-1} onPointerDown={(e) => e.preventDefault()} onClick={() => { hands.drop(tag); onBack(); }}>
-      <span className="when-row-label">Delete tag</span>
+      <span className="when-row-label">Delete tag</span><span className="when-row-hint">{rowsWord(hands.count(tag))}</span>
     </button>
   </div>;
 }
@@ -370,7 +375,7 @@ function TagPicker({ column, value, typed, onPick, onClose, hands }: {
     else if (e.key === 'Tab') { e.preventDefault(); if (find) take(now, e.shiftKey ? 'left' : 'right'); else onPick(value, e.shiftKey ? 'left' : 'right'); }
     else if (e.key === 'Escape') { e.preventDefault(); onClose(); }
   };
-  const nextTone = (['blue', 'purple', 'amber', 'grey'] as const)[column.values.length % 4];
+  const nextTone = newTone(column, q.trim());
   const shown = editingTag !== null ? column.values.find((v) => v.toLowerCase() === editingTag.toLowerCase()) : undefined;
   return <div className="tbl-pick" data-own-escape="" onKeyDown={shown === undefined ? key : undefined}
     onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onClose(); }}>
@@ -403,10 +408,11 @@ function TagPicker({ column, value, typed, onPick, onClose, hands }: {
 }
 
 /** A date cell's calendar, with a box to type a date in words or clear it. */
-function DatePicker({ value, column, onPick, onClose }: {
-  value: string; column: string[]; onPick: (v: string, move?: 'down' | 'right' | 'left') => void; onClose: () => void;
+function DatePicker({ value, column, onPick, onClose, onDraft }: {
+  value: string; column: string[]; onPick: (v: string, move?: 'down' | 'right' | 'left') => void; onClose: () => void; onDraft?: (v: string) => void;
 }) {
   const [q, setQ] = useState(value);
+  useEffect(() => { onDraft?.(q); }, [q]);
   const typedDay = dateOf(q);
   const now = new Date();
   const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
@@ -422,15 +428,16 @@ function DatePicker({ value, column, onPick, onClose }: {
   const days = Array.from({ length: Math.ceil((lead + inMonth) / 7) * 7 }, (_, i) => Date.UTC(m.getUTCFullYear(), m.getUTCMonth(), i - lead + 1));
   const step = (n: number) => setMonth(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + n, 1));
   const pickDay = (day: number, move?: 'down' | 'right' | 'left') => onPick(dateWords(day, column), move);
+  const typed = (move?: 'down' | 'right' | 'left') => onPick(q.trim(), move);
   const key = (e: React.KeyboardEvent) => {
     e.stopPropagation();
-    if (e.key === 'Enter') { e.preventDefault(); onPick(q.trim(), 'down'); }
-    else if (e.key === 'Tab') { e.preventDefault(); onPick(q.trim(), e.shiftKey ? 'left' : 'right'); }
+    if (e.key === 'Enter') { e.preventDefault(); typed('down'); }
+    else if (e.key === 'Tab') { e.preventDefault(); typed(e.shiftKey ? 'left' : 'right'); }
     else if (e.key === 'Escape') { e.preventDefault(); onClose(); }
   };
   const noPress = (e: React.PointerEvent) => e.preventDefault();
   return <div className="tbl-pick tbl-cal" data-own-escape="" onKeyDown={key}
-    onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onClose(); }}>
+    onBlur={(e) => { if (e.currentTarget.contains(e.relatedTarget as Node | null)) return; if (q.trim() !== value.trim()) typed(); else onClose(); }}>
     <div className="when-type-row"><input className="when-type" autoFocus placeholder="Type a date" value={q} aria-label="Date"
       onFocus={(e) => e.target.select()} onChange={(e) => setQ(e.target.value)} /></div>
     <div className="tbl-cal-head">
@@ -480,10 +487,22 @@ function GrowingText({ value, onChange, onKeyDown, onBlur, onPaste, readOnly, au
 }
 
 /** One field in the opened row: its own draft, written when the box is left. */
-function Field({ column, value, editable, onWrite, hands }: { column: Column; value: string; editable: boolean; onWrite: (v: string) => void; hands?: TagHands }) {
+function Field({ column, value, editable, onWrite, hands, cells }: {
+  column: Column; value: string; editable: boolean; onWrite: (v: string) => void; hands?: TagHands; cells: () => string[];
+}) {
   const [draft, setDraft] = useState(value);
   const [picking, setPicking] = useState(false);
   useEffect(() => setDraft(value), [value]);
+  if (column.kind === 'date' && editable) {
+    return <div className="tbl-field-tag">
+      <button type="button" className="tbl-field-tagbtn tbl-field-text" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
+        {value.trim() || <span className="tbl-field-none">Pick a date</span>}
+      </button>
+      {picking && <div className="tbl-field-pick">
+        <DatePicker value={value} column={cells()} onPick={(v) => { setPicking(false); onWrite(asDate(v, value, cells())); }} onClose={() => setPicking(false)} />
+      </div>}
+    </div>;
+  }
   if (column.kind === 'tag') {
     return <div className="tbl-field-tag">
       <button type="button" className="tbl-field-tagbtn" disabled={!editable} onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
@@ -529,7 +548,8 @@ function RowSheet({ table, row, place, count, editable, from, onWrite, onStep, o
       {table.columns.map((c, i) => (
         <div key={`${place}:${i}`} className={`tbl-field${i === from ? ' from' : ''}`} data-field={i}>
           <span className="tbl-field-name">{c.name}</span>
-          <Field column={c} value={row[i] ?? ''} editable={editable && !(table.ranked && i === 0)} onWrite={(v) => onWrite(i, v)} hands={editable ? tagHands?.(i) : undefined} />
+          <Field column={c} value={row[i] ?? ''} editable={editable && !(table.ranked && i === 0)} onWrite={(v) => onWrite(i, v)} hands={editable ? tagHands?.(i) : undefined}
+            cells={() => table.rows.map((r) => r[i] ?? '')} />
         </div>
       ))}
     </div>
@@ -695,7 +715,6 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     ahead.current = [];
     docRef.current = next;
     setDoc(next);
-    // Kept at once, not after the save: the save reads the file back, and the table is drawn again from that.
     if (next.looks !== was.looks) keepLooks(store, next.looks);
     if (fileChanged(next.table, was.table) && saveRef.current) {
       unsaved.current = writeTable(next.table, shape);
@@ -874,7 +893,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     if (!sel || !editable) return;
     const d = docRef.current;
     const gone = new Set(d.order.slice(sel.r0, sel.r1 + 1));
-    const next = { ...d, table: dropRows(d.table, gone), order: orderAfterDrop(d.order, gone) };
+    const next = { ...d, table: dropRows(d.table, gone), order: orderAfterDrop(d.order, gone), looks: pinTones(d.table, d.looks) };
     commit(next);
     const r = Math.min(sel.r0, next.order.length - 1);
     setPick(r >= 0 ? { a: { r, c: pick?.a.c ?? first }, b: { r, c: pick?.a.c ?? first } } : null);
@@ -910,6 +929,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       commit({ ...d, table: withLooks(d.table, looks), looks });
     },
     drop: (tag) => { const d = docRef.current; commit({ ...d, table: dropTag(d.table, col, tag) }); },
+    count: (tag) => docRef.current.table.rows.filter((r) => (r[col] ?? '').trim().toLowerCase() === tag.trim().toLowerCase()).length,
   });
 
   // ---- Moving rows and columns. Rows move only in the file's own order: under a sort, the sort decides.
@@ -921,7 +941,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     const { table: t, to } = moveRows(d.table, d.order.slice(s.r0, s.r1 + 1), before);
     if (t === d.table) return;
     const order = d.order.map((i) => to[i]).sort((a, b) => a - b);
-    commit({ ...d, table: t, order });
+    commit({ ...d, table: t, order, looks: pinTones(d.table, d.looks) });
     const r0 = order.indexOf(to[d.order[s.r0]]);
     // Not goTo: following the pick's far end would scroll the table sideways to its last column.
     setPick({ a: { r: r0, c: first }, b: { r: r0 + s.r1 - s.r0, c: last }, rows: true });
@@ -970,8 +990,11 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     open.current = null;
     setEditing(null);
     if (e && value !== null && editable) {
-      const column = docRef.current.table.columns[e.c];
-      const v = column?.kind === 'number' ? likeItsColumn(value, docRef.current.table.rows.map((row) => row[e.c] ?? '')) : value;
+      const t = docRef.current.table;
+      const column = t.columns[e.c];
+      const cells = t.rows.map((row) => row[e.c] ?? '');
+      const was = t.rows[docRef.current.order[e.r]]?.[e.c] ?? '';
+      const v = column?.kind === 'number' ? likeItsColumn(value, cells) : column?.kind === 'date' ? asDate(value, was, cells) : value;
       writeAt([{ r: e.r, c: e.c, v }]);
     }
     if (e && move) {
@@ -979,7 +1002,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       const to = moved({ r: e.r, c: e.c }, key, edges);
       goTo({ a: to, b: to });
     }
-    requestAnimationFrame(focusKeys);
+    // Not when a double click has already opened the next edit: the keys would take its focus and close it.
+    requestAnimationFrame(() => { if (!open.current) focusKeys(); });
   };
 
   // ---- The keys, while the table holds them.
@@ -1075,7 +1099,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     if (!hit) return;
     pressed.current = true;
     const wasOpen = !!editing && editing.r === hit.at.r && editing.c === hit.at.c;
-    if (editing) endEdit(editing.pop ? null : editing.draft);
+    if (editing) endEdit(editing.pop === 'tag' ? null : open.current?.draft ?? editing.draft);
     if (t.closest('.tbl-open')) { e.preventDefault(); goTo(pickFor('row', hit.at, false)); setSheet(hit.at.r); return; }
     if (hit.kind === 'col' && !order.length) return;
     e.preventDefault();
@@ -1188,7 +1212,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
     const hit = atOf(e.target);
     if (!hit) return;
     e.preventDefault();
-    if (editing) endEdit(editing.pop ? null : editing.draft);
+    if (editing) endEdit(editing.pop === 'tag' ? null : open.current?.draft ?? editing.draft);
     if (hit.kind === 'col') { setFloat({ x: e.clientX, y: e.clientY, col: hit.at.c }); return; }
     if (!sel || !inBox(sel, hit.at.r, hit.at.c === first && hit.kind === 'row' ? first : hit.at.c)) setPick(pickFor(hit.kind, hit.at, false));
     focusKeys();
@@ -1416,6 +1440,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
                 ? <TagPicker column={table.columns[editing.c]} value={editingRow[editing.c] ?? ''} typed={editing.typed ? editing.draft : undefined}
                   hands={tagHands(editing.c)} onPick={(v, move) => endEdit(v, move)} onClose={() => endEdit(null)} />
                 : <DatePicker value={editingRow[editing.c] ?? ''} column={table.rows.map((row) => row[editing.c] ?? '')}
+                  onDraft={(v) => { if (open.current) open.current = { ...open.current, draft: v }; }}
                   onPick={(v, move) => endEdit(v, move)} onClose={() => endEdit(null)} />}
             </div>
             : <div className="tbl-edit" style={{ left: place.left, top: place.top, width: place.w }}>
@@ -1448,7 +1473,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
       </div>
       {float && (floatCol && float.page === 'type'
         ? <FloatMenu x={float.x} y={float.y} onClose={() => setFloat(null)}>
-          <div className="when-head">{floatCol.name}</div>
+          <button type="button" className="when-head tbl-menu-back" onClick={() => setFloat({ ...float, page: undefined })}>{glyph('M10 4L6 8l4 4')}{floatCol.name}</button>
           {TYPES.map(([kind, label]) => {
             const on = (floatCol.kind === 'name' ? 'text' : floatCol.kind) === kind;
             return <button key={kind} type="button" role="menuitemradio" aria-checked={on} className={`when-row${on ? ' on' : ''}`}
@@ -1494,10 +1519,8 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             <span className="when-sep" />
             <MenuRow label="Insert row above" onClick={() => { closeFloat(); addRowAt(sel.r0); }} />
             <MenuRow label="Insert row below" hint="⇧↵" onClick={() => { closeFloat(); addRowAt(sel.r1 + 1); }} />
-            {!sort && <>
-              <MenuRow label={'Move up'} off={sel.r0 <= 0} onClick={() => { closeFloat(); moveRowsTo(sel.r0 - 1); }} />
-              <MenuRow label={'Move down'} off={sel.r1 >= order.length - 1} onClick={() => { closeFloat(); moveRowsTo(sel.r1 + 2); }} />
-            </>}
+            <MenuRow label={'Move up'} hint={sort ? 'Sorted' : undefined} off={!!sort || sel.r0 <= 0} onClick={() => { closeFloat(); moveRowsTo(sel.r0 - 1); }} />
+            <MenuRow label={'Move down'} hint={sort ? 'Sorted' : undefined} off={!!sort || sel.r1 >= order.length - 1} onClick={() => { closeFloat(); moveRowsTo(sel.r1 + 2); }} />
             <MenuRow label="Clear" hint="⌫" onClick={() => { closeFloat(); clearPicked(); focusKeys(); }} />
             <span className="when-sep" />
             <MenuRow label={n > 1 ? `Delete ${n} rows` : 'Delete row'} onClick={() => { closeFloat(); dropPicked(); focusKeys(); }} />

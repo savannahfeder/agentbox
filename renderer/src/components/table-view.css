@@ -238,9 +238,12 @@
 .tbl-pick-more {
   position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
   width: 24px; height: 24px; display: grid; place-items: center; padding: 0;
-  background: none; border: 0; border-radius: var(--radius); color: var(--text-faint); cursor: pointer; opacity: 0;
+  background: none; border: 0; border-radius: var(--radius); color: var(--text-dim); cursor: pointer; opacity: 0;
 }
 .tbl-pick-more svg { width: 14px; height: 14px; fill: currentColor; }
+.tbl-menu-back { width: 100%; background: none; border: 0; cursor: pointer; align-items: center; gap: 4px; font-family: inherit; }
+.tbl-menu-back:hover { color: var(--text); }
+.tbl-menu-back svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .tbl-pick-row.hi .tbl-pick-more, .tbl-pick-row:hover .tbl-pick-more { opacity: 1; }
 .tbl-pick-more:hover { color: var(--text); background: var(--bg-hover); }
 

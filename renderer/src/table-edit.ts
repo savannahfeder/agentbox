@@ -89,7 +89,19 @@ export function learnTag(col: Column, value: string): Column {
   const key = v.toLowerCase();
   if (col.kind !== 'tag' || !v || col.values.some((x) => x.toLowerCase() === key)) return col;
   // A tag deleted and typed again keeps the colour it was given.
-  return { ...col, values: [...col.values, v], tones: { ...col.tones, [key]: col.tones[key] ?? tagTone(v, col.values.length, col.name) } };
+  return { ...col, values: [...col.values, v], tones: { ...col.tones, [key]: col.tones[key] ?? newTone(col, v) } };
+}
+
+/**
+ * A new tag's colour: green or red when its word means done or lost; else the
+ * colour its word means if no other tag has it, or the first in turn no tag has.
+ */
+export function newTone(col: Column, value: string): Tone {
+  const used = new Set(col.values.map((x) => col.tones[x.toLowerCase()]));
+  const meant = [0, 1, 2, 3].map((p) => tagTone(value, p, col.name));
+  if (meant.every((t) => t === meant[0]) && (meant[0] === 'green' || meant[0] === 'rose' || !used.has(meant[0]))) return meant[0];
+  const turns: Tone[] = ['blue', 'purple', 'amber', 'teal', 'grey'];
+  return turns.find((t) => !used.has(t)) ?? turns[col.values.length % turns.length];
 }
 
 /** Cells written, by their row in the file. Only the rows touched are copied. */
@@ -236,7 +248,19 @@ export function withLooks(table: Table, looks: Looks): Table {
   return { ...t, columns };
 }
 
-export const lookKind = (looks: Looks, column: string, kind: ColumnKind): Looks => ({ ...looks, kinds: { ...looks.kinds, [column]: kind } });
+/** Every tag's colour as drawn now, kept: the guess deals colours out in order of first row, so moving rows would deal them again. */
+export function pinTones(table: Table, looks: Looks): Looks {
+  let tones = looks.tones;
+  for (const c of table.columns) {
+    if (c.kind !== 'tag') continue;
+    const kept = tones[c.name] ?? {};
+    const fresh = Object.entries(c.tones).filter(([k]) => !(k in kept));
+    if (fresh.length) tones = { ...tones, [c.name]: { ...kept, ...Object.fromEntries(fresh) } };
+  }
+  return tones === looks.tones ? looks : { ...looks, tones };
+}
+
+export const lookKind =(looks: Looks, column: string, kind: ColumnKind): Looks => ({ ...looks, kinds: { ...looks.kinds, [column]: kind } });
 export const lookTone = (looks: Looks, column: string, tag: string, tone: Tone): Looks =>
   ({ ...looks, tones: { ...looks.tones, [column]: { ...looks.tones[column], [tag.trim().toLowerCase()]: tone } } });
 

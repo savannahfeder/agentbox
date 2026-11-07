@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import { readTable, dateOf, dateWords } from '../renderer/src/table-file.ts';
 import {
   renameTag, dropTag, withLooks, lookKind, lookTone, lookRenameColumn, lookRenameTag, NO_LOOKS,
-  moveRows, moveColumns, writeTable, shapeOf, learnTag, writeCells,
+  moveRows, moveColumns, writeTable, shapeOf, learnTag, writeCells, pinTones, newTone,
 } from '../renderer/src/table-edit.ts';
 
 const PLAN = [
@@ -95,6 +95,32 @@ describe('a colour and a type the person picked come back when the file is read 
     expect(lookRenameColumn(looks, 'Goal', 'Aim')).toBe(looks);
     expect(lookRenameTag(moved, 'State', 'Hello', 'Waiting').tones.State).toEqual({ waiting: 'teal' });
     expect(lookRenameTag(moved, 'State', 'Done', 'Shipped')).toBe(moved);
+  });
+  // A tester moved three Sam rows above the Jordan ones; on reopening, Jordan
+  // and Sam had swapped colours, because the guess deals them out by first row.
+  it('colours the table picked itself stay put after rows move and the file is read again', () => {
+    const src = 'Company,Owner\nA,Jordan\nB,Sam\nC,Jordan\nD,Sam\n';
+    const t = readTable(src, 'l.csv');
+    const before = { ...t.columns[1].tones };
+    const moved = moveRows(t, [1, 3], 0).table;
+    const fresh = readTable(writeTable(moved, shapeOf(src, 'l.csv')), 'l.csv');
+    expect(fresh.columns[1].tones).not.toEqual(before);
+    expect(withLooks(fresh, pinTones(t, NO_LOOKS)).columns[1].tones).toEqual(before);
+    const chosen = lookTone(NO_LOOKS, 'Owner', 'Sam', 'teal');
+    expect(pinTones(t, chosen).tones.Owner.sam).toBe('teal');
+    expect(pinTones(readTable('A,B\n1,2\n', 'x.csv'), NO_LOOKS)).toBe(NO_LOOKS);
+  });
+  it('a new tag takes a colour no tag in the column has yet, unless its word means one', () => {
+    const t = readTable('Lead,Stage\nA,Intro call\nB,Scoping\nC,Intro call\n', 'x.csv');
+    const col = t.columns[1];
+    const used = new Set(Object.values(col.tones));
+    expect(used.has(newTone(col, 'Negotiating'))).toBe(false);
+    expect(newTone(col, 'Won')).toBe('green');
+    // Replied and Negotiating both mean purple; the second one added is told apart.
+    const leads = readTable('Lead,Status\nA,Replied\nB,Won\nC,Replied\n', 'x.csv').columns[1];
+    expect(leads.tones.replied).toBe('purple');
+    expect(newTone(leads, 'Negotiating')).not.toBe('purple');
+    expect(newTone(leads, 'Lost')).toBe('rose');
   });
   it('nothing chosen leaves the table exactly as read', () => {
     const t = plan();
