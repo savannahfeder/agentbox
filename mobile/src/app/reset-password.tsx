@@ -1,6 +1,7 @@
 // Forgot password, from the sign-in screen. The email's link opens the app
 // (app/signed-in.tsx), signed in, on the last step: the new password.
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { router } from '../lib/router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { googleReturn } from '../lib/google-return';
